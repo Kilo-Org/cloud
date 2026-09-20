@@ -3035,6 +3035,23 @@
       "openHint": "च्याट खोल्छ। मेट्न लामो थिच्नुहोस्।",
       "deleteTitle": "यो च्याट मेट्ने?"
     },
-    "beta": "बिटा"
+    "beta": "बिटा",
+    "mcp": {
+      "title": "Kilo उपकरण",
+      "use": "Kilo उपकरण प्रयोग गर्नुहोस्",
+      "useDescription": "यो कुराकानीलाई Kilo सर्भरले दिने उपकरण प्रयोग गर्न दिनुहोस्।",
+      "off": "Kilo उपकरण बन्द छन्",
+      "offDescription": "यो कुराकानीले मोडेलमा कुनै पनि Kilo उपकरण पठाउँदैन।",
+      "connecting": "Kilo उपकरणमा जोडिँदै…",
+      "available": "उपलब्ध उपकरण: {{count}}",
+      "none": "कुनै उपकरण उपलब्ध छैन",
+      "noneDescription": "Kilo सर्भरले कुनै उपकरण फर्काएन।",
+      "unreachable": "Kilo उपकरणसम्म पुग्न सकिएन",
+      "unreachableDescription": "सर्भरले जवाफ दिएन। आफ्नो जडान जाँच्नुहोस्, त्यसपछि फेरि प्रयास गर्नुहोस्।",
+      "unauthorized": "Kilo उपकरणले यो सत्र अस्वीकार गरे",
+      "unauthorizedDescription": "यो कुराकानीमा Kilo उपकरण प्रयोग गर्न फेरि साइन इन गर्नुहोस्।",
+      "unavailable": "Kilo उपकरण उपलब्ध छैनन्",
+      "unavailableDescription": "यो खाताका लागि Kilo सर्भर उपलब्ध छैन।"
+    }
   }
 }

@@ -108,7 +108,9 @@ beforeEach(() => {
 describe('version-aware feature flags', () => {
   it('an older build falls back to the default for a flag introduced in a newer version', async () => {
     // Build 1.0.5 predates mobile-chat (minimum 1.0.11): it must not act
-    // on the remote value, whatever PostHog returns.
+    // on the remote value, whatever PostHog returns. mobile-chat's default is
+    // on, so the fallback the gate relies on is that default and not the
+    // caller's argument.
     hoisted.application.nativeApplicationVersion = '1.0.5';
     hoisted.client.getFeatureFlag.mockImplementation(
       (key: string) => (key === 'mobile-chat' ? true : undefined) as never
@@ -118,7 +120,7 @@ describe('version-aware feature flags', () => {
 
     const probe = await readFlag('mobile-chat', false);
 
-    expect(probe).toBe(false);
+    expect(probe).toBe(true);
   });
 
   it('a build at or above the minimum applies the remote flag value', async () => {
@@ -192,10 +194,10 @@ describe('feature flag statuses (debug surface)', () => {
       {
         key: 'mobile-chat',
         minAppVersion: '1.0.11',
-        defaultValue: false,
+        defaultValue: true,
         appVersion: '1.0.5',
         applied: false,
-        value: false,
+        value: true,
         reason: 'build-too-old',
         loaded: false,
       },
@@ -224,7 +226,7 @@ describe('feature flag statuses (debug surface)', () => {
     expect(chat).toMatchObject({
       applied: false,
       reason: 'build-too-old',
-      value: false,
+      value: true,
       loaded: true,
     });
   });

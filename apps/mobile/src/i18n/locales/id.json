@@ -3035,6 +3035,23 @@
       "openHint": "Membuka obrolan. Tekan lama untuk menghapus.",
       "deleteTitle": "Hapus obrolan ini?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Alat Kilo",
+      "use": "Gunakan alat Kilo",
+      "useDescription": "Izinkan obrolan ini memakai alat yang ditawarkan server Kilo.",
+      "off": "Alat Kilo nonaktif",
+      "offDescription": "Obrolan ini tidak mengirim alat Kilo apa pun ke model.",
+      "connecting": "Menghubungkan ke alat Kilo…",
+      "available": "Alat tersedia: {{count}}",
+      "none": "Tidak ada alat tersedia",
+      "noneDescription": "Server Kilo tidak mengembalikan alat apa pun.",
+      "unreachable": "Tidak dapat menjangkau alat Kilo",
+      "unreachableDescription": "Server tidak menjawab. Periksa koneksimu, lalu coba lagi.",
+      "unauthorized": "Alat Kilo menolak sesi ini",
+      "unauthorizedDescription": "Masuk lagi untuk memakai alat Kilo di obrolan ini.",
+      "unavailable": "Alat Kilo tidak tersedia",
+      "unavailableDescription": "Server Kilo tidak tersedia untuk akun ini."
+    }
   }
 }

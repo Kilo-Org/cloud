@@ -3035,6 +3035,23 @@
       "openHint": "Avaa keskustelun. Poista painamalla pitkään.",
       "deleteTitle": "Poistetaanko tämä keskustelu?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilon työkalut",
+      "use": "Käytä Kilon työkaluja",
+      "useDescription": "Salli tämän keskustelun käyttää työkaluja, joita Kilo-palvelin tarjoaa.",
+      "off": "Kilon työkalut ovat pois käytöstä",
+      "offDescription": "Tämä keskustelu ei lähetä mallille yhtään Kilon työkalua.",
+      "connecting": "Yhdistetään Kilon työkaluihin…",
+      "available": "Käytettävissä olevat työkalut: {{count}}",
+      "none": "Työkaluja ei ole saatavilla",
+      "noneDescription": "Kilo-palvelin ei palauttanut yhtään työkalua.",
+      "unreachable": "Kilon työkaluihin ei saatu yhteyttä",
+      "unreachableDescription": "Palvelin ei vastannut. Tarkista yhteytesi ja yritä uudelleen.",
+      "unauthorized": "Kilon työkalut hylkäsivät tämän istunnon",
+      "unauthorizedDescription": "Kirjaudu uudelleen sisään käyttääksesi Kilon työkaluja tässä keskustelussa.",
+      "unavailable": "Kilon työkalut eivät ole saatavilla",
+      "unavailableDescription": "Kilo-palvelin ei ole käytettävissä tälle tilille."
+    }
   }
 }

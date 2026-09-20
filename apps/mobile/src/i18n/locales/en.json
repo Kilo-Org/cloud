@@ -3035,6 +3035,23 @@
       "openHint": "Opens the chat. Long press to delete.",
       "deleteTitle": "Delete this chat?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo tools",
+      "use": "Use Kilo tools",
+      "useDescription": "Let this chat use the tools the Kilo server offers.",
+      "off": "Kilo tools are off",
+      "offDescription": "This chat sends no Kilo tool to the model.",
+      "connecting": "Connecting to Kilo tools…",
+      "available": "Tools available: {{count}}",
+      "none": "No tools available",
+      "noneDescription": "The Kilo server answered with no tools.",
+      "unreachable": "Couldn't reach Kilo tools",
+      "unreachableDescription": "The server did not answer. Check your connection, then try again.",
+      "unauthorized": "Kilo tools refused this session",
+      "unauthorizedDescription": "Sign in again to use the Kilo tools in this chat.",
+      "unavailable": "Kilo tools are not available",
+      "unavailableDescription": "The Kilo server is not there for this account."
+    }
   }
 }

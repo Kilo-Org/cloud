@@ -3035,6 +3035,23 @@
       "openHint": "Hap bisedën. Shtypni gjatë për ta fshirë.",
       "deleteTitle": "Ta fshini këtë bisedë?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Mjetet Kilo",
+      "use": "Përdor mjetet Kilo",
+      "useDescription": "Lejo këtë bisedë të përdorë mjetet që ofron serveri Kilo.",
+      "off": "Mjetet Kilo janë të fikura",
+      "offDescription": "Kjo bisedë nuk dërgon asnjë mjet Kilo te modeli.",
+      "connecting": "Po lidhet me mjetet Kilo…",
+      "available": "Mjetet e disponueshme: {{count}}",
+      "none": "Nuk ka mjete të disponueshme",
+      "noneDescription": "Serveri Kilo nuk ktheu asnjë mjet.",
+      "unreachable": "Nuk u arritën mjetet Kilo",
+      "unreachableDescription": "Serveri nuk u përgjigj. Kontrollo lidhjen dhe provo përsëri.",
+      "unauthorized": "Mjetet Kilo refuzuan këtë sesion",
+      "unauthorizedDescription": "Hyr përsëri për të përdorur mjetet Kilo në këtë bisedë.",
+      "unavailable": "Mjetet Kilo nuk janë të disponueshme",
+      "unavailableDescription": "Serveri Kilo nuk është i disponueshëm për këtë llogari."
+    }
   }
 }

@@ -3035,6 +3035,23 @@
       "openHint": "ચેટ ખોલે છે. કાઢી નાખવા માટે લાંબું દબાવો.",
       "deleteTitle": "આ ચેટ કાઢી નાખવી?"
     },
-    "beta": "બીટા"
+    "beta": "બીટા",
+    "mcp": {
+      "title": "Kilo સાધનો",
+      "use": "Kilo સાધનો વાપરો",
+      "useDescription": "આ ચેટને Kilo સર્વર આપે છે તે સાધનો વાપરવા દો.",
+      "off": "Kilo સાધનો બંધ છે",
+      "offDescription": "આ ચેટ મોડેલને કોઈ પણ Kilo સાધન મોકલતી નથી.",
+      "connecting": "Kilo સાધનો સાથે જોડાઈ રહ્યું છે…",
+      "available": "ઉપલબ્ધ સાધનો: {{count}}",
+      "none": "કોઈ સાધન ઉપલબ્ધ નથી",
+      "noneDescription": "Kilo સર્વરે કોઈ સાધન પરત આપ્યું નથી.",
+      "unreachable": "Kilo સાધનો સુધી પહોંચી શકાયું નથી",
+      "unreachableDescription": "સર્વરે જવાબ આપ્યો નથી. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
+      "unauthorized": "Kilo સાધનોએ આ સત્ર નકાર્યું",
+      "unauthorizedDescription": "આ ચેટમાં Kilo સાધનો વાપરવા માટે ફરી સાઇન ઇન કરો.",
+      "unavailable": "Kilo સાધનો ઉપલબ્ધ નથી",
+      "unavailableDescription": "આ ખાતા માટે Kilo સર્વર ઉપલબ્ધ નથી."
+    }
   }
 }

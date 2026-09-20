@@ -3035,6 +3035,23 @@
       "openHint": "ਚੈਟ ਖੋਲ੍ਹਦਾ ਹੈ। ਮਿਟਾਉਣ ਲਈ ਲੰਮਾ ਦਬਾਓ।",
       "deleteTitle": "ਇਹ ਚੈਟ ਮਿਟਾਉਣੀ ਹੈ?"
     },
-    "beta": "ਬੀਟਾ"
+    "beta": "ਬੀਟਾ",
+    "mcp": {
+      "title": "Kilo ਟੂਲ",
+      "use": "Kilo ਟੂਲ ਵਰਤੋ",
+      "useDescription": "ਇਸ ਚੈਟ ਨੂੰ Kilo ਸਰਵਰ ਵੱਲੋਂ ਦਿੱਤੇ ਟੂਲ ਵਰਤਣ ਦਿਓ।",
+      "off": "Kilo ਟੂਲ ਬੰਦ ਹਨ",
+      "offDescription": "ਇਹ ਚੈਟ ਮਾਡਲ ਨੂੰ ਕੋਈ ਵੀ Kilo ਟੂਲ ਨਹੀਂ ਭੇਜਦੀ।",
+      "connecting": "Kilo ਟੂਲ ਨਾਲ ਜੁੜ ਰਿਹਾ ਹੈ…",
+      "available": "ਉਪਲਬਧ ਟੂਲ: {{count}}",
+      "none": "ਕੋਈ ਟੂਲ ਉਪਲਬਧ ਨਹੀਂ",
+      "noneDescription": "Kilo ਸਰਵਰ ਨੇ ਕੋਈ ਟੂਲ ਵਾਪਸ ਨਹੀਂ ਕੀਤਾ।",
+      "unreachable": "Kilo ਟੂਲ ਤੱਕ ਨਹੀਂ ਪਹੁੰਚ ਸਕਿਆ",
+      "unreachableDescription": "ਸਰਵਰ ਨੇ ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ। ਆਪਣਾ ਕਨੈਕਸ਼ਨ ਜਾਂਚੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "unauthorized": "Kilo ਟੂਲ ਨੇ ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਅਸਵੀਕਾਰ ਕੀਤਾ",
+      "unauthorizedDescription": "ਇਸ ਚੈਟ ਵਿੱਚ Kilo ਟੂਲ ਵਰਤਣ ਲਈ ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰੋ।",
+      "unavailable": "Kilo ਟੂਲ ਉਪਲਬਧ ਨਹੀਂ",
+      "unavailableDescription": "ਇਸ ਖਾਤੇ ਲਈ Kilo ਸਰਵਰ ਨਹੀਂ ਹੈ।"
+    }
   }
 }

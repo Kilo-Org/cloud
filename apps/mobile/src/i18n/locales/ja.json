@@ -3035,6 +3035,23 @@
       "openHint": "チャットを開きます。長押しで削除します。",
       "deleteTitle": "このチャットを削除しますか？"
     },
-    "beta": "ベータ"
+    "beta": "ベータ",
+    "mcp": {
+      "title": "Kiloツール",
+      "use": "Kiloツールを使う",
+      "useDescription": "このチャットでKiloサーバーが提供するツールを使えるようにします。",
+      "off": "Kiloツールはオフです",
+      "offDescription": "このチャットはモデルにKiloツールを送信しません。",
+      "connecting": "Kiloツールに接続しています…",
+      "available": "利用可能なツール：{{count}}",
+      "none": "利用可能なツールはありません",
+      "noneDescription": "Kiloサーバーはツールを返しませんでした。",
+      "unreachable": "Kiloツールに接続できませんでした",
+      "unreachableDescription": "サーバーが応答しませんでした。接続を確認して、もう一度お試しください。",
+      "unauthorized": "Kiloツールがこのセッションを拒否しました",
+      "unauthorizedDescription": "このチャットでKiloツールを使うには、もう一度サインインしてください。",
+      "unavailable": "Kiloツールは利用できません",
+      "unavailableDescription": "このアカウントではKiloサーバーを利用できません。"
+    }
   }
 }

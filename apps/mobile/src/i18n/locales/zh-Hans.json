@@ -3035,6 +3035,23 @@
       "openHint": "打开对话。长按可删除。",
       "deleteTitle": "删除这个对话？"
     },
-    "beta": "测试版"
+    "beta": "测试版",
+    "mcp": {
+      "title": "Kilo 工具",
+      "use": "使用 Kilo 工具",
+      "useDescription": "允许此对话使用 Kilo 服务器提供的工具。",
+      "off": "Kilo 工具已关闭",
+      "offDescription": "此对话不会向模型发送任何 Kilo 工具。",
+      "connecting": "正在连接 Kilo 工具…",
+      "available": "可用工具：{{count}}",
+      "none": "没有可用工具",
+      "noneDescription": "Kilo 服务器未返回任何工具。",
+      "unreachable": "无法连接 Kilo 工具",
+      "unreachableDescription": "服务器没有响应。请检查网络连接，然后重试。",
+      "unauthorized": "Kilo 工具拒绝了此会话",
+      "unauthorizedDescription": "请重新登录以在此对话中使用 Kilo 工具。",
+      "unavailable": "Kilo 工具不可用",
+      "unavailableDescription": "此账户无法使用 Kilo 服务器。"
+    }
   }
 }

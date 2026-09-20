@@ -205,6 +205,9 @@ vi.mock('@/components/share/share-payload-navigator', () => ({
 vi.mock('@/lib/active-sessions-live-sync-mount', () => ({
   ActiveSessionsLiveSyncMount: 'ActiveSessionsLiveSyncMount',
 }));
+vi.mock('@/lib/artifacts/artifact-mirror-sync-mount', () => ({
+  ArtifactMirrorSyncMount: 'ArtifactMirrorSyncMount',
+}));
 vi.mock('@/lib/persist/cache-persistence-mount', () => ({
   CachePersistenceMount: 'CachePersistenceMount',
 }));

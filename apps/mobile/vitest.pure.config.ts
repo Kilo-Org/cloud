@@ -39,6 +39,7 @@ export default defineProject({
       'src/lib/auth/**/*.test.tsx',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',
+      'src/lib/artifacts/**/*.test.ts',
       'src/lib/glanceable/**/*.test.ts',
       'src/lib/kiloclaw/**/*.test.ts',
       'src/glanceable-ios/**/*.test.ts',

@@ -35,10 +35,12 @@ export function SessionFilterButton({
       onPress={onPress}
       // The visible control is an exact 30pt box: Tailwind's rem-scaled h-7
       // paints only 24.5pt here (rem ≈ 14), under the ≥28pt small-control bar.
-      // 8pt of slop on every side then reaches the 44pt minimum touch target.
-      // The uniform slop stays inside the header's gap, so it never overlaps
-      // the sibling control.
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      // RN does not mirror hitSlop under RTL, so the horizontal slop is
+      // symmetric: 7pt on each side is at most half the 14pt `gap-4` gap
+      // between header controls, so this control's slop cannot reach a
+      // neighbour whichever way the row is laid out. The box plus slop still
+      // reaches the 44pt target: 30 + 7 + 7 wide, 30 + 8 + 8 tall.
+      hitSlop={{ top: 8, bottom: 8, left: 7, right: 7 }}
       accessibilityRole="button"
       // The count is spoken as part of the name, so no new translated string is
       // needed to announce "Filter sessions, 2".

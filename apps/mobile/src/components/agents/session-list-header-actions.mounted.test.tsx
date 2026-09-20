@@ -31,6 +31,10 @@ vi.mock('@/components/ui/text', async () => {
 // explorer files an icon-only control whose node is under 28dp.
 const VISIBLE_SIZE_DP = 30;
 const MIN_TARGET_DP = 44;
+// `gap-4` is 4 × `--spacing` = 1rem, and react-native-css sets 1rem = 14pt on
+// native (react-native-css `dist/module/native-internal/root.js`), so the two
+// controls share a 14pt gap. Their facing slops add up inside it.
+const HEADER_GAP_DP = 14;
 
 type HitSlop = { top: number; bottom: number; left: number; right: number };
 
@@ -81,6 +85,24 @@ describe('SessionListHeaderActions mounted', () => {
     const renderer = await renderActions(false);
 
     expect(findControls(renderer.root)).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('keeps the facing slops of the two controls inside the 14pt header gap, either direction', async () => {
+    const renderer = await renderActions(true);
+
+    const [newSession, filter] = findControls(renderer.root);
+    if (!newSession || !filter) {
+      throw new Error('expected the new-session and filter controls');
+    }
+    const newSessionSlop = newSession.props.hitSlop as HitSlop;
+    const filterSlop = filter.props.hitSlop as HitSlop;
+    // RN does not mirror hitSlop under RTL, and the row itself mirrors, so the
+    // facing pair is right/left in LTR and left/right in RTL; both must fit the
+    // shared `gap-4` gap.
+    expect(newSessionSlop.right + filterSlop.left).toBeLessThanOrEqual(HEADER_GAP_DP);
+    expect(newSessionSlop.left + filterSlop.right).toBeLessThanOrEqual(HEADER_GAP_DP);
 
     renderer.unmount();
   });

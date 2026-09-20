@@ -32,6 +32,10 @@ vi.mock('@/components/ui/text', async () => {
 // and reaches 44pt through its hit slop.
 const VISIBLE_SIZE_DP = 30;
 const MIN_TARGET_DP = 44;
+// `gap-4` is 4 × `--spacing` = 1rem, and react-native-css sets 1rem = 14pt on
+// native (react-native-css `dist/module/native-internal/root.js`). A sibling
+// control shares the gap, so one side's slop can use at most half of it.
+const HALF_HEADER_GAP_DP = 7;
 
 type HitSlop = { top: number; bottom: number; left: number; right: number };
 
@@ -78,6 +82,20 @@ describe('SessionFilterButton mounted', () => {
     const hitSlop = node.props.hitSlop as HitSlop;
     expect(VISIBLE_SIZE_DP + hitSlop.top + hitSlop.bottom).toBeGreaterThanOrEqual(MIN_TARGET_DP);
     expect(VISIBLE_SIZE_DP + hitSlop.left + hitSlop.right).toBeGreaterThanOrEqual(MIN_TARGET_DP);
+
+    renderer.unmount();
+  });
+
+  it('keeps each horizontal slop inside half the 14pt header gap, either direction', async () => {
+    const renderer = await renderButton(0);
+
+    const node = findFilterButton(renderer.root);
+    const hitSlop = node.props.hitSlop as HitSlop;
+    // The sibling control shares the `gap-4` gap and the layout direction
+    // decides which physical side faces it, so neither horizontal slop may
+    // exceed half the gap.
+    expect(hitSlop.left).toBeLessThanOrEqual(HALF_HEADER_GAP_DP);
+    expect(hitSlop.right).toBeLessThanOrEqual(HALF_HEADER_GAP_DP);
 
     renderer.unmount();
   });

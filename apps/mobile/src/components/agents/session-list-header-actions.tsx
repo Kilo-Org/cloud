@@ -31,9 +31,11 @@ export function SessionListHeaderActions({
           onPress={onNewSession}
           // The visible control is an exact 30pt box: Tailwind's rem-scaled h-7
           // paints only 24.5pt here (rem ≈ 14), under the ≥28pt small-control
-          // bar. 8pt of slop on every side then reaches the 44pt minimum touch
-          // target without spilling into the gap before the filter button.
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          // bar. RN does not mirror hitSlop under RTL, so the horizontal slop
+          // is symmetric: the two controls' facing 7pt slops add up to the 14pt
+          // `gap-4` gap exactly whichever way the row is laid out, so the touch
+          // targets never overlap. The box plus slop reaches the 44pt target.
+          hitSlop={{ top: 8, bottom: 8, left: 7, right: 7 }}
           accessibilityRole="button"
           accessibilityLabel={t('common.newSession')}
           className="h-[30px] w-[30px] items-center justify-center active:opacity-70"

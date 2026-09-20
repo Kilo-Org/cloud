@@ -176,6 +176,13 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
 export const refreshGlanceableSessionsInputSchema = z.object({
   userId: z.string().min(1),
   cliSessionIds: z.array(z.string().min(1)).min(1),
+  /**
+   * True when the change moved a session into or out of the `permission`
+   * status. `needsApproval` gates the Approve control on the locked/background
+   * surfaces, so the delivery window may not defer it. The caller is the one
+   * that saw the previous status; the server cannot read a past status.
+   */
+  approvalChanged: z.boolean().optional(),
 });
 export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSessionsInputSchema>;
 

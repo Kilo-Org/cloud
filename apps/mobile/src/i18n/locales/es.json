@@ -3057,6 +3057,23 @@
       "openHint": "Abre el chat. Mantén pulsado para eliminar.",
       "deleteTitle": "¿Eliminar este chat?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Herramientas de Kilo",
+      "use": "Usar las herramientas de Kilo",
+      "useDescription": "Permite que este chat use las herramientas que ofrece el servidor de Kilo.",
+      "off": "Las herramientas de Kilo están desactivadas",
+      "offDescription": "Este chat no envía ninguna herramienta de Kilo al modelo.",
+      "connecting": "Conectando con las herramientas de Kilo…",
+      "available": "Herramientas disponibles: {{count}}",
+      "none": "No hay herramientas disponibles",
+      "noneDescription": "El servidor de Kilo no devolvió ninguna herramienta.",
+      "unreachable": "No se pudo contactar con las herramientas de Kilo",
+      "unreachableDescription": "El servidor no respondió. Comprueba tu conexión y vuelve a intentarlo.",
+      "unauthorized": "Las herramientas de Kilo rechazaron esta sesión",
+      "unauthorizedDescription": "Inicia sesión de nuevo para usar las herramientas de Kilo en este chat.",
+      "unavailable": "Las herramientas de Kilo no están disponibles",
+      "unavailableDescription": "El servidor de Kilo no está disponible para esta cuenta."
+    }
   }
 }

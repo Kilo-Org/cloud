@@ -3057,6 +3057,23 @@
       "openHint": "Abre a conversa. Prima continuamente para eliminar.",
       "deleteTitle": "Eliminar esta conversa?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Ferramentas do Kilo",
+      "use": "Usar as ferramentas do Kilo",
+      "useDescription": "Permite que esta conversa use as ferramentas que o servidor do Kilo oferece.",
+      "off": "As ferramentas do Kilo estão desativadas",
+      "offDescription": "Esta conversa não envia nenhuma ferramenta do Kilo ao modelo.",
+      "connecting": "A ligar às ferramentas do Kilo…",
+      "available": "Ferramentas disponíveis: {{count}}",
+      "none": "Nenhuma ferramenta disponível",
+      "noneDescription": "O servidor do Kilo não devolveu nenhuma ferramenta.",
+      "unreachable": "Não foi possível contactar as ferramentas do Kilo",
+      "unreachableDescription": "O servidor não respondeu. Verifica a tua ligação e tenta novamente.",
+      "unauthorized": "As ferramentas do Kilo recusaram esta sessão",
+      "unauthorizedDescription": "Inicia sessão novamente para usar as ferramentas do Kilo nesta conversa.",
+      "unavailable": "As ferramentas do Kilo não estão disponíveis",
+      "unavailableDescription": "O servidor do Kilo não está disponível para esta conta."
+    }
   }
 }

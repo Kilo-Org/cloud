@@ -3057,6 +3057,23 @@
       "openHint": "Apre la chat. Tieni premuto per eliminare.",
       "deleteTitle": "Eliminare questa chat?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Strumenti Kilo",
+      "use": "Usa gli strumenti Kilo",
+      "useDescription": "Consenti a questa chat di usare gli strumenti offerti dal server Kilo.",
+      "off": "Gli strumenti Kilo sono disattivati",
+      "offDescription": "Questa chat non invia alcuno strumento Kilo al modello.",
+      "connecting": "Connessione agli strumenti Kilo…",
+      "available": "Strumenti disponibili: {{count}}",
+      "none": "Nessuno strumento disponibile",
+      "noneDescription": "Il server Kilo non ha restituito alcuno strumento.",
+      "unreachable": "Impossibile raggiungere gli strumenti Kilo",
+      "unreachableDescription": "Il server non ha risposto. Controlla la connessione e riprova.",
+      "unauthorized": "Gli strumenti Kilo hanno rifiutato questa sessione",
+      "unauthorizedDescription": "Accedi di nuovo per usare gli strumenti Kilo in questa chat.",
+      "unavailable": "Gli strumenti Kilo non sono disponibili",
+      "unavailableDescription": "Il server Kilo non è disponibile per questo account."
+    }
   }
 }

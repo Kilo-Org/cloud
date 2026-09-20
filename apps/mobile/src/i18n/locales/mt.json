@@ -3101,6 +3101,23 @@
       "openHint": "Jiftaħ iċ-chat. Agħfas fit-tul biex tħassar.",
       "deleteTitle": "Tħassar dan iċ-chat?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Għodod Kilo",
+      "use": "Uża l-għodod Kilo",
+      "useDescription": "Ħalli dan il-chat juża l-għodod li joffri s-server Kilo.",
+      "off": "L-għodod Kilo huma mitfija",
+      "offDescription": "Dan il-chat ma jibgħat l-ebda għodda Kilo lill-mudell.",
+      "connecting": "Qed jgħaqqad mal-għodod Kilo…",
+      "available": "Għodod disponibbli: {{count}}",
+      "none": "L-ebda għodda disponibbli",
+      "noneDescription": "Is-server Kilo ma bagħat lura l-ebda għodda.",
+      "unreachable": "Ma setax jintlaħaq l-għodod Kilo",
+      "unreachableDescription": "Is-server ma weġibx. Iċċekkja l-konnessjoni tiegħek, imbagħad erġa' pprova.",
+      "unauthorized": "L-għodod Kilo rrifjutaw din is-sessjoni",
+      "unauthorizedDescription": "Idħol mill-ġdid biex tuża l-għodod Kilo f'dan il-chat.",
+      "unavailable": "L-għodod Kilo mhumiex disponibbli",
+      "unavailableDescription": "Is-server Kilo mhuwiex disponibbli għal dan il-kont."
+    }
   }
 }

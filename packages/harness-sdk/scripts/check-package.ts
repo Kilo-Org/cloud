@@ -39,6 +39,10 @@ const entries: readonly Entry[] = [
   { subpath: './plugins/gateway', promises: ['layerKiloGateway'] },
   { subpath: './plugins/prompt', promises: ['assemble', 'layerAssembler'] },
   {
+    subpath: './plugins/remote-mcp',
+    promises: ['remoteMcpClient', 'remoteMcpTools', 'mcpToolName'],
+  },
+  {
     subpath: './plugins/tools',
     promises: ['questionTool', 'subagentTool', 'timeTool', 'todoTool'],
   },

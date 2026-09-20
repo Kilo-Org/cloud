@@ -62,7 +62,7 @@ describe('registry', () => {
   it('registers every shipped flag with its first release', () => {
     expect(FEATURE_FLAG_DEFINITIONS).toEqual([
       { key: FEATURE_FLAG_PR_REVIEW, minAppVersion: '1.0.4', defaultValue: true },
-      { key: FEATURE_FLAG_CHAT, minAppVersion: '1.0.11', defaultValue: false },
+      { key: FEATURE_FLAG_CHAT, minAppVersion: '1.0.11', defaultValue: true },
     ]);
   });
 

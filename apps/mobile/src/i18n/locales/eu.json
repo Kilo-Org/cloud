@@ -3035,6 +3035,23 @@
       "openHint": "Txata irekitzen du. Ezabatzeko, sakatu luze.",
       "deleteTitle": "Txat hau ezabatu?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kiloren tresnak",
+      "use": "Erabili Kiloren tresnak",
+      "useDescription": "Utzi txat honi Kilo zerbitzariak eskaintzen dituen tresnak erabiltzen.",
+      "off": "Kiloren tresnak desgaituta daude",
+      "offDescription": "Txat honek ez dio ereduari Kilo tresnarik bidaltzen.",
+      "connecting": "Kiloren tresnekin konektatzen…",
+      "available": "Erabilgarri dauden tresnak: {{count}}",
+      "none": "Ez dago tresnarik erabilgarri",
+      "noneDescription": "Kilo zerbitzariak ez du tresnarik itzuli.",
+      "unreachable": "Ezin izan da Kiloren tresnetara iritsi",
+      "unreachableDescription": "Zerbitzariak ez du erantzun. Egiaztatu konexioa eta saiatu berriro.",
+      "unauthorized": "Kiloren tresnek txat saio hau baztertu dute",
+      "unauthorizedDescription": "Hasi saioa berriro txat honetan Kilo tresnak erabiltzeko.",
+      "unavailable": "Kiloren tresnak ez daude erabilgarri",
+      "unavailableDescription": "Kilo zerbitzaria ez dago erabilgarri kontu honetarako."
+    }
   }
 }

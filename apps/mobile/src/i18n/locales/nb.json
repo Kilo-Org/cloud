@@ -3035,6 +3035,23 @@
       "openHint": "Åpner chatten. Trykk og hold for å slette.",
       "deleteTitle": "Slette denne chatten?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo-verktøy",
+      "use": "Bruk Kilo-verktøy",
+      "useDescription": "La denne chatten bruke verktøyene som Kilo-serveren tilbyr.",
+      "off": "Kilo-verktøy er av",
+      "offDescription": "Denne chatten sender ingen Kilo-verktøy til modellen.",
+      "connecting": "Kobler til Kilo-verktøy…",
+      "available": "Tilgjengelige verktøy: {{count}}",
+      "none": "Ingen verktøy tilgjengelige",
+      "noneDescription": "Kilo-serveren svarte uten verktøy.",
+      "unreachable": "Kunne ikke nå Kilo-verktøy",
+      "unreachableDescription": "Serveren svarte ikke. Sjekk tilkoblingen og prøv igjen.",
+      "unauthorized": "Kilo-verktøy avviste denne økten",
+      "unauthorizedDescription": "Logg inn igjen for å bruke Kilo-verktøyene i denne chatten.",
+      "unavailable": "Kilo-verktøy er ikke tilgjengelige",
+      "unavailableDescription": "Kilo-serveren er ikke tilgjengelig for denne kontoen."
+    }
   }
 }

@@ -3035,6 +3035,23 @@
       "openHint": "Wada sheekaysiga ayuu furayaa. Si aad u tirtirto si dheer u taabo.",
       "deleteTitle": "Ma tirtiraa wada sheekaysigan?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Qalabka Kilo",
+      "use": "Isticmaal qalabka Kilo",
+      "useDescription": "U ogolow sheekaysigan inuu isticmaalo qalabka uu bixiyo serverka Kilo.",
+      "off": "Qalabka Kilo waa dammaan",
+      "offDescription": "Sheekaysigan ma diraayo wax qalab Kilo ah oo loo diro modelka.",
+      "connecting": "Waxaa lagu xiriirinayaa qalabka Kilo…",
+      "available": "Qalabka la heli karo: {{count}}",
+      "none": "Ma jiro qalab la heli karo",
+      "noneDescription": "Serverka Kilo ma soo celin wax qalab ah.",
+      "unreachable": "Lama gaari karin qalabka Kilo",
+      "unreachableDescription": "Serverku ma jawaabin. Hubi xiriirkaaga, kadib isku day mar kale.",
+      "unauthorized": "Qalabka Kilo wuu diiday sheekaysigan",
+      "unauthorizedDescription": "Dib u gal si aad u isticmaasho qalabka Kilo sheekaysigan.",
+      "unavailable": "Qalabka Kilo lama heli karo",
+      "unavailableDescription": "Serverka Kilo lama heli karo akoonkan."
+    }
   }
 }

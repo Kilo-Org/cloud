@@ -3079,6 +3079,23 @@
       "openHint": "Atidaro pokalbį. Palaikykite, kad ištrintumėte.",
       "deleteTitle": "Ištrinti šį pokalbį?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo įrankiai",
+      "use": "Naudoti Kilo įrankius",
+      "useDescription": "Leisk šiam pokalbiui naudoti įrankius, kuriuos siūlo Kilo serveris.",
+      "off": "Kilo įrankiai išjungti",
+      "offDescription": "Šis pokalbis nesiunčia modeliui jokio Kilo įrankio.",
+      "connecting": "Jungiamasi prie Kilo įrankių…",
+      "available": "Galimi įrankiai: {{count}}",
+      "none": "Nėra galimų įrankių",
+      "noneDescription": "Kilo serveris negrąžino jokių įrankių.",
+      "unreachable": "Nepavyko pasiekti Kilo įrankių",
+      "unreachableDescription": "Serveris neatsakė. Patikrink ryšį ir bandyk dar kartą.",
+      "unauthorized": "Kilo įrankiai atmetė šią sesiją",
+      "unauthorizedDescription": "Prisijunk iš naujo, kad galėtum naudoti Kilo įrankius šiame pokalbyje.",
+      "unavailable": "Kilo įrankiai nepasiekiami",
+      "unavailableDescription": "Kilo serveris nepasiekiamas šiai paskyrai."
+    }
   }
 }

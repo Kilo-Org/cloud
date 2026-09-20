@@ -38,7 +38,7 @@ export type FeatureFlagDefinition = Readonly<{
  */
 export const FEATURE_FLAG_DEFINITIONS: readonly FeatureFlagDefinition[] = [
   { key: FEATURE_FLAG_PR_REVIEW, minAppVersion: '1.0.4', defaultValue: true },
-  { key: FEATURE_FLAG_CHAT, minAppVersion: '1.0.11', defaultValue: false },
+  { key: FEATURE_FLAG_CHAT, minAppVersion: '1.0.11', defaultValue: true },
 ];
 
 const DEFINITIONS_BY_KEY: ReadonlyMap<string, FeatureFlagDefinition> = new Map(

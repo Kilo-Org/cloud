@@ -3035,6 +3035,23 @@
       "openHint": "Marii ni bana. Haquuf cuqaasii dheeraa godhi.",
       "deleteTitle": "Marii kana haquuf?"
     },
-    "beta": "Beetaa"
+    "beta": "Beetaa",
+    "mcp": {
+      "title": "Meeshaalee Kilo",
+      "use": "Meeshaalee Kilo fayyadami",
+      "useDescription": "Marii kanaaf meeshaalee sarvariin Kilo dhiyeessu fayyadamuu hayyami.",
+      "off": "Meeshaalee Kilo dhaamaniiru",
+      "offDescription": "Mariin kun modeelaaf meeshaa Kilo tokkollee hin ergu.",
+      "connecting": "Meeshaalee Kilo waliin walqunnamaa jira…",
+      "available": "Meeshaalee jiran: {{count}}",
+      "none": "Meeshaalee hin jiran",
+      "noneDescription": "Sarvariin Kilo meeshaa tokkollee hin deebisne.",
+      "unreachable": "Meeshaalee Kilo bira ga'uun hin danda'amne",
+      "unreachableDescription": "Sarvariin hin deebisne. Walqunnamtii kee ilaali, sana booda ammas yaali.",
+      "unauthorized": "Meeshaaleen Kilo marii kana didaniiru",
+      "unauthorizedDescription": "Marii kana keessatti meeshaalee Kilo fayyadamuu keetii ammas seeni.",
+      "unavailable": "Meeshaaleen Kilo hin jiran",
+      "unavailableDescription": "Sarvariin Kilo herrega kanaaf hin jiru."
+    }
   }
 }

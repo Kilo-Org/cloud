@@ -26,7 +26,10 @@ export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<Se
         >
           <Text
             className={cn(
-              'shrink font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary',
+              'shrink font-mono-medium text-[11px] text-primary',
+              // LTR-only: the letterspaced capitals break a cursive script's
+              // joins, so an RTL action label drops them (home-ar-loading).
+              !I18nManager.isRTL && 'uppercase tracking-[1.5px]',
               I18nManager.isRTL ? 'text-left' : 'text-right'
             )}
           >

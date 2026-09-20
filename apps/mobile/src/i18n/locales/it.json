@@ -3197,6 +3197,8 @@
     "couldNotStart": "Avvio non riuscito",
     "channelName": "Agenti attivi",
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco.",
+    "openSession": "Apri",
+    "approveFailed": "Impossibile approvare. Tocca $t(common.approve) per riprovare.",
     "newestResult": "Risultato più recente"
   },
   "transcriptionModel": {

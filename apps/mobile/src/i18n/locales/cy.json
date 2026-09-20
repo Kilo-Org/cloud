@@ -3326,6 +3326,8 @@
     "couldNotStart": "Methwyd dechrau",
     "channelName": "Asiantau gweithredol",
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo.",
+    "openSession": "Agor",
+    "approveFailed": "Methu cymeradwyo. Tapiwch $t(common.approve) i geisio eto.",
     "newestResult": "Canlyniad diweddaraf"
   },
   "transcriptionModel": {

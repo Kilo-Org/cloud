@@ -3154,6 +3154,8 @@
     "couldNotStart": "เริ่มไม่สำเร็จ",
     "channelName": "เอเจนต์ที่กำลังทำงาน",
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก",
+    "openSession": "เปิด",
+    "approveFailed": "อนุมัติไม่สำเร็จ แตะ $t(common.approve) เพื่อลองอีกครั้ง",
     "newestResult": "ผลลัพธ์ล่าสุด"
   },
   "transcriptionModel": {

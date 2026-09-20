@@ -3283,6 +3283,8 @@
     "couldNotStart": "Ma setax jibda",
     "channelName": "Aġenti attivi",
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar.",
+    "openSession": "Iftaħ",
+    "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova.",
     "newestResult": "L-aħħar riżultat"
   },
   "transcriptionModel": {

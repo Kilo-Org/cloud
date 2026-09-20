@@ -3240,6 +3240,8 @@
     "couldNotStart": "Не ўдалося запусціць",
     "channelName": "Актыўныя агенты",
     "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі.",
+    "openSession": "Адкрыць",
+    "approveFailed": "Не ўдалося ўхваліць. Націсніце $t(common.approve), каб паспрабаваць яшчэ раз.",
     "newestResult": "Найноўшы вынік"
   },
   "transcriptionModel": {

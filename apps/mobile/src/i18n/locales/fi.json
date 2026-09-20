@@ -3154,6 +3154,8 @@
     "couldNotStart": "Käynnistys epäonnistui",
     "channelName": "Aktiiviset agentit",
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
+    "openSession": "Avaa",
+    "approveFailed": "Hyväksyminen ei onnistunut. Yritä uudelleen napauttamalla $t(common.approve).",
     "newestResult": "Uusin tulos"
   },
   "transcriptionModel": {

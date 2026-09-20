@@ -3197,6 +3197,8 @@
     "couldNotStart": "Pokretanje nije uspelo",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu.",
+    "openSession": "Otvori",
+    "approveFailed": "Odobravanje nije uspelo. Dodirni $t(common.approve) da pokušaš ponovo.",
     "newestResult": "Najnoviji rezultat"
   },
   "transcriptionModel": {

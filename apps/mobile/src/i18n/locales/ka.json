@@ -3154,6 +3154,8 @@
     "couldNotStart": "დაწყება ვერ მოხერხდა",
     "channelName": "აქტიური აგენტები",
     "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები.",
+    "openSession": "გახსენი",
+    "approveFailed": "დამტკიცება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ $t(common.approve)-ს.",
     "newestResult": "უახლესი შედეგი"
   },
   "transcriptionModel": {

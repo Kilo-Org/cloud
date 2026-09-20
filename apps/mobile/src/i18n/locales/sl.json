@@ -3240,6 +3240,8 @@
     "couldNotStart": "Zagon ni uspel",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu.",
+    "openSession": "Odpri",
+    "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus.",
     "newestResult": "Najnovejši rezultat"
   },
   "transcriptionModel": {

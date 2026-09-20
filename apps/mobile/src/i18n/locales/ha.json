@@ -3154,6 +3154,8 @@
     "couldNotStart": "Ba a iya farawa ba",
     "channelName": "Wakilai da ke aiki",
     "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle.",
+    "openSession": "Buɗe",
+    "approveFailed": "An kasa amincewa. Danna $t(common.approve) don sake gwadawa.",
     "newestResult": "Sabon sakamako"
   },
   "transcriptionModel": {

@@ -3154,6 +3154,8 @@
     "couldNotStart": "Эхлүүлж чадсангүй",
     "channelName": "Идэвхтэй агентууд",
     "activityKitDisabledBody": "Түгжээтэй дэлгэц дээр идэвхтэй агентуудыг харахын тулд тохиргооноос шууд үйл ажиллагааг идэвхжүүлнэ үү.",
+    "openSession": "Нээх",
+    "approveFailed": "Зөвшөөрч чадсангүй. Дахин оролдохын тулд $t(common.approve)-г товшино уу.",
     "newestResult": "Хамгийн сүүлийн үр дүн"
   },
   "transcriptionModel": {

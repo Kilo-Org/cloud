@@ -3283,6 +3283,8 @@
     "couldNotStart": "Níorbh fhéidir tosú",
     "channelName": "Gníomhairí gníomhacha",
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála.",
+    "openSession": "Oscail",
+    "approveFailed": "Níorbh fhéidir ceadú. Tapáil $t(common.approve) chun triail eile a bhaint as.",
     "newestResult": "An toradh is nuaí"
   },
   "transcriptionModel": {

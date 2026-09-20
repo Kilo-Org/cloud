@@ -3154,6 +3154,8 @@
     "couldNotStart": "सुरु गर्न सकिएन",
     "channelName": "सक्रिय एजेन्टहरू",
     "activityKitDisabledBody": "लक स्क्रिनमा सक्रिय एजेन्टहरू हेर्न सेटिङ्समा प्रत्यक्ष गतिविधिहरू चालू गर्नुहोस्।",
+    "openSession": "खोल्नुहोस्",
+    "approveFailed": "स्वीकृति गर्न सकिएन। फेरि प्रयास गर्न $t(common.approve) मा ट्याप गर्नुहोस्।",
     "newestResult": "नवीनतम नतिजा"
   },
   "transcriptionModel": {

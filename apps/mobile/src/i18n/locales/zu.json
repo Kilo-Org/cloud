@@ -3154,6 +3154,8 @@
     "couldNotStart": "Akukwazi ukuqala",
     "channelName": "Ama-ejenti asebenzayo",
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe.",
+    "openSession": "Vula",
+    "approveFailed": "Asikwazanga ukugunyaza. Thepha $t(common.approve) ukuze uzame futhi.",
     "newestResult": "Umphumela wakamuva"
   },
   "transcriptionModel": {

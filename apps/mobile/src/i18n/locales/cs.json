@@ -3240,6 +3240,8 @@
     "couldNotStart": "Spuštění se nezdařilo",
     "channelName": "Aktivní agenti",
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce.",
+    "openSession": "Otevřít",
+    "approveFailed": "Schválení se nepodařilo. Klepnutím na $t(common.approve) to zkuste znovu.",
     "newestResult": "Nejnovější výsledek"
   },
   "transcriptionModel": {

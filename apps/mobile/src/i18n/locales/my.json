@@ -3154,6 +3154,8 @@
     "couldNotStart": "စတင်၍ မရပါ",
     "channelName": "လုပ်ဆောင်နေသော အေးဂျင့်များ",
     "activityKitDisabledBody": "သော့ခတ်မျက်နှာပြင်တွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ကြည့်ရန် ဆက်တင်များ၌ တိုက်ရိုက်လုပ်ဆောင်မှုများကို ဖွင့်ပါ။",
+    "openSession": "ဖွင့်ပါ",
+    "approveFailed": "အတည်ပြု၍မရပါ။ ထပ်ကြိုးစားရန် $t(common.approve) ကို နှိပ်ပါ။",
     "newestResult": "အသစ်ဆုံး ရလဒ်"
   },
   "transcriptionModel": {

@@ -3197,6 +3197,8 @@
     "couldNotStart": "Échec du démarrage",
     "channelName": "Agents actifs",
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé.",
+    "openSession": "Ouvrir",
+    "approveFailed": "Impossible d'approuver. Touchez $t(common.approve) pour réessayer.",
     "newestResult": "Dernier résultat"
   },
   "transcriptionModel": {

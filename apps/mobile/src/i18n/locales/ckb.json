@@ -3154,6 +3154,8 @@
     "couldNotStart": "نەتوانرا دەست پێبکرێت",
     "channelName": "ئەجێنتە چالاکەکان",
     "activityKitDisabledBody": "بۆ بینینی ئەجێنتە چالاکەکان لە شاشەی قوفڵدا، چالاکییە ڕاستەوخۆکان لە ڕێکخستنەکاندا چالاک بکە.",
+    "openSession": "بیکەرەوە",
+    "approveFailed": "نەتوانرا پەسند بکرێت. بۆ دووبارە هەوڵدانەوە، لە $t(common.approve) بدە.",
     "newestResult": "نوێترین ئەنجام"
   },
   "transcriptionModel": {

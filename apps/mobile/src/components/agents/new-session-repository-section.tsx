@@ -205,6 +205,14 @@ export function NewSessionRepositorySection({
     if (!collapseStateLoaded) {
       return null;
     }
+    // The label takes the row's remaining width and is pinned to one line: a
+    // label sized to its own content is measured at its longest word's width
+    // and wraps onto a second line the button's min height then clips. Its
+    // trailing (inline-end) margin mirrors the glyph and the row gap, so the
+    // centred label stays on the button's own centre. The margin is logical,
+    // not physical: in RTL the row mirrors the glyph to the leading edge and
+    // React Native resolves `marginInlineEnd` to `marginLeft`, while a physical
+    // `marginRight` would push the label 24px the wrong way.
     return (
       <CollapsibleSection
         className="mt-3 gap-3 rounded-lg border border-border bg-card p-4"
@@ -229,7 +237,9 @@ export function NewSessionRepositorySection({
             }}
           >
             <ExternalLink size={16} color={colors.foreground} />
-            <Text>{t(copy.openLabel)}</Text>
+            <Text className="me-[24px] flex-1 text-center" numberOfLines={1}>
+              {t(copy.openLabel)}
+            </Text>
           </Button>
           <Button
             variant="outline"

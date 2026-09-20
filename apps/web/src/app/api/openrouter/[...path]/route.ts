@@ -47,7 +47,6 @@ import {
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
-  temporarilyBlockedModelResponse,
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   unavailableModelResponse,
@@ -110,8 +109,6 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
-import { isFableModel, isOpus5Model } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { CLAUDE_OPUS_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
 
 export const maxDuration = 800;
 
@@ -735,18 +732,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       bodyText: requestBodyText,
     });
     return temporarilyUnavailableResponse();
-  }
-
-  if (
-    !autoModel &&
-    (isFableModel(effectiveModelIdLowerCased) ||
-      isOpus5Model(effectiveModelIdLowerCased) ||
-      effectiveModelIdLowerCased === CLAUDE_OPUS_LATEST_MODEL_ALIAS)
-  ) {
-    console.warn(
-      `User requested temporarily blocked model ${effectiveModelIdLowerCased}; rejecting.`
-    );
-    return temporarilyBlockedModelResponse();
   }
 
   if (

@@ -269,7 +269,10 @@ export function createLatencyFetch(
         requestId,
         procedures: trpcProceduresFromUrl(url),
         status: response.status,
-        ok: response.status < 400 || response.status === 207,
+        // A batched call answers 207 when it mixes results and errors, and the
+        // app counts that as a failed call (`isResponseError` in `lib/trpc.ts`),
+        // so a mixed batch is not `ok` even though 207 is a 2xx status.
+        ok: response.status < 400 && response.status !== 207,
       },
       now,
       buffer,

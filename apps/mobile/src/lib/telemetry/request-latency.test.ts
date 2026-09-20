@@ -428,9 +428,11 @@ describe('createLatencyFetch', () => {
     expect(recorded).toHaveLength(1);
   });
 
-  it('records status and ok for success, batch, and failure responses', async () => {
+  it('records status and ok for success, mixed-batch, and failure responses', async () => {
     expect(await recordStatus(200)).toMatchObject({ status: 200, ok: true });
-    expect(await recordStatus(207)).toMatchObject({ status: 207, ok: true });
+    // 207 is a 2xx, but a mixed batch carries an error the app reports, so it
+    // is not counted as `ok`.
+    expect(await recordStatus(207)).toMatchObject({ status: 207, ok: false });
     expect(await recordStatus(404)).toMatchObject({ status: 404, ok: false });
     expect(await recordStatus(500)).toMatchObject({ status: 500, ok: false });
   });

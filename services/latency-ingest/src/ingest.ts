@@ -68,9 +68,11 @@ function clientKey(request: Request): string {
  * Read the request body, stopping as soon as it exceeds `MAX_PAYLOAD_BYTES`.
  * Returns null when the body is over the cap, so an oversized (or
  * chunked-encoded, content-length-less) payload is never buffered whole in the
- * isolate's memory. The chunk normalization mirrors the sibling bounded reader
- * at services/cloud-agent-next/src/server.ts, because
- * worker-configuration.d.ts types the stream's chunks as `any`.
+ * isolate's memory. A read or cancel that rejects — a client aborting the
+ * upload mid-stream — also returns null instead of escaping `handleLatencyIngest`
+ * as an unhandled 500, the guard the sibling bounded reader keeps. The chunk
+ * normalization mirrors that sibling at services/cloud-agent-next/src/server.ts,
+ * because worker-configuration.d.ts types the stream's chunks as `any`.
  */
 async function readBodyWithinCap(request: Request): Promise<string | null> {
   const body = request.body;
@@ -81,18 +83,22 @@ async function readBodyWithinCap(request: Request): Promise<string | null> {
   const decoder = new TextDecoder();
   let text = '';
   let total = 0;
-  for (;;) {
-    const chunk = await reader.read();
-    if (chunk.done) {
-      return text + decoder.decode();
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) {
+        return text + decoder.decode();
+      }
+      const bytes = new Uint8Array(chunk.value);
+      total += bytes.byteLength;
+      if (total > MAX_PAYLOAD_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      text += decoder.decode(bytes, { stream: true });
     }
-    const bytes = new Uint8Array(chunk.value);
-    total += bytes.byteLength;
-    if (total > MAX_PAYLOAD_BYTES) {
-      await reader.cancel();
-      return null;
-    }
-    text += decoder.decode(bytes, { stream: true });
+  } catch {
+    return null;
   }
 }
 

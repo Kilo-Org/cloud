@@ -237,6 +237,61 @@ describe('handleLatencyIngest body validation', () => {
     expect(lines).toHaveLength(0);
     expect(pulled).toBeLessThan(totalChunks);
   });
+
+  it('answers 413 instead of rejecting when the client aborts mid-read', async () => {
+    const { deps, lines } = makeDeps();
+    // A stream that errors makes `reader.read()` reject, which unguarded would
+    // escape `handleLatencyIngest` and fail the Worker with a 500.
+    const body = new ReadableStream<Uint8Array>({
+      pull() {
+        throw new Error('client aborted');
+      },
+    });
+    const request = new Request(ENDPOINT, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${BEARER}`,
+        'x-kilo-app-version': '1.0.12',
+        'content-type': 'application/json',
+      },
+      body,
+      duplex: 'half',
+    } as RequestInit);
+
+    const response = await handleLatencyIngest(request, deps);
+
+    expect(response.status).toBe(413);
+    expect(lines).toHaveLength(0);
+  });
+
+  it('answers 413 instead of rejecting when cancel rejects over the cap', async () => {
+    const { deps, lines } = makeDeps();
+    // This stream always has more data, so the read loop takes the over-cap
+    // path; its `cancel` rejects, the second rejection the guard must swallow.
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(1024));
+      },
+      cancel() {
+        throw new Error('cancel failed');
+      },
+    });
+    const request = new Request(ENDPOINT, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${BEARER}`,
+        'x-kilo-app-version': '1.0.12',
+        'content-type': 'application/json',
+      },
+      body,
+      duplex: 'half',
+    } as RequestInit);
+
+    const response = await handleLatencyIngest(request, deps);
+
+    expect(response.status).toBe(413);
+    expect(lines).toHaveLength(0);
+  });
 });
 
 describe('handleLatencyIngest accepted batches', () => {

@@ -337,6 +337,25 @@ export async function removeItem(scope: string, k: string): Promise<void> {
     .run();
 }
 
+/**
+ * Removes one value only while it still equals `v`, in one statement.
+ *
+ * A read followed by {@link removeItem} is two store calls, so a newer write
+ * under the same key can commit in the gap and be deleted by the stale caller.
+ * Comparing the value inside the `DELETE` closes that window: a newer value
+ * never matches `v` and survives. Returns `true` when a row was removed.
+ */
+export async function removeItemIfValue(scope: string, k: string, v: string): Promise<boolean> {
+  validateItemKey(scope, k);
+  validateValue(v);
+  const db = await openDatabase();
+  const result = db
+    .delete(kv)
+    .where(and(eq(kv.scope, scope), eq(kv.k, k), eq(kv.v, v)))
+    .run();
+  return result.changes > 0;
+}
+
 /** Removes every entry in exactly one scope. */
 export async function clearScope(scope: string): Promise<void> {
   validateScope(scope);
@@ -366,4 +385,17 @@ export async function listEntries(scope: string): Promise<KVPair[]> {
     .where(eq(kv.scope, scope))
     .orderBy(asc(kv.updatedAt))
     .all();
+}
+
+/** Reads one scope's values oldest-first in one statement, for cache hydration. */
+export async function listValues(scope: string): Promise<string[]> {
+  validateScope(scope);
+  const db = await openDatabase();
+  return db
+    .select({ v: kv.v })
+    .from(kv)
+    .where(eq(kv.scope, scope))
+    .orderBy(asc(kv.updatedAt))
+    .all()
+    .map(row => row.v);
 }

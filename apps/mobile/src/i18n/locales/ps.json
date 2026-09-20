@@ -3153,7 +3153,9 @@
     "couldNotApprove": "منظور نه شو",
     "couldNotStart": "پیل نه شو",
     "channelName": "فعال اجنټان",
-    "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ."
+    "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ.",
+    "openSession": "پرانیستل",
+    "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ."
   },
   "transcriptionModel": {
     "title": "د غږ د متن ته بدلولو ماډل",

@@ -76,12 +76,45 @@ const lifecycle = vi.hoisted(() => {
     },
   };
 });
-const keyboard = vi.hoisted(() => ({
-  // Both slots share one signature so either listener can be stored; `hide`
-  // is dispatched with an empty payload.
-  show: undefined as ((event: { endCoordinates: { height: number } }) => void) | undefined,
-  hide: undefined as ((event: { endCoordinates: { height: number } }) => void) | undefined,
-}));
+const keyboard = vi.hoisted(() => {
+  // Keyboard has more than one subscriber in production: `AppRootProviders`
+  // mounts the Toaster's shared keyboard hook alongside a screen's, so the mock
+  // keeps every listener in a set per direction. One slot per direction let the
+  // last registration shadow the earlier ones, and a `remove()` that cleared
+  // both slots detached a listener it did not own. The AppState mock below is a
+  // set for the same reason. Same signature for both directions; `hide` is
+  // dispatched with an empty payload.
+  const showListeners = new Set<(event: { endCoordinates: { height: number } }) => void>();
+  const hideListeners = new Set<(event: { endCoordinates: { height: number } }) => void>();
+  const addListener = (
+    event: string,
+    listener: (event: { endCoordinates: { height: number } }) => void
+  ) => {
+    const listeners =
+      event === 'keyboardDidShow' || event === 'keyboardWillShow' ? showListeners : hideListeners;
+    listeners.add(listener);
+    return {
+      remove: () => {
+        listeners.delete(listener);
+      },
+    };
+  };
+  return {
+    addListener,
+    showListeners,
+    hideListeners,
+    show: (event: { endCoordinates: { height: number } }) => {
+      for (const listener of showListeners) {
+        listener(event);
+      }
+    },
+    hide: () => {
+      for (const listener of hideListeners) {
+        listener({ endCoordinates: { height: 0 } });
+      }
+    },
+  };
+});
 export { announcements, catalogs, keyboard, lifecycle, native, platform, route, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
@@ -103,22 +136,7 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   AccessibilityInfo: { announceForAccessibility: announcements },
   Keyboard: {
-    addListener: (
-      event: string,
-      listener: (event: { endCoordinates: { height: number } }) => void
-    ) => {
-      if (event === 'keyboardDidShow' || event === 'keyboardWillShow') {
-        keyboard.show = listener;
-      } else {
-        keyboard.hide = listener;
-      }
-      return {
-        remove: () => {
-          keyboard.show = undefined;
-          keyboard.hide = undefined;
-        },
-      };
-    },
+    addListener: keyboard.addListener,
   },
   AppState: {
     currentState: 'active',
@@ -335,6 +353,8 @@ export function resetUnlockMocks() {
   route.segments = ['(app)', 'agent-chat'];
   route.pathname = '/agent-chat';
   lifecycle.listeners.clear();
+  keyboard.showListeners.clear();
+  keyboard.hideListeners.clear();
   storage.getItemAsync.mockResolvedValue('enabled');
   native.hasHardwareAsync.mockResolvedValue(true);
   native.isEnrolledAsync.mockResolvedValue(true);

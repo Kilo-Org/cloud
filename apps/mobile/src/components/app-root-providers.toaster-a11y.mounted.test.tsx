@@ -135,12 +135,46 @@ it('keeps the toast above the software keyboard while it is up', async () => {
   await mount();
 
   act(() => {
-    keyboard.show?.({ endCoordinates: { height: 300 } });
+    keyboard.show({ endCoordinates: { height: 300 } });
   });
 
   const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
 
   expect(toasters[0]?.props.offset).toBe(300 + TOAST_BOTTOM_GAP);
+});
+
+/**
+ * The harness keeps every keyboard subscriber, one set per direction (see the
+ * Keyboard mock in the test helpers). A second consumer — here an extra
+ * listener standing in for a screen on top of the Toaster — must not shadow the
+ * Toaster's listener, and disposing it must not detach the Toaster's. A single
+ * slot per direction failed both halves.
+ */
+it('delivers a keyboard event to every subscriber and detaches only the disposed one', async () => {
+  platform.OS = 'android';
+  await mount();
+
+  const extra = vi.fn((_event: { endCoordinates: { height: number } }) => undefined);
+  const subscription = keyboard.addListener('keyboardDidShow', extra);
+
+  act(() => {
+    keyboard.show({ endCoordinates: { height: 300 } });
+  });
+  // Both the Toaster's hook and the extra subscriber received the height.
+  expect(extra).toHaveBeenCalledWith({ endCoordinates: { height: 300 } });
+  expect(unlockRoot().findAllByType('Toaster' as ElementType)[0]?.props.offset).toBe(
+    300 + TOAST_BOTTOM_GAP
+  );
+
+  subscription.remove();
+  act(() => {
+    keyboard.show({ endCoordinates: { height: 240 } });
+  });
+  // The disposed subscriber is gone; the Toaster's listener is still attached.
+  expect(extra).toHaveBeenCalledTimes(1);
+  expect(unlockRoot().findAllByType('Toaster' as ElementType)[0]?.props.offset).toBe(
+    240 + TOAST_BOTTOM_GAP
+  );
 });
 
 /**

@@ -49,7 +49,7 @@ describe('app-aware keyboard padding state', () => {
     });
   });
 
-  it('clears keyboard padding when the keyboard hides or the app leaves active state', () => {
+  it('clears keyboard padding when the keyboard hides or the app leaves the foreground', () => {
     expect(
       resolveAppAwareKeyboardPadding({
         currentPadding: 0,
@@ -68,5 +68,24 @@ describe('app-aware keyboard padding state', () => {
         event: { type: 'app-state-change', appState: 'background' },
       })
     ).toBe(0);
+  });
+
+  it('keeps keyboard padding through a transient iOS inactive state', () => {
+    // iOS reports `inactive` for Control Center, the app switcher, a call
+    // banner, or a system alert while the keyboard stays up, and fires no new
+    // `keyboardWillShow` when it returns to `active`. Collapsing the padding
+    // there left the login action under an open keyboard.
+    expect(
+      resolveAppAwareKeyboardPadding({
+        currentPadding: 320,
+        event: { type: 'app-state-change', appState: 'inactive' },
+      })
+    ).toBe(320);
+    expect(
+      resolveAppAwareKeyboardPadding({
+        currentPadding: 320,
+        event: { type: 'app-state-change', appState: 'active' },
+      })
+    ).toBe(320);
   });
 });

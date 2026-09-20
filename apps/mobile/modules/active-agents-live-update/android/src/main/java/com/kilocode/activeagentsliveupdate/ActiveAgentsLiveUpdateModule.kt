@@ -132,20 +132,45 @@ class ActiveAgentsLiveUpdateModule : Module() {
   @Suppress("DEPRECATION")
   private fun legacyBuilder(): Notification.Builder = Notification.Builder(context)
 
+  /** The deep link both the content intent and the Open action carry. */
+  private fun openIntent(openUrl: String): Intent =
+    Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).apply {
+      setPackage(context.packageName)
+    }
+
   /**
    * A PendingIntent that deep-links the app to the URL the JS side named: the
    * waiting session's route when one is recorded, the Agents tab otherwise.
    */
   private fun openPendingIntent(openUrl: String): PendingIntent {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).apply {
-      setPackage(context.packageName)
-    }
     return PendingIntent.getActivity(
       context,
       OPEN_REQUEST_CODE,
-      intent,
+      openIntent(openUrl),
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
+  }
+
+  /**
+   * A PendingIntent matches on `Intent.filterEquals`, which includes the data
+   * URI, so the per-session Open URL mints a new system record on every
+   * distinct session instead of reusing the fixed request code's record.
+   * Cancel the record the URL this post replaced minted, so superseded records
+   * do not accumulate for the life of the install.
+   *
+   * Called only after the new card is posted, so a failed notify never strips
+   * the Open action off a card that is still in the shade.
+   */
+  private fun cancelSupersededOpenIntent(previousUrl: String, openUrl: String) {
+    if (previousUrl == openUrl) {
+      return
+    }
+    PendingIntent.getActivity(
+      context,
+      OPEN_REQUEST_CODE,
+      openIntent(previousUrl),
+      PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+    )?.cancel()
   }
 
   /**
@@ -198,6 +223,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
     promotion: Boolean,
     timeoutMs: Long
   ) {
+    val previousOpenUrl = notificationState.getString(OPEN_URL, null)
     val contentIntent = openPendingIntent(openUrl)
     // The two OS paths a notification can interrupt Do Not Disturb with are the
     // channel's DND override (user-granted, requested by the app) and the
@@ -311,6 +337,12 @@ class ActiveAgentsLiveUpdateModule : Module() {
       state.putBoolean(HAS_TIMEOUT, false)
     }
     check(state.commit()) { "Cannot persist the active agents notification channel" }
+    // The card now carries this post's URL, so the record the replaced URL
+    // minted is unreachable: cancel it, and remember this one for the next post.
+    if (previousOpenUrl != null) {
+      cancelSupersededOpenIntent(previousOpenUrl, openUrl)
+    }
+    notificationState.edit().putString(OPEN_URL, openUrl).apply()
   }
 
   private fun dismiss() {
@@ -324,6 +356,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
   private companion object {
     const val HAS_TIMEOUT = "has_timeout"
     const val OPEN_REQUEST_CODE = 1002
+    const val OPEN_URL = "open_url"
     const val POSTED_CHANNEL = "posted_channel"
 
     /** The kind marker in the channel id the JS side creates for needs-input. */

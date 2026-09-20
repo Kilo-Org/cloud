@@ -196,13 +196,16 @@ function renderWidgetNow(props: AndroidWidgetProps): void {
  * user. Idle-only work is not worth a status notification: nothing is
  * happening, and an ongoing card has no opt-in the way a placed home-screen
  * widget does. The widget keeps showing the idle counts; the card ends, and a
- * later startable snapshot raises a new one.
+ * later startable snapshot raises a new one. `expiresAt` bounds how long the
+ * counts are trusted, so it fences a card this path could raise; the headless
+ * notice render passes `allowExpired`, because the card it redraws is posted
+ * ongoing with no native deadline and outlives the stored snapshot.
  */
-function hasCurrentWork(snapshot: GlanceableAgentsSnapshot): boolean {
+function hasCurrentWork(snapshot: GlanceableAgentsSnapshot, allowExpired = false): boolean {
   return (
     (snapshot.status === 'happy' || snapshot.status === 'stale') &&
     isStartableGlanceableWork(snapshot) &&
-    Date.parse(snapshot.expiresAt) > Date.now()
+    (allowExpired || Date.parse(snapshot.expiresAt) > Date.now())
   );
 }
 
@@ -222,12 +225,13 @@ function endNotification(): void {
  */
 async function tryStartOrUpdate(
   snapshot: GlanceableAgentsSnapshot,
-  ctx: GlanceableSinkContext
+  ctx: GlanceableSinkContext,
+  allowExpiredSnapshot = false
 ): Promise<void> {
   // The in-app switch is checked first: it is the one the user set here, and
   // honoring it costs no native call. The notification permission still decides
   // the rest. The widget is deliberately not gated — placing one is the opt-in.
-  if (!getLiveActivityEnabled() || !hasCurrentWork(snapshot)) {
+  if (!getLiveActivityEnabled() || !hasCurrentWork(snapshot, allowExpiredSnapshot)) {
     pending = null;
     return;
   }
@@ -245,14 +249,14 @@ async function tryStartOrUpdate(
 
   const epoch = startEpoch;
   const granted = await isNotificationPermissionGranted();
-  if (epoch !== startEpoch || !hasCurrentWork(snapshot)) {
+  if (epoch !== startEpoch || !hasCurrentWork(snapshot, allowExpiredSnapshot)) {
     return;
   }
   if (granted) {
     // Android 8+ drops a post whose channel does not exist yet, and the JS side
     // owns channel creation, so the channel is ensured before the first start.
     await ensureAndroidNotificationChannels();
-    if (epoch !== startEpoch || !hasCurrentWork(snapshot)) {
+    if (epoch !== startEpoch || !hasCurrentWork(snapshot, allowExpiredSnapshot)) {
       return;
     }
     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/retry can set notificationActive while awaiting permission
@@ -281,6 +285,11 @@ async function tryStartOrUpdate(
  * notification actions; its start branch re-posts the fixed native id, so the
  * counts stay and only the text gains the notice.
  *
+ * The card the tap came from is posted ongoing with no native deadline, so it
+ * outlives the stored snapshot's own `expiresAt`; a notice waiting is exactly
+ * the case that must still render past that expiry, while its work is still
+ * startable. With no notice waiting the expiry keeps fencing the render.
+ *
  * Returns when the render is on the notification: the headless task finishes
  * with this promise, so a fire-and-forget update would be lost with the process
  * and the failure line the user's tap produced would never be shown.
@@ -290,7 +299,8 @@ export async function renderStoredSnapshotWithNotice(ctx: GlanceableSinkContext)
   if (snapshot === null) {
     return;
   }
-  await tryStartOrUpdate(snapshot, ctx);
+  // A notice waiting is the one case that renders past the expiry; see above.
+  await tryStartOrUpdate(snapshot, ctx, actionNotice !== null);
 }
 
 /** Retry a pending start after permission turns granted. Caller owns the check. */

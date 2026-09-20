@@ -1007,6 +1007,46 @@ describe('renderStoredSnapshotWithNotice', () => {
     expect(mocks.native.start).not.toHaveBeenCalled();
     expect(mocks.native.update).not.toHaveBeenCalled();
   });
+
+  it('renders the failure line past the stored snapshot expiry', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_expired' }));
+    // A card posted for startable work is ongoing with no native deadline, so
+    // it stays in the shade after the stored snapshot's 8h validity has passed.
+    // The tap came from that card, so its failure line still has to reach it.
+    mocks.native.setWidgetSnapshot(JSON.stringify(MIXED), 0);
+    vi.setSystemTime(NOW + 28_800_001);
+    setGlanceableActionNotice('Approval failed');
+
+    await renderStoredSnapshotWithNotice(CTX);
+
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    expect(mocks.getNotification()).toMatchObject({
+      text: 'Approval failed 2 Needs input, 4 Working, 3 Idle',
+      approveLabel: i18n.t('common.approve'),
+    });
+  });
+
+  it('does not raise a card from an expired snapshot with no notice waiting', async () => {
+    mocks.native.setWidgetSnapshot(JSON.stringify(MIXED), 0);
+    vi.setSystemTime(NOW + 28_800_001);
+
+    await renderStoredSnapshotWithNotice(CTX);
+
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(mocks.native.update).not.toHaveBeenCalled();
+  });
+
+  it('does not render an expired notice onto idle-only work', async () => {
+    recordWaitingAsk(waitingAsk());
+    mocks.native.setWidgetSnapshot(JSON.stringify({ ...MIXED, running: 0, needsInput: 0 }), 0);
+    vi.setSystemTime(NOW + 28_800_001);
+    setGlanceableActionNotice('Approval failed');
+
+    await renderStoredSnapshotWithNotice(CTX);
+
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(mocks.native.update).not.toHaveBeenCalled();
+  });
 });
 
 describe('androidSink widget publish and end', () => {

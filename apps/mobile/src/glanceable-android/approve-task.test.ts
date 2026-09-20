@@ -479,6 +479,13 @@ function evaluateEntry(platform: string): {
         // the stub answers with the one call it makes.
         return { registerAppActionDispatcher: (): void => undefined };
       }
+      case './src/lib/notification-background-task': {
+        // The entry registers the background notification task after the router
+        // entry too; the stub answers with the one call it makes, as a promise
+        // so the entry's `.catch` chain is well formed.
+        // eslint-disable-next-line require-await, @typescript-eslint/require-await -- the stub settles at once, so it needs no await
+        return { registerNotificationBackgroundTask: async () => undefined };
+      }
       default: {
         throw new Error(`The entry required an unexpected module: ${id}`);
       }

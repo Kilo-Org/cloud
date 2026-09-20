@@ -17,6 +17,9 @@ type SessionFilterButtonProps = {
  * Filter affordance shared by both session-list pages: the sliders icon, plus
  * a count badge while filters are applied. The count is the point — it tells
  * the user the list is narrowed without making them open the picker.
+ *
+ * The icon sits in a 30pt visible box so the control itself is big enough to
+ * hit; `hitSlop` then lifts the touch target to the 44pt minimum.
  */
 export function SessionFilterButton({
   activeCount,
@@ -30,8 +33,14 @@ export function SessionFilterButton({
   return (
     <Pressable
       onPress={onPress}
-      // left slop capped against the 16px gap, right slop reaches 44pt wide
-      hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
+      // The visible control is an exact 30pt box: Tailwind's rem-scaled h-7
+      // paints only 24.5pt here (rem ≈ 14), under the ≥28pt small-control bar.
+      // RN does not mirror hitSlop under RTL, so the horizontal slop is
+      // symmetric: 7pt on each side is at most half the 14pt `gap-4` gap
+      // between header controls, so this control's slop cannot reach a
+      // neighbour whichever way the row is laid out. The box plus slop still
+      // reaches the 44pt target: 30 + 7 + 7 wide, 30 + 8 + 8 tall.
+      hitSlop={{ top: 8, bottom: 8, left: 7, right: 7 }}
       accessibilityRole="button"
       // The count is spoken as part of the name, so no new translated string is
       // needed to announce "Filter sessions, 2".
@@ -40,7 +49,7 @@ export function SessionFilterButton({
         activeCount
       )}
       testID={testID}
-      className="active:opacity-70"
+      className="h-[30px] w-[30px] items-center justify-center active:opacity-70"
     >
       <SlidersHorizontal size={20} color={isActive ? colors.foreground : colors.mutedForeground} />
       {isActive ? (

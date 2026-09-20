@@ -29,12 +29,16 @@ export function SessionListHeaderActions({
       {showNewSession ? (
         <Pressable
           onPress={onNewSession}
-          // right slop capped so the expanded targets don't overlap inside the
-          // 16px gap; left slop makes up the difference to a 44pt-wide target
-          hitSlop={{ top: 11, bottom: 11, left: 14, right: 8 }}
+          // The visible control is an exact 30pt box: Tailwind's rem-scaled h-7
+          // paints only 24.5pt here (rem ≈ 14), under the ≥28pt small-control
+          // bar. RN does not mirror hitSlop under RTL, so the horizontal slop
+          // is symmetric: the two controls' facing 7pt slops add up to the 14pt
+          // `gap-4` gap exactly whichever way the row is laid out, so the touch
+          // targets never overlap. The box plus slop reaches the 44pt target.
+          hitSlop={{ top: 8, bottom: 8, left: 7, right: 7 }}
           accessibilityRole="button"
           accessibilityLabel={t('common.newSession')}
-          className="active:opacity-70"
+          className="h-[30px] w-[30px] items-center justify-center active:opacity-70"
         >
           <Plus size={22} color={colors.foreground} />
         </Pressable>

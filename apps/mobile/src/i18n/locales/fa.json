@@ -3161,7 +3161,9 @@
     "couldNotApprove": "تأیید نشد",
     "couldNotStart": "شروع نشد",
     "channelName": "عامل‌های فعال",
-    "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید."
+    "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید.",
+    "openSession": "باز کن",
+    "approveFailed": "تأیید ممکن نشد. برای تلاش دوباره روی $t(common.approve) ضربه بزنید."
   },
   "transcriptionModel": {
     "title": "مدل تبدیل گفتار به متن",

@@ -3290,7 +3290,9 @@
     "couldNotApprove": "Ma setax japprova",
     "couldNotStart": "Ma setax jibda",
     "channelName": "Aġenti attivi",
-    "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar."
+    "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar.",
+    "openSession": "Iftaħ",
+    "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova."
   },
   "transcriptionModel": {
     "title": "Mudell ta' traskrizzjoni",

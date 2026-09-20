@@ -3161,7 +3161,9 @@
     "couldNotApprove": "Lama oggolaan karin",
     "couldNotStart": "Lama bilaabin karin",
     "channelName": "Wakiillada firfircoon",
-    "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka."
+    "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka.",
+    "openSession": "Fur",
+    "approveFailed": "Lama oggolaan karin. Taabo $t(common.approve) si aad mar kale isku daydo."
   },
   "transcriptionModel": {
     "title": "Moodeelka qoraal u beddelidda",

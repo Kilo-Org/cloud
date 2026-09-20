@@ -3161,7 +3161,9 @@
     "couldNotApprove": "Kinnitamine ebaõnnestus",
     "couldNotStart": "Käivitamine ebaõnnestus",
     "channelName": "Aktiivsed agendid",
-    "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente."
+    "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
+    "openSession": "Ava",
+    "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve)."
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",

@@ -3161,7 +3161,9 @@
     "couldNotApprove": "Không thể phê duyệt",
     "couldNotStart": "Không thể bắt đầu",
     "channelName": "Tác nhân đang hoạt động",
-    "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
+    "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
+    "openSession": "Mở",
+    "approveFailed": "Không thể phê duyệt. Nhấn $t(common.approve) để thử lại."
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",

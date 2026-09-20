@@ -3161,7 +3161,9 @@
     "couldNotApprove": "Təsdiqlənmədi",
     "couldNotStart": "Başladılmadı",
     "channelName": "Aktiv agentlər",
-    "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir."
+    "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir.",
+    "openSession": "Aç",
+    "approveFailed": "Təsdiqləmək mümkün olmadı. Yenidən cəhd etmək üçün $t(common.approve) üzərinə toxun."
   },
   "transcriptionModel": {
     "title": "Səsin mətnə çevrilməsi modeli",

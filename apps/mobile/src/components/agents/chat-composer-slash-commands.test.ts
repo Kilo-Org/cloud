@@ -7,10 +7,12 @@ import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-comman
 import {
   createMobileSlashCommandList,
   getLocalClearSlashCommand,
+  getLocalExitSlashCommand,
   getLocalNewSlashCommand,
   getSlashCommandCandidate,
   getSlashCommandDescription,
   getSlashCommandSuggestions,
+  isCatalogueSlashCommand,
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { i18n } from '@/i18n';
@@ -320,6 +322,21 @@ describe('parseChatComposerSubmission — non-remote sessions ignore the remote 
   });
 });
 
+describe('catalogueDescription marker', () => {
+  it('marks the reserved builders and leaves runtime commands unmarked', () => {
+    expect(getLocalNewSlashCommand().catalogueDescription).toBe(true);
+    expect(getLocalExitSlashCommand().catalogueDescription).toBe(true);
+    expect(getLocalClearSlashCommand().catalogueDescription).toBe(true);
+    const runtime = createMobileSlashCommandList('cloud-agent', SAMPLE_COMMANDS, null);
+    expect(runtime.every(command => command.catalogueDescription === undefined)).toBe(true);
+    const suggestions = getSlashCommandSuggestions(
+      '/ne',
+      createMobileSlashCommandList('remote', SAMPLE_COMMANDS, remoteState())
+    );
+    expect(suggestions[0]?.catalogueDescription).toBe(true);
+  });
+});
+
 describe('getSlashCommandDescription', () => {
   afterEach(async () => {
     await i18n.changeLanguage('en');
@@ -416,5 +433,57 @@ describe('getSlashCommandDescription', () => {
 
   it('returns undefined for an unknown command with no description', () => {
     expect(getSlashCommandDescription({ name: 'help', hints: [] })).toBeUndefined();
+  });
+});
+
+describe('isCatalogueSlashCommand', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('accounts for a built-in entry that reports the English catalog source string', () => {
+    expect(
+      isCatalogueSlashCommand({
+        name: 'goal',
+        description: en.agentChat.slashCommands.goalDescription,
+        hints: [],
+      })
+    ).toBe(true);
+  });
+
+  it('accounts for a built-in entry whose reported text matches the source in the English app language', () => {
+    // The worker/CLI catalog reports the exact English catalogue strings, so
+    // in English the resolved string equals the reported one; the row must
+    // still treat it as catalogue copy and keep it out of the gateway.
+    expect(
+      isCatalogueSlashCommand({
+        name: 'review',
+        description: en.agentChat.slashCommands.reviewDescription,
+        hints: [],
+      })
+    ).toBe(true);
+    expect(
+      isCatalogueSlashCommand({
+        name: 'compact',
+        description: en.agentChat.slashCommands.compactDescription,
+        hints: [],
+      })
+    ).toBe(true);
+  });
+
+  it('does not account for an external entry that reuses a built-in name', () => {
+    expect(
+      isCatalogueSlashCommand({ name: 'review', description: 'review my style guide', hints: [] })
+    ).toBe(false);
+  });
+
+  it('does not account for a command the catalog does not know', () => {
+    expect(isCatalogueSlashCommand({ name: 'mcp-tool', description: 'Run it', hints: [] })).toBe(
+      false
+    );
+  });
+
+  it('accounts for a command this client registered', () => {
+    expect(isCatalogueSlashCommand(getLocalNewSlashCommand())).toBe(true);
   });
 });

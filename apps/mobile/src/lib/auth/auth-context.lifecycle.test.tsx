@@ -2,6 +2,7 @@
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable max-lines -- one cohesive auth-context suite: sign-out teardown ordering and stale sign-in fencing share the provider mount and the SecureStore mock */
 import { createElement } from 'react';
+import { type AppState } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type * as AuthContextModule from './auth-context';
@@ -76,7 +77,9 @@ const hoisted = vi.hoisted(() => {
   // Hoisted so the foreground tests can capture AppState listeners from the
   // same mock instance every module registry resolves to.
   const appState = {
-    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+    addEventListener: vi.fn<typeof AppState.addEventListener>(() => ({
+      remove: vi.fn<() => void>(),
+    })),
   };
 
   const deepLinkLaunch = {
@@ -111,6 +114,19 @@ const hoisted = vi.hoisted(() => {
 const readCacheMock = vi.hoisted(() => ({
   clearCacheScopeForSignOut: vi.fn().mockResolvedValue(undefined),
   readCachedUserId: vi.fn().mockReturnValue(null),
+}));
+
+// Hoisted so the sign-out test can assert the offline translation cache is
+// cleared without loading the native-bound encrypted-KV chain.
+const toolSummaryTranslationCacheMock = vi.hoisted(() => ({
+  clearToolSummaryTranslationsForSignOut: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Hoisted so the sign-out test can assert the runtime's in-memory retry memory
+// is dropped with the disk scope, without loading the transcript graph.
+const toolSummaryTranslationRuntimeMock = vi.hoisted(() => ({
+  clearToolSummaryTranslationMemory: vi.fn(),
+  clearToolSummaryTranslationMemoryForSignOut: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Hoisted so the FIFO and failure-matrix tests can hold remote cleanup open or
@@ -213,11 +229,23 @@ vi.mock('@/lib/telemetry/posthog-storage', () => ({
   purgePostHogPersistence: hoisted.posthogStorage.purgePostHogPersistence,
 }));
 
-vi.mock('@/lib/query-client', () => ({
-  queryClient: { clear: vi.fn() },
-}));
+const queryClientMock = vi.hoisted(() => ({ clear: vi.fn() }));
+vi.mock('@/lib/query-client', () => ({ queryClient: queryClientMock }));
 
 vi.mock('@/lib/persist/read-cache', () => readCacheMock);
+
+vi.mock('@/lib/persist/tool-summary-translation-cache', () => toolSummaryTranslationCacheMock);
+
+vi.mock(
+  '@/lib/tool-summary-translation/tool-summary-translation-runtime',
+  async importOriginal => ({
+    ...(await importOriginal()),
+    clearToolSummaryTranslationMemory:
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemory,
+    clearToolSummaryTranslationMemoryForSignOut:
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut,
+  })
+);
 
 // The sign-out teardown reaches the OS search bridge through
 // `session-scoped-state`. That bridge imports the root `expo` entry, which
@@ -477,6 +505,14 @@ async function settleBootstrap(
 
 // ---- tests ----
 
+function invocationOrder(mock: { mock: { invocationCallOrder: number[] } }, index = 0): number {
+  const order = mock.mock.invocationCallOrder[index];
+  if (order === undefined) {
+    throw new Error('Expected a recorded mock invocation');
+  }
+  return order;
+}
+
 describe('sign-out teardown ordering', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -496,11 +532,11 @@ describe('sign-out teardown ordering', () => {
     // Sentry.setUser must be called
     expect(hoisted.sentry.setUser).toHaveBeenCalledWith(null);
 
-    const capture = hoisted.posthog.captureEvent.mock.invocationCallOrder[0];
-    const cleanup = logoutCleanupMock.runLogoutCleanup.mock.invocationCallOrder[0];
-    const flush = hoisted.posthog.flushLastPostHogEvent.mock.invocationCallOrder[0];
-    const clear = hoisted.controller.clearTelemetryDecision.mock.invocationCallOrder[0];
-    const sentry = hoisted.sentry.setUser.mock.invocationCallOrder[0];
+    const capture = invocationOrder(hoisted.posthog.captureEvent);
+    const cleanup = invocationOrder(logoutCleanupMock.runLogoutCleanup);
+    const flush = invocationOrder(hoisted.posthog.flushLastPostHogEvent);
+    const clear = invocationOrder(hoisted.controller.clearTelemetryDecision);
+    const sentry = invocationOrder(hoisted.sentry.setUser);
 
     expect(capture).toBeLessThan(cleanup);
     expect(cleanup).toBeLessThan(flush);
@@ -519,8 +555,8 @@ describe('sign-out teardown ordering', () => {
 
     expect(consentMock.clearPendingConsentOutcome).toHaveBeenCalledTimes(1);
 
-    const clearConsent = consentMock.clearPendingConsentOutcome.mock.invocationCallOrder[0];
-    const discard = hoisted.posthog.discardPostHog.mock.invocationCallOrder[0];
+    const clearConsent = invocationOrder(consentMock.clearPendingConsentOutcome);
+    const discard = invocationOrder(hoisted.posthog.discardPostHog);
     expect(clearConsent).toBeLessThan(discard);
 
     unmount();
@@ -536,9 +572,9 @@ describe('sign-out teardown ordering', () => {
     expect(hoisted.posthog.captureEvent).toHaveBeenCalledWith('logout');
     expect(hoisted.posthog.flushLastPostHogEvent).toHaveBeenCalledTimes(1);
 
-    const capture = hoisted.posthog.captureEvent.mock.invocationCallOrder[0];
-    const flush = hoisted.posthog.flushLastPostHogEvent.mock.invocationCallOrder[0];
-    const discard = hoisted.posthog.discardPostHog.mock.invocationCallOrder[0];
+    const capture = invocationOrder(hoisted.posthog.captureEvent);
+    const flush = invocationOrder(hoisted.posthog.flushLastPostHogEvent);
+    const discard = invocationOrder(hoisted.posthog.discardPostHog);
     expect(capture).toBeLessThan(flush);
     expect(flush).toBeLessThan(discard);
 
@@ -583,10 +619,10 @@ describe('sign-out teardown ordering', () => {
       hoisted.posthog.discardPostHog.mock.invocationCallOrder[0],
       hoisted.posthogStorage.purgePostHogPersistence.mock.invocationCallOrder[0],
     ];
-    const secureStoreOrder = hoisted.secureStore.deleteItemAsync.mock.invocationCallOrder[0];
+    const secureStoreOrder = invocationOrder(hoisted.secureStore.deleteItemAsync);
     expect(secureStoreOrder).toBeDefined();
-    for (const invocationOrder of sdkInvocationOrders) {
-      expect(invocationOrder).toBeLessThan(secureStoreOrder);
+    for (const order of sdkInvocationOrders) {
+      expect(order).toBeLessThan(secureStoreOrder);
     }
 
     unmount();
@@ -739,10 +775,7 @@ describe('sign-out teardown ordering', () => {
     const secureStore = hoisted.secureStore;
 
     // An in-flight write holds the filters key's chain open.
-    let releaseInFlight: (() => void) | undefined = undefined;
-    const inFlightGate = new Promise<void>(resolve => {
-      releaseInFlight = resolve;
-    });
+    const { promise: inFlightGate, resolve: releaseInFlight } = Promise.withResolvers<undefined>();
     let markStarted: (() => void) | undefined = undefined;
     const started = new Promise<void>(resolve => {
       markStarted = resolve;
@@ -766,7 +799,7 @@ describe('sign-out teardown ordering', () => {
     await vi.waitFor(() => {
       expect(secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
     });
-    releaseInFlight?.();
+    releaseInFlight(undefined);
     await act(async () => {
       await signOutPromise;
     });
@@ -785,14 +818,13 @@ describe('sign-out teardown ordering', () => {
     const deleteIndex = deleteCalls.findIndex((call: string[]) => call[0] === 'session-filters');
     expect(deleteIndex).toBeGreaterThanOrEqual(0);
     const deleteOrder = secureStore.deleteItemAsync.mock.invocationCallOrder[deleteIndex];
-    expect(deleteOrder).toBeGreaterThan(secureStore.setItemAsync.mock.invocationCallOrder[0]);
+    expect(deleteOrder).toBeGreaterThan(invocationOrder(secureStore.setItemAsync));
 
     unmount();
   });
 
   it('regression: a cache cleanup failure does not abort sign-out query or auth state reset', async () => {
     const { ctx, unmount } = await mountAndGetContext();
-    const { queryClient: queryClientMock } = await import('@/lib/query-client');
     const clearMock = vi.mocked(queryClientMock.clear);
 
     // The encrypted-kv clear rejects (storage failure): logout must still
@@ -805,12 +837,89 @@ describe('sign-out teardown ordering', () => {
     });
 
     expect(readCacheMock.clearCacheScopeForSignOut).toHaveBeenCalledWith(null);
-    const cleanupOrder: number =
-      readCacheMock.clearCacheScopeForSignOut.mock.invocationCallOrder[0];
-    const clearOrder: number = clearMock.mock.invocationCallOrder[0];
+    const cleanupOrder = invocationOrder(readCacheMock.clearCacheScopeForSignOut);
+    const clearOrder = invocationOrder(clearMock);
     expect(cleanupOrder).toBeLessThan(clearOrder);
     expect(clearMock).toHaveBeenCalledTimes(1);
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
+
+    unmount();
+  });
+
+  it('still clears disk translations when the sign-out memory reset rejects', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    onTestFinished(() => act(unmount));
+    toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut.mockRejectedValueOnce(
+      new Error('reset subscriber failed')
+    );
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    expect(
+      toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut
+    ).toHaveBeenCalledTimes(1);
+    expect(queryClientMock.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the offline translation cache exactly once, only after the runtime reset settles', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const clearMock = vi.mocked(queryClientMock.clear);
+
+    // The runtime reset (generation bump + drain of the writes already
+    // dispatched) is asynchronous. Hold it open: an invocation-order assertion
+    // alone cannot see a dropped `await`, because both mocks are invoked
+    // synchronously in that order either way.
+    const gate = Promise.withResolvers<undefined>();
+    toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut.mockReturnValueOnce(
+      gate.promise
+    );
+
+    const signOutPromise = ctx.signOut();
+    await vi.waitFor(() => {
+      expect(
+        toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    // The disk scope still holds the signed-out account's tool text, so the
+    // clear must not run while the reset that settles its dispatched writes is
+    // in flight: a persist that settled afterwards would outlive the scope.
+    expect(
+      toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut
+    ).not.toHaveBeenCalled();
+
+    gate.resolve(undefined);
+    await act(async () => {
+      await signOutPromise;
+    });
+
+    // The offline translation cache holds the signed-out account's tool text,
+    // so sign-out drops it exactly once, as part of the same local cleanup
+    // batch, before the query client is cleared.
+    expect(
+      toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut
+    ).toHaveBeenCalledTimes(1);
+    // The runtime's in-memory retry memory and cache hold the same tool text:
+    // without this reset the next account's retry re-sends it to the gateway.
+    // It resolves only once the writes already dispatched have settled, so the
+    // disk scope clear can never race one of them.
+    expect(
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut
+    ).toHaveBeenCalledTimes(1);
+    const runtimeResetOrder = invocationOrder(
+      toolSummaryTranslationRuntimeMock.clearToolSummaryTranslationMemoryForSignOut
+    );
+    const translationClearOrder = invocationOrder(
+      toolSummaryTranslationCacheMock.clearToolSummaryTranslationsForSignOut
+    );
+    // The runtime reset (generation bump + dispatched-write drain) resolves
+    // before the disk scope is cleared, so no fire-and-forget persist can land
+    // after the scope is gone.
+    expect(runtimeResetOrder).toBeLessThan(translationClearOrder);
+    const clearOrder = invocationOrder(clearMock);
+    expect(translationClearOrder).toBeLessThan(clearOrder);
 
     unmount();
   });
@@ -888,7 +997,6 @@ describe('stale sign-in continuation', () => {
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().sessionEnded).toBe(true);
     expect(getCtx().isSigningOut).toBe(true);
-    const { queryClient: queryClientMock } = await import('@/lib/query-client');
     // The account-switch path in signIn clears once, and the sign-out teardown
     // clears a second time.
     expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(2);
@@ -1004,7 +1112,7 @@ describe('bootstrap and foreground race fencing', () => {
   async function mountProvider(): Promise<{
     getCtx: () => AuthContextValue;
     unmount: () => void;
-    mod: AuthContextModule;
+    mod: typeof AuthContextModule;
   }> {
     vi.resetModules();
     const mod = await import('./auth-context');
@@ -1044,10 +1152,7 @@ describe('bootstrap and foreground race fencing', () => {
   }
 
   it('regression: sign-out during bootstrap does not restore the preloaded token into React state or the owner', async () => {
-    let releaseRead: (() => void) | undefined = undefined;
-    const readGate = new Promise<void>(resolve => {
-      releaseRead = resolve;
-    });
+    const { promise: readGate, resolve: releaseRead } = Promise.withResolvers<undefined>();
     // Mock queue consumed by the bootstrap load: preloadedToken,
     // preloadedRefreshToken, then the expiry read (held), then the
     // credential re-read (unchanged, so only the epoch fence can stop it).
@@ -1068,7 +1173,7 @@ describe('bootstrap and foreground race fencing', () => {
       await getCtx().signOut(true);
     });
 
-    releaseRead?.();
+    releaseRead(undefined);
     await act(async () => {
       await new Promise<void>(resolve => {
         void setTimeout(resolve, 0);
@@ -1087,10 +1192,7 @@ describe('bootstrap and foreground race fencing', () => {
   });
 
   it('regression: a bootstrap success landing mid-sign-out-teardown never republishes the torn-down credentials', async () => {
-    let releaseRead: (() => void) | undefined = undefined;
-    const readGate = new Promise<void>(resolve => {
-      releaseRead = resolve;
-    });
+    const { promise: readGate, resolve: releaseRead } = Promise.withResolvers<undefined>();
     const storedToken = makeToken({ kiloUserId: 'user-1' });
     // Mock queue consumed by the bootstrap load: preloadedToken,
     // preloadedRefreshToken, then the expiry read (held), then the
@@ -1110,10 +1212,7 @@ describe('bootstrap and foreground race fencing', () => {
     // Hold the sign-out's remote cleanup open: the teardown is mid-flight and
     // its epoch bump (which waits for the cleanup) has not happened when the
     // bootstrap read resolves — the epoch fence alone cannot stop the publish.
-    let releaseCleanup: (() => void) | undefined = undefined;
-    const cleanupGate = new Promise<void>(resolve => {
-      releaseCleanup = resolve;
-    });
+    const { promise: cleanupGate, resolve: releaseCleanup } = Promise.withResolvers<undefined>();
     logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(async () => {
       await cleanupGate;
     });
@@ -1124,7 +1223,7 @@ describe('bootstrap and foreground race fencing', () => {
     });
 
     // Release the bootstrap read while the teardown is still in flight.
-    releaseRead?.();
+    releaseRead(undefined);
     await act(async () => {
       await new Promise<void>(resolve => {
         void setTimeout(resolve, 0);
@@ -1139,7 +1238,7 @@ describe('bootstrap and foreground race fencing', () => {
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).not.toHaveBeenCalledWith('user-1');
 
     // The teardown then finishes into the signed-out end state.
-    releaseCleanup?.();
+    releaseCleanup(undefined);
     await act(async () => {
       await signOutPromise;
     });
@@ -1150,10 +1249,7 @@ describe('bootstrap and foreground race fencing', () => {
   });
 
   it('regression: a legacy-exchange success landing mid-sign-out-teardown never republishes credentials', async () => {
-    let releaseExchange: (() => void) | undefined = undefined;
-    const exchangeGate = new Promise<void>(resolve => {
-      releaseExchange = resolve;
-    });
+    const { promise: exchangeGate, resolve: releaseExchange } = Promise.withResolvers<undefined>();
     const storedToken = makeToken({ kiloUserId: 'user-1' });
     // No stored refresh token: bootstrap takes the legacy-exchange branch.
     // Mock queue consumed by the bootstrap load: preloadedToken,
@@ -1175,10 +1271,7 @@ describe('bootstrap and foreground race fencing', () => {
     // Hold the sign-out's remote cleanup open so the teardown is mid-flight
     // (epoch not yet bumped) when the exchange resolves: the exchange's own
     // epoch checks pass inside that window.
-    let releaseCleanup: (() => void) | undefined = undefined;
-    const cleanupGate = new Promise<void>(resolve => {
-      releaseCleanup = resolve;
-    });
+    const { promise: cleanupGate, resolve: releaseCleanup } = Promise.withResolvers<undefined>();
     logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(async () => {
       await cleanupGate;
     });
@@ -1189,7 +1282,7 @@ describe('bootstrap and foreground race fencing', () => {
     });
 
     // Release the exchange while the teardown is still in flight.
-    releaseExchange?.();
+    releaseExchange(undefined);
     await act(async () => {
       await new Promise<void>(resolve => {
         void setTimeout(resolve, 0);
@@ -1202,7 +1295,7 @@ describe('bootstrap and foreground race fencing', () => {
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).not.toHaveBeenCalledWith('user-1');
 
     // The teardown then finishes into the signed-out end state.
-    releaseCleanup?.();
+    releaseCleanup(undefined);
     await act(async () => {
       await signOutPromise;
     });
@@ -1214,10 +1307,7 @@ describe('bootstrap and foreground race fencing', () => {
   });
 
   it('regression: bootstrap publishes the refreshed token when credentials change during the load', async () => {
-    let releaseRead: (() => void) | undefined = undefined;
-    const readGate = new Promise<void>(resolve => {
-      releaseRead = resolve;
-    });
+    const { promise: readGate, resolve: releaseRead } = Promise.withResolvers<undefined>();
     // Mock queue consumed by the bootstrap load: preloadedToken,
     // preloadedRefreshToken, then the expiry read (held). The credential
     // re-read falls back to the null base mock, so it reports the preloaded
@@ -1243,7 +1333,7 @@ describe('bootstrap and foreground race fencing', () => {
       });
     });
 
-    releaseRead?.();
+    releaseRead(undefined);
     await act(async () => {
       await new Promise<void>(resolve => {
         void setTimeout(resolve, 0);
@@ -1265,10 +1355,7 @@ describe('bootstrap and foreground race fencing', () => {
   });
 
   it('regression: sign-out during bootstrap wins over changed stored credentials', async () => {
-    let releaseRead: (() => void) | undefined = undefined;
-    const readGate = new Promise<void>(resolve => {
-      releaseRead = resolve;
-    });
+    const { promise: readGate, resolve: releaseRead } = Promise.withResolvers<undefined>();
     // Mock queue consumed by the bootstrap load: preloadedToken,
     // preloadedRefreshToken, then the expiry read (held). The credential
     // re-read falls back to the null base mock, so the stored pair no longer
@@ -1288,7 +1375,7 @@ describe('bootstrap and foreground race fencing', () => {
       await getCtx().signOut(true);
     });
 
-    releaseRead?.();
+    releaseRead(undefined);
     await act(async () => {
       await new Promise<void>(resolve => {
         void setTimeout(resolve, 0);
@@ -1341,10 +1428,7 @@ describe('bootstrap and foreground race fencing', () => {
     const eventListener = listeners.at(-1)?.[1];
 
     // Hold the expiry read open so a sign-out can land inside the handler.
-    let releaseRead: (() => void) | undefined = undefined;
-    const readGate = new Promise<void>(resolve => {
-      releaseRead = resolve;
-    });
+    const { promise: readGate, resolve: releaseRead } = Promise.withResolvers<undefined>();
     hoisted.secureStore.getItemAsync.mockImplementationOnce(async () => {
       await readGate;
       // An expiry inside the refresh margin: without the epoch fence the
@@ -1364,7 +1448,7 @@ describe('bootstrap and foreground race fencing', () => {
       await getCtx().signOut(true);
     });
 
-    releaseRead?.();
+    releaseRead(undefined);
     await act(async () => {
       await new Promise<void>(resolve => {
         void setTimeout(resolve, 0);
@@ -1489,6 +1573,13 @@ describe('reactive auth epoch', () => {
     });
     const previous = scope.getAuthenticatedOwner();
     expect(previous.userId).toBe('user-a');
+    // Establish the restored state a cold start sets, so the assertion after the
+    // switch proves `signIn` clears a previously-restored flag instead of
+    // starting from the `false` a never-restored bootstrap already holds.
+    act(() => {
+      scope.markRestoredAuthenticatedOwner();
+    });
+    expect(scope.getAuthenticatedOwner().restored).toBe(true);
     // The old credentials remain readable on disk while the replacement write is held.
     hoisted.secureStore.getItemAsync.mockResolvedValue('account-a-token');
 
@@ -1525,6 +1616,9 @@ describe('reactive auth epoch', () => {
       await transition.promise;
     });
     expect(scope.getAuthenticatedOwner().userId).toBeNull();
+    // A fresh sign-in is not a restore: the previous account's persisted hint
+    // must not scope local data while these credentials are unconfirmed.
+    expect(scope.getAuthenticatedOwner().restored).toBe(false);
     const requestedTokens: (string | undefined)[] = [];
     ownerProducer.getMe.mockImplementationOnce(async () => {
       requestedTokens.push(tokens.getActiveToken()?.token);
@@ -1542,6 +1636,69 @@ describe('reactive auth epoch', () => {
     expect(getCtx().isSigningOut).toBe(false);
   });
 
+  it('removes the previous identity hint before new credentials can survive a restart', async () => {
+    const { getCtx, unmount } = await mountEpochTest();
+    onTestFinished(() => act(unmount));
+    const metadata = await import('./account-metadata-write');
+    const disk = new Map([['active-user-id', 'user-a']]);
+    const oldWrite = Promise.withResolvers<undefined>();
+    const previousSet = hoisted.secureStore.setItemAsync.getMockImplementation();
+    const previousDelete = hoisted.secureStore.deleteItemAsync.getMockImplementation();
+    onTestFinished(() => {
+      if (previousSet) {
+        hoisted.secureStore.setItemAsync.mockImplementation(previousSet);
+      }
+      if (previousDelete) {
+        hoisted.secureStore.deleteItemAsync.mockImplementation(previousDelete);
+      }
+    });
+    hoisted.secureStore.setItemAsync.mockImplementation(async (key: string, value: string) => {
+      if (key === 'active-user-id') {
+        await oldWrite.promise;
+      }
+      disk.set(key, value);
+    });
+    hoisted.secureStore.deleteItemAsync.mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      disk.delete(key);
+    });
+    const pendingHint = metadata.setAccountMetadata('active-user-id', 'user-a');
+    await Promise.resolve();
+    const transition: { promise?: Promise<void> } = {};
+    await act(async () => {
+      transition.promise = getCtx().signIn('account-b-token');
+      await Promise.resolve();
+    });
+    // A crash at any credential write must not leave B's token beside A's hint.
+    expect.soft(disk.has('auth-token')).toBe(false);
+    await act(async () => {
+      oldWrite.resolve(undefined);
+      await pendingHint;
+      await transition.promise;
+    });
+    expect(disk.get('auth-token')).toBe('account-b-token');
+    expect(disk.has('active-user-id')).toBe(false);
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
+  });
+
+  it('does not persist new credentials if removing the previous identity hint fails', async () => {
+    const { getCtx, unmount } = await mountEpochTest();
+    onTestFinished(() => act(unmount));
+    hoisted.secureStore.deleteItemAsync.mockRejectedValueOnce(new Error('keychain unavailable'));
+    await act(async () => {
+      await expect(getCtx().signIn('account-b-token')).rejects.toThrow('keychain unavailable');
+    });
+    expect(hoisted.secureStore.setItemAsync).not.toHaveBeenCalled();
+    expect(getCtx().isSigningOut).toBe(true);
+    expect(getCtx().token).toBeUndefined();
+
+    await act(async () => {
+      await getCtx().signIn('account-b-token');
+    });
+    expect(getCtx().token).toBe('account-b-token');
+    expect(getCtx().isSigningOut).toBe(false);
+  });
+
   it('confirms a restored account from getMe rather than the decoded token hint', async () => {
     const token = makeToken({ kiloUserId: 'unconfirmed-hint' });
     hoisted.secureStore.getItemAsync
@@ -1553,6 +1710,9 @@ describe('reactive auth epoch', () => {
     onTestFinished(() => act(unmount));
     const scope: typeof ContextScopeModule = await import('../context-scope');
     expect(scope.getAuthenticatedOwner().userId).toBeNull();
+    // Credentials restored from storage on bootstrap: the persisted identity
+    // hint may scope local data until getMe answers.
+    expect(scope.getAuthenticatedOwner().restored).toBe(true);
 
     await act(async () => {
       await requestOwnerTicket();
@@ -1746,10 +1906,7 @@ describe('auth-transition queue and sign-out failure matrix', () => {
 
     // Hold the sign-out's remote cleanup open so the teardown is mid-flight
     // when the sign-in is queued.
-    let releaseCleanup: (() => void) | undefined = undefined;
-    const cleanupGate = new Promise<void>(resolve => {
-      releaseCleanup = resolve;
-    });
+    const { promise: cleanupGate, resolve: releaseCleanup } = Promise.withResolvers<undefined>();
     logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(async () => {
       await cleanupGate;
     });
@@ -1770,10 +1927,9 @@ describe('auth-transition queue and sign-out failure matrix', () => {
     expect(hoisted.secureStore.setItemAsync).not.toHaveBeenCalled();
     expect(hoisted.appsflyer.trackEvent).not.toHaveBeenCalled();
 
-    const { queryClient: queryClientMock } = await import('@/lib/query-client');
     const clearMock = vi.mocked(queryClientMock.clear);
 
-    releaseCleanup?.();
+    releaseCleanup(undefined);
     await act(async () => {
       await Promise.all([signOutPromise, signInPromise]);
     });
@@ -1783,7 +1939,7 @@ describe('auth-transition queue and sign-out failure matrix', () => {
     // account-switch path then clears a second time after its credential write.
     expect(clearMock).toHaveBeenCalledTimes(2);
     const clearOrder = clearMock.mock.invocationCallOrder[0];
-    const setOrder = hoisted.secureStore.setItemAsync.mock.invocationCallOrder[0];
+    const setOrder = invocationOrder(hoisted.secureStore.setItemAsync);
     expect(clearOrder).toBeLessThan(setOrder);
     expect(hoisted.appsflyer.trackEvent).toHaveBeenCalledTimes(1);
     expect(getCtx().token).toBe('queued-token');
@@ -1805,7 +1961,6 @@ describe('auth-transition queue and sign-out failure matrix', () => {
 
     // The second queued sign-out no-ops: teardown ran exactly once.
     expect(hoisted.posthog.discardPostHog).toHaveBeenCalledTimes(1);
-    const { queryClient: queryClientMock } = await import('@/lib/query-client');
     expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith(
       'auth-token',
@@ -1832,7 +1987,6 @@ describe('auth-transition queue and sign-out failure matrix', () => {
       expect.anything()
     );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('organization');
-    const { queryClient: queryClientMock } = await import('@/lib/query-client');
     expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().sessionEnded).toBe(false);
@@ -1864,7 +2018,6 @@ describe('auth-transition queue and sign-out failure matrix', () => {
       expect.anything()
     );
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
-    const { queryClient: queryClientMock } = await import('@/lib/query-client');
     expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().sessionEnded).toBe(false);
@@ -1892,7 +2045,6 @@ describe('auth-transition queue and sign-out failure matrix', () => {
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
     const { clearAgentModelPreference } = await import('@/lib/hooks/use-persisted-agent-model');
     expect(clearAgentModelPreference).toHaveBeenCalled();
-    const { queryClient: queryClientMock } = await import('@/lib/query-client');
     expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
     expect(getCtx().token).toBeUndefined();
 
@@ -1915,7 +2067,6 @@ describe('auth-transition queue and sign-out failure matrix', () => {
       });
     });
 
-    const { queryClient: queryClientMock } = await import('@/lib/query-client');
     expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalledTimes(1);
     const { clearAgentModelPreference } = await import('@/lib/hooks/use-persisted-agent-model');
     expect(clearAgentModelPreference).not.toHaveBeenCalled();

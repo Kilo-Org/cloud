@@ -3153,7 +3153,9 @@
     "couldNotApprove": "Tasdiqlab bo'lmadi",
     "couldNotStart": "Boshlab bo'lmadi",
     "channelName": "Faol agentlar",
-    "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing."
+    "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing.",
+    "openSession": "Ochish",
+    "approveFailed": "Tasdiqlab bo'lmadi. Qayta urinish uchun $t(common.approve) ga teging."
   },
   "transcriptionModel": {
     "title": "Matnga aylantirish modeli",

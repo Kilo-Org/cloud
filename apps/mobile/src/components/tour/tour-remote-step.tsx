@@ -8,6 +8,7 @@ import { QueryError } from '@/components/query-error';
 import { TourStepHeader } from '@/components/tour/tour-step-header';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, Server } from '@/components/ui/icons';
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -109,9 +110,7 @@ export function TourRemoteStep({ onChooseComputer }: Readonly<TourRemoteStepProp
             }}
           />
         </View>
-        <Text variant="mono" className="text-center">
-          {t('tour.remoteRunHint')}
-        </Text>
+        <InlineCodeText variant="mono" className="text-center" value={t('tour.remoteRunHint')} />
       </View>
     );
   } else if (isInstancesError) {
@@ -151,13 +150,13 @@ export function TourRemoteStep({ onChooseComputer }: Readonly<TourRemoteStepProp
           <Text variant="large" className="text-center">
             {t('tour.remoteEmptyTitle')}
           </Text>
-          <Text variant="muted" className="text-center">
-            {t('tour.remoteEmptyBody')}
-          </Text>
+          <InlineCodeText
+            variant="muted"
+            className="text-center"
+            value={t('tour.remoteEmptyBody')}
+          />
         </View>
-        <Text variant="mono" className="text-center">
-          {t('tour.remoteRunHint')}
-        </Text>
+        <InlineCodeText variant="mono" className="text-center" value={t('tour.remoteRunHint')} />
         <Button
           variant="outline"
           onPress={() => {

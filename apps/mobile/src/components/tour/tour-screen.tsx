@@ -1,5 +1,5 @@
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BackHandler, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { TourStepHeader } from '@/components/tour/tour-step-header';
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Cloud, type LucideIcon, Monitor, Sparkles } from '@/components/ui/icons';
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -44,7 +45,8 @@ type ForkStepProps = {
 type ForkOptionProps = {
   icon: LucideIcon;
   title: string;
-  body: string;
+  /** Muted body copy, or a node that carries its own styling (e.g. InlineCodeText). */
+  body: ReactNode;
   onPress: () => void;
 };
 
@@ -63,9 +65,16 @@ function ForkOption({ icon: Icon, title, body, onPress }: Readonly<ForkOptionPro
       </View>
       <View className="flex-1 gap-0.5">
         <Text className="text-base font-semibold text-foreground">{title}</Text>
-        <Text variant="muted" className="text-sm">
-          {body}
-        </Text>
+        {
+          // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to detect its plain-string variant
+          typeof body === 'string' ? (
+            <Text variant="muted" className="text-sm">
+              {body}
+            </Text>
+          ) : (
+            body
+          )
+        }
       </View>
     </ChoiceRow>
   );
@@ -108,7 +117,15 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
         <ForkOption
           icon={Monitor}
           title={t('tour.remoteOptionTitle')}
-          body={t('tour.remoteOptionBody')}
+          body={
+            // The copy names `kilo remote` in backticks; the renderer turns
+            // those markers into inline code instead of showing them.
+            <InlineCodeText
+              variant="muted"
+              className="text-sm"
+              value={t('tour.remoteOptionBody')}
+            />
+          }
           onPress={() => {
             onChoose('remote');
           }}

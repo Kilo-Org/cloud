@@ -10,7 +10,7 @@ import {
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
-import '@/i18n';
+import { i18n as appI18n } from '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 
 vi.mock('react-i18next', async importOriginal => {
@@ -103,6 +103,11 @@ vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
 }));
 
+// The hint's own renderer turns the catalog's backtick markers into inline
+// code; its behavior is covered by `inline-code-text.test.ts`. Here it is
+// mocked so the form's wiring to it stays assertable.
+vi.mock('@/components/ui/inline-code-text', () => ({ InlineCodeText: 'InlineCodeText' }));
+
 // ── hooks ──────────────────────────────────────────────────────────
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
@@ -136,22 +141,23 @@ function findTextContent(node: Node, predicate: (text: string) => boolean): bool
 }
 
 function findElementByType(node: Node, typeName: string): Record<string, unknown> | null {
+  return collectElementsOfType(node, typeName)[0] ?? null;
+}
+
+/** Every node of `typeName` in the tree, in render order. */
+function collectElementsOfType(node: Node, typeName: string): Record<string, unknown>[] {
   if (node === null || typeof node !== 'object') {
-    return null;
+    return [];
   }
   const props = node.props ?? {};
-  const children = props.children;
   const type = (node as { type?: unknown }).type;
-  if (type === typeName) {
-    return node.props ?? {};
-  }
-  for (const child of Array.isArray(children) ? children : [children]) {
-    const found = findElementByType(child as Node, typeName);
-    if (found) {
-      return found;
-    }
-  }
-  return null;
+  const here = type === typeName ? [props] : [];
+  const children = props.children;
+  const childrenList = Array.isArray(children) ? children : [children];
+  return [
+    ...here,
+    ...childrenList.flatMap(child => collectElementsOfType(child as Node, typeName)),
+  ];
 }
 
 /** Height of the first node carrying an explicit `style.height` (the clearance spacer). */
@@ -708,9 +714,9 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: null,
       showRunOnSelector: true,
     }) as Node;
-    expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
-      true
-    );
+    const cloudHint = findElementByType(cloud, 'InlineCodeText');
+    expect(cloudHint?.value).toContain('kilo remote');
+    expect(cloudHint?.value).toContain('/remote');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const remote = NewSessionConfigureForm({
@@ -718,9 +724,29 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: INSTANCE,
       showRunOnSelector: false,
     }) as Node;
-    expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
-      true
-    );
+    const remoteHint = findElementByType(remote, 'InlineCodeText');
+    expect(remoteHint?.value).toContain('kilo remote');
+    expect(remoteHint?.value).toContain('/remote');
+  });
+
+  // ── Case 12b: the hint goes through the renderer that turns its markers into code ──
+  it('renders the hint through the inline-code text so its markers never reach the reader', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      showRunOnSelector: true,
+    }) as Node;
+
+    // No bare string in the form carries the catalog copy: the hint is handed
+    // to `InlineCodeText`, which renders `kilo remote` and `/remote` as code
+    // spans with no tick marks (asserted in `inline-code-text.test.ts`).
+    const hint = findElementByType(element, 'InlineCodeText');
+    expect(hint?.className).toBe('mt-2 text-xs text-muted-foreground');
+    expect(hint?.value).toBe(appI18n.t('agentChat.newSession.remoteHint'));
+    expect(findTextContent(element, t => t.includes('kilo remote'))).toBe(false);
   });
 
   // ── Case 14: bottom navigation-bar clearance ──

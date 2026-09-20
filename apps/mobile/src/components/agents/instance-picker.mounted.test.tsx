@@ -42,6 +42,9 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  // `InlineCodeText` (the empty state's description) nests a raw `Text` for
+  // each backtick span, so the picker's react-native mock has to expose it.
+  Text: 'Text',
   View: 'View',
 }));
 vi.mock('expo-router', () => ({
@@ -276,6 +279,10 @@ describe('InstancePickerScreen', () => {
     fetchInstances.mockResolvedValue({ instances: [] });
     const mounted = await openPicker(null);
     await waitFor(() => text(mounted).includes('No CLI instances connected'));
+    // The description names `kilo remote`, so it renders through the inline-code
+    // span: the command reaches the reader and no tick mark does.
+    expect(hosts(mounted, 'Text').some(node => node.children.includes('kilo remote'))).toBe(true);
+    expect(text(mounted)).not.toContain('`');
     expect(radios(mounted).map(row => row.accessibilityState?.checked)).toEqual([true]);
     expect(text(mounted)).not.toContain('Remotes');
     expect(text(mounted)).not.toContain('Terminals');

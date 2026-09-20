@@ -2,6 +2,7 @@ import { createElement, type ElementType } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { HOME_TAB_ROOT } from '@/lib/tour/tour-dismiss';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -219,6 +220,12 @@ describe('TourScreen', () => {
     expect(hasText(renderer, 'tour.forkSubtitle')).toBe(true);
     expect(hasText(renderer, 'tour.cloudOptionTitle')).toBe(true);
     expect(hasText(renderer, 'tour.remoteOptionTitle')).toBe(true);
+    // The card copy names `kilo remote` in backticks, so the card hands it to
+    // the inline-code renderer; the marker-stripping itself is covered in
+    // `inline-code-text.test.ts`.
+    expect(renderer.root.findAllByType(InlineCodeText).map(node => node.props.value)).toEqual([
+      'tour.remoteOptionBody',
+    ]);
     expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(0);
 
     unmount();

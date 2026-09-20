@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Button } from '@/components/ui/button';
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -314,7 +315,15 @@ export default function InstancePickerScreen() {
               icon={Server}
               placement="top"
               title={t('agentChat.instancePicker.noCliInstances')}
-              description={t('agentChat.instancePicker.noCliInstancesDescription')}
+              description={
+                // The copy names `kilo remote` in backticks, so it goes through
+                // the renderer that turns those markers into inline code.
+                <InlineCodeText
+                  variant="muted"
+                  className="text-center"
+                  value={t('agentChat.instancePicker.noCliInstancesDescription')}
+                />
+              }
               action={
                 <Button
                   variant="outline"

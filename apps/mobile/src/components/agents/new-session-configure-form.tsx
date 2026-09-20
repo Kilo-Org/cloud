@@ -20,6 +20,7 @@ import { type AgentMode } from '@/components/agents/mode-selector';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { type ModeOption } from '@/components/agents/mode-normalize';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import {
@@ -258,9 +259,10 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      <Text className="mt-2 text-xs text-muted-foreground">
-        {t('agentChat.newSession.remoteHint')}
-      </Text>
+      <InlineCodeText
+        className="mt-2 text-xs text-muted-foreground"
+        value={t('agentChat.newSession.remoteHint')}
+      />
 
       {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
 

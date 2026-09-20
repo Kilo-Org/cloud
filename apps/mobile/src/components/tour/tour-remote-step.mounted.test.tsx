@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type UseQueryOptions } from '@tanstack/react-query';
 import type * as ReactI18next from 'react-i18next';
 
+import { InlineCodeText } from '@/components/ui/inline-code-text';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -215,6 +216,23 @@ describe('TourRemoteStep', () => {
     unmount();
   });
 
+  it('renders the start instructions through the inline-code renderer', async () => {
+    fetchInstances.mockResolvedValue({ instances: [] });
+    const { renderer, unmount } = await mountStep();
+
+    await waitFor(() => hasText(renderer, 'tour.remoteEmptyTitle'));
+    // Both lines name `kilo remote` / `/remote` in backticks, so they go
+    // through the renderer that turns those markers into inline code (the
+    // marker-stripping itself is covered in `inline-code-text.test.ts`).
+    const rendered = renderer.root.findAllByType(InlineCodeText);
+    expect(rendered.map(node => node.props.value)).toEqual([
+      'tour.remoteEmptyBody',
+      'tour.remoteRunHint',
+    ]);
+
+    unmount();
+  });
+
   it('shows a working retry for a retryable list failure without losing the step chrome', async () => {
     fetchInstances.mockRejectedValue(new Error('offline'));
     const { renderer, unmount } = await mountStep();
@@ -302,7 +320,11 @@ describe('TourRemoteStep', () => {
       { accessibilityRole: 'button', accessibilityLabel: 'desktop' },
     ]);
     // The `kilo remote` / `/remote` start instructions stay visible next to the
-    // detected list.
+    // detected list, through the renderer that turns those markers into inline
+    // code (the marker-stripping itself is covered in `inline-code-text.test.ts`).
+    expect(slot.findAllByType(InlineCodeText).map(node => node.props.value)).toEqual([
+      'tour.remoteRunHint',
+    ]);
     expect(hasTextIn(slot, 'tour.remoteRunHint')).toBe(true);
     expect(slot.findAllByType('Server' as ElementType)).toHaveLength(2);
     expect(slot.findAllByType('ChevronRight' as ElementType)).toHaveLength(2);

@@ -3,6 +3,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { openBrowserAsync } from 'expo-web-browser';
+import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 
 import { IdleAuth } from '../idle-auth';
@@ -62,6 +63,7 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
   useColorScheme: () => 'light',
   View: 'View',
 }));
@@ -121,15 +123,49 @@ function findButton(root: I, label: string): I {
   return btn;
 }
 
-function findText(root: I, text: string): I {
-  const nodes = root.findAll(
-    n => typeof n.type === 'string' && (n.type as string) === 'Text' && n.props.children === text
+function linkPressables(root: I): I[] {
+  return root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Pressable' &&
+      n.props.accessibilityRole === 'link'
   );
-  const node = nodes[0];
-  if (!node || nodes.length !== 1) {
-    throw new Error(`text "${text}" found ${nodes.length} times, expected once`);
+}
+
+function findLink(root: I, label: string): I {
+  const links = linkPressables(root).filter(link => link.props.accessibilityLabel === label);
+  const link = links[0];
+  if (!link || links.length !== 1) {
+    throw new Error(`link "${label}" found ${links.length} times, expected once`);
   }
-  return node;
+  return link;
+}
+
+/** The box a control's className declares, in dp: its own height and width. */
+function boxDp(className: string): { width: number; height: number } {
+  const size = (axis: 'h' | 'w'): number => {
+    const pattern = new RegExp(`^(?:min-)?${axis}-\\[(\\d+(?:\\.\\d+)?)px\\]$`);
+    for (const part of className.split(/\s+/)) {
+      const match = pattern.exec(part);
+      if (match?.[1]) {
+        return Number(match[1]);
+      }
+    }
+    throw new Error(`no ${axis} size class in "${className}"`);
+  };
+  return { width: size('w'), height: size('h') };
+}
+
+/** The smallest per-side reach a hitSlop expresses, in dp. */
+function slopDp(hitSlop: unknown): number {
+  if (typeof hitSlop === 'number') {
+    return hitSlop;
+  }
+  if (hitSlop && typeof hitSlop === 'object') {
+    const sides = Object.values(hitSlop as Record<string, number | undefined>);
+    return Math.min(...sides.map(side => side ?? 0));
+  }
+  return 0;
 }
 
 describe('IdleAuth SSO recovery', () => {
@@ -265,17 +301,44 @@ describe('IdleAuth email continue copy', () => {
     });
   });
 
+  it('offers each legal link as its own pressable target on the audit floor', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    const links = linkPressables(renderer.root);
+    expect(links.map(link => link.props.accessibilityLabel)).toEqual(['Terms', 'Privacy Policy']);
+
+    for (const link of links) {
+      const box = boxDp(link.props.className as string);
+      expect(box.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+      expect(box.height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+      const slop = slopDp(link.props.hitSlop);
+      expect(box.width + 2 * slop).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+      expect(box.height + 2 * slop).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    }
+
+    // The sentence's copy is unchanged: both labels still render, with the
+    // connector and suffix the sentence carried before.
+    expect(texts(renderer.root)).toEqual(
+      expect.arrayContaining(['Terms', 'Privacy Policy', ' and ', '.'])
+    );
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('opens the browser for Terms and Privacy Policy', async () => {
     const start = vi.fn<StartFn>();
     const renderer = await mountIdleAuth(start);
 
-    const terms = findText(renderer.root, 'Terms');
+    const terms = findLink(renderer.root, 'Terms');
     act(() => {
       (terms.props.onPress as () => void)();
     });
     expect(openBrowserAsync).toHaveBeenCalledWith(TERMS_URL);
 
-    const privacy = findText(renderer.root, 'Privacy Policy');
+    const privacy = findLink(renderer.root, 'Privacy Policy');
     act(() => {
       (privacy.props.onPress as () => void)();
     });

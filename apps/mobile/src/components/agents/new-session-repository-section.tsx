@@ -205,6 +205,11 @@ export function NewSessionRepositorySection({
     if (!collapseStateLoaded) {
       return null;
     }
+    // The label takes the row's remaining width and is pinned to one line: a
+    // label sized to its own content is measured at its longest word's width
+    // and wraps onto a second line the button's min height then clips. Its
+    // right margin mirrors the glyph and the row gap, so the centred label
+    // stays on the button's own centre.
     return (
       <CollapsibleSection
         className="mt-3 gap-3 rounded-lg border border-border bg-card p-4"
@@ -229,7 +234,9 @@ export function NewSessionRepositorySection({
             }}
           >
             <ExternalLink size={16} color={colors.foreground} />
-            <Text>{t(copy.openLabel)}</Text>
+            <Text className="mr-[24px] flex-1 text-center" numberOfLines={1}>
+              {t(copy.openLabel)}
+            </Text>
           </Button>
           <Button
             variant="outline"

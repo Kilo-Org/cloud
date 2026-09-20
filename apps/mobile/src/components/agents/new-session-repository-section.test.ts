@@ -134,6 +134,11 @@ function pressables(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root.findAllByType('Pressable' as never);
 }
 
+/** The Text rendering `text`, for the props that decide its layout. */
+function labelNode(renderer: TestRenderer.ReactTestRenderer, text: string) {
+  return renderer.root.findAllByType('Text' as never).find(node => node.children.includes(text));
+}
+
 function connectHeader(renderer: TestRenderer.ReactTestRenderer, title: string) {
   return pressables(renderer).find(node => node.props.accessibilityLabel === title);
 }
@@ -316,5 +321,20 @@ describe('NewSessionRepositorySection connect card collapse', () => {
 
     expect(renderedText(renderer)).not.toContain(i18n.t('common.connectGithub'));
     expect(pressables(renderer)).toHaveLength(0);
+  });
+});
+
+describe('NewSessionRepositorySection connect button label', () => {
+  it('keeps the connect action label on a single line with the row remaining width', () => {
+    // A label sized to its own content is measured at its longest word's width
+    // and wraps onto a second line. Taking the row's remaining width gives the
+    // one line room, and the pin keeps it single-line on a narrow button.
+    const renderer = mountSection({ groups: [group('gitlab', 'connect')] });
+
+    const label = labelNode(renderer, i18n.t('agentChat.newSession.openGitlab'));
+
+    expect(label?.props.numberOfLines).toBe(1);
+    expect(String(label?.props.className)).toContain('flex-1');
+    expect(String(label?.props.className)).toContain('text-center');
   });
 });

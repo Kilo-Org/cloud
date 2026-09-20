@@ -419,6 +419,109 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     });
   });
 
+  it('re-arms a superseded trailing refresh whose own build succeeded', async () => {
+    const h = makeHarness();
+    const base = 95_000_000;
+    let now = base;
+    const scope = { userId: 'user-superseded-built', organizationId: null };
+    const key = pendingKey('user-superseded-built', null);
+    await h.storage.put(key, {
+      userId: 'user-superseded-built',
+      organizationId: null,
+      dueAt: now - 1,
+    });
+
+    // The trailing build stalls, so a newer refresh bumps the revision while it
+    // is in flight. That refresh's own build returns no snapshot, so it delivers
+    // nothing and records nothing: only the trailing refresh can keep the
+    // deferred counts alive.
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    let build = 0;
+    h.deps.buildSnapshot = async () => {
+      build += 1;
+      if (build === 1) {
+        started.resolve();
+        await release.promise;
+        return snapshot({ running: 5 });
+      }
+      return null;
+    };
+
+    const trailing = flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now);
+    await started.promise;
+
+    now = base + 1_000;
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+    expect(h.expoSends).toHaveLength(0);
+
+    release.resolve();
+    // The newer revision owns the surface, so the trailing fetch must not
+    // deliver; the deferred counts still need a pending record and a deadline
+    // instead of being dropped with no alarm left to retry them.
+    await expect(trailing).resolves.toBe(now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS);
+    expect(await h.storage.get(key)).toEqual({
+      userId: 'user-superseded-built',
+      organizationId: null,
+      dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      deferredAt: now,
+    });
+  });
+
+  it('re-arms a superseded trailing refresh when the concurrent attempt failed at the transport', async () => {
+    const h = makeHarness();
+    const base = 96_000_000;
+    let now = base;
+    const scope = { userId: 'user-superseded-built-failed', organizationId: null };
+    const key = pendingKey('user-superseded-built-failed', null);
+    await h.storage.put(key, {
+      userId: 'user-superseded-built-failed',
+      organizationId: null,
+      dueAt: now - 1,
+    });
+
+    // The trailing build stalls, so a newer refresh supersedes it and attempts
+    // its delivery. The transport rejects, and that failure still writes the
+    // delivery record: the record alone cannot tell a landed delivery from a
+    // spent window.
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    let build = 0;
+    h.deps.buildSnapshot = async () => {
+      build += 1;
+      if (build === 1) {
+        started.resolve();
+        await release.promise;
+        return snapshot({ running: 5 });
+      }
+      return snapshot({ running: 6 });
+    };
+
+    const trailing = flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now);
+    await started.promise;
+
+    now = base + 1_000;
+    h.failNextExpoPush(new Error('transport down'));
+    await expect(
+      refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now)
+    ).rejects.toThrow('transport down');
+    expect(await h.storage.get(deliveryKey('user-superseded-built-failed', null))).toEqual({
+      deliveredAt: now,
+      outcome: 'failed',
+    });
+
+    release.resolve();
+    // No snapshot was delivered, so the deferred counts must keep a pending
+    // record and a deadline instead of being dropped with no alarm left.
+    await expect(trailing).resolves.toBe(now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS);
+    expect(await h.storage.get(key)).toEqual({
+      userId: 'user-superseded-built-failed',
+      organizationId: null,
+      dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      deferredAt: now,
+    });
+  });
+
   it('re-arms a stale past alarm so the trailing delivery is not stranded', async () => {
     const h = makeHarness();
     const base = 60_000_000;

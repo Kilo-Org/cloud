@@ -51,6 +51,7 @@ const pendingRefreshSchema = z.object({
   deferredAt: z.number().optional(),
 });
 type PendingGlanceableRefresh = z.infer<typeof pendingRefreshSchema>;
+type DeliveryState = z.infer<typeof deliveryStateSchema>;
 
 const PENDING_PREFIX = 'glanceable-pending:';
 
@@ -70,6 +71,45 @@ function isSameDeferral(
 ): boolean {
   if (before === undefined || after === undefined) return before === after;
   return before.dueAt === after.dueAt && before.deferredAt === after.deferredAt;
+}
+
+/**
+ * Re-arm the deferred change a trailing refresh owes when nothing else carried
+ * it, so the flush's consumed pending record is replaced instead of dropped.
+ *
+ * `buildSnapshot` is awaited after the revision bump, so a concurrent refresh
+ * for this scope can deliver while the fetch is in flight. That delivery
+ * already covers the change; re-arming would leave a record its
+ * `isSameDeferral` check keeps and the alarm would later fire a redundant
+ * build+send. Skip the re-arm only when such a delivery actually landed, told
+ * by the outcome in the record it wrote: the failure branch writes the same
+ * record with `outcome: 'failed'` after spending the window, and treating that
+ * as a landed delivery would drop the deferred change with no pending record
+ * and no alarm left to retry it. A record without an outcome predates the field
+ * and only ever meant a delivery.
+ */
+async function rearmTrailingRefresh(
+  scope: { userId: string; organizationId: string | null },
+  storage: DurableObjectStorage,
+  deliveryKey: string,
+  deliveryAtStart: DeliveryState | undefined,
+  nowMs: () => number
+): Promise<void> {
+  const landed = deliveryStateSchema.optional().parse(await storage.get(deliveryKey));
+  if (
+    landed !== undefined &&
+    landed.outcome !== 'failed' &&
+    landed.deliveredAt !== deliveryAtStart?.deliveredAt
+  ) {
+    return;
+  }
+  const now = nowMs();
+  await storage.put<PendingGlanceableRefresh>(pendingKey(scope), {
+    userId: scope.userId,
+    organizationId: scope.organizationId,
+    dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+    deferredAt: now,
+  });
 }
 
 /** The user DO owns these records; no ordering or interval state lives in a Worker instance. */
@@ -152,31 +192,7 @@ export async function refreshGlanceableSnapshot(
     // credentials fail, and the flush has already consumed the pending record,
     // so re-arm the next window instead of dropping the change with no alarm.
     if (options.trailing === true) {
-      // `buildSnapshot` was awaited after the revision bump, so a concurrent
-      // refresh for this scope can deliver while this fetch is in flight. That
-      // delivery already covers the change; re-arming here would leave a record
-      // its `isSameDeferral` check keeps and the alarm would later fire a
-      // redundant build+send. Skip the re-arm only when such a delivery actually
-      // landed, told by the outcome in the record it wrote: the failure branch
-      // writes the same record with `outcome: 'failed'` after spending the
-      // window, and treating that as a landed delivery would drop this deferred
-      // change with no pending record and no alarm left to retry it. A record
-      // without an outcome predates the field and only ever meant a delivery.
-      const landed = deliveryStateSchema.optional().parse(await storage.get(deliveryKey));
-      if (
-        landed !== undefined &&
-        landed.outcome !== 'failed' &&
-        landed.deliveredAt !== delivery?.deliveredAt
-      ) {
-        return;
-      }
-      const now = nowMs();
-      await storage.put<PendingGlanceableRefresh>(pendingKey(scope), {
-        userId: scope.userId,
-        organizationId: scope.organizationId,
-        dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
-        deferredAt: now,
-      });
+      await rearmTrailingRefresh(scope, storage, deliveryKey, delivery, nowMs);
     }
     return;
   }
@@ -197,7 +213,19 @@ export async function refreshGlanceableSnapshot(
       ).toISOString(),
     };
   });
-  if (committed === null) return;
+  if (committed === null) {
+    // A concurrent refresh bumped the revision while this build was in flight,
+    // so the newer revision owns the surface and this attempt must not deliver.
+    // It can still have delivered nothing — its own build returns no snapshot
+    // when the route fails, and a failed attempt only records a spent window —
+    // while the sweep has already consumed the pending record. Re-arm the
+    // deferred change unless a delivery actually landed, exactly as the
+    // no-snapshot branch above does.
+    if (options.trailing === true) {
+      await rearmTrailingRefresh(scope, storage, deliveryKey, delivery, nowMs);
+    }
+    return;
+  }
 
   // Content-free success evidence for the one-build-per-window invariant
   // (§4.15 rules: identifiers and aggregate counts, never session content).

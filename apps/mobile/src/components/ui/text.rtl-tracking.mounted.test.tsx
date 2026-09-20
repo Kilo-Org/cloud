@@ -106,3 +106,66 @@ describe('Text tracked labels in RTL', () => {
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
   });
 });
+
+// The mono family — JetBrains Mono — is a Latin design with no Arabic glyphs,
+// so Android draws an Arabic word from a fallback one character at a time and
+// every letter comes out in its isolated form ('ا س ت ك ش ف'). The surfaces the
+// spot check names all carry it: the eyebrow variant, the section-header action
+// and the bottom tab labels. The system font the rest of an RTL screen uses
+// keeps the joins.
+describe('Text Arabic labels in RTL', () => {
+  const ARABIC_LABEL = 'عرض الكل';
+
+  it('drops the mono family from an Arabic label and keeps the other classes', () => {
+    i18nManager.isRTL = true;
+    const root = mount(
+      createElement(
+        Text,
+        { className: 'font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary' },
+        ARABIC_LABEL
+      )
+    );
+
+    const className = hostText(root).props.className as string;
+    expect(className).not.toContain('font-mono');
+    expect(className).toContain('text-[11px]');
+    expect(className).toContain('tracking-[1.5px]');
+    expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
+  });
+
+  it('drops it from the shared Eyebrow label', () => {
+    i18nManager.isRTL = true;
+    const root = mount(createElement(Eyebrow, null, 'استكشف'));
+
+    expect(hostText(root).props.className as string).not.toContain('font-mono');
+  });
+
+  it('finds Arabic nested in an array of children', () => {
+    i18nManager.isRTL = true;
+    const root = mount(
+      createElement(
+        Text,
+        { className: 'font-mono text-xs' },
+        'مراجعة ',
+        createElement(Text, null, 'PR')
+      )
+    );
+
+    expect(hostText(root).props.className as string).not.toContain('font-mono');
+  });
+
+  it('keeps the mono family on Latin content in an RTL interface', () => {
+    i18nManager.isRTL = true;
+    const root = mount(createElement(Text, { className: 'font-mono text-xs' }, 'ses_9f2c1a7b'));
+
+    expect(hostText(root).props.className as string).toContain('font-mono text-xs');
+  });
+
+  it('keeps the mono family for an Arabic label in an LTR interface', () => {
+    i18nManager.isRTL = false;
+    const root = mount(createElement(Text, { className: 'font-mono-medium' }, ARABIC_LABEL));
+
+    expect(hostText(root).props.className as string).toContain('font-mono-medium');
+    expect(hostText(root).props.style).toBeUndefined();
+  });
+});

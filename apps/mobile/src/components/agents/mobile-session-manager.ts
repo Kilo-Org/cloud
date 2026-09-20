@@ -30,6 +30,7 @@ import { trpcClient } from '@/lib/trpc';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
+import { answerSessionPermission } from '@/lib/glanceable/approve-ask';
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
 import { cacheFilePart } from '@/components/agents/file-part-cache';
 import {
@@ -395,19 +396,14 @@ export function createMobileAgentSessionManager({
       },
       respondToPermission: async payload => {
         await withCloudAgentDiagnostics('permission', organizationId, async () => {
-          const input = {
-            sessionId: payload.sessionId,
-            permissionId: payload.requestId,
+          // The one answer path: the activity action runs the same body
+          // (`runGlanceableApprove` -> `answerSessionPermission`).
+          await answerSessionPermission({
+            cloudAgentSessionId: payload.sessionId,
+            organizationId,
+            requestId: payload.requestId,
             response: payload.response,
-          };
-          if (organizationId) {
-            await trpcClient.organizations.cloudAgentNext.answerPermission.mutate(
-              { ...input, organizationId },
-              skipBatchOptions
-            );
-            return;
-          }
-          await trpcClient.cloudAgentNext.answerPermission.mutate(input, skipBatchOptions);
+          });
         });
       },
     },

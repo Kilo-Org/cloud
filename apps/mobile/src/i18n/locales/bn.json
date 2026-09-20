@@ -3156,7 +3156,9 @@
     "couldNotApprove": "অনুমোদন করা যায়নি",
     "couldNotStart": "শুরু করা যায়নি",
     "channelName": "সক্রিয় এজেন্ট",
-    "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।"
+    "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।",
+    "openSession": "খুলুন",
+    "approveFailed": "অনুমোদন করা যায়নি। আবার চেষ্টা করতে $t(common.approve) স্পর্শ করুন।"
   },
   "transcriptionModel": {
     "title": "কথা থেকে লেখার মডেল",

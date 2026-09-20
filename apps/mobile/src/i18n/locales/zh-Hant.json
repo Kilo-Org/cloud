@@ -3156,7 +3156,9 @@
     "couldNotApprove": "無法核准",
     "couldNotStart": "無法開始",
     "channelName": "執行中的代理程式",
-    "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。"
+    "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。",
+    "openSession": "開啟",
+    "approveFailed": "無法核准。點一下$t(common.approve)再試一次。"
   },
   "transcriptionModel": {
     "title": "轉錄模型",

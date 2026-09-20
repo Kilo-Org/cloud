@@ -3199,7 +3199,9 @@
     "couldNotApprove": "לא ניתן לאשר",
     "couldNotStart": "לא ניתן להתחיל",
     "channelName": "סוכנים פעילים",
-    "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
+    "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה.",
+    "openSession": "פתח",
+    "approveFailed": "לא ניתן היה לאשר. הקש על $t(common.approve) כדי לנסות שוב."
   },
   "transcriptionModel": {
     "title": "מודל תמלול",

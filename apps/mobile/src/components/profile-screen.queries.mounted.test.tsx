@@ -17,23 +17,11 @@ const keys = vi.hoisted(() => ({
   organizations: ['organizations', 'list'],
 }));
 const authState = vi.hoisted(() => ({ token: 'token-1' as string | null }));
-const interactionState = vi.hoisted(() => ({
-  storedCallback: undefined as (() => void) | undefined,
-  cancel: vi.fn(),
-}));
-// eslint-disable-next-line promise/prefer-await-to-callbacks -- the mock must capture the callback so the test can flush it
-const captureInteraction = vi.hoisted(() => (cb: () => void) => {
-  interactionState.storedCallback = cb;
-  return { cancel: interactionState.cancel };
-});
 const getProfileAgentScopeMock = vi.hoisted(() => vi.fn());
 
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   View: 'View',
-  InteractionManager: {
-    runAfterInteractions: vi.fn(captureInteraction),
-  },
 }));
 
 vi.mock('react-native-reanimated', () => ({
@@ -182,60 +170,40 @@ async function mountProfile() {
   return result;
 }
 
-function flushInteractions() {
-  const run = interactionState.storedCallback;
-  if (!run) {
-    throw new Error('runAfterInteractions callback was not captured');
-  }
-  act(() => {
-    run();
-  });
-}
-
 // ── Tests ──────────────────────────────────────────────────────────────────
 
-describe('ProfileScreen deferred queries', () => {
+describe('ProfileScreen mount queries', () => {
   beforeEach(() => {
     providersQueryFn.mockReset();
     organizationsQueryFn.mockReset();
     signOutFn.mockReset();
     routerPush.mockReset();
     authState.token = 'token-1';
-    interactionState.storedCallback = undefined;
-    interactionState.cancel.mockReset();
     getProfileAgentScopeMock.mockReset();
     getProfileAgentScopeMock.mockReturnValue('personal');
   });
 
-  it('defers both queries until interactions settle, showing the skeleton first', async () => {
-    providersQueryFn.mockResolvedValue({ providers: [] });
-    organizationsQueryFn.mockResolvedValue([]);
+  it('fires both queries at mount, not after an interaction frame, and shows the skeleton until they settle', async () => {
+    // Held in flight: the assertions below run while nothing has resolved yet.
+    providersQueryFn.mockReturnValue(new Promise(() => undefined));
+    organizationsQueryFn.mockReturnValue(new Promise(() => undefined));
 
     const { renderer, unmount } = await mountProfile();
 
-    // Before the flush: neither query fired, the content-shaped skeleton
-    // (icon tile + two text bars) shows, and the agent rows are held
-    // disabled (refreshing argument is true).
-    expect(providersQueryFn).not.toHaveBeenCalled();
-    expect(organizationsQueryFn).not.toHaveBeenCalled();
-    expect(nodeCount(renderer.root, 'Skeleton')).toBe(3);
-    expect(getProfileAgentScopeMock.mock.calls.at(-1)?.[2]).toBe(true);
-
-    flushInteractions();
-
-    await waitFor(
-      () => providersQueryFn.mock.calls.length > 0 && organizationsQueryFn.mock.calls.length > 0
-    );
+    // Both queries are already in flight from the mount effect: nothing waits
+    // for an interaction frame, so the screen settles in one wave.
     expect(providersQueryFn).toHaveBeenCalledTimes(1);
     expect(organizationsQueryFn).toHaveBeenCalledTimes(1);
-
-    // Once the deferred fetch settles, the refreshing argument is false.
-    await waitFor(() => getProfileAgentScopeMock.mock.calls.at(-1)?.[2] === false);
+    // The content-shaped skeleton (icon tile + two text bars) owns the section
+    // while the fetch is in flight, and the agent rows are held disabled
+    // (refreshing argument is true).
+    expect(nodeCount(renderer.root, 'Skeleton')).toBe(3);
+    expect(getProfileAgentScopeMock.mock.calls.at(-1)?.[2]).toBe(true);
 
     unmount();
   });
 
-  it('renders cached providers without the skeleton before the flush', async () => {
+  it('renders cached providers without the skeleton at mount', async () => {
     const queryClient = createTestQueryClient();
     queryClient.setQueryData(keys.providers, {
       providers: [{ provider: 'github', email: 'dev@kilo.ai' }],
@@ -248,20 +216,18 @@ describe('ProfileScreen deferred queries', () => {
       queryClient,
     });
 
-    expect(providersQueryFn).not.toHaveBeenCalled();
     expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
     expect(findConfigureRows(renderer.root, 'GitHub').length).toBe(1);
 
     unmount();
   });
 
-  it('renders QueryError with retry after the deferred providers query fails', async () => {
+  it('renders QueryError with retry when the providers query fails', async () => {
     providersQueryFn.mockRejectedValue(new Error('boom'));
     organizationsQueryFn.mockResolvedValue([]);
 
     const { renderer, unmount } = await mountProfile();
 
-    flushInteractions();
     await waitFor(() => nodeCount(renderer.root, 'QueryError') > 0);
 
     const queryError = findNode(renderer.root, 'QueryError');
@@ -271,39 +237,34 @@ describe('ProfileScreen deferred queries', () => {
     unmount();
   });
 
-  it('does not fire the queries when unauthenticated, even after the flush', async () => {
+  it('does not fire the queries when unauthenticated', async () => {
     authState.token = null;
 
-    const { unmount } = await mountProfile();
+    const { renderer, unmount } = await mountProfile();
 
-    flushInteractions();
     await act(async () => {
       await Promise.resolve();
     });
 
     expect(providersQueryFn).not.toHaveBeenCalled();
     expect(organizationsQueryFn).not.toHaveBeenCalled();
+    // No token: no section, no dangling header and no skeleton.
+    expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
+    expect(nodeCountWithChildren(renderer.root, 'Text', 'Linked accounts')).toBe(0);
 
     unmount();
   });
 
-  it('cancels the interaction handle on unmount', async () => {
-    const { unmount } = await mountProfile();
-
-    expect(interactionState.cancel).not.toHaveBeenCalled();
-    unmount();
-    expect(interactionState.cancel).toHaveBeenCalledTimes(1);
-  });
-
-  it('renders a cached providers error without the skeleton or a refire before the flush', async () => {
-    providersQueryFn.mockRejectedValue(new Error('boom'));
+  it('re-fetches on mount so a cached providers error can recover', async () => {
+    providersQueryFn
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValue({ providers: [{ provider: 'github', email: 'dev@kilo.ai' }] });
     organizationsQueryFn.mockResolvedValue([]);
 
     const queryClient = createTestQueryClient();
     const first = await renderWithProviders(createElement(ProfileScreen), { queryClient });
 
     // Settle the first mount into the error state so the error is cached.
-    flushInteractions();
     await waitFor(() => nodeCount(first.renderer.root, 'QueryError') > 0);
 
     // Unmount without clearing the cache (the harness `unmount` clears it).
@@ -311,15 +272,12 @@ describe('ProfileScreen deferred queries', () => {
       first.renderer.unmount();
     });
 
-    // The error is now cached; reset the call history so a refire is observable.
-    providersQueryFn.mockClear();
-
     const second = await renderWithProviders(createElement(ProfileScreen), { queryClient });
 
-    // Before the flush: the cached error renders, no skeleton, and no refire.
-    expect(nodeCount(second.renderer.root, 'QueryError')).toBe(1);
-    expect(nodeCount(second.renderer.root, 'Skeleton')).toBe(0);
-    expect(providersQueryFn).not.toHaveBeenCalled();
+    // The mount fetch runs again and the row replaces the cached error.
+    await waitFor(() => findConfigureRows(second.renderer.root, 'GitHub').length === 1);
+    expect(providersQueryFn).toHaveBeenCalledTimes(2);
+    expect(nodeCount(second.renderer.root, 'QueryError')).toBe(0);
 
     second.unmount();
   });
@@ -344,22 +302,19 @@ describe('ProfileScreen deferred queries', () => {
     unmount();
   });
 
-  it('hides the linked-accounts section when the deferred fetch settles empty', async () => {
+  it('hides the linked-accounts section when the fetch settles empty', async () => {
     providersQueryFn.mockResolvedValue({ providers: [] });
     organizationsQueryFn.mockResolvedValue([]);
 
     const { renderer, unmount } = await mountProfile();
 
-    flushInteractions();
-    await waitFor(
-      () => providersQueryFn.mock.calls.length > 0 && organizationsQueryFn.mock.calls.length > 0
-    );
-
-    // After the deferred fetch settles empty: no skeleton and no header.
+    // After the fetch settles empty: no skeleton and no header, and the agent
+    // rows stop being held disabled.
     await waitFor(
       () =>
         nodeCountWithChildren(renderer.root, 'Text', 'Linked accounts') === 0 &&
-        nodeCount(renderer.root, 'Skeleton') === 0
+        nodeCount(renderer.root, 'Skeleton') === 0 &&
+        getProfileAgentScopeMock.mock.calls.at(-1)?.[2] === false
     );
 
     expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);

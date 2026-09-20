@@ -782,6 +782,36 @@ describe('UserConnectionDO', () => {
       }
     );
 
+    it('names the owning root when a disconnecting CLI owned a permission subagent', async () => {
+      // A subagent raise carries `permission` on the child row and is only
+      // hoisted onto its root for display. The disconnect caller names root ids
+      // in `cliSessionIds`, so naming the child id in `approvalChangedSessionIds`
+      // would be unknown to the server's batch query, which resolves it to the
+      // personal scope — the org scope whose permission cleared would lose the
+      // delivery-window exemption and the Approve control would lag a window.
+      const { doInstance, mockCtx, env } = setupGlanceableDelivery();
+      const service = env.NOTIFICATIONS as unknown as NotificationsService;
+      const refreshParams: unknown[] = [];
+      const spy = async (params: unknown) => {
+        refreshParams.push(params);
+      };
+      service.refreshGlanceableSessions = spy as never;
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('root'),
+        makeSession('child', 'permission', 'Child', 'root'),
+      ]);
+      await flushAsync();
+      refreshParams.length = 0; // the heartbeat's own refresh is a different case
+      await disconnectCli(doInstance, cliWs);
+      await flushAsync();
+      // The named ids must stay a subset of `cliSessionIds`: the root owns the
+      // child's raise, so it is the root's scope that actually moved.
+      expect(refreshParams).toEqual([
+        { userId: 'usr_1', cliSessionIds: ['root'], approvalChangedSessionIds: ['root'] },
+      ]);
+    });
+
     it.each(['cli-1', 'cli-2'])(
       'does not send a stale close after replacement by %s',
       async replacementId => {

@@ -325,7 +325,7 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
 
   /** Refresh each affected scope without notification preferences or viewer-presence gates. */
   async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams): Promise<void> {
-    const { userId, cliSessionIds, approvalChanged } =
+    const { userId, cliSessionIds, approvalChangedSessionIds } =
       refreshGlanceableSessionsInputSchema.parse(params);
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     // Read ownership too: an absent row is personal, but a foreign row is not authorized.
@@ -338,12 +338,21 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
       .from(cli_sessions_v2)
       .where(inArray(cli_sessions_v2.session_id, cliSessionIds));
     const byId = new Map(rows.map(row => [row.sessionId, row]));
-    const scopes = new Set<string | null>();
-    for (const sessionId of cliSessionIds) {
-      const row = byId.get(sessionId);
-      if (!row) scopes.add(null);
-      else if (row.userId === userId) scopes.add(row.organizationId);
-    }
+    const scopesOf = (sessionIds: readonly string[]): Set<string | null> => {
+      const scopes = new Set<string | null>();
+      for (const sessionId of sessionIds) {
+        const row = byId.get(sessionId);
+        if (!row) scopes.add(null);
+        else if (row.userId === userId) scopes.add(row.organizationId);
+      }
+      return scopes;
+    };
+    const scopes = scopesOf(cliSessionIds);
+    // The window exemption reaches only the scope(s) that actually moved into or
+    // out of `permission`. Forwarding the caller's flag to every scope would skip
+    // the rate-limit/deferral branch for scopes with no approval change — an extra
+    // build and device wake, the cost this window exists to prevent.
+    const approvalScopes = scopesOf(approvalChangedSessionIds ?? []);
 
     // Every entrypoint uses the same user DO. The snapshot route still rechecks membership.
     const stub = this.env.NOTIFICATION_CHANNEL_DO.get(
@@ -351,7 +360,11 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     );
     const results = await Promise.allSettled(
       [...scopes].map(organizationId =>
-        stub.refreshGlanceableSnapshot({ userId, organizationId, approvalChanged })
+        stub.refreshGlanceableSnapshot({
+          userId,
+          organizationId,
+          approvalChanged: approvalScopes.has(organizationId),
+        })
       )
     );
     for (const result of results) {

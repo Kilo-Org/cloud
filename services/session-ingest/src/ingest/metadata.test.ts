@@ -630,7 +630,27 @@ describe('applyMetadataChanges', () => {
       );
       await Promise.all(delivery.tasks);
       expect(delivery.refreshParams).toEqual([
-        { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChanged: true },
+        { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChangedSessionIds: ['ses_1'] },
+      ]);
+    });
+
+    it('marks a cleared permission wait as approval-relevant for the delivery window', async () => {
+      // `permission -> busy` leaves the `session.status === 'permission'` clause
+      // false, so only `previousStatus === 'permission'` can exempt the clearing
+      // move: the Approve control must disappear as promptly as it appears.
+      const db = createApplyMetadataDb({ initialStatus: 'permission' });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+      await applyMetadataChanges(
+        delivery.env as never,
+        'usr_1',
+        'ses_1',
+        new Map([['status', 'busy']]),
+        delivery.ctx
+      );
+      await Promise.all(delivery.tasks);
+      expect(delivery.refreshParams).toEqual([
+        { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChangedSessionIds: ['ses_1'] },
       ]);
     });
 
@@ -647,7 +667,7 @@ describe('applyMetadataChanges', () => {
       );
       await Promise.all(delivery.tasks);
       expect(delivery.refreshParams).toEqual([
-        { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChanged: false },
+        { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChangedSessionIds: [] },
       ]);
     });
 

@@ -235,7 +235,10 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     expect(await h.storage.get(pendingKey('user-approval', null))).toBeUndefined();
     // The approval delivery still spends the window, so counts-only churn right
     // after it defers instead of waking the device again.
-    expect(await h.storage.get(deliveryKey('user-approval', null))).toEqual({ deliveredAt: now });
+    expect(await h.storage.get(deliveryKey('user-approval', null))).toEqual({
+      deliveredAt: now,
+      outcome: 'delivered',
+    });
 
     now = base + 3_000;
     h.setNext(snapshot({ running: 2, needsInput: 1, needsApproval: 1 }));
@@ -264,6 +267,152 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     expect(h.expoSends).toHaveLength(0);
     expect(await h.storage.get(key)).toEqual({
       userId: 'user-null-build',
+      organizationId: null,
+      dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      deferredAt: now,
+    });
+  });
+
+  it('does not re-arm a trailing refresh superseded by a newer delivery', async () => {
+    const h = makeHarness();
+    const base = 80_000_000;
+    let now = base;
+    const scope = { userId: 'user-superseded-null', organizationId: null };
+    const key = pendingKey('user-superseded-null', null);
+    // The flush consumes the due record before it runs.
+    await h.storage.put(key, {
+      userId: 'user-superseded-null',
+      organizationId: null,
+      dueAt: now - 1,
+    });
+
+    // The trailing build stalls, so a newer refresh can bump the revision and
+    // deliver while this fetch is in flight.
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    let build = 0;
+    h.deps.buildSnapshot = async () => {
+      build += 1;
+      if (build === 1) {
+        started.resolve();
+        await release.promise;
+        return null;
+      }
+      return snapshot({ running: 5 });
+    };
+
+    const trailing = flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now);
+    await started.promise;
+
+    // The newer refresh owns the revision and delivers; its snapshot already
+    // covers the deferred change.
+    now = base + 1_000;
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+    expect(h.expoSends).toHaveLength(1);
+
+    release.resolve();
+    // The superseded trailing fetch must not re-arm a redundant device wake.
+    await expect(trailing).resolves.toBeNull();
+    expect(await h.storage.get(key)).toBeUndefined();
+  });
+
+  it('re-arms a trailing refresh when a concurrent refresh only moves the revision', async () => {
+    const h = makeHarness();
+    const base = 85_000_000;
+    let now = base;
+    const scope = { userId: 'user-superseded-no-delivery', organizationId: null };
+    const key = pendingKey('user-superseded-no-delivery', null);
+    await h.storage.put(key, {
+      userId: 'user-superseded-no-delivery',
+      organizationId: null,
+      dueAt: now - 1,
+    });
+
+    // The trailing build stalls; a concurrent refresh bumps the revision while
+    // it is in flight but its own build returns null, so it delivers nothing
+    // and re-arms nothing.
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    let build = 0;
+    h.deps.buildSnapshot = async () => {
+      build += 1;
+      if (build === 1) {
+        started.resolve();
+        await release.promise;
+      }
+      return null;
+    };
+
+    const trailing = flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now);
+    await started.promise;
+
+    now = base + 1_000;
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+    expect(h.expoSends).toHaveLength(0);
+
+    release.resolve();
+    // The revision moved but no delivery landed, so the deferred counts must
+    // keep a pending record and a deadline instead of being dropped.
+    await expect(trailing).resolves.toBe(now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS);
+    expect(await h.storage.get(key)).toEqual({
+      userId: 'user-superseded-no-delivery',
+      organizationId: null,
+      dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      deferredAt: now,
+    });
+  });
+
+  it('re-arms a trailing refresh when the concurrent attempt fails at the transport', async () => {
+    const h = makeHarness();
+    const base = 90_000_000;
+    let now = base;
+    const scope = { userId: 'user-superseded-failed', organizationId: null };
+    const key = pendingKey('user-superseded-failed', null);
+    await h.storage.put(key, {
+      userId: 'user-superseded-failed',
+      organizationId: null,
+      dueAt: now - 1,
+    });
+
+    // The trailing build stalls, so a newer refresh attempts its delivery while
+    // this fetch is in flight.
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    let build = 0;
+    h.deps.buildSnapshot = async () => {
+      build += 1;
+      if (build === 1) {
+        started.resolve();
+        await release.promise;
+        return null;
+      }
+      return snapshot({ running: 5 });
+    };
+
+    const trailing = flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now);
+    await started.promise;
+
+    // The concurrent refresh delivers but the transport rejects: the failure
+    // branch still writes the delivery record (a spent window) before it
+    // rethrows, so the record alone cannot tell a landed delivery from a spent
+    // window.
+    now = base + 1_000;
+    h.failNextExpoPush(new Error('transport down'));
+    await expect(
+      refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now)
+    ).rejects.toThrow('transport down');
+    expect(h.expoSends).toHaveLength(1);
+    expect(await h.storage.get(deliveryKey('user-superseded-failed', null))).toEqual({
+      deliveredAt: now,
+      outcome: 'failed',
+    });
+
+    release.resolve();
+    // No snapshot was delivered, so the deferred counts must keep a pending
+    // record and a deadline instead of being dropped with no alarm left.
+    await expect(trailing).resolves.toBe(now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS);
+    expect(await h.storage.get(key)).toEqual({
+      userId: 'user-superseded-failed',
       organizationId: null,
       dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
       deferredAt: now,
@@ -315,6 +464,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     // would retry the whole build+send at once.
     expect(await h.storage.get(deliveryKey('user-failed-send', null))).toEqual({
       deliveredAt: base,
+      outcome: 'failed',
     });
 
     // A change inside the window is deferred, not retried immediately.
@@ -347,6 +497,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     );
     expect(await h.storage.get(deliveryKey('user-failed-send', null))).toEqual({
       deliveredAt: base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      outcome: 'failed',
     });
     // A throwing trailing delivery keeps the deferred counts: re-armed for the
     // next window instead of dropped with no retry left.
@@ -377,6 +528,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     // refresh a deferred change is waiting on.
     expect(await h.storage.get(deliveryKey('user-failed-keep', null))).toEqual({
       deliveredAt: now,
+      outcome: 'failed',
     });
     expect(await h.storage.get(pendingKey('user-failed-keep', null))).toMatchObject({ dueAt });
   });
@@ -392,6 +544,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
     expect(await h.storage.get(deliveryKey('user-superseded', null))).toEqual({
       deliveredAt: base,
+      outcome: 'delivered',
     });
 
     // A refresh at the window edge starts delivering but stalls in transport.
@@ -431,6 +584,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     });
     expect(await h.storage.get(deliveryKey('user-superseded', null))).toEqual({
       deliveredAt: base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS + 500,
+      outcome: 'delivered',
     });
   });
 
@@ -705,7 +859,10 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     h.setNext(snapshot({ running: 3 }));
     await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
     expect(h.expoSends).toHaveLength(1);
-    expect(await h.storage.get(deliveryKey('user-fail', null))).toEqual({ deliveredAt: now });
+    expect(await h.storage.get(deliveryKey('user-fail', null))).toEqual({
+      deliveredAt: now,
+      outcome: 'delivered',
+    });
     expect(await h.storage.get(pendingKey('user-fail', null))).toBeUndefined();
   });
 

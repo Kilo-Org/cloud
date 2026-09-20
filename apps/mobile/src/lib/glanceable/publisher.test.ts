@@ -295,6 +295,38 @@ describe('GlanceablePublisher', () => {
     publisher.dispose();
   });
 
+  it('does not republish a pending coalesced frame after an unchanged renewal', () => {
+    // A content change inside the coalesce window stores a snapshot dated at
+    // that change. A renewal heartbeat before the timer fires publishes a newer
+    // frame for the same visible content; if the timer then fired, it would
+    // republish the older revision/updatedAt and mark the surface stale right
+    // after the renewal.
+    vi.useFakeTimers();
+    let now = NOW;
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now, coalesceMs: 1000 });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+
+    // A counts-only change at t+1 s is inside the window: coalesced, not emitted.
+    now += 1;
+    publisher.handleSessions([{ status: 'busy' }, { status: 'busy' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(1);
+
+    // A renewal heartbeat at the margin emits the newer frame for the same content.
+    now += GLANCEABLE_RENEW_MARGIN_MS;
+    publisher.handleSessions([{ status: 'busy' }, { status: 'busy' }], PUB_CTX);
+    const renewed = lastSnapshot(calls, 'startOrUpdate');
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+    expect(renewed.updatedAt).toBe(new Date(now).toISOString());
+
+    // The pending coalesced frame must not fire after the renewal.
+    vi.advanceTimersByTime(1000);
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+    expect(lastSnapshot(calls, 'startOrUpdate').updatedAt).toBe(renewed.updatedAt);
+    expect(lastSnapshot(calls, 'startOrUpdate').running).toBe(2);
+    publisher.dispose();
+  });
+
   it('bounds count churn to one native update per window', () => {
     vi.useFakeTimers();
     let now = NOW;

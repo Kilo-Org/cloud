@@ -511,6 +511,46 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     ]);
   });
 
+  it('exempts only the scope whose session moved into permission, not every scope in the batch', async () => {
+    // One heartbeat batch can carry the personal session and an org session at
+    // once. Only the scope that actually moved into permission may skip the
+    // delivery window: exempting the org scope too would wake that device for a
+    // counts-only change, the cost the window exists to prevent.
+    const { createService, messages } = setupService({
+      response: scope =>
+        Response.json(
+          freshSnapshot({
+            scopeKey: `${scope.userId}:${scope.organizationId ?? 'personal'}`,
+            organizationBound: scope.organizationId !== null,
+            running: scope.organizationId === null ? 1 : 2,
+            needsApproval: scope.organizationId === null ? 1 : 0,
+          })
+        ),
+    });
+    // Open the delivery window for both scopes.
+    await createService().refreshGlanceableSessions({
+      userId: 'usr_1',
+      cliSessionIds: ['personal'],
+    });
+    await createService().refreshGlanceableSessions({ userId: 'usr_1', cliSessionIds: ['org-a'] });
+
+    // Inside both windows, only the personal session moved into permission.
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:02.000Z'));
+    await createService().refreshGlanceableSessions({
+      userId: 'usr_1',
+      cliSessionIds: ['personal', 'org-a'],
+      approvalChangedSessionIds: ['personal'],
+    });
+
+    const scopeKeys = messages
+      .filter(message => message.to === 'ExponentPushToken[ios]')
+      .map(message => (message.data as { scopeKey: string }).scopeKey);
+    // The personal scope delivers at once (exempt); the org scope defers to its
+    // window, so its counts-only change lands on the trailing refresh instead.
+    expect(scopeKeys.filter(scopeKey => scopeKey === 'usr_1:personal')).toHaveLength(2);
+    expect(scopeKeys.filter(scopeKey => scopeKey === 'usr_1:org-1')).toHaveLength(1);
+  });
+
   it('recovers delivery after snapshot and delivery failures', async () => {
     let current = freshSnapshot();
     let unavailable = false;

@@ -448,9 +448,11 @@ export async function applyMetadataChanges(
         // A permission wait appearing or clearing gates the Approve control on
         // the locked/background surfaces, so it must not wait for the shared
         // delivery window. This caller is the one that saw the previous status.
-        approvalChanged:
+        approvalChangedSessionIds:
           notification.previousStatus === 'permission' ||
-          notification.session.status === 'permission',
+          notification.session.status === 'permission'
+            ? [sessionId]
+            : [],
       });
       if (ctx) ctx.waitUntil(delivery);
       else await delivery;

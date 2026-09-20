@@ -26,8 +26,18 @@ const snapshotTimestampsSchema = refreshStateSchema
   .pick({ updatedAt: true })
   .extend({ expiresAt: z.string().datetime(), needsInputSince: z.string().datetime().nullable() });
 
-/** The last device wake for a scope, used to rate-limit aggregate delivery. */
-const deliveryStateSchema = z.object({ deliveredAt: z.number() });
+/**
+ * The last device wake for a scope, used to rate-limit aggregate delivery. A
+ * failed attempt writes the same record with `outcome: 'failed'` — it still
+ * spends the window, but it delivered no snapshot, so a trailing refresh must
+ * not read it as a landed delivery that supersedes its deferred change.
+ * Optional for records written before this field existed: those only ever came
+ * from a successful delivery.
+ */
+const deliveryStateSchema = z.object({
+  deliveredAt: z.number(),
+  outcome: z.enum(['delivered', 'failed']).optional(),
+});
 
 /** A refresh deferred until the delivery window elapses. */
 const pendingRefreshSchema = z.object({
@@ -142,6 +152,24 @@ export async function refreshGlanceableSnapshot(
     // credentials fail, and the flush has already consumed the pending record,
     // so re-arm the next window instead of dropping the change with no alarm.
     if (options.trailing === true) {
+      // `buildSnapshot` was awaited after the revision bump, so a concurrent
+      // refresh for this scope can deliver while this fetch is in flight. That
+      // delivery already covers the change; re-arming here would leave a record
+      // its `isSameDeferral` check keeps and the alarm would later fire a
+      // redundant build+send. Skip the re-arm only when such a delivery actually
+      // landed, told by the outcome in the record it wrote: the failure branch
+      // writes the same record with `outcome: 'failed'` after spending the
+      // window, and treating that as a landed delivery would drop this deferred
+      // change with no pending record and no alarm left to retry it. A record
+      // without an outcome predates the field and only ever meant a delivery.
+      const landed = deliveryStateSchema.optional().parse(await storage.get(deliveryKey));
+      if (
+        landed !== undefined &&
+        landed.outcome !== 'failed' &&
+        landed.deliveredAt !== delivery?.deliveredAt
+      ) {
+        return;
+      }
       const now = nowMs();
       await storage.put<PendingGlanceableRefresh>(pendingKey(scope), {
         userId: scope.userId,
@@ -250,7 +278,7 @@ export async function refreshGlanceableSnapshot(
     // per-attempt evidence.
     const current = refreshStateSchema.optional().parse(await storage.get(key));
     if (current?.revision === request.revision) {
-      await storage.put(deliveryKey, { deliveredAt: nowMs() });
+      await storage.put(deliveryKey, { deliveredAt: nowMs(), outcome: 'failed' });
     }
     throw error;
   }
@@ -265,7 +293,7 @@ export async function refreshGlanceableSnapshot(
   // refresh it superseded. A deferral written while this delivery was in flight
   // (an approval-exempt delivery can run inside an open window) is not in the
   // snapshot, so keep it: its counts must still land on the trailing alarm.
-  await storage.put(deliveryKey, { deliveredAt: nowMs() });
+  await storage.put(deliveryKey, { deliveredAt: nowMs(), outcome: 'delivered' });
   const pendingAfterDelivery = pendingRefreshSchema
     .optional()
     .parse(await storage.get(pendingKey(scope)));

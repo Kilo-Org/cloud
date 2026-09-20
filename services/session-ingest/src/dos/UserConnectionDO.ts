@@ -763,26 +763,31 @@ export class UserConnectionDO extends DurableObject<Env> {
     if (attachment.kiloUserId) {
       const changedSessionIds = new Set<string>();
       // `needsApproval` gates the Approve control on the locked surfaces, so a
-      // move into or out of `permission` must bypass the delivery window.
-      let approvalChanged = false;
+      // move into or out of `permission` must bypass the delivery window. Only
+      // the sessions that moved are named: this batch aggregates every
+      // connection, so it can span the personal scope and several orgs, and the
+      // exemption must not reach a scope that had no approval change.
+      const approvalChangedSessionIds = new Set<string>();
       for (const session of this.aggregateSessions()) {
         const previous = previousStatuses.get(session.id);
         if (previous !== session.status) {
           changedSessionIds.add(session.id);
-          if (previous === 'permission' || session.status === 'permission') approvalChanged = true;
+          if (previous === 'permission' || session.status === 'permission') {
+            approvalChangedSessionIds.add(session.id);
+          }
         }
         previousStatuses.delete(session.id);
       }
       for (const [sessionId, previous] of previousStatuses) {
         changedSessionIds.add(sessionId);
-        if (previous === 'permission') approvalChanged = true;
+        if (previous === 'permission') approvalChangedSessionIds.add(sessionId);
       }
       if (changedSessionIds.size > 0) {
         this.ctx.waitUntil(
           refreshGlanceableSessions(this.env, {
             userId: attachment.kiloUserId,
             cliSessionIds: [...changedSessionIds],
-            approvalChanged,
+            approvalChangedSessionIds: [...approvalChangedSessionIds],
           })
         );
       }
@@ -1927,6 +1932,17 @@ export class UserConnectionDO extends DurableObject<Env> {
       .filter(session => !session.parentSessionId && ownedSessions.has(session.id))
       .map(session => session.id);
     if (attachment.kiloUserId && rootSessionIds.length > 0) {
+      // A subagent raise carries `permission` on the child row and is only
+      // hoisted onto its root for display, so the scope the Approve control
+      // moves in is the root's. Name the owning root: an id outside
+      // `cliSessionIds` is unknown to the server's batch query, which resolves
+      // it to the personal scope and leaves the org scope whose permission
+      // cleared stuck behind the delivery window.
+      const permissionRootIds = new Set(
+        sessions
+          .filter(session => ownedSessions.has(session.id) && session.status === 'permission')
+          .map(session => session.parentSessionId ?? session.id)
+      );
       this.ctx.waitUntil(
         refreshGlanceableSessions(this.env, {
           userId: attachment.kiloUserId,
@@ -1935,9 +1951,7 @@ export class UserConnectionDO extends DurableObject<Env> {
           // clears the Approve control on the locked surfaces. The in-memory
           // status is the last one the CLI reported; the attention reset above
           // writes the DB but does not touch this list.
-          approvalChanged: sessions.some(
-            session => ownedSessions.has(session.id) && session.status === 'permission'
-          ),
+          approvalChangedSessionIds: rootSessionIds.filter(id => permissionRootIds.has(id)),
         })
       );
     }

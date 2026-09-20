@@ -198,6 +198,12 @@ export class GlanceablePublisher {
         isEligibleGlanceableWork(snapshot) &&
         (this.lastPublishedAt === null || now - this.lastPublishedAt >= GLANCEABLE_RENEW_MARGIN_MS)
       ) {
+        // The renewal frame carries the same visible content as any pending
+        // coalesced emit but a newer revision, so emitting it supersedes that
+        // timer: leaving the timer armed would republish the older frame after
+        // this one and move `lastPublishedAt` backwards, marking the surface
+        // stale again right after it was renewed.
+        this.cancelCoalesce();
         this.emit(snapshot, ctx);
       }
       this.current = snapshot;

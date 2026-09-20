@@ -65,8 +65,16 @@ export function FakeLoginForm({ searchParams }: FakeSignInButtonProps) {
     return null;
   }
 
+  // Below `sm` the panel stays in the page flow. As a fixed overlay it landed on
+  // top of the sign-in form's own "Continue with Email" label on phone-sized
+  // viewports — the device-link flow opens this page in a phone browser — and the
+  // page text showed through the panel, so two labels occupied the same space. In
+  // flow it cannot overlap the form, and the keyboard cannot reposition it.
+  // `relative` keeps the close button anchored to the panel. From `sm` up there
+  // is room beside the form, so the panel floats again, with an explicit stacking
+  // order so it paints above the page rather than interleaving with it.
   return (
-    <div className="fixed bottom-6 left-6 w-80 overflow-visible rounded-lg border border-amber-600/50 bg-gray-900 p-4 shadow-lg">
+    <div className="relative mb-6 w-full max-w-sm overflow-visible rounded-lg border border-amber-600/50 bg-gray-900 p-4 shadow-lg sm:fixed sm:bottom-6 sm:left-6 sm:z-50 sm:mb-0 sm:w-80">
       {/* Close button */}
       <button
         onClick={() => setIsVisible(false)}

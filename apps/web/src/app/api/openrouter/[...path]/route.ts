@@ -109,8 +109,19 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 export const maxDuration = 800;
+
+/**
+ * The shared gateway/openrouter handler, wrapped so each call emits one
+ * `api_timing` line. The gateway catch-all imports this wrapped handler and
+ * wraps it again with the gateway pattern; the prefix check in
+ * `withRestTiming` keeps this inner line silent for a gateway pathname.
+ */
+export const POST = withRestTiming('/api/openrouter/[...path]', (request: Request) =>
+  openRouterPost(request as NextRequest)
+);
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -168,7 +179,7 @@ async function resolveRateLimit(
   };
 }
 
-export async function POST(request: NextRequest): Promise<NextResponseType<unknown>> {
+async function openRouterPost(request: NextRequest): Promise<NextResponseType<unknown>> {
   const requestStartedAt = performance.now();
 
   const url = new URL(request.url);

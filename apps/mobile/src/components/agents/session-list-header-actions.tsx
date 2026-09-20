@@ -1,5 +1,6 @@
+import { IconButton } from '@/components/ui/icon-button';
 import { Plus } from '@/components/ui/icons';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
@@ -27,17 +28,9 @@ export function SessionListHeaderActions({
   return (
     <View className="flex-row items-center gap-4">
       {showNewSession ? (
-        <Pressable
-          onPress={onNewSession}
-          // right slop capped so the expanded targets don't overlap inside the
-          // 16px gap; left slop makes up the difference to a 44pt-wide target
-          hitSlop={{ top: 11, bottom: 11, left: 14, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel={t('common.newSession')}
-          className="active:opacity-70"
-        >
+        <IconButton onPress={onNewSession} accessibilityLabel={t('common.newSession')}>
           <Plus size={22} color={colors.foreground} />
-        </Pressable>
+        </IconButton>
       ) : null}
       <SessionFilterButton
         activeCount={activeFilterCount}

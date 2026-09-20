@@ -292,11 +292,11 @@ export async function refreshGlanceableSnapshot(
  * earliest deadline still pending so the caller can reschedule its alarm.
  *
  * A scope that throws must not abort the sweep or the DO's idem GC, so each
- * refresh is isolated. The pending record is consumed before the refresh runs:
- * a failed build keeps its last state and is retried by the next change, and a
- * record written while the sweep runs is caught by the second list. A build
- * that returns no snapshot re-arms itself (see `refreshGlanceableSnapshot`), so
- * the deferred change is not dropped without a deadline.
+ * refresh is isolated. The pending record is consumed before the refresh runs,
+ * so a refresh that throws (a rejected build or a rejected transport) re-arms
+ * the record here: a build that returns no snapshot re-arms itself, and a
+ * record written while the sweep runs is caught by the second list. Either way
+ * the deferred change keeps a deadline instead of being dropped.
  */
 export async function flushDueGlanceableRefreshes(
   storage: DurableObjectStorage,
@@ -320,6 +320,23 @@ export async function flushDueGlanceableRefreshes(
         scope: [record.userId, record.organizationId],
         error: error instanceof Error ? error.message : String(error),
       });
+      // The refresh threw before it could deliver or re-arm itself: the build
+      // rejected (a network/DNS failure on the snapshot route) or the transport
+      // rejected. The pending record was consumed above, so re-arm the next
+      // window or the deferred counts are dropped with no alarm left to retry
+      // them. A record written while the refresh ran already owns the key and a
+      // later deadline; only an empty slot is re-armed. The next window, not
+      // now, so a persistently failing route is retried once per window instead
+      // of spinning the alarm.
+      if ((await storage.get(key)) === undefined) {
+        const now = nowMs();
+        await storage.put<PendingGlanceableRefresh>(key, {
+          userId: record.userId,
+          organizationId: record.organizationId,
+          dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+          deferredAt: now,
+        });
+      }
     }
   }
 

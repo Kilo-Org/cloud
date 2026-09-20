@@ -85,9 +85,10 @@ function createMockWs(tags: string[] = [], attachment?: unknown): MockWS {
   return ws;
 }
 
-/** In-memory Map-backed KV fake for ctx.storage (put/get/delete/list). */
+/** In-memory Map-backed KV fake for ctx.storage (put/get/delete/list/alarm). */
 function makeStorageFake() {
   const store = new Map<string, unknown>();
+  let alarmTime: number | null = null;
   return {
     store,
     kv: {
@@ -99,7 +100,9 @@ function makeStorageFake() {
       list: (opts?: { prefix?: string }) =>
         new Map([...store].filter(([key]) => key.startsWith(opts?.prefix ?? ''))),
     },
-    deleteAlarm: vi.fn(async () => undefined),
+    deleteAlarm: vi.fn(async () => {
+      alarmTime = null;
+    }),
     put: vi.fn(async (key: string, value: unknown) => {
       store.set(key, value);
     }),
@@ -119,7 +122,12 @@ function makeStorageFake() {
       }
       return result;
     }),
-    setAlarm: vi.fn(),
+    // The glanceable deferral reads the current alarm before re-arming it, so
+    // the fake must model the alarm rather than return `undefined`.
+    getAlarm: vi.fn(async () => alarmTime),
+    setAlarm: vi.fn(async (scheduledTime: number | Date) => {
+      alarmTime = typeof scheduledTime === 'number' ? scheduledTime : scheduledTime.getTime();
+    }),
   };
 }
 
@@ -235,6 +243,10 @@ function setup(env: Partial<Env> = {}) {
   return { doInstance, ctx, mockCtx };
 }
 
+function pendingGlanceableKey(userId: string, organizationId: string | null): string {
+  return `glanceable-pending:${JSON.stringify([userId, organizationId])}`;
+}
+
 function setupGlanceableDelivery(foreignSessionIds: string[] = []) {
   const messages: ExpoPushMessage[] = [];
   vi.mocked(getWorkerDb).mockReturnValue(
@@ -288,7 +300,7 @@ function setupGlanceableDelivery(foreignSessionIds: string[] = []) {
       })
     );
   });
-  return { ...result, env, messages };
+  return { ...result, env, messages, channelStorage: storage };
 }
 
 function connectWebSocket(doInstance: UserConnectionDO, connectionId: string): MockWS {
@@ -641,8 +653,8 @@ describe('UserConnectionDO', () => {
       ]);
     });
 
-    it('defers a counts-only move inside the delivery window', async () => {
-      const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+    it('defers a counts-only move inside the delivery window and arms the trailing alarm', async () => {
+      const { doInstance, mockCtx, messages, channelStorage } = setupGlanceableDelivery();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
       const clock = useDeliveryWindowClock();
       clock.tick();
@@ -653,6 +665,14 @@ describe('UserConnectionDO', () => {
       await flushAsync();
       // Deferred to the trailing alarm, not delivered on the spot.
       expect(messages).toHaveLength(1);
+      // The deferral is stored and the alarm is armed at its deadline. Without
+      // both, the trailing delivery that lands the final counts never runs and
+      // the deferral is a silent drop.
+      const pending = (await channelStorage.get(pendingGlanceableKey('usr_1', null))) as
+        | { dueAt: number }
+        | undefined;
+      expect(pending).toMatchObject({ userId: 'usr_1', organizationId: null });
+      expect(channelStorage.setAlarm).toHaveBeenCalledWith(pending?.dueAt);
     });
 
     it('does not authorize a foreign-owned row from a real authenticated heartbeat', async () => {

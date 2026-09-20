@@ -296,7 +296,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     expect(h.expoSends[1][0].data).toMatchObject({ running: 2, needsInput: 1 });
   });
 
-  it('spends the window on a failed delivery so the next change defers', async () => {
+  it('spends the window on a failed delivery and re-arms the deferred counts', async () => {
     const h = makeHarness();
     const base = 30_000_000;
     let now = base;
@@ -338,7 +338,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     h.failNextExpoPush(new Error('The bearer token is invalid.'));
     await expect(
       flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now)
-    ).resolves.toBeNull();
+    ).resolves.toBe(now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS);
     expect(h.builds).toBe(2);
     expect(h.expoSends).toHaveLength(2);
     expect(warnSpy).toHaveBeenCalledWith(
@@ -348,7 +348,14 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     expect(await h.storage.get(deliveryKey('user-failed-send', null))).toEqual({
       deliveredAt: base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
     });
-    expect(await h.storage.get(pendingKey('user-failed-send', null))).toBeUndefined();
+    // A throwing trailing delivery keeps the deferred counts: re-armed for the
+    // next window instead of dropped with no retry left.
+    expect(await h.storage.get(pendingKey('user-failed-send', null))).toEqual({
+      userId: 'user-failed-send',
+      organizationId: null,
+      dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      deferredAt: now,
+    });
   });
 
   it('keeps a pending trailing refresh when a failed attempt opens the window', async () => {
@@ -702,7 +709,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
     expect(await h.storage.get(pendingKey('user-fail', null))).toBeUndefined();
   });
 
-  it('catches a throwing build during the flush and clears the pending record', async () => {
+  it('re-arms a throwing build during the flush so the deferred counts retry', async () => {
     const h = makeHarness();
     const now = 12_000_000;
     const key = pendingKey('user-throw', null);
@@ -712,12 +719,50 @@ describe('refreshGlanceableSnapshot delivery window', () => {
 
     await expect(
       flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now)
-    ).resolves.toBeNull();
-    expect(await h.storage.get(key)).toBeUndefined();
+    ).resolves.toBe(now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS);
     expect(warnSpy).toHaveBeenCalledWith(
       'Glanceable trailing refresh failed',
       expect.objectContaining({ error: 'route down' })
     );
+    // The record was consumed before the refresh; the rejected build must put it
+    // back with a fresh deadline or the deferred counts are gone for good.
+    expect(await h.storage.get(key)).toEqual({
+      userId: 'user-throw',
+      organizationId: null,
+      dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      deferredAt: now,
+    });
+    expect(h.builds).toBe(1);
+  });
+
+  it('keeps a deferral written while a throwing trailing refresh ran', async () => {
+    const h = makeHarness();
+    const now = 13_000_000;
+    const key = pendingKey('user-throw-race', null);
+    await h.storage.put(key, { userId: 'user-throw-race', organizationId: null, dueAt: now - 1 });
+    // The refresh defers a newer change (the key is reclaimed with a later
+    // deadline) and only then rejects. The re-arm must not overwrite that
+    // newer record with an older deadline.
+    h.deps.buildSnapshot = async () => {
+      await h.storage.put(key, {
+        userId: 'user-throw-race',
+        organizationId: null,
+        dueAt: now + 3_000,
+        deferredAt: now + 1,
+      });
+      throw new Error('route down');
+    };
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(
+      flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now)
+    ).resolves.toBe(now + 3_000);
+    expect(await h.storage.get(key)).toEqual({
+      userId: 'user-throw-race',
+      organizationId: null,
+      dueAt: now + 3_000,
+      deferredAt: now + 1,
+    });
   });
 });
 

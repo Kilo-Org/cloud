@@ -47,6 +47,7 @@ import {
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
+  temporarilyBlockedModelResponse,
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   unavailableModelResponse,
@@ -736,11 +737,18 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   if (
+    !autoModel &&
+    (isFableModel(effectiveModelIdLowerCased) || isOpus5Model(effectiveModelIdLowerCased))
+  ) {
+    console.warn(
+      `User requested temporarily blocked model ${effectiveModelIdLowerCased}; rejecting.`
+    );
+    return temporarilyBlockedModelResponse();
+  }
+
+  if (
     isDisabledKiloExclusiveModel(effectiveModelIdLowerCased) ||
-    (!autoModel &&
-      (isUnavailableModel(effectiveModelIdLowerCased) ||
-        isFableModel(effectiveModelIdLowerCased) ||
-        isOpus5Model(effectiveModelIdLowerCased)))
+    (!autoModel && isUnavailableModel(effectiveModelIdLowerCased))
   ) {
     console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);
     return unavailableModelResponse();

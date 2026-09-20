@@ -741,7 +741,11 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       const response = await POST(makeRequest(makeBody(modelId)) as never);
 
       expect(response.status).toBe(404);
-      expect(await response.json()).toMatchObject({ error_type: 'unavailable_model' });
+      expect(await response.json()).toEqual({
+        error: 'This model is temporarily unavailable. Try a different model.',
+        error_type: 'unavailable_model',
+        message: 'This model is temporarily unavailable. Try a different model.',
+      });
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     }
   );

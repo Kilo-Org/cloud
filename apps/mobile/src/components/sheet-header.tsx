@@ -15,8 +15,8 @@ import { cn } from '@/lib/utils';
  * - 'bottom-form-sheet': a bottom-anchored formSheet never draws under the
  *   status bar, so it reserves no top clearance on either platform — the
  *   window inset would only be a dead band above the header (p7). Android
- *   caps the detents just below the inset (useFormSheetDetents) and the iOS
- *   sheet clears the top edge with its grabber, so the same rule holds
+ *   caps the detents just below the inset (useFormSheetScreenOptions) and the
+ *   iOS sheet clears the top edge with its grabber, so the same rule holds
  *   everywhere.
  * - 'ios-page-sheet': the SessionPageSheet surface owns the top of the window
  *   on both platforms, so the header reserves no top clearance — the native

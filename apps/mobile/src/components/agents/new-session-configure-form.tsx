@@ -175,9 +175,11 @@ export function NewSessionConfigureForm({
   onRetryCloudCreate,
 }: Readonly<NewSessionConfigureFormProps>) {
   const { t } = useTranslation();
-  // Clears the system navigation bar under the scroll content. Without it the
-  // primary Start action can sit in the bar's translucent region a formSheet
-  // leaves exposed below itself (the picker's bottom strip showed its sliver).
+  // Clears the system navigation bar under the scroll content, so the primary
+  // Start action never sits in the bar's translucent region. A formSheet over
+  // this screen no longer leaves that region exposed below itself (fixed at the
+  // sheet options: sheetShouldOverflowTopInset), so the clearance only serves
+  // this screen's own bottom edge.
   const bottomClearance = useDetailScreenBottomPadding();
   // The form is edge-to-edge and the window never resizes for the IME on
   // either platform, so the scroll body needs two floors: the navigation-bar

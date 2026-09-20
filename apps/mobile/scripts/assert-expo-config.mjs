@@ -48,6 +48,22 @@ const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
 // The one writer of the app target's `<tag>.lproj/Localizable.strings`: the App
 // Intent copy plus the appended Focus-filter catalog.
 const APP_INTENT_LOCALIZATIONS_PLUGIN = './plugins/withAppIntentLocalizations';
+// The developer menu is not the product. On iOS `DevMenuManager` auto-shows it
+// over the app at launch while onboarding is unfinished or EXDevMenuShowsAtLaunch
+// is set, and its SwiftUI icons carry raw SF Symbol names as accessibility labels
+// (`chevron.left.chevron.right` on "Open DevTools", `gearshape.fill` on the
+// floating tool button), so a scene dump of the product screen under it reads
+// them aloud as-is. These options keep it off the product screens; a developer
+// still opens it with Ctrl + d or a shake. Mirrored from
+// src/lib/dev-client-plugin.js -- asserted on the EVALUATED config, because a
+// config that stopped handing the plugin the options would still evaluate to the
+// dev-menu defaults (auto-show on, onboarding on).
+const DEV_CLIENT_PLUGIN = 'expo-dev-client';
+const DEV_CLIENT_PLUGIN_OPTIONS = {
+  toolsButton: false,
+  showMenuAtLaunch: false,
+  skipOnboarding: true,
+};
 const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSMicrophoneUsageDescription',
   'NSSpeechRecognitionUsageDescription',
@@ -209,6 +225,20 @@ check(
   pluginNames.includes(APP_INTENT_LOCALIZATIONS_PLUGIN),
   `plugins must include "${APP_INTENT_LOCALIZATIONS_PLUGIN}"`
 );
+
+// Asserted on the EVALUATED config, not on app.config.ts's source: options that
+// never reach the plugin still evaluate to the dev-menu defaults (auto-show on,
+// onboarding on), and the menu then sits over the product screen carrying the
+// raw SF Symbol names a scene dump reads aloud.
+const devClientPlugin = (config.plugins ?? []).find(
+  plugin => Array.isArray(plugin) && plugin[0] === DEV_CLIENT_PLUGIN
+);
+for (const [option, expected] of Object.entries(DEV_CLIENT_PLUGIN_OPTIONS)) {
+  check(
+    devClientPlugin?.[1]?.[option] === expected,
+    `plugins "${DEV_CLIENT_PLUGIN}" must set ${option}: ${JSON.stringify(expected)}`
+  );
+}
 
 const extra = config.extra ?? {};
 for (const key of Object.keys(ENV_KEYS)) {

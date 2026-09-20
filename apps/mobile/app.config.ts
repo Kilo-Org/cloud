@@ -1,5 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
+import { DEV_CLIENT_PLUGIN_OPTIONS } from './src/lib/dev-client-plugin';
 import { SUPPORTED_LANGUAGES } from './src/i18n/languages.ts';
 import { buildFocusFilterStringsFiles } from './src/i18n/focus-filter-locales.ts';
 import { buildPermissionPromptLocales } from './src/i18n/permission-prompt-locales.ts';
@@ -226,7 +227,7 @@ const config: ExpoConfig = {
     ],
   },
   plugins: [
-    ['expo-dev-client', { toolsButton: false }],
+    ['expo-dev-client', DEV_CLIENT_PLUGIN_OPTIONS],
     [
       'expo-build-properties',
       {

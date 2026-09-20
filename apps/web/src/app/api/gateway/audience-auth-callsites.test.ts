@@ -45,29 +45,41 @@ describe('gateway route aliases', () => {
 
   test.each([
     ['gateway/embeddings', gatewayEmbeddings.POST, gatewayEmbeddingsImplementation.POST],
-    ['gateway/models', gatewayModels.GET, openrouterModels.GET],
-    ['gateway/models-by-provider', gatewayModelsByProvider.GET, openrouterModelsByProvider.GET],
-    ['gateway/v1/models', gatewayV1Models.GET, openrouterModels.GET],
     [
       'gateway/v1/audio/transcriptions',
       gatewayV1AudioTranscriptions.POST,
       openrouterAudioTranscriptions.POST,
     ],
-    ['gateway/v1/transcription-models', gatewayV1TranscriptionModels.GET, transcriptionModels.GET],
     [
       'openrouter/v1/audio/transcriptions',
       openrouterV1AudioTranscriptions.POST,
       openrouterAudioTranscriptions.POST,
     ],
+  ])(
+    '%s exports the implementation handler by identity',
+    (_route, aliasHandler, implementationHandler) => {
+      expect(aliasHandler).toBe(implementationHandler);
+    }
+  );
+
+  test.each([
+    ['gateway/models', gatewayModels.GET, openrouterModels.GET],
+    ['gateway/models-by-provider', gatewayModelsByProvider.GET, openrouterModelsByProvider.GET],
+    ['gateway/v1/models', gatewayV1Models.GET, openrouterModels.GET],
+    ['gateway/v1/transcription-models', gatewayV1TranscriptionModels.GET, transcriptionModels.GET],
     [
       'openrouter/v1/transcription-models',
       openrouterV1TranscriptionModels.GET,
       openrouterTranscriptionModels.GET,
     ],
   ])(
-    '%s exports the implementation handler by identity',
+    '%s re-wraps the already timed handler with its own timing pattern',
     (_route, aliasHandler, implementationHandler) => {
-      expect(aliasHandler).toBe(implementationHandler);
+      // The implementation is wrapped for its own pathname; the alias wraps it
+      // again so an alias pathname logs the alias pattern (the inner wrapper
+      // stays silent by prefix). A bare re-export would emit no line at all.
+      expect(typeof aliasHandler).toBe('function');
+      expect(aliasHandler).not.toBe(implementationHandler);
     }
   );
 });

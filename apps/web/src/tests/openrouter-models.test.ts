@@ -429,8 +429,12 @@ describe('GET /api/openrouter/models', () => {
 });
 
 describe('GET /api/gateway/v1/models', () => {
-  test('uses the OpenRouter models handler', () => {
-    expect(gatewayV1ModelsGET).toBe(GET);
+  test('re-wraps the OpenRouter models handler with its own timing pattern', () => {
+    // The alias wraps the already timed handler so a gateway pathname logs the
+    // gateway pattern; the inner `/api/openrouter/models` wrapper stays silent
+    // by prefix. A bare re-export would emit no `api_timing` line at all.
+    expect(typeof gatewayV1ModelsGET).toBe('function');
+    expect(gatewayV1ModelsGET).not.toBe(GET);
   });
 
   test('retains Enkrypt and Terminal Bench in the gateway catalog response', async () => {

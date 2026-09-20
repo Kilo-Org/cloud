@@ -85,6 +85,12 @@ import * as openRouterTranscriptionModelsRoute from '@/app/api/openrouter/transc
 import * as gatewayTranscriptionModelsRoute from '@/app/api/gateway/transcription-models/route';
 import * as gatewayAudioTranscriptionsRoute from '@/app/api/gateway/audio/transcriptions/route';
 import * as gatewayRoute from '@/app/api/gateway/[...path]/route';
+import * as gatewayModelsRoute from '@/app/api/gateway/models/route';
+import * as gatewayV1ModelsRoute from '@/app/api/gateway/v1/models/route';
+import * as gatewayModelsByProviderRoute from '@/app/api/gateway/models-by-provider/route';
+import * as gatewayProvidersRoute from '@/app/api/gateway/providers/route';
+import * as gatewayV1TranscriptionModelsRoute from '@/app/api/gateway/v1/transcription-models/route';
+import * as openRouterV1TranscriptionModelsRoute from '@/app/api/openrouter/v1/transcription-models/route';
 
 const MOBILE_HEADERS = {
   'x-kilo-client': 'mobile',
@@ -343,5 +349,88 @@ describe('dedicated data routes emit one api_timing line', () => {
 
   test('gateway/audio/transcriptions still exports maxDuration', () => {
     expect(gatewayAudioTranscriptionsRoute.maxDuration).toBe(800);
+  });
+});
+
+// A bare `export { GET } from '...'` re-exports the already timed handler by
+// reference, so the alias pathname is outside the inner pattern's static prefix
+// and no `api_timing` line is emitted at all. Each alias re-wraps the timed
+// handler with its own pattern so the alias traffic is measured once.
+describe('alias routes re-exporting a timed handler emit one api_timing line', () => {
+  test('GET /api/gateway/models logs the gateway alias pattern only', async () => {
+    mockGetEnhancedOpenRouterModels.mockRejectedValue(new Error('catalog down'));
+
+    const response = await gatewayModelsRoute.GET(
+      makeRequest('https://app.kilo.ai/api/gateway/models', 'GET')
+    );
+
+    expect(response.status).toBe(500);
+    expectSingleTimingLine('/api/gateway/models', 'GET', false);
+    expect(timingLines().some(line => line.route === '/api/openrouter/models')).toBe(false);
+  });
+
+  test('GET /api/gateway/v1/models logs the gateway alias pattern only', async () => {
+    mockGetEnhancedOpenRouterModels.mockRejectedValue(new Error('catalog down'));
+
+    const response = await gatewayV1ModelsRoute.GET(
+      makeRequest('https://app.kilo.ai/api/gateway/v1/models', 'GET')
+    );
+
+    expect(response.status).toBe(500);
+    expectSingleTimingLine('/api/gateway/v1/models', 'GET', false);
+    expect(timingLines().some(line => line.route === '/api/openrouter/models')).toBe(false);
+  });
+
+  test('GET /api/gateway/models-by-provider logs the gateway alias pattern only', async () => {
+    await expect(
+      gatewayModelsByProviderRoute.GET(
+        makeRequest('https://app.kilo.ai/api/gateway/models-by-provider', 'GET')
+      )
+    ).rejects.toThrow('outside a request scope');
+
+    expectSingleTimingLine('/api/gateway/models-by-provider', 'GET', false);
+    expect(timingLines().some(line => line.route === '/api/openrouter/models-by-provider')).toBe(
+      false
+    );
+  });
+
+  test('GET /api/gateway/providers logs the gateway alias pattern only', async () => {
+    const response = await gatewayProvidersRoute.GET(
+      makeRequest('https://app.kilo.ai/api/gateway/providers', 'GET')
+    );
+
+    expect(response.status).toBe(503);
+    expectSingleTimingLine('/api/gateway/providers', 'GET', false);
+    expect(timingLines().some(line => line.route === '/api/openrouter/providers')).toBe(false);
+  });
+
+  test('GET /api/gateway/v1/transcription-models logs the v1 alias pattern only', async () => {
+    mockGetUserFromAuth.mockResolvedValue({ user: null, organizationId: null } as never);
+    mockGetOpenRouterTranscriptionModels.mockResolvedValue({ data: [] } as never);
+
+    const response = await gatewayV1TranscriptionModelsRoute.GET(
+      makeRequest('https://app.kilo.ai/api/gateway/v1/transcription-models', 'GET')
+    );
+
+    expect(response.status).toBe(200);
+    expectSingleTimingLine('/api/gateway/v1/transcription-models', 'GET');
+    expect(timingLines().some(line => line.route === '/api/gateway/transcription-models')).toBe(
+      false
+    );
+  });
+
+  test('GET /api/openrouter/v1/transcription-models logs the v1 alias pattern only', async () => {
+    mockGetUserFromAuth.mockResolvedValue({ user: null, organizationId: null } as never);
+    mockGetOpenRouterTranscriptionModels.mockResolvedValue({ data: [] } as never);
+
+    const response = await openRouterV1TranscriptionModelsRoute.GET(
+      makeRequest('https://app.kilo.ai/api/openrouter/v1/transcription-models', 'GET')
+    );
+
+    expect(response.status).toBe(200);
+    expectSingleTimingLine('/api/openrouter/v1/transcription-models', 'GET');
+    expect(timingLines().some(line => line.route === '/api/openrouter/transcription-models')).toBe(
+      false
+    );
   });
 });

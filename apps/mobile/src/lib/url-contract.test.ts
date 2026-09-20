@@ -11,7 +11,6 @@ import {
   LATENCY_INGEST_URL_DEFAULT,
   PRODUCTION_HOSTS,
   URL_SCHEMES,
-  urlEnvVariable,
 } from '@/lib/url-contract';
 import { ENV_KEYS } from './env-keys';
 
@@ -245,19 +244,26 @@ describe('app.config.ts config boundary (text contract)', () => {
   });
 });
 
-// The build-time loop reads each URL value through `urlEnvVariable`, which
-// consults the required and the optional key maps. Resolving through ENV_KEYS
-// alone silently skipped the optional latency ingest URL, so a bad override
-// passed the build gate and threw at runtime in config.ts instead.
+// The build-time loop resolves each URL_SCHEMES key through ENV_KEYS
+// (`process.env[ENV_KEYS[key]]`), so the optional latency ingest URL has to
+// resolve there too: otherwise its scheme and production-host check is
+// silently skipped and a bad override throws at launch in config.ts instead.
+// env-keys.js defines that entry non-enumerably, so the lookup finds the name
+// while the required-presence check (`Object.values(ENV_KEYS)`) stays
+// required-only.
 describe('URL key → environment variable resolution', () => {
-  it('resolves every URL key, optional keys included', () => {
+  it('resolves every URL key through ENV_KEYS, optional keys included', () => {
     for (const key of Object.keys(URL_SCHEMES)) {
-      expect(urlEnvVariable(key), `${key} must resolve to an env var name`).toBeTruthy();
+      const envVar = ENV_KEYS[key as keyof typeof ENV_KEYS];
+      expect(envVar, `${key} must resolve to an env var name`).toBeTruthy();
     }
-    expect(urlEnvVariable('latencyIngestUrl')).toBe('LATENCY_INGEST_URL');
   });
 
-  it('keeps app.config.ts resolving URL values through urlEnvVariable', () => {
-    expect(configCodeSource).toMatch(/process\.env\[urlEnvVariable\(/);
+  it('keeps the optional URL key out of the required-presence values', () => {
+    expect(Object.values(ENV_KEYS)).not.toContain('LATENCY_INGEST_URL');
+  });
+
+  it('keeps app.config.ts resolving URL values through ENV_KEYS', () => {
+    expect(configCodeSource).toMatch(/process\.env\[ENV_KEYS\[/);
   });
 });

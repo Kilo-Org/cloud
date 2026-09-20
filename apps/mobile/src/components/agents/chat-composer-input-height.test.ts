@@ -65,24 +65,45 @@ describe('new-session prompt cap with the keyboard open', () => {
   const PROMPT_LINE_HEIGHT = 24;
   const PROMPT_MIN_HEIGHT = PROMPT_LINE_HEIGHT * 3 + PROMPT_VERTICAL_PADDING;
   const FOUR_LINE_PROMPT_HEIGHT = PROMPT_LINE_HEIGHT * 4 + PROMPT_VERTICAL_PADDING;
+  // The reported device (iOS 393x852) with the keyboard up, at the keyboard
+  // height the shared cap args above already use.
+  const REPORTED_DEVICE_CAP_ARGS = {
+    windowHeight: 852,
+    safeAreaInsetTop: 59,
+    safeAreaInsetBottom: 34,
+    keyboardHeight: 336,
+    sessionHeaderHeight: SESSION_HEADER_HEIGHT,
+    composerChromeHeight: NEW_SESSION_PROMPT_CHROME_HEIGHT,
+    minHeight: PROMPT_MIN_HEIGHT,
+    absoluteMaxHeight: NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
+  } as const;
+
+  // `useTextHeight` publishes the measured content clamped into
+  // `[minHeight, maxHeight]`; that published height is the input's frame.
+  const frameHeight = (contentHeight: number, cap: number) =>
+    Math.min(Math.max(contentHeight, PROMPT_MIN_HEIGHT), cap);
 
   it('lets a four-line prompt grow past the three-line minimum', () => {
-    // Phone-class window (393x852) with the iOS keyboard up and the composer
-    // focused. A stale starter-row reserve left only 79pt of remaining space,
-    // so the cap floored at the 3-line minimum and clipped the prompt's last
-    // line at the input's bottom edge.
-    const cap = resolveComposerMaxHeight({
-      windowHeight: 852,
-      safeAreaInsetTop: 59,
-      safeAreaInsetBottom: 34,
-      keyboardHeight: 300,
-      sessionHeaderHeight: SESSION_HEADER_HEIGHT,
-      composerChromeHeight: NEW_SESSION_PROMPT_CHROME_HEIGHT,
-      minHeight: PROMPT_MIN_HEIGHT,
-      absoluteMaxHeight: NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
-    });
+    // A stale starter-row reserve left only 43pt of remaining space here, so
+    // the cap floored at the 3-line minimum and clipped the prompt's last line
+    // at the input's bottom edge.
+    const cap = resolveComposerMaxHeight(REPORTED_DEVICE_CAP_ARGS);
 
     expect(cap).toBeGreaterThanOrEqual(FOUR_LINE_PROMPT_HEIGHT);
+  });
+
+  it('holds all four wrapped lines on the reported device with the keyboard up', () => {
+    // The reported defect: the last line ('when done') was cut off at the
+    // input's bottom edge because the frame was clamped below the content.
+    const cap = resolveComposerMaxHeight(REPORTED_DEVICE_CAP_ARGS);
+
+    expect(frameHeight(FOUR_LINE_PROMPT_HEIGHT, cap)).toBe(FOUR_LINE_PROMPT_HEIGHT);
+  });
+
+  it('still starts the empty prompt at the three-line minimum', () => {
+    const cap = resolveComposerMaxHeight(REPORTED_DEVICE_CAP_ARGS);
+
+    expect(frameHeight(PROMPT_MIN_HEIGHT, cap)).toBe(PROMPT_MIN_HEIGHT);
   });
 });
 

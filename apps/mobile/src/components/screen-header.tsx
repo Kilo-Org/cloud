@@ -10,6 +10,7 @@ import { Text } from '@/components/ui/text';
 import { useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { offlineHeaderReservation } from '@/lib/offline-banner-state';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 /**
@@ -110,21 +111,17 @@ export function ScreenHeader({
   const safeAreaStyle = safeAreaTop ? { paddingTop } : undefined;
 
   // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
-  // whole chrome off the sensor. They go on an inner wrapper so they ADD to the
-  // `px-4` gutter: an inline padding on the container would beat the className
-  // (inline style wins in React Native) and swallow the gutter, pulling the
-  // back control's `-ml-4` chevron back inside the sensor area. Zero insets
-  // collapse the wrapper style to `undefined`, so portrait geometry is
+  // whole chrome off the sensor. The one shared hook serves both platforms and
+  // every caller: the brand mark on a page root and the sections, cards and
+  // actions below it then share one leading edge. It goes on an inner wrapper so
+  // it ADDS to the `px-4` gutter: an inline padding on the container would beat
+  // the className (inline style wins in React Native) and swallow the gutter,
+  // pulling the back control's `-ml-4` chevron back inside the sensor area. Zero
+  // insets collapse the wrapper style to `undefined`, so portrait geometry is
   // byte-identical and a rotation never moves anything vertically. Side padding
   // applies to every caller — a sheet with `safeAreaTop={false}` still runs
   // edge-to-edge horizontally and must clear the cutout too.
-  const sideInsetStyle =
-    insets.left > 0 || insets.right > 0
-      ? {
-          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
-          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
-        }
-      : undefined;
+  const sideInsetStyle = useSideInsetStyle();
 
   // When `backIcon` isn't specified, fall back to the historical behaviour
   // where iOS modals get a ChevronDown and everything else gets a ChevronLeft.

@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
@@ -19,11 +18,17 @@ import { NewTaskFromPictureButton } from '@/components/home/new-task-from-pictur
 import { ProductChoices } from '@/components/home/product-choices';
 import { ScreenHeader } from '@/components/screen-header';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 
 export function HomeScreen() {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
+  // The page body clears the landscape side safe areas (notch/Dynamic Island,
+  // Android cutout) with the same shared hook the header chrome uses
+  // (ScreenHeader), so the brand mark and the body below it always share one
+  // leading edge. One implementation for both platforms; zero insets collapse
+  // to a no-op and leave the portrait geometry unchanged.
+  const sideInsetStyle = useSideInsetStyle();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const [refreshing, setRefreshing] = useState(false);
   const context = useLiveSessionContext();
@@ -48,20 +53,6 @@ export function HomeScreen() {
       }
     })();
   }, [refetch]);
-
-  // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
-  // whole chrome off the sensor. The header's own chrome applies them already
-  // (ScreenHeader), so the page body adds the same amount: the brand mark then
-  // shares one leading edge with the section labels, the session card and the
-  // actions below it. Zero insets (portrait) collapse to a no-op and leave the
-  // geometry unchanged.
-  const sideInsetStyle =
-    insets.left > 0 || insets.right > 0
-      ? {
-          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
-          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
-        }
-      : undefined;
 
   return (
     <View className="flex-1 bg-background">

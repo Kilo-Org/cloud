@@ -34,6 +34,8 @@ const state = vi.hoisted(() => ({
   prReviewEnabled: true,
   /** Landscape side safe areas (notch/sensor); portrait is all zeros. */
   insets: { top: 0, bottom: 0, left: 0, right: 0 },
+  /** The platform value the safe-area layout must be identical under. */
+  platformOS: 'ios' as 'ios' | 'android',
   refetch: vi.fn<() => Promise<boolean>>(),
   boundaryRefetch: vi.fn(),
   socketRetry: vi.fn(),
@@ -61,7 +63,13 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
+  // A getter so a test can flip the platform and re-render: the safe-area
+  // layout must not depend on it.
+  Platform: {
+    get OS() {
+      return state.platformOS;
+    },
+  },
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',
@@ -233,6 +241,7 @@ beforeEach(() => {
   });
   Object.assign(state.connection, { isConnected: true, reconnectExhausted: false });
   Object.assign(state.insets, { top: 0, bottom: 0, left: 0, right: 0 });
+  state.platformOS = 'ios';
   state.internet = 'online';
   state.prReviewEnabled = true;
   state.destination = '';
@@ -903,6 +912,23 @@ describe('Home leading edge', () => {
     const scroll = nodes('ScrollView')[0];
     expect(scroll).toBeDefined();
     expect(inset.some(view => view.findAll(node => node === scroll).length > 0)).toBe(true);
+  });
+
+  it('renders the same landscape inset on iOS and Android, one implementation for both', async () => {
+    state.insets.left = 47;
+    state.insets.right = 47;
+    state.platformOS = 'ios';
+    await renderHome();
+    const ios = sideInsetViews(47);
+
+    state.platformOS = 'android';
+    await renderHome();
+    const android = sideInsetViews(47);
+
+    // One implementation for both platforms: the platform value never changes
+    // the header chrome's or the page body's leading edge.
+    expect(ios).toHaveLength(2);
+    expect(android.map(view => view.props.style)).toEqual(ios.map(view => view.props.style));
   });
 
   it('clears the landscape side safe area around the centered feedback body too', async () => {

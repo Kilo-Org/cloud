@@ -163,6 +163,7 @@
     "useDifferentEmail": "Gunakan email lain",
     "signInWithApple": "Masuk dengan Apple",
     "signInWithGoogle": "Masuk dengan Google",
+    "signInWithPasskey": "Masuk dengan kunci sandi",
     "emailAddress": "Alamat email",
     "emailPlaceholder": "kamu@example.com",
     "continueWithEmail": "Lanjutkan dengan email",
@@ -175,6 +176,10 @@
     "termsConnector": " dan ",
     "termsSuffix": ".",
     "moreSignInOptions": "Opsi masuk lainnya",
+    "passkeyCancelled": "Masuk dengan kunci sandi dibatalkan. Coba lagi.",
+    "passkeyNotFound": "Tidak ada kunci sandi yang tersimpan untuk perangkat ini. Masuk dengan Apple, Google, atau email Anda sebagai gantinya.",
+    "passkeyUnsupported": "Kunci sandi tidak tersedia di perangkat ini. Masuk dengan Apple, Google, atau email Anda sebagai gantinya.",
+    "passkeyFailed": "Tidak dapat masuk dengan kunci sandi. Coba lagi.",
     "couldNotCompleteSignIn": "Tidak dapat menyelesaikan proses masuk. Coba lagi.",
     "sessionEnded": "Sesimu telah berakhir. Masuk lagi.",
     "signInCodeExpired": "Kode masukmu telah kedaluwarsa. Coba lagi.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Akun uji",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO perusahaan"
+    "providerEnterpriseSso": "SSO perusahaan",
+    "passkeysTitle": "Kunci sandi",
+    "passkeysSubtitle": "Masuk tanpa kata sandi",
+    "passkeysEmpty": "Belum ada kunci sandi",
+    "passkeysEmptyHint": "$t(profile.addPasskey) untuk masuk tanpa kata sandi.",
+    "passkeysCouldNotLoad": "Tidak dapat memuat kunci sandi",
+    "passkeysLoadFailed": "Kunci sandi tidak tersedia sampai ini dimuat.",
+    "addPasskey": "Tambah kunci sandi",
+    "passkeyDefaultName": "Kunci sandi",
+    "passkeyAddedOn": "Ditambahkan {{date}}",
+    "passkeyAdded": "Kunci sandi ditambahkan.",
+    "passkeyAddFailed": "Tidak dapat menambahkan kunci sandi. Coba lagi.",
+    "passkeyAddUnsupported": "Perangkat ini tidak dapat membuat kunci sandi.",
+    "passkeyAddCancelled": "Pembuatan kunci sandi dibatalkan.",
+    "passkeyRemoved": "Kunci sandi dihapus.",
+    "passkeyRemoveFailed": "Tidak dapat menghapus kunci sandi itu. Coba lagi.",
+    "passkeyRenamed": "Kunci sandi diganti namanya.",
+    "passkeyName": "Nama kunci sandi",
+    "renamePasskey": "Ganti nama kunci sandi",
+    "removePasskey": "Hapus kunci sandi",
+    "removePasskeyTitle": "Hapus kunci sandi?",
+    "removePasskeyMessage": "Anda tidak akan bisa lagi masuk dengan kunci sandi ini."
   },
   "preferences": {
     "general": "Umum",
@@ -293,7 +319,7 @@
     "previewFullDescription": "Notifikasi menampilkan teks pesan di layar kuncimu.",
     "previewGenericDescription": "Notifikasi hanya menunjukkan adanya aktivitas. Buka Kilo untuk membaca pesannya.",
     "channel": {
-      "agent": "Sesi agen",
+      "agentProgress": "Kemajuan agen",
       "chat": "Pesan obrolan",
       "kiloclaw": "Aktivitas KiloClaw",
       "balance": "Peringatan saldo",
@@ -310,6 +336,15 @@
       "kiloclawActivitySubtitle": "instans siap/gagal, tindakan terjadwal",
       "balanceAlertsSubtitle": "peringatan saat saldo organisasi rendah",
       "securityFindingsSubtitle": "temuan baru dan pengingat SLA"
+    },
+    "action": {
+      "openSession": "Buka sesi"
+    },
+    "needsInputAction": {
+      "approved": "Permintaan disetujui",
+      "replied": "Balasan terkirim",
+      "failed": "Tidak dapat menjawab. Ketuk lagi untuk mencoba lagi.",
+      "unavailable": "Permintaan ini tidak lagi menunggu."
     }
   },
   "tabs": {
@@ -390,7 +425,9 @@
       "uploadFailed": "Gagal mengunggah.",
       "failedToUploadFile": "Gagal mengunggah berkas: {{reason}}.",
       "nothingToPaste": "Tidak ada yang dapat ditempelkan.",
-      "metadataStripFailed": "Metadata foto tidak dapat dihapus."
+      "metadataStripFailed": "Metadata foto tidak dapat dihapus.",
+      "limit_one": "Kamu dapat melampirkan hingga {{displayCount}} berkas.",
+      "limit_other": "Kamu dapat melampirkan hingga {{displayCount}} berkas."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1159,7 +1196,11 @@
       "syncNow": "Sinkronkan sekarang",
       "syncQueued": "Sinkronisasi diantrekan",
       "syncStatusUnavailable": "Status sinkronisasi tidak tersedia.",
-      "withinDeadline": "Belum melewati tenggat"
+      "withinDeadline": "Belum melewati tenggat",
+      "daysOverdue_one": "Terlambat {{displayCount}} hari",
+      "daysOverdue_other": "Terlambat {{displayCount}} hari",
+      "findingsCount_one": "{{displayCount}} temuan",
+      "findingsCount_other": "{{displayCount}} temuan"
     },
     "dashboardMetrics": {
       "openFindings": "Temuan terbuka",
@@ -1641,20 +1682,7 @@
       "continueFrom": "Melanjutkan sesi {{title}}.",
       "importingSession": "Mengimpor sesi",
       "cliCannotContinue": "CLI ini tidak dapat melanjutkan sesi. Pilih Cloud Agent atau CLI lain.",
-      "importFailed": "Tidak dapat mengimpor sesi ini.",
-      "sandbox": "Lingkungan terisolasi",
-      "sandboxAccessibility": "Lingkungan terisolasi: {{label}}",
-      "sandboxDefaultWithDestination": "Bawaan · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Kecil",
-      "sandboxInstanceShared": "Berbagi",
-      "sandboxInstanceLarge": "Besar",
-      "sandboxInstanceDevcontainer": "Kontainer dev",
-      "sandboxInstanceProviderDefault": "Bawaan penyedia",
-      "sandboxCouldNotLoad": "Tidak dapat memuat opsi sandbox",
-      "sandboxUnavailable": "Lingkungan terisolasi ini tidak tersedia. Pilih lingkungan terisolasi lain atau Bawaan.",
-      "sandboxUseDefault": "Gunakan Bawaan"
+      "importFailed": "Tidak dapat mengimpor sesi ini."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} berkas telah diperbarui.",
@@ -1678,7 +1706,13 @@
       "updateTodos": "Perbarui daftar tugas",
       "linesBadge": "{{displayCount}} baris",
       "filesBadge": "{{displayCount}} berkas",
-      "matchesBadge": "{{displayCount}} kecocokan"
+      "matchesBadge": "{{displayCount}} kecocokan",
+      "filesBadge_one": "{{displayCount}} berkas",
+      "filesBadge_other": "{{displayCount}} berkas",
+      "linesBadge_one": "{{displayCount}} baris",
+      "linesBadge_other": "{{displayCount}} baris",
+      "matchesBadge_one": "{{displayCount}} kecocokan",
+      "matchesBadge_other": "{{displayCount}} kecocokan"
     },
     "readToolMarkdown": {
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",
@@ -1968,7 +2002,11 @@
       "files": "Berkas",
       "couldNotOpenPhotoPicker": "Tidak dapat membuka pemilih foto. Mulai ulang Kilo dan coba lagi.",
       "maxFilesAllowed": "Kamu dapat menambahkan maksimal {{displayCount}} berkas.",
-      "onlyAddingFiles": "Hanya {{accepted}} dari {{total}} berkas yang ditambahkan (maks. {{max}})"
+      "onlyAddingFiles": "Hanya {{accepted}} dari {{total}} berkas yang ditambahkan (maks. {{max}})",
+      "maxFilesAllowed_one": "Kamu dapat menambahkan maksimal {{displayCount}} berkas.",
+      "maxFilesAllowed_other": "Kamu dapat menambahkan maksimal {{displayCount}} berkas.",
+      "onlyAddingFiles_one": "Hanya {{accepted}} dari {{total}} berkas yang ditambahkan (maks. {{max}})",
+      "onlyAddingFiles_other": "Hanya {{accepted}} dari {{total}} berkas yang ditambahkan (maks. {{max}})"
     },
     "composer": {
       "addAttachment": "Tambah lampiran",
@@ -1986,7 +2024,9 @@
       "discardAttachmentsMessage": "Unggahan yang belum dilampirkan ke pesan terkirim akan dihapus.",
       "discardAttachmentsTitle": "Buang lampiran?",
       "charactersRemaining": "{{count}} karakter tersisa",
-      "insertNewline": "Sisipkan baris baru"
+      "insertNewline": "Sisipkan baris baru",
+      "charactersRemaining_one": "{{count}} karakter tersisa",
+      "charactersRemaining_other": "{{count}} karakter tersisa"
     },
     "chatLink": {
       "linkCopied": "Tautan disalin",
@@ -2058,7 +2098,9 @@
       "stepsCount_one": "{{steps}} langkah",
       "stepsCount": "{{steps}} langkah",
       "stepsCount_other": "{{steps}} langkah",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Model ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Setujui otomatis",
@@ -2098,7 +2140,9 @@
     },
     "toolRun": {
       "sheetTitle": "Panggilan alat",
-      "condensedLabel": "{{itemCount}} item; {{last}}"
+      "condensedLabel": "{{itemCount}} item; {{last}}",
+      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_other": "{{itemCount}} item; {{last}}"
     }
   },
   "bootstrap": {
@@ -2233,7 +2277,9 @@
     "cliCantReceiveFilesTitle": "Sesi ini tidak dapat menerima file",
     "cliCantReceiveFilesMessage": "Kilo CLI yang menjalankan sesi ini tidak dapat menerima file. Perbarui CLI di mesin tersebut, atau bagikan ke sesi baru.",
     "contentlessMessage": "Tidak ada konten untuk dibagikan. Tidak ada teks atau file yang disertakan.",
-    "couldNotReadContent": "Tidak dapat membaca konten yang dibagikan."
+    "couldNotReadContent": "Tidak dapat membaca konten yang dibagikan.",
+    "onlyFirstFilesAttached_one": "Hanya {{displayCount}} file pertama yang akan dilampirkan.",
+    "onlyFirstFilesAttached_other": "Hanya {{displayCount}} file pertama yang akan dilampirkan."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2541,7 +2587,9 @@
         "outdatedOnPath": "Sudah tidak sesuai di {{path}}"
       },
       "deletedUser": "pengguna yang dihapus",
-      "replyForbiddenTerm": "Kamu tidak memiliki izin untuk membalas {{term}} ini."
+      "replyForbiddenTerm": "Kamu tidak memiliki izin untuk membalas {{term}} ini.",
+      "moreLinesAbove_one": "… {{displayCount}} baris lagi di atas",
+      "moreLinesAbove_other": "… {{displayCount}} baris lagi di atas"
     },
     "entry": {
       "eyebrow": "Buka PR atau merge request melalui URL",
@@ -2639,7 +2687,17 @@
       "loadingLines": "Memuat {{loaded}} dari {{total}} baris…",
       "loadingMoreFiles": "Memuat file lainnya…",
       "retryLoadingContext": "Coba muat konteks lagi",
-      "retryLoadingNextPage": "Coba muat halaman berikutnya lagi"
+      "retryLoadingNextPage": "Coba muat halaman berikutnya lagi",
+      "expandAllLines_one": "Tampilkan seluruh {{displayCount}} baris",
+      "expandAllLines_other": "Tampilkan seluruh {{displayCount}} baris",
+      "expandLines_one": "Tampilkan {{displayCount}} baris ({{start}}–{{end}})",
+      "expandLines_other": "Tampilkan {{displayCount}} baris ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Tampilkan {{displayCount}} baris konteks",
+      "expandLinesOfContext_other": "Tampilkan {{displayCount}} baris konteks",
+      "expandMoreLines_one": "Tampilkan {{displayCount}} baris lagi ({{start}}–{{end}})",
+      "expandMoreLines_other": "Tampilkan {{displayCount}} baris lagi ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} dari {{total}} file sudah dimuat",
+      "loadedOfTotalFiles_other": "{{loaded}} dari {{total}} file sudah dimuat"
     },
     "inbox": {
       "couldNotLoad": "Tidak dapat memuat kotak masuk.",
@@ -2836,7 +2894,9 @@
       "statusContext": "Konteks",
       "lineLabel": "baris {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "baris {{status}}: {{text}}",
-      "emptyLine": "(kosong)"
+      "emptyLine": "(kosong)",
+      "truncationBanner_one": "Hanya {{limit}} file pertama dari {{total}} file yang diubah ditampilkan karena batas API GitHub.",
+      "truncationBanner_other": "Hanya {{limit}} file pertama dari {{total}} file yang diubah ditampilkan karena batas API GitHub."
     },
     "linkPasteClipboardEmpty": "Papan klip kosong.",
     "linkPasteNotAPullRequest": "Ini bukan tautan PR atau merge request",
@@ -3093,7 +3153,9 @@
     "couldNotApprove": "Tidak dapat menyetujui",
     "couldNotStart": "Tidak dapat memulai",
     "channelName": "Agen aktif",
-    "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci."
+    "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci.",
+    "openSession": "Buka",
+    "approveFailed": "Tidak dapat menyetujui. Ketuk $t(common.approve) untuk mencoba lagi."
   },
   "transcriptionModel": {
     "title": "Model transkripsi",

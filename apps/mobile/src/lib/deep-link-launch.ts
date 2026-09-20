@@ -8,10 +8,24 @@ import {
 } from '@kilocode/app-shared/universal-links';
 
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
+import { APP_SCHEME, isSystemSearchFamilyLink } from './system-search-families';
 
-type DeepLinkSource = 'universal-link' | 'notification';
+type DeepLinkSource = 'universal-link' | 'notification' | 'system-search';
 
 type GetLinkingURL = () => string | null;
+
+/** Per-capture flags the precedence and account rules read back. */
+type PendingDeepLinkOptions = {
+  /** Only the cold-launch capture sets this; see the module flag below. */
+  fromLaunchAppScheme?: boolean;
+  /**
+   * The destination belongs to the session that produced it and must not open
+   * for another account. Set for an app-scheme launch URL that names a family
+   * the phone's own search indexes: on Android that URL is how a tap on an
+   * indexed result is delivered.
+   */
+  sessionBound?: boolean;
+};
 
 /** Minimal SecureStore surface used by the durable mirror. */
 type SecureStoreLike = {
@@ -27,6 +41,8 @@ type PendingDeepLinkRecord = {
   storedAt: number;
   /** Signed-in user id at persist time, or null when captured while signed out. */
   userId: string | null;
+  /** Whether the destination is bound to the session that produced it. */
+  sessionBound: boolean;
 };
 
 /** A persisted record older than this is discarded on restore. */
@@ -36,12 +52,28 @@ let pendingDeepLink: string | null = null;
 let pendingSource: DeepLinkSource | null = null;
 let launchLinkHandled = false;
 
+// True while the pending slot holds a universal link the cold-launch capture
+// derived from an app-scheme (`kiloapp://`) launch URL. On Android a tap on one
+// of the app's own search results IS such a URL, delivered as the launch
+// Intent; the shared web table maps it lossily (it strips the query string), so
+// the lossless `system-search` route for the same tap is allowed to replace it.
+// An `https://` universal link is never flagged, so an ordinary link keeps its
+// precedence over a stale search slot.
+let pendingUniversalLinkFromLaunch = false;
+
 // The signed-in user id at persist time, bound to each durable record so a
 // destination captured for one account is never restored for another. The
 // auth context sets it on sign-in (with the new user id) and on sign-out
 // (with null). A null value means "captured while signed out", which still
 // restores.
 let currentDeepLinkUserId: string | null = null;
+
+// Whether the CURRENT in-memory slot holds a session-bound destination: one
+// that belongs to the session that produced it (a system-search result, or the
+// app-scheme launch URL that delivers one on Android) and so must never open
+// for another account. A destination captured before any account is known is
+// dropped when the account settles signed out.
+let pendingDeepLinkSessionBound = false;
 
 // The signed-in user id the CURRENT in-memory slot was captured for, or null
 // when it was captured while signed out. Mirrors the persisted record's
@@ -50,9 +82,36 @@ let currentDeepLinkUserId: string | null = null;
 // signed-out destination (which any later sign-in may still want).
 let pendingDeepLinkUserId: string | null = null;
 
+// Whether an account identity is known yet. A cold launch captures a
+// system-search tap at module scope, before auth restores, so `currentDeepLinkUserId`
+// is still null there; a system-search destination captured in that window is
+// held in `deferredSystemSearchHref` and bound (or dropped) once the account
+// settles, never stored account-independent.
+let deepLinkUserSettled = false;
+
+// A system-search destination captured before the account settled. It is
+// in-memory only: a system-search result belongs to the session that indexed
+// it, so it is never persisted until an account identity binds it.
+let deferredSystemSearchHref: string | null = null;
+
 /** Sets the signed-in user id that `persistPendingDeepLink` records. */
 export function setCurrentDeepLinkUserId(userId: string | null): void {
   currentDeepLinkUserId = userId;
+  deepLinkUserSettled = true;
+  // The account is now known: a system-search tap captured during bootstrap is
+  // this account's to open, or it is dropped when the launch is signed out.
+  const deferred = deferredSystemSearchHref;
+  deferredSystemSearchHref = null;
+  if (deferred !== null && userId !== null) {
+    applyPendingDeepLink(deferred, 'system-search');
+  }
+  // A session-bound destination captured before the account settled (a cold
+  // launch from the app-scheme URL a search tap uses) belongs to whoever was
+  // signed in then. A signed-out settle means there was no such account, so
+  // the destination must not open for whoever signs in later in this process.
+  if (userId === null && pendingDeepLinkSessionBound) {
+    clearPendingDeepLink();
+  }
 }
 
 // Monotonic epoch bumped on every set, consume, and clear. Restore captures it
@@ -119,6 +178,7 @@ function persistPendingDeepLink(href: string, source: DeepLinkSource): void {
     source,
     storedAt: Date.now(),
     userId: currentDeepLinkUserId,
+    sessionBound: pendingDeepLinkSessionBound,
   };
   enqueuePendingDeepLinkWrite(async () => {
     await getSecureStore().setItemAsync(PENDING_DEEP_LINK_KEY, JSON.stringify(record));
@@ -136,26 +196,89 @@ function deletePersistedPendingDeepLink(): void {
  * Stash a deep-link href for the root layout to consume after gates clear.
  * Source is required so the type checker enforces precedence:
  * - `'universal-link'` always wins (overwrites anything).
+ * - `'system-search'` applies unless the slot holds a universal link: the user
+ *   tapped a result, which is newer evidence than a pending notification. The
+ *   one exception is a universal link the launch capture derived from an
+ *   app-scheme URL (`fromLaunchAppScheme`), because that IS the Android search
+ *   tap and the exact route is lossless where the web-table mapping is not.
  * - `'notification'` applies only when the slot is empty or already a notification.
  * Rationale: `getLastNotificationResponse()` can return a *stale* response on a
  * launch actually caused by a link, so the link is the better evidence of what
  * started this process.
  */
-export function setPendingDeepLink(href: string, source: DeepLinkSource): void {
-  if (source === 'universal-link') {
-    pendingDeepLink = href;
-    pendingSource = source;
-  } else if (pendingDeepLink === null || pendingSource === 'notification') {
-    // notification
-    pendingDeepLink = href;
-    pendingSource = source;
-  } else {
+export function setPendingDeepLink(
+  href: string,
+  source: DeepLinkSource,
+  options?: PendingDeepLinkOptions
+): void {
+  const sessionBound = source === 'system-search' || options?.sessionBound === true;
+  if (sessionBound) {
+    // A destination captured before the account is known. The native
+    // system-search slot is single-shot, so its capture is held until the
+    // settle binds or drops it. A session-bound launch capture is applied now
+    // instead, because a link launch must keep a universal link's precedence
+    // over that slot; the settle drops it when the launch is signed out.
+    if (!deepLinkUserSettled && source === 'system-search') {
+      deferredSystemSearchHref = href;
+      return;
+    }
+    if (deepLinkUserSettled && currentDeepLinkUserId === null) {
+      return;
+    }
+  }
+  applyPendingDeepLink(href, source, options);
+}
+
+/** The precedence rules and the durable write, once the source is admitted. */
+function applyPendingDeepLink(
+  href: string,
+  source: DeepLinkSource,
+  options?: PendingDeepLinkOptions
+): void {
+  // A universal link always wins, except that the exact system-search route for
+  // an app-scheme launch URL may replace the web table's lossy mapping of it —
+  // and only when it names the same destination, so a stale search slot cannot
+  // displace the unrelated link the launch actually opened. An https launch
+  // link is never flagged, so it keeps its precedence over a stale slot.
+  const supersedesLaunchAppSchemeLink =
+    source === 'system-search' &&
+    pendingSource === 'universal-link' &&
+    pendingUniversalLinkFromLaunch &&
+    pendingDeepLink !== null &&
+    sameDestination(pendingDeepLink, href);
+  if (
+    source !== 'universal-link' &&
+    pendingSource === 'universal-link' &&
+    !supersedesLaunchAppSchemeLink
+  ) {
     return;
   }
+  // A notification applies only when the slot is empty or already a notification:
+  // a system-search tap is newer evidence and must not be overwritten by a
+  // stale notification response.
+  if (source === 'notification' && pendingDeepLink !== null && pendingSource !== 'notification') {
+    return;
+  }
+  pendingDeepLink = href;
+  pendingSource = source;
   pendingDeepLinkUserId = currentDeepLinkUserId;
+  pendingUniversalLinkFromLaunch = options?.fromLaunchAppScheme === true;
+  pendingDeepLinkSessionBound = source === 'system-search' || options?.sessionBound === true;
   pendingDeepLinkEpoch += 1;
   persistPendingDeepLink(href, source);
   notifyPendingDeepLinkListeners();
+}
+
+/** The href without its query or fragment, so the lossy web-table mapping of an
+ *  app-scheme launch link still matches the exact search route for the same
+ *  tap while a different destination never does. */
+function sameDestination(left: string, right: string): boolean {
+  return withoutQuery(left) === withoutQuery(right);
+}
+
+function withoutQuery(href: string): string {
+  const cut = href.search(/[?#]/);
+  return cut === -1 ? href : href.slice(0, cut);
 }
 
 /** Get-and-clear. Single consumer is `_layout.tsx`. */
@@ -175,20 +298,30 @@ export function clearPendingDeepLink(): void {
   pendingDeepLink = null;
   pendingSource = null;
   pendingDeepLinkUserId = null;
+  pendingUniversalLinkFromLaunch = false;
+  pendingDeepLinkSessionBound = false;
+  deferredSystemSearchHref = null;
   pendingDeepLinkEpoch += 1;
   deletePersistedPendingDeepLink();
   notifyPendingDeepLinkListeners();
 }
 
 /**
- * Sign-out drop: clear only an account-bound destination (captured while a
- * user was signed in). A destination captured while signed out is
- * account-independent — it is the link the user opened before signing in —
- * so a redundant sign-out must not drop it. The in-memory clear is
- * synchronous; the persisted delete chains behind any in-flight persist.
+ * Sign-out drop: clear an account-bound destination (captured while a user was
+ * signed in), any system-search destination, and any session-bound launch
+ * capture (bound to the session that indexed it, so it must never survive into
+ * another account). A universal link or notification captured while signed out
+ * is account-independent — it is the link the user opened before signing in —
+ * so a redundant sign-out must not drop it. The in-memory clear is synchronous;
+ * the persisted delete chains behind any in-flight persist.
  */
 export function clearAccountBoundPendingDeepLink(): void {
-  if (pendingDeepLinkUserId !== null) {
+  deferredSystemSearchHref = null;
+  if (
+    pendingDeepLinkUserId !== null ||
+    pendingSource === 'system-search' ||
+    pendingDeepLinkSessionBound
+  ) {
     clearPendingDeepLink();
   }
 }
@@ -245,13 +378,19 @@ export async function restorePersistedPendingDeepLink(): Promise<void> {
 
   // A record captured for a different signed-in user must never navigate the
   // current account. A null record userId (captured while signed out) still
-  // restores.
+  // restores, except for a session-bound destination: that belongs to the
+  // session that produced it, so a record without an account identity is never
+  // trusted.
   if (record.userId !== null && record.userId !== currentDeepLinkUserId) {
     deletePersistedPendingDeepLink();
     return;
   }
+  if (record.userId === null && (record.source === 'system-search' || record.sessionBound)) {
+    deletePersistedPendingDeepLink();
+    return;
+  }
 
-  setPendingDeepLink(record.href, record.source);
+  setPendingDeepLink(record.href, record.source, { sessionBound: record.sessionBound });
 }
 
 async function readPersistedPendingDeepLink(): Promise<string | null> {
@@ -267,9 +406,13 @@ async function readPersistedPendingDeepLink(): Promise<string | null> {
 
 const pendingDeepLinkRecordSchema = z.object({
   href: z.string(),
-  source: z.enum(['universal-link', 'notification']),
+  source: z.enum(['universal-link', 'notification', 'system-search']),
   storedAt: z.number(),
   userId: z.string().nullable(),
+  // Absent in a record written before the session binding existed: such a
+  // record can only be an account-independent destination (a link or a
+  // notification), which is what the default restores as.
+  sessionBound: z.boolean().default(false),
 });
 
 function parsePendingDeepLinkRecord(raw: string): PendingDeepLinkRecord | null {
@@ -334,7 +477,16 @@ export function captureLaunchDeepLink(): void {
   }
   const resume = resolveIncomingResume(url);
   if (resume) {
-    setPendingDeepLink(resumeDeepLinkHref(resume), 'universal-link');
+    // An app-scheme launch URL is the shape the Android system-search tap
+    // delivers; flag it so the exact `system-search` route for that tap may
+    // replace this lossy web-table mapping. An `https://` link is never flagged.
+    // An app-scheme URL that names a family the phone's search indexes is a
+    // search result's identifier, so it is session-bound: it must not open for
+    // the account that signs in after the one that indexed it.
+    setPendingDeepLink(resumeDeepLinkHref(resume), 'universal-link', {
+      fromLaunchAppScheme: url.startsWith(APP_SCHEME),
+      sessionBound: isSystemSearchFamilyLink(url),
+    });
     launchLinkHandled = true;
   }
 }
@@ -349,10 +501,14 @@ export function _resetDeepLinkLaunchForTests(): void {
   pendingDeepLink = null;
   pendingSource = null;
   pendingDeepLinkUserId = null;
+  pendingUniversalLinkFromLaunch = false;
+  pendingDeepLinkSessionBound = false;
   launchLinkHandled = false;
   getLinkingURLForTests = null;
   pendingDeepLinkListeners.clear();
   currentDeepLinkUserId = null;
+  deepLinkUserSettled = false;
+  deferredSystemSearchHref = null;
   // eslint-disable-next-line prefer-await-to-then -- reset the chain to the empty sentinel
   pendingDeepLinkWriteChain = Promise.resolve();
 }

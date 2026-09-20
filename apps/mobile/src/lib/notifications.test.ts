@@ -37,6 +37,8 @@ const mocks = vi.hoisted(() => ({
   appState: { currentState: 'active' as string },
   setBadgeCountAsync: vi.fn(),
   setNotificationChannelAsync: vi.fn(),
+  getNotificationChannelAsync: vi.fn(),
+  deleteNotificationChannelAsync: vi.fn(),
   setNotificationHandler: vi.fn(),
   getPermissionsAsync: vi.fn(),
   requestPermissionsAsync: vi.fn(),
@@ -56,6 +58,10 @@ const mocks = vi.hoisted(() => ({
   defineTask: vi.fn(),
   registerTaskAsync: vi.fn(),
   captureEvent: vi.fn(),
+  scheduleNotificationAsync: vi.fn(),
+  dismissNotificationAsync: vi.fn(),
+  runNeedsInputInteraction: vi.fn(),
+  requireOptionalNativeModule: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -68,13 +74,22 @@ vi.mock('react-native', () => ({
   },
 }));
 
+// The Focus filter reads through `requireOptionalNativeModule`; the per-test
+// return value stands in for what the active iOS Focus stored, and `null`
+// stands in for Android, where the module is not registered.
+vi.mock('expo', () => ({ requireOptionalNativeModule: mocks.requireOptionalNativeModule }));
+
 vi.mock('expo-notifications', () => ({
   setBadgeCountAsync: mocks.setBadgeCountAsync,
   setNotificationChannelAsync: mocks.setNotificationChannelAsync,
+  getNotificationChannelAsync: mocks.getNotificationChannelAsync,
+  deleteNotificationChannelAsync: mocks.deleteNotificationChannelAsync,
   getPermissionsAsync: mocks.getPermissionsAsync,
   requestPermissionsAsync: mocks.requestPermissionsAsync,
   getExpoPushTokenAsync: mocks.getExpoPushTokenAsync,
   setNotificationHandler: mocks.setNotificationHandler,
+  scheduleNotificationAsync: mocks.scheduleNotificationAsync,
+  dismissNotificationAsync: mocks.dismissNotificationAsync,
   addNotificationResponseReceivedListener: (listener: ResponseListener) => {
     mocks.listeners.add(listener);
     return { remove: () => mocks.listeners.delete(listener) };
@@ -89,6 +104,12 @@ vi.mock('expo-notifications', () => ({
 
 vi.mock('expo-task-manager', () => ({
   defineTask: mocks.defineTask,
+}));
+
+// The s4 entry point builds the real mobile session manager (RN / tRPC graph),
+// so the suite stubs the module the lazy dynamic import resolves to.
+vi.mock('./notification-action-interaction', () => ({
+  runNeedsInputInteraction: mocks.runNeedsInputInteraction,
 }));
 
 vi.mock('@sentry/react-native', () => ({
@@ -158,12 +179,11 @@ vi.mock('@/lib/persist/read-cache', () => ({ readCachedUserId: () => null }));
 vi.mock('@kilocode/notifications', async importOriginal => ({
   ...(await importOriginal<typeof Notifications>()),
   ANDROID_NOTIFICATION_CHANNELS: [
-    { id: 'agent', name: 'Agent sessions', importance: 'high' },
-    { id: 'chat', name: 'Chat messages', importance: 'high' },
-    { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default' },
-    { id: 'balance', name: 'Balance alerts', importance: 'default' },
-    { id: 'security', name: 'Security findings', importance: 'high' },
-    { id: 'active-agents', name: 'Active agents', importance: 'default' },
+    { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
+    { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
+    { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
+    { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
+    { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
   ],
 }));
 
@@ -214,9 +234,14 @@ beforeEach(() => {
   mocks.appState.currentState = 'active';
   mocks.setBadgeCountAsync.mockResolvedValue(true);
   mocks.setNotificationChannelAsync.mockResolvedValue(undefined);
+  mocks.scheduleNotificationAsync.mockResolvedValue(undefined);
+  mocks.dismissNotificationAsync.mockResolvedValue(undefined);
+  mocks.getNotificationChannelAsync.mockResolvedValue(null);
+  mocks.deleteNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
   mocks.requestPermissionsAsync.mockResolvedValue({ status: 'denied' });
   mocks.getExpoPushTokenAsync.mockResolvedValue({ data: 'expo-token' });
+  mocks.requireOptionalNativeModule.mockReturnValue({ isAgentProgressAllowed: () => true });
   mocks.lastResponse = null;
   mocks.listeners.clear();
   mocks.clearLastNotificationResponse.mockImplementation(() => {
@@ -232,42 +257,83 @@ describe('ensureAndroidNotificationChannels', () => {
     await ensureAndroidNotificationChannels();
 
     expect(mocks.setNotificationChannelAsync).not.toHaveBeenCalled();
+    expect(mocks.deleteNotificationChannelAsync).not.toHaveBeenCalled();
   });
 
-  it('silences the aggregate channel on first creation without changing other channels', async () => {
+  it('creates the named channels with their names, importance, bypassDnd, and sound', async () => {
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
     await ensureAndroidNotificationChannels();
 
     expect(mocks.setNotificationChannelAsync.mock.calls).toEqual([
-      ['agent', { name: 'Agent sessions', importance: 4 }],
-      ['chat', { name: 'Chat messages', importance: 4 }],
-      ['kiloclaw', { name: 'KiloClaw activity', importance: 3 }],
-      ['balance', { name: 'Balance alerts', importance: 3 }],
-      ['security', { name: 'Security findings', importance: 4 }],
+      ['needs-input', { name: 'Needs input', importance: 4, bypassDnd: true }],
       [
-        'active-agents',
-        { name: 'Active agents', importance: 3, sound: null, enableVibrate: false },
+        'agent-progress',
+        {
+          name: 'Agent progress',
+          importance: 3,
+          bypassDnd: false,
+          sound: null,
+          enableVibrate: false,
+        },
       ],
+      ['kiloclaw', { name: 'KiloClaw activity', importance: 3, bypassDnd: false }],
+      ['balance', { name: 'Balance alerts', importance: 3, bypassDnd: false }],
+      ['security', { name: 'Security findings', importance: 4, bypassDnd: false }],
     ]);
   });
 
-  it('also silences first creation through channel renaming without changing other options', async () => {
+  it('silences only the progress channel so needs-input keeps the default sound', async () => {
+    const { ensureAndroidNotificationChannels } = await loadNotifications();
+
+    await ensureAndroidNotificationChannels();
+
+    const optionsFor = (id: string): Record<string, unknown> | undefined =>
+      mocks.setNotificationChannelAsync.mock.calls.find(call => call[0] === id)?.[1];
+    // Android takes a channel-based post's sound from the channel, so the
+    // progress kind must be silent here; an absent key is the default sound.
+    // Vibration is a separate channel setting that defaults to enabled, so a
+    // silent channel disables it explicitly.
+    expect(optionsFor('agent-progress')).toMatchObject({ sound: null, enableVibrate: false });
+    expect(optionsFor('needs-input')).not.toHaveProperty('sound');
+    expect(optionsFor('needs-input')).not.toHaveProperty('enableVibrate');
+  });
+
+  it('deletes the three legacy channels on first creation', async () => {
+    const { ensureAndroidNotificationChannels } = await loadNotifications();
+
+    await ensureAndroidNotificationChannels();
+
+    expect(mocks.deleteNotificationChannelAsync.mock.calls).toEqual([
+      ['agent'],
+      ['chat'],
+      ['active-agents'],
+    ]);
+  });
+
+  it('renames every channel with its translated name, bypassDnd, and sound', async () => {
     const { renameAndroidNotificationChannels } = await loadNotifications();
 
     await renameAndroidNotificationChannels();
 
     expect(mocks.setNotificationChannelAsync.mock.calls).toEqual([
-      ['agent', { name: expect.any(String), importance: 4 }],
-      ['chat', { name: expect.any(String), importance: 4 }],
-      ['kiloclaw', { name: expect.any(String), importance: 3 }],
-      ['balance', { name: expect.any(String), importance: 3 }],
-      ['security', { name: expect.any(String), importance: 4 }],
+      ['needs-input', { name: expect.any(String), importance: 4, bypassDnd: true }],
       [
-        'active-agents',
-        { name: expect.any(String), importance: 3, sound: null, enableVibrate: false },
+        'agent-progress',
+        {
+          name: expect.any(String),
+          importance: 3,
+          bypassDnd: false,
+          sound: null,
+          enableVibrate: false,
+        },
       ],
+      ['kiloclaw', { name: expect.any(String), importance: 3, bypassDnd: false }],
+      ['balance', { name: expect.any(String), importance: 3, bypassDnd: false }],
+      ['security', { name: expect.any(String), importance: 4, bypassDnd: false }],
     ]);
+    // Legacy deletion is part of the single-flight creation pass, not a rename.
+    expect(mocks.deleteNotificationChannelAsync).not.toHaveBeenCalled();
   });
 
   it('single-flights concurrent callers to one creation pass', async () => {
@@ -278,7 +344,8 @@ describe('ensureAndroidNotificationChannels', () => {
 
     expect(first).toBe(second);
     await Promise.all([first, second]);
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(5);
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(3);
   });
 
   it('swallows a per-channel failure and still creates the remaining channels', async () => {
@@ -287,14 +354,220 @@ describe('ensureAndroidNotificationChannels', () => {
 
     await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
 
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(5);
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(3);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
         'error.subsystem': 'notifications',
         'error.operation': 'create_android_channel',
+        'notification.channel': 'needs-input',
+      },
+    });
+  });
+
+  it('reports a legacy deletion failure without rejecting or skipping the remaining deletes', async () => {
+    mocks.deleteNotificationChannelAsync.mockRejectedValueOnce(new Error('delete failed'));
+    const { ensureAndroidNotificationChannels } = await loadNotifications();
+
+    await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
+
+    expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(3);
+    expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: {
+        'error.subsystem': 'notifications',
+        'error.operation': 'delete_android_channel',
         'notification.channel': 'agent',
       },
     });
+  });
+
+  it('retries every channel after a pass that failed one write', async () => {
+    mocks.setNotificationChannelAsync.mockRejectedValueOnce(new Error('channel failed'));
+    const { ensureAndroidNotificationChannels } = await loadNotifications();
+
+    await ensureAndroidNotificationChannels();
+    expect(mocks.captureException).toHaveBeenCalledTimes(1);
+    mocks.setNotificationChannelAsync.mockClear();
+
+    // A pass that failed a required channel is not cached: the next start
+    // retries before it posts, and a channel the framework never created would
+    // drop that post.
+    await ensureAndroidNotificationChannels();
+    expect(mocks.setNotificationChannelAsync.mock.calls.map(call => call[0])).toEqual([
+      'needs-input',
+      'agent-progress',
+      'kiloclaw',
+      'balance',
+      'security',
+    ]);
+
+    // A fully successful pass is cached again.
+    mocks.setNotificationChannelAsync.mockClear();
+    await ensureAndroidNotificationChannels();
+    expect(mocks.setNotificationChannelAsync).not.toHaveBeenCalled();
+  });
+
+  it('keeps a fully successful pass cached', async () => {
+    const { ensureAndroidNotificationChannels } = await loadNotifications();
+
+    await ensureAndroidNotificationChannels();
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(5);
+    mocks.setNotificationChannelAsync.mockClear();
+
+    await ensureAndroidNotificationChannels();
+
+    expect(mocks.setNotificationChannelAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe('planAndroidChannelWrite', () => {
+  it('asks for the override while the user grants Do Not Disturb access', async () => {
+    const { planAndroidChannelWrite } = await loadNotifications();
+
+    expect(planAndroidChannelWrite(true, true)).toEqual({ bypassDnd: true });
+  });
+
+  it('stops asking for the override once the user revokes the access', async () => {
+    const { planAndroidChannelWrite } = await loadNotifications();
+
+    expect(planAndroidChannelWrite(true, false)).toEqual({ bypassDnd: false });
+  });
+
+  it('keeps asking when the access state is unreadable', async () => {
+    const { planAndroidChannelWrite } = await loadNotifications();
+
+    expect(planAndroidChannelWrite(true, null)).toEqual({ bypassDnd: true });
+  });
+
+  it('never asks for an override on a channel that does not want one', async () => {
+    const { planAndroidChannelWrite } = await loadNotifications();
+
+    expect(planAndroidChannelWrite(false, true)).toEqual({ bypassDnd: false });
+    expect(planAndroidChannelWrite(false, false)).toEqual({ bypassDnd: false });
+  });
+});
+
+describe('shouldRecreateAndroidChannel', () => {
+  it('recreates only a channel still stored without the requested override', async () => {
+    const { shouldRecreateAndroidChannel } = await loadNotifications();
+
+    expect(shouldRecreateAndroidChannel(false, true)).toBe(true);
+    expect(shouldRecreateAndroidChannel(true, true)).toBe(false);
+    expect(shouldRecreateAndroidChannel(true, false)).toBe(false);
+    expect(shouldRecreateAndroidChannel(false, false)).toBe(false);
+  });
+
+  it('never recreates an absent channel, which the write creates', async () => {
+    const { shouldRecreateAndroidChannel } = await loadNotifications();
+
+    expect(shouldRecreateAndroidChannel(null, true)).toBe(false);
+    expect(shouldRecreateAndroidChannel(null, false)).toBe(false);
+  });
+});
+
+describe('Android Do Not Disturb override reconciliation', () => {
+  it('requests the override while the user still grants the access', async () => {
+    mocks.requireOptionalNativeModule.mockReturnValue({
+      isAgentProgressAllowed: () => true,
+      isDndAccessGranted: () => true,
+    });
+    const { renameAndroidNotificationChannels } = await loadNotifications();
+
+    await renameAndroidNotificationChannels();
+
+    const needsInput = mocks.setNotificationChannelAsync.mock.calls.find(
+      call => call[0] === 'needs-input'
+    );
+    expect(needsInput?.[1]).toMatchObject({ bypassDnd: true });
+  });
+
+  it('stops requesting the override while the user has revoked the access', async () => {
+    mocks.requireOptionalNativeModule.mockReturnValue({
+      isAgentProgressAllowed: () => true,
+      isDndAccessGranted: () => false,
+    });
+    const { renameAndroidNotificationChannels } = await loadNotifications();
+
+    await renameAndroidNotificationChannels();
+
+    const needsInput = mocks.setNotificationChannelAsync.mock.calls.find(
+      call => call[0] === 'needs-input'
+    );
+    expect(needsInput?.[1]).toMatchObject({ bypassDnd: false });
+  });
+
+  it('recreates a channel whose stored override differs, so the current grant applies', async () => {
+    // Measured on API 35 (2026-09-17): the framework applies the access gate
+    // only while it creates a channel and keeps the value it stored, so a write
+    // to an existing channel never raises or lowers the override. A user who
+    // granted access after the channel existed therefore gets the card to break
+    // through Do Not Disturb only when the stale channel is recreated.
+    mocks.requireOptionalNativeModule.mockReturnValue({
+      isAgentProgressAllowed: () => true,
+      isDndAccessGranted: () => true,
+    });
+    mocks.getNotificationChannelAsync.mockImplementation((channelId: string) =>
+      channelId === 'needs-input' ? { id: 'needs-input', bypassDnd: false } : null
+    );
+    const { renameAndroidNotificationChannels } = await loadNotifications();
+
+    await renameAndroidNotificationChannels();
+
+    expect(mocks.deleteNotificationChannelAsync.mock.calls).toEqual([['needs-input']]);
+    const needsInput = mocks.setNotificationChannelAsync.mock.calls.find(
+      call => call[0] === 'needs-input'
+    );
+    expect(needsInput?.[1]).toMatchObject({ bypassDnd: true });
+  });
+
+  it('recreates a channel whose stored override survives a revoke', async () => {
+    // The framework restores a deleted channel's stored override, so a recreate
+    // cannot take the override back; a revoke needs none, because the framework
+    // ignores a channel's override while the app holds no access. The delete
+    // would only cost the user the ongoing card.
+    mocks.requireOptionalNativeModule.mockReturnValue({
+      isAgentProgressAllowed: () => true,
+      isDndAccessGranted: () => false,
+    });
+    mocks.getNotificationChannelAsync.mockImplementation((channelId: string) =>
+      channelId === 'needs-input' ? { id: 'needs-input', bypassDnd: true } : null
+    );
+    const { renameAndroidNotificationChannels } = await loadNotifications();
+
+    await renameAndroidNotificationChannels();
+
+    expect(mocks.deleteNotificationChannelAsync).not.toHaveBeenCalled();
+    const needsInput = mocks.setNotificationChannelAsync.mock.calls.find(
+      call => call[0] === 'needs-input'
+    );
+    expect(needsInput?.[1]).toMatchObject({ bypassDnd: false });
+  });
+
+  it('leaves a matching channel alone so the ongoing card is not dropped', async () => {
+    mocks.requireOptionalNativeModule.mockReturnValue({
+      isAgentProgressAllowed: () => true,
+      isDndAccessGranted: () => true,
+    });
+    mocks.getNotificationChannelAsync.mockImplementation((channelId: string) =>
+      channelId === 'needs-input' ? { id: 'needs-input', bypassDnd: true } : null
+    );
+    const { renameAndroidNotificationChannels } = await loadNotifications();
+
+    await renameAndroidNotificationChannels();
+
+    expect(mocks.deleteNotificationChannelAsync).not.toHaveBeenCalled();
+  });
+
+  it('keeps the pre-existing request when the native access query is missing', async () => {
+    mocks.requireOptionalNativeModule.mockReturnValue({ isAgentProgressAllowed: () => true });
+    const { renameAndroidNotificationChannels } = await loadNotifications();
+
+    await renameAndroidNotificationChannels();
+
+    const needsInput = mocks.setNotificationChannelAsync.mock.calls.find(
+      call => call[0] === 'needs-input'
+    );
+    expect(needsInput?.[1]).toMatchObject({ bypassDnd: true });
   });
 });
 
@@ -531,6 +804,10 @@ const secureStoreMock = {
   getItemAsync: vi.fn(async (key: string) => {
     await Promise.resolve();
     return secureStore.get(key) ?? null;
+  }),
+  deleteItemAsync: vi.fn(async (key: string) => {
+    secureStore.delete(key);
+    await Promise.resolve();
   }),
 };
 
@@ -777,6 +1054,118 @@ describe('glanceable app badge sink', () => {
     });
     await flushMicrotasks();
     expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2], [3]]);
+  });
+});
+
+// The registered foreground handler, as `setupNotificationHandler` passes it to
+// expo-notifications.
+type ForegroundHandler = (notification: { request: { content: { data: unknown } } }) => Promise<{
+  shouldPlaySound: boolean;
+  shouldSetBadge: boolean;
+  shouldShowBanner: boolean;
+  shouldShowList: boolean;
+}>;
+
+async function loadForegroundHandler(): Promise<ForegroundHandler> {
+  const loaded = await loadNotifications();
+  loaded.setupNotificationHandler();
+  const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as
+    | { handleNotification: ForegroundHandler }
+    | undefined;
+  if (!registration) {
+    throw new Error('The foreground notification handler was not registered');
+  }
+  return registration.handleNotification;
+}
+
+const SUPPRESSED_BEHAVIOR = {
+  shouldPlaySound: false,
+  shouldSetBadge: false,
+  shouldShowBanner: false,
+  shouldShowList: false,
+};
+const SHOWN_BEHAVIOR = {
+  shouldPlaySound: true,
+  shouldSetBadge: true,
+  shouldShowBanner: true,
+  shouldShowList: true,
+};
+
+const progressPush = {
+  type: 'cloud_agent_session',
+  cliSessionId: 'session-1',
+  category: 'status',
+};
+const needsInputPush = {
+  type: 'cloud_agent_session',
+  cliSessionId: 'session-1',
+  category: 'attention',
+};
+
+describe('per-Focus agent-progress suppression', () => {
+  it('suppresses an agent-progress push on iOS when the active Focus excludes it', async () => {
+    mocks.platform.OS = 'ios';
+    mocks.requireOptionalNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { data: progressPush } } })
+    ).resolves.toEqual(SUPPRESSED_BEHAVIOR);
+  });
+
+  it('shows an agent-progress push on iOS when the active Focus allows it', async () => {
+    mocks.platform.OS = 'ios';
+    mocks.requireOptionalNativeModule.mockReturnValue({ isAgentProgressAllowed: () => true });
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { data: progressPush } } })
+    ).resolves.toEqual(SHOWN_BEHAVIOR);
+  });
+
+  it('never suppresses a needs-input push, even when the Focus excludes progress', async () => {
+    mocks.platform.OS = 'ios';
+    mocks.requireOptionalNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { data: needsInputPush } } })
+    ).resolves.toEqual(SHOWN_BEHAVIOR);
+  });
+
+  it('shows an agent-progress push on Android, where the Focus module is absent', async () => {
+    mocks.platform.OS = 'android';
+    mocks.requireOptionalNativeModule.mockReturnValue(null);
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { data: progressPush } } })
+    ).resolves.toEqual(SHOWN_BEHAVIOR);
+  });
+
+  it('never suppresses the glanceable carrier under an excluding Focus', async () => {
+    mocks.platform.OS = 'ios';
+    mocks.requireOptionalNativeModule.mockReturnValue({ isAgentProgressAllowed: () => false });
+    const loaded = await loadNotifications();
+    loaded.persist._setLastGlanceableSnapshotForTests(glanceableSnapshot({ needsInput: 2 }));
+    mockSecureStoreKeys();
+    loaded.setupNotificationHandler();
+    const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
+      handleNotification: ForegroundHandler;
+    };
+
+    // needsInput 0 is the progress kind, exactly what the Focus excluded; the
+    // carrier must still reach the sinks instead of being dropped.
+    const behavior = await registration.handleNotification({
+      request: {
+        content: {
+          data: activeGlanceablePush({ updatedAt: '2026-01-02T00:00:00.000Z', needsInput: 0 }),
+        },
+      },
+    });
+
+    expect(behavior.shouldSetBadge).toBe(true);
+    expect(mocks.refreshActiveSessionsFromPush).toHaveBeenCalledOnce();
   });
 });
 
@@ -1195,11 +1584,16 @@ describe('setupNotificationBackgroundHandler', () => {
 
     setupNotificationBackgroundHandler();
 
+    // Exactly one registered task name: the native side hands a notification
+    // response to every registered consumer, so a second name would run an
+    // Approve / Reply twice under the same needs-input identifier.
     expect(mocks.defineTask).toHaveBeenCalledTimes(1);
     expect(mocks.defineTask).toHaveBeenCalledWith(
       'active-agents-glanceable-background-task',
       expect.any(Function)
     );
+    await flushMicrotasks();
+    expect(mocks.registerTaskAsync).toHaveBeenCalledTimes(1);
     expect(mocks.registerTaskAsync).toHaveBeenCalledWith(
       'active-agents-glanceable-background-task'
     );
@@ -1316,6 +1710,188 @@ describe('setupNotificationBackgroundHandler', () => {
 
     unregisterGlanceableSink(sink);
   });
+
+  it('dispatches a headless notification response to the needs-input action handler', async () => {
+    const loaded = await loadNotifications();
+    // The fresh module instance needs its own loader seam: the static-import
+    // seam in the other tests belongs to a different instance.
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+    mocks.runNeedsInputInteraction.mockResolvedValue('ok');
+    loaded.setupNotificationBackgroundHandler();
+    const executor = executorFor(mocks.defineTask);
+    const result = await executor({
+      data: {
+        actionIdentifier: 'kilo:approve',
+        notification: {
+          request: {
+            identifier: 'fcm-remote-1',
+            content: {
+              title: 'Deploy',
+              data: {
+                type: 'cloud_agent_session',
+                cliSessionId: 'ses_1',
+                category: 'attention',
+                attentionKind: 'permission',
+              },
+              categoryIdentifier: 'kilo-needs-input:permission',
+            },
+          },
+        },
+      },
+      error: null,
+      executionInfo: { eventId: 'e3', taskName: 'active-agents-glanceable-background-task' },
+    });
+
+    expect(mocks.runNeedsInputInteraction).toHaveBeenCalledWith({
+      kiloSessionId: 'ses_1',
+      action: 'approve',
+    });
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ identifier: 'needs-input:ses_1' })
+    );
+    expect(mocks.dismissNotificationAsync).toHaveBeenCalledWith('fcm-remote-1');
+    // A handled action replaced its notification: NewData (0), not NoData (1).
+    expect(result).toBe(0);
+  });
+
+  it('reports NoData for a headless body tap so iOS wakes stay throttled', async () => {
+    const loaded = await loadNotifications();
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+    loaded.setupNotificationBackgroundHandler();
+    const executor = executorFor(mocks.defineTask);
+    const result = await executor({
+      data: {
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        notification: {
+          request: {
+            identifier: 'fcm-remote-2',
+            content: {
+              data: {
+                type: 'cloud_agent_session',
+                cliSessionId: 'ses_1',
+                category: 'attention',
+                attentionKind: 'permission',
+              },
+            },
+          },
+        },
+      },
+      error: null,
+      executionInfo: { eventId: 'e4', taskName: 'active-agents-glanceable-background-task' },
+    });
+
+    expect(result).toBe(1);
+    expect(loaded.pending.getPendingDeepLinkSnapshot()).toBe('/(app)/agent-chat/ses_1?via=push');
+  });
+});
+
+describe('foreground attention-push suppression', () => {
+  async function loadHandler() {
+    const loaded = await loadNotifications();
+    // Imported through the same resetModules cycle as './notifications', so the
+    // posted marker this test reads is the one the handler reads.
+    const needsInput = await import('./needs-input-notification');
+    loaded.setupNotificationHandler();
+    const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
+      handleNotification: (notification: {
+        request: { identifier?: string; content: { data: unknown } };
+      }) => Promise<{ shouldShowBanner: boolean; shouldSetBadge: boolean }>;
+    };
+    return { loaded, needsInput, registration };
+  }
+
+  const attentionPush = {
+    type: 'cloud_agent_session',
+    cliSessionId: 'ses_1',
+    category: 'attention',
+    attentionKind: 'permission',
+  } as const;
+
+  const postedRow = {
+    sessionId: 'ses_1',
+    title: 'Fix the bug',
+    kind: 'permission',
+    prUrl: null,
+    organizationId: null,
+  } as const;
+
+  it('suppresses the server attention push while the app notification for that session is posted', async () => {
+    const { needsInput, registration } = await loadHandler();
+
+    await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
+
+    const behavior = await registration.handleNotification({
+      request: { identifier: 'expo-push-remote-1', content: { data: attentionPush } },
+    });
+    expect(behavior.shouldShowBanner).toBe(false);
+    expect(behavior.shouldSetBadge).toBe(false);
+  });
+
+  it('shows the app-owned needs-input notification even while its session is posted', async () => {
+    const { needsInput, registration } = await loadHandler();
+
+    await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
+
+    // The app's own post carries the same parsed payload as the server push;
+    // suppressing it would drop the only notification the app presents.
+    const behavior = await registration.handleNotification({
+      request: {
+        identifier: needsInput.notificationIdentifierForSession('ses_1'),
+        content: { data: attentionPush },
+      },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
+    expect(behavior.shouldSetBadge).toBe(true);
+  });
+
+  it('shows the app-owned notification while the posted marker is not yet set', async () => {
+    // The schedule resolves before the handler consults the posted marker, so
+    // the app's own post must not depend on it.
+    const { registration } = await loadHandler();
+
+    const behavior = await registration.handleNotification({
+      request: {
+        identifier: 'needs-input:ses_1',
+        content: { data: attentionPush },
+      },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
+  });
+
+  it('shows the server attention push when the app notification is not posted', async () => {
+    const { registration } = await loadHandler();
+
+    const behavior = await registration.handleNotification({
+      request: { content: { data: attentionPush } },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
+  });
+
+  it('shows the server attention push again after the raise is answered headless', async () => {
+    const { needsInput, registration } = await loadHandler();
+    await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
+
+    needsInput.clearPostedNeedsInputNotification('ses_1');
+
+    const behavior = await registration.handleNotification({
+      request: { content: { data: attentionPush } },
+    });
+    expect(behavior.shouldShowBanner).toBe(true);
+  });
+
+  it('shows an ordinary agent progress push even while the raise is posted', async () => {
+    const { needsInput, registration } = await loadHandler();
+    await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
+
+    const progress = await registration.handleNotification({
+      request: {
+        content: {
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1' },
+        },
+      },
+    });
+    expect(progress.shouldShowBanner).toBe(true);
+  });
 });
 
 describe('cold iOS background delivery', () => {
@@ -1348,15 +1924,19 @@ describe('cold iOS background delivery', () => {
   async function loadColdBackground() {
     vi.resetModules();
     await import('@/lib/glanceable/delivery-registration');
-    const [notifications, registry, persist, sink, cleanup, blank] = await Promise.all([
+    const [notifications, registry, persist, sink, cleanup, blank, waitingAsk] = await Promise.all([
       import('./notifications'),
       import('@/lib/glanceable/sink-registry'),
       import('@/lib/glanceable/persist'),
       import('@/glanceable-ios/ios-sink'),
       import('@/lib/auth/logout-cleanup'),
       import('@/lib/glanceable/cleanup'),
+      import('@/lib/glanceable/waiting-ask'),
     ]);
     persist._setSecureStoreForTests(secureStoreMock);
+    // The ask mirror lazy-`require`s the native store too, so the headless
+    // hydration reads the same injected map the snapshot restore does.
+    waitingAsk._setSecureStoreForTests(secureStoreMock);
     for (const listener of mocks.startTokenListeners) {
       listener({ activityPushToStartToken: 'scope-token' });
     }
@@ -1708,8 +2288,71 @@ describe('cold iOS background delivery', () => {
       needsApproval: 0,
       idle: 0,
       needsInputSince: null,
+      // No ask is recorded for this cold push, so the app-built state says so
+      // explicitly; the layout gates Approve on this flag.
+      canApprove: false,
     });
     expect(rows.has('scope-token')).toBe(true);
+  });
+
+  it('hydrates the mirrored ask so a waiting push keeps Approve', async () => {
+    // The app is not running, so the only copy of the ask is the SecureStore
+    // mirror. The headless apply must read it before the sink stamps
+    // `canApprove`, or the card hides an Approve that the tap still answers.
+    secureStore.set(
+      'glanceable-waiting-ask',
+      JSON.stringify({
+        kiloSessionId: 'session-1',
+        status: 'permission',
+        isCloudAgent: true,
+        scopeKey: SCOPE_KEY,
+        organizationId: 'org-9',
+        userId: 'u1',
+        recordedAt: Date.parse('2026-01-01T00:00:00.000Z'),
+      })
+    );
+    const background = await loadColdBackground();
+    expect(
+      await background.deliver({
+        status: 'happy',
+        running: 0,
+        needsInput: 1,
+        idle: 0,
+        needsInputSince: '2026-01-01T00:00:00.000Z',
+      })
+    ).toBe(0);
+
+    expect(JSON.parse(native.props ?? '{}')).toMatchObject({ needsInput: 1, canApprove: true });
+  });
+
+  it('does not revive a mirrored ask recorded for another scope', async () => {
+    // The mirror outlives a sign-out or an org switch, and the ask names the
+    // session and organization an action would answer: a restored record from
+    // another scope must never put Approve on the card.
+    secureStore.set(
+      'glanceable-waiting-ask',
+      JSON.stringify({
+        kiloSessionId: 'session-1',
+        status: 'permission',
+        isCloudAgent: true,
+        scopeKey: buildOpaqueScopeKey({ userId: 'u1', organizationId: 'org-other' }),
+        organizationId: 'org-other',
+        userId: 'u1',
+        recordedAt: Date.parse('2026-01-01T00:00:00.000Z'),
+      })
+    );
+    const background = await loadColdBackground();
+    expect(
+      await background.deliver({
+        status: 'happy',
+        running: 0,
+        needsInput: 1,
+        idle: 0,
+        needsInputSince: '2026-01-01T00:00:00.000Z',
+      })
+    ).toBe(0);
+
+    expect(JSON.parse(native.props ?? '{}')).toMatchObject({ needsInput: 1, canApprove: false });
   });
 
   it('keeps the adopted card when an idle-only push arrives in the background', async () => {

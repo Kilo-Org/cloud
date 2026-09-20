@@ -5,16 +5,28 @@
  * already exist (created via `app:create-user`). Used to test that removing a
  * member closes their socket.
  *
+ * Idempotent: deletes this fixture's previously created organizations for the
+ * given owner (stable `[seed:w4c-org-pair] <owner-email>` name) before
+ * recreating one pair.
+ *
  * Usage: pnpm dev:seed app:w4c-org-pair <owner-email> <member-email>
  */
 
 import { randomUUID } from 'node:crypto';
 
-import { kilocode_users, organizations, organization_memberships } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import {
+  kiloclaw_instances,
+  kilocode_users,
+  organizations,
+  organization_memberships,
+  organization_seats_purchases,
+  platform_integrations,
+} from '@kilocode/db/schema';
+import { eq, inArray } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { w4cOrgPairCleanupPredicate, w4cOrgPairName } from '../lib/w4c-org-pair-fixture';
 import type { SeedResult } from '../index';
 
 export const usage = '<owner-email> <member-email>';
@@ -46,6 +58,39 @@ async function lookupUserId(email: string): Promise<string> {
   return rows[0].id;
 }
 
+/**
+ * Deletes this fixture's previously created organizations for one owner so
+ * reruns stay idempotent. The owner email is the stable key (the member email
+ * changes between harness runs) and the org name embeds it, so scoping the
+ * predicate to that owner avoids accumulating one identically named org per
+ * run without deleting fixture orgs seeded for a different owner.
+ */
+async function cleanupPreviousOrgs(ownerEmail: string): Promise<void> {
+  const db = getSeedDb();
+
+  const previousOrgs = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(w4cOrgPairCleanupPredicate(ownerEmail));
+
+  const orgIds = previousOrgs.map(org => org.id);
+  if (orgIds.length === 0) {
+    return;
+  }
+
+  await db.delete(kiloclaw_instances).where(inArray(kiloclaw_instances.organization_id, orgIds));
+  await db
+    .delete(organization_seats_purchases)
+    .where(inArray(organization_seats_purchases.organization_id, orgIds));
+  await db
+    .delete(platform_integrations)
+    .where(inArray(platform_integrations.owned_by_organization_id, orgIds));
+  await db
+    .delete(organization_memberships)
+    .where(inArray(organization_memberships.organization_id, orgIds));
+  await db.delete(organizations).where(inArray(organizations.id, orgIds));
+}
+
 export async function run(...args: string[]): Promise<SeedResult | void> {
   if (args.includes('--help') || args.includes('-h')) {
     printUsage();
@@ -73,11 +118,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('owner-email and member-email must refer to different users');
   }
 
+  await cleanupPreviousOrgs(trimmedOwnerEmail);
+
   const organizationId = randomUUID();
 
   await db.insert(organizations).values({
     id: organizationId,
-    name: `[seed:w4c-org-pair] ${trimmedOwnerEmail}`,
+    name: w4cOrgPairName(trimmedOwnerEmail),
   });
 
   await db.insert(organization_memberships).values([

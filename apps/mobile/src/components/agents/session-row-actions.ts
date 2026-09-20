@@ -5,6 +5,7 @@ import { Alert } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
+import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 
 export function showDeleteConfirm(onDelete: () => void) {
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -72,8 +73,8 @@ type SessionActionMenuOptions = {
   onExit?: () => void;
   /** Omitted → no Delete entry. */
   onDelete?: () => void;
-  /** `useSafeAreaInsets().bottom` — pads the Android custom sheet. */
-  bottomInset: number;
+  /** Themed sheet base options (`useThemedActionSheetOptions()`), spread first. */
+  themedSheet: ThemedActionSheetOptions;
 };
 
 /**
@@ -85,7 +86,7 @@ type SessionActionMenuOptions = {
  * Android gets backdrop-tap and hardware-back dismiss from the library.
  */
 export function showSessionActionMenu(opts: SessionActionMenuOptions): void {
-  const { showActionSheetWithOptions, onCopySessionId, onRename, onExit, onDelete, bottomInset } =
+  const { showActionSheetWithOptions, onCopySessionId, onRename, onExit, onDelete, themedSheet } =
     opts;
 
   const options = [i18n.t('agents.sessionRow.copyId')];
@@ -116,7 +117,7 @@ export function showSessionActionMenu(opts: SessionActionMenuOptions): void {
       options,
       cancelButtonIndex,
       ...(destructiveButtonIndex !== undefined && { destructiveButtonIndex }),
-      containerStyle: { paddingBottom: bottomInset },
+      ...themedSheet,
     },
     index => {
       if (index === undefined || index === cancelButtonIndex) {

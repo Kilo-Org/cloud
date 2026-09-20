@@ -2,6 +2,7 @@ import { env, runInDurableObject } from 'cloudflare:test';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, it, expect, vi } from 'vitest';
+import { waitFor } from './wait-for.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace';
 import { CALLBACK_OUTBOX_PREFIX } from '../../src/sandbox-session/message-callbacks';
 import {
@@ -1758,7 +1759,7 @@ describe('worktree deletion in Durable Objects', () => {
         })
       );
       try {
-        await vi.waitFor(async () => {
+        await waitFor(async () => {
           expect(await control.getStatus()).toMatchObject({
             connection: 'ready',
             wrapperInstanceId,
@@ -1804,7 +1805,7 @@ describe('worktree deletion in Durable Objects', () => {
                 location: { sandboxId, provider: 'cloudflare' },
                 sessionIds: [kiloId(0)],
               });
-              await vi.waitFor(async () => {
+              await waitFor(async () => {
                 expect(await state.storage.get('exclusive_worktree_deletion')).toBe(worktreeId);
               });
               for (const identity of [

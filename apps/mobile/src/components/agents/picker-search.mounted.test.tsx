@@ -27,6 +27,7 @@ vi.mock('expo-router', () => ({
   },
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
@@ -36,6 +37,7 @@ vi.mock('@/components/ui/icons', () => ({
   Search: 'Search',
   SearchX: 'SearchX',
   Unlock: 'Unlock',
+  X: 'X',
 }));
 vi.mock('@/components/agents/model-selector', () => ({
   ModelPickerOptionRow: 'ModelPickerOptionRow',

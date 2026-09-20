@@ -1,11 +1,13 @@
+/* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
 import { type RefObject } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LaunchFolderField } from '@/components/agents/folder-selector';
+import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
-import { renderProfileRow } from '@/components/agents/new-session-profile-row';
+import { NewSessionProfileRow } from '@/components/agents/new-session-profile-row';
 import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
@@ -95,7 +97,20 @@ type NewSessionConfigureFormProps = {
   profile: EffectiveAgentProfile | null;
   isProfileLoading: boolean;
   isProfileError: boolean;
+  /** The picked override no longer resolves to a profile. */
+  profileOverrideNeedsAttention: boolean;
   onRetryProfile: () => void;
+  /** Opens the profile picker sheet. */
+  onOpenProfilePicker: () => void;
+  /**
+   * The session's profile override, shared by the Environment row and the
+   * advanced-config selector; null keeps the effective default.
+   */
+  selectedProfileId: string | null;
+  /** Reports a pick (or `No profile`) from the advanced-config selector. */
+  onSelectProfile: (id: string | null) => void;
+  /** Opens the repo default-profile bindings screen from the advanced config. */
+  onOpenRepoDefaults?: () => void;
   // Commit choice (Cloud Agent only).
   autoCommit: boolean;
   onAutoCommitChange: (next: boolean) => void;
@@ -165,7 +180,12 @@ export function NewSessionConfigureForm({
   profile,
   isProfileLoading,
   isProfileError,
+  profileOverrideNeedsAttention,
   onRetryProfile,
+  onOpenProfilePicker,
+  selectedProfileId,
+  onSelectProfile,
+  onOpenRepoDefaults,
   autoCommit,
   onAutoCommitChange,
   isSpawningRemote,
@@ -299,9 +319,32 @@ export function NewSessionConfigureForm({
         </View>
       ) : null}
 
-      {!isRemote && !isCloneEntry
-        ? renderProfileRow({ t, profile, isProfileLoading, isProfileError, onRetryProfile })
-        : null}
+      {!isRemote && !isCloneEntry ? (
+        <NewSessionProfileRow
+          profile={profile}
+          isProfileLoading={isProfileLoading}
+          isProfileError={isProfileError}
+          overrideNeedsAttention={profileOverrideNeedsAttention}
+          onRetryProfile={onRetryProfile}
+          onOpenProfilePicker={onOpenProfilePicker}
+        />
+      ) : null}
+
+      {
+        // The advanced configuration disclosure sits under Environment. It is
+        // collapsed by default, so the screen is unchanged until it is tapped;
+        // the panel owns its manual config state, while the profile pick is
+        // the session's own override so both selectors drive one submitted id.
+      }
+      {!isRemote && !isCloneEntry ? (
+        <AdvancedConfigPanel
+          organizationId={organizationId}
+          selectedProfileId={selectedProfileId}
+          onSelectProfile={onSelectProfile}
+          disabled={isStarting}
+          onRepoDefaults={onOpenRepoDefaults}
+        />
+      ) : null}
 
       {
         // Persistent failure feedback for the cloud create, in the same

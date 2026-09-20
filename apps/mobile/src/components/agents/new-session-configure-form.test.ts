@@ -3,6 +3,9 @@ import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
+import { NewSessionProfileRow } from '@/components/agents/new-session-profile-row';
+import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import {
   type NewSessionRepository,
   type RepositoryGroup,
@@ -48,6 +51,7 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Platform: platformState,
+  Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
 }));
@@ -70,6 +74,8 @@ vi.mock('@/components/agents/instance-selector', () => ({
   InstanceSelector: 'InstanceSelector',
 }));
 
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
 vi.mock('@/components/agents/new-session-repository-section', () => ({
   NewSessionRepositorySection: 'NewSessionRepositorySection',
 }));
@@ -90,10 +96,18 @@ vi.mock('@/components/agents/new-session-cloud-create-error', () => ({
   NewSessionCloudCreateError: 'NewSessionCloudCreateError',
 }));
 
+vi.mock('@/components/agents/advanced-config-panel', () => ({
+  AdvancedConfigPanel: 'AdvancedConfigPanel',
+}));
+
 vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
-vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
+vi.mock('@/components/ui/icons', () => ({
+  RefreshCw: 'RefreshCw',
+  ChevronDown: 'ChevronDown',
+  SlidersHorizontal: 'SlidersHorizontal',
+}));
 
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
@@ -147,6 +161,57 @@ function findElementByType(node: Node, typeName: string): Record<string, unknown
   }
   for (const child of Array.isArray(children) ? children : [children]) {
     const found = findElementByType(child as Node, typeName);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+function collectElementsByType(node: Node, typeName: string): Record<string, unknown>[] {
+  if (node === null || typeof node !== 'object') {
+    return [];
+  }
+  const props = node.props ?? {};
+  const children = props.children;
+  const type = (node as { type?: unknown }).type;
+  const found: Record<string, unknown>[] = type === typeName ? [props] : [];
+  for (const child of Array.isArray(children) ? children : [children]) {
+    found.push(...collectElementsByType(child as Node, typeName));
+  }
+  return found;
+}
+
+/** True when the tree contains an element of this component type (by reference). */
+function containsComponent(node: Node, component: unknown): boolean {
+  if (node === null || typeof node !== 'object') {
+    return false;
+  }
+  if ((node as { type?: unknown }).type === component) {
+    return true;
+  }
+  const props = node.props ?? {};
+  const children = props.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    if (containsComponent(child as Node, component)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** First element of this component type (by reference) in the tree, or null. */
+function findElementByComponent(node: Node, component: unknown): Record<string, unknown> | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  if ((node as { type?: unknown }).type === component) {
+    return node.props ?? {};
+  }
+  const props = node.props ?? {};
+  const children = props.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findElementByComponent(child as Node, component);
     if (found) {
       return found;
     }
@@ -228,17 +293,14 @@ function defaultProps() {
     recents: [] as NewSessionRepository[],
     selectedRepo: '',
     organizationId: undefined as string | undefined,
-    profile: null as {
-      id: string;
-      name: string;
-      commandCount: number;
-      mcpServerCount: number;
-      skillCount: number;
-      agentCount: number;
-    } | null,
+    profile: null as EffectiveAgentProfile | null,
     isProfileLoading: false,
     isProfileError: false,
+    profileOverrideNeedsAttention: false,
     onRetryProfile: vi.fn(),
+    onOpenProfilePicker: vi.fn(),
+    selectedProfileId: null as string | null,
+    onSelectProfile: vi.fn(),
     autoCommit: false,
     onAutoCommitChange: vi.fn(),
     isSpawningRemote: false,
@@ -565,69 +627,90 @@ describe('NewSessionConfigureForm', () => {
   });
 
   // ── Case 10: effective profile row ──
-  it('renders the profile name and capability counts when a profile resolves', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+  // The row is a component, so its content tests call it directly (the plain
+  // function call convention of this file); the form only gates its presence.
+  const PROFILE: EffectiveAgentProfile = {
+    id: 'profile-1',
+    name: 'Production',
+    varCount: 2,
+    mcpServerCount: 1,
+    skillCount: 2,
+    kiloCommandCount: 4,
+    commandCount: 3,
+    agentCount: 4,
+  };
 
+  function renderRow(overrides: Partial<Parameters<typeof NewSessionProfileRow>[0]> = {}): Node {
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm({
-      ...defaultProps(),
-      runOnInstance: null,
-      profile: {
-        id: 'profile-1',
-        name: 'Production',
-        commandCount: 3,
-        mcpServerCount: 1,
-        skillCount: 2,
-        agentCount: 4,
-      },
+    return NewSessionProfileRow({
+      profile: null,
+      isProfileLoading: false,
+      isProfileError: false,
+      overrideNeedsAttention: false,
+      onRetryProfile: vi.fn<() => void>(),
+      onOpenProfilePicker: vi.fn<() => void>(),
+      ...overrides,
     }) as Node;
+  }
+
+  it('renders the profile name and capability counts when a profile resolves', () => {
+    const element = renderRow({ profile: PROFILE });
 
     expect(findTextContent(element, t => t === 'Production')).toBe(true);
     expect(findTextContent(element, t => t === '3 commands · 1 MCP · 2 skills · 4 agents')).toBe(
       true
     );
+    // The chip's own copy is covered by its mounted test; here the row must
+    // hand it a resolved (non-null) indicator state.
+    expect(findElementByComponent(element, ActiveProfileIndicator)?.state).not.toBeNull();
   });
 
-  it('renders "Default environment" when no profile resolves', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm({
-      ...defaultProps(),
-      runOnInstance: null,
-      profile: null,
-    }) as Node;
+  it('renders "Default environment" when no profile resolves', () => {
+    const element = renderRow();
 
     expect(findTextContent(element, t => t === 'Default environment')).toBe(true);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
+    // The chip is mounted but holds no state, so it renders nothing.
+    expect(findElementByComponent(element, ActiveProfileIndicator)?.state).toBeNull();
   });
 
-  it('renders an inline error with Retry when the profile query fails', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm({
-      ...defaultProps(),
-      runOnInstance: null,
-      isProfileError: true,
-    }) as Node;
+  it('renders an inline error with Retry when the profile query fails', () => {
+    const element = renderRow({ isProfileError: true });
 
     expect(findTextContent(element, t => t.includes("Couldn't load"))).toBe(true);
     expect(findTextContent(element, t => t === 'Retry')).toBe(true);
   });
 
-  it('hides the environment row while the profile query is loading', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+  it('shows the attention copy when the selected override no longer resolves', () => {
+    // The hook never yields a resolved profile together with a stale override:
+    // an unresolvable pick leaves `profile` null and sets the attention flag.
+    const element = renderRow({ profile: null, overrideNeedsAttention: true });
 
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm({
-      ...defaultProps(),
-      runOnInstance: null,
-      isProfileLoading: true,
-    }) as Node;
+    expect(findTextContent(element, t => t === 'Config needs attention')).toBe(true);
+    expect(findElementByComponent(element, ActiveProfileIndicator)?.state).toMatchObject({
+      kind: 'config-needs-attention',
+      needsAttention: true,
+    });
+  });
 
-    expect(findTextContent(element, t => t === 'Environment')).toBe(false);
+  it('keeps the environment row at reserved height with skeletons while loading', () => {
+    const element = renderRow({ isProfileLoading: true });
+
+    // The label stays mounted and skeletons hold the row's height, so the
+    // rows below never move when the query settles.
+    expect(findTextContent(element, t => t === 'Environment')).toBe(true);
+    expect(findElementByType(element, 'Skeleton')).not.toBeNull();
     expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
+    expect(findTextContent(element, t => t === 'Production')).toBe(false);
+  });
+
+  it('opens the profile picker when the row is pressed', () => {
+    const onOpenProfilePicker = vi.fn<() => void>();
+    const element = renderRow({ profile: PROFILE, onOpenProfilePicker });
+
+    // The row body is the pressable that opens the picker.
+    const pressables = collectElementsByType(element, 'Pressable');
+    expect(pressables.some(p => p.onPress === onOpenProfilePicker)).toBe(true);
   });
 
   it('does not render the environment row for a remote target', async () => {
@@ -637,18 +720,67 @@ describe('NewSessionConfigureForm', () => {
     const element = NewSessionConfigureForm({
       ...defaultProps(),
       runOnInstance: INSTANCE,
-      profile: {
-        id: 'profile-1',
-        name: 'Production',
-        commandCount: 3,
-        mcpServerCount: 1,
-        skillCount: 2,
-        agentCount: 4,
-      },
+      profile: PROFILE,
     }) as Node;
 
-    expect(findTextContent(element, t => t === 'Environment')).toBe(false);
+    expect(containsComponent(element, NewSessionProfileRow)).toBe(false);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
+  });
+
+  it('renders the environment row for a cloud target', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      profile: PROFILE,
+    }) as Node;
+
+    expect(containsComponent(element, NewSessionProfileRow)).toBe(true);
+  });
+
+  // ── Case 10b: the advanced-config disclosure ──
+  it('mounts the collapsed advanced-config panel under Environment for a cloud target', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    const onSelectProfile = vi.fn<(id: string | null) => void>();
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      organizationId: 'org-1',
+      selectedProfileId: 'profile-1',
+      onSelectProfile,
+    }) as Node;
+
+    // The panel is controlled by the session, so it gets the same override the
+    // Environment row shows and reports picks back through the same callback.
+    expect(findElementByType(element, 'AdvancedConfigPanel')).toMatchObject({
+      organizationId: 'org-1',
+      selectedProfileId: 'profile-1',
+      onSelectProfile,
+      disabled: false,
+    });
+  });
+
+  it('hides the advanced-config panel for a remote target and for the clone entry', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const remote = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+    }) as Node;
+    expect(findElementByType(remote, 'AdvancedConfigPanel')).toBeNull();
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const clone = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      isCloneEntry: true,
+    }) as Node;
+    expect(findElementByType(clone, 'AdvancedConfigPanel')).toBeNull();
   });
 
   // ── Case 11: commit choice (cloud-only, default Leave) ──

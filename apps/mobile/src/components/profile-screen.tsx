@@ -41,6 +41,7 @@ import { useOrganization } from '@/lib/organization-context';
 import {
   getCodeReviewerProfilePath,
   getProfileAgentScope,
+  getProfilesPath,
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
 import { getSecurityAgentPath } from '@/lib/security-agent';
@@ -179,11 +180,20 @@ export function ProfileScreen() {
             subtitle={t('profile.securityAgentSubtitle')}
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
-            last
             onPress={() => {
               if (agentScope) {
                 router.push(getSecurityAgentPath(agentScope));
               }
+            }}
+          />
+          <ConfigureRow
+            icon={SlidersHorizontal}
+            title={t('profiles.title')}
+            subtitle={t('profiles.entrySubtitle')}
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push(getProfilesPath());
             }}
           />
         </View>

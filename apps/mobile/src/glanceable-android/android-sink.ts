@@ -219,15 +219,23 @@ function endNotification(): void {
 /**
  * Start the ongoing notification once permission is granted. Permission-denied
  * emits record the latest eligible snapshot so a later gesture can restart it.
+ *
+ * `carryNotice` marks the stored-notice render (`renderStoredSnapshotWithNotice`),
+ * which must reach a card still in the shade even after the snapshot's
+ * `expiresAt`: an eligible card is posted ongoing with no native deadline, so its
+ * Approve can be tapped past the expiry, and the failure line that tap draws must
+ * not be gated on `hasCurrentWork`.
  */
 async function tryStartOrUpdate(
   snapshot: GlanceableAgentsSnapshot,
-  ctx: GlanceableSinkContext
+  ctx: GlanceableSinkContext,
+  options: { carryNotice?: boolean } = {}
 ): Promise<void> {
+  const carryNotice = options.carryNotice === true;
   // The in-app switch is checked first: it is the one the user set here, and
   // honoring it costs no native call. The notification permission still decides
   // the rest. The widget is deliberately not gated — placing one is the opt-in.
-  if (!getLiveActivityEnabled() || !hasCurrentWork(snapshot)) {
+  if (!getLiveActivityEnabled() || (!carryNotice && !hasCurrentWork(snapshot))) {
     pending = null;
     return;
   }
@@ -245,14 +253,14 @@ async function tryStartOrUpdate(
 
   const epoch = startEpoch;
   const granted = await isNotificationPermissionGranted();
-  if (epoch !== startEpoch || !hasCurrentWork(snapshot)) {
+  if (epoch !== startEpoch || (!carryNotice && !hasCurrentWork(snapshot))) {
     return;
   }
   if (granted) {
     // Android 8+ drops a post whose channel does not exist yet, and the JS side
     // owns channel creation, so the channel is ensured before the first start.
     await ensureAndroidNotificationChannels();
-    if (epoch !== startEpoch || !hasCurrentWork(snapshot)) {
+    if (epoch !== startEpoch || (!carryNotice && !hasCurrentWork(snapshot))) {
       return;
     }
     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/retry can set notificationActive while awaiting permission
@@ -281,6 +289,11 @@ async function tryStartOrUpdate(
  * notification actions; its start branch re-posts the fixed native id, so the
  * counts stay and only the text gains the notice.
  *
+ * The card is posted ongoing with no native deadline, so it can still be in the
+ * shade with its Approve action after the stored snapshot's `expiresAt`; the
+ * `carryNotice` render therefore ignores that deadline and draws the notice on
+ * the card the user tapped.
+ *
  * Returns when the render is on the notification: the headless task finishes
  * with this promise, so a fire-and-forget update would be lost with the process
  * and the failure line the user's tap produced would never be shown.
@@ -290,7 +303,7 @@ export async function renderStoredSnapshotWithNotice(ctx: GlanceableSinkContext)
   if (snapshot === null) {
     return;
   }
-  await tryStartOrUpdate(snapshot, ctx);
+  await tryStartOrUpdate(snapshot, ctx, { carryNotice: true });
 }
 
 /** Retry a pending start after permission turns granted. Caller owns the check. */

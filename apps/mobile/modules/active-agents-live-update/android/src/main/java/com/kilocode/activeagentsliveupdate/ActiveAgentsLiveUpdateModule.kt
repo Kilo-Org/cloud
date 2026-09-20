@@ -135,17 +135,50 @@ class ActiveAgentsLiveUpdateModule : Module() {
   /**
    * A PendingIntent that deep-links the app to the URL the JS side named: the
    * waiting session's route when one is recorded, the Agents tab otherwise.
+   *
+   * `PendingIntent.getActivity` matches on `Intent.filterEquals`, which includes
+   * the data URI, so a per-session URL would leave the previous session's record
+   * behind under the fixed request code instead of updating it, and the OS would
+   * accumulate one Open record per session. Cancel the record the previous URL
+   * created before creating this one, so the app holds one Open record at a time.
    */
   private fun openPendingIntent(openUrl: String): PendingIntent {
+    val previousUrl = notificationState.getString(OPEN_URL, null)
+    if (previousUrl != null && previousUrl != openUrl) {
+      cancelOpenIntent(previousUrl)
+    }
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).apply {
       setPackage(context.packageName)
     }
-    return PendingIntent.getActivity(
+    val pendingIntent = PendingIntent.getActivity(
       context,
       OPEN_REQUEST_CODE,
       intent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
+    if (previousUrl != openUrl) {
+      check(notificationState.edit().putString(OPEN_URL, openUrl).commit()) {
+        "Cannot persist the active agents open URL"
+      }
+    }
+    return pendingIntent
+  }
+
+  /**
+   * Drop the PendingIntent record a superseded Open URL created. `FLAG_NO_CREATE`
+   * returns the existing record only, so a URL whose record is already gone is a
+   * no-op rather than a new record.
+   */
+  private fun cancelOpenIntent(openUrl: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).apply {
+      setPackage(context.packageName)
+    }
+    PendingIntent.getActivity(
+      context,
+      OPEN_REQUEST_CODE,
+      intent,
+      PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+    )?.cancel()
   }
 
   /**
@@ -318,12 +351,16 @@ class ActiveAgentsLiveUpdateModule : Module() {
       ActiveAgentsDeadlineReceiver.setLegacyNotificationTimeout(context, 0)
     }
     notificationManager.cancel(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID)
-    notificationState.edit().remove(HAS_TIMEOUT).remove(POSTED_CHANNEL).apply()
+    // The card's Open record outlives the notification unless it is cancelled
+    // here; the fixed id stays, so the next post creates a new one.
+    notificationState.getString(OPEN_URL, null)?.let { cancelOpenIntent(it) }
+    notificationState.edit().remove(HAS_TIMEOUT).remove(POSTED_CHANNEL).remove(OPEN_URL).apply()
   }
 
   private companion object {
     const val HAS_TIMEOUT = "has_timeout"
     const val OPEN_REQUEST_CODE = 1002
+    const val OPEN_URL = "open_url"
     const val POSTED_CHANNEL = "posted_channel"
 
     /** The kind marker in the channel id the JS side creates for needs-input. */

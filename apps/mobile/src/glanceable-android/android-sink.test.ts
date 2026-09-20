@@ -979,6 +979,24 @@ describe('renderStoredSnapshotWithNotice', () => {
     expect(mocks.native.update).not.toHaveBeenCalled();
   });
 
+  it('renders the failure line after the stored snapshot expired, while the card stays', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_expired' }));
+    mocks.native.setWidgetSnapshot(JSON.stringify(MIXED), 0);
+    setGlanceableActionNotice('Approval failed');
+    // An eligible card is posted ongoing with no native deadline, so it is still
+    // in the shade with its Approve action after the snapshot's `expiresAt`. The
+    // failure line that tap draws must still reach it.
+    vi.setSystemTime(NOW + 28_800_001);
+
+    await renderStoredSnapshotWithNotice(CTX);
+
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    expect(mocks.getNotification()).toMatchObject({
+      text: 'Approval failed 2 Needs input, 4 Working, 3 Idle',
+      approveLabel: i18n.t('common.approve'),
+    });
+  });
+
   it('updates an active notification when the revision did not change', async () => {
     recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_live' }));
     androidSink.publish(MIXED);
@@ -988,6 +1006,26 @@ describe('renderStoredSnapshotWithNotice', () => {
     mocks.native.start.mockClear();
 
     setGlanceableActionNotice('Approval failed');
+    await renderStoredSnapshotWithNotice(CTX);
+
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(mocks.native.update).toHaveBeenCalledTimes(1);
+    expect(mocks.getNotification()).toMatchObject({
+      text: 'Approval failed 2 Needs input, 4 Working, 3 Idle',
+      approveLabel: i18n.t('common.approve'),
+    });
+  });
+
+  it('updates an active notification after the stored snapshot expired', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_live' }));
+    androidSink.publish(MIXED);
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    mocks.native.start.mockClear();
+
+    setGlanceableActionNotice('Approval failed');
+    vi.setSystemTime(NOW + 28_800_001);
     await renderStoredSnapshotWithNotice(CTX);
 
     expect(mocks.native.start).not.toHaveBeenCalled();

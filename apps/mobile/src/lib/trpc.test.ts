@@ -10,6 +10,12 @@ const splitLinkMock = vi.hoisted(() =>
   vi.fn((opts: { condition: unknown; true: unknown; false: unknown }) => [opts.true, opts.false])
 );
 
+// Mutable so a test can toggle the optional ingest endpoint before importing
+// trpc.ts (`vi.resetModules()` re-reads the config mock factory).
+const latencyIngestUrlMock = vi.hoisted(() => ({ value: undefined as string | undefined }));
+
+const cryptoMock = vi.hoisted(() => ({ randomUUID: vi.fn(() => 'test-request-id') }));
+
 const secureStoreMock = vi.hoisted(() => {
   const store = new Map<string, string>();
   let heldExpiryRead: Promise<void> | null = null;
@@ -67,10 +73,17 @@ vi.mock('expo-secure-store', () => ({
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
 }));
 
+vi.mock('expo-crypto', () => cryptoMock);
+
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.example.com',
   E2E_LATENCY_MESSAGES_MS: 0,
   E2E_LATENCY_SESSION_MS: 0,
+  // A getter, not a snapshot: the mock factory object is cached, so a test
+  // must be able to swap the optional endpoint without re-running it.
+  get LATENCY_INGEST_URL() {
+    return latencyIngestUrlMock.value;
+  },
 }));
 
 vi.mock('@/lib/storage-keys', () => ({
@@ -98,6 +111,8 @@ afterEach(() => {
   httpLinkMock.mockClear();
   httpBatchLinkMock.mockClear();
   createTRPCClientMock.mockClear();
+  splitLinkMock.mockClear();
+  cryptoMock.randomUUID.mockClear();
 });
 
 describe('tRPC client link options', () => {
@@ -409,5 +424,193 @@ describe('network error reporting', () => {
       'trpc.procedure': 'session.list',
       'trpc.code': 'FORBIDDEN',
     });
+  });
+});
+
+type SplitCondition = (op: { path: string; context: { skipBatch?: boolean } }) => boolean;
+
+type LatencySample = {
+  requestId: string;
+  procedures: string[];
+  ttfbMs: number;
+  totalMs: number;
+  status: number;
+  ok: boolean;
+};
+
+function latencySample(overrides: Partial<LatencySample> = {}): LatencySample {
+  return {
+    requestId: 'req-1',
+    procedures: ['user.getMe'],
+    ttfbMs: 5,
+    totalMs: 9,
+    status: 200,
+    ok: true,
+    ...overrides,
+  };
+}
+
+describe('latency wiring', () => {
+  beforeEach(() => {
+    latencyIngestUrlMock.value = undefined;
+    secureStoreMock.store.clear();
+    mockFetch.mockReset();
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    latencyIngestUrlMock.value = undefined;
+  });
+
+  async function loadLatencyLinks(): Promise<{
+    condition: SplitCondition;
+    httpFetch: typeof fetch;
+    batchFetch: typeof fetch;
+  }> {
+    httpLinkMock.mockReturnValue({});
+    httpBatchLinkMock.mockReturnValue({});
+    createTRPCClientMock.mockReturnValue({});
+
+    await import('./trpc');
+
+    const splitOpts = splitLinkMock.mock.calls.at(-1)?.[0] as
+      | { condition: SplitCondition }
+      | undefined;
+    const httpOpts = httpLinkMock.mock.calls.at(-1)?.[0] as { fetch?: typeof fetch } | undefined;
+    const batchOpts = httpBatchLinkMock.mock.calls.at(-1)?.[0] as
+      | { fetch?: typeof fetch }
+      | undefined;
+    if (!splitOpts || !httpOpts?.fetch || !batchOpts?.fetch) {
+      throw new Error('tRPC link options were not captured');
+    }
+    return {
+      condition: splitOpts.condition,
+      httpFetch: httpOpts.fetch,
+      batchFetch: batchOpts.fetch,
+    };
+  }
+
+  it('routes each unbatch candidate to the single link and the rest to the batch link', async () => {
+    const { condition } = await loadLatencyLinks();
+
+    for (const path of [
+      'user.getMe',
+      'activeSessions.list',
+      'cliSessionsV2.getSessionMessagesPage',
+    ]) {
+      expect(condition({ path, context: {} })).toBe(true);
+    }
+    expect(condition({ path: 'kiloPass.getState', context: {} })).toBe(false);
+    expect(condition({ path: 'some.unlisted.procedure', context: {} })).toBe(false);
+  });
+
+  it('keeps the explicit skipBatch override for every path', async () => {
+    const { condition } = await loadLatencyLinks();
+
+    expect(condition({ path: 'kiloPass.getState', context: { skipBatch: true } })).toBe(true);
+    expect(condition({ path: 'user.getMe', context: { skipBatch: true } })).toBe(true);
+  });
+
+  it('gives the single and batch links the same latency-wrapped fetch', async () => {
+    const { httpFetch, batchFetch } = await loadLatencyLinks();
+    expect(httpFetch).toBe(batchFetch);
+
+    mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));
+    await httpFetch('https://api.example.com/api/trpc/user.getMe', {
+      headers: { authorization: 'Bearer token' },
+    });
+
+    const init = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    const sent = new Headers(init?.headers);
+    expect(sent.get('x-kilo-request-id')).toBe('test-request-id');
+    expect(sent.get('authorization')).toBe('Bearer token');
+  });
+
+  // tRPC's single `httpLink` leaves the body off a POST for a no-input call,
+  // and the server's fetch adapter rejects that empty body with 400. The
+  // shared fetch sends `{}` so an unbatched no-input query reaches its
+  // procedure, matching the batched `{"0":{"json":null}}` shape.
+  it('sends an empty JSON object body when a POST has none', async () => {
+    const { httpFetch } = await loadLatencyLinks();
+    mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    await httpFetch('https://api.example.com/api/trpc/activeSessions.list', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+    });
+
+    const init = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init?.body).toBe('{}');
+  });
+
+  it('keeps a body the caller already provided', async () => {
+    const { httpFetch } = await loadLatencyLinks();
+    mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    await httpFetch('https://api.example.com/api/trpc/activeSessions.list', {
+      method: 'POST',
+      body: '{"organizationId":null}',
+    });
+
+    const init = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(init?.body).toBe('{"organizationId":null}');
+  });
+
+  it('posts a non-empty batch with auth, client metadata, and the JSON content type', async () => {
+    latencyIngestUrlMock.value = 'https://latency.example.com';
+    secureStoreMock.store.set('auth-token', 'stored-token');
+    mockFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
+    const samples = [latencySample()];
+
+    await postLatencyBatch({ samples });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://latency.example.com/v1/latency');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ samples });
+    const headers = new Headers(init.headers);
+    expect(headers.get('authorization')).toBe('Bearer stored-token');
+    expect(headers.get('content-type')).toBe('application/json');
+    expect(headers.get('x-kilo-client')).toBe('mobile');
+    expect(headers.get('x-kilo-app-platform')).toBe('ios');
+    expect(headers.get('x-kilo-app-version')).toBe('1.0.4');
+  });
+
+  it('does nothing when the ingest endpoint is unset', async () => {
+    latencyIngestUrlMock.value = undefined;
+    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
+
+    await postLatencyBatch({ samples: [latencySample()] });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('does nothing for an empty batch', async () => {
+    latencyIngestUrlMock.value = 'https://latency.example.com';
+    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
+
+    await postLatencyBatch({ samples: [] });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('drops the batch quietly on a network failure', async () => {
+    latencyIngestUrlMock.value = 'https://latency.example.com';
+    mockFetch.mockRejectedValue(new Error('ingest down'));
+    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
+
+    await expect(postLatencyBatch({ samples: [latencySample()] })).resolves.toBeUndefined();
+  });
+
+  it('drops the batch quietly on a 5xx response', async () => {
+    latencyIngestUrlMock.value = 'https://latency.example.com';
+    mockFetch.mockResolvedValue(new Response('nope', { status: 503 }));
+    const { postLatencyBatch } = await import('@/lib/telemetry/latency-ingest');
+
+    await expect(postLatencyBatch({ samples: [latencySample()] })).resolves.toBeUndefined();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

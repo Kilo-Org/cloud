@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronRight, Server } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { dedupeInstanceLabels } from '@/lib/instance-picker-rows';
 import { useTRPC } from '@/lib/trpc';
@@ -110,7 +111,7 @@ export function TourRemoteStep({ onChooseComputer }: Readonly<TourRemoteStepProp
           />
         </View>
         <Text variant="mono" className="text-center">
-          {t('tour.remoteRunHint')}
+          {stripInlineCodeMarkers(t('tour.remoteRunHint'))}
         </Text>
       </View>
     );
@@ -152,11 +153,11 @@ export function TourRemoteStep({ onChooseComputer }: Readonly<TourRemoteStepProp
             {t('tour.remoteEmptyTitle')}
           </Text>
           <Text variant="muted" className="text-center">
-            {t('tour.remoteEmptyBody')}
+            {stripInlineCodeMarkers(t('tour.remoteEmptyBody'))}
           </Text>
         </View>
         <Text variant="mono" className="text-center">
-          {t('tour.remoteRunHint')}
+          {stripInlineCodeMarkers(t('tour.remoteRunHint'))}
         </Text>
         <Button
           variant="outline"

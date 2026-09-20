@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Cloud, type LucideIcon, Monitor, Sparkles } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
@@ -108,7 +109,7 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
         <ForkOption
           icon={Monitor}
           title={t('tour.remoteOptionTitle')}
-          body={t('tour.remoteOptionBody')}
+          body={stripInlineCodeMarkers(t('tour.remoteOptionBody'))}
           onPress={() => {
             onChoose('remote');
           }}

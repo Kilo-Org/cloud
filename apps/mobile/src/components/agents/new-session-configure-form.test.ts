@@ -711,6 +711,9 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    // The help draws the commands as prose: the authoring markers must not
+    // reach the screen.
+    expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const remote = NewSessionConfigureForm({
@@ -721,6 +724,7 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 
   // ── Case 14: bottom navigation-bar clearance ──

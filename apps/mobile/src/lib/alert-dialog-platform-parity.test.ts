@@ -116,6 +116,21 @@ describe('one implementation for both platforms on the alert dialog path', () =>
     );
   });
 
+  it('keeps the alert dialog theme when the styles file has no style yet', async () => {
+    // styles.xml can reach the mod without a `<style>` array (the plugin's
+    // fallback path). Pushing the overlay into a throwaway array there would
+    // silently drop it, so the mod must write the array back to modResults.
+    const config = loadConfig();
+    const androidMods = config.mods.android ?? {};
+
+    const styles = await runAndroidMod(config, androidMods.styles, { resources: {} });
+
+    expect(styles.resources.style?.map(style => style.$.name)).toEqual(['AppAlertDialogTheme']);
+    expect(styleValue(styles, 'AppAlertDialogTheme', 'colorAccent')).toBe(
+      '@color/app_dialog_action'
+    );
+  });
+
   it('keeps the one platform gate where the platform has the capability, and names the platform that lacks it', () => {
     // The plugin is Android-only by capability: it registers no iOS mod, so the
     // iOS prebuild has nothing to write. The doc comment names iOS and the

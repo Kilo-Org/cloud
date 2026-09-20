@@ -102,16 +102,19 @@ function withAlertDialogColorsNight(config) {
 
 function withAlertDialogStyles(config) {
   return withAndroidStyles(config, config => {
-    const themes = config.modResults.resources.style ?? [];
-    const appTheme = themes.find(theme => theme.$?.name === THEME_NAME);
+    const resources = config.modResults.resources;
+    // Assigned back, not just defaulted: a styles.xml without a `<style>` yet
+    // would otherwise take the throwaway `[]` and drop the overlay below.
+    resources.style = resources.style ?? [];
+    const appTheme = resources.style.find(theme => theme.$?.name === THEME_NAME);
     if (appTheme) {
       setItem(appTheme, ALERT_DIALOG_THEME_ITEM, `@style/${DIALOG_THEME_NAME}`);
     }
-    const dialogTheme = themes.find(theme => theme.$?.name === DIALOG_THEME_NAME);
+    const dialogTheme = resources.style.find(theme => theme.$?.name === DIALOG_THEME_NAME);
     if (dialogTheme) {
       return config;
     }
-    themes.push({
+    resources.style.push({
       $: { name: DIALOG_THEME_NAME, parent: DIALOG_THEME_PARENT },
       item: [
         { $: { name: BACKGROUND_ITEM }, _: `@color/${BACKGROUND_COLOR_NAME}` },

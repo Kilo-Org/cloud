@@ -479,6 +479,16 @@ function evaluateEntry(platform: string): {
         // the stub answers with the one call it makes.
         return { registerAppActionDispatcher: (): void => undefined };
       }
+      case './src/lib/notification-background-task': {
+        // The entry defines and registers the background-notification task last,
+        // for the same headless-context reason; the stub answers with a resolved
+        // registration so the entry's `.catch` has a promise to attach to.
+        return {
+          registerNotificationBackgroundTask: async (): Promise<void> => {
+            await Promise.resolve();
+          },
+        };
+      }
       default: {
         throw new Error(`The entry required an unexpected module: ${id}`);
       }

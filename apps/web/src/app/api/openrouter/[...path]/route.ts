@@ -109,6 +109,7 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
+import { isFableModel, isOpus5Model } from '@/lib/ai-gateway/providers/anthropic.constants';
 
 export const maxDuration = 800;
 
@@ -736,7 +737,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   if (
     isDisabledKiloExclusiveModel(effectiveModelIdLowerCased) ||
-    (!autoModel && isUnavailableModel(effectiveModelIdLowerCased))
+    (!autoModel &&
+      (isUnavailableModel(effectiveModelIdLowerCased) ||
+        isFableModel(effectiveModelIdLowerCased) ||
+        isOpus5Model(effectiveModelIdLowerCased)))
   ) {
     console.warn(`User requested unavailable model ${effectiveModelIdLowerCased}; rejecting.`);
     return unavailableModelResponse();

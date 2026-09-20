@@ -734,6 +734,18 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it.each(['anthropic/claude-opus-5', 'anthropic/claude-fable-5.1'])(
+    'temporarily rejects a direct %s request as non-retryable',
+    async modelId => {
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest(makeBody(modelId)) as never);
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ error_type: 'unavailable_model' });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    }
+  );
+
   it('applies free-model rate limiting to flagged Kilo-exclusive models', async () => {
     mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: false, requestCount: 200 });
 
@@ -872,6 +884,22 @@ describe('kilo-auto/efficient classifier billing', () => {
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
+
+  it.each(['anthropic/claude-opus-5', 'anthropic/claude-fable-5.1'])(
+    'allows auto routing to select %s',
+    async modelId => {
+      mockedApplyResolvedAutoModel.mockImplementation(async (_params, request) => {
+        request.body.model = modelId;
+        return { kind: 'ok', resolved: { model: modelId } };
+      });
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest(makeBody('kilo-auto/balanced')) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('applies effective organization policy while selecting an Auto Free candidate', async () => {
     mockedGetUserFromAuth.mockResolvedValue({

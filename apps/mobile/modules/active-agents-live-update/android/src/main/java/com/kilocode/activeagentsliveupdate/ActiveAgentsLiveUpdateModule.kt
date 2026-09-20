@@ -139,29 +139,21 @@ class ActiveAgentsLiveUpdateModule : Module() {
    * `PendingIntent.getActivity` matches on `Intent.filterEquals`, which includes
    * the data URI, so a per-session URL would leave the previous session's record
    * behind under the fixed request code instead of updating it, and the OS would
-   * accumulate one Open record per session. Cancel the record the previous URL
-   * created before creating this one, so the app holds one Open record at a time.
+   * accumulate one Open record per session. `commitOpenUrl` retires the
+   * superseded record once the post that carries this one lands, so the app
+   * holds one Open record at a time and a post that throws leaves the card still
+   * in the shade with the record it already carries.
    */
   private fun openPendingIntent(openUrl: String): PendingIntent {
-    val previousUrl = notificationState.getString(OPEN_URL, null)
-    if (previousUrl != null && previousUrl != openUrl) {
-      cancelOpenIntent(previousUrl)
-    }
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).apply {
       setPackage(context.packageName)
     }
-    val pendingIntent = PendingIntent.getActivity(
+    return PendingIntent.getActivity(
       context,
       OPEN_REQUEST_CODE,
       intent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
-    if (previousUrl != openUrl) {
-      check(notificationState.edit().putString(OPEN_URL, openUrl).commit()) {
-        "Cannot persist the active agents open URL"
-      }
-    }
-    return pendingIntent
   }
 
   /**
@@ -179,6 +171,24 @@ class ActiveAgentsLiveUpdateModule : Module() {
       intent,
       PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
     )?.cancel()
+  }
+
+  /**
+   * Retire the Open record the superseded URL created and remember the URL now
+   * in the shade. Called only after the post lands: the card still on screen
+   * after a failed post carries the previous record, so cancelling it before the
+   * post succeeds would leave that card unservable.
+   */
+  private fun commitOpenUrl(previousUrl: String?, openUrl: String) {
+    if (previousUrl == openUrl) {
+      return
+    }
+    if (previousUrl != null) {
+      cancelOpenIntent(previousUrl)
+    }
+    check(notificationState.edit().putString(OPEN_URL, openUrl).commit()) {
+      "Cannot persist the active agents open URL"
+    }
   }
 
   /**
@@ -231,6 +241,9 @@ class ActiveAgentsLiveUpdateModule : Module() {
     promotion: Boolean,
     timeoutMs: Long
   ) {
+    // Read the URL the shade card carries before this call can change it: a
+    // failed post must leave `OPEN_URL` naming the previous card's record.
+    val previousOpenUrl = notificationState.getString(OPEN_URL, null)
     val contentIntent = openPendingIntent(openUrl)
     // The two OS paths a notification can interrupt Do Not Disturb with are the
     // channel's DND override (user-granted, requested by the app) and the
@@ -323,12 +336,19 @@ class ActiveAgentsLiveUpdateModule : Module() {
     try {
       notificationManager.notify(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID, builder.build())
     } catch (error: Throwable) {
-      // The post did not land. When this call removed the previous card the
-      // shade holds nothing, so drop the marker before rethrowing a later start
-      // does not adopt a kind from a card that is not there. A same-channel
-      // update removed nothing: its previous card is still posted, so clearing
-      // the marker would strand it on the next channel switch and hide it from a
-      // JS restart's adoption. Restore the timeout flag with the marker.
+      // The post did not land. The Open record this call created is
+      // unreferenced: any card still in the shade carries the previous record,
+      // which `openPendingIntent` left intact, so drop the new record and keep
+      // `OPEN_URL` naming the previous card's.
+      if (previousOpenUrl != openUrl) {
+        cancelOpenIntent(openUrl)
+      }
+      // When this call removed the previous card the shade holds nothing, so
+      // drop the marker before rethrowing a later start does not adopt a kind
+      // from a card that is not there. A same-channel update removed nothing:
+      // its previous card is still posted, so clearing the marker would strand
+      // it on the next channel switch and hide it from a JS restart's adoption.
+      // Restore the timeout flag with the marker.
       if (previousChannelId != channelId || clearsOnTimeoutChange) {
         notificationState.edit().remove(POSTED_CHANNEL).remove(HAS_TIMEOUT).apply()
       } else {
@@ -336,6 +356,9 @@ class ActiveAgentsLiveUpdateModule : Module() {
       }
       throw error
     }
+    // The post landed: retire the superseded Open record and remember the new
+    // URL, so the card in the shade and `OPEN_URL` describe the same record.
+    commitOpenUrl(previousOpenUrl, openUrl)
     // Mirror the posted channel so the next post can tell whether the card moves.
     // Commit, like the timeout flag: the shade card survives a process exit, so
     // the mirror that describes it must too.

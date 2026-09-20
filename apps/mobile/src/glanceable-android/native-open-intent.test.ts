@@ -18,7 +18,9 @@ const MODULE_SOURCE = readFileSync(
  * `Intent.filterEquals`, which includes that URI: the fixed request code with
  * FLAG_UPDATE_CURRENT cannot reuse the previous session's record, and each new
  * URL would leave another system record behind. The module must therefore
- * remember the URL it posted and cancel the superseded record.
+ * remember the URL it posted and cancel the superseded record — but only once
+ * the post carrying the new record lands. Cancelling it first would leave the
+ * card still in the shade after a failed post with no record to serve or track.
  */
 function segment(from: string, to: string): string {
   const start = MODULE_SOURCE.indexOf(from);
@@ -29,22 +31,51 @@ function segment(from: string, to: string): string {
 }
 
 describe('ActiveAgentsLiveUpdate Open PendingIntent records', () => {
-  it('cancels the superseded session URL record before creating the next one', () => {
+  it('creates the Open record without retiring the previous one before the post can fail', () => {
     const open = segment('private fun openPendingIntent', 'private fun cancelOpenIntent');
-    const cancel = open.indexOf('cancelOpenIntent(previousUrl)');
-    const create = open.indexOf('PendingIntent.getActivity(');
+    expect(open, 'openPendingIntent must create the record').toContain(
+      'PendingIntent.getActivity('
+    );
     expect(
-      cancel,
-      'openPendingIntent does not cancel the previous Open URL record'
-    ).toBeGreaterThan(-1);
+      open,
+      'openPendingIntent must not cancel the previous record before the post can fail'
+    ).not.toContain('cancelOpenIntent(');
     expect(
-      create,
-      'openPendingIntent must create the new record after cancelling the old one'
-    ).toBeGreaterThan(cancel);
+      open,
+      'openPendingIntent must not name the new URL before the post can fail'
+    ).not.toContain('putString(OPEN_URL');
+  });
+
+  it('retires the superseded record only after a successful post', () => {
+    const post = segment('private fun post(', 'private fun dismiss()');
+    const notify = post.indexOf('notificationManager.notify(');
+    expect(notify, 'post no longer posts the notification').toBeGreaterThan(-1);
+    const commit = post.indexOf('commitOpenUrl(previousOpenUrl, openUrl)');
+    expect(commit, 'post must commit the Open URL only after the post lands').toBeGreaterThan(
+      notify
+    );
+  });
+
+  it('drops the record a failed post created and keeps the previous URL', () => {
+    const post = segment('private fun post(', 'private fun dismiss()');
+    const catchStart = post.indexOf('catch (error', post.indexOf('notificationManager.notify('));
+    expect(catchStart, 'post no longer handles a failed notify').toBeGreaterThan(-1);
+    const rethrow = post.indexOf('throw error', catchStart);
+    expect(rethrow).toBeGreaterThan(catchStart);
+    expect(
+      post.slice(catchStart, rethrow),
+      'a failed post must drop the Open record it created'
+    ).toContain('cancelOpenIntent(openUrl)');
+  });
+
+  it('cancels the previous record and remembers the new URL when committing', () => {
+    const commit = segment('private fun commitOpenUrl', 'private fun approvePendingIntent');
+    expect(commit).toContain('cancelOpenIntent(previousUrl)');
+    expect(commit).toContain('putString(OPEN_URL, openUrl)');
   });
 
   it('asks for the existing record only when cancelling', () => {
-    const cancel = segment('private fun cancelOpenIntent', 'private fun approvePendingIntent');
+    const cancel = segment('private fun cancelOpenIntent', 'private fun commitOpenUrl');
     expect(cancel, 'cancelOpenIntent must not create a record it means to remove').toContain(
       'FLAG_NO_CREATE'
     );
@@ -52,8 +83,6 @@ describe('ActiveAgentsLiveUpdate Open PendingIntent records', () => {
   });
 
   it('remembers the posted URL and forgets it on dismiss', () => {
-    const open = segment('private fun openPendingIntent', 'private fun cancelOpenIntent');
-    expect(open).toContain('putString(OPEN_URL, openUrl)');
     const dismiss = segment('private fun dismiss()', 'private companion object');
     expect(dismiss, 'dismiss must drop the Open record it no longer serves').toContain(
       'remove(OPEN_URL)'

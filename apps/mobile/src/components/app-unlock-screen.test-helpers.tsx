@@ -53,10 +53,36 @@ const storage = vi.hoisted(() => ({ getItemAsync: vi.fn(), setItemAsync: vi.fn()
 const catalogs = vi.hoisted(() => ({ fr: vi.fn() }));
 const announcements = vi.hoisted(() => vi.fn());
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
-const lifecycle = vi.hoisted(() => ({
-  change: undefined as ((state: AppStateStatus) => void) | undefined,
+// The route the mocked expo-router reports, shaped like production: segments
+// carry the group names, the pathname strips them. Defaults to a screen
+// pushed over the tabs, where no tab bar is on screen.
+const route = vi.hoisted(() => ({
+  segments: ['(app)', 'agent-chat'] as string[],
+  pathname: '/agent-chat',
 }));
-export { announcements, catalogs, lifecycle, native, platform, storage };
+// AppState has more than one subscriber on this screen (the query client
+// lifecycle and the keyboard-lift hooks), so the harness keeps every listener
+// and broadcasts to all of them. A single slot let the last registration
+// shadow the earlier ones, which hid the stale-lift defect these mounted tests
+// exist to catch. Ported from the closed #6392.
+const lifecycle = vi.hoisted(() => {
+  const listeners = new Set<(state: AppStateStatus) => void>();
+  return {
+    listeners,
+    change: (state: AppStateStatus) => {
+      for (const listener of listeners) {
+        listener(state);
+      }
+    },
+  };
+});
+const keyboard = vi.hoisted(() => ({
+  // Both slots share one signature so either listener can be stored; `hide`
+  // is dispatched with an empty payload.
+  show: undefined as ((event: { endCoordinates: { height: number } }) => void) | undefined,
+  hide: undefined as ((event: { endCoordinates: { height: number } }) => void) | undefined,
+}));
+export { announcements, catalogs, keyboard, lifecycle, native, platform, route, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
@@ -72,16 +98,35 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platform,
+  useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
   StatusBar: { currentHeight: 0 },
   I18nManager: { isRTL: false },
   AccessibilityInfo: { announceForAccessibility: announcements },
+  Keyboard: {
+    addListener: (
+      event: string,
+      listener: (event: { endCoordinates: { height: number } }) => void
+    ) => {
+      if (event === 'keyboardDidShow' || event === 'keyboardWillShow') {
+        keyboard.show = listener;
+      } else {
+        keyboard.hide = listener;
+      }
+      return {
+        remove: () => {
+          keyboard.show = undefined;
+          keyboard.hide = undefined;
+        },
+      };
+    },
+  },
   AppState: {
     currentState: 'active',
     addEventListener: (_event: string, listener: (state: AppStateStatus) => void) => {
-      lifecycle.change = listener;
+      lifecycle.listeners.add(listener);
       return {
         remove: () => {
-          lifecycle.change = undefined;
+          lifecycle.listeners.delete(listener);
         },
       };
     },
@@ -135,9 +180,9 @@ vi.mock('expo-router', () => ({
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
-  usePathname: () => '/(app)/(tabs)/(0_home)',
+  usePathname: () => route.pathname,
   useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
-  useSegments: () => ['(app)', '(tabs)', '(3_profile)', 'organization'],
+  useSegments: () => route.segments,
 }));
 vi.mock('@expo/react-native-action-sheet', () => ({ ActionSheetProvider: 'ActionSheetProvider' }));
 vi.mock('@rn-primitives/portal', () => ({ PortalHost: 'PortalHost' }));
@@ -287,6 +332,9 @@ export function resetUnlockMocks() {
   vi.stubGlobal('__DEV__', true);
   vi.resetAllMocks();
   platform.OS = 'ios';
+  route.segments = ['(app)', 'agent-chat'];
+  route.pathname = '/agent-chat';
+  lifecycle.listeners.clear();
   storage.getItemAsync.mockResolvedValue('enabled');
   native.hasHardwareAsync.mockResolvedValue(true);
   native.isEnrolledAsync.mockResolvedValue(true);

@@ -1,9 +1,38 @@
 import { describe, expect, it } from 'vitest';
 
+import { resolveKeyboardBottomPadding } from '@/components/login-screen-state';
 import {
   resolveAppAwareKeyboardPadding,
   resolveKeyboardPaddingEventsForPlatform,
 } from './app-aware-keyboard-padding-state';
+
+// Ported from the closed #6380, whose cases covered the platform-aware bottom
+// occlusion the keeper #6388 resolves in `resolveKeyboardBottomPadding`: the
+// reported geometry is the platform capability that differs, so Android adds
+// the system-bar inset to reach the keyboard's top edge while iOS keeps the
+// keyboard frame height, which already reaches the window bottom.
+describe('platform-aware keyboard bottom occlusion', () => {
+  it('reaches the keyboard top edge on Android by adding the system-bar inset', () => {
+    expect(
+      resolveKeyboardBottomPadding({ platform: 'android', keyboardHeight: 704, bottomInset: 63 })
+    ).toBe(767);
+  });
+
+  it('keeps the iOS height, which already reaches the window bottom', () => {
+    expect(
+      resolveKeyboardBottomPadding({ platform: 'ios', keyboardHeight: 300, bottomInset: 34 })
+    ).toBe(300);
+  });
+
+  it('reserves the system-bar inset alone while the keyboard is hidden', () => {
+    expect(
+      resolveKeyboardBottomPadding({ platform: 'android', keyboardHeight: 0, bottomInset: 63 })
+    ).toBe(63);
+    expect(
+      resolveKeyboardBottomPadding({ platform: 'ios', keyboardHeight: 0, bottomInset: 34 })
+    ).toBe(34);
+  });
+});
 
 describe('app-aware keyboard padding state', () => {
   it('resolves Android keyboard events from did-show and did-hide notifications', () => {

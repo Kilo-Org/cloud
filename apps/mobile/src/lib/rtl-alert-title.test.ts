@@ -15,6 +15,13 @@ import { describe, expect, it } from 'vitest';
 // prebuild), and the app config that registers the plugin. None of them is
 // bundled here, so the suite reads the sources it ships — same shape as the App
 // Intent contract test in modules/kilo-app-actions.
+//
+// The second half holds the alert path to the same platform rule the needs-input
+// notification path follows (`notification-platform-parity.test.ts`): one
+// implementation for both platforms, with a platform gate kept only where the
+// platform lacks the capability and named in its comment. Here the gate is
+// Android's, because Android is the platform whose alert title alignment lives
+// in a resource no JS API reaches; iOS's `UIAlertController` needs no override.
 
 const mobileDir = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const reactNativeDir = dirname(createRequire(import.meta.url).resolve('react-native/package.json'));
@@ -57,5 +64,37 @@ describe('rtl alert title layout', () => {
   it('is registered on the app config, so prebuild applies it', () => {
     const appConfig = readFileSync(join(mobileDir, 'app.config.ts'), 'utf8');
     expect(appConfig).toContain("'./plugins/withRtlAlertTitle'");
+  });
+});
+
+// One implementation for both platforms on the alert path. The app raises every
+// alert through `Alert.alert`; the only platform-specific artifact is Android's
+// resource override, and it stays because Android is the platform that lacks a
+// JS-level way to align the title — `AlertFragment` inflates the layout and
+// nothing exposes its `textAlignment`. iOS has no counterpart to write, so no
+// module here may carry a second, per-platform alert implementation.
+describe('one alert implementation for both platforms', () => {
+  const pluginSource = readFileSync(join(mobileDir, 'plugins', 'withRtlAlertTitle.js'), 'utf8');
+
+  it('gates the override to Android, the platform with no JS-level title alignment', () => {
+    // The gate is the single platform the mod runs for, named rather than
+    // repeated inline, and there is no iOS half to keep in step with it.
+    expect(pluginSource).toMatch(/const ALERT_TITLE_PLATFORM = 'android'/);
+    expect(pluginSource).toMatch(/withDangerousMod\(config, \[\s*ALERT_TITLE_PLATFORM\b/);
+    expect(pluginSource).not.toMatch(/['"]ios['"]/);
+  });
+
+  it('names the gate and the capability Android lacks in its comment', () => {
+    expect(pluginSource).toContain('Platform gate: Android only');
+    expect(pluginSource).toContain('UIAlertController');
+  });
+
+  it('leaves the discard confirm, the flow the finding names, free of a platform branch', () => {
+    const guardSource = readFileSync(
+      join(mobileDir, 'src', 'components', 'agents', 'use-new-session-discard-guard.ts'),
+      'utf8'
+    );
+    expect(guardSource).toContain('Alert.alert(');
+    expect(guardSource).not.toMatch(/\bPlatform\.(?:OS|select|Version)\b/);
   });
 });

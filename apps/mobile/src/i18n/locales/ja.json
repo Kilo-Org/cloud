@@ -3153,7 +3153,9 @@
     "couldNotApprove": "承認できませんでした",
     "couldNotStart": "開始できませんでした",
     "channelName": "アクティブなエージェント",
-    "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。"
+    "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。",
+    "openSession": "開く",
+    "approveFailed": "承認できませんでした。もう一度試すには$t(common.approve)をタップしてください。"
   },
   "transcriptionModel": {
     "title": "文字起こしモデル",

@@ -12,7 +12,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NotificationsScreen } from './notifications-screen';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
-import '@/i18n';
+import { i18n } from '@/i18n';
+import en from '@/i18n/locales/en.json';
+import ur from '@/i18n/locales/ur.json';
 
 const prefsQueryFn = vi.hoisted(() => vi.fn());
 const pushTokensQueryFn = vi.hoisted(() => vi.fn());
@@ -459,14 +461,15 @@ describe('NotificationsScreen category availability', () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 
-  it('non-retryable unhappy: an unavailable category disables the switch and shows the server reason', async () => {
+  it('non-retryable unhappy: an unavailable category keeps its translated description, never the response sentence', async () => {
+    // The defect: the row rendered the response's `unavailableReason`, an
+    // English sentence, inside a localized screen. The description must come
+    // from the catalog, so a stale response string must never reach the screen.
+    const staleServerReason = 'stale server prose';
     prefsQueryFn.mockResolvedValue(
       fullPrefs({
         capabilities: fullCapabilities({
-          balanceAlerts: {
-            available: false,
-            unavailableReason: 'Join an organization to get balance alerts.',
-          },
+          balanceAlerts: { available: false, unavailableReason: staleServerReason },
         }),
       })
     );
@@ -481,8 +484,41 @@ describe('NotificationsScreen category availability', () => {
 
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(true);
     expect(
-      textWithChildren(renderer.root, 'Join an organization to get balance alerts.').length
+      textWithChildren(renderer.root, en.notifications.category.balanceAlertsSubtitle).length
     ).toBe(1);
+    expect(textWithChildren(renderer.root, staleServerReason).length).toBe(0);
+  });
+
+  it('non-retryable unhappy: an unavailable category reads its description from the active catalog', async () => {
+    // The exact finding: on an Urdu screen the security-findings row showed the
+    // response's English sentence. The row must read its copy from the catalog
+    // of the active language, so a localized screen never prints the response
+    // sentence. `securityFindingsSubtitle` is translated in ur.json, so this
+    // proves the Urdu screen, not an English fallback.
+    const serverReason = 'Enable Kilo Security Agent on a scope to get security findings.';
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          securityFindings: { available: false, unavailableReason: serverReason },
+        }),
+      })
+    );
+
+    await i18n.changeLanguage('ur');
+    try {
+      const { renderer } = await renderScreen();
+      await waitForEnabledSwitch(renderer, ur.notifications.channel.chat);
+
+      expect(
+        switchesByLabel(renderer.root, ur.notifications.channel.security)[0]?.props.disabled
+      ).toBe(true);
+      expect(
+        textWithChildren(renderer.root, ur.notifications.category.securityFindingsSubtitle).length
+      ).toBe(1);
+      expect(textWithChildren(renderer.root, serverReason).length).toBe(0);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('retryable unhappy: a category save failure rolls back the optimistic flip', async () => {

@@ -110,6 +110,7 @@ function InlineRetry({ label, color, onPress }: InlineRetryProps) {
   );
 }
 
+/** One row per notification category. */
 const CATEGORY_META = [
   {
     key: 'chatMessages',
@@ -157,7 +158,12 @@ const CATEGORY_META = [
 
 type CategoryMeta = (typeof CATEGORY_META)[number];
 
-/** Per-category availability from the preferences response `capabilities` map. */
+/**
+ * Per-category availability from the preferences response `capabilities` map.
+ * `unavailableReason` is the server's English-only sentence; it is part of the
+ * response but is deliberately never rendered, because the screen is localized
+ * and the server cannot translate it. See `CategoryRow`.
+ */
 type NotificationCategoryCapability = Readonly<{
   available: boolean;
   unavailableReason: string | null;
@@ -195,14 +201,17 @@ function CategoryRow({
     : (preferences?.[meta.key] ?? readAgentPushPreference(queryClient, queryKey, meta.key));
   const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
   // An unavailable category is a terminal, non-retryable state: the switch is
-  // disabled and the server reason replaces the subtitle. A missing entry (the
+  // disabled and the title is muted. A missing entry (the
   // `noUncheckedIndexedAccess` widening) defaults to available.
   const unavailable = capability?.available === false;
   const isDisabled = disabled || !editable || unavailable;
   const title = t(meta.titleKey);
-  const subtitle = unavailable
-    ? (capability.unavailableReason ?? t(meta.subtitleKey))
-    : t(meta.subtitleKey);
+  // The row's description always comes from this catalog. The response's
+  // `unavailableReason` is an English-only sentence the server cannot
+  // translate, so rendering it printed untranslated English inside every
+  // localized screen (the reported defect). The disabled switch and muted
+  // title carry the unavailable state; the description stays translated.
+  const subtitle = t(meta.subtitleKey);
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />

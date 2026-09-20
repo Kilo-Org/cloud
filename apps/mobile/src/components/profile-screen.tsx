@@ -76,6 +76,10 @@ export function ProfileScreen() {
   const colors = useThemeColors();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
+  // The account queries wait for the tab transition to settle, but the hook
+  // bounds that wait: an interaction queue that never reports idle (an
+  // automated UI session holds one open) must not hide the Linked accounts row,
+  // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const {

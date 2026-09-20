@@ -130,8 +130,36 @@ it('reads the keyboard height through the shared app-aware hook', async () => {
   expect(sharedKeyboardHook.calls).toBeGreaterThan(0);
 });
 
-it('keeps the toast above the software keyboard while it is up', async () => {
+/**
+ * Android's `endCoordinates.height` stops at the navigation bar
+ * (`ReactRootView` sends `imeInsets.bottom − barInsets.bottom`), so the raw
+ * height sits below the IME's true top edge by the bar inset. The toast is
+ * anchored to the screen bottom, so the Toaster resolves the occlusion through
+ * the same rule the screens reserve padding with (`resolveKeyboardBottomPadding`)
+ * — a raw height left the toast's last line behind the IME's navigation row
+ * (2026-09-20 review finding). The mocked bottom inset is 12.
+ */
+it('clears the Android IME navigation row by adding the bottom inset', async () => {
   platform.OS = 'android';
+  await mount();
+
+  act(() => {
+    keyboard.show({ endCoordinates: { height: 300 } });
+  });
+
+  const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
+
+  expect(toasters[0]?.props.offset).toBe(300 + 12 + TOAST_BOTTOM_GAP);
+});
+
+/**
+ * iOS reports the keyboard window frame, which reaches the screen bottom and
+ * so already includes the home-indicator inset. Adding the bottom inset there
+ * would float the toast above the keyboard, so the iOS height passes through
+ * unchanged — the platform-parity half of the keyboard rule.
+ */
+it('keeps the iOS keyboard height, which already reaches the screen bottom', async () => {
+  platform.OS = 'ios';
   await mount();
 
   act(() => {
@@ -163,7 +191,7 @@ it('delivers a keyboard event to every subscriber and detaches only the disposed
   // Both the Toaster's hook and the extra subscriber received the height.
   expect(extra).toHaveBeenCalledWith({ endCoordinates: { height: 300 } });
   expect(unlockRoot().findAllByType('Toaster' as ElementType)[0]?.props.offset).toBe(
-    300 + TOAST_BOTTOM_GAP
+    300 + 12 + TOAST_BOTTOM_GAP
   );
 
   subscription.remove();
@@ -173,7 +201,7 @@ it('delivers a keyboard event to every subscriber and detaches only the disposed
   // The disposed subscriber is gone; the Toaster's listener is still attached.
   expect(extra).toHaveBeenCalledTimes(1);
   expect(unlockRoot().findAllByType('Toaster' as ElementType)[0]?.props.offset).toBe(
-    240 + TOAST_BOTTOM_GAP
+    240 + 12 + TOAST_BOTTOM_GAP
   );
 });
 

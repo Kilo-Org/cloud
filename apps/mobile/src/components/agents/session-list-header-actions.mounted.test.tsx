@@ -1,4 +1,9 @@
+// eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
+import { createRequire } from 'node:module';
+import tailwindcss from '@tailwindcss/postcss';
+import postcss from 'postcss';
 import { createElement } from 'react';
+import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -6,6 +11,10 @@ import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 
 import { SessionListHeaderActions } from './session-list-header-actions';
 import '@/i18n';
+
+const { compile } = createRequire(import.meta.url)(
+  'react-native-css/compiler'
+) as typeof NativeCSSCompiler;
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -65,6 +74,68 @@ function pressesWithLabel(root: I, label: string): I[] {
   );
 }
 
+/** The dp a compiled react-native-css length resolves to, following var fallbacks. */
+function resolveCompiledLength(value: unknown): number {
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (!Array.isArray(value)) {
+    throw new TypeError(`cannot resolve compiled length ${JSON.stringify(value)}`);
+  }
+  // A descriptor is either one term ([guards, kind, ...]) or a list of terms.
+  const term = (value[1] === 'var' || value[1] === 'calc' ? value : value[0]) as unknown[];
+  if (term[1] === 'var') {
+    return resolveCompiledLength((term[2] as [string, unknown])[1]);
+  }
+  if (term[1] === 'calc') {
+    return resolveCalc(term[2] as unknown[]);
+  }
+  throw new Error(`cannot resolve compiled length ${JSON.stringify(value)}`);
+}
+
+function resolveCalc(expression: unknown[]): number {
+  let total = resolveCompiledLength(expression[0]);
+  for (let index = 1; index + 1 < expression.length; index += 2) {
+    const operator = expression[index];
+    const operand = resolveCompiledLength(expression[index + 1]);
+    if (operator === '*') {
+      total *= operand;
+    } else if (operator === '/') {
+      total /= operand;
+    } else if (operator === '+') {
+      total += operand;
+    } else if (operator === '-') {
+      total -= operand;
+    } else {
+      throw new Error(`unsupported calc operator ${String(operator)}`);
+    }
+  }
+  return total;
+}
+
+/** The dp a row's `gap-*` class compiles to, through the app's own pipeline. */
+async function compiledGapDp(rowClassName: string): Promise<number> {
+  const gapClass = rowClassName.split(/\s+/).find(part => part.startsWith('gap-'));
+  if (!gapClass) {
+    throw new Error(`no gap class in "${rowClassName}"`);
+  }
+  // Use the app's theme and installed compilers, not a hand-written utility-to-point map.
+  const { css } = await postcss([tailwindcss()]).process(
+    `@reference "../../global.css"; .target { @apply ${gapClass}; }`,
+    { from: import.meta.filename }
+  );
+  const rules = compile(css, { inlineVariables: false }).stylesheet().s;
+  const declarations =
+    rules?.find(([name]) => name === 'target')?.[1].flatMap(rule => rule.d ?? []) ?? [];
+  const gap = declarations.find(declaration => declaration[1] === 'gap');
+  if (!gap) {
+    throw new Error(`no compiled gap declaration in "${gapClass}"`);
+  }
+  return resolveCompiledLength(gap[0]);
+}
+
+type Insets = { top: number; right: number; bottom: number; left: number };
+
 const noop = (): void => undefined;
 
 async function mountHeader(showNewSession: boolean, onNewSession: () => void): Promise<R> {
@@ -111,6 +182,42 @@ describe('SessionListHeaderActions new-session control', () => {
       (control.props.onPress as () => void)();
     });
     expect(onNewSession).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('meets the filter control at the row gap instead of overlapping its touch region', async () => {
+    const renderer = await mountHeader(true, noop);
+
+    const newSession = pressesWithLabel(renderer.root, 'New session')[0];
+    const filter = pressesWithLabel(renderer.root, 'Filter sessions')[0];
+    if (!newSession || !filter) {
+      throw new Error('header controls not found');
+    }
+
+    const row = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        typeof node.props.className === 'string' &&
+        node.props.className.split(/\s+/).includes('gap-4')
+    );
+    const gapDp = await compiledGapDp(row.props.className as string);
+    // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
+    expect(gapDp).toBe(14);
+
+    const newSessionSlop = newSession.props.hitSlop as Insets;
+    const filterSlop = filter.props.hitSlop as Insets;
+    // The new-session control sits left of the filter, so the gap has to fit
+    // both facing slops; more than the gap means the two regions overlap.
+    expect(newSessionSlop.right + filterSlop.left).toBeLessThanOrEqual(gapDp);
+    // Capping the right side must not drop the control below the design target.
+    const box = boxDp(newSession.props.className as string);
+    expect(box.width + newSessionSlop.left + newSessionSlop.right).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
 
     act(() => {
       renderer.unmount();

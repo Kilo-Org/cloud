@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires -- Jest mocks must be registered before loading the component. */
-// The development login panel is a dev-only helper. On a phone-sized viewport it
-// used to float over the sign-in form, covering the form's own "Continue with
-// Email" label and field while the page text showed through it, so two labels
-// occupied the same space. Below `sm` the panel must stay in the page flow,
-// where it cannot overlap the form; only from `sm` up does it float, and then
-// explicitly above the page.
+// The development login panel is a dev-only helper. It used to float over the
+// sign-in form, covering the form's own "Continue with Email" label and field
+// while the page text showed through it, so two labels occupied the same space.
+// A fixed bottom-left overlay can sit under the centered sign-in form at every
+// width where the two share the page: the form is `max-w-sm` (384px) centered,
+// so its left edge stays left of the panel's right edge (24px + 320px = 344px)
+// until the viewport is roughly 1787px wide. The panel therefore stays in the
+// page flow at every viewport width, where it cannot overlap the form.
 import { jest } from '@jest/globals';
 import * as React from 'react';
 import { createElement } from 'react';
@@ -37,22 +39,25 @@ function panelClassNames(searchParams: Record<string, string> = {}): string[] {
 }
 
 describe('FakeLoginForm development login panel placement', () => {
-  it('stays in the page flow on phone-sized viewports so it cannot cover the sign-in form', () => {
+  it('stays in the page flow at every viewport width so it cannot cover the sign-in form', () => {
     const classNames = panelClassNames();
 
     expect(classNames).toContain('relative');
     expect(classNames).toContain('w-full');
 
-    for (const floatingClass of ['fixed', 'bottom-6', 'left-6', 'w-80']) {
+    // Any `fixed` at any breakpoint puts the panel back over the centered form.
+    expect(classNames.filter(name => name === 'fixed' || name.endsWith(':fixed'))).toEqual([]);
+
+    for (const floatingClass of [
+      'bottom-6',
+      'left-6',
+      'w-80',
+      'sm:bottom-6',
+      'sm:left-6',
+      'sm:z-50',
+      'sm:w-80',
+    ]) {
       expect(classNames).not.toContain(floatingClass);
-    }
-  });
-
-  it('floats above the page from sm up, where there is room beside the form', () => {
-    const classNames = panelClassNames();
-
-    for (const floatingClass of ['sm:fixed', 'sm:bottom-6', 'sm:left-6', 'sm:z-50', 'sm:w-80']) {
-      expect(classNames).toContain(floatingClass);
     }
   });
 

@@ -333,8 +333,12 @@ export function NewSessionConfigureForm({
   );
 
   return (
+    // The root reserves the navigation-bar inset, so the keyboard-lift view
+    // pads from its own bottom edge and must not add the inset again.
     <View className="flex-1 bg-background" style={{ paddingBottom: bottom }}>
-      <AppAwareKeyboardPaddingView className="flex-1">{body}</AppAwareKeyboardPaddingView>
+      <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
+        {body}
+      </AppAwareKeyboardPaddingView>
     </View>
   );
 }

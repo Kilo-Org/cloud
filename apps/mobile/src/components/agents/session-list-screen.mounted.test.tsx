@@ -7,6 +7,11 @@ import { i18n } from '@/i18n';
 import type * as MotionContextModule from '@/lib/a11y/motion-context';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { AgentSessionListScreen } from './session-list-screen';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_BOX_SIZE,
+  COMPACT_CONTROL_HIT_SLOP,
+} from './session-list-tap-target';
 import { RowsRefreshControl } from './rows-refresh-control';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
@@ -320,7 +325,12 @@ function filterButtonProps() {
   if (!button) {
     throw new Error('Missing filter button');
   }
-  return button.props as { accessibilityLabel?: string; accessibilityValue?: unknown };
+  return button.props as {
+    accessibilityLabel?: string;
+    accessibilityValue?: unknown;
+    className?: string;
+    hitSlop?: number;
+  };
 }
 function applyFilters(projectFilter: string[], platformFilter: string[]) {
   act(() => {
@@ -1249,6 +1259,38 @@ describe('AgentSessionListScreen live filtering', () => {
     await renderScreen();
 
     expect(headerAction('agents-open-filters').props.activeCount).toBe(0);
+  });
+
+  it('gives the filter control a 28pt box whose slop reaches the 44pt target', async () => {
+    state.live.activeSessions = [
+      { ...row, id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
+    ];
+    await renderScreen();
+
+    // The box has to measure 28pt on its own: the layout bounds are what a
+    // control is read as, and `hitSlop` never widens them. Hence the arbitrary
+    // px class, not the rem-scaled h-7 (rem is 14px here, so h-7 is 24.5pt).
+    expect(filterButtonProps().className).toContain(COMPACT_CONTROL_BOX_CLASS);
+    expect(filterButtonProps().className).not.toMatch(/\bh-7\b|\bw-7\b/);
+    expect(COMPACT_CONTROL_BOX_SIZE).toBeGreaterThanOrEqual(28);
+    expect(filterButtonProps().hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP);
+    expect(COMPACT_CONTROL_BOX_SIZE + 2 * COMPACT_CONTROL_HIT_SLOP).toBeGreaterThanOrEqual(44);
+  });
+
+  it('keeps the count badge anchored inside the enlarged filter box', async () => {
+    state.live.activeSessions = [
+      { ...row, id: 'a1', organizationId: null, gitUrl: 'https://github.com/kilo/cloud.git' },
+    ];
+    await renderScreen();
+    applyFilters([], ['slack']);
+
+    const badge = nodes('Text').find(node => node.props.testID === 'session-filter-badge');
+    if (!badge) {
+      throw new Error('Missing session filter badge');
+    }
+    expect(badge.parent?.props.className).toContain('absolute');
+    expect(badge.parent?.parent?.parent?.props.className).toContain(COMPACT_CONTROL_BOX_CLASS);
+    expect(filterButtonProps().accessibilityLabel).toBe('Filter sessions, 1');
   });
 
   it('updates filters through the modal without pills or changing the all-live count', async () => {

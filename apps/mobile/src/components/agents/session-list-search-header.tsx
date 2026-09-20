@@ -6,6 +6,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
+import {
+  COMPACT_CONTROL_BOX_CLASS,
+  COMPACT_CONTROL_HIT_SLOP,
+} from '@/components/agents/session-list-tap-target';
 
 type SessionListSearchHeaderProps = {
   inputRef: RefObject<TextInput | null>;
@@ -63,8 +68,11 @@ export function SessionListSearchHeader({
           ref={inputRef}
           accessibilityLabel={t('agents.search.searchSessions')}
           // Height comes from `min-h`, never `py`: iOS insets the already-centered
-          // text rect by the padding and draws the placeholder low.
-          className="min-h-[26px] flex-1 text-[15px] leading-[normal] text-foreground"
+          // text rect by the padding and draws the placeholder low. 28px matches
+          // the clear control's box, so the field keeps one height whether or
+          // not that box is mounted — the list below never steps on the X
+          // appearing.
+          className="min-h-[28px] flex-1 text-[15px] leading-[normal] text-foreground"
           placeholder={t('agents.search.searchSessionsPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           onChangeText={onChangeText}
@@ -78,8 +86,14 @@ export function SessionListSearchHeader({
             onPress={onClearSearch}
             accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
-            hitSlop={12}
-            className="active:opacity-70"
+            // 28pt box plus slop: the layout bounds clear the 28dp bar on their
+            // own, and the slop reaches the 44pt touch target across (the search
+            // field's own height caps it vertically).
+            hitSlop={COMPACT_CONTROL_HIT_SLOP}
+            className={cn(
+              COMPACT_CONTROL_BOX_CLASS,
+              'items-center justify-center active:opacity-70'
+            )}
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>

@@ -274,7 +274,16 @@
     "previewAlways": "Toujours",
     "previewWhenUnlocked": "Si déverrouillé",
     "previewFullDescription": "Les notifications affichent le texte du message sur l'écran verrouillé.",
-    "previewGenericDescription": "Les notifications signalent un nouvel événement sans en afficher le contenu. Ouvrez Kilo pour le consulter."
+    "previewGenericDescription": "Les notifications signalent un nouvel événement sans en afficher le contenu. Ouvrez Kilo pour le consulter.",
+    "action": {
+      "openSession": "Ouvrir la session"
+    },
+    "needsInputAction": {
+      "approved": "Demande approuvée",
+      "replied": "Réponse envoyée",
+      "failed": "Impossible de répondre. Touchez à nouveau pour réessayer.",
+      "unavailable": "Cette demande n’est plus en attente."
+    }
   },
   "tabs": {
     "home": "Accueil",
@@ -1549,20 +1558,7 @@
       "continueFrom": "La session {{title}} reprend.",
       "importingSession": "Importation de la session…",
       "cliCannotContinue": "Cette CLI ne permet pas de reprendre une session. Choisissez Cloud Agent ou une autre CLI.",
-      "importFailed": "Impossible d'importer cette session.",
-      "sandbox": "Bac à sable",
-      "sandboxAccessibility": "Bac à sable : {{label}}",
-      "sandboxDefaultWithDestination": "Par défaut · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Petit",
-      "sandboxInstanceShared": "Partagé",
-      "sandboxInstanceLarge": "Grand",
-      "sandboxInstanceDevcontainer": "Conteneur de développement",
-      "sandboxInstanceProviderDefault": "Par défaut du fournisseur",
-      "sandboxCouldNotLoad": "Impossible de charger les options de bac à sable",
-      "sandboxUnavailable": "Ce bac à sable est indisponible. Choisissez un autre bac à sable ou Par défaut.",
-      "sandboxUseDefault": "Utiliser Par défaut"
+      "importFailed": "Impossible d'importer cette session."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fichier mis à jour.",

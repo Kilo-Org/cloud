@@ -800,6 +800,15 @@
       "kiloclawActivitySubtitle": "instansie gereed/misluk, geskeduleerde aksies",
       "balanceAlertsSubtitle": "waarskuwings oor die organisasie se lae saldo",
       "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe"
+    },
+    "action": {
+      "openSession": "Maak sessie oop"
+    },
+    "needsInputAction": {
+      "approved": "Versoek goedgekeur",
+      "replied": "Antwoord gestuur",
+      "failed": "Kon nie antwoord nie. Tik weer om weer te probeer.",
+      "unavailable": "Hierdie versoek wag nie meer nie."
     }
   },
   "tabs": {
@@ -2131,20 +2140,7 @@
       "continueFrom": "Die sessie {{title}} word voortgesit.",
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortsit nie. Kies Cloud Agent of 'n ander CLI.",
-      "importFailed": "Hierdie sessie kon nie ingevoer word nie.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Standaard · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Klein",
-      "sandboxInstanceShared": "Gedeel",
-      "sandboxInstanceLarge": "Groot",
-      "sandboxInstanceDevcontainer": "Dev container",
-      "sandboxInstanceProviderDefault": "Verskaffer-standaard",
-      "sandboxCouldNotLoad": "Kon nie sandbox-opsies laai nie",
-      "sandboxUnavailable": "Hierdie sandbox is nie beskikbaar nie. Kies 'n ander sandbox of Standaard.",
-      "sandboxUseDefault": "Gebruik Standaard"
+      "importFailed": "Hierdie sessie kon nie ingevoer word nie."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer is bygewerk.",

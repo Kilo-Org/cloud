@@ -818,6 +818,15 @@
       "kiloclawActivitySubtitle": "pripravená inštancia, zlyhanie inštancie, naplánované akcie",
       "balanceAlertsSubtitle": "upozornenia na nízky zostatok organizácie",
       "securityFindingsSubtitle": "nové zistenia a pripomienky SLA"
+    },
+    "action": {
+      "openSession": "Otvoriť reláciu"
+    },
+    "needsInputAction": {
+      "approved": "Žiadosť schválená",
+      "replied": "Odpoveď odoslaná",
+      "failed": "Odpovedať sa nepodarilo. Ťuknutím to skúste znova.",
+      "unavailable": "Táto žiadosť už nečaká."
     }
   },
   "tabs": {
@@ -2167,20 +2176,7 @@
       "continueFrom": "Pokračuje sa v relácii {{title}}.",
       "importingSession": "Importuje sa relácia",
       "cliCannotContinue": "Táto verzia CLI nepodporuje pokračovanie v relácii. Vyber službu Cloud Agent alebo inú inštanciu CLI.",
-      "importFailed": "Túto reláciu sa nepodarilo importovať.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Predvolené · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Malý",
-      "sandboxInstanceShared": "Zdieľaný",
-      "sandboxInstanceLarge": "Veľký",
-      "sandboxInstanceDevcontainer": "Dev kontajner",
-      "sandboxInstanceProviderDefault": "Predvolené od poskytovateľa",
-      "sandboxCouldNotLoad": "Možnosti sandboxu sa nepodarilo načítať",
-      "sandboxUnavailable": "Tento sandbox nie je dostupný. Vyberte iný sandbox alebo Predvolené.",
-      "sandboxUseDefault": "Použiť Predvolené"
+      "importFailed": "Túto reláciu sa nepodarilo importovať."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizoval sa {{displayCount}} súbor.",

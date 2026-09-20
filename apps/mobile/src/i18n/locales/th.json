@@ -800,6 +800,15 @@
       "kiloclawActivitySubtitle": "อินสแตนซ์พร้อมใช้งานหรือทำงานล้มเหลว และการดำเนินการตามกำหนดเวลา",
       "balanceAlertsSubtitle": "คำเตือนเมื่อยอดคงเหลือขององค์กรต่ำ",
       "securityFindingsSubtitle": "ปัญหาที่ตรวจพบใหม่และการเตือนตาม SLA"
+    },
+    "action": {
+      "openSession": "เปิดเซสชัน"
+    },
+    "needsInputAction": {
+      "approved": "อนุมัติคำขอแล้ว",
+      "replied": "ส่งคำตอบกลับแล้ว",
+      "failed": "ตอบกลับไม่สำเร็จ แตะอีกครั้งเพื่อลองใหม่",
+      "unavailable": "คำขอนี้ไม่ได้รออยู่อีกต่อไป"
     }
   },
   "tabs": {
@@ -2131,20 +2140,7 @@
       "continueFrom": "กำลังทำงานต่อจาก {{title}}",
       "importingSession": "กำลังนำเข้าเซสชัน",
       "cliCannotContinue": "CLI นี้ไม่สามารถทำงานต่อจากเซสชันเดิมได้ เลือก Cloud Agent หรือ CLI อื่น",
-      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้",
-      "sandbox": "แซนด์บ็อกซ์",
-      "sandboxAccessibility": "แซนด์บ็อกซ์: {{label}}",
-      "sandboxDefaultWithDestination": "ค่าเริ่มต้น · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "เล็ก",
-      "sandboxInstanceShared": "แชร์",
-      "sandboxInstanceLarge": "ใหญ่",
-      "sandboxInstanceDevcontainer": "คอนเทนเนอร์สำหรับพัฒนา",
-      "sandboxInstanceProviderDefault": "ค่าเริ่มต้นของผู้ให้บริการ",
-      "sandboxCouldNotLoad": "โหลดตัวเลือกแซนด์บ็อกซ์ไม่สำเร็จ",
-      "sandboxUnavailable": "แซนด์บ็อกซ์นี้ใช้งานไม่ได้ โปรดเลือกแซนด์บ็อกซ์อื่นหรือค่าเริ่มต้น",
-      "sandboxUseDefault": "ใช้ค่าเริ่มต้น"
+      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้"
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดตไฟล์แล้ว {{displayCount}} ไฟล์",

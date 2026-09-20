@@ -800,6 +800,15 @@
       "kiloclawActivitySubtitle": "dika mandeha vonona na tsy nahomby, hetsika voalahatra",
       "balanceAlertsSubtitle": "fampitandremana rehefa kely ny ambim-bolan'ny fikambanana",
       "securityFindingsSubtitle": "olana vaovao hita sy fampahatsiahivana SLA"
+    },
+    "action": {
+      "openSession": "Sokafy ny fotoam-piasana"
+    },
+    "needsInputAction": {
+      "approved": "Nankinina ny fangatahana",
+      "replied": "Nalefa ny valiny",
+      "failed": "Tsy nahavaly. Tsindrio indray mba hanandrama.",
+      "unavailable": "Tsy miandry intsony ity fangatahana ity."
     }
   },
   "tabs": {
@@ -2131,20 +2140,7 @@
       "continueFrom": "Mitohy ny {{title}}.",
       "importingSession": "Manafatra fotoam-piasana",
       "cliCannotContinue": "Tsy afaka manohy fotoam-piasana ity CLI ity. Safidio ny Cloud Agent na CLI hafa.",
-      "importFailed": "Tsy nahomby ny fanafarana ity fotoam-piasana ity.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Default · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Kely",
-      "sandboxInstanceShared": "Zaraina",
-      "sandboxInstanceLarge": "Lehibe",
-      "sandboxInstanceDevcontainer": "Kaontener Dev",
-      "sandboxInstanceProviderDefault": "Default amin'ny mpamatsy",
-      "sandboxCouldNotLoad": "Tsy voataona ireo safidy sandbox",
-      "sandboxUnavailable": "Tsy misy ity sandbox ity. Fidio sandbox hafa na Default.",
-      "sandboxUseDefault": "Ampiasao ny Default"
+      "importFailed": "Tsy nahomby ny fanafarana ity fotoam-piasana ity."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nohavaozina ny rakitra {{displayCount}}.",

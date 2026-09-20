@@ -800,6 +800,15 @@
       "kiloclawActivitySubtitle": "ម៉ាស៊ីនរួចរាល់/បរាជ័យ សកម្មភាពតាមកាលវិភាគ",
       "balanceAlertsSubtitle": "ការព្រមានពេលសមតុល្យរបស់អង្គការទាប",
       "securityFindingsSubtitle": "ការរកឃើញថ្មី និងការរំលឹក SLA"
+    },
+    "action": {
+      "openSession": "បើកវគ្គ"
+    },
+    "needsInputAction": {
+      "approved": "សំណើត្រូវបានអនុម័ត",
+      "replied": "បានផ្ញើចម្លើយ",
+      "failed": "មិនអាចឆ្លើយបានទេ។ ចុចម្តងទៀតដើម្បីព្យាយាមម្តងទៀត។",
+      "unavailable": "សំណើនេះលែងរង់ចាំទៀតហើយ។"
     }
   },
   "tabs": {
@@ -2131,20 +2140,7 @@
       "continueFrom": "កំពុងបន្តវគ្គ {{title}}។",
       "importingSession": "កំពុងនាំចូលវគ្គ",
       "cliCannotContinue": "CLI នេះមិនអាចបន្តវគ្គបានទេ។ ជ្រើសរើស Cloud Agent ឬ CLI ផ្សេងទៀត។",
-      "importFailed": "មិនអាចនាំចូលវគ្គនេះបានទេ។",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "លំនាំដើម · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "តូច",
-      "sandboxInstanceShared": "រួម",
-      "sandboxInstanceLarge": "ធំ",
-      "sandboxInstanceDevcontainer": "Dev container",
-      "sandboxInstanceProviderDefault": "លំនាំដើមរបស់អ្នកផ្ដល់សេវា",
-      "sandboxCouldNotLoad": "មិនអាចផ្ទុកជម្រើស Sandbox បានទេ",
-      "sandboxUnavailable": "Sandbox នេះមិនអាចប្រើបានទេ។ សូមជ្រើសរើស Sandbox ផ្សេងទៀត ឬលំនាំដើម។",
-      "sandboxUseDefault": "ប្រើលំនាំដើម"
+      "importFailed": "មិនអាចនាំចូលវគ្គនេះបានទេ។"
     },
     "partRenderer": {
       "updatedFileCount_one": "បានធ្វើបច្ចុប្បន្នភាពឯកសារចំនួន {{displayCount}}។",

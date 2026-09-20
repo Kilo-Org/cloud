@@ -274,7 +274,16 @@
     "previewAlways": "Sempre",
     "previewWhenUnlocked": "A dispositivo sbloccato",
     "previewFullDescription": "Le notifiche mostrano il testo del messaggio nella schermata di blocco.",
-    "previewGenericDescription": "Le notifiche segnalano nuovi eventi senza mostrarne il contenuto. Apri Kilo per leggerlo."
+    "previewGenericDescription": "Le notifiche segnalano nuovi eventi senza mostrarne il contenuto. Apri Kilo per leggerlo.",
+    "action": {
+      "openSession": "Apri la sessione"
+    },
+    "needsInputAction": {
+      "approved": "Richiesta approvata",
+      "replied": "Risposta inviata",
+      "failed": "Impossibile rispondere. Tocca di nuovo per riprovare.",
+      "unavailable": "Questa richiesta non è più in attesa."
+    }
   },
   "tabs": {
     "home": "Inizio",
@@ -1614,20 +1623,7 @@
       "continueFrom": "Stai continuando la sessione {{title}}.",
       "importingSession": "Importazione in corso…",
       "cliCannotContinue": "Questa CLI non può continuare una sessione. Scegli Cloud Agent o un'altra CLI.",
-      "importFailed": "Impossibile importare questa sessione.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Predefinita · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Piccola",
-      "sandboxInstanceShared": "Condivisa",
-      "sandboxInstanceLarge": "Grande",
-      "sandboxInstanceDevcontainer": "Container di sviluppo",
-      "sandboxInstanceProviderDefault": "Predefinita del provider",
-      "sandboxCouldNotLoad": "Impossibile caricare le opzioni della sandbox",
-      "sandboxUnavailable": "Questa sandbox non è disponibile. Scegli un'altra sandbox o Predefinita.",
-      "sandboxUseDefault": "Usa Predefinita"
+      "importFailed": "Impossibile importare questa sessione."
     },
     "partRenderer": {
       "updatedFileCount_one": "È stato aggiornato {{displayCount}} file.",

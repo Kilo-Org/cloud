@@ -809,6 +809,15 @@
       "kiloclawActivitySubtitle": "instanță pregătită sau eșuată, acțiuni programate",
       "balanceAlertsSubtitle": "avertismente de sold scăzut al organizației",
       "securityFindingsSubtitle": "constatări noi și mementouri SLA"
+    },
+    "action": {
+      "openSession": "Deschide sesiunea"
+    },
+    "needsInputAction": {
+      "approved": "Cerere aprobată",
+      "replied": "Răspuns trimis",
+      "failed": "Nu s-a putut răspunde. Atingeți din nou pentru a reîncerca.",
+      "unavailable": "Această cerere nu mai așteaptă."
     }
   },
   "tabs": {
@@ -2149,20 +2158,7 @@
       "continueFrom": "Se continuă sesiunea {{title}}.",
       "importingSession": "Se importă sesiunea",
       "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",
-      "importFailed": "Nu s-a putut importa această sesiune.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Implicit · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Mic",
-      "sandboxInstanceShared": "Partajat",
-      "sandboxInstanceLarge": "Mare",
-      "sandboxInstanceDevcontainer": "Container de dezvoltare",
-      "sandboxInstanceProviderDefault": "Implicit al furnizorului",
-      "sandboxCouldNotLoad": "Nu s-au putut încărca opțiunile pentru sandbox",
-      "sandboxUnavailable": "Acest sandbox nu este disponibil. Alege un alt sandbox sau Implicit.",
-      "sandboxUseDefault": "Folosește Implicit"
+      "importFailed": "Nu s-a putut importa această sesiune."
     },
     "partRenderer": {
       "updatedFileCount_one": "S-a actualizat {{displayCount}} fișier.",

@@ -800,6 +800,15 @@
       "kiloclawActivitySubtitle": "инстанца подготвена/неуспешна, закажани дејства",
       "balanceAlertsSubtitle": "предупредувања за ниска состојба на организацијата",
       "securityFindingsSubtitle": "нови наоди и потсетници за SLA"
+    },
+    "action": {
+      "openSession": "Отвори сесија"
+    },
+    "needsInputAction": {
+      "approved": "Барањето е одобрено",
+      "replied": "Одговорот е испратен",
+      "failed": "Не можеше да се одговори. Допрете повторно за да пробате.",
+      "unavailable": "Ова барање веќе не чека."
     }
   },
   "tabs": {
@@ -2131,20 +2140,7 @@
       "continueFrom": "Се продолжува сесијата {{title}}.",
       "importingSession": "Увезување на сесијата",
       "cliCannotContinue": "Овој CLI не може да продолжи сесија. Избери Cloud Agent или друг CLI.",
-      "importFailed": "Не успеа увезувањето на оваа сесија.",
-      "sandbox": "Песочник",
-      "sandboxAccessibility": "Песочник: {{label}}",
-      "sandboxDefaultWithDestination": "Стандардно · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Мало",
-      "sandboxInstanceShared": "Споделено",
-      "sandboxInstanceLarge": "Големо",
-      "sandboxInstanceDevcontainer": "Дев контејнер",
-      "sandboxInstanceProviderDefault": "Стандардно од добавувачот",
-      "sandboxCouldNotLoad": "Опциите за песочникот не можеа да се вчитаат",
-      "sandboxUnavailable": "Овој песочник е недостапен. Изберете друг песочник или Стандардно.",
-      "sandboxUseDefault": "Користи Стандардно"
+      "importFailed": "Не успеа увезувањето на оваа сесија."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ажурирана е {{displayCount}} датотека.",

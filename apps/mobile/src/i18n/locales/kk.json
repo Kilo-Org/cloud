@@ -800,6 +800,15 @@
       "kiloclawActivitySubtitle": "дана дайын / істен шықты, жоспарланған әрекеттер",
       "balanceAlertsSubtitle": "ұйым балансының азайғаны туралы ескертулер",
       "securityFindingsSubtitle": "жаңа осалдықтар және SLA туралы еске салулар"
+    },
+    "action": {
+      "openSession": "Сессияны ашу"
+    },
+    "needsInputAction": {
+      "approved": "Сұрау мақұлданды",
+      "replied": "Жауап жіберілді",
+      "failed": "Жауап беру мүмкін болмады. Қайталап көру үшін қайта түртіңіз.",
+      "unavailable": "Бұл сұрау енді күтпейді."
     }
   },
   "tabs": {
@@ -2131,20 +2140,7 @@
       "continueFrom": "«{{title}}» сессиясы жалғасуда.",
       "importingSession": "Сессия импортталуда",
       "cliCannotContinue": "Бұл CLI сессияны жалғастыра алмайды. Cloud Agent қызметін немесе басқа CLI құралын таңдаңыз.",
-      "importFailed": "Бұл сессияны импорттау мүмкін болмады.",
-      "sandbox": "Сандбокс",
-      "sandboxAccessibility": "Сандбокс: {{label}}",
-      "sandboxDefaultWithDestination": "Әдепкі · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Кішкене",
-      "sandboxInstanceShared": "Ортақ",
-      "sandboxInstanceLarge": "Үлкен",
-      "sandboxInstanceDevcontainer": "Dev контейнері",
-      "sandboxInstanceProviderDefault": "Жеткізушінің әдепкісі",
-      "sandboxCouldNotLoad": "Сандбокс параметрлерін жүктей алмады",
-      "sandboxUnavailable": "Бұл сандбокс қолжетімсіз. Басқа сандбоксты немесе Әдепкіні таңдаңыз.",
-      "sandboxUseDefault": "Әдепкіні пайдалану"
+      "importFailed": "Бұл сессияны импорттау мүмкін болмады."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды.",

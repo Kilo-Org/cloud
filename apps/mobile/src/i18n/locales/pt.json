@@ -809,6 +809,15 @@
       "kiloclawActivitySubtitle": "instância pronta ou com erro, ações agendadas",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organização",
       "securityFindingsSubtitle": "novas ocorrências e lembretes de SLA"
+    },
+    "action": {
+      "openSession": "Abrir sessão"
+    },
+    "needsInputAction": {
+      "approved": "Pedido aprovado",
+      "replied": "Resposta enviada",
+      "failed": "Não foi possível responder. Toque novamente para tentar de novo.",
+      "unavailable": "Este pedido já não está à espera."
     }
   },
   "tabs": {
@@ -2149,20 +2158,7 @@
       "continueFrom": "A sessão {{title}} está a ser retomada.",
       "importingSession": "A importar a sessão",
       "cliCannotContinue": "Esta CLI não permite continuar uma sessão. Escolha o Cloud Agent ou outra CLI.",
-      "importFailed": "Não foi possível importar esta sessão.",
-      "sandbox": "Ambiente isolado",
-      "sandboxAccessibility": "Ambiente isolado: {{label}}",
-      "sandboxDefaultWithDestination": "Padrão · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Pequeno",
-      "sandboxInstanceShared": "Partilhado",
-      "sandboxInstanceLarge": "Grande",
-      "sandboxInstanceDevcontainer": "Contentor de desenvolvimento",
-      "sandboxInstanceProviderDefault": "Padrão do fornecedor",
-      "sandboxCouldNotLoad": "Não foi possível carregar as opções de ambiente isolado",
-      "sandboxUnavailable": "Este ambiente isolado não está disponível. Escolha outro ambiente isolado ou Padrão.",
-      "sandboxUseDefault": "Usar Padrão"
+      "importFailed": "Não foi possível importar esta sessão."
     },
     "partRenderer": {
       "updatedFileCount_one": "Foi atualizado {{displayCount}} ficheiro.",

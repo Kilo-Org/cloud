@@ -800,6 +800,15 @@
       "kiloclawActivitySubtitle": "ಇನ್‌ಸ್ಟನ್ಸ್ ಸಿದ್ಧವಾಗಿದೆ/ವಿಫಲವಾಗಿದೆ, ನಿಗದಿತ ಕಾರ್ಯಗಳು",
       "balanceAlertsSubtitle": "ಸಂಸ್ಥೆಯ ಉಳಿಕೆ ಕಡಿಮೆಯಾದಾಗ ಎಚ್ಚರಿಕೆಗಳು",
       "securityFindingsSubtitle": "ಹೊಸದಾಗಿ ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಗಳು ಮತ್ತು SLA ಜ್ಞಾಪನೆಗಳು"
+    },
+    "action": {
+      "openSession": "ಸೆಷನ್ ತೆರೆಯಿರಿ"
+    },
+    "needsInputAction": {
+      "approved": "ವಿನಂತಿಯನ್ನು ಅನುಮೋದಿಸಲಾಗಿದೆ",
+      "replied": "ಉತ್ತರ ಕಳುಹಿಸಲಾಗಿದೆ",
+      "failed": "ಉತ್ತರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮರುಪ್ರಯತ್ನಿಸಲು ಮತ್ತೆ ಟ್ಯಾಪ್ ಮಾಡಿ.",
+      "unavailable": "ಈ ವಿನಂತಿಯು ಈಗ ಕಾಯುತ್ತಿಲ್ಲ."
     }
   },
   "tabs": {
@@ -2131,20 +2140,7 @@
       "continueFrom": "{{title}} ಅನ್ನು ಮುಂದುವರಿಸಲಾಗುತ್ತಿದೆ.",
       "importingSession": "ಸೆಶನ್ ಆಮದು ಆಗುತ್ತಿದೆ",
       "cliCannotContinue": "ಈ CLI ಮೂಲಕ ಸೆಶನ್ ಅನ್ನು ಮುಂದುವರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. Cloud Agent ಅಥವಾ ಇನ್ನೊಂದು CLI ಅನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
-      "importFailed": "ಈ ಸೆಶನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "sandbox": "ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್",
-      "sandboxAccessibility": "ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್: {{label}}",
-      "sandboxDefaultWithDestination": "ಡೀಫಾಲ್ಟ್ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "ಸಣ್ಣ",
-      "sandboxInstanceShared": "ಹಂಚಿದ",
-      "sandboxInstanceLarge": "ದೊಡ್ಡದು",
-      "sandboxInstanceDevcontainer": "ಡೆವ್ ಕಂಟೇನರ್",
-      "sandboxInstanceProviderDefault": "ಪೂರೈಕೆದಾರರ ಡೀಫಾಲ್ಟ್",
-      "sandboxCouldNotLoad": "ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್ ಆಯ್ಕೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
-      "sandboxUnavailable": "ಈ ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್ ಲಭ್ಯವಿಲ್ಲ. ಬೇರೊಂದು ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್ ಅಥವಾ ಡೀಫಾಲ್ಟ್ ಆಯ್ಕೆ ಮಾಡಿ.",
-      "sandboxUseDefault": "ಡೀಫಾಲ್ಟ್ ಬಳಸಿ"
+      "importFailed": "ಈ ಸೆಶನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ಫೈಲ್ ಅನ್ನು ನವೀಕರಿಸಲಾಗಿದೆ.",

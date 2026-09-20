@@ -800,6 +800,15 @@
       "kiloclawActivitySubtitle": "ઇન્સ્ટન્સ તૈયાર/નિષ્ફળ, નિર્ધારિત ક્રિયાઓ",
       "balanceAlertsSubtitle": "સંસ્થાનું બેલેન્સ ઓછું થવાની ચેતવણીઓ",
       "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર"
+    },
+    "action": {
+      "openSession": "સેશન ખોલો"
+    },
+    "needsInputAction": {
+      "approved": "વિનંતી મંજૂર થઈ",
+      "replied": "જવાબ મોકલાયો",
+      "failed": "જવાબ આપી શકાયો નથી. ફરી પ્રયાસ કરવા ફરી ટેપ કરો.",
+      "unavailable": "આ વિનંતી હવે રાહ જોતી નથી."
     }
   },
   "tabs": {
@@ -2131,20 +2140,7 @@
       "continueFrom": "{{title}} સત્ર આગળ ચાલુ થઈ રહ્યું છે.",
       "importingSession": "સત્ર આયાત થઈ રહ્યું છે",
       "cliCannotContinue": "આ CLI સત્ર ચાલુ રાખી શકતું નથી. Cloud Agent અથવા બીજું CLI પસંદ કરો.",
-      "importFailed": "આ સત્ર આયાત કરી શકાયું નહીં.",
-      "sandbox": "સેન્ડબોક્સ",
-      "sandboxAccessibility": "સેન્ડબોક્સ: {{label}}",
-      "sandboxDefaultWithDestination": "ડિફોલ્ટ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "નાનું",
-      "sandboxInstanceShared": "શેર કરેલું",
-      "sandboxInstanceLarge": "મોટું",
-      "sandboxInstanceDevcontainer": "ડેવ કન્ટેનર",
-      "sandboxInstanceProviderDefault": "પ્રદાતાનું ડિફોલ્ટ",
-      "sandboxCouldNotLoad": "સેન્ડબોક્સના વિકલ્પો લોડ કરી શકાયા નથી",
-      "sandboxUnavailable": "આ સેન્ડબોક્સ અનુપલબ્ધ છે. બીજું સેન્ડબોક્સ અથવા ડિફોલ્ટ પસંદ કરો.",
-      "sandboxUseDefault": "ડિફોલ્ટ વાપરો"
+      "importFailed": "આ સત્ર આયાત કરી શકાયું નહીં."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ થઈ.",

@@ -836,6 +836,15 @@
       "kiloclawActivitySubtitle": "enghraifft yn barod neu wedi methu, gweithredoedd wedi'u hamserlennu",
       "balanceAlertsSubtitle": "rhybuddion am falans isel y sefydliad",
       "securityFindingsSubtitle": "canfyddiadau newydd a nodiadau atgoffa SLA"
+    },
+    "action": {
+      "openSession": "Agor y sesiwn"
+    },
+    "needsInputAction": {
+      "approved": "Cais wedi’i gymeradwyo",
+      "replied": "Anfonwyd yr ymateb",
+      "failed": "Methwyd ag ateb. Tapwch eto i roi cynnig arall.",
+      "unavailable": "Nid yw’r cais hwn yn aros mwyach."
     }
   },
   "tabs": {
@@ -2203,20 +2212,7 @@
       "continueFrom": "Yn parhau â {{title}}.",
       "importingSession": "Yn mewnforio sesiwn",
       "cliCannotContinue": "Ni all y CLI hwn barhau â sesiwn. Dewiswch Cloud Agent neu CLI arall.",
-      "importFailed": "Methu mewnforio'r sesiwn hon.",
-      "sandbox": "Bocs tywod",
-      "sandboxAccessibility": "Bocs tywod: {{label}}",
-      "sandboxDefaultWithDestination": "Rhagosodedig · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Bach",
-      "sandboxInstanceShared": "Rhannu",
-      "sandboxInstanceLarge": "Mawr",
-      "sandboxInstanceDevcontainer": "Cynhwysydd datblygu",
-      "sandboxInstanceProviderDefault": "Rhagosodedig y darparwr",
-      "sandboxCouldNotLoad": "Methwyd â llwytho opsiynau'r bocs tywod",
-      "sandboxUnavailable": "Nid yw'r bocs tywod hwn ar gael. Dewiswch focs tywod arall neu Rhagosodedig.",
-      "sandboxUseDefault": "Defnyddio Rhagosodedig"
+      "importFailed": "Methu mewnforio'r sesiwn hon."
     },
     "partRenderer": {
       "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil.",

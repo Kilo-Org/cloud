@@ -310,6 +310,15 @@
       "kiloclawActivitySubtitle": "实例就绪/失败、计划操作",
       "balanceAlertsSubtitle": "组织余额不足警告",
       "securityFindingsSubtitle": "新发现的安全问题和 SLA 提醒"
+    },
+    "action": {
+      "openSession": "打开会话"
+    },
+    "needsInputAction": {
+      "approved": "请求已批准",
+      "replied": "回复已发送",
+      "failed": "无法回答。再次点按即可重试。",
+      "unavailable": "该请求已不再等待。"
     }
   },
   "tabs": {
@@ -1641,20 +1650,7 @@
       "continueFrom": "正在继续会话“{{title}}”。",
       "importingSession": "正在导入会话",
       "cliCannotContinue": "此 CLI 无法继续会话。请选择 Cloud Agent 或其他 CLI。",
-      "importFailed": "无法导入此会话。",
-      "sandbox": "沙盒",
-      "sandboxAccessibility": "沙盒：{{label}}",
-      "sandboxDefaultWithDestination": "默认 · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "小型",
-      "sandboxInstanceShared": "共享",
-      "sandboxInstanceLarge": "大型",
-      "sandboxInstanceDevcontainer": "开发容器",
-      "sandboxInstanceProviderDefault": "提供商默认",
-      "sandboxCouldNotLoad": "无法加载沙盒选项",
-      "sandboxUnavailable": "此沙盒不可用。请选择其他沙盒或默认。",
-      "sandboxUseDefault": "使用默认"
+      "importFailed": "无法导入此会话。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 个文件。",

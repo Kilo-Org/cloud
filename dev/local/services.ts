@@ -253,6 +253,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres'],
     dir: 'services/model-eval-ingest',
   },
+  'latency-ingest': {
+    group: 'observability',
+    dependsOn: [],
+    dir: 'services/latency-ingest',
+  },
   'cloudflare-ai-attribution': {
     group: 'observability',
     dependsOn: [],
@@ -260,7 +265,12 @@ const serviceMeta: Record<string, ServiceMeta> = {
   },
   grafana: { group: 'observability', dependsOn: [] },
   // mobile
-  mobile: { group: 'mobile', dependsOn: [], dir: 'apps/mobile' },
+  // The app POSTs its client-observed latency batches to the latency-ingest
+  // worker in every dev session (`LATENCY_INGEST_URL` in the mobile env points
+  // at its wrangler port), so a stack started for mobile work runs it;
+  // otherwise the app POSTs to a dead listener and the ingest path cannot be
+  // observed locally.
+  mobile: { group: 'mobile', dependsOn: ['latency-ingest'], dir: 'apps/mobile' },
   // storybook
   storybook: { group: 'storybook', dependsOn: [] },
   // deletion-mock

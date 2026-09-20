@@ -13,6 +13,7 @@ import { i18n } from '@/i18n';
 import { SpendAlertsScreen } from '@/components/organization/spend-alerts-screen';
 import { thresholdError } from '@/components/organization/spend-alert-validators';
 import { formatList } from '@/lib/format';
+import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const getQueryFn = vi.hoisted(() => vi.fn());
@@ -367,6 +368,17 @@ describe('SpendAlertsScreen happy state', () => {
   });
 });
 
+describe('SpendAlertsScreen foreground refresh', () => {
+  it('refreshes the spend-alerts query with the tRPC-nested key prefix', async () => {
+    await mountLoaded();
+
+    // The stored key is `[['spendAlerts','get'], …]`; the flat `['spendAlerts']`
+    // form compares a string against the first element's array and never
+    // matches, so the refresh would be a silent no-op.
+    expect(vi.mocked(useRouteForegroundRefresh)).toHaveBeenCalledWith([[['spendAlerts']]]);
+  });
+});
+
 describe('SpendAlertsScreen retryable states', () => {
   it('renders the load error with a retry and fills the form in place after it clears', async () => {
     getQueryFn.mockRejectedValue(new Error('offline'));
@@ -406,6 +418,26 @@ describe('SpendAlertsScreen retryable states', () => {
     await waitFor(() => saveMutationFn.mock.calls.length === 2);
     const retried = saveMutationFn.mock.calls[1]?.[0] as { rules: { threshold: number }[] };
     expect(retried.rules[0]?.threshold).toBe(30);
+  });
+
+  it('disables Retry when an edit leaves the draft unsubmittable', async () => {
+    const { renderer } = await mountLoaded();
+    saveMutationFn.mockRejectedValue(new Error('boom'));
+
+    type(renderer, LIMIT, '30');
+    press(buttonByVariant(renderer));
+
+    await waitFor(() => byType(renderer, 'AccessibleStatus')[0]?.props.message != null);
+    expect(buttonByVariant(renderer, 'outline').props.disabled).toBe(false);
+
+    // The edit revalidates but keeps the failure showing. Retry posts whatever
+    // is on screen, so it must not stay tappable for a draft `onSave` would
+    // refuse to send: an enabled-looking control that does nothing.
+    type(renderer, LIMIT, '0');
+    expect(buttonByVariant(renderer, 'outline').props.disabled).toBe(true);
+
+    type(renderer, LIMIT, '40');
+    expect(buttonByVariant(renderer, 'outline').props.disabled).toBe(false);
   });
 });
 

@@ -29,6 +29,7 @@ import {
   SPEND_ALERT_WINDOW_HOURS,
   WINDOW_LABELS,
   derivePanelView,
+  draftAfterSave,
   panelControlsVisible,
   pushChannelNote,
   pushControlDisabled,
@@ -108,9 +109,8 @@ export function SpendAlertsPanel({ organizationId, callerRole }: SpendAlertsPane
 
   const saveMutation = useMutation(
     trpc.spendAlerts.save.mutationOptions({
-      onSuccess: saved => {
+      onSuccess: () => {
         toast.success(SPEND_ALERTS_SAVED);
-        setDraft(toDraft(saved));
         // The save also writes the viewer's push category column, so re-read it
         // to keep the channel-agreement note honest.
         void query.refetch();
@@ -208,8 +208,18 @@ export function SpendAlertsPanel({ organizationId, callerRole }: SpendAlertsPane
 
   const save = () => {
     if (!validation.ok || validation.input === null) return;
+    // Capture the draft this response belongs to. The response is adopted per
+    // call rather than from the mutation's shared `onSuccess`, so a draft the
+    // user edits (or saves again) while the request is open is never replaced
+    // by the values it superseded. `updateDraft`'s `reset()` detaches the
+    // observer and a second `mutate` moves it to the newer call, so the older
+    // response is dropped instead of overwriting the newer draft.
+    const submitted = currentDraft;
     saveMutation.mutate(
-      organizationId ? { organizationId, ...validation.input } : validation.input
+      organizationId ? { organizationId, ...validation.input } : validation.input,
+      {
+        onSuccess: saved => setDraft(current => draftAfterSave(current, submitted, saved)),
+      }
     );
   };
 

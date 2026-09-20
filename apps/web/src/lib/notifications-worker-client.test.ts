@@ -15,8 +15,14 @@ import {
 
 const fetchMock = jest.fn();
 
-function okResponse() {
-  return { ok: true, status: 200, statusText: 'OK', text: async () => '' };
+function okResponse(perRecipient: { userId: string; outcome: string }[] = []) {
+  return {
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    text: async () => '',
+    json: async () => ({ perRecipient }),
+  };
 }
 
 const spendAlertInput: Omit<InternalDispatchSpendAlertRequest, 'kind'> = {
@@ -116,5 +122,41 @@ describe('notifications-worker-client internal dispatch', () => {
         extra: expect.objectContaining({ status: 500, kind: 'spend_alert' }),
       })
     );
+  });
+
+  it('treats a per-recipient failure inside a 200 body as a refused dispatch', async () => {
+    fetchMock.mockResolvedValue(
+      okResponse([
+        { userId: 'user-1', outcome: 'delivered' },
+        { userId: 'user-2', outcome: 'failed' },
+      ])
+    );
+
+    // The worker answers 200 with a per-recipient breakdown even when a push
+    // failed inside it; the spend-alert outbox retries on this boolean.
+    await expect(dispatchSpendAlertPush(spendAlertInput)).resolves.toBe(false);
+
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({ kind: 'spend_alert', failedRecipients: 1 }),
+      })
+    );
+  });
+
+  it('accepts a dispatch whose recipients were delivered, suppressed, or had no device', async () => {
+    fetchMock.mockResolvedValue(
+      okResponse([
+        { userId: 'user-1', outcome: 'delivered' },
+        { userId: 'user-2', outcome: 'suppressed_preference' },
+        { userId: 'user-3', outcome: 'no_tokens' },
+        { userId: 'user-4', outcome: 'duplicate' },
+      ])
+    );
+
+    // A recipient with no deliverable push is not a transport failure: retrying
+    // it would never deliver, so the dispatch counts as accepted.
+    await expect(dispatchSpendAlertPush(spendAlertInput)).resolves.toBe(true);
+    expect(captureException).not.toHaveBeenCalled();
   });
 });

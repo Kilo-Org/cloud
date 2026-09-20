@@ -203,6 +203,28 @@ function isWindowHours(value: number | null | undefined): value is SpendAlertWin
   return SPEND_ALERT_WINDOW_HOURS.some(hours => hours === value);
 }
 
+/**
+ * The draft the panel shows after a save resolves.
+ *
+ * A save echoes the draft it was given, and the panel adopts that response so
+ * every field reads the value the server stored. A draft edit can land while
+ * the request is open — `mutation.reset()` clears a save error without
+ * cancelling the in-flight mutation, and the fields are not gated on
+ * `isPending` — and a response that arrives after such an edit describes
+ * superseded values, so it must not replace the draft the user is now editing.
+ *
+ * `submitted` is the draft this save posted; the response is adopted only while
+ * the current draft is still that same object. Every edit produces a new draft
+ * object, so a newer edit never compares equal and is never discarded.
+ */
+export function draftAfterSave(
+  current: SpendAlertsDraft | null,
+  submitted: SpendAlertsDraft,
+  saved: SpendAlertsQueryData
+): SpendAlertsDraft | null {
+  return current === null || current === submitted ? toDraft(saved) : current;
+}
+
 function formatUsdInput(value: number): string {
   return `${value}`;
 }

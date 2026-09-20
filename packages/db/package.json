@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/db/src"
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/db/src",
+    "test": "jest"
   },
   "exports": {
     ".": "./src/index.ts",

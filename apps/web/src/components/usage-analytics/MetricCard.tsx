@@ -69,12 +69,11 @@ export function MetricCard({
             grows by this line when its data arrives, and reserving it here is
             what keeps the card — and the summary row and everything below it —
             from moving at that moment. `min-h-4` matches the `text-xs`
-            line-height the loaded row occupies. */}
-        {(subtext || loading) && (
-          <div className={cn('text-muted-foreground mt-1 text-xs', !subtext && 'min-h-4')}>
-            {subtext}
-          </div>
-        )}
+            line-height the loaded row occupies. The row is always rendered,
+            not only while loading or when there is a subtext: a card that ends
+            up with no subtext would otherwise drop this line the moment its
+            data lands and move everything below it. */}
+        <div className="text-muted-foreground mt-1 min-h-4 text-xs">{subtext}</div>
       </CardContent>
     </Card>
   );

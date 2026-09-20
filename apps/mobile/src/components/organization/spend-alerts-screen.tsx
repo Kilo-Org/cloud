@@ -118,7 +118,10 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
   // of: the boundary owns that case, so the settings query never fires until
   // membership is confirmed.
   const scopeResolved = !isOrgScope || (!boundary.isResolving && boundary.org != null);
-  useRouteForegroundRefresh([['spendAlerts']]);
+  // The tRPC-nested prefix form: the stored key is `[['spendAlerts','get'], …]`,
+  // whose first element is the procedure path array. The flat `['spendAlerts']`
+  // form compares the string against that array and never matches.
+  useRouteForegroundRefresh([[['spendAlerts']]]);
   const query = useSpendAlertSettings(organizationId, scopeResolved);
 
   if (!scopeResolved) {
@@ -385,6 +388,10 @@ function SpendAlertsForm({
           variant="outline"
           accessibilityLabel={t('common.retry')}
           loading={save.isPending}
+          // An edit after the failure can leave the draft unsubmittable while
+          // the error is still showing; Retry retries whatever is on screen, so
+          // it carries the same gate as Save rather than no-op'ing silently.
+          disabled={!canSave}
           onPress={onSave}
         >
           <Text>{t('common.retry')}</Text>

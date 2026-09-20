@@ -1,11 +1,12 @@
 import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
-import type {
-  InternalDispatchLowBalanceRequest,
-  InternalDispatchSecurityFindingRequest,
-  InternalDispatchSecurityLifecycleRequest,
-  InternalDispatchSpendAlertRequest,
+import {
+  sendPushForConversationOutputSchema,
+  type InternalDispatchLowBalanceRequest,
+  type InternalDispatchSecurityFindingRequest,
+  type InternalDispatchSecurityLifecycleRequest,
+  type InternalDispatchSpendAlertRequest,
 } from '@kilocode/notifications';
 import { INTERNAL_API_SECRET, NOTIFICATIONS_WORKER_URL } from '@/lib/config.server';
 
@@ -20,7 +21,9 @@ type DispatchBody =
  * Never rejects — missing config, network errors, and non-OK responses are
  * logged/captured and swallowed so email paths are never blocked by push — and
  * returns whether the worker accepted the dispatch, which the spend-alert
- * outbox uses to decide whether to retry.
+ * outbox uses to decide whether to retry. A 2xx whose body reports a failed
+ * recipient is a refused dispatch, not an accepted one: the worker answers 200
+ * with a per-recipient breakdown even when a send failed.
  */
 async function dispatchInternal(body: DispatchBody): Promise<boolean> {
   if (!NOTIFICATIONS_WORKER_URL) {
@@ -57,6 +60,29 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
       captureException(error, {
         tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
         extra: { status: response.status, kind: body.kind },
+      });
+      return false;
+    }
+
+    // A 2xx is not by itself an accepted dispatch. The worker answers 200 with
+    // a per-recipient breakdown, and a recipient whose preference read threw,
+    // whose DO call rejected, or whose push the DO could not deliver is reported
+    // as `failed` inside that body rather than as an HTTP status. The spend-alert
+    // outbox retries on this boolean, so any failed recipient means the dispatch
+    // was refused. A body that does not parse keeps the previous reading of an
+    // accepted dispatch.
+    const payload: unknown = await response.json().catch(() => null);
+    const parsed = sendPushForConversationOutputSchema.safeParse(payload);
+    const failedCount = parsed.success
+      ? parsed.data.perRecipient.filter(recipient => recipient.outcome === 'failed').length
+      : 0;
+    if (failedCount > 0) {
+      const error = new Error(
+        `Notifications worker dispatch failed for ${failedCount} recipient${failedCount === 1 ? '' : 's'}`
+      );
+      captureException(error, {
+        tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
+        extra: { kind: body.kind, failedRecipients: failedCount },
       });
       return false;
     }

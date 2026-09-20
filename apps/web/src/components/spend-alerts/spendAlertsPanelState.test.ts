@@ -12,6 +12,7 @@ import {
   SPEND_ALERTS_SAVE_ERROR,
   THRESHOLD_FIELD_ERROR,
   derivePanelView,
+  draftAfterSave,
   effectivePushFor,
   hasSettingsRow,
   panelControlsVisible,
@@ -667,5 +668,29 @@ describe('panel slot reservation', () => {
     // has to be at least as tall as that form.
     expect(reserveAt(bands, 370)).toBeGreaterThanOrEqual(804);
     expect(reserveAt(bands, 786)).toBeGreaterThanOrEqual(804);
+  });
+});
+
+describe('draft adoption after a save', () => {
+  const storedOff = queryData({ enabled: false });
+
+  it('adopts the stored values when the draft is still the one that was posted', () => {
+    const submitted = draft();
+
+    expect(draftAfterSave(submitted, submitted, storedOff)).toEqual(toDraft(storedOff));
+    expect(draftAfterSave(submitted, submitted, storedOff)?.enabled).toBe(false);
+  });
+
+  it('keeps a draft edited while the save was in flight', () => {
+    const submitted = draft();
+    const edited = draft({
+      rules: [draftRule({ kind: 'threshold', thresholdUsd: '99' }), draftRule({ kind: 'anomaly' })],
+    });
+
+    expect(draftAfterSave(edited, submitted, storedOff)).toBe(edited);
+  });
+
+  it('adopts the response when no draft had been seeded yet', () => {
+    expect(draftAfterSave(null, draft(), storedOff)).toEqual(toDraft(storedOff));
   });
 });

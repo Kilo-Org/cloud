@@ -10,8 +10,8 @@ import {
   NOTIFICATION_CATEGORY_KEYS,
   type NotificationPreferences,
   readAgentPushPreference,
-  rollbackAgentPushOptimistic,
   readAgentPushPreferenceIfLoaded,
+  rollbackAgentPushOptimistic,
 } from './agent-push-preference';
 
 const key = ['user', 'getNotificationPreferences'] as const;

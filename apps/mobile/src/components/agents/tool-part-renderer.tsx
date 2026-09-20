@@ -118,5 +118,5 @@ export function ToolPartRenderer({
     }
   }
 
-  return <ToolSummaryTranslationScope>{card}</ToolSummaryTranslationScope>;
+  return <ToolSummaryTranslationScope itemId={part.id}>{card}</ToolSummaryTranslationScope>;
 }

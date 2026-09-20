@@ -14,7 +14,7 @@ const splitLinkMock = vi.hoisted(() =>
 // trpc.ts (`vi.resetModules()` re-reads the config mock factory).
 const latencyIngestUrlMock = vi.hoisted(() => ({ value: undefined as string | undefined }));
 
-const cryptoMock = vi.hoisted(() => ({ randomUUID: vi.fn(() => 'test-request-id') }));
+const randomUUIDMock = vi.hoisted(() => vi.fn(() => 'test-request-id'));
 
 const secureStoreMock = vi.hoisted(() => {
   const store = new Map<string, string>();
@@ -73,8 +73,6 @@ vi.mock('expo-secure-store', () => ({
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
 }));
 
-vi.mock('expo-crypto', () => cryptoMock);
-
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.example.com',
   E2E_LATENCY_MESSAGES_MS: 0,
@@ -112,7 +110,7 @@ afterEach(() => {
   httpBatchLinkMock.mockClear();
   createTRPCClientMock.mockClear();
   splitLinkMock.mockClear();
-  cryptoMock.randomUUID.mockClear();
+  randomUUIDMock.mockClear();
 });
 
 describe('tRPC client link options', () => {
@@ -456,6 +454,9 @@ describe('latency wiring', () => {
     secureStoreMock.store.clear();
     mockFetch.mockReset();
     vi.stubGlobal('fetch', mockFetch);
+    // The platform `crypto` API the request-id generator reads; the stub makes
+    // the id deterministic. The same shape exists on iOS and Android Hermes.
+    vi.stubGlobal('crypto', { randomUUID: randomUUIDMock });
   });
 
   afterEach(() => {
@@ -525,6 +526,26 @@ describe('latency wiring', () => {
     const sent = new Headers(init?.headers);
     expect(sent.get('x-kilo-request-id')).toBe('test-request-id');
     expect(sent.get('authorization')).toBe('Bearer token');
+  });
+
+  // The id comes from the platform `crypto` API every build carries; a
+  // runtime that omits `randomUUID` still stamps a unique id, so neither
+  // platform loses a sample (or needs a native module just for the id).
+  it('stamps a unique request id when the platform crypto API has no randomUUID', async () => {
+    vi.stubGlobal('crypto', {});
+    const { httpFetch } = await loadLatencyLinks();
+    mockFetch.mockResolvedValue(new Response('ok', { status: 200 }));
+
+    await httpFetch('https://api.example.com/api/trpc/user.getMe', {});
+    await httpFetch('https://api.example.com/api/trpc/user.getMe', {});
+
+    const firstInit = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    const secondInit = mockFetch.mock.calls[1]?.[1] as RequestInit | undefined;
+    const first = new Headers(firstInit?.headers).get('x-kilo-request-id');
+    const second = new Headers(secondInit?.headers).get('x-kilo-request-id');
+    expect(first).toBeTruthy();
+    expect(second).toBeTruthy();
+    expect(first).not.toBe(second);
   });
 
   // tRPC's single `httpLink` leaves the body off a POST for a no-input call,

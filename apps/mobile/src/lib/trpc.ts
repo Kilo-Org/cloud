@@ -2,7 +2,6 @@ import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { createTRPCClient, httpBatchLink, httpLink, splitLink } from '@trpc/client';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
-import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 
 import { API_BASE_URL, E2E_LATENCY_MESSAGES_MS, E2E_LATENCY_SESSION_MS } from '@/lib/config';
@@ -139,12 +138,25 @@ const withJsonBody: typeof fetch = async (input, init) => {
 
 // Every tRPC HTTP call (single or batched) gets a per-call `x-kilo-request-id`
 // header and records one latency sample, so the server timing line and the
-// client sample join by the same id. The id comes from `expo-crypto`'s
-// `randomUUID`: UUID generation exists identically on iOS and Android, so
-// neither platform lacks the capability and no per-platform branch is kept.
+// client sample join by the same id. The id comes from the platform `crypto`
+// API, which both iOS and Android expose (`randomUUID` on Hermes), so one
+// implementation serves both and no native-module import or per-platform
+// branch is kept. A runtime without that API still gets an id from the
+// timestamp fallback rather than dropping the sample.
+function newRequestId(): string {
+  // oxlint-disable-next-line anti-slop/no-reflect-get -- a typed access would make TS treat the runtime fallback as dead code
+  const platformCrypto = Reflect.get(globalThis, 'crypto') as
+    | { randomUUID?: () => string }
+    | undefined;
+  if (platformCrypto?.randomUUID !== undefined) {
+    return platformCrypto.randomUUID();
+  }
+  return `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 const measuredFetch = createLatencyFetch(withJsonBody, latencyBuffer, {
   now: () => Date.now(),
-  newId: () => Crypto.randomUUID(),
+  newId: newRequestId,
 });
 
 async function getAuthHeaders() {

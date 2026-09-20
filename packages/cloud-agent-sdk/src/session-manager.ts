@@ -30,6 +30,7 @@ import {
 } from './session';
 import type { CloudAgentSession } from './session';
 import { createChatProcessor } from './chat-processor';
+import { partSettledAt } from './part-utils';
 import { createJotaiStorage } from './storage/jotai';
 import type { JotaiSessionStorage, JotaiStore } from './storage/jotai';
 import type { SessionStorage } from './storage/types';
@@ -1186,7 +1187,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     for (const message of messages) {
       chatProcessor.process({ type: 'message.updated', info: message.info });
       for (const part of message.parts) {
-        chatProcessor.process({ type: 'message.part.updated', part });
+        const settledAt = partSettledAt(part);
+        chatProcessor.process({
+          type: 'message.part.updated',
+          part,
+          ...(settledAt === undefined ? {} : { time: settledAt }),
+        });
       }
     }
   }
@@ -1615,7 +1621,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     for (const message of outcome.messages) {
       chatProcessor.process({ type: 'message.updated', info: message.info });
       for (const part of message.parts) {
-        chatProcessor.process({ type: 'message.part.updated', part });
+        const settledAt = partSettledAt(part);
+        chatProcessor.process({
+          type: 'message.part.updated',
+          part,
+          ...(settledAt === undefined ? {} : { time: settledAt }),
+        });
       }
     }
 

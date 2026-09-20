@@ -109,6 +109,13 @@ export const TOUR_COMPLETED_KEY_PREFIX = 'tour-completed-';
  * expiresAt }` entries; ids and timestamps only, no secrets.
  */
 export const SESSION_ATTENTION_KEY = 'session-attention';
+/**
+ * Durable "Open last session" record behind the launcher shortcut and the
+ * quick-settings tile. Holds `{ sessionId, userId, storedAt }`; the account id
+ * scopes it so one account is never offered another account's session. Not a
+ * secret, but it is mirrored through SecureStore like every other record.
+ */
+export const LAST_OPENED_SESSION_KEY = 'last-opened-session';
 
 /**
  * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,

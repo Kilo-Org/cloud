@@ -65,7 +65,10 @@ function stripEnvQuotes(value: string): string {
   if (value.startsWith("'") && value.endsWith("'")) {
     return value.slice(1, -1);
   }
-  return value;
+  // An unquoted value follows dotenv semantics, which nextjs applies when it
+  // reads the same .env.local: a trailing ` # comment` is not part of the
+  // value (the e2e stub tags its env line with one).
+  return value.replace(/\s+#.*$/, '').trim();
 }
 
 function parseEnvFile(content: string): Map<string, string> {

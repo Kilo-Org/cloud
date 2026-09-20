@@ -10,20 +10,34 @@ import '@/i18n';
 
 type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
 
-const ssoRecovery = vi.hoisted(() => {
-  const value: { email: string; ssoOrganizationId: string | undefined } | null = {
-    email: 'user@example.com',
-    ssoOrganizationId: 'org_1',
-  };
-  return { value };
-});
+type SsoRecoveryFixture = { email: string; ssoOrganizationId: string | undefined } | null;
+
+const ssoRecovery: { value: SsoRecoveryFixture } = vi.hoisted(() => ({
+  value: { email: 'user@example.com', ssoOrganizationId: 'org_1' },
+}));
+
+// The native passkey module is absent in the test runtime, so the capability is
+// the one input the screen reads from the client module.
+const passkeySupport = vi.hoisted(() => ({ supported: true }));
+
+// What the screen reads from the hook: a fixed result object plus the one piece
+// of state the busy treatment depends on.
+const nativeAuth = vi.hoisted(() => ({
+  busy: undefined as 'passkey' | undefined,
+  signInWithPasskey: vi.fn(),
+}));
+
+vi.mock('@/lib/auth/passkey-client', () => ({
+  passkeysSupported: () => passkeySupport.supported,
+}));
 
 vi.mock('@/lib/auth/use-native-auth', () => ({
   useNativeAuth: () => ({
-    busy: undefined,
+    busy: nativeAuth.busy,
     googleConfigured: false,
     signInWithApple: vi.fn(),
     signInWithGoogle: vi.fn(),
+    signInWithPasskey: nativeAuth.signInWithPasskey,
     requestEmailCode: vi.fn(),
     verifyEmailCode: vi.fn(),
     ssoRecovery: ssoRecovery.value,
@@ -121,6 +135,8 @@ function findText(root: I, text: string): I {
 describe('IdleAuth SSO recovery', () => {
   beforeEach(() => {
     ssoRecovery.value = { email: 'user@example.com', ssoOrganizationId: 'org_1' };
+    nativeAuth.busy = undefined;
+    passkeySupport.supported = true;
   });
 
   it('shows the recovery copy and forwards the SSO start', async () => {
@@ -143,6 +159,84 @@ describe('IdleAuth SSO recovery', () => {
   });
 });
 
+describe('IdleAuth passkey control', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    passkeySupport.supported = true;
+    nativeAuth.busy = undefined;
+    nativeAuth.signInWithPasskey.mockClear();
+  });
+
+  it('offers the passkey button above the email field', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const btn = findButton(renderer.root, 'Sign in with a passkey');
+    expect(btn.props.variant).toBe('outline');
+    expect(btn.props.size).toBe('lg');
+
+    const order = renderer.root
+      .findAll(n => typeof n.type === 'string' && ['Button', 'FormField'].includes(n.type))
+      .map(n => n.props.accessibilityLabel ?? n.props.label);
+
+    expect(order).toEqual([
+      'Sign in with a passkey',
+      'Email address',
+      'Continue with email',
+      'More sign-in options',
+    ]);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('starts the passkey ceremony on press', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const btn = findButton(renderer.root, 'Sign in with a passkey');
+    act(() => {
+      (btn.props.onPress as () => void)();
+    });
+
+    expect(nativeAuth.signInWithPasskey).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('shows the busy treatment while the ceremony runs', async () => {
+    nativeAuth.busy = 'passkey';
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const btn = findButton(renderer.root, 'Sign in with a passkey');
+    expect(btn.props.disabled).toBe(true);
+    expect(
+      btn.findAll(n => typeof n.type === 'string' && (n.type as string) === 'ActivityIndicator')
+    ).toHaveLength(1);
+    expect(btn.parent?.props.pointerEvents).toBe('none');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('renders no passkey control without the native module', async () => {
+    passkeySupport.supported = false;
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    expect(() => findButton(renderer.root, 'Sign in with a passkey')).toThrow(
+      'button "Sign in with a passkey" not found'
+    );
+    expect(texts(renderer.root)).not.toContain('Sign in with a passkey');
+    // The other ways in are untouched.
+    expect(findButton(renderer.root, 'Continue with email')).toBeTruthy();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
 describe('IdleAuth email continue copy', () => {
   it('shows a Continue button with email accessibility', async () => {
     const start = vi.fn<StartFn>();

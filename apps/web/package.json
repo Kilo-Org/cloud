@@ -99,6 +99,8 @@
     "@radix-ui/react-tooltip": "1.2.8",
     "@sentry/nextjs": "10.69.0",
     "@sentry/opentelemetry": "10.69.0",
+    "@simplewebauthn/browser": "14.0.0",
+    "@simplewebauthn/server": "14.0.1",
     "@slack/oauth": "3.0.5",
     "@slack/types": "2.21.1",
     "@slack/web-api": "7.19.0",

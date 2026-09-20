@@ -163,6 +163,7 @@
     "useDifferentEmail": "Lo ímeèlì mìíràn",
     "signInWithApple": "Wọlé pẹ̀lú Apple",
     "signInWithGoogle": "Wọlé pẹ̀lú Google",
+    "signInWithPasskey": "Wọlé pẹ̀lú passkey",
     "emailAddress": "Àdírẹ́sì ímeèlì",
     "emailPlaceholder": "oruko@example.com",
     "continueWithEmail": "Tẹ̀síwájú pẹ̀lú ímeèlì",
@@ -175,6 +176,10 @@
     "termsConnector": " àti ",
     "termsSuffix": ".",
     "moreSignInOptions": "Àwọn àṣàyàn ìwọlé sí i",
+    "passkeyCancelled": "A fagilé wíwọlé pẹ̀lú passkey. Gbìyànjú lẹ́ẹ̀kan sí i.",
+    "passkeyNotFound": "Kò sí passkey tí a fi pamọ́ fún ẹ̀rọ yìí. Wọlé pẹ̀lú Apple, Google tàbí ímeèlì rẹ dípò.",
+    "passkeyUnsupported": "Passkey kò sí lórí ẹ̀rọ yìí. Wọlé pẹ̀lú Apple, Google tàbí ímeèlì rẹ dípò.",
+    "passkeyFailed": "Kò ṣe é ṣe láti wọlé pẹ̀lú passkey. Gbìyànjú lẹ́ẹ̀kan sí i.",
     "couldNotCompleteSignIn": "A kò lè parí ìwọlé. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
     "sessionEnded": "Ìgbà ìwọlé rẹ ti parí. Jọ̀wọ́ wọlé lẹ́ẹ̀kan sí i.",
     "signInCodeExpired": "Kóòdù ìwọlé rẹ ti kọjá àkókò lílo. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Àkọọ́lẹ̀ àdánwò",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO ilé iṣẹ́"
+    "providerEnterpriseSso": "SSO ilé iṣẹ́",
+    "passkeysTitle": "Àwọn passkey",
+    "passkeysSubtitle": "Wọlé láìsí ọ̀rọ̀ ìpamọ́",
+    "passkeysEmpty": "Kò sí passkey síbẹ̀",
+    "passkeysEmptyHint": "$t(profile.addPasskey) láti wọlé láìsí ọ̀rọ̀ ìpamọ́.",
+    "passkeysCouldNotLoad": "A kò lè kó àwọn passkey wọlé",
+    "passkeysLoadFailed": "Àwọn passkey kò sí títí di ìgbà tí èyí bá kó wọlé.",
+    "addPasskey": "Fi passkey kún",
+    "passkeyDefaultName": "Passkey",
+    "passkeyAddedOn": "A fi kún {{date}}",
+    "passkeyAdded": "A ti fi passkey kún.",
+    "passkeyAddFailed": "A kò lè fi passkey kún. Gbìyànjú lẹ́ẹ̀kan sí i.",
+    "passkeyAddUnsupported": "Ẹ̀rọ yìí kò lè dá àwọn passkey.",
+    "passkeyAddCancelled": "A fagilé dídá passkey.",
+    "passkeyRemoved": "A ti yọ passkey kúrò.",
+    "passkeyRemoveFailed": "A kò lè yọ passkey yẹn kúrò. Gbìyànjú lẹ́ẹ̀kan sí i.",
+    "passkeyRenamed": "A ti pààrọ̀ orúkọ passkey.",
+    "passkeyName": "Orúkọ passkey",
+    "renamePasskey": "Pààrọ̀ orúkọ passkey",
+    "removePasskey": "Yọ passkey kúrò",
+    "removePasskeyTitle": "Yọ passkey kúrò?",
+    "removePasskeyMessage": "Ìwọ kò ní lè wọlé pẹ̀lú passkey yìí mọ́."
   },
   "preferences": {
     "general": "Gbogbogbo",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "A ti gbé fáìlì {{displayCount}} nínú {{total}} wọlé",
       "filesStillLoading": "A ṣì ń ṣàkójọ àwọn fáìlì. Fà sí ìsàlẹ̀ láti sọ di tuntun.",
       "goToOverview": "Lọ sí àkópọ̀",
-      "goToOverviewTab": "Lọ sí táàbù àkópọ̀"
+      "goToOverviewTab": "Lọ sí táàbù àkópọ̀",
+      "expandAllLines_one": "Fi gbogbo ìlà {{displayCount}} hàn",
+      "expandAllLines_other": "Fi gbogbo ìlà {{displayCount}} hàn",
+      "expandLines_one": "Fi ìlà {{displayCount}} hàn ({{start}}–{{end}})",
+      "expandLines_other": "Fi ìlà {{displayCount}} hàn ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Fi ìlà àyíká {{displayCount}} hàn",
+      "expandLinesOfContext_other": "Fi ìlà àyíká {{displayCount}} hàn",
+      "expandMoreLines_one": "Fi ìlà {{displayCount}} sí i hàn ({{start}}–{{end}})",
+      "expandMoreLines_other": "Fi ìlà {{displayCount}} sí i hàn ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "a ti ṣàkójọ fáìlì {{loaded}} nínú {{total}}",
+      "loadedOfTotalFiles_other": "a ti ṣàkójọ fáìlì {{loaded}} nínú {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ kò sí ìlà tuntun ní òpin fáìlì",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Tí kò bá ẹ̀dà tuntun mu lórí {{path}}"
       },
       "deletedUser": "olùlò tí a pa rẹ́",
-      "replyForbiddenTerm": "O kò ní àṣẹ láti dáhùn sí {{term}} yìí."
+      "replyForbiddenTerm": "O kò ní àṣẹ láti dáhùn sí {{term}} yìí.",
+      "moreLinesAbove_one": "… ìlà {{displayCount}} sí i wà lókè",
+      "moreLinesAbove_other": "… ìlà {{displayCount}} sí i wà lókè"
     },
     "couldNotOpenGitHubAppSettings": "A kò lè ṣí àwọn ètò ohun èlò GitHub.",
     "installKiloGitHubApp": "Fi ìṣàfilọ́lẹ̀ Kilo fún GitHub sórí rẹ̀",
@@ -706,7 +744,9 @@
       "statusContext": "Àyíká ìlà",
       "lineLabel": "ìlà {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(ṣofo)"
+      "emptyLine": "(ṣofo)",
+      "truncationBanner_one": "À ń fi fáìlì {{limit}} àkọ́kọ́ hàn nínú fáìlì {{total}} tí a yí padà — ààlà API GitHub.",
+      "truncationBanner_other": "À ń fi fáìlì {{limit}} àkọ́kọ́ hàn nínú fáìlì {{total}} tí a yí padà — ààlà API GitHub."
     },
     "linkPasteClipboardEmpty": "Àtẹ àdàkọ ṣófo.",
     "linkPasteNotAPullRequest": "Kì í ṣe ọ̀nà àsopọ̀ ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Àwọn ìfitónilétí máa ń fi ọ̀rọ̀ ìfiránṣẹ́ hàn lórí iboju títìpa rẹ.",
     "previewGenericDescription": "Àwọn ìfitónilétí máa ń fi hàn pé ohun kan ṣẹlẹ̀. Ṣí Kilo láti kà á.",
     "channel": {
-      "agent": "Àwọn ìgbà iṣẹ́ aṣojú",
+      "agentProgress": "Ìlọsíwájú aṣojú",
       "chat": "Àwọn ìfiránṣẹ́ ìfọ̀rọ̀wérọ̀",
       "kiloclaw": "Àwọn ìgbòkègbodò KiloClaw",
       "balance": "Àwọn ìkìlọ̀ nípa owó tó kù",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "ẹ̀rọ iṣẹ́ ti ṣe tán/ó kùnà, àwọn ìṣe tí a ṣètò àkókò wọn",
       "balanceAlertsSubtitle": "àwọn ìkìlọ̀ pé owó àjọ tó kù ti dín kù",
       "securityFindingsSubtitle": "àwọn àwárí tuntun àti ìránnilétí SLA"
+    },
+    "action": {
+      "openSession": "Ṣí ìgbà iṣẹ́"
+    },
+    "needsInputAction": {
+      "approved": "Ìbéèrè náà ti fọwọ́ sí",
+      "replied": "Ìfèsì ti ránṣẹ́",
+      "failed": "Kò lè fèsì. Tẹ lẹ́ẹ̀kansi láti gbìyànjú lẹ́ẹ̀kansi.",
+      "unavailable": "Ìbéèrè yìí kì í retí mọ́."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Gbígbé sókè kùnà.",
       "failedToUploadFile": "A kò lè gbé fáìlì sókè: {{reason}}.",
       "nothingToPaste": "Kò sí ohun tí a lè lẹ̀ mọ́ ọn.",
-      "metadataStripFailed": "A kò lè yọ dátà àpèjúwe fọ́tò kúrò."
+      "metadataStripFailed": "A kò lè yọ dátà àpèjúwe fọ́tò kúrò.",
+      "limit_one": "O lè so fáìlì tó pọ̀ jù {{displayCount}} mọ́ ọn.",
+      "limit_other": "O lè so fáìlì tó pọ̀ jù {{displayCount}} mọ́ ọn."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Mú àwọn àbùkù ṣiṣẹ́pọ̀",
       "syncNow": "Mú ṣiṣẹ́pọ̀ báyìí",
       "syncQueued": "Ìmúṣiṣẹ́pọ̀ wà ní ìlà ìdúró",
-      "syncStatusUnavailable": "A kò lè rí ipò ìmúṣiṣẹ́pọ̀."
+      "syncStatusUnavailable": "A kò lè rí ipò ìmúṣiṣẹ́pọ̀.",
+      "daysOverdue_one": "ọjọ́ {{displayCount}} lẹ́yìn ọjọ́ ìparí",
+      "daysOverdue_other": "ọjọ́ {{displayCount}} lẹ́yìn ọjọ́ ìparí",
+      "findingsCount_one": "àbùkù {{displayCount}}",
+      "findingsCount_other": "àbùkù {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Àwọn àbùkù tó ṣì ṣí",
@@ -2131,20 +2186,7 @@
       "continueFrom": "A ń tẹ̀síwájú pẹ̀lú {{title}}.",
       "importingSession": "Ń gbé ìgbà iṣẹ́ wọlé",
       "cliCannotContinue": "CLI yìí kò lè tẹ̀síwájú pẹ̀lú ìgbà iṣẹ́ kan. Yan Cloud Agent tàbí CLI mìíràn.",
-      "importFailed": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Ìpìlẹ̀ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Kékeré",
-      "sandboxInstanceShared": "Tí a pín",
-      "sandboxInstanceLarge": "Ńlá",
-      "sandboxInstanceDevcontainer": "Àpò Dev",
-      "sandboxInstanceProviderDefault": "Ìpìlẹ̀ olùpèsè",
-      "sandboxCouldNotLoad": "Kò ṣe é gbé àwọn àṣàyàn sandbox wá",
-      "sandboxUnavailable": "Sandbox yìí kò wà. Yan sandbox míràn tàbí Ìpìlẹ̀.",
-      "sandboxUseDefault": "Lo Ìpìlẹ̀"
+      "importFailed": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé."
     },
     "partRenderer": {
       "updatedFileCount_one": "A ti ṣe ìmúdójúìwọ̀n fáìlì {{displayCount}}.",
@@ -2168,7 +2210,13 @@
       "updateTodos": "Ṣe ìmúdójúìwọ̀n àkójọ iṣẹ́",
       "linesBadge": "ìlà {{displayCount}}",
       "filesBadge": "fáìlì {{displayCount}}",
-      "matchesBadge": "ìbámu {{displayCount}}"
+      "matchesBadge": "ìbámu {{displayCount}}",
+      "filesBadge_one": "fáìlì {{displayCount}}",
+      "filesBadge_other": "fáìlì {{displayCount}}",
+      "linesBadge_one": "ìlà {{displayCount}}",
+      "linesBadge_other": "ìlà {{displayCount}}",
+      "matchesBadge_one": "ìbámu {{displayCount}}",
+      "matchesBadge_other": "ìbámu {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "ìlà {{start}}–{{end}} (a gé kúrú)",
@@ -2458,7 +2506,11 @@
       "files": "Fáìlì",
       "couldNotOpenPhotoPicker": "A kò lè ṣí ààyè yíyan àwòrán. Tún Kilo bẹ̀rẹ̀ kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
       "maxFilesAllowed": "Fáìlì {{displayCount}} ni ó pọ̀ jù tí o lè fi kún un.",
-      "onlyAddingFiles": "Ń fi fáìlì {{accepted}} nínú {{total}} kún un nìkan (ó pọ̀ jù: {{max}})"
+      "onlyAddingFiles": "Ń fi fáìlì {{accepted}} nínú {{total}} kún un nìkan (ó pọ̀ jù: {{max}})",
+      "maxFilesAllowed_one": "Fáìlì {{displayCount}} ni ó pọ̀ jù tí o lè fi kún un.",
+      "maxFilesAllowed_other": "Fáìlì {{displayCount}} ni ó pọ̀ jù tí o lè fi kún un.",
+      "onlyAddingFiles_one": "Ń fi fáìlì {{accepted}} nínú {{total}} kún un nìkan (ó pọ̀ jù: {{max}})",
+      "onlyAddingFiles_other": "Ń fi fáìlì {{accepted}} nínú {{total}} kún un nìkan (ó pọ̀ jù: {{max}})"
     },
     "composer": {
       "addAttachment": "Fi àsòmọ́ kún un",
@@ -2476,7 +2528,9 @@
       "discardAttachmentsMessage": "A ó pa àwọn fáìlì tí a ti gbé sókè tí kò tíì ní ìfiránṣẹ́ tí a so wọ́n mọ́ rẹ́.",
       "discardAttachmentsTitle": "Pa àwọn àsomọ́ rẹ́?",
       "charactersRemaining": "ohun kikọ {{count}} ló kù",
-      "insertNewline": "Fi ìlà tuntun sí i"
+      "insertNewline": "Fi ìlà tuntun sí i",
+      "charactersRemaining_one": "ohun kikọ {{count}} ló kù",
+      "charactersRemaining_other": "ohun kikọ {{count}} ló kù"
     },
     "chatLink": {
       "linkCopied": "A ti ṣe àdàkọ ọ̀nà àsopọ̀",
@@ -2548,7 +2602,9 @@
       "stepsCount_one": "ìgbésẹ̀ {{steps}}",
       "stepsCount": "ìgbésẹ̀ {{steps}}",
       "stepsCount_other": "ìgbésẹ̀ {{steps}}",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Àwòṣe ({{displayCount}})",
+      "modelsCount_other": "Àwọn àwòṣe ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Ìfọwọ́sí aládàáṣiṣẹ́",
@@ -2588,7 +2644,9 @@
     },
     "toolRun": {
       "sheetTitle": "Àwọn ìpè ohun èlò",
-      "condensedLabel": "{{itemCount}} ohun; {{last}}"
+      "condensedLabel": "{{itemCount}} ohun; {{last}}",
+      "condensedLabel_one": "{{itemCount}} ohun; {{last}}",
+      "condensedLabel_other": "{{itemCount}} ohun; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2781,9 @@
     "cliCantReceiveFilesTitle": "Ìgbà iṣẹ́ yìí kò lè gba fáìlì",
     "cliCantReceiveFilesMessage": "Kilo CLI tí ìgbà iṣẹ́ yìí ń lò kò lè gba fáìlì. Ṣe ìmúdójúìwọ̀n CLI lórí ẹ̀rọ yẹn, tàbí pín sí ìgbà iṣẹ́ tuntun dípò rẹ̀.",
     "contentlessMessage": "Kò sí ohun láti pín — a kò fi ọ̀rọ̀ tàbí fáìlì kankan kún un.",
-    "couldNotReadContent": "A kò lè ka àkóónú tí a pín."
+    "couldNotReadContent": "A kò lè ka àkóónú tí a pín.",
+    "onlyFirstFilesAttached_one": "Fáìlì {{displayCount}} àkọ́kọ́ nìkan ni a ó so mọ́ ọn.",
+    "onlyFirstFilesAttached_other": "Fáìlì {{displayCount}} àkọ́kọ́ nìkan ni a ó so mọ́ ọn."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3134,5 +3194,8 @@
       "repositoryUnknown": "Kilo kò dá {{repository}} mọ̀ gẹ́gẹ́ bí ibi ìpamọ́ kóòdù GitHub tàbí GitLab. Yan ibi ìpamọ́ kóòdù mìíràn nínú Kilo.",
       "repositoryUnsupported": "{{repository}} jẹ́ ibi ìpamọ́ kóòdù Bitbucket — Bẹ̀rẹ̀ aṣojú kò tíì lè lò ó. Yan ibi ìpamọ́ kóòdù mìíràn nínú Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Ṣí ìgbà iṣẹ́ tó kẹ́yìn"
   }
 }

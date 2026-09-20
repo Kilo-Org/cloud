@@ -3108,6 +3108,14 @@
     "tooManySignInAttempts": "Liiga palju sisselogimiskatseid. Oota hetk ja proovi uuesti."
   },
   "models": {
+    "auto": {
+      "frontier": "Automaatne Tipptasemel",
+      "balanced": "Automaatne Tasakaalustatud",
+      "efficient": "Automaatne Tõhus",
+      "small": "Automaatne Väike",
+      "free": "Automaatne Tasuta",
+      "organization": "Organisatsiooni automaatne"
+    },
     "dataCollected": "Andmeid kogutakse",
     "free": "Tasuta",
     "couldNotUpdateFavorites": "Lemmikute uuendamine ebaõnnestus.",

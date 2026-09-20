@@ -3151,6 +3151,14 @@
     "tooManySignInAttempts": "Muitas tentativas de login. Aguarde e tente novamente."
   },
   "models": {
+    "auto": {
+      "frontier": "Automático Avançado",
+      "balanced": "Automático Equilibrado",
+      "efficient": "Automático Eficiente",
+      "small": "Automático Pequeno",
+      "free": "Automático Grátis",
+      "organization": "Automático de organização"
+    },
     "dataCollected": "Dados coletados",
     "free": "Grátis",
     "couldNotUpdateFavorites": "Não foi possível atualizar os favoritos.",

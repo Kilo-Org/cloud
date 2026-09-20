@@ -3151,6 +3151,14 @@
     "tooManySignInAttempts": "Pārāk daudz pierakstīšanās mēģinājumu. Uzgaidi un mēģini vēlreiz."
   },
   "models": {
+    "auto": {
+      "frontier": "Automātiskais Jaudīgākais",
+      "balanced": "Automātiskais Līdzsvarotais",
+      "efficient": "Automātiskais Efektīvais",
+      "small": "Automātiskais Mazais",
+      "free": "Automātiskais Bezmaksas",
+      "organization": "Organizācijas automātiskais"
+    },
     "dataCollected": "Dati tiek vākti",
     "free": "Bezmaksas",
     "couldNotUpdateFavorites": "Neizdevās atjaunināt izlasi.",

@@ -3194,6 +3194,14 @@
     "tooManySignInAttempts": "Per daug bandymų prisijungti. Palauk ir bandyk dar kartą."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatinis Pažangiausias",
+      "balanced": "Automatinis Subalansuotas",
+      "efficient": "Automatinis Efektyvus",
+      "small": "Automatinis Mažas",
+      "free": "Automatinis Nemokamas",
+      "organization": "Organizacijos automatinis"
+    },
     "dataCollected": "Duomenys renkami",
     "free": "Nemokama",
     "couldNotUpdateFavorites": "Nepavyko atnaujinti mėgstamiausių modelių.",

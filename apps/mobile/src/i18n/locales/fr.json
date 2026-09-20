@@ -3151,6 +3151,14 @@
     "tooManySignInAttempts": "Trop de tentatives de connexion. Veuillez patienter et réessayer."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Avancé",
+      "balanced": "Auto Équilibré",
+      "efficient": "Auto Efficace",
+      "small": "Auto Petit",
+      "free": "Auto Gratuit",
+      "organization": "Auto d'organisation"
+    },
     "dataCollected": "Données collectées",
     "free": "Gratuit",
     "couldNotUpdateFavorites": "Impossible de mettre à jour les favoris.",

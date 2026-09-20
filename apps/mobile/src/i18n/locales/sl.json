@@ -3194,6 +3194,14 @@
     "tooManySignInAttempts": "Preveč poskusov prijave. Počakaj in poskusi znova."
   },
   "models": {
+    "auto": {
+      "frontier": "Samodejno Vrhunski",
+      "balanced": "Samodejno Uravnoteženo",
+      "efficient": "Samodejno Učinkovito",
+      "small": "Samodejno Malo",
+      "free": "Samodejno Brezplačno",
+      "organization": "Samodejno organizacije"
+    },
     "dataCollected": "Zbiranje podatkov",
     "free": "Brezplačno",
     "couldNotUpdateFavorites": "Priljubljenih ni bilo mogoče posodobiti.",

@@ -3108,6 +3108,14 @@
     "tooManySignInAttempts": "Ìgbìyànjú ìwọlé ti pọ̀ jù. Jọ̀wọ́ dúró, kí o sì gbìyànjú lẹ́ẹ̀kan sí i."
   },
   "models": {
+    "auto": {
+      "frontier": "Aládàáṣiṣẹ́ Tó ga jù lọ",
+      "balanced": "Aládàáṣiṣẹ́ Dọ́gba",
+      "efficient": "Aládàáṣiṣẹ́ Daradara",
+      "small": "Aládàáṣiṣẹ́ Kékeré",
+      "free": "Aládàáṣiṣẹ́ Ọ̀fẹ́",
+      "organization": "Aládàáṣiṣẹ́ Àjọ"
+    },
     "dataCollected": "A ń gba dátà",
     "free": "Ọ̀fẹ́",
     "couldNotUpdateFavorites": "A kò lè ṣe ìmúdójúìwọ̀n àwọn àyànfẹ́.",

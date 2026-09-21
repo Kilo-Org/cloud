@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.js';
 import {
   diagnosticDetail,
   emitControlDiagnostic,
@@ -141,6 +142,13 @@ function fail(message: string, retryable: boolean): ControlHandlerResult {
 
 function kiloFailure(error: unknown): ControlHandlerResult {
   return fail('Kilo request failed', isKiloServerUnreachableError(error));
+}
+
+function assistantFailureFacts(
+  source: unknown
+): Pick<SessionMessageOutcome, 'assistantReason' | 'providerOwnership'> {
+  const failure = classifyAssistantFailure(source);
+  return { assistantReason: failure.reason, providerOwnership: failure.providerOwnership };
 }
 
 export class SessionOperation {
@@ -800,6 +808,7 @@ export class SessionOperation {
             messageId,
             status: error.name === 'MessageAbortedError' ? 'cancelled' : 'failed',
             reason: `Kilo execution ended with ${error.name}`,
+            ...(error.name === 'MessageAbortedError' ? {} : assistantFailureFacts(error)),
           }
         : { messageId, status: 'completed' };
     } catch (error) {
@@ -846,6 +855,9 @@ export class SessionOperation {
           messageId,
           status: original.error.name === 'MessageAbortedError' ? 'cancelled' : 'failed',
           reason: `Kilo execution ended with ${original.error.name}`,
+          ...(original.error.name === 'MessageAbortedError'
+            ? {}
+            : assistantFailureFacts(original.error)),
         };
       else if (
         this.native.state === 'unknown' &&

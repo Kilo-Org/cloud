@@ -26,6 +26,36 @@ export function assistantFailureMessage(reason: CloudAgentAssistantFailureReason
   return ASSISTANT_FAILURE_MESSAGES[reason];
 }
 
+/**
+ * The single owner of the assistant-reason-to-terminal-code rule shared by the
+ * safe-failure projection and the control-plane run classifier.
+ */
+export function assistantTerminalCode(
+  reason: CloudAgentAssistantFailureReason
+): 'payment_required' | 'model_missing' | undefined {
+  return reason === 'insufficient_credits'
+    ? 'payment_required'
+    : reason === 'model_unavailable'
+      ? 'model_missing'
+      : undefined;
+}
+
+/**
+ * Resolves assistant-failure ownership: a `[BYOK]` marker is preserved, an
+ * admitted run fills `managed` from its admitted model, and otherwise the
+ * supplied ownership is returned unchanged. Mirrors the legacy terminalization
+ * rule exactly.
+ */
+export function resolveAssistantProviderOwnership(
+  providerOwnership: CloudAgentProviderOwnership | undefined,
+  assistantFailureReason: CloudAgentAssistantFailureReason | undefined,
+  admittedModel: string | undefined
+): CloudAgentProviderOwnership | undefined {
+  if (providerOwnership === 'byok' || assistantFailureReason === undefined)
+    return providerOwnership;
+  return admittedModel === undefined ? providerOwnership : 'managed';
+}
+
 export type AssistantFailureClassification = {
   reason: CloudAgentAssistantFailureReason;
   safeMessage: string;
@@ -65,12 +95,7 @@ export function classifyAssistantFailure(
     : (classifySdkErrorName(source) ??
       (messageReason !== 'unknown' ? messageReason : classifySdkStatus(source)) ??
       'unknown');
-  const terminalCode =
-    reason === 'insufficient_credits'
-      ? 'payment_required'
-      : reason === 'model_unavailable'
-        ? 'model_missing'
-        : undefined;
+  const terminalCode = assistantTerminalCode(reason);
 
   return {
     reason,

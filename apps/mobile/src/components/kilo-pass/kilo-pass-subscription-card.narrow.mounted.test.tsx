@@ -7,6 +7,8 @@ import { KiloPassSubscriptionCard } from './kilo-pass-subscription-card';
 
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
 
+const invalidateQueries = vi.hoisted(() => vi.fn());
+
 type CardContent = {
   kind: string;
   state?: { title: string; description: string; action: string; actionLabel: string };
@@ -50,13 +52,16 @@ vi.mock('@/lib/trpc', () => ({
       },
       getCreditHistory: { pathFilter: () => ['kiloPass', 'history'] as const },
     },
-    user: { getContextBalance: { pathFilter: () => ['user', 'getContextBalance'] as const } },
+    user: {
+      getContextBalance: { pathFilter: () => ['user', 'getContextBalance'] as const },
+      getCreditBlocks: { pathFilter: () => ['user', 'getCreditBlocks'] as const },
+    },
   }),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({ data: undefined, isError: false, isPending: true, refetch: vi.fn() }),
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQueryClient: () => ({ invalidateQueries }),
 }));
 
 vi.mock('@/lib/kilo-pass/subscription-card-state', () => ({
@@ -69,6 +74,12 @@ vi.mock('@/lib/kilo-pass/subscription-card-state', () => ({
 
 vi.mock('@/lib/kilo-pass/dev-storekit-refund', () => ({
   getDevStoreKitRefundAppleProductId: () => null,
+}));
+
+vi.mock('./kilo-pass-ios-manage', () => ({
+  openAppStoreManagement: vi.fn(async (params: { invalidateAfter: () => Promise<void> }) => {
+    await params.invalidateAfter();
+  }),
 }));
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -125,6 +136,7 @@ afterEach(() => {
   renderer = undefined;
   windowDims.width = 390;
   cardState.content = CARD_CONTENT;
+  invalidateQueries.mockClear();
 });
 
 describe('KiloPassSubscriptionCard mounted layout', () => {
@@ -163,6 +175,37 @@ describe('KiloPassSubscriptionCard mounted layout', () => {
     expect(
       root.findAll(node => Object.is(node.type, 'Text') && node.props.children === 'Subscribe')
     ).toHaveLength(1);
+  });
+});
+
+describe('KiloPassSubscriptionCard store management', () => {
+  it('invalidates every credit query the store-management path reads', async () => {
+    // The card's invalidateKiloPassState reads four path filters. A mock that
+    // omits one throws `Cannot read properties of undefined (reading
+    // 'pathFilter')` as soon as a test presses an open-store-management card
+    // (review, PR 6481, 2026-09-21).
+    cardState.content = {
+      kind: 'card',
+      state: {
+        title: 'Kilo Pass',
+        description: 'Manage your subscription.',
+        action: 'open-store-management',
+        actionLabel: 'Manage',
+      },
+    };
+    const card = renderCard().findByProps({ accessibilityRole: 'button' });
+    await act(async () => {
+      (card.props.onPress as () => void)();
+      await new Promise(resolve => {
+        setImmediate(resolve);
+      });
+    });
+    expect(invalidateQueries.mock.calls.map(([filter]) => filter)).toEqual([
+      ['kiloPass', 'state'],
+      ['user', 'getContextBalance'],
+      ['user', 'getCreditBlocks'],
+      ['kiloPass', 'history'],
+    ]);
   });
 });
 

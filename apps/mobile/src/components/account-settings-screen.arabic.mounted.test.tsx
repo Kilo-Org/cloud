@@ -26,6 +26,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   Globe: 'Globe',
+  KeyRound: 'KeyRound',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
 }));
@@ -78,7 +79,7 @@ afterAll(async () => {
 });
 
 describe('AccountSettingsScreen in Arabic', () => {
-  it('renders the Arabic header title and all three row titles', async () => {
+  it('renders the Arabic header title and all four row titles', async () => {
     await i18n.changeLanguage('ar');
 
     const renderer = await mountAccount();
@@ -86,6 +87,7 @@ describe('AccountSettingsScreen in Arabic', () => {
     expect(renderer.root.findByType('ScreenHeader').props.title).toBe('الحساب');
     expect(findConfigureRow(renderer, 'اللغة').props).toMatchObject({ subtitle: 'العربية' });
     expect(findConfigureRow(renderer, 'المضيفون الموثوقون')).toBeDefined();
+    expect(findConfigureRow(renderer, 'مفاتيح المرور')).toBeDefined();
     expect(findConfigureRow(renderer, 'جلسات الأجهزة')).toBeDefined();
   });
 

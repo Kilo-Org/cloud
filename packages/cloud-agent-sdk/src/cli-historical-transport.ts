@@ -9,6 +9,7 @@ import type {
   SessionSnapshotPage,
   SessionSnapshotPageOutcome,
 } from './types';
+import { partSettledAt } from './part-utils';
 import type { TransportFactory, TransportSink } from './transport';
 
 type CliHistoricalTransportConfig = {
@@ -46,7 +47,12 @@ function createCliHistoricalTransport(config: CliHistoricalTransportConfig): Tra
         sink.onChatEvent({ type: 'message.updated', info: msg.info });
 
         for (const part of msg.parts) {
-          sink.onChatEvent({ type: 'message.part.updated', part });
+          const settledAt = partSettledAt(part);
+          sink.onChatEvent({
+            type: 'message.part.updated',
+            part,
+            ...(settledAt === undefined ? {} : { time: settledAt }),
+          });
         }
       }
 

@@ -163,6 +163,7 @@
     "useDifferentEmail": "फरक इमेल प्रयोग गर्नुहोस्",
     "signInWithApple": "Apple मार्फत साइन इन गर्नुहोस्",
     "signInWithGoogle": "Google मार्फत साइन इन गर्नुहोस्",
+    "signInWithPasskey": "पासकी मार्फत साइन इन गर्नुहोस्",
     "emailAddress": "इमेल ठेगाना",
     "emailPlaceholder": "tapai@example.com",
     "continueWithEmail": "इमेलमार्फत अघि बढ्नुहोस्",
@@ -175,6 +176,10 @@
     "termsConnector": " र ",
     "termsSuffix": "मा सहमत हुनुहुन्छ।",
     "moreSignInOptions": "थप साइन इन विकल्पहरू",
+    "passkeyCancelled": "पासकीबाट साइन इन रद्द भयो। कृपया फेरि प्रयास गर्नुहोस्।",
+    "passkeyNotFound": "यो यन्त्रका लागि कुनै पासकी सुरक्षित गरिएको छैन। यसको सट्टा Apple, Google वा आफ्नो इमेलबाट साइन इन गर्नुहोस्।",
+    "passkeyUnsupported": "यो यन्त्रमा पासकी उपलब्ध छैनन्। यसको सट्टा Apple, Google वा आफ्नो इमेलबाट साइन इन गर्नुहोस्।",
+    "passkeyFailed": "पासकीबाट साइन इन गर्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।",
     "couldNotCompleteSignIn": "साइन इन पूरा गर्न सकिएन। कृपया फेरि प्रयास गर्नुहोस्।",
     "sessionEnded": "तपाईंको सत्र समाप्त भयो। कृपया फेरि साइन इन गर्नुहोस्।",
     "signInCodeExpired": "तपाईंको साइन इन कोडको म्याद सकियो। कृपया फेरि प्रयास गर्नुहोस्।",
@@ -225,7 +230,28 @@
     "providerTestAccount": "परीक्षण खाता",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "उद्यम SSO"
+    "providerEnterpriseSso": "उद्यम SSO",
+    "passkeysTitle": "पासकीहरू",
+    "passkeysSubtitle": "पासवर्ड बिना साइन इन गर्नुहोस्",
+    "passkeysEmpty": "अझै कुनै पासकी छैन",
+    "passkeysEmptyHint": "$t(profile.addPasskey) गरेर पासवर्ड बिना साइन इन गर्नुहोस्।",
+    "passkeysCouldNotLoad": "पासकीहरू लोड गर्न सकिएन",
+    "passkeysLoadFailed": "यो लोड नभएसम्म पासकीहरू उपलब्ध छैनन्।",
+    "addPasskey": "पासकी थप्नुहोस्",
+    "passkeyDefaultName": "पासकी",
+    "passkeyAddedOn": "{{date}} मा थपियो",
+    "passkeyAdded": "पासकी थपियो।",
+    "passkeyAddFailed": "पासकी थप्न सकिएन। फेरि प्रयास गर्नुहोस्।",
+    "passkeyAddUnsupported": "यो यन्त्रले पासकी बनाउन सक्दैन।",
+    "passkeyAddCancelled": "पासकी बनाउने कार्य रद्द भयो।",
+    "passkeyRemoved": "पासकी हटाइयो।",
+    "passkeyRemoveFailed": "त्यो पासकी हटाउन सकिएन। फेरि प्रयास गर्नुहोस्।",
+    "passkeyRenamed": "पासकीको नाम परिवर्तन भयो।",
+    "passkeyName": "पासकीको नाम",
+    "renamePasskey": "पासकीको नाम परिवर्तन गर्नुहोस्",
+    "removePasskey": "पासकी हटाउनुहोस्",
+    "removePasskeyTitle": "पासकी हटाउने?",
+    "removePasskeyMessage": "अब तपाईं यो पासकीबाट साइन इन गर्न सक्नुहुने छैन।"
   },
   "preferences": {
     "general": "सामान्य",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} मध्ये {{displayCount}} फाइल लोड भए",
       "filesStillLoading": "फाइलहरू अझै लोड हुँदै छन्। रिफ्रेस गर्न तल तान्नुहोस्।",
       "goToOverview": "अवलोकनमा जानुहोस्",
-      "goToOverviewTab": "अवलोकन ट्याबमा जानुहोस्"
+      "goToOverviewTab": "अवलोकन ट्याबमा जानुहोस्",
+      "expandAllLines_one": "सबै {{displayCount}} पङ्क्ति देखाउनुहोस्",
+      "expandAllLines_other": "सबै {{displayCount}} पङ्क्ति देखाउनुहोस्",
+      "expandLines_one": "{{displayCount}} पङ्क्ति देखाउनुहोस् ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} पङ्क्ति देखाउनुहोस् ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "आसपासका {{displayCount}} पङ्क्ति देखाउनुहोस्",
+      "expandLinesOfContext_other": "आसपासका {{displayCount}} पङ्क्ति देखाउनुहोस्",
+      "expandMoreLines_one": "थप {{displayCount}} पङ्क्ति देखाउनुहोस् ({{start}}–{{end}})",
+      "expandMoreLines_other": "थप {{displayCount}} पङ्क्ति देखाउनुहोस् ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}} मध्ये {{loaded}} फाइल लोड भए",
+      "loadedOfTotalFiles_other": "{{total}} मध्ये {{loaded}} फाइल लोड भए"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ फाइलको अन्त्यमा नयाँ पङ्क्ति छैन।",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "{{path}} मा पुरानो भइसकेको"
       },
       "deletedUser": "खाता मेटिएको प्रयोगकर्ता",
-      "replyForbiddenTerm": "तपाईंसँग यो {{term}}मा जवाफ दिने अनुमति छैन।"
+      "replyForbiddenTerm": "तपाईंसँग यो {{term}}मा जवाफ दिने अनुमति छैन।",
+      "moreLinesAbove_one": "… माथि थप {{displayCount}} पङ्क्ति छ।",
+      "moreLinesAbove_other": "… माथि थप {{displayCount}} पङ्क्ति छन्।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub एपको सेटिङ खोल्न सकिएन।",
     "installKiloGitHubApp": "Kilo GitHub एप स्थापना गर्नुहोस्",
@@ -706,7 +744,9 @@
       "statusContext": "सन्दर्भ",
       "lineLabel": "{{status}} पङ्क्ति {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(खाली)"
+      "emptyLine": "(खाली)",
+      "truncationBanner_one": "परिवर्तन भएका {{total}} फाइलमध्ये सुरुका {{limit}} मात्र देखाइएका छन् — GitHub API को सीमाका कारण।",
+      "truncationBanner_other": "परिवर्तन भएका {{total}} फाइलमध्ये सुरुका {{limit}} मात्र देखाइएका छन् — GitHub API को सीमाका कारण।"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली छ।",
     "linkPasteNotAPullRequest": "यो पुल रिक्वेस्ट वा मर्ज रिक्वेस्टको लिङ्क होइन",
@@ -783,7 +823,7 @@
     "previewFullDescription": "सूचनाहरूले तपाईंको लक स्क्रिनमा सन्देशको पाठ देखाउँछन्।",
     "previewGenericDescription": "सूचनाहरूले कुनै गतिविधि भएको मात्र देखाउँछन्। सन्देश पढ्न Kilo खोल्नुहोस्।",
     "channel": {
-      "agent": "एजेन्ट सत्रहरू",
+      "agentProgress": "एजेन्टको प्रगति",
       "chat": "कुराकानीका सन्देशहरू",
       "kiloclaw": "KiloClaw का गतिविधिहरू",
       "balance": "मौज्दातसम्बन्धी चेतावनीहरू",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "इन्स्ट्यान्स तयार वा असफल, निर्धारित कार्यहरू",
       "balanceAlertsSubtitle": "संस्थाको मौज्दात कम भएको चेतावनी",
       "securityFindingsSubtitle": "फेला परेका नयाँ सुरक्षा समस्या र SLA का सम्झना सूचनाहरू"
+    },
+    "action": {
+      "openSession": "सत्र खोल्नुहोस्"
+    },
+    "needsInputAction": {
+      "approved": "अनुरोध स्वीकृत भयो",
+      "replied": "जवाफ पठाइयो",
+      "failed": "जवाफ दिन सकिएन। फेरि प्रयास गर्न फेरि ट्याप गर्नुहोस्।",
+      "unavailable": "यो अनुरोधले अब पर्खिरहेको छैन।"
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "अपलोड गर्न सकिएन।",
       "failedToUploadFile": "फाइल अपलोड गर्न सकिएन: {{reason}}।",
       "nothingToPaste": "टाँस्न केही छैन।",
-      "metadataStripFailed": "फोटोको मेटाडेटा हटाउन सकिएन।"
+      "metadataStripFailed": "फोटोको मेटाडेटा हटाउन सकिएन।",
+      "limit_one": "तपाईं बढीमा {{displayCount}} वटा फाइल संलग्न गर्न सक्नुहुन्छ।",
+      "limit_other": "तपाईं बढीमा {{displayCount}} वटा फाइल संलग्न गर्न सक्नुहुन्छ।"
     },
     "attachmentPreview": {
       "accessibility": "फाइल: {{filename}}, स्थिति: {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "सुरक्षा समस्याहरू सिंक गर्नुहोस्",
       "syncNow": "अहिले सिंक गर्नुहोस्",
       "syncQueued": "सिंक पालोमा राखियो",
-      "syncStatusUnavailable": "सिंकको स्थिति उपलब्ध छैन।"
+      "syncStatusUnavailable": "सिंकको स्थिति उपलब्ध छैन।",
+      "daysOverdue_one": "म्याद नाघेको {{displayCount}} दिन",
+      "daysOverdue_other": "म्याद नाघेको {{displayCount}} दिन",
+      "findingsCount_one": "{{displayCount}} सुरक्षा समस्या",
+      "findingsCount_other": "{{displayCount}} सुरक्षा समस्या"
     },
     "dashboardMetrics": {
       "openFindings": "खुला सुरक्षा समस्याहरू",
@@ -2131,20 +2186,7 @@
       "continueFrom": "{{title}} जारी राखिँदैछ।",
       "importingSession": "सत्र आयात गर्दै",
       "cliCannotContinue": "यो CLI ले सत्र जारी राख्न सक्दैन। Cloud Agent वा अर्को CLI छान्नुहोस्।",
-      "importFailed": "यो सत्र आयात गर्न सकिएन।",
-      "sandbox": "स्यान्डबक्स",
-      "sandboxAccessibility": "स्यान्डबक्स: {{label}}",
-      "sandboxDefaultWithDestination": "पूर्वनिर्धारित · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "सानो",
-      "sandboxInstanceShared": "साझा",
-      "sandboxInstanceLarge": "ठूलो",
-      "sandboxInstanceDevcontainer": "डेभ कन्टेनर",
-      "sandboxInstanceProviderDefault": "प्रदायकको पूर्वनिर्धारित",
-      "sandboxCouldNotLoad": "स्यान्डबक्स विकल्पहरू लोड गर्न सकिएन",
-      "sandboxUnavailable": "यो स्यान्डबक्स उपलब्ध छैन। अर्को स्यान्डबक्स वा पूर्वनिर्धारित रोज्नुहोस्।",
-      "sandboxUseDefault": "पूर्वनिर्धारित प्रयोग गर्नुहोस्"
+      "importFailed": "यो सत्र आयात गर्न सकिएन।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फाइल अद्यावधिक गरियो।",
@@ -2168,7 +2210,14 @@
       "updateTodos": "कामको सूची अद्यावधिक गर्नुहोस्",
       "linesBadge": "{{displayCount}} पङ्क्ति",
       "filesBadge": "{{displayCount}} फाइल",
-      "matchesBadge": "{{displayCount}} नतिजा"
+      "matchesBadge": "{{displayCount}} नतिजा",
+      "filesBadge_one": "{{displayCount}} फाइल",
+      "filesBadge_other": "{{displayCount}} फाइल",
+      "linesBadge_one": "{{displayCount}} पङ्क्ति",
+      "linesBadge_other": "{{displayCount}} पङ्क्ति",
+      "matchesBadge_one": "{{displayCount}} नतिजा",
+      "matchesBadge_other": "{{displayCount}} नतिजा",
+      "noOutput": "कुनै आउटपुट छैन।"
     },
     "readToolMarkdown": {
       "linesTruncated": "पङ्क्ति {{start}}–{{end}} (केही अंश काटिएको)",
@@ -2458,7 +2507,11 @@
       "files": "फाइलहरू",
       "couldNotOpenPhotoPicker": "फोटो छान्ने सुविधा खोल्न सकिएन। Kilo पुनः सुरु गरेर फेरि प्रयास गर्नुहोस्।",
       "maxFilesAllowed": "बढीमा {{displayCount}} फाइल थप्न मिल्छ।",
-      "onlyAddingFiles": "{{total}} फाइलमध्ये {{accepted}} मात्र थप्दै (अधिकतम {{max}})"
+      "onlyAddingFiles": "{{total}} फाइलमध्ये {{accepted}} मात्र थप्दै (अधिकतम {{max}})",
+      "maxFilesAllowed_one": "बढीमा {{displayCount}} फाइल थप्न मिल्छ।",
+      "maxFilesAllowed_other": "बढीमा {{displayCount}} फाइल थप्न मिल्छ।",
+      "onlyAddingFiles_one": "{{total}} फाइलमध्ये {{accepted}} मात्र थप्दै (अधिकतम {{max}})",
+      "onlyAddingFiles_other": "{{total}} फाइलमध्ये {{accepted}} मात्र थप्दै (अधिकतम {{max}})"
     },
     "composer": {
       "addAttachment": "संलग्न फाइल थप्नुहोस्",
@@ -2476,7 +2529,9 @@
       "discardAttachmentsMessage": "कुनै सन्देशमा संलग्न नभएका अपलोड गरिएका फाइलहरू मेटिनेछन्।",
       "discardAttachmentsTitle": "संलग्न फाइलहरू मेट्ने?",
       "charactersRemaining": "{{count}} अक्षर बाँकी छन्",
-      "insertNewline": "नयाँ पङ्क्ति थप्नुहोस्"
+      "insertNewline": "नयाँ पङ्क्ति थप्नुहोस्",
+      "charactersRemaining_one": "{{count}} अक्षर बाँकी छ",
+      "charactersRemaining_other": "{{count}} अक्षर बाँकी छन्"
     },
     "chatLink": {
       "linkCopied": "लिङ्क प्रतिलिपि गरियो",
@@ -2548,7 +2603,9 @@
       "stepsCount_one": "{{steps}} चरण",
       "stepsCount": "{{steps}} चरण",
       "stepsCount_other": "{{steps}} चरण",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "मोडेल ({{displayCount}})",
+      "modelsCount_other": "मोडेलहरू ({{displayCount}})"
     },
     "autoApprove": {
       "title": "स्वतः स्वीकृति",
@@ -2588,7 +2645,9 @@
     },
     "toolRun": {
       "sheetTitle": "उपकरण कलहरू",
-      "condensedLabel": "{{itemCount}} सामग्री; {{last}}"
+      "condensedLabel": "{{itemCount}} सामग्री; {{last}}",
+      "condensedLabel_one": "{{itemCount}} सामग्री; {{last}}",
+      "condensedLabel_other": "{{itemCount}} सामग्री; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2782,9 @@
     "cliCantReceiveFilesTitle": "यो सत्रले फाइल प्राप्त गर्न सक्दैन",
     "cliCantReceiveFilesMessage": "यो सत्र चलाउने Kilo CLI ले फाइलहरू प्राप्त गर्न सक्दैन। त्यो मेसिनको CLI अद्यावधिक गर्नुहोस् वा नयाँ सत्रमा सेयर गर्नुहोस्।",
     "contentlessMessage": "सेयर गर्न केही छैन — कुनै पाठ वा फाइल समावेश गरिएको छैन।",
-    "couldNotReadContent": "सेयर गरिएको सामग्री पढ्न सकिएन।"
+    "couldNotReadContent": "सेयर गरिएको सामग्री पढ्न सकिएन।",
+    "onlyFirstFilesAttached_one": "सुरुका {{displayCount}} फाइल मात्र संलग्न गरिनेछन्।",
+    "onlyFirstFilesAttached_other": "सुरुका {{displayCount}} फाइल मात्र संलग्न गरिनेछन्।"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3154,9 @@
     "couldNotApprove": "स्वीकृति गर्न सकिएन",
     "couldNotStart": "सुरु गर्न सकिएन",
     "channelName": "सक्रिय एजेन्टहरू",
-    "activityKitDisabledBody": "लक स्क्रिनमा सक्रिय एजेन्टहरू हेर्न सेटिङ्समा प्रत्यक्ष गतिविधिहरू चालू गर्नुहोस्।"
+    "activityKitDisabledBody": "लक स्क्रिनमा सक्रिय एजेन्टहरू हेर्न सेटिङ्समा प्रत्यक्ष गतिविधिहरू चालू गर्नुहोस्।",
+    "openSession": "खोल्नुहोस्",
+    "approveFailed": "स्वीकृति गर्न सकिएन। फेरि प्रयास गर्न $t(common.approve) मा ट्याप गर्नुहोस्।"
   },
   "transcriptionModel": {
     "title": "बोलीलाई पाठमा रूपान्तरण गर्ने मोडेल",
@@ -3118,15 +3181,7 @@
     "remoteOptionTitle": "तपाईंको कम्प्युटर",
     "remoteOptionBody": "आफ्नो मेसिनमा `kilo remote` CLI मार्फत Kilo चलाउनुहोस्।",
     "skip": "भ्रमण छोड्नुहोस्",
-    "tutorialLabel": "ट्युटोरियल",
-    "remoteTitle": "तपाईंको पहिलो रिमोट सत्र सुरु गर्नुहोस्",
-    "remoteBody": "तपाईंको कम्प्युटर जोड्नुहोस्, त्यसपछि यहाँबाट सत्र सुरु गर्नुहोस्।",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "अहिलेसम्म कुनै कम्प्युटर जडान भएको छैन",
-    "remoteEmptyBody": "यसलाई जोड्न तपाईंको कम्प्युटरमा `kilo remote` चलाउनुहोस्।",
-    "remoteFound": "कम्प्युटर जडान भयो",
-    "checkAgain": "फेरि जाँच गर्नुहोस्",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ट्युटोरियल"
   },
   "appActions": {
     "start": {

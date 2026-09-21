@@ -156,13 +156,22 @@ export function AgentSessionListScreen() {
   const navigateToSession = useAgentSessionNavigator();
 
   const seeAllLabel = t('home.seeAll');
-  const headerRight = (
-    <View className="min-h-11 min-w-0 flex-row items-center gap-4">
+  // The list controls take the header's `context` slot, one line below the
+  // title, so the 30px title owns the whole title row (Quick Chat puts its
+  // account control in the same slot). Sharing that row through `headerRight`,
+  // the slot's half-row cap squeezed both columns on a narrow viewport until
+  // the title broke mid-word and this label stacked onto two lines (device
+  // capture at 480x1040: "Age / nts" beside "SEE / ALL"). On its own row the
+  // control keeps the header's full width at every display size, and the
+  // reserved row height keeps the header from moving when the filter button
+  // appears with the loaded sessions.
+  const headerActions = (
+    <View className="min-h-11 min-w-0 flex-row items-center justify-end gap-4">
       <Pressable
         onPress={() => {
           router.push('/(app)/(tabs)/(2_agents)/history' as Href);
         }}
-        // left slop capped against the large title, right slop reaches 44pt wide
+        // left slop capped against the gap, right slop reaches 44pt wide
         hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
         accessibilityRole="button"
         accessibilityLabel={seeAllLabel}
@@ -197,19 +206,24 @@ export function AgentSessionListScreen() {
     [navigateToSession, organizationId]
   );
 
-  // The tab bar is an absolutely-positioned overlay, so scrollable content
-  // must clear it. The FAB adds its own inset when it shows so the last row
-  // scrolls clear of the button too. The landscape side insets keep row text
-  // clear of the sensor housing; portrait insets are 0, keeping the geometry
-  // unchanged.
-  const listPadding = useMemo(
+  // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
+  // content must clear them. The inset rides on the list's frame as a
+  // `marginBottom` (the viewport ends above the band) — the same viewport inset
+  // `TabScreenScrollView` uses — never on the list's content and never as
+  // `style` padding: a content inset only cleared the end of the list, so every
+  // row the user scrolled into the button's band had its right-aligned
+  // timestamp and chevron covered, and a scroll view's padding is not part of
+  // its scrollable content on iOS, so padding on the frame clipped the last
+  // rows under the bar with no way to scroll them clear. The vertical value
+  // matches the screen's `StateSurfaceInsets`. The landscape side insets keep
+  // row text clear of the sensor housing; portrait insets are 0, keeping the
+  // geometry unchanged.
+  const listInsets = useMemo(
     () => ({
-      paddingTop: 0,
-      paddingBottom: tabBarHeight + (hasLiveRows ? FAB_SIZE + FAB_MARGIN : 0),
-      paddingLeft: left,
-      paddingRight: right,
+      frame: { marginBottom: showFab ? tabBarHeight + FAB_SIZE + FAB_MARGIN : tabBarHeight },
+      content: { paddingTop: 0, paddingBottom: 0, paddingLeft: left, paddingRight: right },
     }),
-    [tabBarHeight, hasLiveRows, left, right]
+    [showFab, tabBarHeight, left, right]
   );
 
   // The fixed 20pt margin gains the landscape right inset so the FAB clears the
@@ -276,6 +290,9 @@ export function AgentSessionListScreen() {
       <LiveSessionListEmptyState organizationId={organizationId} refreshControl={refreshControl} />
     );
   } else if (hasLiveRows) {
+    // The FAB-band inset shrinks the list's frame (`marginBottom`), so the
+    // viewport ends above the button's band and no row can scroll into it on
+    // either platform.
     body = (
       <FlatList
         ref={listRef}
@@ -283,7 +300,8 @@ export function AgentSessionListScreen() {
         renderItem={renderItem}
         keyExtractor={item => item.id}
         extraData={attentionFocusRevision}
-        contentContainerStyle={listPadding}
+        style={listInsets.frame}
+        contentContainerStyle={listInsets.content}
         refreshControl={rowsControl}
         maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }}
       />
@@ -310,7 +328,7 @@ export function AgentSessionListScreen() {
           size="large"
           showBackButton={false}
           className="px-[22px] pb-1"
-          headerRight={headerRight}
+          context={headerActions}
         />
         {hasLiveRows || isSearching ? (
           <SessionListSearchHeader

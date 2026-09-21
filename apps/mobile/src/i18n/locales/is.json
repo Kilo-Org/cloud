@@ -163,6 +163,7 @@
     "useDifferentEmail": "Nota annað netfang",
     "signInWithApple": "Skrá sig inn með Apple",
     "signInWithGoogle": "Skrá sig inn með Google",
+    "signInWithPasskey": "Skrá sig inn með aðgangslykli",
     "emailAddress": "Netfang",
     "emailPlaceholder": "netfang@example.com",
     "continueWithEmail": "Halda áfram með netfang",
@@ -175,6 +176,10 @@
     "termsConnector": " og ",
     "termsSuffix": ".",
     "moreSignInOptions": "Fleiri innskráningarmöguleikar",
+    "passkeyCancelled": "Hætt var við innskráningu með aðgangslykli. Reyndu aftur.",
+    "passkeyNotFound": "Enginn aðgangslykill er vistaður fyrir þetta tæki. Skráðu þig í staðinn inn með Apple, Google eða tölvupóstinum þínum.",
+    "passkeyUnsupported": "Aðgangslyklar eru ekki í boði á þessu tæki. Skráðu þig í staðinn inn með Apple, Google eða tölvupóstinum þínum.",
+    "passkeyFailed": "Tókst ekki að skrá sig inn með aðgangslykli. Reyndu aftur.",
     "couldNotCompleteSignIn": "Ekki tókst að ljúka innskráningu. Reyndu aftur.",
     "sessionEnded": "Innskráningarlotunni þinni lauk. Skráðu þig inn aftur.",
     "signInCodeExpired": "Innskráningarkóðinn þinn er útrunninn. Reyndu aftur.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Prófunarreikningur",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO fyrir fyrirtæki"
+    "providerEnterpriseSso": "SSO fyrir fyrirtæki",
+    "passkeysTitle": "Aðgangslyklar",
+    "passkeysSubtitle": "Skrá sig inn án lykilorðs",
+    "passkeysEmpty": "Engir aðgangslyklar ennþá",
+    "passkeysEmptyHint": "$t(profile.addPasskey) til að skrá sig inn án lykilorðs.",
+    "passkeysCouldNotLoad": "Tókst ekki að hlaða aðgangslyklum",
+    "passkeysLoadFailed": "Aðgangslyklar eru óaðgengilegir þangað til þetta hleðst.",
+    "addPasskey": "Bæta við aðgangslykli",
+    "passkeyDefaultName": "Aðgangslykill",
+    "passkeyAddedOn": "Bætt við {{date}}",
+    "passkeyAdded": "Aðgangslykli bætt við.",
+    "passkeyAddFailed": "Tókst ekki að bæta við aðgangslykli. Reyndu aftur.",
+    "passkeyAddUnsupported": "Þetta tæki getur ekki búið til aðgangslykla.",
+    "passkeyAddCancelled": "Hætt var við að búa til aðgangslykil.",
+    "passkeyRemoved": "Aðgangslykli eytt.",
+    "passkeyRemoveFailed": "Tókst ekki að eyða þessum aðgangslykli. Reyndu aftur.",
+    "passkeyRenamed": "Aðgangslykill endurnefndur.",
+    "passkeyName": "Heiti aðgangslykils",
+    "renamePasskey": "Endurnefna aðgangslykil",
+    "removePasskey": "Fjarlægja aðgangslykil",
+    "removePasskeyTitle": "Fjarlægja aðgangslykil?",
+    "removePasskeyMessage": "Þú getur ekki lengur skráð þig inn með þessum aðgangslykli."
   },
   "preferences": {
     "general": "Almennt",
@@ -326,7 +352,7 @@
       "expandMoreLines": "Sýna {{displayCount}} línur í viðbót ({{start}}–{{end}})",
       "expandLinesOfContext": "Sýna {{displayCount}} línur af samhengi",
       "expandAll": "Sýna allt",
-      "expandAllLines": "Sýna allar {{displayCount}} línurnar",
+      "expandAllLines": "Sýna allar línurnar ({{displayCount}})",
       "loadingMoreFiles": "Hleð fleiri skrám…",
       "retryLoadingNextPage": "Reyna aftur að hlaða næstu síðu",
       "failedToLoadMoreFiles": "Ekki tókst að hlaða fleiri skrám — ýttu til að reyna aftur",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} af {{total}} skrám hlaðnar",
       "filesStillLoading": "Enn er verið að hlaða skrám. Dragðu niður til að endurnýja.",
       "goToOverview": "Fara í yfirlit",
-      "goToOverviewTab": "Fara á yfirlitsflipann"
+      "goToOverviewTab": "Fara á yfirlitsflipann",
+      "expandAllLines_one": "Sýna allar línurnar ({{displayCount}})",
+      "expandAllLines_other": "Sýna allar línurnar ({{displayCount}})",
+      "expandLines_one": "Sýna {{displayCount}} lína ({{start}}–{{end}})",
+      "expandLines_other": "Sýna {{displayCount}} línur ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Sýna {{displayCount}} lína af samhengi",
+      "expandLinesOfContext_other": "Sýna {{displayCount}} línur af samhengi",
+      "expandMoreLines_one": "Sýna {{displayCount}} lína í viðbót ({{start}}–{{end}})",
+      "expandMoreLines_other": "Sýna {{displayCount}} línur í viðbót ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} af {{total}} skrám hlaðið",
+      "loadedOfTotalFiles_other": "{{loaded}} af {{total}} skrám hlaðið"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "engin línuskil eru í lok skrárinnar.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Úrelt við {{path}}"
       },
       "deletedUser": "eyddur notandi",
-      "replyForbiddenTerm": "Þú hefur ekki heimild til að svara við {{term}}."
+      "replyForbiddenTerm": "Þú hefur ekki heimild til að svara við {{term}}.",
+      "moreLinesAbove_one": "… {{displayCount}} lína til viðbótar fyrir ofan.",
+      "moreLinesAbove_other": "… {{displayCount}} línur til viðbótar fyrir ofan."
     },
     "couldNotOpenGitHubAppSettings": "Tókst ekki að opna stillingar GitHub-forritsins.",
     "installKiloGitHubApp": "Setja upp Kilo-forritið fyrir GitHub",
@@ -574,7 +612,7 @@
       "pending": "{{displayCount}} í bið",
       "skipped": "{{displayCount}} sleppt",
       "checksCount": "fjöldi athugana: {{displayCount}}",
-      "checksCount_one": "{{displayCount}} athugun",
+      "checksCount_one": "fjöldi athugana: {{displayCount}}",
       "checksCount_other": "fjöldi athugana: {{displayCount}}",
       "checkDetails": "upplýsingar um athugun"
     },
@@ -706,7 +744,9 @@
       "statusContext": "Samhengi",
       "lineLabel": "{{status}}, lína {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} – {{text}}",
-      "emptyLine": "(tómt)"
+      "emptyLine": "(tómt)",
+      "truncationBanner_one": "Fyrstu {{limit}} af {{total}} breyttum skrám eru sýndar — þetta eru takmörk API hjá GitHub.",
+      "truncationBanner_other": "Fyrstu {{limit}} af {{total}} breyttum skrám eru sýndar — þetta eru takmörk API hjá GitHub."
     },
     "linkPasteClipboardEmpty": "Klippiborðið er tómt.",
     "linkPasteNotAPullRequest": "Þetta er ekki tengill á samrunabeiðni eða merge request",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Tilkynningar sýna skilaboðatextann á lásskjánum þínum.",
     "previewGenericDescription": "Tilkynningar láta þig vita að eitthvað hafi gerst. Opnaðu Kilo til að lesa skilaboðin.",
     "channel": {
-      "agent": "Lotur fulltrúa",
+      "agentProgress": "Framvinda fulltrúa",
       "chat": "Spjallskilaboð",
       "kiloclaw": "Virkni í KiloClaw",
       "balance": "Inneignarviðvaranir",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "tilvik tilbúið eða bilað, tímasettar aðgerðir",
       "balanceAlertsSubtitle": "viðvaranir um lága inneign félagsins",
       "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar"
+    },
+    "action": {
+      "openSession": "Opna lotu"
+    },
+    "needsInputAction": {
+      "approved": "Beiðni samþykkt",
+      "replied": "Svar sent",
+      "failed": "Ekki tókst að svara. Ýttu aftur til að reyna aftur.",
+      "unavailable": "Þessi beiðni bíður ekki lengur."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Upphleðsla mistókst.",
       "failedToUploadFile": "Ekki tókst að hlaða upp skrá: {{reason}}.",
       "nothingToPaste": "Ekkert er til að líma.",
-      "metadataStripFailed": "Ekki tókst að fjarlægja lýsigögn myndar."
+      "metadataStripFailed": "Ekki tókst að fjarlægja lýsigögn myndar.",
+      "limit_one": "Þú getur hengt allt að {{displayCount}} skrá við.",
+      "limit_other": "Þú getur hengt allt að {{displayCount}} skrár við."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, staða: {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Samstilla frávik",
       "syncNow": "Samstilla núna",
       "syncQueued": "Samstilling í biðröð",
-      "syncStatusUnavailable": "Staða samstillingar er ekki tiltæk."
+      "syncStatusUnavailable": "Staða samstillingar er ekki tiltæk.",
+      "daysOverdue_one": "{{displayCount}} dagur umfram frest",
+      "daysOverdue_other": "{{displayCount}} dagar umfram frest",
+      "findingsCount_one": "{{displayCount}} frávik",
+      "findingsCount_other": "{{displayCount}} frávik"
     },
     "dashboardMetrics": {
       "openFindings": "Opin frávik",
@@ -2131,20 +2186,7 @@
       "continueFrom": "Haldið er áfram með {{title}}.",
       "importingSession": "Flytur lotuna inn",
       "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
-      "importFailed": "Ekki tókst að flytja inn þessa lotu.",
-      "sandbox": "Sandkassi",
-      "sandboxAccessibility": "Sandkassi: {{label}}",
-      "sandboxDefaultWithDestination": "Sjálfgefið · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Lítið",
-      "sandboxInstanceShared": "Deilt",
-      "sandboxInstanceLarge": "Stórt",
-      "sandboxInstanceDevcontainer": "Dev-konteiner",
-      "sandboxInstanceProviderDefault": "Sjálfgefið hjá veitanda",
-      "sandboxCouldNotLoad": "Ekki tókst að hlaða valkostum sandkassans",
-      "sandboxUnavailable": "Þessi sandkassi er ekki tiltækur. Veldu annan sandkassa eða Sjálfgefið.",
-      "sandboxUseDefault": "Nota Sjálfgefið"
+      "importFailed": "Ekki tókst að flytja inn þessa lotu."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} skrá var uppfærð.",
@@ -2168,7 +2210,14 @@
       "updateTodos": "Uppfæra verkefnalista",
       "linesBadge": "{{displayCount}} línur",
       "filesBadge": "{{displayCount}} skrár",
-      "matchesBadge": "{{displayCount}} samsvaranir"
+      "matchesBadge": "{{displayCount}} samsvaranir",
+      "filesBadge_one": "{{displayCount}} skrá",
+      "filesBadge_other": "{{displayCount}} skrár",
+      "linesBadge_one": "{{displayCount}} lína",
+      "linesBadge_other": "{{displayCount}} línur",
+      "matchesBadge_one": "{{displayCount}} samsvörun",
+      "matchesBadge_other": "{{displayCount}} samsvaranir",
+      "noOutput": "Ekkert úttak."
     },
     "readToolMarkdown": {
       "linesTruncated": "línur {{start}}–{{end}} (stytt)",
@@ -2458,7 +2507,11 @@
       "files": "Skrár",
       "couldNotOpenPhotoPicker": "Ekki tókst að opna myndavalann. Endurræstu Kilo og reyndu aftur.",
       "maxFilesAllowed": "Að hámarki eru {{displayCount}} skrár leyfðar.",
-      "onlyAddingFiles": "Aðeins {{accepted}} af {{total}} skrám bætast við (hámark {{max}})"
+      "onlyAddingFiles": "Aðeins {{accepted}} af {{total}} skrám bætast við (hámark {{max}})",
+      "maxFilesAllowed_one": "Að hámarki eru {{displayCount}} skrá leyfðar.",
+      "maxFilesAllowed_other": "Að hámarki eru {{displayCount}} skrár leyfðar.",
+      "onlyAddingFiles_one": "Aðeins {{accepted}} af {{total}} skrám bætast við (hámark {{max}})",
+      "onlyAddingFiles_other": "Aðeins {{accepted}} af {{total}} skrám bætast við (hámark {{max}})"
     },
     "composer": {
       "addAttachment": "Bæta við viðhengi",
@@ -2476,7 +2529,9 @@
       "discardAttachmentsMessage": "Upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt.",
       "discardAttachmentsTitle": "Farga viðhengjum?",
       "charactersRemaining": "{{count}} stafir eftir",
-      "insertNewline": "Setja inn línuskil"
+      "insertNewline": "Setja inn línuskil",
+      "charactersRemaining_one": "{{count}} stafur eftir",
+      "charactersRemaining_other": "{{count}} stafir eftir"
     },
     "chatLink": {
       "linkCopied": "Tengill afritaður",
@@ -2548,7 +2603,9 @@
       "stepsCount_one": "{{steps}} skref",
       "stepsCount": "{{steps}} skref",
       "stepsCount_other": "{{steps}} skref",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Líkan ({{displayCount}})",
+      "modelsCount_other": "Líkön ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Sjálfvirk samþykkt",
@@ -2588,7 +2645,9 @@
     },
     "toolRun": {
       "sheetTitle": "Tólaköll",
-      "condensedLabel": "{{itemCount}} atriði; {{last}}"
+      "condensedLabel": "{{itemCount}} atriði; {{last}}",
+      "condensedLabel_one": "{{itemCount}} atriði; {{last}}",
+      "condensedLabel_other": "{{itemCount}} atriði; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2782,9 @@
     "cliCantReceiveFilesTitle": "Þessi lota getur ekki tekið við skrám",
     "cliCantReceiveFilesMessage": "Kilo CLI sem keyrir þessa lotu getur ekki tekið við skrám. Uppfærðu CLI á þeirri vél eða deildu í nýja lotu í staðinn.",
     "contentlessMessage": "Ekkert er til að deila — hvorki texti né skrár fylgdu með.",
-    "couldNotReadContent": "Ekki tókst að lesa efnið sem var deilt."
+    "couldNotReadContent": "Ekki tókst að lesa efnið sem var deilt.",
+    "onlyFirstFilesAttached_one": "Aðeins fyrstu {{displayCount}} skrá verða hengdar við.",
+    "onlyFirstFilesAttached_other": "Aðeins fyrstu {{displayCount}} skrárnar verða hengdar við."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3154,9 @@
     "couldNotApprove": "Gat ekki samþykkt",
     "couldNotStart": "Gat ekki ræst",
     "channelName": "Virkir fulltrúar",
-    "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum."
+    "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum.",
+    "openSession": "Opna",
+    "approveFailed": "Ekki tókst að samþykkja. Ýttu á $t(common.approve) til að reyna aftur."
   },
   "transcriptionModel": {
     "title": "Umritunarlíkan",
@@ -3118,15 +3181,7 @@
     "remoteOptionTitle": "Tölvan þín",
     "remoteOptionBody": "Keyrðu Kilo á eigin tölvu í gegnum `kilo remote` CLI-ið.",
     "skip": "Sleppa kynningu",
-    "tutorialLabel": "Leiðbeiningar",
-    "remoteTitle": "Hafðu uppi fyrstu fjarlotu þína",
-    "remoteBody": "Tengdu tölvuna þína og vertu svo að byrja lotuna héðan.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Engin tölva tengd ennþá",
-    "remoteEmptyBody": "Til að tengja hana skaltu keyra `kilo remote` á tölvunni þinni.",
-    "remoteFound": "Tölva tengd",
-    "checkAgain": "Athuga aftur",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Leiðbeiningar"
   },
   "appActions": {
     "start": {

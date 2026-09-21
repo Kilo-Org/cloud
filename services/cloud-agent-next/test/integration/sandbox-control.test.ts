@@ -117,6 +117,11 @@ import {
   createSessionMessageRecord,
   type SessionMessageRecord,
 } from '../../src/sandbox-session/session-message-queue.js';
+import {
+  CALLBACK_OUTBOX_PREFIX,
+  type PendingCallbackJob,
+} from '../../src/sandbox-session/message-callbacks.js';
+import type { CallbackTarget } from '../../src/callbacks/types.js';
 import { getPreparationSnapshots } from '../../src/session/preparation-history.js';
 import { createEventQueries } from '../../src/session/queries/index.js';
 import { throwAdmissionError } from '../../src/session/queue-message.js';
@@ -7078,7 +7083,11 @@ const savedWorktreeSnapshot: WorktreeChangesSnapshot = {
 };
 
 async function worktreeFixture(
-  options: { sessionOperationResults?: boolean; sessionId?: `workspace_${string}` } = {}
+  options: {
+    sessionOperationResults?: boolean;
+    sessionId?: `workspace_${string}`;
+    callbackTarget?: CallbackTarget;
+  } = {}
 ) {
   const suffix = crypto.randomUUID();
   const userId = `user_worktree_${suffix}`;
@@ -7119,6 +7128,7 @@ async function worktreeFixture(
         repo: 'acme/demo',
         upstreamBranch: 'main',
       },
+      ...(options.callbackTarget ? { callback: { target: options.callbackTarget } } : {}),
       workspace: {
         sandboxId,
         sandboxProvider: 'cloudflare',
@@ -7509,6 +7519,109 @@ describe('SandboxSession operation authorization admission', () => {
         ]);
       });
       expect(fixture.prompts).toHaveLength(1);
+    } finally {
+      fixture.close();
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('persists a completed operation result gate failure to the message and callback outbox', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => Response.json({ valid: true }));
+    const fixture = await worktreeFixture({
+      sessionOperationResults: true,
+      callbackTarget: { url: 'https://example.com/gate-result' },
+    });
+    const messageId = 'msg_operation_result_gate';
+    try {
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'record the gate result' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+      await fixture.promptSeen;
+      const prompt = fixture.prompts[0];
+      if (!prompt) throw new Error('Missing prompt operation request');
+      const authorization = sessionOperationAuthorizationSchema.parse(prompt.authorization);
+      const delivery: SessionOperationDelivery = {
+        version: 2,
+        authorization,
+        completedAt: Date.now(),
+        result: { ok: true, result: { messageId, status: 'accepted' } },
+        outcome: { messageId, status: 'completed', gateResult: 'fail' },
+        events: [],
+        preparing: [],
+      };
+
+      await expect(fixture.sendOperationResult(delivery)).resolves.toMatchObject({
+        ok: true,
+        result: { disposition: 'applied' },
+      });
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        expect(messages).toMatchObject([
+          { messageId, state: 'completed', terminalSource: 'operation_result', gateResult: 'fail' },
+        ]);
+        const outbox = state.storage.kv.get<PendingCallbackJob>(
+          `${CALLBACK_OUTBOX_PREFIX}${messageId}`
+        );
+        expect(outbox).toBeDefined();
+        expect(outbox?.job.payload.gateResult).toBe('fail');
+      });
+    } finally {
+      fixture.close();
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('omits the gate result when a completed operation result carries none', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => Response.json({ valid: true }));
+    const fixture = await worktreeFixture({
+      sessionOperationResults: true,
+      callbackTarget: { url: 'https://example.com/gate-result-absent' },
+    });
+    const messageId = 'msg_operation_result_no_gate';
+    try {
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'record no gate result' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+      await fixture.promptSeen;
+      const prompt = fixture.prompts[0];
+      if (!prompt) throw new Error('Missing prompt operation request');
+      const authorization = sessionOperationAuthorizationSchema.parse(prompt.authorization);
+      const delivery: SessionOperationDelivery = {
+        version: 2,
+        authorization,
+        completedAt: Date.now(),
+        result: { ok: true, result: { messageId, status: 'accepted' } },
+        outcome: { messageId, status: 'completed' },
+        events: [],
+        preparing: [],
+      };
+
+      await expect(fixture.sendOperationResult(delivery)).resolves.toMatchObject({
+        ok: true,
+        result: { disposition: 'applied' },
+      });
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        const message = messages.find(item => item.messageId === messageId);
+        expect(message).toMatchObject({ state: 'completed', terminalSource: 'operation_result' });
+        expect(message).not.toHaveProperty('gateResult');
+        const outbox = state.storage.kv.get<PendingCallbackJob>(
+          `${CALLBACK_OUTBOX_PREFIX}${messageId}`
+        );
+        expect(outbox).toBeDefined();
+        expect(outbox?.job.payload).toMatchObject({ messageId });
+        expect(outbox?.job.payload).not.toHaveProperty('gateResult');
+      });
     } finally {
       fixture.close();
       fetchMock.mockRestore();
@@ -10742,7 +10855,7 @@ describe('SandboxSession control-plane regressions', () => {
       socket.close();
       replacement?.close();
     }
-  });
+  }, 30_000);
 
   it('normalizes initial and command models once without preflight or leaking session finalization', async () => {
     const { fixture, session } = messageFixture();

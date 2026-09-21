@@ -5358,6 +5358,100 @@ export const magic_link_tokens = pgTable(
 );
 
 export type MagicLinkToken = typeof magic_link_tokens.$inferSelect;
+
+export const passkey_credentials = pgTable(
+  'passkey_credentials',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    // A user id is an arbitrary string, not necessarily a UUID (OAuth ids are
+    // `oauth/...`), so this is text like every other user-id reference.
+    kilo_user_id: text().notNull(),
+    // base64url of the raw WebAuthn credential id.
+    credential_id: text().notNull(),
+    // base64url COSE key the assertion signature is checked against.
+    public_key: text().notNull(),
+    sign_count: integer().default(0).notNull(),
+    transports: text().array(),
+    device_type: text(),
+    backed_up: boolean().default(false).notNull(),
+    aaguid: text(),
+    name: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    // A credential id belongs to exactly one user.
+    uniqueIndex('UQ_passkey_credentials_credential_id').on(table.credential_id),
+    index('idx_passkey_credentials_kilo_user_id').on(table.kilo_user_id),
+  ]
+);
+
+export type PasskeyCredential = typeof passkey_credentials.$inferSelect;
+export type NewPasskeyCredential = typeof passkey_credentials.$inferInsert;
+
+export const passkey_challenges = pgTable(
+  'passkey_challenges',
+  {
+    // The opaque `challengeId` the client echoes back; the server looks the
+    // challenge up by it, so the client never supplies the challenge itself.
+    id: uuid().primaryKey(),
+    challenge: text().notNull(),
+    kind: text().notNull().$type<'registration' | 'authentication'>(),
+    // Null for usernameless authentication.
+    kilo_user_id: text(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('idx_passkey_challenges_expires_at').on(table.expires_at),
+    // Account deletion removes this user's open challenges; without the index
+    // that delete is a sequential scan of every ceremony ever minted.
+    index('idx_passkey_challenges_kilo_user_id').on(table.kilo_user_id),
+    // `kind` decides which ceremony a challenge may authorize, so an unknown
+    // value must never reach a consumer that matches on the known set. The
+    // column is plain text, so without this constraint the union is a fiction.
+    check(
+      'check_passkey_challenges_kind',
+      sql`${table.kind} IN ('registration', 'authentication')`
+    ),
+  ]
+);
+
+export type PasskeyChallenge = typeof passkey_challenges.$inferSelect;
+export type NewPasskeyChallenge = typeof passkey_challenges.$inferInsert;
+
+/**
+ * One-time sign-in tickets minted by a verified passkey assertion and redeemed
+ * by the sign-in provider to establish a session. Only the SHA-256 hash of the
+ * ticket is stored, and a redemption consumes the row atomically, so a stolen
+ * `ticket_hash` alone cannot be replayed.
+ */
+export const passkey_sign_in_tickets = pgTable(
+  'passkey_sign_in_tickets',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    ticket_hash: text().notNull(),
+    kilo_user_id: text().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_passkey_sign_in_tickets_ticket_hash').on(table.ticket_hash),
+    // The device-auth cleanup cron deletes tickets past `expires_at` once a day,
+    // so a full day of tickets is present when it runs; without the index that
+    // delete is a sequential scan of every ticket minted since the last run.
+    index('idx_passkey_sign_in_tickets_expires_at').on(table.expires_at),
+    // Account deletion removes this user's tickets; without the index that
+    // delete is a sequential scan of every ticket ever minted.
+    index('idx_passkey_sign_in_tickets_kilo_user_id').on(table.kilo_user_id),
+  ]
+);
+
+export type PasskeySignInTicket = typeof passkey_sign_in_tickets.$inferSelect;
+export type NewPasskeySignInTicket = typeof passkey_sign_in_tickets.$inferInsert;
+
 export type WebhookEvent = typeof webhook_events.$inferSelect;
 
 // ============ MODEL STATS ============
@@ -6385,7 +6479,7 @@ export type CloudAgentSessionFailureCode =
   | 'initial_queue_full'
   | 'invalid_initial_intent'
   | 'do_rpc_outcome_unknown';
-export type CloudAgentFailureResponsibility = 'platform' | 'user' | 'unknown';
+export type CloudAgentFailureResponsibility = 'platform' | 'provider' | 'user' | 'unknown';
 export type CloudAgentFailureReason =
   | 'insufficient_credits'
   | 'rate_limited'

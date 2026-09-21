@@ -163,6 +163,7 @@
     "useDifferentEmail": "Andere E-Mail-Adresse verwenden",
     "signInWithApple": "Mit Apple anmelden",
     "signInWithGoogle": "Mit Google anmelden",
+    "signInWithPasskey": "Mit einem Passkey anmelden",
     "emailAddress": "E-Mail-Adresse",
     "emailPlaceholder": "du@beispiel.de",
     "continueWithEmail": "Mit E-Mail fortfahren",
@@ -175,6 +176,10 @@
     "termsConnector": " und ",
     "termsSuffix": ".",
     "moreSignInOptions": "Weitere Anmeldeoptionen",
+    "passkeyCancelled": "Passkey-Anmeldung wurde abgebrochen. Bitte versuche es erneut.",
+    "passkeyNotFound": "Für dieses Gerät ist kein Passkey gespeichert. Melde dich stattdessen mit Apple, Google oder deiner E-Mail-Adresse an.",
+    "passkeyUnsupported": "Passkeys sind auf diesem Gerät nicht verfügbar. Melde dich stattdessen mit Apple, Google oder deiner E-Mail-Adresse an.",
+    "passkeyFailed": "Anmeldung mit einem Passkey nicht möglich. Bitte versuche es erneut.",
     "couldNotCompleteSignIn": "Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
     "sessionEnded": "Deine Sitzung wurde beendet. Bitte melde dich erneut an.",
     "signInCodeExpired": "Dein Anmeldecode ist abgelaufen. Bitte versuche es erneut.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Unternehmens-SSO"
+    "providerEnterpriseSso": "Unternehmens-SSO",
+    "passkeysTitle": "Passkeys",
+    "passkeysSubtitle": "Ohne Passwort anmelden",
+    "passkeysEmpty": "Noch keine Passkeys",
+    "passkeysEmptyHint": "$t(profile.addPasskey), um dich ohne Passwort anzumelden.",
+    "passkeysCouldNotLoad": "Passkeys konnten nicht geladen werden",
+    "passkeysLoadFailed": "Passkeys sind nicht verfügbar, bis dies geladen ist.",
+    "addPasskey": "Passkey hinzufügen",
+    "passkeyDefaultName": "Passkey",
+    "passkeyAddedOn": "Hinzugefügt am {{date}}",
+    "passkeyAdded": "Passkey hinzugefügt.",
+    "passkeyAddFailed": "Passkey konnte nicht hinzugefügt werden. Versuche es erneut.",
+    "passkeyAddUnsupported": "Dieses Gerät kann keine Passkeys erstellen.",
+    "passkeyAddCancelled": "Passkey-Erstellung wurde abgebrochen.",
+    "passkeyRemoved": "Passkey entfernt.",
+    "passkeyRemoveFailed": "Der Passkey konnte nicht entfernt werden. Versuche es erneut.",
+    "passkeyRenamed": "Passkey umbenannt.",
+    "passkeyName": "Passkey-Name",
+    "renamePasskey": "Passkey umbenennen",
+    "removePasskey": "Passkey entfernen",
+    "removePasskeyTitle": "Passkey entfernen?",
+    "removePasskeyMessage": "Du kannst dich mit diesem Passkey nicht mehr anmelden."
   },
   "preferences": {
     "general": "Allgemein",
@@ -293,7 +319,7 @@
     "previewFullDescription": "Benachrichtigungen zeigen den Nachrichtentext auf deinem Sperrbildschirm.",
     "previewGenericDescription": "Benachrichtigungen weisen nur auf neue Aktivitäten hin. Öffne Kilo, um die Nachrichten zu lesen.",
     "channel": {
-      "agent": "Agentensitzungen",
+      "agentProgress": "Agentenfortschritt",
       "chat": "Chat-Nachrichten",
       "kiloclaw": "KiloClaw-Aktivitäten",
       "balance": "Guthaben-Warnungen",
@@ -310,6 +336,15 @@
       "kiloclawActivitySubtitle": "instanz bereit/fehlgeschlagen, geplante Aktionen",
       "balanceAlertsSubtitle": "warnungen bei niedrigem Organisationsguthaben",
       "securityFindingsSubtitle": "neue Sicherheitsbefunde und SLA-Erinnerungen"
+    },
+    "action": {
+      "openSession": "Sitzung öffnen"
+    },
+    "needsInputAction": {
+      "approved": "Anfrage genehmigt",
+      "replied": "Antwort gesendet",
+      "failed": "Konnte nicht antworten. Zum Wiederholen erneut antippen.",
+      "unavailable": "Diese Anfrage wartet nicht mehr."
     }
   },
   "tabs": {
@@ -390,7 +425,9 @@
       "uploadFailed": "Das Hochladen ist fehlgeschlagen.",
       "failedToUploadFile": "Die Datei konnte nicht hochgeladen werden: {{reason}}.",
       "nothingToPaste": "Es gibt nichts zum Einfügen.",
-      "metadataStripFailed": "Die Metadaten des Fotos konnten nicht entfernt werden."
+      "metadataStripFailed": "Die Metadaten des Fotos konnten nicht entfernt werden.",
+      "limit_one": "Du kannst bis zu {{displayCount}} Datei anhängen.",
+      "limit_other": "Du kannst bis zu {{displayCount}} Dateien anhängen."
     },
     "attachmentPreview": {
       "accessibility": "Datei: {{filename}}, {{status}}",
@@ -1159,7 +1196,11 @@
       "syncNow": "Jetzt synchronisieren",
       "syncQueued": "Synchronisierung in die Warteschlange aufgenommen",
       "syncStatusUnavailable": "Der Synchronisierungsstatus ist nicht verfügbar.",
-      "withinDeadline": "Innerhalb der Frist"
+      "withinDeadline": "Innerhalb der Frist",
+      "daysOverdue_one": "{{displayCount}} Tag überfällig",
+      "daysOverdue_other": "{{displayCount}} Tage überfällig",
+      "findingsCount_one": "{{displayCount}} Befund",
+      "findingsCount_other": "{{displayCount}} Befunde"
     },
     "dashboardMetrics": {
       "openFindings": "Offene Befunde",
@@ -1641,20 +1682,7 @@
       "continueFrom": "Die Sitzung „{{title}}“ wird fortgesetzt.",
       "importingSession": "Sitzung wird importiert",
       "cliCannotContinue": "Diese CLI kann keine Sitzung fortsetzen. Wähle Cloud Agent oder eine andere CLI.",
-      "importFailed": "Diese Sitzung konnte nicht importiert werden.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Standard · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Klein",
-      "sandboxInstanceShared": "Geteilt",
-      "sandboxInstanceLarge": "Groß",
-      "sandboxInstanceDevcontainer": "Dev-Container",
-      "sandboxInstanceProviderDefault": "Anbieter-Standard",
-      "sandboxCouldNotLoad": "Sandbox-Optionen konnten nicht geladen werden",
-      "sandboxUnavailable": "Diese Sandbox ist nicht verfügbar. Wähle eine andere Sandbox oder Standard.",
-      "sandboxUseDefault": "Standard verwenden"
+      "importFailed": "Diese Sitzung konnte nicht importiert werden."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} Datei wurde aktualisiert.",
@@ -1678,7 +1706,14 @@
       "updateTodos": "Aufgaben aktualisieren",
       "linesBadge": "{{displayCount}} Zeilen",
       "filesBadge": "{{displayCount}} Dateien",
-      "matchesBadge": "{{displayCount}} Treffer"
+      "matchesBadge": "{{displayCount}} Treffer",
+      "filesBadge_one": "{{displayCount}} Datei",
+      "filesBadge_other": "{{displayCount}} Dateien",
+      "linesBadge_one": "{{displayCount}} Zeile",
+      "linesBadge_other": "{{displayCount}} Zeilen",
+      "matchesBadge_one": "{{displayCount}} Treffer",
+      "matchesBadge_other": "{{displayCount}} Treffer",
+      "noOutput": "Keine Ausgabe."
     },
     "readToolMarkdown": {
       "linesTruncated": "zeilen {{start}}–{{end}} (gekürzt)",
@@ -1968,7 +2003,11 @@
       "files": "Dateien",
       "couldNotOpenPhotoPicker": "Die Fotoauswahl konnte nicht geöffnet werden. Starte Kilo neu und versuche es erneut.",
       "maxFilesAllowed": "Es sind höchstens {{displayCount}} Dateien erlaubt.",
-      "onlyAddingFiles": "Es werden nur {{accepted}} von {{total}} Dateien hinzugefügt (max. {{max}})"
+      "onlyAddingFiles": "Es werden nur {{accepted}} von {{total}} Dateien hinzugefügt (max. {{max}})",
+      "maxFilesAllowed_one": "Es sind höchstens {{displayCount}} Datei erlaubt.",
+      "maxFilesAllowed_other": "Es sind höchstens {{displayCount}} Dateien erlaubt.",
+      "onlyAddingFiles_one": "Es werden nur {{accepted}} von {{total}} Dateien hinzugefügt (max. {{max}})",
+      "onlyAddingFiles_other": "Es werden nur {{accepted}} von {{total}} Dateien hinzugefügt (max. {{max}})"
     },
     "composer": {
       "addAttachment": "Anhang hinzufügen",
@@ -1986,7 +2025,9 @@
       "discardAttachmentsMessage": "Hochgeladene Dateien, die keiner gesendeten Nachricht angehängt sind, werden gelöscht.",
       "discardAttachmentsTitle": "Anhänge verwerfen?",
       "charactersRemaining": "Noch {{count}} Zeichen",
-      "insertNewline": "Zeilenumbruch einfügen"
+      "insertNewline": "Zeilenumbruch einfügen",
+      "charactersRemaining_one": "Noch {{count}} Zeichen",
+      "charactersRemaining_other": "Noch {{count}} Zeichen"
     },
     "chatLink": {
       "linkCopied": "Link kopiert",
@@ -2058,7 +2099,9 @@
       "stepsCount_one": "{{steps}} Schritt",
       "stepsCount": "{{steps}} Schritte",
       "stepsCount_other": "{{steps}} Schritte",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Modell ({{displayCount}})",
+      "modelsCount_other": "Modelle ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Automatisch genehmigen",
@@ -2098,7 +2141,9 @@
     },
     "toolRun": {
       "sheetTitle": "Tool-Aufrufe",
-      "condensedLabel": "{{itemCount}} Einträge; {{last}}"
+      "condensedLabel": "{{itemCount}} Einträge; {{last}}",
+      "condensedLabel_one": "{{itemCount}} Eintrag; {{last}}",
+      "condensedLabel_other": "{{itemCount}} Einträge; {{last}}"
     }
   },
   "bootstrap": {
@@ -2233,7 +2278,9 @@
     "cliCantReceiveFilesTitle": "Diese Sitzung kann keine Dateien empfangen",
     "cliCantReceiveFilesMessage": "Die Kilo CLI, auf der diese Sitzung läuft, kann keine Dateien empfangen. Aktualisiere die CLI auf diesem Computer oder sende die Dateien stattdessen an eine neue Sitzung.",
     "contentlessMessage": "Es gibt nichts zu teilen, da weder Text noch Dateien enthalten sind.",
-    "couldNotReadContent": "Der geteilte Inhalt konnte nicht gelesen werden."
+    "couldNotReadContent": "Der geteilte Inhalt konnte nicht gelesen werden.",
+    "onlyFirstFilesAttached_one": "Nur die ersten {{displayCount}} Datei werden angehängt.",
+    "onlyFirstFilesAttached_other": "Nur die ersten {{displayCount}} Dateien werden angehängt."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2483,7 +2530,7 @@
           "terminal": "Dieser Benutzer kann nicht gemeldet werden."
         }
       },
-      "moreLinesAbove": "… darüber stehen {{displayCount}} weitere Zeilen.",
+      "moreLinesAbove": "… darüber stehen weitere Zeilen: {{displayCount}}.",
       "mute": "Stummschalten",
       "mutedUser": "{{login}} stummgeschaltet",
       "noDiscussion": "Noch keine Diskussion",
@@ -2541,7 +2588,9 @@
         "outdatedOnPath": "Veraltet: {{path}}"
       },
       "deletedUser": "gelöschter Benutzer",
-      "replyForbiddenTerm": "Du hast keine Berechtigung, auf diesen {{term}} zu antworten."
+      "replyForbiddenTerm": "Du hast keine Berechtigung, auf diesen {{term}} zu antworten.",
+      "moreLinesAbove_one": "… darüber stehen weitere Zeilen: {{displayCount}}.",
+      "moreLinesAbove_other": "… darüber stehen weitere Zeilen: {{displayCount}}."
     },
     "entry": {
       "eyebrow": "Öffne einen Pull-Request oder Merge-Request über seine URL",
@@ -2612,7 +2661,7 @@
     "hunkRows": {
       "contextUnavailable": "Für diese Referenz ist kein Kontext verfügbar.",
       "expandAll": "Alles einblenden",
-      "expandAllLines": "Alle {{displayCount}} Zeilen einblenden",
+      "expandAllLines": "Alle Zeilen einblenden ({{displayCount}})",
       "expandContext": "Kontext einblenden",
       "expandLines": "{{displayCount}} Zeilen einblenden ({{start}}–{{end}})",
       "expandLinesOfContext": "{{displayCount}} Kontextzeilen einblenden",
@@ -2639,7 +2688,17 @@
       "loadingLines": "Zeilen werden geladen: {{loaded}} von {{total}} …",
       "loadingMoreFiles": "Weitere Dateien werden geladen …",
       "retryLoadingContext": "Kontext erneut laden",
-      "retryLoadingNextPage": "Nächste Seite erneut laden"
+      "retryLoadingNextPage": "Nächste Seite erneut laden",
+      "expandAllLines_one": "Alle Zeilen einblenden ({{displayCount}})",
+      "expandAllLines_other": "Alle Zeilen einblenden ({{displayCount}})",
+      "expandLines_one": "{{displayCount}} Zeile einblenden ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} Zeilen einblenden ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "{{displayCount}} Kontextzeile einblenden",
+      "expandLinesOfContext_other": "{{displayCount}} Kontextzeilen einblenden",
+      "expandMoreLines_one": "{{displayCount}} weitere Zeile einblenden ({{start}}–{{end}})",
+      "expandMoreLines_other": "{{displayCount}} weitere Zeilen einblenden ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} von {{total}} Dateien geladen",
+      "loadedOfTotalFiles_other": "{{loaded}} von {{total}} Dateien geladen"
     },
     "inbox": {
       "couldNotLoad": "Der Posteingang konnte nicht geladen werden.",
@@ -2836,7 +2895,9 @@
       "statusContext": "Kontext",
       "lineLabel": "{{status}}, Zeile {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(leer)"
+      "emptyLine": "(leer)",
+      "truncationBanner_one": "Aufgrund einer Begrenzung der GitHub-API werden nur die ersten {{limit}} von {{total}} geänderten Dateien angezeigt.",
+      "truncationBanner_other": "Aufgrund einer Begrenzung der GitHub-API werden nur die ersten {{limit}} von {{total}} geänderten Dateien angezeigt."
     },
     "linkPasteClipboardEmpty": "Die Zwischenablage ist leer.",
     "linkPasteNotAPullRequest": "Dieser Link führt nicht zu einem Pull-Request oder Merge-Request.",
@@ -3093,7 +3154,9 @@
     "couldNotApprove": "Genehmigung fehlgeschlagen",
     "couldNotStart": "Start fehlgeschlagen",
     "channelName": "Aktive Agenten",
-    "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
+    "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen.",
+    "openSession": "Öffnen",
+    "approveFailed": "Genehmigen fehlgeschlagen. Tippe auf $t(common.approve), um es erneut zu versuchen."
   },
   "transcriptionModel": {
     "title": "Transkriptionsmodell",
@@ -3118,15 +3181,7 @@
     "remoteOptionTitle": "Dein Computer",
     "remoteOptionBody": "Führe Kilo über die `kilo remote`-CLI auf deinem eigenen Rechner aus.",
     "skip": "Tour überspringen",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Starte deine erste Remote-Sitzung",
-    "remoteBody": "Verbinde deinen Computer und starte die Sitzung dann von hier.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Noch kein Computer verbunden",
-    "remoteEmptyBody": "Um ihn zu verbinden, führe `kilo remote` auf deinem Computer aus.",
-    "remoteFound": "Computer verbunden",
-    "checkAgain": "Erneut prüfen",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

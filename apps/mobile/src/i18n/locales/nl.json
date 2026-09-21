@@ -163,6 +163,7 @@
     "useDifferentEmail": "Ander e-mailadres gebruiken",
     "signInWithApple": "Aanmelden met Apple",
     "signInWithGoogle": "Aanmelden met Google",
+    "signInWithPasskey": "Aanmelden met een passkey",
     "emailAddress": "E-mailadres",
     "emailPlaceholder": "jij@voorbeeld.nl",
     "continueWithEmail": "Doorgaan met e-mail",
@@ -175,6 +176,10 @@
     "termsConnector": " en ",
     "termsSuffix": ".",
     "moreSignInOptions": "Meer aanmeldopties",
+    "passkeyCancelled": "Aanmelden met passkey is geannuleerd. Probeer het opnieuw.",
+    "passkeyNotFound": "Er is geen passkey opgeslagen voor dit apparaat. Meld je in plaats daarvan aan met Apple, Google of je e-mail.",
+    "passkeyUnsupported": "Passkeys zijn niet beschikbaar op dit apparaat. Meld je in plaats daarvan aan met Apple, Google of je e-mail.",
+    "passkeyFailed": "Aanmelden met een passkey is niet gelukt. Probeer het opnieuw.",
     "couldNotCompleteSignIn": "Aanmelden kon niet worden voltooid. Probeer het opnieuw.",
     "sessionEnded": "Je sessie is beëindigd. Meld je opnieuw aan.",
     "signInCodeExpired": "Je aanmeldcode is verlopen. Probeer het opnieuw.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Testaccount",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO voor bedrijven"
+    "providerEnterpriseSso": "SSO voor bedrijven",
+    "passkeysTitle": "Passkeys",
+    "passkeysSubtitle": "Aanmelden zonder wachtwoord",
+    "passkeysEmpty": "Nog geen passkeys",
+    "passkeysEmptyHint": "$t(profile.addPasskey) om zonder wachtwoord aan te melden.",
+    "passkeysCouldNotLoad": "Passkeys konden niet worden geladen",
+    "passkeysLoadFailed": "Passkeys zijn niet beschikbaar tot dit is geladen.",
+    "addPasskey": "Een passkey toevoegen",
+    "passkeyDefaultName": "Passkey",
+    "passkeyAddedOn": "Toegevoegd op {{date}}",
+    "passkeyAdded": "Passkey toegevoegd.",
+    "passkeyAddFailed": "Een passkey kon niet worden toegevoegd. Probeer het opnieuw.",
+    "passkeyAddUnsupported": "Dit apparaat kan geen passkeys aanmaken.",
+    "passkeyAddCancelled": "Het aanmaken van de passkey is geannuleerd.",
+    "passkeyRemoved": "Passkey verwijderd.",
+    "passkeyRemoveFailed": "Die passkey kon niet worden verwijderd. Probeer het opnieuw.",
+    "passkeyRenamed": "Passkey hernoemd.",
+    "passkeyName": "Naam van passkey",
+    "renamePasskey": "Passkey hernoemen",
+    "removePasskey": "Passkey verwijderen",
+    "removePasskeyTitle": "Passkey verwijderen?",
+    "removePasskeyMessage": "Je kunt je met deze passkey niet meer aanmelden."
   },
   "preferences": {
     "general": "Algemeen",
@@ -265,7 +291,7 @@
   },
   "notifications": {
     "channel": {
-      "agent": "Agentsessies",
+      "agentProgress": "Agentvoortgang",
       "chat": "Chatberichten",
       "kiloclaw": "KiloClaw-activiteit",
       "balance": "Saldowaarschuwingen",
@@ -310,7 +336,16 @@
     "previewAlways": "Altijd",
     "previewWhenUnlocked": "Als ontgrendeld",
     "previewFullDescription": "Meldingen tonen de berichttekst op je toegangsscherm.",
-    "previewGenericDescription": "Meldingen geven alleen aan dat er iets is gebeurd. Open Kilo om het bericht te lezen."
+    "previewGenericDescription": "Meldingen geven alleen aan dat er iets is gebeurd. Open Kilo om het bericht te lezen.",
+    "action": {
+      "openSession": "Sessie openen"
+    },
+    "needsInputAction": {
+      "approved": "Verzoek goedgekeurd",
+      "replied": "Antwoord verzonden",
+      "failed": "Kon niet antwoorden. Tik nogmaals om het opnieuw te proberen.",
+      "unavailable": "Dit verzoek wacht niet langer."
+    }
   },
   "tabs": {
     "home": "Startpagina",
@@ -390,7 +425,9 @@
       "uploadFailed": "Het uploaden is mislukt.",
       "failedToUploadFile": "Het bestand kon niet worden geüpload: {{reason}}.",
       "nothingToPaste": "Er is niets om te plakken.",
-      "metadataStripFailed": "De metagegevens van de foto konden niet worden verwijderd."
+      "metadataStripFailed": "De metagegevens van de foto konden niet worden verwijderd.",
+      "limit_one": "Je kunt maximaal {{displayCount}} bestand bijvoegen.",
+      "limit_other": "Je kunt maximaal {{displayCount}} bestanden bijvoegen."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}: {{status}}",
@@ -1159,7 +1196,11 @@
       "syncNow": "Nu synchroniseren",
       "syncQueued": "Synchronisatie in de wachtrij gezet",
       "syncStatusUnavailable": "De synchronisatiestatus is niet beschikbaar.",
-      "withinDeadline": "Binnen de deadline"
+      "withinDeadline": "Binnen de deadline",
+      "daysOverdue_one": "Deadline {{displayCount}} dag overschreden",
+      "daysOverdue_other": "Deadline {{displayCount}} dagen overschreden",
+      "findingsCount_one": "{{displayCount}} bevinding",
+      "findingsCount_other": "{{displayCount}} bevindingen"
     },
     "dashboardMetrics": {
       "openFindings": "Open bevindingen",
@@ -1641,20 +1682,7 @@
       "continueFrom": "Je gaat verder met {{title}}.",
       "importingSession": "Sessie importeren…",
       "cliCannotContinue": "Deze CLI kan geen sessie voortzetten. Kies Cloud Agent of een andere CLI.",
-      "importFailed": "Deze sessie kon niet worden geïmporteerd.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Standaard · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Klein",
-      "sandboxInstanceShared": "Gedeeld",
-      "sandboxInstanceLarge": "Groot",
-      "sandboxInstanceDevcontainer": "Dev-container",
-      "sandboxInstanceProviderDefault": "Standaard van provider",
-      "sandboxCouldNotLoad": "Sandbox-opties kunnen niet worden geladen",
-      "sandboxUnavailable": "Deze sandbox is niet beschikbaar. Kies een andere sandbox of Standaard.",
-      "sandboxUseDefault": "Standaard gebruiken"
+      "importFailed": "Deze sessie kon niet worden geïmporteerd."
     },
     "partRenderer": {
       "updatedFileCount_one": "Er is {{displayCount}} bestand bijgewerkt.",
@@ -1678,7 +1706,14 @@
       "updateTodos": "Taken bijwerken",
       "linesBadge": "{{displayCount}} regels",
       "filesBadge": "{{displayCount}} bestanden",
-      "matchesBadge": "{{displayCount}} treffers"
+      "matchesBadge": "{{displayCount}} treffers",
+      "filesBadge_one": "{{displayCount}} bestand",
+      "filesBadge_other": "{{displayCount}} bestanden",
+      "linesBadge_one": "{{displayCount}} regel",
+      "linesBadge_other": "{{displayCount}} regels",
+      "matchesBadge_one": "{{displayCount}} treffer",
+      "matchesBadge_other": "{{displayCount}} treffers",
+      "noOutput": "Geen uitvoer."
     },
     "readToolMarkdown": {
       "linesTruncated": "regels {{start}}–{{end}} (afgekapt)",
@@ -1968,7 +2003,11 @@
       "files": "Bestanden",
       "couldNotOpenPhotoPicker": "De fotokiezer kon niet worden geopend. Start Kilo opnieuw op en probeer het opnieuw.",
       "maxFilesAllowed": "Je kunt maximaal {{displayCount}} bestanden toevoegen.",
-      "onlyAddingFiles": "Er worden slechts {{accepted}} van de {{total}} bestanden toegevoegd (max. {{max}})"
+      "onlyAddingFiles": "Er worden slechts {{accepted}} van de {{total}} bestanden toegevoegd (max. {{max}})",
+      "maxFilesAllowed_one": "Je kunt maximaal {{displayCount}} bestand toevoegen.",
+      "maxFilesAllowed_other": "Je kunt maximaal {{displayCount}} bestanden toevoegen.",
+      "onlyAddingFiles_one": "Er worden slechts {{accepted}} van de {{total}} bestanden toegevoegd (max. {{max}})",
+      "onlyAddingFiles_other": "Er worden slechts {{accepted}} van de {{total}} bestanden toegevoegd (max. {{max}})"
     },
     "composer": {
       "addAttachment": "Bijlage toevoegen",
@@ -1986,7 +2025,9 @@
       "discardAttachmentsMessage": "Uploads die nog niet zijn gebruikt, worden verwijderd.",
       "discardAttachmentsTitle": "Bijlagen verwijderen?",
       "charactersRemaining": "{{count}} tekens over",
-      "insertNewline": "Nieuwe regel invoegen"
+      "insertNewline": "Nieuwe regel invoegen",
+      "charactersRemaining_one": "{{count}} teken over",
+      "charactersRemaining_other": "{{count}} tekens over"
     },
     "chatLink": {
       "linkCopied": "Link gekopieerd",
@@ -2058,7 +2099,9 @@
       "stepsCount_one": "{{steps}} stap",
       "stepsCount": "{{steps}} stappen",
       "stepsCount_other": "{{steps}} stappen",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modellen ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Automatisch goedkeuren",
@@ -2098,7 +2141,9 @@
     },
     "toolRun": {
       "sheetTitle": "Tool-aanroepen",
-      "condensedLabel": "{{itemCount}} items; {{last}}"
+      "condensedLabel": "{{itemCount}} items; {{last}}",
+      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_other": "{{itemCount}} items; {{last}}"
     }
   },
   "bootstrap": {
@@ -2233,7 +2278,9 @@
     "cliCantReceiveFilesTitle": "Deze sessie kan geen bestanden ontvangen",
     "cliCantReceiveFilesMessage": "De Kilo CLI die deze sessie uitvoert, kan geen bestanden ontvangen. Werk de CLI op die computer bij of deel de bestanden met een nieuwe sessie.",
     "contentlessMessage": "Er is niets om te delen. Er zijn geen tekst of bestanden toegevoegd.",
-    "couldNotReadContent": "De gedeelde inhoud kon niet worden gelezen."
+    "couldNotReadContent": "De gedeelde inhoud kon niet worden gelezen.",
+    "onlyFirstFilesAttached_one": "Alleen de eerste {{displayCount}} bestand worden bijgevoegd.",
+    "onlyFirstFilesAttached_other": "Alleen de eerste {{displayCount}} bestanden worden bijgevoegd."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2483,7 +2530,7 @@
           "terminal": "Deze gebruiker kan niet worden gemeld."
         }
       },
-      "moreLinesAbove": "… Hierboven staan nog {{displayCount}} regels.",
+      "moreLinesAbove": "… Hierboven staan nog regels: {{displayCount}}.",
       "mute": "Dempen",
       "mutedUser": "{{login}} gedempt",
       "noDiscussion": "Nog geen discussie",
@@ -2541,7 +2588,9 @@
         "outdatedOnPath": "Verouderd in {{path}}"
       },
       "deletedUser": "verwijderde gebruiker",
-      "replyForbiddenTerm": "Je hebt geen toestemming om op deze {{term}} te reageren."
+      "replyForbiddenTerm": "Je hebt geen toestemming om op deze {{term}} te reageren.",
+      "moreLinesAbove_one": "… Hierboven staan nog regels: {{displayCount}}.",
+      "moreLinesAbove_other": "… Hierboven staan nog regels: {{displayCount}}."
     },
     "entry": {
       "eyebrow": "Open een PR of merge request via een URL",
@@ -2612,7 +2661,7 @@
     "hunkRows": {
       "contextUnavailable": "De context is niet beschikbaar voor deze referentie.",
       "expandAll": "Alles tonen",
-      "expandAllLines": "Alle {{displayCount}} regels tonen",
+      "expandAllLines": "Alle regels tonen ({{displayCount}})",
       "expandContext": "Context tonen",
       "expandLines": "{{displayCount}} regels tonen ({{start}}–{{end}})",
       "expandLinesOfContext": "{{displayCount}} contextregels tonen",
@@ -2639,7 +2688,17 @@
       "loadingLines": "Regels laden: {{loaded}} van {{total}}…",
       "loadingMoreFiles": "Meer bestanden laden…",
       "retryLoadingContext": "Context opnieuw laden",
-      "retryLoadingNextPage": "Volgende pagina opnieuw laden"
+      "retryLoadingNextPage": "Volgende pagina opnieuw laden",
+      "expandAllLines_one": "Alle regels tonen ({{displayCount}})",
+      "expandAllLines_other": "Alle regels tonen ({{displayCount}})",
+      "expandLines_one": "{{displayCount}} regel tonen ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} regels tonen ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "{{displayCount}} contextregel tonen",
+      "expandLinesOfContext_other": "{{displayCount}} contextregels tonen",
+      "expandMoreLines_one": "Nog {{displayCount}} regel tonen ({{start}}–{{end}})",
+      "expandMoreLines_other": "Nog {{displayCount}} regels tonen ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} van {{total}} bestanden geladen",
+      "loadedOfTotalFiles_other": "{{loaded}} van {{total}} bestanden geladen"
     },
     "inbox": {
       "couldNotLoad": "Het postvak IN kon niet worden geladen.",
@@ -2836,7 +2895,9 @@
       "statusContext": "Ongewijzigd",
       "lineLabel": "{{status}}, regel {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(leeg)"
+      "emptyLine": "(leeg)",
+      "truncationBanner_one": "Je ziet de eerste {{limit}} van {{total}} gewijzigde bestanden vanwege de limiet van de GitHub-API.",
+      "truncationBanner_other": "Je ziet de eerste {{limit}} van {{total}} gewijzigde bestanden vanwege de limiet van de GitHub-API."
     },
     "linkPasteClipboardEmpty": "Het klembord is leeg.",
     "linkPasteNotAPullRequest": "Dit is geen koppeling naar een PR of merge request",
@@ -3093,7 +3154,9 @@
     "couldNotApprove": "Goedkeuren mislukt",
     "couldNotStart": "Starten mislukt",
     "channelName": "Actieve agents",
-    "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien."
+    "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
+    "openSession": "Openen",
+    "approveFailed": "Goedkeuren is niet gelukt. Tik op $t(common.approve) om het opnieuw te proberen."
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",
@@ -3118,15 +3181,7 @@
     "remoteOptionTitle": "Je computer",
     "remoteOptionBody": "Voer Kilo uit op je eigen machine via de `kilo remote`-CLI.",
     "skip": "Tour overslaan",
-    "tutorialLabel": "Zelfstudie",
-    "remoteTitle": "Start je eerste externe sessie",
-    "remoteBody": "Verbind je computer en start de sessie vanaf hier.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Nog geen computer verbonden",
-    "remoteEmptyBody": "Voer `kilo remote` uit op je computer om hem te verbinden.",
-    "remoteFound": "Computer verbonden",
-    "checkAgain": "Opnieuw controleren",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Zelfstudie"
   },
   "appActions": {
     "start": {

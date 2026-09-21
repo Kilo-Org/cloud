@@ -163,6 +163,7 @@
     "useDifferentEmail": "სხვა ელფოსტის გამოყენება",
     "signInWithApple": "Apple-ით შესვლა",
     "signInWithGoogle": "Google-ით შესვლა",
+    "signInWithPasskey": "წვდომის გასაღებით შესვლა",
     "emailAddress": "ელფოსტის მისამართი",
     "emailPlaceholder": "სახელი@example.com",
     "continueWithEmail": "ელფოსტით გაგრძელება",
@@ -175,6 +176,10 @@
     "termsConnector": " და ",
     "termsSuffix": ".",
     "moreSignInOptions": "შესვლის სხვა გზები",
+    "passkeyCancelled": "წვდომის გასაღებით შესვლა გაუქმდა. სცადეთ ხელახლა.",
+    "passkeyNotFound": "ამ მოწყობილობისთვის წვდომის გასაღები არ არის შენახული. სამაგიეროდ შედით Apple-ით, Google-ით ან ელფოსტით.",
+    "passkeyUnsupported": "წვდომის გასაღებები ამ მოწყობილობაზე მიუწვდომელია. სამაგიეროდ შედით Apple-ით, Google-ით ან ელფოსტით.",
+    "passkeyFailed": "წვდომის გასაღებით შესვლა ვერ მოხერხდა. სცადეთ ხელახლა.",
     "couldNotCompleteSignIn": "შესვლის დასრულება ვერ მოხერხდა. სცადე ხელახლა.",
     "sessionEnded": "შენი სესია დასრულდა. შედი ხელახლა.",
     "signInCodeExpired": "შესვლის კოდს ვადა გაუვიდა. სცადე ხელახლა.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "სატესტო ანგარიში",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "კორპორაციული SSO"
+    "providerEnterpriseSso": "კორპორაციული SSO",
+    "passkeysTitle": "წვდომის გასაღებები",
+    "passkeysSubtitle": "შესვლა პაროლის გარეშე",
+    "passkeysEmpty": "წვდომის გასაღებები ჯერ არ არის",
+    "passkeysEmptyHint": "$t(profile.addPasskey) პაროლის გარეშე შესვლისთვის.",
+    "passkeysCouldNotLoad": "წვდომის გასაღებები ვერ ჩაიტვირთა",
+    "passkeysLoadFailed": "წვდომის გასაღებები მიუწვდომელია, სანამ ეს ჩაიტვირთება.",
+    "addPasskey": "წვდომის გასაღების დამატება",
+    "passkeyDefaultName": "წვდომის გასაღები",
+    "passkeyAddedOn": "დამატებულია {{date}}",
+    "passkeyAdded": "წვდომის გასაღები დაემატა.",
+    "passkeyAddFailed": "წვდომის გასაღების დამატება ვერ მოხერხდა. სცადეთ ხელახლა.",
+    "passkeyAddUnsupported": "ეს მოწყობილობა ვერ ქმნის წვდომის გასაღებებს.",
+    "passkeyAddCancelled": "წვდომის გასაღების შექმნა გაუქმდა.",
+    "passkeyRemoved": "წვდომის გასაღები წაიშალა.",
+    "passkeyRemoveFailed": "ამ წვდომის გასაღების წაშლა ვერ მოხერხდა. სცადეთ ხელახლა.",
+    "passkeyRenamed": "წვდომის გასაღებს სახელი შეეცვალა.",
+    "passkeyName": "წვდომის გასაღების სახელი",
+    "renamePasskey": "წვდომის გასაღების სახელის შეცვლა",
+    "removePasskey": "წვდომის გასაღების წაშლა",
+    "removePasskeyTitle": "წავშალო წვდომის გასაღები?",
+    "removePasskeyMessage": "ამ წვდომის გასაღებით ვეღარ შეძლებთ შესვლას."
   },
   "preferences": {
     "general": "ზოგადი",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "ჩატვირთულია {{displayCount}} ფაილი {{total}}-დან",
       "filesStillLoading": "ფაილები ჯერ კიდევ იტვირთება. გასაახლებლად ჩამოწიე.",
       "goToOverview": "მიმოხილვაზე გადასვლა",
-      "goToOverviewTab": "მიმოხილვის ჩანართზე გადასვლა"
+      "goToOverviewTab": "მიმოხილვის ჩანართზე გადასვლა",
+      "expandAllLines_one": "ყველა {{displayCount}} სტრიქონის გაშლა",
+      "expandAllLines_other": "ყველა {{displayCount}} სტრიქონის გაშლა",
+      "expandLines_one": "{{displayCount}} სტრიქონის გაშლა ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} სტრიქონის გაშლა ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "კონტექსტის {{displayCount}} სტრიქონის გაშლა",
+      "expandLinesOfContext_other": "კონტექსტის {{displayCount}} სტრიქონის გაშლა",
+      "expandMoreLines_one": "კიდევ {{displayCount}} სტრიქონის გაშლა ({{start}}–{{end}})",
+      "expandMoreLines_other": "კიდევ {{displayCount}} სტრიქონის გაშლა ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "ჩატვირთულია {{total}}-დან {{loaded}} ფაილი",
+      "loadedOfTotalFiles_other": "ჩატვირთულია {{total}}-დან {{loaded}} ფაილი"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ფაილის ბოლოს ახალი სტრიქონი არ არის.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "მოძველებული · {{path}}"
       },
       "deletedUser": "წაშლილი მომხმარებელი",
-      "replyForbiddenTerm": "ამ {{term}}-ზე პასუხის გაცემის უფლება არ გაქვს."
+      "replyForbiddenTerm": "ამ {{term}}-ზე პასუხის გაცემის უფლება არ გაქვს.",
+      "moreLinesAbove_one": "… ზემოთ კიდევ {{displayCount}} სტრიქონია.",
+      "moreLinesAbove_other": "… ზემოთ კიდევ {{displayCount}} სტრიქონია."
     },
     "couldNotOpenGitHubAppSettings": "GitHub-ის აპის პარამეტრები ვერ გაიხსნა.",
     "installKiloGitHubApp": "Kilo-ს GitHub აპის დაყენება",
@@ -706,7 +744,9 @@
       "statusContext": "კონტექსტი",
       "lineLabel": "{{status}} სტრიქონი {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(ცარიელი)"
+      "emptyLine": "(ცარიელი)",
+      "truncationBanner_one": "ნაჩვენებია {{total}} შეცვლილი ფაილიდან პირველი {{limit}} — GitHub API-ის შეზღუდვა.",
+      "truncationBanner_other": "ნაჩვენებია {{total}} შეცვლილი ფაილიდან პირველი {{limit}} — GitHub API-ის შეზღუდვა."
     },
     "linkPasteClipboardEmpty": "გაცვლის ბუფერი ცარიელია.",
     "linkPasteNotAPullRequest": "ეს PR-ის ან შერწყმის მოთხოვნის ბმული არ არის",
@@ -783,7 +823,7 @@
     "previewFullDescription": "ჩაკეტილ ეკრანზე შეტყობინებების ტექსტი ჩანს.",
     "previewGenericDescription": "შეტყობინებები მხოლოდ ახალ მოვლენას აღნიშნავს. ტექსტის წასაკითხად გახსენით Kilo.",
     "channel": {
-      "agent": "აგენტის სესიები",
+      "agentProgress": "აგენტის პროგრესი",
       "chat": "ჩატის შეტყობინებები",
       "kiloclaw": "KiloClaw-ის აქტივობა",
       "balance": "ბალანსის შესახებ გაფრთხილებები",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "ინსტანცია მზადაა / ჩაიშალა, დაგეგმილი მოქმედებები",
       "balanceAlertsSubtitle": "ორგანიზაციის დაბალი ბალანსის გაფრთხილებები",
       "securityFindingsSubtitle": "ახლად აღმოჩენილი პრობლემები და SLA-ის შეხსენებები"
+    },
+    "action": {
+      "openSession": "სესიის გახსნა"
+    },
+    "needsInputAction": {
+      "approved": "მოთხოვნა დამტკიცდა",
+      "replied": "პასუხი გაიგზავნა",
+      "failed": "პასუხის გაცემა ვერ მოხერხდა. ხელახლა საცდელად ისევ შეეხეთ.",
+      "unavailable": "ეს მოთხოვნა აღარ ელოდება."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "ატვირთვა ვერ მოხერხდა.",
       "failedToUploadFile": "ფაილის ატვირთვა ვერ მოხერხდა: {{reason}}.",
       "nothingToPaste": "ჩასასმელი არაფერია.",
-      "metadataStripFailed": "ფოტოს მეტამონაცემების წაშლა ვერ მოხერხდა."
+      "metadataStripFailed": "ფოტოს მეტამონაცემების წაშლა ვერ მოხერხდა.",
+      "limit_one": "შეგიძლია მაქსიმუმ {{displayCount}} ფაილი მიამაგრო.",
+      "limit_other": "შეგიძლია მაქსიმუმ {{displayCount}} ფაილი მიამაგრო."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "მიგნებების სინქრონიზაცია",
       "syncNow": "ახლავე სინქრონიზაცია",
       "syncQueued": "სინქრონიზაცია რიგშია",
-      "syncStatusUnavailable": "სინქრონიზაციის სტატუსი მიუწვდომელია."
+      "syncStatusUnavailable": "სინქრონიზაციის სტატუსი მიუწვდომელია.",
+      "daysOverdue_one": "ვადას გადაცილებულია {{displayCount}} დღით",
+      "daysOverdue_other": "ვადას გადაცილებულია {{displayCount}} დღით",
+      "findingsCount_one": "{{displayCount}} მიგნება",
+      "findingsCount_other": "{{displayCount}} მიგნება"
     },
     "dashboardMetrics": {
       "openFindings": "ღია მიგნებები",
@@ -2131,20 +2186,7 @@
       "continueFrom": "გრძელდება სესია: {{title}}.",
       "importingSession": "სესიის იმპორტი მიმდინარეობს…",
       "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
-      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა.",
-      "sandbox": "სენდბოქსი",
-      "sandboxAccessibility": "სენდბოქსი: {{label}}",
-      "sandboxDefaultWithDestination": "ნაგულისხმევი · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "პატარა",
-      "sandboxInstanceShared": "საერთო",
-      "sandboxInstanceLarge": "დიდი",
-      "sandboxInstanceDevcontainer": "დევ კონტეინერი",
-      "sandboxInstanceProviderDefault": "მომწოდებლის ნაგულისხმევი",
-      "sandboxCouldNotLoad": "სენდბოქსის ვარიანტების ჩატვირთვა ვერ მოხერხდა",
-      "sandboxUnavailable": "ეს სენდბოქსი მიუწვდომელია. აირჩიეთ სხვა სენდბოქსი ან ნაგულისხმევი.",
-      "sandboxUseDefault": "ნაგულისხმევის გამოყენება"
+      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა."
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი.",
@@ -2168,7 +2210,14 @@
       "updateTodos": "დავალებების სიის განახლება",
       "linesBadge": "{{displayCount}} სტრიქონი",
       "filesBadge": "{{displayCount}} ფაილი",
-      "matchesBadge": "{{displayCount}} დამთხვევა"
+      "matchesBadge": "{{displayCount}} დამთხვევა",
+      "filesBadge_one": "{{displayCount}} ფაილი",
+      "filesBadge_other": "{{displayCount}} ფაილი",
+      "linesBadge_one": "{{displayCount}} სტრიქონი",
+      "linesBadge_other": "{{displayCount}} სტრიქონი",
+      "matchesBadge_one": "{{displayCount}} დამთხვევა",
+      "matchesBadge_other": "{{displayCount}} დამთხვევა",
+      "noOutput": "გამოსავალი არ არის."
     },
     "readToolMarkdown": {
       "linesTruncated": "სტრიქონები {{start}}–{{end}} (შემოკლებულია)",
@@ -2458,7 +2507,11 @@
       "files": "ფაილი",
       "couldNotOpenPhotoPicker": "ფოტოების არჩევის ფანჯრის გახსნა ვერ მოხერხდა. ხელახლა გაუშვით Kilo და სცადეთ კიდევ ერთხელ.",
       "maxFilesAllowed": "შეგიძლიათ დაამატოთ მაქსიმუმ {{displayCount}} ფაილი.",
-      "onlyAddingFiles": "{{total}} ფაილიდან ემატება მხოლოდ {{accepted}} (მაქსიმუმ {{max}})"
+      "onlyAddingFiles": "{{total}} ფაილიდან ემატება მხოლოდ {{accepted}} (მაქსიმუმ {{max}})",
+      "maxFilesAllowed_one": "შეგიძლიათ დაამატოთ მაქსიმუმ {{displayCount}} ფაილი.",
+      "maxFilesAllowed_other": "შეგიძლიათ დაამატოთ მაქსიმუმ {{displayCount}} ფაილი.",
+      "onlyAddingFiles_one": "{{total}} ფაილიდან ემატება მხოლოდ {{accepted}} (მაქსიმუმ {{max}})",
+      "onlyAddingFiles_other": "{{total}} ფაილიდან ემატება მხოლოდ {{accepted}} (მაქსიმუმ {{max}})"
     },
     "composer": {
       "addAttachment": "დანართის დამატება",
@@ -2476,7 +2529,9 @@
       "discardAttachmentsMessage": "ატვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება.",
       "discardAttachmentsTitle": "წაიშალოს დანართები?",
       "charactersRemaining": "დარჩენილია {{count}} სიმბოლო",
-      "insertNewline": "ახალი სტრიქონის ჩასმა"
+      "insertNewline": "ახალი სტრიქონის ჩასმა",
+      "charactersRemaining_one": "დარჩენილია {{count}} სიმბოლო",
+      "charactersRemaining_other": "დარჩენილია {{count}} სიმბოლო"
     },
     "chatLink": {
       "linkCopied": "ბმული დაკოპირდა",
@@ -2548,7 +2603,9 @@
       "stepsCount_one": "{{steps}} ნაბიჯი",
       "stepsCount": "{{steps}} ნაბიჯი",
       "stepsCount_other": "{{steps}} ნაბიჯი",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "მოდელი ({{displayCount}})",
+      "modelsCount_other": "მოდელები ({{displayCount}})"
     },
     "autoApprove": {
       "title": "ავტომატური დადასტურება",
@@ -2588,7 +2645,9 @@
     },
     "toolRun": {
       "sheetTitle": "ინსტრუმენტის გამოძახებები",
-      "condensedLabel": "{{itemCount}} ელემენტი; {{last}}"
+      "condensedLabel": "{{itemCount}} ელემენტი; {{last}}",
+      "condensedLabel_one": "{{itemCount}} ელემენტი; {{last}}",
+      "condensedLabel_other": "{{itemCount}} ელემენტი; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2782,9 @@
     "cliCantReceiveFilesTitle": "ამ სესიას ფაილების მიღება არ შეუძლია",
     "cliCantReceiveFilesMessage": "ამ სესიის Kilo CLI ფაილებს ვერ იღებს. იმ კომპიუტერზე განაახლე CLI ან შიგთავსი ახალ სესიაში გააზიარე.",
     "contentlessMessage": "გასაზიარებელი არაფერია — არც ტექსტია დამატებული და არც ფაილები.",
-    "couldNotReadContent": "გაზიარებული შიგთავსის წაკითხვა ვერ მოხერხდა."
+    "couldNotReadContent": "გაზიარებული შიგთავსის წაკითხვა ვერ მოხერხდა.",
+    "onlyFirstFilesAttached_one": "მხოლოდ პირველი {{displayCount}} ფაილი მიემაგრება.",
+    "onlyFirstFilesAttached_other": "მხოლოდ პირველი {{displayCount}} ფაილი მიემაგრება."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3154,9 @@
     "couldNotApprove": "დამტკიცება ვერ მოხერხდა",
     "couldNotStart": "დაწყება ვერ მოხერხდა",
     "channelName": "აქტიური აგენტები",
-    "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები."
+    "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები.",
+    "openSession": "გახსენი",
+    "approveFailed": "დამტკიცება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ $t(common.approve)-ს."
   },
   "transcriptionModel": {
     "title": "ტრანსკრიფციის მოდელი",
@@ -3118,15 +3181,7 @@
     "remoteOptionTitle": "თქვენი კომპიუტერი",
     "remoteOptionBody": "გაუშვით Kilo თქვენს საკუთარ მანქანაზე `kilo remote` CLI-ს საშუალებით.",
     "skip": "ტურის გამოტოვება",
-    "tutorialLabel": "სასწავლო",
-    "remoteTitle": "დაიწყეთ თქვენი პირველი დაშორებული სესია",
-    "remoteBody": "მიავლეთ თქვენს კომპიუტერს და შემდეგ აქედან დაიწყეთ სესია.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ჯერ კომპიუტერი არ არის მიერთებული",
-    "remoteEmptyBody": "დასამაგრებლად, გაუშვით `kilo remote` თქვენს კომპიუტერზე.",
-    "remoteFound": "კომპიუტერი მიერთებულია",
-    "checkAgain": "ხელახლა შემოწმება",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "სასწავლო"
   },
   "appActions": {
     "start": {

@@ -163,6 +163,7 @@
     "useDifferentEmail": "استخدام بريد إلكتروني مختلف",
     "signInWithApple": "تسجيل الدخول عبر Apple",
     "signInWithGoogle": "تسجيل الدخول عبر Google",
+    "signInWithPasskey": "تسجيل الدخول بمفتاح المرور",
     "emailAddress": "عنوان البريد الإلكتروني",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "المتابعة عبر البريد الإلكتروني",
@@ -175,6 +176,10 @@
     "termsConnector": " و ",
     "termsSuffix": ".",
     "moreSignInOptions": "المزيد من خيارات تسجيل الدخول",
+    "passkeyCancelled": "تم إلغاء تسجيل الدخول بمفتاح المرور. حاول مرة أخرى.",
+    "passkeyNotFound": "لا يوجد مفتاح مرور محفوظ لهذا الجهاز. سجّل الدخول عبر Apple أو Google أو بريدك الإلكتروني بدلاً من ذلك.",
+    "passkeyUnsupported": "مفاتيح المرور غير متاحة على هذا الجهاز. سجّل الدخول عبر Apple أو Google أو بريدك الإلكتروني بدلاً من ذلك.",
+    "passkeyFailed": "تعذّر تسجيل الدخول بمفتاح المرور. حاول مرة أخرى.",
     "couldNotCompleteSignIn": "تعذّر إكمال تسجيل الدخول. حاول مرة أخرى.",
     "sessionEnded": "انتهت جلستك. سجّل الدخول مرة أخرى.",
     "signInCodeExpired": "انتهت صلاحية رمز تسجيل الدخول. حاول مرة أخرى.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "حساب تجريبي",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "تسجيل الدخول الموحّد للمؤسسات"
+    "providerEnterpriseSso": "تسجيل الدخول الموحّد للمؤسسات",
+    "passkeysTitle": "مفاتيح المرور",
+    "passkeysSubtitle": "سجّل الدخول بدون كلمة مرور",
+    "passkeysEmpty": "لا توجد مفاتيح مرور بعد",
+    "passkeysEmptyHint": "$t(profile.addPasskey) لتسجيل الدخول بدون كلمة مرور.",
+    "passkeysCouldNotLoad": "تعذّر تحميل مفاتيح المرور",
+    "passkeysLoadFailed": "مفاتيح المرور غير متاحة حتى يتم تحميل هذا.",
+    "addPasskey": "إضافة مفتاح مرور",
+    "passkeyDefaultName": "مفتاح المرور",
+    "passkeyAddedOn": "أُضيف في {{date}}",
+    "passkeyAdded": "تمت إضافة مفتاح المرور.",
+    "passkeyAddFailed": "تعذّرت إضافة مفتاح المرور. حاول مرة أخرى.",
+    "passkeyAddUnsupported": "لا يمكن لهذا الجهاز إنشاء مفاتيح مرور.",
+    "passkeyAddCancelled": "تم إلغاء إنشاء مفتاح المرور.",
+    "passkeyRemoved": "تمت إزالة مفتاح المرور.",
+    "passkeyRemoveFailed": "تعذّرت إزالة مفتاح المرور هذا. حاول مرة أخرى.",
+    "passkeyRenamed": "تمت إعادة تسمية مفتاح المرور.",
+    "passkeyName": "اسم مفتاح المرور",
+    "renamePasskey": "إعادة تسمية مفتاح المرور",
+    "removePasskey": "إزالة مفتاح المرور",
+    "removePasskeyTitle": "إزالة مفتاح المرور؟",
+    "removePasskeyMessage": "لن تتمكن بعد الآن من تسجيل الدخول بمفتاح المرور هذا."
   },
   "preferences": {
     "general": "عام",
@@ -293,7 +319,7 @@
     "previewFullDescription": "تعرض الإشعارات نص الرسالة على شاشة القفل.",
     "previewGenericDescription": "تُعلمك الإشعارات بوجود نشاط جديد دون عرض محتواه. افتح Kilo لقراءته.",
     "channel": {
-      "agent": "جلسات الوكيل",
+      "agentProgress": "تقدم الوكيل",
       "chat": "رسائل الدردشة",
       "kiloclaw": "نشاط KiloClaw",
       "balance": "تنبيهات الرصيد",
@@ -310,6 +336,15 @@
       "kiloclawActivitySubtitle": "جاهزية المثيل أو فشله، وإجراءات مجدولة",
       "balanceAlertsSubtitle": "تحذيرات انخفاض رصيد المؤسسة",
       "securityFindingsSubtitle": "نتائج جديدة وتذكيرات SLA"
+    },
+    "action": {
+      "openSession": "فتح الجلسة"
+    },
+    "needsInputAction": {
+      "approved": "تمت الموافقة على الطلب",
+      "replied": "تم إرسال الرد",
+      "failed": "تعذّرت الإجابة. انقر مجددًا لإعادة المحاولة.",
+      "unavailable": "لم يعد هذا الطلب قيد الانتظار."
     }
   },
   "tabs": {
@@ -390,7 +425,13 @@
       "uploadFailed": "تعذّر الرفع.",
       "failedToUploadFile": "تعذّر رفع الملف: {{reason}}.",
       "nothingToPaste": "لا يوجد محتوى للصقه.",
-      "metadataStripFailed": "تعذّرت إزالة البيانات الوصفية للصورة."
+      "metadataStripFailed": "تعذّرت إزالة البيانات الوصفية للصورة.",
+      "limit_one": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملف.",
+      "limit_other": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملفات.",
+      "limit_zero": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملفات.",
+      "limit_two": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملفان.",
+      "limit_few": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملفات.",
+      "limit_many": "يمكنك إرفاق ما يصل إلى {{displayCount}} ملفًا."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1171,7 +1212,19 @@
       "syncNow": "المزامنة الآن",
       "syncQueued": "أُضيفت المزامنة إلى قائمة الانتظار.",
       "syncStatusUnavailable": "حالة المزامنة غير متاحة.",
-      "withinDeadline": "ضمن المهلة"
+      "withinDeadline": "ضمن المهلة",
+      "daysOverdue_one": "يوم التأخير: {{displayCount}}",
+      "daysOverdue_other": "أيام التأخير: {{displayCount}}",
+      "daysOverdue_zero": "أيام التأخير: {{displayCount}}",
+      "daysOverdue_two": "يومان التأخير: {{displayCount}}",
+      "daysOverdue_few": "أيام التأخير: {{displayCount}}",
+      "daysOverdue_many": "يومًا التأخير: {{displayCount}}",
+      "findingsCount_one": "نتيجة: {{displayCount}}",
+      "findingsCount_other": "النتائج: {{displayCount}}",
+      "findingsCount_zero": "نتائج: {{displayCount}}",
+      "findingsCount_two": "نتيجتان: {{displayCount}}",
+      "findingsCount_few": "نتائج: {{displayCount}}",
+      "findingsCount_many": "نتيجة: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "نتائج مفتوحة",
@@ -1677,20 +1730,7 @@
       "continueFrom": "تجري متابعة {{title}}.",
       "importingSession": "جارٍ استيراد الجلسة",
       "cliCannotContinue": "إصدار CLI هذا لا يدعم متابعة الجلسات. اختر Cloud Agent أو CLI آخر.",
-      "importFailed": "تعذر استيراد هذه الجلسة.",
-      "sandbox": "البيئة المعزولة",
-      "sandboxAccessibility": "البيئة المعزولة: {{label}}",
-      "sandboxDefaultWithDestination": "افتراضي · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "صغير",
-      "sandboxInstanceShared": "مشترك",
-      "sandboxInstanceLarge": "كبير",
-      "sandboxInstanceDevcontainer": "حاوية التطوير",
-      "sandboxInstanceProviderDefault": "الافتراضي للمزوّد",
-      "sandboxCouldNotLoad": "تعذّر تحميل خيارات البيئة المعزولة",
-      "sandboxUnavailable": "هذه البيئة المعزولة غير متاحة. اختر بيئة معزولة أخرى أو الافتراضي.",
-      "sandboxUseDefault": "استخدام الافتراضي"
+      "importFailed": "تعذر استيراد هذه الجلسة."
     },
     "partRenderer": {
       "updatedFileCount_one": "تم تحديث ملف واحد ({{displayCount}}).",
@@ -1718,7 +1758,26 @@
       "updateTodos": "تحديث المهام",
       "linesBadge": "الأسطر: {{displayCount}}",
       "filesBadge": "الملفات: {{displayCount}}",
-      "matchesBadge": "التطابقات: {{displayCount}}"
+      "matchesBadge": "التطابقات: {{displayCount}}",
+      "filesBadge_one": "ملف: {{displayCount}}",
+      "filesBadge_other": "الملفات: {{displayCount}}",
+      "filesBadge_zero": "ملفات: {{displayCount}}",
+      "filesBadge_two": "ملفان: {{displayCount}}",
+      "filesBadge_few": "ملفات: {{displayCount}}",
+      "filesBadge_many": "ملفًا: {{displayCount}}",
+      "linesBadge_one": "سطر: {{displayCount}}",
+      "linesBadge_other": "الأسطر: {{displayCount}}",
+      "linesBadge_zero": "أسطر: {{displayCount}}",
+      "linesBadge_two": "سطران: {{displayCount}}",
+      "linesBadge_few": "أسطر: {{displayCount}}",
+      "linesBadge_many": "سطرًا: {{displayCount}}",
+      "matchesBadge_one": "تطابق: {{displayCount}}",
+      "matchesBadge_other": "التطابقات: {{displayCount}}",
+      "matchesBadge_zero": "تطابقات: {{displayCount}}",
+      "matchesBadge_two": "تطابقان: {{displayCount}}",
+      "matchesBadge_few": "تطابقات: {{displayCount}}",
+      "matchesBadge_many": "تطابقًا: {{displayCount}}",
+      "noOutput": "لا توجد مخرجات."
     },
     "readToolMarkdown": {
       "linesTruncated": "الأسطر {{start}}–{{end}} (مقتطعة)",
@@ -2020,7 +2079,19 @@
       "files": "ملف",
       "couldNotOpenPhotoPicker": "تعذّر فتح نافذة اختيار الصور. أعد تشغيل Kilo وحاول مرة أخرى.",
       "maxFilesAllowed": "الحد الأقصى لعدد الملفات هو {{displayCount}}.",
-      "onlyAddingFiles": "ستُضاف {{accepted}} فقط من إجمالي الملفات البالغ {{total}} (الحد الأقصى: {{max}})"
+      "onlyAddingFiles": "ستُضاف {{accepted}} فقط من إجمالي الملفات البالغ {{total}} (الحد الأقصى: {{max}})",
+      "maxFilesAllowed_one": "الحد الأقصى لعدد الملفات هو {{displayCount}}.",
+      "maxFilesAllowed_other": "الحد الأقصى لعدد الملفات هو {{displayCount}}.",
+      "maxFilesAllowed_zero": "الحد الأقصى لعدد الملفات هو {{displayCount}}.",
+      "maxFilesAllowed_two": "الحد الأقصى لعدد الملفات هو {{displayCount}}.",
+      "maxFilesAllowed_few": "الحد الأقصى لعدد الملفات هو {{displayCount}}.",
+      "maxFilesAllowed_many": "الحد الأقصى لعدد الملفات هو {{displayCount}}.",
+      "onlyAddingFiles_one": "ستُضاف {{accepted}} فقط من إجمالي الملفات البالغ {{total}} (الحد الأقصى: {{max}})",
+      "onlyAddingFiles_other": "ستُضاف {{accepted}} فقط من إجمالي الملفات البالغ {{total}} (الحد الأقصى: {{max}})",
+      "onlyAddingFiles_zero": "ستُضاف {{accepted}} فقط من إجمالي الملفات البالغ {{total}} (الحد الأقصى: {{max}})",
+      "onlyAddingFiles_two": "ستُضاف {{accepted}} فقط من إجمالي الملفات البالغ {{total}} (الحد الأقصى: {{max}})",
+      "onlyAddingFiles_few": "ستُضاف {{accepted}} فقط من إجمالي الملفات البالغ {{total}} (الحد الأقصى: {{max}})",
+      "onlyAddingFiles_many": "ستُضاف {{accepted}} فقط من إجمالي الملفات البالغ {{total}} (الحد الأقصى: {{max}})"
     },
     "composer": {
       "addAttachment": "إضافة مرفق",
@@ -2038,7 +2109,13 @@
       "discardAttachmentsMessage": "ستُحذف الملفات المرفوعة التي لم تُرفق برسائل مرسلة.",
       "discardAttachmentsTitle": "حذف المرفقات؟",
       "charactersRemaining": "الأحرف المتبقية: {{count}}",
-      "insertNewline": "إدراج سطر جديد"
+      "insertNewline": "إدراج سطر جديد",
+      "charactersRemaining_one": "حرف متبقٍ: {{count}}",
+      "charactersRemaining_other": "الأحرف المتبقية: {{count}}",
+      "charactersRemaining_zero": "أحرف متبقية: {{count}}",
+      "charactersRemaining_two": "حرفان متبقيان: {{count}}",
+      "charactersRemaining_few": "أحرف متبقية: {{count}}",
+      "charactersRemaining_many": "حرفًا متبقيًا: {{count}}"
     },
     "chatLink": {
       "linkCopied": "تم نسخ الرابط",
@@ -2114,7 +2191,13 @@
       "stepsCount_zero": "عدد الخطوات: {{steps}}",
       "stepsCount_two": "خطوتان ({{steps}})",
       "stepsCount_few": "{{steps}} خطوات",
-      "stepsCount_many": "{{steps}} خطوةً"
+      "stepsCount_many": "{{steps}} خطوةً",
+      "modelsCount_one": "نموذج ({{displayCount}})",
+      "modelsCount_other": "النماذج ({{displayCount}})",
+      "modelsCount_zero": "نماذج ({{displayCount}})",
+      "modelsCount_two": "نموذجان ({{displayCount}})",
+      "modelsCount_few": "نماذج ({{displayCount}})",
+      "modelsCount_many": "نموذجًا ({{displayCount}})"
     },
     "autoApprove": {
       "title": "الموافقة التلقائية",
@@ -2154,7 +2237,13 @@
     },
     "toolRun": {
       "sheetTitle": "استدعاءات الأدوات",
-      "condensedLabel": "{{itemCount}} عناصر؛ {{last}}"
+      "condensedLabel": "{{itemCount}} عناصر؛ {{last}}",
+      "condensedLabel_one": "{{itemCount}} عنصر؛ {{last}}",
+      "condensedLabel_other": "{{itemCount}} عناصر؛ {{last}}",
+      "condensedLabel_zero": "{{itemCount}} عناصر؛ {{last}}",
+      "condensedLabel_two": "{{itemCount}} عنصران؛ {{last}}",
+      "condensedLabel_few": "{{itemCount}} عناصر؛ {{last}}",
+      "condensedLabel_many": "{{itemCount}} عنصرًا؛ {{last}}"
     }
   },
   "bootstrap": {
@@ -2289,7 +2378,13 @@
     "cliCantReceiveFilesTitle": "لا يمكن لهذه الجلسة استقبال الملفات",
     "cliCantReceiveFilesMessage": "لا يمكن لأداة Kilo CLI التي تشغّل هذه الجلسة استقبال الملفات. حدّث CLI على ذلك الجهاز، أو أرسل المحتوى إلى جلسة جديدة بدلًا من ذلك.",
     "contentlessMessage": "لا يوجد محتوى لمشاركته. لم يُرفق أي نص أو ملفات.",
-    "couldNotReadContent": "تعذّرت قراءة المحتوى الذي تمت مشاركته."
+    "couldNotReadContent": "تعذّرت قراءة المحتوى الذي تمت مشاركته.",
+    "onlyFirstFilesAttached_one": "ستُرفق الملفات الأولى فقط، وعددها {{displayCount}}.",
+    "onlyFirstFilesAttached_other": "ستُرفق الملفات الأولى فقط، وعددها {{displayCount}}.",
+    "onlyFirstFilesAttached_zero": "ستُرفق الملفات الأولى فقط، وعددها {{displayCount}}.",
+    "onlyFirstFilesAttached_two": "ستُرفق الملفات الأولى فقط، وعددها {{displayCount}}.",
+    "onlyFirstFilesAttached_few": "ستُرفق الملفات الأولى فقط، وعددها {{displayCount}}.",
+    "onlyFirstFilesAttached_many": "ستُرفق الملفات الأولى فقط، وعددها {{displayCount}}."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2454,11 +2549,11 @@
     "checkConnection": "التحقق من الاتصال",
     "checks": {
       "checksCount": "الفحوصات: {{displayCount}}",
-      "checksCount_zero": "عدد الفحوصات: {{displayCount}}",
-      "checksCount_one": "{{displayCount}} فحص",
-      "checksCount_two": "{{displayCount}} فحصان",
-      "checksCount_few": "{{displayCount}} فحوصات",
-      "checksCount_many": "{{displayCount}} فحصًا",
+      "checksCount_zero": "فحوصات: {{displayCount}}",
+      "checksCount_one": "فحص: {{displayCount}}",
+      "checksCount_two": "فحصان: {{displayCount}}",
+      "checksCount_few": "فحوصات: {{displayCount}}",
+      "checksCount_many": "فحصًا: {{displayCount}}",
       "checksCount_other": "الفحوصات: {{displayCount}}",
       "couldNotLoad": "تعذّر تحميل الفحوصات.",
       "failed": "فاشلة: {{displayCount}}",
@@ -2609,7 +2704,13 @@
         "outdatedOnPath": "قديم في {{path}}"
       },
       "deletedUser": "مستخدم محذوف",
-      "replyForbiddenTerm": "ليست لديك صلاحية للرد على {{term}} هذا."
+      "replyForbiddenTerm": "ليست لديك صلاحية للرد على {{term}} هذا.",
+      "moreLinesAbove_one": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
+      "moreLinesAbove_other": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
+      "moreLinesAbove_zero": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
+      "moreLinesAbove_two": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
+      "moreLinesAbove_few": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
+      "moreLinesAbove_many": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}."
     },
     "entry": {
       "eyebrow": "افتح طلب سحب أو طلب دمج باستخدام عنوان URL.",
@@ -2715,7 +2816,37 @@
       "fileLoadedOfTotalCount_zero": "الملفات المحمّلة: {{displayCount}} من {{total}}",
       "fileLoadedOfTotalCount_two": "تم تحميل ملفين ({{displayCount}}) من {{total}}",
       "fileLoadedOfTotalCount_few": "تم تحميل {{displayCount}} ملفات من {{total}}",
-      "fileLoadedOfTotalCount_many": "تم تحميل {{displayCount}} ملفًا من {{total}}"
+      "fileLoadedOfTotalCount_many": "تم تحميل {{displayCount}} ملفًا من {{total}}",
+      "expandAllLines_one": "إظهار جميع الأسطر وعددها {{displayCount}}",
+      "expandAllLines_other": "إظهار جميع الأسطر وعددها {{displayCount}}",
+      "expandAllLines_zero": "إظهار جميع الأسطر وعددها {{displayCount}}",
+      "expandAllLines_two": "إظهار جميع الأسطر وعددها {{displayCount}}",
+      "expandAllLines_few": "إظهار جميع الأسطر وعددها {{displayCount}}",
+      "expandAllLines_many": "إظهار جميع الأسطر وعددها {{displayCount}}",
+      "expandLines_one": "إظهار الأسطر: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_other": "إظهار الأسطر: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_zero": "إظهار الأسطر: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_two": "إظهار الأسطر: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_few": "إظهار الأسطر: {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_many": "إظهار الأسطر: {{displayCount}} ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "إظهار أسطر السياق: {{displayCount}}",
+      "expandLinesOfContext_other": "إظهار أسطر السياق: {{displayCount}}",
+      "expandLinesOfContext_zero": "إظهار أسطر السياق: {{displayCount}}",
+      "expandLinesOfContext_two": "إظهار أسطر السياق: {{displayCount}}",
+      "expandLinesOfContext_few": "إظهار أسطر السياق: {{displayCount}}",
+      "expandLinesOfContext_many": "إظهار أسطر السياق: {{displayCount}}",
+      "expandMoreLines_one": "إظهار أسطر إضافية: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_other": "إظهار أسطر إضافية: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_zero": "إظهار أسطر إضافية: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_two": "إظهار أسطر إضافية: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_few": "إظهار أسطر إضافية: {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_many": "إظهار أسطر إضافية: {{displayCount}} ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "الملفات المحمّلة: {{loaded}} من {{total}}",
+      "loadedOfTotalFiles_other": "الملفات المحمّلة: {{loaded}} من {{total}}",
+      "loadedOfTotalFiles_zero": "الملفات المحمّلة: {{loaded}} من {{total}}",
+      "loadedOfTotalFiles_two": "الملفات المحمّلة: {{loaded}} من {{total}}",
+      "loadedOfTotalFiles_few": "الملفات المحمّلة: {{loaded}} من {{total}}",
+      "loadedOfTotalFiles_many": "الملفات المحمّلة: {{loaded}} من {{total}}"
     },
     "inbox": {
       "couldNotLoad": "تعذّر تحميل صندوق الوارد.",
@@ -2928,7 +3059,13 @@
       "statusContext": "السياق",
       "lineLabel": "السطر {{line}}، {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(فارغ)"
+      "emptyLine": "(فارغ)",
+      "truncationBanner_one": "نعرض أول {{limit}} ملفًا من الملفات التي تغيّرت، وعددها {{total}}، بسبب حد API لدى GitHub.",
+      "truncationBanner_other": "نعرض أول {{limit}} ملفًا من الملفات التي تغيّرت، وعددها {{total}}، بسبب حد API لدى GitHub.",
+      "truncationBanner_zero": "نعرض أول {{limit}} ملفًا من الملفات التي تغيّرت، وعددها {{total}}، بسبب حد API لدى GitHub.",
+      "truncationBanner_two": "نعرض أول {{limit}} ملفًا من الملفات التي تغيّرت، وعددها {{total}}، بسبب حد API لدى GitHub.",
+      "truncationBanner_few": "نعرض أول {{limit}} ملفًا من الملفات التي تغيّرت، وعددها {{total}}، بسبب حد API لدى GitHub.",
+      "truncationBanner_many": "نعرض أول {{limit}} ملفًا من الملفات التي تغيّرت، وعددها {{total}}، بسبب حد API لدى GitHub."
     },
     "linkPasteClipboardEmpty": "الحافظة فارغة.",
     "linkPasteNotAPullRequest": "هذا ليس رابط طلب سحب أو طلب دمج",
@@ -3189,7 +3326,9 @@
     "couldNotApprove": "تعذّرت الموافقة",
     "couldNotStart": "تعذّر البدء",
     "channelName": "الوكلاء النشطون",
-    "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل."
+    "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل.",
+    "openSession": "افتح",
+    "approveFailed": "تعذّر الموافقة. اضغط على $t(common.approve) للمحاولة مرة أخرى."
   },
   "transcriptionModel": {
     "title": "نموذج التفريغ الصوتي",
@@ -3214,15 +3353,7 @@
     "remoteOptionTitle": "حاسوبك",
     "remoteOptionBody": "شغّل Kilo على جهازك نفسه عبر واجهة سطر الأوامر `kilo remote`.",
     "skip": "تخطي الجولة",
-    "tutorialLabel": "برنامج تعليمي",
-    "remoteTitle": "ابدأ جلستك عن بُعد الأولى",
-    "remoteBody": "قم بتوصيل حاسوبك، ثم ابدأ الجلسة من هنا.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "لا يوجد حاسوب متصل بعد",
-    "remoteEmptyBody": "شغّل `kilo remote` على حاسوبك لتوصيله.",
-    "remoteFound": "تم توصيل الحاسوب",
-    "checkAgain": "تحقق مرة أخرى",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "برنامج تعليمي"
   },
   "appActions": {
     "start": {

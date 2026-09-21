@@ -163,6 +163,7 @@
     "useDifferentEmail": "Օգտագործել այլ էլ. փոստի հասցե",
     "signInWithApple": "Մուտք գործել Apple-ով",
     "signInWithGoogle": "Մուտք գործել Google-ով",
+    "signInWithPasskey": "Մուտք գործել մուտքի բանալիով",
     "emailAddress": "Էլ. փոստի հասցե",
     "emailPlaceholder": "անուն@example.com",
     "continueWithEmail": "Շարունակել էլ. փոստով",
@@ -175,6 +176,10 @@
     "termsConnector": " և ",
     "termsSuffix": "։",
     "moreSignInOptions": "Մուտքի այլ տարբերակներ",
+    "passkeyCancelled": "Մուտքը մուտքի բանալիով չեղարկվել է։ Փորձեք կրկին։",
+    "passkeyNotFound": "Այս սարքի համար մուտքի բանալի պահված չէ։ Փոխարենը մուտք գործեք Apple-ով, Google-ով կամ ձեր էլ. փոստով։",
+    "passkeyUnsupported": "Մուտքի բանալիները հասանելի չեն այս սարքում։ Փոխարենը մուտք գործեք Apple-ով, Google-ով կամ ձեր էլ. փոստով։",
+    "passkeyFailed": "Չհաջողվեց մուտք գործել մուտքի բանալիով։ Փորձեք կրկին։",
     "couldNotCompleteSignIn": "Չհաջողվեց ավարտել մուտքը։ Կրկին փորձիր։",
     "sessionEnded": "Քո նիստն ավարտվել է։ Նորից մուտք գործիր։",
     "signInCodeExpired": "Մուտքի կոդիդ ժամկետը լրացել է։ Կրկին փորձիր։",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Թեստային հաշիվ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Կորպորատիվ SSO"
+    "providerEnterpriseSso": "Կորպորատիվ SSO",
+    "passkeysTitle": "Մուտքի բանալիներ",
+    "passkeysSubtitle": "Մուտք գործել առանց գաղտնաբառի",
+    "passkeysEmpty": "Դեռ մուտքի բանալիներ չկան",
+    "passkeysEmptyHint": "$t(profile.addPasskey)՝ առանց գաղտնաբառի մուտք գործելու համար։",
+    "passkeysCouldNotLoad": "Չհաջողվեց բեռնել մուտքի բանալիները",
+    "passkeysLoadFailed": "Մուտքի բանալիները հասանելի չեն, քանի դեռ սա չի բեռնվել։",
+    "addPasskey": "Ավելացնել մուտքի բանալի",
+    "passkeyDefaultName": "Մուտքի բանալի",
+    "passkeyAddedOn": "Ավելացվել է {{date}}",
+    "passkeyAdded": "Մուտքի բանալին ավելացվել է։",
+    "passkeyAddFailed": "Չհաջողվեց ավելացնել մուտքի բանալի։ Փորձեք կրկին։",
+    "passkeyAddUnsupported": "Այս սարքը չի կարող ստեղծել մուտքի բանալիներ։",
+    "passkeyAddCancelled": "Մուտքի բանալու ստեղծումը չեղարկվել է։",
+    "passkeyRemoved": "Մուտքի բանալին հեռացվել է։",
+    "passkeyRemoveFailed": "Չհաջողվեց հեռացնել այդ մուտքի բանալին։ Փորձեք կրկին։",
+    "passkeyRenamed": "Մուտքի բանալին վերանվանվել է։",
+    "passkeyName": "Մուտքի բանալու անունը",
+    "renamePasskey": "Վերանվանել մուտքի բանալին",
+    "removePasskey": "Հեռացնել մուտքի բանալին",
+    "removePasskeyTitle": "Հեռացնե՞լ մուտքի բանալին։",
+    "removePasskeyMessage": "Այլևս չեք կարողանա մուտք գործել այս մուտքի բանալիով։"
   },
   "preferences": {
     "general": "Ընդհանուր",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "Բեռնված է {{total}} ֆայլից {{displayCount}}-ը",
       "filesStillLoading": "Ֆայլերը դեռ բեռնվում են։ Քաշիր ներքև՝ թարմացնելու համար։",
       "goToOverview": "Անցնել ակնարկին",
-      "goToOverviewTab": "Անցնել ակնարկի ներդիրին"
+      "goToOverviewTab": "Անցնել ակնարկի ներդիրին",
+      "expandAllLines_one": "Ցույց տալ բոլոր {{displayCount}} տողերը",
+      "expandAllLines_other": "Ցույց տալ բոլոր {{displayCount}} տողերը",
+      "expandLines_one": "Ցույց տալ {{displayCount}} տող ({{start}}–{{end}})",
+      "expandLines_other": "Ցույց տալ {{displayCount}} տող ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Ցույց տալ համատեքստի {{displayCount}} տող",
+      "expandLinesOfContext_other": "Ցույց տալ համատեքստի {{displayCount}} տող",
+      "expandMoreLines_one": "Ցույց տալ ևս {{displayCount}} տող ({{start}}–{{end}})",
+      "expandMoreLines_other": "Ցույց տալ ևս {{displayCount}} տող ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "բեռնված է {{total}} ֆայլից {{loaded}}-ը",
+      "loadedOfTotalFiles_other": "բեռնված է {{total}} ֆայլից {{loaded}}-ը"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ֆայլի վերջում նոր տողի նշան չկա։",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Հնացած՝ {{path}}"
       },
       "deletedUser": "ջնջված օգտատեր",
-      "replyForbiddenTerm": "Այս {{term}}-ին պատասխանելու թույլտվություն չունես։"
+      "replyForbiddenTerm": "Այս {{term}}-ին պատասխանելու թույլտվություն չունես։",
+      "moreLinesAbove_one": "… վերևում կա ևս {{displayCount}} տող։",
+      "moreLinesAbove_other": "… վերևում կա ևս {{displayCount}} տող։"
     },
     "couldNotOpenGitHubAppSettings": "Չհաջողվեց բացել GitHub հավելվածի կարգավորումները։",
     "installKiloGitHubApp": "Տեղադրել Kilo GitHub հավելվածը",
@@ -706,7 +744,9 @@
       "statusContext": "Համատեքստ",
       "lineLabel": "{{status}} տող {{line}}՝ {{text}}",
       "lineLabelNoNumber": "{{status}}՝ {{text}}",
-      "emptyLine": "(դատարկ)"
+      "emptyLine": "(դատարկ)",
+      "truncationBanner_one": "Ցուցադրվում են փոփոխված {{total}} ֆայլից առաջին {{limit}}-ը՝ GitHub API-ի սահմանափակման պատճառով։",
+      "truncationBanner_other": "Ցուցադրվում են փոփոխված {{total}} ֆայլից առաջին {{limit}}-ը՝ GitHub API-ի սահմանափակման պատճառով։"
     },
     "linkPasteClipboardEmpty": "Սեղմատախտակը դատարկ է։",
     "linkPasteNotAPullRequest": "Սա միավորման կամ միաձուլման հարցման հղում չէ",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Ծանուցումները հաղորդագրության տեքստը ցուցադրում են կողպված էկրանին։",
     "previewGenericDescription": "Ծանուցումները հայտնում են միայն նոր իրադարձության մասին։ Բացեք Kilo-ն՝ հաղորդագրությունը կարդալու համար։",
     "channel": {
-      "agent": "Գործակալի նիստեր",
+      "agentProgress": "Գործակալի ընթացքը",
       "chat": "Զրույցի հաղորդագրություններ",
       "kiloclaw": "KiloClaw-ի ակտիվություն",
       "balance": "Մնացորդի մասին զգուշացումներ",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "միջավայրը պատրաստ է կամ ձախողվել է, պլանավորված գործողություններ",
       "balanceAlertsSubtitle": "կազմակերպության ցածր մնացորդի նախազգուշացումներ",
       "securityFindingsSubtitle": "հայտնաբերված նոր խնդիրներ և SLA հիշեցումներ"
+    },
+    "action": {
+      "openSession": "Բացել նիստը"
+    },
+    "needsInputAction": {
+      "approved": "Հարցումը հաստատվեց",
+      "replied": "Պատասխանն ուղարկվեց",
+      "failed": "Չհաջողվեց պատասխանել: Կրկին փորձելու համար նորից հպեք:",
+      "unavailable": "Այս հարցումն այլևս չի սպասում:"
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Վերբեռնումը ձախողվեց։",
       "failedToUploadFile": "Չհաջողվեց վերբեռնել ֆայլը՝ {{reason}}։",
       "nothingToPaste": "Տեղադրելու բան չկա։",
-      "metadataStripFailed": "Չհաջողվեց հեռացնել լուսանկարի մետատվյալները։"
+      "metadataStripFailed": "Չհաջողվեց հեռացնել լուսանկարի մետատվյալները։",
+      "limit_one": "Կարող ես կցել մինչև {{displayCount}} ֆայլ։",
+      "limit_other": "Կարող ես կցել մինչև {{displayCount}} ֆայլ։"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}՝ {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Համաժամեցնել խնդիրները",
       "syncNow": "Համաժամեցնել հիմա",
       "syncQueued": "Համաժամեցումը հերթագրված է",
-      "syncStatusUnavailable": "Համաժամեցման կարգավիճակն անհասանելի է։"
+      "syncStatusUnavailable": "Համաժամեցման կարգավիճակն անհասանելի է։",
+      "daysOverdue_one": "{{displayCount}} օրով ժամկետանց",
+      "daysOverdue_other": "{{displayCount}} օրով ժամկետանց",
+      "findingsCount_one": "{{displayCount}} խնդիր",
+      "findingsCount_other": "{{displayCount}} խնդիր"
     },
     "dashboardMetrics": {
       "openFindings": "Բաց խնդիրներ",
@@ -2131,20 +2186,7 @@
       "continueFrom": "Շարունակվում է «{{title}}» նիստը։",
       "importingSession": "Նիստը ներմուծվում է",
       "cliCannotContinue": "Այս CLI-ն չի կարող շարունակել նիստը։ Ընտրեք Cloud Agent-ը կամ մեկ այլ CLI։",
-      "importFailed": "Չհաջողվեց ներմուծել այս նիստը։",
-      "sandbox": "Ավազարկղ",
-      "sandboxAccessibility": "Ավազարկղ՝ {{label}}",
-      "sandboxDefaultWithDestination": "Կանխադրված · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Փոքր",
-      "sandboxInstanceShared": "Համատեղ",
-      "sandboxInstanceLarge": "Մեծ",
-      "sandboxInstanceDevcontainer": "Մշակման կոնտեյներ",
-      "sandboxInstanceProviderDefault": "Մատակարարի կանխադրված",
-      "sandboxCouldNotLoad": "Չհաջողվեց բեռնել ավազարկղի տարբերակները",
-      "sandboxUnavailable": "Այս ավազարկղը հասանելի չէ: Ընտրեք այլ ավազարկղ կամ Կանխադրված:",
-      "sandboxUseDefault": "Օգտագործել Կանխադրվածը"
+      "importFailed": "Չհաջողվեց ներմուծել այս նիստը։"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ։",
@@ -2168,7 +2210,14 @@
       "updateTodos": "Թարմացնել անելիքները",
       "linesBadge": "{{displayCount}} տող",
       "filesBadge": "{{displayCount}} ֆայլ",
-      "matchesBadge": "{{displayCount}} համընկնում"
+      "matchesBadge": "{{displayCount}} համընկնում",
+      "filesBadge_one": "{{displayCount}} ֆայլ",
+      "filesBadge_other": "{{displayCount}} ֆայլ",
+      "linesBadge_one": "{{displayCount}} տող",
+      "linesBadge_other": "{{displayCount}} տող",
+      "matchesBadge_one": "{{displayCount}} համընկնում",
+      "matchesBadge_other": "{{displayCount}} համընկնում",
+      "noOutput": "Ելք չկա։"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} տողերը (կրճատված)",
@@ -2458,7 +2507,11 @@
       "files": "Ֆայլեր",
       "couldNotOpenPhotoPicker": "Չհաջողվեց բացել լուսանկարների ընտրիչը։ Վերագործարկեք Kilo-ն և կրկին փորձեք։",
       "maxFilesAllowed": "Կարող եք ավելացնել առավելագույնը {{displayCount}} ֆայլ։",
-      "onlyAddingFiles": "{{total}} ֆայլից ավելացվում է միայն {{accepted}}-ը (առավելագույնը՝ {{max}})"
+      "onlyAddingFiles": "{{total}} ֆայլից ավելացվում է միայն {{accepted}}-ը (առավելագույնը՝ {{max}})",
+      "maxFilesAllowed_one": "Կարող եք ավելացնել առավելագույնը {{displayCount}} ֆայլ։",
+      "maxFilesAllowed_other": "Կարող եք ավելացնել առավելագույնը {{displayCount}} ֆայլ։",
+      "onlyAddingFiles_one": "{{total}} ֆայլից ավելացվում է միայն {{accepted}}-ը (առավելագույնը՝ {{max}})",
+      "onlyAddingFiles_other": "{{total}} ֆայլից ավելացվում է միայն {{accepted}}-ը (առավելագույնը՝ {{max}})"
     },
     "composer": {
       "addAttachment": "Կցել ֆայլ",
@@ -2476,7 +2529,9 @@
       "discardAttachmentsMessage": "Ուղարկված հաղորդագրություններին չկցված վերբեռնված ֆայլերը կջնջվեն։",
       "discardAttachmentsTitle": "Ջնջե՞լ կցումները",
       "charactersRemaining": "Մնացել է {{count}} նիշ",
-      "insertNewline": "Տեղադրել նոր տող"
+      "insertNewline": "Տեղադրել նոր տող",
+      "charactersRemaining_one": "Մնացել է {{count}} նիշ",
+      "charactersRemaining_other": "Մնացել է {{count}} նիշ"
     },
     "chatLink": {
       "linkCopied": "Հղումը պատճենված է",
@@ -2548,7 +2603,9 @@
       "stepsCount_one": "{{steps}} քայլ",
       "stepsCount": "{{steps}} քայլ",
       "stepsCount_other": "{{steps}} քայլ",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Մոդել ({{displayCount}})",
+      "modelsCount_other": "Մոդելներ ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Ավտոմատ հաստատում",
@@ -2588,7 +2645,9 @@
     },
     "toolRun": {
       "sheetTitle": "Գործիքների կանչեր",
-      "condensedLabel": "{{itemCount}} տարր; {{last}}"
+      "condensedLabel": "{{itemCount}} տարր; {{last}}",
+      "condensedLabel_one": "{{itemCount}} տարր; {{last}}",
+      "condensedLabel_other": "{{itemCount}} տարր; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2782,9 @@
     "cliCantReceiveFilesTitle": "Այս նիստը չի կարող ստանալ ֆայլեր",
     "cliCantReceiveFilesMessage": "Այս նիստը գործարկող Kilo CLI-ն չի կարող ստանալ ֆայլեր։ Թարմացրու CLI-ն այդ համակարգչում կամ բովանդակությունն ուղարկիր նոր նիստի։",
     "contentlessMessage": "Ուղարկելու բան չկա․ տեքստ կամ ֆայլեր չկան։",
-    "couldNotReadContent": "Չհաջողվեց կարդալ ուղարկվող բովանդակությունը։"
+    "couldNotReadContent": "Չհաջողվեց կարդալ ուղարկվող բովանդակությունը։",
+    "onlyFirstFilesAttached_one": "Կկցվեն միայն առաջին {{displayCount}} ֆայլերը։",
+    "onlyFirstFilesAttached_other": "Կկցվեն միայն առաջին {{displayCount}} ֆայլերը։"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3154,9 @@
     "couldNotApprove": "Չհաջողվեց հաստատել",
     "couldNotStart": "Չհաջողվեց սկսել",
     "channelName": "Ակտիվ գործակալներ",
-    "activityKitDisabledBody": "Կարգավորումներում միացրու ընթացիկ գործողությունների ցուցադրումը՝ ակտիվ գործակալներին կողպման էկրանին տեսնելու համար։"
+    "activityKitDisabledBody": "Կարգավորումներում միացրու ընթացիկ գործողությունների ցուցադրումը՝ ակտիվ գործակալներին կողպման էկրանին տեսնելու համար։",
+    "openSession": "Բացիր",
+    "approveFailed": "Չհաջողվեց հաստատել։ Կրկին փորձելու համար հպեք $t(common.approve)-ին։"
   },
   "transcriptionModel": {
     "title": "Տեքստի վերածման մոդել",
@@ -3118,15 +3181,7 @@
     "remoteOptionTitle": "Քո համակարգիչը",
     "remoteOptionBody": "Գործարկիր Kilo-ն քո սեփական համակարգչում՝ `kilo remote` CLI-ի միջոցով։",
     "skip": "Բաց թողնել ուղեցույցը",
-    "tutorialLabel": "Ուղեցույց",
-    "remoteTitle": "Սկսիր քո առաջին հեռակա աշխատաշրջանը",
-    "remoteBody": "Միացրու քո համակարգիչը, ապա աշխատաշրջանը սկսիր այստեղից։",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Քո համակարգիչը դեռ միացված չէ",
-    "remoteEmptyBody": "Կատարիր `kilo remote` քո համակարգչում՝ այն միացնելու համար։",
-    "remoteFound": "Համակարգիչը միացված է",
-    "checkAgain": "Կրկին ստուգիր",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Ուղեցույց"
   },
   "appActions": {
     "start": {

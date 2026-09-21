@@ -160,14 +160,28 @@ export function PrRefsRow({
   return (
     <View className="flex-row items-center gap-2">
       <GitBranch size={14} color={colors.mutedForeground} />
-      <Text variant="mono" className="text-[13px]" numberOfLines={1} ellipsizeMode="middle">
+      {/* The head ref is the row's flexible value: it shrinks so it ellipsizes
+          instead of running past the screen edge, while the short base ref
+          keeps its full width. `min-w-0` lets the text go below its content
+          width; without it the row overflows and hard-clips. */}
+      <Text
+        variant="mono"
+        className="min-w-0 shrink text-[13px]"
+        numberOfLines={1}
+        ellipsizeMode="middle"
+      >
         {headRepoFullName && isCrossRepo ? `${headRepoFullName}:` : ''}
         {headRef}
       </Text>
-      <Text variant="muted" className="text-sm">
+      <Text variant="muted" className="shrink-0 text-sm">
         ←
       </Text>
-      <Text variant="mono" className="text-[13px]" numberOfLines={1} ellipsizeMode="middle">
+      <Text
+        variant="mono"
+        className="max-w-1/2 shrink-0 text-[13px]"
+        numberOfLines={1}
+        ellipsizeMode="middle"
+      >
         {baseRef}
       </Text>
     </View>

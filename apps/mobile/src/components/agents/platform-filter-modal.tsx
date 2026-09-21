@@ -135,7 +135,10 @@ export function SessionFilterModal({
           // checkboxes/buttons inside stay individually navigable by VoiceOver
           // (a pressable defaults to accessible=true and would collapse them).
           accessible={false}
-          className="gap-4 rounded-2xl bg-popover p-5"
+          // Bounded so the row list can grow to the server's full recent-repository
+          // set without pushing the Apply/Cancel row off-screen: the ScrollView
+          // below shrinks into this cap and scrolls.
+          className="max-h-[80%] gap-4 rounded-2xl bg-popover p-5"
           onPress={e => {
             e.stopPropagation();
           }}
@@ -143,7 +146,7 @@ export function SessionFilterModal({
           <Text accessibilityRole="header" className="text-center text-base font-semibold">
             {t('agentChat.sessionFilter.title')}
           </Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView className="shrink" showsVerticalScrollIndicator={false}>
             <View className="gap-4">
               <View className="gap-1">
                 <Text variant="eyebrow" className="px-3">

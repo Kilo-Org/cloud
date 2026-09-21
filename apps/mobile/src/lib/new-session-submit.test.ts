@@ -152,7 +152,6 @@ describe('resolveNewSessionStartDisabled', () => {
       ...validInput(),
       selectedRepositoryResolved: true,
       isProfileLoading: false,
-      sandboxUnavailable: false,
       ...overrides,
     };
   }
@@ -184,20 +183,6 @@ describe('resolveNewSessionStartDisabled', () => {
         startInput({ selectedRepo: 'github:owner/repo', selectedRepositoryResolved: true })
       )
     ).toBe(false);
-  });
-
-  it('blocks Start when the picked sandbox is known unavailable', () => {
-    // A settled capabilities verdict that the picked allocation is no longer
-    // offered: the server would reject the create outright, so Start blocks.
-    expect(resolveNewSessionStartDisabled(startInput({ sandboxUnavailable: true }))).toBe(true);
-  });
-
-  it('keeps Start enabled when the sandbox capabilities query failed (sandboxUnavailable false)', () => {
-    // A failed or still-loading capabilities query is NOT a disable reason:
-    // the screen passes `sandboxUnavailable: false`, the form shows Retry, and
-    // Start submits the pick for the server to arbitrate (nothing picked means
-    // the backend default applies).
-    expect(resolveNewSessionStartDisabled(startInput({ sandboxUnavailable: false }))).toBe(false);
   });
 });
 

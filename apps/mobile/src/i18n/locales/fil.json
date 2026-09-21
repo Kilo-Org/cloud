@@ -163,6 +163,7 @@
     "useDifferentEmail": "Gumamit ng ibang email",
     "signInWithApple": "Mag-sign in gamit ang Apple",
     "signInWithGoogle": "Mag-sign in gamit ang Google",
+    "signInWithPasskey": "Mag-sign in gamit ang passkey",
     "emailAddress": "Address ng email",
     "emailPlaceholder": "ikaw@example.com",
     "continueWithEmail": "Magpatuloy gamit ang email",
@@ -175,6 +176,10 @@
     "termsConnector": " at ",
     "termsSuffix": ".",
     "moreSignInOptions": "Higit pang mga opsyon sa pag-sign in",
+    "passkeyCancelled": "Kinansela ang pag-sign in gamit ang passkey. Subukan muli.",
+    "passkeyNotFound": "Walang naka-save na passkey para sa device na ito. Mag-sign in gamit ang Apple, Google, o ang iyong email sa halip.",
+    "passkeyUnsupported": "Hindi available ang mga passkey sa device na ito. Mag-sign in gamit ang Apple, Google, o ang iyong email sa halip.",
+    "passkeyFailed": "Hindi makapag-sign in gamit ang passkey. Subukan muli.",
     "couldNotCompleteSignIn": "Hindi makumpleto ang pag-sign in. Pakisubukang muli.",
     "sessionEnded": "Natapos na ang sesyon mo. Mag-sign in muli.",
     "signInCodeExpired": "Nag-expire na ang code mo sa pag-sign in. Pakisubukang muli.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Akawnt sa pagsubok",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO para sa negosyo"
+    "providerEnterpriseSso": "SSO para sa negosyo",
+    "passkeysTitle": "Mga passkey",
+    "passkeysSubtitle": "Mag-sign in nang walang password",
+    "passkeysEmpty": "Wala pang passkey",
+    "passkeysEmptyHint": "$t(profile.addPasskey) para makapag-sign in nang walang password.",
+    "passkeysCouldNotLoad": "Hindi ma-load ang mga passkey",
+    "passkeysLoadFailed": "Hindi available ang mga passkey hanggang ma-load ito.",
+    "addPasskey": "Magdagdag ng passkey",
+    "passkeyDefaultName": "Passkey",
+    "passkeyAddedOn": "Idinagdag {{date}}",
+    "passkeyAdded": "Naidagdag ang passkey.",
+    "passkeyAddFailed": "Hindi maidagdag ang passkey. Subukan muli.",
+    "passkeyAddUnsupported": "Hindi makakagawa ng mga passkey ang device na ito.",
+    "passkeyAddCancelled": "Kinansela ang paggawa ng passkey.",
+    "passkeyRemoved": "Naalis ang passkey.",
+    "passkeyRemoveFailed": "Hindi maalis ang passkey na iyon. Subukan muli.",
+    "passkeyRenamed": "Napalitan ang pangalan ng passkey.",
+    "passkeyName": "Pangalan ng passkey",
+    "renamePasskey": "Palitan ang pangalan ng passkey",
+    "removePasskey": "Alisin ang passkey",
+    "removePasskeyTitle": "Alisin ang passkey?",
+    "removePasskeyMessage": "Hindi ka na makakapag-sign in gamit ang passkey na ito."
   },
   "preferences": {
     "general": "Pangkalahatan",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "Na-load ang {{displayCount}} sa {{total}} na payl",
       "filesStillLoading": "Nilo-load pa ang mga file. Hilahin pababa para i-refresh.",
       "goToOverview": "Pumunta sa buod",
-      "goToOverviewTab": "Pumunta sa tab ng buod"
+      "goToOverviewTab": "Pumunta sa tab ng buod",
+      "expandAllLines_one": "Ipakita ang lahat ng {{displayCount}} na linya",
+      "expandAllLines_other": "Ipakita ang lahat ng {{displayCount}} na linya",
+      "expandLines_one": "Ipakita ang {{displayCount}} na linya ({{start}}–{{end}})",
+      "expandLines_other": "Ipakita ang {{displayCount}} na linya ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Ipakita ang {{displayCount}} na linya ng konteksto",
+      "expandLinesOfContext_other": "Ipakita ang {{displayCount}} na linya ng konteksto",
+      "expandMoreLines_one": "Ipakita ang {{displayCount}} pang linya ({{start}}–{{end}})",
+      "expandMoreLines_other": "Ipakita ang {{displayCount}} pang linya ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} sa {{total}} na file ang na-load",
+      "loadedOfTotalFiles_other": "{{loaded}} sa {{total}} na file ang na-load"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ walang bagong linya sa dulo ng file",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Luma na sa {{path}}"
       },
       "deletedUser": "binurang user",
-      "replyForbiddenTerm": "Wala kang pahintulot na sumagot sa {{term}} na ito."
+      "replyForbiddenTerm": "Wala kang pahintulot na sumagot sa {{term}} na ito.",
+      "moreLinesAbove_one": "… may {{displayCount}} pang linya sa itaas.",
+      "moreLinesAbove_other": "… may {{displayCount}} pang linya sa itaas."
     },
     "couldNotOpenGitHubAppSettings": "Hindi mabuksan ang mga setting ng GitHub App.",
     "installKiloGitHubApp": "I-install ang Kilo GitHub App",
@@ -706,7 +744,9 @@
       "statusContext": "Konteksto",
       "lineLabel": "{{status}} na linya {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(walang laman)"
+      "emptyLine": "(walang laman)",
+      "truncationBanner_one": "Ipinapakita ang unang {{limit}} sa {{total}} na binagong file — ito ang limitasyon ng GitHub API.",
+      "truncationBanner_other": "Ipinapakita ang unang {{limit}} sa {{total}} na binagong file — ito ang limitasyon ng GitHub API."
     },
     "linkPasteClipboardEmpty": "Walang laman ang clipboard.",
     "linkPasteNotAPullRequest": "Hindi ito link ng pull request o merge request",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Ipinapakita ng mga notipikasyon ang teksto ng mensahe sa naka-lock mong screen.",
     "previewGenericDescription": "Ipinapaalam ng mga notipikasyon na may nangyari. Buksan ang Kilo para basahin ang mensahe.",
     "channel": {
-      "agent": "Mga sesyon ng ahente",
+      "agentProgress": "Pag-usad ng ahente",
       "chat": "Mga mensahe sa usapan",
       "kiloclaw": "Aktibidad ng KiloClaw",
       "balance": "Mga babala sa balanse",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "handa o nabigo ang instance, mga nakaiskedyul na aksyon",
       "balanceAlertsSubtitle": "mga babala sa mababang balanse ng organisasyon",
       "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA"
+    },
+    "action": {
+      "openSession": "Buksan ang sesyon"
+    },
+    "needsInputAction": {
+      "approved": "Aprubado ang kahilingan",
+      "replied": "Naipadala ang sagot",
+      "failed": "Hindi nasagot. I-tap muli para subukang muli.",
+      "unavailable": "Hindi na naghihintay ang kahilingang ito."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Nabigo ang pag-upload.",
       "failedToUploadFile": "Hindi ma-upload ang file: {{reason}}.",
       "nothingToPaste": "Walang maipa-paste.",
-      "metadataStripFailed": "Hindi maalis ang metadata ng larawan."
+      "metadataStripFailed": "Hindi maalis ang metadata ng larawan.",
+      "limit_one": "Maaari kang maglakip ng hanggang {{displayCount}} file.",
+      "limit_other": "Maaari kang maglakip ng hanggang {{displayCount}} file."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "I-sync ang mga natukoy na isyu",
       "syncNow": "I-sync ngayon",
       "syncQueued": "Nakapila ang sync",
-      "syncStatusUnavailable": "Hindi makuha ang katayuan ng pag-sync."
+      "syncStatusUnavailable": "Hindi makuha ang katayuan ng pag-sync.",
+      "daysOverdue_one": "{{displayCount}} araw nang lampas sa takdang petsa",
+      "daysOverdue_other": "{{displayCount}} araw nang lampas sa takdang petsa",
+      "findingsCount_one": "{{displayCount}} natukoy na isyu",
+      "findingsCount_other": "{{displayCount}} natukoy na isyu"
     },
     "dashboardMetrics": {
       "openFindings": "Mga bukas na isyu",
@@ -2131,20 +2186,7 @@
       "continueFrom": "Ipinagpapatuloy ang {{title}}.",
       "importingSession": "Ini-import ang sesyon",
       "cliCannotContinue": "Hindi kayang magpatuloy ng sesyon ang CLI na ito. Pumili ng Cloud Agent o ibang CLI.",
-      "importFailed": "Hindi ma-import ang sesyong ito.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Default · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Maliit",
-      "sandboxInstanceShared": "Nakabahagi",
-      "sandboxInstanceLarge": "Malaki",
-      "sandboxInstanceDevcontainer": "Dev container",
-      "sandboxInstanceProviderDefault": "Default ng provider",
-      "sandboxCouldNotLoad": "Hindi na-load ang mga opsyon ng sandbox",
-      "sandboxUnavailable": "Hindi available ang sandbox na ito. Pumili ng ibang sandbox o ng Default.",
-      "sandboxUseDefault": "Gamitin ang Default"
+      "importFailed": "Hindi ma-import ang sesyong ito."
     },
     "partRenderer": {
       "updatedFileCount_one": "Na-update ang {{displayCount}} na file.",
@@ -2168,7 +2210,14 @@
       "updateTodos": "I-update ang listahan ng gagawin",
       "linesBadge": "{{displayCount}} na linya",
       "filesBadge": "{{displayCount}} na file",
-      "matchesBadge": "{{displayCount}} tugma"
+      "matchesBadge": "{{displayCount}} tugma",
+      "filesBadge_one": "{{displayCount}} na file",
+      "filesBadge_other": "{{displayCount}} na file",
+      "linesBadge_one": "{{displayCount}} na linya",
+      "linesBadge_other": "{{displayCount}} na linya",
+      "matchesBadge_one": "{{displayCount}} tugma",
+      "matchesBadge_other": "{{displayCount}} tugma",
+      "noOutput": "Walang output."
     },
     "readToolMarkdown": {
       "linesTruncated": "mga linyang {{start}}–{{end}} (pinaikli)",
@@ -2458,7 +2507,11 @@
       "files": "Mga payl",
       "couldNotOpenPhotoPicker": "Hindi mabuksan ang pagpili ng larawan. I-restart ang Kilo at subukang muli.",
       "maxFilesAllowed": "Hanggang {{displayCount}} na file lang ang pinapayagan.",
-      "onlyAddingFiles": "{{accepted}} lang sa {{total}} na file ang idinaragdag (hanggang {{max}} lang)"
+      "onlyAddingFiles": "{{accepted}} lang sa {{total}} na file ang idinaragdag (hanggang {{max}} lang)",
+      "maxFilesAllowed_one": "Hanggang {{displayCount}} na file lang ang pinapayagan.",
+      "maxFilesAllowed_other": "Hanggang {{displayCount}} na file lang ang pinapayagan.",
+      "onlyAddingFiles_one": "{{accepted}} lang sa {{total}} na file ang idinaragdag (hanggang {{max}} lang)",
+      "onlyAddingFiles_other": "{{accepted}} lang sa {{total}} na file ang idinaragdag (hanggang {{max}} lang)"
     },
     "composer": {
       "addAttachment": "Magdagdag ng kalakip",
@@ -2476,7 +2529,9 @@
       "discardAttachmentsMessage": "Buburahin ang mga na-upload na file na hindi pa nagagamit.",
       "discardAttachmentsTitle": "Burahin ang mga kalakip?",
       "charactersRemaining": "{{count}} na character ang natitira",
-      "insertNewline": "Magpasok ng bagong linya"
+      "insertNewline": "Magpasok ng bagong linya",
+      "charactersRemaining_one": "{{count}} na character ang natitira",
+      "charactersRemaining_other": "{{count}} na character ang natitira"
     },
     "chatLink": {
       "linkCopied": "Nakopya ang link",
@@ -2548,7 +2603,9 @@
       "stepsCount_one": "{{steps}} hakbang",
       "stepsCount": "{{steps}} na hakbang",
       "stepsCount_other": "{{steps}} na hakbang",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Modelo ({{displayCount}})",
+      "modelsCount_other": "Mga modelo ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Auto-apruba",
@@ -2588,7 +2645,9 @@
     },
     "toolRun": {
       "sheetTitle": "Mga tawag ng kagamitan",
-      "condensedLabel": "{{itemCount}} item; {{last}}"
+      "condensedLabel": "{{itemCount}} item; {{last}}",
+      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_other": "{{itemCount}} item; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2782,9 @@
     "cliCantReceiveFilesTitle": "Hindi makakatanggap ng file ang session na ito",
     "cliCantReceiveFilesMessage": "Hindi makatanggap ng mga file ang Kilo CLI na nagpapatakbo ng session na ito. I-update ang CLI sa computer na iyon, o ibahagi ito sa bagong session.",
     "contentlessMessage": "Walang maibabahagi — walang kasamang teksto o file.",
-    "couldNotReadContent": "Hindi mabasa ang ibinahaging nilalaman."
+    "couldNotReadContent": "Hindi mabasa ang ibinahaging nilalaman.",
+    "onlyFirstFilesAttached_one": "Ang unang {{displayCount}} na file lang ang ilalakip.",
+    "onlyFirstFilesAttached_other": "Ang unang {{displayCount}} na file lang ang ilalakip."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3154,9 @@
     "couldNotApprove": "Hindi maaprubahan",
     "couldNotStart": "Hindi masimulan",
     "channelName": "Mga aktibong agent",
-    "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen."
+    "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
+    "openSession": "Buksan",
+    "approveFailed": "Hindi maaprubahan. I-tap ang $t(common.approve) para subukang muli."
   },
   "transcriptionModel": {
     "title": "Modelo para sa pagsasalin ng boses sa teksto",
@@ -3118,15 +3181,7 @@
     "remoteOptionTitle": "Iyong computer",
     "remoteOptionBody": "Patakbuhin ang Kilo sa iyong sariling machine gamit ang `kilo remote` CLI.",
     "skip": "Laktawan ang tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Simulan ang iyong unang remote session",
-    "remoteBody": "Ikonekta ang iyong computer, pagkatapos simulan ang sesyon mula rito.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Walang konektadong computer pa",
-    "remoteEmptyBody": "Para ikonekta ito, patakbuhin ang `kilo remote` sa iyong computer.",
-    "remoteFound": "Konektado ang computer",
-    "checkAgain": "Tingnan muli",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

@@ -53,14 +53,14 @@ describe('SectionHeader mounted layout', () => {
         node => Object.is(node.type, 'Text') && node.children.includes('Live now')
       );
 
+      // The Latin display treatment is LTR-only (home-ar-loading) and is
+      // asserted per direction by the letterspacing test below.
       expect((label.props.className as string).split(' ')).toEqual(
         expect.arrayContaining([
           'grow',
           'max-w-full',
           'font-mono-medium',
           'text-[10px]',
-          'tracking-[1.5px]',
-          'uppercase',
           'text-muted-foreground',
         ])
       );
@@ -83,13 +83,7 @@ describe('SectionHeader mounted layout', () => {
         expect.arrayContaining(['grow', 'max-w-full', 'flex-row', 'justify-end'])
       );
       expect((text.props.className as string).split(' ')).toEqual(
-        expect.arrayContaining([
-          'font-mono-medium',
-          'text-[11px]',
-          'tracking-[1.5px]',
-          'uppercase',
-          'text-primary',
-        ])
+        expect.arrayContaining(['font-mono-medium', 'text-[11px]', 'text-primary'])
       );
       expect(text.props.numberOfLines).toBeUndefined();
       expect(text.props.allowFontScaling).not.toBe(false);
@@ -121,6 +115,38 @@ describe('SectionHeader mounted layout', () => {
       expect(classes).not.toContain('text-right');
     }
   );
+
+  // Finding home-ar-loading: the Arabic section labels carried the Latin
+  // uppercase letter-spacing, whose glyph gaps break a cursive script's joins
+  // ('ال جلسا ت'). The display treatment is LTR-only.
+  it.each([
+    { isRTL: false, tracked: true },
+    { isRTL: true, tracked: false },
+  ])('letterspaces the section labels only outside RTL (RTL=$isRTL)', ({ isRTL, tracked }) => {
+    i18nManager.isRTL = isRTL;
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'الجلسات الجارية الآن',
+        actionLabel: 'عرض الكل',
+        onActionPress: () => undefined,
+      })
+    );
+    const action = root.findByProps({ accessibilityRole: 'button' });
+    const text = action.find(node => Object.is(node.type, 'Text'));
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
+    );
+
+    for (const node of [label, text]) {
+      const classes = (node.props.className as string).split(' ');
+      if (tracked) {
+        expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
+      } else {
+        expect(classes).not.toContain('uppercase');
+        expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+      }
+    }
+  });
 
   it('keeps the complete accessible action name and activates the supplied destination', () => {
     function Destination() {

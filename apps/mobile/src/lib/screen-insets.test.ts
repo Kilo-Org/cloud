@@ -74,6 +74,9 @@ describe('screen side insets: one implementation for both platforms', () => {
     expect(profile, `${PROFILE_SCREEN} imports the native safe-area module again`).not.toMatch(
       SAFE_AREA_MODULE
     );
+    // The sign-out confirmation legitimately picks its dialog per platform,
+    // which is not on the alignment path, so only the path from
+    // `useScreenSideInsets` to the first applied side inset is held to the rule.
     expect(
       alignmentPath(profile),
       `${PROFILE_SCREEN}'s alignment path carries a per-platform branch`

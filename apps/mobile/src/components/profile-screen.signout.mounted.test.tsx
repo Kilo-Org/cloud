@@ -32,6 +32,9 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// The screen reads its landscape side insets through `@/lib/screen-insets`,
+// so the native safe-area module has to be stubbed here as it is in
+// `profile-screen.queries.mounted.test.tsx`.
 // The screen reads its side insets through `@/lib/screen-insets`, which imports
 // this native module; its untransformed source breaks the mounted project.
 vi.mock('react-native-safe-area-context', () => ({

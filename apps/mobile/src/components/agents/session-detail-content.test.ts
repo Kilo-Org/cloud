@@ -1726,7 +1726,7 @@ describe('child transcript requests', () => {
     const errorProps = view.renderer.root.findByType(QueryError).props as ComponentProps<
       typeof QueryError
     >;
-    expect(errorProps.message).toBe('Connection lost. Please retry in a moment.');
+    expect(errorProps.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
     expect(renderedText(cardFor(view.renderer, SELECTED_ID))).toContain('Task ses-selected');
     expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
 
@@ -1751,7 +1751,7 @@ describe('child transcript requests', () => {
     const errorProps = view.renderer.root.findByType(QueryError).props as ComponentProps<
       typeof QueryError
     >;
-    expect(errorProps.message).toBe('You are not authorized to use the Cloud Agent.');
+    expect(errorProps.message).toBe(i18n.t('queryError.permissionDescription'));
     expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
     act(() => {
       sheetProps(view.renderer).onClose();
@@ -2300,6 +2300,34 @@ describe('SessionDetailContent goal visibility', () => {
     motionPolicy.reducedMotion = true;
     const reduced = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
     expect(goalWrapperOf(reduced).props.layout).toBeUndefined();
+  });
+});
+
+describe('SessionDetailContent transcript entrance', () => {
+  beforeEach(() => {
+    motionPolicy.reducedMotion = false;
+  });
+
+  /** The wrapper the screen draws around the transcript list. */
+  function transcriptWrapperOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (list === undefined) {
+      throw new Error('Missing SessionMessageList');
+    }
+    const wrapper = list.parent;
+    if (wrapper === null) {
+      throw new Error('Missing the transcript wrapper');
+    }
+    return wrapper;
+  }
+
+  it('paints the transcript without an entrance animation', async () => {
+    const animated = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    // The transcript body must never depend on an entrance animation to become
+    // visible: Reanimated's `FadeIn` carries `initialValues: { opacity: 0 }`, so
+    // a device that drops or never runs the entrance paints the whole body
+    // blank while the header already shows the loaded token count.
+    expect(transcriptWrapperOf(animated).props.entering).toBeUndefined();
   });
 });
 

@@ -41,7 +41,12 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#888' }),
+  useThemeColors: () => ({
+    card: '#17171A',
+    foreground: '#F2F0EB',
+    mutedForeground: '#8A8680',
+    border: 'rgba(255, 255, 255, 0.07)',
+  }),
 }));
 
 const Text = 'Text' as ElementType;
@@ -88,7 +93,14 @@ async function press(node: ReactTestInstance) {
 function nativePicker() {
   const call = showPicker.mock.lastCall as
     | [
-        { options: string[]; cancelButtonIndex: number; containerStyle: { paddingBottom: number } },
+        {
+          options: string[];
+          cancelButtonIndex: number;
+          title: string;
+          containerStyle: { paddingBottom: number; backgroundColor: string };
+          textStyle: { color: string };
+          titleTextStyle: { color: string };
+        },
         (index?: number) => void,
       ]
     | undefined;
@@ -166,6 +178,20 @@ describe('ContextControl', () => {
       expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe(expected);
     }
   );
+
+  it('themes the native picker with the active theme colors', async () => {
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await press(picker(ui));
+    const native = nativePicker();
+    expect(native.options.title).toBe('Select account');
+    expect(native.options.containerStyle).toEqual({
+      paddingBottom: 18,
+      backgroundColor: '#17171A',
+    });
+    expect(native.options.textStyle).toEqual({ color: '#F2F0EB' });
+    expect(native.options.titleTextStyle).toEqual({ color: '#8A8680' });
+  });
 
   it('recovers an unavailable organization through Personal after an empty membership result', async () => {
     storage.read.mockResolvedValue('org-missing');

@@ -596,6 +596,32 @@ describe('login-screen bottom-bar clearance', () => {
     }
   );
 
+  it('keeps the iOS keyboard occlusion through a transient inactive state', async () => {
+    Platform.OS = 'ios';
+    const renderer = await mountLoginScreen();
+    emitKeyboard(keyboardEventsFor('ios').show, 300);
+    const subscription = addAppStateListener.mock.calls[0];
+    if (!subscription) {
+      throw new Error('missing app state listener');
+    }
+
+    // Control Center, the app switcher preview, a call banner, and system
+    // permission alerts report `inactive` while the keyboard stays up, and no
+    // fresh `keyboardWillShow` follows on the way back to `active`; collapsing
+    // the occlusion here left the form under an open keyboard.
+    act(() => {
+      subscription[1]('inactive');
+    });
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 300 });
+
+    act(() => {
+      subscription[1]('active');
+    });
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 300 });
+
+    renderer.unmount();
+  });
+
   it('tracks bottom inset changes, including devices without a bottom bar', async () => {
     const renderer = await mountLoginScreen();
 

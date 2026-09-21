@@ -26,9 +26,12 @@ const SANDBOX_CONNECT_RETRY_DELAYS_MS = [5_000] as const;
 const WORKSPACE_CAPACITY_RETRY_DELAYS_MS = [10_000, 30_000, 60_000] as const;
 // GitHub's ref-discovery/clone endpoint returns 429 under concurrent-clone or
 // secondary-abuse throttling, which typically clears within well under a
-// minute — give it a short backed-off budget instead of one generic
-// redelivery.
+// minute. When no reset was observable, fall back to this short backed-off
+// budget instead of one generic redelivery.
 const GIT_RATE_LIMIT_RETRY_DELAYS_MS = [15_000, 45_000] as const;
+// A clone that hit its own inactivity bound gets a redelivery budget on the
+// same order as that bound, not the generic base delay.
+const GIT_CLONE_TIMEOUT_RETRY_DELAYS_MS = [120_000] as const;
 // Wrapper cleanup exhaustion fences delivery, but it is recoverable: the lease
 // releases once the wedged wrapper is observably gone, and every flush attempt
 // forces one observation. Give the message a few spaced attempts so a container
@@ -597,11 +600,13 @@ export async function recordPendingFlushFailure(
         ? CLEANUP_EXHAUSTED_RETRY_DELAYS_MS
         : flushFailureCode === 'WORKSPACE_SETUP_FAILED' && failureSubtype === 'sandbox_storage_full'
           ? WORKSPACE_CAPACITY_RETRY_DELAYS_MS
-          : flushFailureCode === 'WORKSPACE_SETUP_FAILED' && failureSubtype === 'git_rate_limited'
-            ? GIT_RATE_LIMIT_RETRY_DELAYS_MS
-            : options.policy === 'cold-init'
-              ? COLD_INIT_RETRY_DELAYS_MS
-              : WARM_FOLLOWUP_RETRY_DELAYS_MS;
+          : flushFailureCode === 'WORKSPACE_SETUP_FAILED' && failureSubtype === 'git_clone_timeout'
+            ? GIT_CLONE_TIMEOUT_RETRY_DELAYS_MS
+            : flushFailureCode === 'WORKSPACE_SETUP_FAILED' && failureSubtype === 'git_rate_limited'
+              ? GIT_RATE_LIMIT_RETRY_DELAYS_MS
+              : options.policy === 'cold-init'
+                ? COLD_INIT_RETRY_DELAYS_MS
+                : WARM_FOLLOWUP_RETRY_DELAYS_MS;
   const retryable = options.retryable ?? isRetryableFlushCode(flushFailureCode);
   const exhausted = !retryable || attempts > retryDelays.length;
   const retryDelay = retryDelays[attempts - 1];

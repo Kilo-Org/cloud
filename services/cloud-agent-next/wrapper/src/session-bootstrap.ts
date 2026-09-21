@@ -213,6 +213,15 @@ function longGitOptions(
   };
 }
 
+// A clone that reports progress is not killed by a total wall clock; a silent
+// clone still stops at the inactivity bound.
+function cloneGitOptions(progress: BootstrapProgress | undefined): ProcessOptions {
+  return {
+    inactivityTimeoutMs: LONG_COMMAND_INACTIVITY_TIMEOUT_MS,
+    onOutput: gitProgressReporter(progress, 'cloning', 'Cloning repository...'),
+  };
+}
+
 export class RestoredWorkspaceReconciliationError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
@@ -424,7 +433,7 @@ async function cloneRepository(
       args.push('--filter=blob:none');
     }
     args.push(repoUrl, request.workspace.workspacePath);
-    return runGit(args, longGitOptions(progress, 'cloning', 'Cloning repository...'));
+    return runGit(args, cloneGitOptions(progress));
   };
 
   // Most servers without partial-clone support ignore the filter and full-clone,

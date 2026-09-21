@@ -409,6 +409,14 @@ export function unavailableModelResponse() {
   );
 }
 
+export function temporarilyBlockedModelResponse() {
+  const error = 'This model is temporarily unavailable. Try a different model.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.unavailable_model, message: error },
+    { status: 404 }
+  );
+}
+
 export function modelDoesNotExistResponse() {
   return NextResponse.json(
     {

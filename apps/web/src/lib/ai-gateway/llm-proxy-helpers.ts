@@ -548,11 +548,21 @@ export async function captureProxyError(params: {
   organizationId: string | undefined;
   model: string;
   trackInSentry: boolean;
+  diagnostics?: {
+    vercelRequestId: string | null;
+    requestedModel: string;
+    resolvedModel: string;
+    autoModel: string | null;
+    authFailedStatus: number | null;
+    authorizationKind: 'absent' | 'anonymous' | 'other';
+    anonymousFallback: boolean;
+  };
 }) {
-  const { errorMessage, user, response, organizationId, model, trackInSentry } = params;
+  const { errorMessage, user, response, organizationId, model, trackInSentry, diagnostics } =
+    params;
   after(
     (async () => {
-      const extraErrorData: Record<string, string | number> = {
+      const extraErrorData: Record<string, string | number | boolean | null> = {
         kiloUserId: user.id,
         model,
         status: response.status,
@@ -560,6 +570,17 @@ export async function captureProxyError(params: {
         responseContentType: response.headers.get('content-type') || '',
         ...(organizationId && { organizationId }),
       };
+
+      // Enrich the existing error event, without adding per-request log events.
+      if (diagnostics) {
+        extraErrorData.vercelRequestId = diagnostics.vercelRequestId?.slice(0, 128) ?? null;
+        extraErrorData.requestedModel = diagnostics.requestedModel.slice(0, 128);
+        extraErrorData.resolvedModel = diagnostics.resolvedModel.slice(0, 128);
+        extraErrorData.autoModel = diagnostics.autoModel?.slice(0, 128) ?? null;
+        extraErrorData.authFailedStatus = diagnostics.authFailedStatus;
+        extraErrorData.authorizationKind = diagnostics.authorizationKind;
+        extraErrorData.anonymousFallback = diagnostics.anonymousFallback;
+      }
 
       const clonedReponse = response.clone();
       try {

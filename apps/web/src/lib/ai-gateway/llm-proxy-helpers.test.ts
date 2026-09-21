@@ -2,6 +2,18 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from './latest-model-aliases';
+import { after } from 'next/server';
+import { captureMessage } from '@sentry/nextjs';
+import { errorExceptInTest } from '@/lib/utils.server';
+
+jest.mock('@/lib/utils.server', () => ({
+  ...jest.requireActual('@/lib/utils.server'),
+  errorExceptInTest: jest.fn(),
+}));
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual('@sentry/nextjs'),
+  captureMessage: jest.fn(),
+}));
 
 let mockInceptionPromoRunning = true;
 
@@ -35,6 +47,7 @@ jest.mock('./processUsage', () => ({
 }));
 
 import {
+  captureProxyError,
   checkOrganizationModelRestrictions,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
@@ -46,6 +59,100 @@ import {
   parseEditUsageFromResponse,
   parseTranscriptionUsageFromResponse,
 } from './llm-proxy-helpers';
+
+describe('captureProxyError diagnostics', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it.each([false, true])('enriches one existing error event (Sentry: %s)', async trackInSentry => {
+    const diagnostics = {
+      vercelRequestId: 'request-123',
+      requestedModel: 'kilo-auto/free',
+      resolvedModel: 'provider/model:free',
+      autoModel: 'kilo-auto/free',
+      authFailedStatus: 401,
+      authorizationKind: 'other' as const,
+      anonymousFallback: true,
+      authorization: 'secret-token',
+    };
+    await captureProxyError({
+      errorMessage: 'upstream returned error 429',
+      user: { id: 'test-user' },
+      request: { messages: [{ content: 'private-prompt' }], apiKey: 'secret-token' },
+      response: new Response('{}', { status: 429 }),
+      organizationId: undefined,
+      model: 'provider/model:free',
+      trackInSentry,
+      diagnostics,
+    });
+    await jest.mocked(after).mock.calls.at(-1)?.[0];
+
+    expect(errorExceptInTest).toHaveBeenCalledTimes(1);
+    const data = jest.mocked(errorExceptInTest).mock.calls[0]?.[1];
+    expect(data).toEqual({
+      kiloUserId: 'test-user',
+      model: 'provider/model:free',
+      status: 429,
+      statusText: '',
+      responseContentType: 'text/plain;charset=UTF-8',
+      first4kOfResponse: '{}',
+      vercelRequestId: 'request-123',
+      requestedModel: 'kilo-auto/free',
+      resolvedModel: 'provider/model:free',
+      autoModel: 'kilo-auto/free',
+      authFailedStatus: 401,
+      authorizationKind: 'other',
+      anonymousFallback: true,
+    });
+    expect(captureMessage).toHaveBeenCalledTimes(trackInSentry ? 1 : 0);
+    if (trackInSentry) {
+      expect(captureMessage).toHaveBeenCalledWith(
+        'upstream returned error 429',
+        expect.objectContaining({ extra: data })
+      );
+    }
+  });
+
+  it('bounds diagnostic strings and preserves callers without diagnostics', async () => {
+    const long = 'x'.repeat(1_000);
+    for (const diagnostics of [
+      undefined,
+      {
+        vercelRequestId: long,
+        requestedModel: long,
+        resolvedModel: long,
+        autoModel: long,
+        authFailedStatus: null,
+        authorizationKind: 'absent' as const,
+        anonymousFallback: false,
+      },
+    ]) {
+      await captureProxyError({
+        errorMessage: 'upstream error',
+        user: { id: 'test-user' },
+        request: {},
+        response: new Response('{}', { status: 500 }),
+        organizationId: undefined,
+        model: 'provider/model',
+        trackInSentry: false,
+        diagnostics,
+      });
+      await jest.mocked(after).mock.calls.at(-1)?.[0];
+    }
+    expect(errorExceptInTest).toHaveBeenCalledTimes(2);
+    expect(jest.mocked(errorExceptInTest).mock.calls[0]?.[1]).not.toHaveProperty('requestedModel');
+    expect(jest.mocked(errorExceptInTest).mock.calls[1]?.[1]).toMatchObject({
+      vercelRequestId: long.slice(0, 128),
+      requestedModel: long.slice(0, 128),
+      resolvedModel: long.slice(0, 128),
+      autoModel: long.slice(0, 128),
+      authFailedStatus: null,
+      authorizationKind: 'absent',
+      anonymousFallback: false,
+    });
+  });
+});
 
 describe('checkOrganizationModelRestrictions', () => {
   describe('enterprise plan - model deny list restrictions', () => {

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
+import { NextResponse } from 'next/server';
 import type { User } from '@kilocode/db/schema';
 import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@/lib/user/server';
@@ -17,7 +18,7 @@ import {
   isValidOpenRouterModelId,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
+import { accountForMicrodollarUsage, captureProxyError } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ReasoningDetailsTransform, type Provider } from '@/lib/ai-gateway/providers/types';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
 import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
@@ -131,6 +132,7 @@ const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
+const mockedCaptureProxyError = jest.mocked(captureProxyError);
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
 const mockedCollectDeniedAutoRoutingModelIds = jest.mocked(collectDeniedAutoRoutingModelIds);
 const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
@@ -511,6 +513,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     );
 
     expect(response.status).toBe(200);
+    expect(mockedCaptureProxyError).not.toHaveBeenCalled();
     expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
       expect.objectContaining({
         logging: expect.objectContaining({ vercel_request_id: 'iad1::iad1::request-id' }),
@@ -518,6 +521,83 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       })
     );
   });
+
+  it.each([429, 402])(
+    'enriches the existing upstream %s error without changing its response',
+    async status => {
+      mockedUpstreamRequest.mockResolvedValue({
+        type: 'success',
+        response: upstreamJsonResponse({ error: { message: 'upstream error' } }, status),
+      });
+      const { POST } = await import('./route');
+      const response = await POST(
+        makeRequest(makeBody(), { 'x-vercel-id': 'request-123' }) as never
+      );
+
+      expect(response.status).toBe(status === 402 ? 503 : status);
+      expect(mockedCaptureProxyError).toHaveBeenCalledTimes(1);
+      expect(mockedCaptureProxyError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          response: expect.objectContaining({ status }),
+          trackInSentry: status === 402,
+          diagnostics: {
+            vercelRequestId: 'request-123',
+            requestedModel: 'openai/gpt-4o',
+            resolvedModel: 'openai/gpt-4o',
+            autoModel: null,
+            authFailedStatus: null,
+            authorizationKind: 'absent',
+            anonymousFallback: false,
+          },
+        })
+      );
+    }
+  );
+
+  it.each([
+    { authorization: undefined, authorizationKind: 'absent' },
+    { authorization: 'Bearer anonymous', authorizationKind: 'anonymous' },
+    { authorization: 'Bearer secret-token', authorizationKind: 'other' },
+  ])(
+    'records anonymous auto routing with $authorizationKind credentials',
+    async ({ authorization, authorizationKind }) => {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: null,
+        authFailedResponse: NextResponse.json(
+          { success: false as const, error: 'Unauthorized' },
+          { status: 401 }
+        ),
+        organizationId: undefined,
+      });
+      mockedApplyResolvedAutoModel.mockImplementation(async (_options, request) => {
+        request.body.model = stepfun_37_flash_free_model.public_id;
+        return { kind: 'ok', resolved: { model: stepfun_37_flash_free_model.public_id } };
+      });
+      mockedUpstreamRequest.mockResolvedValue({
+        type: 'success',
+        response: upstreamJsonResponse({ error: { message: 'upstream rate limit' } }, 429),
+      });
+      const { POST } = await import('./route');
+      const response = await POST(
+        makeRequest(makeBody('kilo-auto/free'), {
+          'x-vercel-id': 'request-123',
+          ...(authorization && { authorization }),
+        }) as never
+      );
+
+      expect(response.status).toBe(429);
+      expect(mockedCaptureProxyError).toHaveBeenCalledTimes(1);
+      expect(mockedCaptureProxyError.mock.calls[0]?.[0].diagnostics).toEqual({
+        vercelRequestId: 'request-123',
+        requestedModel: 'kilo-auto/free',
+        resolvedModel: stepfun_37_flash_free_model.public_id,
+        autoModel: 'kilo-auto/free',
+        authFailedStatus: 401,
+        authorizationKind,
+        anonymousFallback: true,
+      });
+    }
+  );
 
   it('passes provider response transforms to the response rewriter', async () => {
     const responseTransforms = ReasoningDetailsTransform.GeminiThought;

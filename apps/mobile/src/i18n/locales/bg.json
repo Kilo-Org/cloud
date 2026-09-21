@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} ред",
       "linesBadge_other": "{{displayCount}} реда",
       "matchesBadge_one": "{{displayCount}} съвпадение",
-      "matchesBadge_other": "{{displayCount}} съвпадения"
+      "matchesBadge_other": "{{displayCount}} съвпадения",
+      "noOutput": "Няма изход."
     },
     "readToolMarkdown": {
       "linesTruncated": "редове {{start}}–{{end}} (съкратено)",
@@ -3188,15 +3189,7 @@
     "remoteOptionTitle": "Компютърът ти",
     "remoteOptionBody": "Стартирай Kilo на собствената си машина през `kilo remote` CLI.",
     "skip": "Пропусни тура",
-    "tutorialLabel": "Ръководство",
-    "remoteTitle": "Стартирай първата си отдалечена сесия",
-    "remoteBody": "Свържи компютъра си, после стартирай сесията оттук.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Все още няма свързан компютър",
-    "remoteEmptyBody": "За да го свържеш, изпълни `kilo remote` на компютъра си.",
-    "remoteFound": "Компютърът е свързан",
-    "checkAgain": "Провери отново",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Ръководство"
   },
   "appActions": {
     "start": {

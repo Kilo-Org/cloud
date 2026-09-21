@@ -1776,7 +1776,8 @@
       "matchesBadge_zero": "تطابقات: {{displayCount}}",
       "matchesBadge_two": "تطابقان: {{displayCount}}",
       "matchesBadge_few": "تطابقات: {{displayCount}}",
-      "matchesBadge_many": "تطابقًا: {{displayCount}}"
+      "matchesBadge_many": "تطابقًا: {{displayCount}}",
+      "noOutput": "لا توجد مخرجات."
     },
     "readToolMarkdown": {
       "linesTruncated": "الأسطر {{start}}–{{end}} (مقتطعة)",
@@ -3360,15 +3361,7 @@
     "remoteOptionTitle": "حاسوبك",
     "remoteOptionBody": "شغّل Kilo على جهازك نفسه عبر واجهة سطر الأوامر `kilo remote`.",
     "skip": "تخطي الجولة",
-    "tutorialLabel": "برنامج تعليمي",
-    "remoteTitle": "ابدأ جلستك عن بُعد الأولى",
-    "remoteBody": "قم بتوصيل حاسوبك، ثم ابدأ الجلسة من هنا.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "لا يوجد حاسوب متصل بعد",
-    "remoteEmptyBody": "شغّل `kilo remote` على حاسوبك لتوصيله.",
-    "remoteFound": "تم توصيل الحاسوب",
-    "checkAgain": "تحقق مرة أخرى",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "برنامج تعليمي"
   },
   "appActions": {
     "start": {

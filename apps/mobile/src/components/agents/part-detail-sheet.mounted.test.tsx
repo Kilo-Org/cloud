@@ -100,11 +100,11 @@ vi.mock('expo-haptics', () => ({
 vi.mock('react-native-gesture-handler', () => ({
   ScrollView: 'ScrollView',
 }));
-// Content-driven body mock that mirrors the real bodies' mono content:
+// Content-driven body mock that stands in for the real bodies' mono content:
 // BashToolCardBody renders the `$ command` line as plain text, so only a
 // completed bash output block is mono (running and error bash bodies are
-// mono-free); GenericToolCardBody renders the input JSON as a mono block at
-// any status, plus the completed output block. Mounting a real
+// mono-free); the generic fixture emits a mono block at any status so the
+// control's presence can be driven deterministically. Mounting a real
 // MonoScrollBlock proves the full wiring: sheet state -> real SegmentedControl
 // -> context provider -> real MonoScrollBlock branch. Keyed by part id so a
 // part swap unmounts and remounts the block in one commit (the
@@ -476,8 +476,8 @@ describe('PartDetailSheet mounted', () => {
   });
 
   it('shows the control for running generic input JSON and hides it for command-only bash bodies', async () => {
-    // Running generic input JSON is mono (GenericToolCardBody renders the
-    // input as a mono block at any status), so the control appears.
+    // The generic fixture emits a mono block at any status, so the control
+    // appears.
     const withMono = await mountSheet(makeGenericPart('generic-1', { query: 'x' }, 'running'));
     expect(radiogroup(withMono.root)).toBeTruthy();
     await unmount(withMono);

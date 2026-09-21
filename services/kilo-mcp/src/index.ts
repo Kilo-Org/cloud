@@ -20,6 +20,10 @@ import { fetchUserIsAdmin } from './oauth/kilo-pairing';
 import { onError, tokenExchangeCallback } from './oauth/provider-hooks';
 import { createRefreshReuseHandler, isTokenRequest } from './oauth/refresh-reuse';
 import {
+  CLIENT_REGISTRATION_TTL_SECONDS,
+  REFRESH_TOKEN_TTL_SECONDS,
+} from './oauth/session-lifetime';
+import {
   callArgsSchema,
   clientRegistrationSchema,
   initializeParamsSchema,
@@ -937,7 +941,10 @@ const providerOptions: OAuthProviderOptions<Env> = {
   clientRegistrationEndpoint: '/register',
   scopesSupported: [MCP_SCOPE],
   accessTokenTTL: 3600,
-  refreshTokenTTL: 2592000,
+  // Session lifetime policy lives in ./oauth/session-lifetime: one month, with
+  // the DCR record outliving the grant so a lapsed session re-authorizes.
+  refreshTokenTTL: REFRESH_TOKEN_TTL_SECONDS,
+  clientRegistrationTTL: CLIENT_REGISTRATION_TTL_SECONDS,
   resourceMetadata: {
     resource_name: 'Kilo MCP',
     scopes_supported: [MCP_SCOPE],

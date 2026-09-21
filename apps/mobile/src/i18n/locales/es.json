@@ -1728,7 +1728,8 @@
       "linesBadge_many": "{{displayCount}} líneas",
       "matchesBadge_one": "{{displayCount}} coincidencia",
       "matchesBadge_other": "{{displayCount}} coincidencias",
-      "matchesBadge_many": "{{displayCount}} coincidencias"
+      "matchesBadge_many": "{{displayCount}} coincidencias",
+      "noOutput": "No hay salida."
     },
     "readToolMarkdown": {
       "linesTruncated": "líneas {{start}}–{{end}} (truncadas)",
@@ -3231,15 +3232,7 @@
     "remoteOptionTitle": "Tu ordenador",
     "remoteOptionBody": "Ejecuta Kilo en tu propia máquina mediante la CLI `kilo remote`.",
     "skip": "Omitir tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Inicia tu primera sesión remota",
-    "remoteBody": "Conecta tu ordenador y después inicia la sesión desde aquí.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ningún ordenador conectado todavía",
-    "remoteEmptyBody": "Ejecuta `kilo remote` en tu ordenador para conectarlo.",
-    "remoteFound": "Ordenador conectado",
-    "checkAgain": "Volver a comprobar",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

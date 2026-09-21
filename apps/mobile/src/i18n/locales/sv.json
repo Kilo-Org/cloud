@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} rad",
       "linesBadge_other": "{{displayCount}} rader",
       "matchesBadge_one": "{{displayCount}} träff",
-      "matchesBadge_other": "{{displayCount}} träffar"
+      "matchesBadge_other": "{{displayCount}} träffar",
+      "noOutput": "Ingen utdata."
     },
     "readToolMarkdown": {
       "linesTruncated": "rader {{start}}–{{end}} (avkortat)",
@@ -3188,15 +3189,7 @@
     "remoteOptionTitle": "Din dator",
     "remoteOptionBody": "Kör Kilo på din egen maskin via `kilo remote`-CLI:n.",
     "skip": "Hoppa över guiden",
-    "tutorialLabel": "Handledning",
-    "remoteTitle": "Starta din första distanssession",
-    "remoteBody": "Anslut din dator och starta sessionen härifrån.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ingen dator är ansluten ännu",
-    "remoteEmptyBody": "För att ansluta den, kör `kilo remote` på din dator.",
-    "remoteFound": "Dator ansluten",
-    "checkAgain": "Kontrollera igen",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Handledning"
   },
   "appActions": {
     "start": {

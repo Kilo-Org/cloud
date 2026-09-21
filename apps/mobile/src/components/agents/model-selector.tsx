@@ -334,7 +334,9 @@ export function ModelPickerOptionRow({
             fill={isFavorite ? colors.primary : 'transparent'}
           />
         </Pressable>
-        {selected ? <Check size={18} color={colors.primary} /> : null}
+        <View className="w-[18px] items-center justify-center">
+          {selected ? <Check size={18} color={colors.primary} /> : null}
+        </View>
       </View>
       {selected && option.variants.length > 1 ? (
         <View className="px-4 pb-3">

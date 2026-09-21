@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} reël",
       "linesBadge_other": "{{displayCount}} reëls",
       "matchesBadge_one": "{{displayCount}} treffer",
-      "matchesBadge_other": "{{displayCount}} treffers"
+      "matchesBadge_other": "{{displayCount}} treffers",
+      "noOutput": "Geen uitset nie."
     },
     "readToolMarkdown": {
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",
@@ -3188,15 +3189,7 @@
     "remoteOptionTitle": "Jou rekenaar",
     "remoteOptionBody": "Voer Kilo op jou eie masjien uit deur die `kilo remote`-CLI.",
     "skip": "Slaan toer oor",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Begin jou eerste afstandsessie",
-    "remoteBody": "Koppel jou rekenaar en begin dan die sessie van hier af.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Nog geen rekenaar gekoppel nie",
-    "remoteEmptyBody": "Voer `kilo remote` op jou rekenaar uit om dit te koppel.",
-    "remoteFound": "Rekenaar gekoppel",
-    "checkAgain": "Kontroleer weer",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

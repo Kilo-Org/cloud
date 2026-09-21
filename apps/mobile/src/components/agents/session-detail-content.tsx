@@ -99,6 +99,7 @@ import {
 } from '@/components/agents/session-working-state';
 import {
   countInFlightMessages,
+  lastVisibleMessageFailure,
   resolveRetryPrompt,
   retryFailedMessage,
 } from '@/components/agents/session-detail-content-helpers';
@@ -146,6 +147,7 @@ import { ToolRunSheetHost } from '@/components/agents/tool-run-sheet-host';
 import {
   buildTerminalErrorCopyText,
   resolveSessionTerminalError,
+  statusIndicatorDuplicatesMessageFailure,
 } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
@@ -1122,11 +1124,24 @@ export function SessionDetailContent({
         void handleSend(prompt);
         return;
       }
-      void retryFailedMessage(async () => {
-        await handleSend(prompt);
+      // The re-send is a new submission; `retryFailedMessage` clears the
+      // original delivery failure once it is accepted so the row stops showing
+      // as failed. It is cleared against this screen's session — the one that
+      // owns the row and that the manager opened — because the await above can
+      // outlive it: switching sessions while the re-send is in flight must not
+      // record this resolution under the session the user switched to.
+      const ownerSessionId = sessionId;
+      void retryFailedMessage({
+        message,
+        send: async () => {
+          await handleSend(prompt);
+        },
+        clearFailedMessage: messageId => {
+          manager.clearFailedMessage(messageId, ownerSessionId);
+        },
       });
     },
-    [messages, requiresModel, pinned.model, currentModel, handleSend]
+    [messages, requiresModel, pinned.model, currentModel, handleSend, manager, sessionId]
   );
 
   const handleCancelQueued = useCallback(
@@ -1469,8 +1484,30 @@ export function SessionDetailContent({
     isStreaming,
     pendingMessageCount: inFlightMessageCount,
   });
+  // A failed last row states its own failure and carries the action. The fixed
+  // footer's error line must not state the same failure a second time (explorer
+  // finding: the same failure stated three times), so a status error the row
+  // already carries is dropped — a classified one the row does not carry stays.
+  const footerMessageFailure = useMemo(
+    () =>
+      lastVisibleMessageFailure({
+        displayedMessages,
+        messages,
+        pendingMessages,
+        canceledQueuedMessages,
+      }),
+    [displayedMessages, messages, pendingMessages, canceledQueuedMessages]
+  );
+  const footerStatusIndicator =
+    statusIndicator !== null &&
+    !statusIndicatorDuplicatesMessageFailure({
+      indicator: statusIndicator,
+      failure: footerMessageFailure,
+    })
+      ? statusIndicator
+      : null;
   const hasFooterStatusIndicator =
-    (!cachedMetadataRefresh && statusIndicator !== null) ||
+    (!cachedMetadataRefresh && footerStatusIndicator !== null) ||
     (cloudStatus !== null && cloudStatus.type !== 'ready');
   const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
     isAgentWorking: shouldShowWorkingIndicator,
@@ -1487,7 +1524,7 @@ export function SessionDetailContent({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
-    hasStatusIndicator: !cachedMetadataRefresh && statusIndicator !== null,
+    hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
     messageCount: messages.length,
   });
 
@@ -1893,6 +1930,7 @@ export function SessionDetailContent({
             reserveTitleSpace
             backFallback="/(app)/(tabs)/(2_agents)"
             headerRight={headerRight}
+            className="pb-1"
             {...(rename.isTitleInteractive
               ? {
                   onTitlePress: rename.openModal,
@@ -2093,7 +2131,9 @@ export function SessionDetailContent({
                 spinner reads Thinking during a reasoning stream in both modes.
                 Feeding it displayedMessages would drop that label. */}
             <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
-            {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
+            {footerStatusIndicator ? (
+              <SessionStatusIndicator indicator={footerStatusIndicator} />
+            ) : null}
           </Animated.View>
         ) : null}
 

@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} سطر",
       "linesBadge_other": "{{displayCount}} سطریں",
       "matchesBadge_one": "{{displayCount}} مماثلت",
-      "matchesBadge_other": "{{displayCount}} مماثلتیں"
+      "matchesBadge_other": "{{displayCount}} مماثلتیں",
+      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔"
     },
     "readToolMarkdown": {
       "linesTruncated": "سطریں {{start}}–{{end}} (نامکمل متن)",
@@ -3188,15 +3189,7 @@
     "remoteOptionTitle": "آپ کا کمپیوٹر",
     "remoteOptionBody": "اپنے کمپیوٹر پر `kilo remote` CLI کے ذریعے Kilo چلائیں۔",
     "skip": "ٹور چھوڑیں",
-    "tutorialLabel": "ٹیوٹوریل",
-    "remoteTitle": "اپنا پہلا ریموٹ سیشن شروع کریں",
-    "remoteBody": "اپنا کمپیوٹر منسلک کریں، پھر یہاں سے سیشن شروع کریں۔",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ابھی کوئی کمپیوٹر منسلک نہیں ہوا",
-    "remoteEmptyBody": "اسے منسلک کرنے کے لیے اپنے کمپیوٹر پر `kilo remote` چلائیں۔",
-    "remoteFound": "کمپیوٹر منسلک ہو گیا",
-    "checkAgain": "دوبارہ جانچیں",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ٹیوٹوریل"
   },
   "appActions": {
     "start": {

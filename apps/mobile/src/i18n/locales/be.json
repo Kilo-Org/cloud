@@ -2280,7 +2280,8 @@
       "matchesBadge_one": "супадзенне: {{displayCount}}",
       "matchesBadge_other": "супадзенняў: {{displayCount}}",
       "matchesBadge_few": "супадзенні: {{displayCount}}",
-      "matchesBadge_many": "супадзенняў: {{displayCount}}"
+      "matchesBadge_many": "супадзенняў: {{displayCount}}",
+      "noOutput": "Няма вываду."
     },
     "readToolMarkdown": {
       "linesTruncated": "радкі {{start}}–{{end}} (скарочана)",
@@ -3274,15 +3275,7 @@
     "remoteOptionTitle": "Ваш камп'ютар",
     "remoteOptionBody": "Запускайце Kilo на ўласнай машыне праз CLI `kilo remote`.",
     "skip": "Прапусціць агляд",
-    "tutorialLabel": "Навучанне",
-    "remoteTitle": "Пачніце свой першы аддалены сеанс",
-    "remoteBody": "Падключыце свой камп'ютар, а затым пачніце сеанс адсюль.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Яшчэ няма падключанага камп'ютара",
-    "remoteEmptyBody": "Каб падключыць яго, выканайце `kilo remote` на сваім камп'ютары.",
-    "remoteFound": "Камп'ютар падключаны",
-    "checkAgain": "Праверыць яшчэ раз",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Навучанне"
   },
   "appActions": {
     "start": {

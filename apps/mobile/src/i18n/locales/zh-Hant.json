@@ -1712,7 +1712,8 @@
       "linesBadge_one": "{{displayCount}} 行",
       "linesBadge_other": "{{displayCount}} 行",
       "matchesBadge_one": "{{displayCount}} 筆相符結果",
-      "matchesBadge_other": "{{displayCount}} 筆相符結果"
+      "matchesBadge_other": "{{displayCount}} 筆相符結果",
+      "noOutput": "沒有輸出。"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截斷）",
@@ -3188,15 +3189,7 @@
     "remoteOptionTitle": "你的電腦",
     "remoteOptionBody": "透過 `kilo remote` CLI 在你自己的電腦上執行 Kilo。",
     "skip": "跳過導覽",
-    "tutorialLabel": "教學",
-    "remoteTitle": "開始你的第一個遠端工作階段",
-    "remoteBody": "連線你的電腦，然後從這裡啟動工作階段。",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "尚未連線任何電腦",
-    "remoteEmptyBody": "請在你的電腦上執行 `kilo remote` 以完成連線。",
-    "remoteFound": "電腦已連線",
-    "checkAgain": "重新檢查",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "教學"
   },
   "appActions": {
     "start": {

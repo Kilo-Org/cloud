@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} ओळ",
       "linesBadge_other": "{{displayCount}} ओळी",
       "matchesBadge_one": "{{displayCount}} जुळणारे परिणाम",
-      "matchesBadge_other": "{{displayCount}} जुळणारे परिणाम"
+      "matchesBadge_other": "{{displayCount}} जुळणारे परिणाम",
+      "noOutput": "कोणतेही आउटपुट नाही."
     },
     "readToolMarkdown": {
       "linesTruncated": "ओळी {{start}}–{{end}} (काही मजकूर वगळला)",
@@ -3188,15 +3189,7 @@
     "remoteOptionTitle": "तुमचा संगणक",
     "remoteOptionBody": "तुमच्या स्वतःच्या मशीनवर `kilo remote` CLI मधून Kilo चालवा.",
     "skip": "सफर वगळा",
-    "tutorialLabel": "शिकवणी",
-    "remoteTitle": "तुमचे पहिले रिमोट सत्र सुरू करा",
-    "remoteBody": "तुमचा संगणक जोडा, मग इथून सत्र सुरू करा.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "अजून कोणताही संगणक जोडलेला नाही",
-    "remoteEmptyBody": "जोडण्यासाठी तुमच्या संगणकावर `kilo remote` चालवा.",
-    "remoteFound": "संगणक जोडला",
-    "checkAgain": "पुन्हा तपासा",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "शिकवणी"
   },
   "appActions": {
     "start": {

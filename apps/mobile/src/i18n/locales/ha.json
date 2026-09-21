@@ -2216,7 +2216,8 @@
       "linesBadge_one": "layuka {{displayCount}}",
       "linesBadge_other": "layuka {{displayCount}}",
       "matchesBadge_one": "sakamako {{displayCount}}",
-      "matchesBadge_other": "sakamako {{displayCount}}"
+      "matchesBadge_other": "sakamako {{displayCount}}",
+      "noOutput": "Babu fitarwa."
     },
     "readToolMarkdown": {
       "linesTruncated": "layuka {{start}}–{{end}} (an rage)",
@@ -3188,15 +3189,7 @@
     "remoteOptionTitle": "Kwamfutarka",
     "remoteOptionBody": "Gudanar da Kilo a na'urarka ta hanyar CLI na `kilo remote`.",
     "skip": "Tsallake kaita",
-    "tutorialLabel": "Koyarwa",
-    "remoteTitle": "Fara zaman nesa na farko",
-    "remoteBody": "Haɗa kwamfutarka, sai ka fara zaman daga nan.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Babu kwamfuta da aka haɗa tukuna",
-    "remoteEmptyBody": "Don haɗa shi, gudanar da `kilo remote` a kwamfutarka.",
-    "remoteFound": "An haɗa kwamfuta",
-    "checkAgain": "Sake dubawa",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Koyarwa"
   },
   "appActions": {
     "start": {

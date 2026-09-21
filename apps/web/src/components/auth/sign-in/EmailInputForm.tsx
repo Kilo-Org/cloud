@@ -2,6 +2,7 @@
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import React from 'react';
 import { useState } from 'react';
 
@@ -63,7 +64,7 @@ export function EmailInputForm({
           autoComplete="email"
           aria-invalid={Boolean(visibleError)}
           aria-describedby={visibleError ? errorId : undefined}
-          className={visibleError ? 'border-destructive' : ''}
+          className={cn(visibleError ? 'border-destructive' : '', 'pointer-coarse:min-h-11')}
           autoFocus={autoFocus}
         />
         {visibleError && (

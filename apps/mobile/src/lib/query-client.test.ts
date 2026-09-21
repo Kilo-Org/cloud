@@ -39,6 +39,33 @@ describe('createKiloAppQueryClient', () => {
   });
 });
 
+describe('query retry policy', () => {
+  it.each([
+    { code: 'UNPROCESSABLE_CONTENT', expectedAttempts: 1 },
+    { code: 'INTERNAL_SERVER_ERROR', expectedAttempts: 3 },
+  ])(
+    'invokes the query function $expectedAttempts time(s) for $code',
+    async ({ code, expectedAttempts }) => {
+      const queryClient = createKiloAppQueryClient();
+      const error = Object.assign(new Error(code), { data: { code } });
+      let attempts = 0;
+
+      await expect(
+        queryClient.fetchQuery({
+          queryKey: ['session', 'retry-policy', code],
+          retryDelay: 0,
+          queryFn: () => {
+            attempts += 1;
+            throw error;
+          },
+        })
+      ).rejects.toBe(error);
+
+      expect(attempts).toBe(expectedAttempts);
+    }
+  );
+});
+
 describe('permission-denied query removal', () => {
   it('removes an org-scoped query on FORBIDDEN and keeps the user signed in', async () => {
     const signOut = vi.fn();

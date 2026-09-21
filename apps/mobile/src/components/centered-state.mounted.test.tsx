@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SearchX } from '@/components/ui/icons';
 
-import { CenteredState } from './centered-state';
+import { CenteredState, STATE_SURFACE_FALLBACK_MS } from './centered-state';
 import { type useStateSurface } from './centered-state-surface';
 import { EmptyState } from './empty-state';
 import { InvalidRouteState } from './invalid-route-state';
@@ -273,5 +273,53 @@ describe('CenteredState measurements', () => {
     mounted.settle();
     expect(mounted.content().accessibilityElementsHidden).toBe(false);
     mounted.unmount();
+  });
+});
+
+describe('CenteredState measurement fallback', () => {
+  it('reveals the content once the measurement window passes', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      // Never calling `settle()` is exactly the measurement that never lands:
+      // the native geometry callback stays queued while the surface is
+      // measured.
+      const mounted = await mount();
+      expect(mounted.content().accessibilityElementsHidden).toBe(true);
+
+      await act(async () => {
+        vi.advanceTimersByTime(STATE_SURFACE_FALLBACK_MS);
+        await Promise.resolve();
+      });
+
+      expect(mounted.content().accessibilityElementsHidden).toBe(false);
+      expect(mounted.content().className).not.toContain('opacity-0');
+
+      // A real measurement still wins and replaces the fallback placement.
+      mounted.settle();
+      expect(mounted.scroll().contentContainerStyle).toEqual({
+        flexGrow: 1,
+        minHeight: 340,
+        paddingTop: 16,
+        paddingBottom: 16,
+      });
+      mounted.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the hidden-until-measured contract inside the window', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const mounted = await mount();
+      await act(async () => {
+        vi.advanceTimersByTime(STATE_SURFACE_FALLBACK_MS - 1);
+        await Promise.resolve();
+      });
+      expect(mounted.content().accessibilityElementsHidden).toBe(true);
+      mounted.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -95,6 +95,25 @@ describe('SideBySideRow syntax palette follows the color scheme', () => {
   });
 });
 
+describe('SideBySideRow code direction', () => {
+  // Same defect class as the unified DiffLine: code reads left to right in
+  // every interface language, so both column code Texts name their own base
+  // direction instead of inheriting the interface's RTL one.
+  it('names the left-to-right base direction on both column code texts', () => {
+    const renderer = mountRow(row());
+
+    const codeTexts = renderer.root.findAll(
+      node => node.type === ('RNText' as never) && node.props.selectable === true
+    );
+    expect(codeTexts).toHaveLength(2);
+    for (const codeText of codeTexts) {
+      const style = codeText.props.style as { direction?: string; writingDirection?: string };
+      expect(style.direction).toBe('ltr');
+      expect(style.writingDirection).toBe('ltr');
+    }
+  });
+});
+
 describe('SideBySideRow gutter alignment', () => {
   // Same defect class as the unified DiffLine gutter: a wrapped code line
   // makes the column several visual lines tall, and a centered number would

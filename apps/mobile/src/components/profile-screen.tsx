@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BookOpenCheck,
@@ -19,6 +20,10 @@ import {
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
+import {
+  DestructiveConfirmDialog,
+  usesInAppDestructiveConfirm,
+} from '@/components/destructive-confirm-dialog';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -36,13 +41,13 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import {
   getCodeReviewerProfilePath,
   getProfileAgentScope,
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
+import { useScreenSideInsets } from '@/lib/screen-insets';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -70,14 +75,20 @@ function providerLabel(provider: string) {
 }
 
 export function ProfileScreen() {
+  const { left, right } = useScreenSideInsets();
+  const scrollStyle = { marginLeft: left, marginRight: right };
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
-  const colors = useThemeColors();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
+  // Android's native alert paints every button with the theme accent, so
+  // `Alert.alert`'s destructive style never shows the red affordance there.
+  // Android opens the in-app confirmation instead; iOS keeps the native alert,
+  // which already renders the destructive sign-out choice in red.
+  const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
   const {
     data,
     isLoading,
@@ -129,14 +140,16 @@ export function ProfileScreen() {
   };
 
   const confirmSignOut = () => {
+    if (usesInAppDestructiveConfirm()) {
+      setSignOutConfirmVisible(true);
+      return;
+    }
     Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.signOut'),
         style: 'destructive',
-        onPress: () => {
-          void signOut();
-        },
+        onPress: () => void signOut(),
       },
     ]);
   };
@@ -150,7 +163,8 @@ export function ProfileScreen() {
       <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 pt-4"
+        style={scrollStyle}
+        contentContainerClassName="px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {/* Credits */}
@@ -334,7 +348,6 @@ export function ProfileScreen() {
           <ActionTile
             icon={MessageSquare}
             label={t('profile.feedback')}
-            color={colors.mutedForeground}
             onPress={() => {
               showFeedbackPrompt(userId);
             }}
@@ -342,19 +355,12 @@ export function ProfileScreen() {
           <ActionTile
             icon={Lock}
             label={t('profile.privacyChoices')}
-            color={colors.mutedForeground}
             onPress={showPrivacyChoices}
           />
-          <ActionTile
-            icon={LogOut}
-            label={t('common.signOut')}
-            color={colors.mutedForeground}
-            onPress={confirmSignOut}
-          />
+          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={confirmSignOut} />
           <ActionTile
             icon={Trash2}
             label={t('profile.deleteAccount')}
-            color={colors.destructive}
             destructive
             disabled={deletePending}
             onPress={confirmDeleteAccount}
@@ -386,6 +392,21 @@ export function ProfileScreen() {
           </Text>
         </View>
       </TabScreenScrollView>
+
+      {signOutConfirmVisible && (
+        <DestructiveConfirmDialog
+          title={t('profile.signOutTitle')}
+          message={t('profile.signOutMessage')}
+          confirmLabel={t('common.signOut')}
+          onCancel={() => {
+            setSignOutConfirmVisible(false);
+          }}
+          onConfirm={() => {
+            setSignOutConfirmVisible(false);
+            void signOut();
+          }}
+        />
+      )}
     </View>
   );
 }

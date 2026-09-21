@@ -60,15 +60,18 @@ function cliCatalogOption(overrides: Partial<SessionModelOption> = {}): SessionM
   };
 }
 
-function renderRow(option: SessionModelOption, selected = false): TestRenderer.ReactTestRenderer {
+function renderRow(
+  option: SessionModelOption,
+  overrides: Partial<{ selected: boolean; isFavorite: boolean }> = {}
+): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   TestRenderer.act(() => {
     ref.current = TestRenderer.create(
       createElement(ModelPickerOptionRow, {
         option,
-        selected,
+        selected: overrides.selected ?? false,
         selectedVariant: '',
-        isFavorite: false,
+        isFavorite: overrides.isFavorite ?? false,
         onSelectModel: vi.fn<(option: SessionModelOption) => void>(),
         onSelectVariant: vi.fn<(variant: string) => void>(),
         onToggleFavorite: vi.fn<(option: SessionModelOption) => void>(),
@@ -116,6 +119,26 @@ function checkAccessories(
     .map(node => ({ color: node.props.color, size: node.props.size }));
 }
 
+function isInstance(
+  node: TestRenderer.ReactTestInstance | string
+): node is TestRenderer.ReactTestInstance {
+  return typeof node !== 'string';
+}
+
+function rowContainer(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  const container = renderer.root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      node.props.className.includes('gap-3 pr-4')
+  )[0];
+  if (!container) {
+    throw new Error('row container not found');
+  }
+  return container;
+}
+
 describe('ModelPickerOptionRow BYOK badge', () => {
   it('renders the BYOK badge for a CLI-catalog option with user BYOK available', () => {
     const renderer = renderRow(cliCatalogOption({ hasUserByokAvailable: true }));
@@ -134,18 +157,42 @@ describe('ModelPickerOptionRow BYOK badge', () => {
   });
 });
 
-describe('ModelPickerOptionRow favorite star column', () => {
-  it('unselected rows reserve the same trailing accessory slot as selected rows', () => {
+describe('ModelPickerOptionRow trailing accessory slot', () => {
+  it('reserves the same trailing column whether or not the row is selected', () => {
+    const selectedRow = rowContainer(renderRow(cliCatalogOption(), { selected: true }));
+    const unselectedRow = rowContainer(renderRow(cliCatalogOption(), { selected: false }));
+
+    const selectedChildren = selectedRow.children.filter(isInstance);
+    const unselectedChildren = unselectedRow.children.filter(isInstance);
+
+    // content, star, trailing slot — in both rows.
+    expect(selectedChildren).toHaveLength(3);
+    expect(unselectedChildren).toHaveLength(3);
+
+    const selectedSlot = selectedChildren[2];
+    const unselectedSlot = unselectedChildren[2];
+
+    // The trailing slot is the same element with the same fixed width in both
+    // rows, so the favorite star holds one column down the list.
+    expect(selectedSlot?.type).toBe('View');
+    expect(unselectedSlot?.type).toBe('View');
+    expect(selectedSlot?.props.className).toBe(unselectedSlot?.props.className);
+    expect(String(selectedSlot?.props.className)).toContain('w-[18px]');
+  });
+
+  it('keeps the star then the reserved check in one order on every row', () => {
     const option = cliCatalogOption();
-    expect(trailingSlots(renderRow(option, false))).toEqual(['Star:20', 'Check:18']);
-    expect(trailingSlots(renderRow(option, true))).toEqual(['Star:20', 'Check:18']);
+    expect(trailingSlots(renderRow(option, { selected: false }))).toEqual(['Star:20', 'Check:18']);
+    expect(trailingSlots(renderRow(option, { selected: true }))).toEqual(['Star:20', 'Check:18']);
   });
 
   it('hides the reserved check on unselected rows and shows it on selected rows', () => {
     const option = cliCatalogOption();
-    expect(checkAccessories(renderRow(option, false))).toEqual([
+    expect(checkAccessories(renderRow(option, { selected: false }))).toEqual([
       { color: 'transparent', size: 18 },
     ]);
-    expect(checkAccessories(renderRow(option, true))).toEqual([{ color: '#4F5A10', size: 18 }]);
+    expect(checkAccessories(renderRow(option, { selected: true }))).toEqual([
+      { color: '#4F5A10', size: 18 },
+    ]);
   });
 });

@@ -164,8 +164,13 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // This compile runs against the real project root, whose ignored `android/`
+    // prebuild contributes the project's other colors; assert only that the
+    // splash entry is present with the option's background color.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

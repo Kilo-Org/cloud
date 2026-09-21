@@ -120,20 +120,16 @@ vi.mock('@/components/ui/button', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
-// `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
-// import cannot resolve in the pure project; every sibling pure spec mocks it.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
 // The profile row and the environment row both render a loading `Skeleton`,
 // whose module imports `react-native-reanimated`: this pure suite does not set
-// Reanimated up, and this project runs in plain Node, where the
-// Reanimated/worklets native entry cannot resolve (the published worklets
-// build uses bundler-style extensionless imports). The primitive is a stub like
-// every other UI element above; its own rendering is not under test here.
+// Reanimated up, and it runs in plain Node, where the Reanimated/worklets
+// native entry cannot resolve (the published worklets build uses
+// bundler-style extensionless imports). The primitive is a stub like every
+// other UI element above; its own rendering is not under test here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({

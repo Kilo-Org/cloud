@@ -15,6 +15,14 @@ type NewSessionPromptControlState = {
   inputEditable: boolean;
   /** Mirrors `accessibilityState.disabled` on the TextInput. */
   inputAccessibilityDisabled: boolean;
+  /**
+   * Whether the controls that mutate the draft or the payload — the paste
+   * button, its async clipboard read, and the insert-newline button — are
+   * locked. True only while a create is in flight: the create already holds
+   * its own snapshot, so a late clipboard read or a newline must not land in
+   * the draft behind it.
+   */
+  draftMutationLocked: boolean;
   /** Whether the paperclip / "Add attachment" press is locked. */
   paperclipDisabled: boolean;
   /** Mirrors `useVoiceInput`'s `disabled` flag — only isCreating gates voice. */
@@ -45,6 +53,16 @@ export function resolveNewSessionPromptForCreate(rawPrompt: string): string | nu
  * while speech is being recognized, but it keeps the prompt editable so
  * dictation can insert at the caret. It does not by itself disable the
  * create button (Create only fires after the user presses "Start session").
+ *
+ * An in-flight create (`isCreating`) locks the create button, voice, the
+ * paperclip and the draft-mutating controls, but it never makes the prompt
+ * read-only. Setting `editable={false}` on a focused Android input drops the
+ * IME the instant the create starts; the keyboard-lift padding under the
+ * pinned footer then collapses and slides the busy Start button down the
+ * screen, so the busy state no longer sits in the slot the user tapped
+ * (emulator-5554: 63px, 2026-09-21). The create's gates are `createDisabled`
+ * and the locked controls, so an editable prompt cannot start a second
+ * session.
  */
 export function resolveNewSessionPromptControlState(
   input: NewSessionPromptControlInput
@@ -54,11 +72,13 @@ export function resolveNewSessionPromptControlState(
   const createDisabled = isCreating;
   const voiceDisabled = isCreating;
   const paperclipDisabled = isCreating || voiceInputActive || attachmentsCount >= attachmentMax;
-  // Voice activity no longer makes the prompt read-only: dictation inserts at
-  // the caret, so the user can keep editing (an edit aborts the session).
-  const inputEditable = !isCreating;
+  // The prompt stays editable through every state, including an in-flight
+  // create: voice activity inserts at the caret (an edit aborts the session)
+  // and a create must not steal the IME out from under the pinned footer.
+  const inputEditable = true;
   return {
     createDisabled,
+    draftMutationLocked: isCreating,
     hasPrompt,
     inputAccessibilityDisabled: !inputEditable,
     inputEditable,

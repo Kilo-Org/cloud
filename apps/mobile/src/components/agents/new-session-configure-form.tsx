@@ -175,20 +175,24 @@ export function NewSessionConfigureForm({
   onRetryCloudCreate,
 }: Readonly<NewSessionConfigureFormProps>) {
   const { t } = useTranslation();
-  // Clears the system navigation bar under the scroll content. Without it the
-  // primary Start action can sit in the bar's translucent region a formSheet
+  // Clears the system navigation bar under the pinned Start footer. Without it
+  // the primary action can sit in the bar's translucent region a formSheet
   // leaves exposed below itself (the picker's bottom strip showed its sliver).
   const bottomClearance = useDetailScreenBottomPadding();
   // The form is edge-to-edge and the window never resizes for the IME on
-  // either platform, so the scroll body needs two floors: the navigation-bar
-  // inset, and the keyboard height — the composer auto-focuses on open, and
-  // without the keyboard floor the Start control stays half-hidden behind
-  // the keyboard strip. The keyboard-lift view is the app's cross-platform
-  // IME primitive (keyboardDidShow/DidHide on Android, keyboardWillShow/
-  // WillHide on iOS), so the same implementation runs on both platforms.
+  // either platform, so the primary action needs two floors: the
+  // navigation-bar inset, and the keyboard height. Start lives in a footer
+  // *outside* the ScrollView: the composer auto-focuses on arrival, and with
+  // the keyboard up the scroll body is only ~1300 px tall while the form is
+  // ~2000 px, so a Start inside the scroll sits below the fold — the user had
+  // to dismiss the keyboard to reach the primary action, and a scroll drag
+  // (keyboardDismissMode="on-drag") did that for them. The keyboard-lift view
+  // is the app's cross-platform IME primitive (keyboardDidShow/DidHide on
+  // Android, keyboardWillShow/WillHide on iOS), so the same implementation
+  // runs on both platforms, and it shrinks the scroll body as it lifts Start.
   // The ScrollView's keyboard-inset adjustment stays on for focused-field
   // scroll-into-view; it sizes against the scroll view's own frame, which
-  // already ends above the IME, so the two never stack into a double lift.
+  // already ends above the footer, so the two never stack into a double lift.
   // (The picker-sheet sliver of the e1 spot check is fixed at the sheet
   // triggers: a formSheet anchors over the keyboard that is up at its first
   // layout and never re-anchors, so the keyboard must be dismissed before
@@ -303,15 +307,20 @@ export function NewSessionConfigureForm({
         ? renderProfileRow({ t, profile, isProfileLoading, isProfileError, onRetryProfile })
         : null}
 
-      {
-        // Persistent failure feedback for the cloud create, in the same
-        // reserved spot above Start. A retryable rejection carries the retry
-        // control; a terminal one says what the server reported instead. The
-        // form owns this feedback, so the creator hook stays silent for it.
-        // Cloud-only: the route also clears the failure when the target
-        // changes, and this gate keeps a stale one off a remote target no
-        // matter which path selected it.
-      }
+      <View style={{ height: bottomClearance }} pointerEvents="none" />
+    </ScrollView>
+  );
+
+  // Persistent failure feedback for the cloud create, in the reserved spot
+  // directly above Start. A retryable rejection carries the retry control; a
+  // terminal one says what the server reported instead. The form owns this
+  // feedback, so the creator hook stays silent for it. It rides the pinned
+  // footer with Start so the recovery control is visible with the keyboard up
+  // too. Cloud-only: the route also clears the failure when the target
+  // changes, and this gate keeps a stale one off a remote target no matter
+  // which path selected it.
+  const footer = (
+    <View className="bg-background px-4 pt-3 pb-4">
       {cloudCreateError && !isRemote ? (
         <NewSessionCloudCreateError
           failure={cloudCreateError}
@@ -327,14 +336,13 @@ export function NewSessionConfigureForm({
         isStarting={isStarting}
         onStartSession={onStartSession}
       />
-
-      <View style={{ height: bottomClearance }} pointerEvents="none" />
-    </ScrollView>
+    </View>
   );
 
   return (
     <View className="flex-1 bg-background" style={{ paddingBottom: bottom }}>
-      <AppAwareKeyboardPaddingView className="flex-1">{body}</AppAwareKeyboardPaddingView>
+      {body}
+      <AppAwareKeyboardPaddingView>{footer}</AppAwareKeyboardPaddingView>
     </View>
   );
 }

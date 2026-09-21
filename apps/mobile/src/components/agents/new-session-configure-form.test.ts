@@ -739,6 +739,33 @@ describe('NewSessionConfigureForm', () => {
     }
   });
 
+  // ── Case 14a: the primary action is pinned outside the scroll body ──
+  it('pins Start and the cloud-create recovery outside the scroll body, under the keyboard lift', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      cloudCreateError: { retryable: true, message: 'prepare failed' },
+    }) as Node;
+
+    // A Start inside the scroll sits below the fold while the composer's
+    // auto-focus keyboard is up, so the primary action must not live there.
+    const scrollBody = findElementByType(element, 'ScrollView');
+    expect(scrollBody).not.toBeNull();
+    expect(findElementByType(scrollBody?.children as Node, 'NewSessionStartButton')).toBeNull();
+    expect(
+      findElementByType(scrollBody?.children as Node, 'NewSessionCloudCreateError')
+    ).toBeNull();
+
+    // Both ride the keyboard-lift footer below the body: the lift shrinks the
+    // body and keeps the action above the IME on either platform.
+    const lift = findElementByType(element, 'AppAwareKeyboardPaddingView');
+    expect(lift).not.toBeNull();
+    expect(findElementByType(lift?.children as Node, 'NewSessionStartButton')).not.toBeNull();
+    expect(findElementByType(lift?.children as Node, 'NewSessionCloudCreateError')).not.toBeNull();
+  });
+
   // ── Case 13: reorder wiring lock ──
   it('wires onMoveAttachment and onReorderAttachments through to NewSessionPrompt', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');

@@ -48,6 +48,15 @@ describe('screen side insets: one implementation for both platforms', () => {
     expect(profile, `${PROFILE_SCREEN} imports the native safe-area module again`).not.toMatch(
       SAFE_AREA_MODULE
     );
-    expect(profile, `${PROFILE_SCREEN} carries a per-platform branch`).not.toMatch(PLATFORM_BRANCH);
+    // The side-inset path never forks on the platform. The screen carries one
+    // unrelated platform gate — the Android destructive sign-out dialog, which
+    // opens the in-app confirmation because Android's native alert cannot paint
+    // the destructive style — so that named gate is set aside here and any
+    // other per-platform branch on the screen still fails.
+    const SIGN_OUT_GATE = "if (Platform.OS === 'android') {";
+    expect(
+      profile.replace(SIGN_OUT_GATE, ''),
+      `${PROFILE_SCREEN} carries a per-platform branch`
+    ).not.toMatch(PLATFORM_BRANCH);
   });
 });

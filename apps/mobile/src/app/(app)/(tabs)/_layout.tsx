@@ -156,9 +156,6 @@ export default function TabsLayout() {
             ...tabBarHorizontalInset,
           },
           tabBarShowLabel: showTabLabel,
-          // The keyboard owns the bottom band: the absolutely-positioned bar
-          // would otherwise draw its labels under the IME strip.
-          tabBarHideOnKeyboard: true,
         }}
       >
         <Tabs.Screen

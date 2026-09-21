@@ -1,4 +1,12 @@
-import { type ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   type LayoutChangeEvent,
   PixelRatio,
@@ -25,6 +33,13 @@ type CenteredStateProps = {
 };
 
 type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
+
+/**
+ * Upper bound on how long the content stays hidden waiting for a surface
+ * measurement. A missing or empty native reading must not leave a data state
+ * (empty, status, error) invisible forever.
+ */
+export const STATE_SURFACE_FALLBACK_MS = 400;
 
 export function CenteredState({
   children,
@@ -112,8 +127,28 @@ export function CenteredState({
         : undefined,
     [surface, viewport, contentHeight]
   );
-  const contentStyle = useMemo(() => ({ flexGrow: 1, ...layout }), [layout]);
   const ready = layout !== undefined;
+  const contentStyle = useMemo(
+    () =>
+      ready
+        ? { flexGrow: 1, ...layout }
+        : { flexGrow: 1, justifyContent: 'center' as const, paddingVertical: 16 },
+    [layout, ready]
+  );
+  const [fallbackElapsed, setFallbackElapsed] = useState(false);
+  useEffect(() => {
+    if (ready) {
+      setFallbackElapsed(false);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setFallbackElapsed(true);
+    }, STATE_SURFACE_FALLBACK_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [ready]);
+  const visible = ready || fallbackElapsed;
   const band = useMemo(
     () =>
       surface?.frame && viewport?.surface === surface.frame
@@ -148,11 +183,11 @@ export function CenteredState({
         keyboardShouldPersistTaps="handled"
       >
         <View
-          className={cn('w-full', !ready && 'opacity-0')}
+          className={cn('w-full', !visible && 'opacity-0')}
           testID={testID ? `${testID}-content` : undefined}
           onLayout={measureContent}
-          accessibilityElementsHidden={!ready}
-          importantForAccessibility={ready ? 'auto' : 'no-hide-descendants'}
+          accessibilityElementsHidden={!visible}
+          importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
         >
           <View onLayout={measureReserved}>
             {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}

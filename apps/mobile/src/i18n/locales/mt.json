@@ -886,8 +886,11 @@
       "sessionStatusTitle": "Status tas-sessjoni",
       "sessionStatusSubtitle": "tlestiet / falliet / lesta biex tikkontrollaha",
       "kiloclawActivitySubtitle": "istanza lesta jew falliet, azzjonijiet skedati",
+      "kiloclawActivityUnavailable": "Ibda istanza ta' KiloClaw biex tikseb l-attività ta' KiloClaw.",
       "balanceAlertsSubtitle": "twissijiet ta' bilanċ baxx tal-organizzazzjoni",
-      "securityFindingsSubtitle": "sejbiet ġodda u tfakkiriet tal-SLA"
+      "balanceAlertsUnavailable": "Ingħaqad ma' organizzazzjoni biex tikseb twissijiet ta' bilanċ baxx.",
+      "securityFindingsSubtitle": "sejbiet ġodda u tfakkiriet tal-SLA",
+      "securityFindingsUnavailable": "Attiva l-aġent tas-sigurtà ta' Kilo fuq ambitu biex tikseb sejbiet tas-sigurtà."
     },
     "action": {
       "openSession": "Iftaħ is-sessjoni"
@@ -2160,6 +2163,10 @@
       "couldNotLoad": "Ma setgħetx titgħabba s-sessjoni.",
       "failedToLoadDetails": "Ma setgħux jitgħabbew id-dettalji tas-sessjoni.",
       "failedToStopExecution": "Ma setgħetx titwaqqaf l-eżekuzzjoni.",
+      "stopped": "Is-sessjoni twaqqfet",
+      "committing": "Qed jiġi rreġistrat…",
+      "committed": "Irreġistrat",
+      "commitFailed": "Ir-reġistrazzjoni falliet",
       "renameSession": "Ibdel l-isem tas-sessjoni",
       "renamePlaceholder": "Isem is-sessjoni",
       "transcriptAccessibility": "Traskrizzjoni tas-sessjoni",

@@ -23,6 +23,22 @@ type ConsentCardProps = {
   readonly mode?: ConsentMode;
 };
 
+/**
+ * Maximum font scale honoured by the pinned privacy disclosure.
+ *
+ * The disclosure sits in the card's pinned footer with the reserved error
+ * line and two `size="lg"` buttons. Uncapped, the `text-xs` sentence grows
+ * with Dynamic Type to several lines at the largest system text size, and
+ * that height comes out of the sheet, not the scroll region: the footer has
+ * no room left and the second action clips at the sheet bottom. Capped at
+ * 1.6 the sentence stays within two bounded lines on the smallest supported
+ * width, so the footer keeps a bounded height and the actions stay on
+ * screen; scales below 1.6 pass through untouched, so a11y users keep most
+ * of their preferred scale. Same cap and reasoning as the tour header (see
+ * `tour-font-scale`).
+ */
+export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.6;
+
 export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
   const colors = useThemeColors();
@@ -287,14 +303,6 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             </Text>
             <DirectionalChevronRight size={16} color={colors.primary} />
           </Pressable>
-
-          <Text className="mt-6 text-xs text-muted-foreground">
-            {t('consent.privacyPolicyPrefix')}{' '}
-            <Text className="text-xs text-primary underline" onPress={handleOpenPrivacy}>
-              {t('consent.privacyPolicy')}
-            </Text>
-            .
-          </Text>
         </View>
       </ScrollView>
 
@@ -304,7 +312,24 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             invisible behind the buttons (b911 vr2 device repro — staging
             error measured at y=792 under the Back/Revoke footer). The
             one-line slot is always reserved, so an error appears without
-            moving the actions. */}
+            moving the actions. The privacy disclosure is pinned here too,
+            because at the foot of the scrolling body the footer edge cut the
+            sentence in half. Its font scale is capped so the pinned height
+            stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). */}
+        <Text
+          className="text-xs text-muted-foreground"
+          maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
+        >
+          {t('consent.privacyPolicyPrefix')}{' '}
+          <Text
+            className="text-xs text-primary underline"
+            maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
+            onPress={handleOpenPrivacy}
+          >
+            {t('consent.privacyPolicy')}
+          </Text>
+          .
+        </Text>
         <View className="min-h-5 justify-center">
           <AccessibleStatus message={error} className="text-sm" />
         </View>

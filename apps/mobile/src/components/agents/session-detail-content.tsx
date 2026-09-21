@@ -1927,6 +1927,7 @@ export function SessionDetailContent({
           ) : null}
           <ScreenHeader
             title={rename.title}
+            titleNumberOfLines={1}
             reserveTitleSpace
             backFallback="/(app)/(tabs)/(2_agents)"
             headerRight={headerRight}

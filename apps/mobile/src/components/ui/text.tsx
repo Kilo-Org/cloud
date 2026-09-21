@@ -22,7 +22,7 @@ const textVariants = cva('text-foreground text-base font-medium', {
       small: 'text-sm font-medium leading-none',
       muted: 'text-muted-foreground text-sm',
       mono: 'font-mono-medium text-sm',
-      eyebrow: 'font-mono-medium text-[10px] uppercase tracking-[1.5px] text-muted-foreground',
+      eyebrow: 'font-mono-medium text-[10px] text-muted-foreground',
     },
   },
   defaultVariants: {
@@ -47,6 +47,18 @@ const ARIA_LEVEL = {
   h3: '3',
   h4: '4',
 } satisfies Partial<Record<TextVariant, string>>;
+
+/**
+ * The eyebrow's Latin display treatment: full capitals, letterspaced. It is an
+ * LTR-only addition to the variant because `letter-spacing` pulls a cursive
+ * script apart — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت'. An RTL
+ * interface keeps the mono family, size and color and drops both classes.
+ *
+ * Exported so the eyebrow-scale labels rendered outside the variant — the
+ * `SectionHeader` action link — carry the identical treatment instead of a
+ * second copy of the class string that can drift.
+ */
+export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
 
 const TextClassContext = React.createContext<string | undefined>(undefined);
 
@@ -73,7 +85,12 @@ function Text({
   ].filter((style): style is TextStyle => style !== undefined);
   return (
     <Component
-      className={cn(textVariants({ variant }), textClass, className)}
+      className={cn(
+        textVariants({ variant }),
+        variant === 'eyebrow' && !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY,
+        textClass,
+        className
+      )}
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}

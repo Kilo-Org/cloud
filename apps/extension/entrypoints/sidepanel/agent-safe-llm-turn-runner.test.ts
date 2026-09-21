@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 /* eslint-disable consistent-type-imports, no-unsafe-type-assertion, no-unsafe-call, no-unsafe-member-access, no-unsafe-assignment, no-unsafe-argument, id-length, prefer-destructuring, jest/no-untyped-mock-factory, no-useless-undefined, vitest/prefer-called-once, vitest/prefer-called-times, import/first -- test mock factories and fixture constraints */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -37,9 +38,18 @@ vi.mock('./agent-web-mcp-tool-runtime', () => ({
   executeWebMcpToolCall: vi.fn().mockResolvedValue({ ok: true, value: 'webmcp' }),
 }));
 
+// eslint-disable-next-line vitest/prefer-import-in-mock
+vi.mock('./browser-tool-runtime', () => ({
+  executeKiloBrowserToolCall: vi.fn().mockResolvedValue({ ok: true, value: 'browser' }),
+}));
+
 import { runSafeLlmTurn } from './agent-safe-llm-turn-runner';
 // eslint-disable-next-line import/first
 import { runLlmTurn } from '@/src/shared/agent-llm-turn-runner-core';
+// eslint-disable-next-line import/first
+import { KILO_SAFE_BROWSER_TOOL_NAMES } from '@/src/shared/browser-tool-definitions';
+// eslint-disable-next-line import/first
+import { executeKiloBrowserToolCall } from './browser-tool-runtime';
 // eslint-disable-next-line import/first
 import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
 // eslint-disable-next-line import/first
@@ -122,11 +132,13 @@ describe('safe turn runner workflow wiring', () => {
     const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
     const { tools: toolDefs } = firstCall[0];
 
-    expect(toolDefs[0]!.function.name).toBe('get_page_snapshot');
+    expect(
+      toolDefs.slice(0, KILO_SAFE_BROWSER_TOOL_NAMES.length).map(tool => tool.function.name)
+    ).toStrictEqual([...KILO_SAFE_BROWSER_TOOL_NAMES]);
     const workflowIndex = toolDefs.findIndex(tool => tool.function.name === 'run_workflow');
     const mcpIndex = toolDefs.findIndex(tool => tool.function.name === 'mcp_test_tool');
     expect(workflowIndex).toBeLessThan(mcpIndex);
-    expect(workflowIndex).toBeGreaterThan(0);
+    expect(workflowIndex).toBeGreaterThan(KILO_SAFE_BROWSER_TOOL_NAMES.length);
   });
 
   it('calls executeWorkflowToolCall for a workflow tool event', async () => {
@@ -230,7 +242,7 @@ describe('safe turn runner workflow wiring', () => {
     ]);
 
     expect(events).toHaveLength(1);
-    expect(events[0]!.name).toBe('double');
+    expect(events[0]).toMatchObject({ name: 'double' });
     expect(events[0]).toHaveProperty('webMcpOrigin', 'https://example.com');
   });
 
@@ -292,5 +304,99 @@ describe('safe turn runner workflow wiring', () => {
 
     expect(executeWebMcpToolCall).toHaveBeenCalledOnce();
     expect(executeWorkflowToolCall).not.toHaveBeenCalled();
+  });
+
+  it('lists the read-only kilo browser tools plus the non-browser safe tools first', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+
+    await runSafeLlmTurn(buildOptions());
+
+    const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
+    const names = firstCall[0].tools.map(tool => tool.function.name);
+
+    expect(names).toStrictEqual([
+      ...KILO_SAFE_BROWSER_TOOL_NAMES,
+      'web_search',
+      'search_memories',
+      'get_memory',
+    ]);
+  });
+
+  it('routes a kilo_browser_* event to executeKiloBrowserToolCall', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+    vi.mocked(executeKiloBrowserToolCall).mockClear();
+    vi.mocked(runLlmTurn).mockImplementation(async options => {
+      const toolCall = {
+        arguments: { scale: 'css' },
+        id: 'tc-shot',
+        name: 'kilo_browser_take_screenshot' as const,
+        tabId: 7,
+        type: 'tool-call' as const,
+      };
+      await options.executeToolCall(toolCall);
+    });
+
+    await runSafeLlmTurn(buildOptions());
+
+    expect(executeKiloBrowserToolCall).toHaveBeenCalledOnce();
+    expect(vi.mocked(executeKiloBrowserToolCall).mock.calls[0]![0].name).toBe(
+      'kilo_browser_take_screenshot'
+    );
+  });
+
+  it('converts a read-only kilo_browser_* gateway call to a browser tool-call event', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+
+    await runSafeLlmTurn(buildOptions());
+
+    const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
+    const events = firstCall[0].toToolCallEvents([
+      { arguments: { scale: 'css' }, id: 'call-shot', name: 'kilo_browser_take_screenshot' },
+    ]);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      arguments: { scale: 'css' },
+      name: 'kilo_browser_take_screenshot',
+      providerToolCallId: 'call-shot',
+      tabId: 7,
+      type: 'tool-call',
+    });
+  });
+
+  it('refuses a non-read-only browser call in safe mode and keeps the refusal visible', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+    vi.mocked(executeKiloBrowserToolCall).mockClear();
+
+    await runSafeLlmTurn(buildOptions());
+
+    const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
+    const events = firstCall[0].toToolCallEvents([
+      {
+        arguments: { element: 'Save', target: 'e5' },
+        id: 'call-click',
+        name: 'kilo_browser_click',
+      },
+    ]);
+
+    // The refusal travels with its call: the tool-call event renders the exchange and the tool-result event reaches the conversation and the model.
+    expect(events).toHaveLength(2);
+    const callEvent = events.find(event => event.type === 'tool-call');
+    const refusal = events.find(event => event.type === 'tool-result');
+
+    expect(callEvent).toMatchObject({
+      arguments: { element: 'Save', target: 'e5' },
+      name: 'kilo_browser_click',
+      providerToolCallId: 'call-click',
+      tabId: 7,
+      type: 'tool-call',
+    });
+    expect(refusal).toMatchObject({
+      error:
+        'kilo_browser_click is not read-only: safe mode exposes only the Playwright MCP tools the upstream server marks with readOnlyHint, and this tool does not carry it. Switch to danger mode to run it.',
+      ok: false,
+      toolCallId: callEvent?.id,
+      type: 'tool-result',
+    });
   });
 });

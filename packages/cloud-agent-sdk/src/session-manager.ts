@@ -167,6 +167,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const TRANSCRIPT_CLEARED_INDICATOR = 'View cleared — earlier messages are still on this session';
 
 /**
+ * Maximum number of sessions with an in-memory record of retried delivery
+ * failures. Mirrors the durable store's per-user session cap: without one, a
+ * long-lived manager would keep a set for every session the user ever retried.
+ */
+const RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS = 20;
+
+/**
  * Maximum number of retained messages. Once the loaded transcript exceeds this,
  * `trimRetainedHistory` drops the oldest loaded older-page from local storage.
  */
@@ -349,6 +356,20 @@ type SessionManagerConfig = {
   onComplete?: () => void;
   onBranchChanged?: (branch: string) => void;
   onSendFailed?: (messageText: string, displayMessage?: string, error?: unknown) => void;
+  /**
+   * Optional durable memory of delivery failures the user already retried,
+   * scoped to one session. Read on `switchSession` and consulted when a
+   * `cloud.message.failed` event arrives: the DO replays its stored events on
+   * the next open, so without this the cleared footer returns after a relaunch.
+   * Callers without a reader (web, tests) keep the in-memory-only behaviour.
+   */
+  readResolvedDeliveryFailures?: (kiloSessionId: KiloSessionId) => Promise<readonly string[]>;
+  /**
+   * Optional sink for a delivery failure the user resolved by retrying, so the
+   * next open can drop its replayed `cloud.message.failed`. Never throws into
+   * the caller; a failed write costs one restored footer, not a broken retry.
+   */
+  persistResolvedDeliveryFailure?: (kiloSessionId: KiloSessionId, messageId: string) => void;
   /**
    * Optional sink for tool attachment bytes, called just before the chat
    * processor strips a completed tool part's attachment data URLs for storage.
@@ -533,9 +554,16 @@ type SessionManager = {
   dismissSuggestion(requestId: string): Promise<void>;
   /**
    * Remove one failed delivery entry after a successful retry so its row
-   * stops showing.
+   * stops showing, and persist the id (when a sink is configured) so a
+   * replayed `cloud.message.failed` on the next open cannot bring it back.
+   *
+   * `ownerSessionId` is the session that owned the retried row, captured by
+   * the caller before the re-send. Pass it whenever the re-send was awaited:
+   * the user can switch sessions while it is in flight, and the resolution
+   * must be recorded against — and only against — the session it belongs to.
+   * Omitted, the currently active session is assumed.
    */
-  clearFailedMessage(messageId: string): void;
+  clearFailedMessage(messageId: string, ownerSessionId?: KiloSessionId): void;
   createAndStart(input: PrepareInput): Promise<void>;
   clearError(): void;
   destroy(): void;
@@ -934,6 +962,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   let activeSessionId: KiloSessionId | null = null;
   let switchGeneration = 0;
   let currentSession: CloudAgentSession | null = null;
+  /**
+   * Delivery failures the user already retried, kept per session so a
+   * resolution recorded while another session was active still suppresses the
+   * replayed failure when the user switches back — before the fire-and-forget
+   * durable write lands, or if it never does. The active session's set is the
+   * one its live session predicate reads; `resolvedFailuresForSession` is the
+   * only way to reach any set.
+   */
+  const resolvedDeliveryFailuresBySession = new Map<KiloSessionId, Set<string>>();
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
@@ -1770,6 +1807,36 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
+  /**
+   * The in-memory resolution record for one session, created on demand. The
+   * record outlives a switch so a retry recorded while another session was
+   * active — `clearFailedMessage` with an `ownerSessionId` that is not the
+   * active one — still suppresses the replayed failure when the user switches
+   * back, even before (or without) the durable write landing. Bounded to the
+   * most recently used sessions; the active session is never evicted, because
+   * its live session predicate reads this exact set.
+   */
+  function resolvedFailuresForSession(kiloSessionId: KiloSessionId): Set<string> {
+    const existing = resolvedDeliveryFailuresBySession.get(kiloSessionId);
+    if (existing) {
+      // Refresh insertion order so recently touched sessions survive eviction.
+      resolvedDeliveryFailuresBySession.delete(kiloSessionId);
+      resolvedDeliveryFailuresBySession.set(kiloSessionId, existing);
+      return existing;
+    }
+    const created = new Set<string>();
+    resolvedDeliveryFailuresBySession.set(kiloSessionId, created);
+    if (resolvedDeliveryFailuresBySession.size > RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS) {
+      for (const key of resolvedDeliveryFailuresBySession.keys()) {
+        if (key !== kiloSessionId && key !== activeSessionId) {
+          resolvedDeliveryFailuresBySession.delete(key);
+          break;
+        }
+      }
+    }
+    return created;
+  }
+
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
     // A retry of a failed metadata refresh must keep the transcript mounted.
     // A real session switch (or a caller without caching) still starts clean.
@@ -1792,6 +1859,38 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession?.destroy();
     currentSession = null;
     setIndicator(null);
+
+    // Seed the durable memory of retried delivery failures for this session.
+    // The record already held for this session is reused, so a resolution
+    // recorded while another session was active suppresses the replay even if
+    // the durable read below returns the pre-write list. The read is not
+    // awaited: if it lands after the DO's replay already applied a resolved
+    // failure, the prune below removes the whole failure; if it lands first,
+    // the predicate suppresses it.
+    const resolvedFailures = resolvedFailuresForSession(kiloSessionId);
+    if (config.readResolvedDeliveryFailures) {
+      void config
+        .readResolvedDeliveryFailures(kiloSessionId)
+        .then(ids => {
+          if (expectedGeneration !== switchGeneration) return;
+          for (const id of ids) {
+            resolvedFailures.add(id);
+          }
+          for (const id of ids) {
+            // `clearFailedMessage` reports when the pruned entry was also the
+            // failure that set the terminal error and has undone it. That
+            // error reached `errorAtom` through `config.onError`, which the
+            // service state cannot reach, so clear it here: the predicate path
+            // never applies the failure at all, and the two must agree.
+            if (currentSession?.state.clearFailedMessage(id)) {
+              store.set(errorAtom, null);
+            }
+          }
+        })
+        .catch(() => {
+          // An unreadable memory is a miss, never a failed open.
+        });
+    }
 
     // Clean slate immediately — the user asked to switch, so clear all
     // previous session state and show a loading indicator.
@@ -1954,6 +2053,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       storage: jotaiStorage,
       onToolAttachment: config.onToolAttachment,
       onFilePart: config.onFilePart,
+      isDeliveryFailureResolved: messageId => resolvedFailures.has(messageId),
       onSessionCreated: info => {
         if (info.parentID == null) {
           // Adopt the server-reported root session ID so message
@@ -2563,11 +2663,29 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (currentSession) await currentSession.dismissSuggestion({ requestId });
   }
 
-  function clearFailedMessage(messageId: string): void {
-    currentSession?.state.clearFailedMessage(messageId);
-    const next = new Map(store.get(pendingMessagesAtom));
-    next.delete(messageId);
-    store.set(pendingMessagesAtom, next);
+  function clearFailedMessage(messageId: string, ownerSessionId?: KiloSessionId): void {
+    // The re-send is awaited, so the user can switch sessions while it is in
+    // flight. `activeSessionId` is then the switched-to session, and both the
+    // in-memory record and the durable record belong to the session that owned
+    // the row instead — the switched-to session must not have another
+    // transcript's id applied to its state or atom.
+    const owner = ownerSessionId ?? activeSessionId;
+    if (owner === null) return;
+    if (owner === activeSessionId) {
+      currentSession?.state.clearFailedMessage(messageId);
+      const next = new Map(store.get(pendingMessagesAtom));
+      next.delete(messageId);
+      store.set(pendingMessagesAtom, next);
+    }
+    // Remember the resolution for the owner's in-memory suppression: the
+    // failure id is final on the server, so any later `cloud.message.failed`
+    // for it is the DO's stored-event replay and must not restore the footer
+    // the user's retry cleared. Recording it under the owner — not only under
+    // the active session — is what suppresses the replay when the user
+    // switches back before the durable write below lands; that write is what
+    // keeps the clear across a relaunch.
+    resolvedFailuresForSession(owner).add(messageId);
+    config.persistResolvedDeliveryFailure?.(owner, messageId);
   }
 
   async function createAndStart(input: PrepareInput): Promise<void> {
@@ -2654,6 +2772,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
     clearAllAtoms();
     remoteOptimisticIds.clear();
+    resolvedDeliveryFailuresBySession.clear();
     activeSessionId = null;
     activeSessionType = null;
   }

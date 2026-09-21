@@ -4,6 +4,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { AgentConversationItemView } from './agent-conversation-events';
+import { createToolCall } from '@/src/shared/agent-conversation';
 import type {
   AgentConversationEvent,
   GroupedConversationItem,
@@ -184,6 +185,69 @@ describe('workflow tool exchange rendering', () => {
 
     expect(container.textContent).toContain('save_memory');
     expect(container.textContent).toContain('completed');
+  });
+});
+
+describe('playwright browser tool exchange rendering', () => {
+  it('renders the Playwright title for a kilo_browser_ call', () => {
+    const toolCall = createToolCall({
+      arguments: { url: 'https://example.com' },
+      name: 'kilo_browser_navigate',
+      tabId: 7,
+    });
+    const result = {
+      id: 'tr-1',
+      ok: true,
+      toolCallId: toolCall.id,
+      type: 'tool-result' as const,
+      value: 'Example Domain',
+    };
+    const item: GroupedConversationItem = {
+      result,
+      toolCall,
+      type: 'tool-exchange',
+    };
+
+    const { container } = render(<AgentConversationItemView item={item} />);
+
+    expect(container.textContent).toContain('Navigate to a URL');
+    expect(container.textContent).toContain('completed');
+    expect(container.textContent).toContain('tab 7');
+    expect(container.textContent).toContain('Arguments');
+    expect(container.textContent).toContain('https://example.com');
+    expect(container.textContent).toContain('Example Domain');
+  });
+
+  it('renders a browser screenshot image and no result pre', () => {
+    const toolCall = createToolCall({
+      arguments: { scale: 'css' },
+      name: 'kilo_browser_take_screenshot',
+      tabId: 7,
+    });
+    const result = {
+      id: 'tr-1',
+      ok: true,
+      toolCallId: toolCall.id,
+      type: 'tool-result' as const,
+      value: {
+        dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+        mediaType: 'image/png',
+      },
+    };
+    const item: GroupedConversationItem = {
+      result,
+      toolCall,
+      type: 'tool-exchange',
+    };
+
+    const { container } = render(<AgentConversationItemView item={item} />);
+
+    const image = container.querySelector('img');
+    expect(image).not.toBeNull();
+    expect(image?.getAttribute('src')).toContain('data:image/png;base64,');
+    expect(image?.getAttribute('alt')).toBe('Image produced by kilo_browser_take_screenshot');
+    expect(container.textContent).toContain('Take a screenshot');
+    expect(container.textContent).not.toContain('iVBORw0KGgo=');
   });
 });
 

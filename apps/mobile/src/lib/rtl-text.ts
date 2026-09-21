@@ -23,10 +23,11 @@ export const RTL_WRITING_DIRECTION: TextStyle = { writingDirection: 'rtl' };
  */
 export const RTL_NO_LETTER_SPACING: TextStyle = { letterSpacing: 0 };
 
-/** The Arabic blocks: Arabic, Arabic Supplement, Arabic Extended-A, and the
- * Arabic Presentation Forms-A and -B. Any character in them means the copy
- * needs a joining font. */
-const ARABIC_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+/** The Arabic blocks: Arabic, Arabic Supplement, Arabic Extended-B, Arabic
+ * Extended-A, and the Arabic Presentation Forms-A and -B. Any character in
+ * them means the copy needs a joining font. */
+const ARABIC_SCRIPT =
+  /[\u0600-\u06FF\u0750-\u077F\u0870-\u089F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
 /** Whether a React child tree contains Arabic-script copy. */
 export function hasArabicScript(node: ReactNode): boolean {

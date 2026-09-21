@@ -28,6 +28,9 @@ function hostText(root: TestRenderer.ReactTestInstance) {
 }
 
 const ARABIC = 'الجلسات الجارية الآن';
+// U+0870–U+089F, Arabic Extended-B: Arabic-script characters outside the
+// blocks the first fix matched.
+const ARABIC_EXTENDED_B = '\u0870\u089F';
 const LATIN = 'Live now';
 
 beforeEach(() => {
@@ -50,6 +53,16 @@ describe('Text eyebrow in an RTL interface', () => {
     expect(label.props.style).toContainEqual({ letterSpacing: 0 });
     expect(label.props.style).toContainEqual({ writingDirection: 'rtl' });
     expect(label.children).toEqual([ARABIC]);
+  });
+
+  it('drops the mono family and letter spacing from an Extended-B-only label', () => {
+    i18nManager.isRTL = true;
+    const label = hostText(mount(createElement(Text, { variant: 'eyebrow' }, ARABIC_EXTENDED_B)));
+    const classes = (label.props.className as string).split(' ');
+
+    expect(classes.some(token => token.startsWith('font-mono'))).toBe(false);
+    expect(label.props.style).toContainEqual({ letterSpacing: 0 });
+    expect(label.children).toEqual([ARABIC_EXTENDED_B]);
   });
 
   it('keeps the tracked mono design for a Latin label', () => {

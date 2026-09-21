@@ -3163,7 +3163,8 @@
     "channelName": "Mawakala wanaofanya kazi",
     "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa.",
     "openSession": "Fungua",
-    "approveFailed": "Imeshindikana kuidhinisha. Gusa $t(common.approve) ili ujaribu tena."
+    "approveFailed": "Imeshindikana kuidhinisha. Gusa $t(common.approve) ili ujaribu tena.",
+    "newestResult": "Matokeo mapya zaidi"
   },
   "transcriptionModel": {
     "title": "Modeli ya unukuzi",

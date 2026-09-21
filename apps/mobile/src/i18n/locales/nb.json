@@ -3163,7 +3163,8 @@
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen.",
     "openSession": "Åpne",
-    "approveFailed": "Kunne ikke godkjenne. Trykk på $t(common.approve) for å prøve igjen."
+    "approveFailed": "Kunne ikke godkjenne. Trykk på $t(common.approve) for å prøve igjen.",
+    "newestResult": "Nyeste resultat"
   },
   "transcriptionModel": {
     "title": "Transkripsjonsmodell",

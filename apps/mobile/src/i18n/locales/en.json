@@ -3163,7 +3163,8 @@
     "channelName": "Active agents",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
     "openSession": "Open",
-    "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again."
+    "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again.",
+    "newestResult": "Newest result"
   },
   "transcriptionModel": {
     "title": "Transcription model",

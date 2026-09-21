@@ -124,12 +124,12 @@ vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
-// The profile and environment rows render a loading skeleton, and
-// `@/components/ui/skeleton` pulls `react-native-reanimated`: this pure suite
-// runs in plain Node, where the Reanimated/worklets native entry cannot resolve
-// (the published worklets build uses bundler-style extensionless imports). The
-// primitive is a stub like every other UI element above; its own rendering is
-// not under test here.
+// The profile row and the environment row both render a loading `Skeleton`,
+// whose module imports `react-native-reanimated`: this pure suite does not set
+// Reanimated up, and it runs in plain Node, where the Reanimated/worklets
+// native entry cannot resolve (the published worklets build uses
+// bundler-style extensionless imports). The primitive is a stub like every
+// other UI element above; its own rendering is not under test here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({
@@ -829,6 +829,9 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    // The help draws the commands as prose: the authoring markers must not
+    // reach the screen.
+    expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const remote = NewSessionConfigureForm({
@@ -839,6 +842,7 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 
   // ── Case 14: reorder wiring lock ──

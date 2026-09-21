@@ -41,6 +41,9 @@ describe('getToastBottomOffset', () => {
   });
 
   it('raises the toast above the software keyboard', () => {
+    // `keyboardHeight` is the occlusion measured from the screen bottom, which
+    // the caller resolves with `resolveKeyboardBottomPadding`: Android's raw
+    // height stops at the navigation bar and must not reach this math.
     expect(getToastBottomOffset({ safeAreaBottom: 24, keyboardHeight: 300 })).toBe(
       300 + TOAST_BOTTOM_GAP
     );

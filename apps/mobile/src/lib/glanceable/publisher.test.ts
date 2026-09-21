@@ -433,6 +433,54 @@ describe('GlanceablePublisher', () => {
     publisher.dispose();
   });
 
+  it('retries a rejected counts change on the failure backoff, not the renewal margin', () => {
+    // A coalesced counts change is emitted regardless of the renewal gate, so a
+    // sink that rejects it leaves the surface on the previous counts. The last
+    // accepted frame is only seconds old, so waiting for the renewal margin
+    // alone would hold the change back for up to 15 minutes; the rejected frame
+    // must instead retry once the failure backoff elapses.
+    vi.useFakeTimers();
+    let now = NOW;
+    const calls: SinkCall[] = [];
+    let writes = 0;
+    const sink: GlanceableSink = {
+      publish(snapshot) {
+        calls.push({ type: 'publish', snapshot });
+      },
+      startOrUpdate(snapshot, ctx) {
+        writes += 1;
+        calls.push({ type: 'startOrUpdate', snapshot, ctx });
+        if (writes === 2) {
+          throw new Error('ActivityKit update failed');
+        }
+      },
+      endImmediate() {
+        // The counts never go empty here.
+      },
+    };
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now, coalesceMs: 1000 });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(1);
+
+    // A counts-only change is coalesced, then emitted when the window elapses.
+    now += 1;
+    publisher.handleSessions([{ status: 'busy' }, { status: 'busy' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(1);
+
+    now += 1000;
+    vi.advanceTimersByTime(1000);
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+
+    // The accepted frame is only ~1 s old, but the change was rejected, so the
+    // next heartbeat after the backoff retries it rather than holding it until
+    // the surface's stale window approaches.
+    now += GLANCEABLE_COALESCE_MS;
+    publisher.handleSessions([{ status: 'busy' }, { status: 'busy' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(3);
+    expect(lastSnapshot(calls, 'startOrUpdate').running).toBe(2);
+    publisher.dispose();
+  });
+
   it('bounds count churn to one native update per window', () => {
     vi.useFakeTimers();
     let now = NOW;

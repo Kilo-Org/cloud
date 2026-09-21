@@ -395,16 +395,24 @@ export class GlanceablePublisher {
   }
 
   /**
-   * Whether an unchanged heartbeat should renew the native surface. The last
+   * Whether an unchanged heartbeat should retry the native surface. The last
    * accepted frame must be at or past the renewal margin (or none was ever
-   * accepted), and the backoff from a rejected write must have elapsed. The
-   * backoff is what keeps a sink that rejects every write from re-emitting on
-   * every heartbeat: the rejected attempt spends the wait, which doubles to a
-   * ceiling, instead of the published deadline staying frozen and re-arming the
-   * renewal each heartbeat.
+   * accepted), and the backoff from a rejected write must have elapsed. A
+   * rejected write leaves the surface on an older frame than the one the last
+   * emit carried, so it skips the margin check and retries on the backoff alone:
+   * the wait anchors at the rejected attempt, not at the older accepted frame,
+   * so a change the sinks rejected cannot be held back until that frame nears
+   * its stale window. The backoff is what keeps a sink that rejects every write
+   * from re-emitting on every heartbeat: the rejected attempt spends the wait,
+   * which doubles to a ceiling, instead of the published deadline staying frozen
+   * and re-arming the renewal each heartbeat.
    */
   private isRenewalDue(now: number): boolean {
-    if (this.lastPublishedAt !== null && now - this.lastPublishedAt < GLANCEABLE_RENEW_MARGIN_MS) {
+    if (
+      this.writeFailures === 0 &&
+      this.lastPublishedAt !== null &&
+      now - this.lastPublishedAt < GLANCEABLE_RENEW_MARGIN_MS
+    ) {
       return false;
     }
     return (

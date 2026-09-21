@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { I18nManager, Text as RNText, type Role } from 'react-native';
 
-import { RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
+import { RTL_WRITING_DIRECTION, textLetterSpacing } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 const textVariants = cva('text-foreground text-base font-medium', {
@@ -62,13 +62,19 @@ function Text({
   }) {
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot.Text : RNText;
+  // NativeWind merges the `className` style first and this inline `style` last,
+  // so `letterSpacing: 0` overrides a class's `tracking-*` at every call site.
+  const ownStyles = [
+    textLetterSpacing(props.children),
+    I18nManager.isRTL ? RTL_WRITING_DIRECTION : undefined,
+  ].filter(Boolean);
   return (
     <Component
       className={cn(textVariants({ variant }), textClass, className)}
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
-      style={I18nManager.isRTL ? [RTL_WRITING_DIRECTION, props.style] : props.style}
+      style={ownStyles.length > 0 ? [...ownStyles, props.style] : props.style}
     />
   );
 }

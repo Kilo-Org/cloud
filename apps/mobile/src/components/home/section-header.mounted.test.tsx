@@ -96,6 +96,25 @@ describe('SectionHeader mounted layout', () => {
     expect(text.children).toEqual(['See all']);
   });
 
+  it('clears the tracked letter-spacing on the Arabic label and action', () => {
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'الجلسات الجارية الآن',
+        actionLabel: 'عرض الكل',
+        onActionPress: () => undefined,
+      })
+    );
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
+    );
+    const action = root.findByProps({ accessibilityRole: 'button' });
+    const actionText = action.find(node => Object.is(node.type, 'Text'));
+
+    expect((label.props.className as string).split(' ')).toContain('tracking-[1.5px]');
+    expect(label.props.style).toContainEqual({ letterSpacing: 0 });
+    expect(actionText.props.style).toContainEqual({ letterSpacing: 0 });
+  });
+
   it('keeps the complete accessible action name and activates the supplied destination', () => {
     function Destination() {
       const [showAll, setShowAll] = useState(false);

@@ -2219,7 +2219,8 @@
       "linesBadge_one": "{{displayCount}} rida",
       "linesBadge_other": "{{displayCount}} rida",
       "matchesBadge_one": "{{displayCount}} vastet",
-      "matchesBadge_other": "{{displayCount}} vastet"
+      "matchesBadge_other": "{{displayCount}} vastet",
+      "noOutput": "Väljund puudub."
     },
     "readToolMarkdown": {
       "linesTruncated": "read {{start}}–{{end}} (kärbitud)",
@@ -3183,15 +3184,7 @@
     "remoteOptionTitle": "Sinu arvuti",
     "remoteOptionBody": "Käivita Kilo omas arvutis `kilo remote` CLI kaudu.",
     "skip": "Jäta tiivustus vahele",
-    "tutorialLabel": "Õpetus",
-    "remoteTitle": "Alusta oma esimest kaugseanssi",
-    "remoteBody": "Ühenda oma arvuti ja käivita seejärel seanss siit.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ühtegi arvutit veel ühendatud pole",
-    "remoteEmptyBody": "Selle ühendamiseks käivita oma arvutis `kilo remote`.",
-    "remoteFound": "Arvuti ühendatud",
-    "checkAgain": "Kontrolli uuesti",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Õpetus"
   },
   "appActions": {
     "start": {

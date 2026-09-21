@@ -2219,7 +2219,8 @@
       "linesBadge_one": "{{displayCount}} መስመር",
       "linesBadge_other": "{{displayCount}} መስመሮች",
       "matchesBadge_one": "{{displayCount}} ተዛማጅ",
-      "matchesBadge_other": "{{displayCount}} ተዛማጆች"
+      "matchesBadge_other": "{{displayCount}} ተዛማጆች",
+      "noOutput": "ምንም ውጤት የለም።"
     },
     "readToolMarkdown": {
       "linesTruncated": "መስመሮች {{start}}–{{end}} (በከፊል የታዩ)",
@@ -3183,15 +3184,7 @@
     "remoteOptionTitle": "የእርስዎ ኮምፒውተር",
     "remoteOptionBody": "`kilo remote` በሚባለው CLI በመጠቀም Kiloን በራስዎ ማሽን ላይ ያስኪዱ።",
     "skip": "ጉዞውን ዕለጥ",
-    "tutorialLabel": "መመሪያ",
-    "remoteTitle": "የመጀመሪያውን ሩቅ ክፍለ ጊዜ ይጀምሩ",
-    "remoteBody": "ኮምፒውተርዎን ያገናኙ፣ ከዚያ ክፍለ ጊዜውን ከዚህ ይጀምሩ።",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "እስካሁን የተገናኘ ኮምፒውተር የለም",
-    "remoteEmptyBody": "ለማገናኘት በኮምፒውተርዎ ላይ `kilo remote`ን ያስኪዱ።",
-    "remoteFound": "ኮምፒውተር ተገናኝቷል",
-    "checkAgain": "እንደገና ይፈትሹ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "መመሪያ"
   },
   "appActions": {
     "start": {

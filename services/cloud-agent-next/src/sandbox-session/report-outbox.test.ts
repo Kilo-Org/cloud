@@ -64,6 +64,24 @@ function failedReport(messageId: string): CloudAgentQueueReport {
   };
 }
 
+function providerFailedReport(messageId: string): CloudAgentQueueReport {
+  return {
+    version: 1,
+    type: 'run.state',
+    occurredAt: '2026-05-26T08:04:00.000Z',
+    session: { cloudAgentSessionId: 'agent_report_outbox' },
+    run: {
+      messageId,
+      status: 'failed',
+      terminalAt: '2026-05-26T08:04:00.000Z',
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      failureResponsibility: 'provider',
+      failureReason: 'provider_unavailable',
+    },
+  };
+}
+
 function createHarness(
   options: {
     queue?: { send: (report: CloudAgentQueueReport) => Promise<unknown> };
@@ -185,6 +203,24 @@ describe('createReportOutbox', () => {
     await outbox.repair();
 
     expect(sent).toHaveLength(0);
+    expect(outbox.pendingCount()).toBe(0);
+  });
+
+  it('keeps a provider responsibility entry as a valid obligation and sends it', async () => {
+    const sent: CloudAgentQueueReport[] = [];
+    const { outbox } = createHarness({
+      queue: { send: async report => void sent.push(report) },
+    });
+    outbox.record(providerFailedReport('msg_provider'));
+
+    expect(outbox.pendingCount()).toBe(1);
+    await outbox.repair();
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.run).toMatchObject({
+      failureResponsibility: 'provider',
+      failureReason: 'provider_unavailable',
+    });
     expect(outbox.pendingCount()).toBe(0);
   });
 

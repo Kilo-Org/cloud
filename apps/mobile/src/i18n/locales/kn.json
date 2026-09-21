@@ -2219,7 +2219,8 @@
       "linesBadge_one": "{{displayCount}} ಸಾಲು",
       "linesBadge_other": "{{displayCount}} ಸಾಲುಗಳು",
       "matchesBadge_one": "{{displayCount}} ಹೊಂದಾಣಿಕೆ",
-      "matchesBadge_other": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು"
+      "matchesBadge_other": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು",
+      "noOutput": "ಯಾವುದೇ ಔಟ್ಪುಟ್ ಇಲ್ಲ."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} ಸಾಲುಗಳು (ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ)",
@@ -3183,15 +3184,7 @@
     "remoteOptionTitle": "ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್",
     "remoteOptionBody": "ನಿಮ್ಮ ಸ್ವಂತ ಯಂತ್ರದಲ್ಲಿ `kilo remote` CLI ಮೂಲಕ Kilo ಚಲಾಯಿಸಿ.",
     "skip": "ಪ್ರವಾಸ ಬಿಡಿ",
-    "tutorialLabel": "ಟ್ಯುಟೋರಿಯಲ್",
-    "remoteTitle": "ನಿಮ್ಮ ಮೊದಲ ರಿಮೋಟ್ ಸೆಶನ್ ಆರಂಭಿಸಿ",
-    "remoteBody": "ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್ ಅನ್ನು ಸಂಪರ್ಕಿಸಿ, ನಂತರ ಇಲ್ಲಿಂದ ಸೆಶನ್ ಆರಂಭಿಸಿ.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ಇನ್ನೂ ಯಾವುದೇ ಕಂಪ್ಯೂಟರ್ ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",
-    "remoteEmptyBody": "ಅದನ್ನು ಸಂಪರ್ಕಿಸಲು ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್‌ನಲ್ಲಿ `kilo remote` ಚಲಾಯಿಸಿ.",
-    "remoteFound": "ಕಂಪ್ಯೂಟರ್ ಸಂಪರ್ಕಗೊಂಡಿದೆ",
-    "checkAgain": "ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ಟ್ಯುಟೋರಿಯಲ್"
   },
   "appActions": {
     "start": {

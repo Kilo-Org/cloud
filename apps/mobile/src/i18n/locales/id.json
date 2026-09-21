@@ -1715,7 +1715,8 @@
       "linesBadge_one": "{{displayCount}} baris",
       "linesBadge_other": "{{displayCount}} baris",
       "matchesBadge_one": "{{displayCount}} kecocokan",
-      "matchesBadge_other": "{{displayCount}} kecocokan"
+      "matchesBadge_other": "{{displayCount}} kecocokan",
+      "noOutput": "Tidak ada keluaran."
     },
     "readToolMarkdown": {
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",
@@ -3183,15 +3184,7 @@
     "remoteOptionTitle": "Komputer Anda",
     "remoteOptionBody": "Jalankan Kilo di mesin Anda sendiri melalui CLI `kilo remote`.",
     "skip": "Lewati tur",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Mulai sesi remote pertama Anda",
-    "remoteBody": "Hubungkan komputer Anda, lalu mulai sesi dari sini.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Belum ada komputer yang terhubung",
-    "remoteEmptyBody": "Untuk menghubungkannya, jalankan `kilo remote` di komputer Anda.",
-    "remoteFound": "Komputer terhubung",
-    "checkAgain": "Periksa lagi",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

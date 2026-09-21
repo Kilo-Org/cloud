@@ -2219,7 +2219,8 @@
       "linesBadge_one": "{{displayCount}} rresht",
       "linesBadge_other": "{{displayCount}} rreshta",
       "matchesBadge_one": "{{displayCount}} përputhje",
-      "matchesBadge_other": "{{displayCount}} përputhje"
+      "matchesBadge_other": "{{displayCount}} përputhje",
+      "noOutput": "Nuk ka dalje."
     },
     "readToolMarkdown": {
       "linesTruncated": "rreshtat {{start}}–{{end}} (përmbajtje e shkurtuar)",
@@ -3183,15 +3184,7 @@
     "remoteOptionTitle": "Kompjuteri yt",
     "remoteOptionBody": "Ekzekuto Kilo në makinën tënde përmes CLI-së `kilo remote`.",
     "skip": "Kapërce turin",
-    "tutorialLabel": "Tutoriali",
-    "remoteTitle": "Nis sesionin tënd të parë në distancë",
-    "remoteBody": "Lidh kompjuterin tënd, pastaj nis sesionin nga këtu.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ende pa kompjuter të lidhur",
-    "remoteEmptyBody": "Për ta lidhur, ekzekuto `kilo remote` në kompjuterin tënd.",
-    "remoteFound": "Kompjuteri u lidh",
-    "checkAgain": "Kontrollo përsëri",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutoriali"
   },
   "appActions": {
     "start": {

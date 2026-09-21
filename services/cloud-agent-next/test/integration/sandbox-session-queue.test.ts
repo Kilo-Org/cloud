@@ -2,6 +2,7 @@ import { abortAllDurableObjects, env, reset, runInDurableObject } from 'cloudfla
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { waitFor } from './wait-for.js';
 import { router } from '../../src/router/auth.js';
 import { createSessionManagementHandlers } from '../../src/router/handlers/session-management.js';
 import { createSessionSendHandlers } from '../../src/router/handlers/session-send.js';
@@ -197,7 +198,7 @@ describe('public control queue capacity and cancellation', () => {
     const slow = send(sessionId, 11, 'openai/gpt-4.1');
     let before: Awaited<ReturnType<typeof snapshot>>;
     try {
-      await vi.waitFor(() => expect(entered).toBe(true));
+      await waitFor(() => expect(entered).toBe(true));
       expect((await send(sessionId, 10)).status).toBe(200);
       before = await snapshot(session);
     } finally {

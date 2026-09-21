@@ -5,7 +5,10 @@ import { cn } from '@/lib/utils';
 
 type SectionHeaderProps = {
   label: string;
-  /** Optional link at the end of the row (e.g. "SEE ALL"). */
+  /**
+   * Optional link at the row's outer edge (physical right in LTR, physical left
+   * in RTL), e.g. "SEE ALL".
+   */
   actionLabel?: string;
   onActionPress?: () => void;
 };

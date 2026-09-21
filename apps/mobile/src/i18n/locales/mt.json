@@ -888,6 +888,15 @@
       "kiloclawActivitySubtitle": "istanza lesta jew falliet, azzjonijiet skedati",
       "balanceAlertsSubtitle": "twissijiet ta' bilanċ baxx tal-organizzazzjoni",
       "securityFindingsSubtitle": "sejbiet ġodda u tfakkiriet tal-SLA"
+    },
+    "action": {
+      "openSession": "Iftaħ is-sessjoni"
+    },
+    "needsInputAction": {
+      "approved": "It-talba ġiet approvata",
+      "replied": "Ir-risposta ntbagħtet",
+      "failed": "Ma rnexxiex twieġeb. Miss biex terġa’ tipprova.",
+      "unavailable": "Din it-talba ma tistennix aktar."
     }
   },
   "tabs": {
@@ -2261,20 +2270,7 @@
       "continueFrom": "Qed tkompli s-sessjoni {{title}}.",
       "importingSession": "Qed tiġi importata s-sessjoni",
       "cliCannotContinue": "Dan il-CLI ma jistax ikompli sessjoni. Agħżel Cloud Agent jew CLI ieħor.",
-      "importFailed": "Ma setgħetx tiġi importata din is-sessjoni.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Default · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Żgħir",
-      "sandboxInstanceShared": "Kondiviż",
-      "sandboxInstanceLarge": "Kbir",
-      "sandboxInstanceDevcontainer": "Kontenitur tad-Dev",
-      "sandboxInstanceProviderDefault": "Default tal-fornitur",
-      "sandboxCouldNotLoad": "Ma setgħetx titgħabba l-għażliet tas-sandbox",
-      "sandboxUnavailable": "Dan is-sandbox mhuwiex disponibbli. Agħżel sandbox ieħor jew Default.",
-      "sandboxUseDefault": "Uża Default"
+      "importFailed": "Ma setgħetx tiġi importata din is-sessjoni."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ġie aġġornat {{displayCount}} fajl.",
@@ -2316,7 +2312,8 @@
       "matchesBadge_other": "{{displayCount}} riżultati",
       "matchesBadge_two": "{{displayCount}} riżultati",
       "matchesBadge_few": "{{displayCount}} riżultati",
-      "matchesBadge_many": "{{displayCount}} riżultati"
+      "matchesBadge_many": "{{displayCount}} riżultati",
+      "noOutput": "M'hemm l-ebda ħruġ."
     },
     "readToolMarkdown": {
       "linesTruncated": "linji {{start}}–{{end}} (maqtugħa)",
@@ -3286,7 +3283,9 @@
     "couldNotApprove": "Ma setax japprova",
     "couldNotStart": "Ma setax jibda",
     "channelName": "Aġenti attivi",
-    "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar."
+    "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar.",
+    "openSession": "Iftaħ",
+    "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova."
   },
   "transcriptionModel": {
     "title": "Mudell ta' traskrizzjoni",
@@ -3311,15 +3310,7 @@
     "remoteOptionTitle": "Il-kompjuter tiegħek",
     "remoteOptionBody": "Ħaddem Kilo fuq il-magna tiegħek permezz tal-CLI `kilo remote`.",
     "skip": "Aqbeż it-tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Ibda l-ewwel sessjoni remota tiegħek",
-    "remoteBody": "Ikkonetta l-kompjuter tiegħek, imbagħad ibda s-sessjoni minn hawn.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Għad m'hemmx kompjuter konness",
-    "remoteEmptyBody": "Biex tikkonnettjah, ħaddem `kilo remote` fuq il-kompjuter tiegħek.",
-    "remoteFound": "Kompjuter konness",
-    "checkAgain": "Iċċekkja mill-ġdid",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "انسٹینس تیار یا ناکام، مقررہ وقت کے کام",
       "balanceAlertsSubtitle": "تنظیم کا بیلنس کم ہونے کے انتباہات",
       "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں"
+    },
+    "action": {
+      "openSession": "سیشن کھولیں"
+    },
+    "needsInputAction": {
+      "approved": "درخواست منظور ہو گئی",
+      "replied": "جواب بھیج دیا گیا",
+      "failed": "جواب دینا ممکن نہیں ہو سکا۔ دوبارہ کوشش کے لیے دوبارہ ٹیپ کریں۔",
+      "unavailable": "یہ درخواست اب انتظار نہیں کر رہی۔"
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "{{title}} جاری رکھا جا رہا ہے۔",
       "importingSession": "سیشن درآمد ہو رہا ہے",
       "cliCannotContinue": "یہ CLI سیشن جاری نہیں رکھ سکتا۔ Cloud Agent یا کوئی اور CLI منتخب کریں۔",
-      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔",
-      "sandbox": "سینڈ باکس",
-      "sandboxAccessibility": "سینڈ باکس: {{label}}",
-      "sandboxDefaultWithDestination": "پہلے سے طے شدہ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "چھوٹا",
-      "sandboxInstanceShared": "مشترکہ",
-      "sandboxInstanceLarge": "بڑا",
-      "sandboxInstanceDevcontainer": "ڈیو کنٹینر",
-      "sandboxInstanceProviderDefault": "فراہم کنندہ کا پہلے سے طے شدہ",
-      "sandboxCouldNotLoad": "سینڈ باکس کے اختیارات لوڈ نہیں ہو سکے",
-      "sandboxUnavailable": "یہ سینڈ باکس دستیاب نہیں ہے۔ کوئی اور سینڈ باکس یا پہلے سے طے شدہ منتخب کریں۔",
-      "sandboxUseDefault": "پہلے سے طے شدہ استعمال کریں"
+      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہو گئی ہے۔",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} سطر",
       "linesBadge_other": "{{displayCount}} سطریں",
       "matchesBadge_one": "{{displayCount}} مماثلت",
-      "matchesBadge_other": "{{displayCount}} مماثلتیں"
+      "matchesBadge_other": "{{displayCount}} مماثلتیں",
+      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔"
     },
     "readToolMarkdown": {
       "linesTruncated": "سطریں {{start}}–{{end}} (نامکمل متن)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "منظور نہیں کیا جا سکا",
     "couldNotStart": "شروع نہیں کیا جا سکا",
     "channelName": "فعال ایجنٹس",
-    "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔"
+    "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
+    "openSession": "کھولیں",
+    "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔"
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "آپ کا کمپیوٹر",
     "remoteOptionBody": "اپنے کمپیوٹر پر `kilo remote` CLI کے ذریعے Kilo چلائیں۔",
     "skip": "ٹور چھوڑیں",
-    "tutorialLabel": "ٹیوٹوریل",
-    "remoteTitle": "اپنا پہلا ریموٹ سیشن شروع کریں",
-    "remoteBody": "اپنا کمپیوٹر منسلک کریں، پھر یہاں سے سیشن شروع کریں۔",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ابھی کوئی کمپیوٹر منسلک نہیں ہوا",
-    "remoteEmptyBody": "اسے منسلک کرنے کے لیے اپنے کمپیوٹر پر `kilo remote` چلائیں۔",
-    "remoteFound": "کمپیوٹر منسلک ہو گیا",
-    "checkAgain": "دوبارہ جانچیں",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ٹیوٹوریل"
   },
   "appActions": {
     "start": {

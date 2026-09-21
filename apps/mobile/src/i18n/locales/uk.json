@@ -336,6 +336,15 @@
       "kiloclawActivitySubtitle": "готовність або помилка екземпляра, заплановані дії",
       "balanceAlertsSubtitle": "попередження про низький баланс організації",
       "securityFindingsSubtitle": "нові виявлені проблеми та нагадування про SLA"
+    },
+    "action": {
+      "openSession": "Відкрити сеанс"
+    },
+    "needsInputAction": {
+      "approved": "Запит схвалено",
+      "replied": "Відповідь надіслано",
+      "failed": "Не вдалося відповісти. Торкніться ще раз, щоб повторити.",
+      "unavailable": "Цей запит більше не чекає."
     }
   },
   "tabs": {
@@ -1697,20 +1706,7 @@
       "continueFrom": "Продовжується сеанс «{{title}}».",
       "importingSession": "Імпортування сеансу",
       "cliCannotContinue": "Цей CLI не підтримує продовження сеансів. Виберіть Cloud Agent або інший CLI.",
-      "importFailed": "Не вдалося імпортувати цей сеанс.",
-      "sandbox": "Пісочниця",
-      "sandboxAccessibility": "Пісочниця: {{label}}",
-      "sandboxDefaultWithDestination": "За замовчуванням · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Мала",
-      "sandboxInstanceShared": "Спільна",
-      "sandboxInstanceLarge": "Велика",
-      "sandboxInstanceDevcontainer": "Контейнер розробки",
-      "sandboxInstanceProviderDefault": "За замовчуванням постачальника",
-      "sandboxCouldNotLoad": "Не вдалося завантажити параметри пісочниці",
-      "sandboxUnavailable": "Ця пісочниця недоступна. Виберіть іншу пісочницю або «За замовчуванням».",
-      "sandboxUseDefault": "Використати «За замовчуванням»"
+      "importFailed": "Не вдалося імпортувати цей сеанс."
     },
     "partRenderer": {
       "updatedFileCount_one": "Оновлено {{displayCount}} файл.",
@@ -1748,7 +1744,8 @@
       "matchesBadge_one": "збіг: {{displayCount}}",
       "matchesBadge_other": "збігів: {{displayCount}}",
       "matchesBadge_few": "збіги: {{displayCount}}",
-      "matchesBadge_many": "збігів: {{displayCount}}"
+      "matchesBadge_many": "збігів: {{displayCount}}",
+      "noOutput": "Немає виводу."
     },
     "readToolMarkdown": {
       "linesTruncated": "рядки {{start}}–{{end}} (скорочено)",
@@ -3243,7 +3240,9 @@
     "couldNotApprove": "Не вдалося схвалити",
     "couldNotStart": "Не вдалося запустити",
     "channelName": "Активні агенти",
-    "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані."
+    "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані.",
+    "openSession": "Відкрити",
+    "approveFailed": "Не вдалося схвалити. Торкніться $t(common.approve), щоб спробувати ще раз."
   },
   "transcriptionModel": {
     "title": "Модель розпізнавання мовлення",
@@ -3268,15 +3267,7 @@
     "remoteOptionTitle": "Ваш комп'ютер",
     "remoteOptionBody": "Запустіть Kilo на власній машині через CLI `kilo remote`.",
     "skip": "Пропустити огляд",
-    "tutorialLabel": "Навчання",
-    "remoteTitle": "Запустіть свій перший віддалений сеанс",
-    "remoteBody": "Підключіть свій комп'ютер, а потім запустіть сеанс звідси.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Комп'ютер ще не підключено",
-    "remoteEmptyBody": "Щоб підключити його, виконайте `kilo remote` на своєму комп'ютері.",
-    "remoteFound": "Комп'ютер підключено",
-    "checkAgain": "Перевірити ще раз",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Навчання"
   },
   "appActions": {
     "start": {

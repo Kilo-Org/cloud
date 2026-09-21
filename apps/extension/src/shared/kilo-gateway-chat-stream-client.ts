@@ -6,6 +6,8 @@ import type {
   KiloGatewayToolDefinition,
   KiloGatewayToolName,
 } from './kilo-gateway-chat-client';
+import type { KiloBrowserToolName } from './browser-tool-contract';
+import { KILO_BROWSER_TOOL_NAMES } from './browser-tool-contract';
 import type { FetchLike } from './auth';
 import { z } from 'zod';
 
@@ -188,14 +190,28 @@ const getString = (value: string | undefined, message: string): string => {
 
   return value;
 };
+/*
+ * A kilo_browser_* call the current mode does not offer still has to parse: the
+ * turn runner answers it with a refusal tool result (safe mode) instead of the
+ * transparent retry tier re-billing the same request. Every other unoffered name
+ * stays fatal, as before.
+ */
+const toAcceptedToolName = (
+  candidate: string,
+  allowedToolNames: ReadonlySet<KiloGatewayToolName>
+): KiloGatewayToolName | undefined =>
+  [...allowedToolNames].find(allowed => allowed === candidate) ??
+  (KILO_BROWSER_TOOL_NAMES.some(name => name === candidate)
+    ? // eslint-disable-next-line no-unsafe-type-assertion -- the contract list is the kilo_browser_* name set
+      (candidate as KiloBrowserToolName)
+    : undefined);
+
 const parseToolCallBuffer = (
   value: StreamingToolCallBuffer,
   allowedToolNames: ReadonlySet<KiloGatewayToolName>
 ): KiloGatewayToolCallRequest => {
   const name =
-    value.name === undefined
-      ? undefined
-      : [...allowedToolNames].find(allowed => allowed === value.name);
+    value.name === undefined ? undefined : toAcceptedToolName(value.name, allowedToolNames);
 
   if (name === undefined) {
     throw new TypeError('Gateway stream tool call did not include a supported tool name.');

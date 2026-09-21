@@ -6479,7 +6479,7 @@ export type CloudAgentSessionFailureCode =
   | 'initial_queue_full'
   | 'invalid_initial_intent'
   | 'do_rpc_outcome_unknown';
-export type CloudAgentFailureResponsibility = 'platform' | 'user' | 'unknown';
+export type CloudAgentFailureResponsibility = 'platform' | 'provider' | 'user' | 'unknown';
 export type CloudAgentFailureReason =
   | 'insufficient_credits'
   | 'rate_limited'

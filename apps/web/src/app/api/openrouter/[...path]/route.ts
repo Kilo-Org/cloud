@@ -40,6 +40,7 @@ import {
   invalidPathResponse,
   invalidRequestResponse,
   malformedJsonResponse,
+  invalidTokenResponse,
   makeErrorReadable,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
@@ -47,6 +48,7 @@ import {
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
+  temporarilyBlockedModelResponse,
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   unavailableModelResponse,
@@ -65,7 +67,6 @@ import {
 } from '@/lib/ai-gateway/rewriteModelResponse';
 import {
   createAnonymousContext,
-  getAnonymousUserId,
   isAnonymousContext,
   type AnonymousUserContext,
 } from '@/lib/anonymous';
@@ -77,7 +78,10 @@ import {
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { isGatewayAccountRateLimited } from '@/lib/ai-gateway/gateway-account-rate-limit';
+import {
+  gatewayRateLimitKey,
+  isGatewayAccountRateLimited,
+} from '@/lib/ai-gateway/gateway-account-rate-limit';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { isCloudflareIP } from '@/lib/cloudflare-ip';
@@ -107,6 +111,8 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
+import { isFableModel, isOpus5Model } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { CLAUDE_OPUS_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
 
 export const maxDuration = 800;
 
@@ -175,6 +181,30 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   if ('errorResponse' in pathResult) return pathResult.errorResponse;
   const { path } = pathResult;
 
+  // Extract IP early (needed for free model routing fallback and rate limiting)
+  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+
+  // Cap the account before this function starts any database work. Every WAF
+  // rule in front of this route counts per IP, so an actor rotating addresses
+  // buys one allowance per address; this one counts the account itself.
+  //
+  // The cap has to sit above `getUserFromAuth`, not below it. Auth resolves the
+  // account with a read-replica query, so a cap placed after auth still spends a
+  // connection on every flooded request. The key comes from the signed token
+  // instead, which costs no query.
+  const accountKey = gatewayRateLimitKey(request.headers, ipAddress);
+  if (await isGatewayAccountRateLimited(request, accountKey)) {
+    console.warn(`Gateway account rate limit exceeded, user: ${accountKey}`);
+    return NextResponse.json(
+      {
+        error: 'Rate limit exceeded',
+        error_type: ProxyErrorType.rate_limit_exceeded,
+        message: 'Too many requests. Please try again later.',
+      },
+      { status: 429 }
+    );
+  }
+
   // Parse body first to check model before auth (needed for anonymous access)
   const requestBodyText = await request.text();
   const authPromise = getUserFromAuth({
@@ -240,33 +270,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const feature = validateFeatureHeader(
     request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
   );
-
-  // Extract IP early (needed for free model routing fallback and rate limiting)
-  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-
-  // Cap the account before anything below dispatches database work. Every WAF
-  // rule in front of this route counts per IP, so an actor rotating addresses
-  // buys one allowance per address; this one counts the account itself. The
-  // balance and policy lookups are chained off `authPromise` and start the
-  // moment it resolves, so the check has to run before they are created.
-  const authSpan = startInactiveSpan({ name: 'auth-check' });
-  const auth = await authPromise;
-  authSpan.end();
-  // Mirrors the anonymous fallback below: a failed auth is billed and counted
-  // as the address, not as whatever account the token named.
-  const accountKey =
-    auth.authFailedResponse || !auth.user ? getAnonymousUserId(ipAddress ?? '') : auth.user.id;
-  if (await isGatewayAccountRateLimited(request, accountKey)) {
-    console.warn(`Gateway account rate limit exceeded, user: ${accountKey}`);
-    return NextResponse.json(
-      {
-        error: 'Rate limit exceeded',
-        error_type: ProxyErrorType.rate_limit_exceeded,
-        message: 'Too many requests. Please try again later.',
-      },
-      { status: 429 }
-    );
-  }
 
   const balanceAndSettingsPromise = authPromise.then(res =>
     res.user
@@ -451,14 +454,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     }
   }
 
-  // Auth already resolved above, before the account cap.
+  // Now check auth
+  const authSpan = startInactiveSpan({ name: 'auth-check' });
   const {
     user: maybeUser,
     authFailedResponse,
+    credentialsRejected,
     organizationId: authOrganizationId,
     botId: authBotId,
     tokenSource: authTokenSource,
-  } = auth;
+  } = await authPromise;
+  authSpan.end();
 
   let user: typeof maybeUser | AnonymousUserContext;
   let organizationId: string | undefined = authOrganizationId;
@@ -466,6 +472,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
+    // A caller that presented a credential we could not verify is not the same
+    // as a caller that presented none. Answering for it as anonymous would
+    // silently drop its account, organization, BYOK keys and credits, and would
+    // hide from the client that its stored token is broken. Fail the request so
+    // the client re-authenticates.
+    if (credentialsRejected) {
+      return invalidTokenResponse();
+    }
+
     // No valid auth
     if (!(await isFreeModel(effectiveModelIdLowerCased))) {
       // Paid model requires authentication
@@ -731,6 +746,18 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       bodyText: requestBodyText,
     });
     return temporarilyUnavailableResponse();
+  }
+
+  if (
+    !autoModel &&
+    (isFableModel(effectiveModelIdLowerCased) ||
+      isOpus5Model(effectiveModelIdLowerCased) ||
+      effectiveModelIdLowerCased === CLAUDE_OPUS_LATEST_MODEL_ALIAS)
+  ) {
+    console.warn(
+      `User requested temporarily blocked model ${effectiveModelIdLowerCased}; rejecting.`
+    );
+    return temporarilyBlockedModelResponse();
   }
 
   if (

@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "ઇન્સ્ટન્સ તૈયાર/નિષ્ફળ, નિર્ધારિત ક્રિયાઓ",
       "balanceAlertsSubtitle": "સંસ્થાનું બેલેન્સ ઓછું થવાની ચેતવણીઓ",
       "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર"
+    },
+    "action": {
+      "openSession": "સેશન ખોલો"
+    },
+    "needsInputAction": {
+      "approved": "વિનંતી મંજૂર થઈ",
+      "replied": "જવાબ મોકલાયો",
+      "failed": "જવાબ આપી શકાયો નથી. ફરી પ્રયાસ કરવા ફરી ટેપ કરો.",
+      "unavailable": "આ વિનંતી હવે રાહ જોતી નથી."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "{{title}} સત્ર આગળ ચાલુ થઈ રહ્યું છે.",
       "importingSession": "સત્ર આયાત થઈ રહ્યું છે",
       "cliCannotContinue": "આ CLI સત્ર ચાલુ રાખી શકતું નથી. Cloud Agent અથવા બીજું CLI પસંદ કરો.",
-      "importFailed": "આ સત્ર આયાત કરી શકાયું નહીં.",
-      "sandbox": "સેન્ડબોક્સ",
-      "sandboxAccessibility": "સેન્ડબોક્સ: {{label}}",
-      "sandboxDefaultWithDestination": "ડિફોલ્ટ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "નાનું",
-      "sandboxInstanceShared": "શેર કરેલું",
-      "sandboxInstanceLarge": "મોટું",
-      "sandboxInstanceDevcontainer": "ડેવ કન્ટેનર",
-      "sandboxInstanceProviderDefault": "પ્રદાતાનું ડિફોલ્ટ",
-      "sandboxCouldNotLoad": "સેન્ડબોક્સના વિકલ્પો લોડ કરી શકાયા નથી",
-      "sandboxUnavailable": "આ સેન્ડબોક્સ અનુપલબ્ધ છે. બીજું સેન્ડબોક્સ અથવા ડિફોલ્ટ પસંદ કરો.",
-      "sandboxUseDefault": "ડિફોલ્ટ વાપરો"
+      "importFailed": "આ સત્ર આયાત કરી શકાયું નહીં."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ થઈ.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} પંક્તિ",
       "linesBadge_other": "{{displayCount}} પંક્તિઓ",
       "matchesBadge_one": "{{displayCount}} મેળ",
-      "matchesBadge_other": "{{displayCount}} મેળ"
+      "matchesBadge_other": "{{displayCount}} મેળ",
+      "noOutput": "કોઈ આઉટપુટ નથી."
     },
     "readToolMarkdown": {
       "linesTruncated": "પંક્તિઓ {{start}}–{{end}} (ટૂંકાવેલી)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "મંજૂર કરી શકાયું નથી",
     "couldNotStart": "શરૂ કરી શકાયું નથી",
     "channelName": "સક્રિય એજન્ટો",
-    "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો."
+    "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો.",
+    "openSession": "ખોલો",
+    "approveFailed": "મંજૂર કરી શકાયું નહીં. ફરી પ્રયાસ કરવા $t(common.approve) પર ટૅપ કરો."
   },
   "transcriptionModel": {
     "title": "અવાજને લખાણમાં ફેરવવાનું મોડેલ",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "તમારું કમ્પ્યુટર",
     "remoteOptionBody": "તમારા પોતાના મશીન પર `kilo remote` CLI દ્વારા Kilo ચલાવો.",
     "skip": "ટૂર છોડી દો",
-    "tutorialLabel": "ટ્યુટોરિયલ",
-    "remoteTitle": "તમારી પહેલી રિમોટ સત્ર શરૂ કરો",
-    "remoteBody": "તમારું કમ્પ્યુટર કનેક્ટ કરો, પછી અહીંથી સત્ર શરૂ કરો.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "હજુ કોઈ કમ્પ્યુટર કનેક્ટ થયું નથી",
-    "remoteEmptyBody": "તેને કનેક્ટ કરવા તમારા કમ્પ્યુટર પર `kilo remote` ચલાવો.",
-    "remoteFound": "કમ્પ્યુટર કનેક્ટ થયું",
-    "checkAgain": "ફરી તપાસો",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ટ્યુટોરિયલ"
   },
   "appActions": {
     "start": {

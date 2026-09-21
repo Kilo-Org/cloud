@@ -336,6 +336,15 @@
       "kiloclawActivitySubtitle": "インスタンスの準備完了や失敗、予定された操作",
       "balanceAlertsSubtitle": "組織の残高低下に関する警告",
       "securityFindingsSubtitle": "新たな検出結果とSLAのリマインダー"
+    },
+    "action": {
+      "openSession": "セッションを開く"
+    },
+    "needsInputAction": {
+      "approved": "リクエストを承認しました",
+      "replied": "返信を送信しました",
+      "failed": "回答できませんでした。もう一度タップして再試行してください。",
+      "unavailable": "このリクエストは待機中ではなくなりました。"
     }
   },
   "tabs": {
@@ -1673,20 +1682,7 @@
       "continueFrom": "{{title}}を続行しています。",
       "importingSession": "セッションをインポート中",
       "cliCannotContinue": "このCLIではセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
-      "importFailed": "このセッションをインポートできませんでした。",
-      "sandbox": "サンドボックス",
-      "sandboxAccessibility": "サンドボックス：{{label}}",
-      "sandboxDefaultWithDestination": "デフォルト · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "小",
-      "sandboxInstanceShared": "共有",
-      "sandboxInstanceLarge": "大",
-      "sandboxInstanceDevcontainer": "開発コンテナ",
-      "sandboxInstanceProviderDefault": "プロバイダーのデフォルト",
-      "sandboxCouldNotLoad": "サンドボックスのオプションを読み込めませんでした",
-      "sandboxUnavailable": "このサンドボックスは利用できません。別のサンドボックスかデフォルトを選択してください。",
-      "sandboxUseDefault": "デフォルトを使用"
+      "importFailed": "このセッションをインポートできませんでした。"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました。",
@@ -1716,7 +1712,8 @@
       "linesBadge_one": "{{displayCount}}行",
       "linesBadge_other": "{{displayCount}}行",
       "matchesBadge_one": "{{displayCount}}件",
-      "matchesBadge_other": "{{displayCount}}件"
+      "matchesBadge_other": "{{displayCount}}件",
+      "noOutput": "出力はありません。"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}～{{end}}行目（一部省略）",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "承認できませんでした",
     "couldNotStart": "開始できませんでした",
     "channelName": "アクティブなエージェント",
-    "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。"
+    "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。",
+    "openSession": "開く",
+    "approveFailed": "承認できませんでした。もう一度試すには$t(common.approve)をタップしてください。"
   },
   "transcriptionModel": {
     "title": "文字起こしモデル",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "お使いのコンピューター",
     "remoteOptionBody": "`kilo remote` CLI を使って自分のコンピューターで Kilo を実行します。",
     "skip": "ツアーをスキップ",
-    "tutorialLabel": "チュートリアル",
-    "remoteTitle": "最初のリモートセッションを開始",
-    "remoteBody": "コンピューターを接続してから、ここでセッションを開始してください。",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "接続済みのコンピューターはありません",
-    "remoteEmptyBody": "接続するには、コンピューターで `kilo remote` を実行してください。",
-    "remoteFound": "コンピューターが接続されました",
-    "checkAgain": "再チェック",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "チュートリアル"
   },
   "appActions": {
     "start": {

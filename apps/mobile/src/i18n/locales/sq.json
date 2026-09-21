@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "instancë gati / e dështuar, veprime të planifikuara",
       "balanceAlertsSubtitle": "paralajmërime për gjendje të ulët të organizatës",
       "securityFindingsSubtitle": "gjetje të reja dhe kujtesa për SLA"
+    },
+    "action": {
+      "openSession": "Hap seancën"
+    },
+    "needsInputAction": {
+      "approved": "Kërkesa u miratua",
+      "replied": "Përgjigja u dërgua",
+      "failed": "Nuk mundi të përgjigjej. Prekni përsëri për të provuar përsëri.",
+      "unavailable": "Kjo kërkesë nuk pret më."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Po vazhdon seanca {{title}}.",
       "importingSession": "Duke importuar seancën",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidh Cloud Agent ose një CLI tjetër.",
-      "importFailed": "Nuk u arrit të importohej kjo seancë.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Parazgjedhje · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "E vogël",
-      "sandboxInstanceShared": "E përbashkët",
-      "sandboxInstanceLarge": "E madhe",
-      "sandboxInstanceDevcontainer": "Kontejner zhvillimi",
-      "sandboxInstanceProviderDefault": "Parazgjedhje e ofruesit",
-      "sandboxCouldNotLoad": "Nuk mund të ngarkoheshin opsionet e sandbox-it",
-      "sandboxUnavailable": "Ky sandbox nuk është i disponueshëm. Zgjidhni një sandbox tjetër ose Parazgjedhjen.",
-      "sandboxUseDefault": "Përdor Parazgjedhjen"
+      "importFailed": "Nuk u arrit të importohej kjo seancë."
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} rresht",
       "linesBadge_other": "{{displayCount}} rreshta",
       "matchesBadge_one": "{{displayCount}} përputhje",
-      "matchesBadge_other": "{{displayCount}} përputhje"
+      "matchesBadge_other": "{{displayCount}} përputhje",
+      "noOutput": "Nuk ka dalje."
     },
     "readToolMarkdown": {
       "linesTruncated": "rreshtat {{start}}–{{end}} (përmbajtje e shkurtuar)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Miratimi dështoi",
     "couldNotStart": "Nisja dështoi",
     "channelName": "Agjentët aktivë",
-    "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
+    "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
+    "openSession": "Hap",
+    "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri."
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Kompjuteri yt",
     "remoteOptionBody": "Ekzekuto Kilo në makinën tënde përmes CLI-së `kilo remote`.",
     "skip": "Kapërce turin",
-    "tutorialLabel": "Tutoriali",
-    "remoteTitle": "Nis sesionin tënd të parë në distancë",
-    "remoteBody": "Lidh kompjuterin tënd, pastaj nis sesionin nga këtu.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ende pa kompjuter të lidhur",
-    "remoteEmptyBody": "Për ta lidhur, ekzekuto `kilo remote` në kompjuterin tënd.",
-    "remoteFound": "Kompjuteri u lidh",
-    "checkAgain": "Kontrollo përsëri",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutoriali"
   },
   "appActions": {
     "start": {

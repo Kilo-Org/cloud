@@ -856,6 +856,15 @@
       "kiloclawActivitySubtitle": "spremnost ili pogreška instance, zakazane radnje",
       "balanceAlertsSubtitle": "upozorenja o niskom saldu organizacije",
       "securityFindingsSubtitle": "novi nalazi i podsjetnici na SLA"
+    },
+    "action": {
+      "openSession": "Otvori sesiju"
+    },
+    "needsInputAction": {
+      "approved": "Zahtjev je odobren",
+      "replied": "Odgovor je poslan",
+      "failed": "Nije uspjelo odgovoriti. Dodirnite ponovo da biste pokušali.",
+      "unavailable": "Ovaj zahtjev više ne čeka."
     }
   },
   "tabs": {
@@ -2205,20 +2214,7 @@
       "continueFrom": "Nastavlja se sesija {{title}}.",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberi Cloud Agent ili drugi CLI.",
-      "importFailed": "Uvoz ove sesije nije uspio.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Zadano · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Malo",
-      "sandboxInstanceShared": "Dijeljeno",
-      "sandboxInstanceLarge": "Veliko",
-      "sandboxInstanceDevcontainer": "Dev kontejner",
-      "sandboxInstanceProviderDefault": "Zadano od pružatelja",
-      "sandboxCouldNotLoad": "Opcije sandboxa nije moguće učitati",
-      "sandboxUnavailable": "Ovaj sandbox nije dostupan. Odaberite drugi sandbox ili Zadano.",
-      "sandboxUseDefault": "Koristi Zadano"
+      "importFailed": "Uvoz ove sesije nije uspio."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ažurirana je {{displayCount}} datoteka.",
@@ -2252,7 +2248,8 @@
       "linesBadge_few": "retka: {{displayCount}}",
       "matchesBadge_one": "podudaranje: {{displayCount}}",
       "matchesBadge_other": "podudaranja: {{displayCount}}",
-      "matchesBadge_few": "podudaranja: {{displayCount}}"
+      "matchesBadge_few": "podudaranja: {{displayCount}}",
+      "noOutput": "Nema izlaza."
     },
     "readToolMarkdown": {
       "linesTruncated": "retci {{start}}–{{end}} (skraćeno)",
@@ -3200,7 +3197,9 @@
     "couldNotApprove": "Odobravanje nije uspjelo",
     "couldNotStart": "Pokretanje nije uspjelo",
     "channelName": "Aktivni agenti",
-    "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama za prikaz aktivnih agenata na zaključanom zaslonu."
+    "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama za prikaz aktivnih agenata na zaključanom zaslonu.",
+    "openSession": "Otvori",
+    "approveFailed": "Odobravanje nije uspjelo. Dodirni $t(common.approve) da pokušaš ponovno."
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",
@@ -3225,15 +3224,7 @@
     "remoteOptionTitle": "Tvoje računalo",
     "remoteOptionBody": "Pokreni Kilo na vlastitom računalu putem `kilo remote` CLI-ja.",
     "skip": "Preskoči obilazak",
-    "tutorialLabel": "Vodič",
-    "remoteTitle": "Pokreni svoju prvu udaljenu sesiju",
-    "remoteBody": "Poveži svoje računalo, zatim pokreni sesiju odavde.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Još nema povezanog računala",
-    "remoteEmptyBody": "Da ga povežeš, pokreni `kilo remote` na svom računalu.",
-    "remoteFound": "Računalo povezano",
-    "checkAgain": "Provjeri ponovno",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Vodič"
   },
   "appActions": {
     "start": {

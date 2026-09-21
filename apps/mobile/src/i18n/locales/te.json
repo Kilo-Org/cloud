@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "ఇన్‌స్టాన్స్ సిద్ధం/విఫలం, నిర్ణీత సమయాల్లో జరిగే చర్యలు",
       "balanceAlertsSubtitle": "సంస్థ బ్యాలెన్స్ తగ్గినప్పుడు హెచ్చరికలు",
       "securityFindingsSubtitle": "కొత్త భద్రతా సమస్యలు, SLA రిమైండర్లు"
+    },
+    "action": {
+      "openSession": "సెషన్‌ను తెరవండి"
+    },
+    "needsInputAction": {
+      "approved": "అభ్యర్థన ఆమోదించబడింది",
+      "replied": "ప్రత్యుత్తరం పంపబడింది",
+      "failed": "సమాధానం ఇవ్వడం సాధ్యం కాలేదు. మళ్లీ ప్రయత్నించడానికి మళ్లీ నొక్కండి.",
+      "unavailable": "ఈ అభ్యర్థన ఇకపై వేచి ఉండదు."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "{{title}}ను కొనసాగిస్తోంది.",
       "importingSession": "సెషన్‌ను దిగుమతి చేస్తోంది",
       "cliCannotContinue": "ఈ CLIతో సెషన్‌ను కొనసాగించడం సాధ్యం కాదు. Cloud Agent లేదా మరో CLIను ఎంచుకోండి.",
-      "importFailed": "ఈ సెషన్‌ను దిగుమతి చేయలేకపోయాము.",
-      "sandbox": "శాండ్బాక్స్",
-      "sandboxAccessibility": "శాండ్బాక్స్: {{label}}",
-      "sandboxDefaultWithDestination": "డిఫాల్ట్ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "చిన్న",
-      "sandboxInstanceShared": "భాగస్వామ్య",
-      "sandboxInstanceLarge": "పెద్ద",
-      "sandboxInstanceDevcontainer": "డెవ్ కంటైనర్",
-      "sandboxInstanceProviderDefault": "ప్రొవైడర్ డిఫాల్ట్",
-      "sandboxCouldNotLoad": "శాండ్బాక్స్ ఎంపికలు లోడ్ కాలేదు",
-      "sandboxUnavailable": "ఈ శాండ్బాక్స్ అందుబాటులో లేదు. మరొక శాండ్బాక్స్ లేదా డిఫాల్ట్ ఎంచుకోండి.",
-      "sandboxUseDefault": "డిఫాల్ట్ ఉపయోగించండి"
+      "importFailed": "ఈ సెషన్‌ను దిగుమతి చేయలేకపోయాము."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్‌ను నవీకరించాము.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} పంక్తి",
       "linesBadge_other": "{{displayCount}} పంక్తులు",
       "matchesBadge_one": "{{displayCount}} సరిపోలిక",
-      "matchesBadge_other": "{{displayCount}} సరిపోలికలు"
+      "matchesBadge_other": "{{displayCount}} సరిపోలికలు",
+      "noOutput": "అవుట్పుట్ లేదు."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} పంక్తులు (కొంత భాగం మాత్రమే)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "ఆమోదించలేకపోయింది",
     "couldNotStart": "ప్రారంభించలేకపోయింది",
     "channelName": "పనిచేస్తున్న ఏజెంట్లు",
-    "activityKitDisabledBody": "లాక్ స్క్రీన్‌పై పనిచేస్తున్న ఏజెంట్లను చూడటానికి సెట్టింగ్‌లలో లైవ్ యాక్టివిటీస్‌ను ఆన్ చేయండి."
+    "activityKitDisabledBody": "లాక్ స్క్రీన్‌పై పనిచేస్తున్న ఏజెంట్లను చూడటానికి సెట్టింగ్‌లలో లైవ్ యాక్టివిటీస్‌ను ఆన్ చేయండి.",
+    "openSession": "తెరవండి",
+    "approveFailed": "ఆమోదించలేకపోయాము. మళ్లీ ప్రయత్నించడానికి $t(common.approve) ని నొక్కండి."
   },
   "transcriptionModel": {
     "title": "వచనంగా మార్చే మోడల్",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "మీ కంప్యూటర్",
     "remoteOptionBody": "మీ సొంత యంత్రంలో `kilo remote` CLI ద్వారా Kilo ని అమలు చేయండి.",
     "skip": "పర్యటన వదిలేయండి",
-    "tutorialLabel": "ట్యుటోరియల్",
-    "remoteTitle": "మీ మొదటి రిమోట్ సెషన్‌ను ప్రారంభించండి",
-    "remoteBody": "మీ కంప్యూటర్‌ను కనెక్ట్ చేసి, ఆపై ఇక్కడి నుండి సెషన్ ప్రారంభించండి.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ఇంకా ఏ కంప్యూటర్ కూడా కనెక్ట్ కాలేదు",
-    "remoteEmptyBody": "దాన్ని కనెక్ట్ చేయడానికి మీ కంప్యూటర్‌లో `kilo remote` అమలు చేయండి.",
-    "remoteFound": "కంప్యూటర్ కనెక్ట్ అయింది",
-    "checkAgain": "మళ్లీ తనిఖీ చేయండి",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ట్యుటోరియల్"
   },
   "appActions": {
     "start": {

@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "ອິນສະແຕນພ້ອມໃຊ້ງານ/ຂັດຂ້ອງ, ວຽກທີ່ຕັ້ງເວລາໄວ້",
       "balanceAlertsSubtitle": "ຄຳເຕືອນເມື່ອຍອດເງິນຂອງອົງກອນຕໍ່າ",
       "securityFindingsSubtitle": "ບັນຫາທີ່ພົບໃໝ່ ແລະ ການແຈ້ງເຕືອນກ່ຽວກັບ SLA"
+    },
+    "action": {
+      "openSession": "ເປີດເຊສຊັນ"
+    },
+    "needsInputAction": {
+      "approved": "ອະນຸມັດຄຳຮ້ອງຂໍແລ້ວ",
+      "replied": "ສົ່ງຄຳຕອບແລ້ວ",
+      "failed": "ບໍ່ສາມາດຕອບໄດ້. ແຕະອີກເທື່ອໜຶ່ງເພື່ອລອງໃໝ່.",
+      "unavailable": "ຄຳຮ້ອງນີ້ບໍ່ລໍຖ້າຕື່ມແລ້ວ."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "ກຳລັງເຮັດວຽກຕໍ່ຈາກ {{title}}.",
       "importingSession": "ກຳລັງນຳເຂົ້າເຊດຊັນ",
       "cliCannotContinue": "CLI ນີ້ບໍ່ສາມາດເຮັດວຽກຕໍ່ຈາກເຊດຊັນໄດ້. ເລືອກ Cloud Agent ຫຼື CLI ອື່ນ.",
-      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "ຄ່າເລີ່ມຕົ້ນ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "ນ້ອຍ",
-      "sandboxInstanceShared": "ແບ່ງປັນ",
-      "sandboxInstanceLarge": "ໃຫຍ່",
-      "sandboxInstanceDevcontainer": "ຄອນເທນເນີ Dev",
-      "sandboxInstanceProviderDefault": "ຄ່າເລີ່ມຕົ້ນຂອງຜູ້ໃຫ້ບໍລິການ",
-      "sandboxCouldNotLoad": "ໂຫຼດຕົວເລືອກ Sandbox ບໍ່ໄດ້",
-      "sandboxUnavailable": "Sandbox ນີ້ໃຊ້ບໍ່ໄດ້. ເລືອກ Sandbox ອື່ນ ຫຼື ຄ່າເລີ່ມຕົ້ນ.",
-      "sandboxUseDefault": "ໃຊ້ຄ່າເລີ່ມຕົ້ນ"
+      "importFailed": "ບໍ່ສາມາດນຳເຂົ້າເຊດຊັນນີ້ໄດ້."
     },
     "partRenderer": {
       "updatedFileCount_one": "ອັບເດດໄຟລ໌ແລ້ວ {{displayCount}} ໄຟລ໌.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} ບັນທັດ",
       "linesBadge_other": "{{displayCount}} ບັນທັດ",
       "matchesBadge_one": "ພົບ {{displayCount}} ລາຍການ",
-      "matchesBadge_other": "ພົບ {{displayCount}} ລາຍການ"
+      "matchesBadge_other": "ພົບ {{displayCount}} ລາຍການ",
+      "noOutput": "ບໍ່ມີຜົນອອກ."
     },
     "readToolMarkdown": {
       "linesTruncated": "ບັນທັດ {{start}}–{{end}} (ຕັດບາງສ່ວນອອກ)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "ອະນຸມັດບໍ່ໄດ້",
     "couldNotStart": "ເລີ່ມບໍ່ໄດ້",
     "channelName": "ເອເຈນທີ່ກຳລັງເຮັດວຽກ",
-    "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ."
+    "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ.",
+    "openSession": "ເປີດ",
+    "approveFailed": "ບໍ່ສາມາດອະນຸມັດໄດ້. ແຕະ $t(common.approve) ເພື່ອລອງອີກຄັ້ງ."
   },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "ຄອມພິວເຕີຂອງທ່ານ",
     "remoteOptionBody": "ແລ່ນ Kilo ໃນເຄື່ອງຂອງທ່ານເອງຜ່ານ CLI `kilo remote`.",
     "skip": "ຂ້າມການທ່ອງທ່ຽວ",
-    "tutorialLabel": "ຄູ່ມື",
-    "remoteTitle": "ເລີ່ມເຊດຊັນໄກທຳອິດຂອງທ່ານ",
-    "remoteBody": "ເຊື່ອມຕໍ່ຄອມພິວເຕີຂອງທ່ານ, ແລ້ວເລີ່ມເຊດຊັນຈາກທີ່ນີ້.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ຍັງບໍ່ມີຄອມພິວເຕີເຊື່ອມຕໍ່",
-    "remoteEmptyBody": "ເພື່ອເຊື່ອມຕໍ່ມັນ, ໃຫ້ແລ່ນ `kilo remote` ໃນຄອມພິວເຕີຂອງທ່ານ.",
-    "remoteFound": "ຄອມພິວເຕີເຊື່ອມຕໍ່ແລ້ວ",
-    "checkAgain": "ກວດສອບອີກຄັ້ງ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ຄູ່ມື"
   },
   "appActions": {
     "start": {

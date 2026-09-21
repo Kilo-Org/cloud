@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "eksemplar valmis/ebaõnnestunud, ajastatud toimingud",
       "balanceAlertsSubtitle": "organisatsiooni madala saldo hoiatused",
       "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused"
+    },
+    "action": {
+      "openSession": "Ava seanss"
+    },
+    "needsInputAction": {
+      "approved": "Taotlus kiideti heaks",
+      "replied": "Vastus on saadetud",
+      "failed": "Vastamine ei õnnestunud. Uuesti proovimiseks puuduta uuesti.",
+      "unavailable": "See taotlus ei ole enam ootel."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Jätkub seanss „{{title}}“.",
       "importingSession": "Imporditakse seanssi",
       "cliCannotContinue": "See CLI ei saa seanssi jätkata. Vali Cloud Agent või mõni muu CLI.",
-      "importFailed": "Seda seanssi ei õnnestunud importida.",
-      "sandbox": "Liivakast",
-      "sandboxAccessibility": "Liivakast: {{label}}",
-      "sandboxDefaultWithDestination": "Vaikimisi · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Väike",
-      "sandboxInstanceShared": "Jagatud",
-      "sandboxInstanceLarge": "Suur",
-      "sandboxInstanceDevcontainer": "Arenduskonteiner",
-      "sandboxInstanceProviderDefault": "Pakkuja vaikeseade",
-      "sandboxCouldNotLoad": "Liivakasti valikuid ei õnnestunud laadida",
-      "sandboxUnavailable": "See liivakast ei ole saadaval. Valige teine liivakast või Vaikimisi.",
-      "sandboxUseDefault": "Kasuta Vaikimisi"
+      "importFailed": "Seda seanssi ei õnnestunud importida."
     },
     "partRenderer": {
       "updatedFileCount_one": "Uuendati {{displayCount}} fail.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} rida",
       "linesBadge_other": "{{displayCount}} rida",
       "matchesBadge_one": "{{displayCount}} vastet",
-      "matchesBadge_other": "{{displayCount}} vastet"
+      "matchesBadge_other": "{{displayCount}} vastet",
+      "noOutput": "Väljund puudub."
     },
     "readToolMarkdown": {
       "linesTruncated": "read {{start}}–{{end}} (kärbitud)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Kinnitamine ebaõnnestus",
     "couldNotStart": "Käivitamine ebaõnnestus",
     "channelName": "Aktiivsed agendid",
-    "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente."
+    "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
+    "openSession": "Ava",
+    "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve)."
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Sinu arvuti",
     "remoteOptionBody": "Käivita Kilo omas arvutis `kilo remote` CLI kaudu.",
     "skip": "Jäta tiivustus vahele",
-    "tutorialLabel": "Õpetus",
-    "remoteTitle": "Alusta oma esimest kaugseanssi",
-    "remoteBody": "Ühenda oma arvuti ja käivita seejärel seanss siit.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ühtegi arvutit veel ühendatud pole",
-    "remoteEmptyBody": "Selle ühendamiseks käivita oma arvutis `kilo remote`.",
-    "remoteFound": "Arvuti ühendatud",
-    "checkAgain": "Kontrolli uuesti",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Õpetus"
   },
   "appActions": {
     "start": {

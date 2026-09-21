@@ -872,6 +872,15 @@
       "kiloclawActivitySubtitle": "instanca pripravljena ali neuspešna, načrtovana dejanja",
       "balanceAlertsSubtitle": "opozorila o nizkem stanju organizacije",
       "securityFindingsSubtitle": "nove ugotovitve in opomniki SLA"
+    },
+    "action": {
+      "openSession": "Odpri sejo"
+    },
+    "needsInputAction": {
+      "approved": "Zahteva odobrena",
+      "replied": "Odgovor poslan",
+      "failed": "Odgovoriti ni uspelo. Znova se dotaknite, da poskusite znova.",
+      "unavailable": "Ta zahteva ne čaka več."
     }
   },
   "tabs": {
@@ -2233,20 +2242,7 @@
       "continueFrom": "Nadaljuje se seja {{title}}.",
       "importingSession": "Uvažanje seje",
       "cliCannotContinue": "Ta CLI ne podpira nadaljevanja seje. Izberi Cloud Agent ali drug CLI.",
-      "importFailed": "Te seje ni bilo mogoče uvoziti.",
-      "sandbox": "Peskovnik",
-      "sandboxAccessibility": "Peskovnik: {{label}}",
-      "sandboxDefaultWithDestination": "Privzeto · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Malo",
-      "sandboxInstanceShared": "V skupni rabi",
-      "sandboxInstanceLarge": "Veliko",
-      "sandboxInstanceDevcontainer": "Razvojni vsebnik",
-      "sandboxInstanceProviderDefault": "Privzeto ponudnika",
-      "sandboxCouldNotLoad": "Možnosti peskovnika ni bilo mogoče naložiti",
-      "sandboxUnavailable": "Ta peskovnik ni na voljo. Izberite drug peskovnik ali Privzeto.",
-      "sandboxUseDefault": "Uporabi Privzeto"
+      "importFailed": "Te seje ni bilo mogoče uvoziti."
     },
     "partRenderer": {
       "updatedFileCount_one": "Posodobljena je {{displayCount}} datoteka.",
@@ -2284,7 +2280,8 @@
       "matchesBadge_one": "{{displayCount}} zadetek",
       "matchesBadge_other": "{{displayCount}} zadetkov",
       "matchesBadge_two": "{{displayCount}} zadetka",
-      "matchesBadge_few": "{{displayCount}} zadetki"
+      "matchesBadge_few": "{{displayCount}} zadetki",
+      "noOutput": "Ni izhoda."
     },
     "readToolMarkdown": {
       "linesTruncated": "vrstice {{start}}–{{end}} (skrajšano)",
@@ -3243,7 +3240,9 @@
     "couldNotApprove": "Odobritev ni uspela",
     "couldNotStart": "Zagon ni uspel",
     "channelName": "Aktivni agenti",
-    "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu."
+    "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu.",
+    "openSession": "Odpri",
+    "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus."
   },
   "transcriptionModel": {
     "title": "Model za prepisovanje",
@@ -3268,15 +3267,7 @@
     "remoteOptionTitle": "Vaš računalnik",
     "remoteOptionBody": "Zaženi Kilo na svojem računalniku prek CLI-ja `kilo remote`.",
     "skip": "Preskoči ogled",
-    "tutorialLabel": "Vodič",
-    "remoteTitle": "Zaženite svojo prvo oddaljeno sejo",
-    "remoteBody": "Poveži svoj računalnik, nato pa tu zaženi sejo.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Še ni povezanega računalnika",
-    "remoteEmptyBody": "Če ga želite povezati, zaženite `kilo remote` na svojem računalniku.",
-    "remoteFound": "Računalnik povezan",
-    "checkAgain": "Preveri znova",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Vodič"
   },
   "appActions": {
     "start": {

@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "дана дайын / істен шықты, жоспарланған әрекеттер",
       "balanceAlertsSubtitle": "ұйым балансының азайғаны туралы ескертулер",
       "securityFindingsSubtitle": "жаңа осалдықтар және SLA туралы еске салулар"
+    },
+    "action": {
+      "openSession": "Сессияны ашу"
+    },
+    "needsInputAction": {
+      "approved": "Сұрау мақұлданды",
+      "replied": "Жауап жіберілді",
+      "failed": "Жауап беру мүмкін болмады. Қайталап көру үшін қайта түртіңіз.",
+      "unavailable": "Бұл сұрау енді күтпейді."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "«{{title}}» сессиясы жалғасуда.",
       "importingSession": "Сессия импортталуда",
       "cliCannotContinue": "Бұл CLI сессияны жалғастыра алмайды. Cloud Agent қызметін немесе басқа CLI құралын таңдаңыз.",
-      "importFailed": "Бұл сессияны импорттау мүмкін болмады.",
-      "sandbox": "Сандбокс",
-      "sandboxAccessibility": "Сандбокс: {{label}}",
-      "sandboxDefaultWithDestination": "Әдепкі · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Кішкене",
-      "sandboxInstanceShared": "Ортақ",
-      "sandboxInstanceLarge": "Үлкен",
-      "sandboxInstanceDevcontainer": "Dev контейнері",
-      "sandboxInstanceProviderDefault": "Жеткізушінің әдепкісі",
-      "sandboxCouldNotLoad": "Сандбокс параметрлерін жүктей алмады",
-      "sandboxUnavailable": "Бұл сандбокс қолжетімсіз. Басқа сандбоксты немесе Әдепкіні таңдаңыз.",
-      "sandboxUseDefault": "Әдепкіні пайдалану"
+      "importFailed": "Бұл сессияны импорттау мүмкін болмады."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} жол",
       "linesBadge_other": "{{displayCount}} жол",
       "matchesBadge_one": "{{displayCount}} сәйкестік",
-      "matchesBadge_other": "{{displayCount}} сәйкестік"
+      "matchesBadge_other": "{{displayCount}} сәйкестік",
+      "noOutput": "Шығыс жоқ."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} жолдары (қысқартылған)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Мақұлдау сәтсіз аяқталды",
     "couldNotStart": "Бастау сәтсіз аяқталды",
     "channelName": "Белсенді агенттер",
-    "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз."
+    "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз.",
+    "openSession": "Ашыңыз",
+    "approveFailed": "Мақұлдау мүмкін болмады. Қайталап көру үшін $t(common.approve) түртіңіз."
   },
   "transcriptionModel": {
     "title": "Дауысты мәтінге айналдыру моделі",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Сіздің компьютеріңіз",
     "remoteOptionBody": "Kilo-ны өз машинаңызда `kilo remote` CLI арқылы іске қосыңыз.",
     "skip": "Турды өткізу",
-    "tutorialLabel": "Оқу",
-    "remoteTitle": "Бірінші қашық сессияңызды бастаңыз",
-    "remoteBody": "Компьютеріңізді қосып, сессияны осы жерден бастаңыз.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Әлі компьютер қосылмаған",
-    "remoteEmptyBody": "Оны қосу үшін компьютеріңізде `kilo remote` пәрменін орындаңыз.",
-    "remoteFound": "Компьютер қосылды",
-    "checkAgain": "Қайта тексеру",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Оқу"
   },
   "appActions": {
     "start": {

@@ -336,6 +336,15 @@
       "kiloclawActivitySubtitle": "örnek hazır/başarısız, zamanlanmış eylemler",
       "balanceAlertsSubtitle": "düşük kuruluş bakiyesi uyarıları",
       "securityFindingsSubtitle": "yeni bulgular ve SLA hatırlatmaları"
+    },
+    "action": {
+      "openSession": "Oturumu aç"
+    },
+    "needsInputAction": {
+      "approved": "İstek onaylandı",
+      "replied": "Yanıt gönderildi",
+      "failed": "Yanıtlanamadı. Yeniden denemek için tekrar dokunun.",
+      "unavailable": "Bu istek artık beklemiyor."
     }
   },
   "tabs": {
@@ -1673,20 +1682,7 @@
       "continueFrom": "{{title}} oturumuna devam ediliyor.",
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam etmeyi desteklemiyor. Cloud Agent veya başka bir CLI seç.",
-      "importFailed": "Bu oturum içe aktarılamadı.",
-      "sandbox": "Korumalı alan",
-      "sandboxAccessibility": "Korumalı alan: {{label}}",
-      "sandboxDefaultWithDestination": "Varsayılan · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Küçük",
-      "sandboxInstanceShared": "Paylaşımlı",
-      "sandboxInstanceLarge": "Büyük",
-      "sandboxInstanceDevcontainer": "Geliştirme kapsayıcısı",
-      "sandboxInstanceProviderDefault": "Sağlayıcı varsayılanı",
-      "sandboxCouldNotLoad": "Korumalı alan seçenekleri yüklenemedi",
-      "sandboxUnavailable": "Bu korumalı alan kullanılamıyor. Başka bir korumalı alan veya Varsayılan seçin.",
-      "sandboxUseDefault": "Varsayılanı kullan"
+      "importFailed": "Bu oturum içe aktarılamadı."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} dosya güncellendi.",
@@ -1716,7 +1712,8 @@
       "linesBadge_one": "{{displayCount}} satır",
       "linesBadge_other": "{{displayCount}} satır",
       "matchesBadge_one": "{{displayCount}} eşleşme",
-      "matchesBadge_other": "{{displayCount}} eşleşme"
+      "matchesBadge_other": "{{displayCount}} eşleşme",
+      "noOutput": "Çıktı yok."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}. satırlar (kısaltıldı)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Onaylanamadı",
     "couldNotStart": "Başlatılamadı",
     "channelName": "Etkin ajanlar",
-    "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç."
+    "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
+    "openSession": "Aç",
+    "approveFailed": "Onaylanamadı. Tekrar denemek için $t(common.approve) öğesine dokun."
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Bilgisayarın",
     "remoteOptionBody": "Kilo'yu kendi makinende `kilo remote` CLI'si üzerinden çalıştır.",
     "skip": "Turu atla",
-    "tutorialLabel": "Eğitim",
-    "remoteTitle": "İlk uzak oturumunu başlat",
-    "remoteBody": "Bilgisayarını bağla, ardından oturumu buradan başlat.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Henüz bağlı bir bilgisayar yok",
-    "remoteEmptyBody": "Bağlamak için bilgisayarında `kilo remote` komutunu çalıştır.",
-    "remoteFound": "Bilgisayar bağlandı",
-    "checkAgain": "Tekrar kontrol et",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Eğitim"
   },
   "appActions": {
     "start": {

@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "نمونه آماده/ناموفق، اقدامات زمان‌بندی‌شده",
       "balanceAlertsSubtitle": "هشدارهای موجودی کم سازمان",
       "securityFindingsSubtitle": "یافته‌های جدید و یادآوری‌های SLA"
+    },
+    "action": {
+      "openSession": "باز کردن نشست"
+    },
+    "needsInputAction": {
+      "approved": "درخواست تأیید شد",
+      "replied": "پاسخ ارسال شد",
+      "failed": "پاسخ دادن ممکن نشد. برای تلاش دوباره دوباره ضربه بزنید.",
+      "unavailable": "این درخواست دیگر در انتظار نیست."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "نشست {{title}} را ادامه می‌دهید.",
       "importingSession": "در حال وارد کردن نشست",
       "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
-      "importFailed": "وارد کردن این نشست ممکن نشد.",
-      "sandbox": "سندباکس",
-      "sandboxAccessibility": "سندباکس: {{label}}",
-      "sandboxDefaultWithDestination": "پیش‌فرض · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "کوچک",
-      "sandboxInstanceShared": "اشتراکی",
-      "sandboxInstanceLarge": "بزرگ",
-      "sandboxInstanceDevcontainer": "کانتینر توسعه",
-      "sandboxInstanceProviderDefault": "پیش‌فرض ارائه‌دهنده",
-      "sandboxCouldNotLoad": "بارگیری گزینه‌های سندباکس ممکن نشد",
-      "sandboxUnavailable": "این سندباکس در دسترس نیست. سندباکس دیگری یا پیش‌فرض را انتخاب کنید.",
-      "sandboxUseDefault": "استفاده از پیش‌فرض"
+      "importFailed": "وارد کردن این نشست ممکن نشد."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل به‌روزرسانی شد.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} خط",
       "linesBadge_other": "{{displayCount}} خط",
       "matchesBadge_one": "{{displayCount}} تطابق",
-      "matchesBadge_other": "{{displayCount}} تطابق"
+      "matchesBadge_other": "{{displayCount}} تطابق",
+      "noOutput": "هیچ خروجی وجود ندارد."
     },
     "readToolMarkdown": {
       "linesTruncated": "خطوط {{start}}–{{end}} (نمایش ناقص)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "تأیید نشد",
     "couldNotStart": "شروع نشد",
     "channelName": "عامل‌های فعال",
-    "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید."
+    "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید.",
+    "openSession": "باز کن",
+    "approveFailed": "تأیید ممکن نشد. برای تلاش دوباره روی $t(common.approve) ضربه بزنید."
   },
   "transcriptionModel": {
     "title": "مدل تبدیل گفتار به متن",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "رایانهٔ شما",
     "remoteOptionBody": "Kilo را با دستور `kilo remote` روی ماشین خودتان اجرا کنید.",
     "skip": "رد کردن تور",
-    "tutorialLabel": "آموزش",
-    "remoteTitle": "نخستین نشست راه دور خود را شروع کنید",
-    "remoteBody": "رایانهٔ خود را متصل کنید، سپس نشست را از همین‌جا شروع کنید.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "هنوز رایانه‌ای متصل نشده است",
-    "remoteEmptyBody": "برای اتصال آن، دستور `kilo remote` را روی رایانهٔ خود اجرا کنید.",
-    "remoteFound": "رایانه متصل شد",
-    "checkAgain": "دوباره بررسی کنید",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "آموزش"
   },
   "appActions": {
     "start": {

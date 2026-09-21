@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "ইনস্ট্যান্স প্রস্তুত বা ব্যর্থ, নির্ধারিত কাজ",
       "balanceAlertsSubtitle": "সংস্থার ব্যালেন্স কমে যাওয়ার সতর্কতা",
       "securityFindingsSubtitle": "নতুন নিরাপত্তা সমস্যা ও SLA মনে করিয়ে দেওয়ার বিজ্ঞপ্তি"
+    },
+    "action": {
+      "openSession": "সেশন খুলুন"
+    },
+    "needsInputAction": {
+      "approved": "অনুরোধ অনুমোদিত হয়েছে",
+      "replied": "উত্তর পাঠানো হয়েছে",
+      "failed": "উত্তর দেওয়া যায়নি। আবার চেষ্টা করতে আবার ট্যাপ করুন।",
+      "unavailable": "এই অনুরোধ আর অপেক্ষা করছে না।"
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "{{title}} চালিয়ে যাওয়া হচ্ছে।",
       "importingSession": "সেশন ইমপোর্ট হচ্ছে",
       "cliCannotContinue": "এই CLI দিয়ে আগের সেশন চালিয়ে যাওয়া যায় না। Cloud Agent বা অন্য একটি CLI বেছে নিন।",
-      "importFailed": "এই সেশনটি ইমপোর্ট করা যায়নি।",
-      "sandbox": "স্যান্ডবক্স",
-      "sandboxAccessibility": "স্যান্ডবক্স: {{label}}",
-      "sandboxDefaultWithDestination": "ডিফল্ট · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "ছোট",
-      "sandboxInstanceShared": "শেয়ার্ড",
-      "sandboxInstanceLarge": "বড়",
-      "sandboxInstanceDevcontainer": "ডেভ কনটেইনার",
-      "sandboxInstanceProviderDefault": "প্রোভাইডারের ডিফল্ট",
-      "sandboxCouldNotLoad": "স্যান্ডবক্সের বিকল্পগুলি লোড করা যায়নি",
-      "sandboxUnavailable": "এই স্যান্ডবক্সটি অনুপলব্ধ। অন্য স্যান্ডবক্স বা ডিফল্ট বেছে নিন।",
-      "sandboxUseDefault": "ডিফল্ট ব্যবহার করুন"
+      "importFailed": "এই সেশনটি ইমপোর্ট করা যায়নি।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}টি ফাইল আপডেট হয়েছে।",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}}টি লাইন",
       "linesBadge_other": "{{displayCount}}টি লাইন",
       "matchesBadge_one": "{{displayCount}}টি মিল",
-      "matchesBadge_other": "{{displayCount}}টি মিল"
+      "matchesBadge_other": "{{displayCount}}টি মিল",
+      "noOutput": "কোনো আউটপুট নেই।"
     },
     "readToolMarkdown": {
       "linesTruncated": "লাইন {{start}}–{{end}} (আংশিক দেখানো হয়েছে)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "অনুমোদন করা যায়নি",
     "couldNotStart": "শুরু করা যায়নি",
     "channelName": "সক্রিয় এজেন্ট",
-    "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।"
+    "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।",
+    "openSession": "খুলুন",
+    "approveFailed": "অনুমোদন করা যায়নি। আবার চেষ্টা করতে $t(common.approve) স্পর্শ করুন।"
   },
   "transcriptionModel": {
     "title": "কথা থেকে লেখার মডেল",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "আপনার কম্পিউটার",
     "remoteOptionBody": "আপনার নিজের মেশিনে `kilo remote` CLI-এর মাধ্যমে Kilo চালান।",
     "skip": "ট্যুর বাদ দিন",
-    "tutorialLabel": "টিউটোরিয়াল",
-    "remoteTitle": "আপনার প্রথম রিমোট সেশন শুরু করুন",
-    "remoteBody": "আপনার কম্পিউটার সংযোগ করুন, তারপর এখান থেকে সেশন শুরু করুন।",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "এখনো কোনো কম্পিউটার সংযুক্ত হয়নি",
-    "remoteEmptyBody": "সংযোগ করতে আপনার কম্পিউটারে `kilo remote` চালান।",
-    "remoteFound": "কম্পিউটার সংযুক্ত",
-    "checkAgain": "আবার যাচাই করুন",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "টিউটোরিয়াল"
   },
   "appActions": {
     "start": {

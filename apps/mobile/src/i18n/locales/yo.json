@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "ẹ̀rọ iṣẹ́ ti ṣe tán/ó kùnà, àwọn ìṣe tí a ṣètò àkókò wọn",
       "balanceAlertsSubtitle": "àwọn ìkìlọ̀ pé owó àjọ tó kù ti dín kù",
       "securityFindingsSubtitle": "àwọn àwárí tuntun àti ìránnilétí SLA"
+    },
+    "action": {
+      "openSession": "Ṣí ìgbà iṣẹ́"
+    },
+    "needsInputAction": {
+      "approved": "Ìbéèrè náà ti fọwọ́ sí",
+      "replied": "Ìfèsì ti ránṣẹ́",
+      "failed": "Kò lè fèsì. Tẹ lẹ́ẹ̀kansi láti gbìyànjú lẹ́ẹ̀kansi.",
+      "unavailable": "Ìbéèrè yìí kì í retí mọ́."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "A ń tẹ̀síwájú pẹ̀lú {{title}}.",
       "importingSession": "Ń gbé ìgbà iṣẹ́ wọlé",
       "cliCannotContinue": "CLI yìí kò lè tẹ̀síwájú pẹ̀lú ìgbà iṣẹ́ kan. Yan Cloud Agent tàbí CLI mìíràn.",
-      "importFailed": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Ìpìlẹ̀ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Kékeré",
-      "sandboxInstanceShared": "Tí a pín",
-      "sandboxInstanceLarge": "Ńlá",
-      "sandboxInstanceDevcontainer": "Àpò Dev",
-      "sandboxInstanceProviderDefault": "Ìpìlẹ̀ olùpèsè",
-      "sandboxCouldNotLoad": "Kò ṣe é gbé àwọn àṣàyàn sandbox wá",
-      "sandboxUnavailable": "Sandbox yìí kò wà. Yan sandbox míràn tàbí Ìpìlẹ̀.",
-      "sandboxUseDefault": "Lo Ìpìlẹ̀"
+      "importFailed": "A kò lè gbé ìgbà iṣẹ́ yìí wọlé."
     },
     "partRenderer": {
       "updatedFileCount_one": "A ti ṣe ìmúdójúìwọ̀n fáìlì {{displayCount}}.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "ìlà {{displayCount}}",
       "linesBadge_other": "ìlà {{displayCount}}",
       "matchesBadge_one": "ìbámu {{displayCount}}",
-      "matchesBadge_other": "ìbámu {{displayCount}}"
+      "matchesBadge_other": "ìbámu {{displayCount}}",
+      "noOutput": "Kò sí ìjáde."
     },
     "readToolMarkdown": {
       "linesTruncated": "ìlà {{start}}–{{end}} (a gé kúrú)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Kò lè fọwọ́ sí",
     "couldNotStart": "Kò lè bẹ̀rẹ̀",
     "channelName": "Àwọn aṣojú tó ń ṣiṣẹ́",
-    "activityKitDisabledBody": "Tan àwọn ìgbòkègbodò ìsinsìnyí nínú àwọn ètò láti rí àwọn aṣojú tó ń ṣiṣẹ́ lórí ojú ìwé títìpa."
+    "activityKitDisabledBody": "Tan àwọn ìgbòkègbodò ìsinsìnyí nínú àwọn ètò láti rí àwọn aṣojú tó ń ṣiṣẹ́ lórí ojú ìwé títìpa.",
+    "openSession": "Ṣí",
+    "approveFailed": "A kò lè fọwọ́ sí. Tẹ $t(common.approve) láti tún gbìyànjú."
   },
   "transcriptionModel": {
     "title": "Àwòṣe ìyípadà ohùn sí ọ̀rọ̀",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Kọ̀ǹpútà rẹ",
     "remoteOptionBody": "Ṣiṣẹ́ Kilo lórí ẹ̀rọ tirẹ pẹ̀lú CLI `kilo remote`.",
     "skip": "Fo ìrìn àjò sí",
-    "tutorialLabel": "Ìtọ́sọ́nà",
-    "remoteTitle": "Bẹ̀rẹ̀ ìgbà iṣẹ́ ìjìnnà àkọ́kọ́ rẹ",
-    "remoteBody": "So kọ̀ǹpútà rẹ pọ̀, lẹ́yìn náà bẹ̀rẹ̀ ìgbà iṣẹ́ láti ibí yìí.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Kò sí kọ̀ǹpútà tí a so pọ̀ sí báyìí",
-    "remoteEmptyBody": "Láti so ó pọ̀, ṣiṣẹ́ `kilo remote` lórí kọ̀ǹpútà rẹ.",
-    "remoteFound": "Kọ̀ǹpútà ti so pọ̀",
-    "checkAgain": "Tún ṣe àyẹ̀wò",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Ìtọ́sọ́nà"
   },
   "appActions": {
     "start": {

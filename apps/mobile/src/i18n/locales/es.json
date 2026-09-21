@@ -336,7 +336,16 @@
     "previewAlways": "Siempre",
     "previewWhenUnlocked": "Cuando esté desbloqueado",
     "previewFullDescription": "Las notificaciones muestran el texto del mensaje en tu pantalla de bloqueo.",
-    "previewGenericDescription": "Las notificaciones indican que hay novedades, sin mostrar su contenido. Abre Kilo para leerlo."
+    "previewGenericDescription": "Las notificaciones indican que hay novedades, sin mostrar su contenido. Abre Kilo para leerlo.",
+    "action": {
+      "openSession": "Abrir sesión"
+    },
+    "needsInputAction": {
+      "approved": "Solicitud aprobada",
+      "replied": "Respuesta enviada",
+      "failed": "No se pudo responder. Toca de nuevo para reintentarlo.",
+      "unavailable": "Esta solicitud ya no está en espera."
+    }
   },
   "tabs": {
     "home": "Inicio",
@@ -1685,20 +1694,7 @@
       "continueFrom": "Se está continuando la sesión {{title}}.",
       "importingSession": "Importando sesión",
       "cliCannotContinue": "Esta CLI no puede continuar una sesión. Elige Cloud Agent u otra CLI.",
-      "importFailed": "No se pudo importar esta sesión.",
-      "sandbox": "Entorno aislado",
-      "sandboxAccessibility": "Entorno aislado: {{label}}",
-      "sandboxDefaultWithDestination": "Predeterminado · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Pequeño",
-      "sandboxInstanceShared": "Compartido",
-      "sandboxInstanceLarge": "Grande",
-      "sandboxInstanceDevcontainer": "Contenedor de desarrollo",
-      "sandboxInstanceProviderDefault": "Predeterminado del proveedor",
-      "sandboxCouldNotLoad": "No se pudieron cargar las opciones del entorno aislado",
-      "sandboxUnavailable": "Este entorno aislado no está disponible. Elige otro entorno aislado o Predeterminado.",
-      "sandboxUseDefault": "Usar Predeterminado"
+      "importFailed": "No se pudo importar esta sesión."
     },
     "partRenderer": {
       "updatedFileCount_one": "Se ha actualizado {{displayCount}} archivo.",
@@ -1732,7 +1728,8 @@
       "linesBadge_many": "{{displayCount}} líneas",
       "matchesBadge_one": "{{displayCount}} coincidencia",
       "matchesBadge_other": "{{displayCount}} coincidencias",
-      "matchesBadge_many": "{{displayCount}} coincidencias"
+      "matchesBadge_many": "{{displayCount}} coincidencias",
+      "noOutput": "No hay salida."
     },
     "readToolMarkdown": {
       "linesTruncated": "líneas {{start}}–{{end}} (truncadas)",
@@ -3200,7 +3197,9 @@
     "couldNotApprove": "No se pudo aprobar",
     "couldNotStart": "No se pudo iniciar",
     "channelName": "Agentes activos",
-    "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo."
+    "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo.",
+    "openSession": "Abrir",
+    "approveFailed": "No se pudo aprobar. Toca $t(common.approve) para intentarlo de nuevo."
   },
   "transcriptionModel": {
     "title": "Modelo de transcripción",
@@ -3225,15 +3224,7 @@
     "remoteOptionTitle": "Tu ordenador",
     "remoteOptionBody": "Ejecuta Kilo en tu propia máquina mediante la CLI `kilo remote`.",
     "skip": "Omitir tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Inicia tu primera sesión remota",
-    "remoteBody": "Conecta tu ordenador y después inicia la sesión desde aquí.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ningún ordenador conectado todavía",
-    "remoteEmptyBody": "Ejecuta `kilo remote` en tu ordenador para conectarlo.",
-    "remoteFound": "Ordenador conectado",
-    "checkAgain": "Volver a comprobar",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "instantzia prest edo huts eginda, programatutako ekintzak",
       "balanceAlertsSubtitle": "erakundearen saldo baxuaren abisuak",
       "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak"
+    },
+    "action": {
+      "openSession": "Ireki saioa"
+    },
+    "needsInputAction": {
+      "approved": "Eskaera onartu da",
+      "replied": "Erantzuna bidali da",
+      "failed": "Ezin izan da erantzun. Ukitu berriro saiatzeko.",
+      "unavailable": "Eskaera honek jada ez du itxaroten."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Saio honekin jarraitzen ari zara: {{title}}.",
       "importingSession": "Saioa inportatzen",
       "cliCannotContinue": "CLI honek ezin dio saio bati jarraitu. Aukeratu Cloud Agent edo beste CLI bat.",
-      "importFailed": "Ezin izan da saio hau inportatu.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Lehenetsia · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Txikia",
-      "sandboxInstanceShared": "Partekatua",
-      "sandboxInstanceLarge": "Handia",
-      "sandboxInstanceDevcontainer": "Dev edukiontzia",
-      "sandboxInstanceProviderDefault": "Hornitzailearen lehenetsia",
-      "sandboxCouldNotLoad": "Ezin izan dira sandbox-aukerak kargatu",
-      "sandboxUnavailable": "Sandbox hau ez dago erabilgarri. Aukeratu beste sandbox bat edo Lehenetsia.",
-      "sandboxUseDefault": "Erabili Lehenetsia"
+      "importFailed": "Ezin izan da saio hau inportatu."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxategi eguneratu da.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} lerro",
       "linesBadge_other": "{{displayCount}} lerro",
       "matchesBadge_one": "{{displayCount}} bat etortze",
-      "matchesBadge_other": "{{displayCount}} bat etortze"
+      "matchesBadge_other": "{{displayCount}} bat etortze",
+      "noOutput": "Irteerarik ez."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} lerroak (moztuta)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Ezin izan da onartu",
     "couldNotStart": "Ezin izan da hasi",
     "channelName": "Agente aktiboak",
-    "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko."
+    "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko.",
+    "openSession": "Ireki",
+    "approveFailed": "Ezin izan da onartu. Sakatu $t(common.approve) berriro saiatzeko."
   },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Zure ordenagailua",
     "remoteOptionBody": "Exekutatu Kilo zure makinean `kilo remote` CLIaren bidez.",
     "skip": "Baztertu bira",
-    "tutorialLabel": "Tutorial-a",
-    "remoteTitle": "Hasi zure lehen urruneko saioa",
-    "remoteBody": "Konektatu zure ordenagailua, eta gero hasi saioa hemendik.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Oraindik ez dago ordenagailurik konektatuta",
-    "remoteEmptyBody": "Konektatzeko, exekutatu `kilo remote` zure ordenagailuan.",
-    "remoteFound": "Ordenagailua konektatuta",
-    "checkAgain": "Egiaztatu berriro",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial-a"
   },
   "appActions": {
     "start": {

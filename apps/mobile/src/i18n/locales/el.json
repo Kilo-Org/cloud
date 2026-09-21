@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "περιβάλλον έτοιμο ή με αποτυχία, προγραμματισμένες ενέργειες",
       "balanceAlertsSubtitle": "προειδοποιήσεις χαμηλού υπολοίπου οργανισμού",
       "securityFindingsSubtitle": "νέα ευρήματα και υπενθυμίσεις SLA"
+    },
+    "action": {
+      "openSession": "Άνοιγμα συνεδρίας"
+    },
+    "needsInputAction": {
+      "approved": "Το αίτημα εγκρίθηκε",
+      "replied": "Η απάντηση στάλθηκε",
+      "failed": "Δεν ήταν δυνατή η απάντηση. Πατήστε ξανά για επανάληψη.",
+      "unavailable": "Αυτό το αίτημα δεν περιμένει πλέον."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Συνεχίζεται η συνεδρία {{title}}.",
       "importingSession": "Εισαγωγή συνεδρίας…",
       "cliCannotContinue": "Αυτό το CLI δεν μπορεί να συνεχίσει μια συνεδρία. Επίλεξε τον Cloud Agent ή άλλο CLI.",
-      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας.",
-      "sandbox": "Απομονωμένο περιβάλλον",
-      "sandboxAccessibility": "Απομονωμένο περιβάλλον: {{label}}",
-      "sandboxDefaultWithDestination": "Προεπιλογή · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Μικρό",
-      "sandboxInstanceShared": "Κοινόχρηστο",
-      "sandboxInstanceLarge": "Μεγάλο",
-      "sandboxInstanceDevcontainer": "Κοντέινερ ανάπτυξης",
-      "sandboxInstanceProviderDefault": "Προεπιλογή παρόχου",
-      "sandboxCouldNotLoad": "Δεν ήταν δυνατή η φόρτωση των επιλογών sandbox",
-      "sandboxUnavailable": "Αυτό το απομονωμένο περιβάλλον δεν είναι διαθέσιμο. Επιλέξτε άλλο περιβάλλον ή Προεπιλογή.",
-      "sandboxUseDefault": "Χρήση Προεπιλογής"
+      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} γραμμή",
       "linesBadge_other": "{{displayCount}} γραμμές",
       "matchesBadge_one": "{{displayCount}} αντιστοιχία",
-      "matchesBadge_other": "{{displayCount}} αντιστοιχίες"
+      "matchesBadge_other": "{{displayCount}} αντιστοιχίες",
+      "noOutput": "Δεν υπάρχει έξοδος."
     },
     "readToolMarkdown": {
       "linesTruncated": "γραμμές {{start}}–{{end}} (περικομμένες)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Η έγκριση απέτυχε",
     "couldNotStart": "Η εκκίνηση απέτυχε",
     "channelName": "Ενεργοί πράκτορες",
-    "activityKitDisabledBody": "Ενεργοποίησε τις ζωντανές δραστηριότητες στις ρυθμίσεις για να βλέπεις τους ενεργούς πράκτορες στην οθόνη κλειδώματος."
+    "activityKitDisabledBody": "Ενεργοποίησε τις ζωντανές δραστηριότητες στις ρυθμίσεις για να βλέπεις τους ενεργούς πράκτορες στην οθόνη κλειδώματος.",
+    "openSession": "Άνοιξε",
+    "approveFailed": "Δεν ήταν δυνατή η έγκριση. Πάτησε $t(common.approve) για να δοκιμάσεις ξανά."
   },
   "transcriptionModel": {
     "title": "Μοντέλο απομαγνητοφώνησης",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Ο υπολογιστής σου",
     "remoteOptionBody": "Εκτέλεσε το Kilo στο δικό σου μηχάνημα μέσω του CLI `kilo remote`.",
     "skip": "Παράλειξη ξενάγησης",
-    "tutorialLabel": "Οδηγός",
-    "remoteTitle": "Ξεκίνα την πρώτη απομακρυσμένη συνεδρία σου",
-    "remoteBody": "Σύνδεσε τον υπολογιστή σου και μετά ξεκίνα τη συνεδρία από εδώ.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Δεν έχει συνδεθεί υπολογιστής ακόμα",
-    "remoteEmptyBody": "Για να τον συνδέσεις, εκτέλεσε `kilo remote` στον υπολογιστή σου.",
-    "remoteFound": "Ο υπολογιστής συνδέθηκε",
-    "checkAgain": "Έλεγχος ξανά",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Οδηγός"
   },
   "appActions": {
     "start": {

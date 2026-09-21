@@ -888,6 +888,15 @@
       "kiloclawActivitySubtitle": "ásc réidh nó teipthe, gníomhartha sceidealaithe",
       "balanceAlertsSubtitle": "rabhaidh faoi iarmhéid íseal na heagraíochta",
       "securityFindingsSubtitle": "torthaí nua agus meabhrúcháin SLA"
+    },
+    "action": {
+      "openSession": "Oscail an seisiún"
+    },
+    "needsInputAction": {
+      "approved": "Tá an t-iarratas ceadaithe",
+      "replied": "Tá an freagra seolta",
+      "failed": "Níorbh fhéidir freagra a thabhairt. Tapáil arís chun iarracht eile a dhéanamh.",
+      "unavailable": "Níl an t-iarratas seo ag fanacht a thuilleadh."
     }
   },
   "tabs": {
@@ -2261,20 +2270,7 @@
       "continueFrom": "Táthar ag leanúint ar aghaidh le {{title}}.",
       "importingSession": "Ag iompórtáil an tseisiúin",
       "cliCannotContinue": "Ní féidir leis an CLI seo leanúint ar aghaidh le seisiún. Roghnaigh Cloud Agent nó CLI eile.",
-      "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil.",
-      "sandbox": "Bosca gaineamh",
-      "sandboxAccessibility": "Bosca gaineamh: {{label}}",
-      "sandboxDefaultWithDestination": "Réamhshocrú · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Beag",
-      "sandboxInstanceShared": "Roinnte",
-      "sandboxInstanceLarge": "Mór",
-      "sandboxInstanceDevcontainer": "Coimeádán forbartha",
-      "sandboxInstanceProviderDefault": "Réamhshocrú an soláthraithe",
-      "sandboxCouldNotLoad": "Níorbh fhéidir roghanna na bosca gaineamh a lódáil",
-      "sandboxUnavailable": "Níl an bosca gaineamh seo ar fáil. Roghnaigh bosca gaineamh eile nó Réamhshocrú.",
-      "sandboxUseDefault": "Úsáid Réamhshocrú"
+      "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} chomhad.",
@@ -2316,7 +2312,8 @@
       "matchesBadge_other": "{{displayCount}} toradh",
       "matchesBadge_two": "{{displayCount}} toradh",
       "matchesBadge_few": "{{displayCount}} toradh",
-      "matchesBadge_many": "{{displayCount}} toradh"
+      "matchesBadge_many": "{{displayCount}} toradh",
+      "noOutput": "Níl aon aschur ann."
     },
     "readToolMarkdown": {
       "linesTruncated": "línte {{start}}–{{end}} (teasctha)",
@@ -3286,7 +3283,9 @@
     "couldNotApprove": "Níorbh fhéidir ceadú",
     "couldNotStart": "Níorbh fhéidir tosú",
     "channelName": "Gníomhairí gníomhacha",
-    "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála."
+    "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála.",
+    "openSession": "Oscail",
+    "approveFailed": "Níorbh fhéidir ceadú. Tapáil $t(common.approve) chun triail eile a bhaint as."
   },
   "transcriptionModel": {
     "title": "Samhail tras-scríobh",
@@ -3311,15 +3310,7 @@
     "remoteOptionTitle": "Do ríomhaire",
     "remoteOptionBody": "Rith Kilo ar do mheicín féin tríd an CLI `kilo remote`.",
     "skip": "Scipeáil an turas",
-    "tutorialLabel": "Treoir",
-    "remoteTitle": "Tosaigh do chéad seisiún ciar",
-    "remoteBody": "Ceangail do ríomhaire, ansin tosaigh an seisiún anseo.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Níl ríomhaire ceangailte fós",
-    "remoteEmptyBody": "Chun é a cheangal, rith `kilo remote` ar do ríomhaire.",
-    "remoteFound": "Ríomhaire ceangailte",
-    "checkAgain": "Seiceáil arís",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Treoir"
   },
   "appActions": {
     "start": {

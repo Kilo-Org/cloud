@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "instansie gereed/misluk, geskeduleerde aksies",
       "balanceAlertsSubtitle": "waarskuwings oor die organisasie se lae saldo",
       "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe"
+    },
+    "action": {
+      "openSession": "Maak sessie oop"
+    },
+    "needsInputAction": {
+      "approved": "Versoek goedgekeur",
+      "replied": "Antwoord gestuur",
+      "failed": "Kon nie antwoord nie. Tik weer om weer te probeer.",
+      "unavailable": "Hierdie versoek wag nie meer nie."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Die sessie {{title}} word voortgesit.",
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortsit nie. Kies Cloud Agent of 'n ander CLI.",
-      "importFailed": "Hierdie sessie kon nie ingevoer word nie.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Standaard · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Klein",
-      "sandboxInstanceShared": "Gedeel",
-      "sandboxInstanceLarge": "Groot",
-      "sandboxInstanceDevcontainer": "Dev container",
-      "sandboxInstanceProviderDefault": "Verskaffer-standaard",
-      "sandboxCouldNotLoad": "Kon nie sandbox-opsies laai nie",
-      "sandboxUnavailable": "Hierdie sandbox is nie beskikbaar nie. Kies 'n ander sandbox of Standaard.",
-      "sandboxUseDefault": "Gebruik Standaard"
+      "importFailed": "Hierdie sessie kon nie ingevoer word nie."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer is bygewerk.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} reël",
       "linesBadge_other": "{{displayCount}} reëls",
       "matchesBadge_one": "{{displayCount}} treffer",
-      "matchesBadge_other": "{{displayCount}} treffers"
+      "matchesBadge_other": "{{displayCount}} treffers",
+      "noOutput": "Geen uitset nie."
     },
     "readToolMarkdown": {
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Kon nie goedkeur nie",
     "couldNotStart": "Kon nie begin nie",
     "channelName": "Aktiewe agente",
-    "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien."
+    "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
+    "openSession": "Oop",
+    "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer."
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Jou rekenaar",
     "remoteOptionBody": "Voer Kilo op jou eie masjien uit deur die `kilo remote`-CLI.",
     "skip": "Slaan toer oor",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Begin jou eerste afstandsessie",
-    "remoteBody": "Koppel jou rekenaar en begin dan die sessie van hier af.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Nog geen rekenaar gekoppel nie",
-    "remoteEmptyBody": "Voer `kilo remote` op jou rekenaar uit om dit te koppel.",
-    "remoteFound": "Rekenaar gekoppel",
-    "checkAgain": "Kontroleer weer",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

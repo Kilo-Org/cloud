@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "dika mandeha vonona na tsy nahomby, hetsika voalahatra",
       "balanceAlertsSubtitle": "fampitandremana rehefa kely ny ambim-bolan'ny fikambanana",
       "securityFindingsSubtitle": "olana vaovao hita sy fampahatsiahivana SLA"
+    },
+    "action": {
+      "openSession": "Sokafy ny fotoam-piasana"
+    },
+    "needsInputAction": {
+      "approved": "Nankinina ny fangatahana",
+      "replied": "Nalefa ny valiny",
+      "failed": "Tsy nahavaly. Tsindrio indray mba hanandrama.",
+      "unavailable": "Tsy miandry intsony ity fangatahana ity."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Mitohy ny {{title}}.",
       "importingSession": "Manafatra fotoam-piasana",
       "cliCannotContinue": "Tsy afaka manohy fotoam-piasana ity CLI ity. Safidio ny Cloud Agent na CLI hafa.",
-      "importFailed": "Tsy nahomby ny fanafarana ity fotoam-piasana ity.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Default · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Kely",
-      "sandboxInstanceShared": "Zaraina",
-      "sandboxInstanceLarge": "Lehibe",
-      "sandboxInstanceDevcontainer": "Kaontener Dev",
-      "sandboxInstanceProviderDefault": "Default amin'ny mpamatsy",
-      "sandboxCouldNotLoad": "Tsy voataona ireo safidy sandbox",
-      "sandboxUnavailable": "Tsy misy ity sandbox ity. Fidio sandbox hafa na Default.",
-      "sandboxUseDefault": "Ampiasao ny Default"
+      "importFailed": "Tsy nahomby ny fanafarana ity fotoam-piasana ity."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nohavaozina ny rakitra {{displayCount}}.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "Andalana {{displayCount}}",
       "linesBadge_other": "Andalana {{displayCount}}",
       "matchesBadge_one": "Valiny mifanaraka {{displayCount}}",
-      "matchesBadge_other": "Valiny mifanaraka {{displayCount}}"
+      "matchesBadge_other": "Valiny mifanaraka {{displayCount}}",
+      "noOutput": "Tsy misy vokatra."
     },
     "readToolMarkdown": {
       "linesTruncated": "andalana {{start}}–{{end}} (nohafohezina)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Tsy nahomby ny fanekena",
     "couldNotStart": "Tsy nahomby ny fanombohana",
     "channelName": "Mpanatanteraka mandeha",
-    "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy."
+    "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy.",
+    "openSession": "Sokafy",
+    "approveFailed": "Tsy nahomby ny fanekena. Tsindrio $t(common.approve) hanandramana indray."
   },
   "transcriptionModel": {
     "title": "Modely fanovana feo ho soratra",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Ny solosainao",
     "remoteOptionBody": "Alefaso amin'ny solosainao manokana ny Kilo amin'ny alalan'ny CLI `kilo remote`.",
     "skip": "Ahalavala ny fitetezana",
-    "tutorialLabel": "Torolàlana",
-    "remoteTitle": "Atombohy ny fotoam-piasana lava vahany voalohananao",
-    "remoteBody": "Aampakao ny solosainao, dia atomboho eto ny fotoam-piasana.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Tsy mbola misy solosaina mifandray",
-    "remoteEmptyBody": "Mba hampifandray azy dia alefaso `kilo remote` amin'ny solosainao.",
-    "remoteFound": "Mifandray ny solosaina",
-    "checkAgain": "Hamarino indray",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Torolàlana"
   },
   "appActions": {
     "start": {

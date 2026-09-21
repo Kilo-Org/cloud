@@ -300,6 +300,15 @@
       "kiloclawActivitySubtitle": "instância pronta ou com falha, ações agendadas",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organização",
       "securityFindingsSubtitle": "novos problemas de segurança e lembretes de SLA"
+    },
+    "action": {
+      "openSession": "Abrir sessão"
+    },
+    "needsInputAction": {
+      "approved": "Solicitação aprovada",
+      "replied": "Resposta enviada",
+      "failed": "Não foi possível responder. Toque novamente para tentar de novo.",
+      "unavailable": "Esta solicitação não está mais aguardando."
     }
   },
   "tabs": {
@@ -1649,20 +1658,7 @@
       "continueFrom": "Continuando a sessão {{title}}.",
       "importingSession": "Importando sessão",
       "cliCannotContinue": "Esta CLI não permite continuar uma sessão. Escolha o Cloud Agent ou outra CLI.",
-      "importFailed": "Não foi possível importar esta sessão.",
-      "sandbox": "Ambiente isolado",
-      "sandboxAccessibility": "Ambiente isolado: {{label}}",
-      "sandboxDefaultWithDestination": "Padrão · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Pequeno",
-      "sandboxInstanceShared": "Compartilhado",
-      "sandboxInstanceLarge": "Grande",
-      "sandboxInstanceDevcontainer": "Contêiner de desenvolvimento",
-      "sandboxInstanceProviderDefault": "Padrão do provedor",
-      "sandboxCouldNotLoad": "Não foi possível carregar as opções de ambiente isolado",
-      "sandboxUnavailable": "Este ambiente isolado não está disponível. Escolha outro ambiente isolado ou Padrão.",
-      "sandboxUseDefault": "Usar Padrão"
+      "importFailed": "Não foi possível importar esta sessão."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} arquivo foi atualizado.",
@@ -1696,7 +1692,8 @@
       "linesBadge_many": "{{displayCount}} linhas",
       "matchesBadge_one": "{{displayCount}} resultado",
       "matchesBadge_other": "{{displayCount}} resultados",
-      "matchesBadge_many": "{{displayCount}} resultados"
+      "matchesBadge_many": "{{displayCount}} resultados",
+      "noOutput": "Nenhuma saída."
     },
     "readToolMarkdown": {
       "linesTruncated": "linhas {{start}}–{{end}} (truncadas)",
@@ -3200,7 +3197,9 @@
     "couldNotApprove": "Não foi possível aprovar",
     "couldNotStart": "Não foi possível iniciar",
     "channelName": "Agentes ativos",
-    "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada."
+    "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada.",
+    "openSession": "Abrir",
+    "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente."
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",
@@ -3225,15 +3224,7 @@
     "remoteOptionTitle": "Seu computador",
     "remoteOptionBody": "Execute o Kilo na sua própria máquina pela CLI `kilo remote`.",
     "skip": "Pular tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Inicie sua primeira sessão remota",
-    "remoteBody": "Conecte seu computador e depois inicie a sessão por aqui.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Nenhum computador conectado ainda",
-    "remoteEmptyBody": "Para conectá-lo, execute `kilo remote` no seu computador.",
-    "remoteFound": "Computador conectado",
-    "checkAgain": "Verificar novamente",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

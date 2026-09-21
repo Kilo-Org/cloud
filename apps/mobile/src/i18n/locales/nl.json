@@ -336,7 +336,16 @@
     "previewAlways": "Altijd",
     "previewWhenUnlocked": "Als ontgrendeld",
     "previewFullDescription": "Meldingen tonen de berichttekst op je toegangsscherm.",
-    "previewGenericDescription": "Meldingen geven alleen aan dat er iets is gebeurd. Open Kilo om het bericht te lezen."
+    "previewGenericDescription": "Meldingen geven alleen aan dat er iets is gebeurd. Open Kilo om het bericht te lezen.",
+    "action": {
+      "openSession": "Sessie openen"
+    },
+    "needsInputAction": {
+      "approved": "Verzoek goedgekeurd",
+      "replied": "Antwoord verzonden",
+      "failed": "Kon niet antwoorden. Tik nogmaals om het opnieuw te proberen.",
+      "unavailable": "Dit verzoek wacht niet langer."
+    }
   },
   "tabs": {
     "home": "Startpagina",
@@ -1673,20 +1682,7 @@
       "continueFrom": "Je gaat verder met {{title}}.",
       "importingSession": "Sessie importeren…",
       "cliCannotContinue": "Deze CLI kan geen sessie voortzetten. Kies Cloud Agent of een andere CLI.",
-      "importFailed": "Deze sessie kon niet worden geïmporteerd.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Standaard · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Klein",
-      "sandboxInstanceShared": "Gedeeld",
-      "sandboxInstanceLarge": "Groot",
-      "sandboxInstanceDevcontainer": "Dev-container",
-      "sandboxInstanceProviderDefault": "Standaard van provider",
-      "sandboxCouldNotLoad": "Sandbox-opties kunnen niet worden geladen",
-      "sandboxUnavailable": "Deze sandbox is niet beschikbaar. Kies een andere sandbox of Standaard.",
-      "sandboxUseDefault": "Standaard gebruiken"
+      "importFailed": "Deze sessie kon niet worden geïmporteerd."
     },
     "partRenderer": {
       "updatedFileCount_one": "Er is {{displayCount}} bestand bijgewerkt.",
@@ -1716,7 +1712,8 @@
       "linesBadge_one": "{{displayCount}} regel",
       "linesBadge_other": "{{displayCount}} regels",
       "matchesBadge_one": "{{displayCount}} treffer",
-      "matchesBadge_other": "{{displayCount}} treffers"
+      "matchesBadge_other": "{{displayCount}} treffers",
+      "noOutput": "Geen uitvoer."
     },
     "readToolMarkdown": {
       "linesTruncated": "regels {{start}}–{{end}} (afgekapt)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Goedkeuren mislukt",
     "couldNotStart": "Starten mislukt",
     "channelName": "Actieve agents",
-    "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien."
+    "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
+    "openSession": "Openen",
+    "approveFailed": "Goedkeuren is niet gelukt. Tik op $t(common.approve) om het opnieuw te proberen."
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Je computer",
     "remoteOptionBody": "Voer Kilo uit op je eigen machine via de `kilo remote`-CLI.",
     "skip": "Tour overslaan",
-    "tutorialLabel": "Zelfstudie",
-    "remoteTitle": "Start je eerste externe sessie",
-    "remoteBody": "Verbind je computer en start de sessie vanaf hier.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Nog geen computer verbonden",
-    "remoteEmptyBody": "Voer `kilo remote` uit op je computer om hem te verbinden.",
-    "remoteFound": "Computer verbonden",
-    "checkAgain": "Opnieuw controleren",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Zelfstudie"
   },
   "appActions": {
     "start": {

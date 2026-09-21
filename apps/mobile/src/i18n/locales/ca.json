@@ -856,6 +856,15 @@
       "kiloclawActivitySubtitle": "instància a punt/fallida, accions programades",
       "balanceAlertsSubtitle": "avisos de saldo baix de l'organització",
       "securityFindingsSubtitle": "noves deteccions i recordatoris d'SLA"
+    },
+    "action": {
+      "openSession": "Obre la sessió"
+    },
+    "needsInputAction": {
+      "approved": "Sol·licitud aprovada",
+      "replied": "Resposta enviada",
+      "failed": "No s’ha pogut respondre. Torna a tocar-ho per reintentar-ho.",
+      "unavailable": "Aquesta sol·licitud ja no està en espera."
     }
   },
   "tabs": {
@@ -2205,20 +2214,7 @@
       "continueFrom": "S'està continuant la sessió {{title}}.",
       "importingSession": "Important la sessió…",
       "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Tria Cloud Agent o un altre CLI.",
-      "importFailed": "No s'ha pogut importar aquesta sessió.",
-      "sandbox": "Entorn aïllat",
-      "sandboxAccessibility": "Entorn aïllat: {{label}}",
-      "sandboxDefaultWithDestination": "Per defecte · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Petit",
-      "sandboxInstanceShared": "Compartit",
-      "sandboxInstanceLarge": "Gran",
-      "sandboxInstanceDevcontainer": "Contenidor de desenvolupament",
-      "sandboxInstanceProviderDefault": "Per defecte del proveïdor",
-      "sandboxCouldNotLoad": "No s'han pogut carregar les opcions de l'entorn aïllat",
-      "sandboxUnavailable": "Aquest entorn aïllat no està disponible. Tria'n un altre o Per defecte.",
-      "sandboxUseDefault": "Utilitza Per defecte"
+      "importFailed": "No s'ha pogut importar aquesta sessió."
     },
     "partRenderer": {
       "updatedFileCount_one": "S'ha actualitzat {{displayCount}} fitxer.",
@@ -2252,7 +2248,8 @@
       "linesBadge_many": "{{displayCount}} línies",
       "matchesBadge_one": "{{displayCount}} coincidència",
       "matchesBadge_other": "{{displayCount}} coincidències",
-      "matchesBadge_many": "{{displayCount}} coincidències"
+      "matchesBadge_many": "{{displayCount}} coincidències",
+      "noOutput": "No hi ha cap sortida."
     },
     "readToolMarkdown": {
       "linesTruncated": "línies {{start}}–{{end}} (truncades)",
@@ -3200,7 +3197,9 @@
     "couldNotApprove": "No s'ha pogut aprovar",
     "couldNotStart": "No s'ha pogut iniciar",
     "channelName": "Agents actius",
-    "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig."
+    "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig.",
+    "openSession": "Obre",
+    "approveFailed": "No s'ha pogut aprovar. Toca $t(common.approve) per tornar-ho a provar."
   },
   "transcriptionModel": {
     "title": "Model de transcripció",
@@ -3225,15 +3224,7 @@
     "remoteOptionTitle": "El teu ordinador",
     "remoteOptionBody": "Executa el Kilo a la teva pròpia màquina mitjançant el CLI `kilo remote`.",
     "skip": "Salta el tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Inicia la teva primera sessió remota",
-    "remoteBody": "Connecta el teu ordinador i després inicia la sessió des d'aquí.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Encara no hi ha cap ordinador connectat",
-    "remoteEmptyBody": "Per connectar-lo, executa `kilo remote` al teu ordinador.",
-    "remoteFound": "Ordinador connectat",
-    "checkAgain": "Torna-ho a comprovar",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

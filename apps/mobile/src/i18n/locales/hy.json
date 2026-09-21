@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "միջավայրը պատրաստ է կամ ձախողվել է, պլանավորված գործողություններ",
       "balanceAlertsSubtitle": "կազմակերպության ցածր մնացորդի նախազգուշացումներ",
       "securityFindingsSubtitle": "հայտնաբերված նոր խնդիրներ և SLA հիշեցումներ"
+    },
+    "action": {
+      "openSession": "Բացել նիստը"
+    },
+    "needsInputAction": {
+      "approved": "Հարցումը հաստատվեց",
+      "replied": "Պատասխանն ուղարկվեց",
+      "failed": "Չհաջողվեց պատասխանել: Կրկին փորձելու համար նորից հպեք:",
+      "unavailable": "Այս հարցումն այլևս չի սպասում:"
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Շարունակվում է «{{title}}» նիստը։",
       "importingSession": "Նիստը ներմուծվում է",
       "cliCannotContinue": "Այս CLI-ն չի կարող շարունակել նիստը։ Ընտրեք Cloud Agent-ը կամ մեկ այլ CLI։",
-      "importFailed": "Չհաջողվեց ներմուծել այս նիստը։",
-      "sandbox": "Ավազարկղ",
-      "sandboxAccessibility": "Ավազարկղ՝ {{label}}",
-      "sandboxDefaultWithDestination": "Կանխադրված · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Փոքր",
-      "sandboxInstanceShared": "Համատեղ",
-      "sandboxInstanceLarge": "Մեծ",
-      "sandboxInstanceDevcontainer": "Մշակման կոնտեյներ",
-      "sandboxInstanceProviderDefault": "Մատակարարի կանխադրված",
-      "sandboxCouldNotLoad": "Չհաջողվեց բեռնել ավազարկղի տարբերակները",
-      "sandboxUnavailable": "Այս ավազարկղը հասանելի չէ: Ընտրեք այլ ավազարկղ կամ Կանխադրված:",
-      "sandboxUseDefault": "Օգտագործել Կանխադրվածը"
+      "importFailed": "Չհաջողվեց ներմուծել այս նիստը։"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ։",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} տող",
       "linesBadge_other": "{{displayCount}} տող",
       "matchesBadge_one": "{{displayCount}} համընկնում",
-      "matchesBadge_other": "{{displayCount}} համընկնում"
+      "matchesBadge_other": "{{displayCount}} համընկնում",
+      "noOutput": "Ելք չկա։"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} տողերը (կրճատված)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Չհաջողվեց հաստատել",
     "couldNotStart": "Չհաջողվեց սկսել",
     "channelName": "Ակտիվ գործակալներ",
-    "activityKitDisabledBody": "Կարգավորումներում միացրու ընթացիկ գործողությունների ցուցադրումը՝ ակտիվ գործակալներին կողպման էկրանին տեսնելու համար։"
+    "activityKitDisabledBody": "Կարգավորումներում միացրու ընթացիկ գործողությունների ցուցադրումը՝ ակտիվ գործակալներին կողպման էկրանին տեսնելու համար։",
+    "openSession": "Բացիր",
+    "approveFailed": "Չհաջողվեց հաստատել։ Կրկին փորձելու համար հպեք $t(common.approve)-ին։"
   },
   "transcriptionModel": {
     "title": "Տեքստի վերածման մոդել",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Քո համակարգիչը",
     "remoteOptionBody": "Գործարկիր Kilo-ն քո սեփական համակարգչում՝ `kilo remote` CLI-ի միջոցով։",
     "skip": "Բաց թողնել ուղեցույցը",
-    "tutorialLabel": "Ուղեցույց",
-    "remoteTitle": "Սկսիր քո առաջին հեռակա աշխատաշրջանը",
-    "remoteBody": "Միացրու քո համակարգիչը, ապա աշխատաշրջանը սկսիր այստեղից։",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Քո համակարգիչը դեռ միացված չէ",
-    "remoteEmptyBody": "Կատարիր `kilo remote` քո համակարգչում՝ այն միացնելու համար։",
-    "remoteFound": "Համակարգիչը միացված է",
-    "checkAgain": "Կրկին ստուգիր",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Ուղեցույց"
   },
   "appActions": {
     "start": {

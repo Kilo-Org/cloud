@@ -152,6 +152,10 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   suppressIfViewingSession: z.boolean().optional(),
   // Absent category is treated as 'status' at the enforcement read site.
   category: cloudAgentSessionCategorySchema.optional(),
+  // Needs-input raise detail: which answer the waiting agent wants, and the PR
+  // that can be opened from the notification. Absent on status pushes.
+  attentionKind: z.enum(['question', 'permission']).optional(),
+  prUrl: z.string().optional(),
   // Old producers omit these; remove the optionals when every producer sends keys.
   i18nKey: z.string().min(1).optional(),
   i18nParams: z.record(z.string(), z.string()).optional(),
@@ -172,6 +176,17 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
 export const refreshGlanceableSessionsInputSchema = z.object({
   userId: z.string().min(1),
   cliSessionIds: z.array(z.string().min(1)).min(1),
+  /**
+   * The subset of `cliSessionIds` whose change moved a session into or out of
+   * the `permission` status. `needsApproval` gates the Approve control on the
+   * locked/background surfaces, so the delivery window may not defer those
+   * scopes. The caller is the one that saw the previous status; the server
+   * cannot read a past status. Naming the sessions lets the server exempt only
+   * the scope that actually moved: one batch can span the personal scope and
+   * several organizations, and exempting all of them would wake devices that
+   * had no approval change.
+   */
+  approvalChangedSessionIds: z.array(z.string().min(1)).optional(),
 });
 export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSessionsInputSchema>;
 

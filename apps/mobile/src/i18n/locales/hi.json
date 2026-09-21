@@ -336,6 +336,15 @@
       "kiloclawActivitySubtitle": "इंस्टेंस तैयार/विफल, तय समय पर होने वाले कार्य",
       "balanceAlertsSubtitle": "संगठन का बैलेंस कम होने की चेतावनियाँ",
       "securityFindingsSubtitle": "नई सुरक्षा समस्याएँ और SLA के रिमाइंडर"
+    },
+    "action": {
+      "openSession": "सत्र खोलें"
+    },
+    "needsInputAction": {
+      "approved": "अनुरोध स्वीकृत हुआ",
+      "replied": "जवाब भेज दिया गया",
+      "failed": "जवाब नहीं दिया जा सका. फिर से कोशिश करने के लिए दोबारा टैप करें.",
+      "unavailable": "यह अनुरोध अब इंतज़ार नहीं कर रहा।"
     }
   },
   "tabs": {
@@ -1673,20 +1682,7 @@
       "continueFrom": "{{title}} जारी रखा जा रहा है।",
       "importingSession": "सत्र आयात किया जा रहा है",
       "cliCannotContinue": "यह CLI सत्र जारी नहीं रख सकता। Cloud Agent या कोई अन्य CLI चुनें।",
-      "importFailed": "यह सत्र आयात नहीं हो सका।",
-      "sandbox": "सैंडबॉक्स",
-      "sandboxAccessibility": "सैंडबॉक्स: {{label}}",
-      "sandboxDefaultWithDestination": "डिफ़ॉल्ट · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "छोटा",
-      "sandboxInstanceShared": "साझा",
-      "sandboxInstanceLarge": "बड़ा",
-      "sandboxInstanceDevcontainer": "डेव कंटेनर",
-      "sandboxInstanceProviderDefault": "प्रदाता का डिफ़ॉल्ट",
-      "sandboxCouldNotLoad": "सैंडबॉक्स विकल्प लोड नहीं हो सके",
-      "sandboxUnavailable": "यह सैंडबॉक्स उपलब्ध नहीं है। कोई अन्य सैंडबॉक्स या डिफ़ॉल्ट चुनें।",
-      "sandboxUseDefault": "डिफ़ॉल्ट का उपयोग करें"
+      "importFailed": "यह सत्र आयात नहीं हो सका।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई।",
@@ -2104,7 +2100,8 @@
       "linesBadge_one": "{{displayCount}} पंक्ति",
       "linesBadge_other": "{{displayCount}} पंक्तियाँ",
       "matchesBadge_one": "{{displayCount}} मिलान",
-      "matchesBadge_other": "{{displayCount}} मिलान"
+      "matchesBadge_other": "{{displayCount}} मिलान",
+      "noOutput": "कोई आउटपुट नहीं है।"
     },
     "autoApprove": {
       "title": "स्वतः अनुमोदन",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "स्वीकृत नहीं किया जा सका",
     "couldNotStart": "शुरू नहीं किया जा सका",
     "channelName": "सक्रिय एजेंट",
-    "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।"
+    "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।",
+    "openSession": "खोलें",
+    "approveFailed": "स्वीकार नहीं किया जा सका। फिर से कोशिश करने के लिए $t(common.approve) पर टैप करें।"
   },
   "transcriptionModel": {
     "title": "आवाज़ को टेक्स्ट में बदलने का मॉडल",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "आपका कंप्यूटर",
     "remoteOptionBody": "अपने मशीन पर `kilo remote` CLI से Kilo चलाएँ।",
     "skip": "टूर छोड़ें",
-    "tutorialLabel": "ट्यूटोरियल",
-    "remoteTitle": "अपना पहला रिमोट सत्र शुरू करें",
-    "remoteBody": "अपना कंप्यूटर कनेक्ट करें, फिर यहाँ से सत्र शुरू करें।",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "अभी कोई कंप्यूटर कनेक्ट नहीं हुआ है",
-    "remoteEmptyBody": "उसे कनेक्ट करने के लिए अपने कंप्यूटर पर `kilo remote` चलाएँ।",
-    "remoteFound": "कंप्यूटर कनेक्ट हो गया",
-    "checkAgain": "फ़िर से जाँचें",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ट्यूटोरियल"
   },
   "appActions": {
     "start": {

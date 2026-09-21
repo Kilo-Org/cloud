@@ -1,19 +1,6 @@
 // Pure decision helpers for useGitHubReposRefresh, extracted so the test
 // doesn't pull in react-native (Flow-syntax) via the hook module.
 
-export type RefreshTrigger = 'sheet-close' | 'app-foreground';
-
-/**
- * Maps a platform to the expected refetch trigger after the auth session
- * ends. Mirrors the connect-gate pattern.
- */
-export function resolveRefreshTrigger(platform: string): RefreshTrigger {
-  if (platform === 'ios') {
-    return 'sheet-close';
-  }
-  return 'app-foreground';
-}
-
 /**
  * Whether `connectCheckFailed` should be set after a return-triggered
  * force-fresh. Only set when the browser-return payload says

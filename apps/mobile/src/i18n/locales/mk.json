@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "инстанца подготвена/неуспешна, закажани дејства",
       "balanceAlertsSubtitle": "предупредувања за ниска состојба на организацијата",
       "securityFindingsSubtitle": "нови наоди и потсетници за SLA"
+    },
+    "action": {
+      "openSession": "Отвори сесија"
+    },
+    "needsInputAction": {
+      "approved": "Барањето е одобрено",
+      "replied": "Одговорот е испратен",
+      "failed": "Не можеше да се одговори. Допрете повторно за да пробате.",
+      "unavailable": "Ова барање веќе не чека."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Се продолжува сесијата {{title}}.",
       "importingSession": "Увезување на сесијата",
       "cliCannotContinue": "Овој CLI не може да продолжи сесија. Избери Cloud Agent или друг CLI.",
-      "importFailed": "Не успеа увезувањето на оваа сесија.",
-      "sandbox": "Песочник",
-      "sandboxAccessibility": "Песочник: {{label}}",
-      "sandboxDefaultWithDestination": "Стандардно · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Мало",
-      "sandboxInstanceShared": "Споделено",
-      "sandboxInstanceLarge": "Големо",
-      "sandboxInstanceDevcontainer": "Дев контејнер",
-      "sandboxInstanceProviderDefault": "Стандардно од добавувачот",
-      "sandboxCouldNotLoad": "Опциите за песочникот не можеа да се вчитаат",
-      "sandboxUnavailable": "Овој песочник е недостапен. Изберете друг песочник или Стандардно.",
-      "sandboxUseDefault": "Користи Стандардно"
+      "importFailed": "Не успеа увезувањето на оваа сесија."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ажурирана е {{displayCount}} датотека.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} ред",
       "linesBadge_other": "{{displayCount}} редови",
       "matchesBadge_one": "{{displayCount}} совпаѓање",
-      "matchesBadge_other": "{{displayCount}} совпаѓања"
+      "matchesBadge_other": "{{displayCount}} совпаѓања",
+      "noOutput": "Нема излез."
     },
     "readToolMarkdown": {
       "linesTruncated": "редови {{start}}–{{end}} (скратено)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Одобрувањето не успеа",
     "couldNotStart": "Стартувањето не успеа",
     "channelName": "Активни агенти",
-    "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран."
+    "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран.",
+    "openSession": "Отвори",
+    "approveFailed": "Одобрувањето не успеа. Допри $t(common.approve) за да се обидеш повторно."
   },
   "transcriptionModel": {
     "title": "Модел за транскрипција",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Твојот компјутер",
     "remoteOptionBody": "Стартувај го Kilo на сопствената машина преку `kilo remote` CLI.",
     "skip": "Прескокни тура",
-    "tutorialLabel": "Водич",
-    "remoteTitle": "Започни ја твојата прва оддалечена сесија",
-    "remoteBody": "Поврзи го компјутерот, потоа стартувај ја сесијата оттука.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Сè уште нема поврзан компјутер",
-    "remoteEmptyBody": "За да го поврзеш, изврши `kilo remote` на компјутерот.",
-    "remoteFound": "Компјутерот е поврзан",
-    "checkAgain": "Провери повторно",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Водич"
   },
   "appActions": {
     "start": {

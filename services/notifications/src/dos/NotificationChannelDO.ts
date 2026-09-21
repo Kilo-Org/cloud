@@ -3,7 +3,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { user_notification_preferences, user_push_tokens } from '@kilocode/db/schema';
 import {
   androidChannelIdForPushData,
-  androidChannelIdForRegisteredClient,
+  androidChannelIdForPushDataToAppVersion,
   genericPushContentForPushData,
   iosInterruptionLevelForPushData,
   iosMutableContentForPushData,
@@ -18,7 +18,12 @@ import { isPushSinkEnabled } from '../lib/push-sink';
 import type { ExpoPushMessage, SendResult, TicketTokenPair } from '../lib/expo-push';
 import { sendPushNotifications } from '../lib/expo-push';
 import { glanceableDeliveryDeps } from '../lib/glanceable-delivery-deps';
-import { refreshGlanceableSnapshot } from '../lib/glanceable-refresh';
+import {
+  foldPendingGlanceableRefreshDeadline,
+  flushDueGlanceableRefreshesSafely,
+  refreshGlanceableSnapshot,
+} from '../lib/glanceable-refresh';
+import { expoPushExtrasForPushData } from '../lib/push-message-extras';
 
 type ReceiptCheckMessage = { ticketTokenPairs: TicketTokenPair[] };
 
@@ -68,8 +73,16 @@ export class NotificationChannelDO extends DurableObject<Env> {
   async refreshGlanceableSnapshot(params: {
     userId: string;
     organizationId: string | null;
+    approvalChanged?: boolean;
   }): Promise<void> {
-    await refreshGlanceableSnapshot(params, this.ctx.storage, glanceableDeliveryDeps(this.env));
+    const { userId, organizationId, approvalChanged } = params;
+    await refreshGlanceableSnapshot(
+      { userId, organizationId },
+      this.ctx.storage,
+      glanceableDeliveryDeps(this.env),
+      Date.now,
+      { approvalChanged }
+    );
   }
 
   async dispatchPush(input: DispatchPushInput): Promise<DispatchPushOutcome> {
@@ -196,6 +209,9 @@ export class NotificationChannelDO extends DurableObject<Env> {
     // below routes a progress push through the extension that reads the same
     // choice when the app is not in the foreground.
     const channelId = androidChannelIdForPushData(input.push.data);
+    // Attention extras keep the action category; the shared kind model below
+    // owns interruption levels and Focus filtering for every push.
+    const pushExtras = expoPushExtrasForPushData(input.push.data);
     const interruptionLevel = iosInterruptionLevelForPushData(input.push.data);
     const mutableContent = iosMutableContentForPushData(input.push.data);
     let previews: 'generic' | 'full' = 'generic';
@@ -286,17 +302,19 @@ export class NotificationChannelDO extends DurableObject<Env> {
         body = input.push.body;
       }
 
-      const clientChannelId = androidChannelIdForRegisteredClient(channelId, app_version);
+      // Android 8+ drops a notification addressed to a channel that does not
+      // exist. Only clients that create channels (a non-null app version at
+      // registration) get a channelId; older clients fall back to the default
+      // channel. The split agent channels are newer than the rest, so a token
+      // registered before they shipped only has the legacy `agent` channel and
+      // keeps routing there. iOS ignores channelId either way.
+      const clientChannelId = androidChannelIdForPushDataToAppVersion(input.push.data, app_version);
       return {
         to: token,
         title,
         body,
         data: input.push.data,
-        // Android 8+ drops a notification addressed to a channel that does
-        // not exist, and the channel list is created client-side. A token
-        // registered before channel creation, or before the named agent
-        // channels existed, gets no channelId and the post falls back to the
-        // app's default channel. iOS ignores channelId either way.
+        ...pushExtras,
         ...(clientChannelId !== undefined && { channelId: clientChannelId }),
         // iOS has no per-kind channel; the interruption level is its
         // equivalent and it is what lets a needs-input push break through a
@@ -464,6 +482,16 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
   override async alarm(): Promise<void> {
     const now = Date.now();
+    // Deliver any glanceable refresh the rate-limit window deferred. Its
+    // remaining deadline folds into this sweep's alarm so the trailing
+    // delivery is not stranded when no idem/rl record outlives it. The flush runs
+    // safely: a failure inside it must not skip the idem/rate-limit GC below,
+    // which is storage reclamation. The fold re-reads the pending deadlines, so
+    // a failed flush still reschedules the trailing delivery.
+    const dueGlanceableRefreshAt = await flushDueGlanceableRefreshesSafely(
+      this.ctx.storage,
+      glanceableDeliveryDeps(this.env)
+    );
     const idemEntries = await this.ctx.storage.list<IdemRecord>({ prefix: IDEM_PREFIX });
     const expiredIdem: string[] = [];
     let nextAlarmAt: number | undefined;
@@ -472,6 +500,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
         nextAlarmAt = deadline;
       }
     };
+    if (dueGlanceableRefreshAt !== null) requestAlarmAtOrBefore(dueGlanceableRefreshAt);
 
     for (const [key, rec] of idemEntries) {
       if (rec.stage === 'accepted') {
@@ -508,8 +537,12 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
     const toDelete = [...expiredIdem, ...expiredRl];
     if (toDelete.length > 0) await this.ctx.storage.delete(toDelete);
-    if (nextAlarmAt !== undefined) {
-      await this.ctx.storage.setAlarm(nextAlarmAt);
+    // A deferral can land during the awaits above. Fold the pending deadline in
+    // again rather than trusting the flush's earlier capture, so the final
+    // setAlarm cannot overwrite it and delay the trailing delivery.
+    const alarmAt = await foldPendingGlanceableRefreshDeadline(this.ctx.storage, nextAlarmAt);
+    if (alarmAt !== undefined) {
+      await this.ctx.storage.setAlarm(alarmAt);
     }
   }
 

@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "enstans pare/echwe, aksyon pwograme",
       "balanceAlertsSubtitle": "avètisman lè balans òganizasyon an ba",
       "securityFindingsSubtitle": "nouvo rezilta ak rapèl SLA"
+    },
+    "action": {
+      "openSession": "Louvri sesyon an"
+    },
+    "needsInputAction": {
+      "approved": "Demann an apwouve",
+      "replied": "Repons an voye",
+      "failed": "Pa ka reponn. Touche ankò pou eseye ankò.",
+      "unavailable": "Demann sa a pa tann ankò."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Nou ap kontinye {{title}}.",
       "importingSession": "Ap enpòte sesyon an",
       "cliCannotContinue": "CLI sa a pa ka kontinye yon sesyon. Chwazi Cloud Agent oswa yon lòt CLI.",
-      "importFailed": "Nou pa t ka enpòte sesyon sa a.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Pa defo · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Piti",
-      "sandboxInstanceShared": "Pataje",
-      "sandboxInstanceLarge": "Gwo",
-      "sandboxInstanceDevcontainer": "Kontener Dev",
-      "sandboxInstanceProviderDefault": "Pa defo founisè a",
-      "sandboxCouldNotLoad": "Pa ka chaje opsyon sandbox yo",
-      "sandboxUnavailable": "Sandbox sa a pa disponib. Chwazi yon lòt sandbox oswa Pa defo.",
-      "sandboxUseDefault": "Sèvi ak Pa defo"
+      "importFailed": "Nou pa t ka enpòte sesyon sa a."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nou mete {{displayCount}} fichye ajou.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} liy",
       "linesBadge_other": "{{displayCount}} liy",
       "matchesBadge_one": "{{displayCount}} rezilta",
-      "matchesBadge_other": "{{displayCount}} rezilta"
+      "matchesBadge_other": "{{displayCount}} rezilta",
+      "noOutput": "Pa gen rezilta."
     },
     "readToolMarkdown": {
       "linesTruncated": "liy {{start}}–{{end}} (koupe)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Pa t kapab apwouve",
     "couldNotStart": "Pa t kapab kòmanse",
     "channelName": "Ajan aktif",
-    "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an."
+    "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an.",
+    "openSession": "Louvri",
+    "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò."
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Òdinatè ou",
     "remoteOptionBody": "Egzekite Kilo sou pwòp machin ou a nan atravè CLI `kilo remote` la.",
     "skip": "Pase vizit la",
-    "tutorialLabel": "Gid",
-    "remoteTitle": "Kòmanse premye sesyon distans ou a",
-    "remoteBody": "Konekte òdinatè ou a, epi kòmanse sesyon an soti isit la.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Okenn òdinatè konekte pou kounye a",
-    "remoteEmptyBody": "Pou konekte l, egzekite `kilo remote` sou òdinatè ou a.",
-    "remoteFound": "Òdinatè konekte",
-    "checkAgain": "Tcheke ankò",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Gid"
   },
   "appActions": {
     "start": {

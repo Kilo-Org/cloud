@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "tilvik tilbúið eða bilað, tímasettar aðgerðir",
       "balanceAlertsSubtitle": "viðvaranir um lága inneign félagsins",
       "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar"
+    },
+    "action": {
+      "openSession": "Opna lotu"
+    },
+    "needsInputAction": {
+      "approved": "Beiðni samþykkt",
+      "replied": "Svar sent",
+      "failed": "Ekki tókst að svara. Ýttu aftur til að reyna aftur.",
+      "unavailable": "Þessi beiðni bíður ekki lengur."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Haldið er áfram með {{title}}.",
       "importingSession": "Flytur lotuna inn",
       "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",
-      "importFailed": "Ekki tókst að flytja inn þessa lotu.",
-      "sandbox": "Sandkassi",
-      "sandboxAccessibility": "Sandkassi: {{label}}",
-      "sandboxDefaultWithDestination": "Sjálfgefið · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Lítið",
-      "sandboxInstanceShared": "Deilt",
-      "sandboxInstanceLarge": "Stórt",
-      "sandboxInstanceDevcontainer": "Dev-konteiner",
-      "sandboxInstanceProviderDefault": "Sjálfgefið hjá veitanda",
-      "sandboxCouldNotLoad": "Ekki tókst að hlaða valkostum sandkassans",
-      "sandboxUnavailable": "Þessi sandkassi er ekki tiltækur. Veldu annan sandkassa eða Sjálfgefið.",
-      "sandboxUseDefault": "Nota Sjálfgefið"
+      "importFailed": "Ekki tókst að flytja inn þessa lotu."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} skrá var uppfærð.",
@@ -2220,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} lína",
       "linesBadge_other": "{{displayCount}} línur",
       "matchesBadge_one": "{{displayCount}} samsvörun",
-      "matchesBadge_other": "{{displayCount}} samsvaranir"
+      "matchesBadge_other": "{{displayCount}} samsvaranir",
+      "noOutput": "Ekkert úttak."
     },
     "readToolMarkdown": {
       "linesTruncated": "línur {{start}}–{{end}} (stytt)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "Gat ekki samþykkt",
     "couldNotStart": "Gat ekki ræst",
     "channelName": "Virkir fulltrúar",
-    "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum."
+    "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum.",
+    "openSession": "Opna",
+    "approveFailed": "Ekki tókst að samþykkja. Ýttu á $t(common.approve) til að reyna aftur."
   },
   "transcriptionModel": {
     "title": "Umritunarlíkan",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "Tölvan þín",
     "remoteOptionBody": "Keyrðu Kilo á eigin tölvu í gegnum `kilo remote` CLI-ið.",
     "skip": "Sleppa kynningu",
-    "tutorialLabel": "Leiðbeiningar",
-    "remoteTitle": "Hafðu uppi fyrstu fjarlotu þína",
-    "remoteBody": "Tengdu tölvuna þína og vertu svo að byrja lotuna héðan.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Engin tölva tengd ennþá",
-    "remoteEmptyBody": "Til að tengja hana skaltu keyra `kilo remote` á tölvunni þinni.",
-    "remoteFound": "Tölva tengd",
-    "checkAgain": "Athuga aftur",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Leiðbeiningar"
   },
   "appActions": {
     "start": {

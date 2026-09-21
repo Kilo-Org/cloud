@@ -534,7 +534,10 @@ export function AttachmentPreviewStrip({
       horizontal
       showsHorizontalScrollIndicator={false}
       className="mb-2"
-      contentContainerClassName="items-center"
+      // pl-3 matches the composer toolbar's px-3 so the first thumbnail's
+      // left edge lines up with the mode/model chips. No right padding: each
+      // chip carries its own mr-2 and the scroll container clips at the edge.
+      contentContainerClassName="items-center pl-3"
       keyboardShouldPersistTaps="handled"
     >
       {attachments.map((attachment, index) => (

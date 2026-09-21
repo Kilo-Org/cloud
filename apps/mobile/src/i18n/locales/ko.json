@@ -336,6 +336,15 @@
       "kiloclawActivitySubtitle": "인스턴스 준비 완료 및 실패, 예약된 작업",
       "balanceAlertsSubtitle": "조직 잔액 부족 경고",
       "securityFindingsSubtitle": "새 보안 문제 및 SLA 알림"
+    },
+    "action": {
+      "openSession": "세션 열기"
+    },
+    "needsInputAction": {
+      "approved": "요청이 승인되었습니다",
+      "replied": "답장을 보냈습니다",
+      "failed": "답변하지 못했습니다. 다시 탭하여 재시도하세요.",
+      "unavailable": "이 요청은 더 이상 대기 중이 아닙니다."
     }
   },
   "tabs": {
@@ -1673,20 +1682,7 @@
       "continueFrom": "{{title}} 세션을 이어서 진행합니다.",
       "importingSession": "세션 가져오는 중",
       "cliCannotContinue": "이 CLI에서는 세션을 이어서 진행할 수 없습니다. Cloud Agent 또는 다른 CLI를 선택하세요.",
-      "importFailed": "이 세션을 가져올 수 없습니다.",
-      "sandbox": "샌드박스",
-      "sandboxAccessibility": "샌드박스: {{label}}",
-      "sandboxDefaultWithDestination": "기본값 · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "소형",
-      "sandboxInstanceShared": "공유",
-      "sandboxInstanceLarge": "대형",
-      "sandboxInstanceDevcontainer": "개발 컨테이너",
-      "sandboxInstanceProviderDefault": "공급자 기본값",
-      "sandboxCouldNotLoad": "샌드박스 옵션을 불러올 수 없습니다",
-      "sandboxUnavailable": "이 샌드박스는 사용할 수 없습니다. 다른 샌드박스 또는 기본값을 선택하세요.",
-      "sandboxUseDefault": "기본값 사용"
+      "importFailed": "이 세션을 가져올 수 없습니다."
     },
     "partRenderer": {
       "updatedFileCount_one": "파일 {{displayCount}}개를 업데이트했습니다.",
@@ -1716,7 +1712,8 @@
       "linesBadge_one": "{{displayCount}}줄",
       "linesBadge_other": "{{displayCount}}줄",
       "matchesBadge_one": "{{displayCount}}건 일치",
-      "matchesBadge_other": "{{displayCount}}건 일치"
+      "matchesBadge_other": "{{displayCount}}건 일치",
+      "noOutput": "출력이 없습니다."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}줄 (일부 생략)",
@@ -3157,7 +3154,9 @@
     "couldNotApprove": "승인할 수 없음",
     "couldNotStart": "시작할 수 없음",
     "channelName": "활성 에이전트",
-    "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요."
+    "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요.",
+    "openSession": "열기",
+    "approveFailed": "승인하지 못했습니다. 다시 시도하려면 $t(common.approve)을 탭하세요."
   },
   "transcriptionModel": {
     "title": "음성 텍스트 변환 모델",
@@ -3182,15 +3181,7 @@
     "remoteOptionTitle": "내 컴퓨터",
     "remoteOptionBody": "`kilo remote` CLI로 내 컴퓨터에서 Kilo를 실행하세요.",
     "skip": "투어 건너뛰기",
-    "tutorialLabel": "튜토리얼",
-    "remoteTitle": "첫 리모트 세션 시작하기",
-    "remoteBody": "컴퓨터를 연결한 뒤 여기서 세션을 시작하세요.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "연결된 컴퓨터가 없습니다",
-    "remoteEmptyBody": "연결하려면 컴퓨터에서 `kilo remote`를 실행하세요.",
-    "remoteFound": "컴퓨터 연결됨",
-    "checkAgain": "다시 확인",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "튜토리얼"
   },
   "appActions": {
     "start": {

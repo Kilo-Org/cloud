@@ -2546,6 +2546,74 @@ describe('SessionDetailContent send transcript take-over', () => {
   });
 });
 
+// The fixed indicator row sits outside the transcript list. A position layout
+// transition would paint it over the transcript rows it passes while the list
+// resizes (profile-screen.tsx:275-277), so it must snap and stay opaque.
+describe('SessionDetailContent fixed indicator row', () => {
+  const footerMessage: StoredMessage = {
+    info: { ...assistantMessage('msg-footer').info, sessionID: ROOT_ID },
+    parts: [
+      stubTextPart({
+        id: 'text-msg-footer',
+        sessionID: ROOT_ID,
+        messageID: 'msg-footer',
+        text: 'Visible answer',
+      }),
+    ],
+  };
+
+  // The shared fixture's goal slot is module-level; clear it so these cases
+  // mount the plain transcript.
+  beforeEach(() => {
+    goalMountOptions = {};
+  });
+
+  function indicatorRowOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    let node: ReactTestInstance | null = view.renderer.root.findByType(WorkingIndicator);
+    while (node != null && node.type !== ('AnimatedView' as ElementType)) {
+      node = node.parent;
+    }
+    if (node === null) {
+      throw new Error('Missing the fixed indicator row wrapper');
+    }
+    return node;
+  }
+
+  it.each([
+    { type: 'error', message: 'simulated error' },
+    { type: 'warning', message: 'Retrying… simulated error' },
+  ] as const)(
+    'keeps the $type indicator row from animating its position over the transcript',
+    async indicator => {
+      const view = await mountDetails([footerMessage]);
+      act(() => {
+        view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+          view.manager.atoms.statusIndicator,
+          { ...indicator, timestamp: 0 }
+        );
+      });
+      const row = indicatorRowOf(view);
+      // A position layout transition paints this row over the transcript rows it
+      // passes (profile-screen.tsx:275-277); the opacity fades stay.
+      expect(row.props.layout).toBeUndefined();
+      expect(row.props.entering).toBeDefined();
+      expect(row.props.exiting).toBeDefined();
+      expect(String(row.props.className)).toContain('bg-background');
+    }
+  );
+
+  it('renders no fixed indicator row for an empty transcript', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'error', message: 'simulated error', timestamp: 0 }
+      );
+    });
+    expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
+  });
+});
+
 describe('session detail duplicate failure state', () => {
   // Stored messages are ordered by id, which is time-sortable ascending, so the
   // user row must sort before the assistant row for the Retry prompt to resolve.

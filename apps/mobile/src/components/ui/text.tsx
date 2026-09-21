@@ -68,14 +68,19 @@ function Text({
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot.Text : RNText;
   const isRTL = I18nManager.isRTL;
+  const isArabic = hasArabicScript(props.children);
   const classes = cn(textVariants({ variant }), textClass, className);
   return (
     <Component
-      className={isRTL && hasArabicScript(props.children) ? withoutMonoFamily(classes) : classes}
+      className={isRTL && isArabic ? withoutMonoFamily(classes) : classes}
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
-      style={isRTL ? [RTL_WRITING_DIRECTION, RTL_NO_LETTER_SPACING, props.style] : props.style}
+      style={
+        isRTL
+          ? [RTL_WRITING_DIRECTION, isArabic ? RTL_NO_LETTER_SPACING : undefined, props.style]
+          : props.style
+      }
     />
   );
 }

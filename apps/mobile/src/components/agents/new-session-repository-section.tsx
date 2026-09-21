@@ -241,6 +241,14 @@ export function NewSessionRepositorySection({
 
   function renderConnectActions(platform: RepositoryPlatform): ReactElement {
     const copy = PROVIDER_COPY[platform];
+    // The label takes the row's remaining width and is pinned to one line: a
+    // label sized to its own content is measured at its longest word's width
+    // and wraps onto a second line the button's min height then clips. Its
+    // trailing (inline-end) margin mirrors the glyph and the row gap, so the
+    // centred label stays on the button's own centre. The margin is logical,
+    // not physical: in RTL the row mirrors the glyph to the leading edge and
+    // React Native resolves `marginInlineEnd` to `marginLeft`, while a physical
+    // `marginRight` would push the label 24px the wrong way.
     return (
       <View className="flex-row gap-2">
         <Button
@@ -259,7 +267,7 @@ export function NewSessionRepositorySection({
             the label the free space keeps its box wider than the text, and
             `numberOfLines` pins the line.
           */}
-          <Text className="flex-1 text-center" numberOfLines={1}>
+          <Text className="me-[24px] flex-1 text-center" numberOfLines={1}>
             {t(selectedRepository === null ? copy.openLabel : copy.connectTitle)}
           </Text>
         </Button>

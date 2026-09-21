@@ -65,6 +65,17 @@ function slopDp(hitSlop: unknown): number {
   return 0;
 }
 
+/** One side's reach, from a hitSlop that is one number for every side or per-side insets. */
+function slopSideDp(hitSlop: unknown, side: keyof Insets): number {
+  if (typeof hitSlop === 'number') {
+    return hitSlop;
+  }
+  if (hitSlop && typeof hitSlop === 'object') {
+    return (hitSlop as Partial<Insets>)[side] ?? 0;
+  }
+  return 0;
+}
+
 function pressesWithLabel(root: I, label: string): I[] {
   return root.findAll(
     node =>
@@ -235,15 +246,18 @@ describe('SessionListHeaderActions new-session control', () => {
     const newSessionSlop = hitSlopInsets(newSession.props.hitSlop);
     const filterSlop = hitSlopInsets(filter.props.hitSlop);
     // The new-session control sits left of the filter, so the gap has to fit
-    // both facing slops; more than the gap means the two regions overlap. A
-    // control may write its slop as one number for every side (the filter) or
-    // as a per-side object (the new-session control).
-    expect(newSessionSlop.right + filterSlop.left).toBeLessThanOrEqual(gapDp);
+    // both facing slops; more than the gap means the two regions overlap. Either
+    // control may express hitSlop as one number or as per-side insets: the
+    // filter writes its slop as one number for every side, the new-session
+    // control as a per-side object.
+    expect(
+      slopSideDp(newSessionSlop, 'right') + slopSideDp(filterSlop, 'left')
+    ).toBeLessThanOrEqual(gapDp);
     // Capping the right side must not drop the control below the design target.
     const box = boxDp(newSession.props.className as string);
-    expect(box.width + newSessionSlop.left + newSessionSlop.right).toBeGreaterThanOrEqual(
-      TOUCH_TARGET_DP
-    );
+    expect(
+      box.width + slopSideDp(newSessionSlop, 'left') + slopSideDp(newSessionSlop, 'right')
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
 
     act(() => {
       renderer.unmount();

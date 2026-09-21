@@ -120,15 +120,21 @@ vi.mock('@/components/ui/button', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
+// `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
+// import cannot resolve in the pure project; every sibling pure spec mocks it.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
-// The profile row renders a loading `Skeleton`; the real primitive pulls in
-// `react-native-reanimated`, whose worklets native entry cannot resolve under
-// this pure Node project (the published worklets build uses bundler-style
-// extensionless imports). The stub is the type the pending-environment case
-// asserts by name; its own rendering is not under test here.
+// The profile row and the environment row both render a loading `Skeleton`,
+// whose module imports `react-native-reanimated`: this pure suite does not set
+// Reanimated up, and this project runs in plain Node, where the
+// Reanimated/worklets native entry cannot resolve (the published worklets
+// build uses bundler-style extensionless imports). The stub is the type the
+// pending-environment case asserts by name; its own rendering is not under test
+// here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({
@@ -828,6 +834,9 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    // The help draws the commands as prose: the authoring markers must not
+    // reach the screen.
+    expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const remote = NewSessionConfigureForm({
@@ -838,6 +847,7 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 
   // ── Case 14: reorder wiring lock ──

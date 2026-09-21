@@ -229,7 +229,9 @@ export function NewSessionRepositorySection({
             }}
           >
             <ExternalLink size={16} color={colors.foreground} />
-            <Text>{t(copy.openLabel)}</Text>
+            <Text className="me-[23px] flex-1 text-center" numberOfLines={1}>
+              {t(copy.openLabel)}
+            </Text>
           </Button>
           <Button
             variant="outline"

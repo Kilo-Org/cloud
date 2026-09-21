@@ -76,6 +76,11 @@ type SessionMessageLifecycle = {
   retryNotBefore?: number;
   executionDeadlineAt?: number;
   cancellation?: { operationId: string; deadlineAt: number };
+  /**
+   * PR gate verdict reported by a code-review turn. Present only on a completed
+   * terminal record whose wrapper observed a gate result; absent otherwise.
+   */
+  gateResult?: 'pass' | 'fail';
   operations?: {
     attach?: SessionOperationProof;
     retiredAttach?: SessionOperationProof;
@@ -522,6 +527,7 @@ export function applyMessageOutcome(
           terminalAt: now,
           terminalSource,
           ...(outcome.reason ? { failedReason: outcome.reason } : {}),
+          ...(outcome.gateResult !== undefined ? { gateResult: outcome.gateResult } : {}),
         }
       : item
   );

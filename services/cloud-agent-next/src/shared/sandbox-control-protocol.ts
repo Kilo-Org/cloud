@@ -724,8 +724,18 @@ export const sessionMessageOutcomeSchema = z
     messageId: z.string().min(1).max(128),
     status: z.enum(['completed', 'failed', 'cancelled']),
     reason: z.string().max(4096).optional(),
+    gateResult: z.enum(['pass', 'fail']).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.status !== 'completed' && value.gateResult !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Only completed results can include gateResult',
+        path: ['gateResult'],
+      });
+    }
+  });
 
 export type SessionMessageOutcome = z.infer<typeof sessionMessageOutcomeSchema>;
 

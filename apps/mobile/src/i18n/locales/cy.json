@@ -2344,7 +2344,8 @@
       "matchesBadge_zero": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_two": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_few": "{{displayCount}} cyfatebiaeth",
-      "matchesBadge_many": "{{displayCount}} cyfatebiaeth"
+      "matchesBadge_many": "{{displayCount}} cyfatebiaeth",
+      "noOutput": "Dim allbwn."
     },
     "readToolMarkdown": {
       "linesTruncated": "llinellau {{start}}–{{end}} (wedi'u cwtogi)",
@@ -3325,7 +3326,9 @@
     "couldNotApprove": "Methwyd cymeradwyo",
     "couldNotStart": "Methwyd dechrau",
     "channelName": "Asiantau gweithredol",
-    "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo."
+    "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo.",
+    "openSession": "Agor",
+    "approveFailed": "Methu cymeradwyo. Tapiwch $t(common.approve) i geisio eto."
   },
   "transcriptionModel": {
     "title": "Model trawsgrifio",
@@ -3350,15 +3353,7 @@
     "remoteOptionTitle": "Eich cyfrifiadur",
     "remoteOptionBody": "Rhedwch Kilo ar eich peiriant eich hun drwy'r CLI `kilo remote`.",
     "skip": "Hepgor y daith",
-    "tutorialLabel": "Tiwtorial",
-    "remoteTitle": "Dechreuwch eich sesiwn hirhoedlog gyntaf",
-    "remoteBody": "Cysylltwch eich cyfrifiadur, yna dechreuwch y sesiwn o'r fan hon.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Dim cyfrifiadur wedi'i gysylltu eto",
-    "remoteEmptyBody": "I'w gysylltu, rhedwch `kilo remote` ar eich cyfrifiadur.",
-    "remoteFound": "Cyfrifiadur wedi'i gysylltu",
-    "checkAgain": "Gwirio eto",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tiwtorial"
   },
   "appActions": {
     "start": {

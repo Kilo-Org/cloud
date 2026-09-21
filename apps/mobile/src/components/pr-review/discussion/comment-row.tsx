@@ -273,11 +273,12 @@ export function CommentRow({
         <Text variant="muted" className="text-xs">
           {relative}
         </Text>
-        {/* `gap-3` (12pt) >= the pill's 2pt right hitSlop + the overflow's
-            8pt left bleed, leaving commentTrailingControlsClearanceDp() dp
-            between the two tap areas, so a tap anywhere on the pill —
-            including its right edge — opens the session and never the
-            moderation sheet (vr1). See comment-trailing-controls.ts. */}
+        {/* `gap-3` (10.5pt at NativeWind's 14pt rem) exceeds the pill's 2pt
+            right hitSlop plus the overflow's 3pt left slop, leaving
+            commentTrailingControlsClearanceDp() dp between the two tap areas,
+            so a tap anywhere on the pill — including its right edge — opens the
+            session and never the moderation sheet (vr1). See
+            comment-trailing-controls.ts. */}
         <View className="ml-auto flex-row items-center gap-3">
           <PrCommentFixWithKilo
             owner={owner}
@@ -291,9 +292,16 @@ export function CommentRow({
             accessibilityRole="button"
             accessibilityLabel={t('prReview.discussion.commentActions')}
             hitSlop={COMMENT_ACTIONS_HIT_SLOP}
-            className="h-7 w-7 items-center justify-center rounded-full active:bg-muted"
+            // The frame, not the 16pt glyph, is what the size audit measures.
+            // The author row holds the whole frame (no negative margin: RN
+            // stops delivering touches outside the parent, so a shrunk layout
+            // box would leave part of the target dead). The visible circle
+            // stays compact at 28pt.
+            className="h-11 w-11 items-center justify-center rounded-full active:bg-muted"
           >
-            <MoreHorizontal size={16} color={colors.mutedForeground} />
+            <View className="h-[28px] w-[28px] items-center justify-center">
+              <MoreHorizontal size={16} color={colors.mutedForeground} />
+            </View>
           </Pressable>
         </View>
       </View>

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 /* eslint-disable consistent-type-imports, no-unsafe-type-assertion, jest/no-untyped-mock-factory, no-useless-undefined, vitest/prefer-called-once, vitest/prefer-called-times, import/first -- test mock factories and fixture constraints */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -19,11 +20,6 @@ vi.mock('@/src/shared/agent-llm-turn-runner-core', () => ({
 }));
 
 // eslint-disable-next-line vitest/prefer-import-in-mock
-vi.mock('./agent-eval-runtime', () => ({
-  executeEvalToolCall: vi.fn().mockResolvedValue({ ok: true, value: 'eval' }),
-}));
-
-// eslint-disable-next-line vitest/prefer-import-in-mock
 vi.mock('./agent-safe-tool-runtime', () => ({
   createSafeToolExecutor: vi.fn(() => vi.fn().mockResolvedValue({ ok: true, value: 'safe' })),
 }));
@@ -42,9 +38,18 @@ vi.mock('./agent-web-mcp-tool-runtime', () => ({
   executeWebMcpToolCall: vi.fn().mockResolvedValue({ ok: true, value: 'webmcp' }),
 }));
 
+// eslint-disable-next-line vitest/prefer-import-in-mock
+vi.mock('./browser-tool-runtime', () => ({
+  executeKiloBrowserToolCall: vi.fn().mockResolvedValue({ ok: true, value: 'browser' }),
+}));
+
 import { runDangerousLlmTurn } from './agent-llm-turn-runner';
 // eslint-disable-next-line import/first
 import { runLlmTurn } from '@/src/shared/agent-llm-turn-runner-core';
+// eslint-disable-next-line import/first
+import { KILO_BROWSER_TOOL_NAMES } from '@/src/shared/browser-tool-definitions';
+// eslint-disable-next-line import/first
+import { executeKiloBrowserToolCall } from './browser-tool-runtime';
 // eslint-disable-next-line import/first
 import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
 // eslint-disable-next-line import/first
@@ -138,10 +143,10 @@ describe('dangerous turn runner workflow wiring', () => {
     const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
     const [{ tools }] = firstCall;
 
-    const evalIndex = tools.findIndex(tool => tool.function.name === 'eval');
+    const webSearchIndex = tools.findIndex(tool => tool.function.name === 'web_search');
     const searchWorkflowsIndex = tools.findIndex(tool => tool.function.name === 'search_workflows');
-    expect(evalIndex).toBeLessThan(searchWorkflowsIndex);
-    expect(evalIndex).toBeGreaterThan(0);
+    expect(webSearchIndex).toBeLessThan(searchWorkflowsIndex);
+    expect(webSearchIndex).toBe(KILO_BROWSER_TOOL_NAMES.length);
 
     const workflowNames = tools
       .map(tool => tool.function.name)
@@ -254,5 +259,81 @@ describe('dangerous turn runner workflow wiring', () => {
 
     expect(executeWebMcpToolCall).toHaveBeenCalledOnce();
     expect(executeWorkflowToolCall).not.toHaveBeenCalled();
+  });
+
+  it('lists every kilo browser tool in upstream order plus the non-browser tools', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+
+    await runDangerousLlmTurn(buildOptions());
+
+    const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
+    const names = firstCall[0].tools.map(tool => tool.function.name);
+
+    expect(names).toStrictEqual([
+      ...KILO_BROWSER_TOOL_NAMES,
+      'web_search',
+      'search_memories',
+      'get_memory',
+    ]);
+    expect(names).toHaveLength(29);
+  });
+
+  it('routes a kilo_browser_* gateway call to a browser tool-call event without refusing', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+
+    await runDangerousLlmTurn(buildOptions());
+
+    const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
+    const events = firstCall[0].toToolCallEvents([
+      {
+        arguments: { element: 'Save', target: 'e5' },
+        id: 'call-click',
+        name: 'kilo_browser_click',
+      },
+    ]);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      arguments: { element: 'Save', target: 'e5' },
+      name: 'kilo_browser_click',
+      providerToolCallId: 'call-click',
+      tabId: 7,
+      type: 'tool-call',
+    });
+  });
+
+  it('routes a kilo_browser_* event to executeKiloBrowserToolCall', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+    vi.mocked(executeKiloBrowserToolCall).mockClear();
+
+    vi.mocked(runLlmTurn).mockImplementation(async options => {
+      const toolCall = {
+        arguments: { text: 'Checkout' },
+        id: 'tc-wait',
+        name: 'kilo_browser_wait_for' as const,
+        tabId: 7,
+        type: 'tool-call' as const,
+      };
+      await options.executeToolCall(toolCall);
+    });
+
+    await runDangerousLlmTurn(buildOptions());
+
+    expect(executeKiloBrowserToolCall).toHaveBeenCalledOnce();
+    expect(vi.mocked(executeKiloBrowserToolCall).mock.calls[0]![0].name).toBe(
+      'kilo_browser_wait_for'
+    );
+  });
+
+  it('keeps the tool round limit and its message working', async () => {
+    vi.mocked(runLlmTurn).mockClear();
+
+    await runDangerousLlmTurn(buildOptions({ maxToolRounds: 4 }));
+
+    const firstCall = vi.mocked(runLlmTurn).mock.calls[0]!;
+    expect(firstCall[0].maxToolRounds).toBe(4);
+    expect(firstCall[0].tooManyToolRoundsMessage).toBe(
+      'The model requested too many tool rounds. Send another message to continue.'
+    );
   });
 });

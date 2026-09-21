@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} qator",
       "linesBadge_other": "{{displayCount}} qator",
       "matchesBadge_one": "{{displayCount}} natija",
-      "matchesBadge_other": "{{displayCount}} natija"
+      "matchesBadge_other": "{{displayCount}} natija",
+      "noOutput": "Chiqish yo'q."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}-qatorlar (qisqartirilgan)",
@@ -3153,7 +3154,9 @@
     "couldNotApprove": "Tasdiqlab bo'lmadi",
     "couldNotStart": "Boshlab bo'lmadi",
     "channelName": "Faol agentlar",
-    "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing."
+    "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing.",
+    "openSession": "Ochish",
+    "approveFailed": "Tasdiqlab bo'lmadi. Qayta urinish uchun $t(common.approve) ga teging."
   },
   "transcriptionModel": {
     "title": "Matnga aylantirish modeli",
@@ -3178,15 +3181,7 @@
     "remoteOptionTitle": "Kompyuteringiz",
     "remoteOptionBody": "Kilo'ni o'z mashinangizda `kilo remote` CLI orqali ishga tushiring.",
     "skip": "Sayohatni o'tkazib yuborish",
-    "tutorialLabel": "Qo'llanma",
-    "remoteTitle": "Birinchi masofaviy seansingizni boshlang",
-    "remoteBody": "Kompyuteringizni ulang, so'ng seansni shu yerdan boshlang.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Hozircha ulangan kompyuter yo'q",
-    "remoteEmptyBody": "Uni ulash uchun kompyuteringizda `kilo remote` buyrug'ini bajaring.",
-    "remoteFound": "Kompyuter ulandi",
-    "checkAgain": "Yana tekshirish",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Qo'llanma"
   },
   "appActions": {
     "start": {

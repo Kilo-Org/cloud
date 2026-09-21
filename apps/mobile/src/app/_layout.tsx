@@ -5,12 +5,15 @@
 import '@/i18n/rtl';
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
-// Enter the local module's JS in the main process on both platforms. Its
-// Android branch stays a no-op until slice `and` lands; iOS runs the
-// registered glanceable sink below. Imported by path: the module is
-// autolinked from modules/ and intentionally absent from dependencies.
+// Enter the local Android Live Update module's JS in the main process on both
+// platforms: its import side effect registers the Live Update sink on the one
+// platform that can load it, and the require is the capability gate (see the
+// module's src/index.ts). Imported by path: the module is autolinked from
+// modules/ and intentionally absent from dependencies.
 import '../../modules/active-agents-live-update/src';
-// Registers the iOS Live Activity and widget sink with the glanceable publisher.
+// Registers the iOS Live Activity and widget sink with the glanceable
+// publisher. iOS-only by capability (WidgetKit/ActivityKit): the module loads
+// on Android but registers nothing there.
 import '@/glanceable-ios/register';
 
 import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
@@ -46,15 +49,16 @@ import { toast } from 'sonner-native';
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
+import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { OfflineBannerSpaceGate } from '@/components/offline-banner';
 import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
-import { QueryError } from '@/components/query-error';
+import { RuntimeErrorScreen } from '@/components/runtime-error-screen';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
 import { useAuth } from '@/lib/auth/auth-context';
-import { resolveBootstrapDecision } from '@/lib/bootstrap-decision';
+import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
@@ -860,6 +864,12 @@ function RootLayoutNav({
     restoreFailed,
   });
 
+  // Post-startup hidden windows (a sign-in's redirect + consent check, a
+  // sign-out's redirect to login) have no splash over them, so the hidden
+  // wrapper would otherwise paint an empty background. Keep one spinner up
+  // for exactly those windows (app-blank-after-oauth).
+  const showBootstrapLoading = shouldShowBootstrapLoading({ startupFinished, hidden });
+
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
   // both accessibility trees. On the hidden → visible transition,
   // `announceForA11y` is the deterministic entry context for screen-reader
@@ -1007,6 +1017,7 @@ function RootLayoutNav({
       >
         <Slot />
       </View>
+      {showBootstrapLoading && !showRestoreError ? <BootstrapLoadingSurface /> : null}
       {showRestoreError ? (
         <View className="absolute inset-0">
           <BootstrapErrorScreen
@@ -1107,11 +1118,7 @@ function RootLayout() {
 }
 
 function RootErrorBoundary({ retry }: ErrorBoundaryProps) {
-  return (
-    <StateSurface className="flex-1 bg-background">
-      <QueryError onRetry={() => void retry()} />
-    </StateSurface>
-  );
+  return <RuntimeErrorScreen onRetry={() => void retry()} />;
 }
 
 export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(RootErrorBoundary);

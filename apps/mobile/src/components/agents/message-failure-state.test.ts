@@ -112,10 +112,11 @@ describe('selectMessageFailure', () => {
       expect(result?.canCopy).toBe(false);
     });
 
-    it('falls back to the generic line for an unknown error name', () => {
+    it('adds no detail line for an unknown error name, which the title states', () => {
       const result = selectMessageFailure({ info: assistantInfo('UnknownError') });
-      expect(result?.detail).toBe('The response failed.');
-      expect(result?.detail).not.toContain('RAW_PROVIDER_TEXT');
+      expect(result?.title).toBe('Response failed');
+      expect(result?.detail).toBeNull();
+      expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
     });
 
     it('sets canRetry false only for NON_RETRYABLE_ASSISTANT_ERRORS', () => {

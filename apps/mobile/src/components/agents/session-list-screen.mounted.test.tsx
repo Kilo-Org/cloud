@@ -291,6 +291,9 @@ function action(label: string) {
 function press(label: string) {
   (action(label).props.onPress as () => void)();
 }
+function fab() {
+  return nodes('Pressable').find(node => node.props.testID === 'agents-new-session-fab');
+}
 type HeaderElement = {
   type: string;
   props: {
@@ -953,8 +956,6 @@ describe('AgentSessionListScreen live presentation', () => {
   it('offsets the FAB by the landscape right inset and keeps its vertical position', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
-    const fab = () =>
-      nodes('Pressable').find(node => node.props.testID === 'agents-new-session-fab');
     expect(fab()?.props.style).toEqual({
       bottom: state.tabBarHeight + 16,
       right: 20,
@@ -1242,6 +1243,11 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(emptyState.props.description).toBe('Try a different search term.');
     expect(nodes('CenteredState')).toHaveLength(1);
     expect(nodes('FlatList')).toHaveLength(0);
+    // The no-match body owns the band the tab bar leaves (the FAB's band is no
+    // longer reserved in it, see `StateSurfaceInsets` above), so the creation
+    // FAB yields instead of floating over the state's description and Clear
+    // action.
+    expect(fab()).toBeUndefined();
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     act(() => {
       (emptyState.props.action as { props: { onPress: () => void } }).props.onPress();
@@ -1249,6 +1255,7 @@ describe('AgentSessionListScreen live filtering', () => {
 
     expect(nodes('FlatList')).toHaveLength(1);
     expect(nodes('CenteredState')).toHaveLength(0);
+    expect(fab()).toBeDefined();
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
   });

@@ -1,6 +1,6 @@
 import { type LucideIcon } from '@/components/ui/icons';
-import { type ReactNode } from 'react';
-import { type ScrollViewProps, View } from 'react-native';
+import { type ReactNode, useCallback, useState } from 'react';
+import { type LayoutChangeEvent, type ScrollViewProps, View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
 import { useCenteredStateBand } from '@/components/centered-state-band';
@@ -9,16 +9,6 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 const DEFAULT_ICON_CONTAINER_CLASS = 'h-14 w-14 rounded-2xl border border-border bg-card';
-
-/**
- * Height the full centered form needs: the decorative icon bubble, the title,
- * the description, the action, and the gaps between them. A centered state
- * whose band is shorter renders the compact form — the icon is decorative and
- * keeping it pushed the description and the action behind the bottom overlay
- * (landscape spot defect e8: the Agents "No sessions match" state in a 360pt
- * landscape window, whose band above the tab bar is ~97pt).
- */
-const FULL_FORM_BAND = 168;
 
 type EmptyStateProps = {
   icon: LucideIcon;
@@ -37,7 +27,13 @@ type EmptyStateProps = {
   titleAccessibilityRole?: 'header';
 };
 
-type EmptyStateContentProps = EmptyStateProps & { compact: boolean };
+type EmptyStateContentProps = EmptyStateProps & {
+  compact: boolean;
+  /** Measures the rendered form. Set by the centered path only. */
+  onLayout?: (event: LayoutChangeEvent) => void;
+  /** Hides the form until the layout under it belongs to it. Centered path only. */
+  pendingLayout?: boolean;
+};
 
 function EmptyStateContent({
   icon: Icon,
@@ -51,6 +47,8 @@ function EmptyStateContent({
   iconStrokeWidth = 1.5,
   titleAccessibilityRole,
   compact,
+  onLayout,
+  pendingLayout = false,
 }: Readonly<EmptyStateContentProps>) {
   const colors = useThemeColors();
 
@@ -60,8 +58,12 @@ function EmptyStateContent({
         'items-center px-6',
         compact ? 'gap-1' : 'gap-4',
         placement === 'top' && 'pt-16',
+        pendingLayout && 'opacity-0',
         className
       )}
+      onLayout={onLayout}
+      accessibilityElementsHidden={pendingLayout || undefined}
+      importantForAccessibility={pendingLayout ? 'no-hide-descendants' : undefined}
     >
       {compact ? null : (
         <View className={cn('items-center justify-center', iconContainerClassName)}>
@@ -90,12 +92,58 @@ function EmptyStateContent({
 
 /**
  * Reads the measured band from the `CenteredState` it renders inside and picks
- * the full or the compact form. Kept separate from `EmptyState` so the
- * `placement="top"` form, which is not centered, always keeps the full form.
+ * the full or the compact form from it and from the full form's own measured
+ * height: a band that cannot hold the full form renders the compact one — the
+ * icon is decorative, and keeping it pushed the description and the action
+ * behind the bottom overlay (landscape spot defect e8: the Agents "No sessions
+ * match" state in a 360pt landscape window, whose band above the tab bar is
+ * ~97pt).
+ *
+ * The full form's height is measured, not assumed: it grows with Dynamic Type,
+ * with a title or description that wraps, and with the pull-to-refresh line
+ * `CenteredState` renders above these children, all of which a fixed estimate
+ * misses. Only the rendered form can be measured, so the height is kept while
+ * the compact form shows and refreshed the next time the full form renders —
+ * a changed band, text scale, or window size.
+ *
+ * Kept separate from `EmptyState` so the `placement="top"` form, which is not
+ * centered, always keeps the full form.
  */
 function CenteredEmptyStateContent(props: Readonly<EmptyStateProps>) {
   const band = useCenteredStateBand();
-  return <EmptyStateContent {...props} compact={band !== null && band < FULL_FORM_BAND} />;
+  const [fullHeight, setFullHeight] = useState<number | null>(null);
+  const [compact, setCompact] = useState(false);
+  const [measuredCompact, setMeasuredCompact] = useState<boolean | null>(null);
+
+  const shouldCompact = fullHeight !== null && band !== null && band < fullHeight;
+  if (shouldCompact !== compact) {
+    // Adjust during render: the switched form has to commit with `pendingLayout`
+    // set, so the frame that still carries the other form's height stays blank
+    // instead of placing the new form where the old one measured.
+    setCompact(shouldCompact);
+    setMeasuredCompact(null);
+  }
+
+  const measureForm = useCallback(
+    (event: LayoutChangeEvent) => {
+      if (!compact) {
+        setFullHeight(event.nativeEvent.layout.height);
+      }
+      setMeasuredCompact(compact);
+    },
+    [compact]
+  );
+
+  const pendingLayout = fullHeight !== null && measuredCompact !== compact;
+
+  return (
+    <EmptyStateContent
+      {...props}
+      compact={compact}
+      onLayout={measureForm}
+      pendingLayout={pendingLayout}
+    />
+  );
 }
 
 export function EmptyState({

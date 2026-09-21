@@ -88,6 +88,14 @@ export function CenteredState({
   const measureContent = useCallback((event: LayoutChangeEvent) => {
     setContentHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
   }, []);
+  // The pull-to-refresh line is rendered above the children, so it takes the
+  // top of the band: the band the children get is measured from its own layout
+  // rather than assumed (it is `h-0` except under reduced motion while a pull
+  // is in flight).
+  const [reservedHeight, setReservedHeight] = useState(0);
+  const measureReserved = useCallback((event: LayoutChangeEvent) => {
+    setReservedHeight(PixelRatio.roundToNearestPixel(event.nativeEvent.layout.height));
+  }, []);
   const layout = useMemo(
     () =>
       surface?.frame && viewport?.surface === surface.frame && contentHeight !== null
@@ -109,14 +117,17 @@ export function CenteredState({
   const band = useMemo(
     () =>
       surface?.frame && viewport?.surface === surface.frame
-        ? getCenteredStateBand({
-            surface: surface.frame,
-            viewport: viewport.frame,
-            topInset: surface.topInset,
-            bottomInset: surface.bottomInset,
-          }).band
+        ? Math.max(
+            0,
+            getCenteredStateBand({
+              surface: surface.frame,
+              viewport: viewport.frame,
+              topInset: surface.topInset,
+              bottomInset: surface.bottomInset,
+            }).band - reservedHeight
+          )
         : null,
-    [surface, viewport]
+    [surface, viewport, reservedHeight]
   );
 
   if (!surface) {
@@ -143,7 +154,9 @@ export function CenteredState({
           accessibilityElementsHidden={!ready}
           importantForAccessibility={ready ? 'auto' : 'no-hide-descendants'}
         >
-          {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
+          <View onLayout={measureReserved}>
+            {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
+          </View>
           {children}
         </View>
       </ScrollView>

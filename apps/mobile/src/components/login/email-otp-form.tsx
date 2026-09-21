@@ -10,6 +10,28 @@ import { type useNativeAuth } from '@/lib/auth/use-native-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { canSubmitEmailCode } from './email-otp-state';
 
+/**
+ * Marks where the address sits inside the translated sentence. The catalog
+ * message is never rewritten: the address is substituted for this slot and
+ * placed on a line of its own, so a long address starts a fresh line and cannot
+ * be broken mid-word (the reported `.com` orphan).
+ */
+const ADDRESS_SLOT = '\u0000';
+
+/**
+ * Puts the address on its own line without assuming the translation's word
+ * order. Punctuation or a particle written directly after the slot stays on the
+ * address line (Arabic `{{email}}.`); a space-separated phrase starts the next
+ * line. Removing the inserted line breaks reproduces the catalog message
+ * exactly, so the sentence keeps its own punctuation attached.
+ */
+function formatCodeDestination(message: string, email: string): string {
+  const [before = '', after = ''] = message.split(ADDRESS_SLOT);
+  const lead = before ? `${before}\n` : '';
+  const trail = after.startsWith(' ') ? `\n${after}` : after;
+  return `${lead}${email}${trail}`;
+}
+
 export function EmailOtpForm({
   email,
   busy,
@@ -28,12 +50,16 @@ export function EmailOtpForm({
   const codeRef = useRef('');
   const [hasCompleteCode, setHasCompleteCode] = useState(false);
   const authBusy = busy !== undefined;
+  const destination = formatCodeDestination(
+    t('login.enterCodeSentTo', { email: ADDRESS_SLOT }),
+    email
+  );
 
   return (
     // Keyboard avoidance is owned by the login shell in login-screen.tsx.
     <View className="gap-3">
       <Text variant="muted" className="text-center text-sm">
-        {t('login.enterCodeSentTo', { email })}
+        {destination}
       </Text>
       <Text variant="muted" className="text-center text-xs">
         {t('login.codeArrivalHint')}

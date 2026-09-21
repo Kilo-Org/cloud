@@ -155,6 +155,16 @@ describe('classifyPasskeyError', () => {
     }
   );
 
+  it.each(['name', 'message', 'code'] as const)(
+    'folds the %s machine identifier and selects a catalog key for display',
+    field => {
+      const failure = classifyPasskeyError({ [field]: 'NOTCONFIGURED' });
+
+      expect(failure).toBe('unsupported');
+      expect(passkeyFailureKey(failure)).toBe('login.passkeyUnsupported');
+    }
+  );
+
   it.each([
     [{ name: 'USERCANCELLEDEXCEPTION' }, 'login.passkeyCancelled'],
     [{ message: 'NOCREDENTIALS' }, 'login.passkeyNotFound'],

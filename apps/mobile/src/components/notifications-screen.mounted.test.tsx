@@ -501,6 +501,28 @@ describe('NotificationsScreen category availability', () => {
     expect(textWithChildren(renderer.root, 'madeUpCode').length).toBe(0);
   });
 
+  // A code naming an inherited Object.prototype member is still a code the
+  // catalog does not know: it must fall back to the subtitle, not render the
+  // prototype member. `in` matched these; an own-property guard must not.
+  it.each(['constructor', 'toString', 'hasOwnProperty', 'valueOf', '__proto__'])(
+    'non-retryable unhappy: the inherited prototype name %s falls back to the category subtitle',
+    async code => {
+      prefsQueryFn.mockResolvedValue(
+        fullPrefs({
+          capabilities: fullCapabilities({
+            securityFindings: { available: false, unavailableReasonCode: code },
+          }),
+        })
+      );
+      const { renderer } = await renderScreen();
+      await waitForEnabledSwitch(renderer, 'Chat messages');
+
+      expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
+      expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
+      expect(textWithChildren(renderer.root, code).length).toBe(0);
+    }
+  );
+
   it('retryable unhappy: a category save failure rolls back the optimistic flip', async () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     setPreferenceMutationFn.mockRejectedValue({

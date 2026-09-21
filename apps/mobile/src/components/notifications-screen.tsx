@@ -178,7 +178,9 @@ const UNAVAILABLE_REASON_KEY = {
 
 /** A code from a newer server must fall back, never render raw. */
 function unavailableReasonKey(code: string | null | undefined): string | undefined {
-  if (code == null || !(code in UNAVAILABLE_REASON_KEY)) {
+  // Object.hasOwn (not `in`) so an inherited member like 'constructor' falls
+  // back to the subtitle instead of handing a prototype member to `t()`.
+  if (code == null || !Object.hasOwn(UNAVAILABLE_REASON_KEY, code)) {
     return undefined;
   }
   return UNAVAILABLE_REASON_KEY[code as UnavailableReasonCode];

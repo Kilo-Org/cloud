@@ -8,6 +8,8 @@ type DestructiveConfirmDialogProps = {
   title: string;
   message: string;
   confirmLabel: string;
+  /** The safe choice's label; defaults to the generic Cancel. */
+  cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -28,6 +30,7 @@ export function DestructiveConfirmDialog({
   title,
   message,
   confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel,
 }: Readonly<DestructiveConfirmDialogProps>) {
@@ -50,7 +53,7 @@ export function DestructiveConfirmDialog({
           <Text className="text-sm text-muted-foreground">{message}</Text>
           <View className="flex-row justify-end gap-3">
             <Button variant="outline" onPress={onCancel}>
-              <Text>{t('common.cancel')}</Text>
+              <Text>{cancelLabel ?? t('common.cancel')}</Text>
             </Button>
             <Button variant="destructive" onPress={onConfirm}>
               <Text>{confirmLabel}</Text>

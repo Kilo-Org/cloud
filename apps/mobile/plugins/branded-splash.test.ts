@@ -164,8 +164,13 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // Introspection merges the generated entry with the colors a prebuilt
+    // android/ tree already carries (a device-development checkout has the app
+    // theme colors on disk), so assert the splash entry, not the array length.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

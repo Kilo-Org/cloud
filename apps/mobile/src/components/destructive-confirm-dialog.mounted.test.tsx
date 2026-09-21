@@ -39,7 +39,7 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 const onConfirm = vi.fn<() => void>();
 const onCancel = vi.fn<() => void>();
 
-function mount() {
+function mount(props: Partial<Parameters<typeof DestructiveConfirmDialog>[0]> = {}) {
   act(() => {
     const element = createElement(DestructiveConfirmDialog, {
       title: 'Sign out?',
@@ -47,6 +47,7 @@ function mount() {
       confirmLabel: 'Sign out',
       onConfirm,
       onCancel,
+      ...props,
     });
     if (renderer) {
       renderer.update(element);
@@ -142,5 +143,27 @@ describe('DestructiveConfirmDialog', () => {
     });
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  // The new-session discard confirm names its safe choice 'Keep editing'
+  // instead of the generic Cancel, while the sign-out caller keeps the default.
+  it('renders a supplied cancel label instead of the default Cancel', () => {
+    const root = mount({ cancelLabel: 'Keep editing' });
+
+    const cancel = pressableWith(root, 'border-border');
+    expect(
+      cancel.findAll(node => isType(node, 'Text') && node.children.includes('Keep editing'))
+    ).toHaveLength(1);
+    expect(
+      root.findAll(node => isType(node, 'Text') && node.children.includes('Cancel'))
+    ).toHaveLength(0);
+  });
+
+  it('keeps the default Cancel label when no cancel label is supplied', () => {
+    const root = mount();
+
+    expect(
+      root.findAll(node => isType(node, 'Text') && node.children.includes('Cancel'))
+    ).toHaveLength(1);
   });
 });

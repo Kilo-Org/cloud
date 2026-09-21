@@ -1,10 +1,34 @@
 import { useNavigation } from 'expo-router';
-import { type RefObject, useRef } from 'react';
-import { Alert } from 'react-native';
+import {
+  createElement,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useRef,
+  useState,
+} from 'react';
+import { Alert, Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { i18n } from '@/i18n';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
+
+/**
+ * The captured navigation action the confirm will replay. Derived from
+ * `usePreventRemove`'s own callback type so this file keeps the single deep
+ * import (see `prevent-remove.ts`) instead of reaching into react-navigation.
+ */
+type PreventedLeaveAction = Parameters<Parameters<typeof usePreventRemove>[1]>[0]['data']['action'];
+
+type NewSessionDiscardGuard = {
+  /**
+   * The Android discard confirm the screen mounts once (a Modal overlay, so the
+   * composer behind it keeps its layout); null on iOS and while the confirm is
+   * closed.
+   */
+  discardConfirm: ReactNode;
+};
 
 /**
  * Navigation action types that mean "the user is leaving this screen": the
@@ -42,6 +66,14 @@ const LEAVE_ACTION_TYPES: ReadonlySet<string> = new Set(['GO_BACK', 'POP', 'POP_
  *
  * A Discard whose `onDiscard` rejects keeps the screen (no dispatch) and
  * toasts, so a failed draft clear never loses the prompt.
+ *
+ * Android's native `AlertDialog` paints every button with the theme accent, so
+ * `Alert.alert`'s `style: 'destructive'` never reaches the screen there (iOS
+ * honors it and keeps the native alert). The hook therefore forks on platform:
+ * the iOS leave path is unchanged, while Android holds the captured action and
+ * returns a `DestructiveConfirmDialog` node the caller renders — the same
+ * #6393 affordance `profile-screen.tsx` uses for sign-out. The returned
+ * `discardConfirm` is null on iOS and whenever the Android confirm is closed.
  */
 export function useNewSessionDiscardGuard({
   dirty,
@@ -54,7 +86,7 @@ export function useNewSessionDiscardGuard({
   hasUnclaimedAttachments?: boolean;
   onDiscard: () => Promise<void>;
   skipNextGuardRef: RefObject<boolean>;
-}>): void {
+}>): NewSessionDiscardGuard {
   const navigation = useNavigation();
   // Keep the latest onDiscard in a ref so the callback below doesn't depend on
   // it directly — onDiscard is a fresh closure every render. usePreventRemove
@@ -62,6 +94,35 @@ export function useNewSessionDiscardGuard({
   // keeps onDiscard stable without re-registering.
   const onDiscardRef = useRef(onDiscard);
   onDiscardRef.current = onDiscard;
+
+  // Android holds the intercepted leave here until the in-app confirm resolves.
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const pendingActionRef = useRef<PreventedLeaveAction | null>(null);
+
+  const closeConfirm = useCallback(() => {
+    pendingActionRef.current = null;
+    setConfirmVisible(false);
+  }, []);
+
+  const confirmDiscard = useCallback(() => {
+    const action = pendingActionRef.current;
+    if (action === null) {
+      return;
+    }
+    // Close first, exactly as the native alert dismissed on press: the choice
+    // is made, and a second press must not clear or leave twice.
+    closeConfirm();
+    void (async () => {
+      try {
+        await onDiscardRef.current();
+        navigation.dispatch(action);
+      } catch {
+        // The clear failed: stay on the screen so the draft is kept and the
+        // user can retry by leaving again or keep editing.
+        toast.error(i18n.t('agentChat.newSession.discardFailed'));
+      }
+    })();
+  }, [closeConfirm, navigation]);
 
   usePreventRemove(dirty, ({ data }) => {
     if (skipNextGuardRef.current) {
@@ -74,6 +135,11 @@ export function useNewSessionDiscardGuard({
       // Forward navigation (push/navigate/reset): replay it now. The durable
       // draft keeps the prompt, so there is nothing to confirm away.
       navigation.dispatch(data.action);
+      return;
+    }
+    if (Platform.OS === 'android') {
+      pendingActionRef.current = action;
+      setConfirmVisible(true);
       return;
     }
     Alert.alert(
@@ -104,4 +170,22 @@ export function useNewSessionDiscardGuard({
       ]
     );
   });
+
+  return {
+    discardConfirm:
+      Platform.OS === 'android' && confirmVisible
+        ? createElement(DestructiveConfirmDialog, {
+            title: i18n.t('agentChat.newSession.discardDraftTitle'),
+            message: i18n.t(
+              hasUnclaimedAttachments
+                ? 'agentChat.newSession.discardWithUploadsMessage'
+                : 'agentChat.newSession.discardDraftMessage'
+            ),
+            confirmLabel: i18n.t('common.discard'),
+            cancelLabel: i18n.t('common.keepEditing'),
+            onConfirm: confirmDiscard,
+            onCancel: closeConfirm,
+          })
+        : null,
+  };
 }

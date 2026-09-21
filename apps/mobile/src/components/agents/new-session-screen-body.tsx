@@ -533,7 +533,7 @@ export function NewSessionScreenBody() {
     attachments.releaseUnclaimedUploads();
   }, [userId, promptRef, attachments]);
 
-  useNewSessionDiscardGuard({
+  const { discardConfirm } = useNewSessionDiscardGuard({
     dirty: (isCloneEntry ? false : hasPrompt) || attachments.hasUnclaimedAttachments,
     hasUnclaimedAttachments: attachments.hasUnclaimedAttachments,
     onDiscard: handleDiscardDraft,
@@ -779,6 +779,9 @@ export function NewSessionScreenBody() {
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}
       />
+      {/* Android's discard confirm: a Modal overlay, so the composer behind it
+          keeps its layout while the destructive choice keeps its red fill. */}
+      {discardConfirm}
     </View>
   );
 }

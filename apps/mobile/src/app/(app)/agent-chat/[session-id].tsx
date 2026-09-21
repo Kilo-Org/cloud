@@ -12,6 +12,7 @@ import {
 } from '@/lib/context-scope';
 
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
   SessionComposerSkeleton,
   SessionSkeletonMessages,
@@ -202,6 +203,7 @@ export default function SessionDetailScreen() {
         <ScreenHeader
           title={t('agentChat.session.title')}
           reserveTitleSpace
+          titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
           backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={
             <View className="flex-row items-center gap-2">
@@ -269,6 +271,7 @@ export default function SessionDetailScreen() {
         <ScreenHeader
           title={t('agentChat.session.title')}
           reserveTitleSpace
+          titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
           backFallback="/(app)/(tabs)/(2_agents)"
         />
         <CenteredState>

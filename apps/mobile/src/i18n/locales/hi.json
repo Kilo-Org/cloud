@@ -334,8 +334,11 @@
       "sessionStatusTitle": "सत्र की स्थिति",
       "sessionStatusSubtitle": "समाप्त / विफल / नियंत्रण के लिए तैयार",
       "kiloclawActivitySubtitle": "इंस्टेंस तैयार/विफल, तय समय पर होने वाले कार्य",
+      "kiloclawActivityUnavailable": "KiloClaw गतिविधि पाने के लिए KiloClaw इंस्टेंस शुरू करें।",
       "balanceAlertsSubtitle": "संगठन का बैलेंस कम होने की चेतावनियाँ",
-      "securityFindingsSubtitle": "नई सुरक्षा समस्याएँ और SLA के रिमाइंडर"
+      "balanceAlertsUnavailable": "बैलेंस अलर्ट पाने के लिए किसी संगठन से जुड़ें।",
+      "securityFindingsSubtitle": "नई सुरक्षा समस्याएँ और SLA के रिमाइंडर",
+      "securityFindingsUnavailable": "सुरक्षा समस्याएँ पाने के लिए किसी दायरे में Kilo सुरक्षा एजेंट चालू करें।"
     },
     "action": {
       "openSession": "सत्र खोलें"

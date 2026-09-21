@@ -854,8 +854,11 @@
       "sessionStatusTitle": "Status sesije",
       "sessionStatusSubtitle": "završeno / neuspjelo / spremno za upravljanje",
       "kiloclawActivitySubtitle": "instance spremne/neuspjele, zakazane radnje",
+      "kiloclawActivityUnavailable": "Pokreni instancu KiloClaw da bi dobio aktivnost KiloClaw.",
       "balanceAlertsSubtitle": "upozorenja o niskom saldu organizacije",
-      "securityFindingsSubtitle": "novi nalazi i SLA podsjetnici"
+      "balanceAlertsUnavailable": "Pridruži se organizaciji da bi dobio upozorenja o niskom saldu.",
+      "securityFindingsSubtitle": "novi nalazi i SLA podsjetnici",
+      "securityFindingsUnavailable": "Uključi Kilo sigurnosnog agenta na opsegu da bi dobio sigurnosne nalaze."
     },
     "action": {
       "openSession": "Otvori sesiju"

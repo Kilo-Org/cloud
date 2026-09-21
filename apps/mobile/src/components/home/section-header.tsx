@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 type SectionHeaderProps = {
   label: string;
-  /** Optional right-aligned link (e.g. "SEE ALL"). */
+  /** Optional link at the row's outer edge (physical right in LTR, physical left in RTL). */
   actionLabel?: string;
   onActionPress?: () => void;
 };
@@ -22,7 +22,7 @@ export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<Se
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
-          className="max-w-full grow active:opacity-70"
+          className="max-w-full grow flex-row justify-end active:opacity-70"
         >
           <Text
             className={cn(
@@ -31,8 +31,7 @@ export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<Se
               // joins, so an RTL action label drops them (home-ar-loading).
               // The class string is the eyebrow variant's, so the two labels
               // cannot drift apart.
-              !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY,
-              I18nManager.isRTL ? 'text-left' : 'text-right'
+              !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY
             )}
           >
             {actionLabel}

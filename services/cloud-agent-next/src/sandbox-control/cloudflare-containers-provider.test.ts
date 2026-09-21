@@ -373,6 +373,29 @@ describe('cloudflare containers provider stop', () => {
     expect(getContainer).not.toHaveBeenCalled();
   });
 
+  it('returns retryable without a DO call for a reference owned by another allocation', async () => {
+    const { adapter, stub, getContainer } = setup({ allocationName: ALLOCATION_A });
+
+    await expect(adapter.stop(REF_B)).resolves.toBe('retryable');
+
+    expect(getContainer).not.toHaveBeenCalled();
+    expect(stub.stop).not.toHaveBeenCalled();
+  });
+
+  it('returns retryable without a DO call for a contained reference', async () => {
+    const { adapter, stub, getContainer } = setup();
+    const contained = encodeCloudflareProviderRef({
+      sandboxId: ALLOCATION_A,
+      containment: true,
+      instanceId: INTENT_ID,
+    });
+
+    await expect(adapter.stop(contained)).resolves.toBe('retryable');
+
+    expect(getContainer).not.toHaveBeenCalled();
+    expect(stub.stop).not.toHaveBeenCalled();
+  });
+
   it('resolves a null reference through the retained intent', async () => {
     const { adapter, stub } = setup();
 

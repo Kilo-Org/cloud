@@ -5,7 +5,11 @@ import type {
   SandboxContainers,
 } from '../sandbox-containers/SandboxContainers.js';
 import { withDORetry } from '../utils/do-retry.js';
-import { decodeCloudflareProviderRef, encodeCloudflareProviderRef } from './cloudflare-provider.js';
+import {
+  decodeCloudflareProviderRef,
+  encodeCloudflareProviderRef,
+  type CloudflareProviderRef,
+} from './cloudflare-provider.js';
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { DEADLINE_MS, leaseAtLeastMs } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
@@ -49,6 +53,15 @@ export function createCloudflareContainersProviderAdapter(deps: {
   const resolveProviderRef = (ref: string | null, intent?: CreateIntent | null): string | null =>
     ref ?? (intent ? encodeIntentProviderRef(intent) : null);
 
+  const decodeOwnedProviderRef = (ref: string | null): CloudflareProviderRef | null => {
+    const decoded = decodeCloudflareProviderRef(ref);
+    return decoded !== null &&
+      decoded.sandboxId === deps.allocationName &&
+      decoded.containment === false
+      ? decoded
+      : null;
+  };
+
   const ensureBillingAdmission: ProviderAdapter['ensureBillingAdmission'] = async (
     _ref,
     billing
@@ -73,8 +86,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       return { providerRef };
     },
     async launch(ref, env) {
-      const decoded = decodeCloudflareProviderRef(ref);
-      if (!decoded || decoded.sandboxId !== deps.allocationName || decoded.containment !== false) {
+      if (decodeOwnedProviderRef(ref) === null) {
         throw new Error('Invalid Cloudflare containers allocation');
       }
       const container = deps.getContainer(deps.logicalSandboxId);
@@ -108,12 +120,11 @@ export function createCloudflareContainersProviderAdapter(deps: {
     },
     async stop(ref, intent) {
       const resolved = resolveProviderRef(ref, intent);
-      const decoded = decodeCloudflareProviderRef(resolved);
       const diagnostic = {
         provider: 'cloudflare-containers',
         allocationName: deps.logicalSandboxId,
       };
-      if (decoded === null || resolved === null) {
+      if (resolved === null || decodeOwnedProviderRef(resolved) === null) {
         logControlDiagnostic('native_stop', { ...diagnostic, result: 'invalid_reference' });
         return 'retryable';
       }

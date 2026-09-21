@@ -94,6 +94,11 @@ type CloudAgentSessionConfig = {
     state: Extract<MessageDeliveryState, { status: 'failed' }>
   ) => void;
   /**
+   * True when the user already retried this message's delivery failure, so a
+   * replayed `cloud.message.failed` must not restore the cleared footer.
+   */
+  isDeliveryFailureResolved?: (messageId: string) => boolean;
+  /**
    * Optional sink for tool attachment bytes, called just before the chat
    * processor strips a completed tool part's attachment data URLs for storage.
    * Receives the raw data URL exactly once per processor pass; consumers use
@@ -246,6 +251,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     onMessageCanceled: config.onMessageCanceled,
     onMessageCompleted: config.onMessageCompleted,
     onMessageFailed: config.onMessageFailed,
+    isDeliveryFailureResolved: config.isDeliveryFailureResolved,
   });
 
   let transport: Transport | null = null;

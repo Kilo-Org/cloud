@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   createAssistantMessage,
-  createEvalToolCall,
   createSafeToolCall,
+  createToolCall,
   createToolResult,
   createUserMessage,
   createWebMcpToolCall,
@@ -77,11 +77,15 @@ describe('render events as transcript', () => {
 
   it('preserves tool inputs and result payloads', () => {
     const text = renderEventsAsTranscript([
-      createEvalToolCall({ code: 'return document.title;', tabId: 1 }),
+      createToolCall({
+        arguments: { url: 'https://example.com' },
+        name: 'kilo_browser_navigate',
+        tabId: 1,
+      }),
       createToolResult({ ok: true, toolCallId: 'call-1', value: 'Example Domain' }),
       createToolResult({ error: 'boom', ok: false, toolCallId: 'call-2' }),
     ]);
-    expect(text).toContain('Tool call (eval): return document.title;');
+    expect(text).toContain('Tool call (kilo_browser_navigate): {"url":"https://example.com"}');
     expect(text).toContain('Tool result (ok): Example Domain');
     expect(text).toContain('Tool result (error): boom');
   });

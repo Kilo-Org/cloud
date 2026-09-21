@@ -27,7 +27,7 @@ const textVariants = cva('text-foreground text-base font-medium', {
       small: 'text-sm font-medium leading-none',
       muted: 'text-muted-foreground text-sm',
       mono: 'font-mono-medium text-sm',
-      eyebrow: 'font-mono-medium text-[10px] uppercase tracking-[1.5px] text-muted-foreground',
+      eyebrow: 'font-mono-medium text-[10px] text-muted-foreground',
     },
   },
   defaultVariants: {
@@ -53,6 +53,19 @@ const ARIA_LEVEL = {
   h4: '4',
 } satisfies Partial<Record<TextVariant, string>>;
 
+/**
+ * The eyebrow's Latin display treatment: full capitals, letterspaced. It is
+ * dropped for Arabic-script copy in an RTL interface: `letter-spacing` pulls a
+ * cursive script apart — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت' —
+ * and that copy also drops the mono family (see `withoutMonoFamily`). Latin
+ * copy, and Arabic copy in an LTR interface, keep the treatment.
+ *
+ * Exported so the eyebrow-scale labels rendered outside the variant — the
+ * `SectionHeader` action link — carry the identical treatment instead of a
+ * second copy of the class string that can drift.
+ */
+export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
+
 const TextClassContext = React.createContext<string | undefined>(undefined);
 
 function Text({
@@ -69,7 +82,12 @@ function Text({
   const Component = asChild ? Slot.Text : RNText;
   const isRTL = I18nManager.isRTL;
   const isArabic = hasArabicScript(props.children);
-  const classes = cn(textVariants({ variant }), textClass, className);
+  const classes = cn(
+    textVariants({ variant }),
+    variant === 'eyebrow' && !(isRTL && isArabic) && EYEBROW_LATIN_DISPLAY,
+    textClass,
+    className
+  );
   return (
     <Component
       className={isRTL && isArabic ? withoutMonoFamily(classes) : classes}

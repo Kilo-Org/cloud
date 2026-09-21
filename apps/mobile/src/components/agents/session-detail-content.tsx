@@ -116,6 +116,7 @@ import { useInteractionHandlers } from '@/components/agents/use-interaction-hand
 import { useSessionAutoApprove } from '@/components/agents/use-session-auto-approve';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
   SESSION_SLOW_LOAD_MS,
   useSessionSlowLoadPhase,
@@ -1925,8 +1926,8 @@ export function SessionDetailContent({
           ) : null}
           <ScreenHeader
             title={rename.title}
-            titleNumberOfLines={1}
             reserveTitleSpace
+            titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
             backFallback="/(app)/(tabs)/(2_agents)"
             headerRight={headerRight}
             className="pb-1"
@@ -1958,7 +1959,9 @@ export function SessionDetailContent({
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
           {keyboardContainerKind === 'app-aware-padding' ? (
-            <AppAwareKeyboardPaddingView className="flex-1">
+            // The trailing bottom-chrome spacer below reserves the navigation-
+            // bar inset outside this view, so the view must not add it again.
+            <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
               {renderKeyboardBody()}
             </AppAwareKeyboardPaddingView>
           ) : (

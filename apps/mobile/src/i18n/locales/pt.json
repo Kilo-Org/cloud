@@ -854,8 +854,11 @@
       "sessionStatusTitle": "Estado da sessão",
       "sessionStatusSubtitle": "concluída / com erro / pronta para controlo",
       "kiloclawActivitySubtitle": "instância pronta ou com erro, ações agendadas",
+      "kiloclawActivityUnavailable": "Inicia uma instância do KiloClaw para receber a atividade do KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organização",
-      "securityFindingsSubtitle": "novas ocorrências e lembretes de SLA"
+      "balanceAlertsUnavailable": "Entra numa organização para receber alertas de saldo baixo.",
+      "securityFindingsSubtitle": "novas ocorrências e lembretes de SLA",
+      "securityFindingsUnavailable": "Ativa o agente de segurança Kilo num âmbito para receber os problemas de segurança."
     },
     "action": {
       "openSession": "Abrir sessão"

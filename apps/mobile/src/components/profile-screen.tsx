@@ -17,7 +17,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from '@/components/ui/icons';
-import { Alert, Platform, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
@@ -35,6 +35,7 @@ import { useDeleteAccount } from '@/components/use-delete-account';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
+import { needsInAppDestructiveConfirm } from '@/lib/destructive-confirm-platform';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -79,6 +80,10 @@ export function ProfileScreen() {
   const trpc = useTRPC();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
+  // The account queries wait for the tab transition to settle, but the hook
+  // bounds that wait: an interaction queue that never reports idle (an
+  // automated UI session holds one open) must not hide the Linked accounts row,
+  // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   // Android's native alert paints every button with the theme accent, so
@@ -137,7 +142,7 @@ export function ProfileScreen() {
   };
 
   const confirmSignOut = () => {
-    if (Platform.OS === 'android') {
+    if (needsInAppDestructiveConfirm()) {
       setSignOutConfirmVisible(true);
       return;
     }

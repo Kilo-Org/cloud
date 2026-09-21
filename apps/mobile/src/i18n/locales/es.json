@@ -306,8 +306,11 @@
       "sessionStatusTitle": "Estado de la sesión",
       "sessionStatusSubtitle": "terminada / fallida / lista para controlar",
       "kiloclawActivitySubtitle": "instancia lista/fallida, acciones programadas",
+      "kiloclawActivityUnavailable": "Inicia una instancia de KiloClaw para recibir actividad de KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo bajo de la organización",
-      "securityFindingsSubtitle": "nuevos hallazgos y recordatorios de SLA"
+      "balanceAlertsUnavailable": "Únete a una organización para recibir alertas de saldo bajo.",
+      "securityFindingsSubtitle": "nuevos hallazgos y recordatorios de SLA",
+      "securityFindingsUnavailable": "Activa el agente de seguridad de Kilo en un ámbito para recibir hallazgos de seguridad."
     },
     "liveActivities": "Actividades en directo",
     "liveActivitySubtitle": "Mostrar los agentes activos en la pantalla de bloqueo",

@@ -30,11 +30,19 @@ export const TOAST_BOTTOM_GAP = 8;
 
 /**
  * Bottom offset, in logical pixels, for the bottom-center toast container.
- * The keyboard height wins while the software keyboard is up so the toast
+ * The keyboard occlusion wins while the software keyboard is up so the toast
  * cannot hide behind it; otherwise the tallest bottom chrome decides: the
  * floating tab bar when one is on screen, else the reported safe-area inset
  * floored at `MIN_BOTTOM_CHROME_HEIGHT`. The standard gap always separates the
  * toast from the chrome.
+ *
+ * This module reads no platform, so `keyboardHeight` is the keyboard's
+ * occlusion measured from the screen bottom, not a platform's raw metric: the
+ * caller resolves it with `resolveKeyboardBottomPadding`, because Android's
+ * reported height stops at the navigation bar while iOS's keyboard frame
+ * reaches the screen bottom. The container is anchored to the screen bottom, so
+ * a raw Android height would leave the toast's last line behind the IME's
+ * navigation row.
  */
 export function getToastBottomOffset({
   safeAreaBottom,
@@ -42,6 +50,10 @@ export function getToastBottomOffset({
   tabBarHeight = 0,
 }: {
   safeAreaBottom: number;
+  /**
+   * Keyboard occlusion measured from the screen bottom, `0` while the keyboard
+   * is down (see `resolveKeyboardBottomPadding`).
+   */
   keyboardHeight: number;
   /** Rendered height of the floating tab bar while one is on screen, `0` otherwise. */
   tabBarHeight?: number;

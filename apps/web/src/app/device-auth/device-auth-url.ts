@@ -37,7 +37,7 @@ export function getDeviceAuthAppModeFromRequestUrl(requestUrl: string): boolean 
 export function getDeviceAuthShellClassName(isAppMode: boolean): string {
   return cn(
     'bg-background flex items-center justify-center',
-    isAppMode ? 'h-dvh w-full px-4 py-0' : 'min-h-screen p-4'
+    isAppMode ? 'min-h-dvh w-full px-4 py-0 max-[22rem]:px-2' : 'min-h-screen p-4'
   );
 }
 

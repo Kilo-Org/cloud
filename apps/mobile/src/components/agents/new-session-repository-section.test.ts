@@ -1,3 +1,5 @@
+/* oxlint-disable max-lines -- one suite for the repository section: the branch row, Bitbucket restriction, connect-card collapse, one-line connect label, and post-selection compact actions all mount the same section through one hoisted preference mock */
+/* eslint-disable max-lines -- the provider connect-card states (branch row, organizations-only note, collapse, post-selection actions) and the open-label line pinning share one module-mock set */
 import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -67,9 +69,21 @@ vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
   setConnectCtaCollapsed: collapseState.setConnectCtaCollapsed,
 }));
 
+/** The rendered Text node holding exactly `copy`, if it is mounted. */
+function textNode(renderer: TestRenderer.ReactTestRenderer, copy: string) {
+  return renderer.root
+    .findAllByType('Text' as never)
+    .find(node => node.children.length === 1 && node.children[0] === copy);
+}
+
 /** The headers of the connect cards; the section renders no other pressable. */
 function pressables(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root.findAllByType('Pressable' as never);
+}
+
+/** The Text rendering `text`, for the props that decide its layout. */
+function labelNode(renderer: TestRenderer.ReactTestRenderer, text: string) {
+  return renderer.root.findAllByType('Text' as never).find(node => node.children.includes(text));
 }
 
 function connectHeader(renderer: TestRenderer.ReactTestRenderer, title: string) {
@@ -174,6 +188,30 @@ describe('NewSessionRepositorySection Bitbucket connect card', () => {
   });
 });
 
+describe('NewSessionRepositorySection connect card open action', () => {
+  it('gives every provider open label the row width and pins it to one line', () => {
+    const renderer = mountSection({
+      groups: [
+        group('github', 'connect'),
+        group('gitlab', 'connect'),
+        group('bitbucket', 'connect'),
+      ],
+    });
+
+    // A label box sized to the label's own measured width is a fraction
+    // narrower than the glyphs Android lays out, so "Open GitLab" wrapped onto
+    // two lines. The label takes the row's remaining width instead, and
+    // `numberOfLines` pins the single line.
+    for (const key of ['openGithub', 'openGitlab', 'openBitbucket'] as const) {
+      const label = textNode(renderer, i18n.t(`agentChat.newSession.${key}`));
+      expect(label, key).toBeDefined();
+      expect(label?.props.className, key).toContain('flex-1');
+      expect(label?.props.className, key).toContain('text-center');
+      expect(label?.props.numberOfLines, key).toBe(1);
+    }
+  });
+});
+
 describe('NewSessionRepositorySection connect card collapse', () => {
   const bothConnect = [group('github', 'connect'), group('gitlab', 'connect')];
 
@@ -237,6 +275,37 @@ describe('NewSessionRepositorySection connect card collapse', () => {
 
     expect(renderedText(renderer)).not.toContain(i18n.t('common.connectGithub'));
     expect(pressables(renderer)).toHaveLength(0);
+  });
+});
+
+describe('NewSessionRepositorySection connect button label', () => {
+  it('keeps the connect action label on a single line with the row remaining width', () => {
+    // A label sized to its own content is measured at its longest word's width
+    // and wraps onto a second line. Taking the row's remaining width gives the
+    // one line room, and the pin keeps it single-line on a narrow button.
+    const renderer = mountSection({ groups: [group('gitlab', 'connect')] });
+
+    const label = labelNode(renderer, i18n.t('agentChat.newSession.openGitlab'));
+
+    expect(label?.props.numberOfLines).toBe(1);
+    expect(String(label?.props.className)).toContain('flex-1');
+    expect(String(label?.props.className)).toContain('text-center');
+  });
+
+  it('offsets the label with a logical inline-end margin so RTL stays centred', () => {
+    // The trailing offset mirrors the leading glyph plus the row gap. It must be
+    // the logical `me-*` (React Native resolves `marginInlineEnd` to
+    // `marginLeft` under RTL), not the physical `mr-*`: in RTL the row mirrors
+    // the glyph to the right, so a physical right margin would offset the label
+    // on the same side as the glyph and land it 24px off the button's centre.
+    const renderer = mountSection({ groups: [group('gitlab', 'connect')] });
+
+    const className = String(
+      labelNode(renderer, i18n.t('agentChat.newSession.openGitlab'))?.props.className
+    );
+
+    expect(className).toContain('me-[24px]');
+    expect(className).not.toMatch(/\bmr-|margin-?[rR]ight/);
   });
 });
 

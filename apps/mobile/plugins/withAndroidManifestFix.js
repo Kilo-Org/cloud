@@ -5,7 +5,20 @@ const { withAndroidManifest, withDangerousMod } = require('expo/config-plugins')
 
 const BACKUP_RULES_RES = '@xml/kilo_backup_rules';
 const DATA_EXTRACTION_RULES_RES = '@xml/kilo_data_extraction_rules';
-const SHRINK_SENTINEL_NAME = 'kilo_shrink_sentinel_unused';
+
+/**
+ * Unused raw resource the release artifact inspector expects resource shrinking
+ * to strip.
+ *
+ * R8 shrinks resources in safe mode: it keeps every resource whose name starts
+ * with a string literal found in the code, so that a dynamic
+ * `Resources.getIdentifier()` lookup still resolves. The `zz_` prefix stays out
+ * of that heuristic because no literal in the app starts with `zz`. Do not
+ * rename this to a name that starts with a literal already in the code: the
+ * earlier `kilo_shrink_sentinel_unused` survived shrinking once the app gained a
+ * `kilo` literal, and the inspector gate then failed every release.
+ */
+const SHRINK_SENTINEL_NAME = 'zz_unused_shrink_sentinel';
 
 /**
  * Features Google Play treats as required because a permission implies them.

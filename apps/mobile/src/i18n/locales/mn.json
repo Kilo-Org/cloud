@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Сессийн төлөв",
       "sessionStatusSubtitle": "дууссан / амжилтгүй / удирдахад бэлэн",
       "kiloclawActivitySubtitle": "инстанц бэлэн/амжилтгүй, төлөвлөсөн үйлдлүүд",
+      "kiloclawActivityUnavailable": "KiloClaw-ийн үйл ажиллагаа авахын тулд KiloClaw инстанц эхлүүлнэ үү.",
       "balanceAlertsSubtitle": "байгууллагын үлдэгдэл багасах анхааруулга",
-      "securityFindingsSubtitle": "шинээр илэрсэн эмзэг байдал болон SLA сануулга"
+      "balanceAlertsUnavailable": "Балансын анхааруулга авахын тулд байгууллагад нэгдэнэ үү.",
+      "securityFindingsSubtitle": "шинээр илэрсэн эмзэг байдал болон SLA сануулга",
+      "securityFindingsUnavailable": "Аюулгүй байдлын илэрсэн асуудал авахын тулд Kilo Аюулгүй байдлын агентыг хүрээнд идэвхжүүлнэ үү."
     },
     "action": {
       "openSession": "Сесс нээх"

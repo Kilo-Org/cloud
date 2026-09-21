@@ -13,9 +13,11 @@ type SessionFilterButtonProps = {
   onPress: () => void;
   testID?: string;
   /**
-   * Overrides the control's own per-side slop. The agents header row caps the
-   * control's left side against its `gap-4` row gap, so it passes an explicit
-   * per-side slop instead of the control's default.
+   * Overrides the control's own per-side slop. The agents header row narrows
+   * this control's two horizontal sides to fit its `gap-4` row gap: the row
+   * mirrors under RTL while `hitSlop` does not, so the cap cannot sit on one
+   * physical side. Callers pass an explicit per-side slop instead of the
+   * control's default.
    */
   hitSlop?: React.ComponentProps<typeof Pressable>['hitSlop'];
 };

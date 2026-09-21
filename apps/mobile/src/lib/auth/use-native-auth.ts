@@ -275,6 +275,9 @@ export function useNativeAuth(): NativeAuthResult {
       }
 
       if (!startAction('otp-send')) {
+        // Refused because another auth action is in flight. Tell the user why
+        // instead of returning a silent false that leaves the button dead.
+        toast.error(i18n.t('login.couldNotCompleteSignIn'));
         return false;
       }
       try {
@@ -309,6 +312,7 @@ export function useNativeAuth(): NativeAuthResult {
     async (rawEmail: string, code: string) => {
       const email = rawEmail.trim().toLowerCase();
       if (!startAction('otp-verify')) {
+        toast.error(i18n.t('login.couldNotCompleteSignIn'));
         return false;
       }
       try {

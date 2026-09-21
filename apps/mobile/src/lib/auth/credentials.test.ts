@@ -27,8 +27,6 @@ vi.mock('expo-secure-store', () => ({
   }),
 }));
 
-vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
-
 // The sign-out deletes live in auth-context.tsx; mounting it pulls in the full
 // teardown graph, so stub every side-effecting collaborator.
 vi.mock('@sentry/react-native', () => ({
@@ -171,7 +169,7 @@ vi.mock('@/lib/native-system-search', () => ({
 }));
 
 import * as SecureStore from 'expo-secure-store';
-import { persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
+import { performRefresh, persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { clearActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
 import {
@@ -239,6 +237,56 @@ describe('bearer credential writes', () => {
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, expectedOptions);
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, expectedOptions);
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(TOKEN_EXPIRES_AT_KEY, expectedOptions);
+  });
+});
+
+describe('refresh rotation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store.clear();
+    clearActiveToken();
+    setSignOutTeardownActive(false);
+  });
+
+  it('retries a rejected refresh-token read and still rotates the token', async () => {
+    store.set(REFRESH_TOKEN_KEY, 'r1');
+    // The keychain rejects the first read — the transient class on a device
+    // that just foregrounded — and resolves the stored value on the retry.
+    let reads = 0;
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      reads += 1;
+      if (reads === 1) {
+        throw new Error('keychain temporarily unavailable');
+      }
+      return store.get(key) ?? null;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ token: 't2', refreshToken: 'r2', expiresIn: 3600 }, { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      expect(outcome.ok).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 't2', expectedOptions);
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        REFRESH_TOKEN_KEY,
+        'r2',
+        expectedOptions
+      );
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        TOKEN_EXPIRES_AT_KEY,
+        expect.any(String),
+        expectedOptions
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

@@ -9,7 +9,10 @@ import {
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
 import { i18n } from '@/i18n';
-import { getLastGlanceableSnapshot } from '@/lib/glanceable/persist';
+import {
+  getLastGlanceableSnapshot,
+  isGlanceableRestoreUnavailable,
+} from '@/lib/glanceable/persist';
 import {
   getGlanceableDelivery,
   type GlanceableSink,
@@ -254,6 +257,11 @@ export function adoptNativeActivity(
  * expired snapshot owns nothing — those are the states a card outlives its
  * owner in.
  *
+ * `expired` is checked by name, not only by timestamp:
+ * `GlanceablePublisher.applyExpiry()` stamps the lapsed snapshot with a renewed
+ * `expiresAt` eight hours out, so `now < expiresAt` alone would read an expired
+ * snapshot as an owner for the rest of that window.
+ *
  * Counts are deliberately not part of this: an empty snapshot may cover a card
  * a push-to-start raised for a session this process has not seen yet, and
  * ending that card would tear down a surface the server already holds a token
@@ -265,6 +273,7 @@ function snapshotOwnsSurface(snapshot: GlanceableAgentsSnapshot | null, now: num
     snapshot !== null &&
     snapshot.status !== 'signed_out' &&
     snapshot.status !== 'privacy' &&
+    snapshot.status !== 'expired' &&
     now < Date.parse(snapshot.expiresAt)
   );
 }
@@ -286,12 +295,35 @@ function snapshotOwnsSurface(snapshot: GlanceableAgentsSnapshot | null, now: num
  * every instance is ended at once. Otherwise the persisted work may own one
  * card this process has not adopted yet, so the normal reconciliation adopts it
  * and ends every other instance immediately.
+ *
+ * A null snapshot is only proof that nothing owns the surface when the restore
+ * actually read the mirror: if that read failed, native discovery still
+ * collapses duplicates to one card, but that card is kept rather than every
+ * instance being ended, so a push-to-start this process woke to adopt survives
+ * a locked keychain.
  */
 export function sweepStrayActivities(): void {
   if (activityKitDeniedState) {
     return;
   }
-  if (!getLiveActivityEnabled() || !snapshotOwnsSurface(getLastGlanceableSnapshot(), Date.now())) {
+  if (!getLiveActivityEnabled()) {
+    // `endNow` reads native truth itself and cleans each instance's token, so a
+    // card this process never held is retired as thoroughly as its own.
+    void endNow();
+    return;
+  }
+  const snapshot = getLastGlanceableSnapshot();
+  if (snapshot === null && isGlanceableRestoreUnavailable()) {
+    // The persisted owner could not be read, so a null snapshot means
+    // "unknown", not "nothing can own the surface". This runs at import in the
+    // headless push process too, where ending every instance would tear down
+    // the card a push-to-start just raised before this process can adopt it.
+    // Reconciliation still ends every instance but the one native discovery
+    // keeps, so the surface never holds more than one card.
+    refreshActivity();
+    return;
+  }
+  if (!snapshotOwnsSurface(snapshot, Date.now())) {
     // `endNow` reads native truth itself and cleans each instance's token, so a
     // card this process never held is retired as thoroughly as its own.
     void endNow();

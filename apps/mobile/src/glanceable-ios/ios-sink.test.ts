@@ -14,6 +14,7 @@ import {
 } from '@/lib/glanceable/live-activity-switch';
 import {
   _resetGlanceablePersistForTests,
+  _setGlanceableRestoreUnavailableForTests,
   _setLastGlanceableSnapshotForTests,
 } from '@/lib/glanceable/persist';
 import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
@@ -1366,6 +1367,19 @@ describe('iosSink stray sweep', () => {
     });
   });
 
+  it('ends every card for an expired snapshot whose expiry was renewed', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    // `applyExpiry` stamps the lapsed snapshot eight hours out, so the timestamp
+    // alone reads as unexpired; the status is what says nothing owns a card.
+    _setLastGlanceableSnapshotForTests(freshSnapshot([], 'expired'));
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(2);
+    });
+  });
+
   it('ends every card on launch when no snapshot claims one', async () => {
     const cards = [nativeStray(), nativeStray()];
     _setLastGlanceableSnapshotForTests(null);
@@ -1375,6 +1389,21 @@ describe('iosSink stray sweep', () => {
     await vi.waitFor(() => {
       expect(endedCount(cards)).toBe(2);
     });
+  });
+
+  it('keeps one card when the persisted owner could not be read', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    // A locked keychain at launch: the record may name an owner, so the card a
+    // push-to-start just raised must not be swept away as if none existed.
+    _setLastGlanceableSnapshotForTests(null);
+    _setGlanceableRestoreUnavailableForTests(true);
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+    expect(mockState.started).toHaveLength(0);
   });
 
   it.each(['signed_out', 'privacy'] as const)(

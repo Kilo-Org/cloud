@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { I18nManager, type TextStyle } from 'react-native';
 
 /**
@@ -20,6 +21,37 @@ export function withRtlWritingDirection(style: TextStyle | undefined): TextStyle
     return style;
   }
   return style ? { ...RTL_WRITING_DIRECTION, ...style } : RTL_WRITING_DIRECTION;
+}
+
+/** Arabic, Arabic Supplement, Arabic Extended-A, both Arabic Presentation Forms. */
+const JOINED_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+
+/**
+ * Zero letter spacing for a joined script. Arabic and its siblings draw their
+ * letters connected, so the LTR design's `tracking-*` inserts gaps between the
+ * joined forms instead of between words; the reset restores the natural advance.
+ */
+export const NATURAL_LETTER_SPACING: TextStyle = { letterSpacing: 0 };
+
+/**
+ * Whether a `Text` node's own string children are drawn in a joined script.
+ * Only the node's own strings count: a nested `Text` is its own run and applies
+ * this reset itself.
+ */
+export function containsJoinedScript(children: ReactNode): boolean {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- ReactNode has no non-typeof way to reach its plain-string leaf
+  if (typeof children === 'string') {
+    return JOINED_SCRIPT.test(children);
+  }
+  if (Array.isArray(children)) {
+    return children.some((child: ReactNode) => containsJoinedScript(child));
+  }
+  return false;
+}
+
+/** The letter-spacing reset for a joined-script run, or nothing for any other. */
+export function textLetterSpacing(children: ReactNode): TextStyle | undefined {
+  return containsJoinedScript(children) ? NATURAL_LETTER_SPACING : undefined;
 }
 
 /**

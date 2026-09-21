@@ -96,6 +96,29 @@ describe('SectionHeader mounted layout', () => {
     expect(text.children).toEqual(['See all']);
   });
 
+  it('resets the tracked Arabic labels while keeping the tracking class', () => {
+    i18nManager.isRTL = true;
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'استكشاف',
+        actionLabel: 'عرض الكل',
+        onActionPress: () => undefined,
+      })
+    );
+    const action = root.findByProps({ accessibilityRole: 'button' });
+    const actionText = action.find(node => Object.is(node.type, 'Text'));
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('استكشاف')
+    );
+
+    expect(label.props.style).toContainEqual({ letterSpacing: 0 });
+    expect(label.props.style).toContainEqual({ writingDirection: 'rtl' });
+    expect((label.props.className as string).split(' ')).toContain('tracking-[1.5px]');
+
+    expect(actionText.props.style).toContainEqual({ letterSpacing: 0 });
+    expect((actionText.props.className as string).split(' ')).toContain('tracking-[1.5px]');
+  });
+
   it('keeps the complete accessible action name and activates the supplied destination', () => {
     function Destination() {
       const [showAll, setShowAll] = useState(false);

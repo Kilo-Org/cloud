@@ -1,4 +1,3 @@
-import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
   getUserFromBearerForCredentialExchange,
@@ -6,6 +5,7 @@ import {
 } from '@/lib/user/server';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
 import { APP_URL } from '@/lib/constants';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 /**
  * Token exchange endpoint. Authenticates with the existing long-lived bearer
@@ -20,7 +20,7 @@ import { APP_URL } from '@/lib/constants';
  *   401 — invalid or expired existing token
  *   403 — blocked user
  */
-export async function POST(request: NextRequest) {
+export const POST = withRestTiming('/api/auth/native/exchange', async (request: Request) => {
   const auth = request.headers.has('authorization')
     ? await getUserFromBearerForCredentialExchange(request.headers, { legacy: 'five-year-api' })
     : await getSessionAuth(request);
@@ -48,9 +48,9 @@ export async function POST(request: NextRequest) {
     },
     { status: 200, headers: { 'Cache-Control': 'no-store' } }
   );
-}
+});
 
-async function getSessionAuth(request: NextRequest) {
+async function getSessionAuth(request: Request) {
   const origin = request.headers.get('origin');
   if (origin !== new URL(APP_URL).origin) {
     return {

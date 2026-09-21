@@ -156,18 +156,29 @@ const CATEGORY_META = [
   },
 ] as const;
 
+/**
+ * The reason each gated category shows while the server marks it unavailable.
+ * The response's `unavailableReason` is English prose, so the row renders its
+ * own catalog copy: the reason must read in the user's language. Only these
+ * three categories can be unavailable (`apps/web/src/routers/user-router.ts:494-505`;
+ * the other four are `ALWAYS_AVAILABLE_CAPABILITY`, `:450`).
+ */
+const CATEGORY_UNAVAILABLE_SUBTITLE_KEYS: ReadonlyMap<NotificationCategoryKey, string> = new Map([
+  ['kiloclawActivity', 'notifications.category.kiloclawActivityUnavailable'],
+  ['balanceAlerts', 'notifications.category.balanceAlertsUnavailable'],
+  ['securityFindings', 'notifications.category.securityFindingsUnavailable'],
+]);
+
 type CategoryMeta = (typeof CATEGORY_META)[number];
 
 /**
  * Per-category availability from the preferences response `capabilities` map.
- * `unavailableReason` is the server's English-only sentence; it is part of the
- * response but is deliberately never rendered, because the screen is localized
- * and the server cannot translate it. See `CategoryRow`.
+ * The same entry carries the server's `unavailableReason`: an English-only
+ * sentence that is deliberately never rendered, because the screen is localized
+ * and the server cannot translate it. `CategoryRow` reads the reason from
+ * `CATEGORY_UNAVAILABLE_SUBTITLE_KEYS` instead.
  */
-type NotificationCategoryCapability = Readonly<{
-  available: boolean;
-  unavailableReason: string | null;
-}>;
+type NotificationCategoryCapability = Readonly<{ available: boolean }>;
 
 type CategoryRowProps = Readonly<{
   meta: CategoryMeta;
@@ -201,21 +212,18 @@ function CategoryRow({
     : (preferences?.[meta.key] ?? readAgentPushPreference(queryClient, queryKey, meta.key));
   const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
   // An unavailable category is a terminal, non-retryable state: the switch is
-  // disabled and the title is muted. A missing entry (the
+  // disabled and the row renders its own catalog copy for the reason. The
+  // server's `unavailableReason` is English prose and must never render — it
+  // cannot be translated — so the unavailable state is carried by the muted
+  // title and the disabled switch, and the reason comes from
+  // `CATEGORY_UNAVAILABLE_SUBTITLE_KEYS`. A missing entry (the
   // `noUncheckedIndexedAccess` widening) defaults to available.
   const unavailable = capability?.available === false;
   const isDisabled = disabled || !editable || unavailable;
   const title = t(meta.titleKey);
-  // The row's description always comes from this catalog. The response's
-  // `unavailableReason` is an English-only sentence the server cannot
-  // translate, so rendering it printed untranslated English inside every
-  // localized screen (the reported defect). The disabled switch and muted
-  // title carry the unavailable state; the description stays translated.
-  const subtitle = t(meta.subtitleKey);
-  // Security unavailability means no scope has the agent enabled. Keep the
-  // localized Security Agent setup guidance below the description, also read
-  // from the catalog so no server prose reaches a localized screen.
-  const showSecuritySetupGuidance = unavailable && meta.key === 'securityFindings';
+  const unavailableSubtitleKey = CATEGORY_UNAVAILABLE_SUBTITLE_KEYS.get(meta.key);
+  const subtitle =
+    unavailable && unavailableSubtitleKey != null ? t(unavailableSubtitleKey) : t(meta.subtitleKey);
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />
@@ -229,11 +237,6 @@ function CategoryRow({
         <Text variant="muted" className="mt-0.5 text-xs">
           {subtitle}
         </Text>
-        {showSecuritySetupGuidance && (
-          <Text variant="muted" className="mt-0.5 text-xs">
-            {t('securityAgent.settingsOverview.disabledPrompt')}
-          </Text>
-        )}
       </View>
       {isPending && <ActivityIndicator size="small" color={colors.mutedForeground} />}
       <Switch
@@ -792,10 +795,7 @@ export function NotificationsScreen() {
                     // backend that predates the field returns none. The guard
                     // keeps the old response on the always-available path.
                     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
-                    preferences.capabilities?.[meta.key] ?? {
-                      available: true,
-                      unavailableReason: null,
-                    }
+                    preferences.capabilities?.[meta.key] ?? { available: true }
                   }
                   disabled={!notificationsEnabled}
                   isPending={pendingCategories.has(meta.key)}

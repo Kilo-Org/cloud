@@ -870,8 +870,11 @@
       "sessionStatusTitle": "Stanje seje",
       "sessionStatusSubtitle": "končano / neuspešno / pripravljeno za upravljanje",
       "kiloclawActivitySubtitle": "instanca pripravljena ali neuspešna, načrtovana dejanja",
+      "kiloclawActivityUnavailable": "Zaženi instanco KiloClaw, da prejemaš dejavnost KiloClaw.",
       "balanceAlertsSubtitle": "opozorila o nizkem stanju organizacije",
-      "securityFindingsSubtitle": "nove ugotovitve in opomniki SLA"
+      "balanceAlertsUnavailable": "Pridruži se organizaciji, da prejemaš opozorila o nizkem stanju.",
+      "securityFindingsSubtitle": "nove ugotovitve in opomniki SLA",
+      "securityFindingsUnavailable": "Vklopi varnostnega agenta Kilo v obsegu, da prejemaš varnostne ugotovitve."
     },
     "action": {
       "openSession": "Odpri sejo"
@@ -2132,6 +2135,10 @@
       "couldNotLoad": "Seje ni bilo mogoče naložiti.",
       "failedToLoadDetails": "Podrobnosti seje ni bilo mogoče naložiti.",
       "failedToStopExecution": "Izvajanja ni bilo mogoče ustaviti.",
+      "stopped": "Seja ustavljena",
+      "committing": "Uveljavljanje…",
+      "committed": "Uveljavljeno",
+      "commitFailed": "Uveljavljanje ni uspelo",
       "renameSession": "Preimenuj sejo",
       "renamePlaceholder": "Ime seje",
       "transcriptAccessibility": "Zapis pogovora v seji",

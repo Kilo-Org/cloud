@@ -163,6 +163,7 @@
     "useDifferentEmail": "Өөр имэйл хаяг ашиглах",
     "signInWithApple": "Apple-ээр нэвтрэх",
     "signInWithGoogle": "Google-ээр нэвтрэх",
+    "signInWithPasskey": "Нэвтрэх түлхүүрээр нэвтрэх",
     "emailAddress": "Имэйл хаяг",
     "emailPlaceholder": "нэр@example.com",
     "continueWithEmail": "Имэйлээр үргэлжлүүлэх",
@@ -175,6 +176,10 @@
     "termsConnector": " болон ",
     "termsSuffix": ".",
     "moreSignInOptions": "Нэвтрэх бусад сонголтууд",
+    "passkeyCancelled": "Нэвтрэх түлхүүрээр нэвтрэхийг цуцалсан. Дахин оролдоно уу.",
+    "passkeyNotFound": "Энэ төхөөрөмжид нэвтрэх түлхүүр хадгалагдаагүй байна. Оронд нь Apple, Google эсвэл и-мэйлээрээ нэвтэрнэ үү.",
+    "passkeyUnsupported": "Энэ төхөөрөмжид нэвтрэх түлхүүр байхгүй. Оронд нь Apple, Google эсвэл и-мэйлээрээ нэвтэрнэ үү.",
+    "passkeyFailed": "Нэвтрэх түлхүүрээр нэвтэрч чадсангүй. Дахин оролдоно уу.",
     "couldNotCompleteSignIn": "Нэвтрэлтийг дуусгаж чадсангүй. Дахин оролдоно уу.",
     "sessionEnded": "Таны сесс дууссан. Дахин нэвтэрнэ үү.",
     "signInCodeExpired": "Таны нэвтрэх кодын хүчинтэй хугацаа дууссан. Дахин оролдоно уу.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Туршилтын бүртгэл",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Байгууллагын SSO"
+    "providerEnterpriseSso": "Байгууллагын SSO",
+    "passkeysTitle": "Нэвтрэх түлхүүр",
+    "passkeysSubtitle": "Нууц үггүйгээр нэвтрэх",
+    "passkeysEmpty": "Одоогоор нэвтрэх түлхүүр байхгүй",
+    "passkeysEmptyHint": "$t(profile.addPasskey) хийж нууц үггүйгээр нэвтэрнэ үү.",
+    "passkeysCouldNotLoad": "Нэвтрэх түлхүүрийг ачаалж чадсангүй",
+    "passkeysLoadFailed": "Үүнийг ачаалах хүртэл нэвтрэх түлхүүр байхгүй.",
+    "addPasskey": "Нэвтрэх түлхүүр нэмэх",
+    "passkeyDefaultName": "Нэвтрэх түлхүүр",
+    "passkeyAddedOn": "{{date}}-нд нэмсэн",
+    "passkeyAdded": "Нэвтрэх түлхүүр нэмэгдлээ.",
+    "passkeyAddFailed": "Нэвтрэх түлхүүр нэмж чадсангүй. Дахин оролдоно уу.",
+    "passkeyAddUnsupported": "Энэ төхөөрөмж нэвтрэх түлхүүр үүсгэж чадахгүй.",
+    "passkeyAddCancelled": "Нэвтрэх түлхүүр үүсгэхийг цуцалсан.",
+    "passkeyRemoved": "Нэвтрэх түлхүүрийг устгасан.",
+    "passkeyRemoveFailed": "Тухайн нэвтрэх түлхүүрийг устгаж чадсангүй. Дахин оролдоно уу.",
+    "passkeyRenamed": "Нэвтрэх түлхүүрийн нэрийг сольсон.",
+    "passkeyName": "Нэвтрэх түлхүүрийн нэр",
+    "renamePasskey": "Нэвтрэх түлхүүрийн нэрийг солих",
+    "removePasskey": "Нэвтрэх түлхүүрийг устгах",
+    "removePasskeyTitle": "Нэвтрэх түлхүүрийг устгах уу?",
+    "removePasskeyMessage": "Та энэ нэвтрэх түлхүүрээр цаашид нэвтэрч чадахгүй."
   },
   "preferences": {
     "general": "Ерөнхий",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{total}}-оос {{displayCount}} файл ачаалагдсан",
       "filesStillLoading": "Файлуудыг ачаалж дуусаагүй байна. Сэргээхийн тулд доош татна уу.",
       "goToOverview": "Тойм руу орох",
-      "goToOverviewTab": "Тойм табыг нээх"
+      "goToOverviewTab": "Тойм табыг нээх",
+      "expandAllLines_one": "Бүх {{displayCount}} мөрийг дэлгэх",
+      "expandAllLines_other": "Бүх {{displayCount}} мөрийг дэлгэх",
+      "expandLines_one": "{{displayCount}} мөр дэлгэх ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} мөр дэлгэх ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Ойр орчмын {{displayCount}} мөрийг дэлгэх",
+      "expandLinesOfContext_other": "Ойр орчмын {{displayCount}} мөрийг дэлгэх",
+      "expandMoreLines_one": "Дахин {{displayCount}} мөр дэлгэх ({{start}}–{{end}})",
+      "expandMoreLines_other": "Дахин {{displayCount}} мөр дэлгэх ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "Ачаалсан файл: {{loaded}} / {{total}}",
+      "loadedOfTotalFiles_other": "Ачаалсан файл: {{loaded}} / {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "файлын төгсгөлд шинэ мөрийн тэмдэгт байхгүй.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Хуучирсан: {{path}}"
       },
       "deletedUser": "устгагдсан хэрэглэгч",
-      "replyForbiddenTerm": "Танд энэ {{term}}эд хариу бичих эрх байхгүй."
+      "replyForbiddenTerm": "Танд энэ {{term}}эд хариу бичих эрх байхгүй.",
+      "moreLinesAbove_one": "… дээр нь дахиад {{displayCount}} мөр байна.",
+      "moreLinesAbove_other": "… дээр нь дахиад {{displayCount}} мөр байна."
     },
     "couldNotOpenGitHubAppSettings": "GitHub аппын тохиргоог нээж чадсангүй.",
     "installKiloGitHubApp": "Kilo GitHub аппыг суулгах",
@@ -706,7 +744,9 @@
       "statusContext": "Өөрчлөгдөөгүй",
       "lineLabel": "{{status}} {{line}} дугаар мөр: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(хоосон)"
+      "emptyLine": "(хоосон)",
+      "truncationBanner_one": "GitHub API-ийн хязгаараас шалтгаалан өөрчлөгдсөн {{total}} файлаас эхний {{limit}} файлыг харуулж байна.",
+      "truncationBanner_other": "GitHub API-ийн хязгаараас шалтгаалан өөрчлөгдсөн {{total}} файлаас эхний {{limit}} файлыг харуулж байна."
     },
     "linkPasteClipboardEmpty": "Хуулах санах ой хоосон байна.",
     "linkPasteNotAPullRequest": "Энэ татах эсвэл нэгтгэх хүсэлтийн холбоос биш байна.",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Мэдэгдэл түгжээний дэлгэц дээр мессежийн текстийг харуулна.",
     "previewGenericDescription": "Мэдэгдэлд зөвхөн үйл явдал болсныг харуулна. Агуулгыг нь уншихын тулд Kilo-г нээнэ үү.",
     "channel": {
-      "agent": "Агентын сессүүд",
+      "agentProgress": "Агентын явц",
       "chat": "Чатын мессеж",
       "kiloclaw": "KiloClaw-ийн үйл ажиллагаа",
       "balance": "Үлдэгдлийн анхааруулга",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "инстанц бэлэн/амжилтгүй, төлөвлөсөн үйлдлүүд",
       "balanceAlertsSubtitle": "байгууллагын үлдэгдэл багасах анхааруулга",
       "securityFindingsSubtitle": "шинээр илэрсэн эмзэг байдал болон SLA сануулга"
+    },
+    "action": {
+      "openSession": "Сесс нээх"
+    },
+    "needsInputAction": {
+      "approved": "Хүсэлтийг зөвшөөрлөө",
+      "replied": "Хариултыг илгээлээ",
+      "failed": "Хариу өгч чадсангүй. Дахин оролдохын тулд дахин товшино уу.",
+      "unavailable": "Энэ хүсэлт хүлээхээ больсон."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Байршуулж чадсангүй.",
       "failedToUploadFile": "Файлыг байршуулж чадсангүй. Шалтгаан: {{reason}}",
       "nothingToPaste": "Буулгах зүйл алга",
-      "metadataStripFailed": "Зургийн мета өгөгдлийг устгаж чадсангүй."
+      "metadataStripFailed": "Зургийн мета өгөгдлийг устгаж чадсангүй.",
+      "limit_one": "Та {{displayCount}} хүртэл файл хавсаргах боломжтой.",
+      "limit_other": "Та {{displayCount}} хүртэл файл хавсаргах боломжтой."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Илэрсэн асуудлыг синхрончлох",
       "syncNow": "Одоо синхрончлох",
       "syncQueued": "Синхрончлолыг дараалалд орууллаа",
-      "syncStatusUnavailable": "Синхрончлолын төлөвийг авах боломжгүй байна."
+      "syncStatusUnavailable": "Синхрончлолын төлөвийг авах боломжгүй байна.",
+      "daysOverdue_one": "Хугацаа {{displayCount}} хоногоор хэтэрсэн",
+      "daysOverdue_other": "Хугацаа {{displayCount}} хоногоор хэтэрсэн",
+      "findingsCount_one": "{{displayCount}} илэрсэн асуудал",
+      "findingsCount_other": "{{displayCount}} илэрсэн асуудал"
     },
     "dashboardMetrics": {
       "openFindings": "Шийдээгүй асуудал",
@@ -2131,20 +2186,7 @@
       "continueFrom": "«{{title}}» сессийг үргэлжлүүлж байна.",
       "importingSession": "Сесс импортлож байна",
       "cliCannotContinue": "Энэ CLI сессийг үргэлжлүүлэх боломжгүй. Cloud Agent эсвэл өөр CLI сонгоно уу.",
-      "importFailed": "Энэ сессийг импортолж чадсангүй.",
-      "sandbox": "Сэндбокс",
-      "sandboxAccessibility": "Сэндбокс: {{label}}",
-      "sandboxDefaultWithDestination": "Өгөгдмөл · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Жижиг",
-      "sandboxInstanceShared": "Түгээсэн",
-      "sandboxInstanceLarge": "Том",
-      "sandboxInstanceDevcontainer": "Dev контейнер",
-      "sandboxInstanceProviderDefault": "Нийлүүлэгчийн өгөгдмөл",
-      "sandboxCouldNotLoad": "Сэндбоксын сонголтыг ачаалж чадсангүй",
-      "sandboxUnavailable": "Энэ сэндбокс ашиглах боломжгүй. Өөр сэндбокс эсвэл Өгөгдмөлийг сонгоно уу.",
-      "sandboxUseDefault": "Өгөгдмөлийг ашиглах"
+      "importFailed": "Энэ сессийг импортолж чадсангүй."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файлыг шинэчиллээ.",
@@ -2168,7 +2210,14 @@
       "updateTodos": "Хийх ажлын жагсаалтыг шинэчлэх",
       "linesBadge": "{{displayCount}} мөр",
       "filesBadge": "{{displayCount}} файл",
-      "matchesBadge": "{{displayCount}} илэрц"
+      "matchesBadge": "{{displayCount}} илэрц",
+      "filesBadge_one": "{{displayCount}} файл",
+      "filesBadge_other": "{{displayCount}} файл",
+      "linesBadge_one": "{{displayCount}} мөр",
+      "linesBadge_other": "{{displayCount}} мөр",
+      "matchesBadge_one": "{{displayCount}} илэрц",
+      "matchesBadge_other": "{{displayCount}} илэрц",
+      "noOutput": "Гаралт байхгүй."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} мөр (товчилсон)",
@@ -2458,7 +2507,11 @@
       "files": "Файл",
       "couldNotOpenPhotoPicker": "Зураг сонгох цонхыг нээж чадсангүй. Kilo-г дахин эхлүүлээд оролдоно уу.",
       "maxFilesAllowed": "Хамгийн ихдээ {{displayCount}} файл хавсаргах боломжтой.",
-      "onlyAddingFiles": "Нийт {{total}} файлаас зөвхөн {{accepted}} файлыг нэмж байна (дээд хязгаар {{max}})"
+      "onlyAddingFiles": "Нийт {{total}} файлаас зөвхөн {{accepted}} файлыг нэмж байна (дээд хязгаар {{max}})",
+      "maxFilesAllowed_one": "Хамгийн ихдээ {{displayCount}} файл хавсаргах боломжтой.",
+      "maxFilesAllowed_other": "Хамгийн ихдээ {{displayCount}} файл хавсаргах боломжтой.",
+      "onlyAddingFiles_one": "Нийт {{total}} файлаас зөвхөн {{accepted}} файлыг нэмж байна (дээд хязгаар {{max}})",
+      "onlyAddingFiles_other": "Нийт {{total}} файлаас зөвхөн {{accepted}} файлыг нэмж байна (дээд хязгаар {{max}})"
     },
     "composer": {
       "addAttachment": "Хавсралт нэмэх",
@@ -2476,7 +2529,9 @@
       "discardAttachmentsMessage": "Илгээсэн мессежид хавсаргаагүй файлууд устах болно.",
       "discardAttachmentsTitle": "Хавсралтуудыг устгах уу?",
       "charactersRemaining": "{{count}} тэмдэгт үлдсэн",
-      "insertNewline": "Шинэ мөр оруулах"
+      "insertNewline": "Шинэ мөр оруулах",
+      "charactersRemaining_one": "{{count}} тэмдэгт үлдсэн",
+      "charactersRemaining_other": "{{count}} тэмдэгт үлдсэн"
     },
     "chatLink": {
       "linkCopied": "Холбоос хуулагдлаа",
@@ -2548,7 +2603,9 @@
       "stepsCount_one": "{{steps}} алхам",
       "stepsCount": "{{steps}} алхам",
       "stepsCount_other": "{{steps}} алхам",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Загвар ({{displayCount}})",
+      "modelsCount_other": "Загварууд ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Автомат зөвшөөрөл",
@@ -2588,7 +2645,9 @@
     },
     "toolRun": {
       "sheetTitle": "Хэрэгслийн дуудлага",
-      "condensedLabel": "{{itemCount}} хэсэг; {{last}}"
+      "condensedLabel": "{{itemCount}} хэсэг; {{last}}",
+      "condensedLabel_one": "{{itemCount}} хэсэг; {{last}}",
+      "condensedLabel_other": "{{itemCount}} хэсэг; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2782,9 @@
     "cliCantReceiveFilesTitle": "Энэ сесс файл хүлээн авах боломжгүй",
     "cliCantReceiveFilesMessage": "Энэ сессийг ажиллуулж буй Kilo CLI файл хүлээн авах боломжгүй. Тэр компьютерын CLI-г шинэчлэх эсвэл шинэ сесс рүү хуваалцана уу.",
     "contentlessMessage": "Хуваалцах зүйл алга — текст эсвэл файл оруулаагүй.",
-    "couldNotReadContent": "Хуваалцсан агуулгыг уншиж чадсангүй."
+    "couldNotReadContent": "Хуваалцсан агуулгыг уншиж чадсангүй.",
+    "onlyFirstFilesAttached_one": "Зөвхөн эхний {{displayCount}} файл хавсаргагдана.",
+    "onlyFirstFilesAttached_other": "Зөвхөн эхний {{displayCount}} файл хавсаргагдана."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3154,9 @@
     "couldNotApprove": "Зөвшөөрч чадсангүй",
     "couldNotStart": "Эхлүүлж чадсангүй",
     "channelName": "Идэвхтэй агентууд",
-    "activityKitDisabledBody": "Түгжээтэй дэлгэц дээр идэвхтэй агентуудыг харахын тулд тохиргооноос шууд үйл ажиллагааг идэвхжүүлнэ үү."
+    "activityKitDisabledBody": "Түгжээтэй дэлгэц дээр идэвхтэй агентуудыг харахын тулд тохиргооноос шууд үйл ажиллагааг идэвхжүүлнэ үү.",
+    "openSession": "Нээх",
+    "approveFailed": "Зөвшөөрч чадсангүй. Дахин оролдохын тулд $t(common.approve)-г товшино уу."
   },
   "transcriptionModel": {
     "title": "Яриаг бичвэр болгох загвар",
@@ -3118,15 +3181,7 @@
     "remoteOptionTitle": "Таны компьютер",
     "remoteOptionBody": "Өөрийн машинаасаа `kilo remote` CLI-ээр Kilo-г ажиллуул.",
     "skip": "Танилцуулгыг алгасах",
-    "tutorialLabel": "Заавар",
-    "remoteTitle": "Эхний зайн сессээ эхлүүл",
-    "remoteBody": "Компьютерээ холбоод, эндээс сессээ эхлүүлээрэй.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Одоогоор компьютер холбогдоогүй байна",
-    "remoteEmptyBody": "Холбохын тулд компьютер дээрээ `kilo remote` командыг ажиллуулна уу.",
-    "remoteFound": "Компьютер холбогдлоо",
-    "checkAgain": "Дахин шалгах",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Заавар"
   },
   "appActions": {
     "start": {
@@ -3134,5 +3189,8 @@
       "repositoryUnknown": "Kilo {{repository}}-г GitHub эсвэл GitLab кодын сан гэж хүлээн зөвшөөрөхгүй. Kilo дотор өөр кодын сан сонгоно уу.",
       "repositoryUnsupported": "{{repository}} нь Bitbucket кодын сан — Агент эхлүүлэх үүнийг одоохондоо ашиглаж чадахгүй. Kilo дотор өөр кодын сан сонгоно уу."
     }
+  },
+  "launcher": {
+    "openLastSession": "Сүүлийн сессийг нээх"
   }
 }

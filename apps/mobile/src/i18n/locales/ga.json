@@ -163,6 +163,7 @@
     "useDifferentEmail": "Úsáid seoladh ríomhphoist eile",
     "signInWithApple": "Sínigh isteach le Apple",
     "signInWithGoogle": "Sínigh isteach le Google",
+    "signInWithPasskey": "Sínigh isteach le heochair rochtana",
     "emailAddress": "Seoladh ríomhphoist",
     "emailPlaceholder": "tusa@sampla.com",
     "continueWithEmail": "Lean ar aghaidh le ríomhphost",
@@ -175,6 +176,10 @@
     "termsConnector": " agus ",
     "termsSuffix": ".",
     "moreSignInOptions": "Tuilleadh roghanna sínithe isteach",
+    "passkeyCancelled": "Cuireadh an síniú isteach le heochair rochtana ar ceal. Bain triail eile as.",
+    "passkeyNotFound": "Níl aon eochair rochtana sábháilte don ghléas seo. Sínigh isteach le Apple, Google nó do ríomhphost ina ionad.",
+    "passkeyUnsupported": "Níl eochracha rochtana ar fáil ar an ngléas seo. Sínigh isteach le Apple, Google nó do ríomhphost ina ionad.",
+    "passkeyFailed": "Níorbh fhéidir síniú isteach le heochair rochtana. Bain triail eile as.",
     "couldNotCompleteSignIn": "Níorbh fhéidir an síniú isteach a chríochnú. Bain triail as arís le do thoil.",
     "sessionEnded": "Chríochnaigh do sheisiún. Sínigh isteach arís le do thoil.",
     "signInCodeExpired": "Tá do chód sínithe isteach imithe in éag. Bain triail as arís le do thoil.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Cuntas tástála",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO fiontair"
+    "providerEnterpriseSso": "SSO fiontair",
+    "passkeysTitle": "Eochracha rochtana",
+    "passkeysSubtitle": "Sínigh isteach gan phasfhocal",
+    "passkeysEmpty": "Níl aon eochracha rochtana fós",
+    "passkeysEmptyHint": "$t(profile.addPasskey) chun síniú isteach gan phasfhocal.",
+    "passkeysCouldNotLoad": "Níorbh fhéidir eochracha rochtana a lódáil",
+    "passkeysLoadFailed": "Níl eochracha rochtana ar fáil go dtí go lódálfar é seo.",
+    "addPasskey": "Cuir eochair rochtana leis",
+    "passkeyDefaultName": "Eochair rochtana",
+    "passkeyAddedOn": "Curtha leis {{date}}",
+    "passkeyAdded": "Eochair rochtana curtha leis.",
+    "passkeyAddFailed": "Níorbh fhéidir eochair rochtana a chur leis. Bain triail eile as.",
+    "passkeyAddUnsupported": "Ní féidir leis an ngléas seo eochracha rochtana a chruthú.",
+    "passkeyAddCancelled": "Cuireadh cruthú na heochrach rochtana ar ceal.",
+    "passkeyRemoved": "Eochair rochtana bainte.",
+    "passkeyRemoveFailed": "Níorbh fhéidir an eochair rochtana sin a bhaint. Bain triail eile as.",
+    "passkeyRenamed": "Eochair rochtana athainmnithe.",
+    "passkeyName": "Ainm na heochrach rochtana",
+    "renamePasskey": "Athainmnigh eochair rochtana",
+    "removePasskey": "Bain eochair rochtana",
+    "removePasskeyTitle": "Bain eochair rochtana?",
+    "removePasskeyMessage": "Ní bheidh tú in ann síniú isteach leis an eochair rochtana seo a thuilleadh."
   },
   "preferences": {
     "general": "Ginearálta",
@@ -349,7 +375,32 @@
       "fileLoadedCount_many": "{{displayCount}} gcomhad lódáilte",
       "fileLoadedOfTotalCount_two": "{{displayCount}} chomhad lódáilte de {{total}}",
       "fileLoadedOfTotalCount_few": "{{displayCount}} chomhad lódáilte de {{total}}",
-      "fileLoadedOfTotalCount_many": "{{displayCount}} gcomhad lódáilte de {{total}}"
+      "fileLoadedOfTotalCount_many": "{{displayCount}} gcomhad lódáilte de {{total}}",
+      "expandAllLines_one": "Leathnaigh na línte go léir ({{displayCount}})",
+      "expandAllLines_other": "Leathnaigh na línte go léir ({{displayCount}})",
+      "expandAllLines_two": "Leathnaigh na línte go léir ({{displayCount}})",
+      "expandAllLines_few": "Leathnaigh na línte go léir ({{displayCount}})",
+      "expandAllLines_many": "Leathnaigh na línte go léir ({{displayCount}})",
+      "expandLines_one": "Leathnaigh {{displayCount}} líne ({{start}}–{{end}})",
+      "expandLines_other": "Leathnaigh {{displayCount}} líne ({{start}}–{{end}})",
+      "expandLines_two": "Leathnaigh {{displayCount}} líne ({{start}}–{{end}})",
+      "expandLines_few": "Leathnaigh {{displayCount}} líne ({{start}}–{{end}})",
+      "expandLines_many": "Leathnaigh {{displayCount}} líne ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Leathnaigh {{displayCount}} líne comhthéacs",
+      "expandLinesOfContext_other": "Leathnaigh {{displayCount}} líne comhthéacs",
+      "expandLinesOfContext_two": "Leathnaigh {{displayCount}} líne comhthéacs",
+      "expandLinesOfContext_few": "Leathnaigh {{displayCount}} líne comhthéacs",
+      "expandLinesOfContext_many": "Leathnaigh {{displayCount}} líne comhthéacs",
+      "expandMoreLines_one": "Leathnaigh {{displayCount}} líne eile ({{start}}–{{end}})",
+      "expandMoreLines_other": "Leathnaigh {{displayCount}} líne eile ({{start}}–{{end}})",
+      "expandMoreLines_two": "Leathnaigh {{displayCount}} líne eile ({{start}}–{{end}})",
+      "expandMoreLines_few": "Leathnaigh {{displayCount}} líne eile ({{start}}–{{end}})",
+      "expandMoreLines_many": "Leathnaigh {{displayCount}} líne eile ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} de {{total}} comhad lódáilte",
+      "loadedOfTotalFiles_other": "{{loaded}} de {{total}} comhad lódáilte",
+      "loadedOfTotalFiles_two": "{{loaded}} de {{total}} comhad lódáilte",
+      "loadedOfTotalFiles_few": "{{loaded}} de {{total}} comhad lódáilte",
+      "loadedOfTotalFiles_many": "{{loaded}} de {{total}} comhad lódáilte"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ gan líne nua ag deireadh an chomhaid",
@@ -548,7 +599,12 @@
         "outdatedOnPath": "As dáta ar {{path}}"
       },
       "deletedUser": "úsáideoir scriosta",
-      "replyForbiddenTerm": "Níl cead agat freagra a thabhairt ar an {{term}} seo."
+      "replyForbiddenTerm": "Níl cead agat freagra a thabhairt ar an {{term}} seo.",
+      "moreLinesAbove_one": "… {{displayCount}} líne eile thuas",
+      "moreLinesAbove_other": "… {{displayCount}} líne eile thuas",
+      "moreLinesAbove_two": "… {{displayCount}} líne eile thuas",
+      "moreLinesAbove_few": "… {{displayCount}} líne eile thuas",
+      "moreLinesAbove_many": "… {{displayCount}} líne eile thuas"
     },
     "couldNotOpenGitHubAppSettings": "Níorbh fhéidir socruithe na haipe GitHub a oscailt.",
     "installKiloGitHubApp": "Suiteáil aip GitHub Kilo",
@@ -589,8 +645,8 @@
       "pending": "{{displayCount}} ar feitheamh",
       "skipped": "{{displayCount}} scipeáilte",
       "checksCount": "seiceálacha: {{displayCount}}",
-      "checksCount_one": "seiceáil: {{displayCount}}",
-      "checksCount_two": "sheiceáil: {{displayCount}}",
+      "checksCount_one": "seiceálacha: {{displayCount}}",
+      "checksCount_two": "seiceálacha: {{displayCount}}",
       "checksCount_few": "seiceálacha: {{displayCount}}",
       "checksCount_many": "seiceálacha: {{displayCount}}",
       "checksCount_other": "seiceálacha: {{displayCount}}",
@@ -733,7 +789,12 @@
       "statusContext": "Comhthéacs",
       "lineLabel": "Líne {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(folamh)"
+      "emptyLine": "(folamh)",
+      "truncationBanner_one": "Tá na chéad {{limit}} chomhad as {{total}} comhad athraithe á dtaispeáint — teorainn API GitHub.",
+      "truncationBanner_other": "Tá na chéad {{limit}} chomhad as {{total}} comhad athraithe á dtaispeáint — teorainn API GitHub.",
+      "truncationBanner_two": "Tá na chéad {{limit}} chomhad as {{total}} comhad athraithe á dtaispeáint — teorainn API GitHub.",
+      "truncationBanner_few": "Tá na chéad {{limit}} chomhad as {{total}} comhad athraithe á dtaispeáint — teorainn API GitHub.",
+      "truncationBanner_many": "Tá na chéad {{limit}} chomhad as {{total}} comhad athraithe á dtaispeáint — teorainn API GitHub."
     },
     "linkPasteClipboardEmpty": "Tá an ghearrthaisce folamh.",
     "linkPasteNotAPullRequest": "Ní nasc d’iarratas tarraingthe ná d’iarratas cumaisc é seo",
@@ -810,7 +871,7 @@
     "previewFullDescription": "Taispeánann fógraí téacs na teachtaireachta ar do scáileán glasála.",
     "previewGenericDescription": "Léiríonn na fógraí gur tharla rud éigin. Oscail Kilo chun an teachtaireacht a léamh.",
     "channel": {
-      "agent": "Seisiúin gníomhairí",
+      "agentProgress": "Dul chun cinn na ngníomhairí",
       "chat": "Teachtaireachtaí comhrá",
       "kiloclaw": "Gníomhaíocht KiloClaw",
       "balance": "Foláirimh iarmhéid",
@@ -827,6 +888,15 @@
       "kiloclawActivitySubtitle": "ásc réidh nó teipthe, gníomhartha sceidealaithe",
       "balanceAlertsSubtitle": "rabhaidh faoi iarmhéid íseal na heagraíochta",
       "securityFindingsSubtitle": "torthaí nua agus meabhrúcháin SLA"
+    },
+    "action": {
+      "openSession": "Oscail an seisiún"
+    },
+    "needsInputAction": {
+      "approved": "Tá an t-iarratas ceadaithe",
+      "replied": "Tá an freagra seolta",
+      "failed": "Níorbh fhéidir freagra a thabhairt. Tapáil arís chun iarracht eile a dhéanamh.",
+      "unavailable": "Níl an t-iarratas seo ag fanacht a thuilleadh."
     }
   },
   "tabs": {
@@ -907,7 +977,12 @@
       "uploadFailed": "Theip ar an uaslódáil.",
       "failedToUploadFile": "Níorbh fhéidir an comhad a uaslódáil: {{reason}}.",
       "nothingToPaste": "Níl aon rud le greamú.",
-      "metadataStripFailed": "Níorbh fhéidir meiteashonraí an ghrianghraif a bhaint."
+      "metadataStripFailed": "Níorbh fhéidir meiteashonraí an ghrianghraif a bhaint.",
+      "limit_one": "Is féidir leat suas le {{displayCount}} comhad a cheangal.",
+      "limit_other": "Is féidir leat suas le {{displayCount}} comhad a cheangal.",
+      "limit_two": "Is féidir leat suas le {{displayCount}} comhad a cheangal.",
+      "limit_few": "Is féidir leat suas le {{displayCount}} comhad a cheangal.",
+      "limit_many": "Is féidir leat suas le {{displayCount}} comhad a cheangal."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1660,7 +1735,17 @@
       "syncFindings": "Sioncronaigh torthaí",
       "syncNow": "Sioncronaigh anois",
       "syncQueued": "Sioncronú curtha sa scuaine",
-      "syncStatusUnavailable": "Níl stádas an tsioncronaithe ar fáil."
+      "syncStatusUnavailable": "Níl stádas an tsioncronaithe ar fáil.",
+      "daysOverdue_one": "{{displayCount}} lá thar téarma",
+      "daysOverdue_other": "{{displayCount}} lá thar téarma",
+      "daysOverdue_two": "{{displayCount}} lá thar téarma",
+      "daysOverdue_few": "{{displayCount}} lá thar téarma",
+      "daysOverdue_many": "{{displayCount}} lá thar téarma",
+      "findingsCount_one": "Torthaí: {{displayCount}}",
+      "findingsCount_other": "Torthaí: {{displayCount}}",
+      "findingsCount_two": "Torthaí: {{displayCount}}",
+      "findingsCount_few": "Torthaí: {{displayCount}}",
+      "findingsCount_many": "Torthaí: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Torthaí oscailte",
@@ -2185,20 +2270,7 @@
       "continueFrom": "Táthar ag leanúint ar aghaidh le {{title}}.",
       "importingSession": "Ag iompórtáil an tseisiúin",
       "cliCannotContinue": "Ní féidir leis an CLI seo leanúint ar aghaidh le seisiún. Roghnaigh Cloud Agent nó CLI eile.",
-      "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil.",
-      "sandbox": "Bosca gaineamh",
-      "sandboxAccessibility": "Bosca gaineamh: {{label}}",
-      "sandboxDefaultWithDestination": "Réamhshocrú · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Beag",
-      "sandboxInstanceShared": "Roinnte",
-      "sandboxInstanceLarge": "Mór",
-      "sandboxInstanceDevcontainer": "Coimeádán forbartha",
-      "sandboxInstanceProviderDefault": "Réamhshocrú an soláthraithe",
-      "sandboxCouldNotLoad": "Níorbh fhéidir roghanna na bosca gaineamh a lódáil",
-      "sandboxUnavailable": "Níl an bosca gaineamh seo ar fáil. Roghnaigh bosca gaineamh eile nó Réamhshocrú.",
-      "sandboxUseDefault": "Úsáid Réamhshocrú"
+      "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} chomhad.",
@@ -2225,7 +2297,23 @@
       "updateTodos": "Nuashonraigh tascanna",
       "linesBadge": "{{displayCount}} líne",
       "filesBadge": "{{displayCount}} comhad",
-      "matchesBadge": "{{displayCount}} toradh"
+      "matchesBadge": "{{displayCount}} toradh",
+      "filesBadge_one": "{{displayCount}} comhad",
+      "filesBadge_other": "{{displayCount}} comhad",
+      "filesBadge_two": "{{displayCount}} comhad",
+      "filesBadge_few": "{{displayCount}} comhad",
+      "filesBadge_many": "{{displayCount}} comhad",
+      "linesBadge_one": "{{displayCount}} líne",
+      "linesBadge_other": "{{displayCount}} líne",
+      "linesBadge_two": "{{displayCount}} líne",
+      "linesBadge_few": "{{displayCount}} líne",
+      "linesBadge_many": "{{displayCount}} líne",
+      "matchesBadge_one": "{{displayCount}} toradh",
+      "matchesBadge_other": "{{displayCount}} toradh",
+      "matchesBadge_two": "{{displayCount}} toradh",
+      "matchesBadge_few": "{{displayCount}} toradh",
+      "matchesBadge_many": "{{displayCount}} toradh",
+      "noOutput": "Níl aon aschur ann."
     },
     "readToolMarkdown": {
       "linesTruncated": "línte {{start}}–{{end}} (teasctha)",
@@ -2524,7 +2612,17 @@
       "files": "Comhaid",
       "couldNotOpenPhotoPicker": "Níorbh fhéidir roghnóir na ngrianghraf a oscailt. Atosaigh Kilo agus bain triail as arís.",
       "maxFilesAllowed": "Ní cheadaítear níos mó ná {{displayCount}} comhad.",
-      "onlyAddingFiles": "Ní chuirfear leis ach {{accepted}} comhad as {{total}} (uasmhéid {{max}})"
+      "onlyAddingFiles": "Ní chuirfear leis ach {{accepted}} comhad as {{total}} (uasmhéid {{max}})",
+      "maxFilesAllowed_one": "Ní cheadaítear níos mó ná {{displayCount}} comhad.",
+      "maxFilesAllowed_other": "Ní cheadaítear níos mó ná {{displayCount}} comhad.",
+      "maxFilesAllowed_two": "Ní cheadaítear níos mó ná {{displayCount}} comhad.",
+      "maxFilesAllowed_few": "Ní cheadaítear níos mó ná {{displayCount}} comhad.",
+      "maxFilesAllowed_many": "Ní cheadaítear níos mó ná {{displayCount}} comhad.",
+      "onlyAddingFiles_one": "Ní chuirfear leis ach {{accepted}} comhad as {{total}} (uasmhéid {{max}})",
+      "onlyAddingFiles_other": "Ní chuirfear leis ach {{accepted}} comhad as {{total}} (uasmhéid {{max}})",
+      "onlyAddingFiles_two": "Ní chuirfear leis ach {{accepted}} comhad as {{total}} (uasmhéid {{max}})",
+      "onlyAddingFiles_few": "Ní chuirfear leis ach {{accepted}} comhad as {{total}} (uasmhéid {{max}})",
+      "onlyAddingFiles_many": "Ní chuirfear leis ach {{accepted}} comhad as {{total}} (uasmhéid {{max}})"
     },
     "composer": {
       "addAttachment": "Cuir ceangaltán leis",
@@ -2542,7 +2640,12 @@
       "discardAttachmentsMessage": "Scriosfar comhaid uaslódáilte nach bhfuil ceangailte le teachtaireachtaí seolta.",
       "discardAttachmentsTitle": "An gcaithfear na ceangaltáin ar lár?",
       "charactersRemaining": "carachtair fágtha: {{count}}",
-      "insertNewline": "Cuir líne nua isteach"
+      "insertNewline": "Cuir líne nua isteach",
+      "charactersRemaining_one": "carachtair fágtha: {{count}}",
+      "charactersRemaining_other": "carachtair fágtha: {{count}}",
+      "charactersRemaining_two": "carachtair fágtha: {{count}}",
+      "charactersRemaining_few": "carachtair fágtha: {{count}}",
+      "charactersRemaining_many": "carachtair fágtha: {{count}}"
     },
     "chatLink": {
       "linkCopied": "Nasc cóipeáilte",
@@ -2617,7 +2720,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_two": "{{steps}} chéim",
       "stepsCount_few": "{{steps}} chéim",
-      "stepsCount_many": "{{steps}} gcéim"
+      "stepsCount_many": "{{steps}} gcéim",
+      "modelsCount_one": "Samhail ({{displayCount}})",
+      "modelsCount_other": "Samhlacha ({{displayCount}})",
+      "modelsCount_two": "Samhlacha ({{displayCount}})",
+      "modelsCount_few": "Samhlacha ({{displayCount}})",
+      "modelsCount_many": "Samhlacha ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Ceadaigh go huathoibríoch",
@@ -2657,7 +2765,12 @@
     },
     "toolRun": {
       "sheetTitle": "Glaonna uirlise",
-      "condensedLabel": "{{itemCount}} mír; {{last}}"
+      "condensedLabel": "{{itemCount}} mír; {{last}}",
+      "condensedLabel_one": "{{itemCount}} mír; {{last}}",
+      "condensedLabel_other": "{{itemCount}} mír; {{last}}",
+      "condensedLabel_two": "{{itemCount}} mír; {{last}}",
+      "condensedLabel_few": "{{itemCount}} mír; {{last}}",
+      "condensedLabel_many": "{{itemCount}} mír; {{last}}"
     }
   },
   "bootstrap": {
@@ -2792,7 +2905,12 @@
     "cliCantReceiveFilesTitle": "Ní féidir leis an seisiún seo comhaid a fháil",
     "cliCantReceiveFilesMessage": "Ní féidir leis an Kilo CLI atá ag rith an tseisiúin seo comhaid a fháil. Nuashonraigh an CLI ar an meaisín sin nó comhroinn le seisiún nua ina ionad.",
     "contentlessMessage": "Níl aon rud le comhroinnt — níor cuireadh aon téacs ná comhad san áireamh.",
-    "couldNotReadContent": "Níorbh fhéidir an t-ábhar comhroinnte a léamh."
+    "couldNotReadContent": "Níorbh fhéidir an t-ábhar comhroinnte a léamh.",
+    "onlyFirstFilesAttached_one": "Ní cheanglófar ach na chéad {{displayCount}} chomhad.",
+    "onlyFirstFilesAttached_other": "Ní cheanglófar ach na chéad {{displayCount}} chomhad.",
+    "onlyFirstFilesAttached_two": "Ní cheanglófar ach na chéad {{displayCount}} chomhad.",
+    "onlyFirstFilesAttached_few": "Ní cheanglófar ach na chéad {{displayCount}} chomhad.",
+    "onlyFirstFilesAttached_many": "Ní cheanglófar ach na chéad {{displayCount}} chomhad."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3165,7 +3283,9 @@
     "couldNotApprove": "Níorbh fhéidir ceadú",
     "couldNotStart": "Níorbh fhéidir tosú",
     "channelName": "Gníomhairí gníomhacha",
-    "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála."
+    "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála.",
+    "openSession": "Oscail",
+    "approveFailed": "Níorbh fhéidir ceadú. Tapáil $t(common.approve) chun triail eile a bhaint as."
   },
   "transcriptionModel": {
     "title": "Samhail tras-scríobh",
@@ -3190,15 +3310,7 @@
     "remoteOptionTitle": "Do ríomhaire",
     "remoteOptionBody": "Rith Kilo ar do mheicín féin tríd an CLI `kilo remote`.",
     "skip": "Scipeáil an turas",
-    "tutorialLabel": "Treoir",
-    "remoteTitle": "Tosaigh do chéad seisiún ciar",
-    "remoteBody": "Ceangail do ríomhaire, ansin tosaigh an seisiún anseo.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Níl ríomhaire ceangailte fós",
-    "remoteEmptyBody": "Chun é a cheangal, rith `kilo remote` ar do ríomhaire.",
-    "remoteFound": "Ríomhaire ceangailte",
-    "checkAgain": "Seiceáil arís",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Treoir"
   },
   "appActions": {
     "start": {
@@ -3206,5 +3318,8 @@
       "repositoryUnknown": "Ní aithníonn Kilo {{repository}} mar stór GitHub nó GitLab. Roghnaigh stór eile i Kilo.",
       "repositoryUnsupported": "Is stór Bitbucket é {{repository}} — Ní féidir le Tosaigh gníomhaire é a úsáid fós. Roghnaigh stór eile i Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Oscail an seisiún deireanach"
   }
 }

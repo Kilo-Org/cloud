@@ -163,6 +163,7 @@
     "useDifferentEmail": "ಬೇರೆ ಇಮೇಲ್ ಬಳಸಿ",
     "signInWithApple": "Apple ಮೂಲಕ ಸೈನ್ ಇನ್ ಮಾಡಿ",
     "signInWithGoogle": "Google ಮೂಲಕ ಸೈನ್ ಇನ್ ಮಾಡಿ",
+    "signInWithPasskey": "ಪಾಸ್ಕೀ ಮೂಲಕ ಸೈನ್ ಇನ್ ಮಾಡಿ",
     "emailAddress": "ಇಮೇಲ್ ವಿಳಾಸ",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "ಇಮೇಲ್‌ನೊಂದಿಗೆ ಮುಂದುವರಿಸಿ",
@@ -175,6 +176,10 @@
     "termsConnector": " ಮತ್ತು ",
     "termsSuffix": "ಗೆ ಒಪ್ಪುತ್ತೀರಿ.",
     "moreSignInOptions": "ಇನ್ನಷ್ಟು ಸೈನ್ ಇನ್ ಆಯ್ಕೆಗಳು",
+    "passkeyCancelled": "ಪಾಸ್ಕೀ ಮೂಲಕ ಸೈನ್ ಇನ್ ರದ್ದಾಗಿದೆ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "passkeyNotFound": "ಈ ಸಾಧನಕ್ಕೆ ಯಾವುದೇ ಪಾಸ್ಕೀ ಉಳಿಸಲಾಗಿಲ್ಲ. ಬದಲಾಗಿ Apple, Google ಅಥವಾ ನಿಮ್ಮ ಇಮೇಲ್‌ನಿಂದ ಸೈನ್ ಇನ್ ಮಾಡಿ.",
+    "passkeyUnsupported": "ಈ ಸಾಧನದಲ್ಲಿ ಪಾಸ್ಕೀ ಲಭ್ಯವಿಲ್ಲ. ಬದಲಾಗಿ Apple, Google ಅಥವಾ ನಿಮ್ಮ ಇಮೇಲ್‌ನಿಂದ ಸೈನ್ ಇನ್ ಮಾಡಿ.",
+    "passkeyFailed": "ಪಾಸ್ಕೀ ಮೂಲಕ ಸೈನ್ ಇನ್ ಆಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "couldNotCompleteSignIn": "ಸೈನ್ ಇನ್ ಪೂರ್ಣಗೊಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "sessionEnded": "ನಿಮ್ಮ ಸೆಷನ್ ಅಂತ್ಯಗೊಂಡಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಸೈನ್ ಇನ್ ಮಾಡಿ.",
     "signInCodeExpired": "ನಿಮ್ಮ ಸೈನ್ ಇನ್ ಕೋಡ್‌ನ ಅವಧಿ ಮೀರಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "ಪರೀಕ್ಷಾ ಖಾತೆ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "ಸಾಂಸ್ಥಿಕ SSO"
+    "providerEnterpriseSso": "ಸಾಂಸ್ಥಿಕ SSO",
+    "passkeysTitle": "ಪಾಸ್ಕೀಗಳು",
+    "passkeysSubtitle": "ಪಾಸ್‌ವರ್ಡ್ ಇಲ್ಲದೆ ಸೈನ್ ಇನ್ ಮಾಡಿ",
+    "passkeysEmpty": "ಇನ್ನೂ ಯಾವುದೇ ಪಾಸ್ಕೀ ಇಲ್ಲ",
+    "passkeysEmptyHint": "$t(profile.addPasskey) ಮಾಡಿ ಪಾಸ್‌ವರ್ಡ್ ಇಲ್ಲದೆ ಸೈನ್ ಇನ್ ಮಾಡಿ.",
+    "passkeysCouldNotLoad": "ಪಾಸ್ಕೀಗಳು ಲೋಡ್ ಆಗಲಿಲ್ಲ",
+    "passkeysLoadFailed": "ಇದು ಲೋಡ್ ಆಗುವವರೆಗೆ ಪಾಸ್ಕೀಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+    "addPasskey": "ಒಂದು ಪಾಸ್ಕೀ ಸೇರಿಸಿ",
+    "passkeyDefaultName": "ಪಾಸ್ಕೀ",
+    "passkeyAddedOn": "{{date}} ಸೇರಿಸಲಾಗಿದೆ",
+    "passkeyAdded": "ಪಾಸ್ಕೀ ಸೇರಿಸಲಾಗಿದೆ.",
+    "passkeyAddFailed": "ಪಾಸ್ಕೀ ಸೇರಿಸಲಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "passkeyAddUnsupported": "ಈ ಸಾಧನವು ಪಾಸ್ಕೀಗಳನ್ನು ರಚಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+    "passkeyAddCancelled": "ಪಾಸ್ಕೀ ರಚನೆ ರದ್ದಾಗಿದೆ.",
+    "passkeyRemoved": "ಪಾಸ್ಕೀ ತೆಗೆದುಹಾಕಲಾಗಿದೆ.",
+    "passkeyRemoveFailed": "ಆ ಪಾಸ್ಕೀ ತೆಗೆದುಹಾಕಲಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "passkeyRenamed": "ಪಾಸ್ಕೀ ಮರುನಾಮಕರಣವಾಗಿದೆ.",
+    "passkeyName": "ಪಾಸ್ಕೀ ಹೆಸರು",
+    "renamePasskey": "ಪಾಸ್ಕೀ ಮರುನಾಮಕರಣ ಮಾಡಿ",
+    "removePasskey": "ಪಾಸ್ಕೀ ತೆಗೆದುಹಾಕಿ",
+    "removePasskeyTitle": "ಪಾಸ್ಕೀ ತೆಗೆದುಹಾಕುವುದೇ?",
+    "removePasskeyMessage": "ಈ ಪಾಸ್ಕೀಯಿಂದ ಇನ್ನು ಸೈನ್ ಇನ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ."
   },
   "preferences": {
     "general": "ಸಾಮಾನ್ಯ",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "ಒಟ್ಟು {{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{displayCount}} ಲೋಡ್ ಆಗಿವೆ",
       "filesStillLoading": "ಫೈಲ್‌ಗಳು ಇನ್ನೂ ಲೋಡ್ ಆಗುತ್ತಿವೆ. ರಿಫ್ರೆಶ್ ಮಾಡಲು ಕೆಳಗೆ ಎಳೆಯಿರಿ.",
       "goToOverview": "ಅವಲೋಕನಕ್ಕೆ ಹೋಗಿ",
-      "goToOverviewTab": "ಅವಲೋಕನ ಟ್ಯಾಬ್‌ಗೆ ಹೋಗಿ"
+      "goToOverviewTab": "ಅವಲೋಕನ ಟ್ಯಾಬ್‌ಗೆ ಹೋಗಿ",
+      "expandAllLines_one": "ಎಲ್ಲಾ {{displayCount}} ಸಾಲು ತೋರಿಸಿ",
+      "expandAllLines_other": "ಎಲ್ಲಾ {{displayCount}} ಸಾಲುಗಳನ್ನು ತೋರಿಸಿ",
+      "expandLines_one": "{{displayCount}} ಸಾಲು ತೋರಿಸಿ ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} ಸಾಲುಗಳನ್ನು ತೋರಿಸಿ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "ಸುತ್ತಲಿನ {{displayCount}} ಸಾಲು ತೋರಿಸಿ",
+      "expandLinesOfContext_other": "ಸುತ್ತಲಿನ {{displayCount}} ಸಾಲುಗಳನ್ನು ತೋರಿಸಿ",
+      "expandMoreLines_one": "ಇನ್ನೂ {{displayCount}} ಸಾಲು ತೋರಿಸಿ ({{start}}–{{end}})",
+      "expandMoreLines_other": "ಇನ್ನೂ {{displayCount}} ಸಾಲುಗಳನ್ನು ತೋರಿಸಿ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{loaded}} ಲೋಡ್ ಮಾಡಲಾಗಿದೆ",
+      "loadedOfTotalFiles_other": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{loaded}} ಲೋಡ್ ಮಾಡಲಾಗಿದೆ"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ಫೈಲ್‌ನ ಕೊನೆಯಲ್ಲಿ ಹೊಸ ಸಾಲು ಇಲ್ಲ",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "{{path}} — ಹಳೆಯ ಆವೃತ್ತಿಯ ಕಾಮೆಂಟ್"
       },
       "deletedUser": "ಅಳಿಸಲಾದ ಬಳಕೆದಾರ",
-      "replyForbiddenTerm": "ಈ {{term}}‌ಗೆ ಉತ್ತರಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ."
+      "replyForbiddenTerm": "ಈ {{term}}‌ಗೆ ಉತ್ತರಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
+      "moreLinesAbove_one": "… ಮೇಲೆ ಇನ್ನೂ {{displayCount}} ಸಾಲು.",
+      "moreLinesAbove_other": "… ಮೇಲೆ ಇನ್ನೂ {{displayCount}} ಸಾಲುಗಳಿವೆ."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ಆ್ಯಪ್‌ನ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "installKiloGitHubApp": "Kilo GitHub ಆ್ಯಪ್ ಸ್ಥಾಪಿಸಿ",
@@ -706,7 +744,9 @@
       "statusContext": "ಸುತ್ತಲಿನ ಸಾಲುಗಳು",
       "lineLabel": "{{status}} ಸಾಲು {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} ಸಾಲು: {{text}}",
-      "emptyLine": "(ಖಾಲಿ)"
+      "emptyLine": "(ಖಾಲಿ)",
+      "truncationBanner_one": "ಬದಲಾದ {{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ ಮೊದಲ {{limit}} ಫೈಲ್‌ಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ — ಇದು GitHub API ಮಿತಿ.",
+      "truncationBanner_other": "ಬದಲಾದ {{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ ಮೊದಲ {{limit}} ಫೈಲ್‌ಗಳನ್ನು ತೋರಿಸಲಾಗುತ್ತಿದೆ — ಇದು GitHub API ಮಿತಿ."
     },
     "linkPasteClipboardEmpty": "ಕ್ಲಿಪ್‌ಬೋರ್ಡ್ ಖಾಲಿಯಾಗಿದೆ.",
     "linkPasteNotAPullRequest": "ಇದು ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಲ್ಲ",
@@ -783,7 +823,7 @@
     "previewFullDescription": "ಅಧಿಸೂಚನೆಗಳು ನಿಮ್ಮ ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ಸಂದೇಶದ ಪಠ್ಯವನ್ನು ತೋರಿಸುತ್ತವೆ.",
     "previewGenericDescription": "ಅಧಿಸೂಚನೆಗಳು ಹೊಸ ಚಟುವಟಿಕೆ ನಡೆದಿದೆ ಎಂದು ಮಾತ್ರ ತಿಳಿಸುತ್ತವೆ. ಸಂದೇಶವನ್ನು ಓದಲು Kilo ತೆರೆಯಿರಿ.",
     "channel": {
-      "agent": "ಏಜೆಂಟ್ ಸೆಶನ್‌ಗಳು",
+      "agentProgress": "ಏಜೆಂಟ್ ಪ್ರಗತಿ",
       "chat": "ಚಾಟ್ ಸಂದೇಶಗಳು",
       "kiloclaw": "KiloClaw ಚಟುವಟಿಕೆ",
       "balance": "ಉಳಿಕೆ ಮೊತ್ತದ ಎಚ್ಚರಿಕೆಗಳು",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "ಇನ್‌ಸ್ಟನ್ಸ್ ಸಿದ್ಧವಾಗಿದೆ/ವಿಫಲವಾಗಿದೆ, ನಿಗದಿತ ಕಾರ್ಯಗಳು",
       "balanceAlertsSubtitle": "ಸಂಸ್ಥೆಯ ಉಳಿಕೆ ಕಡಿಮೆಯಾದಾಗ ಎಚ್ಚರಿಕೆಗಳು",
       "securityFindingsSubtitle": "ಹೊಸದಾಗಿ ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಗಳು ಮತ್ತು SLA ಜ್ಞಾಪನೆಗಳು"
+    },
+    "action": {
+      "openSession": "ಸೆಷನ್ ತೆರೆಯಿರಿ"
+    },
+    "needsInputAction": {
+      "approved": "ವಿನಂತಿಯನ್ನು ಅನುಮೋದಿಸಲಾಗಿದೆ",
+      "replied": "ಉತ್ತರ ಕಳುಹಿಸಲಾಗಿದೆ",
+      "failed": "ಉತ್ತರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮರುಪ್ರಯತ್ನಿಸಲು ಮತ್ತೆ ಟ್ಯಾಪ್ ಮಾಡಿ.",
+      "unavailable": "ಈ ವಿನಂತಿಯು ಈಗ ಕಾಯುತ್ತಿಲ್ಲ."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "ಅಪ್‌ಲೋಡ್ ವಿಫಲವಾಗಿದೆ.",
       "failedToUploadFile": "ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ: {{reason}}.",
       "nothingToPaste": "ಅಂಟಿಸಲು ಏನೂ ಇಲ್ಲ.",
-      "metadataStripFailed": "ಫೋಟೋದ ಮೆಟಾಡೇಟಾವನ್ನು ತೆಗೆದುಹಾಕಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
+      "metadataStripFailed": "ಫೋಟೋದ ಮೆಟಾಡೇಟಾವನ್ನು ತೆಗೆದುಹಾಕಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "limit_one": "ನೀವು ಗರಿಷ್ಠ {{displayCount}} ಫೈಲ್ ಲಗತ್ತಿಸಬಹುದು.",
+      "limit_other": "ನೀವು ಗರಿಷ್ಠ {{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಲಗತ್ತಿಸಬಹುದು."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಗಳನ್ನು ಸಿಂಕ್ ಮಾಡಿ",
       "syncNow": "ಈಗ ಸಿಂಕ್ ಮಾಡಿ",
       "syncQueued": "ಸಿಂಕ್ ಅನ್ನು ಸರದಿಗೆ ಸೇರಿಸಲಾಗಿದೆ",
-      "syncStatusUnavailable": "ಸಿಂಕ್ ಸ್ಥಿತಿ ಲಭ್ಯವಿಲ್ಲ."
+      "syncStatusUnavailable": "ಸಿಂಕ್ ಸ್ಥಿತಿ ಲಭ್ಯವಿಲ್ಲ.",
+      "daysOverdue_one": "ಗಡುವು ಮೀರಿ {{displayCount}} ದಿನ",
+      "daysOverdue_other": "ಗಡುವು ಮೀರಿ {{displayCount}} ದಿನಗಳಾಗಿವೆ",
+      "findingsCount_one": "ಪತ್ತೆಯಾದ {{displayCount}} ಸಮಸ್ಯೆ",
+      "findingsCount_other": "ಪತ್ತೆಯಾದ {{displayCount}} ಸಮಸ್ಯೆಗಳು"
     },
     "dashboardMetrics": {
       "openFindings": "ಪತ್ತೆಯಾದ ಬಾಕಿ ಸಮಸ್ಯೆಗಳು",
@@ -2131,20 +2186,7 @@
       "continueFrom": "{{title}} ಅನ್ನು ಮುಂದುವರಿಸಲಾಗುತ್ತಿದೆ.",
       "importingSession": "ಸೆಶನ್ ಆಮದು ಆಗುತ್ತಿದೆ",
       "cliCannotContinue": "ಈ CLI ಮೂಲಕ ಸೆಶನ್ ಅನ್ನು ಮುಂದುವರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. Cloud Agent ಅಥವಾ ಇನ್ನೊಂದು CLI ಅನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
-      "importFailed": "ಈ ಸೆಶನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "sandbox": "ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್",
-      "sandboxAccessibility": "ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್: {{label}}",
-      "sandboxDefaultWithDestination": "ಡೀಫಾಲ್ಟ್ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "ಸಣ್ಣ",
-      "sandboxInstanceShared": "ಹಂಚಿದ",
-      "sandboxInstanceLarge": "ದೊಡ್ಡದು",
-      "sandboxInstanceDevcontainer": "ಡೆವ್ ಕಂಟೇನರ್",
-      "sandboxInstanceProviderDefault": "ಪೂರೈಕೆದಾರರ ಡೀಫಾಲ್ಟ್",
-      "sandboxCouldNotLoad": "ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್ ಆಯ್ಕೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
-      "sandboxUnavailable": "ಈ ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್ ಲಭ್ಯವಿಲ್ಲ. ಬೇರೊಂದು ಸ್ಯಾಂಡ್ಬಾಕ್ಸ್ ಅಥವಾ ಡೀಫಾಲ್ಟ್ ಆಯ್ಕೆ ಮಾಡಿ.",
-      "sandboxUseDefault": "ಡೀಫಾಲ್ಟ್ ಬಳಸಿ"
+      "importFailed": "ಈ ಸೆಶನ್ ಅನ್ನು ಆಮದು ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ಫೈಲ್ ಅನ್ನು ನವೀಕರಿಸಲಾಗಿದೆ.",
@@ -2168,7 +2210,14 @@
       "updateTodos": "ಕಾರ್ಯಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ",
       "linesBadge": "{{displayCount}} ಸಾಲುಗಳು",
       "filesBadge": "{{displayCount}} ಫೈಲ್‌ಗಳು",
-      "matchesBadge": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು"
+      "matchesBadge": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು",
+      "filesBadge_one": "{{displayCount}} ಫೈಲ್",
+      "filesBadge_other": "{{displayCount}} ಫೈಲ್‌ಗಳು",
+      "linesBadge_one": "{{displayCount}} ಸಾಲು",
+      "linesBadge_other": "{{displayCount}} ಸಾಲುಗಳು",
+      "matchesBadge_one": "{{displayCount}} ಹೊಂದಾಣಿಕೆ",
+      "matchesBadge_other": "{{displayCount}} ಹೊಂದಾಣಿಕೆಗಳು",
+      "noOutput": "ಯಾವುದೇ ಔಟ್ಪುಟ್ ಇಲ್ಲ."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} ಸಾಲುಗಳು (ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ)",
@@ -2458,7 +2507,11 @@
       "files": "ಫೈಲ್‌ಗಳು",
       "couldNotOpenPhotoPicker": "ಫೋಟೋ ಆಯ್ಕೆ ಪರದೆಯನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. Kilo ಅನ್ನು ಮರುಪ್ರಾರಂಭಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "maxFilesAllowed": "ಗರಿಷ್ಠ {{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಸೇರಿಸಬಹುದು.",
-      "onlyAddingFiles": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{accepted}} ಮಾತ್ರ ಸೇರಿಸಲಾಗುತ್ತಿದೆ (ಗರಿಷ್ಠ {{max}})"
+      "onlyAddingFiles": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{accepted}} ಮಾತ್ರ ಸೇರಿಸಲಾಗುತ್ತಿದೆ (ಗರಿಷ್ಠ {{max}})",
+      "maxFilesAllowed_one": "ಗರಿಷ್ಠ {{displayCount}} ಫೈಲ್ ಸೇರಿಸಬಹುದು.",
+      "maxFilesAllowed_other": "ಗರಿಷ್ಠ {{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಸೇರಿಸಬಹುದು.",
+      "onlyAddingFiles_one": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{accepted}} ಮಾತ್ರ ಸೇರಿಸಲಾಗುತ್ತಿದೆ (ಗರಿಷ್ಠ {{max}})",
+      "onlyAddingFiles_other": "{{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{accepted}} ಮಾತ್ರ ಸೇರಿಸಲಾಗುತ್ತಿದೆ (ಗರಿಷ್ಠ {{max}})"
     },
     "composer": {
       "addAttachment": "ಲಗತ್ತು ಸೇರಿಸಿ",
@@ -2476,7 +2529,9 @@
       "discardAttachmentsMessage": "ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳಿಗೆ ಲಗತ್ತಿಸದ ಅಪ್‌ಲೋಡ್‌ಗಳನ್ನು ಅಳಿಸಲಾಗುತ್ತದೆ.",
       "discardAttachmentsTitle": "ಲಗತ್ತುಗಳನ್ನು ತೆಗೆದುಹಾಕಬೇಕೆ?",
       "charactersRemaining": "{{count}} ಅಕ್ಷರಗಳು ಉಳಿದಿವೆ",
-      "insertNewline": "ಹೊಸ ಸಾಲನ್ನು ಸೇರಿಸಿ"
+      "insertNewline": "ಹೊಸ ಸಾಲನ್ನು ಸೇರಿಸಿ",
+      "charactersRemaining_one": "{{count}} ಅಕ್ಷರ ಉಳಿದಿದೆ",
+      "charactersRemaining_other": "{{count}} ಅಕ್ಷರಗಳು ಉಳಿದಿವೆ"
     },
     "chatLink": {
       "linkCopied": "ಲಿಂಕ್ ನಕಲಿಸಲಾಗಿದೆ",
@@ -2548,7 +2603,9 @@
       "stepsCount_one": "{{steps}} ಹಂತ",
       "stepsCount": "{{steps}} ಹಂತಗಳು",
       "stepsCount_other": "{{steps}} ಹಂತಗಳು",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "ಮಾದರಿ ({{displayCount}})",
+      "modelsCount_other": "ಮಾದರಿಗಳು ({{displayCount}})"
     },
     "autoApprove": {
       "title": "ಸ್ವಯಂ ಅನುಮೋದನೆ",
@@ -2588,7 +2645,9 @@
     },
     "toolRun": {
       "sheetTitle": "ಸಾಧನ ಕರೆಗಳು",
-      "condensedLabel": "{{itemCount}} ಅಂಶಗಳು; {{last}}"
+      "condensedLabel": "{{itemCount}} ಅಂಶಗಳು; {{last}}",
+      "condensedLabel_one": "{{itemCount}} ಅಂಶ; {{last}}",
+      "condensedLabel_other": "{{itemCount}} ಅಂಶಗಳು; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2782,9 @@
     "cliCantReceiveFilesTitle": "ಈ ಸೆಶನ್‌ಗೆ ಫೈಲ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ",
     "cliCantReceiveFilesMessage": "ಈ ಸೆಶನ್ ಚಲಾಯಿಸುತ್ತಿರುವ Kilo CLIಗೆ ಫೈಲ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಆ ಯಂತ್ರದಲ್ಲಿ CLI ನವೀಕರಿಸಿ ಅಥವಾ ಹೊಸ ಸೆಶನ್‌ಗೆ ಹಂಚಿ.",
     "contentlessMessage": "ಹಂಚಲು ಏನೂ ಇಲ್ಲ — ಯಾವುದೇ ಪಠ್ಯ ಅಥವಾ ಫೈಲ್‌ಗಳನ್ನು ಸೇರಿಸಿಲ್ಲ.",
-    "couldNotReadContent": "ಹಂಚಿದ ವಿಷಯವನ್ನು ಓದಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
+    "couldNotReadContent": "ಹಂಚಿದ ವಿಷಯವನ್ನು ಓದಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "onlyFirstFilesAttached_one": "ಮೊದಲ {{displayCount}} ಫೈಲ್ ಮಾತ್ರ ಲಗತ್ತಿಸಲಾಗುತ್ತದೆ.",
+    "onlyFirstFilesAttached_other": "ಮೊದಲ {{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಮಾತ್ರ ಲಗತ್ತಿಸಲಾಗುತ್ತದೆ."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3154,9 @@
     "couldNotApprove": "ಅನುಮೋದಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "couldNotStart": "ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "channelName": "ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳು",
-    "activityKitDisabledBody": "ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳನ್ನು ನೋಡಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಲೈವ್ ಚಟುವಟಿಕೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ."
+    "activityKitDisabledBody": "ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳನ್ನು ನೋಡಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಲೈವ್ ಚಟುವಟಿಕೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ.",
+    "openSession": "ತೆರೆಯಿರಿ",
+    "approveFailed": "ಅನುಮೋದಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು $t(common.approve) ಟ್ಯಾಪ್ ಮಾಡಿ."
   },
   "transcriptionModel": {
     "title": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಮಾದರಿ",
@@ -3118,15 +3181,7 @@
     "remoteOptionTitle": "ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್",
     "remoteOptionBody": "ನಿಮ್ಮ ಸ್ವಂತ ಯಂತ್ರದಲ್ಲಿ `kilo remote` CLI ಮೂಲಕ Kilo ಚಲಾಯಿಸಿ.",
     "skip": "ಪ್ರವಾಸ ಬಿಡಿ",
-    "tutorialLabel": "ಟ್ಯುಟೋರಿಯಲ್",
-    "remoteTitle": "ನಿಮ್ಮ ಮೊದಲ ರಿಮೋಟ್ ಸೆಶನ್ ಆರಂಭಿಸಿ",
-    "remoteBody": "ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್ ಅನ್ನು ಸಂಪರ್ಕಿಸಿ, ನಂತರ ಇಲ್ಲಿಂದ ಸೆಶನ್ ಆರಂಭಿಸಿ.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ಇನ್ನೂ ಯಾವುದೇ ಕಂಪ್ಯೂಟರ್ ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ",
-    "remoteEmptyBody": "ಅದನ್ನು ಸಂಪರ್ಕಿಸಲು ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್‌ನಲ್ಲಿ `kilo remote` ಚಲಾಯಿಸಿ.",
-    "remoteFound": "ಕಂಪ್ಯೂಟರ್ ಸಂಪರ್ಕಗೊಂಡಿದೆ",
-    "checkAgain": "ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ಟ್ಯುಟೋರಿಯಲ್"
   },
   "appActions": {
     "start": {
@@ -3134,5 +3189,8 @@
       "repositoryUnknown": "Kilo, {{repository}} ಅನ್ನು GitHub ಅಥವಾ GitLab ರೆಪೊಸಿಟರಿ ಎಂದು ಗುರುತಿಸುವುದಿಲ್ಲ. Kilo ನಲ್ಲಿ ಬೇರೆ ರೆಪೊಸಿಟರಿ ಆಯ್ಕೆಮಾಡಿ.",
       "repositoryUnsupported": "{{repository}} ಒಂದು Bitbucket ರೆಪೊಸಿಟರಿ — ಏಜೆಂಟ್ ಆರಂಭಿಸಿ ಇನ್ನೂ ಅದನ್ನು ಬಳಸಲಾಗದು. Kilo ನಲ್ಲಿ ಬೇರೆ ರೆಪೊಸಿಟರಿ ಆಯ್ಕೆಮಾಡಿ."
     }
+  },
+  "launcher": {
+    "openLastSession": "ಕೊನೆಯ ಸೆಷನ್ ತೆರೆಯಿರಿ"
   }
 }

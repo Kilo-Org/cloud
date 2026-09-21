@@ -399,7 +399,6 @@ export const remoteCommandCatalogV1Schema = z
     protocolVersion: 1 as const,
     canExitSession: catalog.canExitSession,
     commands: catalog.commands
-      .filter(command => command.source !== 'skill')
       // SlashCommandInfo requires a `hints` array; remote commands with no
       // hints still have an empty array after the strict shape parse above.
       .map(command => ({
@@ -644,6 +643,7 @@ export type MessageUpdatedData = z.infer<typeof messageUpdatedDataSchema>;
 
 export const messagePartUpdatedDataSchema = z.object({
   part: z.object({ id: z.string(), sessionID: z.string(), messageID: z.string() }).passthrough(),
+  time: z.number().optional(),
 });
 export type MessagePartUpdatedData = z.infer<typeof messagePartUpdatedDataSchema>;
 

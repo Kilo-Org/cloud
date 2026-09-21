@@ -163,6 +163,7 @@
     "useDifferentEmail": "Uża indirizz tal-email ieħor",
     "signInWithApple": "Idħol b'Apple",
     "signInWithGoogle": "Idħol b'Google",
+    "signInWithPasskey": "Idħol b'ċavetta tal-aċċess",
     "emailAddress": "Indirizz tal-email",
     "emailPlaceholder": "int@example.com",
     "continueWithEmail": "Kompli bl-email",
@@ -175,6 +176,10 @@
     "termsConnector": " u ",
     "termsSuffix": ".",
     "moreSignInOptions": "Aktar għażliet ta' dħul",
+    "passkeyCancelled": "Il-login b'ċavetta tal-aċċess ġie kkanċellat. Erġa' pprova.",
+    "passkeyNotFound": "L-ebda ċavetta tal-aċċess mhi salvata għal dan l-apparat. Idħol minflok b'Apple, Google jew bl-email tiegħek.",
+    "passkeyUnsupported": "Iċ-ċwievet tal-aċċess mhumiex disponibbli fuq dan l-apparat. Idħol minflok b'Apple, Google jew bl-email tiegħek.",
+    "passkeyFailed": "Ma stajtx tidħol b'ċavetta tal-aċċess. Erġa' pprova.",
     "couldNotCompleteSignIn": "Ma setax jitlesta d-dħul. Jekk jogħġbok erġa' pprova.",
     "sessionEnded": "Is-sessjoni tiegħek intemmet. Jekk jogħġbok idħol mill-ġdid.",
     "signInCodeExpired": "Il-kodiċi tad-dħul tiegħek skada. Jekk jogħġbok erġa' pprova.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Kont tat-test",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO tal-intrapriża"
+    "providerEnterpriseSso": "SSO tal-intrapriża",
+    "passkeysTitle": "Ċwievet tal-aċċess",
+    "passkeysSubtitle": "Idħol mingħajr password",
+    "passkeysEmpty": "Għad m'hemmx ċwievet tal-aċċess",
+    "passkeysEmptyHint": "$t(profile.addPasskey) biex tidħol mingħajr password.",
+    "passkeysCouldNotLoad": "Iċ-ċwievet tal-aċċess ma setgħux jitgħabbew",
+    "passkeysLoadFailed": "Iċ-ċwievet tal-aċċess mhumiex disponibbli sakemm dan jitgħabba.",
+    "addPasskey": "Żid ċavetta tal-aċċess",
+    "passkeyDefaultName": "Ċavetta tal-aċċess",
+    "passkeyAddedOn": "Miżjuda {{date}}",
+    "passkeyAdded": "Iċ-ċavetta tal-aċċess miżjuda.",
+    "passkeyAddFailed": "Ma setgħetx tiġi miżjuda ċavetta tal-aċċess. Erġa' pprova.",
+    "passkeyAddUnsupported": "Dan l-apparat ma jistax joħloq ċwievet tal-aċċess.",
+    "passkeyAddCancelled": "Il-ħolqien taċ-ċavetta tal-aċċess ġie kkanċellat.",
+    "passkeyRemoved": "Iċ-ċavetta tal-aċċess tneħħiet.",
+    "passkeyRemoveFailed": "Dik iċ-ċavetta tal-aċċess ma setgħetx titneħħa. Erġa' pprova.",
+    "passkeyRenamed": "Iċ-ċavetta tal-aċċess ingħatat isem ġdid.",
+    "passkeyName": "Isem iċ-ċavetta tal-aċċess",
+    "renamePasskey": "Agħti isem ġdid liċ-ċavetta tal-aċċess",
+    "removePasskey": "Neħħi ċ-ċavetta tal-aċċess",
+    "removePasskeyTitle": "Tneħħi ċ-ċavetta tal-aċċess?",
+    "removePasskeyMessage": "Ma tkunx tista' tidħol aktar b'din iċ-ċavetta tal-aċċess."
   },
   "preferences": {
     "general": "Ġenerali",
@@ -349,7 +375,32 @@
       "fileLoadedCount_many": "{{displayCount}}-il fajl mgħobbi",
       "fileLoadedOfTotalCount_two": "{{displayCount}} fajls mgħobbija minn {{total}}",
       "fileLoadedOfTotalCount_few": "{{displayCount}} fajls mgħobbija minn {{total}}",
-      "fileLoadedOfTotalCount_many": "{{displayCount}}-il fajl mgħobbi minn {{total}}"
+      "fileLoadedOfTotalCount_many": "{{displayCount}}-il fajl mgħobbi minn {{total}}",
+      "expandAllLines_one": "Uri l-linji kollha ({{displayCount}})",
+      "expandAllLines_other": "Uri l-linji kollha ({{displayCount}})",
+      "expandAllLines_two": "Uri l-linji kollha ({{displayCount}})",
+      "expandAllLines_few": "Uri l-linji kollha ({{displayCount}})",
+      "expandAllLines_many": "Uri l-linji kollha ({{displayCount}})",
+      "expandLines_one": "Uri {{displayCount}} linja ({{start}}–{{end}})",
+      "expandLines_other": "Uri {{displayCount}} linji ({{start}}–{{end}})",
+      "expandLines_two": "Uri {{displayCount}} linji ({{start}}–{{end}})",
+      "expandLines_few": "Uri {{displayCount}} linji ({{start}}–{{end}})",
+      "expandLines_many": "Uri {{displayCount}} linji ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Uri {{displayCount}} linja ta' kuntest",
+      "expandLinesOfContext_other": "Uri {{displayCount}} linji ta' kuntest",
+      "expandLinesOfContext_two": "Uri {{displayCount}} linji ta' kuntest",
+      "expandLinesOfContext_few": "Uri {{displayCount}} linji ta' kuntest",
+      "expandLinesOfContext_many": "Uri {{displayCount}} linji ta' kuntest",
+      "expandMoreLines_one": "Uri {{displayCount}} linja oħra ({{start}}–{{end}})",
+      "expandMoreLines_other": "Uri {{displayCount}} linji oħra ({{start}}–{{end}})",
+      "expandMoreLines_two": "Uri {{displayCount}} linji oħra ({{start}}–{{end}})",
+      "expandMoreLines_few": "Uri {{displayCount}} linji oħra ({{start}}–{{end}})",
+      "expandMoreLines_many": "Uri {{displayCount}} linji oħra ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} minn {{total}} fajls mgħobbija",
+      "loadedOfTotalFiles_other": "{{loaded}} minn {{total}} fajls mgħobbija",
+      "loadedOfTotalFiles_two": "{{loaded}} minn {{total}} fajls mgħobbija",
+      "loadedOfTotalFiles_few": "{{loaded}} minn {{total}} fajls mgħobbija",
+      "loadedOfTotalFiles_many": "{{loaded}} minn {{total}} fajls mgħobbija"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ma hemmx linja ġdida fl-aħħar tal-fajl.",
@@ -548,7 +599,12 @@
         "outdatedOnPath": "Mhux aġġornat fuq {{path}}"
       },
       "deletedUser": "utent imħassar",
-      "replyForbiddenTerm": "M'għandekx permess biex tirrispondi għal dan il-{{term}}."
+      "replyForbiddenTerm": "M'għandekx permess biex tirrispondi għal dan il-{{term}}.",
+      "moreLinesAbove_one": "… {{displayCount}} linja oħra 'l fuq.",
+      "moreLinesAbove_other": "… {{displayCount}} linji oħra 'l fuq.",
+      "moreLinesAbove_two": "… {{displayCount}} linji oħra 'l fuq.",
+      "moreLinesAbove_few": "… {{displayCount}} linji oħra 'l fuq.",
+      "moreLinesAbove_many": "… {{displayCount}} linji oħra 'l fuq."
     },
     "couldNotOpenGitHubAppSettings": "Ma stajniex niftħu l-issettjar tal-app ta' GitHub.",
     "installKiloGitHubApp": "Installa l-app ta' Kilo għal GitHub",
@@ -592,7 +648,7 @@
       "checksCount_one": "{{displayCount}} kontroll",
       "checksCount_two": "{{displayCount}} kontrolli",
       "checksCount_few": "{{displayCount}} kontrolli",
-      "checksCount_many": "{{displayCount}}-il kontroll",
+      "checksCount_many": "{{displayCount}} kontrolli",
       "checksCount_other": "{{displayCount}} kontrolli",
       "checkDetails": "dettalji tal-kontroll"
     },
@@ -733,7 +789,12 @@
       "statusContext": "Kuntest",
       "lineLabel": "linja {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(vojt)"
+      "emptyLine": "(vojt)",
+      "truncationBanner_one": "Qed jintwerew l-ewwel {{limit}} minn {{total}} fajl mibdul — dan huwa l-limitu tal-API ta' GitHub.",
+      "truncationBanner_other": "Qed jintwerew l-ewwel {{limit}} minn {{total}} fajl mibdul — dan huwa l-limitu tal-API ta' GitHub.",
+      "truncationBanner_two": "Qed jintwerew l-ewwel {{limit}} minn {{total}} fajl mibdul — dan huwa l-limitu tal-API ta' GitHub.",
+      "truncationBanner_few": "Qed jintwerew l-ewwel {{limit}} minn {{total}} fajl mibdul — dan huwa l-limitu tal-API ta' GitHub.",
+      "truncationBanner_many": "Qed jintwerew l-ewwel {{limit}} minn {{total}} fajl mibdul — dan huwa l-limitu tal-API ta' GitHub."
     },
     "linkPasteClipboardEmpty": "Il-klibbord huwa vojt.",
     "linkPasteNotAPullRequest": "Din mhix ħolqa ta' PR jew merge request",
@@ -810,7 +871,7 @@
     "previewFullDescription": "In-notifiki juru t-test tal-messaġġ fuq l-iskrin tal-qfil tiegħek.",
     "previewGenericDescription": "In-notifiki juru li ġrat xi ħaġa. Iftaħ Kilo biex taqra l-messaġġ.",
     "channel": {
-      "agent": "Sessjonijiet tal-aġent",
+      "agentProgress": "Avvanz tal-aġent",
       "chat": "Messaġġi tat-taħdit",
       "kiloclaw": "Attività ta' KiloClaw",
       "balance": "Twissijiet tal-bilanċ",
@@ -827,6 +888,15 @@
       "kiloclawActivitySubtitle": "istanza lesta jew falliet, azzjonijiet skedati",
       "balanceAlertsSubtitle": "twissijiet ta' bilanċ baxx tal-organizzazzjoni",
       "securityFindingsSubtitle": "sejbiet ġodda u tfakkiriet tal-SLA"
+    },
+    "action": {
+      "openSession": "Iftaħ is-sessjoni"
+    },
+    "needsInputAction": {
+      "approved": "It-talba ġiet approvata",
+      "replied": "Ir-risposta ntbagħtet",
+      "failed": "Ma rnexxiex twieġeb. Miss biex terġa’ tipprova.",
+      "unavailable": "Din it-talba ma tistennix aktar."
     }
   },
   "tabs": {
@@ -907,7 +977,12 @@
       "uploadFailed": "It-tlugħ falla.",
       "failedToUploadFile": "Ma setax jittella' l-fajl: {{reason}}",
       "nothingToPaste": "M'hemm xejn x'twaħħal.",
-      "metadataStripFailed": "Il-metadata tar-ritratt ma setgħetx titneħħa."
+      "metadataStripFailed": "Il-metadata tar-ritratt ma setgħetx titneħħa.",
+      "limit_one": "Tista' tehmeż sa {{displayCount}} fajl.",
+      "limit_other": "Tista' tehmeż sa {{displayCount}} fajls.",
+      "limit_two": "Tista' tehmeż sa {{displayCount}} fajls.",
+      "limit_few": "Tista' tehmeż sa {{displayCount}} fajls.",
+      "limit_many": "Tista' tehmeż sa {{displayCount}} fajls."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1660,7 +1735,17 @@
       "syncFindings": "Sinkronizza s-sejbiet",
       "syncNow": "Sinkronizza issa",
       "syncQueued": "Is-sinkronizzazzjoni tqiegħdet fil-kju",
-      "syncStatusUnavailable": "L-istat tas-sinkronizzazzjoni mhux disponibbli."
+      "syncStatusUnavailable": "L-istat tas-sinkronizzazzjoni mhux disponibbli.",
+      "daysOverdue_one": "{{displayCount}} jum wara l-iskadenza",
+      "daysOverdue_other": "{{displayCount}} jum wara l-iskadenza",
+      "daysOverdue_two": "{{displayCount}} jiem wara l-iskadenza",
+      "daysOverdue_few": "{{displayCount}} jiem wara l-iskadenza",
+      "daysOverdue_many": "{{displayCount}} jiem wara l-iskadenza",
+      "findingsCount_one": "{{displayCount}} sejba",
+      "findingsCount_other": "{{displayCount}} sejbiet",
+      "findingsCount_two": "{{displayCount}} sejbiet",
+      "findingsCount_few": "{{displayCount}} sejbiet",
+      "findingsCount_many": "{{displayCount}} sejbiet"
     },
     "dashboardMetrics": {
       "openFindings": "Sejbiet miftuħa",
@@ -2185,20 +2270,7 @@
       "continueFrom": "Qed tkompli s-sessjoni {{title}}.",
       "importingSession": "Qed tiġi importata s-sessjoni",
       "cliCannotContinue": "Dan il-CLI ma jistax ikompli sessjoni. Agħżel Cloud Agent jew CLI ieħor.",
-      "importFailed": "Ma setgħetx tiġi importata din is-sessjoni.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Default · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Żgħir",
-      "sandboxInstanceShared": "Kondiviż",
-      "sandboxInstanceLarge": "Kbir",
-      "sandboxInstanceDevcontainer": "Kontenitur tad-Dev",
-      "sandboxInstanceProviderDefault": "Default tal-fornitur",
-      "sandboxCouldNotLoad": "Ma setgħetx titgħabba l-għażliet tas-sandbox",
-      "sandboxUnavailable": "Dan is-sandbox mhuwiex disponibbli. Agħżel sandbox ieħor jew Default.",
-      "sandboxUseDefault": "Uża Default"
+      "importFailed": "Ma setgħetx tiġi importata din is-sessjoni."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ġie aġġornat {{displayCount}} fajl.",
@@ -2225,7 +2297,23 @@
       "updateTodos": "Aġġorna l-kompiti",
       "linesBadge": "{{displayCount}} linji",
       "filesBadge": "{{displayCount}} fajls",
-      "matchesBadge": "{{displayCount}} riżultati"
+      "matchesBadge": "{{displayCount}} riżultati",
+      "filesBadge_one": "{{displayCount}} fajl",
+      "filesBadge_other": "{{displayCount}} fajls",
+      "filesBadge_two": "{{displayCount}} fajls",
+      "filesBadge_few": "{{displayCount}} fajls",
+      "filesBadge_many": "{{displayCount}} fajls",
+      "linesBadge_one": "{{displayCount}} linja",
+      "linesBadge_other": "{{displayCount}} linji",
+      "linesBadge_two": "{{displayCount}} linji",
+      "linesBadge_few": "{{displayCount}} linji",
+      "linesBadge_many": "{{displayCount}} linji",
+      "matchesBadge_one": "{{displayCount}} riżultat",
+      "matchesBadge_other": "{{displayCount}} riżultati",
+      "matchesBadge_two": "{{displayCount}} riżultati",
+      "matchesBadge_few": "{{displayCount}} riżultati",
+      "matchesBadge_many": "{{displayCount}} riżultati",
+      "noOutput": "M'hemm l-ebda ħruġ."
     },
     "readToolMarkdown": {
       "linesTruncated": "linji {{start}}–{{end}} (maqtugħa)",
@@ -2524,7 +2612,17 @@
       "files": "Fajls",
       "couldNotOpenPhotoPicker": "Ma setgħetx tinfetaħ l-għażla tar-ritratti. Erġa' ibda Kilo u erġa' pprova.",
       "maxFilesAllowed": "Tista' żżid sa {{displayCount}} fajls.",
-      "onlyAddingFiles": "Qed jiżdiedu biss {{accepted}} minn {{total}} fajls (massimu {{max}})"
+      "onlyAddingFiles": "Qed jiżdiedu biss {{accepted}} minn {{total}} fajls (massimu {{max}})",
+      "maxFilesAllowed_one": "Tista' żżid sa {{displayCount}} fajl.",
+      "maxFilesAllowed_other": "Tista' żżid sa {{displayCount}} fajls.",
+      "maxFilesAllowed_two": "Tista' żżid sa {{displayCount}} fajls.",
+      "maxFilesAllowed_few": "Tista' żżid sa {{displayCount}} fajls.",
+      "maxFilesAllowed_many": "Tista' żżid sa {{displayCount}} fajls.",
+      "onlyAddingFiles_one": "Qed jiżdiedu biss {{accepted}} minn {{total}} fajls (massimu {{max}})",
+      "onlyAddingFiles_other": "Qed jiżdiedu biss {{accepted}} minn {{total}} fajls (massimu {{max}})",
+      "onlyAddingFiles_two": "Qed jiżdiedu biss {{accepted}} minn {{total}} fajls (massimu {{max}})",
+      "onlyAddingFiles_few": "Qed jiżdiedu biss {{accepted}} minn {{total}} fajls (massimu {{max}})",
+      "onlyAddingFiles_many": "Qed jiżdiedu biss {{accepted}} minn {{total}} fajls (massimu {{max}})"
     },
     "composer": {
       "addAttachment": "Żid anness",
@@ -2542,7 +2640,12 @@
       "discardAttachmentsMessage": "Il-fajls imtellgħin li mhumiex mehmuża ma' messaġġi mibgħuta se jitħassru.",
       "discardAttachmentsTitle": "Twarrab l-annessi?",
       "charactersRemaining": "Fadal {{count}} karattru",
-      "insertNewline": "Daħħal linja ġdida"
+      "insertNewline": "Daħħal linja ġdida",
+      "charactersRemaining_one": "Fadal {{count}} karattru",
+      "charactersRemaining_other": "Fadal {{count}} karattru",
+      "charactersRemaining_two": "Fadal {{count}} karattri",
+      "charactersRemaining_few": "Fadal {{count}} karattri",
+      "charactersRemaining_many": "Fadal {{count}} karattri"
     },
     "chatLink": {
       "linkCopied": "Ir-rabta ġiet ikkupjata",
@@ -2617,7 +2720,12 @@
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_two": "{{steps}} passi",
       "stepsCount_few": "{{steps}} passi",
-      "stepsCount_many": "{{steps}}-il pass"
+      "stepsCount_many": "{{steps}}-il pass",
+      "modelsCount_one": "Mudell ({{displayCount}})",
+      "modelsCount_other": "Mudelli ({{displayCount}})",
+      "modelsCount_two": "Mudelli ({{displayCount}})",
+      "modelsCount_few": "Mudelli ({{displayCount}})",
+      "modelsCount_many": "Mudelli ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Approvazzjoni awtomatika",
@@ -2657,7 +2765,12 @@
     },
     "toolRun": {
       "sheetTitle": "Sejħiet tal-għodda",
-      "condensedLabel": "{{itemCount}} elementi; {{last}}"
+      "condensedLabel": "{{itemCount}} elementi; {{last}}",
+      "condensedLabel_one": "{{itemCount}} element; {{last}}",
+      "condensedLabel_other": "{{itemCount}} elementi; {{last}}",
+      "condensedLabel_two": "{{itemCount}} elementi; {{last}}",
+      "condensedLabel_few": "{{itemCount}} elementi; {{last}}",
+      "condensedLabel_many": "{{itemCount}} elementi; {{last}}"
     }
   },
   "bootstrap": {
@@ -2792,7 +2905,12 @@
     "cliCantReceiveFilesTitle": "Din is-sessjoni ma tistax tirċievi fajls",
     "cliCantReceiveFilesMessage": "Il-Kilo CLI li jħaddem din is-sessjoni ma jistax jirċievi fajls. Aġġorna l-CLI fuq dik il-magna, jew aqsam il-kontenut ma' sessjoni ġdida minflok.",
     "contentlessMessage": "Xejn x'taqsam — l-ebda test jew fajl ma kien inkluż.",
-    "couldNotReadContent": "Ma setax jinqara l-kontenut maqsum."
+    "couldNotReadContent": "Ma setax jinqara l-kontenut maqsum.",
+    "onlyFirstFilesAttached_one": "Se jinthemżu l-ewwel {{displayCount}} fajl biss.",
+    "onlyFirstFilesAttached_other": "Se jinthemżu l-ewwel {{displayCount}} fajls biss.",
+    "onlyFirstFilesAttached_two": "Se jinthemżu l-ewwel {{displayCount}} fajls biss.",
+    "onlyFirstFilesAttached_few": "Se jinthemżu l-ewwel {{displayCount}} fajls biss.",
+    "onlyFirstFilesAttached_many": "Se jinthemżu l-ewwel {{displayCount}} fajls biss."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3165,7 +3283,9 @@
     "couldNotApprove": "Ma setax japprova",
     "couldNotStart": "Ma setax jibda",
     "channelName": "Aġenti attivi",
-    "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar."
+    "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar.",
+    "openSession": "Iftaħ",
+    "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova."
   },
   "transcriptionModel": {
     "title": "Mudell ta' traskrizzjoni",
@@ -3190,15 +3310,7 @@
     "remoteOptionTitle": "Il-kompjuter tiegħek",
     "remoteOptionBody": "Ħaddem Kilo fuq il-magna tiegħek permezz tal-CLI `kilo remote`.",
     "skip": "Aqbeż it-tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Ibda l-ewwel sessjoni remota tiegħek",
-    "remoteBody": "Ikkonetta l-kompjuter tiegħek, imbagħad ibda s-sessjoni minn hawn.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Għad m'hemmx kompjuter konness",
-    "remoteEmptyBody": "Biex tikkonnettjah, ħaddem `kilo remote` fuq il-kompjuter tiegħek.",
-    "remoteFound": "Kompjuter konness",
-    "checkAgain": "Iċċekkja mill-ġdid",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {
@@ -3206,5 +3318,8 @@
       "repositoryUnknown": "Kilo ma jagħrafx lil {{repository}} bħala repożitorju GitHub jew GitLab. Agħżel repożitorju ieħor fil-Kilo.",
       "repositoryUnsupported": "{{repository}} huwa repożitorju Bitbucket — Ibda aġent għadu ma jistax jużah. Agħżel repożitorju ieħor fil-Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Iftaħ l-aħħar sessjoni"
   }
 }

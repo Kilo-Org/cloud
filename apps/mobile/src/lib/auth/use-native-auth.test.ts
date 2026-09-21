@@ -7,6 +7,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { ADMISSION_CHALLENGE_FAILED, getAdmission } from '@/lib/auth/admission';
 import type * as AdmissionTypes from '@/lib/auth/admission';
 import type * as AuthFetchTypes from '@/lib/auth/auth-fetch';
+import type * as PasskeyClientTypes from '@/lib/auth/passkey-client';
 
 import {
   buildChallengeEntry,
@@ -16,6 +17,9 @@ import {
   parseTokenResponse,
   selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
+
+// The hook's sign-in call is the observable end of every provider path.
+const authMock = vi.hoisted(() => ({ signIn: vi.fn() }));
 
 // Mock @/lib/config to avoid pulling in react-native at module import time.
 vi.mock('@/lib/config', () => ({
@@ -76,8 +80,18 @@ vi.mock('expo-crypto', () => ({
 }));
 
 vi.mock('@/lib/auth/auth-context', () => ({
-  useAuth: vi.fn(() => ({ signIn: vi.fn() })),
+  useAuth: () => ({ signIn: authMock.signIn }),
 }));
+
+// The passkey ceremony itself is covered by passkey-client.test.ts; only the
+// hook's toast/sign-in wiring over its result is under test here.
+vi.mock('@/lib/auth/passkey-client', async importOriginal => {
+  const mod = await importOriginal<typeof PasskeyClientTypes>();
+  return {
+    ...mod,
+    signInWithPasskey: vi.fn(),
+  };
+});
 
 // Mock getAdmission so resolveAdmission tests can control the three paths:
 // success with payload, success with undefined, and throw.
@@ -118,6 +132,8 @@ const mockGetAdmission = vi.mocked(getAdmission);
 const { useNativeAuth } = await import('@/lib/auth/use-native-auth');
 const { postAuth } = await import('@/lib/auth/auth-fetch');
 const mockPostAuth = vi.mocked(postAuth);
+const { signInWithPasskey: runPasskeySignIn } = await import('@/lib/auth/passkey-client');
+const mockRunPasskeySignIn = vi.mocked(runPasskeySignIn);
 
 // ── C12: Config invariant ────────────────────────────────────────────────
 
@@ -387,6 +403,53 @@ describe('useNativeAuth SSO recovery', () => {
   });
 });
 
+// ── In-flight refusal ──────────────────────────────────────────────────
+
+type PostAuthResult = Awaited<ReturnType<typeof postAuth>>;
+
+describe('useNativeAuth in-flight refusal', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('surfaces the reason and does not post again when a second submit is refused', async () => {
+    let resolvePost: ((value: PostAuthResult) => void) | undefined = undefined;
+    mockPostAuth.mockImplementation(async () => {
+      const held = await new Promise<PostAuthResult>(resolve => {
+        resolvePost = resolve;
+      });
+      return held;
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    // Hold the first request pending so the busy guard stays set.
+    let firstSubmit: Promise<boolean> | undefined = undefined;
+    act(() => {
+      firstSubmit = result?.requestEmailCode('user@example.com');
+    });
+    expect(resultRef.current?.busy).toBe('otp-send');
+
+    let secondResult: boolean | undefined = undefined;
+    await act(async () => {
+      secondResult = await result?.requestEmailCode('user@example.com');
+    });
+
+    expect(secondResult).toBe(false);
+    expect(mockPostAuth).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith('Could not complete sign in. Please try again.');
+
+    await act(async () => {
+      resolvePost?.({ ok: true, data: { success: true } });
+      await firstSubmit;
+    });
+
+    expect(resultRef.current?.busy).toBeUndefined();
+  });
+});
+
 // ── Created-account announcement ────────────────────────────────────────
 
 describe('useNativeAuth created-account announcement', () => {
@@ -449,5 +512,193 @@ describe('useNativeAuth created-account announcement', () => {
     });
 
     expect(announcingToast.success).not.toHaveBeenCalled();
+  });
+});
+
+// ── Passkey sign-in (hook wiring) ───────────────────────────────────────
+
+describe('useNativeAuth passkey sign-in', () => {
+  beforeEach(() => {
+    mockGetAdmission.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('signs in with the token pair the ceremony returned', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({
+      status: 'ok',
+      token: 'at',
+      refreshToken: 'rt',
+      expiresIn: 3600,
+      created: false,
+    });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(authMock.signIn).toHaveBeenCalledWith('at', 'rt', 3600);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(announcingToast.success).not.toHaveBeenCalled();
+  });
+
+  it('announces the account the ceremony created', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({
+      status: 'ok',
+      token: 'at',
+      refreshToken: 'rt',
+      expiresIn: 3600,
+      created: true,
+    });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(announcingToast.success).toHaveBeenCalledWith('Account created. Welcome to Kilo.');
+  });
+
+  it('toasts the retryable copy a dismissed sheet carries', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'error', failure: 'cancelled' });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith('Passkey sign-in was cancelled. Please try again.');
+    expect(authMock.signIn).not.toHaveBeenCalled();
+  });
+
+  it('toasts the no-passkey copy that names the other methods', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'error', failure: 'no-passkey' });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    const message = vi.mocked(toast.error).mock.calls[0]?.[0];
+    expect(message).toBe(
+      'No passkey is saved for this device. Sign in with Apple, Google, or your email instead.'
+    );
+    expect(message).not.toMatch(/try again/i);
+  });
+
+  it('toasts the non-retryable passkey copy that names the other methods', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({ status: 'error', failure: 'failed' });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    // The server knew the passkey and the assertion did not verify, so the same
+    // button fails identically. The toast names the way out instead of a retry.
+    const message = vi.mocked(toast.error).mock.calls[0]?.[0];
+    expect(message).toBe(
+      'That passkey could not sign you in. Sign in with Apple, Google, or your email instead.'
+    );
+    expect(message).not.toMatch(/try again/i);
+  });
+
+  it('prefers the server copy when the refusal carries a code', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({
+      status: 'error',
+      failure: 'failed',
+      errorCode: 'BLOCKED',
+    });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      'This account has been blocked. Please contact support.'
+    );
+  });
+
+  it('routes a forced-SSO refusal to the recovery block instead of a toast', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({
+      status: 'error',
+      failure: 'failed',
+      errorCode: 'SSO_ERROR',
+      ssoOrganizationId: 'org_1',
+    });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    // The usernameless ceremony names no address, so the block is seeded with
+    // the empty email Apple's credential omits on a later sign-in.
+    expect(resultRef.current?.ssoRecovery).toEqual({ email: '', ssoOrganizationId: 'org_1' });
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(authMock.signIn).not.toHaveBeenCalled();
+  });
+
+  it('does not add a second toast when the failure reported itself', async () => {
+    mockRunPasskeySignIn.mockResolvedValue({
+      status: 'error',
+      failure: 'cancelled',
+      reported: true,
+    });
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('ignores a second tap while a passkey ceremony is running', async () => {
+    let resolveCeremony:
+      | ((result: Awaited<ReturnType<typeof runPasskeySignIn>>) => void)
+      | undefined = undefined;
+    const pending = new Promise<Awaited<ReturnType<typeof runPasskeySignIn>>>(resolve => {
+      resolveCeremony = resolve;
+    });
+    mockRunPasskeySignIn.mockReturnValue(pending);
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    await act(async () => {
+      void result?.signInWithPasskey();
+      void result?.signInWithPasskey();
+      await Promise.resolve();
+    });
+    expect(mockRunPasskeySignIn).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveCeremony?.({
+        status: 'ok',
+        token: 'at',
+        refreshToken: 'rt',
+        expiresIn: 3600,
+        created: false,
+      });
+      await Promise.resolve();
+    });
+    expect(authMock.signIn).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces a thrown ceremony error as the generic message', async () => {
+    mockRunPasskeySignIn.mockRejectedValue(new Error('boom'));
+
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.signInWithPasskey();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
   });
 });

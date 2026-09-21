@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- cohesive unit-test suite for session-list-helpers pure functions */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
@@ -20,6 +21,10 @@ import {
   selectRemoteRowSpokenMeta,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
+
+afterEach(async () => {
+  await i18n.changeLanguage('en');
+});
 
 function makeActive(over: Partial<ActiveSession> = {}): ActiveSession {
   return {
@@ -293,6 +298,25 @@ describe('remoteSessionEyebrowLabel (canonical eyebrow — repo-name-first)', ()
         createdOnPlatform: 'cli',
       })
     ).toBe('MY-REPO');
+  });
+});
+
+describe('eyebrow casing follows the active locale (Turkish i → İ)', () => {
+  it('uppercases the stored-session repo name with the locale', async () => {
+    await i18n.changeLanguage('tr');
+    expect(
+      storedSessionEyebrowLabel({
+        git_url: 'git@github.com:org/instance.git',
+        created_on_platform: 'cli',
+      })
+    ).toBe('İNSTANCE');
+  });
+
+  it('uppercases the remote-session repo name with the locale', async () => {
+    await i18n.changeLanguage('tr');
+    expect(remoteSessionEyebrowLabel({ gitUrl: 'https://github.com/org/instance.git' })).toBe(
+      'İNSTANCE'
+    );
   });
 });
 

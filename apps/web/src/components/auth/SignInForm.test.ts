@@ -16,6 +16,15 @@ jest.mock('@/components/auth/sign-in/EmailInputForm', () => ({
   EmailInputForm: () => null,
 }));
 
+jest.mock('@/components/auth/sign-in/PasskeySignInButton', () => ({
+  PasskeySignInButton: ({ callbackUrl }: { callbackUrl?: string }) =>
+    createElement(
+      'button',
+      { 'data-testid': 'passkey-signin', 'data-callback-url': callbackUrl },
+      'Sign in with a passkey'
+    ),
+}));
+
 jest.mock('@/hooks/useSignInFlow', () => ({
   useSignInFlow: ({
     searchParams,
@@ -27,37 +36,55 @@ jest.mock('@/hooks/useSignInFlow', () => ({
     error?: string;
     isSignUp?: boolean;
     ssoMode?: boolean;
-  }) => ({
-    isHintLoaded: true,
-    emailValidation: { isValid: !error, error: null },
-    error: error ?? '',
-    showTurnstile: false,
-    flowState: 'landing',
-    tier: ssoMode ? 'new' : searchParams.org && searchParams.email ? 'invite' : 'new',
-    hint: null,
-    showEmailInput: Boolean(ssoMode) || !isSignUp,
-    email: '',
-    isVerifying: false,
-    availableProviders: [],
-    isNewUser: false,
-    pendingSignIn: null,
-    turnstileError: false,
-    turnstileAttemptId: 0,
-    inviteOrgId: searchParams.org,
-    inviteOrgName: searchParams.org,
-    handleEmailSubmit: jest.fn(),
-    handleEmailChange: jest.fn(),
-    handleBack: jest.fn(),
-    handleProviderSelect: jest.fn(),
-    handleOAuthClick: jest.fn(),
-    handleClearHint: jest.fn(),
-    handleSSOContinue: jest.fn(),
-    handleClearInvite: jest.fn(),
-    handleTurnstileSuccess: jest.fn(),
-    handleTurnstileError: jest.fn(),
-    handleRetryTurnstile: jest.fn(),
-    handleShowEmailInput: jest.fn(),
-  }),
+  }) => {
+    // `__tier` lets a test reach the returning-user block, which the real hook
+    // only produces once the localStorage hint has loaded.
+    const returning = searchParams.__tier === 'returning';
+    return {
+      isHintLoaded: true,
+      emailValidation: { isValid: !error, error: null },
+      error: error ?? '',
+      showTurnstile: false,
+      flowState: 'landing',
+      tier: returning
+        ? 'returning'
+        : ssoMode
+          ? 'new'
+          : searchParams.org && searchParams.email
+            ? 'invite'
+            : 'new',
+      hint: returning
+        ? {
+            lastEmail: searchParams.email,
+            lastAuthMethod: searchParams.provider ?? 'google',
+            orgId: searchParams.provider === 'workos' ? 'org-1' : undefined,
+            lastLogin: '2026-01-01T00:00:00.000Z',
+          }
+        : null,
+      showEmailInput: returning ? false : Boolean(ssoMode) || !isSignUp,
+      email: '',
+      isVerifying: false,
+      availableProviders: [],
+      isNewUser: false,
+      pendingSignIn: null,
+      turnstileError: false,
+      turnstileAttemptId: 0,
+      inviteOrgId: searchParams.org,
+      inviteOrgName: searchParams.org,
+      handleEmailSubmit: jest.fn(),
+      handleEmailChange: jest.fn(),
+      handleBack: jest.fn(),
+      handleProviderSelect: jest.fn(),
+      handleOAuthClick: jest.fn(),
+      handleClearHint: jest.fn(),
+      handleSSOContinue: jest.fn(),
+      handleClearInvite: jest.fn(),
+      handleTurnstileSuccess: jest.fn(),
+      handleTurnstileError: jest.fn(),
+      handleRetryTurnstile: jest.fn(),
+      handleShowEmailInput: jest.fn(),
+    };
+  },
 }));
 
 const { SignInForm } = require('./SignInForm') as {
@@ -65,6 +92,7 @@ const { SignInForm } = require('./SignInForm') as {
     error?: string;
     isSignUp?: boolean;
     ssoMode?: boolean;
+    emailOnly?: boolean;
     title?: string;
     searchParams: Record<string, string>;
   }) => ReactElement;
@@ -145,5 +173,69 @@ describe('SignInForm Enterprise SSO navigation', () => {
 
     expect(html).toContain('data-error-notification');
     expect(html).toContain('Account Linking Failed');
+  });
+});
+
+describe('SignInForm passkey sign-in placement', () => {
+  it('offers the passkey above the OAuth providers on explicit sign-up', () => {
+    const html = renderToStaticMarkup(
+      createElement(SignInForm, {
+        isSignUp: true,
+        searchParams: { signup: 'true' },
+      })
+    );
+
+    expect(html).toContain('data-testid="passkey-signin"');
+    expect(html).toContain('data-callback-url="/users/after-sign-in?signup=true"');
+    // Above the other providers, and none of them are removed or relabelled.
+    expect(html.indexOf('data-testid="passkey-signin"')).toBeLessThan(
+      html.indexOf('Continue with Email')
+    );
+  });
+
+  it('offers the passkey beside the remembered provider for a returning user', () => {
+    const html = renderToStaticMarkup(
+      createElement(SignInForm, {
+        searchParams: { __tier: 'returning', provider: 'google', email: 'back@example.com' },
+      })
+    );
+
+    expect(html).toContain('data-testid="passkey-signin"');
+    expect(html).toContain('or see other sign-in methods');
+  });
+
+  it('offers the passkey beside Enterprise SSO for a returning SSO user', () => {
+    const html = renderToStaticMarkup(
+      createElement(SignInForm, {
+        searchParams: { __tier: 'returning', provider: 'workos', email: 'back@example.com' },
+      })
+    );
+
+    expect(html).toContain('Sign in with Enterprise SSO');
+    expect(html).toContain('data-testid="passkey-signin"');
+  });
+
+  it('never offers the passkey in SSO mode or email-only mode', () => {
+    const propSets: {
+      ssoMode?: boolean;
+      emailOnly?: boolean;
+      searchParams: Record<string, string>;
+    }[] = [
+      { ssoMode: true, searchParams: { sso: 'true' } },
+      { emailOnly: true, searchParams: { domain: 'example.com' } },
+    ];
+    for (const props of propSets) {
+      const html = renderToStaticMarkup(createElement(SignInForm, props));
+      expect(html).not.toContain('data-testid="passkey-signin"');
+    }
+  });
+
+  it('keeps the passkey out of the email-first sign-in view', () => {
+    const html = renderToStaticMarkup(
+      createElement(SignInForm, { searchParams: { email: 'first@example.com' } })
+    );
+
+    expect(html).not.toContain('data-testid="passkey-signin"');
+    expect(html.match(/Install Kilo Code/g)).toHaveLength(1);
   });
 });

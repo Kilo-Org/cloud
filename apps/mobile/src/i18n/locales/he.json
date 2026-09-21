@@ -163,6 +163,7 @@
     "useDifferentEmail": "שימוש בכתובת דוא״ל אחרת",
     "signInWithApple": "כניסה באמצעות Apple",
     "signInWithGoogle": "כניסה באמצעות Google",
+    "signInWithPasskey": "כניסה באמצעות מפתח גישה",
     "emailAddress": "כתובת דוא״ל",
     "emailPlaceholder": "כתובת הדוא״ל שלך",
     "continueWithEmail": "המשך באמצעות דוא״ל",
@@ -175,6 +176,10 @@
     "termsConnector": " וכן ",
     "termsSuffix": ".",
     "moreSignInOptions": "אפשרויות כניסה נוספות",
+    "passkeyCancelled": "הכניסה באמצעות מפתח גישה בוטלה. נסו שוב.",
+    "passkeyNotFound": "לא נשמר מפתח גישה עבור המכשיר הזה. היכנסו במקום זאת עם Apple, Google או האימייל שלכם.",
+    "passkeyUnsupported": "מפתחות גישה אינם זמינים במכשיר הזה. היכנסו במקום זאת עם Apple, Google או האימייל שלכם.",
+    "passkeyFailed": "לא ניתן היה להיכנס באמצעות מפתח גישה. נסו שוב.",
     "couldNotCompleteSignIn": "לא ניתן להשלים את הכניסה. נסה שוב.",
     "sessionEnded": "תוקף החיבור שלך פג. היכנס שוב.",
     "signInCodeExpired": "תוקף קוד הכניסה שלך פג. נסה שוב.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "חשבון בדיקה",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO ארגוני"
+    "providerEnterpriseSso": "SSO ארגוני",
+    "passkeysTitle": "מפתחות גישה",
+    "passkeysSubtitle": "היכנסו בלי סיסמה",
+    "passkeysEmpty": "אין עדיין מפתחות גישה",
+    "passkeysEmptyHint": "$t(profile.addPasskey) כדי להיכנס בלי סיסמה.",
+    "passkeysCouldNotLoad": "לא ניתן היה לטעון את מפתחות הגישה",
+    "passkeysLoadFailed": "מפתחות הגישה אינם זמינים עד שזה ייטען.",
+    "addPasskey": "הוספת מפתח גישה",
+    "passkeyDefaultName": "מפתח גישה",
+    "passkeyAddedOn": "נוסף ב-{{date}}",
+    "passkeyAdded": "מפתח הגישה נוסף.",
+    "passkeyAddFailed": "לא ניתן היה להוסיף מפתח גישה. נסו שוב.",
+    "passkeyAddUnsupported": "המכשיר הזה אינו יכול ליצור מפתחות גישה.",
+    "passkeyAddCancelled": "יצירת מפתח הגישה בוטלה.",
+    "passkeyRemoved": "מפתח הגישה הוסר.",
+    "passkeyRemoveFailed": "לא ניתן היה להסיר את מפתח הגישה הזה. נסו שוב.",
+    "passkeyRenamed": "שם מפתח הגישה שונה.",
+    "passkeyName": "שם מפתח גישה",
+    "renamePasskey": "שינוי שם מפתח גישה",
+    "removePasskey": "הסרת מפתח גישה",
+    "removePasskeyTitle": "להסיר את מפתח הגישה?",
+    "removePasskeyMessage": "לא תוכלו עוד להיכנס עם מפתח הגישה הזה."
   },
   "preferences": {
     "general": "כללי",
@@ -293,7 +319,7 @@
     "previewFullDescription": "התראות מציגות את טקסט ההודעה במסך הנעילה שלך.",
     "previewGenericDescription": "ההתראות מציינות שיש עדכון, בלי להציג את התוכן. פתח את Kilo כדי לקרוא אותו.",
     "channel": {
-      "agent": "סשנים של סוכנים",
+      "agentProgress": "התקדמות הסוכנים",
       "chat": "הודעות צ׳אט",
       "kiloclaw": "פעילות KiloClaw",
       "balance": "התראות על היתרה",
@@ -310,6 +336,15 @@
       "kiloclawActivitySubtitle": "מופע מוכן או שנכשל, פעולות מתוזמנות",
       "balanceAlertsSubtitle": "אזהרות על יתרה נמוכה בארגון",
       "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA"
+    },
+    "action": {
+      "openSession": "פתיחת סשן"
+    },
+    "needsInputAction": {
+      "approved": "הבקשה אושרה",
+      "replied": "התשובה נשלחה",
+      "failed": "לא ניתן היה לענות. הקישו שוב כדי לנסות שוב.",
+      "unavailable": "הבקשה הזאת כבר לא מחכה."
     }
   },
   "tabs": {
@@ -390,7 +425,10 @@
       "uploadFailed": "ההעלאה נכשלה.",
       "failedToUploadFile": "העלאת הקובץ נכשלה: {{reason}}.",
       "nothingToPaste": "אין תוכן להדבקה.",
-      "metadataStripFailed": "לא ניתן להסיר את נתוני המטא של התמונה."
+      "metadataStripFailed": "לא ניתן להסיר את נתוני המטא של התמונה.",
+      "limit_one": "ניתן לצרף עד {{displayCount}} קובץ.",
+      "limit_other": "ניתן לצרף עד {{displayCount}} קבצים.",
+      "limit_two": "ניתן לצרף עד {{displayCount}} קבצים."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, מצב: {{status}}",
@@ -1162,7 +1200,13 @@
       "syncNow": "סנכרון עכשיו",
       "syncQueued": "הסנכרון נוסף לתור",
       "syncStatusUnavailable": "מצב הסנכרון אינו זמין.",
-      "withinDeadline": "ללא איחור"
+      "withinDeadline": "ללא איחור",
+      "daysOverdue_one": "איחור של {{displayCount}} יום",
+      "daysOverdue_other": "איחור של {{displayCount}} ימים",
+      "daysOverdue_two": "איחור של {{displayCount}} ימים",
+      "findingsCount_one": "{{displayCount}} ממצא",
+      "findingsCount_other": "{{displayCount}} ממצאים",
+      "findingsCount_two": "{{displayCount}} ממצאים"
     },
     "dashboardMetrics": {
       "openFindings": "ממצאים פתוחים",
@@ -1650,20 +1694,7 @@
       "continueFrom": "ממשיך את הסשן {{title}}.",
       "importingSession": "מייבא סשן…",
       "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
-      "importFailed": "לא ניתן היה לייבא את הסשן הזה.",
-      "sandbox": "סביבה מבודדת",
-      "sandboxAccessibility": "סביבה מבודדת: {{label}}",
-      "sandboxDefaultWithDestination": "ברירת מחדל · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "קטן",
-      "sandboxInstanceShared": "משותף",
-      "sandboxInstanceLarge": "גדול",
-      "sandboxInstanceDevcontainer": "קונטיינר פיתוח",
-      "sandboxInstanceProviderDefault": "ברירת המחדל של הספק",
-      "sandboxCouldNotLoad": "טעינת אפשרויות הסביבה המבודדת נכשלה",
-      "sandboxUnavailable": "הסביבה המבודדת הזו אינה זמינה. בחרו סביבה מבודדת אחרת או ברירת מחדל.",
-      "sandboxUseDefault": "השתמשו בברירת המחדל"
+      "importFailed": "לא ניתן היה לייבא את הסשן הזה."
     },
     "partRenderer": {
       "updatedFileCount_one": "מספר הקבצים שעודכנו הוא {{displayCount}}.",
@@ -1688,7 +1719,17 @@
       "updateTodos": "עדכון משימות",
       "linesBadge": "{{displayCount}} שורות",
       "filesBadge": "{{displayCount}} קבצים",
-      "matchesBadge": "{{displayCount}} התאמות"
+      "matchesBadge": "{{displayCount}} התאמות",
+      "filesBadge_one": "{{displayCount}} קובץ",
+      "filesBadge_other": "{{displayCount}} קבצים",
+      "filesBadge_two": "{{displayCount}} קבצים",
+      "linesBadge_one": "{{displayCount}} שורה",
+      "linesBadge_other": "{{displayCount}} שורות",
+      "linesBadge_two": "{{displayCount}} שורות",
+      "matchesBadge_one": "{{displayCount}} התאמה",
+      "matchesBadge_other": "{{displayCount}} התאמות",
+      "matchesBadge_two": "{{displayCount}} התאמות",
+      "noOutput": "אין פלט."
     },
     "readToolMarkdown": {
       "linesTruncated": "שורות {{start}}–{{end}} (התוכן נחתך)",
@@ -1981,7 +2022,13 @@
       "files": "קבצים",
       "couldNotOpenPhotoPicker": "לא ניתן היה לפתוח את חלון בחירת התמונות. הפעל מחדש את Kilo ונסה שוב.",
       "maxFilesAllowed": "אפשר לצרף עד {{displayCount}} קבצים.",
-      "onlyAddingFiles": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (עד {{max}})"
+      "onlyAddingFiles": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (עד {{max}})",
+      "maxFilesAllowed_one": "אפשר לצרף עד {{displayCount}} קובץ.",
+      "maxFilesAllowed_other": "אפשר לצרף עד {{displayCount}} קבצים.",
+      "maxFilesAllowed_two": "אפשר לצרף עד {{displayCount}} קבצים.",
+      "onlyAddingFiles_one": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (עד {{max}})",
+      "onlyAddingFiles_other": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (עד {{max}})",
+      "onlyAddingFiles_two": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (עד {{max}})"
     },
     "composer": {
       "addAttachment": "צירוף קובץ",
@@ -1999,7 +2046,10 @@
       "discardAttachmentsMessage": "קבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
       "discardAttachmentsTitle": "למחוק את הקבצים המצורפים?",
       "charactersRemaining": "נותרו {{count}} תווים",
-      "insertNewline": "הוספת שורה חדשה"
+      "insertNewline": "הוספת שורה חדשה",
+      "charactersRemaining_one": "נותר {{count}} תו",
+      "charactersRemaining_other": "נותרו {{count}} תווים",
+      "charactersRemaining_two": "נותרו {{count}} תווים"
     },
     "chatLink": {
       "linkCopied": "הקישור הועתק",
@@ -2072,7 +2122,10 @@
       "stepsCount": "{{steps}} צעדים",
       "stepsCount_other": "{{steps}} צעדים",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "stepsCount_two": "{{steps}} שלבים"
+      "stepsCount_two": "{{steps}} שלבים",
+      "modelsCount_one": "מודל ({{displayCount}})",
+      "modelsCount_other": "מודלים ({{displayCount}})",
+      "modelsCount_two": "מודלים ({{displayCount}})"
     },
     "autoApprove": {
       "title": "אישור אוטומטי",
@@ -2112,7 +2165,10 @@
     },
     "toolRun": {
       "sheetTitle": "קריאות כלים",
-      "condensedLabel": "{{itemCount}} פריטים; {{last}}"
+      "condensedLabel": "{{itemCount}} פריטים; {{last}}",
+      "condensedLabel_one": "{{itemCount}} פריט; {{last}}",
+      "condensedLabel_other": "{{itemCount}} פריטים; {{last}}",
+      "condensedLabel_two": "{{itemCount}} פריטים; {{last}}"
     }
   },
   "bootstrap": {
@@ -2247,7 +2303,10 @@
     "cliCantReceiveFilesTitle": "לא ניתן לשלוח קבצים לשיחה הזו",
     "cliCantReceiveFilesMessage": "Kilo CLI שמפעיל את השיחה הזו אינו יכול לקבל קבצים. עדכן את ה-CLI במחשב הזה או שתף את הקבצים בשיחה חדשה.",
     "contentlessMessage": "אין מה לשתף — לא נכללו טקסט או קבצים.",
-    "couldNotReadContent": "לא ניתן היה לקרוא את התוכן ששותף."
+    "couldNotReadContent": "לא ניתן היה לקרוא את התוכן ששותף.",
+    "onlyFirstFilesAttached_one": "רק {{displayCount}} הקובץ הראשונים יצורפו.",
+    "onlyFirstFilesAttached_other": "רק {{displayCount}} הקבצים הראשונים יצורפו.",
+    "onlyFirstFilesAttached_two": "רק {{displayCount}} הקבצים הראשונים יצורפו."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2558,7 +2617,10 @@
         "outdatedOnPath": "לא עדכני: {{path}}"
       },
       "deletedUser": "משתמש שנמחק",
-      "replyForbiddenTerm": "אין לך הרשאה להשיב ל-{{term}} הזה."
+      "replyForbiddenTerm": "אין לך הרשאה להשיב ל-{{term}} הזה.",
+      "moreLinesAbove_one": "… עוד {{displayCount}} שורה למעלה.",
+      "moreLinesAbove_other": "… עוד {{displayCount}} שורות למעלה.",
+      "moreLinesAbove_two": "… עוד {{displayCount}} שורות למעלה."
     },
     "entry": {
       "eyebrow": "אפשר לפתוח בקשת משיכה או בקשת מיזוג באמצעות כתובת URL.",
@@ -2658,7 +2720,22 @@
       "retryLoadingContext": "ניסיון נוסף לטעינת שורות ההקשר",
       "retryLoadingNextPage": "ניסיון נוסף לטעינת העמוד הבא",
       "fileLoadedCount_two": "נטענו {{displayCount}} קבצים",
-      "fileLoadedOfTotalCount_two": "נטענו {{displayCount}} קבצים מתוך {{total}}"
+      "fileLoadedOfTotalCount_two": "נטענו {{displayCount}} קבצים מתוך {{total}}",
+      "expandAllLines_one": "הצגת כל {{displayCount}} שורה",
+      "expandAllLines_other": "הצגת כל {{displayCount}} השורות",
+      "expandAllLines_two": "הצגת כל {{displayCount}} השורות",
+      "expandLines_one": "הצגת {{displayCount}} שורה ({{start}}–{{end}})",
+      "expandLines_other": "הצגת {{displayCount}} שורות ({{start}}–{{end}})",
+      "expandLines_two": "הצגת {{displayCount}} שורות ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "הצגת {{displayCount}} שורה הקשר",
+      "expandLinesOfContext_other": "הצגת {{displayCount}} שורות הקשר",
+      "expandLinesOfContext_two": "הצגת {{displayCount}} שורות הקשר",
+      "expandMoreLines_one": "הצגת עוד {{displayCount}} שורה ({{start}}–{{end}})",
+      "expandMoreLines_other": "הצגת עוד {{displayCount}} שורות ({{start}}–{{end}})",
+      "expandMoreLines_two": "הצגת עוד {{displayCount}} שורות ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "נטענו {{loaded}} מתוך {{total}} קבצים",
+      "loadedOfTotalFiles_other": "נטענו {{loaded}} מתוך {{total}} קבצים",
+      "loadedOfTotalFiles_two": "נטענו {{loaded}} מתוך {{total}} קבצים"
     },
     "inbox": {
       "couldNotLoad": "לא ניתן היה לטעון את הבקשות הנכנסות.",
@@ -2859,7 +2936,10 @@
       "statusContext": "הקשר",
       "lineLabel": "שורה {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(ריק)"
+      "emptyLine": "(ריק)",
+      "truncationBanner_one": "מוצגים {{limit}} הקבצים הראשונים מתוך {{total}} קבצים ששונו — בגלל מגבלת ה-API של GitHub.",
+      "truncationBanner_other": "מוצגים {{limit}} הקבצים הראשונים מתוך {{total}} קבצים ששונו — בגלל מגבלת ה-API של GitHub.",
+      "truncationBanner_two": "מוצגים {{limit}} הקבצים הראשונים מתוך {{total}} קבצים ששונו — בגלל מגבלת ה-API של GitHub."
     },
     "linkPasteClipboardEmpty": "לוח ההעתקה ריק.",
     "linkPasteNotAPullRequest": "זה לא קישור לבקשת משיכה או מיזוג",
@@ -3117,7 +3197,9 @@
     "couldNotApprove": "לא ניתן לאשר",
     "couldNotStart": "לא ניתן להתחיל",
     "channelName": "סוכנים פעילים",
-    "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
+    "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה.",
+    "openSession": "פתח",
+    "approveFailed": "לא ניתן היה לאשר. הקש על $t(common.approve) כדי לנסות שוב."
   },
   "transcriptionModel": {
     "title": "מודל תמלול",
@@ -3142,15 +3224,7 @@
     "remoteOptionTitle": "המחשב שלך",
     "remoteOptionBody": "הרץ את Kilo על המחשב שלך באמצעות ה-CLI של `kilo remote`.",
     "skip": "דלג על הסיור",
-    "tutorialLabel": "מדריך",
-    "remoteTitle": "התחל את הסשן המרוחק הראשון שלך",
-    "remoteBody": "חבר את המחשב שלך, ואז התחל את הסשן מכאן.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "עדיין לא חובר מחשב",
-    "remoteEmptyBody": "כדי לחבר אותו, הרץ `kilo remote` במחשב שלך.",
-    "remoteFound": "המחשב חובר",
-    "checkAgain": "בדוק שוב",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "מדריך"
   },
   "appActions": {
     "start": {
@@ -3158,5 +3232,8 @@
       "repositoryUnknown": "Kilo לא מזהה את {{repository}} כמאגר GitHub או GitLab. בחר מאגר אחר ב-Kilo.",
       "repositoryUnsupported": "{{repository}} הוא מאגר Bitbucket — הפעל סוכן עדיין לא יכול להשתמש בו. בחר מאגר אחר ב-Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "פתיחת הסשן האחרון"
   }
 }

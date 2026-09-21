@@ -73,6 +73,7 @@ export function AppAwareKeyboardPaddingView({
   style,
   keyboardOffset = 0,
   containerReservesBottomInset = false,
+  contentReservesBottomInset = false,
   ...props
 }: ComponentProps<typeof View> & {
   keyboardOffset?: number;
@@ -87,6 +88,19 @@ export function AppAwareKeyboardPaddingView({
    * Start button a nav-bar height above the keyboard (2026-09-20).
    */
   containerReservesBottomInset?: boolean;
+  /**
+   * The wrapped content pads the platform's bottom inset itself: the session
+   * composer adds `MESSAGE_INPUT_BOTTOM_CLEARANCE + bottomInset` and the
+   * discussion CTA bar adds `useDetailScreenBottomPadding()`. The occlusion
+   * resolved above is anchored to the screen bottom, so it counts that inset on
+   * top of the content's own padding and floats the composer / CTA a
+   * navigation-bar height above the keyboard. Such a caller adds the platform's
+   * raw keyboard metric instead: on Android the content's inset padding
+   * completes it, and on iOS the metric already reaches the screen bottom, so
+   * the lift those callers shipped with is unchanged (2026-09-21 review
+   * finding).
+   */
+  contentReservesBottomInset?: boolean;
 }) {
   const keyboardHeight = useAppAwareKeyboardPadding();
   const { bottom } = useSafeAreaInsets();
@@ -106,12 +120,16 @@ export function AppAwareKeyboardPaddingView({
           platform: Platform.OS,
         })
       : 0;
-  // One inset per screen: where the container already reserved the bottom
-  // inset outside this view, the screen-bottom-anchored occlusion would count
-  // it a second time.
-  const keyboardPadding = containerReservesBottomInset
-    ? Math.max(keyboardOcclusion - bottom, 0)
-    : keyboardOcclusion;
+  // One inset per screen: where a container outside this view (a trailing
+  // spacer, a parent `paddingBottom`) or the wrapped content's own bottom
+  // padding already reserved the bottom inset, the screen-bottom-anchored
+  // occlusion must not count it a second time.
+  let keyboardPadding = keyboardOcclusion;
+  if (containerReservesBottomInset) {
+    keyboardPadding = Math.max(keyboardOcclusion - bottom, 0);
+  } else if (contentReservesBottomInset) {
+    keyboardPadding = keyboardHeight;
+  }
 
   const resolvedKeyboardPadding = keyboardPadding > 0 ? keyboardPadding + keyboardOffset : 0;
 

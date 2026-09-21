@@ -87,6 +87,10 @@ describe('createManualCodeReviewJob provider failures', () => {
     name: string;
     fetch: () => void;
     code: TRPCError['code'];
+    /** Input overrides for a case whose name names a provider other than GitHub. */
+    input?: Record<string, unknown>;
+    /** Copy that proves the case ran the provider its name names. */
+    message?: string;
   }> = [
     {
       name: 'a missing public pull request maps to NOT_FOUND',
@@ -106,6 +110,10 @@ describe('createManualCodeReviewJob provider failures', () => {
     },
     {
       name: 'a rate-limited GitLab maps to TOO_MANY_REQUESTS',
+      // GitLab reports a rate limit with 429, so the case must run the GitLab
+      // path — the default input is a GitHub pull request.
+      input: { platform: 'gitlab', url: GITLAB_MR_URL },
+      message: 'GitLab rate-limited',
       fetch: () =>
         void jest
           .spyOn(global, 'fetch')
@@ -134,13 +142,16 @@ describe('createManualCodeReviewJob provider failures', () => {
     },
   ];
 
-  it.each(cases)('$name', async ({ fetch, code }) => {
+  it.each(cases)('$name', async ({ fetch, code, input, message }) => {
     fetch();
 
-    const error = await captureError();
+    const error = await captureError(input);
 
     expect(error).toBeInstanceOf(TRPCError);
     expect((error as TRPCError).code).toBe(code);
+    if (message) {
+      expect((error as TRPCError).message).toContain(message);
+    }
     // The finding's defect was tRPC's unmapped INTERNAL_SERVER_ERROR / HTTP 500.
     expect((error as TRPCError).code).not.toBe('INTERNAL_SERVER_ERROR');
     expect(getHTTPStatusCodeFromError(error as TRPCError)).not.toBe(500);

@@ -10,7 +10,10 @@
 // Callers whose own container already reserves the bottom inset above the view
 // (the session screen's trailing chrome spacer, the new-session form's parent
 // padding) pass `containerReservesBottomInset`, so the inset is subtracted and
-// the space is resolved once per screen instead of twice.
+// the space is resolved once per screen instead of twice. Callers whose wrapped
+// content pads the inset itself (the session composer, the discussion CTA bar)
+// pass `contentReservesBottomInset`, so the screen-bottom-anchored occlusion
+// does not add it a second time either.
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -52,7 +55,7 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));
 
-type MountProps = { containerReservesBottomInset?: boolean };
+type MountProps = { containerReservesBottomInset?: boolean; contentReservesBottomInset?: boolean };
 
 function mount(props: MountProps = {}) {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -160,6 +163,49 @@ describe('AppAwareKeyboardPaddingView', () => {
   it('still reserves nothing at rest when the container reserves the inset', () => {
     insets.bottom = 63;
     const renderer = mount({ containerReservesBottomInset: true });
+
+    expect(paddingBottom(renderer)).toBe(0);
+    renderer.unmount();
+  });
+
+  it('leaves the content-reserved inset to the content on Android', () => {
+    // The chat composer and the discussion CTA bar pad the bottom inset inside
+    // the view themselves, so the screen-bottom-anchored occlusion must not add
+    // it again — adding it floated the composer a navigation-bar height above
+    // the keyboard (2026-09-21 review finding).
+    platform.OS = 'android';
+    insets.bottom = 63;
+    const renderer = mount({ contentReservesBottomInset: true });
+
+    act(() => {
+      keyboard.show?.({ endCoordinates: { height: 704 } });
+    });
+    expect(paddingBottom(renderer)).toBe(704);
+
+    act(() => {
+      keyboard.hide?.();
+    });
+    expect(paddingBottom(renderer)).toBe(0);
+
+    renderer.unmount();
+  });
+
+  it('keeps the iOS frame height for content that pads the inset itself', () => {
+    platform.OS = 'ios';
+    insets.bottom = 34;
+    const renderer = mount({ contentReservesBottomInset: true });
+
+    act(() => {
+      keyboard.show?.({ endCoordinates: { height: 300 } });
+    });
+    expect(paddingBottom(renderer)).toBe(300);
+
+    renderer.unmount();
+  });
+
+  it('still reserves nothing at rest when the content reserves the inset', () => {
+    insets.bottom = 63;
+    const renderer = mount({ contentReservesBottomInset: true });
 
     expect(paddingBottom(renderer)).toBe(0);
     renderer.unmount();

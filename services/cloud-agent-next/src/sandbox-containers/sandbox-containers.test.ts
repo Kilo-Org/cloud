@@ -255,6 +255,39 @@ describe('SandboxContainers launch', () => {
     expect(reexecs.container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', 'bun']);
   });
 
+  it('applies the requested instance when resuming a launch whose start never took effect', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'launching', allocationRef: REF_A },
+    });
+    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+
+    const resumed = await instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-3',
+    });
+
+    expect(resumed).toEqual({ started: true });
+    expect(container.startCalls).toEqual([
+      { image: 'registry.example/kilo/app:test', instance: 'standard-3', enableInternet: true },
+    ]);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', 'bun']);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+  });
+
+  it('repairs a stopping record that lacks a stop op id before snapshotting', async () => {
+    const { instance, readRecord } = setup({
+      record: { ...idleRecord, state: 'stopping', allocationRef: REF_A, stopOpId: null },
+    });
+
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+
+    expect(readRecord()).toMatchObject({
+      state: 'idle',
+      lastSnapshot: { id: 'snap-1', sourceAllocation: REF_A },
+    });
+  });
+
   it('leaves launching and throws when the probe exits with an unexpected code, never re-execing', async () => {
     const { instance, container, readRecord } = setup({
       record: { ...idleRecord, state: 'launching', allocationRef: REF_A },

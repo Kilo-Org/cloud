@@ -46,6 +46,7 @@ type ContainersRecord = {
 const RECORD_KEY = 'containers:record:v1';
 const CONTAINER_IMAGE = 'app';
 const PROBE_TIMEOUT_MS = 5_000;
+const CONTAINER_CALL_TIMEOUT_MS = 5_000;
 const WRAPPER_EXEC_TIMEOUT_MS = 60_000;
 const SNAPSHOT_TIMEOUT_MS = 10_000;
 const DESTROY_TIMEOUT_MS = 30_000;
@@ -84,7 +85,7 @@ export class SandboxContainers extends DurableObject<Env> {
         throw new ContainersAllocationConflictError(ref);
       }
       if (record.state === 'launching' && record.allocationRef === ref) {
-        return this.resumeLaunch(record, ref, input.env);
+        return this.resumeLaunch(record, ref, input.env, input.instance);
       }
       const container = this.requiredContainer();
       // Ownership is retained before start: an ambiguous start that takes effect must not release the allocation.
@@ -120,7 +121,11 @@ export class SandboxContainers extends DurableObject<Env> {
       if (record.allocationRef !== ref && record.state !== 'stopping') return 'terminal';
       if (record.allocationRef !== ref) return 'retryable';
       if (record.state === 'stopping') {
-        return this.finishStop(record, ref, record.stopOpId ?? crypto.randomUUID());
+        const stopOpId = record.stopOpId ?? crypto.randomUUID();
+        if (record.stopOpId === null) {
+          await this.writeRecord({ ...record, stopOpId });
+        }
+        return this.finishStop(record, ref, stopOpId);
       }
       const stopOpId = crypto.randomUUID();
       const stopping: ContainersRecord = { ...record, state: 'stopping', stopOpId };
@@ -132,7 +137,13 @@ export class SandboxContainers extends DurableObject<Env> {
   async ensureLeaseAtLeast(allocationRef: string, ms: number): Promise<void> {
     const record = await this.readRecord();
     if (record.allocationRef !== allocationRef) return;
-    await this.ctx.container?.setInactivityTimeout(ms);
+    const container = this.ctx.container;
+    if (!container) return;
+    await withTimeout(
+      container.setInactivityTimeout(ms),
+      CONTAINER_CALL_TIMEOUT_MS,
+      'container lease update timed out'
+    );
   }
 
   async readLog(allocationRef: string, path: string, maxBytes: number): Promise<string> {
@@ -146,8 +157,16 @@ export class SandboxContainers extends DurableObject<Env> {
     const container = this.ctx.container;
     if (!container || container.running !== true) return '';
     try {
-      const proc = await container.exec(['tail', '-c', String(clamped), path]);
-      const out = await proc.output();
+      const proc = await withTimeout(
+        container.exec(['tail', '-c', String(clamped), path]),
+        CONTAINER_CALL_TIMEOUT_MS,
+        'container log read timed out'
+      );
+      const out = await withTimeout(
+        proc.output(),
+        CONTAINER_CALL_TIMEOUT_MS,
+        'container log read timed out'
+      );
       return new TextDecoder().decode(out.stdout);
     } catch {
       return '';
@@ -157,7 +176,8 @@ export class SandboxContainers extends DurableObject<Env> {
   private async resumeLaunch(
     record: ContainersRecord,
     ref: string,
-    env: Record<string, string>
+    env: Record<string, string>,
+    instance: ContainerInstanceSize
   ): Promise<{ started: boolean }> {
     const container = this.requiredContainer();
     const probe = await this.probeWrapper(container);
@@ -165,6 +185,12 @@ export class SandboxContainers extends DurableObject<Env> {
       throw new Error('Wrapper probe was ambiguous');
     }
     if (probe === 'absent') {
+      // A prior launch may have recorded `launching` before `start()` took
+      // effect. Apply the requested instance and snapshot before re-execing the
+      // wrapper, otherwise the retry silently runs at the default size.
+      if (!container.running) {
+        container.start(this.startOptions(instance, record.lastSnapshot?.id));
+      }
       await this.execWrapper(container, env);
     }
     await this.writeRecord({ ...record, state: 'running', allocationRef: ref, stopOpId: null });

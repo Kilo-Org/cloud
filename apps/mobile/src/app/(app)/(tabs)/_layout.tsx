@@ -28,9 +28,10 @@ import {
   getTabBarIconSize,
   shouldHideTabBar,
   shouldShowTabLabel,
-  TAB_LABEL_WRAP_FONT_SCALE,
+  TAB_LABEL_MINIMUM_FONT_SCALE,
   tabAccessibilityLabel,
   tabBarPosition,
+  tabLabelLineCount,
   visibleTabCount,
 } from '@/lib/tab-bar-layout';
 
@@ -54,7 +55,19 @@ function TabBarBackground() {
   );
 }
 
-function TabLabel({ label, focused }: Readonly<{ label: string; focused: boolean }>) {
+/**
+ * One tab label, on the lines the bar reserves for it (`tabLabelLineCount`).
+ * On the single reserved line a label too wide for its tab (a narrow window, a
+ * long translation) shrinks to fit rather than wrapping: a second line has no
+ * height reserved, so it renders clipped at the bar's edge ("PROFIL E" at
+ * 160 dp, e1, 2026-09-21). The two-line presentation is reserved for the
+ * font-scale case, where the bar grows to hold it.
+ */
+function TabLabel({
+  label,
+  focused,
+  allowWrap,
+}: Readonly<{ label: string; focused: boolean; allowWrap: boolean }>) {
   return (
     <Text
       accessible={false}
@@ -63,7 +76,10 @@ function TabLabel({ label, focused }: Readonly<{ label: string; focused: boolean
           ? 'w-full text-center font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px] text-foreground'
           : 'w-full text-center font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px] text-muted-foreground'
       }
-      numberOfLines={2}
+      numberOfLines={allowWrap ? 2 : 1}
+      adjustsFontSizeToFit={!allowWrap}
+      minimumFontScale={TAB_LABEL_MINIMUM_FONT_SCALE}
+      ellipsizeMode="tail"
     >
       {label}
     </Text>
@@ -77,6 +93,8 @@ export default function TabsLayout() {
   const colors = useThemeColors();
   const { bottom, left, right } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
+  const tabLabelLines = tabLabelLineCount(fontScale);
+  const allowLabelWrap = tabLabelLines > 1;
   const hideTabs = shouldHideTabBar(pathname);
   const showTabLabel = shouldShowTabLabel(fontScale);
   const tabBarHeight = getEffectiveTabBarHeight({
@@ -177,7 +195,9 @@ export default function TabsLayout() {
               tabBarPosition('home', tabFlags) ?? 1,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.home')} focused={focused} />,
+            tabBarLabel: ({ focused }) => (
+              <TabLabel label={t('tabs.home')} focused={focused} allowWrap={allowLabelWrap} />
+            ),
             tabBarIcon: ({ color, focused }) => (
               <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -196,12 +216,9 @@ export default function TabsLayout() {
             ),
             tabBarLabel: ({ focused }) => (
               <TabLabel
-                label={
-                  fontScale > TAB_LABEL_WRAP_FONT_SCALE
-                    ? t('tabs.kiloclawWrapped')
-                    : t('common.kiloclaw')
-                }
+                label={allowLabelWrap ? t('tabs.kiloclawWrapped') : t('common.kiloclaw')}
                 focused={focused}
+                allowWrap={allowLabelWrap}
               />
             ),
             tabBarIcon: ({ color, focused }) => (
@@ -228,7 +245,9 @@ export default function TabsLayout() {
               tabBarPosition('agents', tabFlags) ?? 2,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('common.agents')} focused={focused} />,
+            tabBarLabel: ({ focused }) => (
+              <TabLabel label={t('common.agents')} focused={focused} allowWrap={allowLabelWrap} />
+            ),
             tabBarIcon: ({ color, focused }) => (
               <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -245,7 +264,9 @@ export default function TabsLayout() {
               tabBarPosition('chat', tabFlags) ?? 3,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('common.chat')} focused={focused} />,
+            tabBarLabel: ({ focused }) => (
+              <TabLabel label={t('common.chat')} focused={focused} allowWrap={allowLabelWrap} />
+            ),
             tabBarIcon: ({ color, focused }) => (
               <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -262,7 +283,7 @@ export default function TabsLayout() {
               tabCount
             ),
             tabBarLabel: ({ focused }) => (
-              <TabLabel label={t('common.profile')} focused={focused} />
+              <TabLabel label={t('common.profile')} focused={focused} allowWrap={allowLabelWrap} />
             ),
             tabBarIcon: ({ color, focused }) => (
               <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />

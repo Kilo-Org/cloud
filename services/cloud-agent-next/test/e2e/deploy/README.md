@@ -346,13 +346,15 @@ Each scenario owns its cleanup; the runner only repeats `interruptSession` and
 [`../README.md`](../README.md#deployed-matrix-runner) for the scenario matrix
 and the env contract.
 
-Aggregate-runtime risk: the matrix now includes the four public-surface
-scenarios, whose own ceilings are 10 + 12 + 12 + 30 minutes, plus cleanup (up to
-about 2.5 minutes) and transport overhead. The workflow's `timeout-minutes: 120`
-is a reasonable operational ceiling, not a certified whole-matrix bound, and the
-existing scenarios use per-turn rather than overall budgets (`cold-hot` alone
-permits four 240 s turn waits). None of the four new scenarios uses a gate,
-`hang` or interrupt.
+Aggregate-runtime risk: the four public-surface scenarios have declared
+ceilings of 10 + 25 + 12 + 30 minutes, plus cleanup (up to about 2.5 minutes)
+and transport overhead. Their budgets mix per-turn and overall timeouts, as the
+existing scenarios do (`cold-hot` alone permits four 240 s turn waits), so no
+whole-matrix total is derivable from the registry. The workflow's
+`timeout-minutes: 300` is a reasonable operational ceiling, not a certified
+whole-matrix bound. None of the four public-surface scenarios uses a `gate` or
+`hang`; `worktree-multi-chat` does issue a targeted interrupt of the sibling
+chat.
 
 ## After a run
 

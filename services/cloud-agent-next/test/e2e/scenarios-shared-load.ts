@@ -271,6 +271,7 @@ type HeldSession = {
   session: WorktreeSessionResult;
   boot: { messageId: string; stream: StreamConnection };
   hold?: { messageId: string; stream: StreamConnection };
+  recovery?: StreamConnection;
 };
 
 /**
@@ -317,6 +318,9 @@ async function runConcurrentChats(
       );
       owned.register(session);
       const boot = await bootToCompletion(deadline, scenarioConfig, session, `${label} boot`);
+      // Own the boot stream as soon as it exists, so an assertion or allocation
+      // wait below cannot leak it past `finally`.
+      entries.push({ session, boot });
       events.push(...boot.stream.events);
       if (!echoPayloadMatches(boot.text, `boot-${index}-${runId}`)) {
         throw new Error(`${label} boot did not echo boot-${index}-${runId}`);
@@ -329,7 +333,6 @@ async function runConcurrentChats(
         CONTAINER_BUDGET_MS
       );
       if (allocation === null) throw new Error(`${label} did not expose an allocation`);
-      entries.push({ session, boot });
     }
 
     for (const entry of entries) {
@@ -372,7 +375,6 @@ async function runConcurrentChats(
         completed = false;
       }
       if (completed) {
-        events.push(...hold.stream.events);
         outcomes.push(`${entry.session.cloudAgentSessionId.slice(0, 18)}=completed`);
         continue;
       }
@@ -386,6 +388,7 @@ async function runConcurrentChats(
         'recovery turn',
         TURN_BUDGET_MS
       );
+      entry.recovery = recovery.stream;
       events.push(...recovery.stream.events);
       outcomes.push(`${entry.session.cloudAgentSessionId.slice(0, 18)}=completed-after-recovery`);
     }
@@ -404,8 +407,10 @@ async function runConcurrentChats(
     result = fail(errorMessage(error));
   } finally {
     for (const entry of entries) {
+      // Fold each hold once, here, before its stream is closed: a hold stream
+      // stays open and appends events while the other hold's recovery runs.
       if (entry.hold) events.push(...entry.hold.stream.events);
-      for (const stream of [entry.boot.stream, entry.hold?.stream]) {
+      for (const stream of [entry.boot.stream, entry.hold?.stream, entry.recovery]) {
         try {
           stream?.close();
         } catch {

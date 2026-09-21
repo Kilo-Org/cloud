@@ -148,7 +148,12 @@ export type OwnedSessionRegistry = {
    * resolves, before any assertion; dropping it leaks the worktree session.
    */
   config: DriverConfig;
-  /** Record a create result's ids. Repeated ids keep their first registration. */
+  /**
+   * Record a create result's ids. A first registration stores them; a repeat
+   * only fills in a `kiloSessionId` that is still `undefined` (the id
+   * `onSessionCreated` recorded during start), and never replaces one that is
+   * already defined.
+   */
   register(session: OwnedSession): void;
   /**
    * Every owned session, newest first, so a dependent session is cleaned up
@@ -206,7 +211,12 @@ export function createOwnedSessionRegistry(
   return {
     config: composed,
     register: session => {
-      owned.set(session.cloudAgentSessionId, session.kiloSessionId);
+      // `get` returns `undefined` both for an absent id and for the placeholder
+      // `onSessionCreated` writes during start, so this upgrades that placeholder
+      // to the real `kiloSessionId` without clobbering an already-known one.
+      if (owned.get(session.cloudAgentSessionId) === undefined) {
+        owned.set(session.cloudAgentSessionId, session.kiloSessionId);
+      }
     },
     entries: listEntries,
     cleanup: async label => {

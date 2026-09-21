@@ -421,6 +421,71 @@ describe('createOwnedSessionRegistry', () => {
     ]);
   });
 
+  it('upgrades an undefined kiloSessionId and keeps the first defined one on repeat registration', async () => {
+    const cleaned: Array<{ sessionId: string; kiloSessionId: string | undefined }> = [];
+    const registry = createOwnedSessionRegistry(
+      CONFIG,
+      async (_config, sessionId, _label, kiloSessionId) => {
+        cleaned.push({ sessionId, kiloSessionId });
+      }
+    );
+
+    // `onSessionCreated` records the id during start, before the create result
+    // supplies the real `kiloSessionId`.
+    registry.config.onSessionCreated?.('workspace_upgraded');
+    registry.register({ cloudAgentSessionId: 'workspace_upgraded', kiloSessionId: 'ses_real' });
+    registry.register({ cloudAgentSessionId: 'workspace_other', kiloSessionId: 'ses_other' });
+
+    // Newest first: the later registration is ahead of the earlier one.
+    expect(registry.entries()).toEqual([
+      { sessionId: 'workspace_other', kiloSessionId: 'ses_other' },
+      { sessionId: 'workspace_upgraded', kiloSessionId: 'ses_real' },
+    ]);
+
+    // A repeat with a conflicting defined id keeps the first defined value and
+    // does not change the ordering.
+    registry.register({ cloudAgentSessionId: 'workspace_upgraded', kiloSessionId: 'ses_conflict' });
+    registry.register({ cloudAgentSessionId: 'workspace_other', kiloSessionId: 'ses_conflict' });
+    expect(registry.entries()).toEqual([
+      { sessionId: 'workspace_other', kiloSessionId: 'ses_other' },
+      { sessionId: 'workspace_upgraded', kiloSessionId: 'ses_real' },
+    ]);
+
+    await registry.cleanup('scenario');
+    expect(cleaned).toEqual([
+      { sessionId: 'workspace_other', kiloSessionId: 'ses_other' },
+      { sessionId: 'workspace_upgraded', kiloSessionId: 'ses_real' },
+    ]);
+  });
+
+  it('does not clear a defined kiloSessionId when re-registered with undefined', async () => {
+    const cleaned: Array<{ sessionId: string; kiloSessionId: string | undefined }> = [];
+    const registry = createOwnedSessionRegistry(
+      CONFIG,
+      async (_config, sessionId, _label, kiloSessionId) => {
+        cleaned.push({ sessionId, kiloSessionId });
+      }
+    );
+
+    registry.register({ cloudAgentSessionId: 'workspace_root', kiloSessionId: 'ses_root' });
+    registry.register({ cloudAgentSessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' });
+
+    // The original clobber case: a repeat with `undefined` must keep the defined
+    // value and the newest-first ordering.
+    registry.register({ cloudAgentSessionId: 'workspace_root', kiloSessionId: undefined });
+    registry.register({ cloudAgentSessionId: 'workspace_sibling', kiloSessionId: undefined });
+    expect(registry.entries()).toEqual([
+      { sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' },
+      { sessionId: 'workspace_root', kiloSessionId: 'ses_root' },
+    ]);
+
+    await registry.cleanup('scenario');
+    expect(cleaned).toEqual([
+      { sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' },
+      { sessionId: 'workspace_root', kiloSessionId: 'ses_root' },
+    ]);
+  });
+
   it('keeps an id recorded by onSessionCreated when the create later throws', () => {
     const registry = createOwnedSessionRegistry(CONFIG, async () => {});
 

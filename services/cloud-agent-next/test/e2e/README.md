@@ -181,13 +181,12 @@ tsx services/cloud-agent-next/test/e2e/run.ts --api=legacy cold-hot echo:legacy
 
 Every scenario is now a shared definition. The long scenarios (`worktree-chat`,
 `worktree-multi-chat`, `long-conversation`, `leave-and-return`, `large-stream`,
-`concurrent-chats`, `question-idle-resume`, and the `sandboxFaults` scenarios
-`external-kill`, `kill-mid-flight`, `wrapper-freeze-settled-reap`,
-`wrapper-freeze-inflight-reap`) are name-runnable (`run.ts <name> _`) but
-deliberately excluded from `smoke.ts`'s `DEFAULT_MATRIX`: the worktree flows
-need an enrolled driver user, and the fault flows stop or freeze a real
-container (so they run last, in a focused invocation). Run them with `run.ts`
-locally; `smoke-deployed` runs the shared
+`concurrent-chats`, `question-idle-resume`) and the `sandboxFaults` scenarios
+(`external-kill`, `kill-mid-flight`, `wrapper-freeze-settled-reap`,
+`wrapper-freeze-inflight-reap`) are included in `smoke.ts`'s `DEFAULT_MATRIX`:
+the worktree flows need an enrolled driver user, and the fault flows stop or
+freeze a real container, so they run last. They stay name-runnable
+(`run.ts <name> _`) for focused runs; `smoke-deployed` runs the shared
 registry and marks the capability-gated ones `unsupported`. Long scenarios take
 6–30 minutes and require the funded seeded user
 (`E2E_USER_EMAIL=evgeny@kilocode.ai`), the offset-prefixed `WORKER_URL` and
@@ -365,7 +364,7 @@ Scenario matrix:
 | `auth-reject _` | Starts no session. Probes the fake Worker directly over HTTPS (every request timeout-bounded): each model route with no bearer → 401; `Bearer not-a-jwt` → 401; a JWT signed with the wrong secret → 401; positive control `GET /api/openrouter/models` with the real `config.bearerToken` → 200; each `/test/*` route without the admin bearer → 401 and with it → 2xx/400/404; crossover both ways (admin bearer on a model route → 401, model token on `/test/*` → 401). It proves the public HTTP auth boundary only: no sandbox credential propagation and no session path. |
 | `worktree-chat _` | Creates a worktree chat through the public tRPC surface. Requires the worktree id to correspond to the workspace identity (`workspace_<uuid>` → `worktree_<uuid>`), the session's own scope id, `parentSessionId` null and `autoCommit=false`, then a cold echo boot turn, an idempotent same-key replay (same identities, `replayed=true`), and one hot echo turn with no reported preparation, matching allocation references observed before and after the turn through the capability's bounded present-reference wait, and correlated content. The boot allocation reference is acquired **after** the boot turn completes through that bounded wait with a `240 s` budget, so the wait starts only after the boot turn has completed, not while the sandbox is still cold; the hot-turn read uses the same bounded wait (`waitForPresentAllocation`) with a `30 s` cap plus a `1 s` outer backstop slack, tolerates a transient `null` observation, and hard-fails only when no reference appears within the budget. It proves matching observed references before and after each turn, not uninterrupted presence between observations. It runs under the local Docker and deployed HTTP profiles from one definition and asserts only public-surface, per-chat outcomes. |
 | `worktree-multi-chat _` | Boots a root chat, then starts a paced `slow:90:1000:32` turn and waits (budget `60 s`) until that turn is underway: correlated-part liveness for the paced message (transient and empty initialization parts permitted) plus a bounded increase in the fake's aggregate `chatCompletions` counter. The counter is **not** an authoritative paced-request signal: it is attributed to the paced request only under the documented assumption that no auxiliary/title request is in flight in that window, and it cannot distinguish the paced primary request from an auxiliary one. A content-based predicate (correlated non-empty text) was tried and reverted: the paced child's only correlated part can be the empty transient init part, and its streamed content can lag past the wait budget, so the predicate never fired even though the fake had served the request. The laziness baseline is taken only after readiness. It then creates a sibling chat while the turn is still streaming. Requires the root still `queued`/`running` immediately after the create and completing afterwards, the sibling to share one non-null `worktreeId` and `sandboxId` while keeping a distinct workspace/`ses_` identity and its own scope, `chatCompletions` unchanged over a 15 s window (lazy create) and over a same-key replay, the sibling's first turn to report its own `preparing`, and interleaved root-second and sibling-second turns. It proves the shared checkout (the root writes an uncommitted file, the sibling reads it, the root overwrites it, a fresh sibling read echoes the second nonce), sequential question ownership (asked in the root while the sibling is idle, visible only on the root's stream, only the root can answer, and a reconnect replays the still-open question with no new model request), a targeted interrupt of the sibling while the root holds a paced `slow` turn (the root stays nonterminal and then completes, the sibling's turn fails `reason=interrupted`, and the root's allocation reference is unchanged), and a targeted delete of the sibling while the root is active (the sibling's `getSession` rejects and the root accepts and completes another turn). Chat-content isolation scans each chat's streams and a fresh replay stream for the other chat's message ids and, without the `parentID` filter, the other chat's markers. Honest limit: the worktree runtime serializes streaming model turns, so the scenario does not ask a question or start a model turn in one chat while the other streams, and it does not claim concurrent streaming; isolation is per-chat control/state. No `gate`/`hang` is used. |
-| `long-conversation [echo:cold]` | One cold `echo:cold` turn plus ten hot turns (nine `echo:<token>` turns and one paced `slow:2:50` turn). Requires the cold turn to complete with a reported preparation and its correlated content, every hot turn to complete without a reported preparation and with matching allocation references observed before and after through the bounded present-reference wait (not uninterrupted presence between observations), and each `echo:` turn's correlated content. Measured behaviour, not history restoration. |
+| `long-conversation [echo:cold]` | One cold `echo:cold` turn plus twelve hot turns (nine `echo:<token>` turns, one paced `slow:2:50` turn, and a real `file:write`/`file:read` pair). Requires the cold turn to complete with a reported preparation and its correlated content, every hot turn to complete without a reported preparation and with matching allocation references observed before and after through the bounded present-reference wait (not uninterrupted presence between observations), and each `echo:` turn's correlated content. Measured behaviour, not history restoration. |
 | `leave-and-return _` | Boots, completes a boot echo turn, then leaves the session with no demand. Samples the allocation reference targeting +60 s (must still be the baseline `P1`); the baseline read is the bounded present-reference wait, so it may take up to `30 s` to obtain a present reference and its measured timestamp can be later than +60 s. Then every 15 s for up to a 15-minute budget; it fails closed while `P1` remains and if a different non-null reference appears, and stops once the reference is absent. On resume it requires a reported preparation, a different non-null reference `P2`, a completed turn with its echo marker and — from a fresh replay stream — the boot turn's replayed correlated content. It never names a stop cause: a `null` reference is reported as "the allocation disappeared while unattended", not as a release. |
 
 Run artifact for `cold-hot`: capture the fake `/test/requests`
@@ -429,7 +428,7 @@ Run artifacts for the new scenarios (local Docker profile):
 
 - `worktree-chat`: `session=workspace_<uuid>; ses=ses_...; worktreeId=worktree_<uuid> (matches workspace identity); scope=self; autoCommit=false; allocationRef=<R>; initial=<marker>; hot=no-preparing; hotAllocationRef=<R> (read); replay=idempotent`
 - `worktree-multi-chat`: `root=...; sibling=...; worktree=<worktree_...>; sandboxId=<ses-...>; scope=distinct; rootNonterminalAfterSiblingCreate=true; lazyChatCompletions=<before>-><after> (unchanged over <interval>); replay=idempotent; siblingPreparing=true; interleaved=root-second+sibling-second complete; chatContentIsolation=true (no other-chat ids or markers in either chat's streams/replay)`
-- `long-conversation`: `cold=prepare; hot=10/10 complete; no-preparing=true; allocationRef stable=<R> (read each turn)`
+- `long-conversation`: `cold=prepare; hot=12/12 complete; no-preparing=true; allocationRef stable=<R> (read each turn)`
 - `leave-and-return`: `session=workspace_<uuid>; providerRef=<P1>; baselineSample=<P1>@t=<ms>; absentSample=null@t=<ms>; samples=<n>:<ref>@t=<ms>|<ref>@t=<ms>|...; resumePreparing=true; replacement=<P2>!=<P1>; replayedTranscript=<bootMessageId>:<marker>; stopCause=not-read` (every poll sample is reported with its elapsed time, all measured from one interval origin)
 
 ### Deployed matrix runner
@@ -496,11 +495,10 @@ container identity. The absence of hot-turn preparation events is not proof that
 the same container served the turns; identity stays a local-only assertion.
 
 The four `sandboxFaults` scenarios' deployed statements are inference, not
-proof: the deployed matrix was not run for this change. `timeout-minutes` in
-`.github/workflows/e2e-deployed.yml` is derived from the shared registry: the sum
-of every `defaultTimeoutMs` is 14,940,000 ms (249 min), the four fault scenarios
-return unsupported immediately (~60 min of that), and 300 min leaves ~20%
-headroom. Their `sessionSandbox` capability over HTTP reports the
+proof: the deployed matrix was not run for this change. The workflow's
+`timeout-minutes: 300` is an operational ceiling, not a certified or
+registry-derived bound; the scenarios mix per-turn and overall budgets, so no
+whole-matrix total is derivable. Their `sessionSandbox` capability over HTTP reports the
 persisted control-plane allocation reference, so "the same container" is
 allocation-reference stability, not a live runtime observation, and the HTTP
 surface cannot enumerate containers.

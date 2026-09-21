@@ -910,6 +910,7 @@ async function runWorktreeMultiChat(
         'root file write one'
       );
       rootEvents.push(...write1.stream.events);
+      rootMessageIds.push(write1.messageId);
     } finally {
       write1.stream.close();
     }
@@ -937,6 +938,7 @@ async function runWorktreeMultiChat(
         'sibling file read one'
       );
       siblingEvents.push(...read1.stream.events);
+      siblingMessageIds.push(read1.messageId);
     } finally {
       read1.stream.close();
     }
@@ -960,6 +962,7 @@ async function runWorktreeMultiChat(
         'root file write two'
       );
       rootEvents.push(...write2.stream.events);
+      rootMessageIds.push(write2.messageId);
     } finally {
       write2.stream.close();
     }
@@ -987,6 +990,7 @@ async function runWorktreeMultiChat(
         'sibling file read two'
       );
       siblingEvents.push(...read2.stream.events);
+      siblingMessageIds.push(read2.messageId);
     } finally {
       read2.stream.close();
     }

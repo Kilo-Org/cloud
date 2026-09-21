@@ -29,7 +29,6 @@ vi.mock('@/components/ui/icons', () => ({
   // The merged screen carries the passkeys row (`account-settings-screen.tsx`
   // renders KeyRound); a mock without it fails the whole mount.
   KeyRound: 'KeyRound',
-  KeyRound: 'KeyRound',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
 }));

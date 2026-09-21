@@ -130,6 +130,7 @@ import { createEventQueries } from '../../src/session/queries/index.js';
 import { throwAdmissionError } from '../../src/session/queue-message.js';
 import {
   isSandboxAcquisitionLostError,
+  isSandboxAcquisitionSupersededError,
   requestFrameSchema,
   responseFrameSchema,
   sandboxEventBatchResultSchema,
@@ -5647,9 +5648,17 @@ describe('SandboxControl acquisition receipts', () => {
       expect(allocations).toEqual(new Set([canonicalProviderRef(replacement)]));
       expect(provider.create).toHaveBeenCalledTimes(2);
       expect(provider.launch).toHaveBeenCalledTimes(2);
-      await expect(Promise.resolve(control.ensureReady(input))).rejects.toThrow(
-        'Sandbox acquisition no longer owns this allocation'
+      const superseded = await Promise.resolve(control.ensureReady(input)).then(
+        () => new Error('Expected a superseded acquisition rejection'),
+        (error: unknown) => error
       );
+      expect(isSandboxAcquisitionSupersededError(superseded)).toBe(true);
+      expect(isSandboxAcquisitionLostError(superseded)).toBe(true);
+      expect(Object.prototype.hasOwnProperty.call(superseded, 'name')).toBe(true);
+      expect(superseded).toMatchObject({
+        name: 'SandboxAcquisitionSupersededError',
+        message: 'Sandbox acquisition was superseded by a bindable live replacement allocation',
+      });
       expect(provider.ensureBillingAdmission).not.toHaveBeenCalled();
       await runInDurableObject(control, async (_instance, state) => {
         expect(await state.storage.get('acquisition_receipts')).toEqual([

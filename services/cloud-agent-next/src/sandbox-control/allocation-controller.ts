@@ -10,9 +10,11 @@
  * It also owns the acquisition/incarnation fencing (`bindAcquisition`
  * semantics). A request id binds to exactly one allocation identity; a changed
  * deadline throws an ordinary `Error` (matching the live
- * `SandboxControl.bindAcquisition`) and a mismatched live allocation throws
- * `SandboxAcquisitionLostError`, so a replayed request never starts a second
- * create.
+ * `SandboxControl.bindAcquisition`). A mismatched receipt throws
+ * `SandboxAcquisitionSupersededError` when a fresh acquisition would bind the
+ * current allocation (live and identity-bearing) and `SandboxAcquisitionLostError`
+ * otherwise, so a replayed request never starts a second create and a
+ * replacement allocation is recoverable rather than terminal.
  */
 import { z } from 'zod';
 import type { Command } from '../sandbox-state/commands.js';
@@ -21,7 +23,10 @@ import type { AllocationRecord } from '../sandbox-state/model/allocation.js';
 import { decideAllocation } from '../sandbox-state/allocation/reduce.js';
 import { loadAllocation } from '../sandbox-state/persist/load.js';
 import { storeAllocation, type CanonicalStorage } from '../sandbox-state/persist/store.js';
-import { SandboxAcquisitionLostError } from '../shared/sandbox-control-protocol.js';
+import {
+  SandboxAcquisitionLostError,
+  SandboxAcquisitionSupersededError,
+} from '../shared/sandbox-control-protocol.js';
 import {
   allocationTransitionChanged,
   buildAllocationTransition,
@@ -229,6 +234,13 @@ export function createAllocationController(deps: AllocationControllerDeps): Allo
       const receipts = stored.filter(receipt => receipt.deadlineAt > at);
       const receipt = stored.find(candidate => candidate.id === acquisition.id);
       const identity = allocationIdentity(record);
+      // `bindable` means live and identity-bearing: the same condition the
+      // fresh-bind path below requires to insert a receipt, and the one used to
+      // classify a stale receipt's mismatch. The canonical model subsumes the
+      // legacy native-retirement fence: a fenced allocation is `stopping` or
+      // `unknown`, so it is not live.
+      const available = isLiveAllocation(record);
+      const bindable = available && identity !== undefined;
       if (receipt) {
         if (receipt.deadlineAt !== acquisition.deadlineAt) {
           throw new Error('Sandbox acquisition deadline changed');
@@ -238,10 +250,11 @@ export function createAllocationController(deps: AllocationControllerDeps): Allo
           receipt.allocation.kind !== identity.kind ||
           receipt.allocation.id !== identity.id
         ) {
-          throw new SandboxAcquisitionLostError();
+          throw bindable
+            ? new SandboxAcquisitionSupersededError()
+            : new SandboxAcquisitionLostError();
         }
       }
-      const available = isLiveAllocation(record);
       if (!receipt && available) {
         if (!identity) throw new Error('Sandbox allocation identity is unavailable');
         receipts.push({ ...acquisition, allocation: identity });

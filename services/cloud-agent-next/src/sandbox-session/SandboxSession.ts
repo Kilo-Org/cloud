@@ -170,6 +170,7 @@ import {
   sessionQuestionResolveResultSchema,
   sameSessionOperation,
   isSandboxAcquisitionLostError,
+  isSandboxAcquisitionSupersededError,
   wrapperInstanceIdSchema,
   type SessionAttachPayload,
   type SessionOperationAck,
@@ -4387,6 +4388,17 @@ export class SandboxSession extends DurableObject<Env> {
       if (rotated) {
         if (this.saveMessages(rotated, epoch)) await this.armQueueRetry(retryNotBefore);
         return;
+      }
+      const boundWrapperInstanceId = activeWrapperInstanceId(message);
+      if (isSandboxAcquisitionSupersededError(error) && boundWrapperInstanceId !== undefined) {
+        const released = releaseUnadmittedWaitingMessages(
+          this.loadMessages(),
+          boundWrapperInstanceId
+        );
+        if (released.releasedIds.includes(messageId)) {
+          if (this.saveMessages(released.messages, epoch)) await this.armQueueRetry(retryNotBefore);
+          return;
+        }
       }
       // Dispatched or unresolved proofs exist: fall through to the existing terminal handling.
     }

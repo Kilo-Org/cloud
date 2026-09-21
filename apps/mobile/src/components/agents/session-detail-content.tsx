@@ -116,6 +116,7 @@ import { useInteractionHandlers } from '@/components/agents/use-interaction-hand
 import { useSessionAutoApprove } from '@/components/agents/use-session-auto-approve';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
   SESSION_SLOW_LOAD_MS,
   useSessionSlowLoadPhase,
@@ -1925,8 +1926,8 @@ export function SessionDetailContent({
           ) : null}
           <ScreenHeader
             title={rename.title}
-            titleNumberOfLines={1}
             reserveTitleSpace
+            titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
             backFallback="/(app)/(tabs)/(2_agents)"
             headerRight={headerRight}
             className="pb-1"
@@ -2115,15 +2116,20 @@ export function SessionDetailContent({
 
         {/* Fixed indicator row — lives outside the FlashList so per-token
             content-size changes during streaming cannot reposition it.
-            Gated on has-messages so the empty/connecting path (which
-            renders the centered status indicator inside `renderContent`)
-            does not double-render. While preparing, suppressed when the
-            transcript already shows PreparationGroup (no duplicate). */}
+            It carries no position layout transition: while the list resizes it
+            would animate this row's position lag and paint it over the
+            transcript rows it passes (profile-screen.tsx:275-277). It snaps in
+            the same frame and stays opaque via `bg-background`, so a future
+            layout change covers a transcript row instead of overprinting it.
+            Gated on has-messages so the empty/connecting path (which renders
+            the centered status indicator inside `renderContent`) does not
+            double-render. While preparing, suppressed when the transcript
+            already shows PreparationGroup (no duplicate). */}
         {showSessionFooterRow ? (
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
-            layout={LinearTransition.duration(150)}
+            className="bg-background"
           >
             {/* Raw list on purpose: working-indicator.tsx:50-59 derives the
                 label from the last assistant part, and compute-status.ts:33-35
@@ -2387,9 +2393,10 @@ export function SessionDetailContent({
       );
     }
     return (
-      // Fades in as the skeleton fades out, so the transcript resolves in
-      // place instead of replacing the placeholder in one frame.
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+      // No entrance animation: the transcript body must paint on its own, not
+      // after a `FadeIn` (which starts at `opacity: 0`) completes. The
+      // skeleton's `exiting` crossfade still carries the swap visually.
+      <View className="flex-1">
         <SessionMessageList
           sessionId={sessionId}
           items={transcript}
@@ -2410,7 +2417,7 @@ export function SessionDetailContent({
           resumeAt={resumeAnchor}
           followTailNonce={followTailNonce}
         />
-      </Animated.View>
+      </View>
     );
   }
 }

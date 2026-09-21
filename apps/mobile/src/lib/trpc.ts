@@ -10,6 +10,8 @@ import { buildAuthHeaders } from '@/lib/auth/auth-header';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import { shouldRefreshBeforeRequest } from '@/lib/auth/native-auth-contract';
 import { createNetworkErrorFetch, readTrpcResponseError } from '@/lib/telemetry/network-errors';
+import { postLatencyBatch } from '@/lib/telemetry/latency-ingest';
+import { createLatencyBuffer, createLatencyFetch } from '@/lib/telemetry/request-latency';
 import {
   getActiveToken,
   getActiveTokenSnapshot,
@@ -21,6 +23,19 @@ import { TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 export const { TRPCProvider, useTRPC } = createTRPCContext<MobileRouter>();
 
 const trpcUrl = `${API_BASE_URL}/api/trpc`;
+
+/**
+ * Procedures that leave the tRPC batch and get their own HTTP call. Source:
+ * Axiom dashboard d35acea0-747f-4200-9d04-847a2e30a554, panel "Unbatch
+ * candidates — caller-seconds lost", read 2026-09-18T02:48Z: user.getMe
+ * 3,475 batches / 5,836 caller-seconds lost, activeSessions.list 2,129,
+ * cliSessionsV2.getSessionMessagesPage 1,597.
+ */
+export const UNBATCHED_PROCEDURES = new Set([
+  'user.getMe',
+  'activeSessions.list',
+  'cliSessionsV2.getSessionMessagesPage',
+]);
 
 /**
  * E2E-only artificial backend latency (repro for latency-dependent UI states,
@@ -96,6 +111,54 @@ const observedFetch = createNetworkErrorFetch(deadlineFetch, {
   readResponseError: readTrpcResponseError,
 });
 
+const latencyBuffer = createLatencyBuffer({
+  send: postLatencyBatch,
+  now: () => Date.now(),
+  schedule: (fn, ms) => {
+    const timer = setTimeout(fn, ms);
+    return () => {
+      clearTimeout(timer);
+    };
+  },
+});
+
+// tRPC's single `httpLink` omits the request body for a call with no input.
+// The server reads that as `undefined`, which a procedure with a required
+// `.input()` schema rejects with 400 BAD_REQUEST (`activeSessions.list` is
+// called that way from the session resolver), while the batched link sends
+// `{}` for the same call. Send the empty object the batched link sends so an
+// unbatched no-input query reaches its procedure with the input the schema
+// expects. Only a POST with no body is touched; a caller's own body is kept.
+const withJsonBody: typeof fetch = async (input, init) => {
+  const normalized =
+    init?.method === 'POST' && init.body === undefined ? { ...init, body: '{}' } : init;
+  const response = await observedFetch(input, normalized);
+  return response;
+};
+
+// Every tRPC HTTP call (single or batched) gets a per-call `x-kilo-request-id`
+// header and records one latency sample, so the server timing line and the
+// client sample join by the same id. The id comes from the platform `crypto`
+// API, which both iOS and Android expose (`randomUUID` on Hermes), so one
+// implementation serves both and no native-module import or per-platform
+// branch is kept. A runtime without that API still gets an id from the
+// timestamp fallback rather than dropping the sample.
+function newRequestId(): string {
+  // oxlint-disable-next-line anti-slop/no-reflect-get -- a typed access would make TS treat the runtime fallback as dead code
+  const platformCrypto = Reflect.get(globalThis, 'crypto') as
+    | { randomUUID?: () => string }
+    | undefined;
+  if (platformCrypto?.randomUUID !== undefined) {
+    return platformCrypto.randomUUID();
+  }
+  return `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+const measuredFetch = createLatencyFetch(withJsonBody, latencyBuffer, {
+  now: () => Date.now(),
+  newId: newRequestId,
+});
+
 async function getAuthHeaders() {
   const token = await getAuthTokenForRequest();
   if (!token) {
@@ -142,20 +205,20 @@ async function getAuthHeaders() {
 const singleLink = httpLink({
   url: trpcUrl,
   headers: getAuthHeaders,
-  fetch: observedFetch,
+  fetch: measuredFetch,
   methodOverride: 'POST',
 });
 
 const batchLink = httpBatchLink({
   url: trpcUrl,
   headers: getAuthHeaders,
-  fetch: observedFetch,
+  fetch: measuredFetch,
   methodOverride: 'POST',
 });
 
 const trpcLinks = [
   splitLink({
-    condition: op => op.context.skipBatch === true,
+    condition: op => op.context.skipBatch === true || UNBATCHED_PROCEDURES.has(op.path),
     true: singleLink,
     false: batchLink,
   }),

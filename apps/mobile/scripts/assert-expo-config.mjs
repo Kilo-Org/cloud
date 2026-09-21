@@ -45,13 +45,6 @@ const BLOCKED_PERMISSIONS = [
 const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
-// The one writer of the app's alert title layout override: react-native's
-// Android alert title aligns to the window (device-locale) direction, so an
-// app-language RTL interface shows a left-aligned title over a right-aligned
-// body. Registered as a plugin because only prebuild can write the app res.
-// Android-only by design: it is the one platform gate on the alert path (named
-// in the plugin), and iOS's UIAlertController needs no override.
-const RTL_ALERT_TITLE_PLUGIN = './plugins/withRtlAlertTitle';
 const ARTIFACT_FILE_PROVIDER_PLUGIN = './plugins/withArtifactFileProvider';
 // The one writer of the app target's `<tag>.lproj/Localizable.strings`: the App
 // Intent copy plus the appended Focus-filter catalog.
@@ -209,16 +202,6 @@ check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGI
 check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
-);
-// Keeps the Android alert title on the text's start edge. Without it
-// react-native's own layout pins viewStart, which follows the window (device
-// locale) rather than the app language, so an RTL interface renders the title
-// left-aligned above a right-aligned body. Android-only by design — the
-// platform without a JS-level way to set that alignment; iOS's UIAlertController
-// needs no counterpart, so `Alert.alert` stays one implementation for both.
-check(
-  pluginNames.includes(RTL_ALERT_TITLE_PLUGIN),
-  `plugins must include "${RTL_ALERT_TITLE_PLUGIN}"`
 );
 // The iOS File Provider extension target and the Pods integration behind it are
 // created by this plugin alone; without it the Files-app location has no

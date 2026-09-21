@@ -51,7 +51,14 @@ function alignmentPath(profileSource: string): string {
   const end = lines.findIndex(
     (line, index) => index >= start && /margin(?:Left|Right|Start|End)/.test(line)
   );
-  return lines.slice(start, (end === -1 ? start : end) + 1).join('\n');
+  if (end === -1) {
+    // Naming the insets differently, or applying them as padding, would shrink
+    // the scanned path to its first line and leave the guard passing on nothing.
+    throw new Error(
+      `${PROFILE_SCREEN} applies its side insets without a margin declaration; update this guard`
+    );
+  }
+  return lines.slice(start, end + 1).join('\n');
 }
 
 describe('screen side insets: one implementation for both platforms', () => {

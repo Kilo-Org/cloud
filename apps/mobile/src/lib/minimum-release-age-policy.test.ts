@@ -35,9 +35,6 @@ const BASE_EXCLUDE_ENTRIES = [
   'openclaw',
 ] as const;
 
-// The exact versions the Expo SDK 57 aligned graph installs (verified against
-// pnpm-lock.yaml): the four 2026-09-08 patch releases `expo install --check`
-// expects plus the transitive resolutions blocked by the 6842-minute gate.
 // The DO-managed Cloudflare containers runtime needs wrangler 4.134.0+, and
 // 4.135.0 exact-pins its own workerd/miniflare runtime, so each is exempted by
 // exact version. Approved early-access exception; remove this group when 4.135.0
@@ -53,6 +50,9 @@ const CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES = [
   '@cloudflare/workerd-windows-64@1.20260918.1',
 ] as const;
 
+// The exact versions the Expo SDK 57 aligned graph installs (verified against
+// pnpm-lock.yaml): the four 2026-09-08 patch releases `expo install --check`
+// expects plus the transitive resolutions blocked by the 6842-minute gate.
 const SDK_57_EXACT_EXCLUDE_ENTRIES = [
   'expo@57.0.21',
   '@expo/ui@57.0.17',

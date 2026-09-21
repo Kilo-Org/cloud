@@ -31,7 +31,7 @@
 
 import '../lib/load-env';
 
-import { and, asc, desc, eq, like, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
 import { closeAllDrizzleConnections, db } from '@/lib/drizzle';
 import {
@@ -86,7 +86,10 @@ async function main(): Promise<void> {
         eq(operation_ledgers.intent, 'complete_store_purchase'),
         eq(operation_ledgers.status, 'failed'),
         eq(operation_ledgers.outcome_code, ACTIVE_KILO_PASS_SUBSCRIPTION_MESSAGE),
-        like(operation_ledgers.resource_key, `${KiloPassPaymentProvider.GooglePlay}:%`)
+        // `resource_key` is `${paymentProvider}:${providerTransactionId}`, so the
+        // provider is the first colon-separated segment. Compare it exactly:
+        // `LIKE 'google_play:%'` would treat the underscore as a wildcard.
+        sql`split_part(${operation_ledgers.resource_key}, ':', 1) = ${KiloPassPaymentProvider.GooglePlay}`
       )
     )
     .orderBy(asc(operation_ledgers.admitted_at));

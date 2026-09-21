@@ -255,8 +255,7 @@ import {
   type CloudAgentRunStateReport,
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { buildRunStateReport, FAILED_RUN_DIAGNOSTIC_MESSAGES } from '../telemetry/queue-reports.js';
-import { classifyControlPlaneFailure } from '../telemetry/control-plane-failure.js';
-import { classifyCloudAgentFailure } from '@kilocode/worker-utils/cloud-agent-failure';
+import { classifyControlPlaneRunFailure } from '../telemetry/control-plane-failure.js';
 import { PENDING_SESSION_MESSAGE_LIMIT } from '../session/pending-messages.js';
 import {
   commitSessionOperationResult,
@@ -2368,21 +2367,25 @@ export class SandboxSession extends DurableObject<Env> {
       // known coordinator cause.
       const coordinatorOriginated =
         message.terminalSource === undefined || message.terminalSource === 'coordinator';
-      const classification = classifyControlPlaneFailure(
-        coordinatorOriginated ? message.failedReason : undefined,
+      const classification = classifyControlPlaneRunFailure({
+        reason: coordinatorOriginated ? message.failedReason : undefined,
         dispatchState,
-        status
-      );
+        status,
+        ...(message.assistantReason === undefined
+          ? {}
+          : { assistantReason: message.assistantReason }),
+        ...(message.providerOwnership === undefined
+          ? {}
+          : { providerOwnership: message.providerOwnership }),
+        ...(message.intent?.agent.model === undefined
+          ? {}
+          : { admittedModel: message.intent.agent.model }),
+      });
       run.failureStage = classification.stage;
       run.failureCode = classification.code;
       if (status === 'failed') {
-        const orchestrator = classifyCloudAgentFailure({
-          source: 'run',
-          stage: classification.stage,
-          code: classification.code,
-        });
-        run.failureResponsibility = orchestrator.responsibility;
-        run.failureReason = orchestrator.reason;
+        run.failureResponsibility = classification.responsibility;
+        run.failureReason = classification.failureReason;
         if (message.terminalAt !== undefined) {
           run.diagnostic = {
             errorMessageRedacted:

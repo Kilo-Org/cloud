@@ -9,6 +9,7 @@ import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-by
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
+import { tagOpenAiChatGptByokModels } from '@/lib/ai-gateway/openai-chatgpt/routing';
 import { readDb } from '@/lib/drizzle';
 import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
 import { appendLocalFakeDeterministicCatalogModels } from '@/lib/ai-gateway/local-fake-llm';
@@ -74,9 +75,9 @@ export async function GET(
       listAvailableExperimentModels(),
       getUserByokProviderIds(readDb, auth.user.id),
     ]);
-    const modelsWithByokAvailability = await addUserByokAvailability(
-      models,
-      enabledByokProviderIds
+    const modelsWithByokAvailability = await tagOpenAiChatGptByokModels(
+      { kiloUserId: auth.user.id, organizationId: null },
+      await addUserByokAvailability(models, enabledByokProviderIds)
     );
     return await modelResponse({
       data: appendLocalFakeDeterministicCatalogModels(

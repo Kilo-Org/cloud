@@ -17,7 +17,7 @@ type EmailInputFormProps = {
   /**
    * The submit label. Surfaces that show this form beside the OAuth provider
    * buttons name the method ('Continue with Email') so the email action reads
-   * as a peer of 'Continue with Google' / 'Sign in with ChatGPT'; the plain
+   * as a peer of 'Continue with Google' / 'Continue with ChatGPT'; the plain
    * 'Continue' stays the default everywhere else.
    */
   submitLabel?: string;

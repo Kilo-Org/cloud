@@ -1332,10 +1332,13 @@ describe('tryDispatchPendingReviews', () => {
       throw new Error('Expected review to be inserted');
     }
 
+    // Supersede the review while the dispatcher holds the claim and is inside
+    // payload preparation. The cancellation is awaited before preparation
+    // resolves: the dispatcher's post-preparation reservation check then
+    // observes it deterministically. A detached call races that check, so the
+    // test only passed when the cancellation commit happened to land first.
     mockPrepareReviewPayload.mockImplementationOnce(async (params: { reviewId: string }) => {
-      queueMicrotask(() => {
-        void cancelSupersededReviewsForPR(userReviewScope(100), 'sha-race-new');
-      });
+      await cancelSupersededReviewsForPR(userReviewScope(100), 'sha-race-new');
       return { reviewId: params.reviewId, sessionInput: { prompt: 'Review this change.' } };
     });
 

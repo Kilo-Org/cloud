@@ -163,6 +163,7 @@
     "useDifferentEmail": "Usa un altro indirizzo email",
     "signInWithApple": "Accedi con Apple",
     "signInWithGoogle": "Accedi con Google",
+    "signInWithPasskey": "Accedi con una passkey",
     "emailAddress": "Indirizzo email",
     "emailPlaceholder": "tu@esempio.com",
     "continueWithEmail": "Continua con email",
@@ -175,6 +176,10 @@
     "termsConnector": " e ",
     "termsSuffix": ".",
     "moreSignInOptions": "Altre opzioni di accesso",
+    "passkeyCancelled": "L'accesso con passkey è stato annullato. Riprova.",
+    "passkeyNotFound": "Nessuna passkey è salvata per questo dispositivo. Accedi invece con Apple, Google o la tua email.",
+    "passkeyUnsupported": "Le passkey non sono disponibili su questo dispositivo. Accedi invece con Apple, Google o la tua email.",
+    "passkeyFailed": "Impossibile accedere con una passkey. Riprova.",
     "couldNotCompleteSignIn": "Impossibile completare l'accesso. Riprova.",
     "sessionEnded": "La tua sessione è terminata. Accedi di nuovo.",
     "signInCodeExpired": "Il tuo codice di accesso è scaduto. Riprova.",
@@ -225,11 +230,32 @@
     "providerTestAccount": "Account di test",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO aziendale"
+    "providerEnterpriseSso": "SSO aziendale",
+    "passkeysTitle": "Passkey",
+    "passkeysSubtitle": "Accedi senza password",
+    "passkeysEmpty": "Nessuna passkey ancora",
+    "passkeysEmptyHint": "$t(profile.addPasskey) per accedere senza password.",
+    "passkeysCouldNotLoad": "Impossibile caricare le passkey",
+    "passkeysLoadFailed": "Le passkey non sono disponibili finché questo non viene caricato.",
+    "addPasskey": "Aggiungi una passkey",
+    "passkeyDefaultName": "Passkey",
+    "passkeyAddedOn": "Aggiunta il {{date}}",
+    "passkeyAdded": "Passkey aggiunta.",
+    "passkeyAddFailed": "Impossibile aggiungere una passkey. Riprova.",
+    "passkeyAddUnsupported": "Questo dispositivo non può creare passkey.",
+    "passkeyAddCancelled": "La creazione della passkey è stata annullata.",
+    "passkeyRemoved": "Passkey rimossa.",
+    "passkeyRemoveFailed": "Impossibile rimuovere quella passkey. Riprova.",
+    "passkeyRenamed": "Passkey rinominata.",
+    "passkeyName": "Nome della passkey",
+    "renamePasskey": "Rinomina passkey",
+    "removePasskey": "Rimuovi passkey",
+    "removePasskeyTitle": "Rimuovere la passkey?",
+    "removePasskeyMessage": "Non potrai più accedere con questa passkey."
   },
   "notifications": {
     "channel": {
-      "agent": "Sessioni degli agenti",
+      "agentProgress": "Avanzamento degli agenti",
       "chat": "Messaggi di chat",
       "kiloclaw": "Attività di KiloClaw",
       "balance": "Avvisi sul saldo",
@@ -274,7 +300,16 @@
     "previewAlways": "Sempre",
     "previewWhenUnlocked": "A dispositivo sbloccato",
     "previewFullDescription": "Le notifiche mostrano il testo del messaggio nella schermata di blocco.",
-    "previewGenericDescription": "Le notifiche segnalano nuovi eventi senza mostrarne il contenuto. Apri Kilo per leggerlo."
+    "previewGenericDescription": "Le notifiche segnalano nuovi eventi senza mostrarne il contenuto. Apri Kilo per leggerlo.",
+    "action": {
+      "openSession": "Apri la sessione"
+    },
+    "needsInputAction": {
+      "approved": "Richiesta approvata",
+      "replied": "Risposta inviata",
+      "failed": "Impossibile rispondere. Tocca di nuovo per riprovare.",
+      "unavailable": "Questa richiesta non è più in attesa."
+    }
   },
   "tabs": {
     "home": "Inizio",
@@ -354,7 +389,10 @@
       "uploadFailed": "Il caricamento non è riuscito.",
       "failedToUploadFile": "Impossibile caricare il file: {{reason}}.",
       "nothingToPaste": "Non c'è nulla da incollare.",
-      "metadataStripFailed": "Impossibile rimuovere i metadati della foto."
+      "metadataStripFailed": "Impossibile rimuovere i metadati della foto.",
+      "limit_one": "Puoi allegare fino a {{displayCount}} file.",
+      "limit_other": "Puoi allegare fino a {{displayCount}} file.",
+      "limit_many": "Puoi allegare fino a {{displayCount}} file."
     },
     "attachmentPreview": {
       "accessibility": "File {{filename}}, {{status}}",
@@ -1126,7 +1164,13 @@
       "syncNow": "Sincronizza ora",
       "syncQueued": "Sincronizzazione in coda",
       "syncStatusUnavailable": "Lo stato della sincronizzazione non è disponibile.",
-      "withinDeadline": "Entro la scadenza"
+      "withinDeadline": "Entro la scadenza",
+      "daysOverdue_one": "{{displayCount}} giorno di ritardo",
+      "daysOverdue_other": "{{displayCount}} giorni di ritardo",
+      "daysOverdue_many": "{{displayCount}} giorni di ritardo",
+      "findingsCount_one": "{{displayCount}} segnalazione",
+      "findingsCount_other": "{{displayCount}} segnalazioni",
+      "findingsCount_many": "{{displayCount}} segnalazioni"
     },
     "dashboardMetrics": {
       "openFindings": "Segnalazioni aperte",
@@ -1614,20 +1658,7 @@
       "continueFrom": "Stai continuando la sessione {{title}}.",
       "importingSession": "Importazione in corso…",
       "cliCannotContinue": "Questa CLI non può continuare una sessione. Scegli Cloud Agent o un'altra CLI.",
-      "importFailed": "Impossibile importare questa sessione.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Predefinita · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Piccola",
-      "sandboxInstanceShared": "Condivisa",
-      "sandboxInstanceLarge": "Grande",
-      "sandboxInstanceDevcontainer": "Container di sviluppo",
-      "sandboxInstanceProviderDefault": "Predefinita del provider",
-      "sandboxCouldNotLoad": "Impossibile caricare le opzioni della sandbox",
-      "sandboxUnavailable": "Questa sandbox non è disponibile. Scegli un'altra sandbox o Predefinita.",
-      "sandboxUseDefault": "Usa Predefinita"
+      "importFailed": "Impossibile importare questa sessione."
     },
     "partRenderer": {
       "updatedFileCount_one": "È stato aggiornato {{displayCount}} file.",
@@ -1652,7 +1683,16 @@
       "updateTodos": "Aggiorna le attività",
       "linesBadge": "{{displayCount}} righe",
       "filesBadge": "{{displayCount}} file",
-      "matchesBadge": "{{displayCount}} corrispondenze"
+      "matchesBadge": "{{displayCount}} corrispondenze",
+      "filesBadge_one": "{{displayCount}} file",
+      "filesBadge_other": "{{displayCount}} file",
+      "filesBadge_many": "{{displayCount}} file",
+      "linesBadge_one": "{{displayCount}} riga",
+      "linesBadge_other": "{{displayCount}} righe",
+      "linesBadge_many": "{{displayCount}} righe",
+      "matchesBadge_one": "{{displayCount}} corrispondenza",
+      "matchesBadge_other": "{{displayCount}} corrispondenze",
+      "matchesBadge_many": "{{displayCount}} corrispondenze"
     },
     "readToolMarkdown": {
       "linesTruncated": "righe {{start}}–{{end}} (troncate)",
@@ -1945,7 +1985,13 @@
       "files": "Documenti",
       "couldNotOpenPhotoPicker": "Impossibile aprire la selezione delle foto. Riavvia Kilo e riprova.",
       "maxFilesAllowed": "Puoi aggiungere al massimo {{displayCount}} file.",
-      "onlyAddingFiles": "Verranno aggiunti solo {{accepted}} file su {{total}} (massimo {{max}})"
+      "onlyAddingFiles": "Verranno aggiunti solo {{accepted}} file su {{total}} (massimo {{max}})",
+      "maxFilesAllowed_one": "Puoi aggiungere al massimo {{displayCount}} file.",
+      "maxFilesAllowed_other": "Puoi aggiungere al massimo {{displayCount}} file.",
+      "maxFilesAllowed_many": "Puoi aggiungere al massimo {{displayCount}} file.",
+      "onlyAddingFiles_one": "Verranno aggiunti solo {{accepted}} file su {{total}} (massimo {{max}})",
+      "onlyAddingFiles_other": "Verranno aggiunti solo {{accepted}} file su {{total}} (massimo {{max}})",
+      "onlyAddingFiles_many": "Verranno aggiunti solo {{accepted}} file su {{total}} (massimo {{max}})"
     },
     "composer": {
       "addAttachment": "Aggiungi un allegato",
@@ -1963,7 +2009,10 @@
       "discardAttachmentsMessage": "I file caricati non allegati a messaggi inviati verranno eliminati.",
       "discardAttachmentsTitle": "Eliminare gli allegati?",
       "charactersRemaining": "{{count}} caratteri rimanenti",
-      "insertNewline": "Inserisci un'interruzione di riga"
+      "insertNewline": "Inserisci un'interruzione di riga",
+      "charactersRemaining_one": "{{count}} carattere rimanente",
+      "charactersRemaining_other": "{{count}} caratteri rimanenti",
+      "charactersRemaining_many": "{{count}} caratteri rimanenti"
     },
     "chatLink": {
       "linkCopied": "Link copiato",
@@ -2036,7 +2085,10 @@
       "stepsCount": "{{steps}} passaggi",
       "stepsCount_other": "{{steps}} passaggi",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "stepsCount_many": "{{steps}} passaggi"
+      "stepsCount_many": "{{steps}} passaggi",
+      "modelsCount_one": "Modello ({{displayCount}})",
+      "modelsCount_other": "Modelli ({{displayCount}})",
+      "modelsCount_many": "Modelli ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Approvazione automatica",
@@ -2076,7 +2128,10 @@
     },
     "toolRun": {
       "sheetTitle": "Chiamate degli strumenti",
-      "condensedLabel": "{{itemCount}} elementi; {{last}}"
+      "condensedLabel": "{{itemCount}} elementi; {{last}}",
+      "condensedLabel_one": "{{itemCount}} elemento; {{last}}",
+      "condensedLabel_other": "{{itemCount}} elementi; {{last}}",
+      "condensedLabel_many": "{{itemCount}} elementi; {{last}}"
     }
   },
   "bootstrap": {
@@ -2247,7 +2302,10 @@
     "cliCantReceiveFilesTitle": "Questa sessione non può ricevere file",
     "cliCantReceiveFilesMessage": "La CLI Kilo che esegue questa sessione non può ricevere file. Aggiorna la CLI su quel computer oppure condividi il contenuto in una nuova sessione.",
     "contentlessMessage": "Non c'è nulla da condividere: non sono stati inclusi né testo né file.",
-    "couldNotReadContent": "Impossibile leggere il contenuto condiviso."
+    "couldNotReadContent": "Impossibile leggere il contenuto condiviso.",
+    "onlyFirstFilesAttached_one": "Verranno allegati solo i primi {{displayCount}} file.",
+    "onlyFirstFilesAttached_other": "Verranno allegati solo i primi {{displayCount}} file.",
+    "onlyFirstFilesAttached_many": "Verranno allegati solo i primi {{displayCount}} file."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2498,7 +2556,7 @@
           "terminal": "Questo utente non può essere segnalato."
         }
       },
-      "moreLinesAbove": "… altre {{displayCount}} righe sopra.",
+      "moreLinesAbove": "… altre righe sopra: {{displayCount}}.",
       "mute": "Silenzia",
       "mutedUser": "{{login}} silenziato",
       "noDiscussion": "Ancora nessuna discussione",
@@ -2558,7 +2616,10 @@
         "outdatedOnPath": "Non più attuale: {{path}}"
       },
       "deletedUser": "utente eliminato",
-      "replyForbiddenTerm": "Non hai il permesso di rispondere a {{term}}."
+      "replyForbiddenTerm": "Non hai il permesso di rispondere a {{term}}.",
+      "moreLinesAbove_one": "… altre righe sopra: {{displayCount}}.",
+      "moreLinesAbove_other": "… altre righe sopra: {{displayCount}}.",
+      "moreLinesAbove_many": "… altre righe sopra: {{displayCount}}."
     },
     "entry": {
       "eyebrow": "Apri una pull request o una merge request tramite URL",
@@ -2629,7 +2690,7 @@
     "hunkRows": {
       "contextUnavailable": "Il contesto non è disponibile per questo riferimento.",
       "expandAll": "Mostra tutto",
-      "expandAllLines": "Mostra tutte le {{displayCount}} righe",
+      "expandAllLines": "Mostra tutte le righe ({{displayCount}})",
       "expandContext": "Mostra il contesto",
       "expandLines": "Mostra {{displayCount}} righe ({{start}}–{{end}})",
       "expandLinesOfContext": "Mostra {{displayCount}} righe di contesto",
@@ -2658,7 +2719,22 @@
       "retryLoadingContext": "Riprova a caricare il contesto",
       "retryLoadingNextPage": "Riprova a caricare la pagina successiva",
       "fileLoadedCount_many": "{{displayCount}} file caricati",
-      "fileLoadedOfTotalCount_many": "{{displayCount}} file caricati su {{total}}"
+      "fileLoadedOfTotalCount_many": "{{displayCount}} file caricati su {{total}}",
+      "expandAllLines_one": "Mostra tutte le righe ({{displayCount}})",
+      "expandAllLines_other": "Mostra tutte le righe ({{displayCount}})",
+      "expandAllLines_many": "Mostra tutte le righe ({{displayCount}})",
+      "expandLines_one": "Mostra {{displayCount}} riga ({{start}}–{{end}})",
+      "expandLines_other": "Mostra {{displayCount}} righe ({{start}}–{{end}})",
+      "expandLines_many": "Mostra {{displayCount}} righe ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Mostra {{displayCount}} riga di contesto",
+      "expandLinesOfContext_other": "Mostra {{displayCount}} righe di contesto",
+      "expandLinesOfContext_many": "Mostra {{displayCount}} righe di contesto",
+      "expandMoreLines_one": "Mostra {{displayCount}} riga in più ({{start}}–{{end}})",
+      "expandMoreLines_other": "Mostra altre {{displayCount}} righe ({{start}}–{{end}})",
+      "expandMoreLines_many": "Mostra altre {{displayCount}} righe ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} file su {{total}} caricati",
+      "loadedOfTotalFiles_other": "{{loaded}} file su {{total}} caricati",
+      "loadedOfTotalFiles_many": "{{loaded}} file su {{total}} caricati"
     },
     "inbox": {
       "couldNotLoad": "Impossibile caricare la posta in arrivo.",
@@ -2859,7 +2935,10 @@
       "statusContext": "Contesto",
       "lineLabel": "Riga {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}} — {{text}}",
-      "emptyLine": "(vuoto)"
+      "emptyLine": "(vuoto)",
+      "truncationBanner_one": "Sono visualizzati i primi {{limit}} file modificati su {{total}}, per un limite dell'API di GitHub.",
+      "truncationBanner_other": "Sono visualizzati i primi {{limit}} file modificati su {{total}}, per un limite dell'API di GitHub.",
+      "truncationBanner_many": "Sono visualizzati i primi {{limit}} file modificati su {{total}}, per un limite dell'API di GitHub."
     },
     "linkPasteClipboardEmpty": "Gli appunti sono vuoti.",
     "linkPasteNotAPullRequest": "Non è un collegamento a una pull request o merge request",
@@ -3117,7 +3196,9 @@
     "couldNotApprove": "Approvazione non riuscita",
     "couldNotStart": "Avvio non riuscito",
     "channelName": "Agenti attivi",
-    "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco."
+    "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco.",
+    "openSession": "Apri",
+    "approveFailed": "Impossibile approvare. Tocca $t(common.approve) per riprovare."
   },
   "transcriptionModel": {
     "title": "Modello di trascrizione",
@@ -3158,5 +3239,8 @@
       "repositoryUnknown": "Kilo non riconosce {{repository}} come repository GitHub o GitLab. Scegli un altro repository in Kilo.",
       "repositoryUnsupported": "{{repository}} è un repository Bitbucket — Avvia agente non può ancora usarlo. Scegli un altro repository in Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Apri l'ultima sessione"
   }
 }

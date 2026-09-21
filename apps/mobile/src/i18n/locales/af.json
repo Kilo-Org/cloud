@@ -163,6 +163,7 @@
     "useDifferentEmail": "Gebruik 'n ander e-posadres",
     "signInWithApple": "Meld aan met Apple",
     "signInWithGoogle": "Meld aan met Google",
+    "signInWithPasskey": "Meld aan met ’n passkey",
     "emailAddress": "E-posadres",
     "emailPlaceholder": "jou@voorbeeld.com",
     "continueWithEmail": "Gaan voort met e-pos",
@@ -175,6 +176,10 @@
     "termsConnector": " en ",
     "termsSuffix": ".",
     "moreSignInOptions": "Meer aanmeldopsies",
+    "passkeyCancelled": "Passkey-aanmelding is gekanselleer. Probeer asseblief weer.",
+    "passkeyNotFound": "Geen passkey is vir hierdie toestel gestoor nie. Meld eerder aan met Apple, Google of jou e-pos.",
+    "passkeyUnsupported": "Passkeys is nie op hierdie toestel beskikbaar nie. Meld eerder aan met Apple, Google of jou e-pos.",
+    "passkeyFailed": "Kon nie met ’n passkey aanmeld nie. Probeer asseblief weer.",
     "couldNotCompleteSignIn": "Die aanmelding kon nie voltooi word nie. Probeer asseblief weer.",
     "sessionEnded": "Jou sessie is beëindig. Meld asseblief weer aan.",
     "signInCodeExpired": "Jou aanmeldkode het verval. Probeer asseblief weer.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Toetsrekening",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Onderneming-SSO"
+    "providerEnterpriseSso": "Onderneming-SSO",
+    "passkeysTitle": "Passkeys",
+    "passkeysSubtitle": "Meld aan sonder ’n wagwoord",
+    "passkeysEmpty": "Nog geen passkeys nie",
+    "passkeysEmptyHint": "$t(profile.addPasskey) om sonder ’n wagwoord aan te meld.",
+    "passkeysCouldNotLoad": "Kon nie passkeys laai nie",
+    "passkeysLoadFailed": "Passkeys is onbeskikbaar totdat dit laai.",
+    "addPasskey": "Voeg ’n passkey by",
+    "passkeyDefaultName": "Passkey",
+    "passkeyAddedOn": "Bygevoeg {{date}}",
+    "passkeyAdded": "Passkey bygevoeg.",
+    "passkeyAddFailed": "Kon nie ’n passkey byvoeg nie. Probeer weer.",
+    "passkeyAddUnsupported": "Hierdie toestel kan nie passkeys skep nie.",
+    "passkeyAddCancelled": "Passkey-skepping is gekanselleer.",
+    "passkeyRemoved": "Passkey verwyder.",
+    "passkeyRemoveFailed": "Kon nie daardie passkey verwyder nie. Probeer weer.",
+    "passkeyRenamed": "Passkey hernoem.",
+    "passkeyName": "Passkey-naam",
+    "renamePasskey": "Hernoem passkey",
+    "removePasskey": "Verwyder passkey",
+    "removePasskeyTitle": "Verwyder passkey?",
+    "removePasskeyMessage": "Jy sal nie meer met hierdie passkey kan aanmeld nie."
   },
   "preferences": {
     "general": "Algemeen",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} van {{total}} lêers gelaai",
       "filesStillLoading": "Lêers laai nog. Trek af om te verfris.",
       "goToOverview": "Gaan na oorsig",
-      "goToOverviewTab": "Gaan na die oorsigoortjie"
+      "goToOverviewTab": "Gaan na die oorsigoortjie",
+      "expandAllLines_one": "Vou al {{displayCount}} reël uit",
+      "expandAllLines_other": "Vou al {{displayCount}} reëls uit",
+      "expandLines_one": "Vou {{displayCount}} reël uit ({{start}}–{{end}})",
+      "expandLines_other": "Vou {{displayCount}} reëls uit ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Vou {{displayCount}} reël konteks uit",
+      "expandLinesOfContext_other": "Vou {{displayCount}} reëls konteks uit",
+      "expandMoreLines_one": "Vou nog {{displayCount}} reël uit ({{start}}–{{end}})",
+      "expandMoreLines_other": "Vou nog {{displayCount}} reëls uit ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} van {{total}} lêers gelaai",
+      "loadedOfTotalFiles_other": "{{loaded}} van {{total}} lêers gelaai"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ die lêer eindig nie met 'n reëleinde nie.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Verouderd op {{path}}"
       },
       "deletedUser": "geskrapte gebruiker",
-      "replyForbiddenTerm": "Jy het nie toestemming om op hierdie {{term}} te antwoord nie."
+      "replyForbiddenTerm": "Jy het nie toestemming om op hierdie {{term}} te antwoord nie.",
+      "moreLinesAbove_one": "… nog {{displayCount}} reël hierbo",
+      "moreLinesAbove_other": "… nog {{displayCount}} reëls hierbo"
     },
     "couldNotOpenGitHubAppSettings": "Die GitHub-toepassing se instellings kon nie oopgemaak word nie.",
     "installKiloGitHubApp": "Installeer die Kilo GitHub-toep",
@@ -706,7 +744,9 @@
       "statusContext": "Konteks",
       "lineLabel": "{{status}} reël {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(leeg)"
+      "emptyLine": "(leeg)",
+      "truncationBanner_one": "Die eerste {{limit}} van {{total}} gewysigde lêers word vertoon — dit is die GitHub-API se limiet.",
+      "truncationBanner_other": "Die eerste {{limit}} van {{total}} gewysigde lêers word vertoon — dit is die GitHub-API se limiet."
     },
     "linkPasteClipboardEmpty": "Die knipbord is leeg.",
     "linkPasteNotAPullRequest": "Dit is nie 'n skakel na 'n trekversoek of merge request nie",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Kennisgewings wys die boodskapteks op jou sluitskerm.",
     "previewGenericDescription": "Kennisgewings wys dat iets gebeur het. Maak Kilo oop om dit te lees.",
     "channel": {
-      "agent": "Agentsessies",
+      "agentProgress": "Agentvordering",
       "chat": "Kletsboodskappe",
       "kiloclaw": "KiloClaw-aktiwiteit",
       "balance": "Saldowaarskuwings",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "instansie gereed/misluk, geskeduleerde aksies",
       "balanceAlertsSubtitle": "waarskuwings oor die organisasie se lae saldo",
       "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe"
+    },
+    "action": {
+      "openSession": "Maak sessie oop"
+    },
+    "needsInputAction": {
+      "approved": "Versoek goedgekeur",
+      "replied": "Antwoord gestuur",
+      "failed": "Kon nie antwoord nie. Tik weer om weer te probeer.",
+      "unavailable": "Hierdie versoek wag nie meer nie."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Die oplaai het misluk.",
       "failedToUploadFile": "Die lêer kon nie opgelaai word nie: {{reason}}",
       "nothingToPaste": "Daar is niks om te plak nie.",
-      "metadataStripFailed": "Die foto se metadata kon nie verwyder word nie."
+      "metadataStripFailed": "Die foto se metadata kon nie verwyder word nie.",
+      "limit_one": "Jy kan tot {{displayCount}} lêer aanheg.",
+      "limit_other": "Jy kan tot {{displayCount}} lêers aanheg."
     },
     "attachmentPreview": {
       "accessibility": "Lêer: {{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Sinkroniseer bevindings",
       "syncNow": "Sinkroniseer nou",
       "syncQueued": "Sinkronisasie in die tou geplaas",
-      "syncStatusUnavailable": "Die sinkronisasiestatus is nie beskikbaar nie."
+      "syncStatusUnavailable": "Die sinkronisasiestatus is nie beskikbaar nie.",
+      "daysOverdue_one": "{{displayCount}} dag agterstallig",
+      "daysOverdue_other": "{{displayCount}} dae agterstallig",
+      "findingsCount_one": "{{displayCount}} bevinding",
+      "findingsCount_other": "{{displayCount}} bevindings"
     },
     "dashboardMetrics": {
       "openFindings": "Oop bevindings",
@@ -2131,20 +2186,7 @@
       "continueFrom": "Die sessie {{title}} word voortgesit.",
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortsit nie. Kies Cloud Agent of 'n ander CLI.",
-      "importFailed": "Hierdie sessie kon nie ingevoer word nie.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Standaard · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Klein",
-      "sandboxInstanceShared": "Gedeel",
-      "sandboxInstanceLarge": "Groot",
-      "sandboxInstanceDevcontainer": "Dev container",
-      "sandboxInstanceProviderDefault": "Verskaffer-standaard",
-      "sandboxCouldNotLoad": "Kon nie sandbox-opsies laai nie",
-      "sandboxUnavailable": "Hierdie sandbox is nie beskikbaar nie. Kies 'n ander sandbox of Standaard.",
-      "sandboxUseDefault": "Gebruik Standaard"
+      "importFailed": "Hierdie sessie kon nie ingevoer word nie."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer is bygewerk.",
@@ -2168,7 +2210,13 @@
       "updateTodos": "Werk taaklys by",
       "linesBadge": "{{displayCount}} reëls",
       "filesBadge": "{{displayCount}} lêers",
-      "matchesBadge": "{{displayCount}} treffers"
+      "matchesBadge": "{{displayCount}} treffers",
+      "filesBadge_one": "{{displayCount}} lêer",
+      "filesBadge_other": "{{displayCount}} lêers",
+      "linesBadge_one": "{{displayCount}} reël",
+      "linesBadge_other": "{{displayCount}} reëls",
+      "matchesBadge_one": "{{displayCount}} treffer",
+      "matchesBadge_other": "{{displayCount}} treffers"
     },
     "readToolMarkdown": {
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",
@@ -2458,7 +2506,11 @@
       "files": "Lêers",
       "couldNotOpenPhotoPicker": "Die fotokieser kon nie oopgemaak word nie. Herbegin Kilo en probeer weer.",
       "maxFilesAllowed": "Jy kan hoogstens {{displayCount}} lêers byvoeg.",
-      "onlyAddingFiles": "Slegs {{accepted}} van {{total}} lêers word bygevoeg (maks. {{max}})"
+      "onlyAddingFiles": "Slegs {{accepted}} van {{total}} lêers word bygevoeg (maks. {{max}})",
+      "maxFilesAllowed_one": "Jy kan hoogstens {{displayCount}} lêer byvoeg.",
+      "maxFilesAllowed_other": "Jy kan hoogstens {{displayCount}} lêers byvoeg.",
+      "onlyAddingFiles_one": "Slegs {{accepted}} van {{total}} lêers word bygevoeg (maks. {{max}})",
+      "onlyAddingFiles_other": "Slegs {{accepted}} van {{total}} lêers word bygevoeg (maks. {{max}})"
     },
     "composer": {
       "addAttachment": "Voeg aanhegsel by",
@@ -2476,7 +2528,9 @@
       "discardAttachmentsMessage": "Opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word.",
       "discardAttachmentsTitle": "Aanhegsels weggooi?",
       "charactersRemaining": "{{count}} karakters oor",
-      "insertNewline": "Voeg nuwe reël in"
+      "insertNewline": "Voeg nuwe reël in",
+      "charactersRemaining_one": "{{count}} karakter oor",
+      "charactersRemaining_other": "{{count}} karakters oor"
     },
     "chatLink": {
       "linkCopied": "Skakel gekopieer",
@@ -2548,7 +2602,9 @@
       "stepsCount_one": "{{steps}} stap",
       "stepsCount": "{{steps}} stappe",
       "stepsCount_other": "{{steps}} stappe",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modelle ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Outo-goedkeuring",
@@ -2588,7 +2644,9 @@
     },
     "toolRun": {
       "sheetTitle": "Nutsmiddel-oproepe",
-      "condensedLabel": "{{itemCount}} items; {{last}}"
+      "condensedLabel": "{{itemCount}} items; {{last}}",
+      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_other": "{{itemCount}} items; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2781,9 @@
     "cliCantReceiveFilesTitle": "Hierdie sessie kan nie lêers ontvang nie",
     "cliCantReceiveFilesMessage": "Die Kilo CLI wat hierdie sessie laat loop, kan nie lêers ontvang nie. Dateer die CLI op daardie masjien op of deel die lêers eerder met 'n nuwe sessie.",
     "contentlessMessage": "Niks om te deel nie — geen teks of lêers is ingesluit nie.",
-    "couldNotReadContent": "Kon nie die gedeelde inhoud lees nie."
+    "couldNotReadContent": "Kon nie die gedeelde inhoud lees nie.",
+    "onlyFirstFilesAttached_one": "Slegs die eerste {{displayCount}} lêer sal aangeheg word.",
+    "onlyFirstFilesAttached_other": "Slegs die eerste {{displayCount}} lêers sal aangeheg word."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3153,9 @@
     "couldNotApprove": "Kon nie goedkeur nie",
     "couldNotStart": "Kon nie begin nie",
     "channelName": "Aktiewe agente",
-    "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien."
+    "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
+    "openSession": "Oop",
+    "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer."
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",
@@ -3134,5 +3196,8 @@
       "repositoryUnknown": "Kilo herken nie {{repository}} as 'n GitHub- of GitLab-bewaarplek nie. Kies 'n ander bewaarplek in Kilo.",
       "repositoryUnsupported": "{{repository}} is 'n Bitbucket-bewaarplek — Begin agent kan dit nog nie gebruik nie. Kies 'n ander bewaarplek in Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Maak laaste sessie oop"
   }
 }

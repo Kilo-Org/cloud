@@ -163,6 +163,7 @@
     "useDifferentEmail": "Sèvi ak yon lòt adrès imèl",
     "signInWithApple": "Konekte ak Apple",
     "signInWithGoogle": "Konekte ak Google",
+    "signInWithPasskey": "Konekte ak yon kle aksè",
     "emailAddress": "Adrès imèl",
     "emailPlaceholder": "ou@egzanp.com",
     "continueWithEmail": "Kontinye ak imèl",
@@ -175,6 +176,10 @@
     "termsConnector": " ak ",
     "termsSuffix": ".",
     "moreSignInOptions": "Plis opsyon koneksyon",
+    "passkeyCancelled": "Yo anile koneksyon ak kle aksè. Eseye ankò.",
+    "passkeyNotFound": "Pa gen okenn kle aksè ki anrejistre pou aparèy sa a. Konekte ak Apple, Google oswa imèl ou pito.",
+    "passkeyUnsupported": "Kle aksè pa disponib sou aparèy sa a. Konekte ak Apple, Google oswa imèl ou pito.",
+    "passkeyFailed": "Pa t kapab konekte ak yon kle aksè. Eseye ankò.",
     "couldNotCompleteSignIn": "Nou pa t ka fini pwosesis koneksyon an. Tanpri eseye ankò.",
     "sessionEnded": "Sesyon ou a fini. Tanpri konekte ankò.",
     "signInCodeExpired": "Kòd koneksyon ou a ekspire. Tanpri eseye ankò.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Kont tès",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO antrepriz"
+    "providerEnterpriseSso": "SSO antrepriz",
+    "passkeysTitle": "Kle aksè",
+    "passkeysSubtitle": "Konekte san modpas",
+    "passkeysEmpty": "Poko gen kle aksè",
+    "passkeysEmptyHint": "$t(profile.addPasskey) pou konekte san modpas.",
+    "passkeysCouldNotLoad": "Pa t kapab chaje kle aksè yo",
+    "passkeysLoadFailed": "Kle aksè yo pa disponib jiskaske sa a chaje.",
+    "addPasskey": "Ajoute yon kle aksè",
+    "passkeyDefaultName": "Kle aksè",
+    "passkeyAddedOn": "Ajoute {{date}}",
+    "passkeyAdded": "Kle aksè ajoute.",
+    "passkeyAddFailed": "Pa t kapab ajoute yon kle aksè. Eseye ankò.",
+    "passkeyAddUnsupported": "Aparèy sa a pa ka kreye kle aksè.",
+    "passkeyAddCancelled": "Yo anile kreyasyon kle aksè a.",
+    "passkeyRemoved": "Kle aksè retire.",
+    "passkeyRemoveFailed": "Pa t kapab retire kle aksè sa a. Eseye ankò.",
+    "passkeyRenamed": "Kle aksè chanje non.",
+    "passkeyName": "Non kle aksè",
+    "renamePasskey": "Chanje non kle aksè",
+    "removePasskey": "Retire kle aksè",
+    "removePasskeyTitle": "Retire kle aksè?",
+    "removePasskeyMessage": "Ou pap ka konekte ak kle aksè sa a ankò."
   },
   "preferences": {
     "general": "Jeneral",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} fichye sou {{total}} chaje",
       "filesStillLoading": "Fichye yo toujou ap chaje. Rale pou rafrechi.",
       "goToOverview": "Ale nan apèsi a",
-      "goToOverviewTab": "Ale nan onglet apèsi a"
+      "goToOverviewTab": "Ale nan onglet apèsi a",
+      "expandAllLines_one": "Montre tout {{displayCount}} liy yo",
+      "expandAllLines_other": "Montre tout {{displayCount}} liy yo",
+      "expandLines_one": "Montre {{displayCount}} liy ({{start}}–{{end}})",
+      "expandLines_other": "Montre {{displayCount}} liy ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Montre {{displayCount}} liy kontèks",
+      "expandLinesOfContext_other": "Montre {{displayCount}} liy kontèks",
+      "expandMoreLines_one": "Montre {{displayCount}} liy anplis ({{start}}–{{end}})",
+      "expandMoreLines_other": "Montre {{displayCount}} liy anplis ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} sou {{total}} fichye deja chaje",
+      "loadedOfTotalFiles_other": "{{loaded}} sou {{total}} fichye deja chaje"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "pa gen karaktè pou pase nan yon nouvo liy nan fen fichye a.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Pa ajou sou {{path}}"
       },
       "deletedUser": "itilizatè ki efase",
-      "replyForbiddenTerm": "Ou pa gen pèmisyon pou reponn {{term}} sa a."
+      "replyForbiddenTerm": "Ou pa gen pèmisyon pou reponn {{term}} sa a.",
+      "moreLinesAbove_one": "Gen {{displayCount}} liy anplis pi wo a.",
+      "moreLinesAbove_other": "Gen {{displayCount}} liy anplis pi wo a."
     },
     "couldNotOpenGitHubAppSettings": "Nou pa t kapab louvri paramèt aplikasyon GitHub la.",
     "installKiloGitHubApp": "Enstale aplikasyon Kilo pou GitHub la",
@@ -706,7 +744,9 @@
       "statusContext": "Kontèks",
       "lineLabel": "Liy {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(vid)"
+      "emptyLine": "(vid)",
+      "truncationBanner_one": "Se premye {{limit}} sou {{total}} fichye ki chanje yo ki parèt — limit API GitHub la.",
+      "truncationBanner_other": "Se premye {{limit}} sou {{total}} fichye ki chanje yo ki parèt — limit API GitHub la."
     },
     "linkPasteClipboardEmpty": "Près-papye a vid.",
     "linkPasteNotAPullRequest": "Sa a pa yon lyen demann fizyon ni merge request",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Notifikasyon yo montre tèks mesaj la sou ekran fèmen ou a.",
     "previewGenericDescription": "Notifikasyon yo fè ou konnen gen yon bagay ki rive. Louvri Kilo pou li mesaj la.",
     "channel": {
-      "agent": "Sesyon ajan",
+      "agentProgress": "Pwogrè ajan",
       "chat": "Mesaj diskisyon",
       "kiloclaw": "Aktivite KiloClaw",
       "balance": "Alèt balans",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "enstans pare/echwe, aksyon pwograme",
       "balanceAlertsSubtitle": "avètisman lè balans òganizasyon an ba",
       "securityFindingsSubtitle": "nouvo rezilta ak rapèl SLA"
+    },
+    "action": {
+      "openSession": "Louvri sesyon an"
+    },
+    "needsInputAction": {
+      "approved": "Demann an apwouve",
+      "replied": "Repons an voye",
+      "failed": "Pa ka reponn. Touche ankò pou eseye ankò.",
+      "unavailable": "Demann sa a pa tann ankò."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Nou pa t ka voye fichye a.",
       "failedToUploadFile": "Nou pa t ka voye fichye a: {{reason}}",
       "nothingToPaste": "Pa gen anyen pou kole.",
-      "metadataStripFailed": "Nou pa t ka retire metadone foto a."
+      "metadataStripFailed": "Nou pa t ka retire metadone foto a.",
+      "limit_one": "Ou ka atache jiska {{displayCount}} fichye.",
+      "limit_other": "Ou ka atache jiska {{displayCount}} fichye."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Senkronize konsta yo",
       "syncNow": "Senkronize kounye a",
       "syncQueued": "Senkronizasyon nan lis datant",
-      "syncStatusUnavailable": "Estati senkronizasyon an pa disponib."
+      "syncStatusUnavailable": "Estati senkronizasyon an pa disponib.",
+      "daysOverdue_one": "{{displayCount}} jou an reta",
+      "daysOverdue_other": "{{displayCount}} jou an reta",
+      "findingsCount_one": "{{displayCount}} konsta",
+      "findingsCount_other": "{{displayCount}} konsta"
     },
     "dashboardMetrics": {
       "openFindings": "Konsta ouvè",
@@ -2131,20 +2186,7 @@
       "continueFrom": "Nou ap kontinye {{title}}.",
       "importingSession": "Ap enpòte sesyon an",
       "cliCannotContinue": "CLI sa a pa ka kontinye yon sesyon. Chwazi Cloud Agent oswa yon lòt CLI.",
-      "importFailed": "Nou pa t ka enpòte sesyon sa a.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Pa defo · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Piti",
-      "sandboxInstanceShared": "Pataje",
-      "sandboxInstanceLarge": "Gwo",
-      "sandboxInstanceDevcontainer": "Kontener Dev",
-      "sandboxInstanceProviderDefault": "Pa defo founisè a",
-      "sandboxCouldNotLoad": "Pa ka chaje opsyon sandbox yo",
-      "sandboxUnavailable": "Sandbox sa a pa disponib. Chwazi yon lòt sandbox oswa Pa defo.",
-      "sandboxUseDefault": "Sèvi ak Pa defo"
+      "importFailed": "Nou pa t ka enpòte sesyon sa a."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nou mete {{displayCount}} fichye ajou.",
@@ -2168,7 +2210,13 @@
       "updateTodos": "Mete lis travay la ajou",
       "linesBadge": "{{displayCount}} liy",
       "filesBadge": "{{displayCount}} fichye",
-      "matchesBadge": "{{displayCount}} rezilta"
+      "matchesBadge": "{{displayCount}} rezilta",
+      "filesBadge_one": "{{displayCount}} fichye",
+      "filesBadge_other": "{{displayCount}} fichye",
+      "linesBadge_one": "{{displayCount}} liy",
+      "linesBadge_other": "{{displayCount}} liy",
+      "matchesBadge_one": "{{displayCount}} rezilta",
+      "matchesBadge_other": "{{displayCount}} rezilta"
     },
     "readToolMarkdown": {
       "linesTruncated": "liy {{start}}–{{end}} (koupe)",
@@ -2458,7 +2506,11 @@
       "files": "Fichye",
       "couldNotOpenPhotoPicker": "Nou pa t ka louvri selektè foto a. Rekòmanse Kilo epi eseye ankò.",
       "maxFilesAllowed": "Ou ka ajoute {{displayCount}} fichye pou pi plis.",
-      "onlyAddingFiles": "Ap ajoute sèlman {{accepted}} nan {{total}} fichye (maks {{max}})"
+      "onlyAddingFiles": "Ap ajoute sèlman {{accepted}} nan {{total}} fichye (maks {{max}})",
+      "maxFilesAllowed_one": "Ou ka ajoute {{displayCount}} fichye pou pi plis.",
+      "maxFilesAllowed_other": "Ou ka ajoute {{displayCount}} fichye pou pi plis.",
+      "onlyAddingFiles_one": "Ap ajoute sèlman {{accepted}} nan {{total}} fichye (maks {{max}})",
+      "onlyAddingFiles_other": "Ap ajoute sèlman {{accepted}} nan {{total}} fichye (maks {{max}})"
     },
     "composer": {
       "addAttachment": "Ajoute yon fichye tache",
@@ -2476,7 +2528,9 @@
       "discardAttachmentsMessage": "Tout fichye ou voye ki poko atache ak yon mesaj ap efase.",
       "discardAttachmentsTitle": "Jete fichye atache yo?",
       "charactersRemaining": "{{count}} karaktè rete",
-      "insertNewline": "Antre yon nouvo liy"
+      "insertNewline": "Antre yon nouvo liy",
+      "charactersRemaining_one": "{{count}} karaktè rete",
+      "charactersRemaining_other": "{{count}} karaktè rete"
     },
     "chatLink": {
       "linkCopied": "Lyen kopye",
@@ -2548,7 +2602,9 @@
       "stepsCount_one": "{{steps}} etap",
       "stepsCount": "{{steps}} etap",
       "stepsCount_other": "{{steps}} etap",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Modèl ({{displayCount}})",
+      "modelsCount_other": "Modèl ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Apwobasyon otomatik",
@@ -2588,7 +2644,9 @@
     },
     "toolRun": {
       "sheetTitle": "Apèl zouti",
-      "condensedLabel": "{{itemCount}} eleman; {{last}}"
+      "condensedLabel": "{{itemCount}} eleman; {{last}}",
+      "condensedLabel_one": "{{itemCount}} eleman; {{last}}",
+      "condensedLabel_other": "{{itemCount}} eleman; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2781,9 @@
     "cliCantReceiveFilesTitle": "Sesyon sa a pa ka resevwa fichye",
     "cliCantReceiveFilesMessage": "Kilo CLI k ap fè sesyon sa a fonksyone a pa ka resevwa fichye. Mete CLI a ajou sou machin sa a, oswa pataje nan yon nouvo sesyon pito.",
     "contentlessMessage": "Pa gen anyen pou pataje — pa gen tèks ni fichye ki ladan l.",
-    "couldNotReadContent": "Pa t ka li kontni pataje a."
+    "couldNotReadContent": "Pa t ka li kontni pataje a.",
+    "onlyFirstFilesAttached_one": "Se sèlman premye {{displayCount}} fichye yo k ap tache.",
+    "onlyFirstFilesAttached_other": "Se sèlman premye {{displayCount}} fichye yo k ap tache."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3153,9 @@
     "couldNotApprove": "Pa t kapab apwouve",
     "couldNotStart": "Pa t kapab kòmanse",
     "channelName": "Ajan aktif",
-    "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an."
+    "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an.",
+    "openSession": "Louvri",
+    "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò."
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",
@@ -3134,5 +3196,8 @@
       "repositoryUnknown": "Kilo pa rekonèt {{repository}} kòm yon depo GitHub oswa GitLab. Chwazi yon lòt depo nan Kilo.",
       "repositoryUnsupported": "{{repository}} se yon depo Bitbucket — Kòmanse ajan poko ka itilize li. Chwazi yon lòt depo nan Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Louvri dènye sesyon an"
   }
 }

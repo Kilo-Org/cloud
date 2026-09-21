@@ -163,6 +163,7 @@
     "useDifferentEmail": "Použiť iný e-mail",
     "signInWithApple": "Prihlásiť sa cez Apple",
     "signInWithGoogle": "Prihlásiť sa cez Google",
+    "signInWithPasskey": "Prihlásiť sa prístupovým kľúčom",
     "emailAddress": "E-mailová adresa",
     "emailPlaceholder": "vy@priklad.sk",
     "continueWithEmail": "Pokračovať cez e-mail",
@@ -175,6 +176,10 @@
     "termsConnector": " a ",
     "termsSuffix": ".",
     "moreSignInOptions": "Ďalšie možnosti prihlásenia",
+    "passkeyCancelled": "Prihlásenie prístupovým kľúčom bolo zrušené. Skúste to znova.",
+    "passkeyNotFound": "Pre toto zariadenie nie je uložený žiadny prístupový kľúč. Prihláste sa namiesto toho cez Apple, Google alebo svojím e-mailom.",
+    "passkeyUnsupported": "Prístupové kľúče nie sú na tomto zariadení dostupné. Prihláste sa namiesto toho cez Apple, Google alebo svojím e-mailom.",
+    "passkeyFailed": "Prihlásenie prístupovým kľúčom sa nepodarilo. Skúste to znova.",
     "couldNotCompleteSignIn": "Prihlásenie sa nepodarilo dokončiť. Skúste to znova.",
     "sessionEnded": "Vaša relácia sa skončila. Prihláste sa znova.",
     "signInCodeExpired": "Platnosť vášho prihlasovacieho kódu vypršala. Skúste to znova.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Testovací účet",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Podnikové SSO"
+    "providerEnterpriseSso": "Podnikové SSO",
+    "passkeysTitle": "Prístupové kľúče",
+    "passkeysSubtitle": "Prihláste sa bez hesla",
+    "passkeysEmpty": "Zatiaľ žiadne prístupové kľúče",
+    "passkeysEmptyHint": "$t(profile.addPasskey) a prihláste sa bez hesla.",
+    "passkeysCouldNotLoad": "Prístupové kľúče sa nepodarilo načítať",
+    "passkeysLoadFailed": "Prístupové kľúče nie sú dostupné, kým sa toto nenačíta.",
+    "addPasskey": "Pridať prístupový kľúč",
+    "passkeyDefaultName": "Prístupový kľúč",
+    "passkeyAddedOn": "Pridaný {{date}}",
+    "passkeyAdded": "Prístupový kľúč pridaný.",
+    "passkeyAddFailed": "Prístupový kľúč sa nepodarilo pridať. Skúste to znova.",
+    "passkeyAddUnsupported": "Toto zariadenie nedokáže vytvárať prístupové kľúče.",
+    "passkeyAddCancelled": "Vytvorenie prístupového kľúča bolo zrušené.",
+    "passkeyRemoved": "Prístupový kľúč odstránený.",
+    "passkeyRemoveFailed": "Tento prístupový kľúč sa nepodarilo odstrániť. Skúste to znova.",
+    "passkeyRenamed": "Prístupový kľúč premenovaný.",
+    "passkeyName": "Názov prístupového kľúča",
+    "renamePasskey": "Premenovať prístupový kľúč",
+    "removePasskey": "Odstrániť prístupový kľúč",
+    "removePasskeyTitle": "Odstrániť prístupový kľúč?",
+    "removePasskeyMessage": "Týmto prístupovým kľúčom sa už nebudete môcť prihlásiť."
   },
   "preferences": {
     "general": "Všeobecné",
@@ -347,7 +373,27 @@
       "fileLoadedCount_few": "Načítané {{displayCount}} súbory",
       "fileLoadedCount_many": "Načítané: {{displayCount}} súboru",
       "fileLoadedOfTotalCount_few": "Načítané {{displayCount}} súbory z {{total}}",
-      "fileLoadedOfTotalCount_many": "Načítané: {{displayCount}} súboru z {{total}}"
+      "fileLoadedOfTotalCount_many": "Načítané: {{displayCount}} súboru z {{total}}",
+      "expandAllLines_one": "Rozbaliť všetky riadky ({{displayCount}})",
+      "expandAllLines_other": "Rozbaliť všetky riadky ({{displayCount}})",
+      "expandAllLines_few": "Rozbaliť všetky riadky ({{displayCount}})",
+      "expandAllLines_many": "Rozbaliť všetky riadky ({{displayCount}})",
+      "expandLines_one": "Rozbaliť riadky ({{displayCount}}): {{start}}–{{end}}",
+      "expandLines_other": "Rozbaliť riadky ({{displayCount}}): {{start}}–{{end}}",
+      "expandLines_few": "Rozbaliť riadky ({{displayCount}}): {{start}}–{{end}}",
+      "expandLines_many": "Rozbaliť riadky ({{displayCount}}): {{start}}–{{end}}",
+      "expandLinesOfContext_one": "Rozbaliť riadky kontextu ({{displayCount}})",
+      "expandLinesOfContext_other": "Rozbaliť riadky kontextu ({{displayCount}})",
+      "expandLinesOfContext_few": "Rozbaliť riadky kontextu ({{displayCount}})",
+      "expandLinesOfContext_many": "Rozbaliť riadky kontextu ({{displayCount}})",
+      "expandMoreLines_one": "Rozbaliť ďalšie riadky ({{displayCount}}): {{start}}–{{end}}",
+      "expandMoreLines_other": "Rozbaliť ďalšie riadky ({{displayCount}}): {{start}}–{{end}}",
+      "expandMoreLines_few": "Rozbaliť ďalšie riadky ({{displayCount}}): {{start}}–{{end}}",
+      "expandMoreLines_many": "Rozbaliť ďalšie riadky ({{displayCount}}): {{start}}–{{end}}",
+      "loadedOfTotalFiles_one": "načítané súbory: {{loaded}} z {{total}}",
+      "loadedOfTotalFiles_other": "načítané súbory: {{loaded}} z {{total}}",
+      "loadedOfTotalFiles_few": "načítané súbory: {{loaded}} z {{total}}",
+      "loadedOfTotalFiles_many": "načítané súbory: {{loaded}} z {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ na konci súboru nie je nový riadok",
@@ -543,7 +589,11 @@
         "outdatedOnPath": "Neaktuálne: {{path}}"
       },
       "deletedUser": "odstránený používateľ",
-      "replyForbiddenTerm": "Nemáš oprávnenie odpovedať na tento {{term}}."
+      "replyForbiddenTerm": "Nemáš oprávnenie odpovedať na tento {{term}}.",
+      "moreLinesAbove_one": "… ďalšie riadky vyššie: {{displayCount}}",
+      "moreLinesAbove_other": "… ďalšie riadky vyššie: {{displayCount}}",
+      "moreLinesAbove_few": "… ďalšie riadky vyššie: {{displayCount}}",
+      "moreLinesAbove_many": "… ďalšie riadky vyššie: {{displayCount}}"
     },
     "couldNotOpenGitHubAppSettings": "Nepodarilo sa otvoriť nastavenia aplikácie GitHub.",
     "installKiloGitHubApp": "Nainštalovať aplikáciu Kilo pre GitHub",
@@ -584,9 +634,9 @@
       "pending": "čakajúce: {{displayCount}}",
       "skipped": "vynechané: {{displayCount}}",
       "checksCount": "počet kontrol: {{displayCount}}",
-      "checksCount_one": "kontrola: {{displayCount}}",
-      "checksCount_few": "kontroly: {{displayCount}}",
-      "checksCount_many": "kontroly: {{displayCount}}",
+      "checksCount_one": "počet kontrol: {{displayCount}}",
+      "checksCount_few": "počet kontrol: {{displayCount}}",
+      "checksCount_many": "počet kontrol: {{displayCount}}",
       "checksCount_other": "počet kontrol: {{displayCount}}",
       "checkDetails": "podrobnosti kontroly"
     },
@@ -724,7 +774,11 @@
       "statusContext": "Kontext",
       "lineLabel": "Riadok {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "Riadok ({{status}}): {{text}}",
-      "emptyLine": "(prázdne)"
+      "emptyLine": "(prázdne)",
+      "truncationBanner_one": "Zobrazujú sa prvé zmenené súbory ({{limit}} z {{total}}) — limit API služby GitHub.",
+      "truncationBanner_other": "Zobrazujú sa prvé zmenené súbory ({{limit}} z {{total}}) — limit API služby GitHub.",
+      "truncationBanner_few": "Zobrazujú sa prvé zmenené súbory ({{limit}} z {{total}}) — limit API služby GitHub.",
+      "truncationBanner_many": "Zobrazujú sa prvé zmenené súbory ({{limit}} z {{total}}) — limit API služby GitHub."
     },
     "linkPasteClipboardEmpty": "Schránka je prázdna.",
     "linkPasteNotAPullRequest": "Nie je to odkaz na PR ani merge request",
@@ -801,7 +855,7 @@
     "previewFullDescription": "Upozornenia zobrazujú text správy na uzamknutej obrazovke.",
     "previewGenericDescription": "Upozornenia oznámia novú udalosť bez zobrazenia obsahu. Správu si prečítaš v aplikácii Kilo.",
     "channel": {
-      "agent": "Relácie agentov",
+      "agentProgress": "Priebeh agenta",
       "chat": "Správy v čete",
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornenia na zostatok",
@@ -818,6 +872,15 @@
       "kiloclawActivitySubtitle": "pripravená inštancia, zlyhanie inštancie, naplánované akcie",
       "balanceAlertsSubtitle": "upozornenia na nízky zostatok organizácie",
       "securityFindingsSubtitle": "nové zistenia a pripomienky SLA"
+    },
+    "action": {
+      "openSession": "Otvoriť reláciu"
+    },
+    "needsInputAction": {
+      "approved": "Žiadosť schválená",
+      "replied": "Odpoveď odoslaná",
+      "failed": "Odpovedať sa nepodarilo. Ťuknutím to skúste znova.",
+      "unavailable": "Táto žiadosť už nečaká."
     }
   },
   "tabs": {
@@ -898,7 +961,11 @@
       "uploadFailed": "Nahrávanie zlyhalo.",
       "failedToUploadFile": "Súbor sa nepodarilo nahrať: {{reason}}",
       "nothingToPaste": "Nie je čo vložiť.",
-      "metadataStripFailed": "Metaúdaje fotografie sa nepodarilo odstrániť."
+      "metadataStripFailed": "Metaúdaje fotografie sa nepodarilo odstrániť.",
+      "limit_one": "Maximálny počet príloha je {{displayCount}}.",
+      "limit_other": "Maximálny počet príloh je {{displayCount}}.",
+      "limit_few": "Maximálny počet prílohy je {{displayCount}}.",
+      "limit_many": "Maximálny počet príloh je {{displayCount}}."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1648,7 +1715,15 @@
       "syncFindings": "Synchronizovať nálezy",
       "syncNow": "Synchronizovať teraz",
       "syncQueued": "Synchronizácia zaradená do frontu",
-      "syncStatusUnavailable": "Stav synchronizácie nie je dostupný."
+      "syncStatusUnavailable": "Stav synchronizácie nie je dostupný.",
+      "daysOverdue_one": "Počet dní po termíne: {{displayCount}}",
+      "daysOverdue_other": "Počet dní po termíne: {{displayCount}}",
+      "daysOverdue_few": "Počet dní po termíne: {{displayCount}}",
+      "daysOverdue_many": "Počet dní po termíne: {{displayCount}}",
+      "findingsCount_one": "Počet nálezov: {{displayCount}}",
+      "findingsCount_other": "Počet nálezov: {{displayCount}}",
+      "findingsCount_few": "Počet nálezov: {{displayCount}}",
+      "findingsCount_many": "Počet nálezov: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Otvorené nálezy",
@@ -2167,20 +2242,7 @@
       "continueFrom": "Pokračuje sa v relácii {{title}}.",
       "importingSession": "Importuje sa relácia",
       "cliCannotContinue": "Táto verzia CLI nepodporuje pokračovanie v relácii. Vyber službu Cloud Agent alebo inú inštanciu CLI.",
-      "importFailed": "Túto reláciu sa nepodarilo importovať.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Predvolené · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Malý",
-      "sandboxInstanceShared": "Zdieľaný",
-      "sandboxInstanceLarge": "Veľký",
-      "sandboxInstanceDevcontainer": "Dev kontajner",
-      "sandboxInstanceProviderDefault": "Predvolené od poskytovateľa",
-      "sandboxCouldNotLoad": "Možnosti sandboxu sa nepodarilo načítať",
-      "sandboxUnavailable": "Tento sandbox nie je dostupný. Vyberte iný sandbox alebo Predvolené.",
-      "sandboxUseDefault": "Použiť Predvolené"
+      "importFailed": "Túto reláciu sa nepodarilo importovať."
     },
     "partRenderer": {
       "updatedFileCount_one": "Aktualizoval sa {{displayCount}} súbor.",
@@ -2206,7 +2268,19 @@
       "updateTodos": "Aktualizovať úlohy",
       "linesBadge": "riadky: {{displayCount}}",
       "filesBadge": "súbory: {{displayCount}}",
-      "matchesBadge": "zhody: {{displayCount}}"
+      "matchesBadge": "zhody: {{displayCount}}",
+      "filesBadge_one": "súbor: {{displayCount}}",
+      "filesBadge_other": "súbory: {{displayCount}}",
+      "filesBadge_few": "súbory: {{displayCount}}",
+      "filesBadge_many": "súborov: {{displayCount}}",
+      "linesBadge_one": "riadok: {{displayCount}}",
+      "linesBadge_other": "riadky: {{displayCount}}",
+      "linesBadge_few": "riadky: {{displayCount}}",
+      "linesBadge_many": "riadkov: {{displayCount}}",
+      "matchesBadge_one": "zhoda: {{displayCount}}",
+      "matchesBadge_other": "zhody: {{displayCount}}",
+      "matchesBadge_few": "zhody: {{displayCount}}",
+      "matchesBadge_many": "zhôd: {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "riadky {{start}}–{{end}} (skrátené)",
@@ -2502,7 +2576,15 @@
       "files": "Súborov",
       "couldNotOpenPhotoPicker": "Výber fotiek sa nepodarilo otvoriť. Reštartuj Kilo a skús to znova.",
       "maxFilesAllowed": "Povolený počet súborov je najviac {{displayCount}}.",
-      "onlyAddingFiles": "Pridávajú sa len niektoré súbory: {{accepted}} z {{total}} (najviac {{max}})"
+      "onlyAddingFiles": "Pridávajú sa len niektoré súbory: {{accepted}} z {{total}} (najviac {{max}})",
+      "maxFilesAllowed_one": "Povolený počet súborov je najviac {{displayCount}}.",
+      "maxFilesAllowed_other": "Povolený počet súborov je najviac {{displayCount}}.",
+      "maxFilesAllowed_few": "Povolený počet súborov je najviac {{displayCount}}.",
+      "maxFilesAllowed_many": "Povolený počet súborov je najviac {{displayCount}}.",
+      "onlyAddingFiles_one": "Pridávajú sa len niektoré súbory: {{accepted}} z {{total}} (najviac {{max}})",
+      "onlyAddingFiles_other": "Pridávajú sa len niektoré súbory: {{accepted}} z {{total}} (najviac {{max}})",
+      "onlyAddingFiles_few": "Pridávajú sa len niektoré súbory: {{accepted}} z {{total}} (najviac {{max}})",
+      "onlyAddingFiles_many": "Pridávajú sa len niektoré súbory: {{accepted}} z {{total}} (najviac {{max}})"
     },
     "composer": {
       "addAttachment": "Pridať prílohu",
@@ -2520,7 +2602,11 @@
       "discardAttachmentsMessage": "Nahrané súbory nepriložené k odoslaným správam sa odstránia.",
       "discardAttachmentsTitle": "Zahodiť prílohy?",
       "charactersRemaining": "Zostávajúce znaky: {{count}}",
-      "insertNewline": "Vložiť nový riadok"
+      "insertNewline": "Vložiť nový riadok",
+      "charactersRemaining_one": "Zostávajúci znak: {{count}}",
+      "charactersRemaining_other": "Zostávajúce znaky: {{count}}",
+      "charactersRemaining_few": "Zostávajúce znaky: {{count}}",
+      "charactersRemaining_many": "Zostávajúce znakov: {{count}}"
     },
     "chatLink": {
       "linkCopied": "Odkaz skopírovaný",
@@ -2594,7 +2680,11 @@
       "stepsCount_other": "{{steps}} krokov",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} kroky",
-      "stepsCount_many": "{{steps}} kroku"
+      "stepsCount_many": "{{steps}} kroku",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modely ({{displayCount}})",
+      "modelsCount_few": "Modely ({{displayCount}})",
+      "modelsCount_many": "Modely ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Automatické schvaľovanie",
@@ -2634,7 +2724,11 @@
     },
     "toolRun": {
       "sheetTitle": "Volania nástrojov",
-      "condensedLabel": "{{itemCount}} položiek; {{last}}"
+      "condensedLabel": "{{itemCount}} položiek; {{last}}",
+      "condensedLabel_one": "{{itemCount}} položka; {{last}}",
+      "condensedLabel_other": "{{itemCount}} položiek; {{last}}",
+      "condensedLabel_few": "{{itemCount}} položky; {{last}}",
+      "condensedLabel_many": "{{itemCount}} položiek; {{last}}"
     }
   },
   "bootstrap": {
@@ -2769,7 +2863,11 @@
     "cliCantReceiveFilesTitle": "Táto relácia nemôže prijímať súbory",
     "cliCantReceiveFilesMessage": "Kilo CLI, v ktorom beží táto relácia, nemôže prijímať súbory. Aktualizuj CLI na danom zariadení alebo obsah zdieľaj do novej relácie.",
     "contentlessMessage": "Nie je čo zdieľať — chýba text aj súbory.",
-    "couldNotReadContent": "Zdieľaný obsah sa nepodarilo prečítať."
+    "couldNotReadContent": "Zdieľaný obsah sa nepodarilo prečítať.",
+    "onlyFirstFilesAttached_one": "Priložia sa len prvé súbory ({{displayCount}}).",
+    "onlyFirstFilesAttached_other": "Priložia sa len prvé súbory ({{displayCount}}).",
+    "onlyFirstFilesAttached_few": "Priložia sa len prvé súbory ({{displayCount}}).",
+    "onlyFirstFilesAttached_many": "Priložia sa len prvé súbory ({{displayCount}})."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3141,7 +3239,9 @@
     "couldNotApprove": "Schválenie zlyhalo",
     "couldNotStart": "Spustenie zlyhalo",
     "channelName": "Aktívne agenty",
-    "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke."
+    "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke.",
+    "openSession": "Otvoriť",
+    "approveFailed": "Schválenie sa nepodarilo. Klepnutím na $t(common.approve) to skús znova."
   },
   "transcriptionModel": {
     "title": "Model prepisu",
@@ -3182,5 +3282,8 @@
       "repositoryUnknown": "Kilo nerozpoznáva {{repository}} ako repozitár na GitHube alebo GitLabe. Vyber iný repozitár v Kile.",
       "repositoryUnsupported": "{{repository}} je repozitár na Bitbuckete — Spustiť agenta ho zatiaľ nemôže použiť. Vyber iný repozitár v Kile."
     }
+  },
+  "launcher": {
+    "openLastSession": "Otvoriť poslednú reláciu"
   }
 }

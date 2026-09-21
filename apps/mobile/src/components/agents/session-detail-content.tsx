@@ -78,6 +78,7 @@ import {
   useSessionAutoApproveEnabled,
 } from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
+import { SessionCopyLinkAction } from '@/components/agents/session-copy-link-action';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
@@ -98,6 +99,7 @@ import {
 } from '@/components/agents/session-working-state';
 import {
   countInFlightMessages,
+  lastVisibleMessageFailure,
   resolveRetryPrompt,
   retryFailedMessage,
 } from '@/components/agents/session-detail-content-helpers';
@@ -145,6 +147,7 @@ import { ToolRunSheetHost } from '@/components/agents/tool-run-sheet-host';
 import {
   buildTerminalErrorCopyText,
   resolveSessionTerminalError,
+  statusIndicatorDuplicatesMessageFailure,
 } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
@@ -183,6 +186,7 @@ import {
   buildContinueHref,
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
+import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -191,6 +195,7 @@ import {
 } from '@/lib/picker-bridge';
 import { trpcClient } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
+import { SessionHandoffAdvertiser } from '@/lib/session-handoff';
 
 const GOAL_ACTION_LABEL_KEY = {
   edit: 'agentChat.goal.edit',
@@ -198,6 +203,13 @@ const GOAL_ACTION_LABEL_KEY = {
   resume: 'agentChat.goal.resume',
   remove: 'agentChat.goal.remove',
 } as const satisfies Record<GoalAction, string>;
+
+/**
+ * How long the live viewport has to settle before it is written to the route's
+ * search params. The transcript list already reports at most once a second; the
+ * debounce keeps a burst of reports from issuing several navigations.
+ */
+const ANCHOR_PUBLISH_DEBOUNCE_MS = 500;
 
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
@@ -213,6 +225,8 @@ type SessionDetailContentProps = {
   cachedTitle?: string;
   /** Epoch ms the route mounted this open; anchors the slow-load threshold. */
   openStartedAt?: number;
+  /** Message id the opening `?at=` deep link named; the list scrolls to it. */
+  resumeAt?: string | null;
 };
 
 type CancelQueuedStatus = {
@@ -232,6 +246,7 @@ export function SessionDetailContent({
   spawnedMode,
   cachedTitle,
   openStartedAt,
+  resumeAt,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const { t } = useTranslation();
@@ -314,6 +329,65 @@ export function SessionDetailContent({
   const [detailsMessageId, setDetailsMessageId] = useState<string | null>(null);
   const detailsMessageIdRef = useRef<string | null>(null);
   const [isGoalEditOpen, setIsGoalEditOpen] = useState(false);
+  // The live viewport position (the topmost visible message), reported by the
+  // transcript list. It feeds the OS handoff advertiser and the route's search
+  // params so another device resumes the session where the user left it.
+  const [anchor, setAnchor] = useState<string | null>(null);
+  const handleAnchorChange = useCallback((messageId: string) => {
+    setAnchor(messageId);
+  }, []);
+  // The route's `at` is the position this screen resumes at. A resume link
+  // dedupes onto an already-mounted route and updates its params instead of
+  // remounting, so the position is adopted when the live param changes — unless
+  // the change is the route echoing back the anchor this screen just published.
+  const [resumeAnchor, setResumeAnchor] = useState<string | null>(resumeAt ?? null);
+  const publishedAnchorRef = useRef<string | null>(resumeAnchor);
+  const incomingAnchorRef = useRef<string | null>(resumeAt ?? null);
+  useEffect(() => {
+    const incoming = resumeAt ?? null;
+    if (incoming === incomingAnchorRef.current) {
+      return;
+    }
+    incomingAnchorRef.current = incoming;
+    // The route already carries the position this screen believes in; the
+    // publish below wrote it before `router.setParams`, so no re-arm.
+    if (incoming === publishedAnchorRef.current) {
+      return;
+    }
+    setResumeAnchor(incoming);
+    publishedAnchorRef.current = incoming;
+    // A newer link supersedes the live position this screen was about to
+    // publish. Drop it: the publish effect's cleanup then clears its pending
+    // debounce timer, so the pre-link position can never fire afterwards and
+    // write itself back over the position the reader just navigated to. The
+    // list reports the new top once it lands the incoming anchor, re-arming the
+    // publish from the real viewport.
+    setAnchor(null);
+  }, [resumeAt]);
+  useEffect(() => {
+    if (anchor === null || anchor === publishedAnchorRef.current) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      publishedAnchorRef.current = anchor;
+      router.setParams({ at: anchor });
+    }, ANCHOR_PUBLISH_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [anchor, router]);
+
+  // A send takes the transcript position over: the sent message and its reply
+  // must be on screen, even when a `?at=` resume left the transcript parked on
+  // an older row with follow off. Bumping this counter is the transcript list's
+  // signal for it; both composer sends (prompt and slash command) bump it
+  // before their transport call, so a resume retry chain still in flight is
+  // cancelled by the take-over instead of yanking the viewport back to the
+  // recorded anchor.
+  const [followTailNonce, setFollowTailNonce] = useState(0);
+  const takeOverTranscriptPositionForSend = useCallback(() => {
+    setFollowTailNonce(count => count + 1);
+  }, []);
 
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -548,13 +622,26 @@ export function SessionDetailContent({
   );
 
   const viewTrackedRef = useRef<string | null>(null);
+  const recordedLastOpenedRef = useRef<{ sessionId: string; userId: string } | null>(null);
   useEffect(() => {
-    if (fetchedData?.kiloSessionId !== sessionId || viewTrackedRef.current === sessionId) {
+    if (fetchedData?.kiloSessionId !== sessionId) {
       return;
     }
-    viewTrackedRef.current = sessionId;
-    captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
-  }, [fetchedData, sessionId, analyticsSurface, openedVia]);
+    if (viewTrackedRef.current !== sessionId) {
+      viewTrackedRef.current = sessionId;
+      captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
+    }
+    // Record the session the person actually viewed (not one merely fetched) so
+    // the launcher's 'Open last session' reopens it. Its latch is separate from
+    // the analytics one above: `userId` resolves after the first render, so the
+    // analytics event still fires once per session while the record waits for
+    // the identity and lands on the render that has it.
+    const recorded = recordedLastOpenedRef.current;
+    if (userId !== undefined && (recorded?.sessionId !== sessionId || recorded.userId !== userId)) {
+      recordedLastOpenedRef.current = { sessionId, userId };
+      recordLastOpenedSession(sessionId, userId);
+    }
+  }, [fetchedData, sessionId, analyticsSurface, openedVia, userId]);
 
   useEffect(
     () => () => {
@@ -987,6 +1074,7 @@ export function SessionDetailContent({
       // is the single toast owner for send failures. Throw here, without a
       // second toast, purely so the composer's `await onSend(...)` sees the
       // rejection and preserves the draft.
+      takeOverTranscriptPositionForSend();
       const sent = await manager.send({
         payload: {
           type: 'prompt',
@@ -1015,6 +1103,7 @@ export function SessionDetailContent({
       activeSessionType,
       supportsAttachments,
       analyticsSurface,
+      takeOverTranscriptPositionForSend,
       t,
     ]
   );
@@ -1382,8 +1471,30 @@ export function SessionDetailContent({
     isStreaming,
     pendingMessageCount: inFlightMessageCount,
   });
+  // A failed last row states its own failure and carries the action. The fixed
+  // footer's error line must not state the same failure a second time (explorer
+  // finding: the same failure stated three times), so a status error the row
+  // already carries is dropped — a classified one the row does not carry stays.
+  const footerMessageFailure = useMemo(
+    () =>
+      lastVisibleMessageFailure({
+        displayedMessages,
+        messages,
+        pendingMessages,
+        canceledQueuedMessages,
+      }),
+    [displayedMessages, messages, pendingMessages, canceledQueuedMessages]
+  );
+  const footerStatusIndicator =
+    statusIndicator !== null &&
+    !statusIndicatorDuplicatesMessageFailure({
+      indicator: statusIndicator,
+      failure: footerMessageFailure,
+    })
+      ? statusIndicator
+      : null;
   const hasFooterStatusIndicator =
-    (!cachedMetadataRefresh && statusIndicator !== null) ||
+    (!cachedMetadataRefresh && footerStatusIndicator !== null) ||
     (cloudStatus !== null && cloudStatus.type !== 'ready');
   const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
     isAgentWorking: shouldShowWorkingIndicator,
@@ -1400,7 +1511,7 @@ export function SessionDetailContent({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
-    hasStatusIndicator: !cachedMetadataRefresh && statusIndicator !== null,
+    hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
     messageCount: messages.length,
   });
 
@@ -1437,6 +1548,7 @@ export function SessionDetailContent({
           });
         }}
       />
+      <SessionCopyLinkAction sessionId={sessionId} anchorMessageId={anchor ?? resumeAnchor} />
     </View>
   );
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
@@ -1515,6 +1627,7 @@ export function SessionDetailContent({
       // the sole transport-toast owner; we throw a stable error on a
       // false return purely so the composer preserves the draft, and never
       // emit a duplicate toast of our own.
+      takeOverTranscriptPositionForSend();
       const sent = await manager.send({
         payload: { type: 'command', command, arguments: argumentsText },
       });
@@ -1523,7 +1636,7 @@ export function SessionDetailContent({
       }
       return true;
     },
-    [manager]
+    [manager, takeOverTranscriptPositionForSend]
   );
 
   // Goal controls ride the same `manager.send()` command pipeline as the
@@ -1788,6 +1901,17 @@ export function SessionDetailContent({
     <PartDetailSheetHost messages={messages}>
       <ToolRunSheetHost messages={messages}>
         <View className="flex-1 bg-background">
+          {/* Advertise the session and its position to the OS (iOS Handoff,
+              Android launcher entry point). Only once the session is loaded:
+              before that there is no title to advertise and the route is still
+              the skeleton. */}
+          {isSessionLoaded ? (
+            <SessionHandoffAdvertiser
+              sessionId={sessionId}
+              anchorMessageId={anchor ?? resumeAnchor}
+              title={rename.title}
+            />
+          ) : null}
           <ScreenHeader
             title={rename.title}
             reserveTitleSpace
@@ -1993,7 +2117,9 @@ export function SessionDetailContent({
                 spinner reads Thinking during a reasoning stream in both modes.
                 Feeding it displayedMessages would drop that label. */}
             <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
-            {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
+            {footerStatusIndicator ? (
+              <SessionStatusIndicator indicator={footerStatusIndicator} />
+            ) : null}
           </Animated.View>
         ) : null}
 
@@ -2265,7 +2391,10 @@ export function SessionDetailContent({
           onReachedBottom={() => {
             manager.trimRetainedHistory();
           }}
+          onAnchorChange={handleAnchorChange}
           renderItem={renderItem}
+          resumeAt={resumeAnchor}
+          followTailNonce={followTailNonce}
         />
       </Animated.View>
     );

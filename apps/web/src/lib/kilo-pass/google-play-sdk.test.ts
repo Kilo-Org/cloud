@@ -92,7 +92,7 @@ describe('google-play-sdk', () => {
       packageName: 'com.kilocode.kiloapp',
       orderId: 'paid-order',
       fields:
-        'orderId,purchaseToken,state,lineItems(productId,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime))',
+        'orderId,purchaseToken,state,total,tax,lineItems(productId,total,tax,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime))',
     });
     mockOrdersGet.mockImplementationOnce(() => {
       throw new Error('provider unavailable');
@@ -148,6 +148,33 @@ describe('google-play-sdk', () => {
     const { createGooglePlayAndroidPublisherClient } = loadGooglePlaySdk();
 
     expect(() => createGooglePlayAndroidPublisherClient()).toThrow(
+      'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid'
+    );
+  });
+
+  it('throws when the service account value is not JSON', () => {
+    process.env.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON = 'not-json';
+
+    const { createGooglePlayAndroidPublisherClient } = loadGooglePlaySdk();
+
+    expect(() => createGooglePlayAndroidPublisherClient()).toThrow(
+      'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid'
+    );
+  });
+
+  it('asserts the service account without building a client', () => {
+    const { assertGooglePlayServiceAccountConfigured } = loadGooglePlaySdk();
+
+    expect(() => assertGooglePlayServiceAccountConfigured()).not.toThrow();
+    expect(mockAndroidPublisher).not.toHaveBeenCalled();
+
+    delete process.env.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON;
+    expect(() => assertGooglePlayServiceAccountConfigured()).toThrow(
+      'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is not set'
+    );
+
+    process.env.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON = 'not-json';
+    expect(() => assertGooglePlayServiceAccountConfigured()).toThrow(
       'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid'
     );
   });

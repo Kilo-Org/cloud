@@ -163,6 +163,7 @@
     "useDifferentEmail": "အခြားအီးမေးလ်ကို သုံးရန်",
     "signInWithApple": "Apple ဖြင့် အကောင့်ဝင်ရန်",
     "signInWithGoogle": "Google ဖြင့် အကောင့်ဝင်ရန်",
+    "signInWithPasskey": "ပက်စ်ကီးဖြင့် အကောင့်ဝင်ရန်",
     "emailAddress": "အီးမေးလ်လိပ်စာ",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "အီးမေးလ်ဖြင့် ဆက်လုပ်ပါ",
@@ -175,6 +176,10 @@
     "termsConnector": " နှင့် ",
     "termsSuffix": "ကို သဘောတူလက်ခံပါသည်။",
     "moreSignInOptions": "အကောင့်ဝင်ရန် အခြားနည်းလမ်းများ",
+    "passkeyCancelled": "ပက်စ်ကီးဖြင့် အကောင့်ဝင်ခြင်း ပယ်ဖျက်ခဲ့သည်။ ထပ်စမ်းကြည့်ပါ။",
+    "passkeyNotFound": "ဤစက်ပစ္စည်းအတွက် ပက်စ်ကီး မသိမ်းဆည်းထားပါ။ အစား Apple၊ Google သို့မဟုတ် သင့်အီးမေးလ်ဖြင့် အကောင့်ဝင်ပါ။",
+    "passkeyUnsupported": "ဤစက်ပစ္စည်းတွင် ပက်စ်ကီး မရနိုင်ပါ။ အစား Apple၊ Google သို့မဟုတ် သင့်အီးမေးလ်ဖြင့် အကောင့်ဝင်ပါ။",
+    "passkeyFailed": "ပက်စ်ကီးဖြင့် အကောင့်ဝင်၍ မရပါ။ ထပ်စမ်းကြည့်ပါ။",
     "couldNotCompleteSignIn": "အကောင့်ဝင်ခြင်းကို အပြီးသတ်၍ မရပါ။ ထပ်ကြိုးစားပါ။",
     "sessionEnded": "သင့်ဆက်ရှင် ပြီးဆုံးသွားသည်။ အကောင့်ပြန်ဝင်ပါ။",
     "signInCodeExpired": "အကောင့်ဝင်ရန် သင့်ကုဒ် သက်တမ်းကုန်သွားသည်။ ထပ်ကြိုးစားပါ။",
@@ -225,7 +230,28 @@
     "providerTestAccount": "စမ်းသပ်အကောင့်",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "လုပ်ငန်းသုံး SSO"
+    "providerEnterpriseSso": "လုပ်ငန်းသုံး SSO",
+    "passkeysTitle": "ပက်စ်ကီးများ",
+    "passkeysSubtitle": "စကားဝှက်မပါဘဲ အကောင့်ဝင်ပါ",
+    "passkeysEmpty": "ပက်စ်ကီး မရှိသေးပါ",
+    "passkeysEmptyHint": "$t(profile.addPasskey) လုပ်ပြီး စကားဝှက်မပါဘဲ အကောင့်ဝင်ပါ။",
+    "passkeysCouldNotLoad": "ပက်စ်ကီးများ ဖွင့်၍မရပါ",
+    "passkeysLoadFailed": "ဤအရာ ဖွင့်ပြီးသည်အထိ ပက်စ်ကီးများ မရနိုင်ပါ။",
+    "addPasskey": "ပက်စ်ကီး ထည့်ရန်",
+    "passkeyDefaultName": "ပက်စ်ကီး",
+    "passkeyAddedOn": "{{date}} တွင် ထည့်ခဲ့သည်",
+    "passkeyAdded": "ပက်စ်ကီး ထည့်ပြီးပါပြီ။",
+    "passkeyAddFailed": "ပက်စ်ကီး ထည့်၍မရပါ။ ထပ်စမ်းကြည့်ပါ။",
+    "passkeyAddUnsupported": "ဤစက်ပစ္စည်းသည် ပက်စ်ကီးများ ဖန်တီး၍မရပါ။",
+    "passkeyAddCancelled": "ပက်စ်ကီး ဖန်တီးခြင်း ပယ်ဖျက်ခဲ့သည်။",
+    "passkeyRemoved": "ပက်စ်ကီး ဖယ်ရှားပြီးပါပြီ။",
+    "passkeyRemoveFailed": "ထို ပက်စ်ကီးကို ဖယ်ရှား၍မရပါ။ ထပ်စမ်းကြည့်ပါ။",
+    "passkeyRenamed": "ပက်စ်ကီး အမည်ပြောင်းပြီးပါပြီ။",
+    "passkeyName": "ပက်စ်ကီး အမည်",
+    "renamePasskey": "ပက်စ်ကီး အမည်ပြောင်းရန်",
+    "removePasskey": "ပက်စ်ကီး ဖယ်ရှားရန်",
+    "removePasskeyTitle": "ပက်စ်ကီး ဖယ်ရှားမလား?",
+    "removePasskeyMessage": "ဤပက်စ်ကီးဖြင့် နောက်ထပ် အကောင့်ဝင်၍ မရတော့ပါ။"
   },
   "preferences": {
     "general": "အထွေထွေ",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "ဖိုင် {{total}} ခုအနက် {{displayCount}} ခု ရယူပြီး",
       "filesStillLoading": "ဖိုင်များကို ရယူနေဆဲဖြစ်ပါသည်။ ပြန်ရယူရန် အောက်သို့ဆွဲပါ။",
       "goToOverview": "ခြုံငုံချက်သို့ သွားပါ",
-      "goToOverviewTab": "ခြုံငုံချက်တဘ်သို့ သွားပါ"
+      "goToOverviewTab": "ခြုံငုံချက်တဘ်သို့ သွားပါ",
+      "expandAllLines_one": "စာကြောင်း {{displayCount}} ကြောင်းလုံးကို ဖြန့်ပြပါ",
+      "expandAllLines_other": "စာကြောင်း {{displayCount}} ကြောင်းလုံးကို ဖြန့်ပြပါ",
+      "expandLines_one": "စာကြောင်း {{displayCount}} ကြောင်းကို ဖြန့်ပြပါ ({{start}}–{{end}})",
+      "expandLines_other": "စာကြောင်း {{displayCount}} ကြောင်းကို ဖြန့်ပြပါ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "ဆက်စပ်ကုဒ် {{displayCount}} ကြောင်းကို ဖြန့်ပြပါ",
+      "expandLinesOfContext_other": "ဆက်စပ်ကုဒ် {{displayCount}} ကြောင်းကို ဖြန့်ပြပါ",
+      "expandMoreLines_one": "နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်းကို ဖြန့်ပြပါ ({{start}}–{{end}})",
+      "expandMoreLines_other": "နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်းကို ဖြန့်ပြပါ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "ဖိုင် {{total}} ခုအနက် {{loaded}} ခု ရယူပြီး",
+      "loadedOfTotalFiles_other": "ဖိုင် {{total}} ခုအနက် {{loaded}} ခု ရယူပြီး"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "ဖိုင်အဆုံးတွင် စာကြောင်းသစ် မရှိပါ။",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "{{path}} အတွက် ခေတ်မမီတော့သော မှတ်ချက်"
       },
       "deletedUser": "အကောင့်ဖျက်ထားသော အသုံးပြုသူ",
-      "replyForbiddenTerm": "ဒီ {{term}} တွင် အကြောင်းပြန်ခွင့် မရှိပါ။"
+      "replyForbiddenTerm": "ဒီ {{term}} တွင် အကြောင်းပြန်ခွင့် မရှိပါ။",
+      "moreLinesAbove_one": "… အပေါ်တွင် နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်း ရှိပါသည်။",
+      "moreLinesAbove_other": "… အပေါ်တွင် နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်း ရှိပါသည်။"
     },
     "couldNotOpenGitHubAppSettings": "GitHub အက်ပ်၏ ဆက်တင်များကို မဖွင့်နိုင်ပါ။",
     "installKiloGitHubApp": "Kilo GitHub အက်ပ်ကို ထည့်သွင်းပါ",
@@ -706,7 +744,9 @@
       "statusContext": "ဆက်စပ်ကုဒ်",
       "lineLabel": "{{status}} စာကြောင်း {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}၊ {{text}}",
-      "emptyLine": "(ဗလာ)"
+      "emptyLine": "(ဗလာ)",
+      "truncationBanner_one": "GitHub API ကန့်သတ်ချက်ကြောင့် ပြောင်းလဲထားသော ဖိုင် {{total}} ခုအနက် ပထမ {{limit}} ခုကိုသာ ပြသထားပါသည်။",
+      "truncationBanner_other": "GitHub API ကန့်သတ်ချက်ကြောင့် ပြောင်းလဲထားသော ဖိုင် {{total}} ခုအနက် ပထမ {{limit}} ခုကိုသာ ပြသထားပါသည်။"
     },
     "linkPasteClipboardEmpty": "ကလစ်ဘုတ်တွင် ဘာမျှမရှိပါ။",
     "linkPasteNotAPullRequest": "ဤသည် PR သို့မဟုတ် merge request လင့်ခ် မဟုတ်ပါ",
@@ -783,7 +823,7 @@
     "previewFullDescription": "အကြောင်းကြားချက်များသည် သင့်လော့ခ်မျက်နှာပြင်တွင် မက်ဆေ့ခ်ျစာသားကို ပြပါသည်။",
     "previewGenericDescription": "အကြောင်းကြားချက်များတွင် ဖြစ်ရပ်တစ်ခုရှိကြောင်းသာ ပြပါသည်။ မက်ဆေ့ခ်ျကို ဖတ်ရန် Kilo ကို ဖွင့်ပါ။",
     "channel": {
-      "agent": "အေးဂျင့်စက်ရှင်များ",
+      "agentProgress": "အေးဂျင့် လုပ်ဆောင်ပြီးစီးမှု",
       "chat": "စကားဝိုင်း မက်ဆေ့ချ်များ",
       "kiloclaw": "KiloClaw လုပ်ဆောင်ချက်များ",
       "balance": "လက်ကျန်သတိပေးချက်များ",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "စနစ်အသင့်ဖြစ်မှု/မအောင်မြင်မှု၊ အချိန်သတ်မှတ်ထားသော လုပ်ဆောင်ချက်များ",
       "balanceAlertsSubtitle": "အဖွဲ့အစည်း၏ လက်ကျန်နည်းချိန် သတိပေးချက်များ",
       "securityFindingsSubtitle": "တွေ့ရှိချက်အသစ်များနှင့် SLA သတိပေးချက်များ"
+    },
+    "action": {
+      "openSession": "စက်ရှင်ကို ဖွင့်ပါ"
+    },
+    "needsInputAction": {
+      "approved": "တောင်းဆိုမှုကို အတည်ပြုလိုက်ပါပြီ",
+      "replied": "အကြောင်းပြန်စာ ပို့ပြီးပါပြီ",
+      "failed": "အကြောင်းပြန်ရန် မအောင်မြင်ပါ။ ထပ်မံကြိုးစားရန် ထပ်မံနှိပ်ပါ။",
+      "unavailable": "ဤတောင်းဆိုမှုသည် နောက်ထပ် စောင့်ဆိုင်းနေခြင်း မရှိတော့ပါ။"
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "ဖိုင်တင်၍ မရပါ။",
       "failedToUploadFile": "ဖိုင်တင်၍ မရပါ: {{reason}}။",
       "nothingToPaste": "ကူးထည့်စရာ မရှိပါ။",
-      "metadataStripFailed": "ဓာတ်ပုံ၏ နောက်ခံအချက်အလက်များကို ဖယ်ရှား၍မရခဲ့ပါ။"
+      "metadataStripFailed": "ဓာတ်ပုံ၏ နောက်ခံအချက်အလက်များကို ဖယ်ရှား၍မရခဲ့ပါ။",
+      "limit_one": "ဖိုင် {{displayCount}} ခုအထိ တွဲနိုင်သည်။",
+      "limit_other": "ဖိုင် {{displayCount}} ခုအထိ တွဲနိုင်သည်။"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}၊ {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "တွေ့ရှိချက်များ ထပ်တူပြုရန်",
       "syncNow": "ယခု ထပ်တူပြုပါ",
       "syncQueued": "ထပ်တူပြုရန် အလှည့်စောင့်စာရင်းထဲ ထည့်ထားသည်။",
-      "syncStatusUnavailable": "ထပ်တူပြုမှုအခြေအနေကို ရယူ၍ မရပါ။"
+      "syncStatusUnavailable": "ထပ်တူပြုမှုအခြေအနေကို ရယူ၍ မရပါ။",
+      "daysOverdue_one": "သတ်မှတ်ရက်ထက် {{displayCount}} ရက် ကျော်နေ",
+      "daysOverdue_other": "သတ်မှတ်ရက်ထက် {{displayCount}} ရက် ကျော်နေ",
+      "findingsCount_one": "တွေ့ရှိချက် {{displayCount}} ခု",
+      "findingsCount_other": "တွေ့ရှိချက် {{displayCount}} ခု"
     },
     "dashboardMetrics": {
       "openFindings": "မဖြေရှင်းရသေးသော တွေ့ရှိချက်များ",
@@ -2131,20 +2186,7 @@
       "continueFrom": "{{title}} ကို ဆက်လုပ်နေပါသည်။",
       "importingSession": "စက်ရှင်ကို တင်သွင်းနေသည်",
       "cliCannotContinue": "ဤ CLI ဖြင့် စက်ရှင်ကို ဆက်လုပ်၍မရပါ။ Cloud Agent သို့မဟုတ် အခြား CLI တစ်ခုကို ရွေးပါ။",
-      "importFailed": "ဤစက်ရှင်ကို တင်သွင်း၍မရပါ။",
-      "sandbox": "စန်းဒ်ဘောက်စ်",
-      "sandboxAccessibility": "စန်းဒ်ဘောက်စ်: {{label}}",
-      "sandboxDefaultWithDestination": "မူလ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "သေး",
-      "sandboxInstanceShared": "မျှဝေ",
-      "sandboxInstanceLarge": "ကြီး",
-      "sandboxInstanceDevcontainer": "Dev ကွန်တိန်နာ",
-      "sandboxInstanceProviderDefault": "ပံ့ပိုးသူ၏ မူလ",
-      "sandboxCouldNotLoad": "စန်းဒ်ဘောက်စ် ရွေးချယ်စရာများ လုဒ်လုပ်မရပါ",
-      "sandboxUnavailable": "ဤစန်းဒ်ဘောက်စ်ကို သုံးမရပါ။ အခြားစန်းဒ်ဘောက်စ် သို့မဟုတ် မူလကို ရွေးပါ။",
-      "sandboxUseDefault": "မူလကို သုံးရန်"
+      "importFailed": "ဤစက်ရှင်ကို တင်သွင်း၍မရပါ။"
     },
     "partRenderer": {
       "updatedFileCount_one": "ဖိုင် {{displayCount}} ခုကို ပြင်ဆင်ပြီးပါပြီ။",
@@ -2168,7 +2210,13 @@
       "updateTodos": "လုပ်ရန်စာရင်းကို ပြင်ဆင်ပါ",
       "linesBadge": "{{displayCount}} ကြောင်း",
       "filesBadge": "ဖိုင် {{displayCount}} ခု",
-      "matchesBadge": "ကိုက်ညီမှု {{displayCount}} ခု"
+      "matchesBadge": "ကိုက်ညီမှု {{displayCount}} ခု",
+      "filesBadge_one": "ဖိုင် {{displayCount}} ခု",
+      "filesBadge_other": "ဖိုင် {{displayCount}} ခု",
+      "linesBadge_one": "{{displayCount}} ကြောင်း",
+      "linesBadge_other": "{{displayCount}} ကြောင်း",
+      "matchesBadge_one": "ကိုက်ညီမှု {{displayCount}} ခု",
+      "matchesBadge_other": "ကိုက်ညီမှု {{displayCount}} ခု"
     },
     "readToolMarkdown": {
       "linesTruncated": "စာကြောင်း {{start}}–{{end}} (အပြည့်အစုံမဟုတ်)",
@@ -2458,7 +2506,11 @@
       "files": "ဖိုင်",
       "couldNotOpenPhotoPicker": "ဓာတ်ပုံရွေးသည့်အကွက်ကို ဖွင့်၍မရပါ။ Kilo ကို ပြန်ဖွင့်ပြီး ထပ်ကြိုးစားပါ။",
       "maxFilesAllowed": "ဖိုင်အများဆုံး {{displayCount}} ခုသာ ထည့်နိုင်ပါသည်။",
-      "onlyAddingFiles": "ဖိုင် {{total}} ခုမှ {{accepted}} ခုသာ ထည့်နေသည် (အများဆုံး {{max}})"
+      "onlyAddingFiles": "ဖိုင် {{total}} ခုမှ {{accepted}} ခုသာ ထည့်နေသည် (အများဆုံး {{max}})",
+      "maxFilesAllowed_one": "ဖိုင်အများဆုံး {{displayCount}} ခုသာ ထည့်နိုင်ပါသည်။",
+      "maxFilesAllowed_other": "ဖိုင်အများဆုံး {{displayCount}} ခုသာ ထည့်နိုင်ပါသည်။",
+      "onlyAddingFiles_one": "ဖိုင် {{total}} ခုမှ {{accepted}} ခုသာ ထည့်နေသည် (အများဆုံး {{max}})",
+      "onlyAddingFiles_other": "ဖိုင် {{total}} ခုမှ {{accepted}} ခုသာ ထည့်နေသည် (အများဆုံး {{max}})"
     },
     "composer": {
       "addAttachment": "ပူးတွဲဖိုင် ထည့်ပါ",
@@ -2476,7 +2528,9 @@
       "discardAttachmentsMessage": "မက်ဆေ့ခ်ျတွင် မပူးတွဲရသေးသော တင်ထားသည့်ဖိုင်များကို ဖျက်ပါမည်။",
       "discardAttachmentsTitle": "ပူးတွဲဖိုင်များကို ပယ်ဖျက်မလား။",
       "charactersRemaining": "အက္ခရာ {{count}} လုံး ကျန်သည်",
-      "insertNewline": "စာကြောင်းအသစ် ထည့်ပါ"
+      "insertNewline": "စာကြောင်းအသစ် ထည့်ပါ",
+      "charactersRemaining_one": "အက္ခရာ {{count}} လုံး ကျန်သည်",
+      "charactersRemaining_other": "အက္ခရာ {{count}} လုံး ကျန်သည်"
     },
     "chatLink": {
       "linkCopied": "လင့်ခ်ကို ကူးယူပြီးပါပြီ",
@@ -2548,7 +2602,9 @@
       "stepsCount_one": "အဆင့် {{steps}} ဆင့်",
       "stepsCount": "အဆင့် {{steps}} ဆင့်",
       "stepsCount_other": "အဆင့် {{steps}} ဆင့်",
-      "modelAccessibilityLabel": "{{name}}၊ {{provider}}၊ {{steps}}၊ {{cost}}"
+      "modelAccessibilityLabel": "{{name}}၊ {{provider}}၊ {{steps}}၊ {{cost}}",
+      "modelsCount_one": "မော်ဒယ် ({{displayCount}})",
+      "modelsCount_other": "မော်ဒယ်များ ({{displayCount}})"
     },
     "autoApprove": {
       "title": "အလိုအလျောက် အတည်ပြုခြင်း",
@@ -2588,7 +2644,9 @@
     },
     "toolRun": {
       "sheetTitle": "ကိရိယာခေါ်ဆိုမှုများ",
-      "condensedLabel": "{{itemCount}} အကြောင်းအရာ; {{last}}"
+      "condensedLabel": "{{itemCount}} အကြောင်းအရာ; {{last}}",
+      "condensedLabel_one": "{{itemCount}} အကြောင်းအရာ; {{last}}",
+      "condensedLabel_other": "{{itemCount}} အကြောင်းအရာ; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2781,9 @@
     "cliCantReceiveFilesTitle": "ဒီစက်ရှင်က ဖိုင်များကို လက်ခံ၍မရပါ",
     "cliCantReceiveFilesMessage": "ဒီစက်ရှင်ကို လုပ်ဆောင်နေသော Kilo CLI က ဖိုင်များကို လက်ခံ၍မရပါ။ အဲဒီစက်ရှိ CLI ကို မွမ်းမံပါ သို့မဟုတ် စက်ရှင်အသစ်သို့ မျှဝေပါ။",
     "contentlessMessage": "မျှဝေစရာ မရှိပါ — စာသား သို့မဟုတ် ဖိုင်များ မပါဝင်ပါ။",
-    "couldNotReadContent": "မျှဝေထားသော အကြောင်းအရာကို ဖတ်၍မရပါ။"
+    "couldNotReadContent": "မျှဝေထားသော အကြောင်းအရာကို ဖတ်၍မရပါ။",
+    "onlyFirstFilesAttached_one": "ပထမဆုံးဖိုင် {{displayCount}} ခုကိုသာ ပူးတွဲပါမည်။",
+    "onlyFirstFilesAttached_other": "ပထမဆုံးဖိုင် {{displayCount}} ခုကိုသာ ပူးတွဲပါမည်။"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3153,9 @@
     "couldNotApprove": "အတည်ပြု၍ မရပါ",
     "couldNotStart": "စတင်၍ မရပါ",
     "channelName": "လုပ်ဆောင်နေသော အေးဂျင့်များ",
-    "activityKitDisabledBody": "သော့ခတ်မျက်နှာပြင်တွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ကြည့်ရန် ဆက်တင်များ၌ တိုက်ရိုက်လုပ်ဆောင်မှုများကို ဖွင့်ပါ။"
+    "activityKitDisabledBody": "သော့ခတ်မျက်နှာပြင်တွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ကြည့်ရန် ဆက်တင်များ၌ တိုက်ရိုက်လုပ်ဆောင်မှုများကို ဖွင့်ပါ။",
+    "openSession": "ဖွင့်ပါ",
+    "approveFailed": "အတည်ပြု၍မရပါ။ ထပ်ကြိုးစားရန် $t(common.approve) ကို နှိပ်ပါ။"
   },
   "transcriptionModel": {
     "title": "အသံမှစာသားပြောင်းမော်ဒယ်",
@@ -3134,5 +3196,8 @@
       "repositoryUnknown": "Kilo သည် {{repository}} ကို GitHub သို့မဟုတ် GitLab ကုဒ်သိုလှောင်ရာအဖြစ် အသိအမှတ်မပြုပါ။ Kilo တွင် အခြားကုဒ်သိုလှောင်ရာ ရွေးချယ်ပါ။",
       "repositoryUnsupported": "{{repository}} သည် Bitbucket ကုဒ်သိုလှောင်ရာ ဖြစ်သည် — အေးဂျင့်ကို စတင်ပါ ယင်းကို မသုံးနိုင်သေးပါ။ Kilo တွင် အခြားကုဒ်သိုလှောင်ရာ ရွေးချယ်ပါ။"
     }
+  },
+  "launcher": {
+    "openLastSession": "နောက်ဆုံးဆက်ရှင်ကို ဖွင့်ပါ"
   }
 }

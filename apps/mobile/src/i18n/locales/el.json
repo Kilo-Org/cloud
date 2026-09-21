@@ -163,6 +163,7 @@
     "useDifferentEmail": "Χρήση άλλης διεύθυνσης ηλεκτρονικού ταχυδρομείου",
     "signInWithApple": "Σύνδεση με Apple",
     "signInWithGoogle": "Σύνδεση με Google",
+    "signInWithPasskey": "Σύνδεση με κλειδί πρόσβασης",
     "emailAddress": "Διεύθυνση ηλεκτρονικού ταχυδρομείου",
     "emailPlaceholder": "onoma@example.com",
     "continueWithEmail": "Συνέχεια με ηλεκτρονικό ταχυδρομείο",
@@ -175,6 +176,10 @@
     "termsConnector": " και ",
     "termsSuffix": ".",
     "moreSignInOptions": "Περισσότερες επιλογές σύνδεσης",
+    "passkeyCancelled": "Η σύνδεση με κλειδί πρόσβασης ακυρώθηκε. Δοκιμάστε ξανά.",
+    "passkeyNotFound": "Δεν έχει αποθηκευτεί κανένα κλειδί πρόσβασης για αυτή τη συσκευή. Συνδεθείτε με Apple, Google ή το email σας.",
+    "passkeyUnsupported": "Τα κλειδιά πρόσβασης δεν είναι διαθέσιμα σε αυτή τη συσκευή. Συνδεθείτε με Apple, Google ή το email σας.",
+    "passkeyFailed": "Δεν ήταν δυνατή η σύνδεση με κλειδί πρόσβασης. Δοκιμάστε ξανά.",
     "couldNotCompleteSignIn": "Δεν ήταν δυνατή η ολοκλήρωση της σύνδεσης. Δοκίμασε ξανά.",
     "sessionEnded": "Η συνεδρία σου έληξε. Συνδέσου ξανά.",
     "signInCodeExpired": "Ο κωδικός σύνδεσής σου έληξε. Δοκίμασε ξανά.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Δοκιμαστικός λογαριασμός",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Εταιρική ενιαία σύνδεση (SSO)"
+    "providerEnterpriseSso": "Εταιρική ενιαία σύνδεση (SSO)",
+    "passkeysTitle": "Κλειδιά πρόσβασης",
+    "passkeysSubtitle": "Συνδεθείτε χωρίς κωδικό πρόσβασης",
+    "passkeysEmpty": "Δεν υπάρχουν ακόμη κλειδιά πρόσβασης",
+    "passkeysEmptyHint": "$t(profile.addPasskey) για να συνδεθείτε χωρίς κωδικό πρόσβασης.",
+    "passkeysCouldNotLoad": "Δεν ήταν δυνατή η φόρτωση των κλειδιών πρόσβασης",
+    "passkeysLoadFailed": "Τα κλειδιά πρόσβασης δεν είναι διαθέσιμα μέχρι να φορτωθεί αυτό.",
+    "addPasskey": "Προσθήκη κλειδιού πρόσβασης",
+    "passkeyDefaultName": "Κλειδί πρόσβασης",
+    "passkeyAddedOn": "Προστέθηκε {{date}}",
+    "passkeyAdded": "Το κλειδί πρόσβασης προστέθηκε.",
+    "passkeyAddFailed": "Δεν ήταν δυνατή η προσθήκη κλειδιού πρόσβασης. Δοκιμάστε ξανά.",
+    "passkeyAddUnsupported": "Αυτή η συσκευή δεν μπορεί να δημιουργήσει κλειδιά πρόσβασης.",
+    "passkeyAddCancelled": "Η δημιουργία του κλειδιού πρόσβασης ακυρώθηκε.",
+    "passkeyRemoved": "Το κλειδί πρόσβασης αφαιρέθηκε.",
+    "passkeyRemoveFailed": "Δεν ήταν δυνατή η αφαίρεση αυτού του κλειδιού πρόσβασης. Δοκιμάστε ξανά.",
+    "passkeyRenamed": "Το κλειδί πρόσβασης μετονομάστηκε.",
+    "passkeyName": "Όνομα κλειδιού πρόσβασης",
+    "renamePasskey": "Μετονομασία κλειδιού πρόσβασης",
+    "removePasskey": "Αφαίρεση κλειδιού πρόσβασης",
+    "removePasskeyTitle": "Αφαίρεση κλειδιού πρόσβασης;",
+    "removePasskeyMessage": "Δεν θα μπορείτε πλέον να συνδεθείτε με αυτό το κλειδί πρόσβασης."
   },
   "preferences": {
     "general": "Γενικά",
@@ -326,7 +352,7 @@
       "expandMoreLines": "Εμφάνιση {{displayCount}} επιπλέον γραμμών ({{start}}–{{end}})",
       "expandLinesOfContext": "Εμφάνιση {{displayCount}} γραμμών περιβάλλοντος κώδικα",
       "expandAll": "Εμφάνιση όλων",
-      "expandAllLines": "Εμφάνιση και των {{displayCount}} γραμμών",
+      "expandAllLines": "Εμφάνιση όλων των γραμμών ({{displayCount}})",
       "loadingMoreFiles": "Φόρτωση περισσότερων αρχείων…",
       "retryLoadingNextPage": "Νέα προσπάθεια φόρτωσης επόμενης σελίδας",
       "failedToLoadMoreFiles": "Δεν φορτώθηκαν περισσότερα αρχεία — πάτησε για νέα προσπάθεια",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "Φορτώθηκαν {{displayCount}} από {{total}} αρχεία",
       "filesStillLoading": "Τα αρχεία φορτώνονται ακόμα. Σύρε προς τα κάτω για ανανέωση.",
       "goToOverview": "Μετάβαση στην επισκόπηση",
-      "goToOverviewTab": "Μετάβαση στην καρτέλα επισκόπησης"
+      "goToOverviewTab": "Μετάβαση στην καρτέλα επισκόπησης",
+      "expandAllLines_one": "Εμφάνιση όλων των γραμμών ({{displayCount}})",
+      "expandAllLines_other": "Εμφάνιση όλων των γραμμών ({{displayCount}})",
+      "expandLines_one": "Εμφάνιση {{displayCount}} γραμμής ({{start}}–{{end}})",
+      "expandLines_other": "Εμφάνιση {{displayCount}} γραμμών ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Εμφάνιση {{displayCount}} γραμμής περιβάλλοντος κώδικα",
+      "expandLinesOfContext_other": "Εμφάνιση {{displayCount}} γραμμών περιβάλλοντος κώδικα",
+      "expandMoreLines_one": "Εμφάνιση {{displayCount}} επιπλέον γραμμής ({{start}}–{{end}})",
+      "expandMoreLines_other": "Εμφάνιση {{displayCount}} επιπλέον γραμμών ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} από {{total}} αρχεία φορτώθηκαν",
+      "loadedOfTotalFiles_other": "{{loaded}} από {{total}} αρχεία φορτώθηκαν"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ χωρίς αλλαγή γραμμής στο τέλος του αρχείου",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Παρωχημένο στο {{path}}"
       },
       "deletedUser": "διαγραμμένος χρήστης",
-      "replyForbiddenTerm": "Δεν έχεις δικαίωμα να απαντήσεις σε αυτό το {{term}}."
+      "replyForbiddenTerm": "Δεν έχεις δικαίωμα να απαντήσεις σε αυτό το {{term}}.",
+      "moreLinesAbove_one": "… υπάρχει {{displayCount}} επιπλέον γραμμή παραπάνω.",
+      "moreLinesAbove_other": "… υπάρχουν {{displayCount}} επιπλέον γραμμές παραπάνω."
     },
     "couldNotOpenGitHubAppSettings": "Δεν ήταν δυνατό το άνοιγμα των ρυθμίσεων της εφαρμογής GitHub.",
     "installKiloGitHubApp": "Εγκατάσταση της εφαρμογής Kilo για το GitHub",
@@ -706,7 +744,9 @@
       "statusContext": "Περιβάλλων κώδικας",
       "lineLabel": "{{status}}, γραμμή {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(κενό)"
+      "emptyLine": "(κενό)",
+      "truncationBanner_one": "Εμφανίζονται τα πρώτα {{limit}} από τα {{total}} τροποποιημένα αρχεία, λόγω του ορίου του API του GitHub.",
+      "truncationBanner_other": "Εμφανίζονται τα πρώτα {{limit}} από τα {{total}} τροποποιημένα αρχεία, λόγω του ορίου του API του GitHub."
     },
     "linkPasteClipboardEmpty": "Το πρόχειρο είναι άδειο.",
     "linkPasteNotAPullRequest": "Δεν είναι σύνδεσμος αιτήματος ενσωμάτωσης ή συγχώνευσης",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Οι ειδοποιήσεις εμφανίζουν το κείμενο του μηνύματος στην οθόνη κλειδώματος της συσκευής σου.",
     "previewGenericDescription": "Οι ειδοποιήσεις δείχνουν ότι υπάρχει νέα δραστηριότητα. Άνοιξε το Kilo για να διαβάσεις το μήνυμα.",
     "channel": {
-      "agent": "Συνεδρίες πρακτόρων",
+      "agentProgress": "Πρόοδος πράκτορα",
       "chat": "Μηνύματα συνομιλίας",
       "kiloclaw": "Δραστηριότητα KiloClaw",
       "balance": "Ειδοποιήσεις υπολοίπου",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "περιβάλλον έτοιμο ή με αποτυχία, προγραμματισμένες ενέργειες",
       "balanceAlertsSubtitle": "προειδοποιήσεις χαμηλού υπολοίπου οργανισμού",
       "securityFindingsSubtitle": "νέα ευρήματα και υπενθυμίσεις SLA"
+    },
+    "action": {
+      "openSession": "Άνοιγμα συνεδρίας"
+    },
+    "needsInputAction": {
+      "approved": "Το αίτημα εγκρίθηκε",
+      "replied": "Η απάντηση στάλθηκε",
+      "failed": "Δεν ήταν δυνατή η απάντηση. Πατήστε ξανά για επανάληψη.",
+      "unavailable": "Αυτό το αίτημα δεν περιμένει πλέον."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Η μεταφόρτωση απέτυχε.",
       "failedToUploadFile": "Δεν ήταν δυνατή η μεταφόρτωση του αρχείου: {{reason}}.",
       "nothingToPaste": "Δεν υπάρχει τίποτα για επικόλληση.",
-      "metadataStripFailed": "Δεν ήταν δυνατή η αφαίρεση των μεταδεδομένων της φωτογραφίας."
+      "metadataStripFailed": "Δεν ήταν δυνατή η αφαίρεση των μεταδεδομένων της φωτογραφίας.",
+      "limit_one": "Μπορείς να επισυνάψεις έως {{displayCount}} αρχείο.",
+      "limit_other": "Μπορείς να επισυνάψεις έως {{displayCount}} αρχεία."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}: {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Συγχρονισμός ευρημάτων",
       "syncNow": "Συγχρονισμός τώρα",
       "syncQueued": "Ο συγχρονισμός προστέθηκε στην ουρά",
-      "syncStatusUnavailable": "Η κατάσταση συγχρονισμού δεν είναι διαθέσιμη."
+      "syncStatusUnavailable": "Η κατάσταση συγχρονισμού δεν είναι διαθέσιμη.",
+      "daysOverdue_one": "{{displayCount}} ημέρα καθυστέρησης",
+      "daysOverdue_other": "{{displayCount}} ημέρες καθυστέρησης",
+      "findingsCount_one": "{{displayCount}} εύρημα",
+      "findingsCount_other": "{{displayCount}} ευρήματα"
     },
     "dashboardMetrics": {
       "openFindings": "Ανοιχτά ευρήματα",
@@ -2131,20 +2186,7 @@
       "continueFrom": "Συνεχίζεται η συνεδρία {{title}}.",
       "importingSession": "Εισαγωγή συνεδρίας…",
       "cliCannotContinue": "Αυτό το CLI δεν μπορεί να συνεχίσει μια συνεδρία. Επίλεξε τον Cloud Agent ή άλλο CLI.",
-      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας.",
-      "sandbox": "Απομονωμένο περιβάλλον",
-      "sandboxAccessibility": "Απομονωμένο περιβάλλον: {{label}}",
-      "sandboxDefaultWithDestination": "Προεπιλογή · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Μικρό",
-      "sandboxInstanceShared": "Κοινόχρηστο",
-      "sandboxInstanceLarge": "Μεγάλο",
-      "sandboxInstanceDevcontainer": "Κοντέινερ ανάπτυξης",
-      "sandboxInstanceProviderDefault": "Προεπιλογή παρόχου",
-      "sandboxCouldNotLoad": "Δεν ήταν δυνατή η φόρτωση των επιλογών sandbox",
-      "sandboxUnavailable": "Αυτό το απομονωμένο περιβάλλον δεν είναι διαθέσιμο. Επιλέξτε άλλο περιβάλλον ή Προεπιλογή.",
-      "sandboxUseDefault": "Χρήση Προεπιλογής"
+      "importFailed": "Δεν ήταν δυνατή η εισαγωγή αυτής της συνεδρίας."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ενημερώθηκε {{displayCount}} αρχείο.",
@@ -2168,7 +2210,13 @@
       "updateTodos": "Ενημέρωση εκκρεμοτήτων",
       "linesBadge": "{{displayCount}} γραμμές",
       "filesBadge": "{{displayCount}} αρχεία",
-      "matchesBadge": "{{displayCount}} αντιστοιχίες"
+      "matchesBadge": "{{displayCount}} αντιστοιχίες",
+      "filesBadge_one": "{{displayCount}} αρχείο",
+      "filesBadge_other": "{{displayCount}} αρχεία",
+      "linesBadge_one": "{{displayCount}} γραμμή",
+      "linesBadge_other": "{{displayCount}} γραμμές",
+      "matchesBadge_one": "{{displayCount}} αντιστοιχία",
+      "matchesBadge_other": "{{displayCount}} αντιστοιχίες"
     },
     "readToolMarkdown": {
       "linesTruncated": "γραμμές {{start}}–{{end}} (περικομμένες)",
@@ -2458,7 +2506,11 @@
       "files": "Αρχεία",
       "couldNotOpenPhotoPicker": "Δεν ήταν δυνατό το άνοιγμα του επιλογέα φωτογραφιών. Επανεκκίνησε το Kilo και δοκίμασε ξανά.",
       "maxFilesAllowed": "Επιτρέπονται έως {{displayCount}} αρχεία.",
-      "onlyAddingFiles": "Προστίθενται μόνο {{accepted}} από τα {{total}} αρχεία (μέγιστο {{max}})"
+      "onlyAddingFiles": "Προστίθενται μόνο {{accepted}} από τα {{total}} αρχεία (μέγιστο {{max}})",
+      "maxFilesAllowed_one": "Επιτρέπονται έως {{displayCount}} αρχείο.",
+      "maxFilesAllowed_other": "Επιτρέπονται έως {{displayCount}} αρχεία.",
+      "onlyAddingFiles_one": "Προστίθενται μόνο {{accepted}} από τα {{total}} αρχεία (μέγιστο {{max}})",
+      "onlyAddingFiles_other": "Προστίθενται μόνο {{accepted}} από τα {{total}} αρχεία (μέγιστο {{max}})"
     },
     "composer": {
       "addAttachment": "Προσθήκη συνημμένου",
@@ -2476,7 +2528,9 @@
       "discardAttachmentsMessage": "Τα αρχεία που ανέβασες χωρίς να τα στείλεις θα διαγραφούν.",
       "discardAttachmentsTitle": "Απόρριψη συνημμένων;",
       "charactersRemaining": "Απομένουν {{count}} χαρακτήρες",
-      "insertNewline": "Εισαγωγή νέας γραμμής"
+      "insertNewline": "Εισαγωγή νέας γραμμής",
+      "charactersRemaining_one": "Απομένει {{count}} χαρακτήρας",
+      "charactersRemaining_other": "Απομένουν {{count}} χαρακτήρες"
     },
     "chatLink": {
       "linkCopied": "Ο σύνδεσμος αντιγράφηκε",
@@ -2548,7 +2602,9 @@
       "stepsCount_one": "{{steps}} βήμα",
       "stepsCount": "{{steps}} βήματα",
       "stepsCount_other": "{{steps}} βήματα",
-      "modelAccessibilityLabel": "Μοντέλο {{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "Μοντέλο {{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Μοντέλο ({{displayCount}})",
+      "modelsCount_other": "Μοντέλα ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Αυτόματη έγκριση",
@@ -2588,7 +2644,9 @@
     },
     "toolRun": {
       "sheetTitle": "Κλήσεις εργαλείων",
-      "condensedLabel": "{{itemCount}} στοιχεία; {{last}}"
+      "condensedLabel": "{{itemCount}} στοιχεία; {{last}}",
+      "condensedLabel_one": "{{itemCount}} στοιχείο; {{last}}",
+      "condensedLabel_other": "{{itemCount}} στοιχεία; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2781,9 @@
     "cliCantReceiveFilesTitle": "Αυτή η συνεδρία δεν μπορεί να λάβει αρχεία",
     "cliCantReceiveFilesMessage": "Το Kilo CLI που εκτελεί αυτή τη συνεδρία δεν μπορεί να λάβει αρχεία. Ενημέρωσε το CLI στον συγκεκριμένο υπολογιστή ή κοινοποίησε τα αρχεία σε μια νέα συνεδρία.",
     "contentlessMessage": "Δεν υπάρχει περιεχόμενο για κοινοποίηση — δεν συμπεριλήφθηκε κείμενο ούτε αρχεία.",
-    "couldNotReadContent": "Δεν ήταν δυνατή η ανάγνωση του περιεχομένου που κοινοποιήθηκε."
+    "couldNotReadContent": "Δεν ήταν δυνατή η ανάγνωση του περιεχομένου που κοινοποιήθηκε.",
+    "onlyFirstFilesAttached_one": "Θα επισυναφθούν μόνο τα πρώτα {{displayCount}} αρχείο.",
+    "onlyFirstFilesAttached_other": "Θα επισυναφθούν μόνο τα πρώτα {{displayCount}} αρχεία."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3153,9 @@
     "couldNotApprove": "Η έγκριση απέτυχε",
     "couldNotStart": "Η εκκίνηση απέτυχε",
     "channelName": "Ενεργοί πράκτορες",
-    "activityKitDisabledBody": "Ενεργοποίησε τις ζωντανές δραστηριότητες στις ρυθμίσεις για να βλέπεις τους ενεργούς πράκτορες στην οθόνη κλειδώματος."
+    "activityKitDisabledBody": "Ενεργοποίησε τις ζωντανές δραστηριότητες στις ρυθμίσεις για να βλέπεις τους ενεργούς πράκτορες στην οθόνη κλειδώματος.",
+    "openSession": "Άνοιξε",
+    "approveFailed": "Δεν ήταν δυνατή η έγκριση. Πάτησε $t(common.approve) για να δοκιμάσεις ξανά."
   },
   "transcriptionModel": {
     "title": "Μοντέλο απομαγνητοφώνησης",
@@ -3134,5 +3196,8 @@
       "repositoryUnknown": "Το Kilo δεν αναγνωρίζει το {{repository}} ως αποθετήριο GitHub ή GitLab. Επίλεξε άλλο αποθετήριο στο Kilo.",
       "repositoryUnsupported": "Το {{repository}} είναι αποθετήριο Bitbucket — Η έναρξη πράκτορα δεν μπορεί να το χρησιμοποιήσει ακόμη. Επίλεξε άλλο αποθετήριο στο Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Άνοιγμα τελευταίας συνεδρίας"
   }
 }

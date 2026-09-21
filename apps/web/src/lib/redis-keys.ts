@@ -34,9 +34,6 @@ export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
 export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
 export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderboard-provider-race');
 
-export const abuseRulesClassificationRedisKey = (identityKey: string) =>
-  redisKey(`ai-gateway.abuse-rules:last-classification:${identityKey}`);
-
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);
 

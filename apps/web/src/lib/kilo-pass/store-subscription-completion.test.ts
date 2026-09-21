@@ -1,4 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
+import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { and, eq, sql } from 'drizzle-orm';
 
 import {
@@ -17,6 +18,7 @@ import { getMonthlyPriceUsd } from './bonus';
 import { KiloPassCadence, KiloPassIssuanceItemKind, KiloPassTier } from './enums';
 import { KiloPassIssuanceSource, KiloPassPaymentProvider } from './enums';
 import { getEffectiveKiloPassThreshold } from './threshold';
+import { mapGooglePlayKiloPassPurchase } from './google-play-verifier';
 import {
   completeStoreKiloPassPurchase,
   type ValidatedStoreKiloPassPurchase,
@@ -43,7 +45,143 @@ function applePurchase(
   };
 }
 
+function googlePlayOrder(
+  overrides: Partial<androidpublisher_v3.Schema$Order> = {}
+): androidpublisher_v3.Schema$Order {
+  return {
+    orderId: `GPA.${crypto.randomUUID()}`,
+    purchaseToken: `play-token-${crypto.randomUUID()}`,
+    state: 'PROCESSED',
+    lineItems: [
+      {
+        productId: 'kilopass_tier19',
+        subscriptionDetails: {
+          servicePeriodStartTime: '2026-05-01T09:00:00.000Z',
+          servicePeriodEndTime: '2100-01-01T00:00:00.000Z',
+        },
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function googlePlayPurchaseFromOrder(
+  order: androidpublisher_v3.Schema$Order
+): ValidatedStoreKiloPassPurchase {
+  return mapGooglePlayKiloPassPurchase(
+    {
+      purchaseToken: order.purchaseToken ?? '',
+      productId: 'kilopass_tier19',
+      latestOrderId: order.orderId ?? '',
+      startTimeMs: Date.parse('2026-05-01T09:00:00.000Z'),
+      expiryTimeMs: Date.parse('2100-01-01T00:00:00.000Z'),
+      environment: 'Production',
+      subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
+      rawPayload: {},
+    },
+    order
+  );
+}
+
 describe('completeStoreKiloPassPurchase', () => {
+  it('persists the charged amount, currency and tax for a paid Google Play order', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const order = googlePlayOrder({
+      total: { currencyCode: 'USD', units: '19', nanos: 0 },
+      tax: { currencyCode: 'USD', units: '3', nanos: 170000000 },
+      lineItems: [
+        {
+          productId: 'kilopass_tier19',
+          total: { currencyCode: 'USD', units: '19', nanos: 0 },
+          tax: { currencyCode: 'USD', units: '3', nanos: 170000000 },
+          subscriptionDetails: {
+            servicePeriodStartTime: '2026-05-01T09:00:00.000Z',
+            servicePeriodEndTime: '2100-01-01T00:00:00.000Z',
+          },
+        },
+      ],
+    });
+
+    const result = await completeStoreKiloPassPurchase({
+      user,
+      purchase: googlePlayPurchaseFromOrder(order),
+    });
+
+    expect(result).toMatchObject({
+      tier: KiloPassTier.Tier19,
+      cadence: KiloPassCadence.Monthly,
+      alreadyProcessed: false,
+    });
+
+    const purchaseRow = await db.query.kilo_pass_store_purchases.findFirst({
+      where: eq(kilo_pass_store_purchases.provider_transaction_id, order.orderId ?? ''),
+    });
+    expect(purchaseRow).toMatchObject({
+      amount_charged_minor_units: 1900,
+      currency: 'USD',
+      tax_minor_units: 317,
+    });
+
+    const refreshedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(refreshedUser!.total_microdollars_acquired).toBe(
+      getMonthlyPriceUsd(KiloPassTier.Tier19) * 1_000_000
+    );
+  });
+
+  it('persists nulls when a Google Play order carries no money', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const order = googlePlayOrder();
+
+    const result = await completeStoreKiloPassPurchase({
+      user,
+      purchase: googlePlayPurchaseFromOrder(order),
+    });
+    expect(result).toMatchObject({ alreadyProcessed: false });
+
+    const purchaseRow = await db.query.kilo_pass_store_purchases.findFirst({
+      where: eq(kilo_pass_store_purchases.provider_transaction_id, order.orderId ?? ''),
+    });
+    expect(purchaseRow).toMatchObject({
+      amount_charged_minor_units: null,
+      currency: null,
+      tax_minor_units: null,
+    });
+  });
+
+  it('completes and stores nulls when Google Play order money is uninterpretable', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+    const order = googlePlayOrder({
+      lineItems: [
+        {
+          productId: 'kilopass_tier19',
+          total: { units: '19', nanos: 0 },
+          tax: { units: '3', nanos: 170000000 },
+          subscriptionDetails: {
+            servicePeriodStartTime: '2026-05-01T09:00:00.000Z',
+            servicePeriodEndTime: '2100-01-01T00:00:00.000Z',
+          },
+        },
+      ],
+    });
+
+    const result = await completeStoreKiloPassPurchase({
+      user,
+      purchase: googlePlayPurchaseFromOrder(order),
+    });
+    expect(result).toMatchObject({ alreadyProcessed: false });
+
+    const purchaseRow = await db.query.kilo_pass_store_purchases.findFirst({
+      where: eq(kilo_pass_store_purchases.provider_transaction_id, order.orderId ?? ''),
+    });
+    expect(purchaseRow).toMatchObject({
+      amount_charged_minor_units: null,
+      currency: null,
+      tax_minor_units: null,
+    });
+  });
+
   it.each([
     [KiloPassTier.Tier19, KiloPassTier.Tier49],
     [KiloPassTier.Tier19, KiloPassTier.Tier199],

@@ -12,9 +12,10 @@ import {
   formatBlockingCardTitle,
   getBlockingCardPresentationForKind,
 } from '@/components/agents/blocking-card-state';
+import { permissionToolLabel } from '@/components/agents/permission-tool-label';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { capitalize, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 type PermissionCardProps = {
   permission: string;
@@ -85,11 +86,8 @@ export function PermissionCard({
     onRespond(response);
   }
 
-  // Format permission name for display
-  const permissionDisplay = permission
-    .split('_')
-    .map(word => capitalize(word))
-    .join(' ');
+  // Localized tool name from the catalog — never re-cased in code.
+  const permissionDisplay = permissionToolLabel(permission);
 
   const title = formatBlockingCardTitle(t('agentChat.permissionCard.title'), pendingCount);
   const isInert = presentation.state === 'non-retryable';

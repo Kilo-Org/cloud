@@ -9,6 +9,7 @@ import {
   NOTIFICATION_CATEGORY_KEYS,
   type NotificationPreferences,
   readAgentPushPreference,
+  readAgentPushPreferenceIfLoaded,
 } from './agent-push-preference';
 
 const key = ['user', 'getNotificationPreferences'] as const;
@@ -161,5 +162,28 @@ describe('readAgentPushPreference', () => {
     const qc = makeQueryClient();
     qc.setQueryData(key, fullRow({ agentUpdates: false }));
     expect(readAgentPushPreference(qc, key)).toBe(false);
+  });
+});
+
+describe('readAgentPushPreferenceIfLoaded', () => {
+  it('reports the row as unknown while the cache is empty', () => {
+    const qc = makeQueryClient();
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentAttention')).toBeUndefined();
+  });
+
+  it('reports the stored value instead of defaulting to ON once the row is cached', () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, fullRow({ agentAttention: false, chatMessages: true }));
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentAttention')).toBe(false);
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'chatMessages')).toBe(true);
+  });
+
+  it('keeps the legacy `agentPushEnabled` mapping for a legacy snapshot', () => {
+    const qc = makeQueryClient();
+    qc.setQueryData(key, { agentPushEnabled: false });
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentUpdates')).toBe(false);
+    expect(readAgentPushPreferenceIfLoaded(qc, key, 'agentAttention')).toBe(
+      DEFAULT_NOTIFICATION_PREFERENCE
+    );
   });
 });

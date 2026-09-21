@@ -1,7 +1,8 @@
-import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
+import { resolveIncomingResume } from '@kilocode/app-shared/universal-links';
 
-import { setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
+import { resumeDeepLinkHref, setPendingDeepLink, wasLaunchLinkHandled } from './deep-link-launch';
 import { parseGitHubReturnParams, setGitHubInstallReturnOutcome } from './github-install-return';
+import { isSystemSearchFamilyLink } from './system-search-families';
 
 /** Target app path for the /cloud/sessions universal-link route. */
 const AGENTS_TAB_HREF = '/(app)/(tabs)/(2_agents)';
@@ -43,13 +44,20 @@ export function redirectSystemPath({
   initial: boolean;
 }): string | null {
   try {
-    const href = resolveIncomingUrl(path);
+    const resume = resolveIncomingResume(path);
     // Untouched → default handling (and future share intent).
-    if (href == null) {
+    if (resume == null) {
       return path;
     }
+    const { href, anchorMessageId } = resume;
+    // A resume link carries `?at=<message id>`: stash it on the href so the
+    // session screen can land on the recorded position. Links without an
+    // anchor keep their href byte-identical (the AGENTS_TAB_HREF check below
+    // compares against the un-suffixed href on purpose). The synchronous
+    // launch capture formats its stash through the same helper.
+    const stashHref = resumeDeepLinkHref({ href, anchorMessageId });
 
-    // C13 return-outcome: extract query params before resolveIncomingUrl
+    // C13 return-outcome: extract query params before resolveIncomingResume
     // strips them.  Store so the agents tab can show the outcome state.
     if (href === AGENTS_TAB_HREF) {
       const query = getQueryFromRaw(path);
@@ -61,6 +69,13 @@ export function redirectSystemPath({
       }
     }
 
+    // An app-scheme URL that names a family the phone's search indexes is a
+    // system-search result's identifier (the app scheme is how Android
+    // delivers the tap), so it is bound to the session that indexed it and
+    // must not open for another account. An `https://` link stays
+    // account-independent.
+    const sessionBound = isSystemSearchFamilyLink(path);
+
     if (initial) {
       // COLD: stash only. Never navigate — router isn't mounted.
       // Skip when the synchronous launch capture already stashed this launch
@@ -68,12 +83,13 @@ export function redirectSystemPath({
       // the slot, and a restash would surface as a duplicate navigation on a
       // later, unrelated effect re-run (e.g. token refresh).
       if (!wasLaunchLinkHandled()) {
-        setPendingDeepLink(href, 'universal-link');
+        setPendingDeepLink(stashHref, 'universal-link', { sessionBound });
       }
     } else {
       // WARM: stash like the cold path. The layout consumer navigates once the
-      // shell is ready, so a signed-out warm link survives login.
-      setPendingDeepLink(href, 'universal-link');
+      // shell is ready, so a signed-out warm https link survives login; a
+      // session-bound one is dropped by the slot's account rules instead.
+      setPendingDeepLink(stashHref, 'universal-link', { sessionBound });
     }
     // Falsy in both handled cases — critical (see above).
     return null;

@@ -5,12 +5,15 @@
 import '@/i18n/rtl';
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
-// Enter the local module's JS in the main process on both platforms. Its
-// Android branch stays a no-op until slice `and` lands; iOS runs the
-// registered glanceable sink below. Imported by path: the module is
-// autolinked from modules/ and intentionally absent from dependencies.
+// Enter the local Android Live Update module's JS in the main process on both
+// platforms: its import side effect registers the Live Update sink on the one
+// platform that can load it, and the require is the capability gate (see the
+// module's src/index.ts). Imported by path: the module is autolinked from
+// modules/ and intentionally absent from dependencies.
 import '../../modules/active-agents-live-update/src';
-// Registers the iOS Live Activity and widget sink with the glanceable publisher.
+// Registers the iOS Live Activity and widget sink with the glanceable
+// publisher. iOS-only by capability (WidgetKit/ActivityKit): the module loads
+// on Android but registers nothing there.
 import '@/glanceable-ios/register';
 
 import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
@@ -68,6 +71,7 @@ import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
+import { useSystemSearchOpenListener } from '@/lib/hooks/use-system-search-open-listener';
 import { preloadHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
 import {
@@ -92,6 +96,7 @@ import {
   subscribeToPendingDeepLink,
 } from '@/lib/deep-link-launch';
 import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
+import { registerNeedsInputCategories } from '@/lib/notification-actions';
 import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
@@ -123,6 +128,7 @@ import {
   type SharePayload,
 } from '@/lib/share-payload';
 import { persistShareNavigationNow, restoreShareNavigation } from '@/lib/share-navigation';
+import { captureSystemSearchLaunch } from '@/lib/system-search-route';
 import {
   flushDraft,
   isStringDraft,
@@ -161,12 +167,20 @@ function preloadStartupFonts(): void {
 
 void SplashScreen.preventAutoHideAsync();
 void ensureAndroidNotificationChannels();
+// The Approve / Reply / Open PR / Open session buttons a needs-input
+// notification carries; idempotent, one pass per launch.
+void registerNeedsInputCategories();
 setupNotificationHandler();
 // Applies the aggregate glanceable push while backgrounded/killed via a
 // headless expo-notifications task; see setupNotificationBackgroundHandler.
 setupNotificationBackgroundHandler();
 checkInitialNotification();
 captureLaunchDeepLink();
+// A tap on a result in the phone's own search: capture the cold-launch payload
+// now, before any screen mounts. The warm `onSystemSearchOpen` wake-up is held
+// by the mounted layout (useSystemSearchOpenListener below). Both feed the
+// pending deep-link slot the layout already consumes.
+captureSystemSearchLaunch();
 prefetchCurrentUser();
 preloadThemePreference();
 preloadHideBalancePreference();
@@ -379,6 +393,11 @@ function RootLayoutNav({
         await i18n.changeLanguage('en');
       }
       void renameAndroidNotificationChannels();
+      // The module-scope category registration ran under the English default
+      // while the stored preference was still loading; re-register the
+      // Approve / Reply / Open PR / Open session buttons in the applied
+      // language (same localization pass as the channel rename above).
+      void registerNeedsInputCategories();
       if (!cancelled) {
         if (reloadFailed) {
           setLanguageReloadFailed(true);
@@ -1039,6 +1058,12 @@ function RootLayout() {
       subscription.remove();
     };
   }, []);
+
+  // The warm half of a tap on one of the app's own search results: the native
+  // wake-up re-reads the pending slot, so registering it with this tree is
+  // enough. Held here rather than at module scope so unmounting releases the
+  // native listener instead of leaving it alive past the tree that uses it.
+  useSystemSearchOpenListener();
 
   // Reap expired temp files at cold start and whenever the app returns to the
   // foreground, deferred past the current interaction frame so a navigation

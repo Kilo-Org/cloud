@@ -1,4 +1,9 @@
 // Hunk / expand / pagination / empty-state rows for the PR diff FlashList.
+//
+// A hunk header is a code literal, so it names its own LTR base direction
+// (`LTR_TEXT_DIRECTION`): under an RTL interface's base direction its runs
+// reorder — `@@ -0,0 +1,82 @@` draws as `@@ 1,82+ 0,0- @@`. Every other row here
+// is interface copy and keeps the interface's direction.
 
 import { Check, ChevronDown, File, GitCommit, X } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +13,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 import { CenteredState } from '@/components/centered-state';
 import { type ExpandSeparatorItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 
@@ -24,8 +30,8 @@ export function HunkHeaderRow({ header }: { header: string }) {
     >
       <Text
         className="font-mono-medium text-[11px]"
-        // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color
-        style={{ color: colors.mutedForeground }}
+        // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color + the header's code base direction
+        style={{ color: colors.mutedForeground, ...LTR_TEXT_DIRECTION }}
         numberOfLines={1}
       >
         {header}
@@ -101,6 +107,7 @@ export function ExpandSeparatorRow({
     ? t('prReview.hunkRows.expandMoreContext')
     : t('prReview.hunkRows.expandContext');
   if (!isUnknownEnd) {
+    // i18n-dup-ok: 'prReview.hunkRows.expandMoreLines_other' and 'prReview.hunkRows.expandLines_other' are these counted messages' plural other categories — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
     expandText = isPartial
       ? t('prReview.hunkRows.expandMoreLines', {
           count: windowSize,
@@ -125,6 +132,7 @@ export function ExpandSeparatorRow({
         className="flex-row items-center gap-1 active:opacity-70"
         accessibilityRole="button"
         accessibilityLabel={
+          // i18n-dup-ok: 'prReview.hunkRows.expandLinesOfContext_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
           isUnknownEnd
             ? t('prReview.hunkRows.expandContext')
             : t('prReview.hunkRows.expandLinesOfContext', {
@@ -140,6 +148,7 @@ export function ExpandSeparatorRow({
         </Text>
       </Pressable>
       {canExpandAll ? (
+        // i18n-dup-ok: 'prReview.hunkRows.expandAllLines_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
         <Pressable
           onPress={() => {
             onLoad(gapSize);
@@ -221,7 +230,13 @@ export function PaginationRow({
     return (
       <View className="flex-row items-center justify-center gap-3 py-4">
         <Text variant="muted" className="text-xs">
+          {/* i18n-dup-ok: 'prReview.hunkRows.loadedOfTotalFiles_one' and 'prReview.hunkRows.loadedOfTotalFiles_other' are this counted message's plural categories, not two keys for one string — English reads the same at every count, but fr and zu inflect the one-form, so the family stays. */}
           {t('prReview.hunkRows.loadedOfTotalFiles', {
+            // The loaded count drives the plural category: a catalog inflects
+            // the participle on the number of files actually loaded
+            // ("1 fichier chargé sur 5"). English carries the plural noun
+            // because the page set, not the loaded page, names the files.
+            count: loadedFiles,
             loaded: formatNumber(loadedFiles, i18n.language),
             total: totalFiles == null ? '?' : formatNumber(totalFiles, i18n.language),
           })}

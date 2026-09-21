@@ -6,6 +6,7 @@ import {
   COMPOSER_INPUT_PADDING_HORIZONTAL,
   NEW_SESSION_PROMPT_CARD_CHROME_FIXED_HEIGHT,
   NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT,
+  NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR,
   NEW_SESSION_PROMPT_CARD_CHROME_TEXT_HEIGHT,
   NEW_SESSION_PROMPT_CHROME_HEIGHT,
   NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
@@ -13,7 +14,9 @@ import {
   resolveComposerMinHeight,
   resolveComposerMinHeightForViewport,
   resolveComposerTextContentWidth,
+  resolveNewSessionPromptCardChrome,
   resolveNewSessionPromptCardChromeHeight,
+  resolveNewSessionPromptCardChromeHeightFromToolbar,
   SESSION_HEADER_HEIGHT,
   shouldEnableComposerInputScroll,
   STARTER_ROW_HEIGHT,
@@ -290,5 +293,57 @@ describe('resolveNewSessionPromptCardChromeHeight', () => {
         composerChromeHeight: resolveNewSessionPromptCardChromeHeight(1),
       })
     ).toBe(40);
+  });
+});
+
+describe('resolveNewSessionPromptCardChromeHeightFromToolbar', () => {
+  it('matches the shipped fontScale-1 budget for the unwrapped toolbar', () => {
+    // 16 (form pt-4) + 8 (card pt-2) + 44 (control row) sit above the toolbar.
+    expect(NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR).toBe(68);
+    // Unwrapped toolbar: border-t (1) + py-3 (24) + one pill row (32) = 57.
+    expect(resolveNewSessionPromptCardChromeHeightFromToolbar(57)).toBe(
+      NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT
+    );
+  });
+
+  it('reserves the wrapped toolbar so its second pill row clears the keyboard', () => {
+    // Wrapped toolbar: border-t (1) + py-3 (24) + two pill rows and their gap
+    // (32 + 8 + 32) = 97.
+    expect(resolveNewSessionPromptCardChromeHeightFromToolbar(97)).toBe(165);
+    // The 203dp released frame floors two input lines against the unwrapped
+    // chrome…
+    expect(
+      resolveComposerMinHeightForViewport({
+        composerChromeHeight: NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT,
+        lineHeight: 24,
+        verticalPadding: 16,
+        defaultLines: 3,
+        viewportHeight: 203,
+      })
+    ).toBe(64);
+    // …but only one line against the wrapped chrome, whose second pill row
+    // takes the space the second input line would have used.
+    expect(
+      resolveComposerMinHeightForViewport({
+        composerChromeHeight: resolveNewSessionPromptCardChromeHeightFromToolbar(97),
+        lineHeight: 24,
+        verticalPadding: 16,
+        defaultLines: 3,
+        viewportHeight: 203,
+      })
+    ).toBe(40);
+  });
+
+  it('picks the static fontScale budget before the toolbar has laid out, the measured one after', () => {
+    // First frame: no toolbar layout yet — the shipped static budget.
+    expect(resolveNewSessionPromptCardChrome({ fontScale: 1, toolbarHeight: null })).toBe(125);
+    expect(resolveNewSessionPromptCardChrome({ fontScale: 2, toolbarHeight: null })).toBe(145);
+    // Measured: the unwrapped toolbar reproduces the fontScale-1 budget…
+    expect(resolveNewSessionPromptCardChrome({ fontScale: 1, toolbarHeight: 57 })).toBe(125);
+    // …and a wrapped toolbar reserves its second pill row.
+    expect(resolveNewSessionPromptCardChrome({ fontScale: 1, toolbarHeight: 97 })).toBe(165);
+    // A measured toolbar replaces the fontScale estimate entirely: its height
+    // already includes the scaled pill text line.
+    expect(resolveNewSessionPromptCardChrome({ fontScale: 2, toolbarHeight: 89 })).toBe(157);
   });
 });

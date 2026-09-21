@@ -66,6 +66,40 @@ export const NEW_SESSION_PROMPT_CARD_CHROME_FIXED_HEIGHT = 105;
 export const NEW_SESSION_PROMPT_CARD_CHROME_TEXT_HEIGHT = 20;
 
 /**
+ * The card rows above the toolbar, which do not change with the system font
+ * scale: the form's `pt-4` (16), the card's `pt-2` (8), and the control row
+ * (44). The toolbar itself is measured on layout — its mode/model pills wrap
+ * onto a second row on narrow viewports, so its height is not a constant —
+ * and `resolveNewSessionPromptCardChromeHeight` stays only as the first-frame
+ * fallback for the measured value.
+ */
+export const NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR = 68;
+
+/**
+ * Card chrome budget from the measured toolbar height. At the unwrapped
+ * toolbar's 57 (`border-t` 1 + `py-3` 24 + pill row 32) this equals the
+ * shipped fontScale-1 budget; a wrapped toolbar measures ~97 and reserves
+ * its second pill row so the keyboard cannot cut it.
+ */
+export function resolveNewSessionPromptCardChromeHeightFromToolbar(toolbarHeight: number): number {
+  return NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR + toolbarHeight;
+}
+
+/**
+ * The new-session card chrome budget: the measured toolbar height once the
+ * toolbar has laid out (its pills wrap on narrow viewports, so it is not a
+ * constant), or the static fontScale budget before that first layout.
+ */
+export function resolveNewSessionPromptCardChrome(options: {
+  fontScale: number;
+  toolbarHeight: number | null;
+}): number {
+  return options.toolbarHeight === null
+    ? resolveNewSessionPromptCardChromeHeight(options.fontScale)
+    : resolveNewSessionPromptCardChromeHeightFromToolbar(options.toolbarHeight);
+}
+
+/**
  * The card chrome budget at a system font scale: only the pill's text line
  * grows with `fontScale`; every other row above is fixed. The budget feeds the
  * input's min-height floor, so multiplying the fixed rows by `fontScale` too

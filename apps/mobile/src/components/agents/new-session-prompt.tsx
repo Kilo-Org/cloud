@@ -34,7 +34,7 @@ import {
   resolveComposerMaxHeight,
   resolveComposerMinHeight,
   resolveComposerMinHeightForViewport,
-  resolveNewSessionPromptCardChromeHeight,
+  resolveNewSessionPromptCardChrome,
   SESSION_HEADER_HEIGHT,
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
@@ -151,6 +151,11 @@ export function NewSessionPrompt({
   const isComposingRef = useRef(false);
   const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
+  // Measured mode/model toolbar height. The pills wrap onto a second row on
+  // narrow viewports, so the chrome the input must not squeeze out is not a
+  // constant; the static budget covers the first frame, before the toolbar
+  // has laid out.
+  const [toolbarHeight, setToolbarHeight] = useState<number | null>(null);
   const promptLineHeight = PROMPT_INPUT_LINE_HEIGHT * fontScale;
   // The input's floor gives up lines on a short viewport (landscape at a high
   // density) so the card's control row and mode/model toolbar stay above the
@@ -160,7 +165,10 @@ export function NewSessionPrompt({
   // is the floor's yardstick once it exists; the window-based floor covers the
   // first frame, before the host has laid out. The max cap below stays
   // deliberately conservative — only the floor hands lines back.
-  const promptCardChromeHeight = resolveNewSessionPromptCardChromeHeight(fontScale);
+  const promptCardChromeHeight = resolveNewSessionPromptCardChrome({
+    fontScale,
+    toolbarHeight,
+  });
   const promptMinHeight =
     promptViewportHeight > 0
       ? resolveComposerMinHeightForViewport({
@@ -329,6 +337,11 @@ export function NewSessionPrompt({
   function handlePromptInputLayout(event: LayoutChangeEvent) {
     const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
     setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
+  }
+
+  function handleToolbarLayout(event: LayoutChangeEvent) {
+    const nextHeight = Math.max(Math.round(event.nativeEvent.layout.height), 0);
+    setToolbarHeight(current => (current === nextHeight ? current : nextHeight));
   }
 
   function handlePromptSelectionChange(event: TextInputSelectionChangeEvent) {
@@ -505,6 +518,8 @@ export function NewSessionPrompt({
           customOptions={customOptions}
           modelLocked={modelLocked}
           modelLockLabel={modelLockLabel}
+          onLayout={handleToolbarLayout}
+          wrap
           className="border-t border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
         />
       )}

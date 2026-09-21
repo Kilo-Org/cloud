@@ -85,7 +85,7 @@ describe('ChatToolbar', () => {
     expect(props.disabled).toBe(false);
   });
 
-  it('keeps mode, model, and paste on one row', () => {
+  it('keeps mode, model, and paste on one row by default', () => {
     const onPaste = vi.fn(() => undefined);
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = ChatToolbar({ ...defaultProps(), onPaste }) as Node;
@@ -101,6 +101,28 @@ describe('ChatToolbar', () => {
 
     const pasteButtonProps = findElementByType(element, 'ComposerPasteButton') ?? {};
     expect(pasteButtonProps.className).toContain('shrink-0');
+  });
+
+  it('wraps the chips only when wrap is set, for the narrow new-session viewport', () => {
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({ ...defaultProps(), wrap: true }) as Node;
+
+    const className =
+      element !== null &&
+      typeof element === 'object' &&
+      typeof element.props?.className === 'string'
+        ? element.props.className
+        : '';
+    expect(className).toContain('flex-row');
+    expect(className).toContain('flex-wrap');
+  });
+
+  it('forwards onLayout to the row', () => {
+    const onLayout = vi.fn(() => undefined);
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({ ...defaultProps(), onLayout }) as Node;
+
+    expect(element).toMatchObject({ props: { onLayout } });
   });
 
   it('locks only the model picker when modelLocked is true', () => {

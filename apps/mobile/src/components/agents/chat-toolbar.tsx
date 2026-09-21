@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { type LayoutChangeEvent, View } from 'react-native';
 
 import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import { type AgentMode, ModeSelector } from '@/components/agents/mode-selector';
@@ -32,6 +32,16 @@ type ChatToolbarProps = {
   /** Agent name shown in the locked model chip's accessibility label. */
   modelLockLabel?: string;
   className?: string;
+  /**
+   * Lets the chips wrap onto a second row when their combined intrinsic width
+   * exceeds the row (narrow viewports), instead of ellipsizing the selected
+   * model name. The host must own the extra height: the new-session form
+   * scrolls and its input floor reserves the measured toolbar height, while
+   * the chat composer keeps the default one-line row (#5983).
+   */
+  wrap?: boolean;
+  /** Forwards the row's layout, e.g. to measure the wrapped height. */
+  onLayout?: (event: LayoutChangeEvent) => void;
 };
 
 export function ChatToolbar({
@@ -50,6 +60,8 @@ export function ChatToolbar({
   modelLocked = false,
   modelLockLabel,
   className,
+  wrap = false,
+  onLayout,
 }: Readonly<ChatToolbarProps>) {
   const modeSelector = (
     <ModeSelector
@@ -73,7 +85,13 @@ export function ChatToolbar({
 
   return (
     <View
-      className={cn('flex-row items-center gap-2 px-3 py-2.5', disabled && 'opacity-50', className)}
+      onLayout={onLayout}
+      className={cn(
+        'flex-row items-center gap-2 px-3 py-2.5',
+        wrap && 'flex-wrap',
+        disabled && 'opacity-50',
+        className
+      )}
     >
       {order === 'model-first' ? modelSelector : modeSelector}
       {order === 'model-first' ? modeSelector : modelSelector}

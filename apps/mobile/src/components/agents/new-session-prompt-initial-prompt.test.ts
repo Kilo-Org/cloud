@@ -116,7 +116,7 @@ vi.mock('@/components/ui/accessible-status', () => ({
 }));
 
 vi.mock('@/components/agents/chat-toolbar', () => ({
-  ChatToolbar: () => null,
+  ChatToolbar: 'ChatToolbar',
 }));
 
 /** Captures the options the prompt hands the height-measuring hook. */
@@ -494,5 +494,20 @@ describe('NewSessionPrompt initialPrompt seed', () => {
 
     expect(textHeightOptions.current).toMatchObject({ minHeight: 160 });
     expect(textHeightOptions.current?.minHeight).not.toBe(64);
+  });
+
+  it('lets the mode/model pills wrap and reports the toolbar height to the floor', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionPrompt(defaultProps()) as Node;
+
+    // The pills wrap onto a second row when the row runs out of width, so the
+    // toolbar is allowed to grow and is measured for the input's floor (the
+    // fallback-or-measured chrome decision itself is pinned in
+    // chat-composer-input-height.test.ts).
+    const toolbarProps = findElementByType(element, 'ChatToolbar');
+    expect(toolbarProps).toMatchObject({ wrap: true });
+    expect(toolbarProps?.onLayout).toEqual(expect.any(Function));
   });
 });

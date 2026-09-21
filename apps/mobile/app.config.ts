@@ -364,6 +364,14 @@ const config: ExpoConfig = {
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
+    // Overrides react-native's Android alert title layout so the title aligns to
+    // the text's start edge instead of the (device-locale) window direction: an
+    // app-language RTL interface otherwise shows a left-aligned title over a
+    // right-aligned body and button row. Android-only by design — the layout is
+    // the one platform gate on the alert path, and it is named in the plugin;
+    // iOS's UIAlertController needs no override, so `Alert.alert` stays one
+    // implementation for both platforms.
+    './plugins/withRtlAlertTitle',
     './plugins/withAndroidExpoModuleRepos',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their

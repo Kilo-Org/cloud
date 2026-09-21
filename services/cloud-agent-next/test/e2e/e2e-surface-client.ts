@@ -125,10 +125,7 @@ export function createHttpSessionSandbox(
       const deadline = Date.now() + input.timeoutMs;
       while (Date.now() < deadline) {
         if (signal?.aborted) return null;
-        const allocation = await fetchAllocation(
-          { ...options, signal },
-          input.cloudAgentSessionId
-        );
+        const allocation = await fetchAllocation({ ...options, signal }, input.cloudAgentSessionId);
         if (allocation.physicalProviderRef !== null) return allocation.physicalProviderRef;
         await abortableDelay(500, signal);
       }

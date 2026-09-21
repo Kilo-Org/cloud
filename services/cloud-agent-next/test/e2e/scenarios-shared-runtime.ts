@@ -576,7 +576,13 @@ export async function startPacedHoldTurn(input: {
       budgetMs,
       `${label} paced progress`
     );
-    await requireRunning(config, cloudAgentSessionId, sent.messageId, deadline, `${label} paced turn`);
+    await requireRunning(
+      config,
+      cloudAgentSessionId,
+      sent.messageId,
+      deadline,
+      `${label} paced turn`
+    );
     return { messageId: sent.messageId, stream };
   } catch (error) {
     // Only close a stream this call opened; a caller-supplied stream is the
@@ -588,7 +594,7 @@ export async function startPacedHoldTurn(input: {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
-}/**
+} /**
  * Wait until the paced turn is underway: the paced turn's own stream shows a
  * message-correlated part (liveness; transient and empty initialization parts
  * permitted), **and** the fake's aggregate `chatCompletions` counter has

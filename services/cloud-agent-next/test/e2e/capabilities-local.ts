@@ -90,10 +90,7 @@ export function createLocalCallbacks(): CallbackObservation {
  */
 function createLocalSandboxFaults(): SandboxFaultObservation {
   /** Frozen wrapper handles keyed by cloudAgentSessionId, for exact `CONT`. */
-  const frozenHandles = new Map<
-    string,
-    Awaited<ReturnType<typeof captureControlWrapperProcess>>
-  >();
+  const frozenHandles = new Map<string, Awaited<ReturnType<typeof captureControlWrapperProcess>>>();
 
   const requireOwnedContainer = async (
     target: SandboxFaultAllocation
@@ -103,10 +100,7 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
         `sandboxFaults: refusing to act without an observed allocation reference for ${target.cloudAgentSessionId}`
       );
     }
-    const container = await currentOwnedSandbox(
-      target.cloudAgentSessionId,
-      target.kiloSessionId
-    );
+    const container = await currentOwnedSandbox(target.cloudAgentSessionId, target.kiloSessionId);
     if (!container) {
       throw new Error(
         `sandboxFaults: no exclusively owned container for ${target.cloudAgentSessionId}`
@@ -256,8 +250,7 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
         const records = await readWorkerLogSnapshot({
           fromByte: input.fromByte,
           match: record =>
-            (record.sandboxId === input.sandboxId &&
-              evidenceEvents.has(record.diagnosticEvent)) ||
+            (record.sandboxId === input.sandboxId && evidenceEvents.has(record.diagnosticEvent)) ||
             (input.messageId !== undefined &&
               record.diagnosticEvent === 'accepted_reconciliation' &&
               record.messageId === input.messageId),

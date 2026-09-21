@@ -91,7 +91,12 @@ describe('requireScenarioApi (matrix fail-fast contract)', () => {
 
 describe('worktree enrollment derivation', () => {
   it('enrolls scenarios that declare requiresWorktreeCreation', () => {
-    for (const name of ['worktree-chat', 'worktree-multi-chat', 'long-conversation', 'leave-and-return']) {
+    for (const name of [
+      'worktree-chat',
+      'worktree-multi-chat',
+      'long-conversation',
+      'leave-and-return',
+    ]) {
       expect(WORKTREE_ENROLLMENT_SCENARIOS.has(name)).toBe(true);
     }
   });

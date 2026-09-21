@@ -219,12 +219,12 @@ describe('runSharedScenario gate', () => {
 
 describe('resolveScenarioApi', () => {
   it('pins a definition that declares an API, with or without a matching request', () => {
-    expect(resolveScenarioApi({ name: 'callback-completion', defaultApi: 'legacy' }, undefined)).toEqual(
-      { ok: true, api: 'legacy' }
-    );
-    expect(resolveScenarioApi({ name: 'callback-completion', defaultApi: 'legacy' }, 'legacy')).toEqual(
-      { ok: true, api: 'legacy' }
-    );
+    expect(
+      resolveScenarioApi({ name: 'callback-completion', defaultApi: 'legacy' }, undefined)
+    ).toEqual({ ok: true, api: 'legacy' });
+    expect(
+      resolveScenarioApi({ name: 'callback-completion', defaultApi: 'legacy' }, 'legacy')
+    ).toEqual({ ok: true, api: 'legacy' });
   });
 
   it('rejects a request that conflicts with the pin instead of switching transport', () => {
@@ -324,7 +324,11 @@ describe('isScenarioSupported', () => {
     expect(
       isScenarioSupported(
         { requires: ['gates', 'sandboxFaults'] },
-        { ...localEnv(), gates: { parkedStreamsSupported: true }, sandboxFaults: sandboxFaultsStub() }
+        {
+          ...localEnv(),
+          gates: { parkedStreamsSupported: true },
+          sandboxFaults: sandboxFaultsStub(),
+        }
       )
     ).toBe(true);
   });
@@ -337,10 +341,7 @@ describe('isScenarioSupported', () => {
 
   it('is false for a local profile that lacks the mandatory sandbox capability', () => {
     expect(
-      isScenarioSupported(
-        { requires: [] },
-        { profile: 'local', requireControlPlaneSession: false }
-      )
+      isScenarioSupported({ requires: [] }, { profile: 'local', requireControlPlaneSession: false })
     ).toBe(false);
   });
 

@@ -138,11 +138,9 @@ async function startPacedHold(
       // A close failure must not replace the helper's error.
     }
     if (sessionId) {
-      await interruptSession(
-        config,
-        sessionId,
-        AbortSignal.timeout(CLEANUP_TIMEOUT_MS)
-      ).catch(() => {});
+      await interruptSession(config, sessionId, AbortSignal.timeout(CLEANUP_TIMEOUT_MS)).catch(
+        () => {}
+      );
     }
     throw error;
   }
@@ -648,8 +646,12 @@ async function interruptMidStreamBody(
   env: ScenarioEnvironment
 ): Promise<LifecycleResult> {
   const startedAt = Date.now();
-  const { config, conversation, timeoutMs = INTERRUPT_MID_STREAM_TIMEOUT_MS, api = 'unified' } =
-    args;
+  const {
+    config,
+    conversation,
+    timeoutMs = INTERRUPT_MID_STREAM_TIMEOUT_MS,
+    api = 'unified',
+  } = args;
   const scenarioName = 'interrupt-mid-stream';
   const sandbox = sessionSandboxObservation(env);
   const deadline = createScenarioDeadline(startedAt, timeoutMs);

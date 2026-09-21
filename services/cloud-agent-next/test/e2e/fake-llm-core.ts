@@ -371,9 +371,7 @@ export function parseFileDirective(raw: string): FileDirectiveParse {
   }
 
   const header = firstDirectiveLine(input);
-  const seed = header.match(
-    new RegExp(`^seed:(${FILE_TAG}):([^:]+):(\\d+):([A-Za-z0-9_-]+)$`)
-  );
+  const seed = header.match(new RegExp(`^seed:(${FILE_TAG}):([^:]+):(\\d+):([A-Za-z0-9_-]+)$`));
   if (seed) {
     const nonce = seed[4];
     if (nonce.length > MAX_FILE_SEED_NONCE_LENGTH) {
@@ -444,7 +442,9 @@ export type ToolResultNormalization =
   | { ok: true; result: NormalizedToolResult }
   | { ok: false; message: string };
 
-function isToolResultEnvelope(value: unknown): value is Record<string, unknown> & { output: string } {
+function isToolResultEnvelope(
+  value: unknown
+): value is Record<string, unknown> & { output: string } {
   return isRecord(value) && typeof value.output === 'string';
 }
 
@@ -488,9 +488,7 @@ export function normalizeToolResult(raw: string): ToolResultNormalization {
   return { ok: true, result: { output, envelopePath, error } };
 }
 
-export type ReadResultPath =
-  | { ok: true; path: string | null }
-  | { ok: false; message: string };
+export type ReadResultPath = { ok: true; path: string | null } | { ok: false; message: string };
 
 /**
  * The read tool's reported path: an envelope field or a `<path>` element in the
@@ -554,7 +552,6 @@ export function buildSeedFixture(bytes: number, nonce: string): string {
   const remainder = remaining - fullLines * (lineWidth + 1);
   return `${prefix}${line.repeat(fullLines)}${'x'.repeat(remainder)}`;
 }
-
 
 type MessagePart = { type?: string; text?: string };
 type Message = {
@@ -1512,7 +1509,12 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     }
     const body = stripPromptContext(readFileContents(normalized.output));
     if (body === '') {
-      writeJsonError(ctx.emit, 422, 'read tool did not return file contents', 'invalid_tool_result');
+      writeJsonError(
+        ctx.emit,
+        422,
+        'read tool did not return file contents',
+        'invalid_tool_result'
+      );
       return;
     }
     status.fileCompleted = true;

@@ -25,7 +25,13 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ensureTestUser, loadDevVars, loadExistingUserByEmail, loadRepoEnvFiles, DRIVER_USER_EMAIL_SUFFIX } from './auth.js';
+import {
+  ensureTestUser,
+  loadDevVars,
+  loadExistingUserByEmail,
+  loadRepoEnvFiles,
+  DRIVER_USER_EMAIL_SUFFIX,
+} from './auth.js';
 import { DEFAULT_CONFIG, interruptSession, type ApiVersion, type DriverConfig } from './client.js';
 import { stopOwnedSessionSandboxes, type LifecycleResult } from './lifecycle.js';
 import { cleanupOwnedSessions } from './smoke-cleanup.js';
@@ -196,7 +202,9 @@ async function mainLocalHttp(): Promise<void> {
   for (const result of results) counts[resultOutcome(result)] += 1;
   const unsupportedSuffix = counts.unsupported > 0 ? `, ${counts.unsupported} unsupported` : '';
   console.log(`\nSummary: ${counts.pass} passed, ${counts.failure} failed${unsupportedSuffix}`);
-  process.exit(exitCodeForResults(results, { expectedUnsupported: expectedUnsupportedFor(env, executed) }));
+  process.exit(
+    exitCodeForResults(results, { expectedUnsupported: expectedUnsupportedFor(env, executed) })
+  );
 }
 
 async function main(): Promise<void> {
@@ -213,9 +221,7 @@ async function main(): Promise<void> {
     ? await loadExistingUserByEmail(process.env.DATABASE_URL, seededEmail)
     : await ensureTestUser(process.env.DATABASE_URL, email);
   const expectControlPlane = Boolean(devVars.CONTROL_PLANE_IDS?.trim());
-  console.log(
-    `driver user: ${user.id} (${user.email}); controlPlane=${expectControlPlane}`
-  );
+  console.log(`driver user: ${user.id} (${user.email}); controlPlane=${expectControlPlane}`);
 
   const ownedSessionIds = new Set<string>();
   const config: DriverConfig = {
@@ -253,7 +259,14 @@ async function main(): Promise<void> {
         `${lifecycle} requires the driver user to be enrolled in CONTROL_PLANE_IDS and ` +
         'WORKTREE_CREATION_ENABLED_IDS in the Worker .dev.vars; no session was started';
       console.error(`smoke: ${message}`);
-      results.push({ name: lifecycle, conversation, ok: false, message, events: [], durationMs: 0 });
+      results.push({
+        name: lifecycle,
+        conversation,
+        ok: false,
+        message,
+        events: [],
+        durationMs: 0,
+      });
       continue;
     }
     console.log(`\n=== ${lifecycle}/${conversation} [api=${api}] ===`);
@@ -282,10 +295,10 @@ async function main(): Promise<void> {
   const counts = { pass: 0, failure: 0, unsupported: 0 };
   for (const result of results) counts[resultOutcome(result)] += 1;
   const unsupportedSuffix = counts.unsupported > 0 ? `, ${counts.unsupported} unsupported` : '';
-  console.log(
-    `\nSummary: ${counts.pass} passed, ${counts.failure} failed${unsupportedSuffix}`
+  console.log(`\nSummary: ${counts.pass} passed, ${counts.failure} failed${unsupportedSuffix}`);
+  process.exit(
+    exitCodeForResults(results, { expectedUnsupported: expectedUnsupportedFor(env, executed) })
   );
-  process.exit(exitCodeForResults(results, { expectedUnsupported: expectedUnsupportedFor(env, executed) }));
 }
 
 main().catch(err => {

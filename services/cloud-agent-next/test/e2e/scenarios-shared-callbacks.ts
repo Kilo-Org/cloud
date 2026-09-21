@@ -98,7 +98,10 @@ function callbackObservation(
   return env.callbacks;
 }
 
-function payloadsForSession(records: CallbackPayload[], cloudAgentSessionId: string): CallbackPayload[] {
+function payloadsForSession(
+  records: CallbackPayload[],
+  cloudAgentSessionId: string
+): CallbackPayload[] {
   return records.filter(payload => payload.cloudAgentSessionId === cloudAgentSessionId);
 }
 
@@ -201,11 +204,9 @@ async function startCallbackPacedHold(
       // A close failure must not replace the helper's error.
     }
     if (sessionId) {
-      await interruptSession(
-        config,
-        sessionId,
-        AbortSignal.timeout(CLEANUP_TIMEOUT_MS)
-      ).catch(() => {});
+      await interruptSession(config, sessionId, AbortSignal.timeout(CLEANUP_TIMEOUT_MS)).catch(
+        () => {}
+      );
     }
     throw error;
   }
@@ -663,11 +664,9 @@ async function runCallbackInterrupt(
     };
   } finally {
     if (!completed && sessionId) {
-      await interruptSession(
-        config,
-        sessionId,
-        AbortSignal.timeout(CLEANUP_TIMEOUT_MS)
-      ).catch(() => {});
+      await interruptSession(config, sessionId, AbortSignal.timeout(CLEANUP_TIMEOUT_MS)).catch(
+        () => {}
+      );
     }
     try {
       stream?.close();

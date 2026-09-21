@@ -1684,7 +1684,11 @@ describe('callback scenario behaviour under both profiles', () => {
 
     expect(result.ok).toBe(true);
     expect(result.message).toContain('status=interrupted');
-    expect(mocks.interruptSession).toHaveBeenCalledWith(config, SESSION_ID, expect.any(AbortSignal));
+    expect(mocks.interruptSession).toHaveBeenCalledWith(
+      config,
+      SESSION_ID,
+      expect.any(AbortSignal)
+    );
     expect(mocks.releaseGate).not.toHaveBeenCalled();
   });
 
@@ -1706,7 +1710,11 @@ describe('callback scenario behaviour under both profiles', () => {
 
     expect(result.ok).toBe(false);
     expect(result.message).toContain('paced progress');
-    expect(mocks.interruptSession).toHaveBeenCalledWith(config, SESSION_ID, expect.any(AbortSignal));
+    expect(mocks.interruptSession).toHaveBeenCalledWith(
+      config,
+      SESSION_ID,
+      expect.any(AbortSignal)
+    );
     expect(mocks.releaseGate).not.toHaveBeenCalled();
   }, 15_000);
 
@@ -2210,7 +2218,9 @@ describe('moved continuity scenario run isolation', () => {
   it('fails when paced readiness never holds and still interrupts the created session', async () => {
     installContinuityBoot();
     mocks.fetchFakeRequests.mockResolvedValue({ chatCompletions: 3 });
-    mocks.openConnectedStream.mockResolvedValueOnce(fakeStream([], completedEvent('message_paced')));
+    mocks.openConnectedStream.mockResolvedValueOnce(
+      fakeStream([], completedEvent('message_paced'))
+    );
     mocks.sendMessage.mockResolvedValue({ messageId: 'message_paced', delivery: 'sent' });
 
     const result = await runSharedScenario(SHARED_SCENARIOS['interrupt-then-continue'], {

@@ -378,9 +378,8 @@ describe('trackStartedSession', () => {
   it('binds the reported id before the start returns and keeps the prior hook', () => {
     const prior: string[] = [];
     const tracked: string[] = [];
-    const wrapped = trackStartedSession(
-      { ...CONFIG, onSessionCreated: id => prior.push(id) },
-      id => tracked.push(id)
+    const wrapped = trackStartedSession({ ...CONFIG, onSessionCreated: id => prior.push(id) }, id =>
+      tracked.push(id)
     );
 
     // The legacy prepare path reports the id before initiation; a later failure

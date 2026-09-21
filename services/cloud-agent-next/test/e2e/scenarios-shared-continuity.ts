@@ -493,7 +493,8 @@ async function runQuestionIdleResume(
     }
 
     // The unattended interval: the allocation must disappear inside the window.
-    const idleEnd = Date.now() + Math.min(QUESTION_IDLE_WINDOW_MS, deadline.remaining('idle window'));
+    const idleEnd =
+      Date.now() + Math.min(QUESTION_IDLE_WINDOW_MS, deadline.remaining('idle window'));
     let consecutiveAbsent = 0;
     let absent = false;
     while (Date.now() < idleEnd) {

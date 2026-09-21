@@ -1345,9 +1345,7 @@ describe('fake-llm-server HTTP', () => {
       },
     ]);
     expect(response.status).toBe(200);
-    expect(assistantContent(await parseSse(response))).toBe(
-      'file-read:requested.txt\nother-value'
-    );
+    expect(assistantContent(await parseSse(response))).toBe('file-read:requested.txt\nother-value');
   });
 
   it('rejects a same-basename result for an absolute request', async () => {

@@ -26,10 +26,7 @@ import {
   echoPayloadMatches,
   type SharedScenario,
 } from './scenarios-shared.js';
-import {
-  assertReaderCannotDeriveNonce,
-  parseFileReadEcho,
-} from './scenario-assertions.js';
+import { assertReaderCannotDeriveNonce, parseFileReadEcho } from './scenario-assertions.js';
 import {
   awaitDurableTerminal,
   createOwnedSessionRegistry,

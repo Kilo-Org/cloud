@@ -535,15 +535,10 @@ async function runWrapperFreezeSettledReap(
     const evidenceCursor = await faults.captureEvidenceCursor();
     const frozen = await faults.freezeWrapperProcess(target);
     frozenTarget = target;
-    if (!frozen.frozen) throw new Error(`freezeWrapperProcess reported no freeze: ${frozen.detail}`);
+    if (!frozen.frozen)
+      throw new Error(`freezeWrapperProcess reported no freeze: ${frozen.detail}`);
 
-    await waitForAllocationAbsent(
-      deadline,
-      sandbox,
-      session,
-      'settled reap',
-      RECOVERY_BUDGET_MS
-    );
+    await waitForAllocationAbsent(deadline, sandbox, session, 'settled reap', RECOVERY_BUDGET_MS);
 
     const recovery = await sendTurn(
       deadline,
@@ -705,7 +700,8 @@ async function runWrapperFreezeInflightReap(
 
     const frozen = await faults.freezeWrapperProcess(target);
     frozenTarget = target;
-    if (!frozen.frozen) throw new Error(`freezeWrapperProcess reported no freeze: ${frozen.detail}`);
+    if (!frozen.frozen)
+      throw new Error(`freezeWrapperProcess reported no freeze: ${frozen.detail}`);
 
     const failedEvent = await holdStream.waitFor(
       event =>
@@ -722,9 +718,7 @@ async function runWrapperFreezeInflightReap(
         `held message ${held.messageId} did not terminalise after the freeze (durable=${durable.status})`
       );
     }
-    const data = failedEvent.data as
-      | { reason?: string; payload?: { reason?: string } }
-      | undefined;
+    const data = failedEvent.data as { reason?: string; payload?: { reason?: string } } | undefined;
     const reason = data?.reason ?? data?.payload?.reason;
     if (reason !== 'runtime_unhealthy') {
       throw new Error(
@@ -732,13 +726,7 @@ async function runWrapperFreezeInflightReap(
       );
     }
 
-    await waitForAllocationAbsent(
-      deadline,
-      sandbox,
-      session,
-      'inflight reap',
-      RECOVERY_BUDGET_MS
-    );
+    await waitForAllocationAbsent(deadline, sandbox, session, 'inflight reap', RECOVERY_BUDGET_MS);
 
     const recovery = await sendTurn(
       deadline,

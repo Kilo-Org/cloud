@@ -146,7 +146,9 @@ describe('collectReapEvidence', () => {
   });
 
   it('tracks the latest heartbeat state, not an accumulated active flag', () => {
-    expect(collect([...settledRecords(true), heartbeat('idle')], true).routeStaleActive).toBe(false);
+    expect(collect([...settledRecords(true), heartbeat('idle')], true).routeStaleActive).toBe(
+      false
+    );
     const idleThenActive = collect(
       [
         ...settledRecords(true).filter(record => record.diagnosticEvent !== 'heartbeat'),

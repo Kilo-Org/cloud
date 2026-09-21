@@ -509,4 +509,3 @@ export async function readWorkerLogSnapshot(input: {
   }
   return matches;
 }
-

@@ -115,9 +115,7 @@ export function exitCodeForResults(
   if (results.some(result => resultOutcome(result) === 'failure')) return 1;
   const expected = opts.expectedUnsupported ?? new Set<string>();
   if (
-    results.some(
-      result => resultOutcome(result) === 'unsupported' && !expected.has(result.name)
-    )
+    results.some(result => resultOutcome(result) === 'unsupported' && !expected.has(result.name))
   ) {
     return 2;
   }

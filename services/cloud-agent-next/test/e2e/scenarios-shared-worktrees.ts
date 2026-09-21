@@ -1045,7 +1045,8 @@ async function runWorktreeMultiChat(
     } catch {
       wrongSiblingRejected = true;
     }
-    if (!wrongSiblingRejected) throw new Error('the sibling was allowed to answer the root question');
+    if (!wrongSiblingRejected)
+      throw new Error('the sibling was allowed to answer the root question');
 
     const questionRequestsBefore = await deadline.within('question replay baseline', signal =>
       fetchFakeScenarioStatus(scenarioConfig.fakeLlmUrl, questionTag, signal)
@@ -1257,7 +1258,9 @@ async function runWorktreeMultiChat(
       deleteHold.messageId
     );
     if (!isMessageCompleted(deleteHoldTerminal, deleteHold.messageId)) {
-      throw new Error(`root turn ${deleteHold.messageId} did not complete after the sibling delete`);
+      throw new Error(
+        `root turn ${deleteHold.messageId} did not complete after the sibling delete`
+      );
     }
     rootEvents.push(...aHoldStream.events);
     const afterDelete = await sendTurn(
@@ -1274,7 +1277,9 @@ async function runWorktreeMultiChat(
         afterDelete.messageId
       );
       if (!echoPayloadMatches(afterDeleteText, `survived-${runId}`)) {
-        throw new Error('the surviving root did not complete another turn after the sibling delete');
+        throw new Error(
+          'the surviving root did not complete another turn after the sibling delete'
+        );
       }
       rootEvents.push(...afterDelete.stream.events);
     } finally {

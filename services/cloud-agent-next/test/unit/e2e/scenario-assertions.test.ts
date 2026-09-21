@@ -94,7 +94,9 @@ describe('assertMessageLifecycle', () => {
 
 describe('parseFileReadEcho', () => {
   it('returns the body after the exact header line', () => {
-    expect(parseFileReadEcho('file-read:shared.txt\nnonce-value', 'shared.txt')).toBe('nonce-value');
+    expect(parseFileReadEcho('file-read:shared.txt\nnonce-value', 'shared.txt')).toBe(
+      'nonce-value'
+    );
   });
 
   it('returns a multi-line body intact', () => {

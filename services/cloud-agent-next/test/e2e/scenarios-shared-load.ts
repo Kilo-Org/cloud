@@ -44,10 +44,7 @@ import {
   waitForPresentAllocation,
   type InFlightCreations,
 } from './scenarios-shared-runtime.js';
-import {
-  assertReaderCannotDeriveNonce,
-  parseFileReadEcho,
-} from './scenario-assertions.js';
+import { assertReaderCannotDeriveNonce, parseFileReadEcho } from './scenario-assertions.js';
 import { assertScenarioPreconditions } from './public-surface-support.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type { ScenarioEnvironment } from './scenario-capabilities.js';
@@ -178,9 +175,7 @@ async function runLargeStream(
     streams.push(boot.stream);
     events.push(...boot.stream.events);
     if (!boot.text.includes(`file-write:${seedPath}`)) {
-      return fail(
-        `coverage=blocked; reason=seed write not staged: ${JSON.stringify(boot.text)}`
-      );
+      return fail(`coverage=blocked; reason=seed write not staged: ${JSON.stringify(boot.text)}`);
     }
     const allocation = await waitForPresentAllocation(
       deadline,

@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} sadar",
       "linesBadge_other": "{{displayCount}} sadar",
       "matchesBadge_one": "{{displayCount}} natiijo",
-      "matchesBadge_other": "{{displayCount}} natiijo"
+      "matchesBadge_other": "{{displayCount}} natiijo",
+      "noOutput": "Wax soo saar ma jiro."
     },
     "readToolMarkdown": {
       "linesTruncated": "sadarrada {{start}}–{{end}} (la soo gaabiyay)",
@@ -3180,15 +3181,7 @@
     "remoteOptionTitle": "Kombiyuutarkaaga",
     "remoteOptionBody": "Ku socodsii Kilo kombiyuutarkaaga adigoo isticmaalaya CLI-da `kilo remote`.",
     "skip": "Ka bood safarka",
-    "tutorialLabel": "Barasho",
-    "remoteTitle": "Bilow kalfadhigaaga koowaad ee fog",
-    "remoteBody": "Xirir kombiyuutarkaaga, kadibna kalfadhiga ka bilow halkan.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Wali kombiyuutar aan la xidhirin ma jiro",
-    "remoteEmptyBody": "Si aad u xirirto, ku socodsii `kilo remote` kombiyuutarkaaga.",
-    "remoteFound": "Kombiyuutarka la xidhay",
-    "checkAgain": "Mar kale hubi",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Barasho"
   },
   "appActions": {
     "start": {

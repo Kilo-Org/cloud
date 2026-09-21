@@ -462,9 +462,13 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(nodes('CenteredState')).toHaveLength(test.empty || (test.error && !test.rows) ? 1 : 0);
-    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(
-      state.tabBarHeight + (test.empty ? 0 : 64)
-    );
+    // The band a centered body lays out in ends at the tab bar, on every body.
+    // The FAB is a corner control: its band rides the rows list's own frame
+    // inset (`marginBottom`, asserted below) so no row sits under the button,
+    // and reserving it here as well shrank the band below the tab bar's top
+    // edge in a short landscape window, parking the no-match state's second
+    // line and action behind the bar (landscape spot defect e8).
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');

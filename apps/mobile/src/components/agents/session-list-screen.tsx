@@ -300,7 +300,13 @@ export function AgentSessionListScreen() {
   }
 
   return (
-    <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
+    // The band the centered bodies are laid out in ends at the tab bar. The
+    // FAB is a corner control with its own frame inset on the rows list, and
+    // reserving its band here as well shrank the band to the FAB's top: in a
+    // short landscape window that is below the empty state's height, so the
+    // state fell to the scroll anchor and its second line and action were
+    // parked behind the tab bar (landscape spot defect e8).
+    <StateSurfaceInsets bottomInset={tabBarHeight}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}

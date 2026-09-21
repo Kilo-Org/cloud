@@ -143,13 +143,13 @@ type I = ReactTestInstance;
 
 function fullCapabilities(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    chatMessages: { available: true, unavailableReason: null },
-    agentAttention: { available: true, unavailableReason: null },
-    agentUpdates: { available: true, unavailableReason: null },
-    sessionStatus: { available: true, unavailableReason: null },
-    kiloclawActivity: { available: true, unavailableReason: null },
-    balanceAlerts: { available: true, unavailableReason: null },
-    securityFindings: { available: true, unavailableReason: null },
+    chatMessages: { available: true, unavailableReasonCode: null },
+    agentAttention: { available: true, unavailableReasonCode: null },
+    agentUpdates: { available: true, unavailableReasonCode: null },
+    sessionStatus: { available: true, unavailableReasonCode: null },
+    kiloclawActivity: { available: true, unavailableReasonCode: null },
+    balanceAlerts: { available: true, unavailableReasonCode: null },
+    securityFindings: { available: true, unavailableReasonCode: null },
     ...overrides,
   };
 }
@@ -459,13 +459,13 @@ describe('NotificationsScreen category availability', () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 
-  it('non-retryable unhappy: an unavailable category disables the switch and shows the server reason', async () => {
+  it('non-retryable unhappy: an unavailable category disables the switch and shows the catalog reason', async () => {
     prefsQueryFn.mockResolvedValue(
       fullPrefs({
         capabilities: fullCapabilities({
           balanceAlerts: {
             available: false,
-            unavailableReason: 'Join an organization to get balance alerts.',
+            unavailableReasonCode: 'organizationRequired',
           },
         }),
       })
@@ -484,6 +484,44 @@ describe('NotificationsScreen category availability', () => {
       textWithChildren(renderer.root, 'Join an organization to get balance alerts.').length
     ).toBe(1);
   });
+
+  it('non-retryable unhappy: an unknown reason code falls back to the category subtitle', async () => {
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          securityFindings: { available: false, unavailableReasonCode: 'madeUpCode' },
+        }),
+      })
+    );
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
+    expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
+    expect(textWithChildren(renderer.root, 'madeUpCode').length).toBe(0);
+  });
+
+  // A code naming an inherited Object.prototype member is still a code the
+  // catalog does not know: it must fall back to the subtitle, not render the
+  // prototype member. `in` matched these; an own-property guard must not.
+  it.each(['constructor', 'toString', 'hasOwnProperty', 'valueOf', '__proto__'])(
+    'non-retryable unhappy: the inherited prototype name %s falls back to the category subtitle',
+    async code => {
+      prefsQueryFn.mockResolvedValue(
+        fullPrefs({
+          capabilities: fullCapabilities({
+            securityFindings: { available: false, unavailableReasonCode: code },
+          }),
+        })
+      );
+      const { renderer } = await renderScreen();
+      await waitForEnabledSwitch(renderer, 'Chat messages');
+
+      expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
+      expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
+      expect(textWithChildren(renderer.root, code).length).toBe(0);
+    }
+  );
 
   it('retryable unhappy: a category save failure rolls back the optimistic flip', async () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());

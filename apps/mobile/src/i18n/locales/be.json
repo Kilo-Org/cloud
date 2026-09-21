@@ -870,8 +870,11 @@
       "sessionStatusTitle": "Статус сеанса",
       "sessionStatusSubtitle": "завершаны / памылка / гатовы да кіравання",
       "kiloclawActivitySubtitle": "экзэмпляр гатовы або завяршыўся з памылкай, запланаваныя дзеянні",
+      "kiloclawActivityUnavailable": "Запусціце экзэмпляр KiloClaw, каб атрымліваць актыўнасць KiloClaw.",
       "balanceAlertsSubtitle": "папярэджанні аб нізкім балансе арганізацыі",
-      "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA"
+      "balanceAlertsUnavailable": "Далучыцеся да арганізацыі, каб атрымліваць папярэджанні аб балансе.",
+      "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA",
+      "securityFindingsUnavailable": "Уключыце Агента бяспекі Kilo у пэўным абсягу, каб атрымліваць праблемы бяспекі."
     },
     "action": {
       "openSession": "Адкрыць сеанс"

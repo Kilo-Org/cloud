@@ -334,8 +334,11 @@
       "sessionStatusTitle": "Status sesji",
       "sessionStatusSubtitle": "zakończona / nieudana / gotowa do sterowania",
       "kiloclawActivitySubtitle": "gotowość lub błąd instancji, zaplanowane działania",
+      "kiloclawActivityUnavailable": "Uruchom instancję KiloClaw, aby otrzymywać aktywność KiloClaw.",
       "balanceAlertsSubtitle": "ostrzeżenia o niskim saldzie organizacji",
-      "securityFindingsSubtitle": "nowe wykryte problemy i przypomnienia o terminach SLA"
+      "balanceAlertsUnavailable": "Dołącz do organizacji, aby otrzymywać ostrzeżenia o saldzie.",
+      "securityFindingsSubtitle": "nowe wykryte problemy i przypomnienia o terminach SLA",
+      "securityFindingsUnavailable": "Włącz Agenta bezpieczeństwa Kilo w zakresie, aby otrzymywać problemy z bezpieczeństwem."
     },
     "action": {
       "openSession": "Otwórz sesję"

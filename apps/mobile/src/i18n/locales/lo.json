@@ -838,8 +838,11 @@
       "sessionStatusTitle": "ສະຖານະເຊສຊັນ",
       "sessionStatusSubtitle": "ສຳເລັດ / ບໍ່ສຳເລັດ / ພ້ອມໃຫ້ຄວບຄຸມ",
       "kiloclawActivitySubtitle": "ອິນສະແຕນພ້ອມໃຊ້ງານ/ຂັດຂ້ອງ, ວຽກທີ່ຕັ້ງເວລາໄວ້",
+      "kiloclawActivityUnavailable": "ເລີ່ມອິນສະແຕນ KiloClaw ເພື່ອຮັບກິດຈະກຳ KiloClaw.",
       "balanceAlertsSubtitle": "ຄຳເຕືອນເມື່ອຍອດເງິນຂອງອົງກອນຕໍ່າ",
-      "securityFindingsSubtitle": "ບັນຫາທີ່ພົບໃໝ່ ແລະ ການແຈ້ງເຕືອນກ່ຽວກັບ SLA"
+      "balanceAlertsUnavailable": "ເຂົ້າຮ່ວມອົງກອນ ເພື່ອຮັບການແຈ້ງເຕືອນຍອດເງິນ.",
+      "securityFindingsSubtitle": "ບັນຫາທີ່ພົບໃໝ່ ແລະ ການແຈ້ງເຕືອນກ່ຽວກັບ SLA",
+      "securityFindingsUnavailable": "ເປີດເອເຈນດ້ານຄວາມປອດໄພ Kilo ໃນຂອບເຂດ ເພື່ອຮັບບັນຫາຄວາມປອດໄພ."
     },
     "action": {
       "openSession": "ເປີດເຊສຊັນ"

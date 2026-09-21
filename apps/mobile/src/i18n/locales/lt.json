@@ -870,8 +870,11 @@
       "sessionStatusTitle": "Sesijos būsena",
       "sessionStatusSubtitle": "baigta / nepavyko / paruošta valdyti",
       "kiloclawActivitySubtitle": "egzemplioriaus parengtis ar klaida, suplanuoti veiksmai",
+      "kiloclawActivityUnavailable": "Paleiskite KiloClaw egzempliorių, kad gautumėte KiloClaw veiklą.",
       "balanceAlertsSubtitle": "įspėjimai apie mažą organizacijos likutį",
-      "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai"
+      "balanceAlertsUnavailable": "Prisijunkite prie organizacijos, kad gautumėte balanso įspėjimus.",
+      "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai",
+      "securityFindingsUnavailable": "Įjunkite Kilo saugos agentą apimtyje, kad gautumėte saugos radinius."
     },
     "action": {
       "openSession": "Atidaryti sesiją"

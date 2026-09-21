@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Status ng sesyon",
       "sessionStatusSubtitle": "tapos / nabigo / handa nang kontrolin",
       "kiloclawActivitySubtitle": "handa o nabigo ang instance, mga nakaiskedyul na aksyon",
+      "kiloclawActivityUnavailable": "Magsimula ng instance ng KiloClaw para makakuha ng aktibidad ng KiloClaw.",
       "balanceAlertsSubtitle": "mga babala sa mababang balanse ng organisasyon",
-      "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA"
+      "balanceAlertsUnavailable": "Sumali sa isang organisasyon para makakuha ng mga babala sa balanse.",
+      "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA",
+      "securityFindingsUnavailable": "I-enable ang Ahente sa seguridad ng Kilo sa isang saklaw para makakuha ng mga natuklasan sa seguridad."
     },
     "action": {
       "openSession": "Buksan ang sesyon"

@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Ipò ìgbà iṣẹ́",
       "sessionStatusSubtitle": "ó parí / ó kùnà / ó ti ṣe tán fún ìṣàkóso",
       "kiloclawActivitySubtitle": "ẹ̀rọ iṣẹ́ ti ṣe tán/ó kùnà, àwọn ìṣe tí a ṣètò àkókò wọn",
+      "kiloclawActivityUnavailable": "Bẹ̀rẹ̀ ẹ̀rọ iṣẹ́ KiloClaw kan láti gba ìṣe KiloClaw.",
       "balanceAlertsSubtitle": "àwọn ìkìlọ̀ pé owó àjọ tó kù ti dín kù",
-      "securityFindingsSubtitle": "àwọn àwárí tuntun àti ìránnilétí SLA"
+      "balanceAlertsUnavailable": "Darapọ̀ mọ́ àjọ kan láti gba àwọn ìkìlọ̀ owó tó kù.",
+      "securityFindingsSubtitle": "àwọn àwárí tuntun àti ìránnilétí SLA",
+      "securityFindingsUnavailable": "Mu Aṣojú ààbò Kilo ṣiṣẹ́ ní ààyè kan láti gba àwọn àwárí ààbò."
     },
     "action": {
       "openSession": "Ṣí ìgbà iṣẹ́"

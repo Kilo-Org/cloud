@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Sessiya statusu",
       "sessionStatusSubtitle": "tamamlanıb / uğursuz olub / idarəetməyə hazırdır",
       "kiloclawActivitySubtitle": "nüsxə hazırdır/uğursuz olub, planlaşdırılmış əməliyyatlar",
+      "kiloclawActivityUnavailable": "KiloClaw fəaliyyəti üçün KiloClaw nüsxəsini işə salın.",
       "balanceAlertsSubtitle": "təşkilatın balansının azalması barədə xəbərdarlıqlar",
-      "securityFindingsSubtitle": "yeni aşkarlamalar və SLA xatırlatmaları"
+      "balanceAlertsUnavailable": "Balans xəbərdarlıqları üçün təşkilata qoşulun.",
+      "securityFindingsSubtitle": "yeni aşkarlamalar və SLA xatırlatmaları",
+      "securityFindingsUnavailable": "Təhlükəsizlik aşkarlamaları üçün Kilo Təhlükəsizlik agentini bir əhatə dairəsində aktivləşdirin."
     },
     "action": {
       "openSession": "Sessiyanı aç"

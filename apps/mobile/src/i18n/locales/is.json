@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Staða lotu",
       "sessionStatusSubtitle": "lokið / mistókst / tilbúin til stýringar",
       "kiloclawActivitySubtitle": "tilvik tilbúið eða bilað, tímasettar aðgerðir",
+      "kiloclawActivityUnavailable": "Ræstu KiloClaw-tilvik til að fá KiloClaw-virkni.",
       "balanceAlertsSubtitle": "viðvaranir um lága inneign félagsins",
-      "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar"
+      "balanceAlertsUnavailable": "Skráðu þig í félag til að fá viðvaranir um inneign.",
+      "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar",
+      "securityFindingsUnavailable": "Virkjaðu Kilo-öryggiserindreka á sviði til að fá öryggisniðurstöður."
     },
     "action": {
       "openSession": "Opna lotu"

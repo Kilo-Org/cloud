@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Øktstatus",
       "sessionStatusSubtitle": "fullført / mislykket / klar for fjernstyring",
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
+      "kiloclawActivityUnavailable": "Start en KiloClaw-forekomst for å få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "advarsler om lav organisasjonssaldo",
-      "securityFindingsSubtitle": "nye funn og SLA-påminnelser"
+      "balanceAlertsUnavailable": "Bli med i en organisasjon for å få saldovarsler.",
+      "securityFindingsSubtitle": "nye funn og SLA-påminnelser",
+      "securityFindingsUnavailable": "Aktiver Kilo-sikkerhetsagenten på et omfang for å få sikkerhetsfunn."
     },
     "action": {
       "openSession": "Åpne økt"

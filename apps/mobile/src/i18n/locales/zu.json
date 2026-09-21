@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Isimo seseshini",
       "sessionStatusSubtitle": "kuqediwe / kwehlulekile / kulungele ukulawulwa",
       "kiloclawActivitySubtitle": "uhlelo selulungile/lwehlulekile, izenzo ezihleliwe",
+      "kiloclawActivityUnavailable": "Qala i-instance ye-KiloClaw ukuze uthole umsebenzi we-KiloClaw.",
       "balanceAlertsSubtitle": "izexwayiso zebhalansi ephansi yenhlangano",
-      "securityFindingsSubtitle": "okutholakele okusha nezikhumbuzo ze-SLA"
+      "balanceAlertsUnavailable": "Joyina inhlangano ukuze uthole izexwayiso zebhalansi.",
+      "securityFindingsSubtitle": "okutholakele okusha nezikhumbuzo ze-SLA",
+      "securityFindingsUnavailable": "Nika amandla i-ejenti yezokuphepha ye-Kilo kububanzi ukuze uthole okutholakele kwezokuphepha."
     },
     "action": {
       "openSession": "Vula iseshini"

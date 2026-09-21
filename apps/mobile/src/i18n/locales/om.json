@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Haala turtii",
       "sessionStatusSubtitle": "xumurame / hin milkoofne / to'achuuf qophaa'e",
       "kiloclawActivitySubtitle": "fakkeenyi qophaa'e/hin milkoofne, gochaalee sagantaa qaban",
+      "kiloclawActivityUnavailable": "Sochii KiloClaw argachuuf KiloClaw fakkeenyi eegali.",
       "balanceAlertsSubtitle": "akeekkachiisa haftee dhaabbataa xiqqaa",
-      "securityFindingsSubtitle": "argannoowwan haaraa fi yaadachiisa SLA"
+      "balanceAlertsUnavailable": "Akeekkachiisa haftee argachuuf dhaabbata makami.",
+      "securityFindingsSubtitle": "argannoowwan haaraa fi yaadachiisa SLA",
+      "securityFindingsUnavailable": "Argannoowwan nageenyaa argachuuf Kilo eejentii nageenyaa daangaa irratti dandeessisi."
     },
     "action": {
       "openSession": "Turtii bani"

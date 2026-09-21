@@ -838,8 +838,11 @@
       "sessionStatusTitle": "සැසි තත්ත්වය",
       "sessionStatusSubtitle": "අවසන් / අසාර්ථක / පාලනයට සූදානම්",
       "kiloclawActivitySubtitle": "පිටපත සූදානම් හෝ අසාර්ථක වීම, කාලසටහන්ගත ක්‍රියා",
+      "kiloclawActivityUnavailable": "KiloClaw ක්‍රියාකාරකම් ලබා ගැනීමට KiloClaw පිටපතක් අරඹන්න.",
       "balanceAlertsSubtitle": "සංවිධානයේ ශේෂය අඩු වීමේ දැනුම්දීම්",
-      "securityFindingsSubtitle": "නව සොයාගැනීම් සහ SLA මතක් කිරීම්"
+      "balanceAlertsUnavailable": "ශේෂ අනතුරු ඇඟවීම් ලබා ගැනීමට සංවිධානයකට සම්බන්ධ වන්න.",
+      "securityFindingsSubtitle": "නව සොයාගැනීම් සහ SLA මතක් කිරීම්",
+      "securityFindingsUnavailable": "ආරක්ෂක සොයාගැනීම් ලබා ගැනීමට විෂය පථයක Kilo ආරක්ෂක නියෝජිතයා සක්‍රීය කරන්න."
     },
     "action": {
       "openSession": "සැසිය විවෘත කරන්න"

@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Сессия күйі",
       "sessionStatusSubtitle": "аяқталды / сәтсіз аяқталды / басқаруға дайын",
       "kiloclawActivitySubtitle": "дана дайын / істен шықты, жоспарланған әрекеттер",
+      "kiloclawActivityUnavailable": "KiloClaw әрекетін алу үшін KiloClaw данасын іске қосыңыз.",
       "balanceAlertsSubtitle": "ұйым балансының азайғаны туралы ескертулер",
-      "securityFindingsSubtitle": "жаңа осалдықтар және SLA туралы еске салулар"
+      "balanceAlertsUnavailable": "Баланс ескертулерін алу үшін ұйымға қосылыңыз.",
+      "securityFindingsSubtitle": "жаңа осалдықтар және SLA туралы еске салулар",
+      "securityFindingsUnavailable": "Қауіпсіздік осалдықтарын алу үшін Kilo қауіпсіздік агентін бір аяда қосыңыз."
     },
     "action": {
       "openSession": "Сессияны ашу"

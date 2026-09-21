@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Статус на сесија",
       "sessionStatusSubtitle": "завршено / неуспешно / подготвено за контрола",
       "kiloclawActivitySubtitle": "инстанца подготвена/неуспешна, закажани дејства",
+      "kiloclawActivityUnavailable": "Стартувајте инстанца KiloClaw за да добивате активност на KiloClaw.",
       "balanceAlertsSubtitle": "предупредувања за ниска состојба на организацијата",
-      "securityFindingsSubtitle": "нови наоди и потсетници за SLA"
+      "balanceAlertsUnavailable": "Придружете се на организација за да добивате предупредувања за состојба.",
+      "securityFindingsSubtitle": "нови наоди и потсетници за SLA",
+      "securityFindingsUnavailable": "Овозможете го Безбедносниот агент Kilo на опсег за да добивате безбедносни наоди."
     },
     "action": {
       "openSession": "Отвори сесија"

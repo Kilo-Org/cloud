@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Status sesi",
       "sessionStatusSubtitle": "selesai / gagal / sedia untuk dikawal",
       "kiloclawActivitySubtitle": "instans sedia/gagal, tindakan berjadual",
+      "kiloclawActivityUnavailable": "Mulakan instans KiloClaw untuk mendapatkan aktiviti KiloClaw.",
       "balanceAlertsSubtitle": "amaran baki rendah untuk organisasi",
-      "securityFindingsSubtitle": "penemuan baharu dan peringatan SLA"
+      "balanceAlertsUnavailable": "Sertai organisasi untuk mendapatkan amaran baki.",
+      "securityFindingsSubtitle": "penemuan baharu dan peringatan SLA",
+      "securityFindingsUnavailable": "Dayakan Ejen keselamatan Kilo pada skop untuk mendapatkan penemuan keselamatan."
     },
     "action": {
       "openSession": "Buka sesi"

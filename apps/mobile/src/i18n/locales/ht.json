@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Estati sesyon",
       "sessionStatusSubtitle": "fini / echwe / pare pou kontwole",
       "kiloclawActivitySubtitle": "enstans pare/echwe, aksyon pwograme",
+      "kiloclawActivityUnavailable": "Kòmanse yon enstans KiloClaw pou jwenn aktivite KiloClaw.",
       "balanceAlertsSubtitle": "avètisman lè balans òganizasyon an ba",
-      "securityFindingsSubtitle": "nouvo rezilta ak rapèl SLA"
+      "balanceAlertsUnavailable": "Antre nan yon òganizasyon pou jwenn avètisman balans.",
+      "securityFindingsSubtitle": "nouvo rezilta ak rapèl SLA",
+      "securityFindingsUnavailable": "Aktive Ajan sekirite Kilo a sou yon limit pou jwenn rezilta sekirite."
     },
     "action": {
       "openSession": "Louvri sesyon an"

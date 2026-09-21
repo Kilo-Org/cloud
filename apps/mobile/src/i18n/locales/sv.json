@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Sessionsstatus",
       "sessionStatusSubtitle": "avslutad / misslyckad / redo att styras",
       "kiloclawActivitySubtitle": "instans klar eller misslyckad, schemalagda åtgärder",
+      "kiloclawActivityUnavailable": "Starta en KiloClaw-instans för att få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "varningar om lågt organisationssaldo",
-      "securityFindingsSubtitle": "nya säkerhetsfynd och SLA-påminnelser"
+      "balanceAlertsUnavailable": "Gå med i en organisation för att få saldovarningar.",
+      "securityFindingsSubtitle": "nya säkerhetsfynd och SLA-påminnelser",
+      "securityFindingsUnavailable": "Aktivera Kilo-säkerhetsagenten i en omfattning för att få säkerhetsfynd."
     },
     "action": {
       "openSession": "Öppna session"

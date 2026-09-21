@@ -838,8 +838,11 @@
       "sessionStatusTitle": "ស្ថានភាពវគ្គ",
       "sessionStatusSubtitle": "បានបញ្ចប់ / បានបរាជ័យ / រួចរាល់សម្រាប់ឱ្យអ្នកគ្រប់គ្រង",
       "kiloclawActivitySubtitle": "ម៉ាស៊ីនរួចរាល់/បរាជ័យ សកម្មភាពតាមកាលវិភាគ",
+      "kiloclawActivityUnavailable": "ចាប់ផ្តើមអ៊ីនស្តង់ KiloClaw ដើម្បីទទួលបានសកម្មភាព KiloClaw។",
       "balanceAlertsSubtitle": "ការព្រមានពេលសមតុល្យរបស់អង្គការទាប",
-      "securityFindingsSubtitle": "ការរកឃើញថ្មី និងការរំលឹក SLA"
+      "balanceAlertsUnavailable": "ចូលរួមអង្គការមួយ ដើម្បីទទួលបានការព្រមានអំពីសមតុល្យ។",
+      "securityFindingsSubtitle": "ការរកឃើញថ្មី និងការរំលឹក SLA",
+      "securityFindingsUnavailable": "បើកភ្នាក់ងារសុវត្ថិភាព Kilo ក្នុងវិសាលភាពមួយ ដើម្បីទទួលបានការរកឃើញសុវត្ថិភាព។"
     },
     "action": {
       "openSession": "បើកវគ្គ"

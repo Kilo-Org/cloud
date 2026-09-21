@@ -270,8 +270,11 @@
       "sessionStatusTitle": "Statut de la session",
       "sessionStatusSubtitle": "terminée / en échec / prête à être contrôlée",
       "kiloclawActivitySubtitle": "instance prête ou en échec, actions planifiées",
+      "kiloclawActivityUnavailable": "Démarrez une instance KiloClaw pour recevoir l'activité KiloClaw.",
       "balanceAlertsSubtitle": "alertes de solde faible pour l'organisation",
-      "securityFindingsSubtitle": "nouvelles vulnérabilités et rappels SLA"
+      "balanceAlertsUnavailable": "Rejoignez une organisation pour recevoir les alertes de solde.",
+      "securityFindingsSubtitle": "nouvelles vulnérabilités et rappels SLA",
+      "securityFindingsUnavailable": "Activez l'Agent de sécurité Kilo sur un périmètre pour recevoir les signalements de sécurité."
     },
     "liveActivities": "Activités en direct",
     "liveActivitySubtitle": "Afficher les agents actifs sur l’écran verrouillé",

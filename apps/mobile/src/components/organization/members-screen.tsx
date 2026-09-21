@@ -3,7 +3,7 @@ import { type Href, useRouter } from 'expo-router';
 import { UserPlus, Users } from '@/components/ui/icons';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { InvitedMemberRow } from '@/components/organization/invited-member-row';
@@ -12,6 +12,7 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
@@ -69,14 +70,6 @@ function MemberRowSkeleton({ last }: Readonly<{ last?: boolean }>) {
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = { paddingTop: 16, flexGrow: 1 } satisfies ViewStyle;
-
-/**
- * 36pt square + 4pt slop = the 44pt minimum target DESIGN.md asks for. The box
- * is a real layout size, not slop alone: the on-device explorer measures
- * laid-out bounds and `hitSlop` never widens them. `h-[36px]`, not `h-9` — the
- * app's native rem is 14pt, so `h-9` lays out at 31.5pt.
- */
-const INVITE_HIT_SLOP = 4;
 
 export function OrganizationMembersScreen() {
   const router = useRouter();
@@ -209,17 +202,14 @@ export function OrganizationMembersScreen() {
         title={t('organization.members.title')}
         headerRight={
           canInvite ? (
-            <Pressable
+            <IconButton
               onPress={() => {
                 router.push('/(app)/(tabs)/(3_profile)/organization/invite-member' as Href);
               }}
-              hitSlop={INVITE_HIT_SLOP}
-              accessibilityRole="button"
               accessibilityLabel={t('organization.inviteMember.title')}
-              className="h-[36px] w-[36px] items-center justify-center active:opacity-70"
             >
               <UserPlus size={22} color={colors.foreground} />
-            </Pressable>
+            </IconButton>
           ) : undefined
         }
       />

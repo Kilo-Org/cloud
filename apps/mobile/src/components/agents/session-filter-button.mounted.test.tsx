@@ -48,6 +48,18 @@ async function boxOf(button: TestRenderer.ReactTestInstance) {
   return Object.assign({}, ...declarations) as { height: number; width: number };
 }
 
+/** The reach added per side by `hitSlop`, whatever shape it takes. */
+function slopDp(hitSlop: unknown): number {
+  if (typeof hitSlop === 'number') {
+    return hitSlop;
+  }
+  if (hitSlop != null && typeof hitSlop === 'object') {
+    const sides = Object.values(hitSlop as Record<string, number | undefined>);
+    return Math.min(...sides.map(side => side ?? 0));
+  }
+  return 0;
+}
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
 });
@@ -69,7 +81,7 @@ describe('SessionFilterButton touch target', () => {
   it('reaches the 44pt minimum target with its slop', async () => {
     const button = renderFilter(2);
     const box = await boxOf(button);
-    const slop = button.props.hitSlop as number;
+    const slop = slopDp(button.props.hitSlop);
 
     expect(box.height + 2 * slop).toBeGreaterThanOrEqual(44);
     expect(box.width + 2 * slop).toBeGreaterThanOrEqual(44);

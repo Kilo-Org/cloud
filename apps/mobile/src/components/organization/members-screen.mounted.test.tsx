@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { compiledDimensions } from '@/test/native-dimensions';
 
@@ -27,6 +28,47 @@ const withMembersQuery = vi.hoisted(() => ({
   error: null as unknown,
   refetch: vi.fn(),
 }));
+
+const routerPush = vi.hoisted(() => vi.fn());
+
+/** The smallest box the control-size audit accepts on a control's own node. */
+const MIN_BOX_DP = 28;
+/** DESIGN.md: the target every control must reach, in points. */
+const MIN_REACH_DP = 44;
+/** One Tailwind spacing unit, in dp. */
+const SPACING_UNIT_DP = 4;
+
+/** Read a Tailwind `h-*`/`w-*` class as dp (`h-[32px]` or `h-8`). */
+function sideFromClass(className: unknown, axis: 'h' | 'w'): number {
+  const source = typeof className === 'string' ? className : '';
+  const arbitrary = new RegExp(String.raw`(?:^|\s)${axis}-\[(\d+(?:\.\d+)?)px\]`).exec(source);
+  if (arbitrary?.[1]) {
+    return Number(arbitrary[1]);
+  }
+  const scaled = new RegExp(String.raw`(?:^|\s)${axis}-(\d+(?:\.\d+)?)(?!\S)`).exec(source);
+  if (scaled?.[1]) {
+    return Number(scaled[1]) * SPACING_UNIT_DP;
+  }
+  throw new Error(`no ${axis} size in class: ${source}`);
+}
+
+/** The reach added per side by `hitSlop`, whatever shape it takes. */
+function hitSlopPerSide(hitSlop: unknown): number {
+  if (typeof hitSlop === 'number') {
+    return hitSlop;
+  }
+  if (hitSlop != null && typeof hitSlop === 'object') {
+    const sides = hitSlop as Record<string, number | undefined>;
+    return Math.min(sides.top ?? 0, sides.bottom ?? 0, sides.left ?? 0, sides.right ?? 0);
+  }
+  return 0;
+}
+
+function findInviteControl(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
+  return root.findAll(
+    node => typeof node.type === 'string' && node.props.accessibilityLabel === 'Invite member'
+  );
+}
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isMoneyRole: () => true,
@@ -67,7 +109,7 @@ vi.mock('@shopify/flash-list', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: routerPush }),
 }));
 
 vi.mock('@/components/ui/icons', () => ({
@@ -166,6 +208,7 @@ beforeEach(() => {
   withMembersQuery.isError = false;
   withMembersQuery.error = null;
   withMembersQuery.refetch.mockClear();
+  routerPush.mockClear();
 });
 
 describe('OrganizationMembersScreen empty-state precedence', () => {
@@ -217,26 +260,95 @@ describe('OrganizationMembersScreen empty-state precedence', () => {
   });
 });
 
-describe('OrganizationMembersScreen invite control', () => {
-  // The on-device accessibility explorer measures laid-out bounds and `hitSlop`
-  // never widens them: the header's icon-only invite Pressable is read as its
-  // 22pt glyph and reported too small to tap.
-  it('lays out a box at least 28dp on a side', async () => {
+describe('OrganizationMembersScreen invite header control', () => {
+  it('renders the invite control with at least a 28dp box and a 44pt reach', async () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(OrganizationMembersScreen)
     );
-    const invite = renderer.root.find(
-      node => String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Invite member'
+
+    const controls = findInviteControl(renderer.root);
+    expect(controls).toHaveLength(1);
+    const control = controls[0];
+    if (!control) {
+      throw new Error('invite control not found');
+    }
+
+    const height = sideFromClass(control.props.className, 'h');
+    const width = sideFromClass(control.props.className, 'w');
+    expect(height).toBeGreaterThanOrEqual(MIN_BOX_DP);
+    expect(width).toBeGreaterThanOrEqual(MIN_BOX_DP);
+
+    const slop = hitSlopPerSide(control.props.hitSlop);
+    expect(height + 2 * slop).toBeGreaterThanOrEqual(MIN_REACH_DP);
+    expect(width + 2 * slop).toBeGreaterThanOrEqual(MIN_REACH_DP);
+
+    expect(control.props.accessibilityRole).toBe('button');
+    unmount();
+  });
+
+  it('compiles the invite control box to at least 28dp with a 44pt reach', async () => {
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrganizationMembersScreen)
     );
-    const declarations = (await compiledDimensions(invite.props.className as string)) as {
+
+    const control = findInviteControl(renderer.root)[0];
+    if (!control) {
+      throw new Error('invite control not found');
+    }
+
+    const declarations = (await compiledDimensions(control.props.className as string)) as {
       height?: number;
       width?: number;
     }[];
     const box = Object.assign({}, ...declarations) as { height: number; width: number };
+    const slop = hitSlopPerSide(control.props.hitSlop);
 
-    expect(box.height).toBeGreaterThanOrEqual(28);
-    expect(box.width).toBeGreaterThanOrEqual(28);
-    expect(box.height + 2 * (invite.props.hitSlop as number)).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(MIN_BOX_DP);
+    expect(box.width).toBeGreaterThanOrEqual(MIN_BOX_DP);
+    expect(box.height + 2 * slop).toBeGreaterThanOrEqual(MIN_REACH_DP);
+    expect(box.width + 2 * slop).toBeGreaterThanOrEqual(MIN_REACH_DP);
     unmount();
+  });
+
+  it('pushes the invite route when the control is pressed', async () => {
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrganizationMembersScreen)
+    );
+
+    const control = findInviteControl(renderer.root)[0];
+    if (!control) {
+      throw new Error('invite control not found');
+    }
+    act(() => {
+      (control.props.onPress as () => void)();
+    });
+
+    expect(routerPush).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/organization/invite-member');
+    unmount();
+  });
+
+  it('keeps the invite control in place while skeletons swap to rows', async () => {
+    withMembersQuery.isLoading = true;
+    const loading = await renderWithProviders(createElement(OrganizationMembersScreen));
+    const loadingControl = findInviteControl(loading.renderer.root)[0];
+    if (!loadingControl) {
+      throw new Error('invite control not found while loading');
+    }
+    const loadingClassName = loadingControl.props.className;
+    loading.unmount();
+
+    withMembersQuery.isLoading = false;
+    withMembersQuery.data = {
+      settings: {},
+      members: [{ status: 'active', id: 'member-1', name: 'Ada', email: 'ada@example.com' }],
+    };
+    const loaded = await renderWithProviders(createElement(OrganizationMembersScreen));
+    const loadedControl = findInviteControl(loaded.renderer.root)[0];
+    if (!loadedControl) {
+      throw new Error('invite control not found after loading');
+    }
+
+    expect(loadedControl.props.className).toBe(loadingClassName);
+    loaded.unmount();
   });
 });

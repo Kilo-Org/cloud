@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { filterButtonAccessibilityLabel } from '@/components/agents/session-filter-button-label';
 import { Text } from '@/components/ui/text';
+import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type SessionFilterButtonProps = {
@@ -14,12 +15,22 @@ type SessionFilterButtonProps = {
 };
 
 /**
- * 36pt square + 4pt slop = the 44pt minimum target DESIGN.md asks for. The box
- * is a real layout size, not slop alone: the on-device explorer measures
- * laid-out bounds and `hitSlop` never widens them. `h-[36px]`, not `h-9` — the
- * app's native rem is 14pt, so `h-9` lays out at 31.5pt.
+ * 36pt square + 8pt slop = 52pt, past the 44pt minimum target `DESIGN.md` asks
+ * for. The box is a real layout size, not slop alone: the on-device explorer
+ * measures laid-out bounds and `hitSlop` never widens them. `h-[36px]`, not
+ * `h-9` — the app's native rem is 14pt, so `h-9` lays out at 31.5pt.
+ *
+ * The sides are spelled out rather than a single uniform number: the row's
+ * sibling control (`session-list-header-actions.tsx`) caps its facing right
+ * slop against this control's left slop at the row's 14pt gap, and the test
+ * that guards that invariant reads the insets.
  */
-const FILTER_HIT_SLOP = 4;
+const FILTER_HIT_SLOP = {
+  top: COMPACT_CONTROL_HIT_SLOP_DP,
+  bottom: COMPACT_CONTROL_HIT_SLOP_DP,
+  left: COMPACT_CONTROL_HIT_SLOP_DP,
+  right: COMPACT_CONTROL_HIT_SLOP_DP,
+};
 
 /**
  * Filter affordance shared by both session-list pages: the sliders icon, plus

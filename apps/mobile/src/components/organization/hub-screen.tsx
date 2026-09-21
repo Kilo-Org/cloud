@@ -19,6 +19,7 @@ import { OrgUsageStats } from '@/components/organization/org-usage-stats';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { IconButton } from '@/components/ui/icon-button';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -42,14 +43,6 @@ type OrganizationHubScreenProps = Readonly<{
   /** Explicit org id from a deep link (e.g. /organizations/<id>/overview). */
   organizationIdOverride?: string;
 }>;
-
-/**
- * 36pt square + 4pt slop = the 44pt minimum target DESIGN.md asks for. The box
- * is a real layout size, not slop alone: the on-device explorer measures
- * laid-out bounds and `hitSlop` never widens them. `h-[36px]`, not `h-9` — the
- * app's native rem is 14pt, so `h-9` lays out at 31.5pt.
- */
-const RENAME_HIT_SLOP = 4;
 
 export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHubScreenProps = {}) {
   const router = useRouter();
@@ -119,17 +112,14 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               {org.organizationName}
             </Text>
             {showMoney && (
-              <Pressable
+              <IconButton
                 onPress={() => {
                   setRenameVisible(true);
                 }}
-                hitSlop={RENAME_HIT_SLOP}
-                accessibilityRole="button"
                 accessibilityLabel={t('organization.hub.renameTitle')}
-                className="h-[36px] w-[36px] items-center justify-center active:opacity-70"
               >
                 <Pencil size={16} color={colors.mutedForeground} />
-              </Pressable>
+              </IconButton>
             )}
           </View>
           {showMoney && (

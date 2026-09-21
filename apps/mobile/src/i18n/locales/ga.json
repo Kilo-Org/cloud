@@ -2312,7 +2312,8 @@
       "matchesBadge_other": "{{displayCount}} toradh",
       "matchesBadge_two": "{{displayCount}} toradh",
       "matchesBadge_few": "{{displayCount}} toradh",
-      "matchesBadge_many": "{{displayCount}} toradh"
+      "matchesBadge_many": "{{displayCount}} toradh",
+      "noOutput": "Níl aon aschur ann."
     },
     "readToolMarkdown": {
       "linesTruncated": "línte {{start}}–{{end}} (teasctha)",
@@ -3310,15 +3311,7 @@
     "remoteOptionTitle": "Do ríomhaire",
     "remoteOptionBody": "Rith Kilo ar do mheicín féin tríd an CLI `kilo remote`.",
     "skip": "Scipeáil an turas",
-    "tutorialLabel": "Treoir",
-    "remoteTitle": "Tosaigh do chéad seisiún ciar",
-    "remoteBody": "Ceangail do ríomhaire, ansin tosaigh an seisiún anseo.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Níl ríomhaire ceangailte fós",
-    "remoteEmptyBody": "Chun é a cheangal, rith `kilo remote` ar do ríomhaire.",
-    "remoteFound": "Ríomhaire ceangailte",
-    "checkAgain": "Seiceáil arís",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Treoir"
   },
   "appActions": {
     "start": {

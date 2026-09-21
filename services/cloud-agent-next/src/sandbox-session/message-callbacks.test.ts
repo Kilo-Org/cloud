@@ -125,6 +125,28 @@ describe('createMessageCallbacks', () => {
     });
   });
 
+  it('carries a gate result into the callback payload when the record has one', () => {
+    const harness = createHarness();
+
+    expect(
+      harness.callbacks.persistTerminalCallback(message('completed', { gateResult: 'pass' }))
+    ).toBe(true);
+
+    const stored = harness.kv.get<unknown>(callbackOutboxKey(MESSAGE_ID));
+    expect(parseCallbackOutboxValue(stored)?.job.payload).toMatchObject({ gateResult: 'pass' });
+  });
+
+  it('omits the gate result key from the callback payload when the record has none', () => {
+    const harness = createHarness();
+
+    expect(harness.callbacks.persistTerminalCallback(message('completed'))).toBe(true);
+
+    const stored = harness.kv.get<unknown>(callbackOutboxKey(MESSAGE_ID));
+    const payload = parseCallbackOutboxValue(stored)?.job.payload;
+    expect(payload).toBeDefined();
+    expect(payload && 'gateResult' in payload).toBe(false);
+  });
+
   it.each([
     ['failed', 'provider rejected the request', 'provider rejected the request'],
     ['cancelled', undefined, 'The message was interrupted'],

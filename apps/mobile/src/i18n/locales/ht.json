@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} liy",
       "linesBadge_other": "{{displayCount}} liy",
       "matchesBadge_one": "{{displayCount}} rezilta",
-      "matchesBadge_other": "{{displayCount}} rezilta"
+      "matchesBadge_other": "{{displayCount}} rezilta",
+      "noOutput": "Pa gen rezilta."
     },
     "readToolMarkdown": {
       "linesTruncated": "liy {{start}}–{{end}} (koupe)",
@@ -3181,15 +3182,7 @@
     "remoteOptionTitle": "Òdinatè ou",
     "remoteOptionBody": "Egzekite Kilo sou pwòp machin ou a nan atravè CLI `kilo remote` la.",
     "skip": "Pase vizit la",
-    "tutorialLabel": "Gid",
-    "remoteTitle": "Kòmanse premye sesyon distans ou a",
-    "remoteBody": "Konekte òdinatè ou a, epi kòmanse sesyon an soti isit la.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Okenn òdinatè konekte pou kounye a",
-    "remoteEmptyBody": "Pou konekte l, egzekite `kilo remote` sou òdinatè ou a.",
-    "remoteFound": "Òdinatè konekte",
-    "checkAgain": "Tcheke ankò",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Gid"
   },
   "appActions": {
     "start": {

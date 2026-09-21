@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} γραμμή",
       "linesBadge_other": "{{displayCount}} γραμμές",
       "matchesBadge_one": "{{displayCount}} αντιστοιχία",
-      "matchesBadge_other": "{{displayCount}} αντιστοιχίες"
+      "matchesBadge_other": "{{displayCount}} αντιστοιχίες",
+      "noOutput": "Δεν υπάρχει έξοδος."
     },
     "readToolMarkdown": {
       "linesTruncated": "γραμμές {{start}}–{{end}} (περικομμένες)",
@@ -3181,15 +3182,7 @@
     "remoteOptionTitle": "Ο υπολογιστής σου",
     "remoteOptionBody": "Εκτέλεσε το Kilo στο δικό σου μηχάνημα μέσω του CLI `kilo remote`.",
     "skip": "Παράλειξη ξενάγησης",
-    "tutorialLabel": "Οδηγός",
-    "remoteTitle": "Ξεκίνα την πρώτη απομακρυσμένη συνεδρία σου",
-    "remoteBody": "Σύνδεσε τον υπολογιστή σου και μετά ξεκίνα τη συνεδρία από εδώ.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Δεν έχει συνδεθεί υπολογιστής ακόμα",
-    "remoteEmptyBody": "Για να τον συνδέσεις, εκτέλεσε `kilo remote` στον υπολογιστή σου.",
-    "remoteFound": "Ο υπολογιστής συνδέθηκε",
-    "checkAgain": "Έλεγχος ξανά",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Οδηγός"
   },
   "appActions": {
     "start": {

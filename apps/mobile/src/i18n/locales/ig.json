@@ -2216,7 +2216,8 @@
       "linesBadge_one": "ahịrị {{displayCount}}",
       "linesBadge_other": "ahịrị {{displayCount}}",
       "matchesBadge_one": "ndakọrịta {{displayCount}}",
-      "matchesBadge_other": "ndakọrịta {{displayCount}}"
+      "matchesBadge_other": "ndakọrịta {{displayCount}}",
+      "noOutput": "Enweghị mpụta."
     },
     "readToolMarkdown": {
       "linesTruncated": "ahịrị {{start}}–{{end}} (ebipụrụ akụkụ)",
@@ -3181,15 +3182,7 @@
     "remoteOptionTitle": "Kọmputa gị",
     "remoteOptionBody": "Gbaa Kilo na igwe gị site na CLI nke `kilo remote`.",
     "skip": "Kwụsị njem",
-    "tutorialLabel": "Ntuziaka",
-    "remoteTitle": "Malite nnọkọ remote mbụ gị",
-    "remoteBody": "Jikọta kọmputa gị, mesịa malitee nnọkọ ahụ site ebe a.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Onweghị kọmputa jikọrọ ruo ugbu a",
-    "remoteEmptyBody": "Iji jikọta ya, gbaa `kilo remote` na kọmputa gị.",
-    "remoteFound": "Ejikọrọ kọmputa",
-    "checkAgain": "Lelee ọzọ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Ntuziaka"
   },
   "appActions": {
     "start": {

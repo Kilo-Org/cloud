@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} мөр",
       "linesBadge_other": "{{displayCount}} мөр",
       "matchesBadge_one": "{{displayCount}} илэрц",
-      "matchesBadge_other": "{{displayCount}} илэрц"
+      "matchesBadge_other": "{{displayCount}} илэрц",
+      "noOutput": "Гаралт байхгүй."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} мөр (товчилсон)",
@@ -3181,15 +3182,7 @@
     "remoteOptionTitle": "Таны компьютер",
     "remoteOptionBody": "Өөрийн машинаасаа `kilo remote` CLI-ээр Kilo-г ажиллуул.",
     "skip": "Танилцуулгыг алгасах",
-    "tutorialLabel": "Заавар",
-    "remoteTitle": "Эхний зайн сессээ эхлүүл",
-    "remoteBody": "Компьютерээ холбоод, эндээс сессээ эхлүүлээрэй.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Одоогоор компьютер холбогдоогүй байна",
-    "remoteEmptyBody": "Холбохын тулд компьютер дээрээ `kilo remote` командыг ажиллуулна уу.",
-    "remoteFound": "Компьютер холбогдлоо",
-    "checkAgain": "Дахин шалгах",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Заавар"
   },
   "appActions": {
     "start": {

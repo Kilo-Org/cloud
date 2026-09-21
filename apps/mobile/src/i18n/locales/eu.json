@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} lerro",
       "linesBadge_other": "{{displayCount}} lerro",
       "matchesBadge_one": "{{displayCount}} bat etortze",
-      "matchesBadge_other": "{{displayCount}} bat etortze"
+      "matchesBadge_other": "{{displayCount}} bat etortze",
+      "noOutput": "Irteerarik ez."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} lerroak (moztuta)",
@@ -3181,15 +3182,7 @@
     "remoteOptionTitle": "Zure ordenagailua",
     "remoteOptionBody": "Exekutatu Kilo zure makinean `kilo remote` CLIaren bidez.",
     "skip": "Baztertu bira",
-    "tutorialLabel": "Tutorial-a",
-    "remoteTitle": "Hasi zure lehen urruneko saioa",
-    "remoteBody": "Konektatu zure ordenagailua, eta gero hasi saioa hemendik.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Oraindik ez dago ordenagailurik konektatuta",
-    "remoteEmptyBody": "Konektatzeko, exekutatu `kilo remote` zure ordenagailuan.",
-    "remoteFound": "Ordenagailua konektatuta",
-    "checkAgain": "Egiaztatu berriro",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial-a"
   },
   "appActions": {
     "start": {

@@ -2312,7 +2312,8 @@
       "matchesBadge_other": "{{displayCount}} riżultati",
       "matchesBadge_two": "{{displayCount}} riżultati",
       "matchesBadge_few": "{{displayCount}} riżultati",
-      "matchesBadge_many": "{{displayCount}} riżultati"
+      "matchesBadge_many": "{{displayCount}} riżultati",
+      "noOutput": "M'hemm l-ebda ħruġ."
     },
     "readToolMarkdown": {
       "linesTruncated": "linji {{start}}–{{end}} (maqtugħa)",
@@ -3310,15 +3311,7 @@
     "remoteOptionTitle": "Il-kompjuter tiegħek",
     "remoteOptionBody": "Ħaddem Kilo fuq il-magna tiegħek permezz tal-CLI `kilo remote`.",
     "skip": "Aqbeż it-tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Ibda l-ewwel sessjoni remota tiegħek",
-    "remoteBody": "Ikkonetta l-kompjuter tiegħek, imbagħad ibda s-sessjoni minn hawn.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Għad m'hemmx kompjuter konness",
-    "remoteEmptyBody": "Biex tikkonnettjah, ħaddem `kilo remote` fuq il-kompjuter tiegħek.",
-    "remoteFound": "Kompjuter konness",
-    "checkAgain": "Iċċekkja mill-ġdid",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

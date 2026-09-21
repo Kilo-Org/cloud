@@ -2248,7 +2248,8 @@
       "linesBadge_few": "{{displayCount}} linii",
       "matchesBadge_one": "{{displayCount}} potrivire",
       "matchesBadge_other": "{{displayCount}} potriviri",
-      "matchesBadge_few": "{{displayCount}} potriviri"
+      "matchesBadge_few": "{{displayCount}} potriviri",
+      "noOutput": "Nicio ieșire."
     },
     "readToolMarkdown": {
       "linesTruncated": "liniile {{start}}–{{end}} (trunchiate)",
@@ -3224,15 +3225,7 @@
     "remoteOptionTitle": "Computerul tău",
     "remoteOptionBody": "Rulează Kilo pe propria ta mașină prin CLI-ul `kilo remote`.",
     "skip": "Sari peste tur",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Pornește prima ta sesiune la distanță",
-    "remoteBody": "Conectează computerul și apoi pornește sesiunea de aici.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Niciun computer conectat încă",
-    "remoteEmptyBody": "Pentru a-l conecta, rulează `kilo remote` pe computerul tău.",
-    "remoteFound": "Computer conectat",
-    "checkAgain": "Verifică din nou",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

@@ -2248,7 +2248,8 @@
       "linesBadge_few": "reda: {{displayCount}}",
       "matchesBadge_one": "podudaranje: {{displayCount}}",
       "matchesBadge_other": "podudaranja: {{displayCount}}",
-      "matchesBadge_few": "podudaranja: {{displayCount}}"
+      "matchesBadge_few": "podudaranja: {{displayCount}}",
+      "noOutput": "Nema izlaza."
     },
     "readToolMarkdown": {
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",
@@ -3223,15 +3224,7 @@
     "remoteOptionTitle": "Tvoj računar",
     "remoteOptionBody": "Pokreni Kilo na sopstvenoj mašini preko `kilo remote` CLI-ja.",
     "skip": "Preskoči turu",
-    "tutorialLabel": "Tutorijal",
-    "remoteTitle": "Pokreni svoju prvu udaljenu sesiju",
-    "remoteBody": "Poveži svoj računar, zatim pokreni sesiju odavde.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Još nema povezanog računara",
-    "remoteEmptyBody": "Da ga povežeš, pokreni `kilo remote` na računaru.",
-    "remoteFound": "Računar povezan",
-    "checkAgain": "Proveri ponovo",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorijal"
   },
   "appActions": {
     "start": {

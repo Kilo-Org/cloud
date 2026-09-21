@@ -35,6 +35,25 @@ const SAFE_AREA_MODULE = /react-native-safe-area-context/;
 const ENTRY_POINT = 'screen-insets.ts';
 const PROFILE_SCREEN = '../components/profile-screen.tsx';
 
+/**
+ * The Profile screen's alignment path: from the line that reads
+ * `useScreenSideInsets` through the line that first applies a side inset. Only
+ * this path must stay free of per-platform branches. A fork elsewhere in the
+ * screen — the Android sign-out confirmation, for example — is not on the
+ * insets path and must not fail the guard.
+ */
+function alignmentPath(profileSource: string): string {
+  const lines = profileSource.split('\n');
+  const start = lines.findIndex(line => line.includes('useScreenSideInsets()'));
+  if (start === -1) {
+    throw new Error(`${PROFILE_SCREEN} does not read its side insets from ${ENTRY_POINT}`);
+  }
+  const end = lines.findIndex(
+    (line, index) => index >= start && /margin(?:Left|Right|Start|End)/.test(line)
+  );
+  return lines.slice(start, (end === -1 ? start : end) + 1).join('\n');
+}
+
 describe('screen side insets: one implementation for both platforms', () => {
   it('reads the native safe-area module only in the entry point, with no platform branch', () => {
     const entry = source(ENTRY_POINT);
@@ -48,6 +67,9 @@ describe('screen side insets: one implementation for both platforms', () => {
     expect(profile, `${PROFILE_SCREEN} imports the native safe-area module again`).not.toMatch(
       SAFE_AREA_MODULE
     );
-    expect(profile, `${PROFILE_SCREEN} carries a per-platform branch`).not.toMatch(PLATFORM_BRANCH);
+    expect(
+      alignmentPath(profile),
+      `${PROFILE_SCREEN}'s alignment path carries a per-platform branch`
+    ).not.toMatch(PLATFORM_BRANCH);
   });
 });

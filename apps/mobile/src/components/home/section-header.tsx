@@ -1,11 +1,10 @@
-import { I18nManager, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
-import { cn } from '@/lib/utils';
 
 type SectionHeaderProps = {
   label: string;
-  /** Optional right-aligned link (e.g. "SEE ALL"). */
+  /** Optional link at the row's outer edge (physical right in LTR, physical left in RTL). */
   actionLabel?: string;
   onActionPress?: () => void;
 };
@@ -22,14 +21,9 @@ export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<Se
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
-          className="max-w-full grow active:opacity-70"
+          className="max-w-full grow flex-row justify-end active:opacity-70"
         >
-          <Text
-            className={cn(
-              'shrink font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary',
-              I18nManager.isRTL ? 'text-left' : 'text-right'
-            )}
-          >
+          <Text className="shrink font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
             {actionLabel}
           </Text>
         </Pressable>

@@ -12,6 +12,8 @@ import {
   TAB_LABEL_WRAP_FONT_SCALE,
   tabAccessibilityLabel,
   tabBarPosition,
+  tabLabelFits,
+  tabLabelWidth,
   visibleTabCount,
 } from '@/lib/tab-bar-layout';
 
@@ -81,6 +83,17 @@ describe('getEffectiveTabBarHeight', () => {
       70
     );
   });
+
+  it('honours a caller-supplied label decision at the default font scale', () => {
+    expect(
+      getEffectiveTabBarHeight({
+        bottomInset: 16,
+        platform: 'android',
+        fontScale: 1,
+        showLabel: false,
+      })
+    ).toBe(getTabBarIconForwardHeight(16, 'android'));
+  });
 });
 describe('getTabBarIconForwardHeight', () => {
   it('collapses to the base height when labels are hidden at large font scale', () => {
@@ -136,6 +149,42 @@ describe('getTabBarHorizontalInset', () => {
   });
 });
 
+describe('tabLabelWidth', () => {
+  it('measures a single unbroken word at the tab label size', () => {
+    // "Profile" is 7 glyphs at (0.6em x 11) + 0.2 tracking = 47.6
+    expect(tabLabelWidth('Profile')).toBeCloseTo(47.6, 5);
+  });
+
+  it('measures the widest whitespace-separated line of a wrapped label', () => {
+    expect(tabLabelWidth('Kilo\nClaw')).toBeCloseTo(tabLabelWidth('Kilo'), 5);
+    expect(tabLabelWidth('Bogga shakhsiga')).toBeCloseTo(9 * (0.6 * 11 + 0.2), 5);
+  });
+
+  it('scales the glyph advance (not the tracking) with the system font scale', () => {
+    expect(tabLabelWidth('Profile', 2)).toBeCloseTo(7 * (0.6 * 11 * 2 + 0.2), 5);
+  });
+
+  it('counts CJK/Kana/Hangul glyphs as one em wide', () => {
+    expect(tabLabelWidth('設定')).toBeCloseTo(2 * (11 + 0.2), 5);
+  });
+});
+
+describe('tabLabelFits', () => {
+  it('rejects a label wider than its tab minus the item padding', () => {
+    // 160dp / 3 tabs = 53.3dp box, less 10dp padding = 43.3dp for a 47.6dp word
+    expect(tabLabelFits('Profile', 160 / 3)).toBe(false);
+  });
+
+  it('accepts the same label on a normal phone width', () => {
+    expect(tabLabelFits('Profile', 360 / 3)).toBe(true);
+  });
+
+  it('uses the widest line, so a space-separated label can still fit', () => {
+    expect(tabLabelFits('Kilo Claw', 160 / 3)).toBe(true);
+    expect(tabLabelFits('Bogga shakhsiga', 160 / 3)).toBe(false);
+  });
+});
+
 describe('shouldShowTabLabel', () => {
   it('keeps the label below the icon-forward threshold', () => {
     expect(shouldShowTabLabel(1)).toBe(true);
@@ -146,6 +195,23 @@ describe('shouldShowTabLabel', () => {
     expect(shouldShowTabLabel(TAB_ICON_FORWARD_FONT_SCALE)).toBe(false);
     expect(shouldShowTabLabel(2.5)).toBe(false);
     expect(shouldShowTabLabel(3)).toBe(false);
+  });
+
+  it('drops the labels when any label is too wide for its tab', () => {
+    // Reported geometry: 160dp / 5 tabs = 32dp per tab, 22dp for the label
+    expect(shouldShowTabLabel(1, 160 / 5, ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'])).toBe(
+      false
+    );
+  });
+
+  it('keeps the labels when every label fits its tab', () => {
+    expect(shouldShowTabLabel(1, 360 / 5, ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'])).toBe(
+      true
+    );
+  });
+
+  it('keeps the width rule from overriding the font-scale rule', () => {
+    expect(shouldShowTabLabel(2, 160 / 5, ['Home'])).toBe(false);
   });
 });
 

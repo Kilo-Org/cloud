@@ -248,7 +248,14 @@ export function NewSessionRepositorySection({
           }}
         >
           <ExternalLink size={16} color={colors.foreground} />
-          <Text>{t(selectedRepository === null ? copy.openLabel : copy.connectTitle)}</Text>
+          {/* One line per action label: the row's height is the button's, so a
+              label that wraps ("Open GitLab" broke onto two lines beside the
+              one-line "Open GitHub" sibling — explorer new-session-filled /
+              new-session-kb-down) has nowhere to grow. A longer locale
+              ellipsizes; the full copy stays the accessible name. */}
+          <Text numberOfLines={1}>
+            {t(selectedRepository === null ? copy.openLabel : copy.connectTitle)}
+          </Text>
         </Button>
         <Button
           variant="outline"

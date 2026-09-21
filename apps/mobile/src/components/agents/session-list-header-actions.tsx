@@ -5,18 +5,27 @@ import { useTranslation } from 'react-i18next';
 
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_HIT_SLOP_DP as FILTER_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // The row's `gap-4` compiles to 14pt, not 16pt: NativeWind v5 fixes 1rem at
-// 14pt, so `gap-4` (1rem) is 14pt. The filter control's own left slop is 8pt,
-// so the shared 8pt right slop would overlap its touch region by 2pt; capping
-// the new-session control's right side at 14 - 8 leaves the two regions meeting
-// at the gap's boundary. 32 + 8 + 6 = 46pt still clears `DESIGN.md:364`'s 44pt.
+// 14pt, so `gap-4` (1rem) is 14pt. The filter control sits to the right with
+// its own 3pt left slop, so the new-session control caps its right side at 6:
+// the two facing slops total 9pt, inside the gap, and 32 + 8 + 6 = 46pt still
+// clears `DESIGN.md:364`'s 44pt. The filter's slop is spelled per side too, so
+// that meeting can be checked instead of only the smallest of its four sides.
 const NEW_SESSION_HIT_SLOP = {
   top: COMPACT_CONTROL_HIT_SLOP_DP,
   bottom: COMPACT_CONTROL_HIT_SLOP_DP,
   left: COMPACT_CONTROL_HIT_SLOP_DP,
   right: 6,
+};
+
+const FILTER_HIT_SLOP = {
+  top: FILTER_HIT_SLOP_DP,
+  bottom: FILTER_HIT_SLOP_DP,
+  left: FILTER_HIT_SLOP_DP,
+  right: FILTER_HIT_SLOP_DP,
 };
 
 type SessionListHeaderActionsProps = {
@@ -51,6 +60,7 @@ export function SessionListHeaderActions({
       ) : null}
       <SessionFilterButton
         activeCount={activeFilterCount}
+        hitSlop={FILTER_HIT_SLOP}
         onPress={onOpenFilters}
         testID="agents-open-filters"
       />

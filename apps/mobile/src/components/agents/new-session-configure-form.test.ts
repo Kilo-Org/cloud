@@ -99,6 +99,11 @@ vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
+// The profile row's placeholder pulls in `react-native-reanimated`, whose
+// node_modules ESM this project's transform cannot load; the row's shapes are
+// asserted through `renderProfileRow`'s output, not the placeholder.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
 }));

@@ -1,3 +1,10 @@
+// Colocated mounted tests next to route files register as routes in Expo
+// Router's typed-routes walk (metro.config.js keeps them out of the bundle, but
+// the node-side walker has no such block list). A `_layout.<x>.test.tsx` name
+// is worse: the layout match binds it to its directory's layout slot, and the
+// typed-routes walk then drops the whole `(tabs)` subtree — every `Href` that
+// points at a tab route stops compiling. Name this file for what it exercises
+// instead of the layout it renders.
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

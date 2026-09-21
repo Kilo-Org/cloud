@@ -37,6 +37,14 @@ vi.mock('expo-application', () => ({
   nativeBuildVersion: '1',
 }));
 
+// `lib/screen-insets.ts` reads the native safe-area module, whose node_modules
+// entry is TS this pipeline cannot load. The screen only needs the insets
+// contract; the same stub the other mounted suites use.
+const insetsState = vi.hoisted(() => ({ top: 0, right: 0, bottom: 0, left: 0 }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => insetsState,
+}));
+
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     user: {

@@ -26,8 +26,17 @@ export type SessionCreateOrigin = {
   createdOnPlatform?: string;
 };
 
-export function isInteractiveWebSession(origin?: SessionCreateOrigin): boolean {
-  return origin?.createdOnPlatform === 'cloud-agent-web';
+const CONTROL_PLANE_SESSION_ORIGINS = new Set(['cloud-agent-web', 'code-review']);
+
+/**
+ * Origins admitted to the control plane. Code Reviewer gets control-plane
+ * session identity but is not eligible for worktrees.
+ */
+export function isControlPlaneSessionOrigin(origin?: SessionCreateOrigin): boolean {
+  return (
+    origin?.createdOnPlatform !== undefined &&
+    CONTROL_PLANE_SESSION_ORIGINS.has(origin.createdOnPlatform)
+  );
 }
 
 export function isControlPlaneOwner(
@@ -55,7 +64,9 @@ export function sessionPlaneForNewOwner(
   owner: { userId: string; orgId?: string },
   origin?: SessionCreateOrigin
 ): SessionPlane {
-  return isControlPlaneOwner(env, owner) && isInteractiveWebSession(origin) ? 'control' : 'legacy';
+  return isControlPlaneOwner(env, owner) && isControlPlaneSessionOrigin(origin)
+    ? 'control'
+    : 'legacy';
 }
 
 function ownerIdInList(raw: string | undefined, id: string | undefined): boolean {

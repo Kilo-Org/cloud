@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   generateSessionId,
   isControlPlaneOwner,
-  isInteractiveWebSession,
+  isControlPlaneSessionOrigin,
   isWorktreeOwner,
   sessionPlaneForNewOwner,
   sessionPlaneFromId,
@@ -54,7 +54,25 @@ describe('session plane identity', () => {
     expect(isControlPlaneOwner({ CONTROL_PLANE_IDS: 'user-1' }, { userId: 'user-2' })).toBe(false);
   });
 
-  it.each([undefined, '', 'cloud-agent', 'slack', 'scheduled', 'code-review', 'webhook'] as const)(
+  it('mints workspace_ for enrolled Code Reviewer runs', () => {
+    const codeReview = { createdOnPlatform: 'code-review' };
+    expect(
+      sessionPlaneForNewOwner({ CONTROL_PLANE_IDS: 'user-1' }, { userId: 'user-1' }, codeReview)
+    ).toBe('control');
+    expect(
+      sessionPlaneForNewOwner(
+        { CONTROL_PLANE_IDS: 'org-1' },
+        { userId: 'user-2', orgId: 'org-1' },
+        codeReview
+      )
+    ).toBe('control');
+    expect(sessionPlaneForNewOwner({}, { userId: 'user-1' }, codeReview)).toBe('legacy');
+    expect(
+      sessionPlaneForNewOwner({ CONTROL_PLANE_IDS: 'other' }, { userId: 'user-1' }, codeReview)
+    ).toBe('legacy');
+  });
+
+  it.each([undefined, '', 'cloud-agent', 'slack', 'scheduled', 'webhook'] as const)(
     'keeps enrolled owners on agent_ for non-interactive origin %s',
     createdOnPlatform => {
       expect(
@@ -67,11 +85,12 @@ describe('session plane identity', () => {
     }
   );
 
-  it('treats only cloud-agent-web as an interactive web session', () => {
-    expect(isInteractiveWebSession({ createdOnPlatform: 'cloud-agent-web' })).toBe(true);
-    expect(isInteractiveWebSession({ createdOnPlatform: 'slack' })).toBe(false);
-    expect(isInteractiveWebSession({})).toBe(false);
-    expect(isInteractiveWebSession()).toBe(false);
+  it('admits cloud-agent-web and code-review as control-plane origins', () => {
+    expect(isControlPlaneSessionOrigin({ createdOnPlatform: 'cloud-agent-web' })).toBe(true);
+    expect(isControlPlaneSessionOrigin({ createdOnPlatform: 'code-review' })).toBe(true);
+    expect(isControlPlaneSessionOrigin({ createdOnPlatform: 'slack' })).toBe(false);
+    expect(isControlPlaneSessionOrigin({})).toBe(false);
+    expect(isControlPlaneSessionOrigin()).toBe(false);
   });
 
   it.each([

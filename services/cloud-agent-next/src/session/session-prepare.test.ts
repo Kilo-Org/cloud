@@ -1734,7 +1734,6 @@ describe('createSessionWithLedger admission ladder', () => {
     ['missing platform', undefined, undefined],
     ['automation origin', 'browser', 'scheduled'],
     ['integration origin', 'browser', 'slack'],
-    ['code-review origin', undefined, 'code-review'],
   ] as const)(
     'keeps enrolled %s creates on agent_ sessions',
     async (_label, clientProvenance, createdOnPlatform) => {
@@ -1758,6 +1757,37 @@ describe('createSessionWithLedger admission ladder', () => {
       );
     }
   );
+
+  it('creates enrolled code-review origin sessions on the control plane without worktrees', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = '*';
+    ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        finalization: { autoCommit: true },
+        options: { operationKey: OPERATION_KEY, createdOnPlatform: 'code-review' },
+      })
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({
+          sessionId: WORKSPACE_SESSION_ID,
+          createdOnPlatform: 'code-review',
+        }),
+        finalization: { autoCommit: true },
+        workspace: expect.not.objectContaining({
+          worktreeId: expect.anything(),
+          workspacePath: expect.anything(),
+        }),
+      })
+    );
+  });
 
   it.each([
     ['missing provenance', undefined, 'cloud-agent-web'],

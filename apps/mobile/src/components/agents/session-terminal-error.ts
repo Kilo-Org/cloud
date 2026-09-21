@@ -1,4 +1,4 @@
-import { type SessionStatusIndicator } from '@kilocode/cloud-agent-sdk';
+import { type SdkStatusMessageCode, type SessionStatusIndicator } from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
 import { type QueryErrorVariant } from '@/components/query-error';
@@ -134,17 +134,54 @@ const DELIVERY_FAILED_INDICATORS = new Set([
 ]);
 
 /**
- * The SDK's own fixed error copy. The SDK writes these strings itself
- * (service-state.ts, session-manager.ts) rather than forwarding a provider's or
- * the transport's text, so they are already the reader's copy: the indicator
- * shows them as-is, exactly as it shows the SDK's `progress` and `info`
- * messages. Only text the SDK merely forwards goes through the classifier.
+ * The catalog copy for each code the SDK writes itself. The SDK ships the
+ * locale-free `code` beside its English `message`, so the app renders the
+ * reader's own language instead of the SDK's fixed English line. Codes the SDK
+ * only attaches to text it forwards from the Durable Object or the transport
+ * are absent here and fall to the classifier below.
  */
-const SDK_FIXED_ERROR_MESSAGES = new Set([
-  'Agent connection lost',
-  'Session terminated',
-  'Failed to stop execution',
-]);
+const STATUS_COPY_KEY_BY_CODE = {
+  'agent-connection-lost': 'agentChat.sessionConnection.connectionLost',
+  'session-stopped': 'agentChat.session.stopped',
+  'setting-up-environment': 'agentChat.composer.preparingPlaceholder',
+  'wrapping-up': 'agentChat.composer.finalizingPlaceholder',
+  committing: 'agentChat.session.committing',
+  committed: 'agentChat.session.committed',
+  'commit-failed': 'agentChat.session.commitFailed',
+  'message-delivery-failed': 'agentChat.messageFailure.deliveryTitle',
+  'failed-to-stop-execution': 'agentChat.session.failedToStopExecution',
+} satisfies Partial<Record<SdkStatusMessageCode, string>>;
+
+/** The catalog key for a code that labels an SDK-written line, or undefined. */
+export function statusCopyKeyForCode(code: SdkStatusMessageCode): string | undefined {
+  return STATUS_COPY_KEY_BY_CODE[code as keyof typeof STATUS_COPY_KEY_BY_CODE];
+}
+
+/**
+ * The terminal-error class for a code, mirroring `classifyTerminalError`'s
+ * answer for the same failure. A code whose failure the classifier cannot name
+ * is `'unknown'`, exactly as its message-text counterpart is. Codes that carry
+ * their own catalog copy (`STATUS_COPY_KEY_BY_CODE`) name no class because the
+ * status line renders the copy directly.
+ */
+const ERROR_CLASS_BY_CODE = {
+  'not-authorized': 'permission',
+  'insufficient-credits': 'credits',
+  'previous-task-in-progress': 'busy',
+  'selected-model-unavailable': 'model',
+  'service-unavailable': 'unavailable',
+  'service-temporarily-unavailable': 'unavailable',
+  'connection-lost': 'transient',
+  'connection-failed': 'transient',
+  'generic-error': 'transient',
+  'child-session-not-found': 'gone',
+  'session-terminated': 'unknown',
+} satisfies Partial<Record<SdkStatusMessageCode, TerminalErrorClass>>;
+
+/** The class for a coded failure, or undefined when the code has catalog copy. */
+function errorClassForCode(code: SdkStatusMessageCode): TerminalErrorClass | undefined {
+  return ERROR_CLASS_BY_CODE[code as keyof typeof ERROR_CLASS_BY_CODE];
+}
 
 /**
  * The reader's copy the Durable Object writes through its safe failure
@@ -223,28 +260,38 @@ function isSafeFailureMessage(message: string): boolean {
 
 /**
  * The reader's own copy for a session error in the transcript's status slot
- * (session-status-indicator.tsx). A provider's or the transport's own English
- * string never reaches the reader; the classified copy does instead — the same
- * rule `resolveSessionTerminalError` follows for the empty-transcript state. An
- * unrecognized string is still a failed agent run, so it gets the
+ * (session-status-indicator.tsx). A code the SDK attaches to its own fixed copy
+ * maps straight to catalog copy; a code for a failure the app can name maps to
+ * the same class its message text would. Everything else is text the SDK
+ * forwards — a provider's or the transport's English string — so it goes
+ * through the classifier: the reader sees translated copy, never the raw
+ * string. An unrecognized string is still a failed agent run, so it gets the
  * assistant-failure line rather than a generic one.
  *
- * The Durable Object's safe failure projection and the SDK's own fixed lines
- * are already the reader's copy, so the indicator shows them as-is.
+ * The Durable Object's safe failure projection is already the reader's copy, so
+ * the indicator shows it as-is.
  */
-export function sessionStatusErrorMessage(raw: string): string {
+export function sessionStatusErrorMessage(input: {
+  message: string;
+  code?: SdkStatusMessageCode;
+}): string {
+  const { message: raw, code } = input;
+  if (code !== undefined) {
+    const copyKey = statusCopyKeyForCode(code);
+    if (copyKey !== undefined) {
+      return i18n.t(copyKey);
+    }
+  }
   if (DELIVERY_FAILED_INDICATORS.has(raw)) {
     return i18n.t('agentChat.messageFailure.deliveryTitle');
-  }
-  if (SDK_FIXED_ERROR_MESSAGES.has(raw)) {
-    return raw;
   }
   if (isSafeFailureMessage(raw)) {
     // The DO writes the credits failure as safe copy with a lowercase phrase;
     // the reader still gets the actionable credits line.
     return classifyTerminalError(raw) === 'credits' ? messageForClass('credits') : raw;
   }
-  const cls = classifyTerminalError(raw);
+  const codedClass = code === undefined ? undefined : errorClassForCode(code);
+  const cls = codedClass ?? classifyTerminalError(raw);
   return cls === 'unknown'
     ? i18n.t('agentChat.messageFailure.assistantFailed')
     : messageForClass(cls);
@@ -259,14 +306,14 @@ export function sessionStatusErrorMessage(raw: string): string {
  * projection — is kept: the footer is where the reader gets that reason.
  */
 export function statusIndicatorDuplicatesMessageFailure(input: {
-  indicator: Pick<SessionStatusIndicator, 'type' | 'message'>;
+  indicator: Pick<SessionStatusIndicator, 'type' | 'message' | 'code'>;
   failure: MessageFailure | null;
 }): boolean {
   const { indicator, failure } = input;
   if (indicator.type !== 'error' || failure === null) {
     return false;
   }
-  const copy = sessionStatusErrorMessage(indicator.message);
+  const copy = sessionStatusErrorMessage({ message: indicator.message, code: indicator.code });
   if (copy === failure.title) {
     return true;
   }
@@ -294,6 +341,49 @@ export type SessionTerminalError = {
 };
 
 /**
+ * The reader's copy and retryability for a raw SDK error string. The session
+ * manager, the Durable Object's failure projection and the transport all write
+ * English into the atoms and hydration state, so any surface that wants to show
+ * one of those strings runs it through here: the reader gets catalog copy, and
+ * `retryable` says whether a Retry can recover the failure. The original stays
+ * in `detail` for Clipboard.
+ */
+export function describeTerminalFailure(message: string): SessionTerminalError {
+  const cls = classifyTerminalError(message);
+  return {
+    variant: variantForClass(cls),
+    title: titleForClass(cls),
+    message: messageForClass(cls),
+    retryable: retryableClass(cls),
+    detail: message,
+  };
+}
+
+/** The reader's copy and the untranslated original for a runtime failure. */
+type SessionRuntimeFailure = {
+  message: string;
+  detail: string;
+};
+
+/**
+ * The reader's copy for a session's runtime failure — a failed agent run, not a
+ * failed page load. The child sheet's `sessionError` is the same value its
+ * transcript banner renders through `sessionStatusErrorMessage`, so the
+ * full-screen child error resolves the same copy: a recognized class gets its
+ * line, the Durable Object's safe failure projection passes through, and an
+ * unrecognized failure gets the assistant-failure line. That last part is why
+ * this exists: `describeTerminalFailure`'s fallback names a page-load failure,
+ * which is a different failure than the one the user hit. The untranslated
+ * original stays in `detail` for Copy.
+ */
+export function describeSessionRuntimeFailure(message: string): SessionRuntimeFailure {
+  return {
+    message: sessionStatusErrorMessage({ message }),
+    detail: message,
+  };
+}
+
+/**
  * Resolve the terminal error for a session with no messages. Returns `null`
  * when there is nothing terminal to show (loading, empty, or a live session).
  *
@@ -303,7 +393,7 @@ export type SessionTerminalError = {
  */
 export function resolveSessionTerminalError(input: {
   error: string | null;
-  statusIndicator: { type: string; message: string } | null;
+  statusIndicator: { type: string; message: string; code?: SdkStatusMessageCode } | null;
   messageCount: number;
 }): SessionTerminalError | null {
   if (input.messageCount > 0) {
@@ -322,12 +412,19 @@ export function resolveSessionTerminalError(input: {
   }
   if (input.statusIndicator?.type === 'error') {
     const detail = input.statusIndicator.message;
-    const cls = classifyTerminalError(detail);
+    const code = input.statusIndicator.code;
+    // The code names the failure without depending on the English message; a
+    // code the app has no class for falls back to the message, through the same
+    // classifier the child sheet's error surfaces use.
+    const codedClass = code === undefined ? undefined : errorClassForCode(code);
+    if (codedClass === undefined) {
+      return describeTerminalFailure(detail);
+    }
     return {
-      variant: variantForClass(cls),
-      title: titleForClass(cls),
-      message: messageForClass(cls),
-      retryable: retryableClass(cls),
+      variant: variantForClass(codedClass),
+      title: titleForClass(codedClass),
+      message: messageForClass(codedClass),
+      retryable: retryableClass(codedClass),
       detail,
     };
   }

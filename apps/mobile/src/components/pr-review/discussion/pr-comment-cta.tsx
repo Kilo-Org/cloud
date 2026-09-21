@@ -52,5 +52,13 @@ export function PrCommentCta({ onPress, keyboardLift }: PrCommentCtaProps) {
   );
   // Unmounted (not just un-padded) while unfocused: the padding view's own
   // keyboard listener must not react to another surface's keyboard at all.
-  return keyboardLift ? <AppAwareKeyboardPaddingView>{bar}</AppAwareKeyboardPaddingView> : bar;
+  // The bar's inner padding already includes the platform's bottom inset
+  // (`useDetailScreenBottomPadding`), so `contentReservesBottomInset` keeps the
+  // lift from counting that inset a second time and floating the button a
+  // navigation-bar height above the keyboard.
+  return keyboardLift ? (
+    <AppAwareKeyboardPaddingView contentReservesBottomInset>{bar}</AppAwareKeyboardPaddingView>
+  ) : (
+    bar
+  );
 }

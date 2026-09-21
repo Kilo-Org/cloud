@@ -59,6 +59,10 @@ describe('PasskeySignInButton', () => {
 
     expect(reserved).toContain('h-10 w-full');
     expect(offered).toContain('h-10 w-full');
+    // The slot and the button both grow to the 44px touch target on a coarse
+    // pointer, so swapping one for the other cannot move the providers below.
+    expect(reserved).toContain('pointer-coarse:min-h-11');
+    expect(offered).toContain('pointer-coarse:min-h-11');
   });
 
   it('offers the button when a passkey can be used', () => {

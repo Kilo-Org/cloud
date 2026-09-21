@@ -32,7 +32,6 @@ import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 type NewSessionConfigureFormProps = {
   // Prompt / model / attachments (Cloud Agent only).
@@ -176,17 +175,17 @@ export function NewSessionConfigureForm({
   onRetryCloudCreate,
 }: Readonly<NewSessionConfigureFormProps>) {
   const { t } = useTranslation();
-  // Clears the system navigation bar under the scroll content. Without it the
-  // primary Start action can sit in the bar's translucent region a formSheet
-  // leaves exposed below itself (the picker's bottom strip showed its sliver).
-  const bottomClearance = useDetailScreenBottomPadding();
   // The form is edge-to-edge and the window never resizes for the IME on
-  // either platform, so the scroll body needs two floors: the navigation-bar
-  // inset, and the keyboard height — the composer auto-focuses on open, and
-  // without the keyboard floor the Start control stays half-hidden behind
-  // the keyboard strip. The keyboard-lift view is the app's cross-platform
-  // IME primitive (keyboardDidShow/DidHide on Android, keyboardWillShow/
-  // WillHide on iOS), so the same implementation runs on both platforms.
+  // either platform, so the screen needs two floors: the navigation-bar inset
+  // — the Start action sits in a footer below the scroll body, and without the
+  // inset the footer would render in the navigation bar's region (a formSheet
+  // leaves that region exposed below itself; the picker's bottom strip showed
+  // its sliver) — and the keyboard height, because the composer auto-focuses
+  // on open and without the keyboard floor the Start control stays half-hidden
+  // behind the keyboard strip. The keyboard-lift view is the app's
+  // cross-platform IME primitive (keyboardDidShow/DidHide on Android,
+  // keyboardWillShow/WillHide on iOS), so the same implementation runs on both
+  // platforms; the footer is its second child, so the IME lifts the action too.
   // The ScrollView's keyboard-inset adjustment stays on for focused-field
   // scroll-into-view; it sizes against the scroll view's own frame, which
   // already ends above the IME, so the two never stack into a double lift.
@@ -303,39 +302,49 @@ export function NewSessionConfigureForm({
       {!isRemote && !isCloneEntry
         ? renderProfileRow({ t, profile, isProfileLoading, isProfileError, onRetryProfile })
         : null}
-
-      {
-        // Persistent failure feedback for the cloud create, in the same
-        // reserved spot above Start. A retryable rejection carries the retry
-        // control; a terminal one says what the server reported instead. The
-        // form owns this feedback, so the creator hook stays silent for it.
-        // Cloud-only: the route also clears the failure when the target
-        // changes, and this gate keeps a stale one off a remote target no
-        // matter which path selected it.
-      }
-      {cloudCreateError && !isRemote ? (
-        <NewSessionCloudCreateError
-          failure={cloudCreateError}
-          onRetry={onRetryCloudCreate}
-          isRetryDisabled={isStartDisabled}
-        />
-      ) : null}
-
-      <NewSessionStartButton
-        isCloneEntry={isCloneEntry}
-        isRemote={isRemote}
-        isStartDisabled={isStartDisabled}
-        isStarting={isStarting}
-        onStartSession={onStartSession}
-      />
-
-      <View style={{ height: bottomClearance }} pointerEvents="none" />
     </ScrollView>
   );
 
   return (
     <View className="flex-1 bg-background" style={{ paddingBottom: bottom }}>
-      <AppAwareKeyboardPaddingView className="flex-1">{body}</AppAwareKeyboardPaddingView>
+      <AppAwareKeyboardPaddingView className="flex-1">
+        {body}
+        {/*
+          The primary action is pinned below the scroll body, never part of it.
+          A Start button inside the form scrolled out of the viewport on a short
+          screen: only the top of the control stayed visible above the
+          navigation bar, which read as a button the bottom bar had cut off.
+          As the keyboard-lift view's second child the footer is always on
+          screen, clear of the navigation bar, and lifted above the IME.
+        */}
+        <View className="px-4 pb-4">
+          {/*
+            Persistent failure feedback for the cloud create, in the reserved
+            spot above Start. A retryable rejection carries the retry control;
+            a terminal one says what the server reported instead. It rides with
+            the action it answers, so the feedback is on screen wherever the
+            body is scrolled. The form owns this feedback, so the creator hook
+            stays silent for it. Cloud-only: the route also clears the failure
+            when the target changes, and this gate keeps a stale one off a
+            remote target no matter which path selected it.
+          */}
+          {cloudCreateError && !isRemote ? (
+            <NewSessionCloudCreateError
+              failure={cloudCreateError}
+              onRetry={onRetryCloudCreate}
+              isRetryDisabled={isStartDisabled}
+            />
+          ) : null}
+
+          <NewSessionStartButton
+            isCloneEntry={isCloneEntry}
+            isRemote={isRemote}
+            isStartDisabled={isStartDisabled}
+            isStarting={isStarting}
+            onStartSession={onStartSession}
+          />
+        </View>
+      </AppAwareKeyboardPaddingView>
     </View>
   );
 }

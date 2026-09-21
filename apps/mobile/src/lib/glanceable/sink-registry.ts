@@ -53,17 +53,22 @@ function reportSinkFailure(operation: string, error: unknown): void {
 }
 
 /**
- * Run one sink operation and swallow its failure. A native surface must never
- * throw into the auth transition, the org switch, or the in-app publisher: a
- * throwing WidgetKit or ActivityKit host function there would abort a sign-in
- * or kill the publisher effect. The background push path deliberately does NOT
- * use this — a native failure must reject so the OS retries the push.
+ * Run one sink operation and swallow its failure, reporting whether the
+ * operation completed. A native surface must never throw into the auth
+ * transition, the org switch, or the in-app publisher: a throwing WidgetKit or
+ * ActivityKit host function there would abort a sign-in or kill the publisher
+ * effect. The background push path deliberately does NOT use this — a native
+ * failure must reject so the OS retries the push. Callers that track the frame
+ * the native surface last accepted (the publisher's renewal gate) use the
+ * result to tell a write that landed from one that did not.
  */
-export function guardSink(operation: string, run: () => void): void {
+export function guardSink(operation: string, run: () => void): boolean {
   try {
     run();
+    return true;
   } catch (error) {
     reportSinkFailure(operation, error);
+    return false;
   }
 }
 
@@ -76,6 +81,37 @@ export function forEachSink(operation: string, run: (sink: GlanceableSink) => vo
       run(sink);
     });
   }
+}
+
+/**
+ * Write one frame through each supplied sink, reporting whether every write
+ * landed. A context selects the publisher's emit shape (`emit_publish` plus
+ * `emit_start_or_update`); without one, only the plain `publish` write runs.
+ * Each operation is guarded on its own, so a rejected WidgetKit or ActivityKit
+ * call never skips the operation after it or the other sinks. The publisher
+ * advances its published deadline only when this returns true and spaces the
+ * next renewal by a backoff: a rejected renewal is retried without waiting a
+ * full renewal margin and without re-emitting on every heartbeat.
+ */
+export function writeGlanceableFrame(
+  targets: readonly GlanceableSink[],
+  snapshot: GlanceableAgentsSnapshot,
+  ctx: GlanceableSinkContext | null
+): boolean {
+  let ok = true;
+  for (const sink of targets) {
+    const writePublish = () => {
+      sink.publish(snapshot);
+    };
+    ok = guardSink(ctx === null ? 'publish' : 'emit_publish', writePublish) && ok;
+    if (ctx !== null) {
+      const writeStart = () => {
+        sink.startOrUpdate(snapshot, ctx);
+      };
+      ok = guardSink('emit_start_or_update', writeStart) && ok;
+    }
+  }
+  return ok;
 }
 
 /**

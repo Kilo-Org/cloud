@@ -5,15 +5,14 @@ import { SUPPORTED_LANGUAGES } from './languages';
 import { stripInlineCodeMarkers } from './plain-copy';
 
 /**
- * The run-location help the new-task screen, the tour and the instance picker
- * show. Every catalog used to wrap `kilo remote` and `/remote` in backticks,
- * and the native `Text` drew the punctuation.
+ * The run-location help the new-task screen, the tour's fork card and the
+ * instance picker show. Every catalog used to wrap `kilo remote` and `/remote`
+ * in backticks, and the native `Text` drew the punctuation.
  */
 const RUN_LOCATION_COPY_KEYS: string[][] = [
   ['agentChat', 'newSession', 'remoteHint'],
   ['agentChat', 'instancePicker', 'noCliInstancesDescription'],
   ['tour', 'remoteOptionBody'],
-  ['tour', 'remoteEmptyBody'],
 ];
 
 function valueAt(catalog: unknown, path: string[]): unknown {

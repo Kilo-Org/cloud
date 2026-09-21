@@ -303,6 +303,26 @@ describe('MessageBubble failure footer', () => {
     expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
   });
 
+  it('states a generic assistant failure once, without a detail line repeating the title', async () => {
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-laconic', 'APIError'),
+      {
+        onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      }
+    );
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findText(tree, t => t === 'The response failed.')).toBe(false);
+  });
+
+  it('keeps the classified detail line for a known assistant error', async () => {
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-known', 'ProviderAuthError'),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
+    );
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findText(tree, t => t === 'The provider rejected the request.')).toBe(true);
+  });
+
   it('does not render the footer when no handler is supplied', async () => {
     const tree = await renderBubbleWithHandlers(userMessage('m-nohandler'), {
       deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },

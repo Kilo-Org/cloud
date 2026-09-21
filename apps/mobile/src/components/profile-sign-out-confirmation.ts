@@ -1,4 +1,6 @@
-import { Alert, Platform } from 'react-native';
+import { Alert } from 'react-native';
+
+import { needsInAppDestructiveConfirm } from '@/lib/destructive-confirm-platform';
 
 type SignOutConfirmationCopy = {
   title: string;
@@ -22,13 +24,14 @@ type SignOutConfirmationActions = {
  * caller opens `DestructiveConfirmDialog` instead. iOS honors the style and
  * keeps the native alert. The fork lives here rather than in
  * `profile-screen.tsx`, whose cross-platform safe-area alignment path must not
- * branch on the platform (`lib/screen-insets.test.ts`).
+ * branch on the platform (`lib/screen-insets.test.ts`); the platform read is
+ * `needsInAppDestructiveConfirm` from `@/lib/destructive-confirm-platform`.
  */
 export function signOutWithConfirmation(
   copy: SignOutConfirmationCopy,
   actions: SignOutConfirmationActions
 ): void {
-  if (Platform.OS === 'android') {
+  if (needsInAppDestructiveConfirm()) {
     actions.showInAppConfirmation();
     return;
   }

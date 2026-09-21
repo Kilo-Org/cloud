@@ -67,13 +67,7 @@ function slopDp(hitSlop: unknown): number {
 
 /** One side's reach from a hitSlop that is either a number (every side) or a per-side map. */
 function slopSideDp(hitSlop: unknown, side: keyof Insets): number {
-  if (typeof hitSlop === 'number') {
-    return hitSlop;
-  }
-  if (hitSlop && typeof hitSlop === 'object') {
-    return (hitSlop as Partial<Insets>)[side] ?? 0;
-  }
-  return 0;
+  return hitSlopInsets(hitSlop)[side];
 }
 
 function pressesWithLabel(root: I, label: string): I[] {
@@ -146,6 +140,30 @@ async function compiledGapDp(rowClassName: string): Promise<number> {
 }
 
 type Insets = { top: number; right: number; bottom: number; left: number };
+
+/**
+ * A control's hitSlop as per-side insets. Controls here use either shape: the
+ * shared `IconButton` passes per-side insets, while `SessionFilterButton` keeps
+ * the scalar `@/lib/a11y/touch-target` slop, where one number applies to every
+ * side.
+ */
+function hitSlopInsets(hitSlop: unknown): Insets {
+  if (typeof hitSlop === 'number') {
+    return { top: hitSlop, right: hitSlop, bottom: hitSlop, left: hitSlop };
+  }
+  if (hitSlop && typeof hitSlop === 'object') {
+    const insets = hitSlop as Partial<Insets>;
+    if (typeof insets.right === 'number' && typeof insets.left === 'number') {
+      return {
+        top: insets.top ?? 0,
+        right: insets.right,
+        bottom: insets.bottom ?? 0,
+        left: insets.left,
+      };
+    }
+  }
+  throw new Error(`no measurable hitSlop in ${JSON.stringify(hitSlop)}`);
+}
 
 const noop = (): void => undefined;
 

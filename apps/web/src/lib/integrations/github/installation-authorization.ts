@@ -71,6 +71,7 @@ export async function discoverAuthorizedGitHubInstallations(params: {
   accessToken: string;
   githubAppType: GitHubAppType;
   expectedAppId: string;
+  installationId?: string;
 }): Promise<{ identity: GitHubOAuthIdentity; candidates: GitHubInstallationCandidate[] }> {
   const client: GitHubInstallationAuthorizationClient = new Octokit({ auth: params.accessToken });
   const expectedAppId = Number(params.expectedAppId);
@@ -144,6 +145,38 @@ export async function discoverAuthorizedGitHubInstallations(params: {
     return [];
   });
 
+  if (params.installationId) {
+    const target = installations.find(value => value.id.toString() === params.installationId);
+    const membership = target?.account?.id
+      ? memberships.find(value => value.organization.id === target.account?.id)
+      : undefined;
+    console.log(
+      '[github_admin_proof:discovery]',
+      JSON.stringify({
+        github_app_type: params.githubAppType,
+        expected_app_id: expectedAppId,
+        github_user_id: user.id.toString(),
+        installation_id: params.installationId,
+        target: target
+          ? {
+              app_id: target.appId,
+              app_id_matches: target.appId === expectedAppId,
+              account_id: target.account?.id ?? null,
+              account_type: target.account?.type ?? null,
+              account_login_present: Boolean(target.account?.login),
+              membership_visible: Boolean(membership),
+              membership_role: membership?.role ?? null,
+              membership_state: membership?.state ?? null,
+              personal_account_matches_user: target.account?.id === user.id,
+              authorized_candidate: candidates.some(
+                value => value.installationId === params.installationId
+              ),
+            }
+          : null,
+      })
+    );
+  }
+
   return { identity: { id: user.id.toString(), login: user.login }, candidates };
 }
 
@@ -161,6 +194,25 @@ export async function verifyGitHubInstallationAuthorization(params: {
       value.installationId === params.installationId &&
       (!params.accountId || value.accountId === params.accountId) &&
       (!params.accountType || value.accountType === params.accountType)
+  );
+  const installationCandidate = discovered.candidates.find(
+    value => value.installationId === params.installationId
+  );
+  console.log(
+    '[github_admin_proof:verification]',
+    JSON.stringify({
+      github_app_type: params.githubAppType,
+      installation_id: params.installationId,
+      expected_account_id: params.accountId ?? null,
+      expected_account_type: params.accountType ?? null,
+      result: candidate
+        ? 'authorized'
+        : !installationCandidate
+          ? 'installation_not_authorized'
+          : params.accountId && installationCandidate.accountId !== params.accountId
+            ? 'account_id_mismatch'
+            : 'account_type_mismatch',
+    })
   );
   return candidate ? { identity: discovered.identity, candidate } : null;
 }

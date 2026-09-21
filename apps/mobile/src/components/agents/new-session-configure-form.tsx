@@ -1,7 +1,6 @@
 import { type RefObject } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LaunchFolderField } from '@/components/agents/folder-selector';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
@@ -175,9 +174,13 @@ export function NewSessionConfigureForm({
   onRetryCloudCreate,
 }: Readonly<NewSessionConfigureFormProps>) {
   const { t } = useTranslation();
-  // Clears the system navigation bar under the pinned Start footer. Without it
-  // the primary action can sit in the bar's translucent region a formSheet
-  // leaves exposed below itself (the picker's bottom strip showed its sliver).
+  // The pinned footer's single source of bottom clearance: it clears the system
+  // navigation bar under Start. Without it the primary action can sit in the
+  // bar's translucent region a formSheet leaves exposed below itself (the
+  // picker's bottom strip showed its sliver). It rides the footer itself (see
+  // pr-comment-cta.tsx for the same bar pattern) rather than a spacer inside
+  // the ScrollView, which the pinned Start no longer needs and which left dead
+  // space below the last field of a long form.
   const bottomClearance = useDetailScreenBottomPadding();
   // The form is edge-to-edge and the window never resizes for the IME on
   // either platform, so the primary action needs two floors: the
@@ -197,7 +200,6 @@ export function NewSessionConfigureForm({
   // triggers: a formSheet anchors over the keyboard that is up at its first
   // layout and never re-anchors, so the keyboard must be dismissed before
   // the sheet opens.)
-  const { bottom } = useSafeAreaInsets();
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
   const runOnNote =
@@ -306,8 +308,6 @@ export function NewSessionConfigureForm({
       {!isRemote && !isCloneEntry
         ? renderProfileRow({ t, profile, isProfileLoading, isProfileError, onRetryProfile })
         : null}
-
-      <View style={{ height: bottomClearance }} pointerEvents="none" />
     </ScrollView>
   );
 
@@ -320,7 +320,7 @@ export function NewSessionConfigureForm({
   // changes, and this gate keeps a stale one off a remote target no matter
   // which path selected it.
   const footer = (
-    <View className="bg-background px-4 pt-3 pb-4">
+    <View className="bg-background px-4 pt-3" style={{ paddingBottom: bottomClearance }}>
       {cloudCreateError && !isRemote ? (
         <NewSessionCloudCreateError
           failure={cloudCreateError}
@@ -340,7 +340,7 @@ export function NewSessionConfigureForm({
   );
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingBottom: bottom }}>
+    <View className="flex-1 bg-background">
       {body}
       <AppAwareKeyboardPaddingView>{footer}</AppAwareKeyboardPaddingView>
     </View>

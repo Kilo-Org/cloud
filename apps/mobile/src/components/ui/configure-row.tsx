@@ -1,5 +1,6 @@
 import { type LucideIcon } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { IconTile } from '@/components/ui/icon-tile';
 import { type ReactNode } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 
@@ -56,7 +57,6 @@ export function ConfigureRow({
   const { fontScale } = useWindowDimensions();
   const stack = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE;
   const tint: Tint = tone ? toneColor(tone) : agentColor(title);
-  const iconColor = colors[tint.hueThemeKey];
   // Inert rows (no onPress) and disabled rows are not tappable — hide the
   // chevron so they don't look tappable, and never render pressed feedback.
   const showChevron = Boolean(onPress) && !disabled;
@@ -64,17 +64,7 @@ export function ConfigureRow({
     trailing ??
     (showChevron ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null);
 
-  const iconTile = (
-    <View
-      className={cn(
-        'h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border',
-        tint.tileBgClass,
-        tint.tileBorderClass
-      )}
-    >
-      <Icon size={16} color={iconColor} />
-    </View>
-  );
+  const iconTile = <IconTile icon={Icon} tint={tint} />;
 
   const textBlock = (
     <View className={cn('min-w-0', stack ? 'w-full' : 'flex-1')}>

@@ -18,7 +18,6 @@ import {
   SessionSkeletonMessages,
 } from '@/components/agents/session-detail-skeleton';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
-import { SessionCopyLinkAction } from '@/components/agents/session-copy-link-action';
 import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { useSessionSlowLoadPhase } from '@/components/agents/session-slow-load';
 import { useIdentityConfirmation } from '@/components/agents/user-web-connection-provider';
@@ -193,11 +192,12 @@ export default function SessionDetailScreen() {
   ) {
     // The composer placeholder holds its own height: nothing may shift when
     // the query resolves. Route title hints are not bound to an account.
-    // The right cluster reserves the loaded header's Copy-link action too, so
-    // the 44pt control appearing at the swap cannot narrow and re-wrap the
-    // title. The route already holds the `?at=` anchor, so copying the link
-    // while the transcript loads keeps the same position the loaded header
-    // falls back to; with no usable anchor it copies the session-top link.
+    // The loading header reserves the loaded header's context pill (the loaded
+    // right cluster is that pill plus an optional PR badge) so the swap cannot
+    // re-wrap the title. Copying the session link belongs to the context
+    // details sheet, which mounts with SessionDetailContent below, so this
+    // header deliberately renders no copy control while the session is
+    // unresolved.
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
@@ -213,7 +213,6 @@ export default function SessionDetailScreen() {
                 hasMessages={false}
                 loading
               />
-              <SessionCopyLinkAction sessionId={sessionId} anchorMessageId={resumeAt} />
             </View>
           }
         />

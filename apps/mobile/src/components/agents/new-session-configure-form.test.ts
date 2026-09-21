@@ -616,7 +616,7 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Retry')).toBe(true);
   });
 
-  it('hides the environment row while the profile query is loading', async () => {
+  it('explains the pending environment request without hiding the form or showing a default', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -624,10 +624,15 @@ describe('NewSessionConfigureForm', () => {
       ...defaultProps(),
       runOnInstance: null,
       isProfileLoading: true,
+      isStartDisabled: true,
     }) as Node;
 
-    expect(findTextContent(element, t => t === 'Environment')).toBe(false);
+    expect(findTextContent(element, t => t === 'Environment')).toBe(true);
+    expect(findTextContent(element, t => t === 'Loading…')).toBe(true);
     expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
+    expect(findElementByType(element, 'Skeleton')).not.toBeNull();
+    expect(findElementByType(element, 'NewSessionPrompt')?.isCreating).toBe(false);
+    expect(findElementByType(element, 'NewSessionStartButton')?.isStartDisabled).toBe(true);
   });
 
   it('does not render the environment row for a remote target', async () => {

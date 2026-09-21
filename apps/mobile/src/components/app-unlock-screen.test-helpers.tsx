@@ -53,10 +53,23 @@ const storage = vi.hoisted(() => ({ getItemAsync: vi.fn(), setItemAsync: vi.fn()
 const catalogs = vi.hoisted(() => ({ fr: vi.fn() }));
 const announcements = vi.hoisted(() => vi.fn());
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
+// The route the mocked expo-router reports, shaped like production: segments
+// carry the group names, the pathname strips them. Defaults to a screen
+// pushed over the tabs, where no tab bar is on screen.
+const route = vi.hoisted(() => ({
+  segments: ['(app)', 'agent-chat'] as string[],
+  pathname: '/agent-chat',
+}));
 const lifecycle = vi.hoisted(() => ({
   change: undefined as ((state: AppStateStatus) => void) | undefined,
 }));
-export { announcements, catalogs, lifecycle, native, platform, storage };
+const keyboard = vi.hoisted(() => ({
+  // Both slots share one signature so either listener can be stored; `hide`
+  // is dispatched with an empty payload.
+  show: undefined as ((event: { endCoordinates: { height: number } }) => void) | undefined,
+  hide: undefined as ((event: { endCoordinates: { height: number } }) => void) | undefined,
+}));
+export { announcements, catalogs, keyboard, lifecycle, native, platform, route, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
@@ -72,9 +85,28 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platform,
+  useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
   StatusBar: { currentHeight: 0 },
   I18nManager: { isRTL: false },
   AccessibilityInfo: { announceForAccessibility: announcements },
+  Keyboard: {
+    addListener: (
+      event: string,
+      listener: (event: { endCoordinates: { height: number } }) => void
+    ) => {
+      if (event === 'keyboardDidShow' || event === 'keyboardWillShow') {
+        keyboard.show = listener;
+      } else {
+        keyboard.hide = listener;
+      }
+      return {
+        remove: () => {
+          keyboard.show = undefined;
+          keyboard.hide = undefined;
+        },
+      };
+    },
+  },
   AppState: {
     currentState: 'active',
     addEventListener: (_event: string, listener: (state: AppStateStatus) => void) => {
@@ -135,9 +167,9 @@ vi.mock('expo-router', () => ({
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
-  usePathname: () => '/(app)/(tabs)/(0_home)',
+  usePathname: () => route.pathname,
   useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
-  useSegments: () => ['(app)', '(tabs)', '(3_profile)', 'organization'],
+  useSegments: () => route.segments,
 }));
 vi.mock('@expo/react-native-action-sheet', () => ({ ActionSheetProvider: 'ActionSheetProvider' }));
 vi.mock('@rn-primitives/portal', () => ({ PortalHost: 'PortalHost' }));
@@ -204,6 +236,9 @@ vi.mock('@/components/share/share-payload-navigator', () => ({
 }));
 vi.mock('@/lib/active-sessions-live-sync-mount', () => ({
   ActiveSessionsLiveSyncMount: 'ActiveSessionsLiveSyncMount',
+}));
+vi.mock('@/lib/artifacts/artifact-mirror-sync-mount', () => ({
+  ArtifactMirrorSyncMount: 'ArtifactMirrorSyncMount',
 }));
 vi.mock('@/lib/persist/cache-persistence-mount', () => ({
   CachePersistenceMount: 'CachePersistenceMount',
@@ -290,6 +325,8 @@ export function resetUnlockMocks() {
   vi.stubGlobal('__DEV__', true);
   vi.resetAllMocks();
   platform.OS = 'ios';
+  route.segments = ['(app)', 'agent-chat'];
+  route.pathname = '/agent-chat';
   storage.getItemAsync.mockResolvedValue('enabled');
   native.hasHardwareAsync.mockResolvedValue(true);
   native.isEnrolledAsync.mockResolvedValue(true);

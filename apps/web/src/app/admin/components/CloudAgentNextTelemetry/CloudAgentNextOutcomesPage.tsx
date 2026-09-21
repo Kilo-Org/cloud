@@ -119,6 +119,12 @@ const outcomePresentation = {
     marker: 'border-red-500',
     value: 'text-red-400',
   },
+  provider: {
+    label: 'Provider failures',
+    segment: 'bg-orange-500',
+    marker: 'border-orange-500',
+    value: 'text-orange-400',
+  },
   unknown: {
     label: 'Unknown failures',
     segment: 'bg-gray-500',
@@ -149,8 +155,8 @@ function HealthSummary({ summary }: { summary: HealthData['summary'] }) {
       <CardHeader>
         <CardTitle>Observed health</CardTitle>
         <CardDescription>
-          Completed and interrupted runs alongside failures requiring user action, platform action,
-          or further investigation. Every percentage is a share of all observed outcomes.
+          Completed and interrupted runs alongside platform, provider, user, and unknown failures.
+          Every percentage is a share of all observed outcomes.
         </CardDescription>
         <p className="text-muted-foreground pt-2 text-sm tabular-nums">
           <span className="text-foreground font-semibold">
@@ -194,7 +200,7 @@ function HealthSummary({ summary }: { summary: HealthData['summary'] }) {
               );
             })}
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           {stats.outcomes.map(outcome => {
             const presentation = outcomePresentation[outcome.kind];
             return (
@@ -226,6 +232,7 @@ function errorSourceBadge(source: TopError['source']) {
 
 const RESPONSIBILITY_LABELS = {
   platform: 'Platform',
+  provider: 'Provider',
   user: 'User',
   unknown: 'Unknown',
 } as const;
@@ -237,9 +244,11 @@ function responsibilityBadge(responsibility: TopError['responsibility']) {
       className={
         responsibility === 'user'
           ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300'
-          : responsibility === 'unknown'
-            ? 'text-muted-foreground'
-            : undefined
+          : responsibility === 'provider'
+            ? 'border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-300'
+            : responsibility === 'unknown'
+              ? 'text-muted-foreground'
+              : undefined
       }
     >
       {RESPONSIBILITY_LABELS[responsibility]}
@@ -519,6 +528,9 @@ function TopErrors({
               <SelectContent>
                 <SelectItem value="platform">
                   Platform ({summary.platformFailures.toLocaleString()})
+                </SelectItem>
+                <SelectItem value="provider">
+                  Provider ({summary.providerFailures.toLocaleString()})
                 </SelectItem>
                 <SelectItem value="user">User ({summary.userFailures.toLocaleString()})</SelectItem>
                 <SelectItem value="unknown">

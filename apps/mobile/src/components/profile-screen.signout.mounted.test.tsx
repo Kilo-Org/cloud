@@ -10,6 +10,9 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 const signOutFn = vi.hoisted(() => vi.fn());
 const alertFn = vi.hoisted(() => vi.fn());
+// The screen reads its landscape side insets through `@/lib/screen-insets`,
+// which imports `react-native-safe-area-context`.
+const safeArea = vi.hoisted(() => ({ top: 24, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
   Alert: { alert: alertFn },
@@ -30,7 +33,7 @@ vi.mock('react-native-reanimated', () => ({
 // `react-native`, whose Flow source this pipeline cannot parse. The screen only
 // needs the numbers, so the insets are stubbed.
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => safeArea,
 }));
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));

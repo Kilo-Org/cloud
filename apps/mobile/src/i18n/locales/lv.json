@@ -854,8 +854,11 @@
       "sessionStatusTitle": "Sesijas statuss",
       "sessionStatusSubtitle": "sesija pabeigta / kļūda / gatava vadīšanai",
       "kiloclawActivitySubtitle": "instance gatava / kļūda, ieplānotas darbības",
+      "kiloclawActivityUnavailable": "Palaid KiloClaw instanci, lai saņemtu KiloClaw darbību.",
       "balanceAlertsSubtitle": "brīdinājumi par mazu organizācijas kredītu atlikumu",
-      "securityFindingsSubtitle": "jaunas konstatētās problēmas un SLA atgādinājumi"
+      "balanceAlertsUnavailable": "Pievienojies organizācijai, lai saņemtu brīdinājumus par mazu atlikumu.",
+      "securityFindingsSubtitle": "jaunas konstatētās problēmas un SLA atgādinājumi",
+      "securityFindingsUnavailable": "Iespējo Kilo drošības aģentu tvērumā, lai saņemtu drošības konstatējumus."
     },
     "action": {
       "openSession": "Atvērt sesiju"

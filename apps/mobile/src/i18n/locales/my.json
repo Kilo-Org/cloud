@@ -838,8 +838,11 @@
       "sessionStatusTitle": "စက်ရှင်အခြေအနေ",
       "sessionStatusSubtitle": "ပြီးဆုံး / မအောင်မြင် / ထိန်းချုပ်ရန် အသင့်",
       "kiloclawActivitySubtitle": "စနစ်အသင့်ဖြစ်မှု/မအောင်မြင်မှု၊ အချိန်သတ်မှတ်ထားသော လုပ်ဆောင်ချက်များ",
+      "kiloclawActivityUnavailable": "KiloClaw လုပ်ဆောင်ချက်များ ရရှိရန် KiloClaw စနစ်တစ်ခု စတင်ပါ။",
       "balanceAlertsSubtitle": "အဖွဲ့အစည်း၏ လက်ကျန်နည်းချိန် သတိပေးချက်များ",
-      "securityFindingsSubtitle": "တွေ့ရှိချက်အသစ်များနှင့် SLA သတိပေးချက်များ"
+      "balanceAlertsUnavailable": "လက်ကျန်နည်း သတိပေးချက်များ ရရှိရန် အဖွဲ့အစည်းတစ်ခုသို့ ပါဝင်ပါ။",
+      "securityFindingsSubtitle": "တွေ့ရှိချက်အသစ်များနှင့် SLA သတိပေးချက်များ",
+      "securityFindingsUnavailable": "လုံခြုံရေးတွေ့ရှိချက်များ ရရှိရန် နယ်ပယ်တစ်ခုတွင် Kilo လုံခြုံရေးအေးဂျင့်ကို ဖွင့်ပါ။"
     },
     "action": {
       "openSession": "စက်ရှင်ကို ဖွင့်ပါ"

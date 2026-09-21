@@ -129,6 +129,7 @@ import {
   type SessionTranscriptItem,
 } from '@/components/agents/session-transcript';
 import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
+import { displaySessionTitle } from '@/components/agents/session-detail-rename-state';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
@@ -1528,7 +1529,10 @@ export function SessionDetailContent({
   });
 
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
-  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
+  // A `New session - <ISO>` placeholder is not a title: showing it truncates
+  // the header to "New session - 2026-…". Fall through to the short fallback
+  // until auto-titling (or a rename) supplies a real one.
+  const serverTitle = isSessionLoaded ? displaySessionTitle(fetchedData.title) : undefined;
   const rename = useSessionDetailRename({
     sessionId,
     isLoaded: isSessionLoaded,
@@ -1925,9 +1929,12 @@ export function SessionDetailContent({
           ) : null}
           <ScreenHeader
             title={rename.title}
-            titleNumberOfLines={1}
+            // Two lines (the ScreenHeader detail default) are exactly the space
+            // `reserveTitleSpace` already holds, so a long title is shown in
+            // full at a word boundary instead of being cut to one tail-ellipsized
+            // line ("Moving-average empty windo…").
             reserveTitleSpace
-            backFallback="/(app)/(tabs)/(2_agents)"
+            backFallback={'/(app)/(tabs)/(2_agents)' as Href}
             headerRight={headerRight}
             className="pb-1"
             {...(rename.isTitleInteractive

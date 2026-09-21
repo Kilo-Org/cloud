@@ -16,6 +16,7 @@ import {
   SessionComposerSkeleton,
   SessionSkeletonMessages,
 } from '@/components/agents/session-detail-skeleton';
+import { displaySessionTitle } from '@/components/agents/session-detail-rename-state';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { AgentSessionProvider } from '@/components/agents/session-provider';
 import { useSessionSlowLoadPhase } from '@/components/agents/session-slow-load';
@@ -202,7 +203,7 @@ export default function SessionDetailScreen() {
         <ScreenHeader
           title={t('agentChat.session.title')}
           reserveTitleSpace
-          backFallback="/(app)/(tabs)/(2_agents)"
+          backFallback={'/(app)/(tabs)/(2_agents)' as Href}
           headerRight={
             <View className="flex-row items-center gap-2">
               <SessionContextMetrics
@@ -269,7 +270,7 @@ export default function SessionDetailScreen() {
         <ScreenHeader
           title={t('agentChat.session.title')}
           reserveTitleSpace
-          backFallback="/(app)/(tabs)/(2_agents)"
+          backFallback={'/(app)/(tabs)/(2_agents)' as Href}
         />
         <CenteredState>
           <View className="items-center gap-3 px-6">
@@ -335,7 +336,7 @@ export default function SessionDetailScreen() {
     >
       <SessionDetailContent
         sessionId={sessionId as KiloSessionId}
-        cachedTitle={sessionQuery.data?.title ?? undefined}
+        cachedTitle={displaySessionTitle(sessionQuery.data?.title)}
         displayScope={displayScope}
         openedVia={via === 'push' ? 'push' : 'app'}
         shareId={shareId}

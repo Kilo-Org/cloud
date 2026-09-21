@@ -846,7 +846,7 @@ describe('SessionDetailContent display scope', () => {
     });
     const header = renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 1,
+      numberOfLines: 2,
       ellipsizeMode: 'tail',
     });
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
@@ -874,16 +874,18 @@ describe('SessionDetailContent display scope', () => {
 
 describe('SessionDetailContent header title', () => {
   // The title shares its row with a 44pt context pill and a copy action, so on
-  // a narrow phone the title column is a fraction of the row width. Letting the
-  // Text wrap there split a long word across two lines and truncated the second
-  // ("Moving-ave / rage empt…"). One line keeps the truncation at a clean tail
-  // ellipsis instead of breaking a word across two lines.
-  it('keeps a long session title on one line instead of breaking a word across two', async () => {
+  // a narrow phone the title column is a fraction of the row width. Clamping it
+  // to one line cut a long title to a tail ellipsis ("Moving-average empty
+  // windo…"), which the proof audit rejected: the full title has to be readable.
+  // The header already reserves two title lines (`reserveTitleSpace`), and the
+  // wrap lands on word boundaries, so the second line shows the rest of the
+  // title instead of dead space under a truncated first line.
+  it('shows a long session title in full across the two reserved lines', async () => {
     sessionTitleOverride = 'Moving-average rage empty baseline';
     const { renderer } = await mountDetails();
     const header = renderer.root.findByType(ScreenHeader);
     const title = header.findByProps({ accessibilityRole: 'header' });
-    expect(title.props.numberOfLines).toBe(1);
+    expect(title.props.numberOfLines).toBe(2);
     expect(title.props.ellipsizeMode).toBe('tail');
   });
 });
@@ -1526,7 +1528,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
 
     const header = view.renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 1,
+      numberOfLines: 2,
       ellipsizeMode: 'tail',
     });
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(

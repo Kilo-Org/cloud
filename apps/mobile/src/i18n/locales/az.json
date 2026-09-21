@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Sessiya statusu",
       "sessionStatusSubtitle": "tamamlanıb / uğursuz olub / idarəetməyə hazırdır",
       "kiloclawActivitySubtitle": "nüsxə hazırdır/uğursuz olub, planlaşdırılmış əməliyyatlar",
+      "kiloclawActivityUnavailable": "KiloClaw fəaliyyətini almaq üçün KiloClaw nüsxəsini başladın.",
       "balanceAlertsSubtitle": "təşkilatın balansının azalması barədə xəbərdarlıqlar",
-      "securityFindingsSubtitle": "yeni aşkarlamalar və SLA xatırlatmaları"
+      "balanceAlertsUnavailable": "Balans xəbərdarlıqlarını almaq üçün təşkilata qoşulun.",
+      "securityFindingsSubtitle": "yeni aşkarlamalar və SLA xatırlatmaları",
+      "securityFindingsUnavailable": "Təhlükəsizlik problemlərini almaq üçün Kilo Təhlükəsizlik agentini bir əhatə dairəsində aktivləşdirin."
     },
     "action": {
       "openSession": "Sessiyanı aç"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Sessiyanı yükləmək mümkün olmadı.",
       "failedToLoadDetails": "Sessiyanın təfərrüatlarını yükləmək mümkün olmadı.",
       "failedToStopExecution": "İcranı dayandırmaq mümkün olmadı.",
+      "stopped": "Sessiya dayandırıldı",
+      "committing": "Təsdiqlənir…",
+      "committed": "Təsdiqləndi",
+      "commitFailed": "Təsdiqləmə uğursuz oldu",
       "renameSession": "Sessiyanın adını dəyiş",
       "renamePlaceholder": "Sessiya adı",
       "transcriptAccessibility": "Sessiyanın yazışma tarixçəsi",

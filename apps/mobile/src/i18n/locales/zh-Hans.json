@@ -334,8 +334,11 @@
       "sessionStatusTitle": "会话状态",
       "sessionStatusSubtitle": "已完成 / 已失败 / 可接管",
       "kiloclawActivitySubtitle": "实例就绪/失败、计划操作",
+      "kiloclawActivityUnavailable": "启动 KiloClaw 实例即可获取 KiloClaw 活动。",
       "balanceAlertsSubtitle": "组织余额不足警告",
-      "securityFindingsSubtitle": "新发现的安全问题和 SLA 提醒"
+      "balanceAlertsUnavailable": "加入组织即可获取余额不足提醒。",
+      "securityFindingsSubtitle": "新发现的安全问题和 SLA 提醒",
+      "securityFindingsUnavailable": "在范围内启用 Kilo 安全智能体即可获取安全问题。"
     },
     "action": {
       "openSession": "打开会话"
@@ -1572,6 +1575,10 @@
       "couldNotLoad": "无法加载会话。",
       "failedToLoadDetails": "无法加载会话详情。",
       "failedToStopExecution": "停止执行失败。",
+      "stopped": "会话已停止",
+      "committing": "正在提交…",
+      "committed": "已提交",
+      "commitFailed": "提交失败",
       "renameSession": "重命名会话",
       "renamePlaceholder": "会话名称",
       "transcriptAccessibility": "会话记录",

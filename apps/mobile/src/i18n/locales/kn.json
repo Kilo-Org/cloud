@@ -838,8 +838,11 @@
       "sessionStatusTitle": "ಸೆಶನ್ ಸ್ಥಿತಿ",
       "sessionStatusSubtitle": "ಮುಗಿದಿದೆ / ವಿಫಲವಾಗಿದೆ / ನಿಯಂತ್ರಿಸಲು ಸಿದ್ಧ",
       "kiloclawActivitySubtitle": "ಇನ್‌ಸ್ಟನ್ಸ್ ಸಿದ್ಧವಾಗಿದೆ/ವಿಫಲವಾಗಿದೆ, ನಿಗದಿತ ಕಾರ್ಯಗಳು",
+      "kiloclawActivityUnavailable": "KiloClaw ಚಟುವಟಿಕೆ ಪಡೆಯಲು KiloClaw ಇನ್‌ಸ್ಟನ್ಸ್ ಪ್ರಾರಂಭಿಸಿ.",
       "balanceAlertsSubtitle": "ಸಂಸ್ಥೆಯ ಉಳಿಕೆ ಕಡಿಮೆಯಾದಾಗ ಎಚ್ಚರಿಕೆಗಳು",
-      "securityFindingsSubtitle": "ಹೊಸದಾಗಿ ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಗಳು ಮತ್ತು SLA ಜ್ಞಾಪನೆಗಳು"
+      "balanceAlertsUnavailable": "ಬ್ಯಾಲೆನ್ಸ್ ಎಚ್ಚರಿಕೆಗಳನ್ನು ಪಡೆಯಲು ಸಂಸ್ಥೆಗೆ ಸೇರಿ.",
+      "securityFindingsSubtitle": "ಹೊಸದಾಗಿ ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಗಳು ಮತ್ತು SLA ಜ್ಞಾಪನೆಗಳು",
+      "securityFindingsUnavailable": "ಭದ್ರತಾ ಸಮಸ್ಯೆಗಳನ್ನು ಪಡೆಯಲು ಒಂದು ವ್ಯಾಪ್ತಿಯಲ್ಲಿ Kilo ಭದ್ರತಾ ಏಜೆಂಟ್ ಸಕ್ರಿಯಗೊಳಿಸಿ."
     },
     "action": {
       "openSession": "ಸೆಷನ್ ತೆರೆಯಿರಿ"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "ಸೆಶನ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "failedToLoadDetails": "ಸೆಶನ್ ವಿವರಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "failedToStopExecution": "ಕಾರ್ಯನಿರ್ವಹಣೆಯನ್ನು ನಿಲ್ಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "stopped": "ಸೆಶನ್ ನಿಲ್ಲಿಸಲಾಗಿದೆ",
+      "committing": "ಕಮಿಟ್ ಮಾಡಲಾಗುತ್ತಿದೆ…",
+      "committed": "ಕಮಿಟ್ ಆಗಿದೆ",
+      "commitFailed": "ಕಮಿಟ್ ವಿಫಲವಾಗಿದೆ",
       "renameSession": "ಸೆಶನ್ ಹೆಸರು ಬದಲಾಯಿಸಿ",
       "renamePlaceholder": "ಸೆಶನ್ ಹೆಸರು",
       "transcriptAccessibility": "ಸೆಶನ್‌ನ ಸಂಭಾಷಣೆಯ ಪಠ್ಯ",

@@ -298,8 +298,11 @@
       "sessionStatusTitle": "Status da sessão",
       "sessionStatusSubtitle": "sessão concluída, com falha ou pronta para você controlar",
       "kiloclawActivitySubtitle": "instância pronta ou com falha, ações agendadas",
+      "kiloclawActivityUnavailable": "Inicie uma instância do KiloClaw para receber a atividade do KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organização",
-      "securityFindingsSubtitle": "novos problemas de segurança e lembretes de SLA"
+      "balanceAlertsUnavailable": "Entre em uma organização para receber alertas de saldo baixo.",
+      "securityFindingsSubtitle": "novos problemas de segurança e lembretes de SLA",
+      "securityFindingsUnavailable": "Ative o agente de segurança do Kilo em um âmbito para receber problemas de segurança."
     },
     "action": {
       "openSession": "Abrir sessão"
@@ -1548,6 +1551,10 @@
       "couldNotLoad": "Não foi possível carregar a sessão.",
       "failedToLoadDetails": "Não foi possível carregar os detalhes da sessão.",
       "failedToStopExecution": "Não foi possível interromper a execução.",
+      "stopped": "Sessão interrompida",
+      "committing": "Registrando…",
+      "committed": "Registrado",
+      "commitFailed": "Falha ao registrar",
       "renameSession": "Renomear sessão",
       "renamePlaceholder": "Nome da sessão",
       "transcriptAccessibility": "Transcrição da sessão",

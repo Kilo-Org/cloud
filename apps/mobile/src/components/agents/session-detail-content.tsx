@@ -121,6 +121,7 @@ import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agen
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
 import { profileOrganizationId } from '@/components/profiles/profile-owner-model';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
   SESSION_SLOW_LOAD_MS,
   useSessionSlowLoadPhase,
@@ -1959,8 +1960,8 @@ export function SessionDetailContent({
           ) : null}
           <ScreenHeader
             title={rename.title}
-            titleNumberOfLines={1}
             reserveTitleSpace
+            titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
             backFallback="/(app)/(tabs)/(2_agents)"
             headerRight={headerRight}
             className="pb-1"

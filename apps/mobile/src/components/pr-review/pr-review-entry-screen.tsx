@@ -8,6 +8,7 @@ import { Alert, Pressable, TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
+import { PrLinkPlaceholder } from '@/components/pr-review/pr-link-placeholder';
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
 import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -140,6 +141,7 @@ export function PrReviewEntryScreen() {
   };
 
   const showClearButton = selectPrLinkClearButtonVisible({ hasInput });
+  const urlPlaceholder = t('prReview.entry.urlPlaceholder');
 
   let recentsBody: ReactNode = null;
   if (recent === null) {
@@ -255,11 +257,17 @@ export function PrReviewEntryScreen() {
             <TextInput
               ref={inputRef}
               defaultValue=""
-              placeholder={t('prReview.entry.urlPlaceholder')}
-              placeholderTextColor={colors.mutedForeground}
+              placeholder={urlPlaceholder}
+              // The native hint is not reliably one line: Android lays it out
+              // on a second line the one-line field clips. Both platforms draw
+              // the visible placeholder with the one-line PrLinkPlaceholder
+              // overlay instead; the hint stays set for the digest and
+              // accessibility text but is invisible.
+              placeholderTextColor="transparent"
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
+              numberOfLines={1}
               onChangeText={value => {
                 // Don't setState on every keystroke; track only whether the
                 // input has any text. The raw value lives in the ref so
@@ -277,11 +285,14 @@ export function PrReviewEntryScreen() {
               }}
               // leading-[normal] so no lineHeight reaches the style: an explicit lineHeight
               // makes iOS draw the placeholder lower than the typed text (see AGENTS.md).
-              className="min-w-0 flex-1 bg-transparent py-3 pl-3 pr-1 text-base text-foreground leading-[normal]"
+              // min-h-14 (not py-*) sizes the single-line field per the mobile
+              // input rules and still lets Dynamic Type grow it past the floor.
+              className="min-h-14 min-w-0 flex-1 bg-transparent pl-3 pr-1 text-base text-foreground leading-[normal]"
               accessibilityLabel={t('prReview.entry.urlAccessibility')}
               returnKeyType="go"
               onSubmitEditing={handleSubmit}
             />
+            {!hasInput ? <PrLinkPlaceholder label={urlPlaceholder} /> : null}
             {showClearButton ? (
               // h-13 w-13 measures 45×45pt on device; h-12 is 42pt and h-11 is
               // 38pt in this app — do not "simplify" back to h-11/w-11.

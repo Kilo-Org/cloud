@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Сессия күйі",
       "sessionStatusSubtitle": "аяқталды / сәтсіз аяқталды / басқаруға дайын",
       "kiloclawActivitySubtitle": "дана дайын / істен шықты, жоспарланған әрекеттер",
+      "kiloclawActivityUnavailable": "KiloClaw белсенділігін алу үшін KiloClaw данасын іске қосыңыз.",
       "balanceAlertsSubtitle": "ұйым балансының азайғаны туралы ескертулер",
-      "securityFindingsSubtitle": "жаңа осалдықтар және SLA туралы еске салулар"
+      "balanceAlertsUnavailable": "Баланс ескертулерін алу үшін ұйымға қосылыңыз.",
+      "securityFindingsSubtitle": "жаңа осалдықтар және SLA туралы еске салулар",
+      "securityFindingsUnavailable": "Қауіпсіздік мәселелерін алу үшін Kilo Қауіпсіздік агентін ауқымда қосыңыз."
     },
     "action": {
       "openSession": "Сессияны ашу"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Сессияны жүктеу мүмкін болмады.",
       "failedToLoadDetails": "Сессия мәліметтерін жүктеу мүмкін болмады.",
       "failedToStopExecution": "Орындалуды тоқтату мүмкін болмады.",
+      "stopped": "Сессия тоқтатылды",
+      "committing": "Коммит жасалуда…",
+      "committed": "Коммит жасалды",
+      "commitFailed": "Коммит жасау сәтсіз аяқталды",
       "renameSession": "Сессия атауын өзгерту",
       "renamePlaceholder": "Сессия атауы",
       "transcriptAccessibility": "Сессия жазбасы",

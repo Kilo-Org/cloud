@@ -334,8 +334,11 @@
       "sessionStatusTitle": "Trạng thái phiên",
       "sessionStatusSubtitle": "hoàn tất / thất bại / sẵn sàng điều khiển",
       "kiloclawActivitySubtitle": "máy sẵn sàng hoặc gặp lỗi, thao tác đã lên lịch",
+      "kiloclawActivityUnavailable": "Khởi động một máy KiloClaw để nhận hoạt động KiloClaw.",
       "balanceAlertsSubtitle": "cảnh báo số dư tổ chức thấp",
-      "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA"
+      "balanceAlertsUnavailable": "Tham gia một tổ chức để nhận cảnh báo số dư thấp.",
+      "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA",
+      "securityFindingsUnavailable": "Bật Trợ lý bảo mật Kilo trên một phạm vi để nhận vấn đề bảo mật."
     },
     "action": {
       "openSession": "Mở phiên"
@@ -1572,6 +1575,10 @@
       "couldNotLoad": "Không thể tải phiên.",
       "failedToLoadDetails": "Không thể tải thông tin phiên.",
       "failedToStopExecution": "Không thể dừng tác vụ đang chạy.",
+      "stopped": "Đã dừng phiên",
+      "committing": "Đang ghi nhận…",
+      "committed": "Đã ghi nhận",
+      "commitFailed": "Ghi nhận thất bại",
       "renameSession": "Đổi tên phiên",
       "renamePlaceholder": "Tên phiên",
       "transcriptAccessibility": "Bản ghi phiên",

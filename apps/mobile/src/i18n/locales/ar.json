@@ -334,8 +334,11 @@
       "sessionStatusTitle": "حالة الجلسة",
       "sessionStatusSubtitle": "مكتملة / تعذّر إكمالها / جاهزة للتحكم",
       "kiloclawActivitySubtitle": "جاهزية المثيل أو فشله، وإجراءات مجدولة",
+      "kiloclawActivityUnavailable": "ابدأ مثيل KiloClaw للحصول على نشاط KiloClaw.",
       "balanceAlertsSubtitle": "تحذيرات انخفاض رصيد المؤسسة",
-      "securityFindingsSubtitle": "نتائج جديدة وتذكيرات SLA"
+      "balanceAlertsUnavailable": "انضم إلى مؤسسة للحصول على تنبيهات الرصيد.",
+      "securityFindingsSubtitle": "نتائج جديدة وتذكيرات SLA",
+      "securityFindingsUnavailable": "فعّل وكيل أمان Kilo على نطاق للحصول على ملاحظات الأمان."
     },
     "action": {
       "openSession": "فتح الجلسة"
@@ -1620,6 +1623,10 @@
       "couldNotLoad": "تعذّر تحميل الجلسة.",
       "failedToLoadDetails": "تعذّر تحميل تفاصيل الجلسة.",
       "failedToStopExecution": "تعذّر إيقاف التنفيذ.",
+      "stopped": "تم إيقاف الجلسة",
+      "committing": "جارٍ الإيداع…",
+      "committed": "تم الإيداع",
+      "commitFailed": "فشل الإيداع",
       "renameSession": "إعادة تسمية الجلسة",
       "renamePlaceholder": "اسم الجلسة",
       "transcriptAccessibility": "سجل المحادثة في الجلسة",

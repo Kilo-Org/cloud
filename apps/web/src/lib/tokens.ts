@@ -215,23 +215,29 @@ function tryJwtVerify(token: string) {
 }
 
 /**
+ * The one refusal reason that may continue anonymously: the request presented no
+ * credential at all.
+ *
+ * Every other reason means the caller presented a credential that could not be
+ * accepted — `invalid_token`, `token_version_outdated`,
+ * `runtime_attestation_required`, or a valid token sent to an endpoint it is not
+ * scoped for (`audience_not_allowed`). Such a request must not be answered as an
+ * anonymous caller. The caller believes it is authenticated, so downgrading it
+ * silently drops the account, its organization, its BYOK keys and its credits,
+ * and hides the broken credential from the client that sent it.
+ */
+const ANONYMOUS_FALL_THROUGH_REASON = 'missing_credentials';
+
+/**
  * True when the request presented a credential that failed verification, rather
  * than presenting none.
  *
- * `validateAuthorizationHeader` reports why it refused a request in `reason`.
- * `missing_credentials` means no bearer token was sent, and `audience_not_allowed`
- * means a valid token was sent to an endpoint it is not scoped for — an expected
- * fall-through, not a broken credential. Every other reason, including
- * `invalid_token` and `token_version_outdated`, means the caller supplied a
- * credential that could not be accepted.
- *
- * Such a request must not be answered as an anonymous caller. The caller
- * believes it is authenticated, so downgrading it silently drops the account,
- * its organization, its BYOK keys and its credits, and hides the broken
- * credential from the client that sent it.
+ * Fails closed. Only `missing_credentials` returns false, so a reason added to
+ * `validateAuthorizationHeader` later — or a failure that carries no reason at
+ * all — counts as a rejected credential.
  */
 export function isRejectedCredentialReason(reason: string | undefined): boolean {
-  return reason === 'invalid_token' || reason === 'token_version_outdated';
+  return reason !== ANONYMOUS_FALL_THROUGH_REASON;
 }
 
 export function validateAuthorizationHeader(

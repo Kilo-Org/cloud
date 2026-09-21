@@ -1,6 +1,11 @@
 import { describe, test, expect } from '@jest/globals';
 import jwt from 'jsonwebtoken';
-import { TOKEN_EXPIRY, validateAuthorizationHeader, JWT_TOKEN_VERSION } from './tokens';
+import {
+  TOKEN_EXPIRY,
+  validateAuthorizationHeader,
+  JWT_TOKEN_VERSION,
+  isRejectedCredentialReason,
+} from './tokens';
 import { getEnvVariable } from '@/lib/dotenvx';
 
 describe('TOKEN_EXPIRY', () => {
@@ -77,5 +82,21 @@ describe('validateAuthorizationHeader (C15 device-session compatibility)', () =>
 
     expect(result.error).toBeUndefined();
     expect(result.deviceSessionId).toBeUndefined();
+  });
+});
+
+describe('isRejectedCredentialReason', () => {
+  test.each([
+    ['missing_credentials', false],
+    ['invalid_token', true],
+    ['token_version_outdated', true],
+    ['runtime_attestation_required', true],
+    ['audience_not_allowed', true],
+    ['a_reason_added_later', true],
+    [undefined, true],
+  ])('%s -> %s', (reason, expected) => {
+    // Only the absence of a credential may continue anonymously. Every other
+    // reason, including one this version does not know, fails the request.
+    expect(isRejectedCredentialReason(reason)).toBe(expected);
   });
 });

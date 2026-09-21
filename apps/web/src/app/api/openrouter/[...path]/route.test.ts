@@ -271,7 +271,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
   });
 
-  it('treats an API-only token as anonymous for a free model', async () => {
+  it('rejects an API-only token sent to the gateway endpoint', async () => {
     setSignedTokenAuth(signedToken(KILO_API_AUDIENCE), {
       user: {
         id: 'user-123',
@@ -291,39 +291,20 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       }) as never
     );
 
-    expect(response.status).toBe(200);
+    // A token scoped to another audience is a credential that was presented and
+    // refused, not an anonymous caller. It must not be downgraded to the free
+    // tier: the caller has an account, and answering for it anonymously hides
+    // that the token was scoped for a different endpoint.
+    expect(response.status).toBe(401);
     expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
       adminOnly: false,
       expectedAudience: KILO_GATEWAY_AUDIENCE,
     });
-    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
-    expect(mockedGetProvider).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user: expect.objectContaining({
-          id: 'anon:127.0.0.1',
-          isAnonymous: true,
-          microdollars_used: 0,
-        }),
-        organizationId: undefined,
-      })
-    );
-    const providerInput = mockedGetProvider.mock.calls[0]?.[0];
-    expect(providerInput).not.toHaveProperty('botId');
-    expect(providerInput).not.toHaveProperty('tokenSource');
-    expect(providerInput).not.toHaveProperty('balance');
-    expect(providerInput).not.toHaveProperty('userByok');
-    expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        kiloUserId: 'anon:127.0.0.1',
-        organizationId: undefined,
-        botId: undefined,
-        tokenSource: undefined,
-        prior_microdollar_usage: 0,
-        user_byok: false,
-      }),
-      expect.anything()
-    );
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: INVALID_TOKEN_CODE },
+    });
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it('retains verified gateway-token identity through the provider path', async () => {

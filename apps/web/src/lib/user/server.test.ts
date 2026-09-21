@@ -880,7 +880,7 @@ describe('getUserFromAuth', () => {
     expect(result.credentialsRejected).toBe(false);
   });
 
-  test('does not flag an operation-scoped token presented to another endpoint', async () => {
+  test('flags an operation-scoped token presented to another endpoint', async () => {
     const user = await insertTestUser({ api_token_pepper: 'audience-fallthrough-pepper' });
     const token = signPolicyClaims({
       version: JWT_TOKEN_VERSION,
@@ -896,8 +896,10 @@ describe('getUserFromAuth', () => {
       expectedAudience: KILO_GATEWAY_AUDIENCE,
     });
 
+    // The token verified, but not for this endpoint. It is still a credential
+    // that was presented and refused, so it must not become anonymous access.
     expect(result.user).toBeNull();
-    expect(result.credentialsRejected).toBe(false);
+    expect(result.credentialsRejected).toBe(true);
   });
 
   test('enforces the requested audience without falling through to a valid session', async () => {

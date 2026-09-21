@@ -154,6 +154,7 @@ async function runHot(args: LifecycleArgs, env: ScenarioEnvironment): Promise<Li
   const events: StreamEvent[] = [];
   let session: StartSessionResult | undefined;
   let stream: StreamConnection | undefined;
+  let warmupStream: StreamConnection | undefined;
 
   const fail = (message: string): LifecycleResult => ({
     name: scenarioName,
@@ -167,7 +168,7 @@ async function runHot(args: LifecycleArgs, env: ScenarioEnvironment): Promise<Li
   try {
     // Warm-up: cold echo.
     session = await startSession(config, { prompt: fakeDirective('echo:warmup') }, api);
-    const warmupStream = await openConnectedStream(config, session.cloudAgentSessionId);
+    warmupStream = await openConnectedStream(config, session.cloudAgentSessionId);
     const warmupContainer = await requireContainer(sessionSandbox, session, timeoutMs);
     if (warmupContainer === null) {
       warmupStream.close();
@@ -238,6 +239,11 @@ async function runHot(args: LifecycleArgs, env: ScenarioEnvironment): Promise<Li
   } finally {
     try {
       stream?.close();
+    } catch {
+      // A close failure must not replace the scenario result.
+    }
+    try {
+      warmupStream?.close();
     } catch {
       // A close failure must not replace the scenario result.
     }

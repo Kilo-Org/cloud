@@ -655,4 +655,54 @@ describe('fetchStreamTicket', () => {
     );
     await expect(fetchStreamTicket(input)).rejects.toThrow(/ticket/);
   });
+
+  it('fails as a timeout when the request stalls before the headers arrive', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+          })
+      )
+    );
+
+    const error = (await fetchStreamTicket({ ...input, timeoutMs: 5 }).catch(e => e)) as {
+      name?: string;
+    };
+    expect(error.name).toBe('TimeoutError');
+  });
+
+  it('reports a timeout, not invalid JSON, when the body stalls past the bound', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) => {
+        const signal = init?.signal;
+        const body = new ReadableStream({
+          start(controller) {
+            signal?.addEventListener('abort', () => controller.error(signal?.reason));
+          },
+        });
+        return Promise.resolve(new Response(body, { status: 200 }));
+      })
+    );
+
+    const error = (await fetchStreamTicket({ ...input, timeoutMs: 5 }).catch(e => e)) as Error;
+
+    expect(error.message).toMatch(/timed out after 5ms/);
+    expect(error.message).not.toContain('not valid JSON');
+  });
+
+  it('returns the ticket when a valid response arrives before the bound', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ ticket: 'fresh-ticket' }), { status: 200 })
+        )
+    );
+
+    await expect(fetchStreamTicket({ ...input, timeoutMs: 1_000 })).resolves.toBe('fresh-ticket');
+  });
 });

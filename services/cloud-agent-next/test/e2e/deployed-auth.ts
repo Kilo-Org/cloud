@@ -45,6 +45,12 @@ const REJECTED_POLICY_CLAIMS = [
 
 const BARE_JWT_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
 
+/**
+ * Bound the ticket request so a backend that accepts the connection but never
+ * responds cannot hang ticket acquisition, and with it the whole scenario.
+ */
+const STREAM_TICKET_TIMEOUT_MS = 10_000;
+
 function fail(detail: string): never {
   throw new Error(`Refusing token: ${detail}. Expected ${ORDINARY_TOKEN_REQUIREMENT}.`);
 }
@@ -408,8 +414,12 @@ export async function fetchStreamTicket(input: {
   backendUrl: string;
   token: string;
   sessionId: string;
+  /** Override the request bound. Tests inject a small value. */
+  timeoutMs?: number;
 }): Promise<string> {
+  const timeoutMs = input.timeoutMs ?? STREAM_TICKET_TIMEOUT_MS;
   const url = `${input.backendUrl.replace(/\/$/, '')}/api/cloud-agent-next/sessions/stream-ticket`;
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -417,6 +427,7 @@ export async function fetchStreamTicket(input: {
       Authorization: `Bearer ${input.token}`,
     },
     body: JSON.stringify({ cloudAgentSessionId: input.sessionId }),
+    signal: timeoutSignal,
   });
   if (!response.ok) {
     throw new Error(`Failed to fetch stream ticket: ${response.status} ${response.statusText}`);
@@ -426,6 +437,9 @@ export async function fetchStreamTicket(input: {
   try {
     body = await response.json();
   } catch {
+    if (timeoutSignal.aborted) {
+      throw new Error(`Stream ticket request timed out after ${timeoutMs}ms`);
+    }
     throw new Error('Stream ticket response was not valid JSON');
   }
   if (typeof body !== 'object' || body === null) {

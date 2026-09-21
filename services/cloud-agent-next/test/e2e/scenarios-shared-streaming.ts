@@ -71,9 +71,10 @@ async function runChunkedStreaming(
   const start = Date.now();
   const { config, conversation, timeoutMs = 60_000, api = 'unified' } = args;
   const directive = conversation && conversation !== '_' ? conversation : 'slow:5:50';
+  let stream: StreamConnection | undefined;
   try {
     const session = await startSession(config, { prompt: fakeDirective(directive) }, api);
-    const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
+    stream = openStream(config, session.cloudAgentSessionId, { replay: false });
     const container = await requireContainer(
       env.sessionSandbox,
       session,
@@ -114,6 +115,12 @@ async function runChunkedStreaming(
       events: [],
       durationMs: Date.now() - start,
     };
+  } finally {
+    try {
+      stream?.close();
+    } catch {
+      // A close failure must not replace the scenario result.
+    }
   }
 }
 
@@ -128,9 +135,10 @@ async function runEmptyResponse(
 ): Promise<LifecycleResult> {
   const start = Date.now();
   const { config, conversation, timeoutMs = 60_000, api = 'unified' } = args;
+  let stream: StreamConnection | undefined;
   try {
     const session = await startSession(config, { prompt: fakeDirective('idle') }, api);
-    const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
+    stream = openStream(config, session.cloudAgentSessionId, { replay: false });
     const container = await requireContainer(
       env.sessionSandbox,
       session,
@@ -171,6 +179,12 @@ async function runEmptyResponse(
       events: [],
       durationMs: Date.now() - start,
     };
+  } finally {
+    try {
+      stream?.close();
+    } catch {
+      // A close failure must not replace the scenario result.
+    }
   }
 }
 

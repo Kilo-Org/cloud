@@ -154,12 +154,22 @@ describe('google-play-sdk', () => {
     await expect(revokeGooglePlaySubscriptionPurchase('test-token')).resolves.toBeUndefined();
   });
 
-  it('propagates a failed revoke while the subscription still renews', async () => {
+  it('propagates a failed revoke unless the subscription is expired', async () => {
     const { revokeGooglePlaySubscriptionPurchase } = loadGooglePlaySdk();
 
     mockSubscriptionsV2Revoke.mockRejectedValueOnce(new Error('provider unavailable'));
     mockSubscriptionsV2Get.mockReturnValueOnce({
       data: { subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE' },
+    });
+    await expect(revokeGooglePlaySubscriptionPurchase('test-token')).rejects.toThrow(
+      'provider unavailable'
+    );
+
+    // CANCELED is still entitled and still charged, so a failed revoke must not
+    // be mistaken for a reversal.
+    mockSubscriptionsV2Revoke.mockRejectedValueOnce(new Error('provider unavailable'));
+    mockSubscriptionsV2Get.mockReturnValueOnce({
+      data: { subscriptionState: 'SUBSCRIPTION_STATE_CANCELED' },
     });
     await expect(revokeGooglePlaySubscriptionPurchase('test-token')).rejects.toThrow(
       'provider unavailable'

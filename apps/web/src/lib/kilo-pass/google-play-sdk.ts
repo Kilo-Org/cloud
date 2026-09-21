@@ -144,14 +144,11 @@ export async function revokeGooglePlaySubscriptionPurchase(purchaseToken: string
     });
   } catch (error) {
     // A retried notification can find the subscription already revoked, and
-    // Play then rejects the repeat call. A subscription that no longer renews
-    // means the reversal already took effect, so only a still-renewing
-    // subscription is a real failure.
+    // Play then rejects the repeat call. Only EXPIRED proves the reversal took
+    // effect: CANCELED, PAUSED, ON_HOLD and PENDING can still be entitled and
+    // still charged, so their errors must keep the notification unprocessed.
     const current = await getGooglePlaySubscriptionPurchase(purchaseToken);
-    if (
-      current.subscriptionState === 'SUBSCRIPTION_STATE_ACTIVE' ||
-      current.subscriptionState === 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD'
-    ) {
+    if (current.subscriptionState !== 'SUBSCRIPTION_STATE_EXPIRED') {
       throw error;
     }
   }

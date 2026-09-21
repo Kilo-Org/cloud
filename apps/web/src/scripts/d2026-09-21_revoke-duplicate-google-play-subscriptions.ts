@@ -9,10 +9,16 @@
  * Play, and records the reversal with the same code path the live notification
  * handler now uses.
  *
- * Targets are derived from `operation_ledgers` (domain `purchase`, intent
- * `complete_store_purchase`, status `failed`, outcome code = "You already have
- * an active Kilo Pass subscription"). An order that already has a purchase row,
- * or a recorded duplicate reversal, is skipped, so a re-run converges.
+ * Targets are derived from Google Play `operation_ledgers` rows (domain
+ * `purchase`, intent `complete_store_purchase`, status `failed`, outcome code =
+ * "You already have an active Kilo Pass subscription"). An order that already
+ * has a purchase row, or a recorded duplicate reversal, is skipped, so a re-run
+ * converges.
+ *
+ * Coverage is bounded by that source: a duplicate rejected by the Google Play
+ * replacement branch throws before ledger admission, and `operation_ledgers`
+ * rows are pruned at `expires_at`, so this script reverses only admitted
+ * rejections inside the ledger retention window.
  *
  * Defaults to a listing; `--execute` performs the reversal.
  *
@@ -25,7 +31,7 @@
 
 import '../lib/load-env';
 
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, like, sql } from 'drizzle-orm';
 
 import { closeAllDrizzleConnections, db } from '@/lib/drizzle';
 import {
@@ -79,96 +85,109 @@ async function main(): Promise<void> {
         eq(operation_ledgers.domain, 'purchase'),
         eq(operation_ledgers.intent, 'complete_store_purchase'),
         eq(operation_ledgers.status, 'failed'),
-        eq(operation_ledgers.outcome_code, ACTIVE_KILO_PASS_SUBSCRIPTION_MESSAGE)
+        eq(operation_ledgers.outcome_code, ACTIVE_KILO_PASS_SUBSCRIPTION_MESSAGE),
+        like(operation_ledgers.resource_key, `${KiloPassPaymentProvider.GooglePlay}:%`)
       )
     )
     .orderBy(asc(operation_ledgers.admitted_at));
 
   let revoked = 0;
   let skipped = 0;
+  let failed = 0;
 
   for (const target of rejected) {
-    const existingPurchase = await db.query.kilo_pass_store_purchases.findFirst({
-      columns: { id: true },
-      where: and(
-        eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.GooglePlay),
-        eq(kilo_pass_store_purchases.provider_transaction_id, target.orderId)
-      ),
-    });
-    if (existingPurchase) {
-      skipped += 1;
-      console.log(`[SKIP] order=${target.orderId} reason=purchase-row-exists`);
-      continue;
-    }
+    // Isolate each target: one transient Play or database failure must not stop
+    // the remaining charged orders from being reversed.
+    try {
+      const existingPurchase = await db.query.kilo_pass_store_purchases.findFirst({
+        columns: { id: true },
+        where: and(
+          eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.GooglePlay),
+          eq(kilo_pass_store_purchases.provider_transaction_id, target.orderId)
+        ),
+      });
+      if (existingPurchase) {
+        skipped += 1;
+        console.log(`[SKIP] order=${target.orderId} reason=purchase-row-exists`);
+        continue;
+      }
 
-    const alreadyReversed = await db
-      .select({ id: kilo_pass_audit_log.id })
-      .from(kilo_pass_audit_log)
-      .where(
-        and(
-          eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.StoreSubscriptionRefunded),
-          sql`${kilo_pass_audit_log.payload_json}->>'duplicateActiveSubscription' = 'true'`,
-          sql`${kilo_pass_audit_log.payload_json}->>'providerTransactionId' = ${target.orderId}`
+      const alreadyReversed = await db
+        .select({ id: kilo_pass_audit_log.id })
+        .from(kilo_pass_audit_log)
+        .where(
+          and(
+            eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.StoreSubscriptionRefunded),
+            sql`${kilo_pass_audit_log.payload_json}->>'duplicateActiveSubscription' = 'true'`,
+            sql`${kilo_pass_audit_log.payload_json}->>'providerTransactionId' = ${target.orderId}`
+          )
         )
-      )
-      .limit(1);
-    if (alreadyReversed.length > 0) {
-      skipped += 1;
-      console.log(`[SKIP] order=${target.orderId} reason=already-reversed`);
-      continue;
-    }
+        .limit(1);
+      if (alreadyReversed.length > 0) {
+        skipped += 1;
+        console.log(`[SKIP] order=${target.orderId} reason=already-reversed`);
+        continue;
+      }
 
-    const event = await db.query.kilo_pass_store_events.findFirst({
-      columns: { event_id: true, provider_subscription_id: true, payload_json: true },
-      where: and(
-        eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
-        eq(kilo_pass_store_events.provider_transaction_id, target.orderId)
-      ),
-      orderBy: desc(kilo_pass_store_events.created_at),
-    });
-    if (!event || !event.provider_subscription_id) {
-      // The ledger row is the durable record of the rejected order. Without the
-      // notification there is no purchase token, so the charge cannot be
-      // reversed from here; surface it instead of guessing.
-      skipped += 1;
-      console.log(`[SKIP] order=${target.orderId} reason=no-store-event-token`);
-      continue;
-    }
+      const event = await db.query.kilo_pass_store_events.findFirst({
+        columns: { event_id: true, provider_subscription_id: true, payload_json: true },
+        where: and(
+          eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
+          eq(kilo_pass_store_events.provider_transaction_id, target.orderId)
+        ),
+        orderBy: desc(kilo_pass_store_events.created_at),
+      });
+      if (!event || !event.provider_subscription_id) {
+        // The ledger row is the durable record of the rejected order. Without the
+        // notification there is no purchase token, so the charge cannot be
+        // reversed from here; surface it instead of guessing.
+        skipped += 1;
+        console.log(`[SKIP] order=${target.orderId} reason=no-store-event-token`);
+        continue;
+      }
 
-    const productId = String(event.payload_json?.productId ?? '');
-    const order = await getGooglePlaySubscriptionOrder(target.orderId);
-    const money = googlePlayOrderMoneyForProduct(order, productId);
+      const productId = String(event.payload_json?.productId ?? '');
+      const order = await getGooglePlaySubscriptionOrder(target.orderId);
+      const money = googlePlayOrderMoneyForProduct(order, productId);
 
-    if (!execute) {
+      if (!execute) {
+        console.log(
+          `[DRY RUN] order=${target.orderId} product=${productId} ` +
+            `amount=${money.amountChargedMinorUnits} currency=${money.currency} tax=${money.taxMinorUnits}`
+        );
+        continue;
+      }
+
+      await reverseDuplicateGooglePlaySubscription({
+        kiloUserId: target.kiloUserId,
+        productId,
+        purchaseToken: event.provider_subscription_id,
+        providerSubscriptionId: event.provider_subscription_id,
+        providerTransactionId: target.orderId,
+        amountChargedMinorUnits: money.amountChargedMinorUnits,
+        currency: money.currency,
+        taxMinorUnits: money.taxMinorUnits,
+        messageId: null,
+        eventId: event.event_id,
+      });
+      revoked += 1;
       console.log(
-        `[DRY RUN] order=${target.orderId} product=${productId} ` +
-          `amount=${money.amountChargedMinorUnits} currency=${money.currency} tax=${money.taxMinorUnits}`
+        `[REVOKED] order=${target.orderId} product=${productId} ` +
+          `amount=${money.amountChargedMinorUnits} currency=${money.currency}`
       );
-      continue;
+    } catch (error) {
+      failed += 1;
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(`[FAILED] order=${target.orderId} error=${message}`);
     }
-
-    await reverseDuplicateGooglePlaySubscription({
-      kiloUserId: target.kiloUserId,
-      productId,
-      purchaseToken: event.provider_subscription_id,
-      providerSubscriptionId: event.provider_subscription_id,
-      providerTransactionId: target.orderId,
-      amountChargedMinorUnits: money.amountChargedMinorUnits,
-      currency: money.currency,
-      taxMinorUnits: money.taxMinorUnits,
-      messageId: null,
-      eventId: event.event_id,
-    });
-    revoked += 1;
-    console.log(
-      `[REVOKED] order=${target.orderId} product=${productId} ` +
-        `amount=${money.amountChargedMinorUnits} currency=${money.currency}`
-    );
   }
 
   console.log(
-    `targets=${rejected.length} revoked=${revoked} skipped=${skipped} executed=${execute}`
+    `targets=${rejected.length} revoked=${revoked} skipped=${skipped} failed=${failed} executed=${execute}`
   );
+  if (failed > 0) {
+    process.exitCode = 1;
+  }
 }
 
 void main()

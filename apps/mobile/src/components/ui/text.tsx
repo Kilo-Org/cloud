@@ -1,9 +1,9 @@
 import * as Slot from '@rn-primitives/slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
-import { I18nManager, Text as RNText, type Role } from 'react-native';
+import { I18nManager, Text as RNText, type Role, type TextStyle } from 'react-native';
 
-import { RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
+import { RTL_WRITING_DIRECTION, textLetterSpacing } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 const textVariants = cva('text-foreground text-base font-medium', {
@@ -62,13 +62,22 @@ function Text({
   }) {
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot.Text : RNText;
+  // A joined-script run (Arabic, Farsi, Urdu, Kurdish, Pashto) renders with
+  // natural letter spacing whatever the interface language is: any tracking
+  // class on it would pull apart letters the script joins. Latin runs keep the
+  // style's tracking. The caller's own style stays last, so an explicit
+  // `letterSpacing` still wins.
+  const ownStyles = [
+    textLetterSpacing(props.children),
+    I18nManager.isRTL ? RTL_WRITING_DIRECTION : undefined,
+  ].filter((style): style is TextStyle => style !== undefined);
   return (
     <Component
       className={cn(textVariants({ variant }), textClass, className)}
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
-      style={I18nManager.isRTL ? [RTL_WRITING_DIRECTION, props.style] : props.style}
+      style={ownStyles.length > 0 ? [...ownStyles, props.style] : props.style}
     />
   );
 }

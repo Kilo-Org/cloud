@@ -65,17 +65,6 @@ function slopDp(hitSlop: unknown): number {
   return 0;
 }
 
-/** One side's reach, for a hitSlop written as one number for every side or as a per-side object. */
-function slopSideDp(hitSlop: unknown, side: 'left' | 'right'): number {
-  if (typeof hitSlop === 'number') {
-    return hitSlop;
-  }
-  if (hitSlop && typeof hitSlop === 'object') {
-    return (hitSlop as Record<string, number | undefined>)[side] ?? 0;
-  }
-  return 0;
-}
-
 function pressesWithLabel(root: I, label: string): I[] {
   return root.findAll(
     node =>
@@ -143,6 +132,32 @@ async function compiledGapDp(rowClassName: string): Promise<number> {
     throw new Error(`no compiled gap declaration in "${gapClass}"`);
   }
   return resolveCompiledLength(gap[0]);
+}
+
+type Insets = { top: number; right: number; bottom: number; left: number };
+
+/**
+ * A control's hitSlop as per-side insets. Controls here use either shape: the
+ * shared `IconButton` passes per-side insets, while `SessionFilterButton` keeps
+ * the scalar `@/lib/a11y/touch-target` slop, where one number applies to every
+ * side.
+ */
+function hitSlopInsets(hitSlop: unknown): Insets {
+  if (typeof hitSlop === 'number') {
+    return { top: hitSlop, right: hitSlop, bottom: hitSlop, left: hitSlop };
+  }
+  if (hitSlop && typeof hitSlop === 'object') {
+    const insets = hitSlop as Partial<Insets>;
+    if (typeof insets.right === 'number' && typeof insets.left === 'number') {
+      return {
+        top: insets.top ?? 0,
+        right: insets.right,
+        bottom: insets.bottom ?? 0,
+        left: insets.left,
+      };
+    }
+  }
+  throw new Error(`no measurable hitSlop in ${JSON.stringify(hitSlop)}`);
 }
 
 const noop = (): void => undefined;
@@ -217,20 +232,18 @@ describe('SessionListHeaderActions new-session control', () => {
     // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
     expect(gapDp).toBe(14);
 
-    const newSessionSlop = newSession.props.hitSlop;
-    const filterSlop = filter.props.hitSlop;
+    const newSessionSlop = hitSlopInsets(newSession.props.hitSlop);
+    const filterSlop = hitSlopInsets(filter.props.hitSlop);
     // The new-session control sits left of the filter, so the gap has to fit
     // both facing slops; more than the gap means the two regions overlap. A
     // control may write its slop as one number for every side (the filter) or
     // as a per-side object (the new-session control).
-    expect(
-      slopSideDp(newSessionSlop, 'right') + slopSideDp(filterSlop, 'left')
-    ).toBeLessThanOrEqual(gapDp);
+    expect(newSessionSlop.right + filterSlop.left).toBeLessThanOrEqual(gapDp);
     // Capping the right side must not drop the control below the design target.
     const box = boxDp(newSession.props.className as string);
-    expect(
-      box.width + slopSideDp(newSessionSlop, 'left') + slopSideDp(newSessionSlop, 'right')
-    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(box.width + newSessionSlop.left + newSessionSlop.right).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
 
     act(() => {
       renderer.unmount();

@@ -31,6 +31,13 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// The native safe-area module cannot load in this node environment, and the
+// screen only reads its side insets from it; a zero inset keeps the alignment
+// path real without the native module.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',

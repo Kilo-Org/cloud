@@ -166,7 +166,14 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
           {item.title}
         </Text>
         <View className="flex-row items-center gap-2">
-          <Text variant="muted" className="text-xs">
+          {/*
+            A nested GitLab path or a long owner/repo (#2 `discussion-conversation-only`)
+            is wider than the row. Without an explicit shrink the text keeps its intrinsic
+            width and pushes the provider chip past the row edge, where the parent clips it
+            to "Pull re". Truncate the metadata instead; the chip is the row's identity and
+            must stay whole.
+          */}
+          <Text variant="muted" className="min-w-0 shrink text-xs" numberOfLines={1}>
             {rowLabel} · {updatedLabel}
           </Text>
           <InboxChip label={t(providerPrTermKey(item.ref.platform))} />
@@ -180,7 +187,7 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
 
 function InboxChip({ label }: Readonly<{ label: string }>) {
   return (
-    <View className="rounded-full bg-secondary px-2 py-0.5">
+    <View className="shrink-0 rounded-full bg-secondary px-2 py-0.5">
       <Text variant="muted" className="text-[10px] font-medium">
         {label}
       </Text>

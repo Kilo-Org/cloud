@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
 import {
   getEffectiveTabBarHeight,
   getTabBarHorizontalInset,
@@ -12,6 +13,7 @@ import {
   TAB_LABEL_WRAP_FONT_SCALE,
   tabAccessibilityLabel,
   tabBarPosition,
+  tabLabelNumberOfLines,
   visibleTabCount,
 } from '@/lib/tab-bar-layout';
 
@@ -146,6 +148,21 @@ describe('shouldShowTabLabel', () => {
     expect(shouldShowTabLabel(TAB_ICON_FORWARD_FONT_SCALE)).toBe(false);
     expect(shouldShowTabLabel(2.5)).toBe(false);
     expect(shouldShowTabLabel(3)).toBe(false);
+  });
+});
+
+describe('tabLabelNumberOfLines', () => {
+  it('keeps a word that fits its tab on one line', () => {
+    expect(tabLabelNumberOfLines('Home')).toBe(1);
+  });
+
+  it('keeps a word wider than a narrow tab on one line so it truncates instead of breaking mid-word', () => {
+    expect(tabLabelNumberOfLines('Conversazioni')).toBe(1);
+  });
+
+  it('keeps the two lines for copy that carries its own break', () => {
+    expect(tabLabelNumberOfLines(i18n.t('tabs.kiloclawWrapped'))).toBe(2);
+    expect(tabLabelNumberOfLines('Kilo\nClaw')).toBe(2);
   });
 });
 

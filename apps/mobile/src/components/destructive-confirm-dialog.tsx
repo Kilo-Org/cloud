@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, View } from 'react-native';
+import { Modal, Platform, Pressable, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -11,6 +11,19 @@ type DestructiveConfirmDialogProps = {
   onConfirm: () => void;
   onCancel: () => void;
 };
+
+/**
+ * Whether a destructive confirmation has to be this in-app dialog rather than
+ * the native `Alert.alert`.
+ *
+ * Android's native `AlertDialog` paints every button with the theme accent, so
+ * `Alert.alert`'s `style: 'destructive'` never reaches the screen there; iOS
+ * honors it and keeps the native alert. Read at call time, so the answer
+ * follows the platform the call runs on.
+ */
+export function usesInAppDestructiveConfirm(): boolean {
+  return Platform.OS === 'android';
+}
 
 /**
  * In-app confirmation for a destructive action, rendered with the destructive

@@ -31,6 +31,14 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// `@/lib/screen-insets` reads `react-native-safe-area-context`, whose module
+// imports `react-native/Libraries/Utilities/codegenNativeComponent` — a path
+// this pipeline cannot parse, so the entry point is stubbed like the screens'
+// other native reads.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',

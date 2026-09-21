@@ -99,6 +99,13 @@ vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
+// The real `Skeleton` renders through `react-native-reanimated`, whose ESM build
+// this node-environment project cannot load; the environment row only needs the
+// node to exist (see the pending-environment case below).
+vi.mock('@/components/ui/skeleton', () => ({
+  Skeleton: 'Skeleton',
+}));
+
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
 }));

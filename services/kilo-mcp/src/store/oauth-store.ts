@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { AuthRequest } from '@cloudflare/workers-oauth-provider';
-import { and, eq, gt, isNotNull, isNull, lt } from 'drizzle-orm';
+import { and, desc, eq, gt, isNotNull, isNull, lt, notInArray, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
@@ -42,6 +42,15 @@ const STORE_INSTANCE_NAME = 'kilo-mcp-oauth';
 
 /** Interval between expired-row purges (DO alarm). */
 const PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Newest refresh-token hashes kept per grant. The provider accepts the current
+ * and the immediately previous refresh token, so eight rotations is the margin
+ * that keeps both of them — and only a bounded number of older hashes — for
+ * the whole session. Without the bound a year of rotations per client would
+ * grow this single global DO forever.
+ */
+const REFRESH_HISTORY_KEEP_PER_GRANT = 8;
 
 /** How long a protected request stays actionable after `call_protected` (o2). */
 export const PROTECTED_REQUEST_TTL_SECONDS = 300;
@@ -691,7 +700,57 @@ export class KiloMcpOAuthStore
           set: { current: true, expires_at: expiresAt },
         })
         .run();
+      // Every write uses `now + REFRESH_HISTORY_TTL_MS` and the DO's token
+      // queue serializes rotations, so ordering by `expires_at` ranks by write
+      // time; `rowid` breaks a tie between two writes in the same millisecond
+      // by insertion order, which `expires_at` alone cannot, and a LIMIT over
+      // that tie could otherwise keep older rows and drop the newest ones.
+      // Together they put the row just inserted — and with it the provider's
+      // only other accepted token, the previous one — inside the kept set.
+      // `notInArray` is never empty: the kept set always contains the row
+      // inserted a moment earlier.
+      const kept = this.db
+        .select({ token_hash: oauthRefreshTokenHistory.token_hash })
+        .from(oauthRefreshTokenHistory)
+        .where(
+          and(
+            eq(oauthRefreshTokenHistory.user_id, parts.userId),
+            eq(oauthRefreshTokenHistory.grant_id, parts.grantId)
+          )
+        )
+        .orderBy(desc(oauthRefreshTokenHistory.expires_at), desc(sql`rowid`))
+        .limit(REFRESH_HISTORY_KEEP_PER_GRANT)
+        .all()
+        .map(row => row.token_hash);
+      this.db
+        .delete(oauthRefreshTokenHistory)
+        .where(
+          and(
+            eq(oauthRefreshTokenHistory.user_id, parts.userId),
+            eq(oauthRefreshTokenHistory.grant_id, parts.grantId),
+            notInArray(oauthRefreshTokenHistory.token_hash, kept)
+          )
+        )
+        .run();
     });
+  }
+
+  /**
+   * Drop every hash recorded for a grant. The reuse guard calls this after it
+   * revokes a grant: a dead grant can never authenticate another replay, so its
+   * rows must not sit in the single global DO until the one-year history TTL
+   * would have removed them.
+   */
+  async forgetRefreshTokens(parts: RefreshTokenParts): Promise<void> {
+    this.db
+      .delete(oauthRefreshTokenHistory)
+      .where(
+        and(
+          eq(oauthRefreshTokenHistory.user_id, parts.userId),
+          eq(oauthRefreshTokenHistory.grant_id, parts.grantId)
+        )
+      )
+      .run();
   }
 
   /** One alarm per DO: purge rows past their own expiry, then reschedule. */

@@ -60,15 +60,18 @@ function cliCatalogOption(overrides: Partial<SessionModelOption> = {}): SessionM
   };
 }
 
-function renderRow(option: SessionModelOption): TestRenderer.ReactTestRenderer {
+function renderRow(
+  option: SessionModelOption,
+  overrides: Partial<{ selected: boolean; isFavorite: boolean }> = {}
+): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   TestRenderer.act(() => {
     ref.current = TestRenderer.create(
       createElement(ModelPickerOptionRow, {
         option,
-        selected: false,
+        selected: overrides.selected ?? false,
         selectedVariant: '',
-        isFavorite: false,
+        isFavorite: overrides.isFavorite ?? false,
         onSelectModel: vi.fn<(option: SessionModelOption) => void>(),
         onSelectVariant: vi.fn<(variant: string) => void>(),
         onToggleFavorite: vi.fn<(option: SessionModelOption) => void>(),
@@ -98,6 +101,26 @@ function countWithAccessibilityLabel(root: TestRenderer.ReactTestInstance, label
     .length;
 }
 
+function isInstance(
+  node: TestRenderer.ReactTestInstance | string
+): node is TestRenderer.ReactTestInstance {
+  return typeof node !== 'string';
+}
+
+function rowContainer(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  const container = renderer.root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      node.props.className.includes('gap-3 pr-4')
+  )[0];
+  if (!container) {
+    throw new Error('row container not found');
+  }
+  return container;
+}
+
 describe('ModelPickerOptionRow BYOK badge', () => {
   it('renders the BYOK badge for a CLI-catalog option with user BYOK available', () => {
     const renderer = renderRow(cliCatalogOption({ hasUserByokAvailable: true }));
@@ -113,5 +136,33 @@ describe('ModelPickerOptionRow BYOK badge', () => {
     const renderer = renderRow(cliCatalogOption({ isFree: true, mayTrainOnYourPrompts: true }));
     expect(textStrings(renderer.root)).not.toContain(freeModelFreeLabel());
     expect(countWithAccessibilityLabel(renderer.root, freeModelDataLabel())).toBe(0);
+  });
+});
+
+describe('ModelPickerOptionRow trailing check column', () => {
+  it('reserves the same trailing column whether or not the row is selected', () => {
+    const selectedRow = rowContainer(renderRow(cliCatalogOption(), { selected: true }));
+    const unselectedRow = rowContainer(renderRow(cliCatalogOption(), { selected: false }));
+
+    const selectedChildren = selectedRow.children.filter(isInstance);
+    const unselectedChildren = unselectedRow.children.filter(isInstance);
+
+    // content, star, trailing slot — in both rows.
+    expect(selectedChildren).toHaveLength(3);
+    expect(unselectedChildren).toHaveLength(3);
+
+    const selectedSlot = selectedChildren[2];
+    const unselectedSlot = unselectedChildren[2];
+
+    // The trailing slot is the same element with the same fixed width in both
+    // rows, so the favorite star holds one column down the list.
+    expect(selectedSlot?.type).toBe('View');
+    expect(unselectedSlot?.type).toBe('View');
+    expect(selectedSlot?.props.className).toBe(unselectedSlot?.props.className);
+    expect(String(selectedSlot?.props.className)).toContain('w-[18px]');
+
+    // Only the contents differ: the check marks the selected row.
+    expect(selectedSlot?.findAllByType('Check')).toHaveLength(1);
+    expect(unselectedSlot?.findAllByType('Check')).toHaveLength(0);
   });
 });

@@ -18,7 +18,9 @@ type SessionFilterButtonProps = {
  * 36pt square + 8pt slop = 52pt, past the 44pt minimum target `DESIGN.md` asks
  * for. The box is a real layout size, not slop alone: the on-device explorer
  * measures laid-out bounds and `hitSlop` never widens them. `h-[36px]`, not
- * `h-9` — the app's native rem is 14pt, so `h-9` lays out at 31.5pt.
+ * `h-9` — the app's native rem is 14pt, so `h-9` lays out at 31.5pt. The box
+ * carries `shrink-0`, so the header row cannot squeeze it under the audit's
+ * 28dp floor.
  *
  * The sides are spelled out rather than a single uniform number: the row's
  * sibling control (`session-list-header-actions.tsx`) caps its facing right
@@ -58,7 +60,7 @@ export function SessionFilterButton({
         activeCount
       )}
       testID={testID}
-      className="h-[36px] w-[36px] items-center justify-center active:opacity-70"
+      className="h-[36px] w-[36px] shrink-0 items-center justify-center active:opacity-70"
     >
       {/* Anchored to the icon, not the 36pt box, so enlarging the target never
           drifts the badge off the glyph's top-right corner. */}

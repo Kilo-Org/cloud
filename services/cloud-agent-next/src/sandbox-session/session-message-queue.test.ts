@@ -867,6 +867,33 @@ describe('applyMessageOutcome', () => {
       applyMessageOutcome(next ?? [], { messageId: 'a', status: 'failed' }, 'runtime', 40)
     ).toBeUndefined();
   });
+
+  it('persists a gate result on the terminal record when the outcome carries one', () => {
+    const before = [{ ...msg('a', 'accepted'), wrapperInstanceId: 'runtime' }];
+    const next = applyMessageOutcome(
+      before,
+      { messageId: 'a', status: 'completed', gateResult: 'fail' },
+      'runtime',
+      30
+    );
+    expect(next?.find(message => message.messageId === 'a')).toMatchObject({
+      state: 'completed',
+      gateResult: 'fail',
+    });
+  });
+
+  it('leaves the gate result key absent when the outcome carries none', () => {
+    const before = [{ ...msg('a', 'accepted'), wrapperInstanceId: 'runtime' }];
+    const next = applyMessageOutcome(
+      before,
+      { messageId: 'a', status: 'completed' },
+      'runtime',
+      30
+    );
+    const record = next?.find(message => message.messageId === 'a');
+    expect(record).toBeDefined();
+    expect(record && 'gateResult' in record).toBe(false);
+  });
 });
 
 describe('failQueuedMessage', () => {

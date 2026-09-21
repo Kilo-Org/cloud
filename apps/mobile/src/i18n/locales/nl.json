@@ -1712,7 +1712,8 @@
       "linesBadge_one": "{{displayCount}} regel",
       "linesBadge_other": "{{displayCount}} regels",
       "matchesBadge_one": "{{displayCount}} treffer",
-      "matchesBadge_other": "{{displayCount}} treffers"
+      "matchesBadge_other": "{{displayCount}} treffers",
+      "noOutput": "Geen uitvoer."
     },
     "readToolMarkdown": {
       "linesTruncated": "regels {{start}}–{{end}} (afgekapt)",
@@ -3180,15 +3181,7 @@
     "remoteOptionTitle": "Je computer",
     "remoteOptionBody": "Voer Kilo uit op je eigen machine via de `kilo remote`-CLI.",
     "skip": "Tour overslaan",
-    "tutorialLabel": "Zelfstudie",
-    "remoteTitle": "Start je eerste externe sessie",
-    "remoteBody": "Verbind je computer en start de sessie vanaf hier.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Nog geen computer verbonden",
-    "remoteEmptyBody": "Voer `kilo remote` uit op je computer om hem te verbinden.",
-    "remoteFound": "Computer verbonden",
-    "checkAgain": "Opnieuw controleren",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Zelfstudie"
   },
   "appActions": {
     "start": {

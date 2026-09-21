@@ -92,6 +92,23 @@ function resolveBootstrapTag(input: BootstrapDecisionInput): BootstrapDecisionTa
   return 'settle-app';
 }
 
+/**
+ * Whether the hidden tree needs the loading surface painted over it.
+ *
+ * `hidden` is true during the initial launch too, but the native splash and
+ * `AnimatedSplashOverlay` cover that window. Once startup has settled (the
+ * splash has handed over), a hidden tree is an exposed empty background: the
+ * post-sign-in redirect/consent window is the reported case
+ * (app-blank-after-oauth). `startupFinished` is the splash handover signal, so
+ * the surface is only requested for the windows the splash no longer covers.
+ */
+export function shouldShowBootstrapLoading(input: {
+  readonly startupFinished: boolean;
+  readonly hidden: boolean;
+}): boolean {
+  return input.startupFinished && input.hidden;
+}
+
 export function resolveBootstrapDecision(input: BootstrapDecisionInput): BootstrapDecision {
   const hasUserBootstrapError = input.hasToken && input.userIdError;
   const hasConsentBootstrapError = input.hasToken && input.consentCheckError;

@@ -5,15 +5,8 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-/**
- * 36pt square + 4pt slop = the 44pt minimum target DESIGN.md asks for. The box
- * is a real layout size, not slop alone: the on-device explorer measures
- * laid-out bounds and `hitSlop` never widens them. `h-[36px]`, not `h-9` — the
- * app's native rem is 14pt, so `h-9` lays out at 31.5pt.
- */
-const CLEAR_HIT_SLOP = 4;
 
 type SessionListSearchHeaderProps = {
   inputRef: RefObject<TextInput | null>;
@@ -50,12 +43,13 @@ export function SessionListSearchHeader({
   );
   return (
     <View>
-      {/* `min-h-[50px]` reserves the clear control's 36pt box (36 + 6pt padding
-          + 1pt border) so the first keystroke does not grow the row and shift
-          the list below. */}
+      {/* `min-h-[44px]` is the field's floor; `min-h-[50px]` is the height the
+          row must already hold for the clear control's 38pt box plus its own
+          12pt vertical padding (`py-1.5`), so the first keystroke cannot grow
+          the row and shift the list below. */}
       <View
         style={fieldMargins}
-        className="my-2 min-h-[50px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
+        className="my-2 min-h-[44px] min-h-[50px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
       >
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
         <View className="h-[18px] w-[18px] items-center justify-center">
@@ -89,8 +83,14 @@ export function SessionListSearchHeader({
             onPress={onClearSearch}
             accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
-            hitSlop={CLEAR_HIT_SLOP}
-            className="h-[36px] w-[36px] items-center justify-center active:opacity-70"
+            // The frame, not the 16pt glyph, is what the size audit measures:
+            // `h-11 w-11` is the header's frame (38.5pt on device) and the
+            // explicit 38pt box is the whole-pixel size the mounted test
+            // compiles, with the 3pt slop carrying it past the 44pt minimum.
+            // `-mr-2` keeps the glyph near its old inset and the frame's left
+            // edge inside the field's right padding.
+            hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+            className="-mr-2 h-11 w-11 h-[38px] w-[38px] items-center justify-center active:opacity-70"
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>

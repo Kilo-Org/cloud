@@ -25,6 +25,19 @@ const cardState = vi.hoisted(() => {
   return { content: card };
 });
 
+/**
+ * The card hands the store-management helper the invalidation to run after the
+ * store trip. The helper runs it in a floating promise, so the test keeps the
+ * callback here and awaits it itself: a missing query client filter then fails
+ * the test instead of becoming an unhandled rejection.
+ */
+const storeManagement = vi.hoisted(() => ({
+  invalidateAfter: undefined as (() => Promise<void> | void) | undefined,
+}));
+
+/** Every invalidation the card asks the query client to run. */
+const invalidateQueries = vi.hoisted(() => vi.fn());
+
 const CARD_CONTENT: CardContent = {
   kind: 'card',
   state: {
@@ -50,13 +63,22 @@ vi.mock('@/lib/trpc', () => ({
       },
       getCreditHistory: { pathFilter: () => ['kiloPass', 'history'] as const },
     },
-    user: { getContextBalance: { pathFilter: () => ['user', 'getContextBalance'] as const } },
+    user: {
+      getContextBalance: { pathFilter: () => ['user', 'getContextBalance'] as const },
+      getCreditBlocks: { pathFilter: () => ['user', 'getCreditBlocks'] as const },
+    },
   }),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({ data: undefined, isError: false, isPending: true, refetch: vi.fn() }),
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQueryClient: () => ({ invalidateQueries }),
+}));
+
+vi.mock('./kilo-pass-ios-manage', () => ({
+  openAppStoreManagement: (params: { invalidateAfter: () => Promise<void> | void }) => {
+    storeManagement.invalidateAfter = params.invalidateAfter;
+  },
 }));
 
 vi.mock('@/lib/kilo-pass/subscription-card-state', () => ({
@@ -125,6 +147,8 @@ afterEach(() => {
   renderer = undefined;
   windowDims.width = 390;
   cardState.content = CARD_CONTENT;
+  storeManagement.invalidateAfter = undefined;
+  invalidateQueries.mockClear();
 });
 
 describe('KiloPassSubscriptionCard mounted layout', () => {
@@ -163,6 +187,38 @@ describe('KiloPassSubscriptionCard mounted layout', () => {
     expect(
       root.findAll(node => Object.is(node.type, 'Text') && node.props.children === 'Subscribe')
     ).toHaveLength(1);
+  });
+});
+
+describe('KiloPassSubscriptionCard store management', () => {
+  it('invalidates the credit blocks after the store-management trip', async () => {
+    cardState.content = {
+      kind: 'card',
+      state: {
+        title: 'Kilo Pass',
+        description: 'Monthly credits with bonus progress.',
+        action: 'open-store-management',
+        actionLabel: 'Manage',
+      },
+    };
+    const root = renderCard();
+    const card = root.findByProps({ accessibilityRole: 'button' });
+
+    // The handler imports the helper lazily, so the capture lands a microtask
+    // after the press.
+    await act(async () => {
+      (card.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    const invalidateAfter = storeManagement.invalidateAfter;
+    if (!invalidateAfter) {
+      throw new Error('The store-management helper never received an invalidation');
+    }
+
+    await act(async () => {
+      await invalidateAfter();
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith(['user', 'getCreditBlocks']);
   });
 });
 

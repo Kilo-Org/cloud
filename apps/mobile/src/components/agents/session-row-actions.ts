@@ -114,10 +114,10 @@ export function showSessionActionMenu(opts: SessionActionMenuOptions): void {
 
   showActionSheetWithOptions(
     {
+      ...themedSheet,
       options,
       cancelButtonIndex,
       ...(destructiveButtonIndex !== undefined && { destructiveButtonIndex }),
-      ...themedSheet,
     },
     index => {
       if (index === undefined || index === cancelButtonIndex) {

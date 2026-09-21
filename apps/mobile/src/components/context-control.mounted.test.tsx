@@ -22,6 +22,11 @@ const appearance = vi.hoisted(() => ({
   },
   bottom: 18,
 }));
+
+// The palette the hook returns unless a case overrides it. The $theme cases
+// reassign `appearance.colors`, so the per-OS hook restores this default instead
+// of leaking a case's palette into the tests that run after it.
+const DEFAULT_COLORS = appearance.colors;
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
@@ -142,6 +147,7 @@ afterEach(() => {
 describe.each(['ios', 'android'])('ContextControl on %s', os => {
   beforeEach(() => {
     platform.OS = os;
+    appearance.colors = DEFAULT_COLORS;
     appearance.bottom = 18;
   });
   it.each([
@@ -232,6 +238,18 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
       destructiveColor: colors.destructive,
       autoFocus: true,
       useModal: true,
+    });
+  });
+
+  // Guards the $theme cases above: they reassign `appearance.colors`, so this
+  // case only sees the default palette if the per-OS hook restored it.
+  it('opens the account sheet with the default palette after a palette case ran', async () => {
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await press(picker(ui));
+    expect(nativePicker().options.containerStyle).toEqual({
+      backgroundColor: DEFAULT_COLORS.card,
+      paddingBottom: 18,
     });
   });
 

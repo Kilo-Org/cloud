@@ -139,11 +139,11 @@ export function useConversationMessageActions({
       });
       showActionSheetWithOptions(
         {
+          ...themedSheet,
           options: actionSheet.options,
           cancelButtonIndex: actionSheet.cancelButtonIndex,
           destructiveButtonIndex: actionSheet.destructiveButtonIndex,
           title: i18n.t('chat.messageActions.title'),
-          ...themedSheet,
         },
         index => {
           const selectedAction = getSelectedMessageAction(actionSheet, index);

@@ -35,6 +35,7 @@ export function useConversationOptionsSheet({
     void Haptics.selectionAsync();
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         title: conversationTitle,
         options: [
           i18n.t('common.rename'),
@@ -43,7 +44,6 @@ export function useConversationOptionsSheet({
         ],
         cancelButtonIndex: 2,
         destructiveButtonIndex: 1,
-        ...themedSheet,
       },
       index => {
         if (index === 0) {

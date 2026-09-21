@@ -1721,11 +1721,11 @@ export function SessionDetailContent({
     const removeIndex = actions.indexOf('remove');
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         title: t('agentChat.goal.title'),
         options,
         cancelButtonIndex: options.length - 1,
         destructiveButtonIndex: removeIndex === -1 ? undefined : removeIndex,
-        ...themedSheet,
       },
       index => {
         const action = index === undefined ? undefined : actions[index];

@@ -247,9 +247,9 @@ function showAttachmentSourceSheet(
     const options = buildAttachmentSourceOptions(sources);
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         options,
         cancelButtonIndex: options.length - 1,
-        ...themedSheet,
       },
       index => {
         // The sheet's button index is optional by its own types; the cancel

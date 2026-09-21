@@ -55,11 +55,11 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
       const sheet = buildPrLinkTapActionSheet();
       showActionSheetWithOptions(
         {
+          ...themedSheet,
           options: sheet.options,
           cancelButtonIndex: sheet.cancelButtonIndex,
           title: t('agentChat.chatLink.prLinkActions'),
           message: sheetMessage(href),
-          ...themedSheet,
         },
         index => {
           const action = getSelectedChatLinkAction(sheet, index);
@@ -91,11 +91,11 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
       const sheet = buildChatLinkActionSheet({ isPrLink });
       showActionSheetWithOptions(
         {
+          ...themedSheet,
           options: sheet.options,
           cancelButtonIndex: sheet.cancelButtonIndex,
           title: t('agentChat.chatLink.linkActions'),
           message: sheetMessage(href),
-          ...themedSheet,
         },
         index => {
           const action = getSelectedChatLinkAction(sheet, index);

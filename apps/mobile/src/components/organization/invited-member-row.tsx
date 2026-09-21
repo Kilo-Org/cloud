@@ -74,10 +74,10 @@ export function InvitedMemberRow({
     const options = invitedMemberActionOptions(invite.emailStatus, hasInviteUrl);
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         options,
         cancelButtonIndex: options.length - 1,
         destructiveButtonIndex: options.length - 2,
-        ...themedSheet,
       },
       index => {
         const label = index !== undefined ? options[index] : undefined;

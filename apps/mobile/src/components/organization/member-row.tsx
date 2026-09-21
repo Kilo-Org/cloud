@@ -53,9 +53,9 @@ export function MemberRow({
     const options = [...ROLE_OPTIONS.map(role => roleLabel(role)), t('common.cancel')];
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         options,
         cancelButtonIndex: options.length - 1,
-        ...themedSheet,
       },
       index => {
         const role = index !== undefined ? ROLE_OPTIONS[index] : undefined;
@@ -110,10 +110,10 @@ export function MemberRow({
     ];
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         options,
         cancelButtonIndex: options.length - 1,
         destructiveButtonIndex: options.length - 2,
-        ...themedSheet,
       },
       index => {
         const label = index !== undefined ? options[index] : undefined;

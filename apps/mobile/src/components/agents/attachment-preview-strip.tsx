@@ -266,13 +266,13 @@ function AttachmentChip({
     }
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         options: [
           t('agentChat.filePart.openAsText'),
           t('agentChat.filePart.openInExternalApp'),
           t('common.cancel'),
         ],
         cancelButtonIndex: 2,
-        ...themedSheet,
       },
       optionIndex => {
         if (optionIndex === 0) {

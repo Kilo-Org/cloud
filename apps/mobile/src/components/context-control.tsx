@@ -36,10 +36,10 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
     const cancelButtonIndex = options.length - 1;
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         options,
         cancelButtonIndex,
         title: t('profile.selectAccount'),
-        ...themedSheet,
       },
       index => {
         if (index === undefined || index === cancelButtonIndex) {

@@ -193,13 +193,13 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
       }
       showActionSheetWithOptions(
         {
+          ...themedSheet,
           options: [
             t('agentChat.filePart.openAsText'),
             t('agentChat.filePart.openInExternalApp'),
             t('common.cancel'),
           ],
           cancelButtonIndex: 2,
-          ...themedSheet,
         },
         index => {
           if (index === undefined || index === 2) {

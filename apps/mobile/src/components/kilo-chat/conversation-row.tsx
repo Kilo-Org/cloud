@@ -76,11 +76,11 @@ export function ConversationRow({
     void Haptics.selectionAsync();
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         title: title,
         options: [t('common.rename'), t('chat.conversation.leave'), t('common.cancel')],
         cancelButtonIndex: 2,
         destructiveButtonIndex: 1,
-        ...themedSheet,
       },
       index => {
         if (index === 0) {

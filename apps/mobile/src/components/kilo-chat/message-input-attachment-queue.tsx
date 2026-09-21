@@ -109,9 +109,9 @@ export function MessageInputWithAttachmentQueue({
     const actionSheet = getAttachmentActionSheetConfig();
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         ...actionSheet,
         options: [...actionSheet.options],
-        ...themedSheet,
       },
       index => {
         if (index === 0) {

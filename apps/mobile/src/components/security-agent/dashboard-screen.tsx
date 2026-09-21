@@ -231,7 +231,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     );
     const options = [t('common.allRepositories'), ...repoNames, t('common.cancel')];
     showActionSheetWithOptions(
-      { options, cancelButtonIndex: options.length - 1, ...themedSheet },
+      { ...themedSheet, options, cancelButtonIndex: options.length - 1 },
       index => {
         if (index === undefined || index === options.length - 1) {
           return;

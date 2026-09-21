@@ -228,10 +228,10 @@ export function CommentRow({
     const disabledButtonIndices = isSelf ? userActions.map((_, index) => 1 + index) : [];
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         options,
         cancelButtonIndex: options.length - 1,
         disabledButtonIndices,
-        ...themedSheet,
       },
       index => {
         if (index === undefined) {

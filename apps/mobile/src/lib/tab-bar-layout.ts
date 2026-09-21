@@ -76,7 +76,9 @@ export function getTabBarIconSize(fontScale = 1): number {
  * clearance below it: it switches to the compact icon-forward height once labels
  * are hidden, and otherwise uses the label-inclusive overlay height. Callers
  * that already decided the label state (from the window width) pass it as
- * `showLabel`; the default keeps the font-scale-only answer.
+ * `showLabel`; the default keeps the font-scale-only answer. Tab screens use
+ * `useEffectiveTabBarHeight` (`tab-bar-clearance.ts`), which supplies the tab
+ * layout's decision so the clearance cannot drift from the rendered height.
  */
 export function getEffectiveTabBarHeight({
   bottomInset,

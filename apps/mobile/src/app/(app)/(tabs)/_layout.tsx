@@ -22,6 +22,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 import {
   getEffectiveTabBarHeight,
   getTabBarHorizontalInset,
@@ -155,7 +156,10 @@ export default function TabsLayout() {
     }
   }, [showQuickChatTab, onChatTab, router]);
 
-  return (
+  // The label decision is published to the tab screens, whose content
+  // clearance must match the height this layout renders (the width rule can
+  // drop the labels without the callers seeing the window width).
+  const tabsLayout = (
     <StateSurfaceInsets bottomInset={hideTabs ? 0 : tabBarHeight + 16}>
       <Tabs
         screenOptions={{
@@ -279,4 +283,5 @@ export default function TabsLayout() {
       </Tabs>
     </StateSurfaceInsets>
   );
+  return <TabBarLabelContext value={showTabLabel}>{tabsLayout}</TabBarLabelContext>;
 }

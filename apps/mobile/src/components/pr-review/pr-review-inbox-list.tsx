@@ -166,13 +166,15 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
           {item.title}
         </Text>
         <View className="flex-row items-center gap-2">
-          {/*
-            The repo · time line yields width to the term chip: without min-w-0 shrink it
-            takes the whole row, pushing the chip past the right edge where the row clips it
-            (pr-review-home, font scale 2). A nested GitLab path or a long owner/repo
-            (#2 `discussion-conversation-only`) is wider than the row, so truncate the
-            metadata; the chip is the row's identity and must stay whole.
-          */}
+          {/* The ref · age is the row's flexible value: without `min-w-0 shrink`
+              it takes the whole row, pushing the chip past the right edge where
+              the row clips it (pr-review-home, font scale 2) — and a nested
+              GitLab path or a long owner/repo (#2
+              `discussion-conversation-only`) is wider than the row, so the px-6
+              parent clips the pill to "Pull re" and hides its rounded end.
+              Truncate the metadata to one line instead; the chip is the row's
+              identity and must stay whole. Same pattern as `PrRefsRow` in
+              pr-review-overview-parts.tsx. */}
           <Text variant="muted" className="min-w-0 shrink text-xs" numberOfLines={1}>
             {rowLabel} · {updatedLabel}
           </Text>

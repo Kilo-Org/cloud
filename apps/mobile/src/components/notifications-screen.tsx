@@ -212,6 +212,10 @@ function CategoryRow({
   // localized screen (the reported defect). The disabled switch and muted
   // title carry the unavailable state; the description stays translated.
   const subtitle = t(meta.subtitleKey);
+  // Security unavailability means no scope has the agent enabled. Keep the
+  // localized Security Agent setup guidance below the description, also read
+  // from the catalog so no server prose reaches a localized screen.
+  const showSecuritySetupGuidance = unavailable && meta.key === 'securityFindings';
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />
@@ -225,6 +229,11 @@ function CategoryRow({
         <Text variant="muted" className="mt-0.5 text-xs">
           {subtitle}
         </Text>
+        {showSecuritySetupGuidance && (
+          <Text variant="muted" className="mt-0.5 text-xs">
+            {t('securityAgent.settingsOverview.disabledPrompt')}
+          </Text>
+        )}
       </View>
       {isPending && <ActivityIndicator size="small" color={colors.mutedForeground} />}
       <Switch

@@ -63,6 +63,55 @@ describe('Cloud Agent report consumer', () => {
     expect(message.retry).not.toHaveBeenCalled();
   });
 
+  it('accepts a report carrying the provider responsibility', async () => {
+    const saveReport = vi.fn(async () => ({ outcome: 'applied' as const }));
+    vi.mocked(createCloudAgentReportStore).mockReturnValue({ saveReport } as never);
+    const providerReport = {
+      ...report,
+      run: {
+        ...report.run,
+        failureResponsibility: 'provider' as const,
+        failureReason: 'provider_unavailable' as const,
+      },
+    };
+    const message = makeMessage(providerReport);
+
+    await consumeCloudAgentReportBatch(
+      { messages: [message] } as unknown as MessageBatch<unknown>,
+      env
+    );
+
+    expect(saveReport).toHaveBeenCalledExactlyOnceWith(providerReport);
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('acks and drops a report with an unsupported responsibility value', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const saveReport = vi.fn();
+    vi.mocked(createCloudAgentReportStore).mockReturnValue({ saveReport } as never);
+    const message = makeMessage({
+      ...report,
+      run: {
+        ...report.run,
+        failureResponsibility: 'provider_retired',
+        failureReason: 'provider_unavailable',
+      },
+    });
+
+    await consumeCloudAgentReportBatch(
+      { messages: [message] } as unknown as MessageBatch<unknown>,
+      env
+    );
+
+    expect(saveReport).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith('Dropping malformed Cloud Agent report message', {
+      issueCount: expect.any(Number),
+    });
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
   it('acks an expired saved report after discarding retired diagnostic data', async () => {
     const saveReport = vi.fn().mockResolvedValueOnce({ outcome: 'expired' });
     vi.mocked(createCloudAgentReportStore).mockReturnValue({ saveReport } as never);

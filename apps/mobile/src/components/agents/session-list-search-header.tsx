@@ -5,6 +5,7 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type SessionListSearchHeaderProps = {
@@ -44,7 +45,9 @@ export function SessionListSearchHeader({
     <View>
       <View
         style={fieldMargins}
-        className="my-2 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
+        // `min-h-[44px]`: the field reserves the X's target height, so the
+        // field never grows when the first keystroke reveals that button.
+        className="my-2 min-h-[44px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4"
       >
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
         <View className="h-[18px] w-[18px] items-center justify-center">
@@ -78,8 +81,12 @@ export function SessionListSearchHeader({
             onPress={onClearSearch}
             accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
-            hitSlop={12}
-            className="active:opacity-70"
+            // The frame, not the 16pt glyph, is what the size audit measures:
+            // `h-11 w-11` is 38.5pt on device and the 3pt slop carries it to
+            // the 44pt minimum. `-mr-2` keeps the glyph near its old inset and
+            // the frame's left edge inside the field's right padding.
+            hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+            className="-mr-2 h-11 w-11 items-center justify-center active:opacity-70"
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>

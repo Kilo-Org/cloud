@@ -203,7 +203,7 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
             <Button
               variant="ghost"
               size="sm"
-              className="shrink-0 max-[22rem]:w-full"
+              className="shrink-0 max-[22rem]:w-full pointer-coarse:min-h-11"
               onClick={handleSignOut}
               disabled={isSigningOut || status === 'loading'}
             >
@@ -228,14 +228,14 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
           <div className="flex gap-3 max-[22rem]:flex-col">
             <Button
               variant="outline"
-              className="flex-1 max-[22rem]:w-full max-[22rem]:px-2"
+              className="flex-1 max-[22rem]:w-full max-[22rem]:px-2 pointer-coarse:min-h-11"
               onClick={() => handleAuthorize(false)}
               disabled={status === 'loading'}
             >
               Deny
             </Button>
             <Button
-              className="flex-1 max-[22rem]:w-full max-[22rem]:px-2"
+              className="flex-1 max-[22rem]:w-full max-[22rem]:px-2 pointer-coarse:min-h-11"
               onClick={() => handleAuthorize(true)}
               disabled={status === 'loading'}
             >

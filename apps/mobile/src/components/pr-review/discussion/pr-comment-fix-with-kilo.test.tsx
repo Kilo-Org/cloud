@@ -7,6 +7,7 @@ import { createElement, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { FIX_WITH_KILO_HIT_SLOP } from '@/lib/pr-review/comment-trailing-controls';
 import { type PrCommentKind } from '@/lib/pr-review/fix-with-kilo';
 import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
 import { type SharePayload } from '@/lib/share-payload';
@@ -225,9 +226,10 @@ describe('PrCommentFixWithKilo', () => {
     const button = findPressables(renderer)[0];
     expect(button?.props.accessibilityRole).toBe('button');
     expect(button?.props.accessibilityLabel).toBe('Fix with Kilo');
-    // >=44pt effective target on a ~26pt pill; horizontal slop capped at 2pt
-    // so the 12pt gap-3 to the overflow button's hitSlop={8} never overlaps.
-    expect(button?.props.hitSlop).toEqual({ top: 10, bottom: 10, left: 2, right: 2 });
+    // The pill renders 23pt tall; 11pt of vertical slop per side carries it
+    // past 44pt. The horizontal slop is capped at 2pt so the 10.5pt `gap-3` to
+    // the overflow button's 3pt left slop never overlaps.
+    expect(button?.props.hitSlop).toEqual(FIX_WITH_KILO_HIT_SLOP);
     expect(
       renderer.root.findAll(
         node => typeof node.type === 'string' && (node.type as string) === 'WandSparkles'

@@ -117,7 +117,7 @@ export function SheetHeader({
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={resolvedCancelLabel}
-              className="min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 active:opacity-70 disabled:opacity-50"
+              className="min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50"
             >
               <Text className="text-center text-base font-medium text-foreground">
                 {resolvedCancelLabel}
@@ -145,7 +145,7 @@ export function SheetHeader({
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={resolvedDoneLabel}
-            className="ms-auto min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-secondary px-4 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
+            className="ms-auto min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
           >
             <Text className="text-center text-base font-medium text-foreground">
               {resolvedDoneLabel}

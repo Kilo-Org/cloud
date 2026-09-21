@@ -30,8 +30,12 @@ import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import {
   NEW_SESSION_PROMPT_CHROME_HEIGHT,
+  NEW_SESSION_PROMPT_DEFAULT_LINES,
   NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
+  NEW_SESSION_PROMPT_LINE_HEIGHT,
+  NEW_SESSION_PROMPT_VERTICAL_PADDING,
   resolveComposerMaxHeight,
+  resolveNewSessionPromptHeight,
   SESSION_HEADER_HEIGHT,
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
@@ -59,12 +63,10 @@ import {
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 
-const PROMPT_INPUT_DEFAULT_LINES = 3;
-const PROMPT_INPUT_LINE_HEIGHT = 24;
+// Mirrors the input's `text-base`.
 const PROMPT_INPUT_FONT_SIZE = 16;
-// Must mirror the TextInput's actual padding: py-2 (16 total) and px-2 on
-// iOS (16 total) / the 24pt-per-side Android inset (48 total).
-const PROMPT_INPUT_VERTICAL_PADDING = 16;
+// Must mirror the TextInput's actual horizontal padding: px-2 on iOS (16
+// total) / the 24pt-per-side Android inset (48 total).
 const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
 const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
@@ -147,9 +149,11 @@ export function NewSessionPrompt({
   const isComposingRef = useRef(false);
   const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
-  const promptLineHeight = PROMPT_INPUT_LINE_HEIGHT * fontScale;
-  const promptMinHeight =
-    promptLineHeight * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING;
+  const promptLineHeight = NEW_SESSION_PROMPT_LINE_HEIGHT * fontScale;
+  const promptMinHeight = resolveNewSessionPromptHeight(
+    promptLineHeight,
+    NEW_SESSION_PROMPT_DEFAULT_LINES
+  );
   const promptMaxHeight = resolveComposerMaxHeight({
     windowHeight,
     safeAreaInsetTop: insets.top,
@@ -187,10 +191,10 @@ export function NewSessionPrompt({
   const promptMeasure = useTextHeight({
     minHeight: promptMinHeight,
     maxHeight: promptMaxHeight,
-    verticalPadding: PROMPT_INPUT_VERTICAL_PADDING,
+    verticalPadding: NEW_SESSION_PROMPT_VERTICAL_PADDING,
     textContentWidth: promptInputWidth - PROMPT_INPUT_HORIZONTAL_PADDING,
     fontSize: PROMPT_INPUT_FONT_SIZE,
-    lineHeight: PROMPT_INPUT_LINE_HEIGHT,
+    lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
     fontScale,
   });
 

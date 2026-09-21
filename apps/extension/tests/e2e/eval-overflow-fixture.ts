@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test';
 export const expectEvalToolBoxNoHorizontalOverflow = async (sidePanel: Page): Promise<void> => {
   const overflowState = await sidePanel.evaluate(() => {
     const codeLabel = [...document.querySelectorAll('p')].find(
-      element => element.textContent === 'Code'
+      element => element.textContent === 'Arguments'
     );
     const toolBox = codeLabel?.closest('details');
     const codeBlock = codeLabel?.parentElement?.querySelector('pre');

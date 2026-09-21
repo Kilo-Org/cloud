@@ -52,7 +52,6 @@ export default function SecurityAgentFilterFindingsRoute() {
       <View className="flex-1 bg-background">
         <EmptyState
           icon={Info}
-          className="flex-1"
           title={t('securityAgent.filter.noFilters')}
           description={t('securityAgent.filter.noFiltersDescription')}
         />

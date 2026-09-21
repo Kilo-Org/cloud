@@ -69,7 +69,7 @@ type OperationRegistryDependencies = {
 
 type OperationEffects = Pick<
   SessionOperationDependencies,
-  'signal' | 'emitSessionEvent' | 'sendOperationResult' | 'onDiagnostic'
+  'signal' | 'emitSessionEvent' | 'sendOperationResult' | 'consumeGateResult' | 'onDiagnostic'
 >;
 
 type Admission =

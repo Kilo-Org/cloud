@@ -1627,7 +1627,8 @@
       "linesBadge_many": "{{displayCount}} lignes",
       "matchesBadge_one": "{{displayCount}} résultat",
       "matchesBadge_other": "{{displayCount}} résultats",
-      "matchesBadge_many": "{{displayCount}} résultats"
+      "matchesBadge_many": "{{displayCount}} résultats",
+      "noOutput": "Aucune sortie."
     },
     "readToolMarkdown": {
       "linesTruncated": "lignes {{start}}–{{end}} (tronquées)",
@@ -3196,7 +3197,9 @@
     "couldNotApprove": "Échec de l'approbation",
     "couldNotStart": "Échec du démarrage",
     "channelName": "Agents actifs",
-    "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé."
+    "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé.",
+    "openSession": "Ouvrir",
+    "approveFailed": "Impossible d'approuver. Touchez $t(common.approve) pour réessayer."
   },
   "transcriptionModel": {
     "title": "Modèle de transcription",
@@ -3221,15 +3224,7 @@
     "remoteOptionTitle": "Votre ordinateur",
     "remoteOptionBody": "Exécutez Kilo sur votre propre machine via le CLI `kilo remote`.",
     "skip": "Passer la visite",
-    "tutorialLabel": "Tutoriel",
-    "remoteTitle": "Démarrez votre première session à distance",
-    "remoteBody": "Connectez votre ordinateur, puis démarrez la session depuis ici.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Aucun ordinateur connecté pour le moment",
-    "remoteEmptyBody": "Pour le connecter, exécutez `kilo remote` sur votre ordinateur.",
-    "remoteFound": "Ordinateur connecté",
-    "checkAgain": "Vérifier à nouveau",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutoriel"
   },
   "appActions": {
     "start": {

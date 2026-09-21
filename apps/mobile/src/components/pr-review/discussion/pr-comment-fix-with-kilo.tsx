@@ -35,7 +35,7 @@ import { putSharePayload } from '@/lib/share-payload';
 
 // The pill's hit slop lives with the trailing-group gap in
 // comment-trailing-controls.ts: the pill's 2pt horizontal cap plus the
-// overflow button's 8pt left bleed stay inside the group's 12pt `gap-3`.
+// overflow button's 3pt left slop stay inside the group's 10.5pt `gap-3`.
 
 type PrCommentFixWithKiloProps = {
   readonly owner: string;

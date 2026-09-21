@@ -2248,7 +2248,8 @@
       "linesBadge_many": "{{displayCount}} línies",
       "matchesBadge_one": "{{displayCount}} coincidència",
       "matchesBadge_other": "{{displayCount}} coincidències",
-      "matchesBadge_many": "{{displayCount}} coincidències"
+      "matchesBadge_many": "{{displayCount}} coincidències",
+      "noOutput": "No hi ha cap sortida."
     },
     "readToolMarkdown": {
       "linesTruncated": "línies {{start}}–{{end}} (truncades)",
@@ -3196,7 +3197,9 @@
     "couldNotApprove": "No s'ha pogut aprovar",
     "couldNotStart": "No s'ha pogut iniciar",
     "channelName": "Agents actius",
-    "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig."
+    "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig.",
+    "openSession": "Obre",
+    "approveFailed": "No s'ha pogut aprovar. Toca $t(common.approve) per tornar-ho a provar."
   },
   "transcriptionModel": {
     "title": "Model de transcripció",
@@ -3221,15 +3224,7 @@
     "remoteOptionTitle": "El teu ordinador",
     "remoteOptionBody": "Executa el Kilo a la teva pròpia màquina mitjançant el CLI `kilo remote`.",
     "skip": "Salta el tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Inicia la teva primera sessió remota",
-    "remoteBody": "Connecta el teu ordinador i després inicia la sessió des d'aquí.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Encara no hi ha cap ordinador connectat",
-    "remoteEmptyBody": "Per connectar-lo, executa `kilo remote` al teu ordinador.",
-    "remoteFound": "Ordinador connectat",
-    "checkAgain": "Torna-ho a comprovar",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

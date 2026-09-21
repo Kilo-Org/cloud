@@ -70,7 +70,6 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
-  useColorScheme: () => 'light',
   View: 'View',
 }));
 

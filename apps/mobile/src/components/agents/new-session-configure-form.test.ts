@@ -95,6 +95,11 @@ vi.mock('@/components/ui/button', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
+// The profile row's loading state renders `Skeleton`; mock it so the assertion
+// reads the element by name and the real component's Reanimated graph stays
+// out of this pure test's imports.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));

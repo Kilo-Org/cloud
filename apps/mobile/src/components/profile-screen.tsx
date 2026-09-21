@@ -17,7 +17,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from '@/components/ui/icons';
-import { Alert, Platform, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
@@ -35,6 +35,7 @@ import { useDeleteAccount } from '@/components/use-delete-account';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
+import { usesInAppDestructiveConfirm } from '@/lib/destructive-confirm-platform';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -137,7 +138,7 @@ export function ProfileScreen() {
   };
 
   const confirmSignOut = () => {
-    if (Platform.OS === 'android') {
+    if (usesInAppDestructiveConfirm()) {
       setSignOutConfirmVisible(true);
       return;
     }

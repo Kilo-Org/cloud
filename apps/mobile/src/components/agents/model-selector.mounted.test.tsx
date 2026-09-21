@@ -60,13 +60,13 @@ function cliCatalogOption(overrides: Partial<SessionModelOption> = {}): SessionM
   };
 }
 
-function renderRow(option: SessionModelOption): TestRenderer.ReactTestRenderer {
+function renderRow(option: SessionModelOption, selected = false): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   TestRenderer.act(() => {
     ref.current = TestRenderer.create(
       createElement(ModelPickerOptionRow, {
         option,
-        selected: false,
+        selected,
         selectedVariant: '',
         isFavorite: false,
         onSelectModel: vi.fn<(option: SessionModelOption) => void>(),
@@ -98,6 +98,14 @@ function countWithAccessibilityLabel(root: TestRenderer.ReactTestInstance, label
     .length;
 }
 
+// The trailing icons of a row, in render order. The favorite star must be the
+// last one so every row's star shares one right-alignment column.
+function trailingIconTypes(root: TestRenderer.ReactTestInstance): string[] {
+  return root
+    .findAll(node => (node.type as string) === 'Check' || (node.type as string) === 'Star')
+    .map(node => node.type as string);
+}
+
 describe('ModelPickerOptionRow BYOK badge', () => {
   it('renders the BYOK badge for a CLI-catalog option with user BYOK available', () => {
     const renderer = renderRow(cliCatalogOption({ hasUserByokAvailable: true }));
@@ -113,5 +121,15 @@ describe('ModelPickerOptionRow BYOK badge', () => {
     const renderer = renderRow(cliCatalogOption({ isFree: true, mayTrainOnYourPrompts: true }));
     expect(textStrings(renderer.root)).not.toContain(freeModelFreeLabel());
     expect(countWithAccessibilityLabel(renderer.root, freeModelDataLabel())).toBe(0);
+  });
+});
+
+describe('ModelPickerOptionRow trailing alignment', () => {
+  it('keeps the favorite star rightmost so every row star shares one column', () => {
+    const selectedRow = renderRow(cliCatalogOption(), true);
+    expect(trailingIconTypes(selectedRow.root)).toEqual(['Check', 'Star']);
+
+    const plainRow = renderRow(cliCatalogOption());
+    expect(trailingIconTypes(plainRow.root)).toEqual(['Star']);
   });
 });

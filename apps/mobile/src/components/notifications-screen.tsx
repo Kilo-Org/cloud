@@ -156,6 +156,24 @@ const CATEGORY_META = [
   },
 ] as const;
 
+/**
+ * The reason each gated category shows while the server marks it unavailable.
+ * The response's old `unavailableReason` was an English sentence, so the row
+ * renders mobile copy instead: the reason must read in the user's language.
+ * Only these three categories can be unavailable
+ * (`apps/web/src/routers/user-router.ts:494-505`; the other four are
+ * `ALWAYS_AVAILABLE_CAPABILITY`, `:450`).
+ *
+ * This is the fallback for a response that carries no reason code at all — a
+ * server predating the code sent the very sentence this copy translates — so
+ * such a row keeps the same meaning in the reader's language.
+ */
+const CATEGORY_UNAVAILABLE_SUBTITLE_KEYS: ReadonlyMap<NotificationCategoryKey, string> = new Map([
+  ['kiloclawActivity', 'notifications.category.kiloclawActivityUnavailable'],
+  ['balanceAlerts', 'notifications.category.balanceAlertsUnavailable'],
+  ['securityFindings', 'notifications.category.securityFindingsUnavailable'],
+]);
+
 type CategoryMeta = (typeof CATEGORY_META)[number];
 
 /** Per-category availability from the preferences response `capabilities` map. */
@@ -221,23 +239,21 @@ function CategoryRow({
   // disabled and the row explains itself in the reader's language. A missing
   // entry (the `noUncheckedIndexedAccess` widening) defaults to available.
   const unavailable = capability?.available === false;
+  const unavailableReasonCode = capability?.unavailableReasonCode;
   const isDisabled = disabled || !editable || unavailable;
   const title = t(meta.titleKey);
   // The server names the reason with a code, never a sentence: a known code
   // resolves to catalog copy, and an unknown one falls back to the category's
   // own localized subtitle.
-  const reasonKey = unavailable
-    ? unavailableReasonKey(capability.unavailableReasonCode)
-    : undefined;
-  // A server that predates the code sends none at all. Security unavailability
-  // then means no scope has the agent enabled, so that row keeps the Security
-  // Agent screen's localized setup guidance instead of any English prose.
-  const legacySecurityGuidance =
-    unavailable && capability.unavailableReasonCode == null && meta.key === 'securityFindings';
-  const fallbackSubtitleKey = legacySecurityGuidance
-    ? 'securityAgent.settingsOverview.disabledPrompt'
-    : meta.subtitleKey;
-  const subtitle = t(reasonKey ?? fallbackSubtitleKey);
+  const reasonKey = unavailable ? unavailableReasonKey(unavailableReasonCode) : undefined;
+  // A response with no code at all comes from a server that predates the code
+  // contract, which sent the sentence the category's catalog reason translates:
+  // the row keeps that meaning in the reader's language.
+  const noCodeFallbackKey =
+    unavailable && unavailableReasonCode == null
+      ? (CATEGORY_UNAVAILABLE_SUBTITLE_KEYS.get(meta.key) ?? meta.subtitleKey)
+      : meta.subtitleKey;
+  const subtitle = t(reasonKey ?? noCodeFallbackKey);
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />

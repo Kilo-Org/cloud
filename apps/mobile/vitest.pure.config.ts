@@ -33,6 +33,7 @@ export default defineProject({
     // class down to the workers so the suite prints no warnings.
     execArgv: ['--disable-warning=ExperimentalWarning'],
     include: [
+      'plugins/**/*.test.ts',
       'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',
       'src/lib/a11y/**/*.test.ts',

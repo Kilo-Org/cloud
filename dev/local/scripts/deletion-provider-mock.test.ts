@@ -120,7 +120,8 @@ test('PostHog environments lookup and bulk_delete use trailing slashes and uuid 
     assert.deepEqual(deleted.body, {
       id: 'deletion-mock',
       persons_found: 1,
-      persons_deleted: 1,
+      persons_deleted: 0,
+      persons_queued_for_deletion: 1,
       events_queued_for_deletion: true,
       recordings_queued_for_deletion: true,
       deletion_errors: [],

@@ -99,7 +99,7 @@ repository.
    session. The repository MUST remain the one chosen at start.
 8. The user MAY change model and mode for later turns. When a profile or agent
    pins the model, the picker MUST be disabled and MUST say why.
-9. A turn that makes no real agent progress for five minutes MUST fail, MUST
+9. A turn that makes no real agent progress for seven minutes MUST fail, MUST
    tell the user the turn did not complete, MUST re-enable the composer, and
    MUST leave the session usable for a later message. Retry and offline status
    are not real progress. A stop during a retry MUST still end the turn
@@ -268,7 +268,7 @@ repository.
    applicable `inactivityTimeoutMs` MUST be a finite positive whole-millisecond
    duration, or `null` when unknown. It MUST describe the real inactivity policy,
    not wrapper retention or a provider's maximum lifetime. The current policy
-   is 5 minutes for control-plane idle stop; a policy MUST NOT be guessed for an
+   is 10 minutes for control-plane idle stop; a policy MUST NOT be guessed for an
    unsupported provider or session.
 8. `estimatedSleepAt` MUST be `null` unless an active sandbox has a known
    inactivity policy, a valid future idle-stop deadline, and coherent fresh
@@ -379,6 +379,15 @@ The following use SHOULD and are not enforced today:
    ready with setup half-done.)
 
 ## Changelog
+
+### 2026-09-21 -- Decoupled turn and sandbox idle bounds
+
+- Raised Turn rule 9 to seven minutes and made the turn inactivity bound a
+  distinct value from the control-plane idle stop. Retry and offline status
+  remain non-progress.
+- Changed the Sandbox status rule 7 policy to 10 minutes for control-plane idle
+  stop, so the advertised `inactivityTimeoutMs` and `estimatedSleepAt` match the
+  sandbox stop.
 
 ### 2026-09-12 -- Bounded turn inactivity
 

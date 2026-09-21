@@ -120,29 +120,26 @@ vi.mock('@/components/ui/button', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
+// `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
+// import cannot resolve in the pure project; every sibling pure spec mocks it.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
-// The real Skeleton mounts Reanimated, which the pure Node project cannot load.
-vi.mock('@/components/ui/skeleton', () => ({
-  Skeleton: 'Skeleton',
-}));
-
-// The profile row renders a loading skeleton, and `@/components/ui/skeleton`
-// pulls `react-native-reanimated`, which this pure suite does not set up.
+// The profile row and the environment row both render a loading `Skeleton`.
+// The real Skeleton mounts Reanimated, which this pure Node project cannot
+// load: its module imports `react-native-reanimated`, this suite does not set
+// Reanimated up, and the Reanimated/worklets native entry cannot resolve (the
+// published worklets build uses bundler-style extensionless imports). The
+// primitive is a stub like every other UI element above; its own rendering is
+// not under test here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
 }));
-
-// The environment row's loading state renders `Skeleton`, whose module imports
-// react-native-reanimated: this project runs in plain Node, where the
-// Reanimated/worklets native entry cannot resolve (the published worklets
-// build uses bundler-style extensionless imports). The primitive is a stub like
-// every other UI element above; its own rendering is not under test here.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 // ── hooks ──────────────────────────────────────────────────────────
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -837,6 +834,9 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    // The help draws the commands as prose: the authoring markers must not
+    // reach the screen.
+    expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const remote = NewSessionConfigureForm({
@@ -847,6 +847,7 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 
   // ── Case 14: reorder wiring lock ──

@@ -2,7 +2,7 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConsentCard } from './consent-card';
+import { CONSENT_DISCLOSURE_MAX_FONT_SCALE, ConsentCard } from './consent-card';
 
 const mockedAcceptConsent = vi.hoisted(() => vi.fn());
 const mockedReadConsent = vi.hoisted(() => vi.fn());
@@ -414,5 +414,27 @@ describe('ConsentCard', () => {
     const footer = requireParent(findButton(root, 'Back'));
     expect(disclosureTexts(footer).length).toBe(1);
     expect(hasAncestorOfType(requireDisclosure(root), 'ScrollView')).toBe(false);
+  });
+
+  it('caps the pinned disclosure font scale so its footer height stays bounded', () => {
+    for (const mode of ['onboarding', 'review'] as const) {
+      const root = mountCard(mode).root;
+      // The sentence has no line cap: uncapped it grows to several lines at
+      // the largest system text size and the pinned footer's fixed height
+      // pushes the actions off the sheet.
+      const outer = root.findAll(
+        n =>
+          typeof n.type === 'string' &&
+          (n.type as string) === 'Text' &&
+          Array.isArray(n.props.children) &&
+          n.props.children.includes('Your data is handled per the')
+      );
+      expect(outer.length).toBe(1);
+      expect(outer[0]?.props.maxFontSizeMultiplier).toBe(CONSENT_DISCLOSURE_MAX_FONT_SCALE);
+      // The nested link is its own native text node, so it needs the cap too.
+      expect(requireDisclosure(root).props.maxFontSizeMultiplier).toBe(
+        CONSENT_DISCLOSURE_MAX_FONT_SCALE
+      );
+    }
   });
 });

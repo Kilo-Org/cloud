@@ -26,6 +26,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   Globe: 'Globe',
+  KeyRound: 'KeyRound',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
 }));

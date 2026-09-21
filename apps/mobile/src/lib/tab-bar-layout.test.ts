@@ -12,6 +12,7 @@ import {
   TAB_LABEL_WRAP_FONT_SCALE,
   tabAccessibilityLabel,
   tabBarPosition,
+  tabLabelLineCount,
   visibleTabCount,
 } from '@/lib/tab-bar-layout';
 
@@ -30,6 +31,29 @@ describe('getTabBarOverlayHeight', () => {
 
   it('grows to preserve scaled tab labels', () => {
     expect(getTabBarOverlayHeight(34, 'ios', 3)).toBe(164);
+  });
+});
+
+describe('tabLabelLineCount', () => {
+  it('reserves one line below the wrap threshold', () => {
+    expect(tabLabelLineCount(1)).toBe(1);
+    expect(tabLabelLineCount(TAB_LABEL_WRAP_FONT_SCALE)).toBe(1);
+  });
+
+  it('reserves the second line above the wrap threshold', () => {
+    expect(tabLabelLineCount(TAB_LABEL_WRAP_FONT_SCALE + 0.01)).toBe(2);
+    expect(tabLabelLineCount(3)).toBe(2);
+  });
+
+  it('agrees with the height the bar reserves', () => {
+    // The bar reserves one label line below the wrap threshold and two above
+    // it; the label is never allowed to render more lines than that.
+    expect(getTabBarOverlayHeight(0, 'android', 1)).toBeCloseTo(
+      34 + 16 * 1 * tabLabelLineCount(1) + 4
+    );
+    expect(getTabBarOverlayHeight(0, 'android', 1.9)).toBeCloseTo(
+      34 + 16 * 1.9 * tabLabelLineCount(1.9) + 4
+    );
   });
 });
 

@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Halin zaman",
       "sessionStatusSubtitle": "an gama / an kasa / a shirye don sarrafawa",
       "kiloclawActivitySubtitle": "kwafin shirin ya shirya ko ya gaza, ayyukan da aka tsara",
+      "kiloclawActivityUnavailable": "Fara kwafin KiloClaw don samun ayyukan KiloClaw.",
       "balanceAlertsSubtitle": "gargaɗin ƙarancin kuɗin ƙungiya",
-      "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA"
+      "balanceAlertsUnavailable": "Shiga ƙungiya don samun gargaɗin ƙarancin kuɗi.",
+      "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA",
+      "securityFindingsUnavailable": "Kunna wakilin tsaro na Kilo a wani yanki don samun sakamakon binciken tsaro."
     },
     "action": {
       "openSession": "Buɗe zaman"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "An kasa loda zaman.",
       "failedToLoadDetails": "An kasa loda cikakkun bayanan zaman.",
       "failedToStopExecution": "An kasa dakatar da aikin.",
+      "stopped": "An dakatar da zama",
+      "committing": "Ana adanawa…",
+      "committed": "An adana",
+      "commitFailed": "Adanawa ta kasa",
       "renameSession": "Canza sunan zaman",
       "renamePlaceholder": "Sunan zaman",
       "transcriptAccessibility": "Tarihin tattaunawar zaman",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "layuka {{displayCount}}",
       "linesBadge_other": "layuka {{displayCount}}",
       "matchesBadge_one": "sakamako {{displayCount}}",
-      "matchesBadge_other": "sakamako {{displayCount}}"
+      "matchesBadge_other": "sakamako {{displayCount}}",
+      "noOutput": "Babu fitarwa."
     },
     "readToolMarkdown": {
       "linesTruncated": "layuka {{start}}–{{end}} (an rage)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "Kwamfutarka",
     "remoteOptionBody": "Gudanar da Kilo a na'urarka ta hanyar CLI na `kilo remote`.",
     "skip": "Tsallake kaita",
-    "tutorialLabel": "Koyarwa",
-    "remoteTitle": "Fara zaman nesa na farko",
-    "remoteBody": "Haɗa kwamfutarka, sai ka fara zaman daga nan.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Babu kwamfuta da aka haɗa tukuna",
-    "remoteEmptyBody": "Don haɗa shi, gudanar da `kilo remote` a kwamfutarka.",
-    "remoteFound": "An haɗa kwamfuta",
-    "checkAgain": "Sake dubawa",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Koyarwa"
   },
   "appActions": {
     "start": {

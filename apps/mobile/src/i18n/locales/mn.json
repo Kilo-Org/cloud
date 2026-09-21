@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Сессийн төлөв",
       "sessionStatusSubtitle": "дууссан / амжилтгүй / удирдахад бэлэн",
       "kiloclawActivitySubtitle": "инстанц бэлэн/амжилтгүй, төлөвлөсөн үйлдлүүд",
+      "kiloclawActivityUnavailable": "KiloClaw-ийн үйл ажиллагаа авахын тулд KiloClaw инстанц эхлүүлнэ үү.",
       "balanceAlertsSubtitle": "байгууллагын үлдэгдэл багасах анхааруулга",
-      "securityFindingsSubtitle": "шинээр илэрсэн эмзэг байдал болон SLA сануулга"
+      "balanceAlertsUnavailable": "Балансын анхааруулга авахын тулд байгууллагад нэгдэнэ үү.",
+      "securityFindingsSubtitle": "шинээр илэрсэн эмзэг байдал болон SLA сануулга",
+      "securityFindingsUnavailable": "Аюулгүй байдлын илэрсэн асуудал авахын тулд Kilo Аюулгүй байдлын агентыг хүрээнд идэвхжүүлнэ үү."
     },
     "action": {
       "openSession": "Сесс нээх"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Сессийг ачаалж чадсангүй.",
       "failedToLoadDetails": "Сессийн дэлгэрэнгүй мэдээллийг ачаалж чадсангүй.",
       "failedToStopExecution": "Гүйцэтгэлийг зогсоож чадсангүй.",
+      "stopped": "Сесс зогслоо",
+      "committing": "Коммит хийж байна…",
+      "committed": "Коммит хийгдлээ",
+      "commitFailed": "Коммит хийж чадсангүй",
       "renameSession": "Сессийн нэрийг өөрчлөх",
       "renamePlaceholder": "Сессийн нэр",
       "transcriptAccessibility": "Сессийн ярианы бичвэр",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} мөр",
       "linesBadge_other": "{{displayCount}} мөр",
       "matchesBadge_one": "{{displayCount}} илэрц",
-      "matchesBadge_other": "{{displayCount}} илэрц"
+      "matchesBadge_other": "{{displayCount}} илэрц",
+      "noOutput": "Гаралт байхгүй."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} мөр (товчилсон)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "Таны компьютер",
     "remoteOptionBody": "Өөрийн машинаасаа `kilo remote` CLI-ээр Kilo-г ажиллуул.",
     "skip": "Танилцуулгыг алгасах",
-    "tutorialLabel": "Заавар",
-    "remoteTitle": "Эхний зайн сессээ эхлүүл",
-    "remoteBody": "Компьютерээ холбоод, эндээс сессээ эхлүүлээрэй.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Одоогоор компьютер холбогдоогүй байна",
-    "remoteEmptyBody": "Холбохын тулд компьютер дээрээ `kilo remote` командыг ажиллуулна уу.",
-    "remoteFound": "Компьютер холбогдлоо",
-    "checkAgain": "Дахин шалгах",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Заавар"
   },
   "appActions": {
     "start": {

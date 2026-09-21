@@ -270,8 +270,11 @@
       "sessionStatusTitle": "Stato della sessione",
       "sessionStatusSubtitle": "terminata / non riuscita / pronta per il controllo",
       "kiloclawActivitySubtitle": "istanza pronta o in errore, azioni pianificate",
+      "kiloclawActivityUnavailable": "Avvia un'istanza KiloClaw per ricevere l'attività di KiloClaw.",
       "balanceAlertsSubtitle": "avvisi di saldo basso dell'organizzazione",
-      "securityFindingsSubtitle": "nuovi problemi di sicurezza e promemoria SLA"
+      "balanceAlertsUnavailable": "Unisciti a un'organizzazione per ricevere avvisi di saldo basso.",
+      "securityFindingsSubtitle": "nuovi problemi di sicurezza e promemoria SLA",
+      "securityFindingsUnavailable": "Attiva l'agente di sicurezza Kilo su un ambito per ricevere problemi di sicurezza."
     },
     "liveActivities": "Attività in tempo reale",
     "liveActivitySubtitle": "Mostra gli agenti attivi nella schermata di blocco",
@@ -1548,6 +1551,10 @@
       "couldNotLoad": "Impossibile caricare la sessione.",
       "failedToLoadDetails": "Impossibile caricare i dettagli della sessione.",
       "failedToStopExecution": "Impossibile interrompere l'esecuzione.",
+      "stopped": "Sessione interrotta",
+      "committing": "Commit in corso…",
+      "committed": "Commit completato",
+      "commitFailed": "Commit non riuscito",
       "renameSession": "Rinomina sessione",
       "renamePlaceholder": "Nome della sessione",
       "transcriptAccessibility": "Trascrizione della sessione",
@@ -1692,7 +1699,8 @@
       "linesBadge_many": "{{displayCount}} righe",
       "matchesBadge_one": "{{displayCount}} corrispondenza",
       "matchesBadge_other": "{{displayCount}} corrispondenze",
-      "matchesBadge_many": "{{displayCount}} corrispondenze"
+      "matchesBadge_many": "{{displayCount}} corrispondenze",
+      "noOutput": "Nessun output."
     },
     "readToolMarkdown": {
       "linesTruncated": "righe {{start}}–{{end}} (troncate)",
@@ -3223,15 +3231,7 @@
     "remoteOptionTitle": "Il tuo computer",
     "remoteOptionBody": "Esegui Kilo sulla tua macchina tramite la CLI `kilo remote`.",
     "skip": "Salta tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Avvia la tua prima sessione remota",
-    "remoteBody": "Collega il tuo computer e poi avvia la sessione da qui.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Nessun computer ancora connesso",
-    "remoteEmptyBody": "Per connetterlo, esegui `kilo remote` sul tuo computer.",
-    "remoteFound": "Computer connesso",
-    "checkAgain": "Controlla di nuovo",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

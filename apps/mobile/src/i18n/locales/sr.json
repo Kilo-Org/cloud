@@ -854,8 +854,11 @@
       "sessionStatusTitle": "Status sesije",
       "sessionStatusSubtitle": "završeno / neuspešno / spremno za upravljanje",
       "kiloclawActivitySubtitle": "spremnost ili greška instance, zakazane radnje",
+      "kiloclawActivityUnavailable": "Pokreni KiloClaw instancu da dobiješ aktivnosti KiloClaw.",
       "balanceAlertsSubtitle": "upozorenja o niskom saldu organizacije",
-      "securityFindingsSubtitle": "novi nalazi i podsetnici za SLA"
+      "balanceAlertsUnavailable": "Pridruži se organizaciji da dobiješ upozorenja o niskom saldu.",
+      "securityFindingsSubtitle": "novi nalazi i podsetnici za SLA",
+      "securityFindingsUnavailable": "Uključi Kilo bezbednosnog agenta na opsegu da dobiješ bezbednosne nalaze."
     },
     "action": {
       "openSession": "Otvori sesiju"
@@ -2104,6 +2107,10 @@
       "couldNotLoad": "Učitavanje sesije nije uspelo.",
       "failedToLoadDetails": "Učitavanje detalja sesije nije uspelo.",
       "failedToStopExecution": "Zaustavljanje izvršavanja nije uspelo.",
+      "stopped": "Sesija je zaustavljena",
+      "committing": "Komituje se…",
+      "committed": "Komitovano",
+      "commitFailed": "Komitovanje nije uspelo",
       "renameSession": "Preimenuj sesiju",
       "renamePlaceholder": "Naziv sesije",
       "transcriptAccessibility": "Transkript sesije",
@@ -2248,7 +2255,8 @@
       "linesBadge_few": "reda: {{displayCount}}",
       "matchesBadge_one": "podudaranje: {{displayCount}}",
       "matchesBadge_other": "podudaranja: {{displayCount}}",
-      "matchesBadge_few": "podudaranja: {{displayCount}}"
+      "matchesBadge_few": "podudaranja: {{displayCount}}",
+      "noOutput": "Nema izlaza."
     },
     "readToolMarkdown": {
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",
@@ -3223,15 +3231,7 @@
     "remoteOptionTitle": "Tvoj računar",
     "remoteOptionBody": "Pokreni Kilo na sopstvenoj mašini preko `kilo remote` CLI-ja.",
     "skip": "Preskoči turu",
-    "tutorialLabel": "Tutorijal",
-    "remoteTitle": "Pokreni svoju prvu udaljenu sesiju",
-    "remoteBody": "Poveži svoj računar, zatim pokreni sesiju odavde.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Još nema povezanog računara",
-    "remoteEmptyBody": "Da ga povežeš, pokreni `kilo remote` na računaru.",
-    "remoteFound": "Računar povezan",
-    "checkAgain": "Proveri ponovo",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorijal"
   },
   "appActions": {
     "start": {

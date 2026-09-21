@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Sessiestatus",
       "sessionStatusSubtitle": "klaar / misluk / gereed om te beheer",
       "kiloclawActivitySubtitle": "instansie gereed/misluk, geskeduleerde aksies",
+      "kiloclawActivityUnavailable": "Begin 'n KiloClaw-instansie om KiloClaw-aktiwiteit te kry.",
       "balanceAlertsSubtitle": "waarskuwings oor die organisasie se lae saldo",
-      "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe"
+      "balanceAlertsUnavailable": "Sluit by 'n organisasie aan om waarskuwings oor lae saldo te kry.",
+      "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe",
+      "securityFindingsUnavailable": "Aktiveer Kilo-sekuriteitsagent op 'n bestek om sekuriteitsbevindings te kry."
     },
     "action": {
       "openSession": "Maak sessie oop"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Die sessie kon nie gelaai word nie.",
       "failedToLoadDetails": "Die sessiebesonderhede kon nie gelaai word nie.",
       "failedToStopExecution": "Die uitvoering kon nie gestop word nie.",
+      "stopped": "Sessie gestop",
+      "committing": "Besig om te vaslê…",
+      "committed": "Vasgelê",
+      "commitFailed": "Vaslê het misluk",
       "renameSession": "Hernoem sessie",
       "renamePlaceholder": "Sessienaam",
       "transcriptAccessibility": "Sessietranskripsie",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} reël",
       "linesBadge_other": "{{displayCount}} reëls",
       "matchesBadge_one": "{{displayCount}} treffer",
-      "matchesBadge_other": "{{displayCount}} treffers"
+      "matchesBadge_other": "{{displayCount}} treffers",
+      "noOutput": "Geen uitset nie."
     },
     "readToolMarkdown": {
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "Jou rekenaar",
     "remoteOptionBody": "Voer Kilo op jou eie masjien uit deur die `kilo remote`-CLI.",
     "skip": "Slaan toer oor",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Begin jou eerste afstandsessie",
-    "remoteBody": "Koppel jou rekenaar en begin dan die sessie van hier af.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Nog geen rekenaar gekoppel nie",
-    "remoteEmptyBody": "Voer `kilo remote` op jou rekenaar uit om dit te koppel.",
-    "remoteFound": "Rekenaar gekoppel",
-    "checkAgain": "Kontroleer weer",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

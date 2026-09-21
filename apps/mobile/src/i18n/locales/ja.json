@@ -334,8 +334,11 @@
       "sessionStatusTitle": "セッションの状態",
       "sessionStatusSubtitle": "完了 / 失敗 / 操作可能",
       "kiloclawActivitySubtitle": "インスタンスの準備完了や失敗、予定された操作",
+      "kiloclawActivityUnavailable": "KiloClawのアクティビティを受け取るには、KiloClawインスタンスを起動してください。",
       "balanceAlertsSubtitle": "組織の残高低下に関する警告",
-      "securityFindingsSubtitle": "新たな検出結果とSLAのリマインダー"
+      "balanceAlertsUnavailable": "残高アラートを受け取るには、組織に参加してください。",
+      "securityFindingsSubtitle": "新たな検出結果とSLAのリマインダー",
+      "securityFindingsUnavailable": "セキュリティの検出事項を受け取るには、スコープでKiloセキュリティエージェントを有効にしてください。"
     },
     "action": {
       "openSession": "セッションを開く"
@@ -1572,6 +1575,10 @@
       "couldNotLoad": "セッションを読み込めませんでした。",
       "failedToLoadDetails": "セッションの詳細を読み込めませんでした。",
       "failedToStopExecution": "実行を停止できませんでした。",
+      "stopped": "セッションを停止しました",
+      "committing": "コミット中…",
+      "committed": "コミットしました",
+      "commitFailed": "コミットに失敗しました",
       "renameSession": "セッション名の変更",
       "renamePlaceholder": "セッション名",
       "transcriptAccessibility": "セッションの会話履歴",
@@ -1712,7 +1719,8 @@
       "linesBadge_one": "{{displayCount}}行",
       "linesBadge_other": "{{displayCount}}行",
       "matchesBadge_one": "{{displayCount}}件",
-      "matchesBadge_other": "{{displayCount}}件"
+      "matchesBadge_other": "{{displayCount}}件",
+      "noOutput": "出力はありません。"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}～{{end}}行目（一部省略）",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "お使いのコンピューター",
     "remoteOptionBody": "`kilo remote` CLI を使って自分のコンピューターで Kilo を実行します。",
     "skip": "ツアーをスキップ",
-    "tutorialLabel": "チュートリアル",
-    "remoteTitle": "最初のリモートセッションを開始",
-    "remoteBody": "コンピューターを接続してから、ここでセッションを開始してください。",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "接続済みのコンピューターはありません",
-    "remoteEmptyBody": "接続するには、コンピューターで `kilo remote` を実行してください。",
-    "remoteFound": "コンピューターが接続されました",
-    "checkAgain": "再チェック",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "チュートリアル"
   },
   "appActions": {
     "start": {

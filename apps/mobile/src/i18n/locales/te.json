@@ -838,8 +838,11 @@
       "sessionStatusTitle": "సెషన్ స్థితి",
       "sessionStatusSubtitle": "పూర్తయింది / విఫలమైంది / నియంత్రించడానికి సిద్ధం",
       "kiloclawActivitySubtitle": "ఇన్‌స్టాన్స్ సిద్ధం/విఫలం, నిర్ణీత సమయాల్లో జరిగే చర్యలు",
+      "kiloclawActivityUnavailable": "KiloClaw కార్యకలాపాలను పొందడానికి KiloClaw ఇన్‌స్టాన్స్‌ను ప్రారంభించండి.",
       "balanceAlertsSubtitle": "సంస్థ బ్యాలెన్స్ తగ్గినప్పుడు హెచ్చరికలు",
-      "securityFindingsSubtitle": "కొత్త భద్రతా సమస్యలు, SLA రిమైండర్లు"
+      "balanceAlertsUnavailable": "బ్యాలెన్స్ హెచ్చరికలను పొందడానికి ఒక సంస్థలో చేరండి.",
+      "securityFindingsSubtitle": "కొత్త భద్రతా సమస్యలు, SLA రిమైండర్లు",
+      "securityFindingsUnavailable": "భద్రతా సమస్యలను పొందడానికి ఒక పరిధిలో Kilo భద్రతా ఏజెంట్‌ను ప్రారంభించండి."
     },
     "action": {
       "openSession": "సెషన్‌ను తెరవండి"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "సెషన్‌ను లోడ్ చేయలేకపోయాము.",
       "failedToLoadDetails": "సెషన్ వివరాలను లోడ్ చేయలేకపోయాము.",
       "failedToStopExecution": "అమలును ఆపలేకపోయాము.",
+      "stopped": "సెషన్ ఆపబడింది",
+      "committing": "కమిట్ చేస్తోంది…",
+      "committed": "కమిట్ పూర్తయింది",
+      "commitFailed": "కమిట్ విఫలమైంది",
       "renameSession": "సెషన్ పేరు మార్చండి",
       "renamePlaceholder": "సెషన్ పేరు",
       "transcriptAccessibility": "సెషన్ సంభాషణ పాఠ్యం",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} పంక్తి",
       "linesBadge_other": "{{displayCount}} పంక్తులు",
       "matchesBadge_one": "{{displayCount}} సరిపోలిక",
-      "matchesBadge_other": "{{displayCount}} సరిపోలికలు"
+      "matchesBadge_other": "{{displayCount}} సరిపోలికలు",
+      "noOutput": "అవుట్పుట్ లేదు."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} పంక్తులు (కొంత భాగం మాత్రమే)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "మీ కంప్యూటర్",
     "remoteOptionBody": "మీ సొంత యంత్రంలో `kilo remote` CLI ద్వారా Kilo ని అమలు చేయండి.",
     "skip": "పర్యటన వదిలేయండి",
-    "tutorialLabel": "ట్యుటోరియల్",
-    "remoteTitle": "మీ మొదటి రిమోట్ సెషన్‌ను ప్రారంభించండి",
-    "remoteBody": "మీ కంప్యూటర్‌ను కనెక్ట్ చేసి, ఆపై ఇక్కడి నుండి సెషన్ ప్రారంభించండి.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ఇంకా ఏ కంప్యూటర్ కూడా కనెక్ట్ కాలేదు",
-    "remoteEmptyBody": "దాన్ని కనెక్ట్ చేయడానికి మీ కంప్యూటర్‌లో `kilo remote` అమలు చేయండి.",
-    "remoteFound": "కంప్యూటర్ కనెక్ట్ అయింది",
-    "checkAgain": "మళ్లీ తనిఖీ చేయండి",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ట్యుటోరియల్"
   },
   "appActions": {
     "start": {

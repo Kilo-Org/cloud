@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Munkamenet állapota",
       "sessionStatusSubtitle": "befejezett / sikertelen / vezérelhető",
       "kiloclawActivitySubtitle": "elkészült vagy meghibásodott példányok, ütemezett műveletek",
+      "kiloclawActivityUnavailable": "Indíts el egy KiloClaw-példányt, hogy KiloClaw-tevékenységet kapj.",
       "balanceAlertsSubtitle": "figyelmeztetések a szervezet alacsony egyenlegére",
-      "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők"
+      "balanceAlertsUnavailable": "Csatlakozz egy szervezethez, hogy figyelmeztetéseket kapj alacsony egyenlegről.",
+      "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők",
+      "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörben, hogy biztonsági találatokat kapj."
     },
     "action": {
       "openSession": "Munkamenet megnyitása"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Nem sikerült betölteni a munkamenetet.",
       "failedToLoadDetails": "Nem sikerült betölteni a munkamenet részleteit.",
       "failedToStopExecution": "Nem sikerült leállítani a végrehajtást.",
+      "stopped": "A munkamenet leállt",
+      "committing": "Véglegesítés…",
+      "committed": "Véglegesítve",
+      "commitFailed": "A véglegesítés nem sikerült",
       "renameSession": "Munkamenet átnevezése",
       "renamePlaceholder": "Munkamenet neve",
       "transcriptAccessibility": "A munkamenet átirata",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} sor",
       "linesBadge_other": "{{displayCount}} sor",
       "matchesBadge_one": "{{displayCount}} találat",
-      "matchesBadge_other": "{{displayCount}} találat"
+      "matchesBadge_other": "{{displayCount}} találat",
+      "noOutput": "Nincs kimenet."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}. sor (csonkolva)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "A számítógéped",
     "remoteOptionBody": "Futtasd a Kilót a saját gépeden a `kilo remote` CLI-n keresztül.",
     "skip": "Bemutató kihagyása",
-    "tutorialLabel": "Oktatóprogram",
-    "remoteTitle": "Indítsd el az első távoli munkameneted",
-    "remoteBody": "Csatlakoztasd a számítógéped, majd indítsd innen a munkamenetet.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Még nincs számítógép csatlakoztatva",
-    "remoteEmptyBody": "A csatlakoztatáshoz futtasd a `kilo remote` parancsot a számítógépeden.",
-    "remoteFound": "Számítógép csatlakoztatva",
-    "checkAgain": "Ellenőrzés újra",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Oktatóprogram"
   },
   "appActions": {
     "start": {

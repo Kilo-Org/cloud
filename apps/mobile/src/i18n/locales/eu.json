@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Saioaren egoera",
       "sessionStatusSubtitle": "amaituta / huts eginda / kontrolatzeko prest",
       "kiloclawActivitySubtitle": "instantzia prest edo huts eginda, programatutako ekintzak",
+      "kiloclawActivityUnavailable": "Abiarazi KiloClaw instantzia bat KiloClaw jarduera jasotzeko.",
       "balanceAlertsSubtitle": "erakundearen saldo baxuaren abisuak",
-      "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak"
+      "balanceAlertsUnavailable": "Egin bat erakunde batekin saldo baxuko abisuak jasotzeko.",
+      "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak",
+      "securityFindingsUnavailable": "Gaitu Kilo segurtasun-agentea esparru batean segurtasun-arazoak jasotzeko."
     },
     "action": {
       "openSession": "Ireki saioa"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Ezin izan da saioa kargatu.",
       "failedToLoadDetails": "Ezin izan dira saioaren xehetasunak kargatu.",
       "failedToStopExecution": "Ezin izan da exekuzioa gelditu.",
+      "stopped": "Saioa gelditu da",
+      "committing": "Commita egiten…",
+      "committed": "Commita egina",
+      "commitFailed": "Commitak huts egin du",
       "renameSession": "Berrizendatu saioa",
       "renamePlaceholder": "Saioaren izena",
       "transcriptAccessibility": "Saioaren transkripzioa",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} lerro",
       "linesBadge_other": "{{displayCount}} lerro",
       "matchesBadge_one": "{{displayCount}} bat etortze",
-      "matchesBadge_other": "{{displayCount}} bat etortze"
+      "matchesBadge_other": "{{displayCount}} bat etortze",
+      "noOutput": "Irteerarik ez."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} lerroak (moztuta)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "Zure ordenagailua",
     "remoteOptionBody": "Exekutatu Kilo zure makinean `kilo remote` CLIaren bidez.",
     "skip": "Baztertu bira",
-    "tutorialLabel": "Tutorial-a",
-    "remoteTitle": "Hasi zure lehen urruneko saioa",
-    "remoteBody": "Konektatu zure ordenagailua, eta gero hasi saioa hemendik.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Oraindik ez dago ordenagailurik konektatuta",
-    "remoteEmptyBody": "Konektatzeko, exekutatu `kilo remote` zure ordenagailuan.",
-    "remoteFound": "Ordenagailua konektatuta",
-    "checkAgain": "Egiaztatu berriro",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial-a"
   },
   "appActions": {
     "start": {

@@ -838,8 +838,11 @@
       "sessionStatusTitle": "စက်ရှင်အခြေအနေ",
       "sessionStatusSubtitle": "ပြီးဆုံး / မအောင်မြင် / ထိန်းချုပ်ရန် အသင့်",
       "kiloclawActivitySubtitle": "စနစ်အသင့်ဖြစ်မှု/မအောင်မြင်မှု၊ အချိန်သတ်မှတ်ထားသော လုပ်ဆောင်ချက်များ",
+      "kiloclawActivityUnavailable": "KiloClaw လုပ်ဆောင်ချက်များ ရရှိရန် KiloClaw စနစ်တစ်ခု စတင်ပါ။",
       "balanceAlertsSubtitle": "အဖွဲ့အစည်း၏ လက်ကျန်နည်းချိန် သတိပေးချက်များ",
-      "securityFindingsSubtitle": "တွေ့ရှိချက်အသစ်များနှင့် SLA သတိပေးချက်များ"
+      "balanceAlertsUnavailable": "လက်ကျန်နည်း သတိပေးချက်များ ရရှိရန် အဖွဲ့အစည်းတစ်ခုသို့ ပါဝင်ပါ။",
+      "securityFindingsSubtitle": "တွေ့ရှိချက်အသစ်များနှင့် SLA သတိပေးချက်များ",
+      "securityFindingsUnavailable": "လုံခြုံရေးတွေ့ရှိချက်များ ရရှိရန် နယ်ပယ်တစ်ခုတွင် Kilo လုံခြုံရေးအေးဂျင့်ကို ဖွင့်ပါ။"
     },
     "action": {
       "openSession": "စက်ရှင်ကို ဖွင့်ပါ"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "စက်ရှင်ကို ဖွင့်၍မရပါ။",
       "failedToLoadDetails": "စက်ရှင်အသေးစိတ်ကို ရယူ၍မရပါ။",
       "failedToStopExecution": "လုပ်ဆောင်မှုကို ရပ်တန့်၍မရပါ။",
+      "stopped": "စက်ရှင်ကို ရပ်တန့်လိုက်ပါပြီ",
+      "committing": "မှတ်တမ်းတင်နေသည်…",
+      "committed": "မှတ်တမ်းတင်ပြီးပါပြီ",
+      "commitFailed": "မှတ်တမ်းတင်၍မရပါ",
       "renameSession": "စက်ရှင်အမည်ပြောင်းခြင်း",
       "renamePlaceholder": "စက်ရှင်အမည်",
       "transcriptAccessibility": "စက်ရှင်စကားဝိုင်းမှတ်တမ်း",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} ကြောင်း",
       "linesBadge_other": "{{displayCount}} ကြောင်း",
       "matchesBadge_one": "ကိုက်ညီမှု {{displayCount}} ခု",
-      "matchesBadge_other": "ကိုက်ညီမှု {{displayCount}} ခု"
+      "matchesBadge_other": "ကိုက်ညီမှု {{displayCount}} ခု",
+      "noOutput": "အထွက် မရှိပါ။"
     },
     "readToolMarkdown": {
       "linesTruncated": "စာကြောင်း {{start}}–{{end}} (အပြည့်အစုံမဟုတ်)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "သင့်ကွန်ပျူတာ",
     "remoteOptionBody": "သင့်ကိုယ်ပိုင်စက်ပေါ်တွင် `kilo remote` CLI ဖြင့် Kilo ကို လုပ်ဆောင်ပါ။",
     "skip": "လမ်းညွှန်ကို ကျော်သွားပါ",
-    "tutorialLabel": "သင်ခန်းစာ",
-    "remoteTitle": "သင့်ပထမဆုံး ဝေးကွာဆက်ရှင်ကို စတင်ပါ",
-    "remoteBody": "သင့်ကွန်ပျူတာကို ချိတ်ဆက်ပြီး ဤနေရာမှ ဆက်ရှင်ကို စတင်ပါ။",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ကွန်ပျူတာ မချိတ်ဆက်ရသေးပါ",
-    "remoteEmptyBody": "၎င်းကို ချိတ်ဆက်ရန် သင့်ကွန်ပျူတာတွင် `kilo remote` ကို လုပ်ဆောင်ပါ။",
-    "remoteFound": "ကွန်ပျူတာ ချိတ်ဆက်ပြီး",
-    "checkAgain": "ထပ်စစ်ပါ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "သင်ခန်းစာ"
   },
   "appActions": {
     "start": {

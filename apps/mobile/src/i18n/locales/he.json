@@ -334,8 +334,11 @@
       "sessionStatusTitle": "מצב הסשן",
       "sessionStatusSubtitle": "הסתיים / נכשל / מוכן לשליטה",
       "kiloclawActivitySubtitle": "מופע מוכן או שנכשל, פעולות מתוזמנות",
+      "kiloclawActivityUnavailable": "הפעל מופע של KiloClaw כדי לקבל פעילות KiloClaw.",
       "balanceAlertsSubtitle": "אזהרות על יתרה נמוכה בארגון",
-      "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA"
+      "balanceAlertsUnavailable": "הצטרף לארגון כדי לקבל התראות על יתרה נמוכה.",
+      "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA",
+      "securityFindingsUnavailable": "הפעל את סוכן האבטחה של Kilo בהיקף כדי לקבל ממצאי אבטחה."
     },
     "action": {
       "openSession": "פתיחת סשן"
@@ -1584,6 +1587,10 @@
       "couldNotLoad": "לא ניתן היה לטעון את הסשן.",
       "failedToLoadDetails": "לא ניתן היה לטעון את פרטי הסשן.",
       "failedToStopExecution": "לא ניתן היה לעצור את ההרצה.",
+      "stopped": "הסשן הופסק",
+      "committing": "מבצע קומיט…",
+      "committed": "בוצע קומיט",
+      "commitFailed": "הקומיט נכשל",
       "renameSession": "שינוי שם הסשן",
       "renamePlaceholder": "שם הסשן",
       "transcriptAccessibility": "תמליל הסשן",
@@ -1728,7 +1735,8 @@
       "linesBadge_two": "{{displayCount}} שורות",
       "matchesBadge_one": "{{displayCount}} התאמה",
       "matchesBadge_other": "{{displayCount}} התאמות",
-      "matchesBadge_two": "{{displayCount}} התאמות"
+      "matchesBadge_two": "{{displayCount}} התאמות",
+      "noOutput": "אין פלט."
     },
     "readToolMarkdown": {
       "linesTruncated": "שורות {{start}}–{{end}} (התוכן נחתך)",
@@ -3223,15 +3231,7 @@
     "remoteOptionTitle": "המחשב שלך",
     "remoteOptionBody": "הרץ את Kilo על המחשב שלך באמצעות ה-CLI של `kilo remote`.",
     "skip": "דלג על הסיור",
-    "tutorialLabel": "מדריך",
-    "remoteTitle": "התחל את הסשן המרוחק הראשון שלך",
-    "remoteBody": "חבר את המחשב שלך, ואז התחל את הסשן מכאן.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "עדיין לא חובר מחשב",
-    "remoteEmptyBody": "כדי לחבר אותו, הרץ `kilo remote` במחשב שלך.",
-    "remoteFound": "המחשב חובר",
-    "checkAgain": "בדוק שוב",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "מדריך"
   },
   "appActions": {
     "start": {

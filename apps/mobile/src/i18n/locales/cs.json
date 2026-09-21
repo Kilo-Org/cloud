@@ -870,8 +870,11 @@
       "sessionStatusTitle": "Stav relace",
       "sessionStatusSubtitle": "dokončeno / selhalo / připraveno k ovládání",
       "kiloclawActivitySubtitle": "instance připravena/selhala, naplánované akce",
+      "kiloclawActivityUnavailable": "Spusťte instanci KiloClaw, abyste získali aktivitu KiloClaw.",
       "balanceAlertsSubtitle": "upozornění na nízký zůstatek organizace",
-      "securityFindingsSubtitle": "nové nálezy a připomenutí lhůt SLA"
+      "balanceAlertsUnavailable": "Přidejte se k organizaci, abyste dostávali upozornění na nízký zůstatek.",
+      "securityFindingsSubtitle": "nové nálezy a připomenutí lhůt SLA",
+      "securityFindingsUnavailable": "Zapněte bezpečnostního agenta Kilo v určitém rozsahu, abyste dostávali bezpečnostní zjištění."
     },
     "action": {
       "openSession": "Otevřít relaci"
@@ -2132,6 +2135,10 @@
       "couldNotLoad": "Relaci se nepodařilo načíst.",
       "failedToLoadDetails": "Podrobnosti relace se nepodařilo načíst.",
       "failedToStopExecution": "Běh se nepodařilo zastavit.",
+      "stopped": "Relace zastavena",
+      "committing": "Vytváří se commit…",
+      "committed": "Commit vytvořen",
+      "commitFailed": "Vytvoření commitu se nezdařilo",
       "renameSession": "Přejmenovat relaci",
       "renamePlaceholder": "Název relace",
       "transcriptAccessibility": "Přepis relace",
@@ -2280,7 +2287,8 @@
       "matchesBadge_one": "shoda: {{displayCount}}",
       "matchesBadge_other": "shody: {{displayCount}}",
       "matchesBadge_few": "shody: {{displayCount}}",
-      "matchesBadge_many": "shod: {{displayCount}}"
+      "matchesBadge_many": "shod: {{displayCount}}",
+      "noOutput": "Žádný výstup."
     },
     "readToolMarkdown": {
       "linesTruncated": "řádky {{start}}–{{end}} (zkráceno)",
@@ -3266,15 +3274,7 @@
     "remoteOptionTitle": "Váš počítač",
     "remoteOptionBody": "Spusťte Kilo na vlastním stroji prostřednictvím CLI `kilo remote`.",
     "skip": "Přeskočit prohlídku",
-    "tutorialLabel": "Návod",
-    "remoteTitle": "Spusťte svou první vzdálenou relaci",
-    "remoteBody": "Připojte svůj počítač a pak spusťte relaci odtud.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Zatím žádný připojený počítač",
-    "remoteEmptyBody": "Chcete-li ho připojit, spusťte na počítači `kilo remote`.",
-    "remoteFound": "Počítač připojen",
-    "checkAgain": "Zkontrolovat znovu",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Návod"
   },
   "appActions": {
     "start": {

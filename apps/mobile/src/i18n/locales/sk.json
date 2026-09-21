@@ -870,8 +870,11 @@
       "sessionStatusTitle": "Stav relácie",
       "sessionStatusSubtitle": "dokončená / zlyhala / pripravená na ovládanie",
       "kiloclawActivitySubtitle": "pripravená inštancia, zlyhanie inštancie, naplánované akcie",
+      "kiloclawActivityUnavailable": "Spustite inštanciu KiloClaw, aby ste získali aktivitu KiloClaw.",
       "balanceAlertsSubtitle": "upozornenia na nízky zostatok organizácie",
-      "securityFindingsSubtitle": "nové zistenia a pripomienky SLA"
+      "balanceAlertsUnavailable": "Pripojte sa k organizácii, aby ste dostávali upozornenia na nízky zostatok.",
+      "securityFindingsSubtitle": "nové zistenia a pripomienky SLA",
+      "securityFindingsUnavailable": "Zapnite bezpečnostného agenta Kilo v rozsahu, aby ste dostávali bezpečnostné zistenia."
     },
     "action": {
       "openSession": "Otvoriť reláciu"
@@ -2132,6 +2135,10 @@
       "couldNotLoad": "Reláciu sa nepodarilo načítať.",
       "failedToLoadDetails": "Podrobnosti relácie sa nepodarilo načítať.",
       "failedToStopExecution": "Vykonávanie sa nepodarilo zastaviť.",
+      "stopped": "Relácia zastavená",
+      "committing": "Vytvára sa commit…",
+      "committed": "Commit vytvorený",
+      "commitFailed": "Vytvorenie commitu zlyhalo",
       "renameSession": "Premenovať reláciu",
       "renamePlaceholder": "Názov relácie",
       "transcriptAccessibility": "Prepis relácie",
@@ -2280,7 +2287,8 @@
       "matchesBadge_one": "zhoda: {{displayCount}}",
       "matchesBadge_other": "zhody: {{displayCount}}",
       "matchesBadge_few": "zhody: {{displayCount}}",
-      "matchesBadge_many": "zhôd: {{displayCount}}"
+      "matchesBadge_many": "zhôd: {{displayCount}}",
+      "noOutput": "Žiadny výstup."
     },
     "readToolMarkdown": {
       "linesTruncated": "riadky {{start}}–{{end}} (skrátené)",
@@ -3266,15 +3274,7 @@
     "remoteOptionTitle": "Tvoj počítač",
     "remoteOptionBody": "Spusti Kilo na vlastnom stroji cez CLI `kilo remote`.",
     "skip": "Preskočiť prehliadku",
-    "tutorialLabel": "Sprievodca",
-    "remoteTitle": "Spusti svoju prvú vzdialenú reláciu",
-    "remoteBody": "Pripoj svoj počítač a potom spusti reláciu odtiaľto.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Zatiaľ žiadny pripojený počítač",
-    "remoteEmptyBody": "Na pripojenie spusti `kilo remote` na počítači.",
-    "remoteFound": "Počítač pripojený",
-    "checkAgain": "Skontrolovať znova",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Sprievodca"
   },
   "appActions": {
     "start": {

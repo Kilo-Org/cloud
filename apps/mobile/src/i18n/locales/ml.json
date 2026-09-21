@@ -838,8 +838,11 @@
       "sessionStatusTitle": "സെഷൻ നില",
       "sessionStatusSubtitle": "പൂർത്തിയായി / പരാജയപ്പെട്ടു / നിയന്ത്രിക്കാൻ തയ്യാർ",
       "kiloclawActivitySubtitle": "ഇൻസ്റ്റൻസ് തയ്യാറാകൽ/പരാജയപ്പെടൽ, മുൻകൂട്ടി നിശ്ചയിച്ച പ്രവർത്തനങ്ങൾ",
+      "kiloclawActivityUnavailable": "KiloClaw പ്രവർത്തനം ലഭിക്കാൻ ഒരു KiloClaw ഇൻസ്റ്റൻസ് ആരംഭിക്കുക.",
       "balanceAlertsSubtitle": "ഓർഗനൈസേഷന്റെ ബാലൻസ് കുറയുമ്പോഴുള്ള മുന്നറിയിപ്പുകൾ",
-      "securityFindingsSubtitle": "പുതിയ കണ്ടെത്തലുകളും SLA ഓർമ്മപ്പെടുത്തലുകളും"
+      "balanceAlertsUnavailable": "ബാലൻസ് മുന്നറിയിപ്പുകൾ ലഭിക്കാൻ ഒരു സ്ഥാപനത്തിൽ ചേരുക.",
+      "securityFindingsSubtitle": "പുതിയ കണ്ടെത്തലുകളും SLA ഓർമ്മപ്പെടുത്തലുകളും",
+      "securityFindingsUnavailable": "സുരക്ഷാ കണ്ടെത്തലുകൾ ലഭിക്കാൻ ഒരു പരിധിയിൽ Kilo സുരക്ഷാ ഏജന്റ് പ്രവർത്തനക്ഷമമാക്കുക."
     },
     "action": {
       "openSession": "സെഷൻ തുറക്കുക"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "സെഷൻ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "failedToLoadDetails": "സെഷന്റെ വിശദാംശങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "failedToStopExecution": "പ്രവർത്തനം നിർത്താൻ കഴിഞ്ഞില്ല.",
+      "stopped": "സെഷൻ നിർത്തി",
+      "committing": "കമ്മിറ്റ് ചെയ്യുന്നു…",
+      "committed": "കമ്മിറ്റ് ചെയ്തു",
+      "commitFailed": "കമ്മിറ്റ് പരാജയപ്പെട്ടു",
       "renameSession": "സെഷന്റെ പേര് മാറ്റുക",
       "renamePlaceholder": "സെഷന്റെ പേര്",
       "transcriptAccessibility": "സെഷന്റെ സംഭാഷണരേഖ",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} വരി",
       "linesBadge_other": "{{displayCount}} വരികൾ",
       "matchesBadge_one": "{{displayCount}} പൊരുത്തം",
-      "matchesBadge_other": "{{displayCount}} പൊരുത്തങ്ങൾ"
+      "matchesBadge_other": "{{displayCount}} പൊരുത്തങ്ങൾ",
+      "noOutput": "ഔട്ട്പുട്ട് ഇല്ല."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} വരികൾ (ഭാഗികം)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "നിങ്ങളുടെ കമ്പ്യൂട്ടർ",
     "remoteOptionBody": "നിങ്ങളുടെ സ്വന്തം മെഷീനിൽ `kilo remote` CLI വഴി Kilo പ്രവർത്തിപ്പിക്കുക.",
     "skip": "ടൂർ ഒഴിവാക്കുക",
-    "tutorialLabel": "ട്യുടോറിയൽ",
-    "remoteTitle": "നിങ്ങളുടെ ആദ്യ റിമോട്ട് സെഷൻ ആരംഭിക്കുക",
-    "remoteBody": "നിങ്ങളുടെ കമ്പ്യൂട്ടർ കണക്റ്റ് ചെയ്ത് ഇവിടെ നിന്ന് സെഷൻ ആരംഭിക്കുക.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ഇതുവരെ കമ്പ്യൂട്ടർ കണക്റ്റ് ചെയ്തിട്ടില്ല",
-    "remoteEmptyBody": "അത് കണക്റ്റ് ചെയ്യാൻ നിങ്ങളുടെ കമ്പ്യൂട്ടറിൽ `kilo remote` പ്രവർത്തിപ്പിക്കുക.",
-    "remoteFound": "കമ്പ്യൂട്ടർ കണക്റ്റ് ചെയ്തു",
-    "checkAgain": "വീണ്ടും പരിശോധിക്കുക",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ട്യുടോറിയൽ"
   },
   "appActions": {
     "start": {

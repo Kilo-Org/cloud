@@ -21,10 +21,18 @@ import { cn } from '@/lib/utils';
  */
 const MODAL_HEADER_TOP_PADDING = 32;
 
+/**
+ * Ceiling for the header title's line cap. The reserved box grows by a full
+ * line height per cap, so three lines is the most a header should take; the
+ * Text and the reserve are clamped together to keep them in step.
+ */
+const MAX_TITLE_LINES = 3;
+
 type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
   title?: string;
   titleContent?: React.ReactNode;
+  /** Line cap for the title, at most {@link MAX_TITLE_LINES}. */
   titleNumberOfLines?: number;
   /**
    * Cap the eyebrow to this many lines, overriding the header's default single
@@ -34,7 +42,7 @@ type ScreenHeaderProps = {
    * ellipsis, so a long repository label never reflows the header.
    */
   eyebrowNumberOfLines?: number;
-  /** Reserve two title lines so state changes do not move the screen body. */
+  /** Reserve the title's line cap so state changes do not move the screen body. */
   reserveTitleSpace?: boolean;
   /** Optional mono-uppercase line above the title. */
   eyebrow?: string;
@@ -70,6 +78,21 @@ type ScreenHeaderProps = {
   /** Extra classes on the outer header container. Overrides the default `px-4` for screens that need a different horizontal inset. */
   className?: string;
 };
+
+/**
+ * Height of the reserved title box for `reserveTitleSpace`, one title line
+ * height per line the title can paint: the default 18px title's Tailwind line
+ * height is `1.75rem`, the large 30px variant's is 36px. Class names must be
+ * static because NativeWind extracts them at build time. The reserve tracks the
+ * line cap so a title that grows a line (loading -> loaded, rename) cannot move
+ * the body below the header.
+ */
+function reservedTitleHeightClass(size: ScreenHeaderProps['size'], titleLines: number): string {
+  if (size === 'large') {
+    return titleLines > 2 ? 'min-h-[108px]' : 'min-h-[72px]';
+  }
+  return titleLines > 2 ? 'min-h-21' : 'min-h-14';
+}
 
 export function ScreenHeader({
   title,
@@ -122,7 +145,7 @@ export function ScreenHeader({
   // whole chrome off the sensor. They go on an inner wrapper so they ADD to the
   // `px-4` gutter: an inline padding on the container would beat the className
   // (inline style wins in React Native) and swallow the gutter, pulling the
-  // back control's `-ml-4` chevron back inside the sensor area. Zero insets
+  // back control's `-ms-4` chevron back inside the sensor area. Zero insets
   // collapse the wrapper style to `undefined`, so portrait geometry is
   // byte-identical and a rotation never moves anything vertically. Side padding
   // applies to every caller — a sheet with `safeAreaTop={false}` still runs
@@ -143,6 +166,10 @@ export function ScreenHeader({
     size === 'large'
       ? 'shrink text-[30px] font-bold tracking-tight text-foreground'
       : 'shrink text-lg font-semibold text-foreground';
+
+  // One cap for the Text and the reserved box: a title capped deeper than the
+  // reserve would shift the body the moment it reached the extra line.
+  const titleLines = Math.min(Math.max(titleNumberOfLines, 1), MAX_TITLE_LINES);
 
   // The slop widens the title into the free space beside it. RN does not mirror
   // hitSlop under RTL, so the physical right slop would reach across the
@@ -166,7 +193,7 @@ export function ScreenHeader({
     ) : (
       <Text
         className={cn(titleClass, centerTitle && 'text-center')}
-        numberOfLines={titleNumberOfLines}
+        numberOfLines={titleLines}
         ellipsizeMode="tail"
         accessibilityRole="header"
       >
@@ -174,7 +201,7 @@ export function ScreenHeader({
       </Text>
     );
     const titleLayout = reserveTitleSpace ? (
-      <View className={cn(size === 'large' ? 'min-h-[72px]' : 'min-h-14', 'justify-center')}>
+      <View className={cn(reservedTitleHeightClass(size, titleLines), 'justify-center')}>
         {titleText}
       </View>
     ) : (
@@ -224,6 +251,17 @@ export function ScreenHeader({
   // width without placing either control out of flow.
   const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
 
+  // The leading control's pull into the gutter is a START-side margin, never a
+  // hand-picked `mr` under RTL. With `I18nManager.doLeftAndRightSwapInRTL` on
+  // (the default) React Native rewrites margin Left/Right to Yoga Start/End
+  // before layout (YogaLayoutableShadowNode `swapLeftAndRightInYogaStyleProps`),
+  // so `-mr-4` under RTL becomes a negative END margin — the side facing the
+  // title — and the heading (the next sibling, whose interactive title fills
+  // it) starts 12 points under the back control's 44-point target. Measured on
+  // the row: the title box covered 0.27 of the back target's area, and the
+  // explorer's `overlapping_controls` scan reports above 0.25. A
+  // `marginInlineStart` is resolved to Yoga Start in both directions, so `-ms-4`
+  // pulls the control into the gutter and leaves the 4-point `gap-1` intact.
   const backControl = canGoBack ? (
     <Pressable
       onPress={() => {
@@ -239,7 +277,7 @@ export function ScreenHeader({
       accessibilityLabel={resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')}
       className={cn(
         'h-11 w-11 shrink-0 items-center justify-center active:opacity-70',
-        !separateHeading && (I18nManager.isRTL ? '-mr-4' : '-ml-4')
+        !separateHeading && '-ms-4'
       )}
     >
       {resolvedBackIcon === 'close' ? (
@@ -274,9 +312,7 @@ export function ScreenHeader({
               {heading}
             </View>
             {headerRight ? (
-              <View className={`${I18nManager.isRTL ? 'mr-3' : 'ml-3'} min-w-0 max-w-[50%] shrink`}>
-                {headerRight}
-              </View>
+              <View className="ms-3 min-w-0 max-w-[50%] shrink">{headerRight}</View>
             ) : null}
           </View>
         )}

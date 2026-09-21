@@ -870,8 +870,11 @@
       "sessionStatusTitle": "Sesijos būsena",
       "sessionStatusSubtitle": "baigta / nepavyko / paruošta valdyti",
       "kiloclawActivitySubtitle": "egzemplioriaus parengtis ar klaida, suplanuoti veiksmai",
+      "kiloclawActivityUnavailable": "Paleiskite KiloClaw egzempliorių, kad gautumėte KiloClaw veiklą.",
       "balanceAlertsSubtitle": "įspėjimai apie mažą organizacijos likutį",
-      "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai"
+      "balanceAlertsUnavailable": "Prisijunkite prie organizacijos, kad gautumėte mažo likučio įspėjimus.",
+      "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai",
+      "securityFindingsUnavailable": "Įjunkite Kilo saugos agentą apimtyje, kad gautumėte saugos problemas."
     },
     "action": {
       "openSession": "Atidaryti sesiją"
@@ -2132,6 +2135,10 @@
       "couldNotLoad": "Nepavyko įkelti sesijos.",
       "failedToLoadDetails": "Nepavyko įkelti sesijos informacijos.",
       "failedToStopExecution": "Nepavyko sustabdyti vykdymo.",
+      "stopped": "Sesija sustabdyta",
+      "committing": "Įrašoma…",
+      "committed": "Įrašyta",
+      "commitFailed": "Nepavyko įrašyti",
       "renameSession": "Pervadinti sesiją",
       "renamePlaceholder": "Sesijos pavadinimas",
       "transcriptAccessibility": "Sesijos pokalbio išrašas",
@@ -2280,7 +2287,8 @@
       "matchesBadge_one": "atitiktis: {{displayCount}}",
       "matchesBadge_other": "atitikčių: {{displayCount}}",
       "matchesBadge_few": "atitiktys: {{displayCount}}",
-      "matchesBadge_many": "atitikčių: {{displayCount}}"
+      "matchesBadge_many": "atitikčių: {{displayCount}}",
+      "noOutput": "Nėra išvesties."
     },
     "readToolMarkdown": {
       "linesTruncated": "eilutės {{start}}–{{end}} (sutrumpinta)",
@@ -3266,15 +3274,7 @@
     "remoteOptionTitle": "Jūsų kompiuteris",
     "remoteOptionBody": "Paleiskite Kilo savo kompiuteryje per `kilo remote` CLI.",
     "skip": "Praleisti apžvalgą",
-    "tutorialLabel": "Pamoka",
-    "remoteTitle": "Pradėkite pirmąją nuotolinę sesiją",
-    "remoteBody": "Prijunkite savo kompiuterį, tada pradėkite sesiją čia.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Dar nėra prijungto kompiuterio",
-    "remoteEmptyBody": "Norėdami prijungti, kompiuteryje vykdykite `kilo remote`.",
-    "remoteFound": "Kompiuteris prijungtas",
-    "checkAgain": "Kartoti patikrinimą",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Pamoka"
   },
   "appActions": {
     "start": {

@@ -838,8 +838,11 @@
       "sessionStatusTitle": "د ناستې حالت",
       "sessionStatusSubtitle": "بشپړ شوی / ناکام شوی / د کنټرول لپاره چمتو",
       "kiloclawActivitySubtitle": "چمتو یا ناکام انسټانس، مهالویش شوې کړنې",
+      "kiloclawActivityUnavailable": "د KiloClaw فعالیت ترلاسه کولو لپاره د KiloClaw انسټانس پیل کړئ.",
       "balanceAlertsSubtitle": "د سازمان د کم بیلانس خبرداري",
-      "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې"
+      "balanceAlertsUnavailable": "د بیلانس خبرتیاوې ترلاسه کولو لپاره یو سازمان ته وګډون وکړئ.",
+      "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې",
+      "securityFindingsUnavailable": "امنیتي موندنې ترلاسه کولو لپاره په یوه ساحه کې د Kilo امنیتي اجنټ فعال کړئ."
     },
     "action": {
       "openSession": "ناسته پرانیزئ"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "ناسته بار نه شوه.",
       "failedToLoadDetails": "د ناستې جزیات بار نه شول.",
       "failedToStopExecution": "اجرا ونه درول شوه.",
+      "stopped": "ناسته ودرول شوه",
+      "committing": "کمیټ کیږي…",
+      "committed": "کمیټ شو",
+      "commitFailed": "کمیټ ناکام شو",
       "renameSession": "د ناستې نوم بدل کړئ",
       "renamePlaceholder": "د ناستې نوم",
       "transcriptAccessibility": "د ناستې متن",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} کرښې",
       "linesBadge_other": "{{displayCount}} کرښې",
       "matchesBadge_one": "{{displayCount}} پایلې",
-      "matchesBadge_other": "{{displayCount}} پایلې"
+      "matchesBadge_other": "{{displayCount}} پایلې",
+      "noOutput": "هېڅ پایلې نشته."
     },
     "readToolMarkdown": {
       "linesTruncated": "کرښې {{start}}–{{end}} (لنډې شوې)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "ستاسو کمپیوټر",
     "remoteOptionBody": "Kilo په خپل کمپیوټر کې د `kilo remote` CLI له لارې وچلوه.",
     "skip": "سفر پرېږدئ",
-    "tutorialLabel": "زده کړه",
-    "remoteTitle": "خپله لومړۍ لرې ناسته پیل کړئ",
-    "remoteBody": "خپل کمپیوټر ونښلول، بیا ناسته له دې ځای څخه پیل کړئ.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "تر دې دمه هیڅ کمپیوټر نه دی نښلول شوی",
-    "remoteEmptyBody": "د هغه د نښلولو لپاره په خپل کمپیوټر کې `kilo remote` وچلوه.",
-    "remoteFound": "کمپیوټر وڌل شو",
-    "checkAgain": "بیا وګورئ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "زده کړه"
   },
   "appActions": {
     "start": {

@@ -334,8 +334,11 @@
       "sessionStatusTitle": "Status sesji",
       "sessionStatusSubtitle": "zakończona / nieudana / gotowa do sterowania",
       "kiloclawActivitySubtitle": "gotowość lub błąd instancji, zaplanowane działania",
+      "kiloclawActivityUnavailable": "Uruchom instancję KiloClaw, aby otrzymywać aktywność KiloClaw.",
       "balanceAlertsSubtitle": "ostrzeżenia o niskim saldzie organizacji",
-      "securityFindingsSubtitle": "nowe wykryte problemy i przypomnienia o terminach SLA"
+      "balanceAlertsUnavailable": "Dołącz do organizacji, aby otrzymywać powiadomienia o niskim saldzie.",
+      "securityFindingsSubtitle": "nowe wykryte problemy i przypomnienia o terminach SLA",
+      "securityFindingsUnavailable": "Włącz agenta bezpieczeństwa Kilo w zakresie, aby otrzymywać wykryte problemy z bezpieczeństwem."
     },
     "action": {
       "openSession": "Otwórz sesję"
@@ -1596,6 +1599,10 @@
       "couldNotLoad": "Nie udało się wczytać sesji.",
       "failedToLoadDetails": "Nie udało się wczytać szczegółów sesji.",
       "failedToStopExecution": "Nie udało się zatrzymać wykonywania zadania.",
+      "stopped": "Sesja zatrzymana",
+      "committing": "Zatwierdzanie…",
+      "committed": "Zatwierdzono",
+      "commitFailed": "Zatwierdzanie nie powiodło się",
       "renameSession": "Zmień nazwę sesji",
       "renamePlaceholder": "Nazwa sesji",
       "transcriptAccessibility": "Zapis sesji",
@@ -1744,7 +1751,8 @@
       "matchesBadge_one": "dopasowanie: {{displayCount}}",
       "matchesBadge_other": "dopasowania: {{displayCount}}",
       "matchesBadge_few": "dopasowania: {{displayCount}}",
-      "matchesBadge_many": "dopasowań: {{displayCount}}"
+      "matchesBadge_many": "dopasowań: {{displayCount}}",
+      "noOutput": "Brak wyjścia."
     },
     "readToolMarkdown": {
       "linesTruncated": "wiersze {{start}}–{{end}} (skrócono)",
@@ -3266,15 +3274,7 @@
     "remoteOptionTitle": "Twój komputer",
     "remoteOptionBody": "Uruchom Kilo na własnej maszynie za pomocą CLI `kilo remote`.",
     "skip": "Pomiń przewodnik",
-    "tutorialLabel": "Samouczek",
-    "remoteTitle": "Rozpocznij swoją pierwszą sesję zdalną",
-    "remoteBody": "Połącz swój komputer, a następnie uruchom sesję stąd.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Brak podłączonego komputera",
-    "remoteEmptyBody": "Aby go połączyć, uruchom `kilo remote` na swoim komputerze.",
-    "remoteFound": "Komputer połączony",
-    "checkAgain": "Sprawdź ponownie",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Samouczek"
   },
   "appActions": {
     "start": {

@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Նիստի կարգավիճակ",
       "sessionStatusSubtitle": "ավարտված / ձախողված / պատրաստ է կառավարման",
       "kiloclawActivitySubtitle": "միջավայրը պատրաստ է կամ ձախողվել է, պլանավորված գործողություններ",
+      "kiloclawActivityUnavailable": "Մեկնարկիր KiloClaw միջավայր՝ KiloClaw ակտիվություն ստանալու համար։",
       "balanceAlertsSubtitle": "կազմակերպության ցածր մնացորդի նախազգուշացումներ",
-      "securityFindingsSubtitle": "հայտնաբերված նոր խնդիրներ և SLA հիշեցումներ"
+      "balanceAlertsUnavailable": "Միացիր կազմակերպությանը՝ ցածր մնացորդի ծանուցումներ ստանալու համար։",
+      "securityFindingsSubtitle": "հայտնաբերված նոր խնդիրներ և SLA հիշեցումներ",
+      "securityFindingsUnavailable": "Միացրու Kilo անվտանգության գործակալը շրջանակում՝ անվտանգության խնդիրներ ստանալու համար։"
     },
     "action": {
       "openSession": "Բացել նիստը"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Չհաջողվեց բեռնել նիստը։",
       "failedToLoadDetails": "Չհաջողվեց բեռնել նիստի մանրամասները։",
       "failedToStopExecution": "Չհաջողվեց դադարեցնել կատարումը։",
+      "stopped": "Նիստը դադարեցվեց",
+      "committing": "Ամրագրվում է…",
+      "committed": "Ամրագրված է",
+      "commitFailed": "Ամրագրումը ձախողվեց",
       "renameSession": "Վերանվանել նիստը",
       "renamePlaceholder": "Նիստի անուն",
       "transcriptAccessibility": "Նիստի սղագրություն",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} տող",
       "linesBadge_other": "{{displayCount}} տող",
       "matchesBadge_one": "{{displayCount}} համընկնում",
-      "matchesBadge_other": "{{displayCount}} համընկնում"
+      "matchesBadge_other": "{{displayCount}} համընկնում",
+      "noOutput": "Ելք չկա։"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} տողերը (կրճատված)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "Քո համակարգիչը",
     "remoteOptionBody": "Գործարկիր Kilo-ն քո սեփական համակարգչում՝ `kilo remote` CLI-ի միջոցով։",
     "skip": "Բաց թողնել ուղեցույցը",
-    "tutorialLabel": "Ուղեցույց",
-    "remoteTitle": "Սկսիր քո առաջին հեռակա աշխատաշրջանը",
-    "remoteBody": "Միացրու քո համակարգիչը, ապա աշխատաշրջանը սկսիր այստեղից։",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Քո համակարգիչը դեռ միացված չէ",
-    "remoteEmptyBody": "Կատարիր `kilo remote` քո համակարգչում՝ այն միացնելու համար։",
-    "remoteFound": "Համակարգիչը միացված է",
-    "checkAgain": "Կրկին ստուգիր",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Ուղեցույց"
   },
   "appActions": {
     "start": {

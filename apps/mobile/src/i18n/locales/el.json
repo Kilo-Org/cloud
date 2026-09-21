@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Κατάσταση συνεδρίας",
       "sessionStatusSubtitle": "ολοκληρώθηκε / απέτυχε / έτοιμη για έλεγχο",
       "kiloclawActivitySubtitle": "περιβάλλον έτοιμο ή με αποτυχία, προγραμματισμένες ενέργειες",
+      "kiloclawActivityUnavailable": "Ξεκίνα ένα περιβάλλον KiloClaw για να λαμβάνεις δραστηριότητα KiloClaw.",
       "balanceAlertsSubtitle": "προειδοποιήσεις χαμηλού υπολοίπου οργανισμού",
-      "securityFindingsSubtitle": "νέα ευρήματα και υπενθυμίσεις SLA"
+      "balanceAlertsUnavailable": "Γίνε μέλος ενός οργανισμού για να λαμβάνεις ειδοποιήσεις χαμηλού υπολοίπου.",
+      "securityFindingsSubtitle": "νέα ευρήματα και υπενθυμίσεις SLA",
+      "securityFindingsUnavailable": "Ενεργοποίησε τον πράκτορα ασφάλειας Kilo σε ένα πεδίο για να λαμβάνεις ευρήματα ασφάλειας."
     },
     "action": {
       "openSession": "Άνοιγμα συνεδρίας"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση της συνεδρίας.",
       "failedToLoadDetails": "Δεν ήταν δυνατή η φόρτωση των λεπτομερειών της συνεδρίας.",
       "failedToStopExecution": "Δεν ήταν δυνατή η διακοπή της εκτέλεσης.",
+      "stopped": "Η συνεδρία σταμάτησε",
+      "committing": "Γίνεται καταχώριση…",
+      "committed": "Καταχωρίστηκε",
+      "commitFailed": "Η καταχώριση απέτυχε",
       "renameSession": "Μετονομασία συνεδρίας",
       "renamePlaceholder": "Όνομα συνεδρίας",
       "transcriptAccessibility": "Ιστορικό συνομιλίας της συνεδρίας",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} γραμμή",
       "linesBadge_other": "{{displayCount}} γραμμές",
       "matchesBadge_one": "{{displayCount}} αντιστοιχία",
-      "matchesBadge_other": "{{displayCount}} αντιστοιχίες"
+      "matchesBadge_other": "{{displayCount}} αντιστοιχίες",
+      "noOutput": "Δεν υπάρχει έξοδος."
     },
     "readToolMarkdown": {
       "linesTruncated": "γραμμές {{start}}–{{end}} (περικομμένες)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "Ο υπολογιστής σου",
     "remoteOptionBody": "Εκτέλεσε το Kilo στο δικό σου μηχάνημα μέσω του CLI `kilo remote`.",
     "skip": "Παράλειξη ξενάγησης",
-    "tutorialLabel": "Οδηγός",
-    "remoteTitle": "Ξεκίνα την πρώτη απομακρυσμένη συνεδρία σου",
-    "remoteBody": "Σύνδεσε τον υπολογιστή σου και μετά ξεκίνα τη συνεδρία από εδώ.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Δεν έχει συνδεθεί υπολογιστής ακόμα",
-    "remoteEmptyBody": "Για να τον συνδέσεις, εκτέλεσε `kilo remote` στον υπολογιστή σου.",
-    "remoteFound": "Ο υπολογιστής συνδέθηκε",
-    "checkAgain": "Έλεγχος ξανά",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Οδηγός"
   },
   "appActions": {
     "start": {

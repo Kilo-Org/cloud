@@ -838,8 +838,11 @@
       "sessionStatusTitle": "სესიის სტატუსი",
       "sessionStatusSubtitle": "დასრულდა / ჩაიშალა / სამართავად მზადაა",
       "kiloclawActivitySubtitle": "ინსტანცია მზადაა / ჩაიშალა, დაგეგმილი მოქმედებები",
+      "kiloclawActivityUnavailable": "გაუშვი KiloClaw-ის ინსტანცია, რომ მიიღო KiloClaw-ის აქტივობა.",
       "balanceAlertsSubtitle": "ორგანიზაციის დაბალი ბალანსის გაფრთხილებები",
-      "securityFindingsSubtitle": "ახლად აღმოჩენილი პრობლემები და SLA-ის შეხსენებები"
+      "balanceAlertsUnavailable": "შეუერთდი ორგანიზაციას, რომ მიიღო დაბალი ბალანსის გაფრთხილებები.",
+      "securityFindingsSubtitle": "ახლად აღმოჩენილი პრობლემები და SLA-ის შეხსენებები",
+      "securityFindingsUnavailable": "ჩართე Kilo-ს უსაფრთხოების აგენტი სფეროში, რომ მიიღო უსაფრთხოების პრობლემები."
     },
     "action": {
       "openSession": "სესიის გახსნა"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "სესიის ჩატვირთვა ვერ მოხერხდა.",
       "failedToLoadDetails": "სესიის დეტალების ჩატვირთვა ვერ მოხერხდა.",
       "failedToStopExecution": "შესრულების შეჩერება ვერ მოხერხდა.",
+      "stopped": "სესია შეჩერდა",
+      "committing": "მიმდინარეობს კომიტი…",
+      "committed": "კომიტი შესრულდა",
+      "commitFailed": "კომიტი ვერ შესრულდა",
       "renameSession": "სესიის სახელის შეცვლა",
       "renamePlaceholder": "სესიის სახელი",
       "transcriptAccessibility": "სესიის ჩანაწერი",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} სტრიქონი",
       "linesBadge_other": "{{displayCount}} სტრიქონი",
       "matchesBadge_one": "{{displayCount}} დამთხვევა",
-      "matchesBadge_other": "{{displayCount}} დამთხვევა"
+      "matchesBadge_other": "{{displayCount}} დამთხვევა",
+      "noOutput": "გამოსავალი არ არის."
     },
     "readToolMarkdown": {
       "linesTruncated": "სტრიქონები {{start}}–{{end}} (შემოკლებულია)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "თქვენი კომპიუტერი",
     "remoteOptionBody": "გაუშვით Kilo თქვენს საკუთარ მანქანაზე `kilo remote` CLI-ს საშუალებით.",
     "skip": "ტურის გამოტოვება",
-    "tutorialLabel": "სასწავლო",
-    "remoteTitle": "დაიწყეთ თქვენი პირველი დაშორებული სესია",
-    "remoteBody": "მიავლეთ თქვენს კომპიუტერს და შემდეგ აქედან დაიწყეთ სესია.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ჯერ კომპიუტერი არ არის მიერთებული",
-    "remoteEmptyBody": "დასამაგრებლად, გაუშვით `kilo remote` თქვენს კომპიუტერზე.",
-    "remoteFound": "კომპიუტერი მიერთებულია",
-    "checkAgain": "ხელახლა შემოწმება",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "სასწავლო"
   },
   "appActions": {
     "start": {

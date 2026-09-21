@@ -4,12 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import {
-  dangerousToolNames,
-  mockKiloApi,
-  safeToolNames,
-  workflowToolNames,
-} from './kilo-api-fixture';
+import { dangerousToolNames, mockKiloApi, safeToolNames } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
@@ -37,7 +32,7 @@ test('safe mode conversation reads the selected tab with safe tools', async () =
                   {
                     function: {
                       arguments: JSON.stringify({}),
-                      name: 'get_page_snapshot',
+                      name: 'kilo_browser_snapshot',
                     },
                     id: 'call_snapshot_1',
                     index: 0,
@@ -77,7 +72,7 @@ test('safe mode conversation reads the selected tab with safe tools', async () =
     await sidePanel.getByLabel('Message agent').fill('What is on this page?');
     await sidePanel.getByLabel('Message agent').press('Enter');
 
-    await expect(sidePanel.getByText('get_page_snapshot completed')).toBeVisible();
+    await expect(sidePanel.getByText('Page snapshot completed')).toBeVisible();
     await expect(sidePanel.getByText('The page is the Kilo extension fixture.')).toBeVisible();
     await expect(sidePanel.getByText('Switch to dangerous mode')).toBeHidden();
   } finally {
@@ -103,7 +98,7 @@ test('safe mode conversation completes a tool call streamed with empty arguments
                   {
                     function: {
                       arguments: '',
-                      name: 'get_page_snapshot',
+                      name: 'kilo_browser_snapshot',
                     },
                     id: 'call_snapshot_1',
                     index: 0,
@@ -143,7 +138,7 @@ test('safe mode conversation completes a tool call streamed with empty arguments
     await sidePanel.getByLabel('Message agent').fill('What is on this page?');
     await sidePanel.getByLabel('Message agent').press('Enter');
 
-    await expect(sidePanel.getByText('get_page_snapshot completed')).toBeVisible();
+    await expect(sidePanel.getByText('Page snapshot completed')).toBeVisible();
     await expect(sidePanel.getByText('The page is the Kilo extension fixture.')).toBeVisible();
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible();
     await expect(
@@ -170,8 +165,8 @@ test('viewport screenshot tool output expands to a captured image preview', asyn
                 tool_calls: [
                   {
                     function: {
-                      arguments: JSON.stringify({}),
-                      name: 'get_viewport_screenshot',
+                      arguments: JSON.stringify({ scale: 'css' }),
+                      name: 'kilo_browser_take_screenshot',
                     },
                     id: 'call_screenshot_1',
                     index: 0,
@@ -195,16 +190,7 @@ test('viewport screenshot tool output expands to a captured image preview', asyn
           ],
         },
       ],
-      toolNames: [
-        'get_page_snapshot',
-        'get_element_details',
-        'find_in_page',
-        'web_search',
-        'search_memories',
-        'get_memory',
-        'get_viewport_screenshot',
-        ...workflowToolNames,
-      ],
+      toolNames: safeToolNames,
     });
 
     const page = await context.newPage();
@@ -219,16 +205,16 @@ test('viewport screenshot tool output expands to a captured image preview', asyn
     await sidePanel.getByLabel('Message agent').press('Enter');
 
     const screenshotPanel = sidePanel
-      .getByText('get_viewport_screenshot completed')
+      .getByText('Take a screenshot completed')
       .locator('xpath=ancestor::details[1]');
     const preview = screenshotPanel.getByRole('img', {
-      name: 'Viewport screenshot captured by get_viewport_screenshot',
+      name: 'Image produced by kilo_browser_take_screenshot',
     });
 
     await expect(screenshotPanel).toBeVisible();
     await expect(preview).toBeHidden();
 
-    await screenshotPanel.getByText('get_viewport_screenshot completed').click();
+    await screenshotPanel.getByText('Take a screenshot completed').click();
 
     await expect(preview).toBeVisible();
     await expect(preview).toHaveAttribute('src', /^data:image\/png;base64,/u);
@@ -256,8 +242,8 @@ test('safe mode can capture a viewport screenshot from a local image file tab', 
                 tool_calls: [
                   {
                     function: {
-                      arguments: JSON.stringify({}),
-                      name: 'get_viewport_screenshot',
+                      arguments: JSON.stringify({ scale: 'css' }),
+                      name: 'kilo_browser_take_screenshot',
                     },
                     id: 'call_screenshot_1',
                     index: 0,
@@ -281,16 +267,7 @@ test('safe mode can capture a viewport screenshot from a local image file tab', 
           ],
         },
       ],
-      toolNames: [
-        'get_page_snapshot',
-        'get_element_details',
-        'find_in_page',
-        'web_search',
-        'search_memories',
-        'get_memory',
-        'get_viewport_screenshot',
-        ...workflowToolNames,
-      ],
+      toolNames: safeToolNames,
     });
 
     const page = await context.newPage();
@@ -306,7 +283,7 @@ test('safe mode can capture a viewport screenshot from a local image file tab', 
     await sidePanel.getByLabel('Message agent').fill('Capture this local image.');
     await sidePanel.getByLabel('Message agent').press('Enter');
 
-    await expect(sidePanel.getByText('get_viewport_screenshot completed')).toBeVisible();
+    await expect(sidePanel.getByText('Take a screenshot completed')).toBeVisible();
     await expect(sidePanel.getByText('I captured the local image tab.')).toBeVisible();
   } finally {
     await context.close();
@@ -330,7 +307,7 @@ test('dangerous mode conversation can use safe read tools', async () => {
                   {
                     function: {
                       arguments: JSON.stringify({}),
-                      name: 'get_page_snapshot',
+                      name: 'kilo_browser_snapshot',
                     },
                     id: 'call_snapshot_1',
                     index: 0,
@@ -369,7 +346,7 @@ test('dangerous mode conversation can use safe read tools', async () => {
     await sidePanel.getByLabel('Message agent').fill('Read this page safely first');
     await sidePanel.getByLabel('Message agent').press('Enter');
 
-    await expect(sidePanel.getByText('get_page_snapshot completed')).toBeVisible();
+    await expect(sidePanel.getByText('Page snapshot completed')).toBeVisible();
     await expect(sidePanel.getByText('Dangerous mode read the page safely first.')).toBeVisible();
   } finally {
     await context.close();

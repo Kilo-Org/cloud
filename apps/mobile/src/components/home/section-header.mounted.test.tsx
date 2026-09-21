@@ -14,6 +14,15 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 
+const ACTION_BOX_CLASSES = ['grow', 'max-w-full', 'flex-row', 'justify-end'];
+const ACTION_TEXT_CLASSES = ['shrink', 'font-mono-medium', 'text-[11px]', 'text-primary'];
+const PHYSICAL_ALIGNMENT_CLASSES = new Set([
+  'text-left',
+  'text-right',
+  'text-center',
+  'text-justify',
+]);
+
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 function mount(element: ReactElement) {
   act(() => {
@@ -36,10 +45,7 @@ afterEach(() => {
 
 describe('SectionHeader mounted layout', () => {
   // Host props protect the layout contract; only native I4 can prove scaled glyph rendering.
-  it.each([
-    { isRTL: false, alignment: 'text-right' },
-    { isRTL: true, alignment: 'text-left' },
-  ])('gives both labels spare width and wrapping with RTL=$isRTL', ({ isRTL, alignment }) => {
+  it.each([false, true])('places the action at the row outer edge with RTL=%s', isRTL => {
     i18nManager.isRTL = isRTL;
     const root = mount(
       createElement(SectionHeader, {
@@ -60,8 +66,6 @@ describe('SectionHeader mounted layout', () => {
         'max-w-full',
         'font-mono-medium',
         'text-[10px]',
-        'tracking-[1.5px]',
-        'uppercase',
         'text-muted-foreground',
       ])
     );
@@ -77,23 +81,80 @@ describe('SectionHeader mounted layout', () => {
     expect((action.parent?.props.className as string | undefined)?.split(' ')).toContain(
       'flex-wrap'
     );
+    // The row's outer edge comes from the action box's flex direction, never
+    // from a physical text alignment.
     expect((action.props.className as string).split(' ')).toEqual(
-      expect.arrayContaining(['grow', 'max-w-full'])
+      expect.arrayContaining(ACTION_BOX_CLASSES)
     );
-    expect((text.props.className as string).split(' ')).toEqual(
-      expect.arrayContaining([
-        alignment,
-        'font-mono-medium',
-        'text-[11px]',
-        'tracking-[1.5px]',
-        'uppercase',
-        'text-primary',
-      ])
-    );
+    const actionTextClasses = (text.props.className as string).split(' ');
+    expect(actionTextClasses).toEqual(expect.arrayContaining(ACTION_TEXT_CLASSES));
+    expect(actionTextClasses.filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name))).toEqual([]);
     expect(text.props.numberOfLines).toBeUndefined();
     expect(text.props.allowFontScaling).not.toBe(false);
     expect(text.props.maxFontSizeMultiplier).toBeUndefined();
     expect(text.children).toEqual(['See all']);
+  });
+
+  // Finding home-ar-loading: the Arabic section labels carried the Latin
+  // uppercase letter-spacing, whose glyph gaps break a cursive script's joins
+  // ('ال جلسا ت'). The display treatment is LTR-only.
+  it.each([
+    { isRTL: false, tracked: true },
+    { isRTL: true, tracked: false },
+  ])('letterspaces the section labels only outside RTL (RTL=$isRTL)', ({ isRTL, tracked }) => {
+    i18nManager.isRTL = isRTL;
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'الجلسات الجارية الآن',
+        actionLabel: 'عرض الكل',
+        onActionPress: () => undefined,
+      })
+    );
+    const action = root.findByProps({ accessibilityRole: 'button' });
+    const text = action.find(node => Object.is(node.type, 'Text'));
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
+    );
+
+    for (const node of [label, text]) {
+      const classes = (node.props.className as string).split(' ');
+      if (tracked) {
+        expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
+      } else {
+        expect(classes).not.toContain('uppercase');
+        expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+      }
+    }
+  });
+
+  // The action's display treatment intentionally branches on direction (the
+  // LTR-only letterspacing); the layout must not.
+  it('does not branch the action layout on direction', () => {
+    function actionLayout(isRTL: boolean) {
+      i18nManager.isRTL = isRTL;
+      const root = mount(
+        createElement(SectionHeader, {
+          label: 'Live now',
+          actionLabel: 'See all',
+          onActionPress: () => undefined,
+        })
+      );
+      const action = root.findByProps({ accessibilityRole: 'button' });
+      const text = action.find(node => Object.is(node.type, 'Text'));
+      return {
+        box: action.props.className as string,
+        physicalAlignment: (text.props.className as string)
+          .split(' ')
+          .filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name)),
+      };
+    }
+
+    const ltr = actionLayout(false);
+    act(() => renderer?.unmount());
+    renderer = undefined;
+    const rtl = actionLayout(true);
+
+    expect(rtl).toEqual(ltr);
   });
 
   it('keeps the complete accessible action name and activates the supplied destination', () => {

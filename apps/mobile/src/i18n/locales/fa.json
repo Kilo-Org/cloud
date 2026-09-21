@@ -838,8 +838,11 @@
       "sessionStatusTitle": "وضعیت نشست",
       "sessionStatusSubtitle": "تمام‌شده / ناموفق / آمادهٔ کنترل",
       "kiloclawActivitySubtitle": "نمونه آماده/ناموفق، اقدامات زمان‌بندی‌شده",
+      "kiloclawActivityUnavailable": "برای دریافت فعالیت KiloClaw، یک نمونه KiloClaw راه‌اندازی کنید.",
       "balanceAlertsSubtitle": "هشدارهای موجودی کم سازمان",
-      "securityFindingsSubtitle": "یافته‌های جدید و یادآوری‌های SLA"
+      "balanceAlertsUnavailable": "برای دریافت هشدارهای موجودی کم، به یک سازمان بپیوندید.",
+      "securityFindingsSubtitle": "یافته‌های جدید و یادآوری‌های SLA",
+      "securityFindingsUnavailable": "برای دریافت یافته‌های امنیتی، عامل امنیتی Kilo را در یک محدوده فعال کنید."
     },
     "action": {
       "openSession": "باز کردن نشست"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "بارگذاری نشست ممکن نشد.",
       "failedToLoadDetails": "بارگذاری جزئیات نشست ممکن نشد.",
       "failedToStopExecution": "توقف اجرا ممکن نشد.",
+      "stopped": "نشست متوقف شد",
+      "committing": "در حال کامیت…",
+      "committed": "کامیت شد",
+      "commitFailed": "کامیت ناموفق بود",
       "renameSession": "تغییر نام نشست",
       "renamePlaceholder": "نام نشست",
       "transcriptAccessibility": "متن گفت‌وگوی نشست",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} خط",
       "linesBadge_other": "{{displayCount}} خط",
       "matchesBadge_one": "{{displayCount}} تطابق",
-      "matchesBadge_other": "{{displayCount}} تطابق"
+      "matchesBadge_other": "{{displayCount}} تطابق",
+      "noOutput": "هیچ خروجی وجود ندارد."
     },
     "readToolMarkdown": {
       "linesTruncated": "خطوط {{start}}–{{end}} (نمایش ناقص)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "رایانهٔ شما",
     "remoteOptionBody": "Kilo را با دستور `kilo remote` روی ماشین خودتان اجرا کنید.",
     "skip": "رد کردن تور",
-    "tutorialLabel": "آموزش",
-    "remoteTitle": "نخستین نشست راه دور خود را شروع کنید",
-    "remoteBody": "رایانهٔ خود را متصل کنید، سپس نشست را از همین‌جا شروع کنید.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "هنوز رایانه‌ای متصل نشده است",
-    "remoteEmptyBody": "برای اتصال آن، دستور `kilo remote` را روی رایانهٔ خود اجرا کنید.",
-    "remoteFound": "رایانه متصل شد",
-    "checkAgain": "دوباره بررسی کنید",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "آموزش"
   },
   "appActions": {
     "start": {

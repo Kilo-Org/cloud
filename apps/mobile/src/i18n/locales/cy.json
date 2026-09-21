@@ -902,8 +902,11 @@
       "sessionStatusTitle": "Statws sesiwn",
       "sessionStatusSubtitle": "wedi gorffen / wedi methu / yn barod i'w reoli",
       "kiloclawActivitySubtitle": "enghraifft yn barod neu wedi methu, gweithredoedd wedi'u hamserlennu",
+      "kiloclawActivityUnavailable": "Dechreuwch enghraifft KiloClaw i gael gweithgaredd KiloClaw.",
       "balanceAlertsSubtitle": "rhybuddion am falans isel y sefydliad",
-      "securityFindingsSubtitle": "canfyddiadau newydd a nodiadau atgoffa SLA"
+      "balanceAlertsUnavailable": "Ymunwch â sefydliad i gael rhybuddion balans isel.",
+      "securityFindingsSubtitle": "canfyddiadau newydd a nodiadau atgoffa SLA",
+      "securityFindingsUnavailable": "Galluogwch asiant diogelwch Kilo ar gwmpas i gael canfyddiadau diogelwch."
     },
     "action": {
       "openSession": "Agor y sesiwn"
@@ -2188,6 +2191,10 @@
       "couldNotLoad": "Methu llwytho'r sesiwn.",
       "failedToLoadDetails": "Methu llwytho manylion y sesiwn.",
       "failedToStopExecution": "Methu atal y gweithrediad.",
+      "stopped": "Atalwyd y sesiwn",
+      "committing": "Yn cyflwyno…",
+      "committed": "Wedi cyflwyno",
+      "commitFailed": "Methodd cyflwyno",
       "renameSession": "Ailenwi sesiwn",
       "renamePlaceholder": "Enw sesiwn",
       "transcriptAccessibility": "Trawsgrifiad sesiwn",
@@ -2344,7 +2351,8 @@
       "matchesBadge_zero": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_two": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_few": "{{displayCount}} cyfatebiaeth",
-      "matchesBadge_many": "{{displayCount}} cyfatebiaeth"
+      "matchesBadge_many": "{{displayCount}} cyfatebiaeth",
+      "noOutput": "Dim allbwn."
     },
     "readToolMarkdown": {
       "linesTruncated": "llinellau {{start}}–{{end}} (wedi'u cwtogi)",
@@ -3352,15 +3360,7 @@
     "remoteOptionTitle": "Eich cyfrifiadur",
     "remoteOptionBody": "Rhedwch Kilo ar eich peiriant eich hun drwy'r CLI `kilo remote`.",
     "skip": "Hepgor y daith",
-    "tutorialLabel": "Tiwtorial",
-    "remoteTitle": "Dechreuwch eich sesiwn hirhoedlog gyntaf",
-    "remoteBody": "Cysylltwch eich cyfrifiadur, yna dechreuwch y sesiwn o'r fan hon.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Dim cyfrifiadur wedi'i gysylltu eto",
-    "remoteEmptyBody": "I'w gysylltu, rhedwch `kilo remote` ar eich cyfrifiadur.",
-    "remoteFound": "Cyfrifiadur wedi'i gysylltu",
-    "checkAgain": "Gwirio eto",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tiwtorial"
   },
   "appActions": {
     "start": {

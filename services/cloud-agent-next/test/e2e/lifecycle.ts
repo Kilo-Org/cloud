@@ -101,10 +101,6 @@ export const RECOVERY_BUDGET_MS = 8 * 60_000;
 
 const execFileAsync = promisify(execFile);
 
-// ---------------------------------------------------------------------------
-// Shared types
-// ---------------------------------------------------------------------------
-
 export type ConversationScenario = string; // e.g. "echo:hi", "tools:3", "hang"
 
 export type LifecycleResult = {
@@ -1199,10 +1195,6 @@ export async function lifecycleWorktreeShared(args: LifecycleArgs): Promise<Life
   }
 }
 
-// ---------------------------------------------------------------------------
-// Scenarios
-// ---------------------------------------------------------------------------
-
 /**
  * Cold start: fresh sessionId with a newly-created per-session sandbox. Send first prompt.
  * Asserts: a sandbox container appears; the conversation completes (for
@@ -1338,7 +1330,6 @@ export async function lifecycleHot(args: LifecycleArgs): Promise<LifecycleResult
       };
     }
 
-    // Send follow-up prompt. Should land on the same (hot) sandbox.
     const sandboxIdsBeforeFollowup = await snapshotSandboxIds();
     const followPrompt = fakeDirective(conversation);
     const stream = await openConnectedStream(config, session.cloudAgentSessionId, false);
@@ -1768,10 +1759,6 @@ export async function lifecycleKillMidFlight(args: LifecycleArgs): Promise<Lifec
   }
   return result;
 }
-
-// ---------------------------------------------------------------------------
-// Queue-focused scenarios
-// ---------------------------------------------------------------------------
 
 type QueuedOrCompleted = 'queued' | 'completed' | 'failed';
 
@@ -2248,7 +2235,6 @@ export async function lifecycleQueueInterruptClears(args: LifecycleArgs): Promis
 
     await interruptSession(config, gate.cloudAgentSessionId);
 
-    // Expect cloud.message.failed for both queued follow-ups.
     const secondFailed = await stream.waitFor(
       e =>
         e.streamEventType === 'cloud.message.failed' && messageIdFromEvent(e) === second.messageId,
@@ -2301,10 +2287,6 @@ export async function lifecycleQueueInterruptClears(args: LifecycleArgs): Promis
     await releaseGate(config.fakeLlmUrl, gateTag).catch(() => {});
   }
 }
-
-// ---------------------------------------------------------------------------
-// Single-turn scenarios driving specific fake-LLM directives
-// ---------------------------------------------------------------------------
 
 function isRetryStatusEvent(event: StreamEvent): boolean {
   if (event.streamEventType !== 'kilocode') return false;
@@ -2799,10 +2781,6 @@ export async function lifecycleWaitersClean(args: LifecycleArgs): Promise<Lifecy
     };
   }
 }
-
-// ---------------------------------------------------------------------------
-// Callback scenarios
-// ---------------------------------------------------------------------------
 
 type CallbackPayload = {
   sessionId?: string;
@@ -3312,10 +3290,6 @@ export async function lifecycleCallbackInterrupt(args: LifecycleArgs): Promise<L
     await sink?.close().catch(() => {});
   }
 }
-
-// ---------------------------------------------------------------------------
-// Dispatch
-// ---------------------------------------------------------------------------
 
 export const LIFECYCLE_SCENARIOS: Record<
   string,

@@ -412,7 +412,6 @@ describe('router sessionId validation', () => {
 
           vi.mocked(getSandbox).mockReturnValue(mockSandbox);
 
-          // Create caller with mocked context
           caller = appRouter.createCaller(mockContext);
         });
 
@@ -1066,7 +1065,6 @@ describe('router sessionId validation', () => {
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
 
-        // Create caller with mocked context
         caller = appRouter.createCaller(mockContext);
       });
 
@@ -1106,7 +1104,6 @@ describe('router sessionId validation', () => {
 
           const result = await caller.getSession({ cloudAgentSessionId: sessionId });
 
-          // Verify the result contains safe fields
           expect(result.sessionId).toBe(sessionId);
           expect(result.kiloSessionId).toBe('a0000000-0000-4000-8000-000000000001');
           expect(result.userId).toBe('test-user-123');
@@ -1122,7 +1119,6 @@ describe('router sessionId validation', () => {
           expect(result.timestamp).toBe(123456789);
           expect(result.version).toBe(123456789);
 
-          // Verify secrets are NOT returned
           expect(result).not.toHaveProperty('githubToken');
           expect(result).not.toHaveProperty('gitToken');
           expect(result).not.toHaveProperty('envVars');
@@ -1134,7 +1130,6 @@ describe('router sessionId validation', () => {
           expect(result).not.toHaveProperty('callbackTarget');
           expect(result).not.toHaveProperty('providerRuntime');
 
-          // Verify DO was accessed with correct key
           expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
         });
 
@@ -1333,7 +1328,6 @@ describe('router sessionId validation', () => {
             'Session not found'
           );
 
-          // Verify the DO was keyed with the authenticated user's ID
           expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
         });
       });

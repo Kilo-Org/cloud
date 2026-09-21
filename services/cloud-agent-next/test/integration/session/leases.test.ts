@@ -51,7 +51,6 @@ describe('Lease Acquisition', () => {
   it('should acquire lease on first attempt', async () => {
     const stub = sessionStub('user_1', 'sess_1');
 
-    // Use the DO's RPC method directly
     const result = await runInDurableObject(stub, async instance => {
       return instance.acquireLease('exc_123' as ExecutionId, 'msg_1', 'lease_abc');
     });
@@ -67,7 +66,6 @@ describe('Lease Acquisition', () => {
     const stub = sessionStub('user_1', 'sess_2');
 
     const result = await runInDurableObject(stub, async instance => {
-      // First acquisition succeeds
       const first = instance.acquireLease('exc_123' as ExecutionId, 'msg_1', 'lease_abc');
 
       // Second acquisition should fail (lease still held)
@@ -129,7 +127,6 @@ describe('Lease Acquisition', () => {
       // Acquire lease
       const acquire = instance.acquireLease('exc_123' as ExecutionId, 'msg_1', 'lease_abc');
 
-      // Try to extend with wrong leaseId (should fail)
       const extended = instance.extendLease('exc_123' as ExecutionId, 'wrong_lease_id');
 
       return { acquire, extended };

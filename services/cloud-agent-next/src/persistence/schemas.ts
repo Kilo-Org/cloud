@@ -282,8 +282,6 @@ export const RuntimeSkillsSchema = z
 
 export type RuntimeSkillInput = z.infer<typeof RuntimeSkillSchema>;
 
-// --- Runtime agents ---
-
 const PermissionActionSchema = z.enum(['allow', 'ask', 'deny']);
 // Flat permissive shape — the runtime tolerates any shape the CLI accepts
 // (bare action string, per-tool map with per-pattern maps, null sentinels).
@@ -341,8 +339,6 @@ export const RuntimeAgentsSchema = z
 
 export type RuntimeAgentInput = z.infer<typeof RuntimeAgentSchema>;
 
-// --- Runtime kilo commands ---
-
 export const RuntimeKiloCommandSchema = z.object({
   name: z
     .string()
@@ -386,8 +382,6 @@ export const InitialExecutionPayloadSchema = z.discriminatedUnion('type', [
 ]);
 
 export type InitialExecutionPayload = z.infer<typeof InitialExecutionPayloadSchema>;
-
-// --- Profile bundle ---
 
 /**
  * Schema for the profile-derived configuration bundle persisted with a

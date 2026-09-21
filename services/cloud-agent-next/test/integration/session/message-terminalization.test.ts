@@ -660,7 +660,6 @@ describe('message terminalization and stream events', () => {
       };
       await putSessionMessageState(instance.ctx.storage, acceptedState);
 
-      // Call the centralized terminalization wrapper once
       await (instance as any).terminalizeSessionMessageOnce(messageId, {
         kind: 'completed',
         assistantMessageId: 'asst_123',
@@ -773,7 +772,6 @@ describe('message terminalization and stream events', () => {
       };
       await putSessionMessageState(instance.ctx.storage, acceptedState);
 
-      // First terminalization
       await (instance as any).terminalizeSessionMessageOnce(messageId, {
         kind: 'completed',
         completionSource: 'assistant_message_event',

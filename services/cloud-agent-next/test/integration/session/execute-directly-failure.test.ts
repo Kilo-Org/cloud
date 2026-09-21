@@ -472,7 +472,6 @@ describe('handleWrapperTerminalEvent — new-path identity and message preservat
       const { wrapperRunId, wrapperConnectionId } = wrapperState;
 
       const messageId = 'msg_018f1e2d3c4bWrpCmpAbCdEfGh';
-      // Store an accepted (non-terminal) session message state
       const acceptedMessage: SessionMessageState = {
         messageId,
         status: 'accepted',
@@ -549,7 +548,6 @@ describe('new-path liveness without executionId', () => {
       const { state: wrapperState } = await allocateWrapperRuntimeState(instance.ctx.storage);
       const { wrapperRunId, wrapperConnectionId } = wrapperState;
 
-      // Store an accepted (non-terminal) session message state
       const acceptedMessage: SessionMessageState = {
         messageId: 'msg_018f1e2d3c4bnewlivabcdefgh',
         status: 'accepted',

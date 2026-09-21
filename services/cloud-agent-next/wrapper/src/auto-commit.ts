@@ -238,7 +238,6 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
     const trackingUpstream = await hasGitUpstream(workspacePath, GIT_LOCAL_TIMEOUT_MS, signal, env);
     logToFile(`auto-commit: hasGitUpstream=${trackingUpstream}`);
 
-    // Check for uncommitted changes
     const status = await git(['status', '--porcelain'], {
       cwd: workspacePath,
       ...(env ? { env, inheritEnv: false } : {}),

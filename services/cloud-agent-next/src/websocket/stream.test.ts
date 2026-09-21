@@ -155,7 +155,6 @@ describe('stream handler replayEvents', () => {
     // All 6 events should be sent
     expect(ws.sentMessages).toHaveLength(6);
 
-    // Should have started multiple rounds (the generator was called more than once)
     expect(iterateSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
 
     // Second round should have a cursor set from the first round

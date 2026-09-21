@@ -1049,7 +1049,6 @@ describe('direct worktree credential refresh', () => {
     expect(siblingOp.signal.aborted).toBe(false);
     expect(runtime.signal.aborted).toBe(false);
     expect(f.close).not.toHaveBeenCalled();
-    // Remove the sibling operation (equivalent to old deps.tasks.delete)
     siblingOp.cancel('test-cleanup', 'cancelled');
     held.resolve({ ok: true, result: {} });
     await siblingOp.done.catch(() => {});

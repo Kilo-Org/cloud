@@ -11,10 +11,8 @@
 // Types
 export * from './types.js';
 
-// Filters
 export * from './filters.js';
 
-// Stream handler
 export {
   createStreamHandler,
   formatStreamEvent,

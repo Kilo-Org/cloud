@@ -200,7 +200,6 @@ describe('execution-id removal - flush does not create execution rows', () => {
 
       const startResult = await instance.admitSubmittedMessage(request);
 
-      // Trigger alarm to flush the pending message
       await instance.alarm();
 
       const executions = await instance.getExecutions();
@@ -398,7 +397,6 @@ describe('execution-id removal - flush does not create execution rows', () => {
     expect(result.acceptedMessages[0]?.messageId).toBe('msg_018f1e2d3c4bResultNoExecXX');
     expect(result.acceptedMessages[0]?.status).toBe('accepted');
 
-    // Verify message delivery events do not expose executionId in their payloads.
     const queuedEvents = result.allEvents.filter(
       e => e.stream_event_type === 'cloud.message.queued'
     );
@@ -556,7 +554,6 @@ describe('execution-id removal - stream events do not expose fake executionIds',
         throw new Error(`admitSubmittedMessage failed: ${JSON.stringify(startResult)}`);
       }
 
-      // Trigger interrupt which clears pending messages
       await instance.interruptExecution();
 
       const db = drizzle(doState.storage, { logger: false });

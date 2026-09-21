@@ -36,10 +36,6 @@ vi.mock('./ports.js', () => ({
 
 import { randomPort } from './ports.js';
 
-// ---------------------------------------------------------------------------
-// Test Helpers
-// ---------------------------------------------------------------------------
-
 type MockExecResult = {
   exitCode: number;
   stdout?: string;
@@ -159,16 +155,8 @@ const createPromptOptions = (
   session: overrides.session ?? defaultPromptSession,
 });
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe('WrapperClient', () => {
   const defaultPort = 5000;
-
-  // -------------------------------------------------------------------------
-  // Constructor
-  // -------------------------------------------------------------------------
 
   describe('constructor', () => {
     it('creates client with session and port', () => {
@@ -470,10 +458,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Health Check
-  // -------------------------------------------------------------------------
-
   describe('health', () => {
     it('returns health status on success', async () => {
       const healthResponse: WrapperHealthResponse = {
@@ -502,10 +486,6 @@ describe('WrapperClient', () => {
       await expect(client.health()).rejects.toThrow(WrapperError);
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Job Status
-  // -------------------------------------------------------------------------
 
   describe('status', () => {
     it('returns job status', async () => {
@@ -551,14 +531,6 @@ describe('WrapperClient', () => {
       await expect(client.status()).resolves.toEqual(statusResponse);
     });
   });
-
-  // -------------------------------------------------------------------------
-  // (startJob removed — execution binding is now inline in prompt/command)
-  // -------------------------------------------------------------------------
-
-  // -------------------------------------------------------------------------
-  // Prompt
-  // -------------------------------------------------------------------------
 
   describe('prompt', () => {
     it('returns messageId on success', async () => {
@@ -756,10 +728,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Command
-  // -------------------------------------------------------------------------
-
   describe('command', () => {
     it('returns command result', async () => {
       const commandResult = { messages: ['Cleared 5 messages'] };
@@ -817,10 +785,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Answer Permission
-  // -------------------------------------------------------------------------
-
   describe('answerPermission', () => {
     it('returns success on valid response', async () => {
       const session = createMockSession(
@@ -873,10 +837,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Answer Question
-  // -------------------------------------------------------------------------
-
   describe('answerQuestion', () => {
     it('returns success', async () => {
       const session = createMockSession(
@@ -902,10 +862,6 @@ describe('WrapperClient', () => {
       expect(execCall).toContain('q_456');
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Reject Question
-  // -------------------------------------------------------------------------
 
   describe('rejectQuestion', () => {
     it('returns success', async () => {
@@ -933,10 +889,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Abort
-  // -------------------------------------------------------------------------
-
   describe('abort', () => {
     it('completes without error', async () => {
       const session = createMockSession(createSuccessResponse({ status: 'aborted' }));
@@ -955,10 +907,6 @@ describe('WrapperClient', () => {
       expect(execCall).toContain('/job/abort');
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Ensure Running
-  // -------------------------------------------------------------------------
 
   describe('ensureRunning', () => {
     const agentSessionId = 'test-session';
@@ -981,7 +929,6 @@ describe('WrapperClient', () => {
         workspacePath: '/workspace/test',
       });
 
-      // Should only call health once (already running)
       expect(session.exec).toHaveBeenCalledTimes(1);
     });
 
@@ -1006,7 +953,6 @@ describe('WrapperClient', () => {
         workspacePath: '/workspace/test',
       });
 
-      // Should have called startProcess and waitForPort
       expect(session.startProcess).toHaveBeenCalledTimes(1);
       expect(waitForPortMock).toHaveBeenCalledWith(defaultPort, {
         mode: 'http',
@@ -1218,7 +1164,6 @@ describe('WrapperClient', () => {
       const getLogsMock = vi
         .fn()
         .mockResolvedValue({ stdout: 'some output', stderr: 'some error' });
-      // Make startProcess return a process where waitForPort times out
       (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
         id: 'mock-process-id',
         waitForPort: vi.fn().mockRejectedValue(new Error('Port not ready within timeout')),
@@ -1353,7 +1298,6 @@ describe('WrapperClient', () => {
         workspacePath: '/workspace/test',
       });
 
-      // Verify startProcess was called with the wrapper command
       expect(session.startProcess).toHaveBeenCalledTimes(1);
       const startProcessCall = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(startProcessCall[0]).toContain('kilocode-wrapper');
@@ -1435,10 +1379,6 @@ describe('WrapperClient', () => {
       expect(startProcessCall[0]).toContain("--user-id 'test-user'");
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Pre-flight checks
-  // -------------------------------------------------------------------------
 
   describe('pre-flight checks', () => {
     it('throws WrapperNotReadyError when bun exits with SIGILL (exit code 132)', async () => {
@@ -1774,10 +1714,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Ensure Wrapper (static method)
-  // -------------------------------------------------------------------------
-
   describe('ensureWrapper', () => {
     const wrapperOptions = {
       agentSessionId: 'test-session',
@@ -1809,7 +1745,6 @@ describe('WrapperClient', () => {
 
       expect(client).toBeDefined();
       expect(sessionId).toBe('kilo-sess-1');
-      // Should have called listProcesses to find existing wrapper
       expect(sandbox.listProcesses).toHaveBeenCalledTimes(1);
       // Should NOT have started a new process
       expect(session.startProcess).not.toHaveBeenCalled();
@@ -2336,10 +2271,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Error Handling
-  // -------------------------------------------------------------------------
-
   describe('error handling', () => {
     it('parses JSON error response', async () => {
       const session = createMockSession(
@@ -2385,10 +2316,6 @@ describe('WrapperClient', () => {
       }
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Request Formatting
-  // -------------------------------------------------------------------------
 
   describe('request formatting', () => {
     it('escapes single quotes in JSON body', async () => {
@@ -2445,10 +2372,6 @@ describe('WrapperClient', () => {
       expect(execCall).toContain(`http://127.0.0.1:${customPort}`);
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Error Classes
-  // -------------------------------------------------------------------------
 
   describe('error classes', () => {
     it('WrapperFinalizingError carries optional wrapper run identity', () => {

@@ -66,7 +66,6 @@ describe('Event Storage', () => {
     // Access the DO directly and call queries on its sql storage
     // The DO auto-runs migrations in constructor via blockConcurrencyWhile
     const result = await runInDurableObject(stub, async (_instance, state) => {
-      // Create a fresh queries instance using the same storage
       const db = drizzle(state.storage, { logger: false });
       const events = createEventQueries(db, state.storage.sql);
       const eventId = events.insert({
@@ -122,22 +121,17 @@ describe('Event Storage', () => {
         timestamp: now - 2000,
       });
 
-      // Filter by executionId
       const byExecution = events.findByFilters({ executionIds: ['exc_1'] });
 
-      // Filter by eventType
       const byType = events.findByFilters({ eventTypes: ['output'] });
 
-      // Filter by multiple executionIds
       const byMultiExec = events.findByFilters({ executionIds: ['exc_1', 'exc_2'] });
 
-      // Filter by time range
       const byTimeRange = events.findByFilters({
         startTime: now - 4500,
         endTime: now - 2500,
       });
 
-      // Filter with limit
       const withLimit = events.findByFilters({ limit: 2 });
 
       // Combined filters
@@ -200,11 +194,9 @@ describe('Event Storage', () => {
       // Count before cleanup
       const beforeCount = events.findByFilters({}).length;
 
-      // Delete events older than 90 days
       const cutoff = now - 90 * 24 * 60 * 60 * 1000;
       const deletedCount = events.deleteOlderThan(cutoff);
 
-      // Get remaining events
       const remaining = events.findByFilters({});
 
       return { beforeCount, deletedCount, remaining };

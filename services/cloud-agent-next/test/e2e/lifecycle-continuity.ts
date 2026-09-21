@@ -187,10 +187,6 @@ function remainingMs(resources: ScenarioResources, label: string): number {
   return timeoutMs;
 }
 
-// ---------------------------------------------------------------------------
-// Stream and durable-turn helpers
-// ---------------------------------------------------------------------------
-
 async function awaitDurableCompletion(
   resources: ScenarioResources,
   session: WorktreeSessionResult,
@@ -306,10 +302,6 @@ async function sendAndAwaitCompletion(
   const lifecycle = assertMessageLifecycle(stream, sent.messageId, label);
   return { messageId: sent.messageId, terminal, lifecycle };
 }
-
-// ---------------------------------------------------------------------------
-// Wrapper + worker-log evidence helpers (framing/correlation only)
-// ---------------------------------------------------------------------------
 
 export type ConnectionIdentity = {
   sandboxId: string;
@@ -598,10 +590,6 @@ async function waitForEngagedFault(
   return fault;
 }
 
-// ---------------------------------------------------------------------------
-// Idle-stop and resume helpers
-// ---------------------------------------------------------------------------
-
 type IdleEvidence = Awaited<ReturnType<typeof readIdleStopEvidence>>;
 
 async function waitForAutomaticIdleStop(
@@ -787,10 +775,6 @@ async function resumeSameSession(
   return { runtime: resumed, messageId: sent.messageId, lifecycle, fileSurvival };
 }
 
-// ---------------------------------------------------------------------------
-// Question helpers
-// ---------------------------------------------------------------------------
-
 function questionFromEvent(
   event: StreamEvent,
   kiloSessionId: string
@@ -929,10 +913,6 @@ export function heartbeatMovedRouteOffActive(
   const evidence = selectTargetHeartbeat([record], identity, kiloSessionId);
   return evidence !== undefined && evidence.sessionState !== 'active';
 }
-
-// ---------------------------------------------------------------------------
-// recover-same-session (A5 / D4)
-// ---------------------------------------------------------------------------
 
 export async function lifecycleRecoverSameSession(args: LifecycleArgs): Promise<LifecycleResult> {
   const startedAt = Date.now();
@@ -1112,10 +1092,6 @@ export async function lifecycleRecoverSameSession(args: LifecycleArgs): Promise<
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// interrupt-then-continue (A4)
-// ---------------------------------------------------------------------------
-
 export async function lifecycleInterruptThenContinue(
   args: LifecycleArgs
 ): Promise<LifecycleResult> {
@@ -1229,10 +1205,6 @@ export async function lifecycleInterruptThenContinue(
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// warm-cold-cycles (A3)
-// ---------------------------------------------------------------------------
-
 export async function lifecycleWarmColdCycles(args: LifecycleArgs): Promise<LifecycleResult> {
   const startedAt = Date.now();
   const resources = createScenarioResources(
@@ -1334,10 +1306,6 @@ export async function lifecycleWarmColdCycles(args: LifecycleArgs): Promise<Life
   }
   return result;
 }
-
-// ---------------------------------------------------------------------------
-// question-idle-resume (C2)
-// ---------------------------------------------------------------------------
 
 export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<LifecycleResult> {
   const startedAt = Date.now();
@@ -1571,10 +1539,6 @@ export async function lifecycleQuestionIdleResume(args: LifecycleArgs): Promise<
   }
   return result;
 }
-
-// ---------------------------------------------------------------------------
-// large-stream (D1)
-// ---------------------------------------------------------------------------
 
 type ReadMeasurement = {
   bytes?: number;
@@ -1856,10 +1820,6 @@ export async function lifecycleLargeStream(args: LifecycleArgs): Promise<Lifecyc
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// concurrent-chats (D2 / B4)
-// ---------------------------------------------------------------------------
-
 type ConcurrentSession = {
   session: WorktreeSessionResult;
   runtime: ControlPlaneKiloRuntime;
@@ -2096,10 +2056,6 @@ export async function lifecycleConcurrentChats(args: LifecycleArgs): Promise<Lif
   }
   return result;
 }
-
-// ---------------------------------------------------------------------------
-// feed-stale-recovery (silent /global/event subscriber incident)
-// ---------------------------------------------------------------------------
 
 type ControlLogPollResult = { line: string; log: string };
 
@@ -2511,10 +2467,6 @@ export async function lifecycleFeedStaleRecovery(args: LifecycleArgs): Promise<L
   }
   return result;
 }
-
-// ---------------------------------------------------------------------------
-// wrapper-freeze settled/inflight reap (D6/D7)
-// ---------------------------------------------------------------------------
 
 async function captureAndFreezeControlWrapper(
   resources: ScenarioResources,

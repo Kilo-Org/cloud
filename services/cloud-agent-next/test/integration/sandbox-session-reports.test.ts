@@ -442,7 +442,6 @@ describe('control-plane run-state reporting', () => {
       expect(pending?.attempts).toBe(1);
       expect(await state.storage.getAlarm()).not.toBeNull();
 
-      // Simulate the retry interval elapsing without waiting 30 seconds.
       state.storage.kv.put(`${REPORT_OUTBOX_PREFIX}${messageId}`, {
         ...pending,
         dueAt: 0,

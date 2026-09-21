@@ -217,10 +217,6 @@ import {
 } from '../agent-sandbox/vercel/vercel-runtime-state.js';
 import { updateProviderRuntime } from './session-metadata.js';
 
-// ---------------------------------------------------------------------------
-// Alarm Constants
-// ---------------------------------------------------------------------------
-
 /** Reaper alarm interval: 5 minutes */
 const REAPER_INTERVAL_MS_DEFAULT = 5 * 60 * 1000;
 /** Longer reaper interval when idle: 1 hour */
@@ -1312,10 +1308,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     await this.keepContainerAlive();
   }
 
-  // ---------------------------------------------------------------------------
-  // HTTP/WebSocket Routing
-  // ---------------------------------------------------------------------------
-
   /**
    * Handle incoming HTTP requests and WebSocket upgrades.
    * Routes to appropriate handler based on URL pathname.
@@ -1379,10 +1371,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return new Response('Not Found', { status: 404 });
   }
 
-  // ---------------------------------------------------------------------------
-  // WebSocket Lifecycle Methods (Hibernation API)
-  // ---------------------------------------------------------------------------
-
   /**
    * Handle incoming messages from WebSocket clients.
    * Distinguishes between /stream (server-push only) and /ingest connections.
@@ -1390,7 +1378,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const tags = this.ctx.getTags(ws);
 
-    // Check if this is an ingest connection
     if (tags.some(tag => tag.startsWith('ingest:'))) {
       if (await this.hasDeletionIntent()) return;
       const ingestHandler = await this.getIngestHandler();
@@ -1459,10 +1446,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       })
       .error('WebSocket error');
   }
-
-  // ---------------------------------------------------------------------------
-  // Event Broadcasting
-  // ---------------------------------------------------------------------------
 
   /**
    * Broadcast a new event to all connected /stream clients.
@@ -1679,9 +1662,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return closed;
   }
 
-  // ---------------------------------------------------------------------------
-  // Metadata RPC Methods
-  // ---------------------------------------------------------------------------
   /**
    * Get session metadata.
    * Returns null if no metadata has been written yet (e.g., before first CLI execution).
@@ -2360,10 +2340,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     await this.updateMetadata(updated);
   }
-
-  // ---------------------------------------------------------------------------
-  // Wrapper Communication Methods
-  // ---------------------------------------------------------------------------
 
   /**
    * Send a command to the wrapper via its ingest WebSocket connection.
@@ -3289,10 +3265,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     await this.updateLastActivity();
   }
 
-  // ---------------------------------------------------------------------------
-  // Alarm Reaper
-  // ---------------------------------------------------------------------------
-
   /**
    * Alarm handler for periodic cleanup tasks.
    * Runs periodic retention/TTL cleanup and schedules nearer deadlines for
@@ -3355,7 +3327,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         await this.interruptAcceptedWrapperMessages();
       });
 
-      // Run cleanup tasks
       this.cleanupOldEvents(now);
       this.cleanupExpiredLeases(now);
       await this.cleanupIdleKiloServer(now);
@@ -3594,10 +3565,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (await this.hasDeletionIntent()) return;
     await this.getAgentRuntime().keepSandboxAlive();
   }
-
-  // ---------------------------------------------------------------------------
-  // Execution Management RPC Methods
-  // ---------------------------------------------------------------------------
 
   /**
    * Add a new execution with initial 'pending' status.
@@ -4056,10 +4023,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.executionQueries.clearInterrupt();
   }
 
-  // ---------------------------------------------------------------------------
-  // Lease Management RPC Methods
-  // ---------------------------------------------------------------------------
-
   /**
    * Try to acquire a lease for an execution.
    * Used by queue consumers for idempotent processing.
@@ -4100,10 +4063,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   releaseLease(executionId: ExecutionId, leaseId: string): boolean {
     return this.leaseQueries.release(executionId, leaseId);
   }
-
-  // ---------------------------------------------------------------------------
-  // Direct Execution Methods
-  // ---------------------------------------------------------------------------
 
   async hasMessageAdmission(messageId: string): Promise<boolean> {
     return this.getSessionMessageQueue().hasMessageAdmission(messageId);

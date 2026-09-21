@@ -6,10 +6,6 @@ import { executionLeases } from '../../db/sqlite-schema.js';
 
 type SqlStorage = DurableObjectState['storage']['sql'];
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type LeaseRecord = {
   executionId: string;
   leaseId: string;
@@ -27,10 +23,6 @@ export type LeaseExtendError =
   | { code: 'WRONG_HOLDER'; currentHolder: string }
   | { code: 'SQL_ERROR'; message: string };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 type DbLeaseRow = typeof executionLeases.$inferSelect;
 
 function toLeaseRecord(row: DbLeaseRow): LeaseRecord {
@@ -42,10 +34,6 @@ function toLeaseRecord(row: DbLeaseRow): LeaseRecord {
     messageId: row.message_id,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Factory Function
-// ---------------------------------------------------------------------------
 
 export function createLeaseQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStorage) {
   return {

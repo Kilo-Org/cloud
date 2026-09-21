@@ -38,10 +38,6 @@ import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-env
 import type { SessionBoundFeedPolicy } from './global-feed-manager.js';
 import type { ToolCgroupHealth } from './tool-cgroup.js';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type ServerConfig = {
   port: number;
   workspacePath: string;
@@ -150,10 +146,6 @@ type PtyResizeBody = {
     rows?: number;
   };
 };
-
-// ---------------------------------------------------------------------------
-// Helper Functions
-// ---------------------------------------------------------------------------
 
 const PTY_ID_RE = /^[a-zA-Z0-9_-]+$/;
 const MIN_PTY_COLS = 2;
@@ -404,10 +396,6 @@ export async function bindSessionContext(
   }
   return null;
 }
-
-// ---------------------------------------------------------------------------
-// Route Handlers
-// ---------------------------------------------------------------------------
 
 function createHealthHandler(
   config: ServerConfig,
@@ -1217,10 +1205,6 @@ export function createKiloProxyHandler(deps: ServerDependencies) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Server Creation
-// ---------------------------------------------------------------------------
-
 export type WrapperServer = {
   server: ReturnType<typeof Bun.serve>;
   stop: () => Promise<void>;
@@ -1233,7 +1217,6 @@ export function createFetchHandler(
 ): (req: Request, server?: BunUpgradeServer) => Response | Promise<Response> | undefined {
   const { state } = deps;
 
-  // Create route handlers
   const healthHandler = createHealthHandler(config, state, deps.toolCgroupHealth);
   const statusHandler = createStatusHandler(state);
   const promptHandler = createPromptHandler(config, deps);

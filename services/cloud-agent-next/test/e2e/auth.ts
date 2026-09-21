@@ -23,10 +23,6 @@ export const DRIVER_USER_EMAIL_SUFFIX = '@cloud-agent-next-e2e.example.com';
 export const FUNDED_DRIVER_BALANCE_MICRODOLLARS = 10_000_000;
 const JWT_TOKEN_VERSION = 3;
 
-// ---------------------------------------------------------------------------
-// .dev.vars loader
-// ---------------------------------------------------------------------------
-
 /**
  * Parse a `.dev.vars` file — same format as `.env`, with `KEY=value` pairs.
  * Trims surrounding quotes and ignores comments/blank lines.
@@ -84,10 +80,6 @@ export function loadRepoEnvFiles(servicePackageDir: string): void {
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// User ensure
-// ---------------------------------------------------------------------------
 
 export type TestUser = {
   id: string;
@@ -195,10 +187,6 @@ export async function loadExistingUserByEmail(
     await driver.pool.end().catch(() => {});
   }
 }
-
-// ---------------------------------------------------------------------------
-// JWT minting
-// ---------------------------------------------------------------------------
 
 export type MintedTokens = {
   apiToken: string;

@@ -185,8 +185,6 @@ describe('createIngestHandler', () => {
       });
     }
 
-    // --- kilocode events: upsert path ---
-
     it('message.updated is upserted by entity ID', async () => {
       const eventQueries = createFakeEventQueries();
       (eventQueries as unknown as Record<string, unknown>).upsert = vi.fn().mockReturnValue(42);
@@ -362,8 +360,6 @@ describe('createIngestHandler', () => {
       });
     });
 
-    // --- kilocode events: plain insert path (PERSISTED_KILO_EVENT_NAMES) ---
-
     it.each([
       'message.part.removed',
       'session.created',
@@ -390,8 +386,6 @@ describe('createIngestHandler', () => {
       expect(eventQueries.insert).toHaveBeenCalled();
       expect(broadcastFn).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
     });
-
-    // --- kilocode events: broadcast-only (not in any allowlist) ---
 
     it.each([
       'question.asked',
@@ -422,8 +416,6 @@ describe('createIngestHandler', () => {
       );
     });
 
-    // --- non-kilocode: plain insert path (PERSISTED_STREAM_EVENT_TYPES) ---
-
     it.each(['complete', 'interrupted', 'error', 'autocommit_started', 'autocommit_completed'])(
       'stream event %s is plain-inserted',
       async eventType => {
@@ -444,8 +436,6 @@ describe('createIngestHandler', () => {
         expect(broadcastFn).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
       }
     );
-
-    // --- non-kilocode: broadcast-only (not in PERSISTED_STREAM_EVENT_TYPES) ---
 
     it.each(['heartbeat', 'pong', 'output', 'status', 'started', 'wrapper_resumed'])(
       'stream event %s is broadcast-only',
@@ -657,7 +647,6 @@ describe('createIngestHandler', () => {
       );
 
       // Should NOT call onKiloSnapshot (removed)
-      // Should be broadcast as a regular event with eventId 0
       expect(broadcastFn).toHaveBeenCalledWith(
         expect.objectContaining({ id: 0, stream_event_type: 'kilo_snapshot' })
       );

@@ -1171,7 +1171,6 @@ export class SessionService {
     userId: string,
     sessionId: SessionId
   ): Promise<SandboxId> {
-    // Fetch and store metadata
     const fetchedMetadata = await fetchSessionMetadata(env, userId, sessionId);
 
     if (!fetchedMetadata) {
@@ -1564,7 +1563,6 @@ export class SessionService {
     const configJson = JSON.stringify(configContent);
     envVars.OPENCODE_CONFIG_CONTENT = configJson;
     envVars.KILO_CONFIG_CONTENT = configJson;
-    // Set GH_TOKEN for GitHub repos only, respecting user overrides
     if (!baseEnvVars.GH_TOKEN) {
       if (githubToken && githubRepo) {
         envVars.GH_TOKEN = githubToken;

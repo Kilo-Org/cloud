@@ -138,7 +138,6 @@ describe('detectDevContainer', () => {
     const session = mockSessionExec(() => ({ exitCode: 0, stdout: '' }));
     await detectDevContainer(session, "/work's space/repo");
     const calls = (session.exec as unknown as { mock: { calls: unknown[][] } }).mock.calls;
-    // Should escape the embedded single quote.
     expect(calls[0][0]).toContain(`/work'\\''s space/repo`);
   });
 });

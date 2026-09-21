@@ -41,7 +41,6 @@ export async function runCondenseOnComplete(
       timestamp: new Date().toISOString(),
     });
 
-  // Check if already aborted before starting
   if (opts.wasAborted()) {
     logToFile('condense: skipped - execution was aborted');
     return { wasAborted: true, success: false };
@@ -78,7 +77,6 @@ export async function runCondenseOnComplete(
 
     if (result === 'timeout') {
       logToFile('condense: timed out, aborting session');
-      // Abort the session to stop the running prompt
       try {
         await opts.kiloClient.abortSession({ sessionId: opts.kiloSessionId });
         logToFile('condense: session aborted after timeout');
@@ -96,7 +94,6 @@ export async function runCondenseOnComplete(
       return { wasAborted: true, success: false, error: 'Timed out' };
     }
 
-    // Check if aborted during execution
     if (opts.wasAborted()) {
       logToFile('condense: aborted during execution');
       return { wasAborted: true, success: false };

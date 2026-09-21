@@ -7,19 +7,11 @@
 
 import { STALE_THRESHOLD_MS } from './lease.js';
 
-// ---------------------------------------------------------------------------
-// Execution Status
-// ---------------------------------------------------------------------------
-
 /** Possible states of an execution */
 export type ExecutionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'interrupted';
 
 /** Health status for running executions */
 export type ExecutionHealth = 'healthy' | 'stale' | 'unknown';
-
-// ---------------------------------------------------------------------------
-// State Machine
-// ---------------------------------------------------------------------------
 
 /**
  * Valid state transitions for executions.
@@ -64,10 +56,6 @@ export function isTerminal(status: ExecutionStatus): boolean {
 export function getAllowedTransitions(status: ExecutionStatus): ExecutionStatus[] {
   return VALID_TRANSITIONS[status];
 }
-
-// ---------------------------------------------------------------------------
-// Execution Health
-// ---------------------------------------------------------------------------
 
 /** Startup grace period before marking execution as unknown (2 minutes) */
 const STARTUP_GRACE_MS = 2 * 60 * 1000;

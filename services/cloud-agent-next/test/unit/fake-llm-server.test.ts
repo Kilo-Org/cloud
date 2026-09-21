@@ -30,10 +30,6 @@ import {
   type DockerCommandExecutor,
 } from '../e2e/sandbox-control.js';
 
-// ---------------------------------------------------------------------------
-// Pure-helper tests
-// ---------------------------------------------------------------------------
-
 describe('parseDirective', () => {
   it('returns null when the prefix is absent', () => {
     expect(parseDirective('hello')).toBeNull();
@@ -164,10 +160,6 @@ describe('extractMultipartField', () => {
     expect(extractMultipartField(body, boundary, 'model')).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// End-to-end HTTP tests against an ephemeral server
-// ---------------------------------------------------------------------------
 
 let handle: FakeLlmServerHandle | null = null;
 

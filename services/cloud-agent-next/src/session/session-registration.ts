@@ -1358,8 +1358,6 @@ export async function startNewSession(
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
 
-// ----- ledger-guarded session creation ----------------------------------------
-
 /**
  * Ledger `canonical_result` key holding the SHA-256 fingerprint of the immutable
  * create intent, recorded with the first admitted create's progress. A same-key

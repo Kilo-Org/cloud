@@ -125,7 +125,6 @@ describe('manageBranch', () => {
 
   beforeEach(() => {
     mockExec = vi.fn();
-    // Create a mock session with exec method
     fakeSession = {
       exec: mockExec,
     } as unknown as ExecutionSession;
@@ -159,7 +158,6 @@ describe('manageBranch', () => {
 
       const execCalls = mockExec.mock.calls;
       expect(execCalls[3]?.[0]).toContain("git checkout 'main'");
-      // Verify NO pull occurs for upstream branches
       expect(mockExec).toHaveBeenCalledTimes(4); // only fetch + 2 checks + checkout
     });
   });
@@ -176,7 +174,6 @@ describe('manageBranch', () => {
 
       const execCalls = mockExec.mock.calls;
       expect(execCalls[3]?.[0]).toContain("git checkout 'feature/local'");
-      // Verify pull was not called (should only be 4 calls total)
       expect(mockExec).toHaveBeenCalledTimes(4);
     });
   });
@@ -316,7 +313,6 @@ describe('manageBranch', () => {
       // Should not throw for session branches - warnings are logged but we don't assert on them
       const result = await manageBranch(fakeSession, '/workspace', 'session/123', false);
 
-      // Verify the function completed successfully despite the pull failure
       expect(result).toBe('session/123');
     });
 
@@ -329,7 +325,6 @@ describe('manageBranch', () => {
 
       const result = await manageBranch(fakeSession, '/workspace', 'feature/local', false);
 
-      // Verify the function continued despite fetch failure and completed successfully
       const execCalls = mockExec.mock.calls;
       expect(execCalls[3]?.[0]).toContain("git checkout 'feature/local'");
       expect(result).toBe('feature/local');
@@ -364,7 +359,6 @@ describe('manageBranch', () => {
 
       const execCalls = mockExec.mock.calls;
       expect(execCalls[3]?.[0]).toContain("git checkout 'develop'");
-      // Verify NO pull occurs for upstream branches
       expect(mockExec).toHaveBeenCalledTimes(4); // only fetch + 2 checks + checkout
     });
 

@@ -85,7 +85,6 @@ describe('toSlashCommandInfo', () => {
       hints: ['$1'],
       source: 'command',
     });
-    // Make sure template doesn't sneak through.
     expect(result && 'template' in result).toBe(false);
   });
 

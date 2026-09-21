@@ -234,10 +234,6 @@ function isAssistantCompletionSignal(info: unknown): boolean {
   return typeof time?.completed === 'number' || (info.error !== undefined && info.error !== null);
 }
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type ConnectionConfig = {
   kiloClient: WrapperKiloClient;
 };
@@ -462,10 +458,6 @@ export async function openIngestProgressChannel(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Connection Manager
-// ---------------------------------------------------------------------------
-
 export type ConnectionManager = {
   /** Open ingest WS and SSE consumer. Resolves when both are connected. */
   open: () => Promise<void>;
@@ -638,7 +630,6 @@ export function createConnectionManager(
       const codeReviewJob = isCodeReviewJob(state);
       const skipStatusForCodeReview = codeReviewJob && isInteractiveStatusType(sessionStatus.type);
 
-      // Send session status as a regular kilocode event
       if (!skipStatusForCodeReview) {
         const statusProperties = { sessionID: kiloSessionId, status: sessionStatus };
         sendToIngest({
@@ -1330,7 +1321,6 @@ export function createConnectionManager(
     if (ingestWs && existingAbort) {
       state.setConnections(ingestWs, existingAbort);
     }
-    // Send fresh kilo state snapshot after reconnecting
     void sendKiloSnapshot();
     if (eventSubscriptionActive) {
       void resumeRestoredNetworkWaits();
@@ -1407,10 +1397,8 @@ export function createConnectionManager(
       logToFile('opening connections');
       runningBashEventCoalescer.reopen();
 
-      // Open ingest WS first
       await openIngestWs();
 
-      // Send initial kilo state snapshot
       await sendKiloSnapshot();
 
       // Push the slash-command catalog so the DO can hydrate connected clients.
@@ -1465,7 +1453,6 @@ export function createConnectionManager(
       eventSubscriptionAbort = null;
       eventSubscriptionActive = false;
 
-      // Close ingest WS
       if (ingestWs) {
         closedByUs = true;
         try {
@@ -1477,7 +1464,6 @@ export function createConnectionManager(
       }
       closedByUs = false;
 
-      // Clear state references
       state.clearConnectionRefs();
       state.setSendToIngestFn(null);
 

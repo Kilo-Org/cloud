@@ -272,7 +272,6 @@ describe('balance-validation', () => {
         );
 
         expect(result).toEqual({ success: true });
-        // Should use default URL https://api.kilo.ai
         expect(fetchMock).toHaveBeenCalledWith(
           'https://api.kilo.ai/api/profile/balance',
           expect.objectContaining({
@@ -358,7 +357,6 @@ describe('balance-validation', () => {
 
     it('handles URL-encoded values without double-decoding (regression test)', () => {
       // This canary string was used to detect the original double-decoding bug.
-      // When URL-encoded:
       // - `%` in `95%` becomes `%25`
       // - `+` becomes `%2B`
       // If double-decoding occurred, `%25` would incorrectly become `%`

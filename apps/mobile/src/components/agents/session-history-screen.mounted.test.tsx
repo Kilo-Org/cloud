@@ -56,6 +56,32 @@ const appState = vi.hoisted(() => {
   };
 });
 
+const platformState = vi.hoisted(() => ({ OS: 'ios' as string }));
+
+const keyboardState = vi.hoisted(() => {
+  const listeners = new Map<string, Set<(payload: unknown) => void>>();
+  return {
+    addListener: (event: string, listener: (payload: unknown) => void) => {
+      const set = listeners.get(event) ?? new Set<(payload: unknown) => void>();
+      set.add(listener);
+      listeners.set(event, set);
+      return {
+        remove: () => {
+          set.delete(listener);
+        },
+      };
+    },
+    emit: (event: string, payload: unknown): void => {
+      for (const listener of listeners.get(event) ?? []) {
+        listener(payload);
+      }
+    },
+    clear: (): void => {
+      listeners.clear();
+    },
+  };
+});
+
 const focusState = vi.hoisted(() => ({ current: true as boolean }));
 const focusCallbacks = vi.hoisted(() => ({
   current: new Set<() => void>(),
@@ -68,6 +94,9 @@ vi.mock('react-native', () => ({
   Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  Platform: platformState,
+  Keyboard: { addListener: keyboardState.addListener },
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
   AppState: { addEventListener: appState.addEventListener },
 }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', X: 'X' }));
@@ -261,9 +290,35 @@ async function renderScreen(
   return renderer;
 }
 
+function hasType(node: TestRenderer.ReactTestInstance, type: string): boolean {
+  return typeof node.type === 'string' && node.type === type;
+}
+
+/** The single screen-level body container wrapping the list content. */
+function isHistoryBodyContainer(node: TestRenderer.ReactTestInstance): boolean {
+  return (
+    hasType(node, 'View') &&
+    node.props.className === 'flex-1' &&
+    node.findAllByType('AgentSessionListContent').length === 1
+  );
+}
+
+function findHistoryBodyContainer(
+  renderer: TestRenderer.ReactTestRenderer
+): TestRenderer.ReactTestInstance {
+  return renderer.root.find(isHistoryBodyContainer);
+}
+
+function bodyPaddingBottom(node: TestRenderer.ReactTestInstance): number {
+  const style = node.props.style as [unknown, { paddingBottom: number }];
+  return style[1].paddingBottom;
+}
+
 describe('SessionHistoryScreen', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    platformState.OS = 'ios';
+    keyboardState.clear();
     listState.storedSessions = [];
     listState.isSearching = false;
     listState.isError = false;
@@ -356,7 +411,7 @@ describe('SessionHistoryScreen', () => {
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
         tree.children.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
-      ).toEqual(['ScreenHeader', 'SessionListSearchHeader', 'View']);
+      ).toEqual(['ScreenHeader', 'SessionListSearchHeader', 'KeyboardAvoidingView']);
     }
   });
 
@@ -648,5 +703,32 @@ describe('SessionHistoryScreen', () => {
     });
 
     expect(handleRefetchSpy).not.toHaveBeenCalled();
+  });
+
+  // Regression: the finding's empty-state subtitle sat half-drawn behind the
+  // on-screen keyboard. The whole body (empty state, list, refresh band) must
+  // live inside one permanently mounted keyboard container so it lifts with the
+  // keyboard while the header and search field above it stay put.
+  it('mounts the history body inside the iOS keyboard-avoiding container', async () => {
+    const renderer = await renderScreen();
+
+    const container = findNodeByType(renderer, 'KeyboardAvoidingView');
+    expect(container.props.behavior).toBe('padding');
+    expect(container.props.className).toBe('flex-1');
+    expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
+  });
+
+  it('pads the history body above the Android keyboard without remounting it', async () => {
+    platformState.OS = 'android';
+    const renderer = await renderScreen();
+    expect(bodyPaddingBottom(findHistoryBodyContainer(renderer))).toBe(0);
+
+    act(() => {
+      keyboardState.emit('keyboardDidShow', { endCoordinates: { height: 320 } });
+    });
+
+    const container = findHistoryBodyContainer(renderer);
+    expect(bodyPaddingBottom(container)).toBe(320);
+    expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
   });
 });

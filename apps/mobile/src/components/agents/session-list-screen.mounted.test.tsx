@@ -56,6 +56,12 @@ const state = vi.hoisted(() => ({
   sessionId: '',
   liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
 }));
+// The app-aware padding container follows the keyboard through the platform
+// events; the holder keeps the registered listener so a case can raise the IME.
+const keyboardSubscribers = vi.hoisted(() => ({
+  show: null as ((event: { endCoordinates: { height: number } }) => void) | null,
+  hide: null as (() => void) | null,
+}));
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 vi.mock('expo-secure-store', () => ({
   getItemAsync: readFilterRecord,
@@ -83,6 +89,20 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
+  Keyboard: {
+    addListener: (event: string, listener: (event?: unknown) => void) => {
+      if (event === 'keyboardDidShow' || event === 'keyboardWillShow') {
+        keyboardSubscribers.show = listener as (event: {
+          endCoordinates: { height: number };
+        }) => void;
+      }
+      if (event === 'keyboardDidHide' || event === 'keyboardWillHide') {
+        keyboardSubscribers.hide = listener as () => void;
+      }
+      return { remove: vi.fn() };
+    },
+  },
   useWindowDimensions: () => ({ fontScale: state.fontScale, height: 844 }),
   AppState: {
     addEventListener: (_event: string, listener: (next: string) => void) => {
@@ -291,6 +311,16 @@ function action(label: string) {
 function press(label: string) {
   (action(label).props.onPress as () => void)();
 }
+function showKeyboard(height: number) {
+  const listener = keyboardSubscribers.show;
+  if (!listener) {
+    throw new Error('Missing keyboardDidShow listener');
+  }
+  listener({ endCoordinates: { height } });
+}
+function descendantsOf(instance: TestRenderer.ReactTestInstance, type: string) {
+  return instance.findAll(node => typeof node.type === 'string' && node.type === type);
+}
 type HeaderElement = {
   type: string;
   props: {
@@ -386,6 +416,8 @@ beforeEach(() => {
   state.socketRetry.mockReset();
   state.invalidate.mockReset();
   state.liveQuery.mockReset();
+  keyboardSubscribers.show = null;
+  keyboardSubscribers.hide = null;
   readFilterRecord.mockReset().mockResolvedValue(null);
 });
 afterEach(async () => {
@@ -1249,6 +1281,44 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
   });
 
+  it('lifts the no-match body above the keyboard inside the platform container', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const searchHeader = requireNode('SessionListSearchHeader');
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+
+    // iOS: the native container owns the lift, so the centered no-match body is
+    // inside it and re-measures against the viewport it shrinks.
+    const container = requireNode('KeyboardAvoidingView');
+    expect(container.props.behavior).toBe('padding');
+    expect(descendantsOf(container, 'CenteredState')).toHaveLength(1);
+    expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
+
+    // Android: edge-to-edge never resizes the window for the IME, so the
+    // app-aware container follows the keyboard events and pads its frame; the
+    // body re-centers inside the shrunken viewport.
+    state.platform.OS = 'android';
+    await renderScreen();
+    act(() => {
+      showKeyboard(320);
+    });
+    const padded = nodes('View').find(
+      node =>
+        Array.isArray(node.props.style) &&
+        node.props.style.some(
+          (part: { paddingBottom?: number } | undefined) => part?.paddingBottom === 320
+        )
+    );
+    expect(padded).toBeDefined();
+    if (!padded) {
+      throw new Error('Missing app-aware padding container');
+    }
+    expect(descendantsOf(padded, 'CenteredState')).toHaveLength(1);
+    expect(nodes('KeyboardAvoidingView')).toHaveLength(0);
+  });
+
   it('narrows the live list to the search text', async () => {
     state.live.activeSessions = [
       { ...row, id: 'a1', organizationId: null, title: 'Fix the login redirect' },
@@ -1350,8 +1420,9 @@ describe('AgentSessionListScreen live filtering', () => {
       expect(header().parent?.children[0]).toBe(header());
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
-        tree.children.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
-      ).toEqual(['View', 'SessionListSearchHeader', 'View', 'FlatList']);
+        tree.children.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
+      ).toEqual(['View', 'SessionListSearchHeader', 'KeyboardAvoidingView']);
+      expect(descendantsOf(requireNode('KeyboardAvoidingView'), 'FlatList')).toHaveLength(1);
     }
   });
 

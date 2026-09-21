@@ -287,14 +287,6 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             </Text>
             <DirectionalChevronRight size={16} color={colors.primary} />
           </Pressable>
-
-          <Text className="mt-6 text-xs text-muted-foreground">
-            {t('consent.privacyPolicyPrefix')}{' '}
-            <Text className="text-xs text-primary underline" onPress={handleOpenPrivacy}>
-              {t('consent.privacyPolicy')}
-            </Text>
-            .
-          </Text>
         </View>
       </ScrollView>
 
@@ -304,7 +296,16 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             invisible behind the buttons (b911 vr2 device repro — staging
             error measured at y=792 under the Back/Revoke footer). The
             one-line slot is always reserved, so an error appears without
-            moving the actions. */}
+            moving the actions. The privacy disclosure is pinned here too,
+            because at the foot of the scrolling body the footer edge cut the
+            sentence in half. */}
+        <Text className="text-xs text-muted-foreground">
+          {t('consent.privacyPolicyPrefix')}{' '}
+          <Text className="text-xs text-primary underline" onPress={handleOpenPrivacy}>
+            {t('consent.privacyPolicy')}
+          </Text>
+          .
+        </Text>
         <View className="min-h-5 justify-center">
           <AccessibleStatus message={error} className="text-sm" />
         </View>

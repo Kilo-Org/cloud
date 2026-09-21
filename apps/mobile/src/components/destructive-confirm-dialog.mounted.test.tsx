@@ -83,9 +83,11 @@ afterEach(() => {
 });
 
 describe('DestructiveConfirmDialog', () => {
-  // The finding's defect is that the destructive sign-out action had the same
-  // affordance as the neutral cancel on Android. The confirm control must carry
-  // the destructive (red) fill while cancel stays a neutral outline.
+  // The defect this dialog exists for: a destructive action whose confirmation
+  // control carries no distinct affordance (Android's native alert paints every
+  // button with the theme accent). The confirm control must carry the
+  // destructive (red) fill while cancel stays a neutral outline, on both
+  // platforms — this component is the one implementation for both.
   it('gives the confirm action the destructive fill and cancel a neutral one', () => {
     const root = mount();
 
@@ -132,7 +134,7 @@ describe('DestructiveConfirmDialog', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it('dismisses without confirming on the Android back request', () => {
+  it('dismisses without confirming on the back request', () => {
     const root = mount();
 
     act(() => {

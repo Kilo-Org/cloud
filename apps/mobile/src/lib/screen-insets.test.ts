@@ -36,25 +36,29 @@ const ENTRY_POINT = 'screen-insets.ts';
 const PROFILE_SCREEN = '../components/profile-screen.tsx';
 
 /**
- * The Profile screen's side-inset alignment path: the line that reads the
- * insets from the entry point and the statement that applies them. The screen
- * forks on the platform elsewhere by design (Android's in-app sign-out dialog
- * vs iOS's native alert), so the no-platform-branch rule covers this block
- * rather than the whole file.
+ * The Profile screen's alignment path: from the line that reads
+ * `useScreenSideInsets` through the line that first applies a side inset. Only
+ * this path must stay free of per-platform branches. A fork elsewhere in the
+ * screen — the Android sign-out confirmation, for example — is not on the
+ * insets path and must not fail the guard.
  */
-function profileAlignmentPath(profile: string): string {
-  const lines = profile.split('\n');
-  const hookLineIndex = lines.findIndex(line => line.includes('useScreenSideInsets()'));
-  if (hookLineIndex === -1) {
-    throw new Error(`${PROFILE_SCREEN} does not read its side insets from the entry point`);
+function alignmentPath(profileSource: string): string {
+  const lines = profileSource.split('\n');
+  const start = lines.findIndex(line => line.includes('useScreenSideInsets()'));
+  if (start === -1) {
+    throw new Error(`${PROFILE_SCREEN} does not read its side insets from ${ENTRY_POINT}`);
   }
-  const appliedLineIndex = lines.findIndex(
-    (line, index) => index > hookLineIndex && /\b(?:margin|padding)(?:Left|Right)\b/.test(line)
+  const end = lines.findIndex(
+    (line, index) => index >= start && /margin(?:Left|Right|Start|End)/.test(line)
   );
-  if (appliedLineIndex === -1) {
-    throw new Error(`${PROFILE_SCREEN} does not apply the side-inset values`);
+  if (end === -1) {
+    // Naming the insets differently, or applying them as padding, would shrink
+    // the scanned path to its first line and leave the guard passing on nothing.
+    throw new Error(
+      `${PROFILE_SCREEN} applies its side insets without a margin declaration; update this guard`
+    );
   }
-  return lines.slice(hookLineIndex, appliedLineIndex + 1).join('\n');
+  return lines.slice(start, end + 1).join('\n');
 }
 
 describe('screen side insets: one implementation for both platforms', () => {
@@ -71,8 +75,8 @@ describe('screen side insets: one implementation for both platforms', () => {
       SAFE_AREA_MODULE
     );
     expect(
-      profileAlignmentPath(profile),
-      `${PROFILE_SCREEN} carries a per-platform branch on its side-inset alignment path`
+      alignmentPath(profile),
+      `${PROFILE_SCREEN}'s alignment path carries a per-platform branch`
     ).not.toMatch(PLATFORM_BRANCH);
   });
 });

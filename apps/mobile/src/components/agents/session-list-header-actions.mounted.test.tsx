@@ -137,18 +137,27 @@ async function compiledGapDp(rowClassName: string): Promise<number> {
 type Insets = { top: number; right: number; bottom: number; left: number };
 
 /**
- * One side's reach from a control's `hitSlop`: a number is the per-side value,
- * an object carries each side. The filter control passes the shared number
- * from `touch-target.ts`, the new-session control a per-side object.
+ * A control's hitSlop as per-side insets. Controls here use either shape: the
+ * shared `IconButton` passes per-side insets, while `SessionFilterButton` keeps
+ * the scalar `@/lib/a11y/touch-target` slop, where one number applies to every
+ * side.
  */
-function sideSlop(hitSlop: unknown, side: 'left' | 'right'): number {
+function hitSlopInsets(hitSlop: unknown): Insets {
   if (typeof hitSlop === 'number') {
-    return hitSlop;
+    return { top: hitSlop, right: hitSlop, bottom: hitSlop, left: hitSlop };
   }
   if (hitSlop && typeof hitSlop === 'object') {
-    return (hitSlop as Partial<Insets>)[side] ?? 0;
+    const insets = hitSlop as Partial<Insets>;
+    if (typeof insets.right === 'number' && typeof insets.left === 'number') {
+      return {
+        top: insets.top ?? 0,
+        right: insets.right,
+        bottom: insets.bottom ?? 0,
+        left: insets.left,
+      };
+    }
   }
-  return 0;
+  throw new Error(`no measurable hitSlop in ${JSON.stringify(hitSlop)}`);
 }
 
 const noop = (): void => undefined;
@@ -223,18 +232,16 @@ describe('SessionListHeaderActions new-session control', () => {
     // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
     expect(gapDp).toBe(14);
 
-    const newSessionSlop = newSession.props.hitSlop;
-    const filterSlop = filter.props.hitSlop;
+    const newSessionSlop = hitSlopInsets(newSession.props.hitSlop);
+    const filterSlop = hitSlopInsets(filter.props.hitSlop);
     // The new-session control sits left of the filter, so the gap has to fit
     // both facing slops; more than the gap means the two regions overlap.
-    expect(sideSlop(newSessionSlop, 'right') + sideSlop(filterSlop, 'left')).toBeLessThanOrEqual(
-      gapDp
-    );
+    expect(newSessionSlop.right + filterSlop.left).toBeLessThanOrEqual(gapDp);
     // Capping the right side must not drop the control below the design target.
     const box = boxDp(newSession.props.className as string);
-    expect(
-      box.width + sideSlop(newSessionSlop, 'left') + sideSlop(newSessionSlop, 'right')
-    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(box.width + newSessionSlop.left + newSessionSlop.right).toBeGreaterThanOrEqual(
+      TOUCH_TARGET_DP
+    );
 
     act(() => {
       renderer.unmount();

@@ -26,6 +26,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `NEXTAUTH_SECRET` - Secret key for NextAuth.js session encryption and five-minute, audience-bound user assertions verified by internal Workers such as user data export. `[SECRET]`
 - `DEBUG_SHOW_DEV_UI` - Enables dev-only UI elements (debug panels, admin buttons); checked in `apps/web/src/lib/constants.ts` and `apps/web/src/app/(app)/profile/page.tsx`. [SERVER]
 - `TRPC_TIMING_LOGGING` - Enables tRPC timing logs in development; checked in `apps/web/src/lib/trpc/init.ts`. [SERVER]
+- `TRPC_TIMING_SAMPLE_RATE` - Sample rate (`0`-`1`) for non-mobile request timing lines; mobile clients are always logged. Defaults to `0.01` when unset or malformed; read in `apps/web/src/lib/observability/request-timing.ts`. [SERVER]
 - `JEST_MAX_WORKERS` - Limits max worker threads for Jest; read in `apps/web/jest.config.ts`. [SERVER]
 - `JEST_SILENT` - When `false`, shows verbose Jest output; read in `apps/web/jest.config.ts` and `apps/web/.env.test`. [SERVER]
 - `JEST_WORKER_ID` - Set by Jest to identify the current worker thread; used by db connection pooling and libraries to handle worker-specific state. [SERVER]

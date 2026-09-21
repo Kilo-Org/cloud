@@ -11,6 +11,8 @@ import { renderWithProviders } from '@/test/render-with-providers';
 const signOutFn = vi.hoisted(() => vi.fn());
 const alertFn = vi.hoisted(() => vi.fn());
 const platform = vi.hoisted(() => ({ os: 'android' as 'android' | 'ios' }));
+// The screen reads its landscape side insets through `@/lib/screen-insets`,
+// which imports `react-native-safe-area-context`.
 const safeArea = vi.hoisted(() => ({ top: 24, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
@@ -32,9 +34,6 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
-// The screen reads its side insets through `@/lib/screen-insets`; this node
-// suite must stub the native module the same way the sibling queries suite
-// does, or loading it pulls an untransformed native build.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
 }));

@@ -11,6 +11,8 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
   React.RefAttributes<TextInput> & {
     label: string;
     error?: string;
+    /** Reserve the tallest localized message, including wrapping and font scaling. */
+    reserveErrorMessages?: readonly string[];
     disabled?: boolean;
     /**
      * Mark the field as required: the composed accessibility label appends
@@ -37,6 +39,7 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
 function FormField({
   label,
   error,
+  reserveErrorMessages,
   disabled,
   required,
   className,
@@ -88,7 +91,32 @@ function FormField({
           className
         )}
       />
-      <AccessibleStatus message={displayedError ?? null} className="text-sm" />
+      {reserveErrorMessages?.length ? (
+        <View>
+          {/* Full-width overlapping copies reserve the maximum height in native layout,
+              before validation, without measuring or clipping larger text/RTL copy. */}
+          <View
+            className="flex-row opacity-0"
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            {reserveErrorMessages.map((message, index) => (
+              <Text
+                key={message}
+                className={cn('w-full shrink-0 text-sm', index > 0 && '-ms-[100%]')}
+              >
+                {message}
+              </Text>
+            ))}
+          </View>
+          <View className="absolute inset-x-0 top-0">
+            <AccessibleStatus message={displayedError ?? null} className="text-sm" />
+          </View>
+        </View>
+      ) : (
+        <AccessibleStatus message={displayedError ?? null} className="text-sm" />
+      )}
     </View>
   );
 }

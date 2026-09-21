@@ -38,13 +38,13 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import {
   getCodeReviewerProfilePath,
   getProfileAgentScope,
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
+import { useScreenSideInsets } from '@/lib/screen-insets';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -72,10 +72,11 @@ function providerLabel(provider: string) {
 }
 
 export function ProfileScreen() {
+  const { left, right } = useScreenSideInsets();
+  const scrollStyle = { marginLeft: left, marginRight: right };
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
-  const colors = useThemeColors();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
   const afterInteractions = useAfterInteractions();
@@ -159,7 +160,8 @@ export function ProfileScreen() {
       <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 pt-4"
+        style={scrollStyle}
+        contentContainerClassName="px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {/* Credits */}
@@ -343,7 +345,6 @@ export function ProfileScreen() {
           <ActionTile
             icon={MessageSquare}
             label={t('profile.feedback')}
-            color={colors.mutedForeground}
             onPress={() => {
               showFeedbackPrompt(userId);
             }}
@@ -351,19 +352,12 @@ export function ProfileScreen() {
           <ActionTile
             icon={Lock}
             label={t('profile.privacyChoices')}
-            color={colors.mutedForeground}
             onPress={showPrivacyChoices}
           />
-          <ActionTile
-            icon={LogOut}
-            label={t('common.signOut')}
-            color={colors.mutedForeground}
-            onPress={confirmSignOut}
-          />
+          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={confirmSignOut} />
           <ActionTile
             icon={Trash2}
             label={t('profile.deleteAccount')}
-            color={colors.destructive}
             destructive
             disabled={deletePending}
             onPress={confirmDeleteAccount}

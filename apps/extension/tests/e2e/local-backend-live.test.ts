@@ -445,8 +445,12 @@ test('live local backend keeps frontier conversations stable across modes, reloa
     ).resolves.toStrictEqual({});
 
     expect(requests.some(request => request.model === frontierModel)).toBe(true);
-    expect(requests.some(request => request.toolNames.includes('eval'))).toBe(true);
-    expect(requests.some(request => request.toolNames.includes('get_page_snapshot'))).toBe(true);
+    expect(requests.some(request => request.toolNames.includes('kilo_browser_evaluate'))).toBe(
+      true
+    );
+    expect(requests.some(request => request.toolNames.includes('kilo_browser_snapshot'))).toBe(
+      true
+    );
   } finally {
     await context.close();
     await fixture.close();
@@ -777,7 +781,7 @@ test('live local backend keeps real tool rows from overlapping', async () => {
     await sidePanel
       .getByLabel('Message agent')
       .fill(
-        'LOCAL_TOOL_SPACING: use get_page_snapshot and get_viewport_screenshot before answering. Keep the final answer short.'
+        'LOCAL_TOOL_SPACING: use kilo_browser_snapshot and kilo_browser_take_screenshot before answering. Keep the final answer short.'
       );
     await sidePanel.getByLabel('Message agent').press('Enter');
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
@@ -785,9 +789,9 @@ test('live local backend keeps real tool rows from overlapping', async () => {
     });
 
     expect(requests.some(request => request.model === frontierModel)).toBe(true);
-    expect(requests.some(request => request.toolNames.includes('get_viewport_screenshot'))).toBe(
-      true
-    );
+    expect(
+      requests.some(request => request.toolNames.includes('kilo_browser_take_screenshot'))
+    ).toBe(true);
     expect(await getMinConversationGap(sidePanel)).toBeGreaterThanOrEqual(0);
   } finally {
     await context.close();
@@ -911,7 +915,7 @@ test('live local backend dangerous mode eval can update the selected page', asyn
         request =>
           request.model === frontierModel &&
           request.lastUserContent?.includes('LOCAL_DANGEROUS_EVAL') === true &&
-          request.toolNames.includes('eval')
+          request.toolNames.includes('kilo_browser_evaluate')
       )
     ).toBe(true);
   } finally {

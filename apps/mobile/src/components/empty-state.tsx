@@ -17,7 +17,11 @@ type EmptyStateProps = {
   description: ReactNode;
   className?: string;
   action?: ReactNode;
-  placement?: 'center' | 'top';
+  /** `center` scrolls the content inside a measured `StateSurface`; `top`
+   *  pins it to the surface top without a scroller; `static` renders the plain
+   *  content for a caller that owns its own full-screen layout and cannot
+   *  depend on a measured surface (the root runtime-error screen). */
+  placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
   /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
   iconContainerClassName?: string;

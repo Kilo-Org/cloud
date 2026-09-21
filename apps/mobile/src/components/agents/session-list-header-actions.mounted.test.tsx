@@ -66,6 +66,17 @@ function slopDp(hitSlop: unknown): number {
   return 0;
 }
 
+/** One side's reach, from a hitSlop that is one number for every side or per-side insets. */
+function slopSideDp(hitSlop: unknown, side: keyof Insets): number {
+  if (typeof hitSlop === 'number') {
+    return hitSlop;
+  }
+  if (hitSlop && typeof hitSlop === 'object') {
+    return (hitSlop as Partial<Insets>)[side] ?? 0;
+  }
+  return 0;
+}
+
 function pressesWithLabel(root: I, label: string): I[] {
   return root.findAll(
     node =>
@@ -244,22 +255,23 @@ describe('SessionListHeaderActions new-session control', () => {
       const filterSlop = hitSlopInsets(filter.props.hitSlop);
       // The gap has to fit the pair's two facing slops in either direction;
       // more than the gap means the two touch regions overlap, and the later
-      // sibling (the filter) claims the taps inside the overlap.
+      // sibling (the filter) claims the taps inside the overlap. Either control
+      // may express hitSlop as one number or as per-side insets.
       const facingDp = isRTL
-        ? newSessionSlop.left + filterSlop.right
-        : newSessionSlop.right + filterSlop.left;
+        ? slopSideDp(newSessionSlop, 'left') + slopSideDp(filterSlop, 'right')
+        : slopSideDp(newSessionSlop, 'right') + slopSideDp(filterSlop, 'left');
       expect(facingDp).toBeLessThanOrEqual(gapDp);
       // Capping the facing sides must not drop either control below the design
       // target: the compact new-session box plus its symmetric slop, and the
       // filter's `h-11` frame plus the capped slop.
       const box = boxDp(newSession.props.className as string);
-      expect(box.width + newSessionSlop.left + newSessionSlop.right).toBeGreaterThanOrEqual(
-        TOUCH_TARGET_DP
-      );
+      expect(
+        box.width + slopSideDp(newSessionSlop, 'left') + slopSideDp(newSessionSlop, 'right')
+      ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
       expect(String(filter.props.className)).toContain('h-11 w-11');
-      expect(COMPACT_CONTROL_FRAME_DP + filterSlop.left + filterSlop.right).toBeGreaterThanOrEqual(
-        TOUCH_TARGET_DP
-      );
+      expect(
+        COMPACT_CONTROL_FRAME_DP + slopSideDp(filterSlop, 'left') + slopSideDp(filterSlop, 'right')
+      ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
 
       act(() => {
         renderer.unmount();

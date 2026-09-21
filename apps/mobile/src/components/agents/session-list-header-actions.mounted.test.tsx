@@ -209,10 +209,12 @@ describe('SessionListHeaderActions new-session control', () => {
     expect(gapDp).toBe(14);
 
     const newSessionSlop = newSession.props.hitSlop as Insets;
-    const filterSlop = filter.props.hitSlop as Insets;
+    // The filter control expresses its slop as one symmetric number, not
+    // per-side insets, so resolve its facing reach with the slop helper.
+    const filterSlop = slopDp(filter.props.hitSlop);
     // The new-session control sits left of the filter, so the gap has to fit
     // both facing slops; more than the gap means the two regions overlap.
-    expect(newSessionSlop.right + filterSlop.left).toBeLessThanOrEqual(gapDp);
+    expect(newSessionSlop.right + filterSlop).toBeLessThanOrEqual(gapDp);
     // Capping the right side must not drop the control below the design target.
     const box = boxDp(newSession.props.className as string);
     expect(box.width + newSessionSlop.left + newSessionSlop.right).toBeGreaterThanOrEqual(

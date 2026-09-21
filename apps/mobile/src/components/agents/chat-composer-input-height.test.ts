@@ -5,9 +5,13 @@ import {
   COMPOSER_INPUT_MAX_HEIGHT,
   COMPOSER_INPUT_PADDING_HORIZONTAL,
   NEW_SESSION_PROMPT_CHROME_HEIGHT,
+  NEW_SESSION_PROMPT_DEFAULT_LINES,
   NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
+  NEW_SESSION_PROMPT_LINE_HEIGHT,
   resolveComposerMaxHeight,
   resolveComposerTextContentWidth,
+  resolveNewSessionPromptHeight,
+  SESSION_HEADER_HEIGHT,
   shouldEnableComposerInputScroll,
   STARTER_ROW_HEIGHT,
 } from './chat-composer-input-height';
@@ -48,10 +52,64 @@ describe('resolveComposerTextContentWidth', () => {
 });
 
 describe('composer chrome budgets', () => {
-  it('reserve the starter-row height inside both chrome budgets', () => {
-    // 120 (composer chrome) + STARTER_ROW_HEIGHT = 176, and 176 + STARTER_ROW_HEIGHT = 232.
+  it('keeps the starter-row reserve out of the new-session prompt budget', () => {
+    // The chat composer budget still carries the reserve: 120 + STARTER_ROW_HEIGHT = 232.
     expect(COMPOSER_CHROME_HEIGHT - STARTER_ROW_HEIGHT).toBe(120);
-    expect(NEW_SESSION_PROMPT_CHROME_HEIGHT - STARTER_ROW_HEIGHT).toBe(176);
+    // The new-session prompt budget carries no reserve, so the keyboard-open cap
+    // can reach the input's absolute max instead of flooring at its minimum.
+    expect(NEW_SESSION_PROMPT_CHROME_HEIGHT).toBe(176);
+  });
+});
+
+describe('new-session prompt cap with the keyboard open', () => {
+  // The new-session prompt's own geometry, imported from the same module
+  // `new-session-prompt.tsx` reads: 16pt of vertical padding around 24pt lines,
+  // starting at a three-line minimum. A four-line prompt is the reported
+  // regression case, not a production default.
+  const PROMPT_MIN_HEIGHT = resolveNewSessionPromptHeight(
+    NEW_SESSION_PROMPT_LINE_HEIGHT,
+    NEW_SESSION_PROMPT_DEFAULT_LINES
+  );
+  const FOUR_LINE_PROMPT_HEIGHT = resolveNewSessionPromptHeight(NEW_SESSION_PROMPT_LINE_HEIGHT, 4);
+  // The reported device (iOS 393x852) with the keyboard up, at the keyboard
+  // height the shared cap args above already use.
+  const REPORTED_DEVICE_CAP_ARGS = {
+    windowHeight: 852,
+    safeAreaInsetTop: 59,
+    safeAreaInsetBottom: 34,
+    keyboardHeight: 336,
+    sessionHeaderHeight: SESSION_HEADER_HEIGHT,
+    composerChromeHeight: NEW_SESSION_PROMPT_CHROME_HEIGHT,
+    minHeight: PROMPT_MIN_HEIGHT,
+    absoluteMaxHeight: NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
+  } as const;
+
+  // `useTextHeight` publishes the measured content clamped into
+  // `[minHeight, maxHeight]`; that published height is the input's frame.
+  const frameHeight = (contentHeight: number, cap: number) =>
+    Math.min(Math.max(contentHeight, PROMPT_MIN_HEIGHT), cap);
+
+  it('lets a four-line prompt grow past the three-line minimum', () => {
+    // A stale starter-row reserve left only 43pt of remaining space here, so
+    // the cap floored at the 3-line minimum and clipped the prompt's last line
+    // at the input's bottom edge.
+    const cap = resolveComposerMaxHeight(REPORTED_DEVICE_CAP_ARGS);
+
+    expect(cap).toBeGreaterThanOrEqual(FOUR_LINE_PROMPT_HEIGHT);
+  });
+
+  it('holds all four wrapped lines on the reported device with the keyboard up', () => {
+    // The reported defect: the last line ('when done') was cut off at the
+    // input's bottom edge because the frame was clamped below the content.
+    const cap = resolveComposerMaxHeight(REPORTED_DEVICE_CAP_ARGS);
+
+    expect(frameHeight(FOUR_LINE_PROMPT_HEIGHT, cap)).toBe(FOUR_LINE_PROMPT_HEIGHT);
+  });
+
+  it('still starts the empty prompt at the three-line minimum', () => {
+    const cap = resolveComposerMaxHeight(REPORTED_DEVICE_CAP_ARGS);
+
+    expect(frameHeight(PROMPT_MIN_HEIGHT, cap)).toBe(PROMPT_MIN_HEIGHT);
   });
 });
 

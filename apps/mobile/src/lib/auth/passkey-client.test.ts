@@ -142,6 +142,19 @@ describe('classifyPasskeyError', () => {
     }
   );
 
+  it.each(['name', 'message', 'code'])(
+    'normalizes the native %s only for classification, leaving display copy to the catalog',
+    field => {
+      const error = { [field]: 'NOTCONFIGURED' };
+
+      const failure = classifyPasskeyError(error);
+
+      expect(failure).toBe('unsupported');
+      expect(passkeyFailureKey(failure)).toBe('login.passkeyUnsupported');
+      expect(error[field]).toBe('NOTCONFIGURED');
+    }
+  );
+
   it.each([
     [{ name: 'USERCANCELLEDEXCEPTION' }, 'login.passkeyCancelled'],
     [{ message: 'NOCREDENTIALS' }, 'login.passkeyNotFound'],

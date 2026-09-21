@@ -83,6 +83,25 @@ export const COMPOSER_INPUT_MAX_HEIGHT = 124;
 export const NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT = 160;
 
 /**
+ * New-session prompt TextInput geometry, mirroring the input's own classes:
+ * `leading-6` lines, `py-2` vertical padding, and the three-line floor an empty
+ * prompt starts at. Exported so the clipped-last-line regression test measures
+ * the frame the prompt actually renders instead of re-declaring the numbers.
+ */
+export const NEW_SESSION_PROMPT_LINE_HEIGHT = 24;
+export const NEW_SESSION_PROMPT_VERTICAL_PADDING = 16;
+export const NEW_SESSION_PROMPT_DEFAULT_LINES = 3;
+
+/**
+ * Rendered height of `lineCount` prompt lines: the (font-scaled) line box plus
+ * the input's vertical padding. The new-session prompt's minimum height uses
+ * this with `NEW_SESSION_PROMPT_DEFAULT_LINES`.
+ */
+export function resolveNewSessionPromptHeight(lineHeight: number, lineCount: number): number {
+  return lineHeight * lineCount + NEW_SESSION_PROMPT_VERTICAL_PADDING;
+}
+
+/**
  * Remaining-space cap for the composer input, bounded by an absolute cap. The
  * input may grow only into the space left after the keyboard, the safe areas,
  * the session header, and every other piece of composer chrome (attachment

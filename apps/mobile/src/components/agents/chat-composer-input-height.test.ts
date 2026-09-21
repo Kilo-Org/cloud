@@ -5,9 +5,12 @@ import {
   COMPOSER_INPUT_MAX_HEIGHT,
   COMPOSER_INPUT_PADDING_HORIZONTAL,
   NEW_SESSION_PROMPT_CHROME_HEIGHT,
+  NEW_SESSION_PROMPT_DEFAULT_LINES,
   NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
+  NEW_SESSION_PROMPT_LINE_HEIGHT,
   resolveComposerMaxHeight,
   resolveComposerTextContentWidth,
+  resolveNewSessionPromptHeight,
   SESSION_HEADER_HEIGHT,
   shouldEnableComposerInputScroll,
   STARTER_ROW_HEIGHT,
@@ -59,12 +62,15 @@ describe('composer chrome budgets', () => {
 });
 
 describe('new-session prompt cap with the keyboard open', () => {
-  // The new-session prompt's own geometry (see `new-session-prompt.tsx`):
-  // 16pt of vertical padding around 24pt lines.
-  const PROMPT_VERTICAL_PADDING = 16;
-  const PROMPT_LINE_HEIGHT = 24;
-  const PROMPT_MIN_HEIGHT = PROMPT_LINE_HEIGHT * 3 + PROMPT_VERTICAL_PADDING;
-  const FOUR_LINE_PROMPT_HEIGHT = PROMPT_LINE_HEIGHT * 4 + PROMPT_VERTICAL_PADDING;
+  // The new-session prompt's own geometry, imported from the same module
+  // `new-session-prompt.tsx` reads: 16pt of vertical padding around 24pt lines,
+  // starting at a three-line minimum. A four-line prompt is the reported
+  // regression case, not a production default.
+  const PROMPT_MIN_HEIGHT = resolveNewSessionPromptHeight(
+    NEW_SESSION_PROMPT_LINE_HEIGHT,
+    NEW_SESSION_PROMPT_DEFAULT_LINES
+  );
+  const FOUR_LINE_PROMPT_HEIGHT = resolveNewSessionPromptHeight(NEW_SESSION_PROMPT_LINE_HEIGHT, 4);
   // The reported device (iOS 393x852) with the keyboard up, at the keyboard
   // height the shared cap args above already use.
   const REPORTED_DEVICE_CAP_ARGS = {

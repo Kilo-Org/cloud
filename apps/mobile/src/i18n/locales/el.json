@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Κατάσταση συνεδρίας",
       "sessionStatusSubtitle": "ολοκληρώθηκε / απέτυχε / έτοιμη για έλεγχο",
       "kiloclawActivitySubtitle": "περιβάλλον έτοιμο ή με αποτυχία, προγραμματισμένες ενέργειες",
+      "kiloclawActivityUnavailable": "Ξεκίνα ένα περιβάλλον KiloClaw για να λαμβάνεις δραστηριότητα KiloClaw.",
       "balanceAlertsSubtitle": "προειδοποιήσεις χαμηλού υπολοίπου οργανισμού",
-      "securityFindingsSubtitle": "νέα ευρήματα και υπενθυμίσεις SLA"
+      "balanceAlertsUnavailable": "Γίνε μέλος ενός οργανισμού για να λαμβάνεις ειδοποιήσεις χαμηλού υπολοίπου.",
+      "securityFindingsSubtitle": "νέα ευρήματα και υπενθυμίσεις SLA",
+      "securityFindingsUnavailable": "Ενεργοποίησε τον πράκτορα ασφάλειας Kilo σε ένα πεδίο για να λαμβάνεις ευρήματα ασφάλειας."
     },
     "action": {
       "openSession": "Άνοιγμα συνεδρίας"

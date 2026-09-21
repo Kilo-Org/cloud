@@ -45,6 +45,17 @@ export const COMPOSER_CHROME_HEIGHT = 120 + STARTER_ROW_HEIGHT;
 export const NEW_SESSION_PROMPT_CHROME_HEIGHT = 176 + STARTER_ROW_HEIGHT;
 
 /**
+ * New-session prompt card chrome the input must never squeeze out: the form's
+ * `pt-4` (16), the card's `pt-2` (8), the control row (44), and the toolbar
+ * (57). The mode and model pills are the last of these rows, so they are what
+ * the keyboard clips first when the space above the IME is short. Kept apart
+ * from `NEW_SESSION_PROMPT_CHROME_HEIGHT`, which is a soft cap that also
+ * reserves the starter row; the min-height floor guards only the rows the input
+ * must not push off screen.
+ */
+export const NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT = 125;
+
+/**
  * Width of the real text area inside the composer input row.
  *
  * `onLayout` reports the wrapper's border box, so both the wrapper border and
@@ -114,4 +125,50 @@ export function resolveComposerMaxHeight({
     sessionHeaderHeight -
     composerChromeHeight;
   return Math.max(minHeight, Math.min(Math.floor(remaining), absoluteMaxHeight));
+}
+
+/**
+ * Remaining-space floor for the composer input: the counterpart of the max cap.
+ * The max bounds how tall the input may GROW; this bounds how tall it may
+ * INSIST on being. It subtracts the same terms as `resolveComposerMaxHeight`
+ * (keyboard, safe areas, session header, composer chrome) and snaps the
+ * leftover to whole lines, clamped between `minLines` and `defaultLines`. The
+ * input then gives up lines before the card's control row and its mode/model
+ * toolbar are clipped by the keyboard. The result is never negative and never
+ * below `minLines` whole lines, so a degenerate window still renders a readable
+ * input.
+ */
+export function resolveComposerMinHeight({
+  windowHeight,
+  safeAreaInsetTop,
+  safeAreaInsetBottom,
+  keyboardHeight,
+  sessionHeaderHeight,
+  composerChromeHeight,
+  lineHeight,
+  verticalPadding,
+  defaultLines,
+  minLines = 1,
+}: {
+  windowHeight: number;
+  safeAreaInsetTop: number;
+  safeAreaInsetBottom: number;
+  keyboardHeight: number;
+  sessionHeaderHeight: number;
+  composerChromeHeight: number;
+  lineHeight: number;
+  verticalPadding: number;
+  defaultLines: number;
+  minLines?: number;
+}): number {
+  const available =
+    windowHeight -
+    safeAreaInsetTop -
+    safeAreaInsetBottom -
+    keyboardHeight -
+    sessionHeaderHeight -
+    composerChromeHeight;
+  const lines = Math.floor((available - verticalPadding) / lineHeight);
+  const bounded = Math.min(Math.max(lines, minLines), defaultLines);
+  return bounded * lineHeight + verticalPadding;
 }

@@ -62,6 +62,10 @@ vi.mock('react', async () => {
 });
 
 // ── react-native ────────────────────────────────────────────────────
+const dimensions = vi.hoisted(() => ({
+  current: { fontScale: 1, height: 800, scale: 1, width: 400 },
+}));
+
 vi.mock('react-native', () => ({
   AccessibilityInfo: {
     announceForAccessibility: vi.fn(),
@@ -74,7 +78,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   Text: 'Text',
   TextInput: 'TextInput',
-  useWindowDimensions: () => ({ fontScale: 1, height: 800, scale: 1, width: 400 }),
+  useWindowDimensions: () => dimensions.current,
   View: 'View',
 }));
 
@@ -115,13 +119,21 @@ vi.mock('@/components/agents/chat-toolbar', () => ({
   ChatToolbar: () => null,
 }));
 
+/** Captures the options the prompt hands the height-measuring hook. */
+const textHeightOptions = vi.hoisted(() => ({
+  current: null as Record<string, unknown> | null,
+}));
+
 vi.mock('@/components/agents/use-text-height', () => ({
-  useTextHeight: () => ({
-    height: 48,
-    measureElement: null,
-    reset: vi.fn(),
-    setText: vi.fn(),
-  }),
+  useTextHeight: (options: Record<string, unknown>) => {
+    textHeightOptions.current = options;
+    return {
+      height: 48,
+      measureElement: null,
+      reset: vi.fn(),
+      setText: vi.fn(),
+    };
+  },
 }));
 
 const voiceInputAvailable = vi.hoisted(() => ({ current: false }));
@@ -263,6 +275,8 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     voiceInputAvailable.current = false;
     returnSendsMessage.current = false;
     layoutDirection.isRTL = false;
+    dimensions.current = { fontScale: 1, height: 800, scale: 1, width: 400 };
+    textHeightOptions.current = null;
   });
 
   it.each(TEXT_DIRECTIONS)(
@@ -453,5 +467,17 @@ describe('NewSessionPrompt initialPrompt seed', () => {
 
     expect(findElementByType(element, 'TextInput')).toBeNull();
     expect(findElementByType(element, renderPromptControls)).toBeNull();
+  });
+
+  it('shrinks the input min height to two lines when the viewport above the keyboard is short', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    // 300 - 92 (header) - 125 (card chrome) = 83; floor((83 - 16) / 24) = 2 lines.
+    dimensions.current = { ...dimensions.current, height: 300 };
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt(defaultProps());
+
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 64 });
+    expect(textHeightOptions.current?.minHeight).not.toBe(88);
   });
 });

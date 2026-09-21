@@ -49,6 +49,7 @@ const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
 // Android backing-surface adapter is a documented native capability exception,
 // not a separate launch lifecycle. The wrapper owns the mod ordering.
 const BRANDED_SPLASH_PLUGIN = './plugins/withBrandedSplash';
+const ARTIFACT_FILE_PROVIDER_PLUGIN = './plugins/withArtifactFileProvider';
 // The one writer of the app target's `<tag>.lproj/Localizable.strings`: the App
 // Intent copy plus the appended Focus-filter catalog.
 const APP_INTENT_LOCALIZATIONS_PLUGIN = './plugins/withAppIntentLocalizations';
@@ -225,6 +226,21 @@ check(
 check(
   splashOptions?.ios === undefined && splashOptions?.android === undefined,
   'the branded splash must not fork its options by platform'
+);
+// The iOS File Provider extension target and the Pods integration behind it are
+// created by this plugin alone; without it the Files-app location has no
+// extension to serve it.
+check(
+  pluginNames.includes(ARTIFACT_FILE_PROVIDER_PLUGIN),
+  `plugins must include "${ARTIFACT_FILE_PROVIDER_PLUGIN}"`
+);
+// Same reason one layer down: EAS only builds and signs the extension from its
+// `appExtensions` entry, and the evaluated config is the only place that shows
+// the entry the plugin composed.
+const appExtensions = config.extra?.eas?.build?.experimental?.ios?.appExtensions ?? [];
+check(
+  appExtensions.some(extension => extension.targetName === 'ArtifactsFileProvider'),
+  'extra.eas.build.experimental.ios.appExtensions must carry the ArtifactsFileProvider target'
 );
 // The app target's one `Localizable.strings` (the App Intent copy plus the
 // appended Focus-filter catalog) is written by this plugin; without it the

@@ -53,8 +53,12 @@ const ARIA_LEVEL = {
  * LTR-only addition to the variant because `letter-spacing` pulls a cursive
  * script apart — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت'. An RTL
  * interface keeps the mono family, size and color and drops both classes.
+ *
+ * Exported so the eyebrow-scale labels rendered outside the variant — the
+ * `SectionHeader` action link — carry the identical treatment instead of a
+ * second copy of the class string that can drift.
  */
-const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
+export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
 
 const TextClassContext = React.createContext<string | undefined>(undefined);
 

@@ -1,6 +1,6 @@
 import { I18nManager, Pressable, View } from 'react-native';
 
-import { Text } from '@/components/ui/text';
+import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 
 type SectionHeaderProps = {
@@ -29,7 +29,9 @@ export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<Se
               'shrink font-mono-medium text-[11px] text-primary',
               // LTR-only: the letterspaced capitals break a cursive script's
               // joins, so an RTL action label drops them (home-ar-loading).
-              !I18nManager.isRTL && 'uppercase tracking-[1.5px]',
+              // The class string is the eyebrow variant's, so the two labels
+              // cannot drift apart.
+              !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY,
               I18nManager.isRTL ? 'text-left' : 'text-right'
             )}
           >

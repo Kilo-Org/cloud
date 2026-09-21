@@ -85,6 +85,26 @@ describe('validateAuthorizationHeader (C15 device-session compatibility)', () =>
   });
 });
 
+describe('the anonymous bearer sentinel', () => {
+  test('means no credential, not a refused one', () => {
+    // The Kilo clients send `apiKey: "anonymous"` when nobody is signed in.
+    // Failing that request closed would take the free tier down with it.
+    const result = validateAuthorizationHeader(new Headers({ authorization: 'Bearer anonymous' }));
+
+    expect(result.reason).toBe('missing_credentials');
+    expect(isRejectedCredentialReason(result.reason)).toBe(false);
+  });
+
+  test('does not swallow a real token that merely starts the same way', () => {
+    const result = validateAuthorizationHeader(
+      new Headers({ authorization: 'Bearer anonymous-ish-token' })
+    );
+
+    expect(result.reason).toBe('invalid_token');
+    expect(isRejectedCredentialReason(result.reason)).toBe(true);
+  });
+});
+
 describe('isRejectedCredentialReason', () => {
   test.each([
     ['missing_credentials', false],

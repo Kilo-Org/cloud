@@ -33,6 +33,17 @@ export const JWT_TOKEN_VERSION = 3;
 
 const jwtSigningAlgorithm = 'HS256';
 
+/**
+ * The bearer a Kilo client sends when nobody is signed in.
+ *
+ * The clients set `apiKey: "anonymous"` rather than omitting the header
+ * (`ANONYMOUS_API_KEY` in `packages/kilo-gateway/src/api/constants.ts` of the
+ * kilocode repository), so the header arrives present and its value is not a
+ * token. It means "no credential", not "a credential that failed", and must be
+ * treated as the former. Delete this constant once no released client sends it.
+ */
+const ANONYMOUS_BEARER_SENTINEL = 'anonymous';
+
 export const BOUNDED_INTERNAL_SERVICE_AUDIENCES = [
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
@@ -255,6 +266,14 @@ export function validateAuthorizationHeader(
   }
 
   const token = authHeader.substring(7);
+
+  if (token === ANONYMOUS_BEARER_SENTINEL) {
+    return {
+      error: 'Unauthorized - authentication required',
+      reason: 'missing_credentials',
+    };
+  }
+
   const payload = tryJwtVerify(token);
 
   if (!payload) {

@@ -271,6 +271,38 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
   });
 
+  it('serves a free model to a client that sends the anonymous sentinel', async () => {
+    setSignedTokenAuth('anonymous', {
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 99,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest(makeBody(stepfun_37_flash_free_model.public_id), {
+        // A Kilo client sets `apiKey: "anonymous"` when nobody is signed in.
+        // This is the free tier's normal path, so it must stay anonymous.
+        authorization: 'Bearer anonymous',
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedGetProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user: expect.objectContaining({
+          id: 'anon:127.0.0.1',
+          isAnonymous: true,
+        }),
+        organizationId: undefined,
+      })
+    );
+  });
+
   it('rejects an API-only token sent to the gateway endpoint', async () => {
     setSignedTokenAuth(signedToken(KILO_API_AUDIENCE), {
       user: {

@@ -26,6 +26,8 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   Globe: 'Globe',
+  // The merged screen carries the passkeys row (`account-settings-screen.tsx`
+  // renders KeyRound); a mock without it fails the whole mount.
   KeyRound: 'KeyRound',
   Shield: 'Shield',
   Smartphone: 'Smartphone',

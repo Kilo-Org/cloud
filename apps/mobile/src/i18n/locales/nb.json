@@ -2219,7 +2219,8 @@
       "linesBadge_one": "{{displayCount}} linje",
       "linesBadge_other": "{{displayCount}} linjer",
       "matchesBadge_one": "{{displayCount}} treff",
-      "matchesBadge_other": "{{displayCount}} treff"
+      "matchesBadge_other": "{{displayCount}} treff",
+      "noOutput": "Ingen utdata."
     },
     "readToolMarkdown": {
       "linesTruncated": "linje {{start}}–{{end}} (avkortet)",
@@ -3183,15 +3184,7 @@
     "remoteOptionTitle": "Datamaskinen din",
     "remoteOptionBody": "Kjør Kilo på din egen maskin via `kilo remote`-CLI-en.",
     "skip": "Hopp over omvisning",
-    "tutorialLabel": "Opplæring",
-    "remoteTitle": "Start din første remote-økt",
-    "remoteBody": "Koble til datamaskinen din, og start økten herfra.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ingen datamaskin er koblet til ennå",
-    "remoteEmptyBody": "For å koble den til, kjør `kilo remote` på datamaskinen din.",
-    "remoteFound": "Datamaskin tilkoblet",
-    "checkAgain": "Sjekk igjen",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Opplæring"
   },
   "appActions": {
     "start": {

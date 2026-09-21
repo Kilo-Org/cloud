@@ -218,16 +218,26 @@ function CategoryRow({
     : (preferences?.[meta.key] ?? readAgentPushPreference(queryClient, queryKey, meta.key));
   const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
   // An unavailable category is a terminal, non-retryable state: the switch is
-  // disabled and the server's reason code resolves to catalog copy. A missing
-  // entry (the `noUncheckedIndexedAccess` widening) defaults to available; an
-  // unknown code falls back to the category's own localized subtitle.
+  // disabled and the row explains itself in the reader's language. A missing
+  // entry (the `noUncheckedIndexedAccess` widening) defaults to available.
   const unavailable = capability?.available === false;
   const isDisabled = disabled || !editable || unavailable;
   const title = t(meta.titleKey);
+  // The server names the reason with a code, never a sentence: a known code
+  // resolves to catalog copy, and an unknown one falls back to the category's
+  // own localized subtitle.
   const reasonKey = unavailable
     ? unavailableReasonKey(capability.unavailableReasonCode)
     : undefined;
-  const subtitle = reasonKey ? t(reasonKey) : t(meta.subtitleKey);
+  // A server that predates the code sends none at all. Security unavailability
+  // then means no scope has the agent enabled, so that row keeps the Security
+  // Agent screen's localized setup guidance instead of any English prose.
+  const legacySecurityGuidance =
+    unavailable && capability.unavailableReasonCode == null && meta.key === 'securityFindings';
+  const fallbackSubtitleKey = legacySecurityGuidance
+    ? 'securityAgent.settingsOverview.disabledPrompt'
+    : meta.subtitleKey;
+  const subtitle = t(reasonKey ?? fallbackSubtitleKey);
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />

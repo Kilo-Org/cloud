@@ -1715,7 +1715,8 @@
       "linesBadge_one": "{{displayCount}}줄",
       "linesBadge_other": "{{displayCount}}줄",
       "matchesBadge_one": "{{displayCount}}건 일치",
-      "matchesBadge_other": "{{displayCount}}건 일치"
+      "matchesBadge_other": "{{displayCount}}건 일치",
+      "noOutput": "출력이 없습니다."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}줄 (일부 생략)",
@@ -3183,15 +3184,7 @@
     "remoteOptionTitle": "내 컴퓨터",
     "remoteOptionBody": "`kilo remote` CLI로 내 컴퓨터에서 Kilo를 실행하세요.",
     "skip": "투어 건너뛰기",
-    "tutorialLabel": "튜토리얼",
-    "remoteTitle": "첫 리모트 세션 시작하기",
-    "remoteBody": "컴퓨터를 연결한 뒤 여기서 세션을 시작하세요.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "연결된 컴퓨터가 없습니다",
-    "remoteEmptyBody": "연결하려면 컴퓨터에서 `kilo remote`를 실행하세요.",
-    "remoteFound": "컴퓨터 연결됨",
-    "checkAgain": "다시 확인",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "튜토리얼"
   },
   "appActions": {
     "start": {

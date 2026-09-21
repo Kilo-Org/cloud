@@ -8,11 +8,12 @@
 
 import { createElement } from 'react';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NotificationsScreen } from './notifications-screen';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
-import '@/i18n';
+import { i18n } from '@/i18n';
+import ar from '@/i18n/locales/ar.json';
 
 const prefsQueryFn = vi.hoisted(() => vi.fn());
 const pushTokensQueryFn = vi.hoisted(() => vi.fn());
@@ -584,5 +585,138 @@ describe('NotificationsScreen category availability', () => {
     // Last good availability is preserved: rows stay rendered and enabled.
     expect(switchesByLabel(renderer.root, 'Chat messages')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(false);
+  });
+});
+
+describe('NotificationsScreen Arabic Security findings row', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    getNotificationPermissionStatus.mockResolvedValue('granted');
+    getDevicePushToken.mockResolvedValue('device-token');
+    pushTokensQueryFn.mockResolvedValue([{ token: 'device-token', platform: 'android' }]);
+    setPreferenceMutationFn.mockResolvedValue({});
+    registerTokenMutationFn.mockResolvedValue({ success: true });
+    await i18n.changeLanguage('ar');
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it.each(['Enable Kilo Security Agent on a scope to get security findings.', null])(
+    'non-retryable empty: no enabled scope shows localized setup guidance for reason %s',
+    async serverReason => {
+      prefsQueryFn.mockResolvedValue(
+        fullPrefs({
+          capabilities: fullCapabilities({
+            securityFindings: { available: false, unavailableReason: serverReason },
+          }),
+        })
+      );
+      const { renderer, unmount } = await renderScreen();
+      try {
+        await waitForEnabledSwitch(renderer, ar.notifications.channel.chat);
+
+        expect(
+          switchesByLabel(renderer.root, ar.notifications.channel.security)[0]?.props.disabled
+        ).toBe(true);
+        expect(
+          textWithChildren(
+            renderer.root,
+            'Enable Kilo Security Agent on a scope to get security findings.'
+          )
+        ).toHaveLength(0);
+        expect(
+          textWithChildren(renderer.root, ar.securityAgent.settingsOverview.disabledPrompt)
+        ).toHaveLength(1);
+        expect(textWithChildren(renderer.root, ar.common.retry)).toHaveLength(0);
+
+        act(() => {
+          switchOnValueChange(renderer.root, ar.notifications.channel.security)?.(false);
+        });
+        expect(setPreferenceMutationFn).not.toHaveBeenCalled();
+      } finally {
+        unmount();
+      }
+    }
+  );
+
+  it.each([fullCapabilities(), undefined])(
+    'happy: available or legacy capabilities %j keep the localized subtitle and working switch',
+    async capabilities => {
+      prefsQueryFn.mockResolvedValue(fullPrefs({ capabilities }));
+      const { renderer, unmount } = await renderScreen();
+      try {
+        await waitForEnabledSwitch(renderer, ar.notifications.channel.security);
+        expect(
+          textWithChildren(renderer.root, ar.notifications.category.securityFindingsSubtitle)
+        ).toHaveLength(1);
+        expect(
+          textWithChildren(renderer.root, ar.securityAgent.settingsOverview.disabledPrompt)
+        ).toHaveLength(0);
+
+        prefsQueryFn.mockResolvedValue(fullPrefs({ securityFindings: false, capabilities }));
+        act(() => {
+          switchOnValueChange(renderer.root, ar.notifications.channel.security)?.(false);
+        });
+        await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
+        expect(setPreferenceMutationFn.mock.calls[0]?.[0]).toEqual({ securityFindings: false });
+        await waitFor(() => activityIndicators(renderer.root).length === 0);
+        expect(
+          switchesByLabel(renderer.root, ar.notifications.channel.security)[0]?.props.value
+        ).toBe(false);
+      } finally {
+        unmount();
+      }
+    }
+  );
+
+  it('retryable unhappy: retrying the preferences query recovers localized setup guidance', async () => {
+    prefsQueryFn.mockRejectedValue(new Error('offline'));
+    const { renderer, unmount } = await renderScreen();
+    try {
+      await waitFor(
+        () =>
+          renderer.root.findAllByProps({ accessibilityLabel: ar.notifications.retryCategories })
+            .length === 1
+      );
+      expect(switchesByLabel(renderer.root, ar.notifications.channel.security)).toHaveLength(0);
+      prefsQueryFn.mockResolvedValue(
+        fullPrefs({
+          capabilities: fullCapabilities({
+            securityFindings: { available: false, unavailableReason: null },
+          }),
+        })
+      );
+      const retry = renderer.root.findByProps({
+        accessibilityLabel: ar.notifications.retryCategories,
+      }).props as { onPress: () => void };
+      act(() => {
+        retry.onPress();
+      });
+      await waitForEnabledSwitch(renderer, ar.notifications.channel.chat);
+      expect(
+        textWithChildren(renderer.root, ar.securityAgent.settingsOverview.disabledPrompt)
+      ).toHaveLength(1);
+      expect(
+        renderer.root.findAllByProps({ accessibilityLabel: ar.notifications.retryCategories })
+      ).toHaveLength(0);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('loading: unresolved preferences show skeletons without a Security findings control', async () => {
+    prefsQueryFn.mockReturnValue(new Promise(() => undefined));
+    const { renderer, unmount } = await renderScreen();
+    try {
+      expect(skeletonCount(renderer.root)).toBeGreaterThan(0);
+      expect(switchesByLabel(renderer.root, ar.notifications.channel.security)).toHaveLength(0);
+      expect(
+        textWithChildren(renderer.root, ar.securityAgent.settingsOverview.disabledPrompt)
+      ).toHaveLength(0);
+    } finally {
+      unmount();
+    }
   });
 });

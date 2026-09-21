@@ -2219,7 +2219,8 @@
       "linesBadge_one": "{{displayCount}} rārangi",
       "linesBadge_other": "{{displayCount}} rārangi",
       "matchesBadge_one": "{{displayCount}} kitenga",
-      "matchesBadge_other": "{{displayCount}} kitenga"
+      "matchesBadge_other": "{{displayCount}} kitenga",
+      "noOutput": "Kāore he putanga."
     },
     "readToolMarkdown": {
       "linesTruncated": "ngā rārangi {{start}}–{{end}} (kua poroa)",
@@ -3183,15 +3184,7 @@
     "remoteOptionTitle": "Tō rorohiko",
     "remoteOptionBody": "Whakahaere i te Kilo ki tō ake mīhini mā te CLI `kilo remote`.",
     "skip": "Waiho te haere",
-    "tutorialLabel": "Akoranga",
-    "remoteTitle": "Tīmata tō wātū tawhiti tuatahi",
-    "remoteBody": "Honoa tō rorohiko, kātahi ka tīmata te wātū mai i konei.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Kāore anō kia honoa he rorohiko",
-    "remoteEmptyBody": "Hei hono i a ia, whakahaeretia `kilo remote` ki tō rorohiko.",
-    "remoteFound": "Kua honoa te rorohiko",
-    "checkAgain": "Tirohia anō",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Akoranga"
   },
   "appActions": {
     "start": {

@@ -2219,7 +2219,8 @@
       "linesBadge_one": "{{displayCount}} دێڕ",
       "linesBadge_other": "{{displayCount}} دێڕ",
       "matchesBadge_one": "{{displayCount}} ئەنجام",
-      "matchesBadge_other": "{{displayCount}} ئەنجام"
+      "matchesBadge_other": "{{displayCount}} ئەنجام",
+      "noOutput": "هیچ دەرچووێک نییە."
     },
     "readToolMarkdown": {
       "linesTruncated": "دێڕەکانی {{start}}–{{end}} (کورتکراوە)",
@@ -3183,15 +3184,7 @@
     "remoteOptionTitle": "کۆمپیوتەرەکەت",
     "remoteOptionBody": "Kilo لەسەر ئامێری خۆتدا بە ڕێگای CLI ی `kilo remote` جێبەجێ بکە.",
     "skip": "گەشتەکە دەربپەڕێ",
-    "tutorialLabel": "فێربوون",
-    "remoteTitle": "یەکەم دانیشتنی دوورەکەت دەست پێبکە",
-    "remoteBody": "کۆمپیوتەرەکەت پەیوەست بکە، پاشان دانیشتنەکە لێرەوە دەست پێبکە.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "هێشتا کۆمپیوتەرێک پەیوەست نەبووە",
-    "remoteEmptyBody": "بۆ پەیوەستکردنی، `kilo remote` لە کۆمپیوتەرەکەتدا جێبەجێ بکە.",
-    "remoteFound": "کۆمپیوتەر پەیوەست بوو",
-    "checkAgain": "دووبارە پشکنین بکە",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "فێربوون"
   },
   "appActions": {
     "start": {

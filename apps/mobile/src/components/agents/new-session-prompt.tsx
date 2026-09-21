@@ -35,6 +35,7 @@ import {
   resolveComposerMinHeight,
   resolveComposerMinHeightForViewport,
   resolveNewSessionPromptCardChrome,
+  resolveNewSessionPromptCardChromeRowsAboveToolbar,
   SESSION_HEADER_HEIGHT,
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
@@ -157,6 +158,16 @@ export function NewSessionPrompt({
   // has laid out.
   const [toolbarHeight, setToolbarHeight] = useState<number | null>(null);
   const promptLineHeight = PROMPT_INPUT_LINE_HEIGHT * fontScale;
+  // The card rows above the toolbar that render only in some states. The floor
+  // below reserves each one under the same condition the render uses.
+  const hasAttachments = attachments.length > 0;
+  const showsAttachmentStatus = attachments.some(
+    attachment => attachment.metadataStripFailed === true
+  );
+  const showsCounter =
+    PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING;
+  // The models-error block renders in the toolbar's place.
+  const showsModelsError = isModelsError && modelOptions.length === 0;
   // The input's floor gives up lines on a short viewport (landscape at a high
   // density) so the card's control row and mode/model toolbar stay above the
   // keyboard. With room it is still the three-line default. The floor scales
@@ -168,6 +179,18 @@ export function NewSessionPrompt({
   const promptCardChromeHeight = resolveNewSessionPromptCardChrome({
     fontScale,
     toolbarHeight,
+    // The card renders three more rows above the toolbar in some states; the
+    // floor reserves each with the same condition the render uses. A row it
+    // does not reserve is a line the input keeps while the pills drop under
+    // the keyboard.
+    rowsAboveToolbarHeight: resolveNewSessionPromptCardChromeRowsAboveToolbar({
+      hasAttachments,
+      showsAttachmentStatus,
+      showsCounter,
+    }),
+    // The models-error block renders in the toolbar's place, so the toolbar's
+    // measured height must not stand in for a row that is not there.
+    toolbarRendered: !showsModelsError,
   });
   const promptMinHeight =
     promptViewportHeight > 0
@@ -340,8 +363,13 @@ export function NewSessionPrompt({
   }
 
   function handleToolbarLayout(event: LayoutChangeEvent) {
-    const nextHeight = Math.max(Math.round(event.nativeEvent.layout.height), 0);
-    setToolbarHeight(current => (current === nextHeight ? current : nextHeight));
+    const nextHeight = Math.round(event.nativeEvent.layout.height);
+    // A zero-height layout is not a measurement — the row is collapsed or has
+    // not laid out — so keep the last measured height (or the `null` that makes
+    // the floor use the static budget). Reserving the rows above the toolbar
+    // alone (68) would sit below the static estimate (125) and let the input
+    // keep lines the card cannot fit.
+    setToolbarHeight(current => (nextHeight <= 0 ? current : nextHeight));
   }
 
   function handlePromptSelectionChange(event: TextInputSelectionChangeEvent) {
@@ -413,7 +441,7 @@ export function NewSessionPrompt({
         onMove={onMoveAttachment}
         onReorder={onReorderAttachments}
       />
-      {attachments.some(attachment => attachment.metadataStripFailed === true) ? (
+      {showsAttachmentStatus ? (
         <AccessibleStatus
           tone="error"
           message={t('agentChat.composer.photoMetadataNotRemoved')}
@@ -454,7 +482,7 @@ export function NewSessionPrompt({
           // arrival hides the attachment strip and the Start button.
           autoFocus={shareId === undefined || shareId === ''}
         />
-        {PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING ? (
+        {showsCounter ? (
           <View className="flex-row justify-end px-1 pb-1">
             {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
             <Text
@@ -494,7 +522,7 @@ export function NewSessionPrompt({
           ) : null}
         </NewSessionPromptControls>
       </View>
-      {isModelsError && modelOptions.length === 0 ? (
+      {showsModelsError ? (
         <QueryError
           placement="top"
           variant="server"

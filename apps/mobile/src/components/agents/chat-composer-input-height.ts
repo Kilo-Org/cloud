@@ -66,37 +66,108 @@ export const NEW_SESSION_PROMPT_CARD_CHROME_FIXED_HEIGHT = 105;
 export const NEW_SESSION_PROMPT_CARD_CHROME_TEXT_HEIGHT = 20;
 
 /**
- * The card rows above the toolbar, which do not change with the system font
- * scale: the form's `pt-4` (16), the card's `pt-2` (8), and the control row
- * (44). The toolbar itself is measured on layout — its mode/model pills wrap
- * onto a second row on narrow viewports, so its height is not a constant —
- * and `resolveNewSessionPromptCardChromeHeight` stays only as the first-frame
+ * The always-present card rows above the toolbar, none of which changes with
+ * the system font scale: the form's `pt-4` (16), the card's `pt-2` (8), and
+ * the control row (44). The rows that render only in some states are added by
+ * `resolveNewSessionPromptCardChromeRowsAboveToolbar`. The toolbar itself is
+ * measured on layout — its mode/model pills wrap onto a second row on narrow
+ * viewports, so its height is not a constant — and
+ * `resolveNewSessionPromptCardChromeHeight` stays only as the first-frame
  * fallback for the measured value.
  */
 export const NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR = 68;
 
 /**
- * Card chrome budget from the measured toolbar height. At the unwrapped
- * toolbar's 57 (`border-t` 1 + `py-3` 24 + pill row 32) this equals the
- * shipped fontScale-1 budget; a wrapped toolbar measures ~97 and reserves
- * its second pill row so the keyboard cannot cut it.
+ * The attachment strip above the input: its `mb-2` (8) plus the tallest chip,
+ * the image's `h-16` (64). It renders only while an attachment is staged, so
+ * the floor must reserve it conditionally — without it the input keeps a line
+ * the strip takes and the toolbar's pills drop toward the keyboard.
  */
-export function resolveNewSessionPromptCardChromeHeightFromToolbar(toolbarHeight: number): number {
-  return NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR + toolbarHeight;
+export const NEW_SESSION_PROMPT_CARD_CHROME_ATTACHMENT_STRIP_HEIGHT = 72;
+
+/**
+ * The metadata-strip failure notice above the input: its `mb-2` (8) plus one
+ * `text-xs` line (16). It renders only after a failed strip, so the floor
+ * reserves it conditionally like the attachment strip.
+ */
+export const NEW_SESSION_PROMPT_CARD_CHROME_ATTACHMENT_STATUS_HEIGHT = 24;
+
+/**
+ * The near-limit character counter between the input and the control row: its
+ * `pb-1` (4) plus one `text-xs` line (16). It renders only near the prompt
+ * limit, so the floor reserves it conditionally too.
+ */
+export const NEW_SESSION_PROMPT_CARD_CHROME_COUNTER_HEIGHT = 20;
+
+/**
+ * The card rows above the toolbar, including the ones that render only in some
+ * states: the fixed rows plus the attachment strip while attachments are
+ * staged, the metadata-strip failure notice, and the counter near the prompt
+ * limit. Every row the input's floor does not reserve is a line the input keeps
+ * while the row that needs the space drops under the keyboard.
+ */
+export function resolveNewSessionPromptCardChromeRowsAboveToolbar(options: {
+  hasAttachments: boolean;
+  showsAttachmentStatus: boolean;
+  showsCounter: boolean;
+}): number {
+  return (
+    NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR +
+    (options.hasAttachments ? NEW_SESSION_PROMPT_CARD_CHROME_ATTACHMENT_STRIP_HEIGHT : 0) +
+    (options.showsAttachmentStatus ? NEW_SESSION_PROMPT_CARD_CHROME_ATTACHMENT_STATUS_HEIGHT : 0) +
+    (options.showsCounter ? NEW_SESSION_PROMPT_CARD_CHROME_COUNTER_HEIGHT : 0)
+  );
 }
 
 /**
- * The new-session card chrome budget: the measured toolbar height once the
- * toolbar has laid out (its pills wrap on narrow viewports, so it is not a
- * constant), or the static fontScale budget before that first layout.
+ * Card chrome budget from the measured toolbar height and the rows above it.
+ * At the unwrapped toolbar's 57 (`border-t` 1 + `py-3` 24 + pill row 32) this
+ * equals the shipped fontScale-1 budget; a wrapped toolbar measures ~97 and
+ * reserves its second pill row so the keyboard cannot cut it.
+ */
+export function resolveNewSessionPromptCardChromeHeightFromToolbar(
+  toolbarHeight: number,
+  rowsAboveToolbarHeight: number = NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR
+): number {
+  return rowsAboveToolbarHeight + toolbarHeight;
+}
+
+/**
+ * The new-session card chrome budget: the rows above the toolbar plus the
+ * measured toolbar height once the toolbar has laid out (its pills wrap on
+ * narrow viewports, so it is not a constant), or the static fontScale budget
+ * before that first layout.
+ *
+ * A missing or non-positive toolbar height means "not measured": the static
+ * budget stands in rather than the rows above the toolbar alone (68), which
+ * sits below the static estimate (125) and makes the input keep lines the card
+ * cannot fit. `toolbarRendered: false` is the same case — the models-error
+ * block renders in the toolbar's place, so there is no toolbar to measure.
  */
 export function resolveNewSessionPromptCardChrome(options: {
   fontScale: number;
   toolbarHeight: number | null;
+  rowsAboveToolbarHeight?: number;
+  toolbarRendered?: boolean;
 }): number {
-  return options.toolbarHeight === null
-    ? resolveNewSessionPromptCardChromeHeight(options.fontScale)
-    : resolveNewSessionPromptCardChromeHeightFromToolbar(options.toolbarHeight);
+  const rowsAboveToolbarHeight =
+    options.rowsAboveToolbarHeight ?? NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR;
+  const conditionalRows =
+    rowsAboveToolbarHeight - NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR;
+  const measuredToolbarHeight =
+    options.toolbarRendered === false ||
+    options.toolbarHeight === null ||
+    options.toolbarHeight <= 0
+      ? null
+      : options.toolbarHeight;
+  // The static budget already covers the fixed rows, so the conditional rows
+  // are added on top of it.
+  return measuredToolbarHeight === null
+    ? resolveNewSessionPromptCardChromeHeight(options.fontScale) + conditionalRows
+    : resolveNewSessionPromptCardChromeHeightFromToolbar(
+        measuredToolbarHeight,
+        rowsAboveToolbarHeight
+      );
 }
 
 /**

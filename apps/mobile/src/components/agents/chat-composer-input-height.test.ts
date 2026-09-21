@@ -1,9 +1,13 @@
+/* eslint-disable max-lines -- The composer height contract spans the chat cap, the new-session card chrome (constant and measured rows), and both the window and viewport floors in one suite. */
 import { describe, expect, it } from 'vitest';
 
 import {
   COMPOSER_CHROME_HEIGHT,
   COMPOSER_INPUT_MAX_HEIGHT,
   COMPOSER_INPUT_PADDING_HORIZONTAL,
+  NEW_SESSION_PROMPT_CARD_CHROME_ATTACHMENT_STATUS_HEIGHT,
+  NEW_SESSION_PROMPT_CARD_CHROME_ATTACHMENT_STRIP_HEIGHT,
+  NEW_SESSION_PROMPT_CARD_CHROME_COUNTER_HEIGHT,
   NEW_SESSION_PROMPT_CARD_CHROME_FIXED_HEIGHT,
   NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT,
   NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR,
@@ -17,6 +21,7 @@ import {
   resolveNewSessionPromptCardChrome,
   resolveNewSessionPromptCardChromeHeight,
   resolveNewSessionPromptCardChromeHeightFromToolbar,
+  resolveNewSessionPromptCardChromeRowsAboveToolbar,
   SESSION_HEADER_HEIGHT,
   shouldEnableComposerInputScroll,
   STARTER_ROW_HEIGHT,
@@ -345,5 +350,159 @@ describe('resolveNewSessionPromptCardChromeHeightFromToolbar', () => {
     // A measured toolbar replaces the fontScale estimate entirely: its height
     // already includes the scaled pill text line.
     expect(resolveNewSessionPromptCardChrome({ fontScale: 2, toolbarHeight: 89 })).toBe(157);
+  });
+});
+
+describe('resolveNewSessionPromptCardChromeRowsAboveToolbar', () => {
+  const NO_CONDITIONAL_ROWS = {
+    hasAttachments: false,
+    showsAttachmentStatus: false,
+    showsCounter: false,
+  } as const;
+
+  it('adds only the rows the card renders', () => {
+    expect(resolveNewSessionPromptCardChromeRowsAboveToolbar(NO_CONDITIONAL_ROWS)).toBe(
+      NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR
+    );
+    expect(
+      resolveNewSessionPromptCardChromeRowsAboveToolbar({
+        ...NO_CONDITIONAL_ROWS,
+        hasAttachments: true,
+      })
+    ).toBe(
+      NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR +
+        NEW_SESSION_PROMPT_CARD_CHROME_ATTACHMENT_STRIP_HEIGHT
+    );
+    expect(
+      resolveNewSessionPromptCardChromeRowsAboveToolbar({
+        ...NO_CONDITIONAL_ROWS,
+        showsAttachmentStatus: true,
+      })
+    ).toBe(
+      NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR +
+        NEW_SESSION_PROMPT_CARD_CHROME_ATTACHMENT_STATUS_HEIGHT
+    );
+    expect(
+      resolveNewSessionPromptCardChromeRowsAboveToolbar({
+        ...NO_CONDITIONAL_ROWS,
+        showsCounter: true,
+      })
+    ).toBe(
+      NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR +
+        NEW_SESSION_PROMPT_CARD_CHROME_COUNTER_HEIGHT
+    );
+  });
+
+  it('matches the rows the card renders', () => {
+    // The strip's mb-2 (8) plus the tallest chip, the image's h-16 (64).
+    expect(NEW_SESSION_PROMPT_CARD_CHROME_ATTACHMENT_STRIP_HEIGHT).toBe(8 + 64);
+    // The notice's mb-2 (8) plus a text-xs line (16).
+    expect(NEW_SESSION_PROMPT_CARD_CHROME_ATTACHMENT_STATUS_HEIGHT).toBe(8 + 16);
+    // The counter's pb-1 (4) plus a text-xs line (16).
+    expect(NEW_SESSION_PROMPT_CARD_CHROME_COUNTER_HEIGHT).toBe(4 + 16);
+  });
+
+  it('reserves the conditional rows, so the toolbar cannot drop below the frame', () => {
+    // The released density-560 frame.
+    const viewportHeight = 203;
+    const floor = (rowsAboveToolbarHeight?: number) =>
+      resolveComposerMinHeightForViewport({
+        viewportHeight,
+        composerChromeHeight: resolveNewSessionPromptCardChrome({
+          fontScale: 1,
+          toolbarHeight: 57,
+          rowsAboveToolbarHeight,
+        }),
+        lineHeight: 24,
+        verticalPadding: 16,
+        defaultLines: 3,
+      });
+    // Without them the frame floors two input lines…
+    expect(floor()).toBe(64);
+    // …and the attachment strip's 72 takes the second line.
+    expect(
+      floor(
+        resolveNewSessionPromptCardChromeRowsAboveToolbar({
+          ...NO_CONDITIONAL_ROWS,
+          hasAttachments: true,
+        })
+      )
+    ).toBe(40);
+    // The counter's 20 takes it too.
+    expect(
+      floor(
+        resolveNewSessionPromptCardChromeRowsAboveToolbar({
+          ...NO_CONDITIONAL_ROWS,
+          showsCounter: true,
+        })
+      )
+    ).toBe(40);
+    // The metadata notice's 24 takes it as well.
+    expect(
+      floor(
+        resolveNewSessionPromptCardChromeRowsAboveToolbar({
+          ...NO_CONDITIONAL_ROWS,
+          showsAttachmentStatus: true,
+        })
+      )
+    ).toBe(40);
+  });
+});
+
+describe('resolveNewSessionPromptCardChrome with an unmeasured toolbar', () => {
+  it('falls back to the static budget for a missing, zero, or negative height', () => {
+    expect(resolveNewSessionPromptCardChrome({ fontScale: 1, toolbarHeight: null })).toBe(125);
+    // A zero measurement is not a measurement: collapsing the budget to the
+    // rows above the toolbar (68) would sit below the first-frame estimate.
+    expect(resolveNewSessionPromptCardChrome({ fontScale: 1, toolbarHeight: 0 })).toBe(125);
+    expect(resolveNewSessionPromptCardChrome({ fontScale: 1, toolbarHeight: -8 })).toBe(125);
+    expect(resolveNewSessionPromptCardChrome({ fontScale: 2, toolbarHeight: 0 })).toBe(145);
+  });
+
+  it('keeps the conditional rows on top of the static budget', () => {
+    // 125 (static) + 72 (strip) + 20 (counter).
+    expect(
+      resolveNewSessionPromptCardChrome({
+        fontScale: 1,
+        toolbarHeight: 0,
+        rowsAboveToolbarHeight: resolveNewSessionPromptCardChromeRowsAboveToolbar({
+          hasAttachments: true,
+          showsAttachmentStatus: false,
+          showsCounter: true,
+        }),
+      })
+    ).toBe(217);
+  });
+
+  it('does not hand the input lines the card cannot fit', () => {
+    const floor = (toolbarHeight: number | null) =>
+      resolveComposerMinHeightForViewport({
+        viewportHeight: 203,
+        composerChromeHeight: resolveNewSessionPromptCardChrome({ fontScale: 1, toolbarHeight }),
+        lineHeight: 24,
+        verticalPadding: 16,
+        defaultLines: 3,
+      });
+    // The zero measurement is ignored, so the floor stays at the static-budget
+    // result rather than the three lines a bare 68 chrome would allow.
+    expect(floor(0)).toBe(64);
+    expect(
+      resolveComposerMinHeightForViewport({
+        viewportHeight: 203,
+        composerChromeHeight: NEW_SESSION_PROMPT_CARD_CHROME_ROWS_ABOVE_TOOLBAR,
+        lineHeight: 24,
+        verticalPadding: 16,
+        defaultLines: 3,
+      })
+    ).toBe(88);
+  });
+
+  it('uses the static budget while the models-error block replaces the toolbar', () => {
+    // A wrapped toolbar measured before the error took its place…
+    expect(resolveNewSessionPromptCardChrome({ fontScale: 1, toolbarHeight: 97 })).toBe(165);
+    // …and the static estimate while the block renders in its place.
+    expect(
+      resolveNewSessionPromptCardChrome({ fontScale: 1, toolbarHeight: 97, toolbarRendered: false })
+    ).toBe(125);
   });
 });

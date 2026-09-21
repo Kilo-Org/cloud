@@ -510,4 +510,46 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(toolbarProps).toMatchObject({ wrap: true });
     expect(toolbarProps?.onLayout).toEqual(expect.any(Function));
   });
+
+  it('reserves the attachment strip so the toolbar clears the keyboard with an attachment staged', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    // The released density-560 frame: 203 - 125 (card chrome) - 12 = 66;
+    // floor((66 - 16) / 24) = two lines.
+    const promptViewportHeight = 203;
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt({ ...defaultProps(), promptViewportHeight });
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 64 });
+
+    // The strip's 72 leaves the frame room for one line, so the input gives the
+    // line up instead of pushing the mode/model pills under the IME.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt({
+      ...defaultProps(),
+      attachments: [{ id: 'a1', metadataStripFailed: false }] as never[],
+      promptViewportHeight,
+    });
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 40 });
+  });
+
+  it('reserves the counter and the metadata notice above the toolbar in the floor', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    const promptViewportHeight = 203;
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt({
+      ...defaultProps(),
+      initialPrompt: 'x'.repeat(100_000 - 5),
+      promptViewportHeight,
+    });
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 40 });
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt({
+      ...defaultProps(),
+      attachments: [{ id: 'a1', metadataStripFailed: true }] as never[],
+      promptViewportHeight,
+    });
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 40 });
+  });
 });

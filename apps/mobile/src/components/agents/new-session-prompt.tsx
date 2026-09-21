@@ -36,6 +36,7 @@ import {
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
 import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
+import { resolveNewSessionPromptMinHeight } from '@/components/agents/new-session-prompt-fit';
 import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
 import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
@@ -83,9 +84,9 @@ type NewSessionPromptComponentProps = NewSessionPromptProps & {
 };
 
 /**
- * New-session prompt surface: attachment strip, full-width multiline text
- * input, bottom action row (paperclip leading, voice toggle trailing), and
- * the model/mode toolbar. Owns the prompt ref (for voice input to read), the
+ * New-session prompt surface: model/mode toolbar, attachment strip,
+ * full-width multiline text input, and bottom action row (paperclip leading,
+ * voice toggle trailing). Owns the prompt ref (for voice input to read), the
  * height-measuring TextInput machinery, and the `useVoiceInput` hook. The
  * route listens to `onChangeText` so the create handler can read the live
  * prompt value after `settleVoiceInputBeforeSubmit` resolves; the attachment,
@@ -118,6 +119,7 @@ export function NewSessionPrompt({
   shareId,
   voiceInputSettlerRef,
   initialPrompt,
+  frameHeight,
   onStartSession,
   isCloneEntry = false,
 }: Readonly<NewSessionPromptComponentProps>) {
@@ -147,9 +149,21 @@ export function NewSessionPrompt({
   const isComposingRef = useRef(false);
   const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
+  // The card's own top offset and the chrome it renders around the input,
+  // measured by the card's `onLayout` below. Together they size the space the
+  // frame leaves for the input.
+  const [cardTop, setCardTop] = useState(0);
+  const [cardChromeHeight, setCardChromeHeight] = useState(0);
   const promptLineHeight = PROMPT_INPUT_LINE_HEIGHT * fontScale;
-  const promptMinHeight =
-    promptLineHeight * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING;
+  const promptMinHeight = resolveNewSessionPromptMinHeight({
+    frameHeight: frameHeight ?? 0,
+    cardTop,
+    cardChromeHeight,
+    preferredMinHeight:
+      promptLineHeight * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING,
+    lineHeight: promptLineHeight,
+    preferredLines: PROMPT_INPUT_DEFAULT_LINES,
+  });
   const promptMaxHeight = resolveComposerMaxHeight({
     windowHeight,
     safeAreaInsetTop: insets.top,
@@ -300,6 +314,16 @@ export function NewSessionPrompt({
     setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
+  function handleCardLayout(event: LayoutChangeEvent) {
+    const { y, height } = event.nativeEvent.layout;
+    setCardTop(current => (current === y ? current : y));
+    // Everything the card renders other than the input itself. The input's
+    // height changes when the fit yields and the card's height changes with it,
+    // so this is stable across the yielding re-render.
+    const nextChromeHeight = height - promptMeasure.height;
+    setCardChromeHeight(current => (current === nextChromeHeight ? current : nextChromeHeight));
+  }
+
   function handlePromptSelectionChange(event: TextInputSelectionChangeEvent) {
     promptSelectionRef.current = event.nativeEvent.selection;
   }
@@ -361,7 +385,37 @@ export function NewSessionPrompt({
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]">
+    <View
+      onLayout={handleCardLayout}
+      className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]"
+    >
+      {isModelsError && modelOptions.length === 0 ? (
+        <QueryError
+          placement="top"
+          variant="server"
+          title={t('agentChat.newSession.couldNotLoadModels')}
+          message={t('organization.boundary.loadErrorMessage')}
+          onRetry={() => {
+            onRefetchModels();
+          }}
+          className="border-b border-border py-4"
+        />
+      ) : (
+        <ChatToolbar
+          mode={mode}
+          onModeChange={onModeChange}
+          model={model}
+          variant={variant}
+          modelOptions={modelOptions}
+          onModelSelect={onModelSelect}
+          disabled={isCreating}
+          isLoadingModels={isLoadingModels}
+          customOptions={customOptions}
+          modelLocked={modelLocked}
+          modelLockLabel={modelLockLabel}
+          className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
+        />
+      )}
       <AttachmentPreviewStrip
         attachments={attachments}
         onRemove={onRemoveAttachment}
@@ -450,33 +504,6 @@ export function NewSessionPrompt({
           ) : null}
         </NewSessionPromptControls>
       </View>
-      {isModelsError && modelOptions.length === 0 ? (
-        <QueryError
-          placement="top"
-          variant="server"
-          title={t('agentChat.newSession.couldNotLoadModels')}
-          message={t('organization.boundary.loadErrorMessage')}
-          onRetry={() => {
-            onRefetchModels();
-          }}
-          className="border-t border-border py-4"
-        />
-      ) : (
-        <ChatToolbar
-          mode={mode}
-          onModeChange={onModeChange}
-          model={model}
-          variant={variant}
-          modelOptions={modelOptions}
-          onModelSelect={onModelSelect}
-          disabled={isCreating}
-          isLoadingModels={isLoadingModels}
-          customOptions={customOptions}
-          modelLocked={modelLocked}
-          modelLockLabel={modelLockLabel}
-          className="border-t border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
-        />
-      )}
     </View>
   );
 }

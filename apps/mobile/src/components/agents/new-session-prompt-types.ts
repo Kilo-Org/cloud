@@ -45,6 +45,13 @@ export type NewSessionPromptProps = {
   voiceInputSettlerRef: RefObject<(() => Promise<boolean>) | null>;
   /** Optional initial prompt text seeded into the uncontrolled input once on mount. */
   initialPrompt?: string;
+  /**
+   * Height of the scrollable form frame the prompt sits in, in points. The
+   * prompt yields its minimum height to this frame so the whole card renders
+   * above the bottom system bar; omitted or unmeasured keeps the preferred
+   * floor.
+   */
+  frameHeight?: number;
   /** True for the Continue clone entry: hides the composer, paperclip, paste, and voice. */
   isCloneEntry?: boolean;
 };

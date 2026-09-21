@@ -133,6 +133,15 @@ describe('classifyPasskeyError', () => {
     }
   );
 
+  it.each(['name', 'message', 'code'])(
+    'classifies uppercase protocol errors in %s without locale-dependent casing',
+    field => {
+      expect(classifyPasskeyError({ [field]: 'NOCREDENTIALS' })).toBe('no-passkey');
+      expect(classifyPasskeyError({ [field]: 'NOTCONFIGURED' })).toBe('unsupported');
+      expect(classifyPasskeyError({ [field]: 'USERCANCELLED' })).toBe('cancelled');
+    }
+  );
+
   it.each([
     [{ name: 'USERCANCELLEDEXCEPTION' }, 'login.passkeyCancelled'],
     [{ message: 'NOCREDENTIALS' }, 'login.passkeyNotFound'],

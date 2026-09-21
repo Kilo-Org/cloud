@@ -1,10 +1,11 @@
 /* eslint-disable max-lines -- test-renderer mounts native presentation with mocked bridges. */
-import { createElement, type ElementType } from 'react';
+import { createElement, type ElementType, useEffect, useState } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { ContextControl, type ContextDisplayScope } from '@/components/context-control';
+import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 import { OrganizationProvider, useOrganization } from '@/lib/organization-context';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -13,20 +14,30 @@ const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn
 const showPicker = vi.hoisted(() => vi.fn());
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
 const platform = vi.hoisted(() => ({ OS: 'android' }));
-const appearance = vi.hoisted(() => ({
+// Mutable so the palette cases can prove the picker re-reads the active palette,
+// not just that one set of values is passed through. The initial values mirror
+// the real dark tokens in theme-colors.generated.ts.
+const appearance = vi.hoisted((): { colors: Record<string, string>; bottom: number } => ({
   colors: {
     card: '#17171A',
     foreground: '#F2F0EB',
-    mutedForeground: '#888',
-    destructive: '#F28B7A',
+    mutedForeground: '#8A8680',
+    border: 'rgba(255, 255, 255, 0.07)',
   },
   bottom: 18,
 }));
 
-// The palette the hook returns unless a case overrides it. The $theme cases
+// The palette the hook returns unless a case overrides it. The palette cases
 // reassign `appearance.colors`, so the per-OS hook restores this default instead
 // of leaking a case's palette into the tests that run after it.
 const DEFAULT_COLORS = appearance.colors;
+const DARK_COLORS = { ...appearance.colors };
+const LIGHT_COLORS = {
+  card: '#FFFFFF',
+  foreground: '#14130F',
+  mutedForeground: '#6F6A61',
+  border: 'rgba(20, 15, 10, 0.09)',
+};
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
@@ -69,9 +80,16 @@ const orgs = [{ organizationId: 'org-a', organizationName: name, role: 'owner' }
 type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
 const mounted: Mounted[] = [];
 let persisted: string | null = null;
+let rerender: (() => void) | undefined = undefined;
 
 function Surface({ scope }: { scope?: ContextDisplayScope }) {
   const { organizationId: id } = useOrganization();
+  const [, setVersion] = useState(0);
+  useEffect(() => {
+    rerender = () => {
+      setVersion(version => version + 1);
+    };
+  }, []);
   return createElement('GlobalScope', { id }, createElement(ContextControl, { scope }));
 }
 
@@ -126,6 +144,8 @@ function nativePicker() {
 beforeEach(() => {
   auth.token = 'token';
   persisted = null;
+  rerender = undefined;
+  appearance.colors = { ...DARK_COLORS };
   list.mockReset().mockResolvedValue(orgs);
   storage.read.mockReset().mockResolvedValue(null);
   storage.write.mockReset().mockImplementation(async (_key: string, value: string) => {
@@ -250,6 +270,50 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     expect(nativePicker().options.containerStyle).toEqual({
       backgroundColor: DEFAULT_COLORS.card,
       paddingBottom: 18,
+    });
+  });
+
+  it('themes the native picker with the active theme colors', async () => {
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await press(picker(ui));
+    const dark = nativePicker();
+    expect(dark.options.title).toBe('Select account');
+    expect(dark.options.containerStyle).toEqual({
+      paddingBottom: 18,
+      backgroundColor: DARK_COLORS.card,
+    });
+    expect(dark.options.textStyle).toEqual({ color: DARK_COLORS.foreground });
+    expect(dark.options.titleTextStyle).toEqual({ color: DARK_COLORS.mutedForeground });
+
+    // Switching the active palette and re-rendering must change what the sheet
+    // receives; the picker cannot be hardcoding the dark tokens.
+    appearance.colors = { ...LIGHT_COLORS };
+    await act(() => {
+      rerender?.();
+    });
+    await press(picker(ui));
+    const light = nativePicker();
+    expect(light.options.containerStyle).toEqual({
+      paddingBottom: 18,
+      backgroundColor: LIGHT_COLORS.card,
+    });
+    expect(light.options.textStyle).toEqual({ color: LIGHT_COLORS.foreground });
+    expect(light.options.titleTextStyle).toEqual({ color: LIGHT_COLORS.mutedForeground });
+  });
+
+  it('keeps the mocked palettes mirroring the generated theme tokens', () => {
+    expect(DARK_COLORS).toEqual({
+      card: darkColors.card,
+      foreground: darkColors.foreground,
+      mutedForeground: darkColors.mutedForeground,
+      border: darkColors.border,
+    });
+    expect(LIGHT_COLORS).toEqual({
+      card: lightColors.card,
+      foreground: lightColors.foreground,
+      mutedForeground: lightColors.mutedForeground,
+      border: lightColors.border,
     });
   });
 

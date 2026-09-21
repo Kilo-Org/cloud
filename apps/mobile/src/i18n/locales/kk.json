@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} жол",
       "linesBadge_other": "{{displayCount}} жол",
       "matchesBadge_one": "{{displayCount}} сәйкестік",
-      "matchesBadge_other": "{{displayCount}} сәйкестік"
+      "matchesBadge_other": "{{displayCount}} сәйкестік",
+      "noOutput": "Шығыс жоқ."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} жолдары (қысқартылған)",
@@ -3180,15 +3181,7 @@
     "remoteOptionTitle": "Сіздің компьютеріңіз",
     "remoteOptionBody": "Kilo-ны өз машинаңызда `kilo remote` CLI арқылы іске қосыңыз.",
     "skip": "Турды өткізу",
-    "tutorialLabel": "Оқу",
-    "remoteTitle": "Бірінші қашық сессияңызды бастаңыз",
-    "remoteBody": "Компьютеріңізді қосып, сессияны осы жерден бастаңыз.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Әлі компьютер қосылмаған",
-    "remoteEmptyBody": "Оны қосу үшін компьютеріңізде `kilo remote` пәрменін орындаңыз.",
-    "remoteFound": "Компьютер қосылды",
-    "checkAgain": "Қайта тексеру",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Оқу"
   },
   "appActions": {
     "start": {

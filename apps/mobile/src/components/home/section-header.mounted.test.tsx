@@ -95,6 +95,31 @@ describe('SectionHeader mounted layout', () => {
     expect(text.children).toEqual(['See all']);
   });
 
+  it('renders Arabic labels without the mono family or letter spacing in RTL', () => {
+    i18nManager.isRTL = true;
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'الجلسات الجارية الآن',
+        actionLabel: 'عرض الكل',
+        onActionPress: () => undefined,
+      })
+    );
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
+    );
+    const action = root.findByProps({ accessibilityRole: 'button' });
+    const text = action.find(node => Object.is(node.type, 'Text'));
+
+    for (const node of [label, text]) {
+      const classes = (node.props.className as string).split(' ');
+      expect(classes.some(token => token.startsWith('font-mono'))).toBe(false);
+      expect(node.props.style).toContainEqual({ writingDirection: 'rtl' });
+      expect(node.props.style).toContainEqual({ letterSpacing: 0 });
+    }
+    expect(label.children).toEqual(['الجلسات الجارية الآن']);
+    expect(text.children).toEqual(['عرض الكل']);
+  });
+
   // Finding home-ar-loading: the Arabic section labels carried the Latin
   // uppercase letter-spacing, whose glyph gaps break a cursive script's joins
   // ('ال جلسا ت'). The display treatment is LTR-only.

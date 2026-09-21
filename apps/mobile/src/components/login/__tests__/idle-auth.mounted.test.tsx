@@ -1,6 +1,7 @@
+/* eslint-disable max-lines -- the SSO, provider-button, and email-continue suites share one IdleAuth mount harness and its native-module mocks; a second file would duplicate every mock. */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { openBrowserAsync } from 'expo-web-browser';
 import {
@@ -29,6 +30,7 @@ const passkeySupport = vi.hoisted(() => ({ supported: true }));
 // of state the busy treatment depends on.
 const nativeAuth = vi.hoisted(() => ({
   busy: undefined as 'passkey' | undefined,
+  googleConfigured: false,
   signInWithPasskey: vi.fn(),
 }));
 
@@ -39,7 +41,7 @@ vi.mock('@/lib/auth/passkey-client', () => ({
 vi.mock('@/lib/auth/use-native-auth', () => ({
   useNativeAuth: () => ({
     busy: nativeAuth.busy,
-    googleConfigured: false,
+    googleConfigured: nativeAuth.googleConfigured,
     signInWithApple: vi.fn(),
     signInWithGoogle: vi.fn(),
     signInWithPasskey: nativeAuth.signInWithPasskey,
@@ -277,6 +279,45 @@ describe('IdleAuth passkey control', () => {
     });
   });
 });
+describe('IdleAuth provider buttons stay single-line', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    passkeySupport.supported = true;
+    nativeAuth.busy = undefined;
+    nativeAuth.googleConfigured = true;
+  });
+
+  afterEach(() => {
+    nativeAuth.googleConfigured = false;
+  });
+
+  it.each([['Sign in with Google'], ['Sign in with a passkey']])(
+    'keeps %s on one line beside its icon',
+    async label => {
+      const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+      const btn = findButton(renderer.root, label);
+      // A `flex-wrap` row let a long catalog label (Arabic at a small width) push
+      // the icon onto its own line and stack the words into a card.
+      expect(btn.props.className).not.toContain('flex-wrap');
+      expect(btn.props.className).toContain('flex-row');
+
+      // The label is the button's own text node, capped to one line so it
+      // shrinks and ellipsizes instead of wrapping.
+      const labelTexts = btn.findAll(
+        n =>
+          typeof n.type === 'string' && (n.type as string) === 'Text' && n.props.children === label
+      );
+      expect(labelTexts).toHaveLength(1);
+      expect(labelTexts[0]?.props.numberOfLines).toBe(1);
+
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  );
+});
+
 describe('IdleAuth email continue copy', () => {
   it('shows a Continue button with email accessibility', async () => {
     const start = vi.fn<StartFn>();

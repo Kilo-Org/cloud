@@ -333,12 +333,17 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
                 onPress={openReviewSubmit}
                 disabled={loadFailed}
                 accessibilityLabel={t('prReview.submit.submitReview')}
-                // ScreenHeader caps a trailing action at half the row. A label
-                // that cannot shrink overflows that cap and is clipped by the
-                // screen edge at large font scales, so the button and its
-                // label shrink and wrap (as the Agents header action does)
-                // instead of drawing off-screen.
-                className={cn('min-w-0 shrink px-3')}
+                // The trailing header cluster is content-sized and never
+                // shrinks (ScreenHeader keeps fixed-width actions whole), so
+                // nothing squeezes this button from outside: a label grown by
+                // a large font scale used to push the whole cluster off the
+                // right screen edge (#6328). A variable-width label must be
+                // bounded at its source. 140 dp keeps the cluster — Share and
+                // Merge icon buttons included — on the narrowest 320 dp
+                // viewport and leaves 96 dp for the label, where the scale-2
+                // words ("Submit", "review") still fit, so the label wraps in
+                // place instead of clipping.
+                className={cn('min-w-0 max-w-[140px] shrink px-3')}
               >
                 <Check size={14} color={colors.primaryForeground} />
                 <Text className="shrink text-center">{t('prReview.submit.submitReview')}</Text>

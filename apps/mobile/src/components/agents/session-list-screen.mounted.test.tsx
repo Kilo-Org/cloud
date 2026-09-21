@@ -31,6 +31,8 @@ const state = vi.hoisted(() => ({
   leftInset: 0,
   rightInset: 0,
   tabBarHeight: 60,
+  keyboardPadding: 0,
+  bottomInsets: [] as number[],
   focusCallbacks: new Set<() => void>(),
   listeners: new Set<(state: string) => void>(),
   auth: { token: 'account' as string | undefined, isLoading: false, isSigningOut: false },
@@ -72,7 +74,24 @@ vi.mock('@/components/ui/activity-indicator', () => ({
 }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/centered-state-surface', () => ({
-  StateSurfaceInsets: ({ children }: { children: ReactNode }): ReactNode => children,
+  // Records each reservation instead of adding a node: the tree shape is part
+  // of other assertions in this file.
+  StateSurfaceInsets: ({
+    children,
+    bottomInset,
+  }: {
+    children: ReactNode;
+    bottomInset: number;
+  }): ReactNode => {
+    state.bottomInsets.push(bottomInset);
+    return children;
+  },
+}));
+// The keyboard read is one hook module; the screen's job is to fold its height
+// into the centred body's reservation, and the hook's own height arithmetic is
+// covered by app-aware-keyboard-padding-state.test.ts.
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
+  useAppAwareKeyboardPadding: () => state.keyboardPadding,
 }));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
@@ -363,6 +382,8 @@ beforeEach(() => {
   state.leftInset = 0;
   state.rightInset = 0;
   state.tabBarHeight = 60;
+  state.keyboardPadding = 0;
+  state.bottomInsets = [];
   state.focusCallbacks.clear();
   state.destination = '';
   state.sessionId = '';
@@ -952,6 +973,34 @@ describe('AgentSessionListScreen live presentation', () => {
     });
     expect(nodes('ActivityIndicator')).toHaveLength(0);
     expect(refresh().props.refreshing).toBe(false);
+  });
+
+  it('reserves the search keyboard height so the no-match body sits above it', async () => {
+    state.live.activeSessions = [row];
+    state.platform.OS = 'android';
+    await renderScreen();
+
+    // Keyboard down: the centred body keeps the tab bar + FAB band.
+    act(() => {
+      (requireNode('SessionListSearchHeader').props.onChangeText as (text: string) => void)(
+        'nothing matches this'
+      );
+    });
+    expect(nodes('CenteredState')).toHaveLength(1);
+    const tabBarBand = state.bottomInsets.at(-1);
+    expect(tabBarBand).toBeGreaterThan(0);
+
+    // Keyboard up: the reservation grows to the IME, so the empty state's hint
+    // line and its Clear search action stay in the visible band (the Android
+    // window never resizes for the IME, so they were cut off behind it).
+    state.keyboardPadding = 336;
+    await renderScreen();
+    expect(state.bottomInsets.at(-1)).toBe(336);
+
+    // Dismissed again: back to the tab bar + FAB band, no lingering gap.
+    state.keyboardPadding = 0;
+    await renderScreen();
+    expect(state.bottomInsets.at(-1)).toBe(tabBarBand);
   });
 
   it('passes a numeric attention revision as extraData to the live FlatList', async () => {

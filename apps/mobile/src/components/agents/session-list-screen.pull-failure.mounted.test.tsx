@@ -80,6 +80,9 @@ vi.mock('react-native', () => ({
     },
   },
   Platform: { OS: 'ios' },
+  // session-list-screen reads the IME height through
+  // useAppAwareKeyboardPadding; the listeners only fire on a real keyboard.
+  Keyboard: { addListener: () => ({ remove: () => undefined }) },
   Modal: 'Modal',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',

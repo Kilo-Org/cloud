@@ -136,6 +136,17 @@ async function compiledGapDp(rowClassName: string): Promise<number> {
 
 type Insets = { top: number; right: number; bottom: number; left: number };
 
+/** The hitSlop one side expresses, in dp: a numeric hitSlop is uniform. */
+function sideSlopDp(hitSlop: unknown, side: 'left' | 'right'): number {
+  if (typeof hitSlop === 'number') {
+    return hitSlop;
+  }
+  if (hitSlop && typeof hitSlop === 'object') {
+    return (hitSlop as Partial<Insets>)[side] ?? 0;
+  }
+  return 0;
+}
+
 const noop = (): void => undefined;
 
 async function mountHeader(showNewSession: boolean, onNewSession: () => void): Promise<R> {
@@ -208,16 +219,19 @@ describe('SessionListHeaderActions new-session control', () => {
     // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
     expect(gapDp).toBe(14);
 
-    const newSessionSlop = newSession.props.hitSlop as Insets;
-    const filterSlop = filter.props.hitSlop as Insets;
+    // hitSlop is a number (uniform) or per-side insets, depending on the
+    // control: the new-session control caps its right side with an object, the
+    // filter button declares one uniform value.
+    const newSessionRightSlop = sideSlopDp(newSession.props.hitSlop, 'right');
+    const filterLeftSlop = sideSlopDp(filter.props.hitSlop, 'left');
     // The new-session control sits left of the filter, so the gap has to fit
     // both facing slops; more than the gap means the two regions overlap.
-    expect(newSessionSlop.right + filterSlop.left).toBeLessThanOrEqual(gapDp);
+    expect(newSessionRightSlop + filterLeftSlop).toBeLessThanOrEqual(gapDp);
     // Capping the right side must not drop the control below the design target.
     const box = boxDp(newSession.props.className as string);
-    expect(box.width + newSessionSlop.left + newSessionSlop.right).toBeGreaterThanOrEqual(
-      TOUCH_TARGET_DP
-    );
+    expect(
+      box.width + sideSlopDp(newSession.props.hitSlop, 'left') + newSessionRightSlop
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
 
     act(() => {
       renderer.unmount();

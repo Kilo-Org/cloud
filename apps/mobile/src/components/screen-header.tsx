@@ -256,6 +256,23 @@ export function ScreenHeader({
       <View className="h-11 w-11 shrink-0" accessibilityElementsHidden pointerEvents="none" />
     ) : null;
 
+  // The trailing cluster sizes to its content and never shrinks (`shrink-0`).
+  // The previous `max-w-[50%] shrink` cap clamped the cluster's box on narrow
+  // screens (a 360 dp viewport gives the session header's PR badge + metrics
+  // pill cluster just 180 dp) while the fixed-width children kept painting at
+  // their full width — the last control's glyphs ran past the right screen
+  // edge and were cut off (device capture, session-compose-kbup). Content
+  // sizing moves the squeeze to the title: `heading` is `min-w-0 flex-1`, so
+  // a long title truncates in place and the controls stay whole inside the
+  // screen's own padding. The widest current cluster (PR badge + pill,
+  // ~190 dp) fits beside the 44 dp back control on the narrowest supported
+  // viewport (320 dp), so the title always keeps space to draw in.
+  //
+  // Content sizing gives a variable-width label nothing to shrink against, so
+  // a `headerRight` action whose width grows with its copy — pr-review's
+  // Submit review is the one today — must bound itself with its own max-w cap;
+  // an uncapped one pushes the whole cluster past the screen edge at large
+  // font scales (#6328).
   return (
     <View className={cn('bg-background px-4 pb-3', className)} style={safeAreaStyle}>
       <View style={sideInsetStyle}>
@@ -263,11 +280,7 @@ export function ScreenHeader({
           <View className="min-h-11 flex-row items-center">
             {backControl}
             <View className="min-w-0 flex-1 flex-row items-center justify-center">{heading}</View>
-            {headerRight ? (
-              <View className="ms-3 max-w-[50%] min-w-0 shrink">{headerRight}</View>
-            ) : (
-              centeredControls
-            )}
+            {headerRight ? <View className="ms-3 shrink-0">{headerRight}</View> : centeredControls}
           </View>
         ) : (
           <View className="flex-row items-center">
@@ -275,9 +288,7 @@ export function ScreenHeader({
               {backControl}
               {heading}
             </View>
-            {headerRight ? (
-              <View className="ms-3 min-w-0 max-w-[50%] shrink">{headerRight}</View>
-            ) : null}
+            {headerRight ? <View className="ms-3 shrink-0">{headerRight}</View> : null}
           </View>
         )}
       </View>

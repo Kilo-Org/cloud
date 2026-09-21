@@ -1318,6 +1318,7 @@ export function ChatComposer({
               hasSendableContent={control.hasSendableContent}
               inputAccessibilityDisabled={control.inputAccessibilityDisabled}
               inputEditable={control.inputEditable}
+              inputEmpty={characterCount === 0}
               inputRef={inputRef}
               isSending={isSending}
               isStreaming={isStreaming}

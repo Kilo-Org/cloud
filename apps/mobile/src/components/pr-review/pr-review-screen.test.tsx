@@ -273,11 +273,13 @@ describe('PrReviewScreen Submit review reachability (P1-F-46b)', () => {
   });
 });
 
-// The header caps a trailing action at half the row (ScreenHeader's
-// `max-w-[50%]`). A button whose label cannot shrink overflows that cap and is
-// clipped by the screen edge at large font scales — the explorer found the
-// Overview "Submit review" label cut off at font scale 2. The button and its
-// label must shrink and wrap instead, like the Agents header action.
+// The trailing header cluster is content-sized and never shrinks (ScreenHeader
+// keeps fixed-width actions whole — the session-compose-kbup fix), so nothing
+// squeezes the Submit-review button from outside. A label grown by a large
+// font scale used to push the whole cluster off the right screen edge — the
+// explorer found the Overview "Submit review" label cut off at font scale 2
+// (#6328). The button must bound itself with a hard max-w cap while keeping
+// the shrink allowance, so the label wraps in place instead of clipping.
 describe('PrReviewScreen Submit review header fit', () => {
   function findSubmitButton(): React.ReactElement | null {
     // eslint-disable-next-line new-cap
@@ -290,7 +292,26 @@ describe('PrReviewScreen Submit review header fit', () => {
     });
   }
 
-  it('lets the Submit review button shrink inside the header action slot', () => {
+  it('bounds the Submit review button so its label cannot push the cluster off-screen', () => {
+    const button = findSubmitButton();
+    if (!button) {
+      throw new Error('Submit review button not found');
+    }
+    const className = (button.props as { className?: string }).className ?? '';
+    // Widest the button may be with the Share and Merge icon buttons beside it
+    // on the narrowest supported 320 dp viewport: 132 dp of row (288 dp of
+    // px-4 content − 48 dp back control + gap − 12 dp cluster margin − 96 dp
+    // Share/Merge cluster) plus the 16 dp gutter that keeps an at-cap cluster
+    // on-screen. Without a cap the font-scale-2 label pushed the cluster past
+    // the screen edge (#6328); the regression cannot come back uncapped.
+    const cap = /max-w-\[(\d+)px\]/.exec(className);
+    if (!cap) {
+      throw new Error('Submit review button has no max-w cap');
+    }
+    expect(Number(cap[1])).toBeLessThanOrEqual(148);
+  });
+
+  it('keeps the Submit review button shrinkable so the label wraps inside the cap', () => {
     const button = findSubmitButton();
     if (!button) {
       throw new Error('Submit review button not found');
@@ -320,7 +341,7 @@ describe('PrReviewScreen Submit review header fit', () => {
       allowFontScaling?: boolean;
     };
     // Wrapping, not truncation: no line cap and no disabled scaling, so a
-    // large font scale grows the button instead of clipping the label.
+    // large font scale wraps the label inside the cap instead of clipping it.
     expect(labelProps.numberOfLines).toBeUndefined();
     expect(labelProps.allowFontScaling).not.toBe(false);
   });

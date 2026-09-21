@@ -61,6 +61,9 @@ vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshCont
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   AppState: { addEventListener: () => ({ remove: () => undefined }) },
+  // session-list-screen reads the IME height through
+  // useAppAwareKeyboardPadding; the listeners only fire on a real keyboard.
+  Keyboard: { addListener: () => ({ remove: () => undefined }) },
   View: 'View',
   FlatList: 'FlatList',
   Pressable: 'Pressable',

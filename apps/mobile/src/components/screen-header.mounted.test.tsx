@@ -237,9 +237,34 @@ describe('ScreenHeader mounted', () => {
     expect(await compiledMarginProperties(headerRight.props.className as string)).toEqual([
       'marginInlineStart',
     ]);
-    expect(headerRight.props.className).toContain('max-w-[50%]');
-    expect(headerRight.props.className).toContain('shrink');
-    expect(headerRight.props.className).not.toContain('shrink-0');
+  });
+
+  it('sizes the trailing cluster to its content so the last control stays inside the screen', () => {
+    // The previous `max-w-[50%] shrink` cap clamped the cluster's box on
+    // narrow screens while its fixed-width children (PR badge, metrics pill)
+    // kept painting at full width — the rightmost action's glyphs ran past
+    // the right screen edge and were cut off (session-compose-kbup capture).
+    // The cluster must never shrink or clamp; the title absorbs the squeeze.
+    const renderer = renderHeader({ title: 'Sessions', headerRight: 'RIGHT' });
+
+    const headerRight = findHeaderRight(renderer.root);
+    const clusterClass = headerRight.props.className as string;
+    expect(clusterClass.split(/\s+/u).toSorted()).toEqual(['ms-3', 'shrink-0']);
+
+    // The squeeze lands on the heading: it may shrink to zero width
+    // (`min-w-0`) inside the flex-1 slot, so a long title truncates in place
+    // instead of pushing the trailing cluster off-screen.
+    const heading = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        node.props.className === 'min-w-0 flex-1 flex-row items-center gap-1'
+    )[0];
+    if (!heading) {
+      throw new Error('heading row not found');
+    }
+    expect(heading.props.className).toContain('min-w-0');
+    expect(heading.props.className).toContain('flex-1');
   });
 
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {

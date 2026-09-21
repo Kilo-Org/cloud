@@ -2118,13 +2118,17 @@ export function SessionDetailContent({
             Gated on has-messages so the empty/connecting path (which
             renders the centered status indicator inside `renderContent`)
             does not double-render. While preparing, suppressed when the
-            transcript already shows PreparationGroup (no duplicate). */}
+            transcript already shows PreparationGroup (no duplicate).
+            No `layout` transition on purpose: this wrapper animates its
+            position across keyboard show/hide and blocking-card
+            mount/unmount, and a Reanimated layout transition interrupted
+            by that same resize storm can strand the row at its pre-change
+            Y — floating mid-screen over the transcript, where the red
+            error line drew on top of a transcript row (device capture,
+            question-kb-down). FadeIn/FadeOut only touch opacity, so the
+            entry/exit cues stay; the position is always plain layout. */}
         {showSessionFooterRow ? (
-          <Animated.View
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(150)}
-            layout={LinearTransition.duration(150)}
-          >
+          <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
             {/* Raw list on purpose: working-indicator.tsx:50-59 derives the
                 label from the last assistant part, and compute-status.ts:33-35
                 maps a reasoning part to agentChat.partDetail.thinking, so the

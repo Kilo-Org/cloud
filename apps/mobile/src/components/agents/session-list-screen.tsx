@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Bot, Plus } from '@/components/ui/icons';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
+import { useAppAwareKeyboardPadding } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { EmptyState } from '@/components/empty-state';
 import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
@@ -14,6 +15,7 @@ import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
+import { SessionListSkeletonRows } from '@/components/agents/session-list-skeleton-rows';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
@@ -21,7 +23,6 @@ import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -30,8 +31,6 @@ import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
-
-const SKELETON_ROW_COUNT = 8;
 
 export function AgentSessionListScreen() {
   const router = useRouter();
@@ -62,6 +61,7 @@ export function AgentSessionListScreen() {
   const query = useLiveSessionQuery(activeSessions);
   const { visibleSessions, isSearching } = query;
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const keyboardPadding = useAppAwareKeyboardPadding();
 
   const refetchRef = useRef(refetch);
   useEffect(() => {
@@ -246,17 +246,21 @@ export function AgentSessionListScreen() {
     [left, right]
   );
 
+  // The centred bodies (the no-match state with its Clear search action, the
+  // load-failure state) must land in the band the search field's keyboard
+  // leaves visible: the Android window never resizes for the IME, so the hint
+  // line and the action were cut off behind it and unreachable while the field
+  // still held the reader's query. The rows list is unaffected — it sizes
+  // itself from `listInsets`, not from the surface. The tab bar + FAB band is
+  // the floor, so a dismissed keyboard leaves no gap.
+  const bottomInset = useMemo(
+    () => Math.max(tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0), keyboardPadding),
+    [showFab, tabBarHeight, keyboardPadding]
+  );
+
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
-    body = (
-      <View className="pt-[18px]">
-        {Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => (
-          <View key={i} className="py-1.5" style={sidePadding}>
-            <Skeleton className="h-[76px] rounded-none" />
-          </View>
-        ))}
-      </View>
-    );
+    body = <SessionListSkeletonRows sidePadding={sidePadding} />;
   } else if (hasLiveRows && visibleSessions.length === 0) {
     // The reserved band is mounted here too (the sessions exist behind the
     // filter), so the native control gets the same treatment as the rows
@@ -309,7 +313,7 @@ export function AgentSessionListScreen() {
   }
 
   return (
-    <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
+    <StateSurfaceInsets bottomInset={bottomInset}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}

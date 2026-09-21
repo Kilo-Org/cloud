@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { ContextControl, type ContextDisplayScope } from '@/components/context-control';
+import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 import { OrganizationProvider, useOrganization } from '@/lib/organization-context';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -28,7 +29,7 @@ const LIGHT_COLORS = {
   card: '#FFFFFF',
   foreground: '#14130F',
   mutedForeground: '#6F6A61',
-  border: 'rgba(0, 0, 0, 0.07)',
+  border: 'rgba(20, 15, 10, 0.09)',
 };
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
@@ -228,6 +229,21 @@ describe('ContextControl', () => {
     });
     expect(light.options.textStyle).toEqual({ color: LIGHT_COLORS.foreground });
     expect(light.options.titleTextStyle).toEqual({ color: LIGHT_COLORS.mutedForeground });
+  });
+
+  it('keeps the mocked palettes mirroring the generated theme tokens', () => {
+    expect(DARK_COLORS).toEqual({
+      card: darkColors.card,
+      foreground: darkColors.foreground,
+      mutedForeground: darkColors.mutedForeground,
+      border: darkColors.border,
+    });
+    expect(LIGHT_COLORS).toEqual({
+      card: lightColors.card,
+      foreground: lightColors.foreground,
+      mutedForeground: lightColors.mutedForeground,
+      border: lightColors.border,
+    });
   });
 
   it('recovers an unavailable organization through Personal after an empty membership result', async () => {

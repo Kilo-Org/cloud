@@ -121,3 +121,35 @@ export async function acknowledgeGooglePlaySubscriptionPurchase(
     if (current.acknowledgementState !== 'ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED') throw error;
   }
 }
+
+/**
+ * Refunds the latest charge and revokes the subscription immediately.
+ *
+ * A user holds at most one Kilo Pass, so a second paid subscription is a
+ * duplicate: the charge is reversed instead of admitted. The full amount is
+ * refunded because Kilo granted nothing against a duplicate purchase; the
+ * Kilo-side clawback (`reverseGooglePlayRefundCredits`) accounts for the spent
+ * side, so the customer nets amount paid minus amount spent.
+ *
+ * A caller must treat a throw as "not reversed" and keep the notification
+ * unprocessed, because retiring a charged order without a reversal loses money.
+ */
+export async function revokeGooglePlaySubscriptionPurchase(purchaseToken: string): Promise<void> {
+  const client = createGooglePlayAndroidPublisherClient();
+  try {
+    await client.purchases.subscriptionsv2.revoke({
+      packageName: GOOGLE_PLAY_PACKAGE_NAME,
+      token: purchaseToken,
+      requestBody: { revocationContext: { fullRefund: {} } },
+    });
+  } catch (error) {
+    // A retried notification can find the subscription already revoked, and
+    // Play then rejects the repeat call. Only EXPIRED proves the reversal took
+    // effect: CANCELED, PAUSED, ON_HOLD and PENDING can still be entitled and
+    // still charged, so their errors must keep the notification unprocessed.
+    const current = await getGooglePlaySubscriptionPurchase(purchaseToken);
+    if (current.subscriptionState !== 'SUBSCRIPTION_STATE_EXPIRED') {
+      throw error;
+    }
+  }
+}

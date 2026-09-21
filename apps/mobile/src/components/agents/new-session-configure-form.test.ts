@@ -99,6 +99,10 @@ vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
+// The profile row renders a loading skeleton, and `@/components/ui/skeleton`
+// pulls `react-native-reanimated`, which this pure suite does not set up.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
 }));

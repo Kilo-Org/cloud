@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
+import { TabBarLabel } from '@/components/tab-bar-label';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
 import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
@@ -60,14 +61,18 @@ function TabBarBackground() {
  * On the single reserved line a label too wide for its tab (a narrow window, a
  * long translation) shrinks to fit rather than wrapping: a second line has no
  * height reserved, so it renders clipped at the bar's edge ("PROFIL E" at
- * 160 dp, e1, 2026-09-21). The two-line presentation is reserved for the
- * font-scale case, where the bar grows to hold it.
+ * 160 dp, e1, 2026-09-21). Where the bar does reserve a second line (the wrap
+ * font scale) the shared `TabBarLabel` renders it: the two-line copy that
+ * carries its own break, and one truncated line for every other label.
  */
 function TabLabel({
   label,
   focused,
   allowWrap,
 }: Readonly<{ label: string; focused: boolean; allowWrap: boolean }>) {
+  if (allowWrap) {
+    return <TabBarLabel label={label} focused={focused} />;
+  }
   return (
     <Text
       accessible={false}
@@ -76,8 +81,8 @@ function TabLabel({
           ? 'w-full text-center font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px] text-foreground'
           : 'w-full text-center font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px] text-muted-foreground'
       }
-      numberOfLines={allowWrap ? 2 : 1}
-      adjustsFontSizeToFit={!allowWrap}
+      numberOfLines={1}
+      adjustsFontSizeToFit
       minimumFontScale={TAB_LABEL_MINIMUM_FONT_SCALE}
       ellipsizeMode="tail"
     >

@@ -9,8 +9,6 @@ import {
 } from 'react';
 import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
-import * as Clipboard from 'expo-clipboard';
-import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { type Pressable } from 'react-native';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
@@ -231,12 +229,14 @@ vi.mock('@/components/agents/context-usage-ring', () => ({
   ContextUsageRing: 'ContextUsageRing',
 }));
 // The real context sheet (rendered so the auto-approve row can be asserted)
-// reaches `copySessionId`, which imports the native `expo-clipboard` module that
-// cannot load in this DOM-free node suite. Mock the boundary, as the mounted
-// context-sheet suite does. The session header's copy-link action reaches the
-// same native module through the real chat-link copy path.
+// reaches `copySessionId`/`copySessionLink`, which import the native
+// `expo-clipboard` module that cannot load in this DOM-free node suite. Mock
+// the boundary, as the mounted context-sheet suite does.
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
-vi.mock('@/components/agents/session-row-actions', () => ({ copySessionId: vi.fn() }));
+vi.mock('@/components/agents/session-row-actions', () => ({
+  copySessionId: vi.fn(),
+  copySessionLink: vi.fn(),
+}));
 // The copy-link path reaches the browser helper; its native module cannot load here.
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 // The handoff advertiser owns the OS entry point (Head plus Android's launcher
@@ -570,6 +570,10 @@ function page(
 // resolves with this cursor instead of the default `null`.
 let rootPageNextCursor: string | null = null;
 
+// Set before `mountDetails` by the long-title header tests; `fetchSession`
+// reports this session title instead of the short default.
+let sessionTitleOverride: string | null = null;
+
 function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
   return renderer.root.findAll(node => Object.is(node.type, 'MessageList'));
 }
@@ -584,6 +588,7 @@ beforeEach(() => {
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
   rootPageNextCursor = null;
+  sessionTitleOverride = null;
   condensePreference.value = false;
   currentUserId.value = 'test-user';
   connectionHealth.isConnected = true;
@@ -672,7 +677,7 @@ async function mountDetails(
       return {
         kiloSessionId: id,
         cloudAgentSessionId: null,
-        title: `Root ${id}`,
+        title: sessionTitleOverride ?? `Root ${id}`,
         organizationId: null,
         gitUrl: null,
         gitBranch: null,
@@ -841,7 +846,7 @@ describe('SessionDetailContent display scope', () => {
     });
     const header = renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 2,
+      numberOfLines: 1,
       ellipsizeMode: 'tail',
     });
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
@@ -864,6 +869,22 @@ describe('SessionDetailContent display scope', () => {
     expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)']);
     expect(globalContext.organizationId).toBe('global-org');
     expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
+  });
+});
+
+describe('SessionDetailContent header title', () => {
+  // The title shares its row with a 44pt context pill and a copy action, so on
+  // a narrow phone the title column is a fraction of the row width. Letting the
+  // Text wrap there split a long word across two lines and truncated the second
+  // ("Moving-ave / rage empt…"). One line keeps the truncation at a clean tail
+  // ellipsis instead of breaking a word across two lines.
+  it('keeps a long session title on one line instead of breaking a word across two', async () => {
+    sessionTitleOverride = 'Moving-average rage empty baseline';
+    const { renderer } = await mountDetails();
+    const header = renderer.root.findByType(ScreenHeader);
+    const title = header.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.numberOfLines).toBe(1);
+    expect(title.props.ellipsizeMode).toBe('tail');
   });
 });
 
@@ -1505,7 +1526,7 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
 
     const header = view.renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 2,
+      numberOfLines: 1,
       ellipsizeMode: 'tail',
     });
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
@@ -2282,6 +2303,34 @@ describe('SessionDetailContent goal visibility', () => {
   });
 });
 
+describe('SessionDetailContent transcript entrance', () => {
+  beforeEach(() => {
+    motionPolicy.reducedMotion = false;
+  });
+
+  /** The wrapper the screen draws around the transcript list. */
+  function transcriptWrapperOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (list === undefined) {
+      throw new Error('Missing SessionMessageList');
+    }
+    const wrapper = list.parent;
+    if (wrapper === null) {
+      throw new Error('Missing the transcript wrapper');
+    }
+    return wrapper;
+  }
+
+  it('paints the transcript without an entrance animation', async () => {
+    const animated = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    // The transcript body must never depend on an entrance animation to become
+    // visible: Reanimated's `FadeIn` carries `initialValues: { opacity: 0 }`, so
+    // a device that drops or never runs the entrance paints the whole body
+    // blank while the header already shows the loaded token count.
+    expect(transcriptWrapperOf(animated).props.entering).toBeUndefined();
+  });
+});
+
 describe('SessionDetailContent last-opened record', () => {
   it('records the viewed session when the identity resolves after the first render', async () => {
     // A cold start: the session renders before `user.getMe` answers, so the
@@ -2359,11 +2408,10 @@ describe('SessionDetailContent goal edit dialog', () => {
 });
 
 // The screen's live position: the transcript list reports the topmost visible
-// message, and the screen publishes it to the OS handoff, the copy-link action,
-// and the route's search params.
+// message, and the screen publishes it to the OS handoff and the route's
+// search params.
 describe('SessionDetailContent live position', () => {
-  it('publishes the transcript position to the handoff, the copy action, and the route', async () => {
-    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+  it('publishes the transcript position to the handoff and the route', async () => {
     routerSetParams.mockClear();
     handoffAdvertiserCalls.props.length = 0;
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
@@ -2378,18 +2426,6 @@ describe('SessionDetailContent live position', () => {
 
     // The handoff advertises the position the transcript is showing.
     expect(handoffAdvertiserCalls.props.at(-1)?.anchorMessageId).toBe('msg-77');
-
-    // The header's copy action copies that same position's universal link.
-    const copy = view.renderer.root.findByProps({
-      accessibilityLabel: i18n.t('common.copyLink'),
-    });
-    await act(async () => {
-      (copy.props as { onPress: () => void }).onPress();
-      await Promise.resolve();
-    });
-    expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
-      sessionResumeUrl({ sessionId: ROOT_ID, anchorMessageId: 'msg-77' })
-    );
 
     // The route's search params carry it after the publish debounce.
     await act(async () => {
@@ -2535,6 +2571,74 @@ describe('SessionDetailContent send transcript take-over', () => {
     });
 
     expect(followTailNonceOf(view)).toBe(1);
+  });
+});
+
+// The fixed indicator row sits outside the transcript list. A position layout
+// transition would paint it over the transcript rows it passes while the list
+// resizes (profile-screen.tsx:275-277), so it must snap and stay opaque.
+describe('SessionDetailContent fixed indicator row', () => {
+  const footerMessage: StoredMessage = {
+    info: { ...assistantMessage('msg-footer').info, sessionID: ROOT_ID },
+    parts: [
+      stubTextPart({
+        id: 'text-msg-footer',
+        sessionID: ROOT_ID,
+        messageID: 'msg-footer',
+        text: 'Visible answer',
+      }),
+    ],
+  };
+
+  // The shared fixture's goal slot is module-level; clear it so these cases
+  // mount the plain transcript.
+  beforeEach(() => {
+    goalMountOptions = {};
+  });
+
+  function indicatorRowOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    let node: ReactTestInstance | null = view.renderer.root.findByType(WorkingIndicator);
+    while (node != null && node.type !== ('AnimatedView' as ElementType)) {
+      node = node.parent;
+    }
+    if (node === null) {
+      throw new Error('Missing the fixed indicator row wrapper');
+    }
+    return node;
+  }
+
+  it.each([
+    { type: 'error', message: 'simulated error' },
+    { type: 'warning', message: 'Retrying… simulated error' },
+  ] as const)(
+    'keeps the $type indicator row from animating its position over the transcript',
+    async indicator => {
+      const view = await mountDetails([footerMessage]);
+      act(() => {
+        view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+          view.manager.atoms.statusIndicator,
+          { ...indicator, timestamp: 0 }
+        );
+      });
+      const row = indicatorRowOf(view);
+      // A position layout transition paints this row over the transcript rows it
+      // passes (profile-screen.tsx:275-277); the opacity fades stay.
+      expect(row.props.layout).toBeUndefined();
+      expect(row.props.entering).toBeDefined();
+      expect(row.props.exiting).toBeDefined();
+      expect(String(row.props.className)).toContain('bg-background');
+    }
+  );
+
+  it('renders no fixed indicator row for an empty transcript', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'error', message: 'simulated error', timestamp: 0 }
+      );
+    });
+    expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
   });
 });
 

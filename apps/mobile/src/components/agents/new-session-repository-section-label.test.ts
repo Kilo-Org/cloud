@@ -80,7 +80,7 @@ describe('NewSessionRepositorySection open label', () => {
     const className = labelNode(renderer, i18n.t('agentChat.newSession.openGitlab'))?.props
       .className as string;
 
-    expect(className).toContain('me-[23px]');
+    expect(className).toContain('me-[24px]');
     expect(className).not.toMatch(/\bmr-|margin-?[rR]ight/);
   });
 

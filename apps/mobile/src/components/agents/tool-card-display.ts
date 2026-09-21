@@ -1,15 +1,11 @@
 import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { buildToolDetailSummary } from '@kilocode/app-shared/tool-detail';
 import { z } from 'zod';
 
 import { i18n } from '@/i18n';
 import { formatList, formatNumber } from '@/lib/format';
 import { getToolFileAttachments, getToolImageAttachments } from './tool-card-attachments';
-import {
-  getDirectoryName,
-  getFilename,
-  getGenericToolTitle,
-  truncateText,
-} from './tool-card-utils';
+import { getDirectoryName, getFilename, truncateText } from './tool-card-utils';
 import { listPatchFilePaths } from './tool-patch-model';
 import { buildResultRowsModel } from './tool-list-model';
 import { suggestionToolMetadataSchema } from './suggestion-card-state';
@@ -262,10 +258,19 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
     default: {
       const stateTitle =
         status === 'running' || status === 'completed' ? part.state.title : undefined;
+      const detail = buildToolDetailSummary(part);
+      const summary = detail.name === part.tool ? detail.summary : undefined;
       return {
         title: part.tool,
-        subtitle: getGenericToolTitle(part.tool, stateTitle, input),
-        translatable: Boolean(stateTitle?.trim()),
+        subtitle:
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- a whitespace-only state title must fall through to the projected name; ?? would keep it
+          stateTitle?.trim() || (summary !== undefined ? truncateText(summary, 60) : detail.name),
+        // The state title and the projected argument summary are agent prose.
+        // A known-tool label (`Publish Image`) is raw English app copy with no
+        // catalog, so it must reach the gateway like agent prose; a raw tool id
+        // or an `mcp` `server/tool` identifier is an id and stays out, like the
+        // already-localized fallback labels above.
+        translatable: Boolean(stateTitle?.trim()) || summary !== undefined || detail.nameIsLabel,
       };
     }
   }

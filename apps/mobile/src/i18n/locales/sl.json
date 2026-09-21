@@ -870,8 +870,11 @@
       "sessionStatusTitle": "Stanje seje",
       "sessionStatusSubtitle": "končano / neuspešno / pripravljeno za upravljanje",
       "kiloclawActivitySubtitle": "instanca pripravljena ali neuspešna, načrtovana dejanja",
+      "kiloclawActivityUnavailable": "Zaženi instanco KiloClaw, da prejemaš dejavnost KiloClaw.",
       "balanceAlertsSubtitle": "opozorila o nizkem stanju organizacije",
-      "securityFindingsSubtitle": "nove ugotovitve in opomniki SLA"
+      "balanceAlertsUnavailable": "Pridruži se organizaciji, da prejemaš opozorila o nizkem stanju.",
+      "securityFindingsSubtitle": "nove ugotovitve in opomniki SLA",
+      "securityFindingsUnavailable": "Vklopi varnostnega agenta Kilo v obsegu, da prejemaš varnostne ugotovitve."
     },
     "action": {
       "openSession": "Odpri sejo"
@@ -2132,6 +2135,10 @@
       "couldNotLoad": "Seje ni bilo mogoče naložiti.",
       "failedToLoadDetails": "Podrobnosti seje ni bilo mogoče naložiti.",
       "failedToStopExecution": "Izvajanja ni bilo mogoče ustaviti.",
+      "stopped": "Seja ustavljena",
+      "committing": "Uveljavljanje…",
+      "committed": "Uveljavljeno",
+      "commitFailed": "Uveljavljanje ni uspelo",
       "renameSession": "Preimenuj sejo",
       "renamePlaceholder": "Ime seje",
       "transcriptAccessibility": "Zapis pogovora v seji",
@@ -2280,7 +2287,8 @@
       "matchesBadge_one": "{{displayCount}} zadetek",
       "matchesBadge_other": "{{displayCount}} zadetkov",
       "matchesBadge_two": "{{displayCount}} zadetka",
-      "matchesBadge_few": "{{displayCount}} zadetki"
+      "matchesBadge_few": "{{displayCount}} zadetki",
+      "noOutput": "Ni izhoda."
     },
     "readToolMarkdown": {
       "linesTruncated": "vrstice {{start}}–{{end}} (skrajšano)",
@@ -3266,15 +3274,7 @@
     "remoteOptionTitle": "Vaš računalnik",
     "remoteOptionBody": "Zaženi Kilo na svojem računalniku prek CLI-ja `kilo remote`.",
     "skip": "Preskoči ogled",
-    "tutorialLabel": "Vodič",
-    "remoteTitle": "Zaženite svojo prvo oddaljeno sejo",
-    "remoteBody": "Poveži svoj računalnik, nato pa tu zaženi sejo.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Še ni povezanega računalnika",
-    "remoteEmptyBody": "Če ga želite povezati, zaženite `kilo remote` na svojem računalniku.",
-    "remoteFound": "Računalnik povezan",
-    "checkAgain": "Preveri znova",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Vodič"
   },
   "appActions": {
     "start": {

@@ -1,4 +1,4 @@
-/* eslint-disable id-length, import/no-nodejs-modules, max-lines, no-await-in-loop, promise/avoid-new, promise/no-callback-in-promise, promise/prefer-await-to-callbacks */
+/* eslint-disable id-length, import/max-dependencies, import/no-nodejs-modules, max-lines, no-await-in-loop, promise/avoid-new, promise/no-callback-in-promise, promise/prefer-await-to-callbacks -- the Firefox harness vendors the Selenium driver plus the browser-tool contract and its own fixture helpers */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -10,6 +10,10 @@ import { fileURLToPath } from 'node:url';
 import { Builder, By, Key } from 'selenium-webdriver';
 import type { WebDriver, WebElement } from 'selenium-webdriver';
 import firefox, { ServiceBuilder } from 'selenium-webdriver/firefox';
+import {
+  BROWSER_TOOL_CONTRACT,
+  KILO_BROWSER_TOOL_PREFIX,
+} from '../../src/shared/browser-tool-contract';
 import { z } from 'zod';
 
 const extensionRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -73,15 +77,23 @@ const workflowToolNames = [
   'save_memory',
 ] as const;
 
-const safeToolNames = [
-  'get_page_snapshot',
-  'get_element_details',
-  'find_in_page',
+// The model-facing browser tool set the extension exposes: the vendored Playwright MCP
+// Contract under the kilo_ prefix. Safe mode sends only the read-only entries.
+const toKiloToolName = (name: string): string => `${KILO_BROWSER_TOOL_PREFIX}${name}`;
+const allKiloBrowserToolNames: readonly string[] = BROWSER_TOOL_CONTRACT.map(entry =>
+  toKiloToolName(entry.name)
+);
+const safeKiloBrowserToolNames: readonly string[] = BROWSER_TOOL_CONTRACT.filter(
+  entry => entry.readOnly
+).map(entry => toKiloToolName(entry.name));
+
+const safeToolNames: readonly string[] = [
+  ...safeKiloBrowserToolNames,
   'web_search',
   'search_memories',
   'get_memory',
   ...workflowToolNames,
-] as const;
+];
 
 interface ServerHandle {
   readonly close: () => Promise<void>;
@@ -106,7 +118,7 @@ interface KiloApiOptions {
   readonly seenChatBodies?: unknown[];
   readonly seenChatOrganizationIds?: string[];
   readonly thirdCompletionEvents?: unknown[];
-  readonly toolNames?: string[];
+  readonly toolNames?: readonly string[];
 }
 
 interface KiloApiHandle extends ServerHandle {
@@ -174,15 +186,12 @@ const chatCompletionStreamResponse = (events: unknown[]): string => {
   return `${[...events, ...terminal].map(event => `data: ${JSON.stringify(event)}\n\n`).join('')}data: [DONE]\n\n`;
 };
 
-const defaultEvalCode = 'return document.documentElement.outerHTML.length;';
-const dangerousToolNames = [
-  'get_page_snapshot',
-  'get_element_details',
-  'find_in_page',
+const defaultEvaluateFunction = '() => document.documentElement.outerHTML.length';
+const dangerousToolNames: readonly string[] = [
+  ...allKiloBrowserToolNames,
   'web_search',
   'search_memories',
   'get_memory',
-  'eval',
   ...workflowToolNames,
   'run_workflow',
   'delete_workflow',
@@ -197,8 +206,8 @@ const defaultFirstCompletionEvents = (): unknown[] => [
           tool_calls: [
             {
               function: {
-                arguments: JSON.stringify({ code: defaultEvalCode }),
-                name: 'eval',
+                arguments: JSON.stringify({ function: defaultEvaluateFunction }),
+                name: 'kilo_browser_evaluate',
               },
               id: 'call_eval_1',
               index: 0,
@@ -1365,8 +1374,8 @@ const scenarios: FirefoxScenario[] = [
                     tool_calls: [
                       {
                         function: {
-                          arguments: JSON.stringify({ code: 'return document.title;' }),
-                          name: 'eval',
+                          arguments: JSON.stringify({ function: '() => document.title' }),
+                          name: 'kilo_browser_evaluate',
                         },
                         id: 'call_eval_2',
                         index: 0,
@@ -1388,7 +1397,7 @@ const scenarios: FirefoxScenario[] = [
 
           const bodyText = await getBodyText(session.driver);
 
-          assert.equal((bodyText.match(/eval completed/gu) ?? []).length, 2);
+          assert.equal((bodyText.match(/Evaluate JavaScript completed/gu) ?? []).length, 2);
           assert.doesNotMatch(bodyText, /requested another eval/u);
         }
       ),
@@ -1448,15 +1457,7 @@ const scenarios: FirefoxScenario[] = [
           beforeFirstCompletion: () => pendingFirstCompletion,
           firstCompletionEvents: [{ choices: [{ delta: { content: 'First tab finished.' } }] }],
           secondCompletionEvents: [{ choices: [{ delta: { content: 'Second tab finished.' } }] }],
-          toolNames: [
-            'get_page_snapshot',
-            'get_element_details',
-            'find_in_page',
-            'web_search',
-            'search_memories',
-            'get_memory',
-            ...workflowToolNames,
-          ],
+          toolNames: [...safeToolNames],
         },
         async session => {
           try {
@@ -1495,15 +1496,7 @@ const scenarios: FirefoxScenario[] = [
           secondCompletionEvents: [
             { choices: [{ delta: { content: 'Second persisted reply.' } }] },
           ],
-          toolNames: [
-            'get_page_snapshot',
-            'get_element_details',
-            'find_in_page',
-            'web_search',
-            'search_memories',
-            'get_memory',
-            ...workflowToolNames,
-          ],
+          toolNames: [...safeToolNames],
         },
         async session => {
           await session.openTargetPage();
@@ -1533,15 +1526,7 @@ const scenarios: FirefoxScenario[] = [
         {
           firstCompletionEvents: [{ choices: [{ delta: { content: 'Keep this reply.' } }] }],
           secondCompletionEvents: [{ choices: [{ delta: { content: 'Close this reply.' } }] }],
-          toolNames: [
-            'get_page_snapshot',
-            'get_element_details',
-            'find_in_page',
-            'web_search',
-            'search_memories',
-            'get_memory',
-            ...workflowToolNames,
-          ],
+          toolNames: [...safeToolNames],
         },
         async session => {
           await session.openTargetPage();
@@ -1816,15 +1801,7 @@ const scenarios: FirefoxScenario[] = [
           firstCompletionEvents: [
             { choices: [{ delta: { content: 'Delayed Firefox reply arrived.' } }] },
           ],
-          toolNames: [
-            'get_page_snapshot',
-            'get_element_details',
-            'find_in_page',
-            'web_search',
-            'search_memories',
-            'get_memory',
-            ...workflowToolNames,
-          ],
+          toolNames: [...safeToolNames],
         },
         async session => {
           try {
@@ -1968,15 +1945,7 @@ const scenarios: FirefoxScenario[] = [
           secondCompletionEvents: [
             { choices: [{ delta: { content: 'Second Firefox reply after bottom.' } }] },
           ],
-          toolNames: [
-            'get_page_snapshot',
-            'get_element_details',
-            'find_in_page',
-            'web_search',
-            'search_memories',
-            'get_memory',
-            ...workflowToolNames,
-          ],
+          toolNames: [...safeToolNames],
         },
         async session => {
           try {
@@ -2117,10 +2086,10 @@ const scenarios: FirefoxScenario[] = [
     run: context =>
       withSession(context.api, {}, async session => {
         await submitDangerousPrompt(session, 'Inspect this tab and tell me the HTML length');
-        await waitForText(session.driver, 'eval completed');
+        await waitForText(session.driver, 'Evaluate JavaScript completed');
         await waitForTextMatch(session.driver, /The selected tab HTML length is [0-9]+\./u);
         await clickButtonByLabel(session.driver, 'New conversation');
-        await waitForTextGone(session.driver, 'eval completed');
+        await waitForTextGone(session.driver, 'Evaluate JavaScript completed');
         // Empty transcript state (not a seeded assistant message).
         await waitForText(session.driver, 'Pick a tab and ask Kilo to inspect it.');
       }),
@@ -2141,7 +2110,7 @@ const scenarios: FirefoxScenario[] = [
                       {
                         function: {
                           arguments: JSON.stringify({}),
-                          name: 'get_page_snapshot',
+                          name: 'kilo_browser_snapshot',
                         },
                         id: 'call_snapshot_1',
                         index: 0,
@@ -2156,15 +2125,7 @@ const scenarios: FirefoxScenario[] = [
           secondCompletionEvents: [
             { choices: [{ delta: { content: 'The page is the Kilo extension fixture.' } }] },
           ],
-          toolNames: [
-            'get_page_snapshot',
-            'get_element_details',
-            'find_in_page',
-            'web_search',
-            'search_memories',
-            'get_memory',
-            ...workflowToolNames,
-          ],
+          toolNames: [...safeToolNames],
         },
         async session => {
           await session.openTargetPage();
@@ -2172,7 +2133,7 @@ const scenarios: FirefoxScenario[] = [
           await waitForModel(session.driver);
           await waitForTargetTab(session.driver, 'Kilo extension fixture');
           await sendMessage(session.driver, 'What is on this page?');
-          await waitForText(session.driver, 'get_page_snapshot completed');
+          await waitForText(session.driver, 'Page snapshot completed');
           await waitForText(session.driver, 'The page is the Kilo extension fixture.');
         }
       ),
@@ -2193,7 +2154,7 @@ const scenarios: FirefoxScenario[] = [
                       {
                         function: {
                           arguments: '',
-                          name: 'get_page_snapshot',
+                          name: 'kilo_browser_snapshot',
                         },
                         id: 'call_snapshot_1',
                         index: 0,
@@ -2208,15 +2169,7 @@ const scenarios: FirefoxScenario[] = [
           secondCompletionEvents: [
             { choices: [{ delta: { content: 'The page is the Kilo extension fixture.' } }] },
           ],
-          toolNames: [
-            'get_page_snapshot',
-            'get_element_details',
-            'find_in_page',
-            'web_search',
-            'search_memories',
-            'get_memory',
-            ...workflowToolNames,
-          ],
+          toolNames: [...safeToolNames],
         },
         async session => {
           await session.openTargetPage();
@@ -2224,7 +2177,7 @@ const scenarios: FirefoxScenario[] = [
           await waitForModel(session.driver);
           await waitForTargetTab(session.driver, 'Kilo extension fixture');
           await sendMessage(session.driver, 'What is on this page?');
-          await waitForText(session.driver, 'get_page_snapshot completed');
+          await waitForText(session.driver, 'Page snapshot completed');
           await waitForText(session.driver, 'The page is the Kilo extension fixture.');
           await getButtonByText(session.driver, 'Send message');
           const bodyText = await getBodyText(session.driver);
@@ -2247,7 +2200,7 @@ const scenarios: FirefoxScenario[] = [
                       {
                         function: {
                           arguments: JSON.stringify({}),
-                          name: 'get_page_snapshot',
+                          name: 'kilo_browser_snapshot',
                         },
                         id: 'call_snapshot_1',
                         index: 0,
@@ -2270,7 +2223,7 @@ const scenarios: FirefoxScenario[] = [
           await waitForTargetTab(session.driver, 'Kilo extension fixture');
           await switchToDangerousMode(session.driver);
           await sendMessage(session.driver, 'Read this page safely first');
-          await waitForText(session.driver, 'get_page_snapshot completed');
+          await waitForText(session.driver, 'Page snapshot completed');
           await waitForText(session.driver, 'Dangerous mode read the page safely first.');
         }
       ),
@@ -2553,15 +2506,7 @@ const scenarios: FirefoxScenario[] = [
         {
           beforeFirstCompletion: () => pendingCompletion,
           firstCompletionEvents: [{ choices: [{ delta: { content: 'Original tab completed.' } }] }],
-          toolNames: [
-            'get_page_snapshot',
-            'get_element_details',
-            'find_in_page',
-            'web_search',
-            'search_memories',
-            'get_memory',
-            ...workflowToolNames,
-          ],
+          toolNames: [...safeToolNames],
         },
         async session => {
           try {

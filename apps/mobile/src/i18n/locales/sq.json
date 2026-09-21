@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Statusi i seancës",
       "sessionStatusSubtitle": "e përfunduar / e dështuar / gati për kontroll",
       "kiloclawActivitySubtitle": "instancë gati / e dështuar, veprime të planifikuara",
+      "kiloclawActivityUnavailable": "Nis një instancë KiloClaw për të marrë aktivitetin e KiloClaw.",
       "balanceAlertsSubtitle": "paralajmërime për gjendje të ulët të organizatës",
-      "securityFindingsSubtitle": "gjetje të reja dhe kujtesa për SLA"
+      "balanceAlertsUnavailable": "Bashkohu me një organizatë për të marrë njoftime për gjendje të ulët.",
+      "securityFindingsSubtitle": "gjetje të reja dhe kujtesa për SLA",
+      "securityFindingsUnavailable": "Aktivizo agjentin e sigurisë Kilo në një fushëveprim për të marrë gjetjet e sigurisë."
     },
     "action": {
       "openSession": "Hap seancën"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Nuk u ngarkua seanca.",
       "failedToLoadDetails": "Nuk u ngarkuan detajet e seancës.",
       "failedToStopExecution": "Nuk u ndal ekzekutimi.",
+      "stopped": "Seanca u ndal",
+      "committing": "Duke regjistruar…",
+      "committed": "U regjistrua",
+      "commitFailed": "Regjistrimi dështoi",
       "renameSession": "Riemërto seancën",
       "renamePlaceholder": "Emri i seancës",
       "transcriptAccessibility": "Transkripti i seancës",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} rresht",
       "linesBadge_other": "{{displayCount}} rreshta",
       "matchesBadge_one": "{{displayCount}} përputhje",
-      "matchesBadge_other": "{{displayCount}} përputhje"
+      "matchesBadge_other": "{{displayCount}} përputhje",
+      "noOutput": "Nuk ka dalje."
     },
     "readToolMarkdown": {
       "linesTruncated": "rreshtat {{start}}–{{end}} (përmbajtje e shkurtuar)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "Kompjuteri yt",
     "remoteOptionBody": "Ekzekuto Kilo në makinën tënde përmes CLI-së `kilo remote`.",
     "skip": "Kapërce turin",
-    "tutorialLabel": "Tutoriali",
-    "remoteTitle": "Nis sesionin tënd të parë në distancë",
-    "remoteBody": "Lidh kompjuterin tënd, pastaj nis sesionin nga këtu.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ende pa kompjuter të lidhur",
-    "remoteEmptyBody": "Për ta lidhur, ekzekuto `kilo remote` në kompjuterin tënd.",
-    "remoteFound": "Kompjuteri u lidh",
-    "checkAgain": "Kontrollo përsëri",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutoriali"
   },
   "appActions": {
     "start": {

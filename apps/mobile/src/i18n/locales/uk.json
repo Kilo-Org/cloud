@@ -334,8 +334,11 @@
       "sessionStatusTitle": "Стан сеансу",
       "sessionStatusSubtitle": "завершено / помилка / готовність до керування",
       "kiloclawActivitySubtitle": "готовність або помилка екземпляра, заплановані дії",
+      "kiloclawActivityUnavailable": "Запустіть екземпляр KiloClaw, щоб отримувати активність KiloClaw.",
       "balanceAlertsSubtitle": "попередження про низький баланс організації",
-      "securityFindingsSubtitle": "нові виявлені проблеми та нагадування про SLA"
+      "balanceAlertsUnavailable": "Приєднайтеся до організації, щоб отримувати сповіщення про низький баланс.",
+      "securityFindingsSubtitle": "нові виявлені проблеми та нагадування про SLA",
+      "securityFindingsUnavailable": "Увімкніть Агента безпеки Kilo в області, щоб отримувати виявлені проблеми безпеки."
     },
     "action": {
       "openSession": "Відкрити сеанс"
@@ -1596,6 +1599,10 @@
       "couldNotLoad": "Не вдалося завантажити сеанс.",
       "failedToLoadDetails": "Не вдалося завантажити відомості про сеанс.",
       "failedToStopExecution": "Не вдалося зупинити виконання.",
+      "stopped": "Сеанс зупинено",
+      "committing": "Комітимо…",
+      "committed": "Коміт створено",
+      "commitFailed": "Не вдалося створити коміт",
       "renameSession": "Перейменувати сеанс",
       "renamePlaceholder": "Назва сеансу",
       "transcriptAccessibility": "Історія повідомлень сеансу",
@@ -1744,7 +1751,8 @@
       "matchesBadge_one": "збіг: {{displayCount}}",
       "matchesBadge_other": "збігів: {{displayCount}}",
       "matchesBadge_few": "збіги: {{displayCount}}",
-      "matchesBadge_many": "збігів: {{displayCount}}"
+      "matchesBadge_many": "збігів: {{displayCount}}",
+      "noOutput": "Немає виводу."
     },
     "readToolMarkdown": {
       "linesTruncated": "рядки {{start}}–{{end}} (скорочено)",
@@ -3266,15 +3274,7 @@
     "remoteOptionTitle": "Ваш комп'ютер",
     "remoteOptionBody": "Запустіть Kilo на власній машині через CLI `kilo remote`.",
     "skip": "Пропустити огляд",
-    "tutorialLabel": "Навчання",
-    "remoteTitle": "Запустіть свій перший віддалений сеанс",
-    "remoteBody": "Підключіть свій комп'ютер, а потім запустіть сеанс звідси.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Комп'ютер ще не підключено",
-    "remoteEmptyBody": "Щоб підключити його, виконайте `kilo remote` на своєму комп'ютері.",
-    "remoteFound": "Комп'ютер підключено",
-    "checkAgain": "Перевірити ще раз",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Навчання"
   },
   "appActions": {
     "start": {

@@ -334,8 +334,11 @@
       "sessionStatusTitle": "工作階段狀態",
       "sessionStatusSubtitle": "已完成／失敗／可開始控制",
       "kiloclawActivitySubtitle": "執行個體就緒或失敗、排程動作",
+      "kiloclawActivityUnavailable": "啟動 KiloClaw 執行個體即可取得 KiloClaw 活動。",
       "balanceAlertsSubtitle": "組織餘額不足警告",
-      "securityFindingsSubtitle": "新發現的安全問題與 SLA 提醒"
+      "balanceAlertsUnavailable": "加入組織即可取得餘額不足提醒。",
+      "securityFindingsSubtitle": "新發現的安全問題與 SLA 提醒",
+      "securityFindingsUnavailable": "在範圍內啟用 Kilo 資安代理程式即可取得資安問題。"
     },
     "action": {
       "openSession": "開啟工作階段"
@@ -1572,6 +1575,10 @@
       "couldNotLoad": "無法載入工作階段。",
       "failedToLoadDetails": "無法載入工作階段詳細資料。",
       "failedToStopExecution": "無法停止執行。",
+      "stopped": "工作階段已停止",
+      "committing": "正在提交…",
+      "committed": "已提交",
+      "commitFailed": "提交失敗",
       "renameSession": "重新命名工作階段",
       "renamePlaceholder": "工作階段名稱",
       "transcriptAccessibility": "工作階段對話記錄",
@@ -1712,7 +1719,8 @@
       "linesBadge_one": "{{displayCount}} 行",
       "linesBadge_other": "{{displayCount}} 行",
       "matchesBadge_one": "{{displayCount}} 筆相符結果",
-      "matchesBadge_other": "{{displayCount}} 筆相符結果"
+      "matchesBadge_other": "{{displayCount}} 筆相符結果",
+      "noOutput": "沒有輸出。"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截斷）",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "你的電腦",
     "remoteOptionBody": "透過 `kilo remote` CLI 在你自己的電腦上執行 Kilo。",
     "skip": "跳過導覽",
-    "tutorialLabel": "教學",
-    "remoteTitle": "開始你的第一個遠端工作階段",
-    "remoteBody": "連線你的電腦，然後從這裡啟動工作階段。",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "尚未連線任何電腦",
-    "remoteEmptyBody": "請在你的電腦上執行 `kilo remote` 以完成連線。",
-    "remoteFound": "電腦已連線",
-    "checkAgain": "重新檢查",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "教學"
   },
   "appActions": {
     "start": {

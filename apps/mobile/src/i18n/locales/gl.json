@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Estado da sesión",
       "sessionStatusSubtitle": "rematada / con erros / lista para controlar",
       "kiloclawActivitySubtitle": "instancia lista ou con erros, accións programadas",
+      "kiloclawActivityUnavailable": "Inicia unha instancia de KiloClaw para recibir actividade de KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organización",
-      "securityFindingsSubtitle": "novos problemas detectados e recordatorios de SLA"
+      "balanceAlertsUnavailable": "Únete a unha organización para recibir alertas de saldo baixo.",
+      "securityFindingsSubtitle": "novos problemas detectados e recordatorios de SLA",
+      "securityFindingsUnavailable": "Activa o axente de seguridade de Kilo nun ámbito para recibir problemas de seguridade."
     },
     "action": {
       "openSession": "Abrir a sesión"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Non se puido cargar a sesión.",
       "failedToLoadDetails": "Non se puideron cargar os detalles da sesión.",
       "failedToStopExecution": "Non se puido deter a execución.",
+      "stopped": "Sesión detida",
+      "committing": "Confirmando…",
+      "committed": "Confirmado",
+      "commitFailed": "Non se puido confirmar",
       "renameSession": "Renomear sesión",
       "renamePlaceholder": "Nome da sesión",
       "transcriptAccessibility": "Transcrición da sesión",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} liña",
       "linesBadge_other": "{{displayCount}} liñas",
       "matchesBadge_one": "{{displayCount}} coincidencia",
-      "matchesBadge_other": "{{displayCount}} coincidencias"
+      "matchesBadge_other": "{{displayCount}} coincidencias",
+      "noOutput": "Non hai saída."
     },
     "readToolMarkdown": {
       "linesTruncated": "liñas {{start}}–{{end}} (contido truncado)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "O teu computador",
     "remoteOptionBody": "Executa Kilo na túa propia máquina mediante a CLI `kilo remote`.",
     "skip": "Omitir o tour",
-    "tutorialLabel": "Titorial",
-    "remoteTitle": "Inicia a túa primeira sesión remota",
-    "remoteBody": "Conecta o teu computador e despois inicia a sesión desde aquí.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ningún computador conectado aínda",
-    "remoteEmptyBody": "Para conectalo, executa `kilo remote` no teu computador.",
-    "remoteFound": "Computador conectado",
-    "checkAgain": "Comprobar de novo",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Titorial"
   },
   "appActions": {
     "start": {

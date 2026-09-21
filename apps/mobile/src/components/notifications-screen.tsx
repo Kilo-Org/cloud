@@ -155,13 +155,23 @@ const CATEGORY_META = [
   },
 ] as const;
 
+/**
+ * The reason each gated category shows while the server marks it unavailable.
+ * The response's `unavailableReason` is English prose, so the row renders its
+ * own catalog copy: the reason must read in the user's language. Only these
+ * three categories can be unavailable (`apps/web/src/routers/user-router.ts:494-505`;
+ * the other four are `ALWAYS_AVAILABLE_CAPABILITY`, `:450`).
+ */
+const CATEGORY_UNAVAILABLE_SUBTITLE_KEYS: ReadonlyMap<NotificationCategoryKey, string> = new Map([
+  ['kiloclawActivity', 'notifications.category.kiloclawActivityUnavailable'],
+  ['balanceAlerts', 'notifications.category.balanceAlertsUnavailable'],
+  ['securityFindings', 'notifications.category.securityFindingsUnavailable'],
+]);
+
 type CategoryMeta = (typeof CATEGORY_META)[number];
 
 /** Per-category availability from the preferences response `capabilities` map. */
-type NotificationCategoryCapability = Readonly<{
-  available: boolean;
-  unavailableReason: string | null;
-}>;
+type NotificationCategoryCapability = Readonly<{ available: boolean }>;
 
 type CategoryRowProps = Readonly<{
   meta: CategoryMeta;
@@ -195,14 +205,16 @@ function CategoryRow({
     : (preferences?.[meta.key] ?? readAgentPushPreference(queryClient, queryKey, meta.key));
   const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
   // An unavailable category is a terminal, non-retryable state: the switch is
-  // disabled and the server reason replaces the subtitle. A missing entry (the
-  // `noUncheckedIndexedAccess` widening) defaults to available.
+  // disabled and the row renders its own catalog copy for the reason. The
+  // server's `unavailableReason` is English prose and must never render — it
+  // cannot be translated. A missing entry (the `noUncheckedIndexedAccess`
+  // widening) defaults to available.
   const unavailable = capability?.available === false;
   const isDisabled = disabled || !editable || unavailable;
   const title = t(meta.titleKey);
-  const subtitle = unavailable
-    ? (capability.unavailableReason ?? t(meta.subtitleKey))
-    : t(meta.subtitleKey);
+  const unavailableSubtitleKey = CATEGORY_UNAVAILABLE_SUBTITLE_KEYS.get(meta.key);
+  const subtitle =
+    unavailable && unavailableSubtitleKey != null ? t(unavailableSubtitleKey) : t(meta.subtitleKey);
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />
@@ -774,10 +786,7 @@ export function NotificationsScreen() {
                     // backend that predates the field returns none. The guard
                     // keeps the old response on the always-available path.
                     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
-                    preferences.capabilities?.[meta.key] ?? {
-                      available: true,
-                      unavailableReason: null,
-                    }
+                    preferences.capabilities?.[meta.key] ?? { available: true }
                   }
                   disabled={!notificationsEnabled}
                   isPending={pendingCategories.has(meta.key)}

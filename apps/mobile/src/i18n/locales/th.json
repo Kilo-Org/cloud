@@ -838,8 +838,11 @@
       "sessionStatusTitle": "สถานะเซสชัน",
       "sessionStatusSubtitle": "เสร็จสิ้น / ล้มเหลว / พร้อมควบคุม",
       "kiloclawActivitySubtitle": "อินสแตนซ์พร้อมใช้งานหรือทำงานล้มเหลว และการดำเนินการตามกำหนดเวลา",
+      "kiloclawActivityUnavailable": "เริ่มอินสแตนซ์ KiloClaw เพื่อรับกิจกรรม KiloClaw",
       "balanceAlertsSubtitle": "คำเตือนเมื่อยอดคงเหลือขององค์กรต่ำ",
-      "securityFindingsSubtitle": "ปัญหาที่ตรวจพบใหม่และการเตือนตาม SLA"
+      "balanceAlertsUnavailable": "เข้าร่วมองค์กรเพื่อรับการแจ้งเตือนยอดคงเหลือต่ำ",
+      "securityFindingsSubtitle": "ปัญหาที่ตรวจพบใหม่และการเตือนตาม SLA",
+      "securityFindingsUnavailable": "เปิดเอเจนต์ความปลอดภัย Kilo ในขอบเขตเพื่อรับข้อค้นพบด้านความปลอดภัย"
     },
     "action": {
       "openSession": "เปิดเซสชัน"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "ไม่สามารถโหลดเซสชันได้",
       "failedToLoadDetails": "ไม่สามารถโหลดรายละเอียดเซสชันได้",
       "failedToStopExecution": "ไม่สามารถหยุดการทำงานได้",
+      "stopped": "หยุดเซสชันแล้ว",
+      "committing": "กำลังคอมมิต…",
+      "committed": "คอมมิตแล้ว",
+      "commitFailed": "คอมมิตไม่สำเร็จ",
       "renameSession": "เปลี่ยนชื่อเซสชัน",
       "renamePlaceholder": "ชื่อเซสชัน",
       "transcriptAccessibility": "บันทึกการสนทนาของเซสชัน",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} บรรทัด",
       "linesBadge_other": "{{displayCount}} บรรทัด",
       "matchesBadge_one": "พบ {{displayCount}} รายการ",
-      "matchesBadge_other": "พบ {{displayCount}} รายการ"
+      "matchesBadge_other": "พบ {{displayCount}} รายการ",
+      "noOutput": "ไม่มีเอาต์พุต"
     },
     "readToolMarkdown": {
       "linesTruncated": "บรรทัด {{start}}–{{end}} (ตัดบางส่วนออก)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "คอมพิวเตอร์ของคุณ",
     "remoteOptionBody": "รัน Kilo บนเครื่องของคุณเองผ่าน CLI `kilo remote`",
     "skip": "ข้ามทัวร์",
-    "tutorialLabel": "บทช่วยสอน",
-    "remoteTitle": "เริ่มเซสชันทางไกลแรกของคุณ",
-    "remoteBody": "เชื่อมต่อคอมพิวเตอร์ของคุณ แล้วเริ่มเซสชันจากที่นี่",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ยังไม่มีคอมพิวเตอร์เชื่อมต่อ",
-    "remoteEmptyBody": "หากต้องการเชื่อมต่อ ให้รัน `kilo remote` บนคอมพิวเตอร์ของคุณ",
-    "remoteFound": "เชื่อมต่อคอมพิวเตอร์แล้ว",
-    "checkAgain": "ตรวจสอบอีกครั้ง",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "บทช่วยสอน"
   },
   "appActions": {
     "start": {

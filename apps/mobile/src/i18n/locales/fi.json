@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Istunnon tila",
       "sessionStatusSubtitle": "valmis / epäonnistui / valmis hallittavaksi",
       "kiloclawActivitySubtitle": "instanssi valmis/epäonnistui, ajoitetut toiminnot",
+      "kiloclawActivityUnavailable": "Käynnistä KiloClaw-instanssi saadaksesi KiloClaw-tapahtumia.",
       "balanceAlertsSubtitle": "varoitukset organisaation alhaisesta saldosta",
-      "securityFindingsSubtitle": "uudet löydökset ja SLA-muistutukset"
+      "balanceAlertsUnavailable": "Liity organisaatioon saadaksesi saldohälytyksiä.",
+      "securityFindingsSubtitle": "uudet löydökset ja SLA-muistutukset",
+      "securityFindingsUnavailable": "Ota Kilo-tietoturva-agentti käyttöön laajuudessa saadaksesi tietoturvahavaintoja."
     },
     "action": {
       "openSession": "Avaa istunto"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Istuntoa ei voitu ladata.",
       "failedToLoadDetails": "Istunnon tietojen lataus epäonnistui.",
       "failedToStopExecution": "Suorituksen pysäyttäminen epäonnistui.",
+      "stopped": "Istunto pysäytetty",
+      "committing": "Tallennetaan…",
+      "committed": "Tallennettu",
+      "commitFailed": "Tallennus epäonnistui",
       "renameSession": "Nimeä istunto uudelleen",
       "renamePlaceholder": "Istunnon nimi",
       "transcriptAccessibility": "Istunnon viestihistoria",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} rivi",
       "linesBadge_other": "{{displayCount}} riviä",
       "matchesBadge_one": "{{displayCount}} osuma",
-      "matchesBadge_other": "{{displayCount}} osumaa"
+      "matchesBadge_other": "{{displayCount}} osumaa",
+      "noOutput": "Ei tulostetta."
     },
     "readToolMarkdown": {
       "linesTruncated": "rivit {{start}}–{{end}} (katkaistu)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "Tietokoneesi",
     "remoteOptionBody": "Suorita Kilo omalla koneellasi `kilo remote` -CLI:n kautta.",
     "skip": "Ohita esittely",
-    "tutorialLabel": "Käyttöopas",
-    "remoteTitle": "Aloita ensimmäinen etäistuntosi",
-    "remoteBody": "Yhdistä tietokoneesi ja käynnistä istunto täältä.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Tietokonetta ei ole vielä yhdistetty",
-    "remoteEmptyBody": "Yhdistääksesi sen, suorita `kilo remote` tietokoneellasi.",
-    "remoteFound": "Tietokone yhdistetty",
-    "checkAgain": "Tarkista uudelleen",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Käyttöopas"
   },
   "appActions": {
     "start": {

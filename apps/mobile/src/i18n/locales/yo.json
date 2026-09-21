@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Ipò ìgbà iṣẹ́",
       "sessionStatusSubtitle": "ó parí / ó kùnà / ó ti ṣe tán fún ìṣàkóso",
       "kiloclawActivitySubtitle": "ẹ̀rọ iṣẹ́ ti ṣe tán/ó kùnà, àwọn ìṣe tí a ṣètò àkókò wọn",
+      "kiloclawActivityUnavailable": "Bẹ̀rẹ̀ ẹ̀rọ iṣẹ́ KiloClaw láti gba ìgbòkègbodò KiloClaw.",
       "balanceAlertsSubtitle": "àwọn ìkìlọ̀ pé owó àjọ tó kù ti dín kù",
-      "securityFindingsSubtitle": "àwọn àwárí tuntun àti ìránnilétí SLA"
+      "balanceAlertsUnavailable": "Dara pọ̀ mọ́ àjọ kan láti gba àwọn ìkìlọ̀ owó tó kù díẹ̀.",
+      "securityFindingsSubtitle": "àwọn àwárí tuntun àti ìránnilétí SLA",
+      "securityFindingsUnavailable": "Mú Aṣojú ààbò Kilo ṣiṣẹ́ ní ìwọ̀n kan láti gba àwọn àwárí ààbò."
     },
     "action": {
       "openSession": "Ṣí ìgbà iṣẹ́"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "A kò lè gbé ìgbà iṣẹ́ náà wọlé.",
       "failedToLoadDetails": "A kò lè gbé àwọn àlàyé ìgbà iṣẹ́ náà wọlé.",
       "failedToStopExecution": "A kò lè dá ìṣiṣẹ́ náà dúró.",
+      "stopped": "A ti dá ìgbà iṣẹ́ dúró",
+      "committing": "Ń ṣe àkọsílẹ̀…",
+      "committed": "A ti ṣe àkọsílẹ̀",
+      "commitFailed": "Àkọsílẹ̀ kùnà",
       "renameSession": "Yí orúkọ ìgbà iṣẹ́ padà",
       "renamePlaceholder": "Orúkọ ìgbà iṣẹ́",
       "transcriptAccessibility": "Àkọsílẹ̀ ìgbà iṣẹ́",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "ìlà {{displayCount}}",
       "linesBadge_other": "ìlà {{displayCount}}",
       "matchesBadge_one": "ìbámu {{displayCount}}",
-      "matchesBadge_other": "ìbámu {{displayCount}}"
+      "matchesBadge_other": "ìbámu {{displayCount}}",
+      "noOutput": "Kò sí ìjáde."
     },
     "readToolMarkdown": {
       "linesTruncated": "ìlà {{start}}–{{end}} (a gé kúrú)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "Kọ̀ǹpútà rẹ",
     "remoteOptionBody": "Ṣiṣẹ́ Kilo lórí ẹ̀rọ tirẹ pẹ̀lú CLI `kilo remote`.",
     "skip": "Fo ìrìn àjò sí",
-    "tutorialLabel": "Ìtọ́sọ́nà",
-    "remoteTitle": "Bẹ̀rẹ̀ ìgbà iṣẹ́ ìjìnnà àkọ́kọ́ rẹ",
-    "remoteBody": "So kọ̀ǹpútà rẹ pọ̀, lẹ́yìn náà bẹ̀rẹ̀ ìgbà iṣẹ́ láti ibí yìí.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Kò sí kọ̀ǹpútà tí a so pọ̀ sí báyìí",
-    "remoteEmptyBody": "Láti so ó pọ̀, ṣiṣẹ́ `kilo remote` lórí kọ̀ǹpútà rẹ.",
-    "remoteFound": "Kọ̀ǹpútà ti so pọ̀",
-    "checkAgain": "Tún ṣe àyẹ̀wò",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Ìtọ́sọ́nà"
   },
   "appActions": {
     "start": {

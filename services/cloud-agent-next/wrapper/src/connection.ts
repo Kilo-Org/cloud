@@ -27,6 +27,7 @@ import {
 import { logToFile } from './utils.js';
 import type { KiloEvent, WrapperKiloClient } from './kilo-api.js';
 import type { ModelNotFoundRuntimeDiagnostics } from '../../src/shared/runtime-model-diagnostics.js';
+import { gateResultFromProperties } from '../../src/shared/kilo-event-properties.js';
 import { buildModelNotFoundRuntimeDiagnostics } from './model-diagnostics.js';
 import { createRunningBashEventCoalescer } from './running-bash-event-coalescer.js';
 
@@ -46,13 +47,6 @@ function isPlanFollowupQuestion(value: unknown): boolean {
 
 function isCodeReviewJob(state: WrapperState): boolean {
   return state.currentSession?.platform === 'code-review';
-}
-
-function gateResultFromProperties(
-  properties: Record<string, unknown>
-): 'pass' | 'fail' | undefined {
-  const gateResult = properties.gateResult;
-  return gateResult === 'pass' || gateResult === 'fail' ? gateResult : undefined;
 }
 
 function statusTypeFromProperties(properties: Record<string, unknown>): string | undefined {

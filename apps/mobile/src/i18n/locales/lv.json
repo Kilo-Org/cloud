@@ -854,8 +854,11 @@
       "sessionStatusTitle": "Sesijas statuss",
       "sessionStatusSubtitle": "sesija pabeigta / kļūda / gatava vadīšanai",
       "kiloclawActivitySubtitle": "instance gatava / kļūda, ieplānotas darbības",
+      "kiloclawActivityUnavailable": "Palaid KiloClaw instanci, lai saņemtu KiloClaw darbību.",
       "balanceAlertsSubtitle": "brīdinājumi par mazu organizācijas kredītu atlikumu",
-      "securityFindingsSubtitle": "jaunas konstatētās problēmas un SLA atgādinājumi"
+      "balanceAlertsUnavailable": "Pievienojies organizācijai, lai saņemtu brīdinājumus par mazu atlikumu.",
+      "securityFindingsSubtitle": "jaunas konstatētās problēmas un SLA atgādinājumi",
+      "securityFindingsUnavailable": "Iespējo Kilo drošības aģentu tvērumā, lai saņemtu drošības konstatējumus."
     },
     "action": {
       "openSession": "Atvērt sesiju"
@@ -2104,6 +2107,10 @@
       "couldNotLoad": "Neizdevās ielādēt sesiju.",
       "failedToLoadDetails": "Neizdevās ielādēt sesijas informāciju.",
       "failedToStopExecution": "Neizdevās apturēt izpildi.",
+      "stopped": "Sesija apturēta",
+      "committing": "Notiek fiksēšana…",
+      "committed": "Fiksēts",
+      "commitFailed": "Fiksēšana neizdevās",
       "renameSession": "Pārdēvēt sesiju",
       "renamePlaceholder": "Sesijas nosaukums",
       "transcriptAccessibility": "Sesijas sarakste",
@@ -2248,7 +2255,8 @@
       "linesBadge_zero": "{{displayCount}} rindu",
       "matchesBadge_one": "{{displayCount}} atbilstība",
       "matchesBadge_other": "{{displayCount}} atbilstības",
-      "matchesBadge_zero": "{{displayCount}} atbilstību"
+      "matchesBadge_zero": "{{displayCount}} atbilstību",
+      "noOutput": "Nav izvades."
     },
     "readToolMarkdown": {
       "linesTruncated": "rindas {{start}}–{{end}} (saturs saīsināts)",
@@ -3223,15 +3231,7 @@
     "remoteOptionTitle": "Tavs dators",
     "remoteOptionBody": "Palaid Kilo savā datorā, izmantojot `kilo remote` CLI.",
     "skip": "Izlaist apskati",
-    "tutorialLabel": "Apmācība",
-    "remoteTitle": "Sāc savu pirmo attālināto sesiju",
-    "remoteBody": "Pievieno datoru un tad sāc sesiju šeit.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Vēl nav pievienota datora",
-    "remoteEmptyBody": "Lai to pievienotu, palaid `kilo remote` savā datorā.",
-    "remoteFound": "Dators pievienots",
-    "checkAgain": "Pārbaudīt vēlreiz",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Apmācība"
   },
   "appActions": {
     "start": {

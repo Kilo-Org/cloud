@@ -8,11 +8,12 @@
 
 import { createElement } from 'react';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NotificationsScreen } from './notifications-screen';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
-import '@/i18n';
+import { i18n } from '@/i18n';
+import ar from '@/i18n/locales/ar.json';
 
 const prefsQueryFn = vi.hoisted(() => vi.fn());
 const pushTokensQueryFn = vi.hoisted(() => vi.fn());
@@ -442,6 +443,10 @@ describe('NotificationsScreen category availability', () => {
     registerTokenMutationFn.mockResolvedValue({ success: true });
   });
 
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
   it('happy: an available category toggle flips and persists', async () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     const { renderer } = await renderScreen();
@@ -459,14 +464,13 @@ describe('NotificationsScreen category availability', () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 
-  it('non-retryable unhappy: an unavailable category disables the switch and shows the server reason', async () => {
+  it('non-retryable unhappy: an unavailable category disables the switch and shows the catalog reason', async () => {
+    // The server's `unavailableReason` is English prose; the row must render
+    // the catalog copy instead.
     prefsQueryFn.mockResolvedValue(
       fullPrefs({
         capabilities: fullCapabilities({
-          balanceAlerts: {
-            available: false,
-            unavailableReason: 'Join an organization to get balance alerts.',
-          },
+          balanceAlerts: { available: false, unavailableReason: 'SERVER PROSE SENTINEL' },
         }),
       })
     );
@@ -475,14 +479,58 @@ describe('NotificationsScreen category availability', () => {
     // Wait for an available sibling row to be enabled first: the master gate
     // disables every row until the permission/device-token/push-token queries
     // settle, so the unavailable row is disabled from the first render. Waiting
-    // on the sibling proves the gate settled and capabilities loaded, so the
-    // Balance alerts `disabled` below is the unavailable state, not the gate.
+    // on the sibling proves the gate settled and capabilities loaded.
     await waitForEnabledSwitch(renderer, 'Chat messages');
 
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(true);
     expect(
-      textWithChildren(renderer.root, 'Join an organization to get balance alerts.').length
+      textWithChildren(renderer.root, i18n.t('notifications.category.balanceAlertsUnavailable'))
+        .length
     ).toBe(1);
+    expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
+  });
+
+  it('repro: an unavailable Security findings row reads in the app language, never the server prose', async () => {
+    // The finding: the Arabic list showed the server's English sentence
+    // 'Enable Kilo Security Agent on a scope to get security findings.' The
+    // row must ignore that prose and render the catalog copy instead.
+    //
+    // The server reason is a sentinel because in English the catalog value IS
+    // that exact sentence (asserted below), so only a distinct string can
+    // prove the response's prose is never the rendered source.
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          securityFindings: { available: false, unavailableReason: 'SERVER PROSE SENTINEL' },
+        }),
+      })
+    );
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    // The catalog owns the finding's sentence.
+    expect(i18n.t('notifications.category.securityFindingsUnavailable')).toBe(
+      'Enable Kilo Security Agent on a scope to get security findings.'
+    );
+    // The reported defect: the row rendered the server's prose.
+    expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
+    expect(
+      textWithChildren(renderer.root, i18n.t('notifications.category.securityFindingsUnavailable'))
+        .length
+    ).toBe(1);
+    expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
+
+    // The finding's screen: the Arabic list carries the catalog copy, resolved
+    // in the active language (s2 supplies the Arabic value; until then it
+    // falls back to English, so the assertion holds either way).
+    await act(async () => {
+      await i18n.changeLanguage('ar');
+    });
+    expect(
+      textWithChildren(renderer.root, i18n.t('notifications.category.securityFindingsUnavailable'))
+        .length
+    ).toBe(1);
+    expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
   });
 
   it('retryable unhappy: a category save failure rolls back the optimistic flip', async () => {
@@ -546,5 +594,138 @@ describe('NotificationsScreen category availability', () => {
     // Last good availability is preserved: rows stay rendered and enabled.
     expect(switchesByLabel(renderer.root, 'Chat messages')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(false);
+  });
+});
+
+describe('NotificationsScreen Arabic Security findings row', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    getNotificationPermissionStatus.mockResolvedValue('granted');
+    getDevicePushToken.mockResolvedValue('device-token');
+    pushTokensQueryFn.mockResolvedValue([{ token: 'device-token', platform: 'android' }]);
+    setPreferenceMutationFn.mockResolvedValue({});
+    registerTokenMutationFn.mockResolvedValue({ success: true });
+    await i18n.changeLanguage('ar');
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it.each(['Enable Kilo Security Agent on a scope to get security findings.', null])(
+    'non-retryable empty: no enabled scope shows localized setup guidance for reason %s',
+    async serverReason => {
+      prefsQueryFn.mockResolvedValue(
+        fullPrefs({
+          capabilities: fullCapabilities({
+            securityFindings: { available: false, unavailableReason: serverReason },
+          }),
+        })
+      );
+      const { renderer, unmount } = await renderScreen();
+      try {
+        await waitForEnabledSwitch(renderer, ar.notifications.channel.chat);
+
+        expect(
+          switchesByLabel(renderer.root, ar.notifications.channel.security)[0]?.props.disabled
+        ).toBe(true);
+        expect(
+          textWithChildren(
+            renderer.root,
+            'Enable Kilo Security Agent on a scope to get security findings.'
+          )
+        ).toHaveLength(0);
+        expect(
+          textWithChildren(renderer.root, ar.notifications.category.securityFindingsUnavailable)
+        ).toHaveLength(1);
+        expect(textWithChildren(renderer.root, ar.common.retry)).toHaveLength(0);
+
+        act(() => {
+          switchOnValueChange(renderer.root, ar.notifications.channel.security)?.(false);
+        });
+        expect(setPreferenceMutationFn).not.toHaveBeenCalled();
+      } finally {
+        unmount();
+      }
+    }
+  );
+
+  it.each([fullCapabilities(), undefined])(
+    'happy: available or legacy capabilities %j keep the localized subtitle and working switch',
+    async capabilities => {
+      prefsQueryFn.mockResolvedValue(fullPrefs({ capabilities }));
+      const { renderer, unmount } = await renderScreen();
+      try {
+        await waitForEnabledSwitch(renderer, ar.notifications.channel.security);
+        expect(
+          textWithChildren(renderer.root, ar.notifications.category.securityFindingsSubtitle)
+        ).toHaveLength(1);
+        expect(
+          textWithChildren(renderer.root, ar.notifications.category.securityFindingsUnavailable)
+        ).toHaveLength(0);
+
+        prefsQueryFn.mockResolvedValue(fullPrefs({ securityFindings: false, capabilities }));
+        act(() => {
+          switchOnValueChange(renderer.root, ar.notifications.channel.security)?.(false);
+        });
+        await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
+        expect(setPreferenceMutationFn.mock.calls[0]?.[0]).toEqual({ securityFindings: false });
+        await waitFor(() => activityIndicators(renderer.root).length === 0);
+        expect(
+          switchesByLabel(renderer.root, ar.notifications.channel.security)[0]?.props.value
+        ).toBe(false);
+      } finally {
+        unmount();
+      }
+    }
+  );
+
+  it('retryable unhappy: retrying the preferences query recovers localized setup guidance', async () => {
+    prefsQueryFn.mockRejectedValue(new Error('offline'));
+    const { renderer, unmount } = await renderScreen();
+    try {
+      await waitFor(
+        () =>
+          renderer.root.findAllByProps({ accessibilityLabel: ar.notifications.retryCategories })
+            .length === 1
+      );
+      expect(switchesByLabel(renderer.root, ar.notifications.channel.security)).toHaveLength(0);
+      prefsQueryFn.mockResolvedValue(
+        fullPrefs({
+          capabilities: fullCapabilities({
+            securityFindings: { available: false, unavailableReason: null },
+          }),
+        })
+      );
+      const retry = renderer.root.findByProps({
+        accessibilityLabel: ar.notifications.retryCategories,
+      }).props as { onPress: () => void };
+      act(() => {
+        retry.onPress();
+      });
+      await waitForEnabledSwitch(renderer, ar.notifications.channel.chat);
+      expect(
+        textWithChildren(renderer.root, ar.notifications.category.securityFindingsUnavailable)
+      ).toHaveLength(1);
+      expect(
+        renderer.root.findAllByProps({ accessibilityLabel: ar.notifications.retryCategories })
+      ).toHaveLength(0);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('loading: unresolved preferences show skeletons without a Security findings control', async () => {
+    prefsQueryFn.mockReturnValue(new Promise(() => undefined));
+    const { renderer, unmount } = await renderScreen();
+    try {
+      expect(skeletonCount(renderer.root)).toBeGreaterThan(0);
+      expect(switchesByLabel(renderer.root, ar.notifications.channel.security)).toHaveLength(0);
+      expect(
+        textWithChildren(renderer.root, ar.notifications.category.securityFindingsUnavailable)
+      ).toHaveLength(0);
+    } finally {
+      unmount();
+    }
   });
 });

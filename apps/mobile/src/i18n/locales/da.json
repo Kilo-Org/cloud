@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Sessionsstatus",
       "sessionStatusSubtitle": "afsluttet / mislykket / klar til styring",
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
+      "kiloclawActivityUnavailable": "Start en KiloClaw-instans for at få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "advarsler om lav saldo i organisationen",
-      "securityFindingsSubtitle": "nye fund og SLA-påmindelser"
+      "balanceAlertsUnavailable": "Tilmeld dig en organisation for at få advarsler om lav saldo.",
+      "securityFindingsSubtitle": "nye fund og SLA-påmindelser",
+      "securityFindingsUnavailable": "Aktivér Kilo-sikkerhedsagenten i et område for at få sikkerhedsfund."
     },
     "action": {
       "openSession": "Åbn session"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Kunne ikke indlæse sessionen.",
       "failedToLoadDetails": "Kunne ikke indlæse oplysninger om sessionen.",
       "failedToStopExecution": "Kunne ikke stoppe kørslen.",
+      "stopped": "Sessionen er stoppet",
+      "committing": "Committer…",
+      "committed": "Commit gennemført",
+      "commitFailed": "Commit mislykkedes",
       "renameSession": "Omdøb session",
       "renamePlaceholder": "Sessionens navn",
       "transcriptAccessibility": "Sessionens samtalehistorik",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} linje",
       "linesBadge_other": "{{displayCount}} linjer",
       "matchesBadge_one": "{{displayCount}} resultat",
-      "matchesBadge_other": "{{displayCount}} resultater"
+      "matchesBadge_other": "{{displayCount}} resultater",
+      "noOutput": "Ingen output."
     },
     "readToolMarkdown": {
       "linesTruncated": "linje {{start}}–{{end}} (forkortet)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "Din computer",
     "remoteOptionBody": "Kør Kilo på din egen maskin via `kilo remote`-CLI'en.",
     "skip": "Spring omvisning over",
-    "tutorialLabel": "Vejledning",
-    "remoteTitle": "Start din første remote-session",
-    "remoteBody": "Tilslut din computer, og start derefter sessionen herfra.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ingen computer tilsluttet endnu",
-    "remoteEmptyBody": "For at tilslutte den, kør `kilo remote` på din computer.",
-    "remoteFound": "Computer tilsluttet",
-    "checkAgain": "Tjek igen",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Vejledning"
   },
   "appActions": {
     "start": {

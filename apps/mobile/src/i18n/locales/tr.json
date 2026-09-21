@@ -334,8 +334,11 @@
       "sessionStatusTitle": "Oturum durumu",
       "sessionStatusSubtitle": "bitti / başarısız / kontrol edilmeye hazır",
       "kiloclawActivitySubtitle": "örnek hazır/başarısız, zamanlanmış eylemler",
+      "kiloclawActivityUnavailable": "KiloClaw etkinliği almak için bir KiloClaw örneği başlat.",
       "balanceAlertsSubtitle": "düşük kuruluş bakiyesi uyarıları",
-      "securityFindingsSubtitle": "yeni bulgular ve SLA hatırlatmaları"
+      "balanceAlertsUnavailable": "Düşük bakiye uyarıları almak için bir kuruluşa katıl.",
+      "securityFindingsSubtitle": "yeni bulgular ve SLA hatırlatmaları",
+      "securityFindingsUnavailable": "Güvenlik bulguları almak için bir kapsamda Kilo Güvenlik ajanını etkinleştir."
     },
     "action": {
       "openSession": "Oturumu aç"
@@ -1572,6 +1575,10 @@
       "couldNotLoad": "Oturum yüklenemedi.",
       "failedToLoadDetails": "Oturum ayrıntıları yüklenemedi.",
       "failedToStopExecution": "Çalışan işlem durdurulamadı.",
+      "stopped": "Oturum durduruldu",
+      "committing": "İşleniyor…",
+      "committed": "İşlendi",
+      "commitFailed": "İşleme başarısız oldu",
       "renameSession": "Oturumu yeniden adlandır",
       "renamePlaceholder": "Oturum adı",
       "transcriptAccessibility": "Oturum dökümü",
@@ -1712,7 +1719,8 @@
       "linesBadge_one": "{{displayCount}} satır",
       "linesBadge_other": "{{displayCount}} satır",
       "matchesBadge_one": "{{displayCount}} eşleşme",
-      "matchesBadge_other": "{{displayCount}} eşleşme"
+      "matchesBadge_other": "{{displayCount}} eşleşme",
+      "noOutput": "Çıktı yok."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}. satırlar (kısaltıldı)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "Bilgisayarın",
     "remoteOptionBody": "Kilo'yu kendi makinende `kilo remote` CLI'si üzerinden çalıştır.",
     "skip": "Turu atla",
-    "tutorialLabel": "Eğitim",
-    "remoteTitle": "İlk uzak oturumunu başlat",
-    "remoteBody": "Bilgisayarını bağla, ardından oturumu buradan başlat.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Henüz bağlı bir bilgisayar yok",
-    "remoteEmptyBody": "Bağlamak için bilgisayarında `kilo remote` komutunu çalıştır.",
-    "remoteFound": "Bilgisayar bağlandı",
-    "checkAgain": "Tekrar kontrol et",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Eğitim"
   },
   "appActions": {
     "start": {

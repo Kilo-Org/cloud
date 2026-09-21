@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Status sesi",
       "sessionStatusSubtitle": "selesai / gagal / sedia untuk dikawal",
       "kiloclawActivitySubtitle": "instans sedia/gagal, tindakan berjadual",
+      "kiloclawActivityUnavailable": "Mulakan instans KiloClaw untuk mendapat aktiviti KiloClaw.",
       "balanceAlertsSubtitle": "amaran baki rendah untuk organisasi",
-      "securityFindingsSubtitle": "penemuan baharu dan peringatan SLA"
+      "balanceAlertsUnavailable": "Sertai organisasi untuk mendapat amaran baki rendah.",
+      "securityFindingsSubtitle": "penemuan baharu dan peringatan SLA",
+      "securityFindingsUnavailable": "Dayakan ejen keselamatan Kilo pada skop untuk mendapat dapatan keselamatan."
     },
     "action": {
       "openSession": "Buka sesi"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Tidak dapat memuatkan sesi.",
       "failedToLoadDetails": "Gagal memuatkan butiran sesi.",
       "failedToStopExecution": "Gagal menghentikan pelaksanaan.",
+      "stopped": "Sesi dihentikan",
+      "committing": "Melakukan komit…",
+      "committed": "Komit selesai",
+      "commitFailed": "Komit gagal",
       "renameSession": "Namakan semula sesi",
       "renamePlaceholder": "Nama sesi",
       "transcriptAccessibility": "Transkrip sesi",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} baris",
       "linesBadge_other": "{{displayCount}} baris",
       "matchesBadge_one": "{{displayCount}} padanan",
-      "matchesBadge_other": "{{displayCount}} padanan"
+      "matchesBadge_other": "{{displayCount}} padanan",
+      "noOutput": "Tiada keluaran."
     },
     "readToolMarkdown": {
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "Komputer anda",
     "remoteOptionBody": "Jalankan Kilo pada mesin anda sendiri melalui CLI `kilo remote`.",
     "skip": "Langkau lawatan",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Mulakan sesi remote pertama anda",
-    "remoteBody": "Sambungkan komputer anda, kemudian mulakan sesi dari sini.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Tiada komputer bersambung lagi",
-    "remoteEmptyBody": "Untuk menyambungkannya, jalankan `kilo remote` pada komputer anda.",
-    "remoteFound": "Komputer bersambung",
-    "checkAgain": "Semak semula",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

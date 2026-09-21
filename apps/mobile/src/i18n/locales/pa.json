@@ -838,8 +838,11 @@
       "sessionStatusTitle": "ਸੈਸ਼ਨ ਦੀ ਸਥਿਤੀ",
       "sessionStatusSubtitle": "ਪੂਰਾ ਹੋਇਆ / ਅਸਫਲ / ਕੰਟਰੋਲ ਕਰਨ ਲਈ ਤਿਆਰ",
       "kiloclawActivitySubtitle": "ਇੰਸਟੈਂਸ ਤਿਆਰ/ਅਸਫਲ, ਨਿਰਧਾਰਤ ਕਾਰਵਾਈਆਂ",
+      "kiloclawActivityUnavailable": "KiloClaw ਗਤੀਵਿਧੀ ਪਾਉਣ ਲਈ ਇੱਕ KiloClaw ਇੰਸਟੈਂਸ ਸ਼ੁਰੂ ਕਰੋ।",
       "balanceAlertsSubtitle": "ਸੰਸਥਾ ਦਾ ਬੈਲੰਸ ਘੱਟ ਹੋਣ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ",
-      "securityFindingsSubtitle": "ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਅਤੇ SLA ਲਈ ਯਾਦ-ਦਹਾਨੀਆਂ"
+      "balanceAlertsUnavailable": "ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਪਾਉਣ ਲਈ ਇੱਕ ਸੰਸਥਾ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ।",
+      "securityFindingsSubtitle": "ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਅਤੇ SLA ਲਈ ਯਾਦ-ਦਹਾਨੀਆਂ",
+      "securityFindingsUnavailable": "ਸੁਰੱਖਿਆ ਨਤੀਜੇ ਪਾਉਣ ਲਈ ਇੱਕ ਦਾਇਰੇ ਵਿੱਚ Kilo ਸੁਰੱਖਿਆ ਏਜੰਟ ਚਾਲੂ ਕਰੋ।"
     },
     "action": {
       "openSession": "ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "failedToLoadDetails": "ਸੈਸ਼ਨ ਦੇ ਵੇਰਵੇ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ।",
       "failedToStopExecution": "ਚੱਲ ਰਿਹਾ ਕੰਮ ਰੋਕਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
+      "stopped": "ਸੈਸ਼ਨ ਰੋਕ ਦਿੱਤਾ ਗਿਆ",
+      "committing": "ਕਮਿਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ…",
+      "committed": "ਕਮਿਟ ਹੋ ਗਿਆ",
+      "commitFailed": "ਕਮਿਟ ਅਸਫਲ ਰਿਹਾ",
       "renameSession": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ ਬਦਲੋ",
       "renamePlaceholder": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ",
       "transcriptAccessibility": "ਸੈਸ਼ਨ ਦੀ ਲਿਖਤ",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} ਲਾਈਨ",
       "linesBadge_other": "{{displayCount}} ਲਾਈਨਾਂ",
       "matchesBadge_one": "{{displayCount}} ਮੇਲ",
-      "matchesBadge_other": "{{displayCount}} ਮੇਲ"
+      "matchesBadge_other": "{{displayCount}} ਮੇਲ",
+      "noOutput": "ਕੋਈ ਆਉਟਪੁੱਟ ਨਹੀਂ ਹੈ।"
     },
     "readToolMarkdown": {
       "linesTruncated": "ਲਾਈਨਾਂ {{start}}–{{end}} (ਪੂਰੀ ਸਮੱਗਰੀ ਨਹੀਂ ਦਿਖਾਈ ਗਈ)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "ਤੁਹਾਡਾ ਕੰਪਿਊਟਰ",
     "remoteOptionBody": "ਆਪਣੀ ਮਸ਼ੀਨ ਉੱਤੇ `kilo remote` CLI ਰਾਹੀਂ Kilo ਚਲਾਓ।",
     "skip": "ਟੂਰ ਛੱਡੋ",
-    "tutorialLabel": "ਟਿਊਟੋਰੀਅਲ",
-    "remoteTitle": "ਆਪਣਾ ਪਹਿਲਾ ਰਿਮੋਟ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",
-    "remoteBody": "ਆਪਣਾ ਕੰਪਿਊਟਰ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਇੱਥੋਂ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ।",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ਹਾਲੇ ਕੋਈ ਕੰਪਿਊਟਰ ਕਨੈਕਟ ਨਹੀਂ ਹੋਇਆ",
-    "remoteEmptyBody": "ਇਸ ਨੂੰ ਕਨੈਕਟ ਕਰਨ ਲਈ ਆਪਣੇ ਕੰਪਿਊਟਰ ਉੱਤੇ `kilo remote` ਚਲਾਓ।",
-    "remoteFound": "ਕੰਪਿਊਟਰ ਕਨੈਕਟ ਹੋਇਆ",
-    "checkAgain": "ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ਟਿਊਟੋਰੀਅਲ"
   },
   "appActions": {
     "start": {

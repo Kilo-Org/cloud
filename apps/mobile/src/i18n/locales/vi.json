@@ -334,8 +334,11 @@
       "sessionStatusTitle": "Trạng thái phiên",
       "sessionStatusSubtitle": "hoàn tất / thất bại / sẵn sàng điều khiển",
       "kiloclawActivitySubtitle": "máy sẵn sàng hoặc gặp lỗi, thao tác đã lên lịch",
+      "kiloclawActivityUnavailable": "Khởi động một máy KiloClaw để nhận hoạt động KiloClaw.",
       "balanceAlertsSubtitle": "cảnh báo số dư tổ chức thấp",
-      "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA"
+      "balanceAlertsUnavailable": "Tham gia một tổ chức để nhận cảnh báo số dư thấp.",
+      "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA",
+      "securityFindingsUnavailable": "Bật Trợ lý bảo mật Kilo trên một phạm vi để nhận vấn đề bảo mật."
     },
     "action": {
       "openSession": "Mở phiên"
@@ -1572,6 +1575,10 @@
       "couldNotLoad": "Không thể tải phiên.",
       "failedToLoadDetails": "Không thể tải thông tin phiên.",
       "failedToStopExecution": "Không thể dừng tác vụ đang chạy.",
+      "stopped": "Đã dừng phiên",
+      "committing": "Đang ghi nhận…",
+      "committed": "Đã ghi nhận",
+      "commitFailed": "Ghi nhận thất bại",
       "renameSession": "Đổi tên phiên",
       "renamePlaceholder": "Tên phiên",
       "transcriptAccessibility": "Bản ghi phiên",
@@ -1712,7 +1719,8 @@
       "linesBadge_one": "{{displayCount}} dòng",
       "linesBadge_other": "{{displayCount}} dòng",
       "matchesBadge_one": "{{displayCount}} kết quả khớp",
-      "matchesBadge_other": "{{displayCount}} kết quả khớp"
+      "matchesBadge_other": "{{displayCount}} kết quả khớp",
+      "noOutput": "Không có đầu ra."
     },
     "readToolMarkdown": {
       "linesTruncated": "dòng {{start}}–{{end}} (đã cắt bớt)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "Máy tính của bạn",
     "remoteOptionBody": "Chạy Kilo trên máy của bạn qua CLI `kilo remote`.",
     "skip": "Bỏ qua tour",
-    "tutorialLabel": "Hướng dẫn",
-    "remoteTitle": "Bắt đầu phiên từ xa đầu tiên của bạn",
-    "remoteBody": "Kết nối máy tính của bạn, sau đó bắt đầu phiên từ đây.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Chưa có máy tính nào được kết nối",
-    "remoteEmptyBody": "Để kết nối, hãy chạy `kilo remote` trên máy tính của bạn.",
-    "remoteFound": "Đã kết nối máy tính",
-    "checkAgain": "Kiểm tra lại",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Hướng dẫn"
   },
   "appActions": {
     "start": {

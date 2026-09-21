@@ -838,8 +838,11 @@
       "sessionStatusTitle": "ស្ថានភាពវគ្គ",
       "sessionStatusSubtitle": "បានបញ្ចប់ / បានបរាជ័យ / រួចរាល់សម្រាប់ឱ្យអ្នកគ្រប់គ្រង",
       "kiloclawActivitySubtitle": "ម៉ាស៊ីនរួចរាល់/បរាជ័យ សកម្មភាពតាមកាលវិភាគ",
+      "kiloclawActivityUnavailable": "ចាប់ផ្ដើមម៉ាស៊ីន KiloClaw ដើម្បីទទួលបានសកម្មភាព KiloClaw។",
       "balanceAlertsSubtitle": "ការព្រមានពេលសមតុល្យរបស់អង្គការទាប",
-      "securityFindingsSubtitle": "ការរកឃើញថ្មី និងការរំលឹក SLA"
+      "balanceAlertsUnavailable": "ចូលរួមស្ថាប័នដើម្បីទទួលបានការជូនដំណឹងពេលសមតុល្យទាប។",
+      "securityFindingsSubtitle": "ការរកឃើញថ្មី និងការរំលឹក SLA",
+      "securityFindingsUnavailable": "បើកភ្នាក់ងារសុវត្ថិភាព Kilo នៅក្នុងវិសាលភាពដើម្បីទទួលបានបញ្ហាសុវត្ថិភាពដែលរកឃើញ។"
     },
     "action": {
       "openSession": "បើកវគ្គ"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "មិនអាចផ្ទុកវគ្គបានទេ។",
       "failedToLoadDetails": "មិនអាចផ្ទុកព័ត៌មានលម្អិតនៃវគ្គបានទេ។",
       "failedToStopExecution": "មិនអាចបញ្ឈប់ការដំណើរការបានទេ។",
+      "stopped": "វគ្គត្រូវបានបញ្ឈប់",
+      "committing": "កំពុងកត់ត្រា…",
+      "committed": "កត់ត្រារួចរាល់",
+      "commitFailed": "ការកត់ត្រាបានបរាជ័យ",
       "renameSession": "ប្តូរឈ្មោះវគ្គ",
       "renamePlaceholder": "ឈ្មោះវគ្គ",
       "transcriptAccessibility": "កំណត់ត្រាសន្ទនារបស់វគ្គ",
@@ -2216,7 +2223,8 @@
       "linesBadge_one": "{{displayCount}} បន្ទាត់",
       "linesBadge_other": "{{displayCount}} បន្ទាត់",
       "matchesBadge_one": "ត្រូវគ្នា {{displayCount}}",
-      "matchesBadge_other": "ត្រូវគ្នា {{displayCount}}"
+      "matchesBadge_other": "ត្រូវគ្នា {{displayCount}}",
+      "noOutput": "គ្មានលទ្ធផលទេ។"
     },
     "readToolMarkdown": {
       "linesTruncated": "បន្ទាត់ {{start}}–{{end}} (បានកាត់ឱ្យខ្លី)",
@@ -3180,15 +3188,7 @@
     "remoteOptionTitle": "កុំព្យូទ័ររបស់អ្នក",
     "remoteOptionBody": "ដំណើរការ Kilo លើម៉ាស៊ីនរបស់អ្នកតាមរយៈ CLI `kilo remote`។",
     "skip": "រំលងដំណើរ",
-    "tutorialLabel": "ការណែនាំ",
-    "remoteTitle": "ចាប់ផ្តើមវគ្គចម្ងាយដំបូងរបស់អ្នក",
-    "remoteBody": "ភ្ជាប់កុំព្យូទ័ររបស់អ្នក បន្ទាប់មកចាប់ផ្តើមវគ្គពីទីនេះ។",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "មិនទាន់មានកុំព្យូទ័របានភ្ជាប់ទេ",
-    "remoteEmptyBody": "ដើម្បីភ្ជាប់វា ចូលដំណើរការ `kilo remote` លើកុំព្យូទ័ររបស់អ្នក។",
-    "remoteFound": "បានភ្ជាប់កុំព្យូទ័រ",
-    "checkAgain": "ពិនិត្យម្តងទៀត",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ការណែនាំ"
   },
   "appActions": {
     "start": {

@@ -95,8 +95,11 @@ function connectNoteKey(platform: RepositoryPlatform): string | undefined {
 
 /**
  * Provider-aware repository section. One group per provider renders its own
- * connect/empty/error state independently, and the picker trigger lists every
- * repository plus the Recently used rows when any provider has rows.
+ * empty/error state independently, and the picker trigger lists every
+ * repository plus the Recently used rows when any provider has rows. A
+ * provider's expanded connect prompt renders only before a repository is
+ * selected. Afterwards, compact actions keep other providers reachable without
+ * contradicting the completed selection or requiring it to be cleared.
  */
 export function NewSessionRepositorySection({
   disabled,
@@ -164,7 +167,15 @@ export function NewSessionRepositorySection({
   ): ReactElement | null {
     switch (status) {
       case 'connect': {
-        return renderConnectCard(platform);
+        const noteKey = connectNoteKey(platform);
+        return selectedRepository === null ? (
+          renderConnectCard(platform)
+        ) : (
+          <View className="mt-3 gap-2">
+            {noteKey ? <Text variant="muted">{t(noteKey)}</Text> : null}
+            {renderConnectActions(platform)}
+          </View>
+        );
       }
       case 'connected-empty': {
         return renderConnectedEmptyCard(platform);
@@ -220,32 +231,49 @@ export function NewSessionRepositorySection({
           <Text variant="muted">{t(copy.connectDescription)}</Text>
           {noteKey ? <Text variant="muted">{t(noteKey)}</Text> : null}
         </View>
-        <View className="flex-row gap-2">
-          <Button
-            variant="outline"
-            className="flex-1"
-            onPress={() => {
-              onConnect(platform);
-            }}
-          >
-            <ExternalLink size={16} color={colors.foreground} />
-            <Text>{t(copy.openLabel)}</Text>
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onPress={onRefreshRepos}
-            disabled={isRetrying}
-            accessibilityLabel={t('agentChat.newSession.refreshRepositories')}
-          >
-            {isRetrying ? (
-              <ActivityIndicator size="small" color={colors.foreground} />
-            ) : (
-              <RefreshCw size={16} color={colors.foreground} />
-            )}
-          </Button>
-        </View>
+        {renderConnectActions(platform)}
       </CollapsibleSection>
+    );
+  }
+
+  function renderConnectActions(platform: RepositoryPlatform): ReactElement {
+    const copy = PROVIDER_COPY[platform];
+    return (
+      <View className="flex-row gap-2">
+        <Button
+          variant="outline"
+          className="flex-1"
+          onPress={() => {
+            onConnect(platform);
+          }}
+        >
+          <ExternalLink size={16} color={colors.foreground} />
+          {/*
+            The label owns the row's remaining width and is pinned to one line.
+            A box sized to the label's own measured width is a fraction narrower
+            than the glyphs Android lays out, so "Open GitLab" wrapped onto two
+            lines and grew the button taller than its one-line siblings; giving
+            the label the free space keeps its box wider than the text, and
+            `numberOfLines` pins the line.
+          */}
+          <Text className="flex-1 text-center" numberOfLines={1}>
+            {t(selectedRepository === null ? copy.openLabel : copy.connectTitle)}
+          </Text>
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onPress={onRefreshRepos}
+          disabled={isRetrying}
+          accessibilityLabel={t('agentChat.newSession.refreshRepositories')}
+        >
+          {isRetrying ? (
+            <ActivityIndicator size="small" color={colors.foreground} />
+          ) : (
+            <RefreshCw size={16} color={colors.foreground} />
+          )}
+        </Button>
+      </View>
     );
   }
 

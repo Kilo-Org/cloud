@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- test-renderer mounts native presentation with mocked bridges. */
-import { createElement, type ElementType } from 'react';
+import { createElement, type ElementType, useEffect, useState } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,6 +12,24 @@ const list = vi.hoisted(() => vi.fn());
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 const showPicker = vi.hoisted(() => vi.fn());
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
+// Mutable so the theme test can prove the picker re-reads the active palette,
+// not just that the dark values are passed through. Values mirror the real
+// light/dark tokens in theme-colors.generated.ts.
+const theme = vi.hoisted(() => ({
+  colors: {
+    card: '#17171A',
+    foreground: '#F2F0EB',
+    mutedForeground: '#8A8680',
+    border: 'rgba(255, 255, 255, 0.07)',
+  },
+}));
+const DARK_COLORS = { ...theme.colors };
+const LIGHT_COLORS = {
+  card: '#FFFFFF',
+  foreground: '#14130F',
+  mutedForeground: '#6F6A61',
+  border: 'rgba(0, 0, 0, 0.07)',
+};
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
@@ -41,7 +59,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#888' }),
+  useThemeColors: () => theme.colors,
 }));
 
 const Text = 'Text' as ElementType;
@@ -52,9 +70,16 @@ const orgs = [{ organizationId: 'org-a', organizationName: name, role: 'owner' }
 type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
 const mounted: Mounted[] = [];
 let persisted: string | null = null;
+let rerender: (() => void) | undefined = undefined;
 
 function Surface({ scope }: { scope?: ContextDisplayScope }) {
   const { organizationId: id } = useOrganization();
+  const [, setVersion] = useState(0);
+  useEffect(() => {
+    rerender = () => {
+      setVersion(version => version + 1);
+    };
+  }, []);
   return createElement('GlobalScope', { id }, createElement(ContextControl, { scope }));
 }
 
@@ -88,7 +113,14 @@ async function press(node: ReactTestInstance) {
 function nativePicker() {
   const call = showPicker.mock.lastCall as
     | [
-        { options: string[]; cancelButtonIndex: number; containerStyle: { paddingBottom: number } },
+        {
+          options: string[];
+          cancelButtonIndex: number;
+          title: string;
+          containerStyle: { paddingBottom: number; backgroundColor: string };
+          textStyle: { color: string };
+          titleTextStyle: { color: string };
+        },
         (index?: number) => void,
       ]
     | undefined;
@@ -101,6 +133,8 @@ function nativePicker() {
 beforeEach(() => {
   auth.token = 'token';
   persisted = null;
+  rerender = undefined;
+  theme.colors = { ...DARK_COLORS };
   list.mockReset().mockResolvedValue(orgs);
   storage.read.mockReset().mockResolvedValue(null);
   storage.write.mockReset().mockImplementation(async (_key: string, value: string) => {
@@ -166,6 +200,35 @@ describe('ContextControl', () => {
       expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe(expected);
     }
   );
+
+  it('themes the native picker with the active theme colors', async () => {
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await press(picker(ui));
+    const dark = nativePicker();
+    expect(dark.options.title).toBe('Select account');
+    expect(dark.options.containerStyle).toEqual({
+      paddingBottom: 18,
+      backgroundColor: DARK_COLORS.card,
+    });
+    expect(dark.options.textStyle).toEqual({ color: DARK_COLORS.foreground });
+    expect(dark.options.titleTextStyle).toEqual({ color: DARK_COLORS.mutedForeground });
+
+    // Switching the active palette and re-rendering must change what the sheet
+    // receives; the picker cannot be hardcoding the dark tokens.
+    theme.colors = { ...LIGHT_COLORS };
+    await act(() => {
+      rerender?.();
+    });
+    await press(picker(ui));
+    const light = nativePicker();
+    expect(light.options.containerStyle).toEqual({
+      paddingBottom: 18,
+      backgroundColor: LIGHT_COLORS.card,
+    });
+    expect(light.options.textStyle).toEqual({ color: LIGHT_COLORS.foreground });
+    expect(light.options.titleTextStyle).toEqual({ color: LIGHT_COLORS.mutedForeground });
+  });
 
   it('recovers an unavailable organization through Personal after an empty membership result', async () => {
     storage.read.mockResolvedValue('org-missing');

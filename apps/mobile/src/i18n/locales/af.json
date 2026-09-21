@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Sessiestatus",
       "sessionStatusSubtitle": "klaar / misluk / gereed om te beheer",
       "kiloclawActivitySubtitle": "instansie gereed/misluk, geskeduleerde aksies",
+      "kiloclawActivityUnavailable": "Begin 'n KiloClaw-instansie om KiloClaw-aktiwiteit te kry.",
       "balanceAlertsSubtitle": "waarskuwings oor die organisasie se lae saldo",
-      "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe"
+      "balanceAlertsUnavailable": "Sluit by 'n organisasie aan om waarskuwings oor lae saldo te kry.",
+      "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe",
+      "securityFindingsUnavailable": "Aktiveer Kilo-sekuriteitsagent op 'n bestek om sekuriteitsbevindings te kry."
     },
     "action": {
       "openSession": "Maak sessie oop"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Die sessie kon nie gelaai word nie.",
       "failedToLoadDetails": "Die sessiebesonderhede kon nie gelaai word nie.",
       "failedToStopExecution": "Die uitvoering kon nie gestop word nie.",
+      "stopped": "Sessie gestop",
+      "committing": "Besig om te vaslê…",
+      "committed": "Vasgelê",
+      "commitFailed": "Vaslê het misluk",
       "renameSession": "Hernoem sessie",
       "renamePlaceholder": "Sessienaam",
       "transcriptAccessibility": "Sessietranskripsie",

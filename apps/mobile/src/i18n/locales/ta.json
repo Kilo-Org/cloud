@@ -838,8 +838,11 @@
       "sessionStatusTitle": "அமர்வு நிலை",
       "sessionStatusSubtitle": "முடிந்தது / தோல்வியடைந்தது / கட்டுப்படுத்தத் தயார்",
       "kiloclawActivitySubtitle": "இயக்கப் பிரதி தயார் / தோல்வி, திட்டமிட்ட செயல்கள்",
+      "kiloclawActivityUnavailable": "KiloClaw செயல்பாட்டைப் பெற ஒரு KiloClaw இயக்கப் பிரதியைத் தொடங்கவும்.",
       "balanceAlertsSubtitle": "நிறுவனத்தின் இருப்பு குறையும்போது வரும் எச்சரிக்கைகள்",
-      "securityFindingsSubtitle": "புதிய கண்டறிதல்கள் மற்றும் SLA நினைவூட்டல்கள்"
+      "balanceAlertsUnavailable": "இருப்பு எச்சரிக்கைகளைப் பெற ஒரு நிறுவனத்தில் சேரவும்.",
+      "securityFindingsSubtitle": "புதிய கண்டறிதல்கள் மற்றும் SLA நினைவூட்டல்கள்",
+      "securityFindingsUnavailable": "பாதுகாப்புச் சிக்கல்களைப் பெற ஒரு வரம்பில் Kilo பாதுகாப்பு முகவரை இயக்கவும்."
     },
     "action": {
       "openSession": "அமர்வைத் திறக்கவும்"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "அமர்வை ஏற்ற முடியவில்லை.",
       "failedToLoadDetails": "அமர்வு விவரங்களை ஏற்ற முடியவில்லை.",
       "failedToStopExecution": "இயக்கத்தை நிறுத்த முடியவில்லை.",
+      "stopped": "அமர்வு நிறுத்தப்பட்டது",
+      "committing": "கமிட் செய்யப்படுகிறது…",
+      "committed": "கமிட் செய்யப்பட்டது",
+      "commitFailed": "கமிட் தோல்வியடைந்தது",
       "renameSession": "அமர்வின் பெயரை மாற்றவும்",
       "renamePlaceholder": "அமர்வின் பெயர்",
       "transcriptAccessibility": "அமர்வின் உரையாடல் பதிவு",

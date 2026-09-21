@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Øktstatus",
       "sessionStatusSubtitle": "fullført / mislykket / klar for fjernstyring",
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
+      "kiloclawActivityUnavailable": "Start en KiloClaw-instans for å få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "advarsler om lav organisasjonssaldo",
-      "securityFindingsSubtitle": "nye funn og SLA-påminnelser"
+      "balanceAlertsUnavailable": "Bli med i en organisasjon for å få varsler om lav saldo.",
+      "securityFindingsSubtitle": "nye funn og SLA-påminnelser",
+      "securityFindingsUnavailable": "Aktiver Kilo-sikkerhetsagenten i et omfang for å få sikkerhetsfunn."
     },
     "action": {
       "openSession": "Åpne økt"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Kunne ikke laste inn økten.",
       "failedToLoadDetails": "Kunne ikke laste inn øktdetaljene.",
       "failedToStopExecution": "Kunne ikke stoppe kjøringen.",
+      "stopped": "Økten er stoppet",
+      "committing": "Lagrer…",
+      "committed": "Lagret",
+      "commitFailed": "Lagringen mislyktes",
       "renameSession": "Gi økten nytt navn",
       "renamePlaceholder": "Øktnavn",
       "transcriptAccessibility": "Samtalelogg for økten",

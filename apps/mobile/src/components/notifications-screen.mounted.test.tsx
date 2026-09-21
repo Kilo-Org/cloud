@@ -443,6 +443,10 @@ describe('NotificationsScreen category availability', () => {
     registerTokenMutationFn.mockResolvedValue({ success: true });
   });
 
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
   it('happy: an available category toggle flips and persists', async () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     const { renderer } = await renderScreen();
@@ -460,14 +464,13 @@ describe('NotificationsScreen category availability', () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 
-  it('non-retryable unhappy: an unavailable category disables the switch and shows the server reason', async () => {
+  it('non-retryable unhappy: an unavailable category disables the switch and shows the catalog reason', async () => {
+    // The server's `unavailableReason` is English prose; the row must render
+    // the catalog copy instead.
     prefsQueryFn.mockResolvedValue(
       fullPrefs({
         capabilities: fullCapabilities({
-          balanceAlerts: {
-            available: false,
-            unavailableReason: 'Join an organization to get balance alerts.',
-          },
+          balanceAlerts: { available: false, unavailableReason: 'SERVER PROSE SENTINEL' },
         }),
       })
     );
@@ -476,14 +479,58 @@ describe('NotificationsScreen category availability', () => {
     // Wait for an available sibling row to be enabled first: the master gate
     // disables every row until the permission/device-token/push-token queries
     // settle, so the unavailable row is disabled from the first render. Waiting
-    // on the sibling proves the gate settled and capabilities loaded, so the
-    // Balance alerts `disabled` below is the unavailable state, not the gate.
+    // on the sibling proves the gate settled and capabilities loaded.
     await waitForEnabledSwitch(renderer, 'Chat messages');
 
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(true);
     expect(
-      textWithChildren(renderer.root, 'Join an organization to get balance alerts.').length
+      textWithChildren(renderer.root, i18n.t('notifications.category.balanceAlertsUnavailable'))
+        .length
     ).toBe(1);
+    expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
+  });
+
+  it('repro: an unavailable Security findings row reads in the app language, never the server prose', async () => {
+    // The finding: the Arabic list showed the server's English sentence
+    // 'Enable Kilo Security Agent on a scope to get security findings.' The
+    // row must ignore that prose and render the catalog copy instead.
+    //
+    // The server reason is a sentinel because in English the catalog value IS
+    // that exact sentence (asserted below), so only a distinct string can
+    // prove the response's prose is never the rendered source.
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          securityFindings: { available: false, unavailableReason: 'SERVER PROSE SENTINEL' },
+        }),
+      })
+    );
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    // The catalog owns the finding's sentence.
+    expect(i18n.t('notifications.category.securityFindingsUnavailable')).toBe(
+      'Enable Kilo Security Agent on a scope to get security findings.'
+    );
+    // The reported defect: the row rendered the server's prose.
+    expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
+    expect(
+      textWithChildren(renderer.root, i18n.t('notifications.category.securityFindingsUnavailable'))
+        .length
+    ).toBe(1);
+    expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
+
+    // The finding's screen: the Arabic list carries the catalog copy, resolved
+    // in the active language (s2 supplies the Arabic value; until then it
+    // falls back to English, so the assertion holds either way).
+    await act(async () => {
+      await i18n.changeLanguage('ar');
+    });
+    expect(
+      textWithChildren(renderer.root, i18n.t('notifications.category.securityFindingsUnavailable'))
+        .length
+    ).toBe(1);
+    expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
   });
 
   it('retryable unhappy: a category save failure rolls back the optimistic flip', async () => {
@@ -589,7 +636,7 @@ describe('NotificationsScreen Arabic Security findings row', () => {
           )
         ).toHaveLength(0);
         expect(
-          textWithChildren(renderer.root, ar.securityAgent.settingsOverview.disabledPrompt)
+          textWithChildren(renderer.root, ar.notifications.category.securityFindingsUnavailable)
         ).toHaveLength(1);
         expect(textWithChildren(renderer.root, ar.common.retry)).toHaveLength(0);
 
@@ -614,7 +661,7 @@ describe('NotificationsScreen Arabic Security findings row', () => {
           textWithChildren(renderer.root, ar.notifications.category.securityFindingsSubtitle)
         ).toHaveLength(1);
         expect(
-          textWithChildren(renderer.root, ar.securityAgent.settingsOverview.disabledPrompt)
+          textWithChildren(renderer.root, ar.notifications.category.securityFindingsUnavailable)
         ).toHaveLength(0);
 
         prefsQueryFn.mockResolvedValue(fullPrefs({ securityFindings: false, capabilities }));
@@ -658,7 +705,7 @@ describe('NotificationsScreen Arabic Security findings row', () => {
       });
       await waitForEnabledSwitch(renderer, ar.notifications.channel.chat);
       expect(
-        textWithChildren(renderer.root, ar.securityAgent.settingsOverview.disabledPrompt)
+        textWithChildren(renderer.root, ar.notifications.category.securityFindingsUnavailable)
       ).toHaveLength(1);
       expect(
         renderer.root.findAllByProps({ accessibilityLabel: ar.notifications.retryCategories })
@@ -675,7 +722,7 @@ describe('NotificationsScreen Arabic Security findings row', () => {
       expect(skeletonCount(renderer.root)).toBeGreaterThan(0);
       expect(switchesByLabel(renderer.root, ar.notifications.channel.security)).toHaveLength(0);
       expect(
-        textWithChildren(renderer.root, ar.securityAgent.settingsOverview.disabledPrompt)
+        textWithChildren(renderer.root, ar.notifications.category.securityFindingsUnavailable)
       ).toHaveLength(0);
     } finally {
       unmount();

@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Статус на сесията",
       "sessionStatusSubtitle": "завършена / неуспешна / готова за управление",
       "kiloclawActivitySubtitle": "готова инстанция или грешка, планирани действия",
+      "kiloclawActivityUnavailable": "Стартирай инстанция на KiloClaw, за да получаваш активност от KiloClaw.",
       "balanceAlertsSubtitle": "предупреждения за ниска наличност на организацията",
-      "securityFindingsSubtitle": "нови открити проблеми и напомняния за SLA"
+      "balanceAlertsUnavailable": "Присъедини се към организация, за да получаваш предупреждения за нисък баланс.",
+      "securityFindingsSubtitle": "нови открити проблеми и напомняния за SLA",
+      "securityFindingsUnavailable": "Активирай агента по сигурността на Kilo за даден обхват, за да получаваш проблеми със сигурността."
     },
     "action": {
       "openSession": "Отваряне на сесия"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Не успяхме да заредим сесията.",
       "failedToLoadDetails": "Не успяхме да заредим подробностите за сесията.",
       "failedToStopExecution": "Не успяхме да спрем изпълнението.",
+      "stopped": "Сесията е спряна",
+      "committing": "Създава се комит…",
+      "committed": "Комитът е създаден",
+      "commitFailed": "Неуспешно създаване на комит",
       "renameSession": "Преименуване на сесията",
       "renamePlaceholder": "Име на сесията",
       "transcriptAccessibility": "Запис на разговора",

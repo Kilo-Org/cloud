@@ -1726,7 +1726,7 @@ describe('child transcript requests', () => {
     const errorProps = view.renderer.root.findByType(QueryError).props as ComponentProps<
       typeof QueryError
     >;
-    expect(errorProps.message).toBe('Connection lost. Please retry in a moment.');
+    expect(errorProps.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
     expect(renderedText(cardFor(view.renderer, SELECTED_ID))).toContain('Task ses-selected');
     expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
 
@@ -1751,7 +1751,7 @@ describe('child transcript requests', () => {
     const errorProps = view.renderer.root.findByType(QueryError).props as ComponentProps<
       typeof QueryError
     >;
-    expect(errorProps.message).toBe('You are not authorized to use the Cloud Agent.');
+    expect(errorProps.message).toBe(i18n.t('queryError.permissionDescription'));
     expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
     act(() => {
       sheetProps(view.renderer).onClose();

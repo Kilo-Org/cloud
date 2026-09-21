@@ -1,6 +1,7 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, expect, it, vi } from 'vitest';
+import { waitFor } from './wait-for.js';
 import {
   cloudAgentEventSchema,
   type CloudAgentEvent,
@@ -106,7 +107,7 @@ async function observe(result: Response) {
     if (normalized && !isChatEvent(normalized)) view.process(normalized);
   });
   socket.accept();
-  await vi.waitFor(() =>
+  await waitFor(() =>
     expect(frames.some(frame => frame.streamEventType === 'connected')).toBe(true)
   );
   return { socket, view, frames };
@@ -140,11 +141,11 @@ describe('Session pending-input projection', () => {
       };
       const updated = { ...empty, questions: [updatedQuestion], permissions: [updatedPermission] };
       try {
-        await vi.waitFor(() => expect(client.view.getPermission()?.requestId).toBe(permission.id));
+        await waitFor(() => expect(client.view.getPermission()?.requestId).toBe(permission.id));
         expect(client.view.getQuestion()?.questions).toEqual(question.questions);
         f.pending.resolve(response(updated));
         await f.refresh();
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(client.view.getQuestion()?.questions).toEqual(updatedQuestion.questions);
           expect(client.view.getPermission()?.patterns).toEqual(updatedPermission.patterns);
         });
@@ -166,7 +167,7 @@ describe('Session pending-input projection', () => {
         expect(inputFrames(client.frames)).toEqual(beforeUnchanged);
         f.request.mockResolvedValue(response(empty));
         await f.refresh();
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(client.view.getQuestion()).toBeNull();
           expect(client.view.getPermission()).toBeNull();
         });
@@ -356,7 +357,7 @@ describe('Session pending-input projection', () => {
         expect(client.view.getPermission()).toBeNull();
         f.pending.resolve(response(asks));
         await f.refresh();
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(client.view.getQuestion()).toEqual({
             requestId: question.id,
             questions: question.questions,

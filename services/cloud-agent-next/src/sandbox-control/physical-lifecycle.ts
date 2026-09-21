@@ -1,4 +1,7 @@
-import { vercelSandboxResourcesSchema } from '@kilocode/worker-utils/sandbox-allocation';
+import {
+  CLOUDFLARE_CONTAINERS_INSTANCES,
+  vercelSandboxResourcesSchema,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 
@@ -7,7 +10,12 @@ export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider
   z
     .object({ provider: z.literal('vercel'), resources: vercelSandboxResourcesSchema.optional() })
     .strict(),
-  z.object({ provider: z.literal('cloudflare-containers') }).strict(),
+  z
+    .object({
+      provider: z.literal('cloudflare-containers'),
+      instance: z.enum(CLOUDFLARE_CONTAINERS_INSTANCES).optional(),
+    })
+    .strict(),
 ]);
 
 export type SandboxProviderConfiguration = z.infer<typeof sandboxProviderConfigurationSchema>;

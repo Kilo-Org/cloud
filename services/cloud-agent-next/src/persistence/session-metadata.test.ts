@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { getSandboxAllocationProvider } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   CurrentSessionMetadataSchema,
   getEffectiveCredentialContainment,
@@ -432,10 +433,17 @@ describe('session metadata boundary', () => {
     ).toThrow();
   });
 
-  it.each(['cloudflare-single', 'cloudflare-shared', 'vercel-small', 'vercel-large'] as const)(
+  it.each([
+    'cloudflare-single',
+    'cloudflare-shared',
+    'cloudflare-containers-standard-4',
+    'vercel-small',
+    'vercel-large',
+  ] as const)(
     'round-trips the immutable %s preset and rejects inconsistent allocations',
     sandboxAllocation => {
       const sandboxId = `${sandboxAllocation === 'cloudflare-shared' ? 'org' : 'ses'}-${'a'.repeat(48)}`;
+      const provider = getSandboxAllocationProvider(sandboxAllocation);
       const current = {
         metadataSchemaVersion: 2,
         identity: { sessionId: 'workspace_preset', userId: 'oauth/user', orgId: 'org-id' },
@@ -443,7 +451,7 @@ describe('session metadata boundary', () => {
         workspace: {
           sandboxId,
           sandboxAllocation,
-          sandboxProvider: sandboxAllocation.startsWith('vercel-') ? 'vercel' : 'cloudflare',
+          sandboxProvider: provider,
           ...(sandboxAllocation === 'cloudflare-shared'
             ? { sandboxRoute: { kind: 'shared', routeKey: sandboxId } }
             : {}),
@@ -451,22 +459,22 @@ describe('session metadata boundary', () => {
         lifecycle: { version: 1, timestamp: 1 },
       };
       expect(serializeSessionMetadata(parseSessionMetadata(current))).toEqual(current);
-      const vercel = sandboxAllocation.startsWith('vercel-');
+      const controlPlaneOnly = provider !== 'cloudflare';
       for (const workspace of [
         { ...current.workspace, sandboxId: `dind-${'a'.repeat(48)}` },
         {
           ...current.workspace,
-          sandboxProvider: current.workspace.sandboxProvider === 'vercel' ? 'cloudflare' : 'vercel',
+          sandboxProvider: provider === 'vercel' ? 'cloudflare' : 'vercel',
         },
         { ...current.workspace, devcontainerRequested: true },
         // `istd-` is the only identity Isolated Standard accepts.
         { ...current.workspace, sandboxAllocation: 'isolated-standard' },
         { ...current.workspace, sandboxAllocation: 'custom' },
-        ...(vercel ? [{ ...current.workspace, sandboxProvider: undefined }] : []),
+        ...(controlPlaneOnly ? [{ ...current.workspace, sandboxProvider: undefined }] : []),
       ]) {
         expect(() => parseSessionMetadata({ ...current, workspace })).toThrow();
       }
-      if (!vercel) {
+      if (!controlPlaneOnly) {
         // Metadata written before the explicit provider field defaults to Cloudflare.
         const implicit = {
           ...current,
@@ -485,9 +493,9 @@ describe('session metadata boundary', () => {
           identity: { ...current.identity, orgId: undefined },
         }).workspace?.sandboxAllocation
       ).toBe(sandboxAllocation);
-      // Cloudflare presets keep the owner's plane; Vercel presets exist only on control.
+      // Cloudflare presets keep the owner's plane; the other providers exist only on control.
       const legacy = { ...current, identity: { ...current.identity, sessionId: 'agent_legacy' } };
-      if (sandboxAllocation.startsWith('vercel-')) {
+      if (controlPlaneOnly) {
         expect(() => parseSessionMetadata(legacy)).toThrow('control-plane session');
       } else {
         expect(serializeSessionMetadata(parseSessionMetadata(legacy))).toEqual(legacy);

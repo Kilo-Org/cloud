@@ -3,6 +3,7 @@ import { SandboxSession } from '../sandbox-session/SandboxSession.js';
 import { createMemoryEventQueries } from '../session/preparation-test-helpers.js';
 import type { BillingContext } from '@kilocode/container-usage';
 import {
+  CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
   getSandboxAllocationResources,
   type SandboxAllocation,
   type VercelSandboxResources,
@@ -884,7 +885,7 @@ describe('SandboxControl lifecycle boundaries', () => {
     });
     expect(h.containerStub.launchWrapper).toHaveBeenCalledWith({
       allocationRef: physical.providerRef,
-      instance: 'standard-2',
+      instance: CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
       env: expect.objectContaining({
         PROVIDER_INSTANCE_ID: physical.providerRef,
         WRAPPER_LOG_PATH: '/tmp/kilocode-control-wrapper.log',

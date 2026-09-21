@@ -251,6 +251,8 @@ const SANDBOX_ALLOCATION_ID_CLASS: Record<
 > = {
   'isolated-standard': 'isolated-standard',
   'cloudflare-single': 'isolated-small',
+  'cloudflare-containers-standard-3': 'isolated-small',
+  'cloudflare-containers-standard-4': 'isolated-small',
   'vercel-small': 'isolated-small',
   'vercel-large': 'isolated-small',
 };
@@ -413,7 +415,7 @@ export const CurrentSessionMetadataSchema = z
     metadata =>
       !sandboxAllocationRequiresControlPlane(metadata.workspace?.sandboxAllocation) ||
       sessionPlaneFromId(metadata.identity.sessionId) === 'control',
-    'Vercel sandbox allocations require a control-plane session'
+    'Sandbox allocations for this provider require a control-plane session'
   )
   .refine(
     metadata =>

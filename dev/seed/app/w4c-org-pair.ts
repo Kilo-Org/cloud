@@ -5,9 +5,9 @@
  * already exist (created via `app:create-user`). Used to test that removing a
  * member closes their socket.
  *
- * The fixture is idempotent: rerunning it for the same pair keeps the oldest
- * organization it created before, so the mobile account sheet lists one row
- * per account instead of one row per seed run.
+ * The fixture is idempotent: rerunning it for the same owner keeps the oldest
+ * organization it created for that owner, so the mobile account sheet lists
+ * one row per account instead of one row per seed run.
  *
  * Usage: pnpm dev:seed app:w4c-org-pair <owner-email> <member-email>
  */
@@ -21,13 +21,13 @@ import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
 import {
   FIXTURE_SETTINGS_KEY,
-  FIXTURE_SETTINGS_VALUE,
   fixtureSettingsMarkerJson,
   LEGACY_ORGANIZATION_NAME_PREFIX,
   membershipsToPrune,
   SEEDED_ORGANIZATION_NAME,
   selectSeededOrganization,
 } from '../lib/w4c-org-pair';
+import type { FixturePair } from '../lib/w4c-org-pair';
 import type { SeedResult } from '../index';
 
 export const usage = '<owner-email> <member-email>';
@@ -46,8 +46,8 @@ function printUsage(): void {
   console.log('Creates one organization with an owner and a member. Both users must');
   console.log('already exist (create them first with app:create-user).');
   console.log('');
-  console.log('Rerunning with the same pair reuses the organization created before, so');
-  console.log('the fixture stays one organization per pair.');
+  console.log('Rerunning for the same owner reuses the organization created before,');
+  console.log('so the fixture stays one organization per account.');
   console.log('');
   console.log('Examples:');
   console.log('  pnpm dev:seed app:w4c-org-pair owner@example.com member@example.com');
@@ -71,9 +71,10 @@ async function lookupUserId(email: string): Promise<string> {
 }
 
 /**
- * Every organization this fixture has ever created, whatever name it carried:
+ * Every organization this fixture may have created, whatever name it carried:
  * the settings marker, the legacy `[seed:w4c-org-pair] ` prefix, or the name
- * written since #6332.
+ * written since #6332. Which of them belong to this pair's run is decided by
+ * `isPairOrganization`.
  */
 async function listFixtureOrganizations() {
   const db = getSeedDb();
@@ -89,7 +90,7 @@ async function listFixtureOrganizations() {
       or(
         eq(organizations.name, SEEDED_ORGANIZATION_NAME),
         like(organizations.name, `${LEGACY_ORGANIZATION_NAME_PREFIX}%`),
-        sql`${organizations.settings} ->> ${FIXTURE_SETTINGS_KEY} = ${FIXTURE_SETTINGS_VALUE}`
+        sql`${organizations.settings} ->> ${FIXTURE_SETTINGS_KEY} IS NOT NULL`
       )
     );
 }
@@ -139,14 +140,22 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const userIds = [ownerUserId, memberUserId];
 
-  // Recognition is database-wide on purpose: the settings marker is a plain
-  // flag (`w4c_org_pair: 'true'`), so it cannot identify which pair a row came
-  // from. The fixture therefore converges on the oldest organization it ever
-  // created and prunes only this pair's memberships elsewhere, so each of the
-  // two users ends with exactly one fixture organization membership and the
-  // account sheet lists that organization once.
+  // Recognition is scoped to this pair's owner: the marker names the owner a
+  // row was created for, so a row belonging to another pair is never claimed.
+  // Rows created before the marker named an owner carry none, and the pair's
+  // existing memberships are the only evidence the fixture created them, so
+  // they are read first and passed in. The fixture therefore converges on the
+  // oldest organization it created for this owner and prunes only this pair's
+  // memberships elsewhere, so each of the two users ends with one fixture
+  // organization membership and the account sheet lists that organization once.
+  const membershipRows = await listMemberships(userIds);
+  const pair: FixturePair = {
+    ownerEmail: normalizeSeedEmail(trimmedOwnerEmail),
+    organizationIds: new Set(membershipRows.map(row => row.organization_id)),
+  };
+
   const fixtureOrganizations = await listFixtureOrganizations();
-  const keptOrganization = selectSeededOrganization(fixtureOrganizations);
+  const keptOrganization = selectSeededOrganization(fixtureOrganizations, pair);
   const organizationId = keptOrganization?.id ?? randomUUID();
 
   if (!keptOrganization) {
@@ -164,16 +173,16 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   await db
     .update(organizations)
     .set({
-      settings: sql`${organizations.settings} || ${fixtureSettingsMarkerJson()}::jsonb`,
+      settings: sql`${organizations.settings} || ${fixtureSettingsMarkerJson(pair.ownerEmail)}::jsonb`,
       ...(renamesFromLegacyMarker ? { name: SEEDED_ORGANIZATION_NAME } : {}),
     })
     .where(eq(organizations.id, organizationId));
 
   // The pair must end up with exactly one membership each: the kept
-  // organization's. Membership rows in the other fixture organizations are
-  // pruned; the organizations themselves are never deleted.
-  const membershipRows = await listMemberships(userIds);
-  const pruneMembershipIds = membershipsToPrune(membershipRows, organizationId, userIds).map(
+  // organization's. Membership rows in the other organizations this fixture
+  // created for the pair are pruned; the organizations themselves are never
+  // deleted.
+  const pruneMembershipIds = membershipsToPrune(membershipRows, organizationId, userIds, pair).map(
     row => row.id
   );
   if (pruneMembershipIds.length > 0) {

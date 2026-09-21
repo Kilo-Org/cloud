@@ -69,17 +69,13 @@ describe('resolveNewSessionPromptControlState', () => {
     });
 
     expect(state.createDisabled).toBe(true);
-    // The prompt stays editable so the create cannot dismiss the IME and
-    // shift the pinned footer (the busy button must not move).
-    expect(state.inputEditable).toBe(true);
-    expect(state.inputAccessibilityDisabled).toBe(false);
     // The draft-mutating controls stay locked: the create holds its snapshot.
     expect(state.draftMutationLocked).toBe(true);
     expect(state.voiceDisabled).toBe(true);
     expect(state.paperclipDisabled).toBe(true);
   });
 
-  it('disables the paperclip but keeps the prompt editable while this owner is voice active', () => {
+  it('disables the paperclip while this owner is voice active', () => {
     const state = resolveNewSessionPromptControlState({
       attachmentsCount: 0,
       attachmentMax: 5,
@@ -88,8 +84,6 @@ describe('resolveNewSessionPromptControlState', () => {
       voiceInputActive: true,
     });
 
-    expect(state.inputEditable).toBe(true);
-    expect(state.inputAccessibilityDisabled).toBe(false);
     expect(state.paperclipDisabled).toBe(true);
     expect(state.voiceDisabled).toBe(false);
     expect(state.hasPrompt).toBe(true);
@@ -105,8 +99,6 @@ describe('resolveNewSessionPromptControlState', () => {
     });
 
     expect(state.voiceDisabled).toBe(false);
-    expect(state.inputEditable).toBe(true);
-    expect(state.inputAccessibilityDisabled).toBe(false);
     expect(state.draftMutationLocked).toBe(false);
     expect(state.paperclipDisabled).toBe(false);
     expect(state.createDisabled).toBe(false);

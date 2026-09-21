@@ -164,9 +164,14 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
-    });
+    // The introspected project root may already hold a generated Android
+    // project, whose colors.xml merges into the mod result. Assert the splash
+    // color is present instead of pinning the whole array's length.
+    expect(evaluated._internal?.modResults?.android?.colors?.resources?.color).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+      ])
+    );
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {
         style: expect.arrayContaining([

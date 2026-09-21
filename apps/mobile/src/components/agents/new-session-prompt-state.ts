@@ -11,10 +11,6 @@ type NewSessionPromptControlState = {
   createDisabled: boolean;
   /** Whether the prompt has non-whitespace text — the upstream canCreate gate. */
   hasPrompt: boolean;
-  /** Whether the prompt row itself can be tapped into for typing. */
-  inputEditable: boolean;
-  /** Mirrors `accessibilityState.disabled` on the TextInput. */
-  inputAccessibilityDisabled: boolean;
   /**
    * Whether the controls that mutate the draft or the payload — the paste
    * button, its async clipboard read, and the insert-newline button — are
@@ -72,16 +68,10 @@ export function resolveNewSessionPromptControlState(
   const createDisabled = isCreating;
   const voiceDisabled = isCreating;
   const paperclipDisabled = isCreating || voiceInputActive || attachmentsCount >= attachmentMax;
-  // The prompt stays editable through every state, including an in-flight
-  // create: voice activity inserts at the caret (an edit aborts the session)
-  // and a create must not steal the IME out from under the pinned footer.
-  const inputEditable = true;
   return {
     createDisabled,
     draftMutationLocked: isCreating,
     hasPrompt,
-    inputAccessibilityDisabled: !inputEditable,
-    inputEditable,
     paperclipDisabled,
     voiceDisabled,
   };

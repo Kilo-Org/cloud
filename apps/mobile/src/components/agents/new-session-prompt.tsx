@@ -405,9 +405,7 @@ export function NewSessionPrompt({
           onSelectionChange={handlePromptSelectionChange}
           onLayout={handlePromptInputLayout}
           scrollEnabled={promptMeasure.height >= promptMaxHeight}
-          editable={control.inputEditable}
           maxLength={PROMPT_INPUT_MAX_CHARS}
-          accessibilityState={{ disabled: control.inputAccessibilityDisabled }}
           returnKeyType={returnSendsMessage ? 'send' : 'default'}
           submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
           onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}

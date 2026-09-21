@@ -336,6 +336,15 @@
       "kiloclawActivitySubtitle": "готовність або помилка екземпляра, заплановані дії",
       "balanceAlertsSubtitle": "попередження про низький баланс організації",
       "securityFindingsSubtitle": "нові виявлені проблеми та нагадування про SLA"
+    },
+    "action": {
+      "openSession": "Відкрити сеанс"
+    },
+    "needsInputAction": {
+      "approved": "Запит схвалено",
+      "replied": "Відповідь надіслано",
+      "failed": "Не вдалося відповісти. Торкніться ще раз, щоб повторити.",
+      "unavailable": "Цей запит більше не чекає."
     }
   },
   "tabs": {
@@ -1697,20 +1706,7 @@
       "continueFrom": "Продовжується сеанс «{{title}}».",
       "importingSession": "Імпортування сеансу",
       "cliCannotContinue": "Цей CLI не підтримує продовження сеансів. Виберіть Cloud Agent або інший CLI.",
-      "importFailed": "Не вдалося імпортувати цей сеанс.",
-      "sandbox": "Пісочниця",
-      "sandboxAccessibility": "Пісочниця: {{label}}",
-      "sandboxDefaultWithDestination": "За замовчуванням · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Мала",
-      "sandboxInstanceShared": "Спільна",
-      "sandboxInstanceLarge": "Велика",
-      "sandboxInstanceDevcontainer": "Контейнер розробки",
-      "sandboxInstanceProviderDefault": "За замовчуванням постачальника",
-      "sandboxCouldNotLoad": "Не вдалося завантажити параметри пісочниці",
-      "sandboxUnavailable": "Ця пісочниця недоступна. Виберіть іншу пісочницю або «За замовчуванням».",
-      "sandboxUseDefault": "Використати «За замовчуванням»"
+      "importFailed": "Не вдалося імпортувати цей сеанс."
     },
     "partRenderer": {
       "updatedFileCount_one": "Оновлено {{displayCount}} файл.",
@@ -3243,7 +3239,9 @@
     "couldNotApprove": "Не вдалося схвалити",
     "couldNotStart": "Не вдалося запустити",
     "channelName": "Активні агенти",
-    "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані."
+    "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані.",
+    "openSession": "Відкрити",
+    "approveFailed": "Не вдалося схвалити. Торкніться $t(common.approve), щоб спробувати ще раз."
   },
   "transcriptionModel": {
     "title": "Модель розпізнавання мовлення",

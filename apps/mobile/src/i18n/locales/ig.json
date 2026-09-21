@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "usoro dị njikere ma ọ bụ agaghị nke ọma, omume a haziri oge ha",
       "balanceAlertsSubtitle": "ịdọ aka na ntị mgbe ego ụlọ ọrụ fọdụrụ dị ntakịrị",
       "securityFindingsSubtitle": "nchọpụta ọhụrụ na ncheta SLA"
+    },
+    "action": {
+      "openSession": "Mepee nnọkọ"
+    },
+    "needsInputAction": {
+      "approved": "Arịrịọ ahụ ekwenyere",
+      "replied": "Eziterela azịza",
+      "failed": "Enweghị ike izaghachi. Pịa ọzọ ka ị nwaa ọzọ.",
+      "unavailable": "Arịrịọ a anaghịzi eche."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "A na-aga n'ihu na {{title}}.",
       "importingSession": "Na-ebubata nnọkọ",
       "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",
-      "importFailed": "Enweghị ike ibubata nnọkọ a.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Ndabere · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Nta",
-      "sandboxInstanceShared": "Kejoro",
-      "sandboxInstanceLarge": "Ukwu",
-      "sandboxInstanceDevcontainer": "Dev konteita",
-      "sandboxInstanceProviderDefault": "Ndabere onye na-enye ọrụ",
-      "sandboxCouldNotLoad": "Enweghị ike ibudata nhọrọ sandbox",
-      "sandboxUnavailable": "Sandbox a adịghị. Họrọ sandbox ọzọ ma ọ bụ Ndabere.",
-      "sandboxUseDefault": "Jiri Ndabere"
+      "importFailed": "Enweghị ike ibubata nnọkọ a."
     },
     "partRenderer": {
       "updatedFileCount_one": "Emelitere faịlụ {{displayCount}}.",
@@ -3157,7 +3153,9 @@
     "couldNotApprove": "Enweghị ike ịkwado",
     "couldNotStart": "Enweghị ike ịmalite",
     "channelName": "Ndị nnọchi anya na-arụ ọrụ",
-    "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi."
+    "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi.",
+    "openSession": "Meghe",
+    "approveFailed": "Enweghị ike ịkwado. Pịa $t(common.approve) ka ị nwaa ọzọ."
   },
   "transcriptionModel": {
     "title": "Ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",

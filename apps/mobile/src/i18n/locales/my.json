@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "စနစ်အသင့်ဖြစ်မှု/မအောင်မြင်မှု၊ အချိန်သတ်မှတ်ထားသော လုပ်ဆောင်ချက်များ",
       "balanceAlertsSubtitle": "အဖွဲ့အစည်း၏ လက်ကျန်နည်းချိန် သတိပေးချက်များ",
       "securityFindingsSubtitle": "တွေ့ရှိချက်အသစ်များနှင့် SLA သတိပေးချက်များ"
+    },
+    "action": {
+      "openSession": "စက်ရှင်ကို ဖွင့်ပါ"
+    },
+    "needsInputAction": {
+      "approved": "တောင်းဆိုမှုကို အတည်ပြုလိုက်ပါပြီ",
+      "replied": "အကြောင်းပြန်စာ ပို့ပြီးပါပြီ",
+      "failed": "အကြောင်းပြန်ရန် မအောင်မြင်ပါ။ ထပ်မံကြိုးစားရန် ထပ်မံနှိပ်ပါ။",
+      "unavailable": "ဤတောင်းဆိုမှုသည် နောက်ထပ် စောင့်ဆိုင်းနေခြင်း မရှိတော့ပါ။"
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "{{title}} ကို ဆက်လုပ်နေပါသည်။",
       "importingSession": "စက်ရှင်ကို တင်သွင်းနေသည်",
       "cliCannotContinue": "ဤ CLI ဖြင့် စက်ရှင်ကို ဆက်လုပ်၍မရပါ။ Cloud Agent သို့မဟုတ် အခြား CLI တစ်ခုကို ရွေးပါ။",
-      "importFailed": "ဤစက်ရှင်ကို တင်သွင်း၍မရပါ။",
-      "sandbox": "စန်းဒ်ဘောက်စ်",
-      "sandboxAccessibility": "စန်းဒ်ဘောက်စ်: {{label}}",
-      "sandboxDefaultWithDestination": "မူလ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "သေး",
-      "sandboxInstanceShared": "မျှဝေ",
-      "sandboxInstanceLarge": "ကြီး",
-      "sandboxInstanceDevcontainer": "Dev ကွန်တိန်နာ",
-      "sandboxInstanceProviderDefault": "ပံ့ပိုးသူ၏ မူလ",
-      "sandboxCouldNotLoad": "စန်းဒ်ဘောက်စ် ရွေးချယ်စရာများ လုဒ်လုပ်မရပါ",
-      "sandboxUnavailable": "ဤစန်းဒ်ဘောက်စ်ကို သုံးမရပါ။ အခြားစန်းဒ်ဘောက်စ် သို့မဟုတ် မူလကို ရွေးပါ။",
-      "sandboxUseDefault": "မူလကို သုံးရန်"
+      "importFailed": "ဤစက်ရှင်ကို တင်သွင်း၍မရပါ။"
     },
     "partRenderer": {
       "updatedFileCount_one": "ဖိုင် {{displayCount}} ခုကို ပြင်ဆင်ပြီးပါပြီ။",
@@ -3157,7 +3153,9 @@
     "couldNotApprove": "အတည်ပြု၍ မရပါ",
     "couldNotStart": "စတင်၍ မရပါ",
     "channelName": "လုပ်ဆောင်နေသော အေးဂျင့်များ",
-    "activityKitDisabledBody": "သော့ခတ်မျက်နှာပြင်တွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ကြည့်ရန် ဆက်တင်များ၌ တိုက်ရိုက်လုပ်ဆောင်မှုများကို ဖွင့်ပါ။"
+    "activityKitDisabledBody": "သော့ခတ်မျက်နှာပြင်တွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ကြည့်ရန် ဆက်တင်များ၌ တိုက်ရိုက်လုပ်ဆောင်မှုများကို ဖွင့်ပါ။",
+    "openSession": "ဖွင့်ပါ",
+    "approveFailed": "အတည်ပြု၍မရပါ။ ထပ်ကြိုးစားရန် $t(common.approve) ကို နှိပ်ပါ။"
   },
   "transcriptionModel": {
     "title": "အသံမှစာသားပြောင်းမော်ဒယ်",

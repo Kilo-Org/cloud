@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "instanssi valmis/epäonnistui, ajoitetut toiminnot",
       "balanceAlertsSubtitle": "varoitukset organisaation alhaisesta saldosta",
       "securityFindingsSubtitle": "uudet löydökset ja SLA-muistutukset"
+    },
+    "action": {
+      "openSession": "Avaa istunto"
+    },
+    "needsInputAction": {
+      "approved": "Pyyntö hyväksytty",
+      "replied": "Vastaus lähetetty",
+      "failed": "Vastaaminen ei onnistunut. Yritä uudelleen napauttamalla uudelleen.",
+      "unavailable": "Tämä pyyntö ei ole enää odottamassa."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Jatketaan istuntoa: {{title}}.",
       "importingSession": "Tuodaan istuntoa",
       "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
-      "importFailed": "Tätä istuntoa ei voitu tuoda.",
-      "sandbox": "Hiekkalaatikko",
-      "sandboxAccessibility": "Hiekkalaatikko: {{label}}",
-      "sandboxDefaultWithDestination": "Oletus · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Pieni",
-      "sandboxInstanceShared": "Jaettu",
-      "sandboxInstanceLarge": "Suuri",
-      "sandboxInstanceDevcontainer": "Kehityssäiliö",
-      "sandboxInstanceProviderDefault": "Palveluntarjoajan oletus",
-      "sandboxCouldNotLoad": "Hiekkalaatikon vaihtoehtoja ei voitu ladata",
-      "sandboxUnavailable": "Tämä hiekkalaatikko ei ole käytettävissä. Valitse toinen hiekkalaatikko tai Oletus.",
-      "sandboxUseDefault": "Käytä Oletusta"
+      "importFailed": "Tätä istuntoa ei voitu tuoda."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} tiedosto päivitettiin.",
@@ -3157,7 +3153,9 @@
     "couldNotApprove": "Hyväksyntä epäonnistui",
     "couldNotStart": "Käynnistys epäonnistui",
     "channelName": "Aktiiviset agentit",
-    "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä."
+    "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
+    "openSession": "Avaa",
+    "approveFailed": "Hyväksyminen ei onnistunut. Yritä uudelleen napauttamalla $t(common.approve)."
   },
   "transcriptionModel": {
     "title": "Puheentunnistusmalli",

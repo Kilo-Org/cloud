@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "ଇନଷ୍ଟାନ୍ସ ପ୍ରସ୍ତୁତ/ବିଫଳ, ନିର୍ଦ୍ଧାରିତ କାର୍ଯ୍ୟ",
       "balanceAlertsSubtitle": "ସଂଗଠନର କମ୍ ବ୍ୟାଲାନ୍ସ ସତର୍କତା",
       "securityFindingsSubtitle": "ନୂଆ ସୁରକ୍ଷା ସମସ୍ୟା ଓ SLA ସ୍ମାରକ"
+    },
+    "action": {
+      "openSession": "ସେସନ ଖୋଲନ୍ତୁ"
+    },
+    "needsInputAction": {
+      "approved": "ଅନୁରୋଧ ଅନୁମୋଦିତ ହେଲା",
+      "replied": "ଉତ୍ତର ପଠାଯାଇଛି",
+      "failed": "ଉତ୍ତର ଦିଆଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବା ପାଇଁ ପୁଣି ଟାପ୍ କରନ୍ତୁ।",
+      "unavailable": "ଏହି ଅନୁରୋଧ ବର୍ତ୍ତମାନ ଅପେକ୍ଷା କରୁନାହିଁ।"
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "{{title}} ଜାରି ରଖାଯାଉଛି।",
       "importingSession": "ସେସନ୍ ଆମଦାନି ହେଉଛି",
       "cliCannotContinue": "ଏହି CLI ସେସନ୍ ଜାରି ରଖିପାରିବ ନାହିଁ। Cloud Agent କିମ୍ବା ଅନ୍ୟ ଏକ CLI ବାଛନ୍ତୁ।",
-      "importFailed": "ଏହି ସେସନ୍ ଆମଦାନି ହୋଇପାରିଲା ନାହିଁ।",
-      "sandbox": "ସ୍ୟାଣ୍ଡବକ୍ସ",
-      "sandboxAccessibility": "ସ୍ୟାଣ୍ଡବକ୍ସ: {{label}}",
-      "sandboxDefaultWithDestination": "ଡିଫଲ୍ଟ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "ଛୋଟ",
-      "sandboxInstanceShared": "ସହଭାଗୀ",
-      "sandboxInstanceLarge": "ବଡ଼",
-      "sandboxInstanceDevcontainer": "ଡେଭ୍ କଣ୍ଟେନର୍",
-      "sandboxInstanceProviderDefault": "ପ୍ରଦାତାଙ୍କ ଡିଫଲ୍ଟ",
-      "sandboxCouldNotLoad": "ସ୍ୟାଣ୍ଡବକ୍ସ ବିକଳ୍ପଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
-      "sandboxUnavailable": "ଏହି ସ୍ୟାଣ୍ଡବକ୍ସ ଉପଲବ୍ଧ ନାହିଁ। ଅନ୍ୟ ଏକ ସ୍ୟାଣ୍ଡବକ୍ସ କିମ୍ବା ଡିଫଲ୍ଟ ବାଛନ୍ତୁ।",
-      "sandboxUseDefault": "ଡିଫଲ୍ଟ ବ୍ୟବହାର କରନ୍ତୁ"
+      "importFailed": "ଏହି ସେସନ୍ ଆମଦାନି ହୋଇପାରିଲା ନାହିଁ।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି।",
@@ -3157,7 +3153,9 @@
     "couldNotApprove": "ଅନୁମୋଦନ କରାଯାଇପାରିଲା ନାହିଁ",
     "couldNotStart": "ଆରମ୍ଭ କରାଯାଇପାରିଲା ନାହିଁ",
     "channelName": "ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ",
-    "activityKitDisabledBody": "ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ ଦେଖିବାକୁ ସେଟିଂସ୍‌ରେ ଲାଇଭ୍ କାର୍ଯ୍ୟକଳାପ ଚାଲୁ କରନ୍ତୁ।"
+    "activityKitDisabledBody": "ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ ଦେଖିବାକୁ ସେଟିଂସ୍‌ରେ ଲାଇଭ୍ କାର୍ଯ୍ୟକଳାପ ଚାଲୁ କରନ୍ତୁ।",
+    "openSession": "ଖୋଲନ୍ତୁ",
+    "approveFailed": "ଅନୁମୋଦନ କରିହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ $t(common.approve) ଟାପ୍ କରନ୍ତୁ।"
   },
   "transcriptionModel": {
     "title": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର ମଡେଲ୍",

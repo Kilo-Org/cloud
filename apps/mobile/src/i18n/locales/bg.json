@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "готова инстанция или грешка, планирани действия",
       "balanceAlertsSubtitle": "предупреждения за ниска наличност на организацията",
       "securityFindingsSubtitle": "нови открити проблеми и напомняния за SLA"
+    },
+    "action": {
+      "openSession": "Отваряне на сесия"
+    },
+    "needsInputAction": {
+      "approved": "Заявката е одобрена",
+      "replied": "Отговорът е изпратен",
+      "failed": "Не можа да се отговори. Докоснете отново, за да опитате пак.",
+      "unavailable": "Тази заявка вече не чака."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Продължаваш сесията {{title}}.",
       "importingSession": "Импортиране на сесията",
       "cliCannotContinue": "Този CLI не може да продължи сесия. Избери Cloud Agent или друг CLI.",
-      "importFailed": "Тази сесия не можа да бъде импортирана.",
-      "sandbox": "Пясъчник",
-      "sandboxAccessibility": "Пясъчник: {{label}}",
-      "sandboxDefaultWithDestination": "По подразбиране · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Малка",
-      "sandboxInstanceShared": "Споделена",
-      "sandboxInstanceLarge": "Голяма",
-      "sandboxInstanceDevcontainer": "Контейнер за разработка",
-      "sandboxInstanceProviderDefault": "По подразбиране от доставчика",
-      "sandboxCouldNotLoad": "Опциите за пясъчника не можаха да се заредят",
-      "sandboxUnavailable": "Този пясъчник е недостъпен. Изберете друг пясъчник или По подразбиране.",
-      "sandboxUseDefault": "Използвай По подразбиране"
+      "importFailed": "Тази сесия не можа да бъде импортирана."
     },
     "partRenderer": {
       "updatedFileCount_one": "Актуализиран е {{displayCount}} файл.",
@@ -3157,7 +3153,9 @@
     "couldNotApprove": "Одобряването не бе успешно",
     "couldNotStart": "Стартирането не бе успешно",
     "channelName": "Активни агенти",
-    "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран."
+    "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран.",
+    "openSession": "Отвори",
+    "approveFailed": "Не успяхме да одобрим. Докосни $t(common.approve), за да опиташ отново."
   },
   "transcriptionModel": {
     "title": "Модел за транскрипция",

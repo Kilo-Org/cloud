@@ -52,8 +52,12 @@ vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurf
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useOfflineBannerState: () => false,
 }));
+// `credentials.ts` reads `WHEN_UNLOCKED_THIS_DEVICE_ONLY` at module scope via
+// the manager -> approve-ask import; the real expo-secure-store entry imports
+// react-native, so this suite only needs the import to resolve.
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'whenUnlockedThisDeviceOnly',
 }));
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
@@ -386,6 +390,7 @@ vi.mock('@/components/agents/use-message-copy', () => ({
 }));
 vi.mock('@/components/agents/session-detail-content-helpers', () => ({
   countInFlightMessages: () => 0,
+  lastVisibleMessageFailure: () => null,
   resolveRetryPrompt: () => null,
   retryFailedMessage: vi.fn(),
 }));

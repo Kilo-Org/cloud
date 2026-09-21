@@ -5,12 +5,15 @@
 import '@/i18n/rtl';
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
-// Enter the local module's JS in the main process on both platforms. Its
-// Android branch stays a no-op until slice `and` lands; iOS runs the
-// registered glanceable sink below. Imported by path: the module is
-// autolinked from modules/ and intentionally absent from dependencies.
+// Enter the local Android Live Update module's JS in the main process on both
+// platforms: its import side effect registers the Live Update sink on the one
+// platform that can load it, and the require is the capability gate (see the
+// module's src/index.ts). Imported by path: the module is autolinked from
+// modules/ and intentionally absent from dependencies.
 import '../../modules/active-agents-live-update/src';
-// Registers the iOS Live Activity and widget sink with the glanceable publisher.
+// Registers the iOS Live Activity and widget sink with the glanceable
+// publisher. iOS-only by capability (WidgetKit/ActivityKit): the module loads
+// on Android but registers nothing there.
 import '@/glanceable-ios/register';
 
 import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
@@ -93,6 +96,7 @@ import {
   subscribeToPendingDeepLink,
 } from '@/lib/deep-link-launch';
 import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
+import { registerNeedsInputCategories } from '@/lib/notification-actions';
 import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
@@ -163,6 +167,9 @@ function preloadStartupFonts(): void {
 
 void SplashScreen.preventAutoHideAsync();
 void ensureAndroidNotificationChannels();
+// The Approve / Reply / Open PR / Open session buttons a needs-input
+// notification carries; idempotent, one pass per launch.
+void registerNeedsInputCategories();
 setupNotificationHandler();
 // Applies the aggregate glanceable push while backgrounded/killed via a
 // headless expo-notifications task; see setupNotificationBackgroundHandler.
@@ -386,6 +393,11 @@ function RootLayoutNav({
         await i18n.changeLanguage('en');
       }
       void renameAndroidNotificationChannels();
+      // The module-scope category registration ran under the English default
+      // while the stored preference was still loading; re-register the
+      // Approve / Reply / Open PR / Open session buttons in the applied
+      // language (same localization pass as the channel rename above).
+      void registerNeedsInputCategories();
       if (!cancelled) {
         if (reloadFailed) {
           setLanguageReloadFailed(true);

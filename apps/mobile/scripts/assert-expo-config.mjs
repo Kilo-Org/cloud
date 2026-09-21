@@ -24,6 +24,9 @@ const PASSKEY_ASSOCIATED_DOMAIN = 'webcredentials:app.kilo.ai';
 // ASSOCIATED_DOMAIN above: the session link the app advertises and the
 // universal link the app claims have to be the same URL.
 const HEAD_ORIGIN = 'https://app.kilo.ai';
+// Time Sensitive Notifications capability: the iOS half of the needs-input
+// raise's `interruptionLevel: 'timeSensitive'` break-through contract.
+const TIME_SENSITIVE_ENTITLEMENT = 'com.apple.developer.usernotifications.time-sensitive';
 // The app name (app.config.ts `name`). `$(PRODUCT_NAME)` resolves to this in
 // the base Info.plist, but `.lproj/InfoPlist.strings` is compiled verbatim, so
 // the localized copy has to spell it out.
@@ -42,6 +45,7 @@ const BLOCKED_PERMISSIONS = [
 const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+const ARTIFACT_FILE_PROVIDER_PLUGIN = './plugins/withArtifactFileProvider';
 // The one writer of the app target's `<tag>.lproj/Localizable.strings`: the App
 // Intent copy plus the appended Focus-filter catalog.
 const APP_INTENT_LOCALIZATIONS_PLUGIN = './plugins/withAppIntentLocalizations';
@@ -118,6 +122,14 @@ check(
   `extra.router.headOrigin must be "${HEAD_ORIGIN}"`
 );
 
+// iOS honors `UNNotificationInterruptionLevel.timeSensitive` only when the app
+// carries the Time Sensitive Notifications capability; without it the
+// needs-input raise is demoted to the platform default and stays quiet in Focus.
+check(
+  config.ios?.entitlements?.[TIME_SENSITIVE_ENTITLEMENT] === true,
+  `ios.entitlements must enable the Time Sensitive Notifications capability (${TIME_SENSITIVE_ENTITLEMENT})`
+);
+
 const blockedPermissions = config.android?.blockedPermissions ?? [];
 const blockedPermissionsMatch =
   blockedPermissions.length === BLOCKED_PERMISSIONS.length &&
@@ -190,6 +202,21 @@ check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGI
 check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
+);
+// The iOS File Provider extension target and the Pods integration behind it are
+// created by this plugin alone; without it the Files-app location has no
+// extension to serve it.
+check(
+  pluginNames.includes(ARTIFACT_FILE_PROVIDER_PLUGIN),
+  `plugins must include "${ARTIFACT_FILE_PROVIDER_PLUGIN}"`
+);
+// Same reason one layer down: EAS only builds and signs the extension from its
+// `appExtensions` entry, and the evaluated config is the only place that shows
+// the entry the plugin composed.
+const appExtensions = config.extra?.eas?.build?.experimental?.ios?.appExtensions ?? [];
+check(
+  appExtensions.some(extension => extension.targetName === 'ArtifactsFileProvider'),
+  'extra.eas.build.experimental.ios.appExtensions must carry the ArtifactsFileProvider target'
 );
 // The app target's one `Localizable.strings` (the App Intent copy plus the
 // appended Focus-filter catalog) is written by this plugin; without it the

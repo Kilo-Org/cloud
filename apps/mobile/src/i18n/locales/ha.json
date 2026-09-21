@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "kwafin shirin ya shirya ko ya gaza, ayyukan da aka tsara",
       "balanceAlertsSubtitle": "gargaɗin ƙarancin kuɗin ƙungiya",
       "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA"
+    },
+    "action": {
+      "openSession": "Buɗe zaman"
+    },
+    "needsInputAction": {
+      "approved": "An amince da buƙatar",
+      "replied": "An tura amsa",
+      "failed": "Ba a iya amsawa ba. Sake danna don sake gwadawa.",
+      "unavailable": "Wannan buƙatar ba ta jira ba."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Ana ci gaba da {{title}}.",
       "importingSession": "Ana shigo da zaman",
       "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zaman ba. Zaɓi Cloud Agent ko wani CLI.",
-      "importFailed": "An kasa shigo da wannan zaman.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Tsoho · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Ƙarami",
-      "sandboxInstanceShared": "Raba",
-      "sandboxInstanceLarge": "Babba",
-      "sandboxInstanceDevcontainer": "Kwantena Dev",
-      "sandboxInstanceProviderDefault": "Tsohowar mai bayarwa",
-      "sandboxCouldNotLoad": "Ba a iya lodin zaɓuɓɓukan sandbox ba",
-      "sandboxUnavailable": "Wannan sandbox ba ake samunsa ba. Zaɓi wani sandbox ko Tsoho.",
-      "sandboxUseDefault": "Yi amfani da Tsoho"
+      "importFailed": "An kasa shigo da wannan zaman."
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta fayil {{displayCount}}.",
@@ -3157,7 +3153,9 @@
     "couldNotApprove": "Ba a iya amincewa ba",
     "couldNotStart": "Ba a iya farawa ba",
     "channelName": "Wakilai da ke aiki",
-    "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle."
+    "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle.",
+    "openSession": "Buɗe",
+    "approveFailed": "An kasa amincewa. Danna $t(common.approve) don sake gwadawa."
   },
   "transcriptionModel": {
     "title": "Samfurin mayar da magana zuwa rubutu",

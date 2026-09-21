@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "nusxa tayyor yoki xatolik yuz berdi, rejalashtirilgan amallar",
       "balanceAlertsSubtitle": "tashkilot balansi kamaygani haqida ogohlantirishlar",
       "securityFindingsSubtitle": "aniqlangan yangi zaifliklar va SLA eslatmalari"
+    },
+    "action": {
+      "openSession": "Sessiyani ochish"
+    },
+    "needsInputAction": {
+      "approved": "So‘rov tasdiqlandi",
+      "replied": "Javob yuborildi",
+      "failed": "Javob berilmadi. Qayta urinish uchun yana bosing.",
+      "unavailable": "Bu so‘rov endi kutmaydi."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "{{title}} sessiyasi davom ettirilmoqda.",
       "importingSession": "Sessiya import qilinmoqda",
       "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent xizmatini yoki boshqa CLI dasturini tanlang.",
-      "importFailed": "Bu sessiyani import qilib bo'lmadi.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Standart · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Kichik",
-      "sandboxInstanceShared": "Ulashilgan",
-      "sandboxInstanceLarge": "Katta",
-      "sandboxInstanceDevcontainer": "Dev konteyner",
-      "sandboxInstanceProviderDefault": "Provayder standarti",
-      "sandboxCouldNotLoad": "Sandbox sozlamalarini yuklash amalga oshmadi",
-      "sandboxUnavailable": "Bu sandbox mavjud emas. Boshqa sandbox yoki Standartni tanlang.",
-      "sandboxUseDefault": "Standartdan foydalaning"
+      "importFailed": "Bu sessiyani import qilib bo'lmadi."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ta fayl yangilandi.",
@@ -3157,7 +3153,9 @@
     "couldNotApprove": "Tasdiqlab bo'lmadi",
     "couldNotStart": "Boshlab bo'lmadi",
     "channelName": "Faol agentlar",
-    "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing."
+    "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing.",
+    "openSession": "Ochish",
+    "approveFailed": "Tasdiqlab bo'lmadi. Qayta urinish uchun $t(common.approve) ga teging."
   },
   "transcriptionModel": {
     "title": "Matnga aylantirish modeli",

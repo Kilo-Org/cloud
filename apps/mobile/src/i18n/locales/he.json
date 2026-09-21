@@ -336,6 +336,15 @@
       "kiloclawActivitySubtitle": "מופע מוכן או שנכשל, פעולות מתוזמנות",
       "balanceAlertsSubtitle": "אזהרות על יתרה נמוכה בארגון",
       "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA"
+    },
+    "action": {
+      "openSession": "פתיחת סשן"
+    },
+    "needsInputAction": {
+      "approved": "הבקשה אושרה",
+      "replied": "התשובה נשלחה",
+      "failed": "לא ניתן היה לענות. הקישו שוב כדי לנסות שוב.",
+      "unavailable": "הבקשה הזאת כבר לא מחכה."
     }
   },
   "tabs": {
@@ -1685,20 +1694,7 @@
       "continueFrom": "ממשיך את הסשן {{title}}.",
       "importingSession": "מייבא סשן…",
       "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
-      "importFailed": "לא ניתן היה לייבא את הסשן הזה.",
-      "sandbox": "סביבה מבודדת",
-      "sandboxAccessibility": "סביבה מבודדת: {{label}}",
-      "sandboxDefaultWithDestination": "ברירת מחדל · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "קטן",
-      "sandboxInstanceShared": "משותף",
-      "sandboxInstanceLarge": "גדול",
-      "sandboxInstanceDevcontainer": "קונטיינר פיתוח",
-      "sandboxInstanceProviderDefault": "ברירת המחדל של הספק",
-      "sandboxCouldNotLoad": "טעינת אפשרויות הסביבה המבודדת נכשלה",
-      "sandboxUnavailable": "הסביבה המבודדת הזו אינה זמינה. בחרו סביבה מבודדת אחרת או ברירת מחדל.",
-      "sandboxUseDefault": "השתמשו בברירת המחדל"
+      "importFailed": "לא ניתן היה לייבא את הסשן הזה."
     },
     "partRenderer": {
       "updatedFileCount_one": "מספר הקבצים שעודכנו הוא {{displayCount}}.",
@@ -3200,7 +3196,9 @@
     "couldNotApprove": "לא ניתן לאשר",
     "couldNotStart": "לא ניתן להתחיל",
     "channelName": "סוכנים פעילים",
-    "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
+    "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה.",
+    "openSession": "פתח",
+    "approveFailed": "לא ניתן היה לאשר. הקש על $t(common.approve) כדי לנסות שוב."
   },
   "transcriptionModel": {
     "title": "מודל תמלול",

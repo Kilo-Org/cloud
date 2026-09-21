@@ -336,6 +336,15 @@
       "kiloclawActivitySubtitle": "gotowość lub błąd instancji, zaplanowane działania",
       "balanceAlertsSubtitle": "ostrzeżenia o niskim saldzie organizacji",
       "securityFindingsSubtitle": "nowe wykryte problemy i przypomnienia o terminach SLA"
+    },
+    "action": {
+      "openSession": "Otwórz sesję"
+    },
+    "needsInputAction": {
+      "approved": "Żądanie zatwierdzone",
+      "replied": "Odpowiedź wysłana",
+      "failed": "Nie udało się odpowiedzieć. Dotknij ponownie, aby spróbować.",
+      "unavailable": "To żądanie już nie oczekuje."
     }
   },
   "tabs": {
@@ -1697,20 +1706,7 @@
       "continueFrom": "Kontynuujesz sesję {{title}}.",
       "importingSession": "Importowanie sesji",
       "cliCannotContinue": "Ta instancja CLI nie obsługuje kontynuowania sesji. Wybierz Cloud Agent lub inną instancję CLI.",
-      "importFailed": "Nie udało się zaimportować tej sesji.",
-      "sandbox": "Środowisko izolowane",
-      "sandboxAccessibility": "Środowisko izolowane: {{label}}",
-      "sandboxDefaultWithDestination": "Domyślne · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Małe",
-      "sandboxInstanceShared": "Współdzielone",
-      "sandboxInstanceLarge": "Duże",
-      "sandboxInstanceDevcontainer": "Kontener deweloperski",
-      "sandboxInstanceProviderDefault": "Domyślne dostawcy",
-      "sandboxCouldNotLoad": "Nie udało się wczytać opcji środowiska izolowanego",
-      "sandboxUnavailable": "To środowisko izolowane jest niedostępne. Wybierz inne środowisko lub Domyślne.",
-      "sandboxUseDefault": "Użyj Domyślnego"
+      "importFailed": "Nie udało się zaimportować tej sesji."
     },
     "partRenderer": {
       "updatedFileCount_one": "Zaktualizowano {{displayCount}} plik.",
@@ -3243,7 +3239,9 @@
     "couldNotApprove": "Nie udało się zatwierdzić",
     "couldNotStart": "Nie udało się uruchomić",
     "channelName": "Aktywni agenci",
-    "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
+    "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady.",
+    "openSession": "Otwórz",
+    "approveFailed": "Nie udało się zatwierdzić. Dotknij $t(common.approve), aby spróbować ponownie."
   },
   "transcriptionModel": {
     "title": "Model transkrypcji",

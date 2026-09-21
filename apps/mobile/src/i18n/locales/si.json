@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "පිටපත සූදානම් හෝ අසාර්ථක වීම, කාලසටහන්ගත ක්‍රියා",
       "balanceAlertsSubtitle": "සංවිධානයේ ශේෂය අඩු වීමේ දැනුම්දීම්",
       "securityFindingsSubtitle": "නව සොයාගැනීම් සහ SLA මතක් කිරීම්"
+    },
+    "action": {
+      "openSession": "සැසිය විවෘත කරන්න"
+    },
+    "needsInputAction": {
+      "approved": "ඉල්ලීම අනුමත විය",
+      "replied": "පිළිතුර යවන ලදී",
+      "failed": "පිළිතුරු දීමට නොහැකි විය. නැවත උත්සාහ කිරීමට නැවත තට්ටු කරන්න.",
+      "unavailable": "මෙම ඉල්ලීම තවදුරටත් බලා නොසිටී."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "{{title}} සැසිය දිගටම කරගෙන යමින් පවතී.",
       "importingSession": "සැසිය ආයාත කරමින්",
       "cliCannotContinue": "මෙම CLI අනුවාදයට සැසියක් දිගටම කරගෙන යා නොහැක. Cloud Agent හෝ වෙනත් CLI එකක් තෝරන්න.",
-      "importFailed": "මෙම සැසිය ආයාත කළ නොහැකි විය.",
-      "sandbox": "සෑන්ඩ්බොක්ස්",
-      "sandboxAccessibility": "සෑන්ඩ්බොක්ස්: {{label}}",
-      "sandboxDefaultWithDestination": "පෙරනිමිය · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "කුඩා",
-      "sandboxInstanceShared": "බෙදාහරින ලද",
-      "sandboxInstanceLarge": "විශාල",
-      "sandboxInstanceDevcontainer": "ඩෙව් කන්ටේනරය",
-      "sandboxInstanceProviderDefault": "සපයන්නාගේ පෙරනිමිය",
-      "sandboxCouldNotLoad": "සෑන්ඩ්බොක්ස් විකල්ප පූරණය කළ නොහැක",
-      "sandboxUnavailable": "මෙම සෑන්ඩ්බොක්ස් ලබා ගත නොහැක. වෙනත් සෑන්ඩ්බොක්ස් එකක් හෝ පෙරනිමිය තෝරන්න.",
-      "sandboxUseDefault": "පෙරනිමිය භාවිතා කරන්න"
+      "importFailed": "මෙම සැසිය ආයාත කළ නොහැකි විය."
     },
     "partRenderer": {
       "updatedFileCount_one": "ගොනු {{displayCount}} ක් යාවත්කාලීන කර ඇත.",
@@ -3157,7 +3153,9 @@
     "couldNotApprove": "අනුමත කළ නොහැකි විය",
     "couldNotStart": "ආරම්භ කළ නොහැකි විය",
     "channelName": "සක්‍රීය නියෝජිතයන්",
-    "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න."
+    "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න.",
+    "openSession": "විවෘත කරන්න",
+    "approveFailed": "අනුමත කිරීමට නොහැකි විය. නැවත උත්සාහ කිරීමට $t(common.approve) තට්ටු කරන්න."
   },
   "transcriptionModel": {
     "title": "හඬ පෙළට හරවන ආකෘතිය",

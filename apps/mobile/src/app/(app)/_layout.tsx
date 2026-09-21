@@ -10,6 +10,7 @@ import { LauncherSurfacesMount } from '@/components/launcher-surfaces-mount';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { TourAutoOpen } from '@/components/tour/tour-auto-open';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
+import { ArtifactMirrorSyncMount } from '@/lib/artifacts/artifact-mirror-sync-mount';
 import { attemptLogoutReconciliation } from '@/lib/auth/logout-reconciliation';
 import { GlanceablePublisherMount } from '@/lib/glanceable/mount';
 import { useGlanceableOrgFence } from '@/lib/glanceable/org-fence';
@@ -24,6 +25,7 @@ import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refr
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
 import { SystemSearchIndexMount } from '@/lib/system-search-index-mount';
+import { ToolSummaryTranslationRetryMount } from '@/lib/tool-summary-translation/tool-summary-translation-retry-mount';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -118,10 +120,12 @@ export default function AppLayout() {
   return (
     <UserWebConnectionProvider>
       <ActiveSessionsLiveSyncMount />
+      <ArtifactMirrorSyncMount />
       <SystemSearchIndexMount />
       <GlanceablePublisherMount />
       <LauncherSurfacesMount />
       <CachePersistenceMount />
+      <ToolSummaryTranslationRetryMount />
       <LogoutReconciliationMount />
       <PushRegistrationMount />
       <AppWideFreshnessMount />
@@ -193,15 +197,6 @@ export default function AppLayout() {
             />
             <Stack.Screen
               name="agent-chat/folder-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="agent-chat/sandbox-picker"
               options={{
                 presentation: 'formSheet',
                 sheetAllowedDetents: [0.5, fullSheetDetent],

@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "kua rite te tāruatanga / i rahua, ngā mahi kua whakaritea",
       "balanceAlertsSubtitle": "ngā whakatūpato mō te toenga iti o te rōpū",
       "securityFindingsSubtitle": "ngā kitenga hōu me ngā whakamaumahara SLA"
+    },
+    "action": {
+      "openSession": "Whakatuwheratia te wātū"
+    },
+    "needsInputAction": {
+      "approved": "Kua whakaaetia te tono",
+      "replied": "Kua tukuna te whakautu",
+      "failed": "Kāore i tutuki te whakautu. Pātia anō hei ngana anō.",
+      "unavailable": "Kāore te tono nei e tatari anō."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "Kei te haere tonu te wātū {{title}}.",
       "importingSession": "Kei te kawemai i te wātū",
       "cliCannotContinue": "Kāore e taea e tēnei CLI te haere tonu i tētahi wātū. Kōwhiria a Cloud Agent, tētahi atu CLI rānei.",
-      "importFailed": "Kāore i taea te kawemai i tēnei wātū.",
-      "sandbox": "Pouaka kirikiri",
-      "sandboxAccessibility": "Pouaka kirikiri: {{label}}",
-      "sandboxDefaultWithDestination": "Taunoa · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Iti",
-      "sandboxInstanceShared": "Tohatoha",
-      "sandboxInstanceLarge": "Nui",
-      "sandboxInstanceDevcontainer": "Pouaka Dev",
-      "sandboxInstanceProviderDefault": "Taunoa a te kaiwhakarato",
-      "sandboxCouldNotLoad": "Kāhore i taea te uta i ngā kōwhiringa pouaka kirikiri",
-      "sandboxUnavailable": "Kāore tēnei pouaka kirikiri i te wātea. Tīpakohia tētahi atu pouaka kirikiri, ko Taunoa rānei.",
-      "sandboxUseDefault": "Whakamahia te Taunoa"
+      "importFailed": "Kāore i taea te kawemai i tēnei wātū."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kua whakahoutia {{displayCount}} kōnae.",
@@ -3157,7 +3153,9 @@
     "couldNotApprove": "Kāore i taea te whakaae",
     "couldNotStart": "Kāore i taea te tīmata",
     "channelName": "Ngā māngai e mahi ana",
-    "activityKitDisabledBody": "Whakakāngia ngā mahi wā-tūturu i ngā tautuhinga kia kite ai i ngā māngai e mahi ana i te mata maukati."
+    "activityKitDisabledBody": "Whakakāngia ngā mahi wā-tūturu i ngā tautuhinga kia kite ai i ngā māngai e mahi ana i te mata maukati.",
+    "openSession": "Tuwhera",
+    "approveFailed": "Kāore i taea te whakaae. Pāwhiria $t(common.approve) hei whakamātau anō."
   },
   "transcriptionModel": {
     "title": "Tauira tuhi ā-reo",

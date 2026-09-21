@@ -872,6 +872,15 @@
       "kiloclawActivitySubtitle": "egzemplioriaus parengtis ar klaida, suplanuoti veiksmai",
       "balanceAlertsSubtitle": "įspėjimai apie mažą organizacijos likutį",
       "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai"
+    },
+    "action": {
+      "openSession": "Atidaryti sesiją"
+    },
+    "needsInputAction": {
+      "approved": "Užklausa patvirtinta",
+      "replied": "Atsakymas išsiųstas",
+      "failed": "Nepavyko atsakyti. Bakstelėkite dar kartą, kad pabandytumėte.",
+      "unavailable": "Šios užklausos nebelaukiama."
     }
   },
   "tabs": {
@@ -2233,20 +2242,7 @@
       "continueFrom": "Tęsiama sesija „{{title}}“.",
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šioje CLI sesijos tęsti negalima. Pasirinkite „Cloud Agent“ arba kitą CLI.",
-      "importFailed": "Nepavyko importuoti šios sesijos.",
-      "sandbox": "Smėlio dėžė",
-      "sandboxAccessibility": "Smėlio dėžė: {{label}}",
-      "sandboxDefaultWithDestination": "Numatytasis · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Mažas",
-      "sandboxInstanceShared": "Bendras",
-      "sandboxInstanceLarge": "Didelis",
-      "sandboxInstanceDevcontainer": "Kūrimo konteineris",
-      "sandboxInstanceProviderDefault": "Tiekėjo numatytasis",
-      "sandboxCouldNotLoad": "Nepavyko įkelti smėlio dėžės parinkčių",
-      "sandboxUnavailable": "Ši smėlio dėžė neprieinama. Pasirinkite kitą smėlio dėžę arba Numatytąjį.",
-      "sandboxUseDefault": "Naudoti Numatytąjį"
+      "importFailed": "Nepavyko importuoti šios sesijos."
     },
     "partRenderer": {
       "updatedFileCount_one": "Atnaujintas {{displayCount}} failas.",
@@ -3243,7 +3239,9 @@
     "couldNotApprove": "Nepavyko patvirtinti",
     "couldNotStart": "Nepavyko paleisti",
     "channelName": "Aktyvūs agentai",
-    "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus."
+    "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
+    "openSession": "Atidaryti",
+    "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą."
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",

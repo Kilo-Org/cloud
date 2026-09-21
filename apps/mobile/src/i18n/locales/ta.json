@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "இயக்கப் பிரதி தயார் / தோல்வி, திட்டமிட்ட செயல்கள்",
       "balanceAlertsSubtitle": "நிறுவனத்தின் இருப்பு குறையும்போது வரும் எச்சரிக்கைகள்",
       "securityFindingsSubtitle": "புதிய கண்டறிதல்கள் மற்றும் SLA நினைவூட்டல்கள்"
+    },
+    "action": {
+      "openSession": "அமர்வைத் திறக்கவும்"
+    },
+    "needsInputAction": {
+      "approved": "கோரிக்கை அங்கீகரிக்கப்பட்டது",
+      "replied": "பதில் அனுப்பப்பட்டது",
+      "failed": "பதிலளிக்க முடியவில்லை. மீண்டும் முயற்சிக்க மீண்டும் தட்டவும்.",
+      "unavailable": "இந்தக் கோரிக்கை இனி காத்திருக்கவில்லை."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "{{title}} தொடரப்படுகிறது.",
       "importingSession": "அமர்வு இறக்குமதி செய்யப்படுகிறது",
       "cliCannotContinue": "இந்த CLI-இல் அமர்வைத் தொடர முடியாது. Cloud Agent அல்லது வேறொரு CLI-ஐத் தேர்ந்தெடுக்கவும்.",
-      "importFailed": "இந்த அமர்வை இறக்குமதி செய்ய முடியவில்லை.",
-      "sandbox": "சாண்ட்பாக்ஸ்",
-      "sandboxAccessibility": "சாண்ட்பாக்ஸ்: {{label}}",
-      "sandboxDefaultWithDestination": "இயல்புநிலை · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "சிறியது",
-      "sandboxInstanceShared": "பகிர்ந்தது",
-      "sandboxInstanceLarge": "பெரியது",
-      "sandboxInstanceDevcontainer": "தேவ் கண்டெய்னர்",
-      "sandboxInstanceProviderDefault": "வழங்குநரின் இயல்புநிலை",
-      "sandboxCouldNotLoad": "சாண்ட்பாக்ஸ் விருப்பங்களை ஏற்ற முடியவில்லை",
-      "sandboxUnavailable": "இந்த சாண்ட்பாக்ஸ் கிடைக்கவில்லை. வேறு சாண்ட்பாக்ஸ் அல்லது இயல்புநிலையைத் தேர்ந்தெடுக்கவும்.",
-      "sandboxUseDefault": "இயல்புநிலையைப் பயன்படுத்து"
+      "importFailed": "இந்த அமர்வை இறக்குமதி செய்ய முடியவில்லை."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} கோப்பு புதுப்பிக்கப்பட்டது.",
@@ -3157,7 +3153,9 @@
     "couldNotApprove": "ஒப்புதல் அளிக்க முடியவில்லை",
     "couldNotStart": "தொடங்க முடியவில்லை",
     "channelName": "செயலில் உள்ள ஏஜெண்டுகள்",
-    "activityKitDisabledBody": "பூட்டுத் திரையில் செயலில் உள்ள ஏஜெண்டுகளைப் பார்க்க, அமைப்புகளில் நேரலைச் செயல்பாடுகளை இயக்கவும்."
+    "activityKitDisabledBody": "பூட்டுத் திரையில் செயலில் உள்ள ஏஜெண்டுகளைப் பார்க்க, அமைப்புகளில் நேரலைச் செயல்பாடுகளை இயக்கவும்.",
+    "openSession": "திற",
+    "approveFailed": "ஒப்புதல் அளிக்க முடியவில்லை. மீண்டும் முயற்சிக்க $t(common.approve) தட்டவும்."
   },
   "transcriptionModel": {
     "title": "உரையாக்க மாதிரி",

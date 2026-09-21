@@ -840,6 +840,15 @@
       "kiloclawActivitySubtitle": "نموونەی ئامادە یان سەرنەکەوتوو، کردارە کاتدیاریکراوەکان",
       "balanceAlertsSubtitle": "ئاگادارکردنەوەکانی کەمی باڵانسی ڕێکخراوە",
       "securityFindingsSubtitle": "دۆزینەوە نوێکان و بیرخستنەوەکانی SLA"
+    },
+    "action": {
+      "openSession": "کردنەوەی سێشن"
+    },
+    "needsInputAction": {
+      "approved": "داواکاری پەسندکرا",
+      "replied": "وەڵام نێردرا",
+      "failed": "وەڵامدانەوە نەکرا. بۆ دووبارەکردنەوە دووبارە دەست لێبدە.",
+      "unavailable": "ئەم داواکارییە ئیتر چاوەڕێ ناکات."
     }
   },
   "tabs": {
@@ -2177,20 +2186,7 @@
       "continueFrom": "بەردەوام دەبین لە {{title}}.",
       "importingSession": "سێشنەکە هاوردە دەکرێت",
       "cliCannotContinue": "ئەم CLI ـیە ناتوانێت سێشنێک بەردەوام بکات. Cloud Agent یان CLI ـیەکی تر هەڵبژێرە.",
-      "importFailed": "نەتوانرا ئەم سێشنە هاوردە بکرێت.",
-      "sandbox": "سەندبۆکس",
-      "sandboxAccessibility": "سەندبۆکس: {{label}}",
-      "sandboxDefaultWithDestination": "بنەڕەت · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "بچووک",
-      "sandboxInstanceShared": "هاوبەش",
-      "sandboxInstanceLarge": "گەورە",
-      "sandboxInstanceDevcontainer": "کۆنتەینەری Dev",
-      "sandboxInstanceProviderDefault": "بنەڕەتی دابینکەر",
-      "sandboxCouldNotLoad": "نەتوانرا هەڵبژاردەکانی سەندبۆکس بار بکرێن",
-      "sandboxUnavailable": "ئەم سەندبۆکسە بەردەست نییە. سەندبۆکسێکی تر یان بنەڕەت هەڵبژێرە.",
-      "sandboxUseDefault": "بەکارهێنانی بنەڕەت"
+      "importFailed": "نەتوانرا ئەم سێشنە هاوردە بکرێت."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} پەڕگە نوێ کرایەوە.",
@@ -3157,7 +3153,9 @@
     "couldNotApprove": "نەتوانرا پەسەند بکرێت",
     "couldNotStart": "نەتوانرا دەست پێبکرێت",
     "channelName": "ئەجێنتە چالاکەکان",
-    "activityKitDisabledBody": "بۆ بینینی ئەجێنتە چالاکەکان لە شاشەی قوفڵدا، چالاکییە ڕاستەوخۆکان لە ڕێکخستنەکاندا چالاک بکە."
+    "activityKitDisabledBody": "بۆ بینینی ئەجێنتە چالاکەکان لە شاشەی قوفڵدا، چالاکییە ڕاستەوخۆکان لە ڕێکخستنەکاندا چالاک بکە.",
+    "openSession": "بیکەرەوە",
+    "approveFailed": "نەتوانرا پەسند بکرێت. بۆ دووبارە هەوڵدانەوە، لە $t(common.approve) بدە."
   },
   "transcriptionModel": {
     "title": "مۆدێلی گۆڕینی دەنگ بۆ دەق",

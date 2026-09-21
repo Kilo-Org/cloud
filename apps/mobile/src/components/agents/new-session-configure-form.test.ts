@@ -154,20 +154,21 @@ function findElementByType(node: Node, typeName: string): Record<string, unknown
   return null;
 }
 
-/** Height of the first node carrying an explicit `style.height` (the clearance spacer). */
-function findElementHeight(node: Node): number | null {
+type ElementNode = { type?: unknown; props?: Record<string, unknown> } | null;
+
+/** The first node of `typeName`, so a test can inspect its position in the tree. */
+function findElement(node: Node, typeName: string): ElementNode {
   if (node === null || typeof node !== 'object') {
     return null;
   }
-  const props = node.props ?? {};
-  const style = props.style as { height?: unknown } | undefined;
-  if (typeof style?.height === 'number') {
-    return style.height;
+  const typed = node as { type?: unknown; props?: Record<string, unknown> };
+  if (typed.type === typeName) {
+    return typed;
   }
-  const children = props.children;
+  const children = typed.props?.children;
   for (const child of Array.isArray(children) ? children : [children]) {
-    const found = findElementHeight(child as Node);
-    if (found !== null) {
+    const found = findElement(child as Node, typeName);
+    if (found) {
       return found;
     }
   }
@@ -280,7 +281,7 @@ describe('NewSessionConfigureForm', () => {
   });
 
   it.each(['android', 'ios'] as const)(
-    'floors the scroll body at the safe-area bottom and lifts it above the IME on %s',
+    'floors the root at the safe-area bottom and pins the footer above the IME on %s',
     async os => {
       platformState.OS = os;
       insetsState.bottom = 42;
@@ -301,6 +302,59 @@ describe('NewSessionConfigureForm', () => {
       }
     }
   );
+
+  it('keeps the Start action out of the scroll body', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({ ...defaultProps() }) as Node;
+
+    // The Start action must not scroll: it is not part of the scroll body.
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(scrollBody).not.toBeNull();
+    expect(findElementByType(scrollBody, 'NewSessionStartButton')).toBeNull();
+
+    // It is pinned in the keyboard-lift view instead, as a later sibling of the body.
+    const lift = findElement(element, 'AppAwareKeyboardPaddingView');
+    expect(lift).not.toBeNull();
+    expect(findElement(lift, 'ScrollView')).not.toBeNull();
+    expect(findElement(lift, 'NewSessionStartButton')).not.toBeNull();
+
+    const liftChildren = (lift?.props?.children ?? []) as Node[];
+    const bodyIndex = liftChildren.findIndex(child => findElement(child, 'ScrollView') !== null);
+    const footerIndex = liftChildren.findIndex(
+      child => findElement(child, 'NewSessionStartButton') !== null
+    );
+    expect(bodyIndex).toBe(0);
+    expect(footerIndex).toBeGreaterThan(bodyIndex);
+  });
+
+  it('keeps the cloud-create failure with the Start action', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+    const cloudCreateError = { retryable: true, message: 'prepare failed' };
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const cloud = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: null,
+      cloudCreateError,
+    }) as Node;
+
+    // The failure sits in the pinned footer, not in the scroll body.
+    const scrollBody = findElement(cloud, 'ScrollView');
+    expect(findElementByType(scrollBody, 'NewSessionCloudCreateError')).toBeNull();
+    const lift = findElement(cloud, 'AppAwareKeyboardPaddingView');
+    expect(findElement(lift, 'NewSessionCloudCreateError')).not.toBeNull();
+
+    // Switching the target to a computer must not surface the stale failure.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const remote = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+      cloudCreateError,
+    }) as Node;
+    expect(findElement(remote, 'NewSessionCloudCreateError')).toBeNull();
+  });
 
   // ── Case 1: Cloud, selector shown ──
   it('renders prompt, repo, and the run-target block when cloud target with selector shown', async () => {
@@ -721,22 +775,6 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
-  });
-
-  // ── Case 14: bottom navigation-bar clearance ──
-  it('reserves the bottom safe-area inset so the Start action clears the navigation bar', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    insetsState.bottom = 44;
-    try {
-      // The inset is 44; the helper floors at 16 and adds 16.
-      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-      const element = NewSessionConfigureForm(defaultProps()) as Node;
-
-      expect(findElementHeight(element)).toBe(60);
-    } finally {
-      insetsState.bottom = 0;
-    }
   });
 
   // ── Case 13: reorder wiring lock ──

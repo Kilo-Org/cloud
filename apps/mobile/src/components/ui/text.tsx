@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { I18nManager, Text as RNText, type Role } from 'react-native';
 
-import { RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
+import { hasArabicScript, RTL_WRITING_DIRECTION, withoutLatinLabelTreatment } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 const textVariants = cva('text-foreground text-base font-medium', {
@@ -61,10 +61,14 @@ function Text({
     asChild?: boolean;
   }) {
   const textClass = React.useContext(TextClassContext);
+  const isRTL = I18nManager.isRTL;
+  const classes = cn(textVariants({ variant }), textClass, className);
   const Component = asChild ? Slot.Text : RNText;
   return (
     <Component
-      className={cn(textVariants({ variant }), textClass, className)}
+      className={
+        isRTL && hasArabicScript(props.children) ? withoutLatinLabelTreatment(classes) : classes
+      }
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}

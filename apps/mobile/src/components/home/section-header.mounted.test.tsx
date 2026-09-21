@@ -96,6 +96,33 @@ describe('SectionHeader mounted layout', () => {
     expect(text.children).toEqual(['See all']);
   });
 
+  it('drops the Latin label treatment for the finding copy in an RTL interface', () => {
+    i18nManager.isRTL = true;
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'الجلسات الجارية الآن',
+        actionLabel: 'عرض الكل',
+        onActionPress: () => undefined,
+      })
+    );
+    const action = root.findByProps({ accessibilityRole: 'button' });
+    const actionText = action.find(node => Object.is(node.type, 'Text'));
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
+    );
+
+    const labelClasses = (label.props.className as string).split(' ');
+    expect(labelClasses.some(token => token.startsWith('font-mono'))).toBe(false);
+    expect(labelClasses.some(token => token.startsWith('tracking'))).toBe(false);
+    expect(labelClasses).toContain('text-muted-foreground');
+    expect(label.props.style).toContainEqual({ writingDirection: 'rtl' });
+
+    const actionClasses = (actionText.props.className as string).split(' ');
+    expect(actionClasses.some(token => token.startsWith('font-mono'))).toBe(false);
+    expect(actionClasses.some(token => token.startsWith('tracking'))).toBe(false);
+    expect(actionClasses).toContain('text-primary');
+  });
+
   it('keeps the complete accessible action name and activates the supplied destination', () => {
     function Destination() {
       const [showAll, setShowAll] = useState(false);

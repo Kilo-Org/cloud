@@ -2,30 +2,7 @@ import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 
 import { confirmRemoteSessionExit } from './remote-session-exit-confirmation';
-
-/**
- * Classifier literals copied from `exit-remote-session-with-feedback.ts`. They
- * must stay in sync with that file (which pins them to the SDK source). The
- * barrel import is not used here because the mobile test runner cannot resolve
- * the SDK's transitive web-only `@/...` aliases.
- */
-const REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE =
-  'Remote session exit is not supported for the current session';
-const REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE =
-  'Remote session exit is unavailable for the current session';
-const REMOTE_SESSION_EXIT_UPGRADE_PREFIX = 'Remote slash commands require a newer Kilo CLI';
-
-const NON_RETRYABLE_EXIT_MESSAGES: ReadonlySet<string> = new Set([
-  REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE,
-  REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE,
-]);
-
-function isNonRetryableExitError(message: string): boolean {
-  if (NON_RETRYABLE_EXIT_MESSAGES.has(message)) {
-    return true;
-  }
-  return message.startsWith(REMOTE_SESSION_EXIT_UPGRADE_PREFIX);
-}
+import { isNonRetryableExitError } from './remote-session-exit-messages';
 
 type ExitRemoteSessionFromListInput = {
   confirm: () => Promise<boolean>;

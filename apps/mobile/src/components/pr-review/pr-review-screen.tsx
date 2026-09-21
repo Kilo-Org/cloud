@@ -18,6 +18,7 @@ import {
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { Text } from '@/components/ui/text';
 import {
   defaultMergeMethodFor,
   getMergeabilityStatus,
@@ -27,6 +28,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { providerPrTriple, providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
 import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
+import { cn } from '@/lib/utils';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 const MERGE_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/merge' as const;
@@ -327,13 +329,19 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
                 a submit affordance — comment threads there are read-only. */}
             {tab === 'overview' && canSubmitReview ? (
               <Button
-                size="icon"
-                variant="ghost"
+                size="sm"
                 onPress={openReviewSubmit}
                 disabled={loadFailed}
                 accessibilityLabel={t('prReview.submit.submitReview')}
+                // ScreenHeader caps a trailing action at half the row. A label
+                // that cannot shrink overflows that cap and is clipped by the
+                // screen edge at large font scales, so the button and its
+                // label shrink and wrap (as the Agents header action does)
+                // instead of drawing off-screen.
+                className={cn('min-w-0 shrink px-3')}
               >
-                <Check size={18} color={colors.foreground} />
+                <Check size={14} color={colors.primaryForeground} />
+                <Text className="shrink text-center">{t('prReview.submit.submitReview')}</Text>
               </Button>
             ) : null}
             {/* Owner request item 3: a Merge CTA at the top right, present only

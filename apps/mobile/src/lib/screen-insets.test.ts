@@ -74,8 +74,15 @@ describe('screen side insets: one implementation for both platforms', () => {
     expect(profile, `${PROFILE_SCREEN} imports the native safe-area module again`).not.toMatch(
       SAFE_AREA_MODULE
     );
+    const alignment = alignmentPath(profile);
+    // `alignmentPath` starts at the `useScreenSideInsets` line, so this also
+    // proves the path it scans is the screen's insets read, not an empty slice.
     expect(
-      alignmentPath(profile),
+      alignment,
+      `${PROFILE_SCREEN} does not read its side insets from the entry point`
+    ).toMatch(/useScreenSideInsets/);
+    expect(
+      alignment,
       `${PROFILE_SCREEN}'s alignment path carries a per-platform branch`
     ).not.toMatch(PLATFORM_BRANCH);
   });

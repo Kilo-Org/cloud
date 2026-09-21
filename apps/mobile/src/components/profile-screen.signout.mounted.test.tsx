@@ -34,6 +34,10 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// The native safe-area module cannot load in this node environment. The screen
+// reads its landscape side insets from it, so the mock returns the hoisted
+// `safeArea`; the alignment guard in `screen-insets.test.ts` holds that read to
+// the shared entry point.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
 }));

@@ -334,8 +334,11 @@
       "sessionStatusTitle": "מצב הסשן",
       "sessionStatusSubtitle": "הסתיים / נכשל / מוכן לשליטה",
       "kiloclawActivitySubtitle": "מופע מוכן או שנכשל, פעולות מתוזמנות",
+      "kiloclawActivityUnavailable": "הפעל מופע של KiloClaw כדי לקבל פעילות KiloClaw.",
       "balanceAlertsSubtitle": "אזהרות על יתרה נמוכה בארגון",
-      "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA"
+      "balanceAlertsUnavailable": "הצטרף לארגון כדי לקבל התראות על יתרה נמוכה.",
+      "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA",
+      "securityFindingsUnavailable": "הפעל את סוכן האבטחה של Kilo בהיקף כדי לקבל ממצאי אבטחה."
     },
     "action": {
       "openSession": "פתיחת סשן"

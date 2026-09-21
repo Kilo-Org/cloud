@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Te tūnga o te wātū",
       "sessionStatusSubtitle": "kua oti / i rahua / kua rite hei whakahaere māu",
       "kiloclawActivitySubtitle": "kua rite te tāruatanga / i rahua, ngā mahi kua whakaritea",
+      "kiloclawActivityUnavailable": "Tīmatahia tētahi tāruatanga KiloClaw kia whiwhi ai i ngā mahi KiloClaw.",
       "balanceAlertsSubtitle": "ngā whakatūpato mō te toenga iti o te rōpū",
-      "securityFindingsSubtitle": "ngā kitenga hōu me ngā whakamaumahara SLA"
+      "balanceAlertsUnavailable": "Whakaurua ki tētahi whakahaerenga kia whiwhi ai i ngā whakatūpato toenga iti.",
+      "securityFindingsSubtitle": "ngā kitenga hōu me ngā whakamaumahara SLA",
+      "securityFindingsUnavailable": "Whakahohea te kaiāwhina haumarutanga Kilo i runga i tētahi whānuitanga kia whiwhi ai i ngā kitenga haumarutanga."
     },
     "action": {
       "openSession": "Whakatuwheratia te wātū"

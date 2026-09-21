@@ -838,8 +838,11 @@
       "sessionStatusTitle": "სესიის სტატუსი",
       "sessionStatusSubtitle": "დასრულდა / ჩაიშალა / სამართავად მზადაა",
       "kiloclawActivitySubtitle": "ინსტანცია მზადაა / ჩაიშალა, დაგეგმილი მოქმედებები",
+      "kiloclawActivityUnavailable": "გაუშვი KiloClaw-ის ინსტანცია, რომ მიიღო KiloClaw-ის აქტივობა.",
       "balanceAlertsSubtitle": "ორგანიზაციის დაბალი ბალანსის გაფრთხილებები",
-      "securityFindingsSubtitle": "ახლად აღმოჩენილი პრობლემები და SLA-ის შეხსენებები"
+      "balanceAlertsUnavailable": "შეუერთდი ორგანიზაციას, რომ მიიღო დაბალი ბალანსის გაფრთხილებები.",
+      "securityFindingsSubtitle": "ახლად აღმოჩენილი პრობლემები და SLA-ის შეხსენებები",
+      "securityFindingsUnavailable": "ჩართე Kilo-ს უსაფრთხოების აგენტი სფეროში, რომ მიიღო უსაფრთხოების პრობლემები."
     },
     "action": {
       "openSession": "სესიის გახსნა"

@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Istunnon tila",
       "sessionStatusSubtitle": "valmis / epäonnistui / valmis hallittavaksi",
       "kiloclawActivitySubtitle": "instanssi valmis/epäonnistui, ajoitetut toiminnot",
+      "kiloclawActivityUnavailable": "Käynnistä KiloClaw-instanssi saadaksesi KiloClaw-tapahtumia.",
       "balanceAlertsSubtitle": "varoitukset organisaation alhaisesta saldosta",
-      "securityFindingsSubtitle": "uudet löydökset ja SLA-muistutukset"
+      "balanceAlertsUnavailable": "Liity organisaatioon saadaksesi saldohälytyksiä.",
+      "securityFindingsSubtitle": "uudet löydökset ja SLA-muistutukset",
+      "securityFindingsUnavailable": "Ota Kilo-tietoturva-agentti käyttöön laajuudessa saadaksesi tietoturvahavaintoja."
     },
     "action": {
       "openSession": "Avaa istunto"

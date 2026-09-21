@@ -334,8 +334,11 @@
       "sessionStatusTitle": "Status sesi",
       "sessionStatusSubtitle": "selesai / gagal / siap dikendalikan",
       "kiloclawActivitySubtitle": "instans siap/gagal, tindakan terjadwal",
+      "kiloclawActivityUnavailable": "Mulai instans KiloClaw untuk mendapatkan aktivitas KiloClaw.",
       "balanceAlertsSubtitle": "peringatan saat saldo organisasi rendah",
-      "securityFindingsSubtitle": "temuan baru dan pengingat SLA"
+      "balanceAlertsUnavailable": "Gabung ke organisasi untuk mendapatkan peringatan saldo rendah.",
+      "securityFindingsSubtitle": "temuan baru dan pengingat SLA",
+      "securityFindingsUnavailable": "Aktifkan agen keamanan Kilo pada cakupan untuk mendapatkan temuan keamanan."
     },
     "action": {
       "openSession": "Buka sesi"

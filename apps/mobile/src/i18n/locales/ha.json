@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Halin zaman",
       "sessionStatusSubtitle": "an gama / an kasa / a shirye don sarrafawa",
       "kiloclawActivitySubtitle": "kwafin shirin ya shirya ko ya gaza, ayyukan da aka tsara",
+      "kiloclawActivityUnavailable": "Fara kwafin KiloClaw don samun ayyukan KiloClaw.",
       "balanceAlertsSubtitle": "gargaɗin ƙarancin kuɗin ƙungiya",
-      "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA"
+      "balanceAlertsUnavailable": "Shiga ƙungiya don samun gargaɗin ƙarancin kuɗi.",
+      "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA",
+      "securityFindingsUnavailable": "Kunna wakilin tsaro na Kilo a wani yanki don samun sakamakon binciken tsaro."
     },
     "action": {
       "openSession": "Buɗe zaman"

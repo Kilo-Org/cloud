@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Munkamenet állapota",
       "sessionStatusSubtitle": "befejezett / sikertelen / vezérelhető",
       "kiloclawActivitySubtitle": "elkészült vagy meghibásodott példányok, ütemezett műveletek",
+      "kiloclawActivityUnavailable": "Indíts el egy KiloClaw-példányt, hogy KiloClaw-tevékenységet kapj.",
       "balanceAlertsSubtitle": "figyelmeztetések a szervezet alacsony egyenlegére",
-      "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők"
+      "balanceAlertsUnavailable": "Csatlakozz egy szervezethez, hogy figyelmeztetéseket kapj alacsony egyenlegről.",
+      "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők",
+      "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörben, hogy biztonsági találatokat kapj."
     },
     "action": {
       "openSession": "Munkamenet megnyitása"

@@ -838,8 +838,11 @@
       "sessionStatusTitle": "ਸੈਸ਼ਨ ਦੀ ਸਥਿਤੀ",
       "sessionStatusSubtitle": "ਪੂਰਾ ਹੋਇਆ / ਅਸਫਲ / ਕੰਟਰੋਲ ਕਰਨ ਲਈ ਤਿਆਰ",
       "kiloclawActivitySubtitle": "ਇੰਸਟੈਂਸ ਤਿਆਰ/ਅਸਫਲ, ਨਿਰਧਾਰਤ ਕਾਰਵਾਈਆਂ",
+      "kiloclawActivityUnavailable": "KiloClaw ਗਤੀਵਿਧੀ ਪਾਉਣ ਲਈ ਇੱਕ KiloClaw ਇੰਸਟੈਂਸ ਸ਼ੁਰੂ ਕਰੋ।",
       "balanceAlertsSubtitle": "ਸੰਸਥਾ ਦਾ ਬੈਲੰਸ ਘੱਟ ਹੋਣ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ",
-      "securityFindingsSubtitle": "ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਅਤੇ SLA ਲਈ ਯਾਦ-ਦਹਾਨੀਆਂ"
+      "balanceAlertsUnavailable": "ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਪਾਉਣ ਲਈ ਇੱਕ ਸੰਸਥਾ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ।",
+      "securityFindingsSubtitle": "ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਅਤੇ SLA ਲਈ ਯਾਦ-ਦਹਾਨੀਆਂ",
+      "securityFindingsUnavailable": "ਸੁਰੱਖਿਆ ਨਤੀਜੇ ਪਾਉਣ ਲਈ ਇੱਕ ਦਾਇਰੇ ਵਿੱਚ Kilo ਸੁਰੱਖਿਆ ਏਜੰਟ ਚਾਲੂ ਕਰੋ।"
     },
     "action": {
       "openSession": "ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ"

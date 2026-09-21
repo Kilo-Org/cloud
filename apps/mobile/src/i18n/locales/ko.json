@@ -334,8 +334,11 @@
       "sessionStatusTitle": "세션 상태",
       "sessionStatusSubtitle": "완료 / 실패 / 제어 준비 완료",
       "kiloclawActivitySubtitle": "인스턴스 준비 완료 및 실패, 예약된 작업",
+      "kiloclawActivityUnavailable": "KiloClaw 활동을 받으려면 KiloClaw 인스턴스를 시작하세요.",
       "balanceAlertsSubtitle": "조직 잔액 부족 경고",
-      "securityFindingsSubtitle": "새 보안 문제 및 SLA 알림"
+      "balanceAlertsUnavailable": "잔액 부족 알림을 받으려면 조직에 참여하세요.",
+      "securityFindingsSubtitle": "새 보안 문제 및 SLA 알림",
+      "securityFindingsUnavailable": "보안 진단 결과를 받으려면 범위에서 Kilo 보안 에이전트를 활성화하세요."
     },
     "action": {
       "openSession": "세션 열기"

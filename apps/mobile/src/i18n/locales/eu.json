@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Saioaren egoera",
       "sessionStatusSubtitle": "amaituta / huts eginda / kontrolatzeko prest",
       "kiloclawActivitySubtitle": "instantzia prest edo huts eginda, programatutako ekintzak",
+      "kiloclawActivityUnavailable": "Abiarazi KiloClaw instantzia bat KiloClaw jarduera jasotzeko.",
       "balanceAlertsSubtitle": "erakundearen saldo baxuaren abisuak",
-      "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak"
+      "balanceAlertsUnavailable": "Egin bat erakunde batekin saldo baxuko abisuak jasotzeko.",
+      "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak",
+      "securityFindingsUnavailable": "Gaitu Kilo segurtasun-agentea esparru batean segurtasun-arazoak jasotzeko."
     },
     "action": {
       "openSession": "Ireki saioa"

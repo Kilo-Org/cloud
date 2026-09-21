@@ -838,8 +838,11 @@
       "sessionStatusTitle": "د ناستې حالت",
       "sessionStatusSubtitle": "بشپړ شوی / ناکام شوی / د کنټرول لپاره چمتو",
       "kiloclawActivitySubtitle": "چمتو یا ناکام انسټانس، مهالویش شوې کړنې",
+      "kiloclawActivityUnavailable": "د KiloClaw فعالیت ترلاسه کولو لپاره د KiloClaw انسټانس پیل کړئ.",
       "balanceAlertsSubtitle": "د سازمان د کم بیلانس خبرداري",
-      "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې"
+      "balanceAlertsUnavailable": "د بیلانس خبرتیاوې ترلاسه کولو لپاره یو سازمان ته وګډون وکړئ.",
+      "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې",
+      "securityFindingsUnavailable": "امنیتي موندنې ترلاسه کولو لپاره په یوه ساحه کې د Kilo امنیتي اجنټ فعال کړئ."
     },
     "action": {
       "openSession": "ناسته پرانیزئ"

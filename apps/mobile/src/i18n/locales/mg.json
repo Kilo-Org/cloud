@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Satan'ny fotoam-piasana",
       "sessionStatusSubtitle": "vita / tsy nahomby / vonona hofehezina",
       "kiloclawActivitySubtitle": "dika mandeha vonona na tsy nahomby, hetsika voalahatra",
+      "kiloclawActivityUnavailable": "Alefaso ny instance KiloClaw hahazoana ny hetsika KiloClaw.",
       "balanceAlertsSubtitle": "fampitandremana rehefa kely ny ambim-bolan'ny fikambanana",
-      "securityFindingsSubtitle": "olana vaovao hita sy fampahatsiahivana SLA"
+      "balanceAlertsUnavailable": "Midira ao amin'ny fikambanana hahazoana fampitandremana momba ny ambim-bola kely.",
+      "securityFindingsSubtitle": "olana vaovao hita sy fampahatsiahivana SLA",
+      "securityFindingsUnavailable": "Alefaso ny mpanampy amin'ny fiarovana Kilo ao amin'ny faritra iray hahazoana ny olana hita amin'ny fiarovana."
     },
     "action": {
       "openSession": "Sokafy ny fotoam-piasana"

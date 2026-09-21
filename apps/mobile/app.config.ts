@@ -233,7 +233,7 @@ const config: ExpoConfig = {
         android: {
           enableMinifyInReleaseBuilds: true,
           // Old release AABs shipped without resource shrinking. Keep this on so
-          // the unused kilo_shrink_sentinel_unused raw resource is stripped and
+          // the unused zz_unused_shrink_sentinel raw resource is stripped and
           // the inspector contract can catch a shrink regression before it lands.
           enableShrinkResourcesInReleaseBuilds: true,
           usePrecompiledHeaders: true,

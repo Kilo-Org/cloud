@@ -23,6 +23,7 @@ export const OUTCOME_AGGREGATE_LIMITATIONS = [
   'pre_dispatch_not_proof_of_model_reach',
   'post_dispatch_no_activity_does_not_establish_prior_activity',
   'unknown_includes_wrapper_reasons',
+  'provider_includes_user_model_selection_errors',
   'no_provider_or_region',
 ] as const;
 

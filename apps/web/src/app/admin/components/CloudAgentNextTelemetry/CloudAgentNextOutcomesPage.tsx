@@ -155,8 +155,8 @@ function HealthSummary({ summary }: { summary: HealthData['summary'] }) {
       <CardHeader>
         <CardTitle>Observed health</CardTitle>
         <CardDescription>
-          Completed and interrupted runs alongside failures requiring user action, platform action,
-          or further investigation. Every percentage is a share of all observed outcomes.
+          Completed and interrupted runs alongside platform, provider, user, and unknown failures.
+          Every percentage is a share of all observed outcomes.
         </CardDescription>
         <p className="text-muted-foreground pt-2 text-sm tabular-nums">
           <span className="text-foreground font-semibold">

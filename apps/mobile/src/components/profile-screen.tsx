@@ -35,7 +35,6 @@ import { useDeleteAccount } from '@/components/use-delete-account';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
-import { confirmDestructiveAction } from '@/lib/destructive-confirm';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -82,10 +81,10 @@ export function ProfileScreen() {
   const isAuthenticated = token != null;
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
-  // Android's native alert paints every button with the theme accent, so
-  // `Alert.alert`'s destructive style never shows the red affordance there.
-  // Android opens the in-app confirmation instead; iOS keeps the native alert,
-  // which already renders the destructive sign-out choice in red.
+  // One sign-out confirmation for both platforms: the in-app dialog carries
+  // the destructive (red) affordance that Android's native alert cannot render
+  // (its `AlertDialog` paints every button with the theme accent), so neither
+  // platform forks on the confirmation.
   const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
   const {
     data,
@@ -138,16 +137,7 @@ export function ProfileScreen() {
   };
 
   const confirmSignOut = () => {
-    confirmDestructiveAction({
-      title: t('profile.signOutTitle'),
-      message: t('profile.signOutMessage'),
-      cancelLabel: t('common.cancel'),
-      confirmLabel: t('common.signOut'),
-      onConfirm: () => void signOut(),
-      renderInApp: () => {
-        setSignOutConfirmVisible(true);
-      },
-    });
+    setSignOutConfirmVisible(true);
   };
 
   const showPrivacyChoices = () => {

@@ -1,3 +1,8 @@
+// Kept out of `src/app/(app)/(tabs)/` on purpose: expo-router reads any file named
+// `_layout.<x>.tsx` as that directory's layout, and the typed-routes generator then
+// skips a layout's children, dropping every `(tabs)` route from the generated
+// `Href` union and failing `pnpm typecheck`. Mounted tests run from anywhere under
+// `src/` (vitest.mounted.config.ts), so this one lives beside the tab-bar tests.
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

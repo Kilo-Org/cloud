@@ -36,15 +36,14 @@ import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { showFeedbackPrompt } from '@/lib/feedback';
-import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import {
   getCodeReviewerProfilePath,
   getProfileAgentScope,
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
+import { useScreenSideInsets } from '@/lib/screen-insets';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -72,14 +71,20 @@ function providerLabel(provider: string) {
 }
 
 export function ProfileScreen() {
+  const { left, right } = useScreenSideInsets();
+  const scrollStyle = { marginLeft: left, marginRight: right };
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
-  const colors = useThemeColors();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
-  const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
+  // Both sections fetch at mount, in parallel with the Credits card, so the
+  // screen settles in one wave. They used to wait for
+  // `InteractionManager.runAfterInteractions`, which is unbounded: a delayed
+  // interaction frame left the linked-accounts skeleton and the disabled agent
+  // rows on screen long after the rest of the profile had loaded (explorer:
+  // "profile: 7.5s to settle, 1.5s is its normal").
   // Android's native alert paints every button with the theme accent, so
   // `Alert.alert`'s destructive style never shows the red affordance there.
   // Android opens the in-app confirmation instead; iOS keeps the native alert,
@@ -87,13 +92,12 @@ export function ProfileScreen() {
   const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
   const {
     data,
-    isLoading,
     isError: providersError,
     isFetching: providersFetching,
     refetch: refetchProviders,
   } = useQuery({
     ...trpc.user.getAuthProviders.queryOptions(),
-    enabled: isAuthenticated && afterInteractions,
+    enabled: isAuthenticated,
   });
   const {
     data: orgs,
@@ -102,10 +106,10 @@ export function ProfileScreen() {
     refetch: refetchOrganizations,
   } = useQuery({
     ...trpc.organizations.list.queryOptions(),
-    enabled: isAuthenticated && afterInteractions,
+    enabled: isAuthenticated,
   });
   const agentScope = organizationContextLoaded
-    ? getProfileAgentScope(organizationId, orgs, organizationsFetching || !afterInteractions)
+    ? getProfileAgentScope(organizationId, orgs, organizationsFetching)
     : undefined;
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
@@ -159,7 +163,8 @@ export function ProfileScreen() {
       <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 pt-4"
+        style={scrollStyle}
+        contentContainerClassName="px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {/* Credits */}
@@ -286,14 +291,13 @@ export function ProfileScreen() {
             position lag as a visible header overlap. Opacity fades are safe. */}
         {(providersError ||
           (data?.providers.length ?? 0) > 0 ||
-          isLoading ||
-          (!afterInteractions && !data)) && (
+          (isAuthenticated && data === undefined)) && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('profile.linkedAccounts')}
             </Text>
 
-            {(isLoading || !afterInteractions) && !data && !providersError && (
+            {isAuthenticated && data === undefined && !providersError && (
               <Animated.View exiting={FadeOut.duration(150)}>
                 {/* Content-shaped skeleton (icon tile + two text bars in the
                     row's own bg-secondary card): a plain block read as an
@@ -343,7 +347,6 @@ export function ProfileScreen() {
           <ActionTile
             icon={MessageSquare}
             label={t('profile.feedback')}
-            color={colors.mutedForeground}
             onPress={() => {
               showFeedbackPrompt(userId);
             }}
@@ -351,19 +354,12 @@ export function ProfileScreen() {
           <ActionTile
             icon={Lock}
             label={t('profile.privacyChoices')}
-            color={colors.mutedForeground}
             onPress={showPrivacyChoices}
           />
-          <ActionTile
-            icon={LogOut}
-            label={t('common.signOut')}
-            color={colors.mutedForeground}
-            onPress={confirmSignOut}
-          />
+          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={confirmSignOut} />
           <ActionTile
             icon={Trash2}
             label={t('profile.deleteAccount')}
-            color={colors.destructive}
             destructive
             disabled={deletePending}
             onPress={confirmDeleteAccount}

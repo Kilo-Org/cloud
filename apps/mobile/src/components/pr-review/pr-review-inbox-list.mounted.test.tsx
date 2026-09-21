@@ -151,6 +151,24 @@ function flashListProps(renderer: TestRenderer.ReactTestRenderer): {
   };
 }
 
+function metadataText(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.find(
+    node =>
+      String(node.type) === 'Text' &&
+      Array.isArray(node.props.children) &&
+      node.props.children.includes(' · ')
+  );
+}
+
+function inboxChips(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(
+    node =>
+      String(node.type) === 'View' &&
+      typeof node.props.className === 'string' &&
+      node.props.className.includes('rounded-full bg-secondary')
+  );
+}
+
 describe('PrReviewInboxList side insets (landscape)', () => {
   beforeEach(() => {
     insetsState.top = 0;
@@ -219,5 +237,79 @@ describe('PrReviewInboxList side insets (landscape)', () => {
 
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(1);
+  });
+
+  it('lets the repo · time text shrink so the term chip stays inside the row', () => {
+    const renderer = mountInboxList();
+
+    // At font scale 2 the unshrunk text took the whole row and pushed the chip
+    // past the right edge, where the row clipped it mid-label.
+    const meta = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Text' &&
+        flattenTextChildren(node.props.children) === 'octocat/hello-world#7 · just now'
+    );
+    expect(meta).toHaveLength(1);
+    expect(meta[0]?.props.className).toContain('min-w-0');
+    expect(meta[0]?.props.className).toContain('shrink');
+
+    const chips = renderer.root.findAll(
+      node =>
+        String(node.type) === 'View' &&
+        typeof node.props.className === 'string' &&
+        node.props.className.includes('rounded-full')
+    );
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips) {
+      expect(chip.props.className).toContain('shrink-0');
+    }
+  });
+});
+
+function flattenTextChildren(children: unknown): string {
+  if (typeof children === 'string') {
+    return children;
+  }
+  if (Array.isArray(children)) {
+    return children.map(child => flattenTextChildren(child)).join('');
+  }
+  return '';
+}
+
+// The explorer found the `Conversation-only fixture` row pushing its provider
+// chip off the right edge ("Pull re") because the long repo/time metadata kept
+// its intrinsic width. The row must give that metadata up (single line, shrink)
+// and hold the chips whole (shrink-0).
+describe('PrReviewInboxList row metadata (long repository)', () => {
+  beforeEach(() => {
+    insetsState.left = 0;
+    insetsState.right = 0;
+    inboxState.query.isPending = false;
+    inboxState.firstPageErrorState = null;
+    inboxState.laterPageError = false;
+    inboxState.items = [
+      makeItem({ owner: 'kilo-stub', repo: 'discussion-conversation-only', number: 2 }),
+    ];
+  });
+
+  it('truncates the metadata instead of letting it push the chip out', () => {
+    const renderer = mountInboxList();
+
+    expect(metadataText(renderer).props.numberOfLines).toBe(1);
+    expect(metadataText(renderer).props.className).toContain('shrink');
+    expect(metadataText(renderer).props.className).toContain('min-w-0');
+  });
+
+  it('renders the provider chip whole and unsqueezed beside that metadata', () => {
+    const renderer = mountInboxList();
+    const rowChips = inboxChips(renderer);
+
+    expect(rowChips).toHaveLength(1);
+    expect(rowChips[0]?.props.className).toContain('shrink-0');
+    expect(
+      renderer.root.findAll(
+        node => String(node.type) === 'Text' && node.props.children === 'prReview.terms.pullRequest'
+      )
+    ).toHaveLength(1);
   });
 });

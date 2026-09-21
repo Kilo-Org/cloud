@@ -1,13 +1,18 @@
-import { createElement } from 'react';
-import { act, TestRenderer } from '@/test/renderer';
+/* eslint-disable max-lines -- the provider connect-card states (branch row, organizations-only note, collapse, post-selection actions) and the open-label line pinning share one module-mock set */
+import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { NewSessionRepositorySection } from './new-session-repository-section';
+import {
+  branchSelectorProps,
+  githubRow,
+  gitlabRow,
+  group,
+  mountSection,
+  renderedText,
+} from './new-session-repository-section.test-helpers';
 import {
   getSelectedBranchOverride,
-  type NewSessionRepository,
-  type RepositoryGroup,
   resetSelectedBranchOverrides,
   setSelectedBranchOverride,
 } from './new-session-repository-state';
@@ -63,70 +68,11 @@ vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
   setConnectCtaCollapsed: collapseState.setConnectCtaCollapsed,
 }));
 
-const githubRow: NewSessionRepository = {
-  platform: 'github',
-  fullName: 'owner/repo',
-  isPrivate: false,
-};
-const gitlabRow: NewSessionRepository = {
-  platform: 'gitlab',
-  fullName: 'owner/repo',
-  isPrivate: false,
-};
-
-const group = (
-  key: RepositoryGroup['key'],
-  status: RepositoryGroup['status'],
-  repositories: NewSessionRepository[] = []
-): RepositoryGroup => ({ key, status, repositories });
-
-function mountSection(overrides: {
-  value?: string;
-  repositories?: NewSessionRepository[];
-  groups?: RepositoryGroup[];
-  organizationId?: string | undefined;
-  isCloneEntry?: boolean;
-}) {
-  const renderer: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
-  act(() => {
-    renderer.current = TestRenderer.create(
-      createElement(NewSessionRepositorySection, {
-        disabled: false,
-        isRetrying: false,
-        onChange: vi.fn(() => undefined),
-        onConnect: vi.fn(() => undefined),
-        onRefreshRepos: vi.fn(() => undefined),
-        repositories: overrides.repositories ?? [githubRow, gitlabRow],
-        recents: [],
-        groups: overrides.groups ?? [group('github', 'repos'), group('gitlab', 'repos')],
-        value: overrides.value ?? '',
-        organizationId: overrides.organizationId,
-        isCloneEntry: overrides.isCloneEntry ?? false,
-      })
-    );
-  });
-  const created = renderer.current;
-  if (created === null) {
-    throw new Error('the section did not render');
-  }
-  return created;
-}
-
-function branchSelectorProps(renderer: TestRenderer.ReactTestRenderer) {
-  return renderer.root.findAllByType('RepositoryBranchSelector' as never)[0]?.props as
-    | {
-        repository: NewSessionRepository | null;
-        organizationId: string | undefined;
-        disabled: boolean;
-      }
-    | undefined;
-}
-
-function renderedText(renderer: TestRenderer.ReactTestRenderer): string[] {
+/** The rendered Text node holding exactly `copy`, if it is mounted. */
+function textNode(renderer: TestRenderer.ReactTestRenderer, copy: string) {
   return renderer.root
     .findAllByType('Text' as never)
-    .flatMap(node => node.children)
-    .filter((child): child is string => typeof child === 'string');
+    .find(node => node.children.length === 1 && node.children[0] === copy);
 }
 
 /** The headers of the connect cards; the section renders no other pressable. */
@@ -157,22 +103,14 @@ beforeEach(() => {
 });
 
 describe('NewSessionRepositorySection branch row', () => {
-  it('hands the branch selector the resolved repository row', () => {
-    const renderer = mountSection({ value: 'github:owner/repo' });
+  it.each([
+    ['github:owner/repo', githubRow],
+    ['gitlab:owner/repo', gitlabRow],
+    ['', null],
+  ] as const)('resolves "%s" to its provider-specific branch row', (value, repository) => {
+    const renderer = mountSection({ value });
 
-    expect(branchSelectorProps(renderer)?.repository).toEqual(githubRow);
-  });
-
-  it('keeps same-named rows on two providers distinct', () => {
-    const renderer = mountSection({ value: 'gitlab:owner/repo' });
-
-    expect(branchSelectorProps(renderer)?.repository).toEqual(gitlabRow);
-  });
-
-  it('offers no branch row until a repository is selected', () => {
-    const renderer = mountSection({ value: '' });
-
-    expect(branchSelectorProps(renderer)?.repository).toBeNull();
+    expect(branchSelectorProps(renderer)?.repository).toEqual(repository);
   });
 
   it('hands the branch selector the route organization scope', () => {
@@ -205,15 +143,19 @@ describe('NewSessionRepositorySection branch row', () => {
 });
 
 describe('NewSessionRepositorySection Bitbucket connect card', () => {
-  it('states outright that Bitbucket is organizations-only', () => {
-    const renderer = mountSection({
-      groups: [group('github', 'repos'), group('gitlab', 'repos'), group('bitbucket', 'connect')],
-    });
+  it.each(['', 'github:owner/repo', 'gitlab:owner/repo'])(
+    'states outright that Bitbucket is organizations-only with selection "%s"',
+    value => {
+      const renderer = mountSection({
+        value,
+        groups: [group('github', 'repos'), group('gitlab', 'repos'), group('bitbucket', 'connect')],
+      });
 
-    expect(renderedText(renderer)).toContain(
-      i18n.t('agentChat.newSession.bitbucketOrganizationsOnly')
-    );
-  });
+      expect(renderedText(renderer)).toContain(
+        i18n.t('agentChat.newSession.bitbucketOrganizationsOnly')
+      );
+    }
+  );
 
   it('leaves the GitHub connect card free of the Bitbucket restriction', () => {
     const renderer = mountSection({
@@ -237,6 +179,30 @@ describe('NewSessionRepositorySection Bitbucket connect card', () => {
     expect(
       connectHeader(renderer, i18n.t('common.connectBitbucket'))?.props.accessibilityState
     ).toEqual({ expanded: false });
+  });
+});
+
+describe('NewSessionRepositorySection connect card open action', () => {
+  it('gives every provider open label the row width and pins it to one line', () => {
+    const renderer = mountSection({
+      groups: [
+        group('github', 'connect'),
+        group('gitlab', 'connect'),
+        group('bitbucket', 'connect'),
+      ],
+    });
+
+    // A label box sized to the label's own measured width is a fraction
+    // narrower than the glyphs Android lays out, so "Open GitLab" wrapped onto
+    // two lines. The label takes the row's remaining width instead, and
+    // `numberOfLines` pins the single line.
+    for (const key of ['openGithub', 'openGitlab', 'openBitbucket'] as const) {
+      const label = textNode(renderer, i18n.t(`agentChat.newSession.${key}`));
+      expect(label, key).toBeDefined();
+      expect(label?.props.className, key).toContain('flex-1');
+      expect(label?.props.className, key).toContain('text-center');
+      expect(label?.props.numberOfLines, key).toBe(1);
+    }
   });
 });
 
@@ -276,21 +242,13 @@ describe('NewSessionRepositorySection connect card collapse', () => {
     ).toEqual({ expanded: true });
   });
 
-  it('requests a collapse when an expanded header is pressed', () => {
+  it.each([false, true])('toggles the persisted collapse state from %s', collapsed => {
+    collapseState.collapsedCtas = collapsed ? ['github'] : [];
     const renderer = mountSection({ groups: [group('github', 'connect')] });
 
     pressHeader(renderer, i18n.t('common.connectGithub'));
 
-    expect(collapseState.setConnectCtaCollapsed).toHaveBeenCalledWith('github', true);
-  });
-
-  it('requests an expand when a collapsed header is pressed', () => {
-    collapseState.collapsedCtas = ['github'];
-    const renderer = mountSection({ groups: [group('github', 'connect')] });
-
-    pressHeader(renderer, i18n.t('common.connectGithub'));
-
-    expect(collapseState.setConnectCtaCollapsed).toHaveBeenCalledWith('github', false);
+    expect(collapseState.setConnectCtaCollapsed).toHaveBeenCalledWith('github', !collapsed);
   });
 
   it('renders no connect card until the persisted state has loaded', () => {
@@ -303,18 +261,119 @@ describe('NewSessionRepositorySection connect card collapse', () => {
     expect(pressables(renderer)).toHaveLength(0);
   });
 
-  it('renders no connect card when every provider has repositories', () => {
-    const renderer = mountSection({
-      groups: [group('github', 'repos'), group('gitlab', 'repos')],
-    });
-
-    expect(pressables(renderer)).toHaveLength(0);
-  });
-
-  it('renders no connect card for a github group that only has repositories', () => {
-    const renderer = mountSection({ groups: [group('github', 'repos')] });
+  it.each([
+    { groups: [group('github', 'repos')] },
+    { groups: [group('github', 'repos'), group('gitlab', 'repos')] },
+  ])('renders no connect card when every provider has repositories: $groups', options => {
+    const renderer = mountSection(options);
 
     expect(renderedText(renderer)).not.toContain(i18n.t('common.connectGithub'));
     expect(pressables(renderer)).toHaveLength(0);
+  });
+});
+
+describe('NewSessionRepositorySection connect cards after selection', () => {
+  it.each([
+    ['github', 'Github', gitlabRow],
+    ['gitlab', 'Gitlab', githubRow],
+    ['bitbucket', 'Bitbucket', githubRow],
+  ] as const)('keeps compact %s actions without expanded instructions', (platform, copy, row) => {
+    const onConnect = vi.fn(() => undefined);
+    const onRefreshRepos = vi.fn(() => undefined);
+    collapseState.collapsedCtas = [platform];
+    collapseState.hasLoaded = false;
+    setSelectedBranchOverride(row, 'release/2.0');
+    const renderer = mountSection({
+      value: `${row.platform}:${row.fullName}`,
+      groups: [group(row.platform, 'repos'), group(platform, 'connect')],
+      organizationId: 'org-1',
+      onConnect,
+      onRefreshRepos,
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t(`common.connect${copy}`));
+    expect(text).not.toContain(i18n.t(`agentChat.newSession.connect${copy}Description`));
+    expect(text.includes(i18n.t('agentChat.newSession.bitbucketOrganizationsOnly'))).toBe(
+      platform === 'bitbucket'
+    );
+    expect(pressables(renderer)).toHaveLength(0);
+    const connect = renderer.root.findAllByType('Button' as never)[0];
+    if (!connect) {
+      throw new Error('no connect action');
+    }
+    const refresh = renderer.root.findByProps({
+      accessibilityLabel: i18n.t('agentChat.newSession.refreshRepositories'),
+    });
+    expect(refresh.props.disabled).toBe(false);
+    act(() => {
+      (connect.props.onPress as () => void)();
+      (refresh.props.onPress as () => void)();
+    });
+    expect(onConnect).toHaveBeenCalledWith(platform);
+    expect(onRefreshRepos).toHaveBeenCalledOnce();
+    expect(branchSelectorProps(renderer)?.repository).toEqual(row);
+    expect(getSelectedBranchOverride(row)).toBe('release/2.0');
+  });
+
+  it('keeps one inline wait in the disabled refresh action', () => {
+    const renderer = mountSection({
+      value: 'github:owner/repo',
+      groups: [group('github', 'repos'), group('gitlab', 'connect')],
+      isRetrying: true,
+    });
+    expect(
+      renderer.root.findByProps({
+        accessibilityLabel: i18n.t('agentChat.newSession.refreshRepositories'),
+      }).props.disabled
+    ).toBe(true);
+    expect(renderer.root.findAllByType('ActivityIndicator' as never)).toHaveLength(1);
+    expect(branchSelectorProps(renderer)?.repository).toEqual(githubRow);
+  });
+
+  it('keeps a retryable provider error recoverable after selection', () => {
+    const onRefreshRepos = vi.fn(() => undefined);
+    const renderer = mountSection({
+      value: 'github:owner/repo',
+      groups: [group('github', 'repos'), group('gitlab', 'error')],
+      onRefreshRepos,
+    });
+    const error = renderer.root.findByType('QueryError' as never);
+    expect(error.props.title).toBe(i18n.t('agentChat.newSession.couldNotLoadGitlabRepositories'));
+    act(() => {
+      (error.props.onRetry as () => void)();
+    });
+    expect(onRefreshRepos).toHaveBeenCalledOnce();
+    expect(branchSelectorProps(renderer)?.repository).toEqual(githubRow);
+  });
+
+  it('keeps connected-empty guidance and refresh after selection', () => {
+    const onRefreshRepos = vi.fn(() => undefined);
+    const renderer = mountSection({
+      value: 'github:owner/repo',
+      groups: [group('github', 'repos'), group('gitlab', 'connected-empty')],
+      onRefreshRepos,
+    });
+    expect(renderedText(renderer)).toContain(
+      i18n.t('agentChat.newSession.noRepositoriesVisibleGitlab')
+    );
+    const refresh = renderer.root.findByProps({
+      accessibilityLabel: i18n.t('agentChat.newSession.refreshRepositories'),
+    });
+    act(() => {
+      (refresh.props.onPress as () => void)();
+    });
+    expect(onRefreshRepos).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the connect prompt while no repository is selected', () => {
+    const renderer = mountSection({
+      value: '',
+      groups: [group('github', 'repos'), group('gitlab', 'connect')],
+    });
+
+    expect(renderedText(renderer)).toContain(
+      i18n.t('agentChat.newSession.connectGitlabDescription')
+    );
   });
 });

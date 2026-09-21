@@ -4,11 +4,11 @@ import * as Haptics from 'expo-haptics';
 import { MessageSquare, MoreVertical } from '@/components/ui/icons';
 import { Alert, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RenameModal } from '@/components/rename-modal';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { timeAgo } from '@/lib/utils';
 
 import { useConversationRename } from './hooks/use-conversation-rename';
@@ -47,7 +47,7 @@ export function ConversationRow({
 }: Readonly<ConversationRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const client = useKiloChatClient();
   const { renaming, openRename, closeRename, saveRename } = useConversationRename(
@@ -80,7 +80,7 @@ export function ConversationRow({
         options: [t('common.rename'), t('chat.conversation.leave'), t('common.cancel')],
         cancelButtonIndex: 2,
         destructiveButtonIndex: 1,
-        containerStyle: { paddingBottom: bottom },
+        ...themedSheet,
       },
       index => {
         if (index === 0) {

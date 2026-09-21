@@ -944,33 +944,36 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   );
   usageContext.status_code = response.status;
 
-  // Handle OpenRouter 402 errors - don't pass them through to the client. We need to pay, not them.
-  // Skip this conversion when user BYOK is used - the 402 is about their account, not ours.
-  if (response.status === 402 && !effectiveProviderContext.userByok) {
-    await captureProxyError({
-      user,
-      request: requestBodyParsed.body,
-      response,
-      organizationId,
-      model: finalUpstreamModel,
-      errorMessage: `${effectiveProviderContext.provider.id} returned 402 Payment Required`,
-      trackInSentry: true,
-    });
-
-    // Return a service unavailable error instead of the 402
-    return temporarilyUnavailableResponse();
-  }
-
   if (response.status >= 400) {
+    // Our provider's 402 is not a customer payment error, except for user BYOK.
+    const isProviderPaymentError = response.status === 402 && !effectiveProviderContext.userByok;
+    const authorization = request.headers.get('authorization')?.trim();
     await captureProxyError({
       user,
       request: requestBodyParsed.body,
       response,
       organizationId,
       model: finalUpstreamModel,
-      errorMessage: `${effectiveProviderContext.provider.id} returned error ${response.status}`,
-      trackInSentry: response.status >= 500,
+      errorMessage: isProviderPaymentError
+        ? `${effectiveProviderContext.provider.id} returned 402 Payment Required`
+        : `${effectiveProviderContext.provider.id} returned error ${response.status}`,
+      trackInSentry: isProviderPaymentError || response.status >= 500,
+      diagnostics: {
+        vercelRequestId,
+        requestedModel: requestedModelLowerCased,
+        resolvedModel: effectiveModelIdLowerCased,
+        autoModel,
+        authFailedStatus: authFailedResponse?.status ?? null,
+        authorizationKind: !authorization
+          ? 'absent'
+          : /^Bearer\s+anonymous$/.test(authorization)
+            ? 'anonymous'
+            : 'other',
+        anonymousFallback: isAnonymousContext(user),
+      },
     });
+
+    if (isProviderPaymentError) return temporarilyUnavailableResponse();
   }
 
   const clonedReponse = response.clone(); // reading from body is side-effectful

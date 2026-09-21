@@ -18,6 +18,7 @@ import {
   createSessionManager,
   createUserWebConnection,
   type KiloSessionId,
+  type MessageDeliveryState,
   type ReasoningPart,
   type SessionGoal,
   type SessionManager,
@@ -889,6 +890,56 @@ describe('session detail status placement', () => {
       expect(view.renderer.root.findAllByType(EmptyState)).toHaveLength(0);
     }
   );
+});
+
+describe('session detail failed delivery retry', () => {
+  it('stops showing the failed delivery once the retry is accepted', async () => {
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: 'Continue',
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    expect(renderedText(view.renderer.root)).toContain(
+      i18n.t('agentChat.messageFailure.deliveryTitle')
+    );
+
+    const send = vi.spyOn(view.manager, 'send').mockResolvedValue(true);
+    const clearFailedMessage = vi.spyOn(view.manager, 'clearFailedMessage');
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(send).toHaveBeenCalledTimes(1);
+    // The clear carries the session that owns the retried row, so the
+    // resolution is never recorded under a session the user switched to while
+    // the re-send was in flight.
+    expect(clearFailedMessage).toHaveBeenCalledExactlyOnceWith('msg-failed', ROOT_ID);
+  });
 });
 
 describe('session detail slow load', () => {

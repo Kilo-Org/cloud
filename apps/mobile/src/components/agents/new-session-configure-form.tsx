@@ -13,6 +13,7 @@ import { useComposerRevealScroll } from '@/components/agents/use-composer-reveal
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
@@ -204,7 +205,7 @@ export function NewSessionConfigureForm({
       ) : null}
 
       <Text className="mt-2 text-xs text-muted-foreground">
-        {t('agentChat.newSession.remoteHint')}
+        {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
       </Text>
 
       {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
@@ -278,10 +279,18 @@ export function NewSessionConfigureForm({
     </View>
   );
 
+  // The primary action is pinned below the scroll body, never part of it: a
+  // Start inside the form scrolled below the fold on a short screen, so only
+  // the top of the control stayed visible above the navigation bar. The lift
+  // view wraps the footer alone, so the IME shrinks the body instead of
+  // covering the action, and Start stays on screen above the navigation bar.
+  // The footer's own padding already reserves the bottom inset
+  // (`bottomClearance`), so `contentReservesBottomInset` keeps the
+  // screen-bottom-anchored occlusion from counting that inset a second time.
   return (
     <View className="flex-1 bg-background">
       {body}
-      <AppAwareKeyboardPaddingView>{footer}</AppAwareKeyboardPaddingView>
+      <AppAwareKeyboardPaddingView contentReservesBottomInset>{footer}</AppAwareKeyboardPaddingView>
     </View>
   );
 }

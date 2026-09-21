@@ -33,16 +33,22 @@ describe('accepted watchdog scheduling', () => {
 });
 
 describe('accepted inactivity bound', () => {
-  it('is due exactly at activity + five minutes', () => {
+  it('is due exactly at activity + seven minutes', () => {
     const activityAt = 1_000;
-    expect(acceptedInactivityDue(activityAt, activityAt + DEADLINE_MS.idleStop - 1)).toBe(false);
-    expect(acceptedInactivityDue(activityAt, activityAt + DEADLINE_MS.idleStop)).toBe(true);
+    expect(acceptedInactivityDue(activityAt, activityAt + DEADLINE_MS.kiloInactivity - 1)).toBe(
+      false
+    );
+    expect(acceptedInactivityDue(activityAt, activityAt + DEADLINE_MS.kiloInactivity)).toBe(true);
   });
 
   it('measures from the last real activity, not acceptance', () => {
     const acceptedAt = 1_000;
-    const lastActivityAt = acceptedAt + DEADLINE_MS.idleStop;
-    expect(acceptedInactivityDue(lastActivityAt, acceptedAt + DEADLINE_MS.idleStop)).toBe(false);
-    expect(acceptedInactivityDue(lastActivityAt, lastActivityAt + DEADLINE_MS.idleStop)).toBe(true);
+    const lastActivityAt = acceptedAt + DEADLINE_MS.kiloInactivity;
+    expect(acceptedInactivityDue(lastActivityAt, acceptedAt + DEADLINE_MS.kiloInactivity)).toBe(
+      false
+    );
+    expect(acceptedInactivityDue(lastActivityAt, lastActivityAt + DEADLINE_MS.kiloInactivity)).toBe(
+      true
+    );
   });
 });

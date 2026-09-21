@@ -39,6 +39,7 @@ import { ReplyInput } from '@/components/pr-review/discussion/reply-input';
 import { ThreadDiffSnippet } from '@/components/pr-review/discussion/thread-diff-snippet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
 import { formatNumber } from '@/lib/format';
 import {
   type ReviewComment,
@@ -263,7 +264,12 @@ function ThreadHeader({
     : ({} as const);
   return (
     <View className="gap-2">
-      <View className="flex-row items-start justify-between gap-2">
+      {/* `items-center`: the resolve control's tap frame is taller than the
+          anchor label, and the row holds that frame so the whole target is
+          hittable (a negative margin would push part of it outside the row,
+          where React Native stops delivering touches). Centering keeps the
+          label aligned with the control's visible circle. */}
+      <View className="flex-row items-center justify-between gap-2">
         <LabelRow
           {...labelRowA11y}
           className={cn('flex-1 flex-row items-center gap-2', expanded && 'active:opacity-70')}
@@ -350,10 +356,18 @@ function ResolveToggle({ resolved, disabled, onPress }: Readonly<ResolveTogglePr
       }
       onPress={onPress}
       disabled={disabled}
-      hitSlop={8}
-      className="h-7 w-7 items-center justify-center rounded-full border border-border bg-card"
+      // The frame is the tap target the size audit measures (38.5pt on
+      // device) and the header row grows to hold it, so the whole frame is
+      // hittable; the 3pt slop reaches the 44pt minimum.
+      hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+      className="h-11 w-11 items-center justify-center active:opacity-70"
     >
-      <Check size={14} color={resolved ? colors.good : colors.mutedForeground} />
+      {/* The visible circle stays compact (explicit px, because NativeWind's
+          14pt rem renders `h-7` at 24.5pt): DESIGN.md keeps the target, not the
+          visual, at 44pt. */}
+      <View className="h-[28px] w-[28px] items-center justify-center rounded-full border border-border bg-card">
+        <Check size={14} color={resolved ? colors.good : colors.mutedForeground} />
+      </View>
     </Pressable>
   );
 }

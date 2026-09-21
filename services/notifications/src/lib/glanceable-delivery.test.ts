@@ -440,6 +440,8 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     });
     await createService().refreshGlanceableSessions(personalRefresh);
     current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
+    // A newer read only reaches the route once the delivery window has elapsed.
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
     deferNext = true;
     const oldIdle = createService().refreshGlanceableSessions(personalRefresh);
     await started.promise;
@@ -509,6 +511,46 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     ]);
   });
 
+  it('exempts only the scope whose session moved into permission, not every scope in the batch', async () => {
+    // One heartbeat batch can carry the personal session and an org session at
+    // once. Only the scope that actually moved into permission may skip the
+    // delivery window: exempting the org scope too would wake that device for a
+    // counts-only change, the cost the window exists to prevent.
+    const { createService, messages } = setupService({
+      response: scope =>
+        Response.json(
+          freshSnapshot({
+            scopeKey: `${scope.userId}:${scope.organizationId ?? 'personal'}`,
+            organizationBound: scope.organizationId !== null,
+            running: scope.organizationId === null ? 1 : 2,
+            needsApproval: scope.organizationId === null ? 1 : 0,
+          })
+        ),
+    });
+    // Open the delivery window for both scopes.
+    await createService().refreshGlanceableSessions({
+      userId: 'usr_1',
+      cliSessionIds: ['personal'],
+    });
+    await createService().refreshGlanceableSessions({ userId: 'usr_1', cliSessionIds: ['org-a'] });
+
+    // Inside both windows, only the personal session moved into permission.
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:02.000Z'));
+    await createService().refreshGlanceableSessions({
+      userId: 'usr_1',
+      cliSessionIds: ['personal', 'org-a'],
+      approvalChangedSessionIds: ['personal'],
+    });
+
+    const scopeKeys = messages
+      .filter(message => message.to === 'ExponentPushToken[ios]')
+      .map(message => (message.data as { scopeKey: string }).scopeKey);
+    // The personal scope delivers at once (exempt); the org scope defers to its
+    // window, so its counts-only change lands on the trailing refresh instead.
+    expect(scopeKeys.filter(scopeKey => scopeKey === 'usr_1:personal')).toHaveLength(2);
+    expect(scopeKeys.filter(scopeKey => scopeKey === 'usr_1:org-1')).toHaveLength(1);
+  });
+
   it('recovers delivery after snapshot and delivery failures', async () => {
     let current = freshSnapshot();
     let unavailable = false;
@@ -517,12 +559,17 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     });
     await createService().refreshGlanceableSessions(personalRefresh);
     unavailable = true;
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
     await createService().refreshGlanceableSessions(personalRefresh);
     unavailable = false;
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:10:00.000Z'));
     current = freshSnapshot({ running: 0, idle: 1 });
     vi.mocked(sendPushNotifications).mockRejectedValueOnce(new Error('Expo unavailable'));
     await createService().refreshGlanceableSessions(personalRefresh);
+    // The failed send spent its window: an immediate retry would turn every
+    // change inside GLANCEABLE_DELIVERY_MIN_INTERVAL_MS into another build and
+    // device wake. The next change recovers once the window elapses.
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:10:20.000Z'));
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(
       messages
@@ -539,6 +586,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     const { createService, messages } = setupService({ response: () => Response.json(current) });
     await createService().refreshGlanceableSessions(personalRefresh);
     current = freshSnapshot({ status: 'stale', running: 0, needsInputSince: null });
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
     await createService().refreshGlanceableSessions(personalRefresh);
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:10:00.000Z'));
     current = freshSnapshot({ running: 0, idle: 1 });
@@ -591,13 +639,14 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       needsInputSince: null,
     });
 
-    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
     // Idle work keeps a card alive but never raises one, so the push-to-start
     // token stays unused until an agent works or asks for input.
     current = freshSnapshot({ running: 0, idle: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([['old-activity', 'end']]);
 
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:20.000Z'));
     current = freshSnapshot({ running: 1, idle: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
@@ -607,7 +656,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     expect(JSON.parse(apns[1].aps['content-state'].props)).toMatchObject({
       running: 1,
       idle: 1,
-      needsInputSince: '2026-08-27T10:00:01.000Z',
+      needsInputSince: '2026-08-27T10:00:20.000Z',
     });
     expect([...activityRows.keys()]).toEqual(['scope-token']);
   });
@@ -622,7 +671,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     // Nothing registers an activity token while the app never runs, so without
     // the fence every refresh would stack another card on the Lock Screen.
     for (const second of [0, 1, 2]) {
-      vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:00.000Z') + second * 1000);
+      vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:00.000Z') + second * 10_000);
       await createService().refreshGlanceableSessions(personalRefresh);
     }
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([['scope-token', 'start']]);
@@ -645,13 +694,13 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       kind: 'ios_activity',
       updated_at: '2026-08-27 10:00:00+00',
     });
-    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
     current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect([...activityRows.keys()]).toEqual(['scope-token']);
 
     // That end retired the card, so fresh work may raise another one.
-    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:02.000Z'));
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:20.000Z'));
     current = freshSnapshot({ running: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
@@ -691,11 +740,11 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       kind: 'ios_activity',
       updated_at: '2026-08-27 10:00:00+00',
     });
-    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(apns.map(({ aps }) => [aps.event, aps['stale-date']])).toEqual([
       ['start', Date.parse('2026-08-27T10:30:00.000Z') / 1000],
-      ['update', Date.parse('2026-08-27T10:30:01.000Z') / 1000],
+      ['update', Date.parse('2026-08-27T10:30:10.000Z') / 1000],
     ]);
   });
 
@@ -824,7 +873,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
             contentState: toGlanceableContentState(snapshot),
           });
         }
-        vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
+        vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:11.000Z'));
         current = freshSnapshot({ running: 0, needsInput: 1 });
         await createService().refreshGlanceableSessions(personalRefresh);
         expect(liveActivityProps()).toMatchObject([{ running: 0, needsInput: 1 }]);
@@ -838,7 +887,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         await ending;
       }
       expect(activityRows.get('old-activity')).toEqual(renewedRow);
-      vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:02.000Z'));
+      vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:21.000Z'));
       current = freshSnapshot({ running: 0, idle: 1 });
       await createService().refreshGlanceableSessions(personalRefresh);
       expect(liveActivityProps()).toMatchObject([
@@ -847,7 +896,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           needsInput: 0,
           idle: 1,
           // Forwarded from this refresh's snapshot, not latched at the earlier one.
-          needsInputSince: '2026-08-27T10:00:02.000Z',
+          needsInputSince: '2026-08-27T10:00:21.000Z',
         },
       ]);
       const liveToken = withPushToStart ? 'started-2' : 'live-activity';
@@ -1004,6 +1053,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       expect([...activityRows.keys()]).toEqual(['scope-token', 'activity-token']);
       configured = true;
       current = freshSnapshot({ running: 0, needsInput: 1 });
+      vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
       await createService().refreshGlanceableSessions(personalRefresh);
       expect(liveActivityProps()).toMatchObject([{ running: 0, needsInput: 1 }]);
       expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
@@ -1030,7 +1080,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     expect([...activityRows.keys()]).toEqual(['scope-token', 'old-activity']);
     expect(liveActivityProps()).toEqual([]);
 
-    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
     current = freshSnapshot({ running: 0, needsInput: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(liveActivityProps()).toMatchObject([{ running: 0, needsInput: 1 }]);
@@ -1043,11 +1093,11 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         updated_at: '2026-08-27 10:00:01+00',
       });
     }
-    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:02.000Z'));
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:20.000Z'));
     current = freshSnapshot({ running: 0, idle: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(liveActivityProps()).toMatchObject([
-      { running: 0, needsInput: 0, idle: 1, needsInputSince: '2026-08-27T10:00:02.000Z' },
+      { running: 0, needsInput: 0, idle: 1, needsInputSince: '2026-08-27T10:00:20.000Z' },
     ]);
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
       ['old-activity', 'end'],
@@ -1072,11 +1122,11 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       });
       await createService().refreshGlanceableSessions(personalRefresh);
       rejected = false;
-      vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
+      vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
       current = freshSnapshot({ running: 0, needsInput: 1 });
       await createService().refreshGlanceableSessions(personalRefresh);
       expect(liveActivityProps()).toMatchObject([
-        { running: 0, needsInput: 1, needsInputSince: '2026-08-27T10:00:01.000Z' },
+        { running: 0, needsInput: 1, needsInputSince: '2026-08-27T10:00:10.000Z' },
       ]);
       expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
         ['old-activity', 'end'],
@@ -1110,7 +1160,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       kind: 'ios_activity',
       updated_at: '2026-08-27 10:00:01+00',
     });
-    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
     current = freshSnapshot({ running: 0, needsInput: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(liveActivityProps()).toMatchObject([{ running: 0, needsInput: 1 }]);
@@ -1173,6 +1223,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           release.resolve();
           await firstEnd;
         }
+        vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
         current = freshSnapshot({ running: 0, needsInput: 1 });
         await createService().refreshGlanceableSessions(personalRefresh);
         expect(liveActivityProps()).toMatchObject([{ running: 0, needsInput: 1 }]);
@@ -1191,6 +1242,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         }
       }
       current = freshSnapshot({ running: 0, idle: 1 });
+      vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:20.000Z'));
       await createService().refreshGlanceableSessions(personalRefresh);
       expect(liveActivityProps()).toMatchObject([{ running: 0, needsInput: 0, idle: 1 }]);
       expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
@@ -1233,6 +1285,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       await firstEnd;
     }
     rejected = false;
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
     current = freshSnapshot({ running: 0, needsInput: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(liveActivityProps()).toMatchObject([{ running: 0, needsInput: 1 }]);
@@ -1282,6 +1335,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         cliSessionIds: ['org-a'],
       });
       rejected = false;
+      vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
       current = freshSnapshot({ running: 0, needsInput: 1 });
       await createService().refreshGlanceableSessions({
         userId: 'usr_1',
@@ -1316,10 +1370,12 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     await createService().refreshGlanceableSessions(personalRefresh);
     expect([...activityRows.keys()]).toEqual(['scope-token', 'old-activity']);
     rejected = false;
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:10.000Z'));
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(liveActivityProps()).toEqual([]);
     expect([...activityRows.keys()]).toEqual(['scope-token']);
     current = freshSnapshot({ running: 0, needsInput: 1 });
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:20.000Z'));
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(liveActivityProps()).toMatchObject([{ running: 0, needsInput: 1 }]);
     expect(apns.map(request => request.aps.event)).toEqual(['end', 'end', 'start']);

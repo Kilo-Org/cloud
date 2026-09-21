@@ -3224,15 +3224,7 @@
     "remoteOptionTitle": "המחשב שלך",
     "remoteOptionBody": "הרץ את Kilo על המחשב שלך באמצעות ה-CLI של `kilo remote`.",
     "skip": "דלג על הסיור",
-    "tutorialLabel": "מדריך",
-    "remoteTitle": "התחל את הסשן המרוחק הראשון שלך",
-    "remoteBody": "חבר את המחשב שלך, ואז התחל את הסשן מכאן.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "עדיין לא חובר מחשב",
-    "remoteEmptyBody": "כדי לחבר אותו, הרץ `kilo remote` במחשב שלך.",
-    "remoteFound": "המחשב חובר",
-    "checkAgain": "בדוק שוב",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "מדריך"
   },
   "appActions": {
     "start": {

@@ -3181,15 +3181,7 @@
     "remoteOptionTitle": "Kọ̀ǹpútà rẹ",
     "remoteOptionBody": "Ṣiṣẹ́ Kilo lórí ẹ̀rọ tirẹ pẹ̀lú CLI `kilo remote`.",
     "skip": "Fo ìrìn àjò sí",
-    "tutorialLabel": "Ìtọ́sọ́nà",
-    "remoteTitle": "Bẹ̀rẹ̀ ìgbà iṣẹ́ ìjìnnà àkọ́kọ́ rẹ",
-    "remoteBody": "So kọ̀ǹpútà rẹ pọ̀, lẹ́yìn náà bẹ̀rẹ̀ ìgbà iṣẹ́ láti ibí yìí.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Kò sí kọ̀ǹpútà tí a so pọ̀ sí báyìí",
-    "remoteEmptyBody": "Láti so ó pọ̀, ṣiṣẹ́ `kilo remote` lórí kọ̀ǹpútà rẹ.",
-    "remoteFound": "Kọ̀ǹpútà ti so pọ̀",
-    "checkAgain": "Tún ṣe àyẹ̀wò",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Ìtọ́sọ́nà"
   },
   "appActions": {
     "start": {

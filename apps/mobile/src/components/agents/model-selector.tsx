@@ -247,9 +247,11 @@ export function ModelPickerOptionRow({
   // main select (row content) and the favorite star. A pressable nested
   // inside a pressable would shadow the favorite for assistive technology,
   // so the two must never nest. The selected check is a static sibling to
-  // the LEFT of the star, and the star is the row's last child with the
-  // constant pr-4 padding, so every row's star shares one right-alignment
-  // column and the check can never sit right of it.
+  // the LEFT of the star, in a fixed-width column reserved in every row so
+  // selecting a row never moves the row content or the star, and the star is
+  // the row's last child with the constant pr-4 padding, so every row's star
+  // shares one right-alignment column and the check can never sit right of
+  // it.
   return (
     <View className="border-b border-border">
       <View className={cn('flex-row items-center gap-3 pr-4', option.unavailable && 'opacity-50')}>
@@ -310,7 +312,9 @@ export function ModelPickerOptionRow({
             ) : null}
           </View>
         </Pressable>
-        {selected ? <Check size={18} color={colors.primary} /> : null}
+        <View className="w-[18px] items-center justify-center">
+          {selected ? <Check size={18} color={colors.primary} /> : null}
+        </View>
         <Pressable
           onPress={() => {
             void Haptics.selectionAsync();

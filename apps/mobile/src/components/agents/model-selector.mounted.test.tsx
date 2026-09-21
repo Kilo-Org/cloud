@@ -60,15 +60,18 @@ function cliCatalogOption(overrides: Partial<SessionModelOption> = {}): SessionM
   };
 }
 
-function renderRow(option: SessionModelOption, selected = false): TestRenderer.ReactTestRenderer {
+function renderRow(
+  option: SessionModelOption,
+  overrides: Partial<{ selected: boolean; isFavorite: boolean }> = {}
+): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   TestRenderer.act(() => {
     ref.current = TestRenderer.create(
       createElement(ModelPickerOptionRow, {
         option,
-        selected,
+        selected: overrides.selected ?? false,
         selectedVariant: '',
-        isFavorite: false,
+        isFavorite: overrides.isFavorite ?? false,
         onSelectModel: vi.fn<(option: SessionModelOption) => void>(),
         onSelectVariant: vi.fn<(variant: string) => void>(),
         onToggleFavorite: vi.fn<(option: SessionModelOption) => void>(),
@@ -98,8 +101,29 @@ function countWithAccessibilityLabel(root: TestRenderer.ReactTestInstance, label
     .length;
 }
 
+function isInstance(
+  node: TestRenderer.ReactTestInstance | string
+): node is TestRenderer.ReactTestInstance {
+  return typeof node !== 'string';
+}
+
+function rowContainer(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  const container = renderer.root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      node.props.className.includes('gap-3 pr-4')
+  )[0];
+  if (!container) {
+    throw new Error('row container not found');
+  }
+  return container;
+}
+
 // The trailing icons of a row, in render order. The favorite star must be the
-// last one so every row's star shares one right-alignment column.
+// last one so every row's star shares one right-alignment column, and the
+// selected check sits in the reserved column to its left.
 function trailingIconTypes(root: TestRenderer.ReactTestInstance): string[] {
   return root
     .findAll(node => (node.type as string) === 'Check' || (node.type as string) === 'Star')
@@ -124,9 +148,42 @@ describe('ModelPickerOptionRow BYOK badge', () => {
   });
 });
 
+describe('ModelPickerOptionRow trailing check column', () => {
+  it('reserves the same fixed-width check column whether or not the row is selected', () => {
+    const selectedRow = rowContainer(renderRow(cliCatalogOption(), { selected: true }));
+    const unselectedRow = rowContainer(renderRow(cliCatalogOption(), { selected: false }));
+
+    const selectedChildren = selectedRow.children.filter(isInstance);
+    const unselectedChildren = unselectedRow.children.filter(isInstance);
+
+    // content, reserved check column, star — in both rows.
+    expect(selectedChildren).toHaveLength(3);
+    expect(unselectedChildren).toHaveLength(3);
+
+    const selectedSlot = selectedChildren[1];
+    const unselectedSlot = unselectedChildren[1];
+
+    // The reserved column is the same element with the same fixed width in
+    // both rows, so selecting a row never moves the content or the star.
+    expect(selectedSlot?.type).toBe('View');
+    expect(unselectedSlot?.type).toBe('View');
+    expect(selectedSlot?.props.className).toBe(unselectedSlot?.props.className);
+    expect(String(selectedSlot?.props.className)).toContain('w-[18px]');
+
+    // Only the contents differ: the check marks the selected row.
+    expect(selectedSlot?.findAllByType('Check')).toHaveLength(1);
+    expect(unselectedSlot?.findAllByType('Check')).toHaveLength(0);
+
+    // The star stays the row's last child, so it holds one right-alignment
+    // column whichever row is selected.
+    expect(selectedChildren[2]?.type).toBe('Pressable');
+    expect(unselectedChildren[2]?.type).toBe('Pressable');
+  });
+});
+
 describe('ModelPickerOptionRow trailing alignment', () => {
   it('keeps the favorite star rightmost so every row star shares one column', () => {
-    const selectedRow = renderRow(cliCatalogOption(), true);
+    const selectedRow = renderRow(cliCatalogOption(), { selected: true });
     expect(trailingIconTypes(selectedRow.root)).toEqual(['Check', 'Star']);
 
     const plainRow = renderRow(cliCatalogOption());

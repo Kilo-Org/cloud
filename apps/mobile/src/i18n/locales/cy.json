@@ -3353,15 +3353,7 @@
     "remoteOptionTitle": "Eich cyfrifiadur",
     "remoteOptionBody": "Rhedwch Kilo ar eich peiriant eich hun drwy'r CLI `kilo remote`.",
     "skip": "Hepgor y daith",
-    "tutorialLabel": "Tiwtorial",
-    "remoteTitle": "Dechreuwch eich sesiwn hirhoedlog gyntaf",
-    "remoteBody": "Cysylltwch eich cyfrifiadur, yna dechreuwch y sesiwn o'r fan hon.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Dim cyfrifiadur wedi'i gysylltu eto",
-    "remoteEmptyBody": "I'w gysylltu, rhedwch `kilo remote` ar eich cyfrifiadur.",
-    "remoteFound": "Cyfrifiadur wedi'i gysylltu",
-    "checkAgain": "Gwirio eto",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tiwtorial"
   },
   "appActions": {
     "start": {

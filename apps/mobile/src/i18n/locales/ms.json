@@ -3181,15 +3181,7 @@
     "remoteOptionTitle": "Komputer anda",
     "remoteOptionBody": "Jalankan Kilo pada mesin anda sendiri melalui CLI `kilo remote`.",
     "skip": "Langkau lawatan",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Mulakan sesi remote pertama anda",
-    "remoteBody": "Sambungkan komputer anda, kemudian mulakan sesi dari sini.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Tiada komputer bersambung lagi",
-    "remoteEmptyBody": "Untuk menyambungkannya, jalankan `kilo remote` pada komputer anda.",
-    "remoteFound": "Komputer bersambung",
-    "checkAgain": "Semak semula",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

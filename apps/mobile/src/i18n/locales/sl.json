@@ -3267,15 +3267,7 @@
     "remoteOptionTitle": "Vaš računalnik",
     "remoteOptionBody": "Zaženi Kilo na svojem računalniku prek CLI-ja `kilo remote`.",
     "skip": "Preskoči ogled",
-    "tutorialLabel": "Vodič",
-    "remoteTitle": "Zaženite svojo prvo oddaljeno sejo",
-    "remoteBody": "Poveži svoj računalnik, nato pa tu zaženi sejo.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Še ni povezanega računalnika",
-    "remoteEmptyBody": "Če ga želite povezati, zaženite `kilo remote` na svojem računalniku.",
-    "remoteFound": "Računalnik povezan",
-    "checkAgain": "Preveri znova",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Vodič"
   },
   "appActions": {
     "start": {

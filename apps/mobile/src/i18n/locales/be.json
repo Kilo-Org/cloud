@@ -3267,15 +3267,7 @@
     "remoteOptionTitle": "Ваш камп'ютар",
     "remoteOptionBody": "Запускайце Kilo на ўласнай машыне праз CLI `kilo remote`.",
     "skip": "Прапусціць агляд",
-    "tutorialLabel": "Навучанне",
-    "remoteTitle": "Пачніце свой першы аддалены сеанс",
-    "remoteBody": "Падключыце свой камп'ютар, а затым пачніце сеанс адсюль.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Яшчэ няма падключанага камп'ютара",
-    "remoteEmptyBody": "Каб падключыць яго, выканайце `kilo remote` на сваім камп'ютары.",
-    "remoteFound": "Камп'ютар падключаны",
-    "checkAgain": "Праверыць яшчэ раз",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Навучанне"
   },
   "appActions": {
     "start": {

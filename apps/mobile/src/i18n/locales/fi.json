@@ -3181,15 +3181,7 @@
     "remoteOptionTitle": "Tietokoneesi",
     "remoteOptionBody": "Suorita Kilo omalla koneellasi `kilo remote` -CLI:n kautta.",
     "skip": "Ohita esittely",
-    "tutorialLabel": "Käyttöopas",
-    "remoteTitle": "Aloita ensimmäinen etäistuntosi",
-    "remoteBody": "Yhdistä tietokoneesi ja käynnistä istunto täältä.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Tietokonetta ei ole vielä yhdistetty",
-    "remoteEmptyBody": "Yhdistääksesi sen, suorita `kilo remote` tietokoneellasi.",
-    "remoteFound": "Tietokone yhdistetty",
-    "checkAgain": "Tarkista uudelleen",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Käyttöopas"
   },
   "appActions": {
     "start": {

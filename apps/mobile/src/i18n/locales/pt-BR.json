@@ -3224,15 +3224,7 @@
     "remoteOptionTitle": "Seu computador",
     "remoteOptionBody": "Execute o Kilo na sua própria máquina pela CLI `kilo remote`.",
     "skip": "Pular tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Inicie sua primeira sessão remota",
-    "remoteBody": "Conecte seu computador e depois inicie a sessão por aqui.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Nenhum computador conectado ainda",
-    "remoteEmptyBody": "Para conectá-lo, execute `kilo remote` no seu computador.",
-    "remoteFound": "Computador conectado",
-    "checkAgain": "Verificar novamente",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

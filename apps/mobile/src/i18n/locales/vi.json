@@ -3181,15 +3181,7 @@
     "remoteOptionTitle": "Máy tính của bạn",
     "remoteOptionBody": "Chạy Kilo trên máy của bạn qua CLI `kilo remote`.",
     "skip": "Bỏ qua tour",
-    "tutorialLabel": "Hướng dẫn",
-    "remoteTitle": "Bắt đầu phiên từ xa đầu tiên của bạn",
-    "remoteBody": "Kết nối máy tính của bạn, sau đó bắt đầu phiên từ đây.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Chưa có máy tính nào được kết nối",
-    "remoteEmptyBody": "Để kết nối, hãy chạy `kilo remote` trên máy tính của bạn.",
-    "remoteFound": "Đã kết nối máy tính",
-    "checkAgain": "Kiểm tra lại",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Hướng dẫn"
   },
   "appActions": {
     "start": {

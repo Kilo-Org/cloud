@@ -35,6 +35,32 @@ const SAFE_AREA_MODULE = /react-native-safe-area-context/;
 const ENTRY_POINT = 'screen-insets.ts';
 const PROFILE_SCREEN = '../components/profile-screen.tsx';
 
+/**
+ * The Profile screen's alignment path: from the line that reads
+ * `useScreenSideInsets` through the line that first applies a side inset. Only
+ * this path must stay free of per-platform branches. A fork elsewhere in the
+ * screen — the Android sign-out confirmation, for example — is not on the
+ * insets path and must not fail the guard.
+ */
+function alignmentPath(profileSource: string): string {
+  const lines = profileSource.split('\n');
+  const start = lines.findIndex(line => line.includes('useScreenSideInsets()'));
+  if (start === -1) {
+    throw new Error(`${PROFILE_SCREEN} does not read its side insets from ${ENTRY_POINT}`);
+  }
+  const end = lines.findIndex(
+    (line, index) => index >= start && /margin(?:Left|Right|Start|End)/.test(line)
+  );
+  if (end === -1) {
+    // Naming the insets differently, or applying them as padding, would shrink
+    // the scanned path to its first line and leave the guard passing on nothing.
+    throw new Error(
+      `${PROFILE_SCREEN} applies its side insets without a margin declaration; update this guard`
+    );
+  }
+  return lines.slice(start, end + 1).join('\n');
+}
+
 describe('screen side insets: one implementation for both platforms', () => {
   it('reads the native safe-area module only in the entry point, with no platform branch', () => {
     const entry = source(ENTRY_POINT);
@@ -48,16 +74,12 @@ describe('screen side insets: one implementation for both platforms', () => {
     expect(profile, `${PROFILE_SCREEN} imports the native safe-area module again`).not.toMatch(
       SAFE_AREA_MODULE
     );
-    // The alignment path is the entry-point import and the wiring that carries
-    // its result into the screen root. The sign-out confirmation legitimately
-    // picks its dialog per platform, which is not on that path, so hold the
-    // wiring lines to the rule instead of every line in the file.
-    const alignmentWiring = profile
-      .split('\n')
-      .filter(line => /screen-insets|useScreenSideInsets|scrollStyle/.test(line))
-      .join('\n');
-    expect(alignmentWiring, `${PROFILE_SCREEN} carries a per-platform branch`).not.toMatch(
-      PLATFORM_BRANCH
-    );
+    // The sign-out confirmation legitimately picks its dialog per platform,
+    // which is not on the alignment path, so only the path from
+    // `useScreenSideInsets` to the first applied side inset is held to the rule.
+    expect(
+      alignmentPath(profile),
+      `${PROFILE_SCREEN}'s alignment path carries a per-platform branch`
+    ).not.toMatch(PLATFORM_BRANCH);
   });
 });

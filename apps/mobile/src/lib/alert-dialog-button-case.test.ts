@@ -17,6 +17,11 @@ import { describe, expect, it } from 'vitest';
 // confirm draws ALL-CAPS while every other button is sentence case
 // (DESIGN.md:350). The prebuild plugin this suite guards re-cases the actions
 // from the activity theme, keeping the stock parent so only the case changes.
+// AppTheme is the carrier: AppCompat resolves the three `buttonBar*ButtonStyle`
+// attrs through `alertDialogTheme`, which is `ThemeOverlay.AppCompat.Dialog.Alert`
+// — a ThemeOverlay applied over the activity theme (ContextThemeWrapper copies
+// the activity theme, then applies the overlay) that defines none of the three,
+// so their lookups fall through to AppTheme.
 //
 // No host here has an Android device, so the fact the device would show is
 // pinned here: the three button bar attrs point at `AppAlertDialogButton`, that
@@ -115,10 +120,20 @@ describe('Android alert-dialog button case plugin', () => {
     expect(appTheme?.item?.some(candidate => candidate.$?.name === WINDOW_BACKGROUND_ITEM)).toBe(
       true
     );
-    // The dialog theme belongs to the panel/accent plugin; this slice must not
-    // write alertDialogTheme.
+    // Nothing may write `alertDialogTheme`: AppCompat's value is the
+    // ThemeOverlay that supplies the dialog's window properties and defines
+    // none of the three button-bar attrs, so the three reach the dialog through
+    // AppTheme (the assertion above) and a second carrier would only risk
+    // dropping that overlay.
     const allItems = result.modResults.resources.style.flatMap(style => style.item ?? []);
     expect(allItems.some(item => item.$?.name === 'alertDialogTheme')).toBe(false);
+    // And they must be the appcompat attrs the dialog's button-bar layout reads
+    // (`style="?attr/buttonBarPositiveButtonStyle"`): the framework's
+    // `android:buttonBar*ButtonStyle` ids are separate attrs the layout never
+    // looks up, so writing those would leave the actions ALL-CAPS.
+    for (const item of BUTTON_BAR_STYLE_ITEMS) {
+      expect(allItems.some(candidate => candidate.$?.name === `android:${item}`)).toBe(false);
+    }
   });
 
   it('keeps the stock button parent and flips only android:textAllCaps', () => {

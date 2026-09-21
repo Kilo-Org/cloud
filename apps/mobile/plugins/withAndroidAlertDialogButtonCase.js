@@ -15,9 +15,24 @@ const { withAndroidStyles } = require('expo/config-plugins');
  * Eyebrows are the exception because the token explicitly transforms them to
  * uppercase."
  *
- * The fix re-cases the actions from the *activity* theme (AppTheme), not the
- * dialog theme: the three `buttonBar*ButtonStyle` attrs are pointed at
- * `AppAlertDialogButton`, a style that keeps the stock parent
+ * The override belongs on the activity theme (AppTheme) because that is the
+ * theme the dialog resolves the three attrs against. AppCompat's
+ * `alertDialogTheme` is `@style/ThemeOverlay.AppCompat.Dialog.Alert`, a
+ * ThemeOverlay whose chain (`Base.ThemeOverlay.AppCompat.Dialog.Alert` ->
+ * `Base.ThemeOverlay.AppCompat.Dialog` -> `Base.V7.ThemeOverlay.AppCompat.Dialog`
+ * -> `Base.ThemeOverlay.AppCompat` -> `Platform.ThemeOverlay.AppCompat`,
+ * `parent=""`) carries only the dialog's window properties, none of the three
+ * `buttonBar*ButtonStyle` attrs. `AlertDialog.Builder` wraps the activity in a
+ * `ContextThemeWrapper` that copies the activity theme and applies that overlay
+ * on top of it (`Resources.Theme.setTo` then `applyStyle(resid, true)`), so an
+ * attr the overlay does not define falls through to AppTheme — where the stock
+ * values live anyway (`Base.V7.Theme.AppCompat` points the three attrs at
+ * `?attr/buttonBarButtonStyle` = the ALL-CAPS `Widget.AppCompat.Button.ButtonBar.AlertDialog`).
+ * No custom `alertDialogTheme` is needed, and writing one would only risk losing
+ * the overlay's window properties.
+ *
+ * The fix re-cases the actions: the three `buttonBar*ButtonStyle` attrs are
+ * pointed at `AppAlertDialogButton`, a style that keeps the stock parent
  * (`Widget.AppCompat.Button.ButtonBar.AlertDialog`) and sets only
  * `android:textAllCaps=false`. AOSP `TextView`'s constructor reads the
  * `textAppearance` first and the view's own attributes from its `style` chain

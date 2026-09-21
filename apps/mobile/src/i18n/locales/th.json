@@ -2242,7 +2242,8 @@
       "linesBadge_one": "{{displayCount}} บรรทัด",
       "linesBadge_other": "{{displayCount}} บรรทัด",
       "matchesBadge_one": "พบ {{displayCount}} รายการ",
-      "matchesBadge_other": "พบ {{displayCount}} รายการ"
+      "matchesBadge_other": "พบ {{displayCount}} รายการ",
+      "noOutput": "ไม่มีเอาต์พุต"
     },
     "readToolMarkdown": {
       "linesTruncated": "บรรทัด {{start}}–{{end}} (ตัดบางส่วนออก)",
@@ -3206,15 +3207,7 @@
     "remoteOptionTitle": "คอมพิวเตอร์ของคุณ",
     "remoteOptionBody": "รัน Kilo บนเครื่องของคุณเองผ่าน CLI `kilo remote`",
     "skip": "ข้ามทัวร์",
-    "tutorialLabel": "บทช่วยสอน",
-    "remoteTitle": "เริ่มเซสชันทางไกลแรกของคุณ",
-    "remoteBody": "เชื่อมต่อคอมพิวเตอร์ของคุณ แล้วเริ่มเซสชันจากที่นี่",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ยังไม่มีคอมพิวเตอร์เชื่อมต่อ",
-    "remoteEmptyBody": "หากต้องการเชื่อมต่อ ให้รัน `kilo remote` บนคอมพิวเตอร์ของคุณ",
-    "remoteFound": "เชื่อมต่อคอมพิวเตอร์แล้ว",
-    "checkAgain": "ตรวจสอบอีกครั้ง",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "บทช่วยสอน"
   },
   "appActions": {
     "start": {

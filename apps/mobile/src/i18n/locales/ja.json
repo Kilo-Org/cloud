@@ -1738,7 +1738,8 @@
       "linesBadge_one": "{{displayCount}}行",
       "linesBadge_other": "{{displayCount}}行",
       "matchesBadge_one": "{{displayCount}}件",
-      "matchesBadge_other": "{{displayCount}}件"
+      "matchesBadge_other": "{{displayCount}}件",
+      "noOutput": "出力はありません。"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}～{{end}}行目（一部省略）",
@@ -3206,15 +3207,7 @@
     "remoteOptionTitle": "お使いのコンピューター",
     "remoteOptionBody": "`kilo remote` CLI を使って自分のコンピューターで Kilo を実行します。",
     "skip": "ツアーをスキップ",
-    "tutorialLabel": "チュートリアル",
-    "remoteTitle": "最初のリモートセッションを開始",
-    "remoteBody": "コンピューターを接続してから、ここでセッションを開始してください。",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "接続済みのコンピューターはありません",
-    "remoteEmptyBody": "接続するには、コンピューターで `kilo remote` を実行してください。",
-    "remoteFound": "コンピューターが接続されました",
-    "checkAgain": "再チェック",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "チュートリアル"
   },
   "appActions": {
     "start": {

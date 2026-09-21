@@ -2242,7 +2242,8 @@
       "linesBadge_one": "{{displayCount}} სტრიქონი",
       "linesBadge_other": "{{displayCount}} სტრიქონი",
       "matchesBadge_one": "{{displayCount}} დამთხვევა",
-      "matchesBadge_other": "{{displayCount}} დამთხვევა"
+      "matchesBadge_other": "{{displayCount}} დამთხვევა",
+      "noOutput": "გამოსავალი არ არის."
     },
     "readToolMarkdown": {
       "linesTruncated": "სტრიქონები {{start}}–{{end}} (შემოკლებულია)",
@@ -3206,15 +3207,7 @@
     "remoteOptionTitle": "თქვენი კომპიუტერი",
     "remoteOptionBody": "გაუშვით Kilo თქვენს საკუთარ მანქანაზე `kilo remote` CLI-ს საშუალებით.",
     "skip": "ტურის გამოტოვება",
-    "tutorialLabel": "სასწავლო",
-    "remoteTitle": "დაიწყეთ თქვენი პირველი დაშორებული სესია",
-    "remoteBody": "მიავლეთ თქვენს კომპიუტერს და შემდეგ აქედან დაიწყეთ სესია.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ჯერ კომპიუტერი არ არის მიერთებული",
-    "remoteEmptyBody": "დასამაგრებლად, გაუშვით `kilo remote` თქვენს კომპიუტერზე.",
-    "remoteFound": "კომპიუტერი მიერთებულია",
-    "checkAgain": "ხელახლა შემოწმება",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "სასწავლო"
   },
   "appActions": {
     "start": {

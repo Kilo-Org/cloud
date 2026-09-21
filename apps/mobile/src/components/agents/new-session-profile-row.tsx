@@ -1,105 +1,110 @@
-import { Pressable, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
+import { type ReactNode } from 'react';
+import { View } from 'react-native';
 import { type TFunction } from 'i18next';
 
-import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
-import { buildActiveProfileIndicatorState } from '@/components/agents/active-profile-indicator-model';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { Button } from '@/components/ui/button';
-import { ChevronDown } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
-type NewSessionProfileRowProps = {
-  profile: EffectiveAgentProfile | null;
+type RenderProfileRowArgs = {
   isProfileLoading: boolean;
+  t: TFunction;
+  profile: ProfileRowProfile | null;
   isProfileError: boolean;
-  /** The picked override no longer resolves to a profile. */
-  overrideNeedsAttention: boolean;
   onRetryProfile: () => void;
-  /** Opens the profile picker sheet. */
-  onOpenProfilePicker: () => void;
 };
 
-type ProfileBodyProps = NewSessionProfileRowProps & {
-  t: TFunction;
-  mutedForeground: string;
-};
+/** The capability summary the row renders; a full profile is assignable. */
+type ProfileRowProfile = Pick<
+  EffectiveAgentProfile,
+  'name' | 'commandCount' | 'mcpServerCount' | 'skillCount' | 'agentCount'
+>;
 
 /**
- * The new-session Environment row: a tappable summary of the effective profile
- * with the active-profile indicator beside its label. While the profiles load
- * the row keeps the same height with skeletons, so the name never flashes a
- * placeholder and the rows below never move.
+ * Keep the environment visible while it gates Start, without showing a default
+ * before the query settles. Every state reserves the same two text lines.
+ *
+ * This module stays free of the app's icon barrel: the mounted suite that
+ * renders it cannot load `lucide-react-native`, so the tappable
+ * `NewSessionProfileRow` (which needs the chevron) lives with its screen.
  */
-export function NewSessionProfileRow({
+export function renderProfileRow({
+  t,
   profile,
   isProfileLoading,
   isProfileError,
-  overrideNeedsAttention,
   onRetryProfile,
-  onOpenProfilePicker,
-}: Readonly<NewSessionProfileRowProps>) {
-  const { t } = useTranslation();
-  const colors = useThemeColors();
-
-  const indicatorState = buildActiveProfileIndicatorState({
-    selectedProfileName: profile?.name ?? null,
-    repoBoundProfileName: null,
-    hasManualEnvVars: false,
-    hasManualSetupCommands: false,
-    hasSelectedProfileId: profile !== null || overrideNeedsAttention,
-    isProfilesLoading: isProfileLoading,
-    hasProfileError: isProfileError,
-  });
-
+}: Readonly<RenderProfileRowArgs>): ReactNode {
   return (
     <View className="mt-5">
-      <View className="mb-2 flex-row items-center justify-between gap-2">
-        <Text className="text-sm font-medium text-muted-foreground">
-          {t('agentChat.newSession.environment')}
-        </Text>
-        <ActiveProfileIndicator state={indicatorState} onPress={onOpenProfilePicker} />
-      </View>
-      {renderProfileBody({
-        t,
-        mutedForeground: colors.mutedForeground,
-        profile,
-        isProfileLoading,
-        isProfileError,
-        overrideNeedsAttention,
-        onRetryProfile,
-        onOpenProfilePicker,
-      })}
+      <Text className="mb-2 text-sm font-medium text-muted-foreground">
+        {t('agentChat.newSession.environment')}
+      </Text>
+      {renderProfileRowBody({ t, profile, isProfileLoading, isProfileError, onRetryProfile })}
     </View>
   );
 }
 
-function renderProfileBody({
+/**
+ * The state body without the Environment label. `NewSessionProfileRow` reuses
+ * it for its loading and failure states so both rows reserve the same lines.
+ */
+export function renderProfileRowBody({
   t,
-  mutedForeground,
   profile,
   isProfileLoading,
   isProfileError,
-  overrideNeedsAttention,
   onRetryProfile,
-  onOpenProfilePicker,
-}: Readonly<ProfileBodyProps>) {
+}: Readonly<RenderProfileRowArgs>): ReactNode {
+  let title = t('agentChat.newSession.defaultEnvironment');
+  let summary: string | undefined = undefined;
+  const showError = isProfileError && !isProfileLoading;
   if (isProfileLoading) {
-    return (
-      <View className="gap-1.5">
-        <Skeleton className="h-6 w-40 rounded-md" />
-        <Skeleton className="h-4 w-56 rounded-md" />
-      </View>
-    );
+    title = t('common.loading');
+  } else if (showError) {
+    title = t('agentChat.newSession.couldNotLoadEnvironment');
+  } else if (profile) {
+    title = profile.name;
+    summary = t('agentChat.newSession.environmentSummary', {
+      commands: profile.commandCount,
+      mcp: profile.mcpServerCount,
+      skills: profile.skillCount,
+      agents: profile.agentCount,
+    });
   }
-  if (isProfileError) {
-    return (
-      <View className="min-h-11 flex-row items-center gap-2">
-        <Text className="text-sm text-destructive">
-          {t('agentChat.newSession.couldNotLoadEnvironment')}
+
+  return (
+    <View className="min-h-[36px] flex-row items-center gap-2">
+      <View className="min-w-0 flex-1 gap-1">
+        <Text
+          className={cn(
+            'text-sm leading-5 text-foreground',
+            isProfileLoading && 'text-muted-foreground',
+            showError && 'text-destructive',
+            summary && 'font-semibold'
+          )}
+          numberOfLines={1}
+          accessibilityLiveRegion="polite"
+          accessibilityState={{ busy: isProfileLoading }}
+        >
+          {title}
         </Text>
+        <View
+          accessibilityElementsHidden={!summary}
+          importantForAccessibility={summary ? 'auto' : 'no-hide-descendants'}
+        >
+          {/* A text line reserves the summary's height even at larger system font sizes. */}
+          <Text className="text-sm leading-5 text-muted-foreground" numberOfLines={1}>
+            {summary ?? '\u00A0'}
+          </Text>
+          {isProfileLoading ? (
+            <Skeleton className="absolute inset-y-0 left-0 w-2/3 rounded" />
+          ) : null}
+        </View>
+      </View>
+      {showError ? (
         <Button
           variant="link"
           size="sm"
@@ -108,37 +113,7 @@ function renderProfileBody({
         >
           <Text>{t('common.retry')}</Text>
         </Button>
-      </View>
-    );
-  }
-  return (
-    <Pressable
-      className="min-h-11 flex-row items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5 active:opacity-70"
-      onPress={onOpenProfilePicker}
-      accessibilityRole="button"
-      accessibilityLabel={t('agentChat.newSession.pickProfile')}
-    >
-      <View className="min-w-0 flex-1 gap-1">
-        {overrideNeedsAttention ? (
-          <Text className="text-sm text-warn">
-            {t('agentChat.newSession.configNeedsAttention')}
-          </Text>
-        ) : null}
-        <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
-          {profile?.name ?? t('agentChat.newSession.defaultEnvironment')}
-        </Text>
-        {profile ? (
-          <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-            {t('agentChat.newSession.environmentSummary', {
-              commands: profile.commandCount,
-              mcp: profile.mcpServerCount,
-              skills: profile.skillCount,
-              agents: profile.agentCount,
-            })}
-          </Text>
-        ) : null}
-      </View>
-      <ChevronDown size={18} color={mutedForeground} />
-    </Pressable>
+      ) : null}
+    </View>
   );
 }

@@ -2242,7 +2242,8 @@
       "linesBadge_one": "Andalana {{displayCount}}",
       "linesBadge_other": "Andalana {{displayCount}}",
       "matchesBadge_one": "Valiny mifanaraka {{displayCount}}",
-      "matchesBadge_other": "Valiny mifanaraka {{displayCount}}"
+      "matchesBadge_other": "Valiny mifanaraka {{displayCount}}",
+      "noOutput": "Tsy misy vokatra."
     },
     "readToolMarkdown": {
       "linesTruncated": "andalana {{start}}–{{end}} (nohafohezina)",
@@ -3206,15 +3207,7 @@
     "remoteOptionTitle": "Ny solosainao",
     "remoteOptionBody": "Alefaso amin'ny solosainao manokana ny Kilo amin'ny alalan'ny CLI `kilo remote`.",
     "skip": "Ahalavala ny fitetezana",
-    "tutorialLabel": "Torolàlana",
-    "remoteTitle": "Atombohy ny fotoam-piasana lava vahany voalohananao",
-    "remoteBody": "Aampakao ny solosainao, dia atomboho eto ny fotoam-piasana.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Tsy mbola misy solosaina mifandray",
-    "remoteEmptyBody": "Mba hampifandray azy dia alefaso `kilo remote` amin'ny solosainao.",
-    "remoteFound": "Mifandray ny solosaina",
-    "checkAgain": "Hamarino indray",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Torolàlana"
   },
   "appActions": {
     "start": {

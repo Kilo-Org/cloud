@@ -2242,7 +2242,8 @@
       "linesBadge_one": "Mstari {{displayCount}}",
       "linesBadge_other": "Mistari {{displayCount}}",
       "matchesBadge_one": "Tokeo {{displayCount}}",
-      "matchesBadge_other": "Matokeo {{displayCount}}"
+      "matchesBadge_other": "Matokeo {{displayCount}}",
+      "noOutput": "Hakuna matokeo."
     },
     "readToolMarkdown": {
       "linesTruncated": "mistari {{start}}–{{end}} (imekatwa)",
@@ -3206,15 +3207,7 @@
     "remoteOptionTitle": "Kompyuta yako",
     "remoteOptionBody": "Endesha Kilo kwenye kompyuta yako mwenyewe kupitia CLI ya `kilo remote`.",
     "skip": "Ruka ziara",
-    "tutorialLabel": "Mafunzo",
-    "remoteTitle": "Anza kikao chako cha kwanza cha mbali",
-    "remoteBody": "Unganisha kompyuta yako, kisha anza kikao hapa.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Hakuna kompyuta iliyounganishwa bado",
-    "remoteEmptyBody": "Ili kuiunganisha, endesha `kilo remote` kwenye kompyuta yako.",
-    "remoteFound": "Kompyuta imeunganishwa",
-    "checkAgain": "Angalia tena",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Mafunzo"
   },
   "appActions": {
     "start": {

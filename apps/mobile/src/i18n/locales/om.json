@@ -2242,7 +2242,8 @@
       "linesBadge_one": "Sarara {{displayCount}}",
       "linesBadge_other": "Sarara {{displayCount}}",
       "matchesBadge_one": "Walsimsiisota {{displayCount}}",
-      "matchesBadge_other": "Walsimsiisota {{displayCount}}"
+      "matchesBadge_other": "Walsimsiisota {{displayCount}}",
+      "noOutput": "Bu'aan hin jiru."
     },
     "readToolMarkdown": {
       "linesTruncated": "sararoota {{start}}–{{end}} (gabaabbate)",
@@ -3206,15 +3207,7 @@
     "remoteOptionTitle": "Kompiitara kee",
     "remoteOptionBody": "Kilo kompiitara kee irratti `kilo remote` CLI'n hojjechisi.",
     "skip": "Daawannoo darbi",
-    "tutorialLabel": "Barnoota",
-    "remoteTitle": "Turtii fageenya jalqabaa kee eegaladhu",
-    "remoteBody": "Kompiitara kee walqunnamsiisi, itti aanse turtii kana as irraa eegaladhu.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Amma kompiitaraan hin walqabate",
-    "remoteEmptyBody": "Walqunnamuuf, kompiitara kee irratti `kilo remote` raawwadhu.",
-    "remoteFound": "Kompiitaraan walqabate",
-    "checkAgain": "Irra deebi'ii ilaali",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Barnoota"
   },
   "appActions": {
     "start": {

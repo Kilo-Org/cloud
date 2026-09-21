@@ -2242,7 +2242,8 @@
       "linesBadge_one": "umugqa ongu-{{displayCount}}",
       "linesBadge_other": "imigqa engu-{{displayCount}}",
       "matchesBadge_one": "okufanayo okungu-{{displayCount}}",
-      "matchesBadge_other": "okufanayo okungu-{{displayCount}}"
+      "matchesBadge_other": "okufanayo okungu-{{displayCount}}",
+      "noOutput": "Akukho mphumela."
     },
     "readToolMarkdown": {
       "linesTruncated": "imigqa {{start}}–{{end}} (ifinyeziwe)",
@@ -3206,15 +3207,7 @@
     "remoteOptionTitle": "Ikhompyutha yakho",
     "remoteOptionBody": "Sebenzisa i-Kilo ekhompyutheni yakho ngokusebenzisa i-CLI ethi `kilo remote`.",
     "skip": "Qeda uhambo",
-    "tutorialLabel": "Uqeqesho",
-    "remoteTitle": "Qala iseshini yakho yokuqala ekude",
-    "remoteBody": "Xhuma ikhompyutha yakho, bese uqala iseshini lapha.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Akukho khompyutha exhunyiwe okwamanje",
-    "remoteEmptyBody": "Ukuze uyixhume, qalisa `kilo remote` ekhompyutheni yakho.",
-    "remoteFound": "Ikhompyutha ixhunyiwe",
-    "checkAgain": "Phinda uhlole",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Uqeqesho"
   },
   "appActions": {
     "start": {

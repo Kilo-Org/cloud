@@ -2,6 +2,11 @@
 import { expect } from '@playwright/test';
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 import { z } from 'zod';
+import {
+  KILO_BROWSER_TOOL_NAMES,
+  KILO_BROWSER_TOOL_PREFIX,
+  SAFE_BROWSER_TOOL_NAMES,
+} from '../../src/shared/browser-tool-contract';
 const toolMessageSchema = z.object({
   content: z.string(),
   role: z.literal('tool'),
@@ -54,36 +59,58 @@ const chatCompletionStreamResponse = (events: unknown[]): string => {
   return `${[...events, ...terminal].map(event => `data: ${JSON.stringify(event)}\n\n`).join('')}data: [DONE]\n\n`;
 };
 
-const longEvalIdentifier = `kilo${'VeryLongIdentifier'.repeat(16)}`;
-const evalFixtureCode = `const ${longEvalIdentifier} = document.documentElement.outerHTML.length; return ${longEvalIdentifier};`;
+/*
+ * The default turn inspects the selected tab and reports its HTML length. It
+ * uses the exposed `kilo_browser_evaluate` tool (danger mode) so the default
+ * matches the model-facing contract; safe mode refuses it and the turn still
+ * answers on the next completion.
+ */
+const evaluateFixtureFunction = '() => document.documentElement.outerHTML.length';
 const chatCompletionsPath = '/api/gateway/v1/chat/completions';
+/** The four workflow tools exposed in both modes (the dangerous-only two are added below). */
 export const workflowToolNames = [
   'search_workflows',
   'get_workflow',
   'save_workflow',
   'save_memory',
 ];
-export const safeToolNames = [
-  'get_page_snapshot',
-  'get_element_details',
-  'find_in_page',
-  'web_search',
-  'search_memories',
-  'get_memory',
-  ...workflowToolNames,
-];
-export const dangerousToolNames = [
-  'get_page_snapshot',
-  'get_element_details',
-  'find_in_page',
-  'web_search',
-  'search_memories',
-  'get_memory',
-  'eval',
-  ...workflowToolNames,
-  'run_workflow',
-  'delete_workflow',
-];
+
+/*
+ * The model-facing browser tools are the vendored Playwright MCP contract with
+ * the `playwright_` -> `kilo_` prefix rename. Safe mode exposes exactly the
+ * upstream read-only entries; danger mode exposes the whole contract, both in
+ * upstream order. Derived here so a contract change can never leave the
+ * expectation behind the product.
+ */
+export const safeBrowserToolNames: readonly string[] = SAFE_BROWSER_TOOL_NAMES.map(
+  name => `${KILO_BROWSER_TOOL_PREFIX}${name}`
+);
+
+export const dangerousBrowserToolNames: readonly string[] = KILO_BROWSER_TOOL_NAMES;
+
+export type ExtensionAgentMode = 'dangerous' | 'safe';
+
+const nonBrowserToolNames = ['web_search', 'search_memories', 'get_memory'] as const;
+
+/**
+ * The exact ordered tool list the extension sends to the gateway for a mode:
+ * the mode's browser tools, the web/memory tools, then the workflow tools.
+ * Shared by `mockKiloApi`'s per-request assertion and by the specs that show
+ * each `kilo_` name against its `playwright_` counterpart.
+ */
+export const expectedToolNamesForMode = (mode: ExtensionAgentMode): string[] =>
+  mode === 'dangerous'
+    ? [
+        ...dangerousBrowserToolNames,
+        ...nonBrowserToolNames,
+        ...workflowToolNames,
+        'run_workflow',
+        'delete_workflow',
+      ]
+    : [...safeBrowserToolNames, ...nonBrowserToolNames, ...workflowToolNames];
+
+export const safeToolNames = expectedToolNamesForMode('safe');
+export const dangerousToolNames = expectedToolNamesForMode('dangerous');
 interface MockGatewayModel {
   readonly contextLength?: number;
   readonly hasUserByokAvailable?: boolean;
@@ -113,6 +140,12 @@ export const mockKiloApi = async (
     beforeFirstCompletion?: () => Promise<void>;
     beforeModels?: (organizationId: string) => Promise<void>;
     afterModels?: (organizationId: string) => void;
+    /**
+     * Per-call completion events, index 0 = the first chat completion. Lets a
+     * spec script more than three rounds (for example two messages in one
+     * conversation) without weakening the tool-list assertion.
+     */
+    completionEventsByCall?: unknown[][];
     firstCompletionEvents?: unknown[];
     modelInputModalities?: string[];
     modelFailuresBeforeSuccessByOrganizationId?: Record<string, number>;
@@ -317,6 +350,12 @@ export const mockKiloApi = async (
   });
   await context.route('https://app.kilo.ai/api/gateway/v1/chat/completions', async route => {
     chatCompletionCalls += 1;
+    /*
+     * Snapshot the request's ordinal before any await: a held first completion
+     * (beforeFirstCompletion) must not be served as the ordinal a concurrent
+     * request advanced the counter to while it was suspended.
+     */
+    const callOrdinal = chatCompletionCalls;
     options.seenChatOrganizationIds?.push(
       route.request().headers()['x-kilocode-organizationid'] ?? ''
     );
@@ -330,7 +369,7 @@ export const mockKiloApi = async (
     ];
 
     const toolNames =
-      options.toolNamesByCall?.[chatCompletionCalls - 1] ?? options.toolNames ?? safeToolNames;
+      options.toolNamesByCall?.[callOrdinal - 1] ?? options.toolNames ?? safeToolNames;
 
     // Summarization calls use tool_choice: 'none' (tools: []); skip normal-turn assertions for them.
     const isSummarizationCall =
@@ -363,11 +402,21 @@ export const mockKiloApi = async (
       expect(userMessages.at(-1)?.content).toEqual(expect.stringContaining('Timezone:'));
     }
 
-    if (chatCompletionCalls === 1) {
-      if (options.beforeFirstCompletion !== undefined) {
-        await options.beforeFirstCompletion();
-      }
+    if (callOrdinal === 1 && options.beforeFirstCompletion !== undefined) {
+      await options.beforeFirstCompletion();
+    }
 
+    const completionEventsByCall = options.completionEventsByCall?.[callOrdinal - 1];
+
+    if (completionEventsByCall !== undefined) {
+      return route.fulfill({
+        body: chatCompletionStreamResponse(completionEventsByCall),
+        contentType: 'text/event-stream',
+        status: 200,
+      });
+    }
+
+    if (callOrdinal === 1) {
       return route.fulfill({
         body: chatCompletionStreamResponse(
           options.firstCompletionEvents ?? [
@@ -380,10 +429,10 @@ export const mockKiloApi = async (
                     tool_calls: [
                       {
                         function: {
-                          arguments: JSON.stringify({ code: evalFixtureCode }),
-                          name: 'eval',
+                          arguments: JSON.stringify({ function: evaluateFixtureFunction }),
+                          name: 'kilo_browser_evaluate',
                         },
-                        id: 'call_eval_1',
+                        id: 'call_evaluate_1',
                         index: 0,
                         type: 'function',
                       },
@@ -399,7 +448,7 @@ export const mockKiloApi = async (
       });
     }
 
-    if (chatCompletionCalls === 2 && options.secondCompletionEvents !== undefined) {
+    if (callOrdinal === 2 && options.secondCompletionEvents !== undefined) {
       return route.fulfill({
         body: chatCompletionStreamResponse(options.secondCompletionEvents),
         contentType: 'text/event-stream',
@@ -407,7 +456,7 @@ export const mockKiloApi = async (
       });
     }
 
-    if (chatCompletionCalls === 3 && options.thirdCompletionEvents !== undefined) {
+    if (callOrdinal === 3 && options.thirdCompletionEvents !== undefined) {
       return route.fulfill({
         body: chatCompletionStreamResponse(options.thirdCompletionEvents),
         contentType: 'text/event-stream',

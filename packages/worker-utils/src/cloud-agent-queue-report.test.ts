@@ -235,6 +235,50 @@ describe('CloudAgentQueueReportSchema', () => {
     ).toBe(false);
   });
 
+  it('accepts a provider responsibility pair on a failed run and keeps the existing refines', () => {
+    const providerFailed = {
+      status: 'failed',
+      terminalAt,
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      failureResponsibility: 'provider',
+      failureReason: 'provider_unavailable',
+    };
+    const parsed = CloudAgentQueueReportSchema.safeParse(reportWithRun(providerFailed));
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.run).toMatchObject({
+      failureResponsibility: 'provider',
+      failureReason: 'provider_unavailable',
+    });
+    expect(
+      CloudAgentQueueReportSchema.safeParse(
+        reportWithRun({ ...providerFailed, failureReason: undefined })
+      ).success
+    ).toBe(false);
+    const interruptedProvider = CloudAgentQueueReportSchema.safeParse(
+      reportWithRun({
+        status: 'interrupted',
+        terminalAt,
+        failureStage: 'interruption',
+        failureCode: 'user_interrupt',
+        failureResponsibility: 'provider',
+        failureReason: 'provider_unavailable',
+      })
+    );
+    expect(interruptedProvider.success).toBe(false);
+    expect(!interruptedProvider.success && interruptedProvider.error.issues).toContainEqual(
+      expect.objectContaining({
+        path: ['run', 'failureResponsibility'],
+        message: 'Failure responsibility is permitted only on failed runs',
+      })
+    );
+    expect(
+      CloudAgentQueueReportSchema.safeParse(
+        reportWithRun({ ...providerFailed, failureResponsibility: 'provider_retired' })
+      ).success
+    ).toBe(false);
+  });
+
   it('requires strict ISO timestamps at the queue boundary', () => {
     expect(
       CloudAgentQueueReportSchema.safeParse(

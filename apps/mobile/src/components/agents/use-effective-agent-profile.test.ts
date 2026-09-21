@@ -143,30 +143,34 @@ function mountProfile(organizationId?: string, overrideProfileId?: string | null
 }
 
 describe('useEffectiveAgentProfile', () => {
-  it('keeps Start enabled and omits profileId on query error despite cached data', () => {
-    // React Query keeps `data` on error; the hook must not leak that cached
-    // profile into the form (the error row shows and Start sends no id). A
-    // settled error also leaves the gate false, so Start stays enabled.
-    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial query result; the hook reads only data/isPending/isError/refetch
-    vi.mocked(useQuery).mockReturnValue({
-      data: [profile({ id: 'cached-default', isDefault: true })],
-      isPending: false,
-      isError: true,
-      refetch: vi.fn(),
-    } as never);
+  it.each([false, true])(
+    'omits cached profileId and gates Start only during retry (isFetching: %s)',
+    isFetching => {
+      // React Query keeps `data` on error; the hook must not leak that cached
+      // profile into the form (the error row shows and Start sends no id). A
+      // settled error also leaves the gate false, so Start stays enabled.
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial query result; the hook reads only data/isPending/isFetching/isError/refetch
+      vi.mocked(useQuery).mockReturnValue({
+        data: [profile({ id: 'cached-default', isDefault: true })],
+        isPending: false,
+        isFetching,
+        isError: true,
+        refetch: vi.fn(),
+      } as never);
 
-    const personal = mountProfile();
-    expect(personal.isError).toBe(true);
-    expect(personal.isLoading).toBe(false);
-    expect(personal.profile).toBeNull();
-    expect(personal.profileId).toBeNull();
+      const personal = mountProfile();
+      expect(personal.isError).toBe(true);
+      expect(personal.isLoading).toBe(isFetching);
+      expect(personal.profile).toBeNull();
+      expect(personal.profileId).toBeNull();
 
-    const org = mountProfile('org-1');
-    expect(org.isError).toBe(true);
-    expect(org.isLoading).toBe(false);
-    expect(org.profile).toBeNull();
-    expect(org.profileId).toBeNull();
-  });
+      const org = mountProfile('org-1');
+      expect(org.isError).toBe(true);
+      expect(org.isLoading).toBe(isFetching);
+      expect(org.profile).toBeNull();
+      expect(org.profileId).toBeNull();
+    }
+  );
 
   it('reports loading (not error) while the query is in flight so Start stays blocked', () => {
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- partial query result; the hook reads only data/isPending/isError/refetch

@@ -531,4 +531,37 @@ describe('ScreenHeader mounted', () => {
     expect(iosStyle).toEqual({ paddingTop: 32 });
     expect(androidStyle).toEqual(iosStyle);
   });
+
+  it('caps the eyebrow to one line with a middle ellipsis when eyebrowNumberOfLines is set', () => {
+    const renderer = renderHeader({
+      title: '#1',
+      eyebrow: 'KILO-STUB/DISCUSSION-MIXED',
+      eyebrowNumberOfLines: 1,
+    });
+
+    const eyebrow = renderer.root.findByType('Eyebrow');
+    expect(eyebrow.props.numberOfLines).toBe(1);
+    expect(eyebrow.props.ellipsizeMode).toBe('middle');
+    expect(eyebrow.children).toEqual(['KILO-STUB/DISCUSSION-MIXED']);
+  });
+
+  it('leaves the eyebrow uncapped by default so a full instruction is never truncated', () => {
+    const renderer = renderHeader({
+      title: 'Open a pull request',
+      eyebrow: 'Open a pull request or merge request by URL',
+    });
+
+    const eyebrow = renderer.root.findByType('Eyebrow');
+    expect(eyebrow.props.numberOfLines).toBeUndefined();
+    expect(eyebrow.props.ellipsizeMode).toBeUndefined();
+  });
+
+  it('keeps the reserved eyebrow placeholder on the same single capped line', () => {
+    const renderer = renderHeader({ reserveEyebrow: true, eyebrowNumberOfLines: 1 });
+
+    const eyebrow = renderer.root.findByType('Eyebrow');
+    expect(eyebrow.props.numberOfLines).toBe(1);
+    expect(eyebrow.props.ellipsizeMode).toBe('middle');
+    expect(eyebrow.children).toEqual(['\u00A0']);
+  });
 });

@@ -7,7 +7,7 @@ import {
 } from 'expo-apple-authentication';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -17,10 +17,16 @@ import { GoogleLogo } from '@/components/login/google-logo';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import {
+  INLINE_LINK_BOX_CLASS,
+  INLINE_LINK_CONNECTOR_CLASS,
+  INLINE_LINK_HIT_SLOP_DP,
+} from '@/lib/a11y/tap-target';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 import { setLoginEmailDraft, setSsoRecoveryDraft, type SsoRecoveryDraft } from '@/lib/login-draft';
+import { cn } from '@/lib/utils';
 
 export function IdleAuth({
   start,
@@ -51,6 +57,11 @@ export function IdleAuth({
   const [browserAuthStarting, setBrowserAuthStarting] = useState(false);
   const emailRef = useRef(initialEmail);
   const browserAuthStartingRef = useRef(false);
+  // Field-level validation message for the email input. Rendered under the
+  // field through FormField's `error` slot (AccessibleStatus announces it and
+  // keeps it on screen) instead of a toast, which is not part of the
+  // accessibility hierarchy.
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,6 +119,13 @@ export function IdleAuth({
   }, [ssoRecovery]);
 
   const handleSendCode = async () => {
+    if (!emailRef.current.trim()) {
+      // Empty input is a field-level error: show it under the field so the
+      // landing never looks dead, and never post an empty address.
+      setEmailError(t('login.pleaseEnterEmail'));
+      return;
+    }
+    setEmailError(null);
     const ok = await requestEmailCode(emailRef.current);
     if (ok) {
       setView('otp');
@@ -296,6 +314,7 @@ export function IdleAuth({
         autoComplete="email"
         textContentType="emailAddress"
         defaultValue={initialEmail || undefined}
+        error={emailError ?? undefined}
         // Small-phone IME (Defect B / QB-A1): the IME's Go key must submit
         // the same way the "Continue" button does, instead of only
         // dismissing the keyboard as `actionDone` previously did.
@@ -308,6 +327,10 @@ export function IdleAuth({
         onChangeText={value => {
           emailRef.current = value;
           setLoginEmailDraft(value);
+          // Clear the validation message as soon as the user starts fixing it.
+          if (emailError !== null) {
+            setEmailError(null);
+          }
         }}
       />
       <Button
@@ -320,23 +343,37 @@ export function IdleAuth({
         {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
         <Text>{t('common.continue')}</Text>
       </Button>
-      <Text className="text-xs text-muted-foreground">
-        {t('login.termsPrefix')}{' '}
-        <Text
-          className="text-xs text-primary underline"
+      <View className="flex-row flex-wrap items-center justify-center">
+        {/* The sentence is a row of nodes, not one Text with nested handlers: an
+            inline link's own box is what the control-size audit measures, so
+            each link carries the shared inline-link box and its own reach. The
+            connector between them reserves at least both facing slops, so the
+            two touch regions never overlap in a catalog with a short
+            conjunction. */}
+        <Text className="text-xs text-muted-foreground">{t('login.termsPrefix')} </Text>
+        <Pressable
+          className={cn(INLINE_LINK_BOX_CLASS, 'px-1')}
+          hitSlop={INLINE_LINK_HIT_SLOP_DP}
+          accessibilityRole="link"
+          accessibilityLabel={t('login.terms')}
           onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
         >
-          {t('login.terms')}
+          <Text className="text-xs text-primary underline">{t('login.terms')}</Text>
+        </Pressable>
+        <Text className={cn('text-xs text-muted-foreground', INLINE_LINK_CONNECTOR_CLASS)}>
+          {t('login.termsConnector')}
         </Text>
-        {t('login.termsConnector')}
-        <Text
-          className="text-xs text-primary underline"
+        <Pressable
+          className={cn(INLINE_LINK_BOX_CLASS, 'px-1')}
+          hitSlop={INLINE_LINK_HIT_SLOP_DP}
+          accessibilityRole="link"
+          accessibilityLabel={t('common.privacyPolicy')}
           onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
         >
-          {t('common.privacyPolicy')}
-        </Text>
-        {t('login.termsSuffix')}
-      </Text>
+          <Text className="text-xs text-primary underline">{t('common.privacyPolicy')}</Text>
+        </Pressable>
+        <Text className="text-xs text-muted-foreground">{t('login.termsSuffix')}</Text>
+      </View>
       <Button
         variant="ghost"
         disabled={authBusy}

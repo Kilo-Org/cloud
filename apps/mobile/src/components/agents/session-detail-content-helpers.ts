@@ -1,6 +1,8 @@
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
+import { type MessageFailure, selectMessageFailure } from './message-failure-state';
 import { firstHumanText } from './part-types';
+import { transcriptRendersMessage } from './session-transcript';
 
 /**
  * Counts pending messages that are still in flight. A terminal delivery
@@ -60,4 +62,70 @@ export function resolveRetryPrompt(
     }
   }
   return null;
+}
+
+type LastVisibleFailureInput = {
+  /** The rendered list, in order. Its last entry the transcript renders owns
+   * the row above the footer. */
+  displayedMessages: readonly StoredMessage[];
+  /** The full list, for the retry prompt's preceding-user search. */
+  messages: readonly StoredMessage[];
+  pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
+  /** Canceled rows kept locally, keyed by message id. */
+  canceledQueuedMessages: ReadonlyMap<string, StoredMessage>;
+};
+
+/**
+ * The failure footer the transcript's last message row renders, or `null` when
+ * that row renders none. The fixed footer's status indicator uses this to tell
+ * a failure the row already states (which it must not repeat) from a
+ * session-level error the row does not carry (which only the footer can show).
+ *
+ * Mirrors MessageBubble's own gate: a footer needs a failure and a wired
+ * action. Copy to composer is always wired on a delivery failure, so only an
+ * assistant failure can be left without one (no preceding user row).
+ */
+export function lastVisibleMessageFailure({
+  displayedMessages,
+  messages,
+  pendingMessages,
+  canceledQueuedMessages,
+}: LastVisibleFailureInput): MessageFailure | null {
+  // The transcript drops a message whose parts render nothing (unless its
+  // delivery failed and its typed footer is the row's surface), so such a
+  // message owns no row and cannot state a failure. Walk back to the last row
+  // `mergeSessionTranscript` actually renders: reading `displayedMessages.at(-1)`
+  // let a dropped failure suppress the footer's own line and leave the failure
+  // with no surface at all.
+  const last = lastRenderedMessage(displayedMessages, pendingMessages);
+  if (last === undefined) {
+    return null;
+  }
+  const deliveryState =
+    last.info.role === 'user' && !canceledQueuedMessages.has(last.info.id)
+      ? pendingMessages.get(last.info.id)
+      : undefined;
+  const failure = selectMessageFailure({ deliveryState, info: last.info });
+  if (failure === null || failure.kind === 'delivery') {
+    return failure;
+  }
+  return resolveRetryPrompt(last, messages) !== null ? failure : null;
+}
+
+/**
+ * The last message `mergeSessionTranscript` renders, or `undefined` when it
+ * renders none. A dropped message is invisible, so the row above the footer is
+ * the one before it.
+ */
+function lastRenderedMessage(
+  displayedMessages: readonly StoredMessage[],
+  pendingMessages: ReadonlyMap<string, MessageDeliveryState>
+): StoredMessage | undefined {
+  for (let i = displayedMessages.length - 1; i >= 0; i -= 1) {
+    const message = displayedMessages[i];
+    if (message !== undefined && transcriptRendersMessage(message, pendingMessages)) {
+      return message;
+    }
+  }
+  return undefined;
 }

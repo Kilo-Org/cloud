@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Statusi i seancës",
       "sessionStatusSubtitle": "e përfunduar / e dështuar / gati për kontroll",
       "kiloclawActivitySubtitle": "instancë gati / e dështuar, veprime të planifikuara",
+      "kiloclawActivityUnavailable": "Nis një instancë KiloClaw për të marrë aktivitetin e KiloClaw.",
       "balanceAlertsSubtitle": "paralajmërime për gjendje të ulët të organizatës",
+      "balanceAlertsUnavailable": "Bashkohu me një organizatë për të marrë njoftime për gjendje të ulët.",
+      "securityFindingsSubtitle": "gjetje të reja dhe kujtesa për SLA",
+      "securityFindingsUnavailable": "Aktivizo agjentin e sigurisë Kilo në një fushëveprim për të marrë gjetjet e sigurisë.",
       "spendAlertsSubtitle": "tejkalime pragjesh dhe rritje për orë",
-      "spendAlertsToggle": "Kategoria e njoftimeve për shpenzimet",
-      "securityFindingsSubtitle": "gjetje të reja dhe kujtesa për SLA"
+      "spendAlertsToggle": "Kategoria e njoftimeve për shpenzimet"
     },
     "action": {
       "openSession": "Hap seancën"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Nuk u ngarkua seanca.",
       "failedToLoadDetails": "Nuk u ngarkuan detajet e seancës.",
       "failedToStopExecution": "Nuk u ndal ekzekutimi.",
+      "stopped": "Seanca u ndal",
+      "committing": "Duke regjistruar…",
+      "committed": "U regjistrua",
+      "commitFailed": "Regjistrimi dështoi",
       "renameSession": "Riemërto seancën",
       "renamePlaceholder": "Emri i seancës",
       "transcriptAccessibility": "Transkripti i seancës",

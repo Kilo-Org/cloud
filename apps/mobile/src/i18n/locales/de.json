@@ -335,10 +335,13 @@
       "sessionStatusTitle": "Sitzungsstatus",
       "sessionStatusSubtitle": "beendet / fehlgeschlagen / bereit zur Steuerung",
       "kiloclawActivitySubtitle": "instanz bereit/fehlgeschlagen, geplante Aktionen",
+      "kiloclawActivityUnavailable": "Starte eine KiloClaw-Instanz, um KiloClaw-Aktivitäten zu erhalten.",
       "balanceAlertsSubtitle": "warnungen bei niedrigem Organisationsguthaben",
+      "balanceAlertsUnavailable": "Tritt einer Organisation bei, um Warnungen bei niedrigem Guthaben zu erhalten.",
+      "securityFindingsSubtitle": "neue Sicherheitsbefunde und SLA-Erinnerungen",
+      "securityFindingsUnavailable": "Aktiviere den Kilo-Sicherheitsagenten für einen Bereich, um Sicherheitsbefunde zu erhalten.",
       "spendAlertsSubtitle": "Schwellenwertüberschreitungen und stündliche Spitzen",
-      "spendAlertsToggle": "Kategorie „Ausgaben-Warnungen“",
-      "securityFindingsSubtitle": "neue Sicherheitsbefunde und SLA-Erinnerungen"
+      "spendAlertsToggle": "Kategorie „Ausgaben-Warnungen“"
     },
     "action": {
       "openSession": "Sitzung öffnen"
@@ -1575,6 +1578,10 @@
       "couldNotLoad": "Die Sitzung konnte nicht geladen werden.",
       "failedToLoadDetails": "Die Sitzungsdetails konnten nicht geladen werden.",
       "failedToStopExecution": "Die Ausführung konnte nicht gestoppt werden.",
+      "stopped": "Sitzung gestoppt",
+      "committing": "Wird committet…",
+      "committed": "Committet",
+      "commitFailed": "Committen fehlgeschlagen",
       "renameSession": "Sitzung umbenennen",
       "renamePlaceholder": "Sitzungsname",
       "transcriptAccessibility": "Sitzungsprotokoll",

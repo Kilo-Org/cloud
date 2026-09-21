@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Staða lotu",
       "sessionStatusSubtitle": "lokið / mistókst / tilbúin til stýringar",
       "kiloclawActivitySubtitle": "tilvik tilbúið eða bilað, tímasettar aðgerðir",
+      "kiloclawActivityUnavailable": "Ræstu KiloClaw-tilvik til að fá KiloClaw-virkni.",
       "balanceAlertsSubtitle": "viðvaranir um lága inneign félagsins",
+      "balanceAlertsUnavailable": "Skráðu þig í fyrirtæki til að fá viðvaranir um lága inneign.",
+      "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar",
+      "securityFindingsUnavailable": "Virkjaðu Kilo öryggiserindreka á sviði til að fá öryggisniðurstöður.",
       "spendAlertsSubtitle": "yfirferðir þröskulda og uppsveiflur á klukkustund",
-      "spendAlertsToggle": "Flokkur útgjaldaviðvarana",
-      "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar"
+      "spendAlertsToggle": "Flokkur útgjaldaviðvarana"
     },
     "action": {
       "openSession": "Opna lotu"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Ekki tókst að hlaða lotunni.",
       "failedToLoadDetails": "Ekki tókst að hlaða upplýsingum um lotuna.",
       "failedToStopExecution": "Ekki tókst að stöðva keyrsluna.",
+      "stopped": "Lotan var stöðvuð",
+      "committing": "Skrái…",
+      "committed": "Skráð",
+      "commitFailed": "Skráning mistókst",
       "renameSession": "Endurnefna lotu",
       "renamePlaceholder": "Lotunafn",
       "transcriptAccessibility": "Samtalsferill lotunnar",

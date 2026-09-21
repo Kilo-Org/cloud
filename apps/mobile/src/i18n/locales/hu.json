@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Munkamenet állapota",
       "sessionStatusSubtitle": "befejezett / sikertelen / vezérelhető",
       "kiloclawActivitySubtitle": "elkészült vagy meghibásodott példányok, ütemezett műveletek",
+      "kiloclawActivityUnavailable": "Indíts el egy KiloClaw-példányt, hogy KiloClaw-tevékenységet kapj.",
       "balanceAlertsSubtitle": "figyelmeztetések a szervezet alacsony egyenlegére",
+      "balanceAlertsUnavailable": "Csatlakozz egy szervezethez, hogy figyelmeztetéseket kapj alacsony egyenlegről.",
+      "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők",
+      "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörben, hogy biztonsági találatokat kapj.",
       "spendAlertsSubtitle": "küszöbátlépések és óránkénti kiugrások",
-      "spendAlertsToggle": "Költésfigyelmeztetések kategória",
-      "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők"
+      "spendAlertsToggle": "Költésfigyelmeztetések kategória"
     },
     "action": {
       "openSession": "Munkamenet megnyitása"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Nem sikerült betölteni a munkamenetet.",
       "failedToLoadDetails": "Nem sikerült betölteni a munkamenet részleteit.",
       "failedToStopExecution": "Nem sikerült leállítani a végrehajtást.",
+      "stopped": "A munkamenet leállt",
+      "committing": "Véglegesítés…",
+      "committed": "Véglegesítve",
+      "commitFailed": "A véglegesítés nem sikerült",
       "renameSession": "Munkamenet átnevezése",
       "renamePlaceholder": "Munkamenet neve",
       "transcriptAccessibility": "A munkamenet átirata",

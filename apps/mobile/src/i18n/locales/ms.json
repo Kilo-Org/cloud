@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Status sesi",
       "sessionStatusSubtitle": "selesai / gagal / sedia untuk dikawal",
       "kiloclawActivitySubtitle": "instans sedia/gagal, tindakan berjadual",
+      "kiloclawActivityUnavailable": "Mulakan instans KiloClaw untuk mendapat aktiviti KiloClaw.",
       "balanceAlertsSubtitle": "amaran baki rendah untuk organisasi",
+      "balanceAlertsUnavailable": "Sertai organisasi untuk mendapat amaran baki rendah.",
+      "securityFindingsSubtitle": "penemuan baharu dan peringatan SLA",
+      "securityFindingsUnavailable": "Dayakan ejen keselamatan Kilo pada skop untuk mendapat dapatan keselamatan.",
       "spendAlertsSubtitle": "melepasi ambang dan lonjakan setiap jam",
-      "spendAlertsToggle": "Kategori amaran perbelanjaan",
-      "securityFindingsSubtitle": "penemuan baharu dan peringatan SLA"
+      "spendAlertsToggle": "Kategori amaran perbelanjaan"
     },
     "action": {
       "openSession": "Buka sesi"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Tidak dapat memuatkan sesi.",
       "failedToLoadDetails": "Gagal memuatkan butiran sesi.",
       "failedToStopExecution": "Gagal menghentikan pelaksanaan.",
+      "stopped": "Sesi dihentikan",
+      "committing": "Melakukan komit…",
+      "committed": "Komit selesai",
+      "commitFailed": "Komit gagal",
       "renameSession": "Namakan semula sesi",
       "renamePlaceholder": "Nama sesi",
       "transcriptAccessibility": "Transkrip sesi",

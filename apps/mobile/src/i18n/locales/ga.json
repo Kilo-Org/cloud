@@ -887,10 +887,13 @@
       "sessionStatusTitle": "Stádas seisiúin",
       "sessionStatusSubtitle": "críochnaithe / teipthe / réidh le rialú",
       "kiloclawActivitySubtitle": "ásc réidh nó teipthe, gníomhartha sceidealaithe",
+      "kiloclawActivityUnavailable": "Tosaigh ásc KiloClaw chun gníomhaíocht KiloClaw a fháil.",
       "balanceAlertsSubtitle": "rabhaidh faoi iarmhéid íseal na heagraíochta",
+      "balanceAlertsUnavailable": "Bí páirteach in eagraíocht chun foláirimh faoi iarmhéid íseal a fháil.",
+      "securityFindingsSubtitle": "torthaí nua agus meabhrúcháin SLA",
+      "securityFindingsUnavailable": "Cumasaigh gníomhaire slándála Kilo ar raon chun torthaí slándála a fháil.",
       "spendAlertsSubtitle": "sáruithe tairsí agus spuaiceanna uaire",
-      "spendAlertsToggle": "Catagóir foláirimh chaiteachais",
-      "securityFindingsSubtitle": "torthaí nua agus meabhrúcháin SLA"
+      "spendAlertsToggle": "Catagóir foláirimh chaiteachais"
     },
     "action": {
       "openSession": "Oscail an seisiún"
@@ -2163,6 +2166,10 @@
       "couldNotLoad": "Níorbh fhéidir an seisiún a lódáil.",
       "failedToLoadDetails": "Níorbh fhéidir sonraí an tseisiúin a lódáil.",
       "failedToStopExecution": "Níorbh fhéidir an forghníomhú a stopadh.",
+      "stopped": "Stopadh an seisiún",
+      "committing": "Á thaifeadadh…",
+      "committed": "Taifeadta",
+      "commitFailed": "Theip ar an taifeadadh",
       "renameSession": "Athainmnigh seisiún",
       "renamePlaceholder": "Ainm an tseisiúin",
       "transcriptAccessibility": "Athscríbhinn an tseisiúin",

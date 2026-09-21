@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Xaaladda kalfadhiga",
       "sessionStatusSubtitle": "dhammaaday / fashilmay / diyaar u ah in la xakameeyo",
       "kiloclawActivitySubtitle": "nuqul diyaar ah ama fashilmay, ficillo la jadwaleeyay",
+      "kiloclawActivityUnavailable": "Bilow nuqul KiloClaw si aad u hesho hawlaha KiloClaw.",
       "balanceAlertsSubtitle": "digniinaha hadhaaga yar ee ururka",
+      "balanceAlertsUnavailable": "Ku biir urur si aad u hesho digniinaha hadhaaga yar.",
+      "securityFindingsSubtitle": "natiijooyin cusub iyo xusuusinno SLA",
+      "securityFindingsUnavailable": "Shid wakiilka amniga Kilo baaxad si aad u hesho natiijooyinka amniga.",
       "spendAlertsSubtitle": "dhaafitaanka xadka iyo kor u kaca saacadlaha",
-      "spendAlertsToggle": "Qaybta digniinaha kharashka",
-      "securityFindingsSubtitle": "natiijooyin cusub iyo xusuusinno SLA"
+      "spendAlertsToggle": "Qaybta digniinaha kharashka"
     },
     "action": {
       "openSession": "Fur kalfadhi"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Kalfadhiga lama soo shubi karin.",
       "failedToLoadDetails": "Faahfaahinta kalfadhiga lama soo shubi karin.",
       "failedToStopExecution": "Fulinta lama joojin karin.",
+      "stopped": "Kalfadhiga waa la joojiyay",
+      "committing": "Waa la diiwaangelinayaa…",
+      "committed": "Waa la diiwaangeliyay",
+      "commitFailed": "Diiwaangelinta waa fashilantay",
       "renameSession": "Beddel magaca kalfadhiga",
       "renamePlaceholder": "Magaca kalfadhiga",
       "transcriptAccessibility": "Qoraalka kalfadhiga",

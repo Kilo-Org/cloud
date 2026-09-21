@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Satan'ny fotoam-piasana",
       "sessionStatusSubtitle": "vita / tsy nahomby / vonona hofehezina",
       "kiloclawActivitySubtitle": "dika mandeha vonona na tsy nahomby, hetsika voalahatra",
+      "kiloclawActivityUnavailable": "Alefaso ny instance KiloClaw hahazoana ny hetsika KiloClaw.",
       "balanceAlertsSubtitle": "fampitandremana rehefa kely ny ambim-bolan'ny fikambanana",
+      "balanceAlertsUnavailable": "Midira ao amin'ny fikambanana hahazoana fampitandremana momba ny ambim-bola kely.",
+      "securityFindingsSubtitle": "olana vaovao hita sy fampahatsiahivana SLA",
+      "securityFindingsUnavailable": "Alefaso ny mpanampy amin'ny fiarovana Kilo ao amin'ny faritra iray hahazoana ny olana hita amin'ny fiarovana.",
       "spendAlertsSubtitle": "fihoaram-bidy sy fitsambikinana isan'ora",
-      "spendAlertsToggle": "Sokajin'ny fampitandremana momba ny fandaniana",
-      "securityFindingsSubtitle": "olana vaovao hita sy fampahatsiahivana SLA"
+      "spendAlertsToggle": "Sokajin'ny fampitandremana momba ny fandaniana"
     },
     "action": {
       "openSession": "Sokafy ny fotoam-piasana"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Tsy voaray ny fotoam-piasana.",
       "failedToLoadDetails": "Tsy voaray ny antsipirian'ny fotoam-piasana.",
       "failedToStopExecution": "Tsy nahomby ny fampijanonana ny fampandehanana.",
+      "stopped": "Najanona ny fotoam-piasana",
+      "committing": "Mandraketra…",
+      "committed": "Voarakitra",
+      "commitFailed": "Tsy nahomby ny fandraketana",
       "renameSession": "Ovao ny anaran'ny fotoam-piasana",
       "renamePlaceholder": "Anaran'ny fotoam-piasana",
       "transcriptAccessibility": "Rakitsoratry ny fotoam-piasana",

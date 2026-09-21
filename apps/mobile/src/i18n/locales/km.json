@@ -839,10 +839,13 @@
       "sessionStatusTitle": "ស្ថានភាពវគ្គ",
       "sessionStatusSubtitle": "បានបញ្ចប់ / បានបរាជ័យ / រួចរាល់សម្រាប់ឱ្យអ្នកគ្រប់គ្រង",
       "kiloclawActivitySubtitle": "ម៉ាស៊ីនរួចរាល់/បរាជ័យ សកម្មភាពតាមកាលវិភាគ",
+      "kiloclawActivityUnavailable": "ចាប់ផ្ដើមម៉ាស៊ីន KiloClaw ដើម្បីទទួលបានសកម្មភាព KiloClaw។",
       "balanceAlertsSubtitle": "ការព្រមានពេលសមតុល្យរបស់អង្គការទាប",
+      "balanceAlertsUnavailable": "ចូលរួមស្ថាប័នដើម្បីទទួលបានការជូនដំណឹងពេលសមតុល្យទាប។",
+      "securityFindingsSubtitle": "ការរកឃើញថ្មី និងការរំលឹក SLA",
+      "securityFindingsUnavailable": "បើកភ្នាក់ងារសុវត្ថិភាព Kilo នៅក្នុងវិសាលភាពដើម្បីទទួលបានបញ្ហាសុវត្ថិភាពដែលរកឃើញ។",
       "spendAlertsSubtitle": "ការឆ្លងកាត់កម្រិត និងការកើនឡើងប្រចាំម៉ោង",
-      "spendAlertsToggle": "ប្រភេទនៃការជូនដំណឹងអំពីការចំណាយ",
-      "securityFindingsSubtitle": "ការរកឃើញថ្មី និងការរំលឹក SLA"
+      "spendAlertsToggle": "ប្រភេទនៃការជូនដំណឹងអំពីការចំណាយ"
     },
     "action": {
       "openSession": "បើកវគ្គ"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "មិនអាចផ្ទុកវគ្គបានទេ។",
       "failedToLoadDetails": "មិនអាចផ្ទុកព័ត៌មានលម្អិតនៃវគ្គបានទេ។",
       "failedToStopExecution": "មិនអាចបញ្ឈប់ការដំណើរការបានទេ។",
+      "stopped": "វគ្គត្រូវបានបញ្ឈប់",
+      "committing": "កំពុងកត់ត្រា…",
+      "committed": "កត់ត្រារួចរាល់",
+      "commitFailed": "ការកត់ត្រាបានបរាជ័យ",
       "renameSession": "ប្តូរឈ្មោះវគ្គ",
       "renamePlaceholder": "ឈ្មោះវគ្គ",
       "transcriptAccessibility": "កំណត់ត្រាសន្ទនារបស់វគ្គ",

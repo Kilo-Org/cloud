@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Hali ya kikao",
       "sessionStatusSubtitle": "kimekamilika / kimeshindikana / kiko tayari kudhibitiwa",
       "kiloclawActivitySubtitle": "nakala iko tayari au imeshindikana, vitendo vilivyoratibiwa",
+      "kiloclawActivityUnavailable": "Anzisha nakala ya KiloClaw ili kupata shughuli za KiloClaw.",
       "balanceAlertsSubtitle": "maonyo ya salio la chini la shirika",
+      "balanceAlertsUnavailable": "Jiunge na shirika ili kupata maonyo ya salio la chini.",
+      "securityFindingsSubtitle": "matokeo mapya na vikumbusho vya SLA",
+      "securityFindingsUnavailable": "Washa wakala wa usalama wa Kilo kwenye wigo ili kupata matokeo ya ukaguzi wa usalama.",
       "spendAlertsSubtitle": "kuvuka vizingiti na kuongezeka kwa saa",
-      "spendAlertsToggle": "Aina ya tahadhari za matumizi",
-      "securityFindingsSubtitle": "matokeo mapya na vikumbusho vya SLA"
+      "spendAlertsToggle": "Aina ya tahadhari za matumizi"
     },
     "action": {
       "openSession": "Fungua kikao"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Imeshindikana kupakia kikao.",
       "failedToLoadDetails": "Imeshindikana kupakia maelezo ya kikao.",
       "failedToStopExecution": "Imeshindikana kusimamisha utekelezaji.",
+      "stopped": "Kikao kimesimamishwa",
+      "committing": "Inahifadhi…",
+      "committed": "Imehifadhiwa",
+      "commitFailed": "Uhifadhi umeshindikana",
       "renameSession": "Badilisha jina la kikao",
       "renamePlaceholder": "Jina la kikao",
       "transcriptAccessibility": "Nakala ya mazungumzo ya kikao",

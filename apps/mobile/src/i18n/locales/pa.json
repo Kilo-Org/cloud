@@ -839,10 +839,13 @@
       "sessionStatusTitle": "ਸੈਸ਼ਨ ਦੀ ਸਥਿਤੀ",
       "sessionStatusSubtitle": "ਪੂਰਾ ਹੋਇਆ / ਅਸਫਲ / ਕੰਟਰੋਲ ਕਰਨ ਲਈ ਤਿਆਰ",
       "kiloclawActivitySubtitle": "ਇੰਸਟੈਂਸ ਤਿਆਰ/ਅਸਫਲ, ਨਿਰਧਾਰਤ ਕਾਰਵਾਈਆਂ",
+      "kiloclawActivityUnavailable": "KiloClaw ਗਤੀਵਿਧੀ ਪਾਉਣ ਲਈ ਇੱਕ KiloClaw ਇੰਸਟੈਂਸ ਸ਼ੁਰੂ ਕਰੋ।",
       "balanceAlertsSubtitle": "ਸੰਸਥਾ ਦਾ ਬੈਲੰਸ ਘੱਟ ਹੋਣ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ",
+      "balanceAlertsUnavailable": "ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਪਾਉਣ ਲਈ ਇੱਕ ਸੰਸਥਾ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ।",
+      "securityFindingsSubtitle": "ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਅਤੇ SLA ਲਈ ਯਾਦ-ਦਹਾਨੀਆਂ",
+      "securityFindingsUnavailable": "ਸੁਰੱਖਿਆ ਨਤੀਜੇ ਪਾਉਣ ਲਈ ਇੱਕ ਦਾਇਰੇ ਵਿੱਚ Kilo ਸੁਰੱਖਿਆ ਏਜੰਟ ਚਾਲੂ ਕਰੋ।",
       "spendAlertsSubtitle": "ਸੀਮਾ ਟੱਪਣਾ ਅਤੇ ਹਰ ਘੰਟੇ ਵਾਧਾ",
-      "spendAlertsToggle": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਦੀ ਸ਼੍ਰੇਣੀ",
-      "securityFindingsSubtitle": "ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਅਤੇ SLA ਲਈ ਯਾਦ-ਦਹਾਨੀਆਂ"
+      "spendAlertsToggle": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਦੀ ਸ਼੍ਰੇਣੀ"
     },
     "action": {
       "openSession": "ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "failedToLoadDetails": "ਸੈਸ਼ਨ ਦੇ ਵੇਰਵੇ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ।",
       "failedToStopExecution": "ਚੱਲ ਰਿਹਾ ਕੰਮ ਰੋਕਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
+      "stopped": "ਸੈਸ਼ਨ ਰੋਕ ਦਿੱਤਾ ਗਿਆ",
+      "committing": "ਕਮਿਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ…",
+      "committed": "ਕਮਿਟ ਹੋ ਗਿਆ",
+      "commitFailed": "ਕਮਿਟ ਅਸਫਲ ਰਿਹਾ",
       "renameSession": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ ਬਦਲੋ",
       "renamePlaceholder": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ",
       "transcriptAccessibility": "ਸੈਸ਼ਨ ਦੀ ਲਿਖਤ",

@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Estati sesyon",
       "sessionStatusSubtitle": "fini / echwe / pare pou kontwole",
       "kiloclawActivitySubtitle": "enstans pare/echwe, aksyon pwograme",
+      "kiloclawActivityUnavailable": "Kòmanse yon enstans KiloClaw pou jwenn aktivite KiloClaw.",
       "balanceAlertsSubtitle": "avètisman lè balans òganizasyon an ba",
+      "balanceAlertsUnavailable": "Antre nan yon òganizasyon pou jwenn alèt sou balans ki ba.",
+      "securityFindingsSubtitle": "nouvo rezilta ak rapèl SLA",
+      "securityFindingsUnavailable": "Aktive ajan sekirite Kilo sou yon domèn pou jwenn pwoblèm sekirite detekte.",
       "spendAlertsSubtitle": "depasman papòt ak ogmantasyon chak èdtan",
-      "spendAlertsToggle": "Kategori alèt depans",
-      "securityFindingsSubtitle": "nouvo rezilta ak rapèl SLA"
+      "spendAlertsToggle": "Kategori alèt depans"
     },
     "action": {
       "openSession": "Louvri sesyon an"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Nou pa t ka chaje sesyon an.",
       "failedToLoadDetails": "Nou pa t ka chaje detay sesyon an.",
       "failedToStopExecution": "Nou pa t ka sispann egzekisyon an.",
+      "stopped": "Sesyon an sispann",
+      "committing": "N ap anrejistre…",
+      "committed": "Anrejistre",
+      "commitFailed": "Anrejistreman an echwe",
       "renameSession": "Chanje non sesyon an",
       "renamePlaceholder": "Non sesyon",
       "transcriptAccessibility": "Transkripsyon sesyon an",

@@ -11,6 +11,9 @@ import { renderWithProviders } from '@/test/render-with-providers';
 const signOutFn = vi.hoisted(() => vi.fn());
 const alertFn = vi.hoisted(() => vi.fn());
 const platform = vi.hoisted(() => ({ os: 'android' as 'android' | 'ios' }));
+// The screen reads its landscape side insets through `@/lib/screen-insets`,
+// which imports `react-native-safe-area-context`.
+const safeArea = vi.hoisted(() => ({ top: 24, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
   Alert: { alert: alertFn },
@@ -35,7 +38,7 @@ vi.mock('react-native-reanimated', () => ({
 // whose real module loads the native safe-area package. The node project cannot
 // load that native module, so the screen's own tests stub the hook.
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 0 }),
+  useSafeAreaInsets: () => safeArea,
 }));
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));

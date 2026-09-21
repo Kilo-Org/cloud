@@ -839,10 +839,13 @@
       "sessionStatusTitle": "සැසි තත්ත්වය",
       "sessionStatusSubtitle": "අවසන් / අසාර්ථක / පාලනයට සූදානම්",
       "kiloclawActivitySubtitle": "පිටපත සූදානම් හෝ අසාර්ථක වීම, කාලසටහන්ගත ක්‍රියා",
+      "kiloclawActivityUnavailable": "KiloClaw ක්‍රියාකාරකම් ලබා ගැනීමට KiloClaw පිටපතක් අරඹන්න.",
       "balanceAlertsSubtitle": "සංවිධානයේ ශේෂය අඩු වීමේ දැනුම්දීම්",
+      "balanceAlertsUnavailable": "ශේෂය අඩු වීමේ දැනුම්දීම් ලබා ගැනීමට සංවිධානයකට සම්බන්ධ වන්න.",
+      "securityFindingsSubtitle": "නව සොයාගැනීම් සහ SLA මතක් කිරීම්",
+      "securityFindingsUnavailable": "ආරක්ෂක ගැටලු ලබා ගැනීමට විෂය පථයක Kilo ආරක්ෂක නියෝජිතයා සක්‍රීය කරන්න.",
       "spendAlertsSubtitle": "සීමා ඉක්මවීම් සහ පැයකට ඇති උච්චතා",
-      "spendAlertsToggle": "වියදම් දැනුම්දීම් ප්‍රවර්ගය",
-      "securityFindingsSubtitle": "නව සොයාගැනීම් සහ SLA මතක් කිරීම්"
+      "spendAlertsToggle": "වියදම් දැනුම්දීම් ප්‍රවර්ගය"
     },
     "action": {
       "openSession": "සැසිය විවෘත කරන්න"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "සැසිය පූරණය කළ නොහැකි විය.",
       "failedToLoadDetails": "සැසියේ විස්තර පූරණය කළ නොහැකි විය.",
       "failedToStopExecution": "ක්‍රියාත්මක කිරීම නතර කළ නොහැකි විය.",
+      "stopped": "සැසිය නතර කරන ලදී",
+      "committing": "කමිට් කරමින්…",
+      "committed": "කමිට් කරන ලදී",
+      "commitFailed": "කමිට් කිරීම අසාර්ථක විය",
       "renameSession": "සැසියේ නම වෙනස් කරන්න",
       "renamePlaceholder": "සැසියේ නම",
       "transcriptAccessibility": "සැසියේ සංවාද පිටපත",

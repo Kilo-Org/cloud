@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Նիստի կարգավիճակ",
       "sessionStatusSubtitle": "ավարտված / ձախողված / պատրաստ է կառավարման",
       "kiloclawActivitySubtitle": "միջավայրը պատրաստ է կամ ձախողվել է, պլանավորված գործողություններ",
+      "kiloclawActivityUnavailable": "Մեկնարկիր KiloClaw միջավայր՝ KiloClaw ակտիվություն ստանալու համար։",
       "balanceAlertsSubtitle": "կազմակերպության ցածր մնացորդի նախազգուշացումներ",
+      "balanceAlertsUnavailable": "Միացիր կազմակերպությանը՝ ցածր մնացորդի ծանուցումներ ստանալու համար։",
+      "securityFindingsSubtitle": "հայտնաբերված նոր խնդիրներ և SLA հիշեցումներ",
+      "securityFindingsUnavailable": "Միացրու Kilo անվտանգության գործակալը շրջանակում՝ անվտանգության խնդիրներ ստանալու համար։",
       "spendAlertsSubtitle": "շեմերի հատումներ և ժամային ցատկեր",
-      "spendAlertsToggle": "Ծախսերի ծանուցումների կատեգորիա",
-      "securityFindingsSubtitle": "հայտնաբերված նոր խնդիրներ և SLA հիշեցումներ"
+      "spendAlertsToggle": "Ծախսերի ծանուցումների կատեգորիա"
     },
     "action": {
       "openSession": "Բացել նիստը"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Չհաջողվեց բեռնել նիստը։",
       "failedToLoadDetails": "Չհաջողվեց բեռնել նիստի մանրամասները։",
       "failedToStopExecution": "Չհաջողվեց դադարեցնել կատարումը։",
+      "stopped": "Նիստը դադարեցվեց",
+      "committing": "Ամրագրվում է…",
+      "committed": "Ամրագրված է",
+      "commitFailed": "Ամրագրումը ձախողվեց",
       "renameSession": "Վերանվանել նիստը",
       "renamePlaceholder": "Նիստի անուն",
       "transcriptAccessibility": "Նիստի սղագրություն",

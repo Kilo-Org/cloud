@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Status ng sesyon",
       "sessionStatusSubtitle": "tapos / nabigo / handa nang kontrolin",
       "kiloclawActivitySubtitle": "handa o nabigo ang instance, mga nakaiskedyul na aksyon",
+      "kiloclawActivityUnavailable": "Magsimula ng instance ng KiloClaw para makakuha ng aktibidad ng KiloClaw.",
       "balanceAlertsSubtitle": "mga babala sa mababang balanse ng organisasyon",
+      "balanceAlertsUnavailable": "Sumali sa isang organisasyon para makakuha ng mga babala sa mababang balanse.",
+      "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA",
+      "securityFindingsUnavailable": "Paganahin ang Kilo security agent sa isang saklaw para makakuha ng mga natukoy na isyu sa seguridad.",
       "spendAlertsSubtitle": "mga paglampas sa hangganan at pagtaas bawat oras",
-      "spendAlertsToggle": "Kategorya ng mga babala sa gastos",
-      "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA"
+      "spendAlertsToggle": "Kategorya ng mga babala sa gastos"
     },
     "action": {
       "openSession": "Buksan ang sesyon"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Hindi ma-load ang sesyon.",
       "failedToLoadDetails": "Hindi ma-load ang mga detalye ng sesyon.",
       "failedToStopExecution": "Hindi maihinto ang pagpapatakbo.",
+      "stopped": "Huminto ang sesyon",
+      "committing": "Nagko-commit…",
+      "committed": "Na-commit",
+      "commitFailed": "Nabigo ang pag-commit",
       "renameSession": "Palitan ang pangalan ng sesyon",
       "renamePlaceholder": "Pangalan ng sesyon",
       "transcriptAccessibility": "Tala ng pag-uusap sa sesyon",

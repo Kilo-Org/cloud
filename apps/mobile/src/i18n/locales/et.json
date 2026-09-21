@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Seansi olek",
       "sessionStatusSubtitle": "lõppenud / ebaõnnestunud / juhtimiseks valmis",
       "kiloclawActivitySubtitle": "eksemplar valmis/ebaõnnestunud, ajastatud toimingud",
+      "kiloclawActivityUnavailable": "Käivita KiloClaw eksemplar, et saada KiloClaw tegevust.",
       "balanceAlertsSubtitle": "organisatsiooni madala saldo hoiatused",
+      "balanceAlertsUnavailable": "Liitu organisatsiooniga, et saada madala saldo hoiatusi.",
+      "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused",
+      "securityFindingsUnavailable": "Lülita Kilo turvaagent kindlas ulatuses sisse, et saada turvaleide.",
       "spendAlertsSubtitle": "lävendi ületamised ja tunnipõhised tõusud",
-      "spendAlertsToggle": "Kulutushoiatuste kategooria",
-      "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused"
+      "spendAlertsToggle": "Kulutushoiatuste kategooria"
     },
     "action": {
       "openSession": "Ava seanss"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Seansi laadimine ebaõnnestus.",
       "failedToLoadDetails": "Seansi üksikasjade laadimine ebaõnnestus.",
       "failedToStopExecution": "Täitmise peatamine ebaõnnestus.",
+      "stopped": "Seanss peatati",
+      "committing": "Kinnitamine…",
+      "committed": "Kinnitatud",
+      "commitFailed": "Kinnitamine ebaõnnestus",
       "renameSession": "Nimeta seanss ümber",
       "renamePlaceholder": "Seansi nimi",
       "transcriptAccessibility": "Seansi vestlusajalugu",

@@ -335,10 +335,13 @@
       "sessionStatusTitle": "Статус сеанса",
       "sessionStatusSubtitle": "завершён / ошибка / готов к управлению",
       "kiloclawActivitySubtitle": "готовность и ошибки экземпляра, запланированные действия",
+      "kiloclawActivityUnavailable": "Запустите экземпляр KiloClaw, чтобы получать активность KiloClaw.",
       "balanceAlertsSubtitle": "предупреждения о низком балансе организации",
+      "balanceAlertsUnavailable": "Присоединитесь к организации, чтобы получать оповещения о низком балансе.",
+      "securityFindingsSubtitle": "новые уязвимости и напоминания о сроках SLA",
+      "securityFindingsUnavailable": "Включите Агент безопасности Kilo в области, чтобы получать замечания по безопасности.",
       "spendAlertsSubtitle": "превышения порогов и почасовые всплески",
-      "spendAlertsToggle": "Категория «Оповещения о расходах»",
-      "securityFindingsSubtitle": "новые уязвимости и напоминания о сроках SLA"
+      "spendAlertsToggle": "Категория «Оповещения о расходах»"
     },
     "action": {
       "openSession": "Открыть сеанс"
@@ -1599,6 +1602,10 @@
       "couldNotLoad": "Не удалось загрузить сеанс.",
       "failedToLoadDetails": "Не удалось загрузить сведения о сеансе.",
       "failedToStopExecution": "Не удалось остановить выполнение.",
+      "stopped": "Сеанс остановлен",
+      "committing": "Коммитим…",
+      "committed": "Коммит создан",
+      "commitFailed": "Не удалось создать коммит",
       "renameSession": "Переименовать сеанс",
       "renamePlaceholder": "Название сеанса",
       "transcriptAccessibility": "Переписка в сеансе",

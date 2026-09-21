@@ -839,10 +839,13 @@
       "sessionStatusTitle": "የክፍለ ጊዜ ሁኔታ",
       "sessionStatusSubtitle": "የተጠናቀቀ / ያልተሳካ / ለመቆጣጠር ዝግጁ",
       "kiloclawActivitySubtitle": "ዝግጁ የሆነ/ያልተሳካ ሂደት፣ መርሐግብር የተያዘላቸው ተግባሮች",
+      "kiloclawActivityUnavailable": "የKiloClaw እንቅስቃሴ ለማግኘት የKiloClaw ሂደት ይጀምሩ።",
       "balanceAlertsSubtitle": "ዝቅተኛ የድርጅት ቀሪ ሂሳብ ማስጠንቀቂያዎች",
+      "balanceAlertsUnavailable": "የቀሪ ሂሳብ ማስጠንቀቂያዎችን ለማግኘት ድርጅት ይቀላቀሉ።",
+      "securityFindingsSubtitle": "አዳዲስ ግኝቶችና የSLA ማስታወሻዎች",
+      "securityFindingsUnavailable": "የደህንነት ግኝቶችን ለማግኘት የKilo የደህንነት ወኪልን በአንድ ወሰን ያንቁ።",
       "spendAlertsSubtitle": "የገደብ መሻገሪያዎች እና የሰዓት ጭማሪዎች",
-      "spendAlertsToggle": "የወጪ ማስጠንቀቂያ ምድብ",
-      "securityFindingsSubtitle": "አዳዲስ ግኝቶችና የSLA ማስታወሻዎች"
+      "spendAlertsToggle": "የወጪ ማስጠንቀቂያ ምድብ"
     },
     "action": {
       "openSession": "ክፍለ ጊዜውን ክፈት"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "ክፍለ ጊዜውን መጫን አልተቻለም።",
       "failedToLoadDetails": "የክፍለ ጊዜውን ዝርዝሮች መጫን አልተሳካም።",
       "failedToStopExecution": "ሂደቱን ማቆም አልተሳካም።",
+      "stopped": "ክፍለ ጊዜው ቆሟል",
+      "committing": "በመመዝገብ ላይ…",
+      "committed": "ተመዝግቧል",
+      "commitFailed": "መመዝገብ አልተሳካም",
       "renameSession": "የክፍለ ጊዜ ስም መቀየር",
       "renamePlaceholder": "የክፍለ ጊዜ ስም",
       "transcriptAccessibility": "የክፍለ ጊዜው የውይይት ግልባጭ",

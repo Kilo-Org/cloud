@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Κατάσταση συνεδρίας",
       "sessionStatusSubtitle": "ολοκληρώθηκε / απέτυχε / έτοιμη για έλεγχο",
       "kiloclawActivitySubtitle": "περιβάλλον έτοιμο ή με αποτυχία, προγραμματισμένες ενέργειες",
+      "kiloclawActivityUnavailable": "Ξεκίνα ένα περιβάλλον KiloClaw για να λαμβάνεις δραστηριότητα KiloClaw.",
       "balanceAlertsSubtitle": "προειδοποιήσεις χαμηλού υπολοίπου οργανισμού",
+      "balanceAlertsUnavailable": "Γίνε μέλος ενός οργανισμού για να λαμβάνεις ειδοποιήσεις χαμηλού υπολοίπου.",
+      "securityFindingsSubtitle": "νέα ευρήματα και υπενθυμίσεις SLA",
+      "securityFindingsUnavailable": "Ενεργοποίησε τον πράκτορα ασφάλειας Kilo σε ένα πεδίο για να λαμβάνεις ευρήματα ασφάλειας.",
       "spendAlertsSubtitle": "υπερβάσεις ορίων και ωριαίες κορυφώσεις",
-      "spendAlertsToggle": "Κατηγορία ειδοποιήσεων δαπανών",
-      "securityFindingsSubtitle": "νέα ευρήματα και υπενθυμίσεις SLA"
+      "spendAlertsToggle": "Κατηγορία ειδοποιήσεων δαπανών"
     },
     "action": {
       "openSession": "Άνοιγμα συνεδρίας"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Δεν ήταν δυνατή η φόρτωση της συνεδρίας.",
       "failedToLoadDetails": "Δεν ήταν δυνατή η φόρτωση των λεπτομερειών της συνεδρίας.",
       "failedToStopExecution": "Δεν ήταν δυνατή η διακοπή της εκτέλεσης.",
+      "stopped": "Η συνεδρία σταμάτησε",
+      "committing": "Γίνεται καταχώριση…",
+      "committed": "Καταχωρίστηκε",
+      "commitFailed": "Η καταχώριση απέτυχε",
       "renameSession": "Μετονομασία συνεδρίας",
       "renamePlaceholder": "Όνομα συνεδρίας",
       "transcriptAccessibility": "Ιστορικό συνομιλίας της συνεδρίας",

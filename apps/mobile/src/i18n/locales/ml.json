@@ -839,10 +839,13 @@
       "sessionStatusTitle": "സെഷൻ നില",
       "sessionStatusSubtitle": "പൂർത്തിയായി / പരാജയപ്പെട്ടു / നിയന്ത്രിക്കാൻ തയ്യാർ",
       "kiloclawActivitySubtitle": "ഇൻസ്റ്റൻസ് തയ്യാറാകൽ/പരാജയപ്പെടൽ, മുൻകൂട്ടി നിശ്ചയിച്ച പ്രവർത്തനങ്ങൾ",
+      "kiloclawActivityUnavailable": "KiloClaw പ്രവർത്തനം ലഭിക്കാൻ ഒരു KiloClaw ഇൻസ്റ്റൻസ് ആരംഭിക്കുക.",
       "balanceAlertsSubtitle": "ഓർഗനൈസേഷന്റെ ബാലൻസ് കുറയുമ്പോഴുള്ള മുന്നറിയിപ്പുകൾ",
+      "balanceAlertsUnavailable": "ബാലൻസ് മുന്നറിയിപ്പുകൾ ലഭിക്കാൻ ഒരു സ്ഥാപനത്തിൽ ചേരുക.",
+      "securityFindingsSubtitle": "പുതിയ കണ്ടെത്തലുകളും SLA ഓർമ്മപ്പെടുത്തലുകളും",
+      "securityFindingsUnavailable": "സുരക്ഷാ കണ്ടെത്തലുകൾ ലഭിക്കാൻ ഒരു പരിധിയിൽ Kilo സുരക്ഷാ ഏജന്റ് പ്രവർത്തനക്ഷമമാക്കുക.",
       "spendAlertsSubtitle": "പരിധി ലംഘനങ്ങളും മണിക്കൂർ തോറുമുള്ള വർധനകളും",
-      "spendAlertsToggle": "ചെലവ് മുന്നറിയിപ്പ് വിഭാഗം",
-      "securityFindingsSubtitle": "പുതിയ കണ്ടെത്തലുകളും SLA ഓർമ്മപ്പെടുത്തലുകളും"
+      "spendAlertsToggle": "ചെലവ് മുന്നറിയിപ്പ് വിഭാഗം"
     },
     "action": {
       "openSession": "സെഷൻ തുറക്കുക"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "സെഷൻ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "failedToLoadDetails": "സെഷന്റെ വിശദാംശങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "failedToStopExecution": "പ്രവർത്തനം നിർത്താൻ കഴിഞ്ഞില്ല.",
+      "stopped": "സെഷൻ നിർത്തി",
+      "committing": "കമ്മിറ്റ് ചെയ്യുന്നു…",
+      "committed": "കമ്മിറ്റ് ചെയ്തു",
+      "commitFailed": "കമ്മിറ്റ് പരാജയപ്പെട്ടു",
       "renameSession": "സെഷന്റെ പേര് മാറ്റുക",
       "renamePlaceholder": "സെഷന്റെ പേര്",
       "transcriptAccessibility": "സെഷന്റെ സംഭാഷണരേഖ",

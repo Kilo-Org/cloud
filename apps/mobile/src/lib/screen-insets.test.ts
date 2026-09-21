@@ -36,17 +36,29 @@ const ENTRY_POINT = 'screen-insets.ts';
 const PROFILE_SCREEN = '../components/profile-screen.tsx';
 
 /**
- * The Profile screen's side-inset alignment path: the lines that read the
- * insets and the style they build. The screen legitimately forks on the
- * platform elsewhere (its Android-only in-app sign-out confirmation, covered by
- * `profile-screen.signout.mounted.test.tsx`), but no line on the alignment path
- * that applies the insets may.
+ * The Profile screen's alignment path: from the line that reads
+ * `useScreenSideInsets` through the line that first applies a side inset. Only
+ * this path must stay free of per-platform branches. A fork elsewhere in the
+ * screen — the Android sign-out confirmation, for example — is not on the
+ * insets path and must not fail the guard.
  */
-function alignmentPath(sourceText: string): string {
-  return sourceText
-    .split('\n')
-    .filter(line => /useScreenSideInsets|scrollStyle/.test(line))
-    .join('\n');
+function alignmentPath(profileSource: string): string {
+  const lines = profileSource.split('\n');
+  const start = lines.findIndex(line => line.includes('useScreenSideInsets()'));
+  if (start === -1) {
+    throw new Error(`${PROFILE_SCREEN} does not read its side insets from ${ENTRY_POINT}`);
+  }
+  const end = lines.findIndex(
+    (line, index) => index >= start && /margin(?:Left|Right|Start|End)/.test(line)
+  );
+  if (end === -1) {
+    // Naming the insets differently, or applying them as padding, would shrink
+    // the scanned path to its first line and leave the guard passing on nothing.
+    throw new Error(
+      `${PROFILE_SCREEN} applies its side insets without a margin declaration; update this guard`
+    );
+  }
+  return lines.slice(start, end + 1).join('\n');
 }
 
 describe('screen side insets: one implementation for both platforms', () => {
@@ -64,7 +76,7 @@ describe('screen side insets: one implementation for both platforms', () => {
     );
     expect(
       alignmentPath(profile),
-      `${PROFILE_SCREEN} forks on the platform on its side-inset alignment path`
+      `${PROFILE_SCREEN}'s alignment path carries a per-platform branch`
     ).not.toMatch(PLATFORM_BRANCH);
   });
 });

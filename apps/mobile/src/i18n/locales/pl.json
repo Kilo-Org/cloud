@@ -335,10 +335,13 @@
       "sessionStatusTitle": "Status sesji",
       "sessionStatusSubtitle": "zakończona / nieudana / gotowa do sterowania",
       "kiloclawActivitySubtitle": "gotowość lub błąd instancji, zaplanowane działania",
+      "kiloclawActivityUnavailable": "Uruchom instancję KiloClaw, aby otrzymywać aktywność KiloClaw.",
       "balanceAlertsSubtitle": "ostrzeżenia o niskim saldzie organizacji",
+      "balanceAlertsUnavailable": "Dołącz do organizacji, aby otrzymywać powiadomienia o niskim saldzie.",
+      "securityFindingsSubtitle": "nowe wykryte problemy i przypomnienia o terminach SLA",
+      "securityFindingsUnavailable": "Włącz agenta bezpieczeństwa Kilo w zakresie, aby otrzymywać wykryte problemy z bezpieczeństwem.",
       "spendAlertsSubtitle": "przekroczenia progów i skoki godzinowe",
-      "spendAlertsToggle": "Kategoria alertów o wydatkach",
-      "securityFindingsSubtitle": "nowe wykryte problemy i przypomnienia o terminach SLA"
+      "spendAlertsToggle": "Kategoria alertów o wydatkach"
     },
     "action": {
       "openSession": "Otwórz sesję"
@@ -1599,6 +1602,10 @@
       "couldNotLoad": "Nie udało się wczytać sesji.",
       "failedToLoadDetails": "Nie udało się wczytać szczegółów sesji.",
       "failedToStopExecution": "Nie udało się zatrzymać wykonywania zadania.",
+      "stopped": "Sesja zatrzymana",
+      "committing": "Zatwierdzanie…",
+      "committed": "Zatwierdzono",
+      "commitFailed": "Zatwierdzanie nie powiodło się",
       "renameSession": "Zmień nazwę sesji",
       "renamePlaceholder": "Nazwa sesji",
       "transcriptAccessibility": "Zapis sesji",

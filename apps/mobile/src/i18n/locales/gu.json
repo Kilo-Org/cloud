@@ -839,10 +839,13 @@
       "sessionStatusTitle": "સત્રની સ્થિતિ",
       "sessionStatusSubtitle": "પૂર્ણ / નિષ્ફળ / નિયંત્રિત કરવા તૈયાર",
       "kiloclawActivitySubtitle": "ઇન્સ્ટન્સ તૈયાર/નિષ્ફળ, નિર્ધારિત ક્રિયાઓ",
+      "kiloclawActivityUnavailable": "KiloClaw પ્રવૃત્તિ મેળવવા માટે KiloClaw ઇન્સ્ટન્સ શરૂ કરો.",
       "balanceAlertsSubtitle": "સંસ્થાનું બેલેન્સ ઓછું થવાની ચેતવણીઓ",
+      "balanceAlertsUnavailable": "બેલેન્સ ચેતવણીઓ મેળવવા માટે સંસ્થામાં જોડાઓ.",
+      "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર",
+      "securityFindingsUnavailable": "સુરક્ષા તારણો મેળવવા માટે વ્યાપમાં Kilo સુરક્ષા એજન્ટ ચાલુ કરો.",
       "spendAlertsSubtitle": "મર્યાદા ઓળંગવી અને કલાકદીઠ ઉછાળા",
-      "spendAlertsToggle": "ખર્ચની ચેતવણીની શ્રેણી",
-      "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર"
+      "spendAlertsToggle": "ખર્ચની ચેતવણીની શ્રેણી"
     },
     "action": {
       "openSession": "સેશન ખોલો"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "સત્ર લોડ કરી શકાયું નહીં.",
       "failedToLoadDetails": "સત્રની વિગતો લોડ કરી શકાઈ નહીં.",
       "failedToStopExecution": "ચાલી રહેલું કાર્ય રોકી શકાયું નહીં.",
+      "stopped": "સત્ર બંધ થયું",
+      "committing": "કમિટ થઈ રહ્યું છે…",
+      "committed": "કમિટ થયું",
+      "commitFailed": "કમિટ નિષ્ફળ ગયું",
       "renameSession": "સત્રનું નામ બદલો",
       "renamePlaceholder": "સત્રનું નામ",
       "transcriptAccessibility": "સત્રની લેખિત વાતચીત",

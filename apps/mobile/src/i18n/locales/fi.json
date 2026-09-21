@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Istunnon tila",
       "sessionStatusSubtitle": "valmis / epäonnistui / valmis hallittavaksi",
       "kiloclawActivitySubtitle": "instanssi valmis/epäonnistui, ajoitetut toiminnot",
+      "kiloclawActivityUnavailable": "Käynnistä KiloClaw-instanssi saadaksesi KiloClaw-tapahtumia.",
       "balanceAlertsSubtitle": "varoitukset organisaation alhaisesta saldosta",
+      "balanceAlertsUnavailable": "Liity organisaatioon saadaksesi saldohälytyksiä.",
+      "securityFindingsSubtitle": "uudet löydökset ja SLA-muistutukset",
+      "securityFindingsUnavailable": "Ota Kilo-tietoturva-agentti käyttöön laajuudessa saadaksesi tietoturvahavaintoja.",
       "spendAlertsSubtitle": "raja-arvojen ylitykset ja tunneittaiset piikit",
-      "spendAlertsToggle": "Kulutusvaroitusten luokka",
-      "securityFindingsSubtitle": "uudet löydökset ja SLA-muistutukset"
+      "spendAlertsToggle": "Kulutusvaroitusten luokka"
     },
     "action": {
       "openSession": "Avaa istunto"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Istuntoa ei voitu ladata.",
       "failedToLoadDetails": "Istunnon tietojen lataus epäonnistui.",
       "failedToStopExecution": "Suorituksen pysäyttäminen epäonnistui.",
+      "stopped": "Istunto pysäytetty",
+      "committing": "Tallennetaan…",
+      "committed": "Tallennettu",
+      "commitFailed": "Tallennus epäonnistui",
       "renameSession": "Nimeä istunto uudelleen",
       "renamePlaceholder": "Istunnon nimi",
       "transcriptAccessibility": "Istunnon viestihistoria",

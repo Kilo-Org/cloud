@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Sessionsstatus",
       "sessionStatusSubtitle": "afsluttet / mislykket / klar til styring",
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
+      "kiloclawActivityUnavailable": "Start en KiloClaw-instans for at få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "advarsler om lav saldo i organisationen",
+      "balanceAlertsUnavailable": "Tilmeld dig en organisation for at få advarsler om lav saldo.",
+      "securityFindingsSubtitle": "nye fund og SLA-påmindelser",
+      "securityFindingsUnavailable": "Aktivér Kilo-sikkerhedsagenten i et område for at få sikkerhedsfund.",
       "spendAlertsSubtitle": "grænseoverskridelser og spikes pr. time",
-      "spendAlertsToggle": "Kategorien forbrugsadvarsler",
-      "securityFindingsSubtitle": "nye fund og SLA-påmindelser"
+      "spendAlertsToggle": "Kategorien forbrugsadvarsler"
     },
     "action": {
       "openSession": "Åbn session"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Kunne ikke indlæse sessionen.",
       "failedToLoadDetails": "Kunne ikke indlæse oplysninger om sessionen.",
       "failedToStopExecution": "Kunne ikke stoppe kørslen.",
+      "stopped": "Sessionen er stoppet",
+      "committing": "Committer…",
+      "committed": "Commit gennemført",
+      "commitFailed": "Commit mislykkedes",
       "renameSession": "Omdøb session",
       "renamePlaceholder": "Sessionens navn",
       "transcriptAccessibility": "Sessionens samtalehistorik",

@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Isimo seseshini",
       "sessionStatusSubtitle": "kuqediwe / kwehlulekile / kulungele ukulawulwa",
       "kiloclawActivitySubtitle": "uhlelo selulungile/lwehlulekile, izenzo ezihleliwe",
+      "kiloclawActivityUnavailable": "Qala uhlelo lwe-KiloClaw ukuze uthole umsebenzi we-KiloClaw.",
       "balanceAlertsSubtitle": "izexwayiso zebhalansi ephansi yenhlangano",
+      "balanceAlertsUnavailable": "Joyina inhlangano ukuze uthole izexwayiso zebhalansi ephansi.",
+      "securityFindingsSubtitle": "okutholakele okusha nezikhumbuzo ze-SLA",
+      "securityFindingsUnavailable": "Vula i-ejenti yezokuphepha ye-Kilo kububanzi ukuze uthole okutholakele kwezokuphepha.",
       "spendAlertsSubtitle": "ukweqa imingcele nokukhuphuka ngehora",
-      "spendAlertsToggle": "Isigaba sezexwayiso zokusebenzisa imali",
-      "securityFindingsSubtitle": "okutholakele okusha nezikhumbuzo ze-SLA"
+      "spendAlertsToggle": "Isigaba sezexwayiso zokusebenzisa imali"
     },
     "action": {
       "openSession": "Vula iseshini"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Asikwazanga ukulayisha iseshini.",
       "failedToLoadDetails": "Asikwazanga ukulayisha imininingwane yeseshini.",
       "failedToStopExecution": "Asikwazanga ukumisa ukusebenza.",
+      "stopped": "Iseshini imisiwe",
+      "committing": "Kuyaqoshwa…",
+      "committed": "Kuqoshiwe",
+      "commitFailed": "Ukuqopha kuhlulekile",
       "renameSession": "Qamba kabusha iseshini",
       "renamePlaceholder": "Igama leseshini",
       "transcriptAccessibility": "Umbhalo weseshini",

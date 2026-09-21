@@ -839,10 +839,13 @@
       "sessionStatusTitle": "सत्रको स्थिति",
       "sessionStatusSubtitle": "समाप्त / असफल / नियन्त्रण गर्न तयार",
       "kiloclawActivitySubtitle": "इन्स्ट्यान्स तयार वा असफल, निर्धारित कार्यहरू",
+      "kiloclawActivityUnavailable": "KiloClaw गतिविधि पाउन KiloClaw इन्स्ट्यान्स सुरु गर्नुहोस्।",
       "balanceAlertsSubtitle": "संस्थाको मौज्दात कम भएको चेतावनी",
+      "balanceAlertsUnavailable": "ब्यालेन्स सूचना पाउन कुनै संस्थामा सामेल हुनुहोस्।",
+      "securityFindingsSubtitle": "फेला परेका नयाँ सुरक्षा समस्या र SLA का सम्झना सूचनाहरू",
+      "securityFindingsUnavailable": "सुरक्षा समस्या पाउन कुनै दायरामा Kilo सुरक्षा एजेन्ट चालु गर्नुहोस्।",
       "spendAlertsSubtitle": "सीमा नाघ्ने र प्रति घण्टा वृद्धि",
-      "spendAlertsToggle": "खर्चका चेतावनी श्रेणी",
-      "securityFindingsSubtitle": "फेला परेका नयाँ सुरक्षा समस्या र SLA का सम्झना सूचनाहरू"
+      "spendAlertsToggle": "खर्चका चेतावनी श्रेणी"
     },
     "action": {
       "openSession": "सत्र खोल्नुहोस्"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "सत्र लोड गर्न सकिएन।",
       "failedToLoadDetails": "सत्रको विवरण लोड गर्न सकिएन।",
       "failedToStopExecution": "चलिरहेको काम रोक्न सकिएन।",
+      "stopped": "सत्र रोकियो",
+      "committing": "कमिट गरिँदै…",
+      "committed": "कमिट भयो",
+      "commitFailed": "कमिट असफल भयो",
       "renameSession": "सत्रको नाम बदल्नुहोस्",
       "renamePlaceholder": "सत्रको नाम",
       "transcriptAccessibility": "सत्रको कुराकानीको अभिलेख",

@@ -335,10 +335,13 @@
       "sessionStatusTitle": "מצב הסשן",
       "sessionStatusSubtitle": "הסתיים / נכשל / מוכן לשליטה",
       "kiloclawActivitySubtitle": "מופע מוכן או שנכשל, פעולות מתוזמנות",
+      "kiloclawActivityUnavailable": "הפעל מופע של KiloClaw כדי לקבל פעילות KiloClaw.",
       "balanceAlertsSubtitle": "אזהרות על יתרה נמוכה בארגון",
+      "balanceAlertsUnavailable": "הצטרף לארגון כדי לקבל התראות על יתרה נמוכה.",
+      "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA",
+      "securityFindingsUnavailable": "הפעל את סוכן האבטחה של Kilo בהיקף כדי לקבל ממצאי אבטחה.",
       "spendAlertsSubtitle": "חציית ספים וזינוקים שעתיים",
-      "spendAlertsToggle": "קטגוריית התראות הוצאות",
-      "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA"
+      "spendAlertsToggle": "קטגוריית התראות הוצאות"
     },
     "action": {
       "openSession": "פתיחת סשן"
@@ -1587,6 +1590,10 @@
       "couldNotLoad": "לא ניתן היה לטעון את הסשן.",
       "failedToLoadDetails": "לא ניתן היה לטעון את פרטי הסשן.",
       "failedToStopExecution": "לא ניתן היה לעצור את ההרצה.",
+      "stopped": "הסשן הופסק",
+      "committing": "מבצע קומיט…",
+      "committed": "בוצע קומיט",
+      "commitFailed": "הקומיט נכשל",
       "renameSession": "שינוי שם הסשן",
       "renamePlaceholder": "שם הסשן",
       "transcriptAccessibility": "תמליל הסשן",

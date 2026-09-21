@@ -839,10 +839,13 @@
       "sessionStatusTitle": "سیشن کی حالت",
       "sessionStatusSubtitle": "مکمل / ناکام / کنٹرول کے لیے تیار",
       "kiloclawActivitySubtitle": "انسٹینس تیار یا ناکام، مقررہ وقت کے کام",
+      "kiloclawActivityUnavailable": "KiloClaw کی سرگرمی حاصل کرنے کے لیے ایک KiloClaw انسٹینس شروع کریں۔",
       "balanceAlertsSubtitle": "تنظیم کا بیلنس کم ہونے کے انتباہات",
+      "balanceAlertsUnavailable": "بیلنس کے انتباہات حاصل کرنے کے لیے کسی تنظیم میں شامل ہوں۔",
+      "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں",
+      "securityFindingsUnavailable": "سیکیورٹی مسائل حاصل کرنے کے لیے ایک دائرہ کار میں Kilo سیکیورٹی ایجنٹ فعال کریں۔",
       "spendAlertsSubtitle": "حدوں سے تجاوز اور فی گھنٹہ اضافہ",
-      "spendAlertsToggle": "اخراجات کی تنبیہات کی قسم",
-      "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں"
+      "spendAlertsToggle": "اخراجات کی تنبیہات کی قسم"
     },
     "action": {
       "openSession": "سیشن کھولیں"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "سیشن لوڈ نہیں ہو سکا۔",
       "failedToLoadDetails": "سیشن کی تفصیلات لوڈ نہیں ہو سکیں۔",
       "failedToStopExecution": "کام کو روکا نہیں جا سکا۔",
+      "stopped": "سیشن روک دیا گیا",
+      "committing": "کمٹ کیا جا رہا ہے…",
+      "committed": "کمٹ ہو گیا",
+      "commitFailed": "کمٹ ناکام ہو گیا",
       "renameSession": "سیشن کا نام تبدیل کریں",
       "renamePlaceholder": "سیشن کا نام",
       "transcriptAccessibility": "سیشن کی گفتگو کا متن",

@@ -871,10 +871,13 @@
       "sessionStatusTitle": "Статус сеанса",
       "sessionStatusSubtitle": "завершаны / памылка / гатовы да кіравання",
       "kiloclawActivitySubtitle": "экзэмпляр гатовы або завяршыўся з памылкай, запланаваныя дзеянні",
+      "kiloclawActivityUnavailable": "Запусціце экзэмпляр KiloClaw, каб атрымліваць актыўнасць KiloClaw.",
       "balanceAlertsSubtitle": "папярэджанні аб нізкім балансе арганізацыі",
+      "balanceAlertsUnavailable": "Далучыцеся да арганізацыі, каб атрымліваць папярэджанні аб нізкім балансе.",
+      "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA",
+      "securityFindingsUnavailable": "Уключыце агента бяспекі Kilo у пэўным абсягу, каб атрымліваць выяўленыя праблемы бяспекі.",
       "spendAlertsSubtitle": "перасячэнні парогаў і гадзінныя ўсплёскі",
-      "spendAlertsToggle": "Катэгорыя апавяшчэнняў аб выдатаках",
-      "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA"
+      "spendAlertsToggle": "Катэгорыя апавяшчэнняў аб выдатаках"
     },
     "action": {
       "openSession": "Адкрыць сеанс"
@@ -2135,6 +2138,10 @@
       "couldNotLoad": "Не ўдалося загрузіць сеанс.",
       "failedToLoadDetails": "Не ўдалося загрузіць падрабязнасці сеанса.",
       "failedToStopExecution": "Не ўдалося спыніць выкананне.",
+      "stopped": "Сеанс спынены",
+      "committing": "Ствараецца каміт…",
+      "committed": "Каміт створаны",
+      "commitFailed": "Не ўдалося стварыць каміт",
       "renameSession": "Перайменаваць сеанс",
       "renamePlaceholder": "Назва сеанса",
       "transcriptAccessibility": "Гісторыя паведамленняў сеанса",

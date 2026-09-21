@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Estado da sesión",
       "sessionStatusSubtitle": "rematada / con erros / lista para controlar",
       "kiloclawActivitySubtitle": "instancia lista ou con erros, accións programadas",
+      "kiloclawActivityUnavailable": "Inicia unha instancia de KiloClaw para recibir actividade de KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organización",
+      "balanceAlertsUnavailable": "Únete a unha organización para recibir alertas de saldo baixo.",
+      "securityFindingsSubtitle": "novos problemas detectados e recordatorios de SLA",
+      "securityFindingsUnavailable": "Activa o axente de seguridade de Kilo nun ámbito para recibir problemas de seguridade.",
       "spendAlertsSubtitle": "superacións de limiares e picos por hora",
-      "spendAlertsToggle": "Categoría de alertas de gasto",
-      "securityFindingsSubtitle": "novos problemas detectados e recordatorios de SLA"
+      "spendAlertsToggle": "Categoría de alertas de gasto"
     },
     "action": {
       "openSession": "Abrir a sesión"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Non se puido cargar a sesión.",
       "failedToLoadDetails": "Non se puideron cargar os detalles da sesión.",
       "failedToStopExecution": "Non se puido deter a execución.",
+      "stopped": "Sesión detida",
+      "committing": "Confirmando…",
+      "committed": "Confirmado",
+      "commitFailed": "Non se puido confirmar",
       "renameSession": "Renomear sesión",
       "renamePlaceholder": "Nome da sesión",
       "transcriptAccessibility": "Transcrición da sesión",

@@ -839,10 +839,13 @@
       "sessionStatusTitle": "সেশনের অবস্থা",
       "sessionStatusSubtitle": "সমাপ্ত / ব্যর্থ / নিয়ন্ত্রণের জন্য প্রস্তুত",
       "kiloclawActivitySubtitle": "ইনস্ট্যান্স প্রস্তুত বা ব্যর্থ, নির্ধারিত কাজ",
+      "kiloclawActivityUnavailable": "KiloClaw কার্যকলাপ পেতে একটি KiloClaw ইনস্ট্যান্স শুরু করুন।",
       "balanceAlertsSubtitle": "সংস্থার ব্যালেন্স কমে যাওয়ার সতর্কতা",
+      "balanceAlertsUnavailable": "ব্যালেন্স সতর্কতা পেতে একটি সংস্থায় যোগ দিন।",
+      "securityFindingsSubtitle": "নতুন নিরাপত্তা সমস্যা ও SLA মনে করিয়ে দেওয়ার বিজ্ঞপ্তি",
+      "securityFindingsUnavailable": "নিরাপত্তা সমস্যা পেতে একটি পরিসরে Kilo নিরাপত্তা এজেন্ট চালু করুন।",
       "spendAlertsSubtitle": "সীমা অতিক্রম ও ঘণ্টাভিত্তিক বৃদ্ধি",
-      "spendAlertsToggle": "খরচের সতর্কতার বিভাগ",
-      "securityFindingsSubtitle": "নতুন নিরাপত্তা সমস্যা ও SLA মনে করিয়ে দেওয়ার বিজ্ঞপ্তি"
+      "spendAlertsToggle": "খরচের সতর্কতার বিভাগ"
     },
     "action": {
       "openSession": "সেশন খুলুন"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "সেশন লোড করা যায়নি।",
       "failedToLoadDetails": "সেশনের বিস্তারিত লোড করা যায়নি।",
       "failedToStopExecution": "কাজটি থামানো যায়নি।",
+      "stopped": "সেশন থেমে গেছে",
+      "committing": "কমিট করা হচ্ছে…",
+      "committed": "কমিট সম্পন্ন",
+      "commitFailed": "কমিট ব্যর্থ হয়েছে",
       "renameSession": "সেশনের নাম পরিবর্তন করুন",
       "renamePlaceholder": "সেশনের নাম",
       "transcriptAccessibility": "সেশনের কথোপকথন",

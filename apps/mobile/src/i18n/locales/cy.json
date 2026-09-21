@@ -903,10 +903,13 @@
       "sessionStatusTitle": "Statws sesiwn",
       "sessionStatusSubtitle": "wedi gorffen / wedi methu / yn barod i'w reoli",
       "kiloclawActivitySubtitle": "enghraifft yn barod neu wedi methu, gweithredoedd wedi'u hamserlennu",
+      "kiloclawActivityUnavailable": "Dechreuwch enghraifft KiloClaw i gael gweithgaredd KiloClaw.",
       "balanceAlertsSubtitle": "rhybuddion am falans isel y sefydliad",
+      "balanceAlertsUnavailable": "Ymunwch â sefydliad i gael rhybuddion balans isel.",
+      "securityFindingsSubtitle": "canfyddiadau newydd a nodiadau atgoffa SLA",
+      "securityFindingsUnavailable": "Galluogwch asiant diogelwch Kilo ar gwmpas i gael canfyddiadau diogelwch.",
       "spendAlertsSubtitle": "croesi trothwyon a sbigau bob awr",
-      "spendAlertsToggle": "Categori rhybuddion gwariant",
-      "securityFindingsSubtitle": "canfyddiadau newydd a nodiadau atgoffa SLA"
+      "spendAlertsToggle": "Categori rhybuddion gwariant"
     },
     "action": {
       "openSession": "Agor y sesiwn"
@@ -2191,6 +2194,10 @@
       "couldNotLoad": "Methu llwytho'r sesiwn.",
       "failedToLoadDetails": "Methu llwytho manylion y sesiwn.",
       "failedToStopExecution": "Methu atal y gweithrediad.",
+      "stopped": "Atalwyd y sesiwn",
+      "committing": "Yn cyflwyno…",
+      "committed": "Wedi cyflwyno",
+      "commitFailed": "Methodd cyflwyno",
       "renameSession": "Ailenwi sesiwn",
       "renamePlaceholder": "Enw sesiwn",
       "transcriptAccessibility": "Trawsgrifiad sesiwn",

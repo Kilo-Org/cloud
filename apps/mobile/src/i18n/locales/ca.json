@@ -855,10 +855,13 @@
       "sessionStatusTitle": "Estat de la sessió",
       "sessionStatusSubtitle": "finalitzada / fallida / a punt per controlar",
       "kiloclawActivitySubtitle": "instància a punt/fallida, accions programades",
+      "kiloclawActivityUnavailable": "Inicia una instància de KiloClaw per rebre activitat de KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baix de l'organització",
+      "balanceAlertsUnavailable": "Uneix-te a una organització per rebre avisos de saldo baix.",
+      "securityFindingsSubtitle": "noves deteccions i recordatoris d'SLA",
+      "securityFindingsUnavailable": "Activa l'agent de seguretat de Kilo en un àmbit per rebre problemes de seguretat.",
       "spendAlertsSubtitle": "superacions de llindars i pics horaris",
-      "spendAlertsToggle": "Categoria d'alertes de despesa",
-      "securityFindingsSubtitle": "noves deteccions i recordatoris d'SLA"
+      "spendAlertsToggle": "Categoria d'alertes de despesa"
     },
     "action": {
       "openSession": "Obre la sessió"
@@ -2107,6 +2110,10 @@
       "couldNotLoad": "No s'ha pogut carregar la sessió.",
       "failedToLoadDetails": "No s'han pogut carregar els detalls de la sessió.",
       "failedToStopExecution": "No s'ha pogut aturar l'execució.",
+      "stopped": "Sessió aturada",
+      "committing": "S'està consignant…",
+      "committed": "Consignat",
+      "commitFailed": "No s'ha pogut consignar",
       "renameSession": "Reanomena la sessió",
       "renamePlaceholder": "Nom de la sessió",
       "transcriptAccessibility": "Transcripció de la sessió",

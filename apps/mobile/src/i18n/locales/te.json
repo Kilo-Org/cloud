@@ -839,10 +839,13 @@
       "sessionStatusTitle": "సెషన్ స్థితి",
       "sessionStatusSubtitle": "పూర్తయింది / విఫలమైంది / నియంత్రించడానికి సిద్ధం",
       "kiloclawActivitySubtitle": "ఇన్‌స్టాన్స్ సిద్ధం/విఫలం, నిర్ణీత సమయాల్లో జరిగే చర్యలు",
+      "kiloclawActivityUnavailable": "KiloClaw కార్యకలాపాలను పొందడానికి KiloClaw ఇన్‌స్టాన్స్‌ను ప్రారంభించండి.",
       "balanceAlertsSubtitle": "సంస్థ బ్యాలెన్స్ తగ్గినప్పుడు హెచ్చరికలు",
+      "balanceAlertsUnavailable": "బ్యాలెన్స్ హెచ్చరికలను పొందడానికి ఒక సంస్థలో చేరండి.",
+      "securityFindingsSubtitle": "కొత్త భద్రతా సమస్యలు, SLA రిమైండర్లు",
+      "securityFindingsUnavailable": "భద్రతా సమస్యలను పొందడానికి ఒక పరిధిలో Kilo భద్రతా ఏజెంట్‌ను ప్రారంభించండి.",
       "spendAlertsSubtitle": "పరిమితి దాటడం మరియు గంటకు పెరుగుదల",
-      "spendAlertsToggle": "ఖర్చు హెచ్చరికల వర్గం",
-      "securityFindingsSubtitle": "కొత్త భద్రతా సమస్యలు, SLA రిమైండర్లు"
+      "spendAlertsToggle": "ఖర్చు హెచ్చరికల వర్గం"
     },
     "action": {
       "openSession": "సెషన్‌ను తెరవండి"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "సెషన్‌ను లోడ్ చేయలేకపోయాము.",
       "failedToLoadDetails": "సెషన్ వివరాలను లోడ్ చేయలేకపోయాము.",
       "failedToStopExecution": "అమలును ఆపలేకపోయాము.",
+      "stopped": "సెషన్ ఆపబడింది",
+      "committing": "కమిట్ చేస్తోంది…",
+      "committed": "కమిట్ పూర్తయింది",
+      "commitFailed": "కమిట్ విఫలమైంది",
       "renameSession": "సెషన్ పేరు మార్చండి",
       "renamePlaceholder": "సెషన్ పేరు",
       "transcriptAccessibility": "సెషన్ సంభాషణ పాఠ్యం",

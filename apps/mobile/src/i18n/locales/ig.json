@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Ọnọdụ nnọkọ",
       "sessionStatusSubtitle": "agwụla / agaghị nke ọma / dị njikere ka ị chịkwaa ya",
       "kiloclawActivitySubtitle": "usoro dị njikere ma ọ bụ agaghị nke ọma, omume a haziri oge ha",
+      "kiloclawActivityUnavailable": "Malite usoro KiloClaw iji nweta ihe omume KiloClaw.",
       "balanceAlertsSubtitle": "ịdọ aka na ntị mgbe ego ụlọ ọrụ fọdụrụ dị ntakịrị",
+      "balanceAlertsUnavailable": "Sonye n'òtù iji nweta ịdọ aka na ntị maka ego fọdụrụ.",
+      "securityFindingsSubtitle": "nchọpụta ọhụrụ na ncheta SLA",
+      "securityFindingsUnavailable": "Gbanye onye enyemaka nchebe Kilo na mpaghara iji nweta ihe achọpụtara gbasara nchebe.",
       "spendAlertsSubtitle": "ịgafe oke na mmụba kwa awa",
-      "spendAlertsToggle": "Otu ọkwa gbasara mmefu",
-      "securityFindingsSubtitle": "nchọpụta ọhụrụ na ncheta SLA"
+      "spendAlertsToggle": "Otu ọkwa gbasara mmefu"
     },
     "action": {
       "openSession": "Mepee nnọkọ"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Enweghị ike ibudata nnọkọ ahụ.",
       "failedToLoadDetails": "Enweghị ike ibudata nkọwa nnọkọ ahụ.",
       "failedToStopExecution": "Enweghị ike ịkwụsị ọrụ ahụ.",
+      "stopped": "A kwụsịrị nnọkọ ahụ",
+      "committing": "A na-echekwa…",
+      "committed": "Echekwara",
+      "commitFailed": "Nchekwa dara",
       "renameSession": "Gbanwee aha nnọkọ",
       "renamePlaceholder": "Aha nnọkọ",
       "transcriptAccessibility": "Ndekọ nnọkọ",

@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Saioaren egoera",
       "sessionStatusSubtitle": "amaituta / huts eginda / kontrolatzeko prest",
       "kiloclawActivitySubtitle": "instantzia prest edo huts eginda, programatutako ekintzak",
+      "kiloclawActivityUnavailable": "Abiarazi KiloClaw instantzia bat KiloClaw jarduera jasotzeko.",
       "balanceAlertsSubtitle": "erakundearen saldo baxuaren abisuak",
+      "balanceAlertsUnavailable": "Egin bat erakunde batekin saldo baxuko abisuak jasotzeko.",
+      "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak",
+      "securityFindingsUnavailable": "Gaitu Kilo segurtasun-agentea esparru batean segurtasun-arazoak jasotzeko.",
       "spendAlertsSubtitle": "atalaseen gainditzeak eta orduko gorakadak",
-      "spendAlertsToggle": "Gastu-alerten kategoria",
-      "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak"
+      "spendAlertsToggle": "Gastu-alerten kategoria"
     },
     "action": {
       "openSession": "Ireki saioa"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Ezin izan da saioa kargatu.",
       "failedToLoadDetails": "Ezin izan dira saioaren xehetasunak kargatu.",
       "failedToStopExecution": "Ezin izan da exekuzioa gelditu.",
+      "stopped": "Saioa gelditu da",
+      "committing": "Commita egiten…",
+      "committed": "Commita egina",
+      "commitFailed": "Commitak huts egin du",
       "renameSession": "Berrizendatu saioa",
       "renamePlaceholder": "Saioaren izena",
       "transcriptAccessibility": "Saioaren transkripzioa",

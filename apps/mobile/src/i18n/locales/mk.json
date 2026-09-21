@@ -839,10 +839,13 @@
       "sessionStatusTitle": "Статус на сесија",
       "sessionStatusSubtitle": "завршено / неуспешно / подготвено за контрола",
       "kiloclawActivitySubtitle": "инстанца подготвена/неуспешна, закажани дејства",
+      "kiloclawActivityUnavailable": "Стартувај инстанца на KiloClaw за да добиеш активност од KiloClaw.",
       "balanceAlertsSubtitle": "предупредувања за ниска состојба на организацијата",
+      "balanceAlertsUnavailable": "Приклучи се кон организација за да добиеш предупредувања за ниска состојба.",
+      "securityFindingsSubtitle": "нови наоди и потсетници за SLA",
+      "securityFindingsUnavailable": "Вклучи го безбедносниот агент на Kilo во опсег за да добиеш безбедносни наоди.",
       "spendAlertsSubtitle": "преминувања на прагови и часовни скокови",
-      "spendAlertsToggle": "Категорија предупредувања за трошење",
-      "securityFindingsSubtitle": "нови наоди и потсетници за SLA"
+      "spendAlertsToggle": "Категорија предупредувања за трошење"
     },
     "action": {
       "openSession": "Отвори сесија"
@@ -2079,6 +2082,10 @@
       "couldNotLoad": "Не успеа вчитувањето на сесијата.",
       "failedToLoadDetails": "Не успеа вчитувањето на деталите за сесијата.",
       "failedToStopExecution": "Не успеа запирањето на извршувањето.",
+      "stopped": "Сесијата е запрена",
+      "committing": "Се комитира…",
+      "committed": "Комитирано",
+      "commitFailed": "Комитирањето не успеа",
       "renameSession": "Преименување на сесијата",
       "renamePlaceholder": "Име на сесијата",
       "transcriptAccessibility": "Транскрипт на сесијата",

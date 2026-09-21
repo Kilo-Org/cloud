@@ -871,10 +871,13 @@
       "sessionStatusTitle": "Stav relácie",
       "sessionStatusSubtitle": "dokončená / zlyhala / pripravená na ovládanie",
       "kiloclawActivitySubtitle": "pripravená inštancia, zlyhanie inštancie, naplánované akcie",
+      "kiloclawActivityUnavailable": "Spustite inštanciu KiloClaw, aby ste získali aktivitu KiloClaw.",
       "balanceAlertsSubtitle": "upozornenia na nízky zostatok organizácie",
+      "balanceAlertsUnavailable": "Pripojte sa k organizácii, aby ste dostávali upozornenia na nízky zostatok.",
+      "securityFindingsSubtitle": "nové zistenia a pripomienky SLA",
+      "securityFindingsUnavailable": "Zapnite bezpečnostného agenta Kilo v rozsahu, aby ste dostávali bezpečnostné zistenia.",
       "spendAlertsSubtitle": "prekročenia prahov a hodinové špičky",
-      "spendAlertsToggle": "Kategória upozornení na výdavky",
-      "securityFindingsSubtitle": "nové zistenia a pripomienky SLA"
+      "spendAlertsToggle": "Kategória upozornení na výdavky"
     },
     "action": {
       "openSession": "Otvoriť reláciu"
@@ -2135,6 +2138,10 @@
       "couldNotLoad": "Reláciu sa nepodarilo načítať.",
       "failedToLoadDetails": "Podrobnosti relácie sa nepodarilo načítať.",
       "failedToStopExecution": "Vykonávanie sa nepodarilo zastaviť.",
+      "stopped": "Relácia zastavená",
+      "committing": "Vytvára sa commit…",
+      "committed": "Commit vytvorený",
+      "commitFailed": "Vytvorenie commitu zlyhalo",
       "renameSession": "Premenovať reláciu",
       "renamePlaceholder": "Názov relácie",
       "transcriptAccessibility": "Prepis relácie",

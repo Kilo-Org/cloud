@@ -132,6 +132,13 @@ vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
 }));
 
+// The pending-environment case asserts the host `Skeleton` element, and the
+// real primitive pulls in `react-native-reanimated` -> `react-native-worklets`,
+// whose extensionless ESM entry cannot load under this project's node runner.
+vi.mock('@/components/ui/skeleton', () => ({
+  Skeleton: 'Skeleton',
+}));
+
 // The environment row's loading state renders `Skeleton`, whose module imports
 // react-native-reanimated: this project runs in plain Node, where the
 // Reanimated/worklets native entry cannot resolve (the published worklets

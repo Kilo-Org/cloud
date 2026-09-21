@@ -29,11 +29,11 @@ import {
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import {
-  NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT,
   NEW_SESSION_PROMPT_CHROME_HEIGHT,
   NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
   resolveComposerMaxHeight,
   resolveComposerMinHeight,
+  resolveNewSessionPromptCardChromeHeight,
   SESSION_HEADER_HEIGHT,
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
@@ -152,14 +152,17 @@ export function NewSessionPrompt({
   const promptLineHeight = PROMPT_INPUT_LINE_HEIGHT * fontScale;
   // The input's floor gives up lines on a short viewport (landscape at a high
   // density) so the card's control row and mode/model toolbar stay above the
-  // keyboard. With room it is still the three-line default.
+  // keyboard. With room it is still the three-line default. The floor scales
+  // only the rows that grow with `fontScale` (the pill's text line); the header
+  // row is pinned by its own `min-h-14` and does not. The max cap below stays
+  // deliberately conservative — only the floor hands lines back.
   const promptMinHeight = resolveComposerMinHeight({
     windowHeight,
     safeAreaInsetTop: insets.top,
     safeAreaInsetBottom: insets.bottom,
     keyboardHeight,
-    sessionHeaderHeight: SESSION_HEADER_HEIGHT * fontScale,
-    composerChromeHeight: NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT * fontScale,
+    sessionHeaderHeight: SESSION_HEADER_HEIGHT,
+    composerChromeHeight: resolveNewSessionPromptCardChromeHeight(fontScale),
     lineHeight: promptLineHeight,
     verticalPadding: PROMPT_INPUT_VERTICAL_PADDING,
     defaultLines: PROMPT_INPUT_DEFAULT_LINES,

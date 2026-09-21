@@ -4,12 +4,16 @@ import {
   COMPOSER_CHROME_HEIGHT,
   COMPOSER_INPUT_MAX_HEIGHT,
   COMPOSER_INPUT_PADDING_HORIZONTAL,
+  NEW_SESSION_PROMPT_CARD_CHROME_FIXED_HEIGHT,
   NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT,
+  NEW_SESSION_PROMPT_CARD_CHROME_TEXT_HEIGHT,
   NEW_SESSION_PROMPT_CHROME_HEIGHT,
   NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
   resolveComposerMaxHeight,
   resolveComposerMinHeight,
   resolveComposerTextContentWidth,
+  resolveNewSessionPromptCardChromeHeight,
+  SESSION_HEADER_HEIGHT,
   shouldEnableComposerInputScroll,
   STARTER_ROW_HEIGHT,
 } from './chat-composer-input-height';
@@ -162,5 +166,68 @@ describe('resolveComposerMinHeight', () => {
   it('snaps to whole lines at a scaled line height', () => {
     // floor((369 - 16) / 32) = 11 -> clamped to 3 lines of 32 + 16 padding.
     expect(resolveComposerMinHeight({ ...MIN_HEIGHT_ARGS, lineHeight: 32 })).toBe(112);
+  });
+});
+
+describe('resolveNewSessionPromptCardChromeHeight', () => {
+  it('keeps the fontScale-1 budget identical to the shipped card chrome', () => {
+    expect(resolveNewSessionPromptCardChromeHeight(1)).toBe(NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT);
+    expect(
+      NEW_SESSION_PROMPT_CARD_CHROME_FIXED_HEIGHT + NEW_SESSION_PROMPT_CARD_CHROME_TEXT_HEIGHT
+    ).toBe(NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT);
+  });
+
+  it('scales only the pill text line, not the fixed card rows', () => {
+    expect(resolveNewSessionPromptCardChromeHeight(2)).toBe(145);
+    expect(resolveNewSessionPromptCardChromeHeight(2)).toBeLessThan(
+      NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT * 2
+    );
+  });
+
+  it('gives the input its three lines back at a large font scale', () => {
+    // Corrected: 914 - 24 - 24 - 336 - 92 - 145 = 293; floor((293 - 16) / 48) = 5
+    // -> clamped to the three-line default of 48 * 3 + 16 padding.
+    expect(
+      resolveComposerMinHeight({
+        windowHeight: 914,
+        safeAreaInsetTop: 24,
+        safeAreaInsetBottom: 24,
+        keyboardHeight: 336,
+        sessionHeaderHeight: SESSION_HEADER_HEIGHT,
+        lineHeight: 48,
+        verticalPadding: 16,
+        defaultLines: 3,
+        composerChromeHeight: resolveNewSessionPromptCardChromeHeight(2),
+      })
+    ).toBe(160);
+    // Shipped over-shrink: the header and the card chrome were both scaled too,
+    // 914 - 24 - 24 - 336 - 184 - 250 = 96; floor((96 - 16) / 48) = 1 line.
+    expect(
+      resolveComposerMinHeight({
+        windowHeight: 914,
+        safeAreaInsetTop: 24,
+        safeAreaInsetBottom: 24,
+        keyboardHeight: 336,
+        sessionHeaderHeight: SESSION_HEADER_HEIGHT * 2,
+        lineHeight: 48,
+        verticalPadding: 16,
+        defaultLines: 3,
+        composerChromeHeight: NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT * 2,
+      })
+    ).toBe(64);
+  });
+
+  it('still floors the reported landscape viewport at one line', () => {
+    // 308 - 24 - 0 - 48 - 92 - 125 = 19; floor((19 - 16) / 24) = 0 -> one line.
+    expect(
+      resolveComposerMinHeight({
+        ...MIN_HEIGHT_ARGS,
+        windowHeight: 308,
+        safeAreaInsetTop: 24,
+        safeAreaInsetBottom: 0,
+        keyboardHeight: 48,
+        composerChromeHeight: resolveNewSessionPromptCardChromeHeight(1),
+      })
+    ).toBe(40);
   });
 });

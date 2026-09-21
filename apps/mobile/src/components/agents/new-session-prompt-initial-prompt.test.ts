@@ -480,4 +480,19 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(textHeightOptions.current).toMatchObject({ minHeight: 64 });
     expect(textHeightOptions.current?.minHeight).not.toBe(88);
   });
+
+  it('keeps the three-line floor at a large font scale when the viewport has room', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    // 500 - 92 (header, unscaled) - 145 (card chrome: 105 fixed + 20 text * 2)
+    // = 263; floor((263 - 16) / 48) = 5 -> clamped to the three-line default.
+    // Scaling the fixed rows (the shipped regression) gives 500 - 184 - 250 = 66
+    // -> one line -> 64.
+    dimensions.current = { ...dimensions.current, fontScale: 2, height: 500 };
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt(defaultProps());
+
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 160 });
+    expect(textHeightOptions.current?.minHeight).not.toBe(64);
+  });
 });

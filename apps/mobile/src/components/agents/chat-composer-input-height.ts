@@ -56,6 +56,34 @@ export const NEW_SESSION_PROMPT_CHROME_HEIGHT = 176 + STARTER_ROW_HEIGHT;
 export const NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT = 125;
 
 /**
+ * The card rows whose height does not change with the system font scale: the
+ * form's `pt-4` (16), the card's `pt-2` (8), the control row (44), and the
+ * toolbar's border plus padding (37).
+ */
+export const NEW_SESSION_PROMPT_CARD_CHROME_FIXED_HEIGHT = 105;
+
+/** The one row that does scale: the mode/model pill's `text-sm` line. */
+export const NEW_SESSION_PROMPT_CARD_CHROME_TEXT_HEIGHT = 20;
+
+/**
+ * The card chrome budget at a system font scale: only the pill's text line
+ * grows with `fontScale`; every other row above is fixed. The budget feeds the
+ * input's min-height floor, so multiplying the fixed rows by `fontScale` too
+ * over-reserves and makes the input give up lines the card has room for.
+ *
+ * `resolveNewSessionPromptCardChromeHeight(1)` equals
+ * `NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT` (125) on purpose: the reported
+ * density-560 viewport must keep exactly the result the fontScale-1 budget
+ * produces.
+ */
+export function resolveNewSessionPromptCardChromeHeight(fontScale: number): number {
+  return (
+    NEW_SESSION_PROMPT_CARD_CHROME_FIXED_HEIGHT +
+    NEW_SESSION_PROMPT_CARD_CHROME_TEXT_HEIGHT * fontScale
+  );
+}
+
+/**
  * Width of the real text area inside the composer input row.
  *
  * `onLayout` reports the wrapper's border box, so both the wrapper border and

@@ -78,7 +78,6 @@ import {
   useSessionAutoApproveEnabled,
 } from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
-import { SessionCopyLinkAction } from '@/components/agents/session-copy-link-action';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
@@ -1561,7 +1560,6 @@ export function SessionDetailContent({
           });
         }}
       />
-      <SessionCopyLinkAction sessionId={sessionId} anchorMessageId={anchor ?? resumeAnchor} />
     </View>
   );
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
@@ -1927,6 +1925,7 @@ export function SessionDetailContent({
           ) : null}
           <ScreenHeader
             title={rename.title}
+            titleNumberOfLines={1}
             reserveTitleSpace
             backFallback="/(app)/(tabs)/(2_agents)"
             headerRight={headerRight}
@@ -1981,6 +1980,7 @@ export function SessionDetailContent({
               visible={sheetMountState.visible}
               info={sheetMountState.info}
               sessionId={sessionId}
+              anchorMessageId={anchor ?? resumeAnchor}
               sessionTitle={rename.title}
               activeSessionType={activeSessionType}
               ownerConnectionId={remoteModelState.ownerConnectionId}
@@ -2115,15 +2115,20 @@ export function SessionDetailContent({
 
         {/* Fixed indicator row — lives outside the FlashList so per-token
             content-size changes during streaming cannot reposition it.
-            Gated on has-messages so the empty/connecting path (which
-            renders the centered status indicator inside `renderContent`)
-            does not double-render. While preparing, suppressed when the
-            transcript already shows PreparationGroup (no duplicate). */}
+            It carries no position layout transition: while the list resizes it
+            would animate this row's position lag and paint it over the
+            transcript rows it passes (profile-screen.tsx:275-277). It snaps in
+            the same frame and stays opaque via `bg-background`, so a future
+            layout change covers a transcript row instead of overprinting it.
+            Gated on has-messages so the empty/connecting path (which renders
+            the centered status indicator inside `renderContent`) does not
+            double-render. While preparing, suppressed when the transcript
+            already shows PreparationGroup (no duplicate). */}
         {showSessionFooterRow ? (
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
-            layout={LinearTransition.duration(150)}
+            className="bg-background"
           >
             {/* Raw list on purpose: working-indicator.tsx:50-59 derives the
                 label from the last assistant part, and compute-status.ts:33-35

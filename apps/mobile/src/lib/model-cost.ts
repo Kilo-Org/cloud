@@ -1,5 +1,5 @@
 import { i18n } from '@/i18n';
-import { formatNumber, formatUsd } from '@/lib/format';
+import { formatMoney, formatNumber, formatUsd } from '@/lib/format';
 
 export type ModelPricing = { prompt?: string; completion?: string };
 
@@ -19,10 +19,10 @@ function formatSide(pricePerTokenStr: string | undefined): string | null {
     });
   }
 
-  return formatUsd(pricePer1M, i18n.language, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
+  // Two fixed decimals so every row in the picker lines up, matching the web
+  // model list (`formatPrice` pins `$X.XX`). Trimming produced "$0.6" beside
+  // "$0.54" in the same list.
+  return formatMoney(pricePer1M, i18n.language);
 }
 
 /** Visible per-1M-token cost for picker rows. null = hide the cost line. */

@@ -1,12 +1,17 @@
 import { type FlashListRef } from '@shopify/flash-list';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import {
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 
 import {
   getInitialSessionListAutoScrollVisibility,
   isSessionListAtBottom,
   SESSION_LIST_BOTTOM_THRESHOLD_PX,
   shouldFollowSessionContentSize,
+  shouldFollowSessionViewportResize,
   shouldRetrySessionAutoScroll,
   shouldScheduleSessionAutoScroll,
 } from '@/components/agents/use-session-auto-scroll-state';
@@ -88,6 +93,9 @@ export function useSessionListAutoScroll<ItemT>({
   // compares against it to tell a genuine append (newest key changed) from
   // an older page landing (count grew, newest key untouched).
   const lastNewestItemKeyRef = useRef<string | null>(null);
+  // The list's own height, tracked so a viewport resize (the fixed status row
+  // mounting outside the list) can re-pin the tail. See `handleListLayout`.
+  const lastViewportHeightRef = useRef(0);
   const autoScrollResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoScrollRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userScrollingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -371,9 +379,8 @@ export function useSessionListAutoScroll<ItemT>({
       // to the bottom. Gating on `!isAutoScrolling` here would silently
       // drop every streaming update that lands inside the debounce
       // window. Bypass `scheduleScrollToLatestMessage` (which keeps
-      // the `!isAutoScrolling` guard for the initial itemCount /
-      // handleListLayout triggers) and trigger the programmatic scroll
-      // directly.
+      // the `!isAutoScrolling` guard for the initial itemCount trigger)
+      // and trigger the programmatic scroll directly.
       if (
         shouldFollowSessionContentSize({
           isUserScrolling: isUserScrollingRef.current,
@@ -387,17 +394,41 @@ export function useSessionListAutoScroll<ItemT>({
     [scrollToLatestMessage]
   );
 
-  const handleListLayout = useCallback(() => {
-    if (
-      shouldScheduleSessionAutoScroll({
-        isAutoScrolling: isAutoScrollingRef.current,
-        isUserScrolling: isUserScrollingRef.current,
-        shouldAutoScroll: shouldAutoScrollRef.current,
-      })
-    ) {
-      scheduleScrollToLatestMessage();
-    }
-  }, [scheduleScrollToLatestMessage]);
+  const handleListLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const { height } = event.nativeEvent.layout;
+      const didViewportHeightChange = height !== lastViewportHeightRef.current;
+      lastViewportHeightRef.current = height;
+      // A viewport resize is the same hazard as a content-size change: the
+      // fixed status rows mount OUTSIDE the list, so the list gets shorter
+      // while its offset stays put and the newest row is left below the fold,
+      // drawn over the transparent status row. Re-pin the tail directly —
+      // bypassing `scheduleScrollToLatestMessage`'s `!isAutoScrolling` guard
+      // for the same reason `handleContentSizeChange` does: the resize lands
+      // inside the streaming follow window, and the guarded scheduler would
+      // swallow exactly the correction this exists for.
+      if (
+        shouldFollowSessionViewportResize({
+          isUserScrolling: isUserScrollingRef.current,
+          shouldAutoScroll: shouldAutoScrollRef.current,
+          didViewportHeightChange,
+        })
+      ) {
+        scrollToLatestMessage();
+        return;
+      }
+      if (
+        shouldScheduleSessionAutoScroll({
+          isAutoScrolling: isAutoScrollingRef.current,
+          isUserScrolling: isUserScrollingRef.current,
+          shouldAutoScroll: shouldAutoScrollRef.current,
+        })
+      ) {
+        scheduleScrollToLatestMessage();
+      }
+    },
+    [scheduleScrollToLatestMessage, scrollToLatestMessage]
+  );
 
   const handleKeyboardShow = useCallback(() => {
     // Reuse the guarded scheduler so a keyboard opening never yanks the list

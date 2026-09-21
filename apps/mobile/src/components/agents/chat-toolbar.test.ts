@@ -38,6 +38,34 @@ function findElementByType(node: Node, typeName: string): Record<string, unknown
   return null;
 }
 
+function childTypesOf(node: Node): unknown[] {
+  const props = (node as { props?: Record<string, unknown> } | null | undefined)?.props ?? {};
+  const children = props.children;
+  return (Array.isArray(children) ? children : [children]).map(child =>
+    child !== null && typeof child === 'object' ? (child as { type?: unknown }).type : undefined
+  );
+}
+
+/** The row that directly holds every one of `typeNames`, if there is one. */
+function findRowHolding(node: Node, typeNames: string[]): Record<string, unknown> | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const childTypes = childTypesOf(node);
+  if (typeNames.every(typeName => childTypes.includes(typeName))) {
+    return node.props ?? {};
+  }
+  const props = node.props ?? {};
+  const children = props.children;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findRowHolding(child as Node, typeNames);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 function defaultProps() {
   return {
     mode: 'code' as AgentMode,
@@ -85,7 +113,7 @@ describe('ChatToolbar', () => {
     expect(props.disabled).toBe(false);
   });
 
-  it('keeps mode, model, and paste on one row', () => {
+  it('lets the control row reflow so a long model chip keeps its own width', () => {
     const onPaste = vi.fn(() => undefined);
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = ChatToolbar({ ...defaultProps(), onPaste }) as Node;
@@ -97,10 +125,32 @@ describe('ChatToolbar', () => {
         ? element.props.className
         : '';
     expect(className).toContain('flex-row');
-    expect(className).not.toContain('flex-wrap');
+    // The mode chip is shrink-0, so a nowrap row would squeeze the model name
+    // down to a few characters. Wrapping gives the model chip its own line.
+    expect(className).toContain('flex-wrap');
 
     const pasteButtonProps = findElementByType(element, 'ComposerPasteButton') ?? {};
     expect(pasteButtonProps.className).toContain('shrink-0');
+  });
+
+  it('packs the paste button with the model chip so it never wraps to a line of its own', () => {
+    const onPaste = vi.fn(() => undefined);
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({ ...defaultProps(), onPaste }) as Node;
+
+    // A paste button that is a sibling of the chips overflows the first line on
+    // its own and wraps to an empty row below the model chip. One inner row
+    // holding both makes the outer wrap move them together.
+    const packRow = findRowHolding(element, ['ModelSelector', 'ComposerPasteButton']);
+    expect(packRow).not.toBeNull();
+    const packClassName = typeof packRow?.className === 'string' ? packRow.className : '';
+    expect(packClassName).toContain('flex-row');
+    expect(packClassName).not.toContain('flex-wrap');
+
+    // On the chip's line the button still keeps the trailing edge, as it did
+    // when every item fit on the first line.
+    const pasteButtonProps = findElementByType(element, 'ComposerPasteButton') ?? {};
+    expect(pasteButtonProps.className).toContain('ml-auto');
   });
 
   it('locks only the model picker when modelLocked is true', () => {

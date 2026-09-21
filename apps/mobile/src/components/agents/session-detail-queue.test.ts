@@ -392,6 +392,7 @@ vi.mock('@/components/agents/use-message-copy', () => ({
 }));
 vi.mock('@/components/agents/session-detail-content-helpers', () => ({
   countInFlightMessages: () => 0,
+  lastVisibleMessageFailure: () => null,
   resolveRetryPrompt: () => null,
   retryFailedMessage: vi.fn(),
 }));

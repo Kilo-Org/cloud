@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import {
   countInFlightMessages,
+  lastVisibleMessageFailure,
   resolveRetryPrompt,
   retryFailedMessage,
 } from './session-detail-content-helpers';
@@ -116,5 +117,133 @@ describe('resolveRetryPrompt', () => {
   it('returns null for an assistant row with no preceding user row', () => {
     const assistant = assistantMessage('m5');
     expect(resolveRetryPrompt(assistant, [assistant])).toBeNull();
+  });
+});
+
+describe('lastVisibleMessageFailure', () => {
+  function assistantMessageWithText(id: string): StoredMessage {
+    const message = assistantMessage(id);
+    // `mergeSessionTranscript` keeps a message only when a part renders content,
+    // so a row that states a failure needs a part the transcript renders.
+    message.parts = [
+      { id: `${id}-text`, sessionID: 'ses_1', messageID: id, type: 'text', text: 'reply' },
+    ] as typeof message.parts;
+    return message;
+  }
+
+  function assistantMessageWithError(id: string, errorName: string): StoredMessage {
+    const message = assistantMessageWithText(id);
+    (message.info as { error?: { name: string; data: unknown } }).error = {
+      name: errorName,
+      data: { message: 'raw' },
+    };
+    return message;
+  }
+
+  const noPending = new Map<string, MessageDeliveryState>();
+  const nothingCanceled = new Map<string, StoredMessage>();
+
+  it('returns null when the last row has no failure', () => {
+    const messages: StoredMessage[] = [userMessage('m1'), assistantMessageWithText('m2')];
+    expect(
+      lastVisibleMessageFailure({
+        displayedMessages: messages,
+        messages,
+        pendingMessages: noPending,
+        canceledQueuedMessages: nothingCanceled,
+      })
+    ).toBeNull();
+  });
+
+  it('returns the assistant failure the last row renders with a Retry', () => {
+    const messages: StoredMessage[] = [
+      userMessage('m1'),
+      assistantMessageWithError('m2', 'APIError'),
+    ];
+    const failure = lastVisibleMessageFailure({
+      displayedMessages: messages,
+      messages,
+      pendingMessages: noPending,
+      canceledQueuedMessages: nothingCanceled,
+    });
+    expect(failure?.kind).toBe('assistant');
+    expect(failure?.title).toBe('Response failed');
+    expect(failure?.detail).toBeNull();
+  });
+
+  it('returns null for an assistant failure with no preceding user row (no Retry)', () => {
+    const messages: StoredMessage[] = [assistantMessageWithError('m1', 'APIError')];
+    expect(
+      lastVisibleMessageFailure({
+        displayedMessages: messages,
+        messages,
+        pendingMessages: noPending,
+        canceledQueuedMessages: nothingCanceled,
+      })
+    ).toBeNull();
+  });
+
+  it('returns the delivery failure the last row renders', () => {
+    const messages: StoredMessage[] = [userMessage('m1')];
+    const pendingMessages = new Map<string, MessageDeliveryState>([
+      ['m1', { status: 'failed', error: 'nope', reason: 'exhausted' }],
+    ]);
+    const failure = lastVisibleMessageFailure({
+      displayedMessages: messages,
+      messages,
+      pendingMessages,
+      canceledQueuedMessages: nothingCanceled,
+    });
+    expect(failure?.kind).toBe('delivery');
+    expect(failure?.title).toBe('Failed to deliver');
+  });
+
+  it('ignores a cancelled queued row', () => {
+    const messages: StoredMessage[] = [userMessage('m1')];
+    const pendingMessages = new Map<string, MessageDeliveryState>([
+      ['m1', { status: 'failed', error: 'nope', reason: 'exhausted' }],
+    ]);
+    expect(
+      lastVisibleMessageFailure({
+        displayedMessages: messages,
+        messages,
+        pendingMessages,
+        canceledQueuedMessages: new Map<string, StoredMessage>([['m1', userMessage('m1')]]),
+      })
+    ).toBeNull();
+  });
+
+  it('ignores a failure that is not the last row', () => {
+    const messages: StoredMessage[] = [
+      userMessage('m1'),
+      assistantMessageWithError('m2', 'APIError'),
+      assistantMessageWithText('m3'),
+    ];
+    expect(
+      lastVisibleMessageFailure({
+        displayedMessages: messages,
+        messages,
+        pendingMessages: noPending,
+        canceledQueuedMessages: nothingCanceled,
+      })
+    ).toBeNull();
+  });
+
+  it('falls back past a message the transcript drops, which states no failure', () => {
+    // `mergeSessionTranscript` drops an assistant row whose parts render
+    // nothing (no delivery failure keeps it), so it owns no row and cannot
+    // state a failure. Treating it as the last row suppressed the footer's own
+    // line and left the failure with no surface at all.
+    const dropped = assistantMessageWithError('m2', 'APIError');
+    dropped.parts = [];
+    const messages: StoredMessage[] = [userMessage('m1'), dropped];
+    expect(
+      lastVisibleMessageFailure({
+        displayedMessages: messages,
+        messages,
+        pendingMessages: noPending,
+        canceledQueuedMessages: nothingCanceled,
+      })
+    ).toBeNull();
   });
 });

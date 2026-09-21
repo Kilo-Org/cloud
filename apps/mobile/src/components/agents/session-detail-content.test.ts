@@ -34,7 +34,7 @@ import { ChildSessionModelLabel } from '@/components/agents/child-session-model-
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
 import { MessageBubble } from '@/components/agents/message-bubble';
-import { assistantMessage } from '@/components/agents/message-bubble-test-utils';
+import { assistantMessage, userMessage } from '@/components/agents/message-bubble-test-utils';
 import {
   exitRemoteSessionWithFeedback,
   type RetryableExitFailure,
@@ -2608,3 +2608,99 @@ describe('SessionDetailContent send transcript take-over', () => {
     expect(followTailNonceOf(view)).toBe(1);
   });
 });
+
+describe('session detail duplicate failure state', () => {
+  // Stored messages are ordered by id, which is time-sortable ascending, so the
+  // user row must sort before the assistant row for the Retry prompt to resolve.
+  const USER_ID = 'msg_1761000000000_user';
+  const ASSISTANT_ID = 'msg_1761000000010_assistant';
+
+  function rootUserMessage(text: string): StoredMessage {
+    const message = userMessage(USER_ID);
+    return {
+      info: { ...message.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({ id: `${USER_ID}-text`, sessionID: ROOT_ID, messageID: USER_ID, text }),
+      ],
+    };
+  }
+
+  function rootFailedAssistantMessage(text: string): StoredMessage {
+    const message = assistantMessage(ASSISTANT_ID);
+    message.info = { ...message.info, sessionID: ROOT_ID };
+    (message.info as { error?: { name: string; data: unknown } }).error = {
+      name: 'APIError',
+      data: { message: 'raw provider text' },
+    };
+    return {
+      info: message.info,
+      parts: [
+        stubTextPart({
+          id: `${ASSISTANT_ID}-text`,
+          sessionID: ROOT_ID,
+          messageID: ASSISTANT_ID,
+          text,
+        }),
+      ],
+    };
+  }
+
+  async function mountFailedTurn(indicator: SessionStatusIndicator) {
+    const view = await mountDetails([
+      rootUserMessage('please refactor'),
+      rootFailedAssistantMessage('matching the requested refactor.'),
+    ]);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        indicator
+      );
+    });
+    return view;
+  }
+
+  it('states the failure once: no repeated detail line and no repeated footer error', async () => {
+    const view = await mountFailedTurn({ type: 'error', message: 'simulated error', timestamp: 0 });
+    const text = renderedText(view.renderer.root);
+    expect(text).toContain('Response failed');
+    expect(text).not.toContain('The response failed.');
+    expect(indicatorNodes(view)).toHaveLength(0);
+  });
+
+  it('keeps a classified session error the message row does not carry', async () => {
+    const view = await mountFailedTurn({
+      type: 'error',
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      timestamp: 0,
+    });
+    const nodes = indicatorNodes(view);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]?.props).toMatchObject({
+      indicator: { message: expect.stringContaining('Insufficient credits') },
+    });
+  });
+
+  it('keeps the footer line when the transcript drops the failed row it names', async () => {
+    // A failed assistant row whose parts render nothing is dropped by
+    // `mergeSessionTranscript`; it owns no row, so the footer is the failure's
+    // only surface and must not be suppressed by it.
+    const dropped = rootFailedAssistantMessage('partial reply');
+    dropped.parts = [];
+    const view = await mountDetails([rootUserMessage('please refactor'), dropped]);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'error', message: 'simulated error', timestamp: 0 }
+      );
+    });
+    const nodes = indicatorNodes(view);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]?.props).toMatchObject({
+      indicator: { message: 'simulated error' },
+    });
+  });
+});
+
+function indicatorNodes(view: Awaited<ReturnType<typeof mountDetails>>) {
+  return view.renderer.root.findAll(node => Object.is(node.type, 'SessionStatusIndicator'));
+}

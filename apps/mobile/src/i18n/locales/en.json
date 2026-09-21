@@ -163,6 +163,7 @@
     "useDifferentEmail": "Use a different email",
     "signInWithApple": "Sign in with Apple",
     "signInWithGoogle": "Sign in with Google",
+    "signInWithPasskey": "Sign in with a passkey",
     "emailAddress": "Email address",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "Continue with email",
@@ -175,6 +176,10 @@
     "termsConnector": " and ",
     "termsSuffix": ".",
     "moreSignInOptions": "More sign-in options",
+    "passkeyCancelled": "Passkey sign-in was cancelled. Please try again.",
+    "passkeyNotFound": "No passkey is saved for this device. Sign in with Apple, Google, or your email instead.",
+    "passkeyUnsupported": "Passkeys are not available on this device. Sign in with Apple, Google, or your email instead.",
+    "passkeyFailed": "That passkey could not sign you in. Sign in with Apple, Google, or your email instead.",
     "couldNotCompleteSignIn": "Could not complete sign in. Please try again.",
     "sessionEnded": "Your session ended. Please sign in again.",
     "signInCodeExpired": "Your sign-in code has expired. Please try again.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Test Account",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Enterprise SSO"
+    "providerEnterpriseSso": "Enterprise SSO",
+    "passkeysTitle": "Passkeys",
+    "passkeysSubtitle": "Sign in without a password",
+    "passkeysEmpty": "No passkeys yet",
+    "passkeysEmptyHint": "$t(profile.addPasskey) to sign in without a password.",
+    "passkeysCouldNotLoad": "Could not load passkeys",
+    "passkeysLoadFailed": "Passkeys are unavailable until this loads.",
+    "addPasskey": "Add a passkey",
+    "passkeyDefaultName": "Passkey",
+    "passkeyAddedOn": "Added {{date}}",
+    "passkeyAdded": "Passkey added.",
+    "passkeyAddFailed": "Could not add a passkey. Try again.",
+    "passkeyAddUnsupported": "This device cannot create passkeys.",
+    "passkeyAddCancelled": "Passkey creation was cancelled.",
+    "passkeyRemoved": "Passkey removed.",
+    "passkeyRemoveFailed": "Could not remove that passkey. Try again.",
+    "passkeyRenamed": "Passkey renamed.",
+    "passkeyName": "Passkey name",
+    "renamePasskey": "Rename passkey",
+    "removePasskey": "Remove passkey",
+    "removePasskeyTitle": "Remove passkey?",
+    "removePasskeyMessage": "You will no longer be able to sign in with this passkey."
   },
   "preferences": {
     "biometricUnlock": "Unlock with biometrics",
@@ -322,17 +348,27 @@
       "loadingLines": "Loading {{loaded}} of {{total}} lines…",
       "expandContext": "Expand context",
       "expandMoreContext": "Expand more context",
+      "expandLines_one": "Expand {{displayCount}} line ({{start}}–{{end}})",
       "expandLines": "Expand {{displayCount}} lines ({{start}}–{{end}})",
+      "expandLines_other": "Expand {{displayCount}} lines ({{start}}–{{end}})",
+      "expandMoreLines_one": "Expand more {{displayCount}} line ({{start}}–{{end}})",
       "expandMoreLines": "Expand more {{displayCount}} lines ({{start}}–{{end}})",
+      "expandMoreLines_other": "Expand more {{displayCount}} lines ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Expand {{displayCount}} line of context",
       "expandLinesOfContext": "Expand {{displayCount}} lines of context",
+      "expandLinesOfContext_other": "Expand {{displayCount}} lines of context",
       "expandAll": "Expand all",
+      "expandAllLines_one": "Expand all {{displayCount}} line",
       "expandAllLines": "Expand all {{displayCount}} lines",
+      "expandAllLines_other": "Expand all {{displayCount}} lines",
       "loadingMoreFiles": "Loading more files…",
       "retryLoadingNextPage": "Retry loading next page",
       "failedToLoadMoreFiles": "Failed to load more files — tap to retry",
       "loadingAllFiles": "Loading all files — {{loaded}}…",
       "loadingAllFilesOf": "Loading all files — {{loaded}} of {{total}}…",
+      "loadedOfTotalFiles_one": "{{loaded}} of {{total}} files loaded",
       "loadedOfTotalFiles": "{{loaded}} of {{total}} files loaded",
+      "loadedOfTotalFiles_other": "{{loaded}} of {{total}} files loaded",
       "loadAllFiles": "Load all files",
       "loadAll": "Load all",
       "fileLoadedCount_one": "{{displayCount}} file loaded",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Outdated on {{path}}"
       },
       "deletedUser": "deleted user",
-      "replyForbiddenTerm": "You don't have permission to reply to this {{term}}."
+      "replyForbiddenTerm": "You don't have permission to reply to this {{term}}.",
+      "moreLinesAbove_one": "… {{displayCount}} more line above",
+      "moreLinesAbove_other": "… {{displayCount}} more lines above"
     },
     "couldNotOpenGitHubAppSettings": "Could not open GitHub App settings",
     "installKiloGitHubApp": "Install the Kilo GitHub App",
@@ -702,7 +740,9 @@
     "diff": {
       "selectedTapToChange": "Selected {{label}}, tap to change selection",
       "tapToComment": "{{label}}, tap to comment",
+      "truncationBanner_one": "Showing the first {{limit}} of {{total}} changed file — GitHub API limit",
       "truncationBanner": "Showing the first {{limit}} of {{total}} changed files — GitHub API limit",
+      "truncationBanner_other": "Showing the first {{limit}} of {{total}} changed files — GitHub API limit",
       "statusContext": "Context",
       "lineLabel": "{{status}} line {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Notifications show the message text on your lock screen.",
     "previewGenericDescription": "Notifications show that something happened. Open Kilo to read it.",
     "channel": {
-      "agent": "Agent sessions",
+      "agentProgress": "Agent progress",
       "chat": "Chat messages",
       "kiloclaw": "KiloClaw activity",
       "balance": "Balance alerts",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "instance ready/failed, scheduled actions",
       "balanceAlertsSubtitle": "low organization balance warnings",
       "securityFindingsSubtitle": "new findings and SLA reminders"
+    },
+    "action": {
+      "openSession": "Open session"
+    },
+    "needsInputAction": {
+      "approved": "Request approved",
+      "replied": "Reply sent",
+      "failed": "Couldn't answer. Tap again to retry.",
+      "unavailable": "This request is no longer waiting."
     }
   },
   "tabs": {
@@ -873,7 +922,9 @@
       "open": "Open {{filename}}",
       "openFailed": "Couldn't open attachment. Check your connection and try again.",
       "attachFailed": "Failed to attach file",
+      "limit_one": "You can attach up to {{displayCount}} file.",
       "limit": "You can attach up to {{displayCount}} files.",
+      "limit_other": "You can attach up to {{displayCount}} files.",
       "sizeRejection": "{{filename}} exceeds the {{limit}} attachment limit.",
       "unreadable": "Couldn't read {{filename}}.",
       "pastedImage": "the pasted image",
@@ -1598,7 +1649,9 @@
       "no": "No"
     },
     "dashboard": {
+      "findingsCount_one": "{{displayCount}} finding",
       "findingsCount": "{{displayCount}} findings",
+      "findingsCount_other": "{{displayCount}} findings",
       "notMeasured": "Not measured",
       "actFirst": "Act first",
       "slaPosture": "SLA posture",
@@ -1607,7 +1660,9 @@
       "repositoryActionPlan": "Repository action plan",
       "noOpenFindings": "No open findings need attention",
       "deadlineToday": "Deadline reached today",
+      "daysOverdue_one": "{{displayCount}} day overdue",
       "daysOverdue": "{{displayCount}} days overdue",
+      "daysOverdue_other": "{{displayCount}} days overdue",
       "withinDeadline": "Within deadline",
       "criticalOverdue": "Critical overdue",
       "highOverdue": "High overdue",
@@ -2139,20 +2194,7 @@
       "continueFrom": "Continuing {{title}}",
       "importingSession": "Importing session",
       "cliCannotContinue": "This CLI cannot continue a session. Pick Cloud Agent or another CLI.",
-      "importFailed": "Couldn't import this session.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Default · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Small",
-      "sandboxInstanceShared": "Shared",
-      "sandboxInstanceLarge": "Large",
-      "sandboxInstanceDevcontainer": "Dev container",
-      "sandboxInstanceProviderDefault": "Provider default",
-      "sandboxCouldNotLoad": "Couldn't load sandbox options",
-      "sandboxUnavailable": "This sandbox is unavailable. Choose another sandbox or Default.",
-      "sandboxUseDefault": "Use Default"
+      "importFailed": "Couldn't import this session."
     },
     "partRenderer": {
       "updatedFileCount_one": "Updated {{displayCount}} file",
@@ -2174,9 +2216,15 @@
       "toolTask": "task",
       "readTodos": "Read todos",
       "updateTodos": "Update todos",
+      "linesBadge_one": "{{displayCount}} line",
       "linesBadge": "{{displayCount}} lines",
+      "linesBadge_other": "{{displayCount}} lines",
+      "filesBadge_one": "{{displayCount}} file",
       "filesBadge": "{{displayCount}} files",
-      "matchesBadge": "{{displayCount}} matches"
+      "filesBadge_other": "{{displayCount}} files",
+      "matchesBadge_one": "{{displayCount}} match",
+      "matchesBadge": "{{displayCount}} matches",
+      "matchesBadge_other": "{{displayCount}} matches"
     },
     "readToolMarkdown": {
       "linesTruncated": "lines {{start}}–{{end}} (truncated)",
@@ -2211,7 +2259,7 @@
       "emptyTitle": "No folders inside",
       "emptyDescription": "Done uses this folder.",
       "retryableTitle": "Couldn't list folders",
-      "retryableDescription": "Check your connection and Retry. Done still confirms this folder.",
+      "retryableDescription": "Check your connection and try again. Done still confirms this folder.",
       "unsupportedTitle": "Can't list folders",
       "unsupportedDescription": "This CLI can't list folders. Done keeps the launch folder and Start session starts there."
     },
@@ -2481,15 +2529,21 @@
       "photoLibrary": "Photo Library",
       "files": "Files",
       "couldNotOpenPhotoPicker": "Could not open the photo picker. Restart Kilo and try again.",
+      "maxFilesAllowed_one": "Maximum {{displayCount}} file allowed",
       "maxFilesAllowed": "Maximum {{displayCount}} files allowed",
-      "onlyAddingFiles": "Only adding {{accepted}} of {{total}} files (max {{max}})"
+      "maxFilesAllowed_other": "Maximum {{displayCount}} files allowed",
+      "onlyAddingFiles_one": "Only adding {{accepted}} of {{total}} files (max {{max}})",
+      "onlyAddingFiles": "Only adding {{accepted}} of {{total}} files (max {{max}})",
+      "onlyAddingFiles_other": "Only adding {{accepted}} of {{total}} files (max {{max}})"
     },
     "composer": {
       "addAttachment": "Add attachment",
       "removeOrRetryFailed": "Remove or retry failed attachments first.",
       "attachmentsWithSlashCommands": "Attachments cannot be sent with slash commands.",
       "photoMetadataNotRemoved": "Photo metadata could not be removed from an attachment.",
+      "charactersRemaining_one": "{{count}} character remaining",
       "charactersRemaining": "{{count}} characters remaining",
+      "charactersRemaining_other": "{{count}} characters remaining",
       "discardAttachmentsTitle": "Discard attachments?",
       "discardAttachmentsMessage": "Unclaimed uploads will be deleted.",
       "waitForUploads": "Wait for attachments to finish uploading.",
@@ -2567,7 +2621,9 @@
       "usageReflectsLatest": "Usage reflects the latest completed assistant response.",
       "tokenUsage": "Token usage",
       "cacheRate": "Cache rate",
+      "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount": "Models ({{displayCount}})",
+      "modelsCount_other": "Models ({{displayCount}})",
       "tokenTotalsNote": "Token totals cover this session only and exclude subagent/child-session tokens.",
       "subagents": "Subagents",
       "subagentsDescription": "Residual cost from child sessions",
@@ -2596,7 +2652,9 @@
     },
     "toolRun": {
       "sheetTitle": "Tool calls",
-      "condensedLabel": "{{itemCount}} items; {{last}}"
+      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel": "{{itemCount}} items; {{last}}",
+      "condensedLabel_other": "{{itemCount}} items; {{last}}"
     }
   },
   "bootstrap": {
@@ -2730,7 +2788,9 @@
     "connectedCli": "On a connected CLI",
     "newSessionOn": "New session on {{name}}",
     "noMatchingSessions": "No matching sessions.",
+    "onlyFirstFilesAttached_one": "Only the first {{displayCount}} file will be attached.",
     "onlyFirstFilesAttached": "Only the first {{displayCount}} files will be attached.",
+    "onlyFirstFilesAttached_other": "Only the first {{displayCount}} files will be attached.",
     "staleMessage": "This share is no longer available.",
     "retryableMessage": "Couldn't load your sessions.",
     "emptyMessage": "No sessions yet — start a new one to send this.",
@@ -3093,7 +3153,9 @@
     "couldNotApprove": "Could not approve",
     "couldNotStart": "Could not start",
     "channelName": "Active agents",
-    "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."
+    "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
+    "openSession": "Open",
+    "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again."
   },
   "transcriptionModel": {
     "title": "Transcription model",

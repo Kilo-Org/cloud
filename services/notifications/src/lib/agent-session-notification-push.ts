@@ -55,8 +55,12 @@ export type DispatchAgentSessionNotificationPushDeps = {
   getSession: (userId: string, cliSessionId: string) => Promise<AgentNotificationSession | null>;
   hasOrganizationAccess: (userId: string, organizationId: string) => Promise<boolean>;
   /**
-   * Read the user's notification preferences. The agent-push RPC is
-   * category 3 ("Agent updates") and gates on `agentPushEnabled`. A throw
+   * Read the user's notification preferences. The explicit `notify_user`
+   * push is classified needs-input (see
+   * `buildAgentSessionNotificationDispatchInput`), so it gates on
+   * `agentAttentionEnabled`, the same 'Agent needs you' toggle the
+   * attention producer of `cloud_agent_session` reads — not on
+   * `agentPushEnabled` ('Agent updates'), which no longer governs it. A throw
    * fails closed (§4.5) and propagates as a
    * `{dispatched:false, reason:'failed'}` result; the RPC layer does not
    * translate that into a thrown RPC error because preference read is a
@@ -87,7 +91,14 @@ export function buildAgentSessionNotificationDispatchInput(
       // through the catalog templates as params.
       i18nKey: 'agentSession.notification',
       i18nParams: { sessionTitle: content.title, message: content.body },
-      data: { type: 'cloud_agent_session', cliSessionId: params.cliSessionId },
+      // The explicit `notify_user` tool call is a question for the user, so the
+      // push is classified as needs-input (breaks through Do Not Disturb) rather
+      // than falling back to the absent-category default of status.
+      data: {
+        type: 'cloud_agent_session',
+        cliSessionId: params.cliSessionId,
+        category: 'attention',
+      },
       sound: 'default',
       priority: 'high',
     },
@@ -143,7 +154,7 @@ export async function dispatchAgentSessionNotificationPush(
   } catch {
     return { dispatched: false, reason: 'failed' };
   }
-  if (!prefs.agentPushEnabled) {
+  if (!prefs.agentAttentionEnabled) {
     return { dispatched: false, reason: 'suppressed_preference' };
   }
 

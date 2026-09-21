@@ -163,6 +163,7 @@
     "useDifferentEmail": "ଅନ୍ୟ ଏକ ଇମେଲ୍ ଠିକଣା ବ୍ୟବହାର କରନ୍ତୁ",
     "signInWithApple": "Apple ସହିତ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ",
     "signInWithGoogle": "Google ସହିତ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ",
+    "signInWithPasskey": "ପାସକି ସହିତ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ",
     "emailAddress": "ଇମେଲ୍ ଠିକଣା",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "ଇମେଲ୍ ସହିତ ଜାରି ରଖନ୍ତୁ",
@@ -175,6 +176,10 @@
     "termsConnector": " ଏବଂ ",
     "termsSuffix": "ରେ ସହମତ ହେଉଛନ୍ତି।",
     "moreSignInOptions": "ସାଇନ୍ ଇନ୍ ପାଇଁ ଅଧିକ ବିକଳ୍ପ",
+    "passkeyCancelled": "ପାସକି ସହିତ ସାଇନ୍ ଇନ୍ ବାତିଲ୍ ହୋଇଛି। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "passkeyNotFound": "ଏହି ଡିଭାଇସ୍ ପାଇଁ କୌଣସି ପାସକି ସେଭ୍ ହୋଇନାହିଁ। ଏହା ବଦଳରେ Apple, Google କିମ୍ବା ଆପଣଙ୍କ ଇମେଲ୍ ସହିତ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
+    "passkeyUnsupported": "ଏହି ଡିଭାଇସରେ ପାସକି ଉପଲବ୍ଧ ନାହିଁ। ଏହା ବଦଳରେ Apple, Google କିମ୍ବା ଆପଣଙ୍କ ଇମେଲ୍ ସହିତ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
+    "passkeyFailed": "ପାସକି ସହିତ ସାଇନ୍ ଇନ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "couldNotCompleteSignIn": "ସାଇନ୍ ଇନ୍ ସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "sessionEnded": "ଆପଣଙ୍କ ସେସନ୍ ସମାପ୍ତ ହୋଇଛି। ପୁଣି ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
     "signInCodeExpired": "ଆପଣଙ୍କ ସାଇନ୍ ଇନ୍ କୋଡ୍‌ର ଅବଧି ଶେଷ ହୋଇଛି। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
@@ -225,7 +230,28 @@
     "providerTestAccount": "ପରୀକ୍ଷଣ ଆକାଉଣ୍ଟ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "ଏଣ୍ଟରପ୍ରାଇଜ୍ SSO"
+    "providerEnterpriseSso": "ଏଣ୍ଟରପ୍ରାଇଜ୍ SSO",
+    "passkeysTitle": "ପାସକି",
+    "passkeysSubtitle": "ପାସୱାର୍ଡ ବିନା ସାଇନ୍ ଇନ୍ କରନ୍ତୁ",
+    "passkeysEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ପାସକି ନାହିଁ",
+    "passkeysEmptyHint": "$t(profile.addPasskey) କରି ପାସୱାର୍ଡ ବିନା ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
+    "passkeysCouldNotLoad": "ପାସକି ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
+    "passkeysLoadFailed": "ଏହା ଲୋଡ୍ ନହେବା ପର୍ଯ୍ୟନ୍ତ ପାସକି ଉପଲବ୍ଧ ନାହିଁ।",
+    "addPasskey": "ଏକ ପାସକି ଯୋଡ଼ନ୍ତୁ",
+    "passkeyDefaultName": "ପାସକି",
+    "passkeyAddedOn": "{{date}} ରେ ଯୋଡ଼ାଗଲା",
+    "passkeyAdded": "ପାସକି ଯୋଡ଼ାଗଲା।",
+    "passkeyAddFailed": "ପାସକି ଯୋଡ଼ାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "passkeyAddUnsupported": "ଏହି ଡିଭାଇସ୍ ପାସକି ତିଆରି କରିପାରିବ ନାହିଁ।",
+    "passkeyAddCancelled": "ପାସକି ତିଆରି ବାତିଲ୍ ହୋଇଛି।",
+    "passkeyRemoved": "ପାସକି ହଟାଗଲା।",
+    "passkeyRemoveFailed": "ସେହି ପାସକି ହଟାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "passkeyRenamed": "ପାସକିର ନାମ ବଦଳାଗଲା।",
+    "passkeyName": "ପାସକିର ନାମ",
+    "renamePasskey": "ପାସକିର ନାମ ବଦଳାନ୍ତୁ",
+    "removePasskey": "ପାସକି ହଟାନ୍ତୁ",
+    "removePasskeyTitle": "ପାସକି ହଟାଇବେ?",
+    "removePasskeyMessage": "ଆପଣ ଆଉ ଏହି ପାସକି ସହିତ ସାଇନ୍ ଇନ୍ କରିପାରିବେ ନାହିଁ।"
   },
   "preferences": {
     "general": "ସାଧାରଣ",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} ମଧ୍ୟରୁ {{displayCount}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
       "filesStillLoading": "ଫାଇଲ୍ ଏବେ ବି ଲୋଡ୍ ହେଉଛି। ରିଫ୍ରେସ୍ କରିବାକୁ ତଳକୁ ଟାଣନ୍ତୁ।",
       "goToOverview": "ସାରାଂଶକୁ ଯାଆନ୍ତୁ",
-      "goToOverviewTab": "ସାରାଂଶ ଟ୍ୟାବ୍‌କୁ ଯାଆନ୍ତୁ"
+      "goToOverviewTab": "ସାରାଂଶ ଟ୍ୟାବ୍‌କୁ ଯାଆନ୍ତୁ",
+      "expandAllLines_one": "ସମସ୍ତ {{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ",
+      "expandAllLines_other": "ସମସ୍ତ {{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ",
+      "expandLines_one": "{{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "ଆଖପାଖ କୋଡ୍‌ର {{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ",
+      "expandLinesOfContext_other": "ଆଖପାଖ କୋଡ୍‌ର {{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ",
+      "expandMoreLines_one": "ଆହୁରି {{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ ({{start}}–{{end}})",
+      "expandMoreLines_other": "ଆହୁରି {{displayCount}} ଧାଡ଼ି ଦେଖାନ୍ତୁ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}} ମଧ୍ୟରୁ {{loaded}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା",
+      "loadedOfTotalFiles_other": "{{total}} ମଧ୍ୟରୁ {{loaded}} ଫାଇଲ୍ ଲୋଡ୍ ହେଲା"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ଫାଇଲ୍ ଶେଷରେ ନୂଆ ଧାଡ଼ି ନାହିଁ",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "{{path}}ରେ ପୁରୁଣା ମନ୍ତବ୍ୟ"
       },
       "deletedUser": "ବିଲୋପ ହୋଇଥିବା ବ୍ୟବହାରକାରୀ",
-      "replyForbiddenTerm": "ଏହି {{term}}ରେ ଉତ୍ତର ଦେବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।"
+      "replyForbiddenTerm": "ଏହି {{term}}ରେ ଉତ୍ତର ଦେବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
+      "moreLinesAbove_one": "… ଉପରେ ଆହୁରି {{displayCount}} ଧାଡ଼ି ଅଛି।",
+      "moreLinesAbove_other": "… ଉପରେ ଆହୁରି {{displayCount}} ଧାଡ଼ି ଅଛି।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ଆପ୍‌ର ସେଟିଂସ୍ ଖୋଲିହେଲା ନାହିଁ।",
     "installKiloGitHubApp": "Kilo GitHub ଆପ୍ ଇନଷ୍ଟଲ୍ କରନ୍ତୁ",
@@ -706,7 +744,9 @@
       "statusContext": "ଆଖପାଖ କୋଡ୍",
       "lineLabel": "{{status}} ଧାଡ଼ି {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(ଖାଲି)"
+      "emptyLine": "(ଖାଲି)",
+      "truncationBanner_one": "GitHub API ସୀମା ଯୋଗୁଁ ମୋଟ {{total}} ପରିବର୍ତ୍ତିତ ଫାଇଲ୍ ମଧ୍ୟରୁ ପ୍ରଥମ {{limit}} ଦେଖାଯାଉଛି।",
+      "truncationBanner_other": "GitHub API ସୀମା ଯୋଗୁଁ ମୋଟ {{total}} ପରିବର୍ତ୍ତିତ ଫାଇଲ୍ ମଧ୍ୟରୁ ପ୍ରଥମ {{limit}} ଦେଖାଯାଉଛି।"
     },
     "linkPasteClipboardEmpty": "କ୍ଲିପବୋର୍ଡ ଖାଲି ଅଛି।",
     "linkPasteNotAPullRequest": "ଏହା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ କିମ୍ବା ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ନୁହେଁ",
@@ -783,7 +823,7 @@
     "previewFullDescription": "ବିଜ୍ଞପ୍ତିରେ ଆପଣଙ୍କ ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ବାର୍ତ୍ତାର ପାଠ୍ୟ ଦେଖାଯାଏ।",
     "previewGenericDescription": "ବିଜ୍ଞପ୍ତି କେବଳ କିଛି ଘଟିଥିବା ସୂଚନା ଦିଏ। ବାର୍ତ୍ତା ପଢ଼ିବାକୁ Kilo ଖୋଲନ୍ତୁ।",
     "channel": {
-      "agent": "ଏଜେଣ୍ଟ ସେସନଗୁଡ଼ିକ",
+      "agentProgress": "ଏଜେଣ୍ଟ ଅଗ୍ରଗତି",
       "chat": "ଚାଟ୍ ସନ୍ଦେଶ",
       "kiloclaw": "KiloClaw କାର୍ଯ୍ୟକଳାପ",
       "balance": "ଅବଶିଷ୍ଟ ରାଶି ସମ୍ବନ୍ଧୀୟ ସତର୍କ ସୂଚନା",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "ଇନଷ୍ଟାନ୍ସ ପ୍ରସ୍ତୁତ/ବିଫଳ, ନିର୍ଦ୍ଧାରିତ କାର୍ଯ୍ୟ",
       "balanceAlertsSubtitle": "ସଂଗଠନର କମ୍ ବ୍ୟାଲାନ୍ସ ସତର୍କତା",
       "securityFindingsSubtitle": "ନୂଆ ସୁରକ୍ଷା ସମସ୍ୟା ଓ SLA ସ୍ମାରକ"
+    },
+    "action": {
+      "openSession": "ସେସନ ଖୋଲନ୍ତୁ"
+    },
+    "needsInputAction": {
+      "approved": "ଅନୁରୋଧ ଅନୁମୋଦିତ ହେଲା",
+      "replied": "ଉତ୍ତର ପଠାଯାଇଛି",
+      "failed": "ଉତ୍ତର ଦିଆଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବା ପାଇଁ ପୁଣି ଟାପ୍ କରନ୍ତୁ।",
+      "unavailable": "ଏହି ଅନୁରୋଧ ବର୍ତ୍ତମାନ ଅପେକ୍ଷା କରୁନାହିଁ।"
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "ଅପଲୋଡ୍ ବିଫଳ ହେଲା।",
       "failedToUploadFile": "ଫାଇଲ୍ ଅପଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ। କାରଣ: {{reason}}",
       "nothingToPaste": "ପେଷ୍ଟ କରିବାକୁ କିଛି ନାହିଁ।",
-      "metadataStripFailed": "ଫଟୋର ମେଟାଡାଟା ହଟାଯାଇପାରିଲା ନାହିଁ।"
+      "metadataStripFailed": "ଫଟୋର ମେଟାଡାଟା ହଟାଯାଇପାରିଲା ନାହିଁ।",
+      "limit_one": "ଆପଣ ଅତି ବେଶୀରେ {{displayCount}}ଟି ଫାଇଲ୍ ସଂଲଗ୍ନ କରିପାରିବେ।",
+      "limit_other": "ଆପଣ ଅତି ବେଶୀରେ {{displayCount}}ଟି ଫାଇଲ୍ ସଂଲଗ୍ନ କରିପାରିବେ।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "ଚିହ୍ନଟ ସମସ୍ୟା ସିଙ୍କ୍ କରନ୍ତୁ",
       "syncNow": "ବର୍ତ୍ତମାନ ସିଙ୍କ୍ କରନ୍ତୁ",
       "syncQueued": "ସିଙ୍କ୍ ଅପେକ୍ଷା ତାଲିକାରେ ରଖାଗଲା",
-      "syncStatusUnavailable": "ସିଙ୍କ୍ ସ୍ଥିତି ଉପଲବ୍ଧ ନାହିଁ।"
+      "syncStatusUnavailable": "ସିଙ୍କ୍ ସ୍ଥିତି ଉପଲବ୍ଧ ନାହିଁ।",
+      "daysOverdue_one": "{{displayCount}} ଦିନ ବିଳମ୍ବିତ",
+      "daysOverdue_other": "{{displayCount}} ଦିନ ବିଳମ୍ବିତ",
+      "findingsCount_one": "{{displayCount}}ଟି ଚିହ୍ନଟ ସମସ୍ୟା",
+      "findingsCount_other": "{{displayCount}}ଟି ଚିହ୍ନଟ ସମସ୍ୟା"
     },
     "dashboardMetrics": {
       "openFindings": "ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟା",
@@ -2131,20 +2186,7 @@
       "continueFrom": "{{title}} ଜାରି ରଖାଯାଉଛି।",
       "importingSession": "ସେସନ୍ ଆମଦାନି ହେଉଛି",
       "cliCannotContinue": "ଏହି CLI ସେସନ୍ ଜାରି ରଖିପାରିବ ନାହିଁ। Cloud Agent କିମ୍ବା ଅନ୍ୟ ଏକ CLI ବାଛନ୍ତୁ।",
-      "importFailed": "ଏହି ସେସନ୍ ଆମଦାନି ହୋଇପାରିଲା ନାହିଁ।",
-      "sandbox": "ସ୍ୟାଣ୍ଡବକ୍ସ",
-      "sandboxAccessibility": "ସ୍ୟାଣ୍ଡବକ୍ସ: {{label}}",
-      "sandboxDefaultWithDestination": "ଡିଫଲ୍ଟ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "ଛୋଟ",
-      "sandboxInstanceShared": "ସହଭାଗୀ",
-      "sandboxInstanceLarge": "ବଡ଼",
-      "sandboxInstanceDevcontainer": "ଡେଭ୍ କଣ୍ଟେନର୍",
-      "sandboxInstanceProviderDefault": "ପ୍ରଦାତାଙ୍କ ଡିଫଲ୍ଟ",
-      "sandboxCouldNotLoad": "ସ୍ୟାଣ୍ଡବକ୍ସ ବିକଳ୍ପଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
-      "sandboxUnavailable": "ଏହି ସ୍ୟାଣ୍ଡବକ୍ସ ଉପଲବ୍ଧ ନାହିଁ। ଅନ୍ୟ ଏକ ସ୍ୟାଣ୍ଡବକ୍ସ କିମ୍ବା ଡିଫଲ୍ଟ ବାଛନ୍ତୁ।",
-      "sandboxUseDefault": "ଡିଫଲ୍ଟ ବ୍ୟବହାର କରନ୍ତୁ"
+      "importFailed": "ଏହି ସେସନ୍ ଆମଦାନି ହୋଇପାରିଲା ନାହିଁ।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି।",
@@ -2168,7 +2210,13 @@
       "updateTodos": "କାମ ତାଲିକା ଅଦ୍ୟତନ କରନ୍ତୁ",
       "linesBadge": "{{displayCount}}ଟି ଧାଡ଼ି",
       "filesBadge": "{{displayCount}}ଟି ଫାଇଲ୍",
-      "matchesBadge": "{{displayCount}}ଟି ମେଳ"
+      "matchesBadge": "{{displayCount}}ଟି ମେଳ",
+      "filesBadge_one": "{{displayCount}}ଟି ଫାଇଲ୍",
+      "filesBadge_other": "{{displayCount}}ଟି ଫାଇଲ୍",
+      "linesBadge_one": "{{displayCount}}ଟି ଧାଡ଼ି",
+      "linesBadge_other": "{{displayCount}}ଟି ଧାଡ଼ି",
+      "matchesBadge_one": "{{displayCount}}ଟି ମେଳ",
+      "matchesBadge_other": "{{displayCount}}ଟି ମେଳ"
     },
     "readToolMarkdown": {
       "linesTruncated": "ଧାଡ଼ି {{start}}–{{end}} (କାଟି ଦିଆଯାଇଛି)",
@@ -2458,7 +2506,11 @@
       "files": "ଫାଇଲ୍",
       "couldNotOpenPhotoPicker": "ଫଟୋ ବାଛିବା ସୁବିଧା ଖୋଲି ହେଲା ନାହିଁ। Kilo ପୁଣି ଆରମ୍ଭ କରି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "maxFilesAllowed": "ସର୍ବାଧିକ {{displayCount}}ଟି ଫାଇଲ୍ ଯୋଡ଼ିପାରିବେ।",
-      "onlyAddingFiles": "ମୋଟ {{total}}ଟି ଫାଇଲ୍ ମଧ୍ୟରୁ କେବଳ {{accepted}}ଟି ଯୋଡ଼ାଯାଉଛି (ସର୍ବାଧିକ {{max}})"
+      "onlyAddingFiles": "ମୋଟ {{total}}ଟି ଫାଇଲ୍ ମଧ୍ୟରୁ କେବଳ {{accepted}}ଟି ଯୋଡ଼ାଯାଉଛି (ସର୍ବାଧିକ {{max}})",
+      "maxFilesAllowed_one": "ସର୍ବାଧିକ {{displayCount}}ଟି ଫାଇଲ୍ ଯୋଡ଼ିପାରିବେ।",
+      "maxFilesAllowed_other": "ସର୍ବାଧିକ {{displayCount}}ଟି ଫାଇଲ୍ ଯୋଡ଼ିପାରିବେ।",
+      "onlyAddingFiles_one": "ମୋଟ {{total}}ଟି ଫାଇଲ୍ ମଧ୍ୟରୁ କେବଳ {{accepted}}ଟି ଯୋଡ଼ାଯାଉଛି (ସର୍ବାଧିକ {{max}})",
+      "onlyAddingFiles_other": "ମୋଟ {{total}}ଟି ଫାଇଲ୍ ମଧ୍ୟରୁ କେବଳ {{accepted}}ଟି ଯୋଡ଼ାଯାଉଛି (ସର୍ବାଧିକ {{max}})"
     },
     "composer": {
       "addAttachment": "ଫାଇଲ୍ ସଂଲଗ୍ନ କରନ୍ତୁ",
@@ -2476,7 +2528,9 @@
       "discardAttachmentsMessage": "କୌଣସି ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ଯୋଡ଼ା ହୋଇନଥିବା ଅପଲୋଡ୍ ଫାଇଲ୍ ହଟିଯିବ।",
       "discardAttachmentsTitle": "ଯୋଡ଼ା ହୋଇଥିବା ଫାଇଲ୍ ହଟାଇବେ?",
       "charactersRemaining": "{{count}}ଟି ଅକ୍ଷର ବାକି ଅଛି",
-      "insertNewline": "ନୂଆ ଧାଡ଼ି ଯୋଡ଼ନ୍ତୁ"
+      "insertNewline": "ନୂଆ ଧାଡ଼ି ଯୋଡ଼ନ୍ତୁ",
+      "charactersRemaining_one": "{{count}}ଟି ଅକ୍ଷର ବାକି ଅଛି",
+      "charactersRemaining_other": "{{count}}ଟି ଅକ୍ଷର ବାକି ଅଛି"
     },
     "chatLink": {
       "linkCopied": "ଲିଙ୍କ କପି ହେଲା",
@@ -2548,7 +2602,9 @@
       "stepsCount_one": "{{steps}} ପଦକ୍ଷେପ",
       "stepsCount": "{{steps}}ଟି ପର୍ଯ୍ୟାୟ",
       "stepsCount_other": "{{steps}}ଟି ପର୍ଯ୍ୟାୟ",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "ମଡେଲ୍ ({{displayCount}})",
+      "modelsCount_other": "ମଡେଲ୍ ({{displayCount}})"
     },
     "autoApprove": {
       "title": "ସ୍ୱଚାଳିତ ଅନୁମୋଦନ",
@@ -2588,7 +2644,9 @@
     },
     "toolRun": {
       "sheetTitle": "ଟୁଲ୍ କଲ୍",
-      "condensedLabel": "{{itemCount}}ଟି ଆଇଟମ୍; {{last}}"
+      "condensedLabel": "{{itemCount}}ଟି ଆଇଟମ୍; {{last}}",
+      "condensedLabel_one": "{{itemCount}}ଟି ଆଇଟମ୍; {{last}}",
+      "condensedLabel_other": "{{itemCount}}ଟି ଆଇଟମ୍; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2781,9 @@
     "cliCantReceiveFilesTitle": "ଏହି ସେସନ୍ ଫାଇଲ୍ ଗ୍ରହଣ କରିପାରିବ ନାହିଁ",
     "cliCantReceiveFilesMessage": "ଏହି ସେସନ୍ ଚଲାଉଥିବା Kilo CLI ଫାଇଲ୍ ଗ୍ରହଣ କରିପାରିବ ନାହିଁ। ସେହି ମେସିନ୍‌ରେ CLI ଅପଡେଟ୍ କରନ୍ତୁ କିମ୍ବା ଏକ ନୂଆ ସେସନ୍‌କୁ ସେୟାର କରନ୍ତୁ।",
     "contentlessMessage": "ସେୟାର କରିବାକୁ କିଛି ନାହିଁ — କୌଣସି ଲେଖା କିମ୍ବା ଫାଇଲ୍ ଦିଆଯାଇନଥିଲା।",
-    "couldNotReadContent": "ସେୟାର କରାଯାଇଥିବା ବିଷୟବସ୍ତୁ ପଢ଼ିହେଲା ନାହିଁ।"
+    "couldNotReadContent": "ସେୟାର କରାଯାଇଥିବା ବିଷୟବସ୍ତୁ ପଢ଼ିହେଲା ନାହିଁ।",
+    "onlyFirstFilesAttached_one": "କେବଳ ପ୍ରଥମ {{displayCount}} ଫାଇଲ୍ ସଂଲଗ୍ନ ହେବ।",
+    "onlyFirstFilesAttached_other": "କେବଳ ପ୍ରଥମ {{displayCount}} ଫାଇଲ୍ ସଂଲଗ୍ନ ହେବ।"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3153,9 @@
     "couldNotApprove": "ଅନୁମୋଦନ କରାଯାଇପାରିଲା ନାହିଁ",
     "couldNotStart": "ଆରମ୍ଭ କରାଯାଇପାରିଲା ନାହିଁ",
     "channelName": "ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ",
-    "activityKitDisabledBody": "ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ ଦେଖିବାକୁ ସେଟିଂସ୍‌ରେ ଲାଇଭ୍ କାର୍ଯ୍ୟକଳାପ ଚାଲୁ କରନ୍ତୁ।"
+    "activityKitDisabledBody": "ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ ଦେଖିବାକୁ ସେଟିଂସ୍‌ରେ ଲାଇଭ୍ କାର୍ଯ୍ୟକଳାପ ଚାଲୁ କରନ୍ତୁ।",
+    "openSession": "ଖୋଲନ୍ତୁ",
+    "approveFailed": "ଅନୁମୋଦନ କରିହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ $t(common.approve) ଟାପ୍ କରନ୍ତୁ।"
   },
   "transcriptionModel": {
     "title": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର ମଡେଲ୍",

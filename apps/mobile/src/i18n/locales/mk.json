@@ -163,6 +163,7 @@
     "useDifferentEmail": "Користи друга адреса на е-пошта",
     "signInWithApple": "Најави се со Apple",
     "signInWithGoogle": "Најави се со Google",
+    "signInWithPasskey": "Најави се со клуч за пристап",
     "emailAddress": "Адреса на е-пошта",
     "emailPlaceholder": "ime@example.com",
     "continueWithEmail": "Продолжи со е-пошта",
@@ -175,6 +176,10 @@
     "termsConnector": " и ",
     "termsSuffix": ".",
     "moreSignInOptions": "Повеќе опции за најавување",
+    "passkeyCancelled": "Најавувањето со клуч за пристап е откажано. Обиди се повторно.",
+    "passkeyNotFound": "За овој уред не е зачуван клуч за пристап. Најави се наместо тоа со Apple, Google или твојата е-пошта.",
+    "passkeyUnsupported": "Клучевите за пристап не се достапни на овој уред. Најави се наместо тоа со Apple, Google или твојата е-пошта.",
+    "passkeyFailed": "Не успеа најавувањето со клуч за пристап. Обиди се повторно.",
     "couldNotCompleteSignIn": "Не можеше да се заврши најавувањето. Обиди се повторно.",
     "sessionEnded": "Твојата сесија заврши. Најави се повторно.",
     "signInCodeExpired": "Твојот код за најавување истече. Обиди се повторно.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Тестна сметка",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Деловно SSO"
+    "providerEnterpriseSso": "Деловно SSO",
+    "passkeysTitle": "Клучеви за пристап",
+    "passkeysSubtitle": "Најави се без лозинка",
+    "passkeysEmpty": "Сè уште нема клучеви за пристап",
+    "passkeysEmptyHint": "$t(profile.addPasskey) за да се најавиш без лозинка.",
+    "passkeysCouldNotLoad": "Не успеа вчитувањето на клучевите за пристап",
+    "passkeysLoadFailed": "Клучевите за пристап се недостапни додека ова не се вчита.",
+    "addPasskey": "Додај клуч за пристап",
+    "passkeyDefaultName": "Клуч за пристап",
+    "passkeyAddedOn": "Додаден {{date}}",
+    "passkeyAdded": "Клучот за пристап е додаден.",
+    "passkeyAddFailed": "Не успеа додавањето на клуч за пристап. Обиди се повторно.",
+    "passkeyAddUnsupported": "Овој уред не може да создава клучеви за пристап.",
+    "passkeyAddCancelled": "Создавањето на клучот за пристап е откажано.",
+    "passkeyRemoved": "Клучот за пристап е отстранет.",
+    "passkeyRemoveFailed": "Тој клуч за пристап не може да се отстрани. Обиди се повторно.",
+    "passkeyRenamed": "Клучот за пристап е преименуван.",
+    "passkeyName": "Име на клучот за пристап",
+    "renamePasskey": "Преименувај клуч за пристап",
+    "removePasskey": "Отстрани клуч за пристап",
+    "removePasskeyTitle": "Да се отстрани клучот за пристап?",
+    "removePasskeyMessage": "Веќе нема да можеш да се најавиш со овој клуч за пристап."
   },
   "preferences": {
     "general": "Општо",
@@ -326,7 +352,7 @@
       "expandMoreLines": "Прикажи уште {{displayCount}} редови ({{start}}–{{end}})",
       "expandLinesOfContext": "Прикажи {{displayCount}} редови контекст",
       "expandAll": "Прошири сè",
-      "expandAllLines": "Прикажи ги сите {{displayCount}} редови",
+      "expandAllLines": "Прикажи ги сите редови ({{displayCount}})",
       "loadingMoreFiles": "Се вчитуваат повеќе датотеки…",
       "retryLoadingNextPage": "Повтори го вчитувањето на следната страница",
       "failedToLoadMoreFiles": "Не успеа вчитувањето на дополнителни датотеки — допри за повторен обид",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "Вчитани се {{displayCount}} од {{total}} датотеки",
       "filesStillLoading": "Датотеките сè уште се вчитуваат. Повлечи за да освежиш.",
       "goToOverview": "Оди на општиот преглед",
-      "goToOverviewTab": "Оди на јазичето за општ преглед"
+      "goToOverviewTab": "Оди на јазичето за општ преглед",
+      "expandAllLines_one": "Прикажи ги сите редови ({{displayCount}})",
+      "expandAllLines_other": "Прикажи ги сите редови ({{displayCount}})",
+      "expandLines_one": "Прикажи {{displayCount}} ред ({{start}}–{{end}})",
+      "expandLines_other": "Прикажи {{displayCount}} редови ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Прикажи {{displayCount}} ред контекст",
+      "expandLinesOfContext_other": "Прикажи {{displayCount}} редови контекст",
+      "expandMoreLines_one": "Прикажи уште {{displayCount}} ред ({{start}}–{{end}})",
+      "expandMoreLines_other": "Прикажи уште {{displayCount}} редови ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "вчитани {{loaded}} од {{total}} датотеки",
+      "loadedOfTotalFiles_other": "вчитани {{loaded}} од {{total}} датотеки"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ нема нов ред на крајот на датотеката",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Застарено на {{path}}"
       },
       "deletedUser": "избришан корисник",
-      "replyForbiddenTerm": "Немате дозвола за одговор на {{term}}."
+      "replyForbiddenTerm": "Немате дозвола за одговор на {{term}}.",
+      "moreLinesAbove_one": "… уште {{displayCount}} ред погоре",
+      "moreLinesAbove_other": "… уште {{displayCount}} редови погоре"
     },
     "couldNotOpenGitHubAppSettings": "Поставките за апликацијата на GitHub не се отворија.",
     "installKiloGitHubApp": "Инсталирај ја апликацијата Kilo за GitHub",
@@ -706,7 +744,9 @@
       "statusContext": "Контекст",
       "lineLabel": "{{status}}, ред {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(празно)"
+      "emptyLine": "(празно)",
+      "truncationBanner_one": "Се прикажуваат првите {{limit}} од {{total}} променети датотеки поради ограничувањето на API на GitHub.",
+      "truncationBanner_other": "Се прикажуваат првите {{limit}} од {{total}} променети датотеки поради ограничувањето на API на GitHub."
     },
     "linkPasteClipboardEmpty": "Таблата со исечоци е празна.",
     "linkPasteNotAPullRequest": "Ова не е врска до барање за спојување или merge барање",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Известувањата го прикажуваат текстот на пораката на твојот заклучен екран.",
     "previewGenericDescription": "Известувањата покажуваат дека нешто се случило. Отвори го Kilo за да ја прочиташ пораката.",
     "channel": {
-      "agent": "Сесии на агенти",
+      "agentProgress": "Напредок на агентите",
       "chat": "Пораки во разговорите",
       "kiloclaw": "Активност на KiloClaw",
       "balance": "Предупредувања за салдо",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "инстанца подготвена/неуспешна, закажани дејства",
       "balanceAlertsSubtitle": "предупредувања за ниска состојба на организацијата",
       "securityFindingsSubtitle": "нови наоди и потсетници за SLA"
+    },
+    "action": {
+      "openSession": "Отвори сесија"
+    },
+    "needsInputAction": {
+      "approved": "Барањето е одобрено",
+      "replied": "Одговорот е испратен",
+      "failed": "Не можеше да се одговори. Допрете повторно за да пробате.",
+      "unavailable": "Ова барање веќе не чека."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Испраќањето не успеа.",
       "failedToUploadFile": "Не успеа испраќањето на датотеката: {{reason}}.",
       "nothingToPaste": "Нема што да се залепи.",
-      "metadataStripFailed": "Метаподатоците на фотографијата не можеа да се отстранат."
+      "metadataStripFailed": "Метаподатоците на фотографијата не можеа да се отстранат.",
+      "limit_one": "Можеш да прикачиш најмногу {{displayCount}} датотека.",
+      "limit_other": "Можеш да прикачиш најмногу {{displayCount}} датотеки."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Синхронизирај ги наодите",
       "syncNow": "Синхронизирај сега",
       "syncQueued": "Синхронизацијата е додадена во редицата",
-      "syncStatusUnavailable": "Статусот на синхронизацијата не е достапен."
+      "syncStatusUnavailable": "Статусот на синхронизацијата не е достапен.",
+      "daysOverdue_one": "Рокот е пречекорен за {{displayCount}} ден",
+      "daysOverdue_other": "Рокот е пречекорен за {{displayCount}} дена",
+      "findingsCount_one": "{{displayCount}} наод",
+      "findingsCount_other": "{{displayCount}} наоди"
     },
     "dashboardMetrics": {
       "openFindings": "Отворени наоди",
@@ -2131,20 +2186,7 @@
       "continueFrom": "Се продолжува сесијата {{title}}.",
       "importingSession": "Увезување на сесијата",
       "cliCannotContinue": "Овој CLI не може да продолжи сесија. Избери Cloud Agent или друг CLI.",
-      "importFailed": "Не успеа увезувањето на оваа сесија.",
-      "sandbox": "Песочник",
-      "sandboxAccessibility": "Песочник: {{label}}",
-      "sandboxDefaultWithDestination": "Стандардно · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Мало",
-      "sandboxInstanceShared": "Споделено",
-      "sandboxInstanceLarge": "Големо",
-      "sandboxInstanceDevcontainer": "Дев контејнер",
-      "sandboxInstanceProviderDefault": "Стандардно од добавувачот",
-      "sandboxCouldNotLoad": "Опциите за песочникот не можеа да се вчитаат",
-      "sandboxUnavailable": "Овој песочник е недостапен. Изберете друг песочник или Стандардно.",
-      "sandboxUseDefault": "Користи Стандардно"
+      "importFailed": "Не успеа увезувањето на оваа сесија."
     },
     "partRenderer": {
       "updatedFileCount_one": "Ажурирана е {{displayCount}} датотека.",
@@ -2168,7 +2210,13 @@
       "updateTodos": "Ажурирај ги задачите",
       "linesBadge": "{{displayCount}} редови",
       "filesBadge": "{{displayCount}} датотеки",
-      "matchesBadge": "{{displayCount}} совпаѓања"
+      "matchesBadge": "{{displayCount}} совпаѓања",
+      "filesBadge_one": "{{displayCount}} датотека",
+      "filesBadge_other": "{{displayCount}} датотеки",
+      "linesBadge_one": "{{displayCount}} ред",
+      "linesBadge_other": "{{displayCount}} редови",
+      "matchesBadge_one": "{{displayCount}} совпаѓање",
+      "matchesBadge_other": "{{displayCount}} совпаѓања"
     },
     "readToolMarkdown": {
       "linesTruncated": "редови {{start}}–{{end}} (скратено)",
@@ -2458,7 +2506,11 @@
       "files": "Датотеки",
       "couldNotOpenPhotoPicker": "Не успеа отворањето на избирачот на фотографии. Рестартирај го Kilo и обиди се повторно.",
       "maxFilesAllowed": "Дозволени се најмногу {{displayCount}} датотеки.",
-      "onlyAddingFiles": "Се додаваат само {{accepted}} од {{total}} датотеки (макс. {{max}})"
+      "onlyAddingFiles": "Се додаваат само {{accepted}} од {{total}} датотеки (макс. {{max}})",
+      "maxFilesAllowed_one": "Дозволени се најмногу {{displayCount}} датотека.",
+      "maxFilesAllowed_other": "Дозволени се најмногу {{displayCount}} датотеки.",
+      "onlyAddingFiles_one": "Се додаваат само {{accepted}} од {{total}} датотеки (макс. {{max}})",
+      "onlyAddingFiles_other": "Се додаваат само {{accepted}} од {{total}} датотеки (макс. {{max}})"
     },
     "composer": {
       "addAttachment": "Додади прилог",
@@ -2476,7 +2528,9 @@
       "discardAttachmentsMessage": "Прикачените датотеки што не се приложени кон испратени пораки ќе бидат избришани.",
       "discardAttachmentsTitle": "Да се отфрлат прилозите?",
       "charactersRemaining": "Преостануваат {{count}} знаци",
-      "insertNewline": "Вметни нов ред"
+      "insertNewline": "Вметни нов ред",
+      "charactersRemaining_one": "Преостанува {{count}} знак",
+      "charactersRemaining_other": "Преостануваат {{count}} знаци"
     },
     "chatLink": {
       "linkCopied": "Линкот е копиран",
@@ -2548,7 +2602,9 @@
       "stepsCount_one": "{{steps}} чекор",
       "stepsCount": "{{steps}} чекори",
       "stepsCount_other": "{{steps}} чекори",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Модел ({{displayCount}})",
+      "modelsCount_other": "Модели ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Автоматско одобрување",
@@ -2588,7 +2644,9 @@
     },
     "toolRun": {
       "sheetTitle": "Повици на алатки",
-      "condensedLabel": "{{itemCount}} ставки; {{last}}"
+      "condensedLabel": "{{itemCount}} ставки; {{last}}",
+      "condensedLabel_one": "{{itemCount}} ставка; {{last}}",
+      "condensedLabel_other": "{{itemCount}} ставки; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2781,9 @@
     "cliCantReceiveFilesTitle": "Оваа сесија не може да прима датотеки",
     "cliCantReceiveFilesMessage": "Kilo CLI што ја извршува оваа сесија не може да прима датотеки. Ажурирај го CLI на тој компјутер или сподели во нова сесија.",
     "contentlessMessage": "Нема што да се сподели — не се вклучени ниту текст ниту датотеки.",
-    "couldNotReadContent": "Не успеа читањето на споделената содржина."
+    "couldNotReadContent": "Не успеа читањето на споделената содржина.",
+    "onlyFirstFilesAttached_one": "Ќе се прикачат само првите {{displayCount}} датотека.",
+    "onlyFirstFilesAttached_other": "Ќе се прикачат само првите {{displayCount}} датотеки."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3153,9 @@
     "couldNotApprove": "Одобрувањето не успеа",
     "couldNotStart": "Стартувањето не успеа",
     "channelName": "Активни агенти",
-    "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран."
+    "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран.",
+    "openSession": "Отвори",
+    "approveFailed": "Одобрувањето не успеа. Допри $t(common.approve) за да се обидеш повторно."
   },
   "transcriptionModel": {
     "title": "Модел за транскрипција",

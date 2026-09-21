@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchCloudAgentStreamTicket } from './cloud-agent-stream-ticket';
+import { fetchCloudAgentStreamTicket, StreamTicketHttpError } from './cloud-agent-stream-ticket';
 
 const getAuthTokenForRequestMock = vi.hoisted(() => vi.fn());
 const fetchMock = vi.hoisted(() => vi.fn());
@@ -84,6 +84,21 @@ describe('fetchCloudAgentStreamTicket', () => {
       'Failed to get stream ticket'
     );
   });
+
+  it.each([400, 401, 403, 404, 410, 500])(
+    'carries the HTTP status (%s) so a caller can tell a refusal from a blip',
+    async status => {
+      fetchMock.mockResolvedValue(errorResponse(status, { error: 'no stream for you' }));
+
+      const rejection = await fetchCloudAgentStreamTicket('agent-1').catch(
+        (error: unknown) => error
+      );
+
+      expect(rejection).toBeInstanceOf(StreamTicketHttpError);
+      expect((rejection as StreamTicketHttpError).status).toBe(status);
+      expect((rejection as Error).message).toBe('no stream for you');
+    }
+  );
 
   it('throws when ticket is missing from an ok response', async () => {
     fetchMock.mockResolvedValue(okResponse({ expiresAt: 123 }));

@@ -3181,8 +3181,7 @@
     "remoteOptionTitle": "Your computer",
     "remoteOptionBody": "Run Kilo on your own machine through the kilo remote CLI.",
     "skip": "Skip tour",
-    "tutorialLabel": "Tutorial",
-    "remoteEmptyBody": "Run kilo remote on your computer to connect it."
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

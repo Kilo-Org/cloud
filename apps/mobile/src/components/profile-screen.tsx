@@ -17,7 +17,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from '@/components/ui/icons';
-import { Alert, Platform, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
@@ -35,6 +35,7 @@ import { useDeleteAccount } from '@/components/use-delete-account';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
+import { confirmDestructiveAction } from '@/lib/destructive-confirm';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -137,18 +138,16 @@ export function ProfileScreen() {
   };
 
   const confirmSignOut = () => {
-    if (Platform.OS === 'android') {
-      setSignOutConfirmVisible(true);
-      return;
-    }
-    Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.signOut'),
-        style: 'destructive',
-        onPress: () => void signOut(),
+    confirmDestructiveAction({
+      title: t('profile.signOutTitle'),
+      message: t('profile.signOutMessage'),
+      cancelLabel: t('common.cancel'),
+      confirmLabel: t('common.signOut'),
+      onConfirm: () => void signOut(),
+      renderInApp: () => {
+        setSignOutConfirmVisible(true);
       },
-    ]);
+    });
   };
 
   const showPrivacyChoices = () => {

@@ -24,10 +24,6 @@ const RUN_COPY = [
     key: 'tour.remoteOptionBody',
     value: 'Run Kilo on your own machine through the kilo remote CLI.',
   },
-  {
-    key: 'tour.remoteEmptyBody',
-    value: 'Run kilo remote on your computer to connect it.',
-  },
 ] as const;
 
 function lookup(path: string): unknown {

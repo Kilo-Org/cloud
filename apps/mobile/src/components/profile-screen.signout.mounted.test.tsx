@@ -31,6 +31,14 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// The profile screen reads its side insets through `@/lib/screen-insets`, whose
+// real module pulls `react-native-safe-area-context` — and with it the real
+// `react-native`, whose Flow source this pipeline cannot parse. The screen only
+// needs the numbers, so the insets are stubbed.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',

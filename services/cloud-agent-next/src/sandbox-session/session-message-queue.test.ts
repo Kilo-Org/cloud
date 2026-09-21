@@ -5515,7 +5515,7 @@ describe('SandboxSession orchestration', () => {
           expect(writer.record('writer')?.state).toBe('accepted');
           expect(writer.record('writer')?.lastActivityAt).toBe(progressAt);
           expect(writer.alarmAt()).not.toBeNull();
-          expect(writer.alarmAt()!).toBeLessThanOrEqual(progressAt + DEADLINE_MS.idleStop);
+          expect(writer.alarmAt()!).toBeLessThanOrEqual(progressAt + DEADLINE_MS.kiloInactivity);
           expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
           expect(writer.terminalEvents()).toHaveLength(0);
           await writer.outcome('writer', 'completed');
@@ -6918,7 +6918,7 @@ describe('SandboxSession orchestration', () => {
     ).toBe(true);
   });
 
-  it('fails a retrying prompt at five minutes without real events and fences the abort', async () => {
+  it('fails a retrying prompt at seven minutes without real events and fences the abort', async () => {
     const fixture = sessionFixture();
     const reports: CloudAgentQueueReport[] = [];
     (
@@ -6950,14 +6950,14 @@ describe('SandboxSession orchestration', () => {
     await fixture.admit('b');
     await fixture.flush();
 
-    vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop - 1);
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity - 1);
     await fixture.fireAlarm();
     expect(fixture.record('a')?.state).toBe('accepted');
     // The next wake must be at or before the due bound, not a past 90s
     // threshold that already elapsed.
-    expect(fixture.alarmAt()).toBe(acceptedAt + DEADLINE_MS.idleStop);
+    expect(fixture.alarmAt()).toBe(acceptedAt + DEADLINE_MS.kiloInactivity);
 
-    vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop);
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
     await fixture.fireAlarm();
     await fixture.flush();
 
@@ -6995,7 +6995,7 @@ describe('SandboxSession orchestration', () => {
     const acceptedAt = fixture.record('a')?.acceptedAt;
     if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
 
-    vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop);
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
     const alarm = fixture.fireAlarm();
     await vi.advanceTimersByTimeAsync(0);
     // Real progress arrives while the health check is awaiting its sync.
@@ -7047,9 +7047,9 @@ describe('SandboxSession orchestration', () => {
       // The watchdog must survive for the still-accepted turn.
       expect(fixture.record('a')?.state).toBe('accepted');
       expect(fixture.alarmAt()).not.toBeNull();
-      expect(fixture.alarmAt()!).toBeLessThanOrEqual(acceptedAt + DEADLINE_MS.idleStop);
+      expect(fixture.alarmAt()!).toBeLessThanOrEqual(acceptedAt + DEADLINE_MS.kiloInactivity);
 
-      vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop);
+      vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
       await fixture.fireAlarm();
       await fixture.flush();
       expect(fixture.record('a')).toMatchObject({
@@ -7077,7 +7077,7 @@ describe('SandboxSession orchestration', () => {
       return null;
     });
 
-    vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop);
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
     const alarm = fixture.fireAlarm();
     await entered.promise;
     // The failure is already persisted and the follow-up arm is in flight.
@@ -7115,7 +7115,7 @@ describe('SandboxSession orchestration', () => {
     const acceptedAt = fixture.record('a')?.acceptedAt;
     if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
 
-    vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop);
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
     await fixture.fireAlarm();
     expect(fixture.record('a')).toMatchObject({
       state: 'failed',
@@ -7175,12 +7175,12 @@ describe('SandboxSession orchestration', () => {
       expect(fixture.record('a')?.state).toBe('accepted');
       expect(fixture.record('b')?.state).toBe('queued');
       expect(fixture.alarmAt()).toBe(
-        Math.min(Date.now() + DEADLINE_MS.acceptedAlarmCap, acceptedAt + DEADLINE_MS.idleStop)
+        Math.min(Date.now() + DEADLINE_MS.acceptedAlarmCap, acceptedAt + DEADLINE_MS.kiloInactivity)
       );
       expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
 
-      // Five minutes with no real event: the snapshot cannot keep it alive.
-      vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop);
+      // Seven minutes with no real event: the snapshot cannot keep it alive.
+      vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
       await fixture.fireAlarm();
       expect(fixture.record('a')).toMatchObject({
         state: 'failed',

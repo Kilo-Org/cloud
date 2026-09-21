@@ -1,4 +1,5 @@
 import { type ActionSheetOptions } from '@expo/react-native-action-sheet';
+import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Alert } from 'react-native';
@@ -52,6 +53,29 @@ export async function copySessionId(sessionId: string): Promise<boolean> {
     return true;
   } catch {
     toast.error(i18n.t('agents.sessionRow.couldNotCopyId'));
+    return false;
+  }
+}
+
+/**
+ * Copies the session's resume link — the same universal link the OS handoff
+ * advertises (`sessionResumeUrl`), anchored at the position the transcript is
+ * showing — and returns whether it succeeded. No toast: the copy-link row
+ * lives inside the context sheet, whose Modal window hides app-root toasts, so
+ * the caller renders the outcome inline from this result.
+ */
+export async function copySessionLink(
+  sessionId: string,
+  anchorMessageId: string | null
+): Promise<boolean> {
+  try {
+    const copied = await Clipboard.setStringAsync(sessionResumeUrl({ sessionId, anchorMessageId }));
+    if (!copied) {
+      throw new Error('Clipboard rejected session link');
+    }
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    return true;
+  } catch {
     return false;
   }
 }

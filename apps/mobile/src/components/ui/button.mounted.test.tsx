@@ -167,6 +167,47 @@ describe('Button native target contract', () => {
     expect(button.findByType(NativeText).children).toEqual(['Retry']);
   });
 
+  it('keeps a disabled primary label legible instead of dimming the brand pair', () => {
+    const button = renderButton({ disabled: true });
+    const classes = (button.props.className as string).split(' ');
+    // bg-primary-disabled must win over the variant's bg-primary so the disabled
+    // fill is the muted surface the ink label stays readable on.
+    expect(classes).toContain('bg-primary-disabled');
+    expect(classes).not.toContain('bg-primary');
+    expect(classes).not.toContain('opacity-50');
+    // The label keeps the ink colour; the disabled fill is chosen to contrast
+    // with it, so hard-coded primaryForeground children stay legible too.
+    const label = button.findByType(NativeText).props.className as string;
+    expect(label).toContain('text-primary-foreground');
+    expect(label).not.toContain('text-muted-foreground');
+  });
+
+  it('keeps a hard-coded primaryForeground child on a fill that contrasts with it', () => {
+    const button = renderButton({
+      disabled: true,
+      children: createElement(Text, { className: 'text-primary-foreground' }, 'Save'),
+    });
+    const classes = (button.props.className as string).split(' ');
+    expect(classes).toContain('bg-primary-disabled');
+    expect(classes).not.toContain('bg-muted');
+    expect(button.findByType(NativeText).props.className).toContain('text-primary-foreground');
+  });
+
+  it('keeps a busy primary on its brand fill so it still reads as working', () => {
+    const button = renderButton({ loading: true });
+    const classes = (button.props.className as string).split(' ');
+    expect(classes).toContain('bg-primary');
+    expect(classes).not.toContain('bg-primary-disabled');
+    expect(classes).not.toContain('opacity-50');
+  });
+
+  it('keeps the dimmed treatment for a disabled non-primary variant', () => {
+    const button = renderButton({ variant: 'outline', disabled: true });
+    const classes = (button.props.className as string).split(' ');
+    expect(classes).toContain('opacity-50');
+    expect(classes).not.toContain('bg-primary-disabled');
+  });
+
   it('keeps an enabled action connected to its visible outcome', () => {
     function Action() {
       const [started, setStarted] = useState(false);

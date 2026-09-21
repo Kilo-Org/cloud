@@ -38,6 +38,21 @@ const BASE_EXCLUDE_ENTRIES = [
 // The exact versions the Expo SDK 57 aligned graph installs (verified against
 // pnpm-lock.yaml): the four 2026-09-08 patch releases `expo install --check`
 // expects plus the transitive resolutions blocked by the 6842-minute gate.
+// The DO-managed Cloudflare containers runtime needs wrangler 4.134.0+, and
+// 4.135.0 exact-pins its own workerd/miniflare runtime, so each is exempted by
+// exact version. Approved early-access exception; remove this group when 4.135.0
+// matures.
+const CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES = [
+  'wrangler@4.135.0',
+  'workerd@1.20260918.1',
+  'miniflare@5.20260918.0-alpha',
+  '@cloudflare/workerd-darwin-64@1.20260918.1',
+  '@cloudflare/workerd-darwin-arm64@1.20260918.1',
+  '@cloudflare/workerd-linux-64@1.20260918.1',
+  '@cloudflare/workerd-linux-arm64@1.20260918.1',
+  '@cloudflare/workerd-windows-64@1.20260918.1',
+] as const;
+
 const SDK_57_EXACT_EXCLUDE_ENTRIES = [
   'expo@57.0.21',
   '@expo/ui@57.0.17',
@@ -94,11 +109,13 @@ describe('minimum release age policy contract', () => {
     expect(Number(match?.[1])).toBe(EXPECTED_MINIMUM_RELEASE_AGE_MINUTES);
   });
 
-  it('excludes exactly the base list plus the ten SDK 57 exact versions', () => {
-    // Order as written: tsx, the ten aligned-version exemptions, then the
-    // remaining base entries — the base list with nothing dropped or changed.
+  it('excludes exactly the base list plus the container-runtime and SDK 57 exact versions', () => {
+    // Order as written: tsx, the container-runtime exemptions, the ten
+    // aligned-version exemptions, then the remaining base entries — the base
+    // list with nothing dropped or changed.
     const expected = [
       BASE_EXCLUDE_ENTRIES[0],
+      ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
       ...SDK_57_EXACT_EXCLUDE_ENTRIES,
       ...BASE_EXCLUDE_ENTRIES.slice(1),
     ];
@@ -106,7 +123,10 @@ describe('minimum release age policy contract', () => {
   });
 
   it('scopes every new exclusion to one exact package@version', () => {
-    expect(newExclusions).toEqual([...SDK_57_EXACT_EXCLUDE_ENTRIES]);
+    expect(newExclusions).toEqual([
+      ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
+      ...SDK_57_EXACT_EXCLUDE_ENTRIES,
+    ]);
     for (const entry of newExclusions) {
       expect(entry).toMatch(EXACT_VERSION_PATTERN);
     }

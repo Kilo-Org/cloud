@@ -12,6 +12,12 @@ type SessionFilterButtonProps = {
   activeCount: number;
   onPress: () => void;
   testID?: string;
+  /**
+   * Overrides the control's own per-side slop. The agents header row caps the
+   * control's left side against its `gap-4` row gap, so it passes an explicit
+   * per-side slop instead of the control's default.
+   */
+  hitSlop?: React.ComponentProps<typeof Pressable>['hitSlop'];
 };
 
 /**
@@ -23,6 +29,7 @@ export function SessionFilterButton({
   activeCount,
   onPress,
   testID,
+  hitSlop,
 }: Readonly<SessionFilterButtonProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -34,8 +41,9 @@ export function SessionFilterButton({
       // The frame is the tap target the size audit measures, not the 20pt
       // glyph: `h-11 w-11` is 38.5pt on device, and the 3pt slop carries it to
       // the 44pt minimum. It fits the header's own `min-h-11` row, so the
-      // header keeps its height.
-      hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+      // header keeps its height. A caller that lays this control beside another
+      // in a tight row overrides the slop to fit the row's gap.
+      hitSlop={hitSlop ?? COMPACT_CONTROL_HIT_SLOP_DP}
       accessibilityRole="button"
       // The count is spoken as part of the name, so no new translated string is
       // needed to announce "Filter sessions, 2".

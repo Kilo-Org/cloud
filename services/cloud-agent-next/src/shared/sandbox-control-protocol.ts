@@ -724,6 +724,7 @@ export const sessionMessageOutcomeSchema = z
     messageId: z.string().min(1).max(128),
     status: z.enum(['completed', 'failed', 'cancelled']),
     reason: z.string().max(4096).optional(),
+    gateResult: z.enum(['pass', 'fail']).optional(),
   })
   .strict();
 

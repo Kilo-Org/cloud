@@ -128,6 +128,23 @@ describe('filterLiveSessions', () => {
     );
   });
 
+  it('does not match a session whose only title is the creation-default placeholder', () => {
+    // The row paints "Untitled" for this title, so a search must not return a
+    // row whose visible text does not contain the needle.
+    const placeholder = {
+      id: 'placeholder',
+      title: 'New session - 2026-09-21T15:44:47.176Z',
+      gitUrl: null,
+      createdOnPlatform: 'cli',
+    };
+    expect(
+      filterLiveSessions([placeholder], query({ searchQuery: 'New session - 2026' }))
+    ).toHaveLength(0);
+    expect(filterLiveSessions([placeholder], query({ searchQuery: 'placeholder' }))).toHaveLength(
+      1
+    );
+  });
+
   it('searches the repository name too', () => {
     expect(filterLiveSessions(sessions, query({ searchQuery: 'kilo/app' })).map(s => s.id)).toEqual(
       ['cli']

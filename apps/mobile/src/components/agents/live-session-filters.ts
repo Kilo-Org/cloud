@@ -4,6 +4,7 @@ import {
   PLATFORM_FILTERS,
   type ProjectFilterOption,
 } from '@/components/agents/session-list-helpers';
+import { resolveSessionDisplayTitle } from '@/lib/session-title';
 
 /** The part of an active session the live filters read. */
 export type LiveFilterSession = {
@@ -78,7 +79,10 @@ export function buildLiveFilterOptions(sessions: readonly LiveFilterSession[]): 
 
 function matchesSearch(session: LiveFilterSession, needle: string): boolean {
   return [
-    session.title,
+    // The row paints the resolved title ("Untitled session" for the server's
+    // creation-default placeholder), so the search matches the same value the
+    // user can see — never the raw placeholder.
+    resolveSessionDisplayTitle(session.title),
     session.id,
     session.gitUrl,
     session.gitUrl ? formatGitUrlProject(session.gitUrl) : undefined,

@@ -211,6 +211,19 @@ describe('StoredSessionRow live speech', () => {
     expect(hosts(renderer, 'SessionStatusIcon')).toHaveLength(0);
   });
 
+  it('shows the generic label for the server creation-default title', () => {
+    // The server writes "New session - <ISO>" at creation and mobile must not
+    // paint it (see `@/lib/session-title`). A list row that is the only surface
+    // for a failed-send session still shows a human label.
+    const placeholder = 'New session - 2026-09-21T15:44:47.176Z';
+    const renderer = mount(row({ session: { ...session, title: placeholder } }));
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain(placeholder);
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Untitled session, feature/live, CLI, and cost 12 cents, 5 minutes ago'
+    );
+  });
+
   it('keeps the live eyebrow to the status glyph alone (no platform mark beside it)', () => {
     // A platform glyph beside the status mark reads as a stray second mark
     // crowding the meta, so a live row draws the status glyph only. The
@@ -381,6 +394,13 @@ describe('RemoteSessionRow live speech', () => {
     ]);
     expect(texts(renderer)).toContain('5 MINUTES AGO');
     expect(texts(renderer)).toContain('feature/live');
+  });
+
+  it('shows the generic label for the server creation-default title', () => {
+    const placeholder = 'New session - 2026-09-21T15:44:47.176Z';
+    const renderer = mountRemote({ title: placeholder });
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain(placeholder);
   });
 
   it('speaks Idle once the agent stops working', () => {

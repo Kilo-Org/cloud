@@ -25,6 +25,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { resolveSessionDisplayTitle } from '@/lib/session-title';
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
@@ -90,7 +91,11 @@ export function RemoteSessionRow({
     };
   }, [refreshScope]);
   const exitingRef = useRef(false);
-  const title = session.title.length > 0 ? session.title : t('agents.sessionRow.untitled');
+  // Same creation-default guard as the stored row: the tray title is
+  // DB-authoritative and the DB holds the server's "New session - <ISO>"
+  // placeholder until the first message is ingested, so a just-created
+  // session must not paint the raw timestamp here or prefill it on rename.
+  const title = resolveSessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
   const agentLabel = remoteSessionEyebrowLabel(session);

@@ -54,8 +54,15 @@ export type ShareGateStateInput = {
   validation: SharePayloadValidation | null;
   storedIsError: boolean;
   storedIsSuccess: boolean;
+  /** Stored-sessions query is paused (offline) — the list is unresolved. */
+  storedIsPaused: boolean;
   activeIsError: boolean;
-  storedRowCount: number;
+  /** Live-sessions query is paused (offline) — liveness is unresolved. */
+  activeIsPaused: boolean;
+  /** Live destination rows the gate can offer (see `selectShareDestinations`). */
+  liveRowCount: number;
+  /** Stored sessions loaded for this context, live or not. */
+  storedSessionCount: number;
   isLoading: boolean;
 };
 
@@ -78,8 +85,10 @@ export function isShareCommitEnabled(input: {
  *   1. stale-share (missing/unknown/consumed shareId) — before any validation
  *   2. non-retryable-classification (all files rejected, no usable text)
  *   3. loading (validation or destination queries in flight)
- *   4. retryable (storedIsError with zero stored rows — never activeIsError alone)
- *   5. empty (settled, not errored, zero destinations)
+ *   4. retryable (no live rows and a query that decides liveness or the
+ *      stored page is unresolved: errored or paused offline)
+ *   5. empty (settled, zero live rows) — live-aware copy when stored sessions
+ *      exist but none are live, `share.emptyMessage` only when there are none
  *   6. happy
  */
 export function selectShareGateState(input: ShareGateStateInput): ShareGateState {
@@ -105,7 +114,13 @@ export function selectShareGateState(input: ShareGateStateInput): ShareGateState
   }
 
   const validationPending = input.validation === null;
-  const destinationsPending = input.isLoading || (!input.storedIsSuccess && !input.storedIsError);
+  // A paused query is not loading (`isLoading` is `isPending && isFetching`),
+  // so a fresh open offline has no cached stored page and no fetch in flight.
+  // Counting that as pending would strand the gate on the skeleton: no Retry
+  // and no explanation while the network is down. Treat it as unresolved and
+  // let the retryable branch below decide.
+  const storedPending = !input.storedIsSuccess && !input.storedIsError && !input.storedIsPaused;
+  const destinationsPending = input.isLoading || storedPending;
 
   if (validationPending || destinationsPending) {
     return {
@@ -117,9 +132,18 @@ export function selectShareGateState(input: ShareGateStateInput): ShareGateState
     };
   }
 
-  // Retryable only when the stored list failed with no rows. activeIsError
-  // alone is indistinguishable from "nothing live" (list swallows failures).
-  if (input.storedIsError && input.storedRowCount === 0) {
+  // Retryable when nothing live can be offered and a query that decides
+  // liveness is unresolved. The stored list blocks the list on its own; a
+  // live-lookup failure with no live rows is indistinguishable from "nothing
+  // live", so it must offer a retry instead of a settled empty state. A paused
+  // query (offline, NetInfo down) is the same: `isError` is false and
+  // `isLoading` is false (`fetchStatus: 'paused'` is not fetching), so without
+  // this it would fall through to a "Nothing running right now" that liveness
+  // never proved. Retry refetches both queries
+  // (`useAgentSessions().refetch`), matching the Agents list.
+  const livenessUnknown =
+    input.storedIsError || input.storedIsPaused || input.activeIsError || input.activeIsPaused;
+  if (input.liveRowCount === 0 && livenessUnknown) {
     return {
       kind: 'retryable',
       message: i18n.t('share.retryableMessage'),
@@ -129,10 +153,14 @@ export function selectShareGateState(input: ShareGateStateInput): ShareGateState
     };
   }
 
-  if (input.storedRowCount === 0) {
+  if (input.liveRowCount === 0) {
     return {
       kind: 'empty',
-      message: i18n.t('share.emptyMessage'),
+      // Sessions that exist but are offline are not "no sessions": use the
+      // app's live-empty copy, and only claim there are none when the stored
+      // page really is empty.
+      message:
+        input.storedSessionCount > 0 ? i18n.t('home.noLiveSessions') : i18n.t('share.emptyMessage'),
       showNewSession: true,
       showRetry: false,
       showList: false,

@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
-import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, View } from 'react-native';
+import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { usePathname } from 'expo-router';
 import { CenteredState } from '@/components/centered-state';
@@ -17,8 +17,7 @@ import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useExternalAuthReturn } from '@/lib/external-auth/use-external-auth-return';
-import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
+import { launchConnectGateBrowser } from '@/lib/pr-review/connect-gate-platform';
 import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-view';
 import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
@@ -65,9 +64,7 @@ type PrReviewConnectGateProps = {
  * pass-through there; the provider gates protect each detail route.
  *
  * The GitHub CTA calls `githubApps.connectUserAuthorization` and opens the
- * returned URL with the platform-appropriate browser launcher (iOS native
- * auth session that resolves on sheet close; Android custom tab that
- * resolves on app-foreground via AppState). Cancellation on either platform
+ * returned URL with the shared auth-session launcher. Cancellation on either platform
  * simply leaves the gate showing — there's nothing to roll back because the
  * auth flow is server-driven.
  */
@@ -107,45 +104,32 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
     })
   );
 
-  // Track the in-flight launch so a stale AppState 'active' transition
-  // (from the user backgrounding the app before tapping Connect) doesn't
-  // trigger a refetch on its own. iOS: openAuthSessionAsync already resolves
-  // on sheet close, so we await it and refetch right there. Android:
-  // openBrowserAsync is fire-and-forget, so the hook refetches on AppState
-  // returning to 'active'.
-  const refetchAuthorization = useCallback(() => {
-    void authorization.refetch();
-  }, [authorization]);
-  const { markLaunched, clearLaunch } = useExternalAuthReturn(refetchAuthorization);
   const [connecting, setConnecting] = useState(false);
+  const connectAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => connectAbort.current?.abort(), []);
 
   const handleConnect = async () => {
+    const controller = new AbortController();
+    connectAbort.current = controller;
     setConnecting(true);
     try {
       const result = await connect.mutateAsync();
-      markLaunched();
-      const trigger = await openAuthorizationAndWaitForReturn(Platform.OS, result.authorizationUrl);
-      if (trigger === 'sheet-close') {
-        // iOS: refetch immediately. Clear the launch sentinel so the
-        // AppState handler (if it ever fires) doesn't double-refetch.
-        clearLaunch();
-        await authorization.refetch();
-        await queryClient.invalidateQueries({
-          queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
-        });
-      }
-      // Android: refetch is handled by the AppState listener when the app
-      // returns to foreground. `openBrowserAsync` resolves as soon as the
-      // browser is launched, so we must NOT clear the sentinel here — the
-      // foreground handler clears it once it has consumed it.
+      await launchConnectGateBrowser(result.authorizationUrl, {
+        signal: controller.signal,
+        onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
+        onReturn: async () => {
+          await authorization.refetch();
+          await queryClient.invalidateQueries({
+            queryKey: trpc.githubApps.getUserAuthorization.queryKey(),
+          });
+        },
+      });
     } catch {
-      // mutateAsync already toasted; the openAuthorizationAndWaitForReturn
-      // rejection means the browser failed to open — clear the sentinel so
-      // a later unrelated foreground doesn't trigger a stray refetch, and
-      // keep the gate showing.
-      clearLaunch();
+      // mutateAsync toasted the server error; keep the gate showing.
     } finally {
-      setConnecting(false);
+      if (!controller.signal.aborted) {
+        setConnecting(false);
+      }
     }
   };
 
@@ -276,37 +260,38 @@ function ProviderConnectGate({
   });
   const status = platform === 'gitlab' ? gitlabStatus : bitbucketStatus;
 
-  const refetchStatus = useCallback(() => {
-    void status.refetch();
-  }, [status]);
-  const { markLaunched, clearLaunch } = useExternalAuthReturn(refetchStatus);
   const [connecting, setConnecting] = useState(false);
+  const connectAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => connectAbort.current?.abort(), []);
 
   const handleConnect = async () => {
+    const controller = new AbortController();
+    connectAbort.current = controller;
     setConnecting(true);
     try {
       // The provider connections are web-side integrations: open the
       // existing integration page and re-check the status when the app
-      // returns (pattern: `openAuthorizationAndWaitForReturn`).
-      markLaunched();
+      // returns (pattern: `launchConnectGateBrowser`).
       const integrationUrl =
         platform === 'gitlab'
           ? getGitLabIntegrationUrl(WEB_BASE_URL, organizationId ?? undefined)
           : getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId ?? '');
-      const trigger = await openAuthorizationAndWaitForReturn(Platform.OS, integrationUrl);
-      if (trigger === 'sheet-close') {
-        clearLaunch();
-        await status.refetch();
-      }
-      // Android: the AppState listener in `useExternalAuthReturn` refetches
-      // when the app returns to foreground; the sentinel stays set until it
-      // consumes the launch.
+      await launchConnectGateBrowser(integrationUrl, {
+        signal: controller.signal,
+        onOpenFailure: () => void toast.error(t('authErrors.couldNotOpenBrowser')),
+        onReturn: async () => {
+          await status.refetch();
+        },
+      });
     } catch {
-      // The browser failed to open — clear the sentinel so a later unrelated
-      // foreground doesn't trigger a stray refetch, and keep the gate showing.
-      clearLaunch();
+      // The helper reports a failed launch itself, so a rejected `onReturn`
+      // refetch is the only error that reaches here. Keep the gate showing:
+      // the query's error state renders the retryable
+      // QueryError instead of letting `void handleConnect()` reject.
     } finally {
-      setConnecting(false);
+      if (!controller.signal.aborted) {
+        setConnecting(false);
+      }
     }
   };
 

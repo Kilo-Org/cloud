@@ -2,6 +2,7 @@
 
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
+import type { CloudAgentFailureResponsibility } from '@kilocode/worker-utils/cloud-agent-failure';
 import {
   healthErrorSessionsInput,
   type CloudAgentHealthError,
@@ -9,7 +10,7 @@ import {
 } from './health-query-input';
 
 export type CloudAgentNextHealthFilters = CloudAgentHealthInterval;
-export type CloudAgentFailureResponsibilityFilter = 'all' | 'platform' | 'user' | 'unknown';
+export type CloudAgentFailureResponsibilityFilter = 'all' | CloudAgentFailureResponsibility;
 
 function enabledForInterval(params: CloudAgentNextHealthFilters) {
   return Boolean(params.startDate && params.endDate);

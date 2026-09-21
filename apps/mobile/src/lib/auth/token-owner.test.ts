@@ -87,6 +87,23 @@ describe('token-owner', () => {
       expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(1);
     });
 
+    it('retries a rejected cold read and serves the stored token', async () => {
+      store.set(AUTH_TOKEN_KEY, 'stored-token');
+      // The keychain rejects the first read — the transient class on a device
+      // that just foregrounded — and resolves the stored value on the retry.
+      let reads = 0;
+      vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
+        await Promise.resolve();
+        reads += 1;
+        if (reads === 1) {
+          throw new Error('keychain temporarily unavailable');
+        }
+        return store.get(key) ?? null;
+      });
+
+      await expect(getAuthTokenForRequest()).resolves.toBe('stored-token');
+    });
+
     it('warms the owner on a cold read so the next read is in-memory', async () => {
       store.set(AUTH_TOKEN_KEY, 'stored-token');
       await getAuthTokenForRequest();

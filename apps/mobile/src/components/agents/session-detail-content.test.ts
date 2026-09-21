@@ -2214,6 +2214,34 @@ describe('SessionDetailContent goal visibility', () => {
   });
 });
 
+describe('SessionDetailContent transcript entrance', () => {
+  beforeEach(() => {
+    motionPolicy.reducedMotion = false;
+  });
+
+  /** The wrapper the screen draws around the transcript list. */
+  function transcriptWrapperOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (list === undefined) {
+      throw new Error('Missing SessionMessageList');
+    }
+    const wrapper = list.parent;
+    if (wrapper === null) {
+      throw new Error('Missing the transcript wrapper');
+    }
+    return wrapper;
+  }
+
+  it('paints the transcript without an entrance animation', async () => {
+    const animated = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    // The transcript body must never depend on an entrance animation to become
+    // visible: Reanimated's `FadeIn` carries `initialValues: { opacity: 0 }`, so
+    // a device that drops or never runs the entrance paints the whole body
+    // blank while the header already shows the loaded token count.
+    expect(transcriptWrapperOf(animated).props.entering).toBeUndefined();
+  });
+});
+
 describe('SessionDetailContent last-opened record', () => {
   it('records the viewed session when the identity resolves after the first render', async () => {
     // A cold start: the session renders before `user.getMe` answers, so the

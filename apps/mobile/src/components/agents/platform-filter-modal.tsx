@@ -1,6 +1,7 @@
 import { Check } from '@/components/ui/icons';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
@@ -17,6 +18,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 export { type ProjectFilterOption };
+
+/** Gap kept between the sheet and the window edges (matches the `px-6` gutter). */
+const SHEET_EDGE_MARGIN = 24;
 
 type SessionFilterModalProps = {
   selectedPlatforms: string[];
@@ -97,6 +101,17 @@ export function SessionFilterModal({
   onApply,
 }: Readonly<SessionFilterModalProps>) {
   const { t } = useTranslation();
+  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // Yoga resolves vertical percentage padding against the parent's WIDTH, so the
+  // old `pt-[20%]` grew with the screen width and pushed the pinned Cancel/Apply
+  // row past the bottom of a short (landscape) window. Cap the sheet to the
+  // window minus the safe areas instead: the option list then scrolls inside the
+  // card and the action row stays visible.
+  const sheetMaxHeight = Math.max(
+    0,
+    windowHeight - insets.top - insets.bottom - SHEET_EDGE_MARGIN * 2
+  );
   const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
   const [draftProjects, setDraftProjects] = useState<string[]>(selectedProjects);
   const platforms = [...new Set([...platformOptions, ...selectedPlatforms])];
@@ -126,7 +141,11 @@ export function SessionFilterModal({
         // whole sheet subtree into a single VoiceOver node (Pressable defaults to
         // accessible=true) — the inner controls stay individually navigable.
         accessible={false}
-        className="flex-1 justify-start px-6 pt-[20%]"
+        className="flex-1 justify-center px-6"
+        style={{
+          paddingTop: insets.top + SHEET_EDGE_MARGIN,
+          paddingBottom: insets.bottom + SHEET_EDGE_MARGIN,
+        }}
         onPress={onClose}
       >
         <View className="absolute inset-0 bg-black opacity-50" />
@@ -137,8 +156,10 @@ export function SessionFilterModal({
           accessible={false}
           // Bounded so the row list can grow to the server's full recent-repository
           // set without pushing the Apply/Cancel row off-screen: the ScrollView
-          // below shrinks into this cap and scrolls.
+          // below shrinks into this cap and scrolls. The inline maxHeight tightens
+          // that bound to the visible window minus the safe-area insets.
           className="max-h-[80%] gap-4 rounded-2xl bg-popover p-5"
+          style={{ maxHeight: sheetMaxHeight }}
           onPress={e => {
             e.stopPropagation();
           }}

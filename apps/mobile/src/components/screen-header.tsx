@@ -21,12 +21,20 @@ import { cn } from '@/lib/utils';
  */
 const MODAL_HEADER_TOP_PADDING = 32;
 
+/**
+ * Ceiling for the header title's line cap. The reserved box grows by a full
+ * line height per cap, so three lines is the most a header should take; the
+ * Text and the reserve are clamped together to keep them in step.
+ */
+const MAX_TITLE_LINES = 3;
+
 type ScreenHeaderProps = {
   /** Omit to render a bare back-button bar (e.g. when the screen body provides its own title). */
   title?: string;
   titleContent?: React.ReactNode;
+  /** Line cap for the title, at most {@link MAX_TITLE_LINES}. */
   titleNumberOfLines?: number;
-  /** Reserve two title lines so state changes do not move the screen body. */
+  /** Reserve the title's line cap so state changes do not move the screen body. */
   reserveTitleSpace?: boolean;
   /** Optional mono-uppercase line above the title. */
   eyebrow?: string;
@@ -62,6 +70,21 @@ type ScreenHeaderProps = {
   /** Extra classes on the outer header container. Overrides the default `px-4` for screens that need a different horizontal inset. */
   className?: string;
 };
+
+/**
+ * Height of the reserved title box for `reserveTitleSpace`, one title line
+ * height per line the title can paint: the default 18px title's Tailwind line
+ * height is `1.75rem`, the large 30px variant's is 36px. Class names must be
+ * static because NativeWind extracts them at build time. The reserve tracks the
+ * line cap so a title that grows a line (loading -> loaded, rename) cannot move
+ * the body below the header.
+ */
+function reservedTitleHeightClass(size: ScreenHeaderProps['size'], titleLines: number): string {
+  if (size === 'large') {
+    return titleLines > 2 ? 'min-h-[108px]' : 'min-h-[72px]';
+  }
+  return titleLines > 2 ? 'min-h-21' : 'min-h-14';
+}
 
 export function ScreenHeader({
   title,
@@ -135,6 +158,10 @@ export function ScreenHeader({
       ? 'shrink text-[30px] font-bold tracking-tight text-foreground'
       : 'shrink text-lg font-semibold text-foreground';
 
+  // One cap for the Text and the reserved box: a title capped deeper than the
+  // reserve would shift the body the moment it reached the extra line.
+  const titleLines = Math.min(Math.max(titleNumberOfLines, 1), MAX_TITLE_LINES);
+
   // The slop widens the title into the free space beside it. RN does not mirror
   // hitSlop under RTL, so the physical right slop would reach across the
   // visually mirrored back control and the title (the later sibling) would win
@@ -157,7 +184,7 @@ export function ScreenHeader({
     ) : (
       <Text
         className={cn(titleClass, centerTitle && 'text-center')}
-        numberOfLines={titleNumberOfLines}
+        numberOfLines={titleLines}
         ellipsizeMode="tail"
         accessibilityRole="header"
       >
@@ -165,7 +192,7 @@ export function ScreenHeader({
       </Text>
     );
     const titleLayout = reserveTitleSpace ? (
-      <View className={cn(size === 'large' ? 'min-h-[72px]' : 'min-h-14', 'justify-center')}>
+      <View className={cn(reservedTitleHeightClass(size, titleLines), 'justify-center')}>
         {titleText}
       </View>
     ) : (

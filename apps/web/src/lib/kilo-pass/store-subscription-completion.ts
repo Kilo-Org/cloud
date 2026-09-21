@@ -464,12 +464,19 @@ const PURCHASE_LEDGER_LEASE_SECONDS = 120;
 const OPERATION_IN_PROGRESS_MESSAGE = 'operation_in_progress';
 const OPERATION_KEY_REUSE_MISMATCH_MESSAGE = 'operation_key_reuse_mismatch';
 
+/**
+ * A user holds at most one Kilo Pass, so a second paid subscription is a
+ * duplicate. Callers reverse that charge instead of admitting it.
+ */
+export const ACTIVE_KILO_PASS_SUBSCRIPTION_MESSAGE =
+  'You already have an active Kilo Pass subscription';
+
 /** Provider/user mismatch messages that settle `failed` and never retry. */
 const STORE_PURCHASE_MISMATCH_MESSAGES = [
   'Store purchase has been refunded',
   'Store transaction already belongs to another user',
   'Store subscription already belongs to another user',
-  'You already have an active Kilo Pass subscription',
+  ACTIVE_KILO_PASS_SUBSCRIPTION_MESSAGE,
 ] as const;
 
 export function isStorePurchaseMismatchMessage(message: string): boolean {
@@ -478,6 +485,10 @@ export function isStorePurchaseMismatchMessage(message: string): boolean {
 
 export function isStorePurchaseMismatchError(error: unknown): boolean {
   return error instanceof Error && isStorePurchaseMismatchMessage(error.message);
+}
+
+export function isActiveKiloPassSubscriptionError(error: unknown): boolean {
+  return error instanceof Error && error.message === ACTIVE_KILO_PASS_SUBSCRIPTION_MESSAGE;
 }
 
 /** `purchase_settled` outbox payload (DEC-05): no free text, no resource keys. */
@@ -564,7 +575,7 @@ export async function completeStoreKiloPassPurchase(params: {
         ),
       });
       if (otherActive && !isStripeSubscriptionEnded(otherActive.status)) {
-        throw new Error('You already have an active Kilo Pass subscription');
+        throw new Error(ACTIVE_KILO_PASS_SUBSCRIPTION_MESSAGE);
       }
       if (replacement.deferred) {
         const receipt = await tx.query.kilo_pass_store_purchases.findFirst({
@@ -704,7 +715,7 @@ export async function completeStoreKiloPassPurchase(params: {
         previousExpiry > Date.now() ||
         previousExpiry > Date.parse(purchase.purchasedAtIso)
       ) {
-        throw new Error('You already have an active Kilo Pass subscription');
+        throw new Error(ACTIVE_KILO_PASS_SUBSCRIPTION_MESSAGE);
       }
       // State reads already treat this receipt as expired. Reconcile it here
       // when a new paid subscription arrives before the expiry notification.

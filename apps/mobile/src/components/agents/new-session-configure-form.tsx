@@ -14,6 +14,7 @@ import { useComposerRevealScroll } from '@/components/agents/use-composer-reveal
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
 /**
@@ -198,7 +199,7 @@ export function NewSessionConfigureForm({
       ) : null}
 
       <Text className="mt-2 text-xs text-muted-foreground">
-        {t('agentChat.newSession.remoteHint')}
+        {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
       </Text>
 
       {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
@@ -245,8 +246,10 @@ export function NewSessionConfigureForm({
   );
 
   return (
+    // The root reserves the navigation-bar inset, so the keyboard-lift view
+    // pads from its own bottom edge and must not add the inset again.
     <View className="flex-1 bg-background" style={{ paddingBottom: bottom }}>
-      <AppAwareKeyboardPaddingView className="flex-1">
+      <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
         {body}
         {/*
           The primary action is pinned below the scroll body, never part of it.

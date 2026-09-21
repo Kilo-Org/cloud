@@ -1,6 +1,5 @@
 import { ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LaunchFolderField } from '@/components/agents/folder-selector';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
@@ -15,6 +14,7 @@ import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-ke
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 /**
  * THE new-session screen body — one screen for every entry point (cloud,
@@ -93,25 +93,32 @@ export function NewSessionConfigureForm({
   // edge (rounded corner, top padding, the prompt's first line) comes back
   // clipped under the header.
   const composerReveal = useComposerRevealScroll();
+  // The pinned footer's single source of bottom clearance: it clears the system
+  // navigation bar under Start. Without it the primary action can sit in the
+  // bar's translucent region a formSheet leaves exposed below itself (the
+  // picker's bottom strip showed its sliver). It rides the footer itself (see
+  // pr-comment-cta.tsx for the same bar pattern) rather than a spacer inside
+  // the ScrollView, which the pinned Start no longer needs and which left dead
+  // space below the last field of a long form.
+  const bottomClearance = useDetailScreenBottomPadding();
   // The form is edge-to-edge and the window never resizes for the IME on
-  // either platform, so the screen needs two floors: the navigation-bar inset
-  // — the Start action sits in a footer below the scroll body, and without the
-  // inset the footer would render in the navigation bar's region (a formSheet
-  // leaves that region exposed below itself; the picker's bottom strip showed
-  // its sliver) — and the keyboard height, because the composer auto-focuses
-  // on open and without the keyboard floor the Start control stays half-hidden
-  // behind the keyboard strip. The keyboard-lift view is the app's
-  // cross-platform IME primitive (keyboardDidShow/DidHide on Android,
-  // keyboardWillShow/WillHide on iOS), so the same implementation runs on both
-  // platforms; the footer is its second child, so the IME lifts the action too.
+  // either platform, so the primary action needs two floors: the
+  // navigation-bar inset, and the keyboard height. Start lives in a footer
+  // *outside* the ScrollView: the composer auto-focuses on arrival, and with
+  // the keyboard up the scroll body is only ~1300 px tall while the form is
+  // ~2000 px, so a Start inside the scroll sits below the fold — the user had
+  // to dismiss the keyboard to reach the primary action, and a scroll drag
+  // (keyboardDismissMode="on-drag") did that for them. The keyboard-lift view
+  // is the app's cross-platform IME primitive (keyboardDidShow/DidHide on
+  // Android, keyboardWillShow/WillHide on iOS), so the same implementation
+  // runs on both platforms, and it shrinks the scroll body as it lifts Start.
   // The ScrollView's keyboard-inset adjustment stays on for focused-field
   // scroll-into-view; it sizes against the scroll view's own frame, which
-  // already ends above the IME, so the two never stack into a double lift.
+  // already ends above the footer, so the two never stack into a double lift.
   // (The picker-sheet sliver of the e1 spot check is fixed at the sheet
   // triggers: a formSheet anchors over the keyboard that is up at its first
   // layout and never re-anchors, so the keyboard must be dismissed before
   // the sheet opens.)
-  const { bottom } = useSafeAreaInsets();
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
   const runOnNote =
@@ -243,46 +250,38 @@ export function NewSessionConfigureForm({
     </ScrollView>
   );
 
-  return (
-    <View className="flex-1 bg-background" style={{ paddingBottom: bottom }}>
-      <AppAwareKeyboardPaddingView className="flex-1">
-        {body}
-        {/*
-          The primary action is pinned below the scroll body, never part of it.
-          A Start button inside the form scrolled out of the viewport on a short
-          screen: only the top of the control stayed visible above the
-          navigation bar, which read as a button the bottom bar had cut off.
-          As the keyboard-lift view's second child the footer is always on
-          screen, clear of the navigation bar, and lifted above the IME.
-        */}
-        <View className="px-4 pb-4">
-          {/*
-            Persistent failure feedback for the cloud create, in the reserved
-            spot above Start. A retryable rejection carries the retry control;
-            a terminal one says what the server reported instead. It rides with
-            the action it answers, so the feedback is on screen wherever the
-            body is scrolled. The form owns this feedback, so the creator hook
-            stays silent for it. Cloud-only: the route also clears the failure
-            when the target changes, and this gate keeps a stale one off a
-            remote target no matter which path selected it.
-          */}
-          {cloudCreateError && !isRemote ? (
-            <NewSessionCloudCreateError
-              failure={cloudCreateError}
-              onRetry={onRetryCloudCreate}
-              isRetryDisabled={isStartDisabled}
-            />
-          ) : null}
+  // Persistent failure feedback for the cloud create, in the reserved spot
+  // directly above Start. A retryable rejection carries the retry control; a
+  // terminal one says what the server reported instead. The form owns this
+  // feedback, so the creator hook stays silent for it. It rides the pinned
+  // footer with Start so the recovery control is visible with the keyboard up
+  // too. Cloud-only: the route also clears the failure when the target
+  // changes, and this gate keeps a stale one off a remote target no matter
+  // which path selected it.
+  const footer = (
+    <View className="bg-background px-4 pt-3" style={{ paddingBottom: bottomClearance }}>
+      {cloudCreateError && !isRemote ? (
+        <NewSessionCloudCreateError
+          failure={cloudCreateError}
+          onRetry={onRetryCloudCreate}
+          isRetryDisabled={isStartDisabled}
+        />
+      ) : null}
 
-          <NewSessionStartButton
-            isCloneEntry={isCloneEntry}
-            isRemote={isRemote}
-            isStartDisabled={isStartDisabled}
-            isStarting={isStarting}
-            onStartSession={onStartSession}
-          />
-        </View>
-      </AppAwareKeyboardPaddingView>
+      <NewSessionStartButton
+        isCloneEntry={isCloneEntry}
+        isRemote={isRemote}
+        isStartDisabled={isStartDisabled}
+        isStarting={isStarting}
+        onStartSession={onStartSession}
+      />
+    </View>
+  );
+
+  return (
+    <View className="flex-1 bg-background">
+      {body}
+      <AppAwareKeyboardPaddingView>{footer}</AppAwareKeyboardPaddingView>
     </View>
   );
 }

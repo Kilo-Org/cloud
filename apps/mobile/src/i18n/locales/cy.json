@@ -2344,7 +2344,8 @@
       "matchesBadge_zero": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_two": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_few": "{{displayCount}} cyfatebiaeth",
-      "matchesBadge_many": "{{displayCount}} cyfatebiaeth"
+      "matchesBadge_many": "{{displayCount}} cyfatebiaeth",
+      "noOutput": "Dim allbwn."
     },
     "readToolMarkdown": {
       "linesTruncated": "llinellau {{start}}–{{end}} (wedi'u cwtogi)",

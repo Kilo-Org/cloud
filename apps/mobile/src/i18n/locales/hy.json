@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} տող",
       "linesBadge_other": "{{displayCount}} տող",
       "matchesBadge_one": "{{displayCount}} համընկնում",
-      "matchesBadge_other": "{{displayCount}} համընկնում"
+      "matchesBadge_other": "{{displayCount}} համընկնում",
+      "noOutput": "Ելք չկա։"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} տողերը (կրճատված)",

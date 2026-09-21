@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} мөр",
       "linesBadge_other": "{{displayCount}} мөр",
       "matchesBadge_one": "{{displayCount}} илэрц",
-      "matchesBadge_other": "{{displayCount}} илэрц"
+      "matchesBadge_other": "{{displayCount}} илэрц",
+      "noOutput": "Гаралт байхгүй."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} мөр (товчилсон)",

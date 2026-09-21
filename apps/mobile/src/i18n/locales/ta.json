@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} வரி",
       "linesBadge_other": "{{displayCount}} வரிகள்",
       "matchesBadge_one": "{{displayCount}} பொருத்தம்",
-      "matchesBadge_other": "{{displayCount}} பொருத்தங்கள்"
+      "matchesBadge_other": "{{displayCount}} பொருத்தங்கள்",
+      "noOutput": "வெளியீடு இல்லை."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} வரிகள் (முழுவதும் காட்டப்படவில்லை)",

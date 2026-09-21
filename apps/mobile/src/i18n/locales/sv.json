@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} rad",
       "linesBadge_other": "{{displayCount}} rader",
       "matchesBadge_one": "{{displayCount}} träff",
-      "matchesBadge_other": "{{displayCount}} träffar"
+      "matchesBadge_other": "{{displayCount}} träffar",
+      "noOutput": "Ingen utdata."
     },
     "readToolMarkdown": {
       "linesTruncated": "rader {{start}}–{{end}} (avkortat)",

@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} کرښې",
       "linesBadge_other": "{{displayCount}} کرښې",
       "matchesBadge_one": "{{displayCount}} پایلې",
-      "matchesBadge_other": "{{displayCount}} پایلې"
+      "matchesBadge_other": "{{displayCount}} پایلې",
+      "noOutput": "هېڅ پایلې نشته."
     },
     "readToolMarkdown": {
       "linesTruncated": "کرښې {{start}}–{{end}} (لنډې شوې)",

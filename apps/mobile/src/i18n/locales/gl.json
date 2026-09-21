@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} liña",
       "linesBadge_other": "{{displayCount}} liñas",
       "matchesBadge_one": "{{displayCount}} coincidencia",
-      "matchesBadge_other": "{{displayCount}} coincidencias"
+      "matchesBadge_other": "{{displayCount}} coincidencias",
+      "noOutput": "Non hai saída."
     },
     "readToolMarkdown": {
       "linesTruncated": "liñas {{start}}–{{end}} (contido truncado)",

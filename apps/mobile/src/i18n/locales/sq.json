@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} rresht",
       "linesBadge_other": "{{displayCount}} rreshta",
       "matchesBadge_one": "{{displayCount}} përputhje",
-      "matchesBadge_other": "{{displayCount}} përputhje"
+      "matchesBadge_other": "{{displayCount}} përputhje",
+      "noOutput": "Nuk ka dalje."
     },
     "readToolMarkdown": {
       "linesTruncated": "rreshtat {{start}}–{{end}} (përmbajtje e shkurtuar)",

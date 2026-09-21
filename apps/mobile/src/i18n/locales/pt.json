@@ -2248,7 +2248,8 @@
       "linesBadge_many": "{{displayCount}} linhas",
       "matchesBadge_one": "{{displayCount}} correspondência",
       "matchesBadge_other": "{{displayCount}} correspondências",
-      "matchesBadge_many": "{{displayCount}} correspondências"
+      "matchesBadge_many": "{{displayCount}} correspondências",
+      "noOutput": "Sem saída."
     },
     "readToolMarkdown": {
       "linesTruncated": "linhas {{start}}–{{end}} (truncadas)",

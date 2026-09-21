@@ -2216,7 +2216,8 @@
       "linesBadge_one": "Mstari {{displayCount}}",
       "linesBadge_other": "Mistari {{displayCount}}",
       "matchesBadge_one": "Tokeo {{displayCount}}",
-      "matchesBadge_other": "Matokeo {{displayCount}}"
+      "matchesBadge_other": "Matokeo {{displayCount}}",
+      "noOutput": "Hakuna matokeo."
     },
     "readToolMarkdown": {
       "linesTruncated": "mistari {{start}}–{{end}} (imekatwa)",

@@ -1712,7 +1712,8 @@
       "linesBadge_one": "{{displayCount}} Zeile",
       "linesBadge_other": "{{displayCount}} Zeilen",
       "matchesBadge_one": "{{displayCount}} Treffer",
-      "matchesBadge_other": "{{displayCount}} Treffer"
+      "matchesBadge_other": "{{displayCount}} Treffer",
+      "noOutput": "Keine Ausgabe."
     },
     "readToolMarkdown": {
       "linesTruncated": "zeilen {{start}}–{{end}} (gekürzt)",

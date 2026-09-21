@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} жол",
       "linesBadge_other": "{{displayCount}} жол",
       "matchesBadge_one": "{{displayCount}} сәйкестік",
-      "matchesBadge_other": "{{displayCount}} сәйкестік"
+      "matchesBadge_other": "{{displayCount}} сәйкестік",
+      "noOutput": "Шығыс жоқ."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} жолдары (қысқартылған)",

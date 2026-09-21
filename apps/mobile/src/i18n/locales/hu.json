@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} sor",
       "linesBadge_other": "{{displayCount}} sor",
       "matchesBadge_one": "{{displayCount}} találat",
-      "matchesBadge_other": "{{displayCount}} találat"
+      "matchesBadge_other": "{{displayCount}} találat",
+      "noOutput": "Nincs kimenet."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}. sor (csonkolva)",

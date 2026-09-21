@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}}টি লাইন",
       "linesBadge_other": "{{displayCount}}টি লাইন",
       "matchesBadge_one": "{{displayCount}}টি মিল",
-      "matchesBadge_other": "{{displayCount}}টি মিল"
+      "matchesBadge_other": "{{displayCount}}টি মিল",
+      "noOutput": "কোনো আউটপুট নেই।"
     },
     "readToolMarkdown": {
       "linesTruncated": "লাইন {{start}}–{{end}} (আংশিক দেখানো হয়েছে)",

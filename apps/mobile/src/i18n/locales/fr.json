@@ -1627,7 +1627,8 @@
       "linesBadge_many": "{{displayCount}} lignes",
       "matchesBadge_one": "{{displayCount}} résultat",
       "matchesBadge_other": "{{displayCount}} résultats",
-      "matchesBadge_many": "{{displayCount}} résultats"
+      "matchesBadge_many": "{{displayCount}} résultats",
+      "noOutput": "Aucune sortie."
     },
     "readToolMarkdown": {
       "linesTruncated": "lignes {{start}}–{{end}} (tronquées)",

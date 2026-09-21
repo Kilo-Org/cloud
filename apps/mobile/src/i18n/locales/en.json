@@ -2224,7 +2224,8 @@
       "filesBadge_other": "{{displayCount}} files",
       "matchesBadge_one": "{{displayCount}} match",
       "matchesBadge": "{{displayCount}} matches",
-      "matchesBadge_other": "{{displayCount}} matches"
+      "matchesBadge_other": "{{displayCount}} matches",
+      "noOutput": "No output."
     },
     "readToolMarkdown": {
       "linesTruncated": "lines {{start}}–{{end}} (truncated)",

@@ -2248,7 +2248,8 @@
       "linesBadge_few": "{{displayCount}} linii",
       "matchesBadge_one": "{{displayCount}} potrivire",
       "matchesBadge_other": "{{displayCount}} potriviri",
-      "matchesBadge_few": "{{displayCount}} potriviri"
+      "matchesBadge_few": "{{displayCount}} potriviri",
+      "noOutput": "Nicio ieșire."
     },
     "readToolMarkdown": {
       "linesTruncated": "liniile {{start}}–{{end}} (trunchiate)",

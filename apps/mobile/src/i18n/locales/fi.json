@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} rivi",
       "linesBadge_other": "{{displayCount}} riviä",
       "matchesBadge_one": "{{displayCount}} osuma",
-      "matchesBadge_other": "{{displayCount}} osumaa"
+      "matchesBadge_other": "{{displayCount}} osumaa",
+      "noOutput": "Ei tulostetta."
     },
     "readToolMarkdown": {
       "linesTruncated": "rivit {{start}}–{{end}} (katkaistu)",

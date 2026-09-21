@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} પંક્તિ",
       "linesBadge_other": "{{displayCount}} પંક્તિઓ",
       "matchesBadge_one": "{{displayCount}} મેળ",
-      "matchesBadge_other": "{{displayCount}} મેળ"
+      "matchesBadge_other": "{{displayCount}} મેળ",
+      "noOutput": "કોઈ આઉટપુટ નથી."
     },
     "readToolMarkdown": {
       "linesTruncated": "પંક્તિઓ {{start}}–{{end}} (ટૂંકાવેલી)",

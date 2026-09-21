@@ -1712,7 +1712,8 @@
       "linesBadge_one": "{{displayCount}} baris",
       "linesBadge_other": "{{displayCount}} baris",
       "matchesBadge_one": "{{displayCount}} kecocokan",
-      "matchesBadge_other": "{{displayCount}} kecocokan"
+      "matchesBadge_other": "{{displayCount}} kecocokan",
+      "noOutput": "Tidak ada keluaran."
     },
     "readToolMarkdown": {
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",

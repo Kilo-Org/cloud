@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} lerro",
       "linesBadge_other": "{{displayCount}} lerro",
       "matchesBadge_one": "{{displayCount}} bat etortze",
-      "matchesBadge_other": "{{displayCount}} bat etortze"
+      "matchesBadge_other": "{{displayCount}} bat etortze",
+      "noOutput": "Irteerarik ez."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} lerroak (moztuta)",

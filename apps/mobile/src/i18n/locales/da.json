@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} linje",
       "linesBadge_other": "{{displayCount}} linjer",
       "matchesBadge_one": "{{displayCount}} resultat",
-      "matchesBadge_other": "{{displayCount}} resultater"
+      "matchesBadge_other": "{{displayCount}} resultater",
+      "noOutput": "Ingen output."
     },
     "readToolMarkdown": {
       "linesTruncated": "linje {{start}}–{{end}} (forkortet)",

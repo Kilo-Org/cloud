@@ -1712,7 +1712,8 @@
       "linesBadge_one": "{{displayCount}} regel",
       "linesBadge_other": "{{displayCount}} regels",
       "matchesBadge_one": "{{displayCount}} treffer",
-      "matchesBadge_other": "{{displayCount}} treffers"
+      "matchesBadge_other": "{{displayCount}} treffers",
+      "noOutput": "Geen uitvoer."
     },
     "readToolMarkdown": {
       "linesTruncated": "regels {{start}}–{{end}} (afgekapt)",

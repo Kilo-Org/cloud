@@ -1692,7 +1692,8 @@
       "linesBadge_many": "{{displayCount}} righe",
       "matchesBadge_one": "{{displayCount}} corrispondenza",
       "matchesBadge_other": "{{displayCount}} corrispondenze",
-      "matchesBadge_many": "{{displayCount}} corrispondenze"
+      "matchesBadge_many": "{{displayCount}} corrispondenze",
+      "noOutput": "Nessun output."
     },
     "readToolMarkdown": {
       "linesTruncated": "righe {{start}}–{{end}} (troncate)",

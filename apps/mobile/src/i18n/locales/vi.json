@@ -1712,7 +1712,8 @@
       "linesBadge_one": "{{displayCount}} dòng",
       "linesBadge_other": "{{displayCount}} dòng",
       "matchesBadge_one": "{{displayCount}} kết quả khớp",
-      "matchesBadge_other": "{{displayCount}} kết quả khớp"
+      "matchesBadge_other": "{{displayCount}} kết quả khớp",
+      "noOutput": "Không có đầu ra."
     },
     "readToolMarkdown": {
       "linesTruncated": "dòng {{start}}–{{end}} (đã cắt bớt)",

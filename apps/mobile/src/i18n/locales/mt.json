@@ -2312,7 +2312,8 @@
       "matchesBadge_other": "{{displayCount}} riżultati",
       "matchesBadge_two": "{{displayCount}} riżultati",
       "matchesBadge_few": "{{displayCount}} riżultati",
-      "matchesBadge_many": "{{displayCount}} riżultati"
+      "matchesBadge_many": "{{displayCount}} riżultati",
+      "noOutput": "M'hemm l-ebda ħruġ."
     },
     "readToolMarkdown": {
       "linesTruncated": "linji {{start}}–{{end}} (maqtugħa)",

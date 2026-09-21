@@ -1744,7 +1744,8 @@
       "matchesBadge_one": "збіг: {{displayCount}}",
       "matchesBadge_other": "збігів: {{displayCount}}",
       "matchesBadge_few": "збіги: {{displayCount}}",
-      "matchesBadge_many": "збігів: {{displayCount}}"
+      "matchesBadge_many": "збігів: {{displayCount}}",
+      "noOutput": "Немає виводу."
     },
     "readToolMarkdown": {
       "linesTruncated": "рядки {{start}}–{{end}} (скорочено)",

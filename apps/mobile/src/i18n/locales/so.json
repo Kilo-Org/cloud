@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} sadar",
       "linesBadge_other": "{{displayCount}} sadar",
       "matchesBadge_one": "{{displayCount}} natiijo",
-      "matchesBadge_other": "{{displayCount}} natiijo"
+      "matchesBadge_other": "{{displayCount}} natiijo",
+      "noOutput": "Wax soo saar ma jiro."
     },
     "readToolMarkdown": {
       "linesTruncated": "sadarrada {{start}}–{{end}} (la soo gaabiyay)",

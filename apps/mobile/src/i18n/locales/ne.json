@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} पङ्क्ति",
       "linesBadge_other": "{{displayCount}} पङ्क्ति",
       "matchesBadge_one": "{{displayCount}} नतिजा",
-      "matchesBadge_other": "{{displayCount}} नतिजा"
+      "matchesBadge_other": "{{displayCount}} नतिजा",
+      "noOutput": "कुनै आउटपुट छैन।"
     },
     "readToolMarkdown": {
       "linesTruncated": "पङ्क्ति {{start}}–{{end}} (केही अंश काटिएको)",

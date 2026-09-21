@@ -163,6 +163,7 @@
     "useDifferentEmail": "ใช้อีเมลอื่น",
     "signInWithApple": "ลงชื่อเข้าใช้ด้วย Apple",
     "signInWithGoogle": "ลงชื่อเข้าใช้ด้วย Google",
+    "signInWithPasskey": "ลงชื่อเข้าใช้ด้วยพาสคีย์",
     "emailAddress": "ที่อยู่อีเมล",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "ดำเนินการต่อด้วยอีเมล",
@@ -175,6 +176,10 @@
     "termsConnector": " และ ",
     "termsSuffix": ".",
     "moreSignInOptions": "ตัวเลือกการลงชื่อเข้าใช้เพิ่มเติม",
+    "passkeyCancelled": "การลงชื่อเข้าใช้ด้วยพาสคีย์ถูกยกเลิก โปรดลองอีกครั้ง",
+    "passkeyNotFound": "ไม่มีพาสคีย์ที่บันทึกไว้สำหรับอุปกรณ์นี้ ให้ลงชื่อเข้าใช้ด้วย Apple, Google หรืออีเมลของคุณแทน",
+    "passkeyUnsupported": "พาสคีย์ไม่พร้อมใช้งานบนอุปกรณ์นี้ ให้ลงชื่อเข้าใช้ด้วย Apple, Google หรืออีเมลของคุณแทน",
+    "passkeyFailed": "ไม่สามารถลงชื่อเข้าใช้ด้วยพาสคีย์ได้ โปรดลองอีกครั้ง",
     "couldNotCompleteSignIn": "ลงชื่อเข้าใช้ไม่สำเร็จ กรุณาลองอีกครั้ง",
     "sessionEnded": "เซสชันของคุณสิ้นสุดแล้ว กรุณาลงชื่อเข้าใช้อีกครั้ง",
     "signInCodeExpired": "รหัสลงชื่อเข้าใช้ของคุณหมดอายุแล้ว กรุณาลองอีกครั้ง",
@@ -225,7 +230,28 @@
     "providerTestAccount": "บัญชีทดสอบ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO สำหรับองค์กร"
+    "providerEnterpriseSso": "SSO สำหรับองค์กร",
+    "passkeysTitle": "พาสคีย์",
+    "passkeysSubtitle": "ลงชื่อเข้าใช้โดยไม่ใช้รหัสผ่าน",
+    "passkeysEmpty": "ยังไม่มีพาสคีย์",
+    "passkeysEmptyHint": "$t(profile.addPasskey) เพื่อลงชื่อเข้าใช้โดยไม่ใช้รหัสผ่าน",
+    "passkeysCouldNotLoad": "โหลดพาสคีย์ไม่สำเร็จ",
+    "passkeysLoadFailed": "พาสคีย์จะไม่พร้อมใช้งานจนกว่าจะโหลดเสร็จ",
+    "addPasskey": "เพิ่มพาสคีย์",
+    "passkeyDefaultName": "พาสคีย์",
+    "passkeyAddedOn": "เพิ่มเมื่อ {{date}}",
+    "passkeyAdded": "เพิ่มพาสคีย์แล้ว",
+    "passkeyAddFailed": "เพิ่มพาสคีย์ไม่สำเร็จ ลองอีกครั้ง",
+    "passkeyAddUnsupported": "อุปกรณ์นี้สร้างพาสคีย์ไม่ได้",
+    "passkeyAddCancelled": "การสร้างพาสคีย์ถูกยกเลิก",
+    "passkeyRemoved": "ลบพาสคีย์แล้ว",
+    "passkeyRemoveFailed": "ลบพาสคีย์นั้นไม่สำเร็จ ลองอีกครั้ง",
+    "passkeyRenamed": "เปลี่ยนชื่อพาสคีย์แล้ว",
+    "passkeyName": "ชื่อพาสคีย์",
+    "renamePasskey": "เปลี่ยนชื่อพาสคีย์",
+    "removePasskey": "ลบพาสคีย์",
+    "removePasskeyTitle": "ลบพาสคีย์หรือไม่?",
+    "removePasskeyMessage": "คุณจะไม่สามารถลงชื่อเข้าใช้ด้วยพาสคีย์นี้ได้อีก"
   },
   "preferences": {
     "general": "ทั่วไป",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "โหลดแล้ว {{displayCount}} จาก {{total}} ไฟล์",
       "filesStillLoading": "ยังโหลดไฟล์ไม่เสร็จ ดึงลงเพื่อรีเฟรช",
       "goToOverview": "ไปที่ภาพรวม",
-      "goToOverviewTab": "ไปที่แท็บภาพรวม"
+      "goToOverviewTab": "ไปที่แท็บภาพรวม",
+      "expandAllLines_one": "ขยายทั้ง {{displayCount}} บรรทัด",
+      "expandAllLines_other": "ขยายทั้ง {{displayCount}} บรรทัด",
+      "expandLines_one": "แสดง {{displayCount}} บรรทัด ({{start}}–{{end}})",
+      "expandLines_other": "แสดง {{displayCount}} บรรทัด ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "แสดงบรรทัดแวดล้อม {{displayCount}} บรรทัด",
+      "expandLinesOfContext_other": "แสดงบรรทัดแวดล้อม {{displayCount}} บรรทัด",
+      "expandMoreLines_one": "แสดงเพิ่มอีก {{displayCount}} บรรทัด ({{start}}–{{end}})",
+      "expandMoreLines_other": "แสดงเพิ่มอีก {{displayCount}} บรรทัด ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "โหลดแล้ว {{loaded}} จาก {{total}} ไฟล์",
+      "loadedOfTotalFiles_other": "โหลดแล้ว {{loaded}} จาก {{total}} ไฟล์"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ไม่มีอักขระขึ้นบรรทัดใหม่ท้ายไฟล์",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "อ้างอิงโค้ดเก่าที่ {{path}}"
       },
       "deletedUser": "ผู้ใช้ที่ถูกลบ",
-      "replyForbiddenTerm": "คุณไม่มีสิทธิ์ตอบกลับใน {{term}} นี้"
+      "replyForbiddenTerm": "คุณไม่มีสิทธิ์ตอบกลับใน {{term}} นี้",
+      "moreLinesAbove_one": "… ยังมีอีก {{displayCount}} บรรทัดด้านบน",
+      "moreLinesAbove_other": "… ยังมีอีก {{displayCount}} บรรทัดด้านบน"
     },
     "couldNotOpenGitHubAppSettings": "ไม่สามารถเปิดการตั้งค่าแอป GitHub ได้",
     "installKiloGitHubApp": "ติดตั้ง Kilo GitHub App",
@@ -706,7 +744,9 @@
       "statusContext": "บรรทัดแวดล้อม",
       "lineLabel": "บรรทัด {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "สถานะ {{status}}: {{text}}",
-      "emptyLine": "(ว่าง)"
+      "emptyLine": "(ว่าง)",
+      "truncationBanner_one": "กำลังแสดง {{limit}} ไฟล์แรกจากทั้งหมด {{total}} ไฟล์ที่เปลี่ยนแปลง — ขีดจำกัด API ของ GitHub",
+      "truncationBanner_other": "กำลังแสดง {{limit}} ไฟล์แรกจากทั้งหมด {{total}} ไฟล์ที่เปลี่ยนแปลง — ขีดจำกัด API ของ GitHub"
     },
     "linkPasteClipboardEmpty": "คลิปบอร์ดว่างเปล่า",
     "linkPasteNotAPullRequest": "ไม่ใช่ลิงก์พูลรีเควสต์หรือ merge request",
@@ -783,7 +823,7 @@
     "previewFullDescription": "การแจ้งเตือนแสดงข้อความบนหน้าจอล็อกของคุณ",
     "previewGenericDescription": "การแจ้งเตือนจะแสดงเพียงว่ามีความเคลื่อนไหว เปิด Kilo เพื่ออ่านข้อความ",
     "channel": {
-      "agent": "เซสชันเอเจนต์",
+      "agentProgress": "ความคืบหน้าของเอเจนต์",
       "chat": "ข้อความแชท",
       "kiloclaw": "กิจกรรม KiloClaw",
       "balance": "การแจ้งเตือนยอดเงิน",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "อินสแตนซ์พร้อมใช้งานหรือทำงานล้มเหลว และการดำเนินการตามกำหนดเวลา",
       "balanceAlertsSubtitle": "คำเตือนเมื่อยอดคงเหลือขององค์กรต่ำ",
       "securityFindingsSubtitle": "ปัญหาที่ตรวจพบใหม่และการเตือนตาม SLA"
+    },
+    "action": {
+      "openSession": "เปิดเซสชัน"
+    },
+    "needsInputAction": {
+      "approved": "อนุมัติคำขอแล้ว",
+      "replied": "ส่งคำตอบกลับแล้ว",
+      "failed": "ตอบกลับไม่สำเร็จ แตะอีกครั้งเพื่อลองใหม่",
+      "unavailable": "คำขอนี้ไม่ได้รออยู่อีกต่อไป"
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "อัปโหลดล้มเหลว",
       "failedToUploadFile": "อัปโหลดไฟล์ไม่สำเร็จ: {{reason}}",
       "nothingToPaste": "ไม่มีอะไรให้วาง",
-      "metadataStripFailed": "ไม่สามารถลบข้อมูลเมตาของรูปภาพได้"
+      "metadataStripFailed": "ไม่สามารถลบข้อมูลเมตาของรูปภาพได้",
+      "limit_one": "คุณสามารถแนบได้สูงสุด {{displayCount}} ไฟล์",
+      "limit_other": "คุณสามารถแนบได้สูงสุด {{displayCount}} ไฟล์"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}} สถานะ: {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "ซิงค์ข้อค้นพบ",
       "syncNow": "ซิงค์ตอนนี้",
       "syncQueued": "จัดคิวการซิงค์แล้ว",
-      "syncStatusUnavailable": "ไม่สามารถดูสถานะการซิงค์ได้"
+      "syncStatusUnavailable": "ไม่สามารถดูสถานะการซิงค์ได้",
+      "daysOverdue_one": "เกินกำหนด {{displayCount}} วัน",
+      "daysOverdue_other": "เกินกำหนด {{displayCount}} วัน",
+      "findingsCount_one": "ข้อค้นพบ {{displayCount}} รายการ",
+      "findingsCount_other": "ข้อค้นพบ {{displayCount}} รายการ"
     },
     "dashboardMetrics": {
       "openFindings": "ข้อค้นพบที่ยังเปิดอยู่",
@@ -2135,20 +2190,7 @@
       "continueFrom": "กำลังทำงานต่อจาก {{title}}",
       "importingSession": "กำลังนำเข้าเซสชัน",
       "cliCannotContinue": "CLI นี้ไม่สามารถทำงานต่อจากเซสชันเดิมได้ เลือก Cloud Agent หรือ CLI อื่น",
-      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้",
-      "sandbox": "แซนด์บ็อกซ์",
-      "sandboxAccessibility": "แซนด์บ็อกซ์: {{label}}",
-      "sandboxDefaultWithDestination": "ค่าเริ่มต้น · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "เล็ก",
-      "sandboxInstanceShared": "แชร์",
-      "sandboxInstanceLarge": "ใหญ่",
-      "sandboxInstanceDevcontainer": "คอนเทนเนอร์สำหรับพัฒนา",
-      "sandboxInstanceProviderDefault": "ค่าเริ่มต้นของผู้ให้บริการ",
-      "sandboxCouldNotLoad": "โหลดตัวเลือกแซนด์บ็อกซ์ไม่สำเร็จ",
-      "sandboxUnavailable": "แซนด์บ็อกซ์นี้ใช้งานไม่ได้ โปรดเลือกแซนด์บ็อกซ์อื่นหรือค่าเริ่มต้น",
-      "sandboxUseDefault": "ใช้ค่าเริ่มต้น"
+      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้"
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดตไฟล์แล้ว {{displayCount}} ไฟล์",
@@ -2172,7 +2214,13 @@
       "updateTodos": "อัปเดตรายการงาน",
       "linesBadge": "{{displayCount}} บรรทัด",
       "filesBadge": "{{displayCount}} ไฟล์",
-      "matchesBadge": "พบ {{displayCount}} รายการ"
+      "matchesBadge": "พบ {{displayCount}} รายการ",
+      "filesBadge_one": "{{displayCount}} ไฟล์",
+      "filesBadge_other": "{{displayCount}} ไฟล์",
+      "linesBadge_one": "{{displayCount}} บรรทัด",
+      "linesBadge_other": "{{displayCount}} บรรทัด",
+      "matchesBadge_one": "พบ {{displayCount}} รายการ",
+      "matchesBadge_other": "พบ {{displayCount}} รายการ"
     },
     "readToolMarkdown": {
       "linesTruncated": "บรรทัด {{start}}–{{end}} (ตัดบางส่วนออก)",
@@ -2462,7 +2510,11 @@
       "files": "ไฟล์",
       "couldNotOpenPhotoPicker": "เปิดหน้าต่างเลือกรูปภาพไม่สำเร็จ ปิดแล้วเปิด Kilo ใหม่ จากนั้นลองอีกครั้ง",
       "maxFilesAllowed": "แนบไฟล์ได้สูงสุด {{displayCount}} ไฟล์",
-      "onlyAddingFiles": "เพิ่มเพียง {{accepted}} ไฟล์จากทั้งหมด {{total}} ไฟล์ (สูงสุด {{max}} ไฟล์)"
+      "onlyAddingFiles": "เพิ่มเพียง {{accepted}} ไฟล์จากทั้งหมด {{total}} ไฟล์ (สูงสุด {{max}} ไฟล์)",
+      "maxFilesAllowed_one": "แนบไฟล์ได้สูงสุด {{displayCount}} ไฟล์",
+      "maxFilesAllowed_other": "แนบไฟล์ได้สูงสุด {{displayCount}} ไฟล์",
+      "onlyAddingFiles_one": "เพิ่มเพียง {{accepted}} ไฟล์จากทั้งหมด {{total}} ไฟล์ (สูงสุด {{max}} ไฟล์)",
+      "onlyAddingFiles_other": "เพิ่มเพียง {{accepted}} ไฟล์จากทั้งหมด {{total}} ไฟล์ (สูงสุด {{max}} ไฟล์)"
     },
     "composer": {
       "addAttachment": "เพิ่มไฟล์แนบ",
@@ -2480,7 +2532,9 @@
       "discardAttachmentsMessage": "ไฟล์ที่อัปโหลดไว้แต่ยังไม่ได้ใช้จะถูกลบ",
       "discardAttachmentsTitle": "ทิ้งไฟล์แนบหรือไม่?",
       "charactersRemaining": "เหลือ {{count}} อักขระ",
-      "insertNewline": "แทรกบรรทัดใหม่"
+      "insertNewline": "แทรกบรรทัดใหม่",
+      "charactersRemaining_one": "เหลือ {{count}} อักขระ",
+      "charactersRemaining_other": "เหลือ {{count}} อักขระ"
     },
     "chatLink": {
       "linkCopied": "คัดลอกลิงก์แล้ว",
@@ -2552,7 +2606,9 @@
       "stepsCount_one": "{{steps}} ขั้นตอน",
       "stepsCount": "{{steps}} ขั้นตอน",
       "stepsCount_other": "{{steps}} ขั้นตอน",
-      "modelAccessibilityLabel": "{{name}} จาก {{provider}} · {{steps}} · {{cost}}"
+      "modelAccessibilityLabel": "{{name}} จาก {{provider}} · {{steps}} · {{cost}}",
+      "modelsCount_one": "โมเดล ({{displayCount}})",
+      "modelsCount_other": "โมเดล ({{displayCount}})"
     },
     "autoApprove": {
       "title": "อนุมัติอัตโนมัติ",
@@ -2592,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "การเรียกเครื่องมือ",
-      "condensedLabel": "{{itemCount}} รายการ; {{last}}"
+      "condensedLabel": "{{itemCount}} รายการ; {{last}}",
+      "condensedLabel_one": "{{itemCount}} รายการ; {{last}}",
+      "condensedLabel_other": "{{itemCount}} รายการ; {{last}}"
     }
   },
   "bootstrap": {
@@ -2727,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "เซสชันนี้ไม่สามารถรับไฟล์ได้",
     "cliCantReceiveFilesMessage": "Kilo CLI ที่รันเซสชันนี้ไม่สามารถรับไฟล์ได้ อัปเดต CLI บนเครื่องนั้น หรือแชร์ไปยังเซสชันใหม่แทน",
     "contentlessMessage": "ไม่มีเนื้อหาให้แชร์ เพราะไม่มีข้อความหรือไฟล์แนบมา",
-    "couldNotReadContent": "อ่านเนื้อหาที่แชร์ไม่สำเร็จ"
+    "couldNotReadContent": "อ่านเนื้อหาที่แชร์ไม่สำเร็จ",
+    "onlyFirstFilesAttached_one": "จะแนบเฉพาะ {{displayCount}} ไฟล์แรกเท่านั้น",
+    "onlyFirstFilesAttached_other": "จะแนบเฉพาะ {{displayCount}} ไฟล์แรกเท่านั้น"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3097,7 +3157,9 @@
     "couldNotApprove": "อนุมัติไม่สำเร็จ",
     "couldNotStart": "เริ่มไม่สำเร็จ",
     "channelName": "เอเจนต์ที่กำลังทำงาน",
-    "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก"
+    "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก",
+    "openSession": "เปิด",
+    "approveFailed": "อนุมัติไม่สำเร็จ แตะ $t(common.approve) เพื่อลองอีกครั้ง"
   },
   "transcriptionModel": {
     "title": "โมเดลถอดเสียง",
@@ -3138,5 +3200,8 @@
       "repositoryUnknown": "Kilo ไม่รู้จัก {{repository}} ว่าเป็นคลังโค้ด GitHub หรือ GitLab เลือกคลังโค้ดอื่นใน Kilo",
       "repositoryUnsupported": "{{repository}} เป็นคลังโค้ด Bitbucket — เริ่มเอเจนต์ยังใช้ไม่ได้ เลือกคลังโค้ดอื่นใน Kilo"
     }
+  },
+  "launcher": {
+    "openLastSession": "เปิดเซสชันล่าสุด"
   }
 }

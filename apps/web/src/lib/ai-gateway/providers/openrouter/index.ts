@@ -229,6 +229,7 @@ function removeUpstreamEnkrypt(response: unknown): unknown {
  */
 export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse> {
   const response = await fetch(`${OPENROUTER.apiUrl}/models`, {
+    cache: 'force-cache',
     method: 'GET',
     headers: {
       Authorization: `Bearer ${OPENROUTER.apiKey}`,

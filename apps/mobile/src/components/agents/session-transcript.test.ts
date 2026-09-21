@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   condenseTranscriptToolRuns,
   getSessionTranscriptItemKey,
+  getSessionTranscriptItemMessageId,
   mergeSessionTranscript,
   TRANSCRIPT_TIME_MARKER_GAP_MS,
 } from '@/components/agents/session-transcript';
@@ -307,6 +308,44 @@ function toolPartCount(items: ReturnType<typeof mergeSessionTranscript>): number
 function keysOf(items: ReturnType<typeof mergeSessionTranscript>): string[] {
   return items.map(item => getSessionTranscriptItemKey(item));
 }
+
+function messageIdsOf(items: ReturnType<typeof mergeSessionTranscript>): (string | null)[] {
+  return items.map(item => getSessionTranscriptItemMessageId(item));
+}
+
+describe('getSessionTranscriptItemMessageId', () => {
+  it('maps message and time rows to their message id', () => {
+    const transcript = mergeSessionTranscript([message('msg_001')], []);
+
+    expect(keysOf(transcript)).toEqual(['time:msg_001', 'msg_001']);
+    expect(messageIdsOf(transcript)).toEqual(['msg_001', 'msg_001']);
+  });
+
+  it('maps a preparation row to null — it renders no message row of its own', () => {
+    const transcript = mergeSessionTranscript(
+      [message('msg_001')],
+      [attempt('attempt_001', 'msg_001')]
+    );
+
+    expect(messageIdsOf(transcript)).toEqual(['msg_001', 'msg_001', null]);
+  });
+
+  it("maps a condensed tool run to its first part's message id", () => {
+    const base = 1_000_000_000;
+    const condensed = condenseTranscriptToolRuns(
+      mergeSessionTranscript(
+        [
+          assistantToolOnlyMessageAt('msg_tool_a', base, ['ta1', 'ta2']),
+          assistantToolOnlyMessageAt('msg_tool_b', base + 1000, ['tb1']),
+        ],
+        []
+      )
+    );
+
+    expect(keysOf(condensed)).toEqual(['time:msg_tool_a', 'tool-run:ta1']);
+    expect(messageIdsOf(condensed)).toEqual(['msg_tool_a', 'msg_tool_a']);
+  });
+});
 
 describe('session transcript', () => {
   it('places preparation attempts after their trigger message', () => {

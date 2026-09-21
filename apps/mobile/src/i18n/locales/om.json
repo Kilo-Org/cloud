@@ -163,6 +163,7 @@
     "useDifferentEmail": "Imeelii biraa fayyadami",
     "signInWithApple": "Apple fayyadamuun seeni",
     "signInWithGoogle": "Google fayyadamuun seeni",
+    "signInWithPasskey": "Furtuu seenitiin seeni",
     "emailAddress": "Teessoo imeelii",
     "emailPlaceholder": "ati@example.com",
     "continueWithEmail": "Imeelii fayyadamuun itti fufi",
@@ -175,6 +176,10 @@
     "termsConnector": " fi ",
     "termsSuffix": ".",
     "moreSignInOptions": "Filannoowwan seensaa dabalataa",
+    "passkeyCancelled": "Furtuu seenitiin seenuun haqame. Irra deebi'ii yaali.",
+    "passkeyNotFound": "Meeshaa kanaaf furtuu seenii hin olkaa'amne. Kanaa mannaa Apple, Google ykn imeelii keetiin seeni.",
+    "passkeyUnsupported": "Furtuun seenii meeshaa kana irratti hin jiru. Kanaa mannaa Apple, Google ykn imeelii keetiin seeni.",
+    "passkeyFailed": "Furtuu seenitiin seenuun hin danda'amne. Irra deebi'ii yaali.",
     "couldNotCompleteSignIn": "Seensa xumuruun hin danda'amne. Irra deebi'ii yaali.",
     "sessionEnded": "Turtiin kee xumurameera. Irra deebi'ii seeni.",
     "signInCodeExpired": "Yeroon koodii seensaa kee darbeera. Irra deebi'ii yaali.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Herrega yaalii",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO dhaabbataa"
+    "providerEnterpriseSso": "SSO dhaabbataa",
+    "passkeysTitle": "Furtuu seenii",
+    "passkeysSubtitle": "Jecha darbii malee seeni",
+    "passkeysEmpty": "Amma amma furtuu seenii hin jiru",
+    "passkeysEmptyHint": "$t(profile.addPasskey) jecha darbii malee seenuuf.",
+    "passkeysCouldNotLoad": "Furtuu seenii fe'uun hin danda'amne",
+    "passkeysLoadFailed": "Kun hanga fe'amuu furtuun seenii hin jiru.",
+    "addPasskey": "Furtuu seenii dabali",
+    "passkeyDefaultName": "Furtuu seenii",
+    "passkeyAddedOn": "{{date}} dabalaman",
+    "passkeyAdded": "Furtuu seenii dabalaman.",
+    "passkeyAddFailed": "Furtuu seenii dabaluun hin danda'amne. Irra deebi'ii yaali.",
+    "passkeyAddUnsupported": "Meeshaan kun furtuu seenii uumuu hin danda'u.",
+    "passkeyAddCancelled": "Uumaan furtuu seenii haqame.",
+    "passkeyRemoved": "Furtuu seenii haqame.",
+    "passkeyRemoveFailed": "Furtuu seenii sana haquun hin danda'amne. Irra deebi'ii yaali.",
+    "passkeyRenamed": "Maqaan furtuu seenii jijjiirame.",
+    "passkeyName": "Maqaa furtuu seenii",
+    "renamePasskey": "Maqaa furtuu seenii jijjiiri",
+    "removePasskey": "Furtuu seenii haqi",
+    "removePasskeyTitle": "Furtuu seenii haquu?",
+    "removePasskeyMessage": "Kana booda furtuu seenii kanaan seenuu hin dandeessu."
   },
   "preferences": {
     "general": "Waliigalaa",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "Faayiloota {{total}} keessaa {{displayCount}} fe'amaniiru",
       "filesStillLoading": "Faayiloonni ammas fe'amaa jiru. Haaromsuuf harkisi.",
       "goToOverview": "Gara ilaalcha waliigalaatti deemi",
-      "goToOverviewTab": "Gara taabii ilaalcha waliigalaatti deemi"
+      "goToOverviewTab": "Gara taabii ilaalcha waliigalaatti deemi",
+      "expandAllLines_one": "Sararoota {{displayCount}} hunda agarsiisi",
+      "expandAllLines_other": "Sararoota {{displayCount}} hunda agarsiisi",
+      "expandLines_one": "Sararoota {{displayCount}} agarsiisi ({{start}}–{{end}})",
+      "expandLines_other": "Sararoota {{displayCount}} agarsiisi ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Sararoota naannoo {{displayCount}} agarsiisi",
+      "expandLinesOfContext_other": "Sararoota naannoo {{displayCount}} agarsiisi",
+      "expandMoreLines_one": "Sararoota dabalataa {{displayCount}} agarsiisi ({{start}}–{{end}})",
+      "expandMoreLines_other": "Sararoota dabalataa {{displayCount}} agarsiisi ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "Faayiloota {{total}} keessaa {{loaded}} fe'aman",
+      "loadedOfTotalFiles_other": "Faayiloota {{total}} keessaa {{loaded}} fe'aman"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "xumura faayilii irratti mallattoon sarara haaraa hin jiru.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Yeroon kan darbe: {{path}}"
       },
       "deletedUser": "fayyadamaa haqame",
-      "replyForbiddenTerm": "{{term}} kanaaf deebii kennuuf hayyama hin qabdu."
+      "replyForbiddenTerm": "{{term}} kanaaf deebii kennuuf hayyama hin qabdu.",
+      "moreLinesAbove_one": "… Sararoonni dabalataa {{displayCount}} ol jiru.",
+      "moreLinesAbove_other": "… Sararoonni dabalataa {{displayCount}} ol jiru."
     },
     "couldNotOpenGitHubAppSettings": "Qindaa'ina appii GitHub banuun hin danda'amne.",
     "installKiloGitHubApp": "Appii Kilo GitHub fe'i",
@@ -706,7 +744,9 @@
       "statusContext": "Sararoota naannoo",
       "lineLabel": "Sarara {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(duwwaa)"
+      "emptyLine": "(duwwaa)",
+      "truncationBanner_one": "Faayiloota jijjiiraman {{total}} keessaa {{limit}} jalqabaa agarsiisaa jirra — kun daangaa API GitHub ti.",
+      "truncationBanner_other": "Faayiloota jijjiiraman {{total}} keessaa {{limit}} jalqabaa agarsiisaa jirra — kun daangaa API GitHub ti."
     },
     "linkPasteClipboardEmpty": "Gabateen waraabbii duwwaadha.",
     "linkPasteNotAPullRequest": "Liinkii gaaffii walitti makuu miti",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Beeksisoonni barreeffama ergaa iskiriinii qulfii kee irratti agarsiisu.",
     "previewGenericDescription": "Beeksisoonni wanti tokko akka ta'e agarsiisu. Dubbisuuf Kilo bani.",
     "channel": {
-      "agent": "Turtiiwwan ergamaa",
+      "agentProgress": "Haala adeemsaa ergamaa",
       "chat": "Ergaawwan marii",
       "kiloclaw": "Sochii KiloClaw",
       "balance": "Akeekkachiisa haftee maallaqaa",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "fakkeenyi qophaa'e/hin milkoofne, gochaalee sagantaa qaban",
       "balanceAlertsSubtitle": "akeekkachiisa haftee dhaabbataa xiqqaa",
       "securityFindingsSubtitle": "argannoowwan haaraa fi yaadachiisa SLA"
+    },
+    "action": {
+      "openSession": "Turtii bani"
+    },
+    "needsInputAction": {
+      "approved": "Gaaffiin mirkanaa’eera",
+      "replied": "Deebbiin ergameera",
+      "failed": "Deebuu kennuu hin dandeenye. Yaaluuf irra deebi’i cuqaasi.",
+      "unavailable": "Gaaffiin kun eegamaa hin oolu."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Ol fe'uun hin milkoofne.",
       "failedToUploadFile": "Faayila ol fe'uun hin danda'amne: {{reason}}.",
       "nothingToPaste": "Wanti maxxanfamu hin jiru.",
-      "metadataStripFailed": "Odeeffannoo dabalataa suuraa haquun hin danda'amne."
+      "metadataStripFailed": "Odeeffannoo dabalataa suuraa haquun hin danda'amne.",
+      "limit_one": "Faayiloota hanga {{displayCount}}tti qabsiisuu dandeessa.",
+      "limit_other": "Faayiloota hanga {{displayCount}}tti qabsiisuu dandeessa."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Argamoota walsimsiisi",
       "syncNow": "Amma walsimsiisi",
       "syncQueued": "Walsimsiisuun tarree eegumsaatti dabalameera",
-      "syncStatusUnavailable": "Haala walsimsiisuu argachuun hin danda'amne."
+      "syncStatusUnavailable": "Haala walsimsiisuu argachuun hin danda'amne.",
+      "daysOverdue_one": "Yeroon isaa guyyaa {{displayCount}} darbeera",
+      "daysOverdue_other": "Yeroon isaa guyyaa {{displayCount}} darbeera",
+      "findingsCount_one": "Argamoota {{displayCount}}",
+      "findingsCount_other": "Argamoota {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Argamoota banaa",
@@ -2135,20 +2190,7 @@
       "continueFrom": "{{title}} itti fufaa jira.",
       "importingSession": "Turtii galchaa jira",
       "cliCannotContinue": "CLI kun turtii itti fufuu hin danda'u. Cloud Agent yookaan CLI biraa filadhu.",
-      "importFailed": "Turtii kana galchuu hin danda'amne.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Default · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Xiqqaa",
-      "sandboxInstanceShared": "Qoodama",
-      "sandboxInstanceLarge": "Guddaa",
-      "sandboxInstanceDevcontainer": "Konteenara Dev",
-      "sandboxInstanceProviderDefault": "Kan dhiyeessaa Default",
-      "sandboxCouldNotLoad": "Filannoo sandbox fe'uuf jijjiirama hin qabu",
-      "sandboxUnavailable": "Sandbox kun hin argamu. Sandbox bira ykn Default filadhu.",
-      "sandboxUseDefault": "Default fayyadami"
+      "importFailed": "Turtii kana galchuu hin danda'amne."
     },
     "partRenderer": {
       "updatedFileCount_one": "Faayiliin {{displayCount}} haaromfameera.",
@@ -2172,7 +2214,13 @@
       "updateTodos": "Tarree hojii haaromsi",
       "linesBadge": "Sarara {{displayCount}}",
       "filesBadge": "Faayiloota {{displayCount}}",
-      "matchesBadge": "Walsimsiisota {{displayCount}}"
+      "matchesBadge": "Walsimsiisota {{displayCount}}",
+      "filesBadge_one": "Faayiloota {{displayCount}}",
+      "filesBadge_other": "Faayiloota {{displayCount}}",
+      "linesBadge_one": "Sarara {{displayCount}}",
+      "linesBadge_other": "Sarara {{displayCount}}",
+      "matchesBadge_one": "Walsimsiisota {{displayCount}}",
+      "matchesBadge_other": "Walsimsiisota {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "sararoota {{start}}–{{end}} (gabaabbate)",
@@ -2462,7 +2510,11 @@
       "files": "Faayiloota",
       "couldNotOpenPhotoPicker": "Filattoo suuraa banuu hin danda'amne. Kilo deebi'ii jalqabiitii deebi'ii yaali.",
       "maxFilesAllowed": "Faayiloota hanga {{displayCount}} qofa hayyamama.",
-      "onlyAddingFiles": "Faayiloota {{total}} keessaa {{accepted}} qofa dabalaa jira (daangaa {{max}})"
+      "onlyAddingFiles": "Faayiloota {{total}} keessaa {{accepted}} qofa dabalaa jira (daangaa {{max}})",
+      "maxFilesAllowed_one": "Faayiloota hanga {{displayCount}} qofa hayyamama.",
+      "maxFilesAllowed_other": "Faayiloota hanga {{displayCount}} qofa hayyamama.",
+      "onlyAddingFiles_one": "Faayiloota {{total}} keessaa {{accepted}} qofa dabalaa jira (daangaa {{max}})",
+      "onlyAddingFiles_other": "Faayiloota {{total}} keessaa {{accepted}} qofa dabalaa jira (daangaa {{max}})"
     },
     "composer": {
       "addAttachment": "Miiltoo dabali",
@@ -2480,7 +2532,9 @@
       "discardAttachmentsMessage": "Faayiloonni ol fe'aman kan ergaa ergametti hin qabachiifamne ni haqamu.",
       "discardAttachmentsTitle": "Faayiloota qabachiifaman haqxaa?",
       "charactersRemaining": "arfiiwwan {{count}} hafan",
-      "insertNewline": "Sarara haaraa galchi"
+      "insertNewline": "Sarara haaraa galchi",
+      "charactersRemaining_one": "arfiiwwan {{count}} hafan",
+      "charactersRemaining_other": "arfiiwwan {{count}} hafan"
     },
     "chatLink": {
       "linkCopied": "Geessituun kopii ta'eera",
@@ -2552,7 +2606,9 @@
       "stepsCount_one": "tarkaanfii {{steps}}",
       "stepsCount": "tarkaanfiiwwan {{steps}}",
       "stepsCount_other": "tarkaanfiiwwan {{steps}}",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Moodela ({{displayCount}})",
+      "modelsCount_other": "Moodeloota ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Eeyyama ofumaan",
@@ -2592,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "Waamicha meeshaa",
-      "condensedLabel": "{{itemCount}} wantoota; {{last}}"
+      "condensedLabel": "{{itemCount}} wantoota; {{last}}",
+      "condensedLabel_one": "{{itemCount}} wantoota; {{last}}",
+      "condensedLabel_other": "{{itemCount}} wantoota; {{last}}"
     }
   },
   "bootstrap": {
@@ -2727,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "Turtiin kun faayiloota fudhachuu hin danda'u",
     "cliCantReceiveFilesMessage": "Kilo CLI turtii kana hojjechiisu faayiloota fudhachuu hin danda'u. Kompiitara sana irratti CLI haaromsi ykn gara turtii haaraatti qoodi.",
     "contentlessMessage": "Qooduuf wanti hin jiru — barruun ykn faayiliin hin dabalamne.",
-    "couldNotReadContent": "Qabiyyee qoodame dubbisuun hin danda'amne."
+    "couldNotReadContent": "Qabiyyee qoodame dubbisuun hin danda'amne.",
+    "onlyFirstFilesAttached_one": "Faayiloonni jalqabaa {{displayCount}} qofa dabalamu.",
+    "onlyFirstFilesAttached_other": "Faayiloonni jalqabaa {{displayCount}} qofa dabalamu."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3097,7 +3157,9 @@
     "couldNotApprove": "Raggaasisuu hin dandeenye",
     "couldNotStart": "Kaasuu hin dandeenye",
     "channelName": "Eejentoota hojii irra jiran",
-    "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi."
+    "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi.",
+    "openSession": "Bani",
+    "approveFailed": "Raggaasisuun hin danda'amne. Deebi'anii yaaluuf $t(common.approve) tuqi."
   },
   "transcriptionModel": {
     "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",
@@ -3138,5 +3200,8 @@
       "repositoryUnknown": "Kilo {{repository}} kuusaa koodii GitHub yookaan GitLab jedhee hin beeku. Kilo keessatti kuusaa koodii bira filadhu.",
       "repositoryUnsupported": "{{repository}} kuusaa koodii Bitbucket ti — Eejensa jalqabi ammallee isa fayyadamuu hin danda'u. Kilo keessatti kuusaa koodii bira filadhu."
     }
+  },
+  "launcher": {
+    "openLastSession": "Turtii dhumaa bani"
   }
 }

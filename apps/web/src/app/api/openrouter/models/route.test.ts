@@ -162,10 +162,10 @@ describe('GET /api/openrouter/models', () => {
     await expect(response.json()).resolves.toEqual({
       data: [{ ...openAiModel, hasUserByokAvailable: true }, otherModel],
     });
-    expect(mockedTagOpenAiChatGptByokModels).toHaveBeenCalledWith('user-id', [
-      openAiModel,
-      otherModel,
-    ]);
+    expect(mockedTagOpenAiChatGptByokModels).toHaveBeenCalledWith(
+      { kiloUserId: 'user-id', organizationId: null },
+      [openAiModel, otherModel]
+    );
   });
 
   test('adds auto-routing models from routing sources', async () => {

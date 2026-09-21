@@ -163,6 +163,7 @@
     "useDifferentEmail": "Bruk en annen e-postadresse",
     "signInWithApple": "Logg inn med Apple",
     "signInWithGoogle": "Logg inn med Google",
+    "signInWithPasskey": "Logg inn med en passnøkkel",
     "emailAddress": "E-postadresse",
     "emailPlaceholder": "du@eksempel.no",
     "continueWithEmail": "Fortsett med e-post",
@@ -175,6 +176,10 @@
     "termsConnector": " og ",
     "termsSuffix": ".",
     "moreSignInOptions": "Flere innloggingsalternativer",
+    "passkeyCancelled": "Pålogging med passnøkkel ble avbrutt. Prøv igjen.",
+    "passkeyNotFound": "Det er ikke lagret noen passnøkkel for denne enheten. Logg inn med Apple, Google eller e-posten din i stedet.",
+    "passkeyUnsupported": "Passnøkler er ikke tilgjengelige på denne enheten. Logg inn med Apple, Google eller e-posten din i stedet.",
+    "passkeyFailed": "Kunne ikke logge inn med en passnøkkel. Prøv igjen.",
     "couldNotCompleteSignIn": "Kunne ikke fullføre innloggingen. Prøv igjen.",
     "sessionEnded": "Økten din er avsluttet. Logg inn igjen.",
     "signInCodeExpired": "Innloggingskoden din er utløpt. Prøv igjen.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO for bedrifter"
+    "providerEnterpriseSso": "SSO for bedrifter",
+    "passkeysTitle": "Passnøkler",
+    "passkeysSubtitle": "Logg inn uten passord",
+    "passkeysEmpty": "Ingen passnøkler ennå",
+    "passkeysEmptyHint": "$t(profile.addPasskey) for å logge inn uten passord.",
+    "passkeysCouldNotLoad": "Kunne ikke laste passnøkler",
+    "passkeysLoadFailed": "Passnøkler er utilgjengelige til dette lastes.",
+    "addPasskey": "Legg til en passnøkkel",
+    "passkeyDefaultName": "Passnøkkel",
+    "passkeyAddedOn": "Lagt til {{date}}",
+    "passkeyAdded": "Passnøkkel lagt til.",
+    "passkeyAddFailed": "Kunne ikke legge til en passnøkkel. Prøv igjen.",
+    "passkeyAddUnsupported": "Denne enheten kan ikke opprette passnøkler.",
+    "passkeyAddCancelled": "Opprettelsen av passnøkkelen ble avbrutt.",
+    "passkeyRemoved": "Passnøkkel fjernet.",
+    "passkeyRemoveFailed": "Kunne ikke fjerne den passnøkkelen. Prøv igjen.",
+    "passkeyRenamed": "Passnøkkel gitt nytt navn.",
+    "passkeyName": "Navn på passnøkkel",
+    "renamePasskey": "Gi passnøkkelen nytt navn",
+    "removePasskey": "Fjern passnøkkel",
+    "removePasskeyTitle": "Fjerne passnøkkel?",
+    "removePasskeyMessage": "Du kan ikke lenger logge inn med denne passnøkkelen."
   },
   "preferences": {
     "general": "Generelt",
@@ -323,10 +349,10 @@
       "expandContext": "Vis kontekst",
       "expandMoreContext": "Vis mer kontekst",
       "expandLines": "Vis {{displayCount}} linjer ({{start}}–{{end}})",
-      "expandMoreLines": "Vis {{displayCount}} flere linjer ({{start}}–{{end}})",
+      "expandMoreLines": "Vis flere linjer ({{displayCount}}) ({{start}}–{{end}})",
       "expandLinesOfContext": "Vis {{displayCount}} linjer med kontekst",
       "expandAll": "Vis alle",
-      "expandAllLines": "Vis alle {{displayCount}} linjene",
+      "expandAllLines": "Vis alle linjene ({{displayCount}})",
       "loadingMoreFiles": "Laster inn flere filer…",
       "retryLoadingNextPage": "Prøv å laste inn neste side på nytt",
       "failedToLoadMoreFiles": "Kunne ikke laste inn flere filer – trykk for å prøve igjen",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} av {{total}} filer lastet inn",
       "filesStillLoading": "Filene lastes fortsatt inn. Dra ned for å oppdatere.",
       "goToOverview": "Gå til oversikten",
-      "goToOverviewTab": "Gå til oversiktsfanen"
+      "goToOverviewTab": "Gå til oversiktsfanen",
+      "expandAllLines_one": "Vis alle linjene ({{displayCount}})",
+      "expandAllLines_other": "Vis alle linjene ({{displayCount}})",
+      "expandLines_one": "Vis {{displayCount}} linje ({{start}}–{{end}})",
+      "expandLines_other": "Vis {{displayCount}} linjer ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Vis {{displayCount}} linje med kontekst",
+      "expandLinesOfContext_other": "Vis {{displayCount}} linjer med kontekst",
+      "expandMoreLines_one": "Vis flere linjer ({{displayCount}}) ({{start}}–{{end}})",
+      "expandMoreLines_other": "Vis flere linjer ({{displayCount}}) ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} av {{total}} filer lastet inn",
+      "loadedOfTotalFiles_other": "{{loaded}} av {{total}} filer lastet inn"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ filen mangler linjeskift til slutt.",
@@ -511,7 +547,7 @@
       "noDiscussionDescription": "Denne PR-en har ingen diskusjonstråder fra kodegjennomganger eller andre kommentarer.",
       "reviewFiles": "Gå gjennom filene",
       "quotedDiffSnippet": "Sitert utdrag fra endringsvisningen",
-      "moreLinesAbove": "… {{displayCount}} flere linjer ovenfor",
+      "moreLinesAbove": "… flere linjer ovenfor: {{displayCount}}",
       "termsAcceptRequired": "Du må godta bruksvilkårene for å publisere.",
       "termsOutdatedCopy": "Bruksvilkårene er endret. Åpne denne siden på nytt for å godta den nyeste versjonen.",
       "termsCheckRetryCopy": "Kunne ikke sjekke bruksvilkårene. Sjekk tilkoblingen og prøv igjen.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Utdatert i {{path}}"
       },
       "deletedUser": "slettet bruker",
-      "replyForbiddenTerm": "Du har ikke tillatelse til å svare på denne {{term}}."
+      "replyForbiddenTerm": "Du har ikke tillatelse til å svare på denne {{term}}.",
+      "moreLinesAbove_one": "… flere linjer ovenfor: {{displayCount}}",
+      "moreLinesAbove_other": "… flere linjer ovenfor: {{displayCount}}"
     },
     "couldNotOpenGitHubAppSettings": "Kunne ikke åpne innstillingene for GitHub-appen.",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
@@ -706,7 +744,9 @@
       "statusContext": "Kontekst",
       "lineLabel": "{{status}} linje {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(tom)"
+      "emptyLine": "(tom)",
+      "truncationBanner_one": "Viser de første {{limit}} av {{total}} endrede filene på grunn av en grense i GitHub sitt API.",
+      "truncationBanner_other": "Viser de første {{limit}} av {{total}} endrede filene på grunn av en grense i GitHub sitt API."
     },
     "linkPasteClipboardEmpty": "Utklippstavlen er tom.",
     "linkPasteNotAPullRequest": "Dette er ikke en lenke til en PR eller merge request",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Varsler viser meldingsteksten på låseskjermen din.",
     "previewGenericDescription": "Varslene viser bare at noe har skjedd. Åpne Kilo for å lese meldingen.",
     "channel": {
-      "agent": "Agentøkter",
+      "agentProgress": "Agentfremdrift",
       "chat": "Samtalemeldinger",
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarsler",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
       "balanceAlertsSubtitle": "advarsler om lav organisasjonssaldo",
       "securityFindingsSubtitle": "nye funn og SLA-påminnelser"
+    },
+    "action": {
+      "openSession": "Åpne økt"
+    },
+    "needsInputAction": {
+      "approved": "Forespørsel godkjent",
+      "replied": "Svar sendt",
+      "failed": "Kunne ikke svare. Trykk på nytt for å prøve igjen.",
+      "unavailable": "Denne forespørselen venter ikke lenger."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Opplastingen mislyktes.",
       "failedToUploadFile": "Kunne ikke laste opp filen: {{reason}}.",
       "nothingToPaste": "Det er ingenting å lime inn.",
-      "metadataStripFailed": "Kunne ikke fjerne metadataene fra bildet."
+      "metadataStripFailed": "Kunne ikke fjerne metadataene fra bildet.",
+      "limit_one": "Du kan legge ved opptil {{displayCount}} fil.",
+      "limit_other": "Du kan legge ved opptil {{displayCount}} filer."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Synkroniser funn",
       "syncNow": "Synkroniser nå",
       "syncQueued": "Synkronisering i kø",
-      "syncStatusUnavailable": "Synkroniseringsstatusen er ikke tilgjengelig."
+      "syncStatusUnavailable": "Synkroniseringsstatusen er ikke tilgjengelig.",
+      "daysOverdue_one": "{{displayCount}} dag over fristen",
+      "daysOverdue_other": "{{displayCount}} dager over fristen",
+      "findingsCount_one": "{{displayCount}} funn",
+      "findingsCount_other": "{{displayCount}} funn"
     },
     "dashboardMetrics": {
       "openFindings": "Åpne funn",
@@ -2135,20 +2190,7 @@
       "continueFrom": "Fortsetter økten {{title}}.",
       "importingSession": "Importerer økten",
       "cliCannotContinue": "Denne CLI-en kan ikke fortsette en økt. Velg Cloud Agent eller en annen CLI.",
-      "importFailed": "Kunne ikke importere denne økten.",
-      "sandbox": "Sandkasse",
-      "sandboxAccessibility": "Sandkasse: {{label}}",
-      "sandboxDefaultWithDestination": "Standard · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Liten",
-      "sandboxInstanceShared": "Delt",
-      "sandboxInstanceLarge": "Stor",
-      "sandboxInstanceDevcontainer": "Utviklingscontainer",
-      "sandboxInstanceProviderDefault": "Leverandørstandard",
-      "sandboxCouldNotLoad": "Kunne ikke laste inn sandkassevalg",
-      "sandboxUnavailable": "Denne sandkassen er utilgjengelig. Velg en annen sandkasse eller Standard.",
-      "sandboxUseDefault": "Bruk Standard"
+      "importFailed": "Kunne ikke importere denne økten."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er oppdatert.",
@@ -2172,7 +2214,13 @@
       "updateTodos": "Oppdater oppgavelisten",
       "linesBadge": "{{displayCount}} linjer",
       "filesBadge": "{{displayCount}} filer",
-      "matchesBadge": "{{displayCount}} treff"
+      "matchesBadge": "{{displayCount}} treff",
+      "filesBadge_one": "{{displayCount}} fil",
+      "filesBadge_other": "{{displayCount}} filer",
+      "linesBadge_one": "{{displayCount}} linje",
+      "linesBadge_other": "{{displayCount}} linjer",
+      "matchesBadge_one": "{{displayCount}} treff",
+      "matchesBadge_other": "{{displayCount}} treff"
     },
     "readToolMarkdown": {
       "linesTruncated": "linje {{start}}–{{end}} (avkortet)",
@@ -2462,7 +2510,11 @@
       "files": "Filer",
       "couldNotOpenPhotoPicker": "Kunne ikke åpne bildevelgeren. Start Kilo på nytt og prøv igjen.",
       "maxFilesAllowed": "Du kan legge til maksimalt {{displayCount}} filer.",
-      "onlyAddingFiles": "Legger bare til {{accepted}} av {{total}} filer (maks. {{max}})"
+      "onlyAddingFiles": "Legger bare til {{accepted}} av {{total}} filer (maks. {{max}})",
+      "maxFilesAllowed_one": "Du kan legge til maksimalt {{displayCount}} fil.",
+      "maxFilesAllowed_other": "Du kan legge til maksimalt {{displayCount}} filer.",
+      "onlyAddingFiles_one": "Legger bare til {{accepted}} av {{total}} filer (maks. {{max}})",
+      "onlyAddingFiles_other": "Legger bare til {{accepted}} av {{total}} filer (maks. {{max}})"
     },
     "composer": {
       "addAttachment": "Legg til vedlegg",
@@ -2480,7 +2532,9 @@
       "discardAttachmentsMessage": "Opplastede filer som ikke er vedlagt sendte meldinger, blir slettet.",
       "discardAttachmentsTitle": "Forkaste vedlegg?",
       "charactersRemaining": "{{count}} tegn igjen",
-      "insertNewline": "Sett inn linjeskift"
+      "insertNewline": "Sett inn linjeskift",
+      "charactersRemaining_one": "{{count}} tegn igjen",
+      "charactersRemaining_other": "{{count}} tegn igjen"
     },
     "chatLink": {
       "linkCopied": "Lenke kopiert",
@@ -2552,7 +2606,9 @@
       "stepsCount_one": "{{steps}} steg",
       "stepsCount": "{{steps}} steg",
       "stepsCount_other": "{{steps}} steg",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Modell ({{displayCount}})",
+      "modelsCount_other": "Modeller ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Automatisk godkjenning",
@@ -2592,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "Verktøykall",
-      "condensedLabel": "{{itemCount}} elementer; {{last}}"
+      "condensedLabel": "{{itemCount}} elementer; {{last}}",
+      "condensedLabel_one": "{{itemCount}} element; {{last}}",
+      "condensedLabel_other": "{{itemCount}} elementer; {{last}}"
     }
   },
   "bootstrap": {
@@ -2727,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "Denne økten kan ikke motta filer",
     "cliCantReceiveFilesMessage": "Kilo CLI-en som kjører denne økten, kan ikke motta filer. Oppdater CLI-en på den maskinen, eller del med en ny økt i stedet.",
     "contentlessMessage": "Det er ingenting å dele. Ingen tekst eller filer fulgte med.",
-    "couldNotReadContent": "Kunne ikke lese det delte innholdet."
+    "couldNotReadContent": "Kunne ikke lese det delte innholdet.",
+    "onlyFirstFilesAttached_one": "Bare de første {{displayCount}} fil legges ved.",
+    "onlyFirstFilesAttached_other": "Bare de første {{displayCount}} filene legges ved."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3097,7 +3157,9 @@
     "couldNotApprove": "Kunne ikke godkjenne",
     "couldNotStart": "Kunne ikke starte",
     "channelName": "Aktive agenter",
-    "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
+    "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen.",
+    "openSession": "Åpne",
+    "approveFailed": "Kunne ikke godkjenne. Trykk på $t(common.approve) for å prøve igjen."
   },
   "transcriptionModel": {
     "title": "Transkripsjonsmodell",
@@ -3138,5 +3200,8 @@
       "repositoryUnknown": "Kilo gjenkjenner ikke {{repository}} som et GitHub- eller GitLab-kodelager. Velg et annet kodelager i Kilo.",
       "repositoryUnsupported": "{{repository}} er et Bitbucket-kodelager — Start agenten kan ennå ikke bruke det. Velg et annet kodelager i Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Åpne siste økt"
   }
 }

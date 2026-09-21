@@ -661,14 +661,22 @@ function IntentStep({
           onChange={e => setName(e.target.value)}
           maxLength={NAME_MAX_LENGTH}
           autoFocus
+          aria-invalid={Boolean(nameError)}
+          aria-describedby={nameError ? 'wasteland-name-error' : undefined}
         />
-        {nameError && <p className="text-xs text-destructive">{nameError}</p>}
+        {nameError && (
+          <p id="wasteland-name-error" role="alert" className="text-xs text-destructive">
+            {nameError}
+          </p>
+        )}
       </div>
 
       {/* Ownership */}
       <div className="space-y-2">
-        <Label>Ownership</Label>
+        <Label id="wasteland-ownership-label">Ownership</Label>
         <RadioGroup
+          role="radiogroup"
+          aria-labelledby="wasteland-ownership-label"
           value={ownership}
           onValueChange={v => {
             if (lockedOrgId) return;
@@ -701,7 +709,11 @@ function IntentStep({
               </p>
             ) : (
               <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger
+                  className="w-full"
+                  aria-invalid={Boolean(orgError)}
+                  aria-describedby={orgError ? 'wasteland-org-error' : undefined}
+                >
                   <SelectValue placeholder="Select an organization" />
                 </SelectTrigger>
                 <SelectContent>
@@ -725,7 +737,11 @@ function IntentStep({
                 </SelectContent>
               </Select>
             )}
-            {orgError && <p className="mt-1 text-xs text-destructive">{orgError}</p>}
+            {orgError && (
+              <p id="wasteland-org-error" role="alert" className="mt-1 text-xs text-destructive">
+                {orgError}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -1092,7 +1108,10 @@ function PreviewStep({
       </div>
 
       {error && (
-        <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3">
+        <div
+          role="alert"
+          className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3"
+        >
           <p className="text-sm font-medium text-destructive">We couldn&apos;t finish the setup.</p>
           <p className="text-xs text-destructive/90">{error}</p>
           <p className="text-xs text-muted-foreground">

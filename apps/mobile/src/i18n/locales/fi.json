@@ -163,6 +163,7 @@
     "useDifferentEmail": "Käytä eri sähköpostiosoitetta",
     "signInWithApple": "Kirjaudu Apple-tilillä",
     "signInWithGoogle": "Kirjaudu Google-tilillä",
+    "signInWithPasskey": "Kirjaudu pääsyavaimella",
     "emailAddress": "Sähköpostiosoite",
     "emailPlaceholder": "nimi@example.com",
     "continueWithEmail": "Jatka sähköpostilla",
@@ -175,6 +176,10 @@
     "termsConnector": " ja ",
     "termsSuffix": ".",
     "moreSignInOptions": "Lisää kirjautumisvaihtoehtoja",
+    "passkeyCancelled": "Pääsyavaimella kirjautuminen peruutettiin. Yritä uudelleen.",
+    "passkeyNotFound": "Tälle laitteelle ei ole tallennettu yhtään pääsyavainta. Kirjaudu sen sijaan Applella, Googlella tai sähköpostillasi.",
+    "passkeyUnsupported": "Pääsyavaimet eivät ole käytettävissä tällä laitteella. Kirjaudu sen sijaan Applella, Googlella tai sähköpostillasi.",
+    "passkeyFailed": "Kirjautuminen pääsyavaimella ei onnistunut. Yritä uudelleen.",
     "couldNotCompleteSignIn": "Kirjautumista ei voitu viimeistellä. Yritä uudelleen.",
     "sessionEnded": "Istuntosi päättyi. Kirjaudu uudelleen.",
     "signInCodeExpired": "Kirjautumiskoodisi on vanhentunut. Yritä uudelleen.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Testitili",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Yrityksen SSO"
+    "providerEnterpriseSso": "Yrityksen SSO",
+    "passkeysTitle": "Pääsyavaimet",
+    "passkeysSubtitle": "Kirjaudu ilman salasanaa",
+    "passkeysEmpty": "Ei vielä pääsyavaimia",
+    "passkeysEmptyHint": "$t(profile.addPasskey), jotta voit kirjautua ilman salasanaa.",
+    "passkeysCouldNotLoad": "Pääsyavaimia ei voitu ladata",
+    "passkeysLoadFailed": "Pääsyavaimet eivät ole käytettävissä ennen kuin tämä latautuu.",
+    "addPasskey": "Lisää pääsyavain",
+    "passkeyDefaultName": "Pääsyavain",
+    "passkeyAddedOn": "Lisätty {{date}}",
+    "passkeyAdded": "Pääsyavain lisätty.",
+    "passkeyAddFailed": "Pääsyavainta ei voitu lisätä. Yritä uudelleen.",
+    "passkeyAddUnsupported": "Tämä laite ei voi luoda pääsyavaimia.",
+    "passkeyAddCancelled": "Pääsyavaimen luonti peruutettiin.",
+    "passkeyRemoved": "Pääsyavain poistettu.",
+    "passkeyRemoveFailed": "Kyseistä pääsyavainta ei voitu poistaa. Yritä uudelleen.",
+    "passkeyRenamed": "Pääsyavain nimetty uudelleen.",
+    "passkeyName": "Pääsyavaimen nimi",
+    "renamePasskey": "Nimeä pääsyavain uudelleen",
+    "removePasskey": "Poista pääsyavain",
+    "removePasskeyTitle": "Poistetaanko pääsyavain?",
+    "removePasskeyMessage": "Et voi enää kirjautua tällä pääsyavaimella."
   },
   "preferences": {
     "general": "Yleiset",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}}/{{total}} tiedostoa ladattu",
       "filesStillLoading": "Tiedostoja ladataan vielä. Päivitä vetämällä alaspäin.",
       "goToOverview": "Siirry yleiskatsaukseen",
-      "goToOverviewTab": "Siirry Yleiskatsaus-välilehdelle"
+      "goToOverviewTab": "Siirry Yleiskatsaus-välilehdelle",
+      "expandAllLines_one": "Näytä kaikki {{displayCount}} rivi",
+      "expandAllLines_other": "Näytä kaikki {{displayCount}} riviä",
+      "expandLines_one": "Näytä {{displayCount}} rivi ({{start}}–{{end}})",
+      "expandLines_other": "Näytä {{displayCount}} riviä ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Näytä {{displayCount}} ympäröivää rivi",
+      "expandLinesOfContext_other": "Näytä {{displayCount}} ympäröivää riviä",
+      "expandMoreLines_one": "Näytä vielä {{displayCount}} rivi ({{start}}–{{end}})",
+      "expandMoreLines_other": "Näytä vielä {{displayCount}} riviä ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}}/{{total}} tiedostoa ladattu",
+      "loadedOfTotalFiles_other": "{{loaded}}/{{total}} tiedostoa ladattu"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "tiedoston lopusta puuttuu rivinvaihto.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Vanhentunut: {{path}}"
       },
       "deletedUser": "poistettu käyttäjä",
-      "replyForbiddenTerm": "Sinulla ei ole oikeutta vastata tähän {{term}}ön."
+      "replyForbiddenTerm": "Sinulla ei ole oikeutta vastata tähän {{term}}ön.",
+      "moreLinesAbove_one": "… yläpuolella on vielä {{displayCount}} rivi.",
+      "moreLinesAbove_other": "… yläpuolella on vielä {{displayCount}} riviä."
     },
     "couldNotOpenGitHubAppSettings": "GitHub-sovelluksen asetusten avaaminen epäonnistui.",
     "installKiloGitHubApp": "Asenna Kilo GitHub -sovellus",
@@ -706,7 +744,9 @@
       "statusContext": "Muuttumaton",
       "lineLabel": "{{status}} rivi {{line}}: {{text}}",
       "lineLabelNoNumber": "Rivi, {{status}}: {{text}}",
-      "emptyLine": "(tyhjä)"
+      "emptyLine": "(tyhjä)",
+      "truncationBanner_one": "Näytetään {{limit}} ensimmäistä tiedostoa kaikkiaan {{total}} muutetusta tiedostosta GitHubin API-rajoituksen vuoksi.",
+      "truncationBanner_other": "Näytetään {{limit}} ensimmäistä tiedostoa kaikkiaan {{total}} muutetusta tiedostosta GitHubin API-rajoituksen vuoksi."
     },
     "linkPasteClipboardEmpty": "Leikepöytä on tyhjä.",
     "linkPasteNotAPullRequest": "Tämä ei ole muutospyynnön tai yhdistämispyynnön linkki",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Ilmoitukset näyttävät viestin tekstin lukitusnäytöllä.",
     "previewGenericDescription": "Ilmoitukset kertovat uudesta tapahtumasta. Avaa Kilo, jotta voit lukea viestin.",
     "channel": {
-      "agent": "Agentti-istunnot",
+      "agentProgress": "Agentin eteneminen",
       "chat": "Keskusteluviestit",
       "kiloclaw": "KiloClaw-tapahtumat",
       "balance": "Saldoilmoitukset",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "instanssi valmis/epäonnistui, ajoitetut toiminnot",
       "balanceAlertsSubtitle": "varoitukset organisaation alhaisesta saldosta",
       "securityFindingsSubtitle": "uudet löydökset ja SLA-muistutukset"
+    },
+    "action": {
+      "openSession": "Avaa istunto"
+    },
+    "needsInputAction": {
+      "approved": "Pyyntö hyväksytty",
+      "replied": "Vastaus lähetetty",
+      "failed": "Vastaaminen ei onnistunut. Yritä uudelleen napauttamalla uudelleen.",
+      "unavailable": "Tämä pyyntö ei ole enää odottamassa."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Lähetys epäonnistui.",
       "failedToUploadFile": "Tiedoston lähetys epäonnistui: {{reason}}.",
       "nothingToPaste": "Leikepöydällä ei ole mitään liitettävää.",
-      "metadataStripFailed": "Valokuvan metatietoja ei voitu poistaa."
+      "metadataStripFailed": "Valokuvan metatietoja ei voitu poistaa.",
+      "limit_one": "Voit liittää enintään {{displayCount}} tiedosto.",
+      "limit_other": "Voit liittää enintään {{displayCount}} tiedostoa."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, tila: {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Synkronoi havainnot",
       "syncNow": "Synkronoi nyt",
       "syncQueued": "Synkronointi lisättiin jonoon",
-      "syncStatusUnavailable": "Synkronoinnin tilaa ei ole saatavilla."
+      "syncStatusUnavailable": "Synkronoinnin tilaa ei ole saatavilla.",
+      "daysOverdue_one": "{{displayCount}} päivä myöhässä",
+      "daysOverdue_other": "{{displayCount}} päivää myöhässä",
+      "findingsCount_one": "{{displayCount}} havainto",
+      "findingsCount_other": "{{displayCount}} havaintoa"
     },
     "dashboardMetrics": {
       "openFindings": "Avoimet havainnot",
@@ -2135,20 +2190,7 @@
       "continueFrom": "Jatketaan istuntoa: {{title}}.",
       "importingSession": "Tuodaan istuntoa",
       "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",
-      "importFailed": "Tätä istuntoa ei voitu tuoda.",
-      "sandbox": "Hiekkalaatikko",
-      "sandboxAccessibility": "Hiekkalaatikko: {{label}}",
-      "sandboxDefaultWithDestination": "Oletus · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Pieni",
-      "sandboxInstanceShared": "Jaettu",
-      "sandboxInstanceLarge": "Suuri",
-      "sandboxInstanceDevcontainer": "Kehityssäiliö",
-      "sandboxInstanceProviderDefault": "Palveluntarjoajan oletus",
-      "sandboxCouldNotLoad": "Hiekkalaatikon vaihtoehtoja ei voitu ladata",
-      "sandboxUnavailable": "Tämä hiekkalaatikko ei ole käytettävissä. Valitse toinen hiekkalaatikko tai Oletus.",
-      "sandboxUseDefault": "Käytä Oletusta"
+      "importFailed": "Tätä istuntoa ei voitu tuoda."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} tiedosto päivitettiin.",
@@ -2172,7 +2214,13 @@
       "updateTodos": "Päivitä tehtävät",
       "linesBadge": "{{displayCount}} riviä",
       "filesBadge": "{{displayCount}} tiedostoa",
-      "matchesBadge": "{{displayCount}} osumaa"
+      "matchesBadge": "{{displayCount}} osumaa",
+      "filesBadge_one": "{{displayCount}} tiedosto",
+      "filesBadge_other": "{{displayCount}} tiedostoa",
+      "linesBadge_one": "{{displayCount}} rivi",
+      "linesBadge_other": "{{displayCount}} riviä",
+      "matchesBadge_one": "{{displayCount}} osuma",
+      "matchesBadge_other": "{{displayCount}} osumaa"
     },
     "readToolMarkdown": {
       "linesTruncated": "rivit {{start}}–{{end}} (katkaistu)",
@@ -2462,7 +2510,11 @@
       "files": "Tiedostot",
       "couldNotOpenPhotoPicker": "Kuvavalitsinta ei voitu avata. Käynnistä Kilo uudelleen ja kokeile sitten uudelleen.",
       "maxFilesAllowed": "Voit lisätä enintään {{displayCount}} tiedostoa.",
-      "onlyAddingFiles": "Lisätään vain {{accepted}}/{{total}} tiedostoa (enintään {{max}})"
+      "onlyAddingFiles": "Lisätään vain {{accepted}}/{{total}} tiedostoa (enintään {{max}})",
+      "maxFilesAllowed_one": "Voit lisätä enintään {{displayCount}} tiedosto.",
+      "maxFilesAllowed_other": "Voit lisätä enintään {{displayCount}} tiedostoa.",
+      "onlyAddingFiles_one": "Lisätään vain {{accepted}}/{{total}} tiedostoa (enintään {{max}})",
+      "onlyAddingFiles_other": "Lisätään vain {{accepted}}/{{total}} tiedostoa (enintään {{max}})"
     },
     "composer": {
       "addAttachment": "Lisää liite",
@@ -2480,7 +2532,9 @@
       "discardAttachmentsMessage": "Palvelimelle siirretyt tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
       "discardAttachmentsTitle": "Hylätäänkö liitteet?",
       "charactersRemaining": "{{count}} merkkiä jäljellä",
-      "insertNewline": "Lisää rivinvaihto"
+      "insertNewline": "Lisää rivinvaihto",
+      "charactersRemaining_one": "{{count}} merkki jäljellä",
+      "charactersRemaining_other": "{{count}} merkkiä jäljellä"
     },
     "chatLink": {
       "linkCopied": "Linkki kopioitu",
@@ -2552,7 +2606,9 @@
       "stepsCount_one": "{{steps}} vaihe",
       "stepsCount": "{{steps}} vaihetta",
       "stepsCount_other": "{{steps}} vaihetta",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Malli ({{displayCount}})",
+      "modelsCount_other": "Mallit ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Automaattinen hyväksyntä",
@@ -2592,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "Työkalukutsut",
-      "condensedLabel": "{{itemCount}} kohdetta; {{last}}"
+      "condensedLabel": "{{itemCount}} kohdetta; {{last}}",
+      "condensedLabel_one": "{{itemCount}} kohde; {{last}}",
+      "condensedLabel_other": "{{itemCount}} kohdetta; {{last}}"
     }
   },
   "bootstrap": {
@@ -2727,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "Tämä istunto ei voi vastaanottaa tiedostoja",
     "cliCantReceiveFilesMessage": "Tätä istuntoa suorittava Kilo CLI ei voi vastaanottaa tiedostoja. Päivitä Kilo CLI kyseisellä koneella tai jaa sisältö uuteen istuntoon.",
     "contentlessMessage": "Jaettavaa sisältöä ei ole. Mukana ei ollut tekstiä eikä tiedostoja.",
-    "couldNotReadContent": "Jaettua sisältöä ei voitu lukea."
+    "couldNotReadContent": "Jaettua sisältöä ei voitu lukea.",
+    "onlyFirstFilesAttached_one": "Vain ensimmäiset {{displayCount}} tiedosto liitetään.",
+    "onlyFirstFilesAttached_other": "Vain ensimmäiset {{displayCount}} tiedostoa liitetään."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3097,7 +3157,9 @@
     "couldNotApprove": "Hyväksyntä epäonnistui",
     "couldNotStart": "Käynnistys epäonnistui",
     "channelName": "Aktiiviset agentit",
-    "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä."
+    "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
+    "openSession": "Avaa",
+    "approveFailed": "Hyväksyminen ei onnistunut. Yritä uudelleen napauttamalla $t(common.approve)."
   },
   "transcriptionModel": {
     "title": "Puheentunnistusmalli",
@@ -3138,5 +3200,8 @@
       "repositoryUnknown": "Kilo ei tunnista {{repository}}-kohdetta GitHub- tai GitLab-koodivarastoksi. Valitse toinen koodivarasto Kilossa.",
       "repositoryUnsupported": "{{repository}} on Bitbucket-koodivarasto — Käynnistä agentti ei voi vielä käyttää sitä. Valitse toinen koodivarasto Kilossa."
     }
+  },
+  "launcher": {
+    "openLastSession": "Avaa viimeisin istunto"
   }
 }

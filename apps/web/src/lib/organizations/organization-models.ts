@@ -60,8 +60,13 @@ export async function getAvailableModelsForOrganization(
   availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
   availableModels.push(...(await listAvailableCustomLlms(organizationId, context.groupIds)));
 
+  // The ChatGPT connection is personal, so it marks models only for the member
+  // whose connection applies to this organization.
   if (subject.type === 'member') {
-    availableModels = await tagOpenAiChatGptByokModels(subject.kiloUserId, availableModels);
+    availableModels = await tagOpenAiChatGptByokModels(
+      { kiloUserId: subject.kiloUserId, organizationId },
+      availableModels
+    );
   }
 
   const snapshot = await getEnkryptBenchmarks();

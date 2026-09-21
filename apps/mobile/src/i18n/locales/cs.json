@@ -163,6 +163,7 @@
     "useDifferentEmail": "Použít jiný e-mail",
     "signInWithApple": "Přihlásit se přes Apple",
     "signInWithGoogle": "Přihlásit se přes Google",
+    "signInWithPasskey": "Přihlásit se přístupovým klíčem",
     "emailAddress": "E-mailová adresa",
     "emailPlaceholder": "vy@example.com",
     "continueWithEmail": "Pokračovat pomocí e-mailu",
@@ -175,6 +176,10 @@
     "termsConnector": " a ",
     "termsSuffix": ".",
     "moreSignInOptions": "Další možnosti přihlášení",
+    "passkeyCancelled": "Přihlášení přístupovým klíčem bylo zrušeno. Zkuste to znovu.",
+    "passkeyNotFound": "Pro toto zařízení není uložen žádný přístupový klíč. Přihlaste se místo toho přes Apple, Google nebo svým e-mailem.",
+    "passkeyUnsupported": "Přístupové klíče nejsou na tomto zařízení dostupné. Přihlaste se místo toho přes Apple, Google nebo svým e-mailem.",
+    "passkeyFailed": "Přihlášení přístupovým klíčem se nezdařilo. Zkuste to znovu.",
     "couldNotCompleteSignIn": "Přihlášení se nepodařilo dokončit. Zkuste to prosím znovu.",
     "sessionEnded": "Vaše relace skončila. Přihlaste se prosím znovu.",
     "signInCodeExpired": "Platnost vašeho přihlašovacího kódu vypršela. Zkuste to prosím znovu.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Testovací účet",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Podnikové SSO"
+    "providerEnterpriseSso": "Podnikové SSO",
+    "passkeysTitle": "Přístupové klíče",
+    "passkeysSubtitle": "Přihlaste se bez hesla",
+    "passkeysEmpty": "Zatím žádné přístupové klíče",
+    "passkeysEmptyHint": "$t(profile.addPasskey) a přihlaste se bez hesla.",
+    "passkeysCouldNotLoad": "Přístupové klíče se nepodařilo načíst",
+    "passkeysLoadFailed": "Přístupové klíče nejsou dostupné, dokud se toto nenačte.",
+    "addPasskey": "Přidat přístupový klíč",
+    "passkeyDefaultName": "Přístupový klíč",
+    "passkeyAddedOn": "Přidán {{date}}",
+    "passkeyAdded": "Přístupový klíč přidán.",
+    "passkeyAddFailed": "Přístupový klíč se nepodařilo přidat. Zkuste to znovu.",
+    "passkeyAddUnsupported": "Toto zařízení nemůže vytvářet přístupové klíče.",
+    "passkeyAddCancelled": "Vytvoření přístupového klíče bylo zrušeno.",
+    "passkeyRemoved": "Přístupový klíč odebrán.",
+    "passkeyRemoveFailed": "Tento přístupový klíč se nepodařilo odebrat. Zkuste to znovu.",
+    "passkeyRenamed": "Přístupový klíč přejmenován.",
+    "passkeyName": "Název přístupového klíče",
+    "renamePasskey": "Přejmenovat přístupový klíč",
+    "removePasskey": "Odebrat přístupový klíč",
+    "removePasskeyTitle": "Odebrat přístupový klíč?",
+    "removePasskeyMessage": "Tímto přístupovým klíčem se už nebudete moci přihlásit."
   },
   "preferences": {
     "general": "Obecné",
@@ -347,7 +373,27 @@
       "fileLoadedCount_few": "Načteny {{displayCount}} soubory",
       "fileLoadedCount_many": "Načteno {{displayCount}} souboru",
       "fileLoadedOfTotalCount_few": "Načteny {{displayCount}} soubory z {{total}}",
-      "fileLoadedOfTotalCount_many": "Načteno {{displayCount}} souboru z {{total}}"
+      "fileLoadedOfTotalCount_many": "Načteno {{displayCount}} souboru z {{total}}",
+      "expandAllLines_one": "Rozbalit všechny řádky ({{displayCount}})",
+      "expandAllLines_other": "Rozbalit všechny řádky ({{displayCount}})",
+      "expandAllLines_few": "Rozbalit všechny řádky ({{displayCount}})",
+      "expandAllLines_many": "Rozbalit všechny řádky ({{displayCount}})",
+      "expandLines_one": "Rozbalit řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandLines_other": "Rozbalit řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandLines_few": "Rozbalit řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandLines_many": "Rozbalit řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandLinesOfContext_one": "Rozbalit řádky kontextu ({{displayCount}})",
+      "expandLinesOfContext_other": "Rozbalit řádky kontextu ({{displayCount}})",
+      "expandLinesOfContext_few": "Rozbalit řádky kontextu ({{displayCount}})",
+      "expandLinesOfContext_many": "Rozbalit řádky kontextu ({{displayCount}})",
+      "expandMoreLines_one": "Rozbalit další řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandMoreLines_other": "Rozbalit další řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandMoreLines_few": "Rozbalit další řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandMoreLines_many": "Rozbalit další řádky {{start}}–{{end}} ({{displayCount}})",
+      "loadedOfTotalFiles_one": "Načteno {{loaded}} z {{total}} souborů",
+      "loadedOfTotalFiles_other": "Načteno {{loaded}} z {{total}} souborů",
+      "loadedOfTotalFiles_few": "Načteno {{loaded}} z {{total}} souborů",
+      "loadedOfTotalFiles_many": "Načteno {{loaded}} z {{total}} souborů"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "na konci souboru chybí nový řádek.",
@@ -543,7 +589,11 @@
         "outdatedOnPath": "Zastaralé: {{path}}"
       },
       "deletedUser": "smazaný uživatel",
-      "replyForbiddenTerm": "Nemáš oprávnění odpovídat v tomto {{term}}."
+      "replyForbiddenTerm": "Nemáš oprávnění odpovídat v tomto {{term}}.",
+      "moreLinesAbove_one": "… další řádky výše: {{displayCount}}",
+      "moreLinesAbove_other": "… další řádky výše: {{displayCount}}",
+      "moreLinesAbove_few": "… další řádky výše: {{displayCount}}",
+      "moreLinesAbove_many": "… další řádky výše: {{displayCount}}"
     },
     "couldNotOpenGitHubAppSettings": "Nepodařilo se otevřít nastavení aplikace GitHub.",
     "installKiloGitHubApp": "Nainstalovat aplikaci Kilo pro GitHub",
@@ -586,7 +636,7 @@
       "checksCount": "kontroly: {{displayCount}}",
       "checksCount_one": "kontrola: {{displayCount}}",
       "checksCount_few": "kontroly: {{displayCount}}",
-      "checksCount_many": "kontroly: {{displayCount}}",
+      "checksCount_many": "kontrol: {{displayCount}}",
       "checksCount_other": "kontroly: {{displayCount}}",
       "checkDetails": "podrobnosti kontroly"
     },
@@ -724,7 +774,11 @@
       "statusContext": "Kontext",
       "lineLabel": "{{status}}, řádek {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} – {{text}}",
-      "emptyLine": "(prázdné)"
+      "emptyLine": "(prázdné)",
+      "truncationBanner_one": "Kvůli limitu GitHub API se zobrazuje jen část změněných souborů: {{limit}} z {{total}}.",
+      "truncationBanner_other": "Kvůli limitu GitHub API se zobrazuje jen část změněných souborů: {{limit}} z {{total}}.",
+      "truncationBanner_few": "Kvůli limitu GitHub API se zobrazuje jen část změněných souborů: {{limit}} z {{total}}.",
+      "truncationBanner_many": "Kvůli limitu GitHub API se zobrazuje jen část změněných souborů: {{limit}} z {{total}}."
     },
     "linkPasteClipboardEmpty": "Schránka je prázdná.",
     "linkPasteNotAPullRequest": "Tohle není odkaz na PR ani merge request",
@@ -801,7 +855,7 @@
     "previewFullDescription": "Oznámení zobrazují text zprávy na uzamčené obrazovce.",
     "previewGenericDescription": "Oznámení pouze upozorní na novou událost. Podrobnosti si přečtete v aplikaci Kilo.",
     "channel": {
-      "agent": "Relace agentů",
+      "agentProgress": "Průběh agenta",
       "chat": "Zprávy v konverzaci",
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornění na zůstatek",
@@ -818,6 +872,15 @@
       "kiloclawActivitySubtitle": "instance připravena/selhala, naplánované akce",
       "balanceAlertsSubtitle": "upozornění na nízký zůstatek organizace",
       "securityFindingsSubtitle": "nové nálezy a připomenutí lhůt SLA"
+    },
+    "action": {
+      "openSession": "Otevřít relaci"
+    },
+    "needsInputAction": {
+      "approved": "Žádost schválena",
+      "replied": "Odpověď odeslána",
+      "failed": "Odpovědět se nepodařilo. Klepnutím to zkuste znovu.",
+      "unavailable": "Tato žádost už nečeká."
     }
   },
   "tabs": {
@@ -898,7 +961,11 @@
       "uploadFailed": "Nahrání se nezdařilo.",
       "failedToUploadFile": "Soubor se nepodařilo nahrát: {{reason}}.",
       "nothingToPaste": "Není co vložit.",
-      "metadataStripFailed": "Metadata fotografie se nepodařilo odstranit."
+      "metadataStripFailed": "Metadata fotografie se nepodařilo odstranit.",
+      "limit_one": "Maximální počet příloha je {{displayCount}}.",
+      "limit_other": "Maximální počet příloh je {{displayCount}}.",
+      "limit_few": "Maximální počet přílohy je {{displayCount}}.",
+      "limit_many": "Maximální počet příloh je {{displayCount}}."
     },
     "attachmentPreview": {
       "accessibility": "Soubor {{filename}}, {{status}}",
@@ -1648,7 +1715,15 @@
       "syncFindings": "Synchronizovat nálezy",
       "syncNow": "Synchronizovat nyní",
       "syncQueued": "Synchronizace zařazena do fronty",
-      "syncStatusUnavailable": "Stav synchronizace není k dispozici."
+      "syncStatusUnavailable": "Stav synchronizace není k dispozici.",
+      "daysOverdue_one": "Počet dní po termínu: {{displayCount}}",
+      "daysOverdue_other": "Počet dní po termínu: {{displayCount}}",
+      "daysOverdue_few": "Počet dní po termínu: {{displayCount}}",
+      "daysOverdue_many": "Počet dní po termínu: {{displayCount}}",
+      "findingsCount_one": "Počet nálezů: {{displayCount}}",
+      "findingsCount_other": "Počet nálezů: {{displayCount}}",
+      "findingsCount_few": "Počet nálezů: {{displayCount}}",
+      "findingsCount_many": "Počet nálezů: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Otevřené nálezy",
@@ -2171,20 +2246,7 @@
       "continueFrom": "Pokračujete v relaci {{title}}.",
       "importingSession": "Import relace",
       "cliCannotContinue": "Toto CLI nepodporuje pokračování v relaci. Vyberte službu Cloud Agent nebo jiné CLI.",
-      "importFailed": "Tuto relaci se nepodařilo importovat.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Výchozí · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Malý",
-      "sandboxInstanceShared": "Sdílený",
-      "sandboxInstanceLarge": "Velký",
-      "sandboxInstanceDevcontainer": "Dev kontejner",
-      "sandboxInstanceProviderDefault": "Výchozí od poskytovatele",
-      "sandboxCouldNotLoad": "Možnosti sandboxu se nepodařilo načíst",
-      "sandboxUnavailable": "Tento sandbox není dostupný. Vyberte jiný sandbox nebo Výchozí.",
-      "sandboxUseDefault": "Použít Výchozí"
+      "importFailed": "Tuto relaci se nepodařilo importovat."
     },
     "partRenderer": {
       "updatedFileCount_one": "Byl aktualizován {{displayCount}} soubor.",
@@ -2210,7 +2272,19 @@
       "updateTodos": "Aktualizovat úkoly",
       "linesBadge": "řádky: {{displayCount}}",
       "filesBadge": "soubory: {{displayCount}}",
-      "matchesBadge": "shody: {{displayCount}}"
+      "matchesBadge": "shody: {{displayCount}}",
+      "filesBadge_one": "soubor: {{displayCount}}",
+      "filesBadge_other": "soubory: {{displayCount}}",
+      "filesBadge_few": "soubory: {{displayCount}}",
+      "filesBadge_many": "souborů: {{displayCount}}",
+      "linesBadge_one": "řádek: {{displayCount}}",
+      "linesBadge_other": "řádky: {{displayCount}}",
+      "linesBadge_few": "řádky: {{displayCount}}",
+      "linesBadge_many": "řádků: {{displayCount}}",
+      "matchesBadge_one": "shoda: {{displayCount}}",
+      "matchesBadge_other": "shody: {{displayCount}}",
+      "matchesBadge_few": "shody: {{displayCount}}",
+      "matchesBadge_many": "shod: {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "řádky {{start}}–{{end}} (zkráceno)",
@@ -2506,7 +2580,15 @@
       "files": "Soubory",
       "couldNotOpenPhotoPicker": "Výběr fotek se nepodařilo otevřít. Restartujte Kilo a zkuste to znovu.",
       "maxFilesAllowed": "Maximální počet souborů je {{displayCount}}.",
-      "onlyAddingFiles": "Přidává se jen část souborů: {{accepted}} z {{total}} (maximum: {{max}})"
+      "onlyAddingFiles": "Přidává se jen část souborů: {{accepted}} z {{total}} (maximum: {{max}})",
+      "maxFilesAllowed_one": "Maximální počet souborů je {{displayCount}}.",
+      "maxFilesAllowed_other": "Maximální počet souborů je {{displayCount}}.",
+      "maxFilesAllowed_few": "Maximální počet souborů je {{displayCount}}.",
+      "maxFilesAllowed_many": "Maximální počet souborů je {{displayCount}}.",
+      "onlyAddingFiles_one": "Přidává se jen část souborů: {{accepted}} z {{total}} (maximum: {{max}})",
+      "onlyAddingFiles_other": "Přidává se jen část souborů: {{accepted}} z {{total}} (maximum: {{max}})",
+      "onlyAddingFiles_few": "Přidává se jen část souborů: {{accepted}} z {{total}} (maximum: {{max}})",
+      "onlyAddingFiles_many": "Přidává se jen část souborů: {{accepted}} z {{total}} (maximum: {{max}})"
     },
     "composer": {
       "addAttachment": "Přidat přílohu",
@@ -2524,7 +2606,11 @@
       "discardAttachmentsMessage": "Nahrané soubory nepřipojené k odeslaným zprávám budou smazány.",
       "discardAttachmentsTitle": "Zahodit přílohy?",
       "charactersRemaining": "Zbývající počet znaků: {{count}}",
-      "insertNewline": "Vložit nový řádek"
+      "insertNewline": "Vložit nový řádek",
+      "charactersRemaining_one": "Zbývající počet znaků: {{count}}",
+      "charactersRemaining_other": "Zbývající počet znaků: {{count}}",
+      "charactersRemaining_few": "Zbývající počet znaků: {{count}}",
+      "charactersRemaining_many": "Zbývající počet znaků: {{count}}"
     },
     "chatLink": {
       "linkCopied": "Odkaz zkopírován",
@@ -2598,7 +2684,11 @@
       "stepsCount_other": "{{steps}} kroků",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} kroky",
-      "stepsCount_many": "{{steps}} kroku"
+      "stepsCount_many": "{{steps}} kroku",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modely ({{displayCount}})",
+      "modelsCount_few": "Modely ({{displayCount}})",
+      "modelsCount_many": "Modely ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Automatické schvalování",
@@ -2638,7 +2728,11 @@
     },
     "toolRun": {
       "sheetTitle": "Volání nástrojů",
-      "condensedLabel": "{{itemCount}} položek; {{last}}"
+      "condensedLabel": "{{itemCount}} položek; {{last}}",
+      "condensedLabel_one": "{{itemCount}} položka; {{last}}",
+      "condensedLabel_other": "{{itemCount}} položek; {{last}}",
+      "condensedLabel_few": "{{itemCount}} položky; {{last}}",
+      "condensedLabel_many": "{{itemCount}} položek; {{last}}"
     }
   },
   "bootstrap": {
@@ -2773,7 +2867,11 @@
     "cliCantReceiveFilesTitle": "Tato relace nemůže přijímat soubory",
     "cliCantReceiveFilesMessage": "Kilo CLI, ve kterém tato relace běží, nemůže přijímat soubory. Aktualizuj CLI na daném počítači nebo obsah sdílej do nové relace.",
     "contentlessMessage": "Není co sdílet. Obsah neobsahuje žádný text ani soubory.",
-    "couldNotReadContent": "Sdílený obsah se nepodařilo přečíst."
+    "couldNotReadContent": "Sdílený obsah se nepodařilo přečíst.",
+    "onlyFirstFilesAttached_one": "Připojí se jen soubory ze začátku seznamu ({{displayCount}}).",
+    "onlyFirstFilesAttached_other": "Připojí se jen soubory ze začátku seznamu ({{displayCount}}).",
+    "onlyFirstFilesAttached_few": "Připojí se jen soubory ze začátku seznamu ({{displayCount}}).",
+    "onlyFirstFilesAttached_many": "Připojí se jen soubory ze začátku seznamu ({{displayCount}})."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3145,7 +3243,9 @@
     "couldNotApprove": "Schválení se nezdařilo",
     "couldNotStart": "Spuštění se nezdařilo",
     "channelName": "Aktivní agenti",
-    "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce."
+    "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce.",
+    "openSession": "Otevřít",
+    "approveFailed": "Schválení se nepodařilo. Klepnutím na $t(common.approve) to zkuste znovu."
   },
   "transcriptionModel": {
     "title": "Model přepisu",
@@ -3186,5 +3286,8 @@
       "repositoryUnknown": "Kilo nerozpoznává {{repository}} jako repozitář na GitHubu nebo GitLabu. Vyber jiný repozitář v Kilu.",
       "repositoryUnsupported": "{{repository}} je repozitář na Bitbucketu — Spustit agenta ho zatím nemůže použít. Vyber jiný repozitář v Kilu."
     }
+  },
+  "launcher": {
+    "openLastSession": "Otevřít poslední relaci"
   }
 }

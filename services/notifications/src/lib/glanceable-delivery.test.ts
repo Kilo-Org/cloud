@@ -1807,10 +1807,20 @@ describe('buildGlanceableExpoMessages', () => {
       expect(message.body).toBeUndefined();
       expect(message.sound).toBeNull();
       expect(message.priority).toBe('default');
-      expect(message.channelId).toBe('active-agents');
+      expect(message.channelId).toBe('needs-input');
       expect(message.tag).toBe('deadbeef');
     }
     expect(messages.map(m => m.to)).toEqual(['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]']);
+  });
+
+  it('names the kind channel: progress when the snapshot waits on nothing', () => {
+    const messages = buildGlanceableExpoMessages(
+      [{ token: 'ExponentPushToken[aaa]', locale: null }],
+      { ...snapshot, needsInput: 0 },
+      'default'
+    );
+
+    expect(messages[0].channelId).toBe('agent-progress');
   });
 
   it('builds the iOS wake at default priority and the Android wake at high priority', () => {

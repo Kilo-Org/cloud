@@ -34,8 +34,20 @@ import {
 import { orgPickerFormSchema, orgPickerQuerySchema, pairingStatusQuerySchema } from '../schemas';
 import type { McpAnalytics } from '../analytics';
 import type { OAuthStoreApi, PendingAuthorization } from '../store/oauth-store';
-import { createKiloPairing, fetchOrgOptions, pollKiloPairing } from './kilo-pairing';
-import { PERSONAL_ORG_ID, consentPage, orgPickerPage, type OrgOption } from './pages';
+import type { AuthenticatorEnrollmentApi } from '../types';
+import {
+  createKiloPairing,
+  fetchOrgOptions,
+  fetchUserIsAdmin,
+  pollKiloPairing,
+} from './kilo-pairing';
+import {
+  PERSONAL_ORG_ID,
+  consentPage,
+  orgPickerPage,
+  type AuthenticatorView,
+  type OrgOption,
+} from './pages';
 
 /** Pending records are short-lived: 10 minutes to complete sign-in. */
 export const PENDING_TTL_SECONDS = 600;
@@ -44,8 +56,26 @@ export const PENDING_TTL_SECONDS = 600;
 const STALE_REQUEST_MESSAGE =
   'This request is no longer valid. Close this tab and retry from your MCP client.';
 
+/** Shown when the paired identity's admin check could not be reached (fail-closed). */
+const ADMIN_CHECK_NOTICE =
+  'We could not check admin access for this account. Reload this page to try again.';
+
+/** Retryable copy for a membership read that failed (the personal context stays). */
+const ORG_LIST_UNAVAILABLE_MESSAGE =
+  'Could not load your organizations right now — only the personal account is offered. Choose it, or retry.';
+
+/** The opt-in was submitted with no code: ask for it again, mint nothing. */
+const OTP_REQUIRED_MESSAGE = 'Enter the code from your authenticator app.';
+
+/** The code did not verify against the admin's registered authenticator. */
+const OTP_INVALID_MESSAGE = 'That code is not valid. Check your authenticator app and try again.';
+
 export type ConsentDeps = {
-  store: OAuthStoreApi;
+  /**
+   * The OAuth pending records plus the admin authenticator enrolment the opt-in
+   * subsection reads (`ensureAuthenticator`/`confirmAuthenticator`).
+   */
+  store: OAuthStoreApi & AuthenticatorEnrollmentApi;
   /** apps/web base URL — the user-identity provider. */
   webBaseUrl: string;
   fetchImpl?: typeof fetch;
@@ -356,18 +386,93 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
   }
   const kiloToken = record.kiloToken;
 
-  /** Render the picker offering only the personal context with a retry message. */
-  const personalOnlyPage = (error: string) =>
+  // Admin eligibility is fail-closed and derived per request from the paired
+  // identity's live `user.getMe`, never from the submitted checkbox. A thrown
+  // check is 'not eligible'; on the GET it also explains why the option is
+  // missing so the reload is an informed retry. The authenticator read is part
+  // of the same option: read on the POST too (not just the GET) so every render
+  // for an eligible admin carries the subsection, and a throw fails closed
+  // exactly like a thrown admin check — no checkbox, no subsection, org list
+  // and Connect intact. A throw is an internal failure of the admin option,
+  // never a reason to block a plain connection.
+  let adminEligible = false;
+  let adminCheckFailed = false;
+  let adminNotice: string | null = null;
+  let authenticator: AuthenticatorView | null = null;
+  try {
+    adminEligible = await fetchUserIsAdmin(deps, kiloToken);
+    if (adminEligible) {
+      authenticator = await deps.store.ensureAuthenticator(record.kiloUserId, nowIso);
+    }
+  } catch {
+    // Fail closed, and remember the failure: the POST below must not drop a
+    // submitted opt-in silently when this check could not run.
+    adminEligible = false;
+    authenticator = null;
+    adminCheckFailed = true;
+    if (request.method === 'GET') adminNotice = ADMIN_CHECK_NOTICE;
+  }
+
+  /** One picker render carrying the admin option and its authenticator subsection. */
+  const renderPicker = (config: {
+    options: OrgOption[];
+    error: string | null;
+    /** Reveal the subsection (a refused admin submit must not lose its prompt). */
+    revealed?: boolean;
+    /** Overrides the GET-only admin-check notice when a branch must show it. */
+    notice?: string | null;
+  }): Response =>
     orgPickerPage({
       clientName,
       actionUrl,
+      options: config.options,
+      error: config.error,
+      showAdminOption: adminEligible,
+      authenticator,
+      ...(config.revealed ? { authenticatorRevealed: true } : {}),
+      adminNotice: config.notice === undefined ? adminNotice : config.notice,
+    });
+
+  /** Render the picker offering only the personal context with a retry message. */
+  const personalOnlyPage = (error: string): Response =>
+    renderPicker({
       options: [{ id: PERSONAL_ORG_ID, name: 'Personal account' }],
       error,
     });
 
+  /**
+   * Render with the live org list; when the read fails the personal context
+   * (always valid for a Kilo login) stays selectable with the same message.
+   * `notice` overrides the GET-only admin-check notice when a branch must show it.
+   */
+  const orgListPage = async (
+    error: string | null,
+    revealed = false,
+    notice?: string | null
+  ): Promise<Response> => {
+    const render = (options: OrgOption[]): Response =>
+      renderPicker({
+        options,
+        error,
+        revealed,
+        ...(notice === undefined ? {} : { notice }),
+      });
+    try {
+      return render(await fetchOrgOptions(deps, kiloToken));
+    } catch {
+      return renderPicker({
+        options: [{ id: PERSONAL_ORG_ID, name: 'Personal account' }],
+        error: error ?? ORG_LIST_UNAVAILABLE_MESSAGE,
+        revealed,
+        ...(notice === undefined ? {} : { notice }),
+      });
+    }
+  };
+
   /** Bind the chosen context and complete the authorize; stops on a lost race. */
   const approveAndRedirect = async (
     organizationId: string | null,
+    adminEnabled: boolean,
     renderRetry: (message: string) => Response
   ): Promise<Response> => {
     const approved = await deps.store.approvePendingAuthorization(
@@ -383,6 +488,16 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
     }
     let redirectTo: string;
     try {
+      // The DCR client record's TTL is anchored at registration, but the grant
+      // this authorization is about to mint can start much later. Re-put the
+      // record here so `client:<id>` is anchored to the grant it serves and its
+      // session+margin lifetime (session-lifetime.ts) always outlives the
+      // session: without this a sign-in that starts more than the margin after
+      // registration would outlive its own record and be refused as
+      // `401 invalid_client`, which no MCP client re-authorizes on. Renewing
+      // before the code is minted keeps a renewal failure retryable, exactly
+      // like a failed completion.
+      await env.OAUTH_PROVIDER.updateClient(record.authRequest.clientId, {});
       ({ redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
         request: record.authRequest,
         userId: record.kiloUserId,
@@ -393,14 +508,24 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
           organizationId,
           kiloToken: record.kiloToken,
           clientId: record.authRequest.clientId,
+          adminEnabled,
+          // Whether the owner was an admin when this grant was minted. Fail-
+          // closed: an unreachable/failed check left it false, and grants minted
+          // before this key existed carry no key at all (also treated as false).
+          adminEligible,
+          // The connection identity every grant carries, admin or not: a
+          // protected request binds to the session that created it, so another
+          // session can never submit its OTP. Minted fresh on every grant.
+          sessionId: crypto.randomUUID(),
         },
       }));
     } catch {
-      // The library could not mint the code. The record is 'approved' and would
-      // reject every future picker submit, so release it back to retryable
-      // 'pending' (keeping the paired identity) and let the same user retry.
-      // A concurrent completion/denial/expiry wins the guard: then the request
-      // really is over and the terminal error page is correct.
+      // The library could not mint the code, or the client record could not be
+      // renewed. The record is 'approved' and would reject every future picker
+      // submit, so release it back to retryable 'pending' (keeping the paired
+      // identity) and let the same user retry. A concurrent
+      // completion/denial/expiry wins the guard: then the request really is
+      // over and the terminal error page is correct.
       const released = await deps.store.releasePendingAuthorization(id, nowIso);
       return released
         ? renderRetry(
@@ -429,41 +554,72 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
   };
 
   if (request.method === 'GET') {
-    let options: OrgOption[];
-    try {
-      options = await fetchOrgOptions(deps, kiloToken);
-    } catch {
-      // Retryable unhappy: the org list is a live read, so the personal context
-      // stays selectable and the same submit completes the flow on retry.
-      return personalOnlyPage(
-        'Could not load your organizations right now — only the personal account is offered. Choose it, or retry.'
-      );
-    }
-    return orgPickerPage({ clientName, actionUrl, options, error: null });
+    // Retryable unhappy: the org list is a live read, so the personal context
+    // stays selectable and the same submit completes the flow on retry.
+    return orgListPage(null);
   }
 
   // POST. The personal context is always valid for an approved Kilo login, so
   // it must not depend on the live membership read.
   const form = await request.formData().catch(() => null);
+  // Read the opt-in and the code tolerantly: only a string is inspected, so a
+  // non-text form value cannot fail the whole parse.
+  const adminField = form?.get('admin_enabled');
+  const otpField = form?.get('otp_code');
   const parsedForm = orgPickerFormSchema.safeParse({
     organization_id: form?.get('organization_id') ?? '',
+    admin_enabled: typeof adminField === 'string' ? adminField : undefined,
+    otp_code: typeof otpField === 'string' ? otpField : undefined,
   });
   if (!parsedForm.success) {
     // Missing or malformed selection: re-render the picker with a prompt when
     // the org list is reachable, else offer the (still valid) personal context.
-    let options: OrgOption[] | null = null;
-    try {
-      options = await fetchOrgOptions(deps, kiloToken);
-    } catch {
-      options = null;
-    }
-    return options
-      ? orgPickerPage({ clientName, actionUrl, options, error: 'Choose an account to continue.' })
-      : personalOnlyPage('Choose an account to continue.');
+    return orgListPage('Choose an account to continue.');
   }
+  // The operator ticked the admin opt-in but the eligibility check could not
+  // run: honoring it is impossible (fail-closed) and silently completing with
+  // `adminEnabled: false` would merge a retryable failure into the happy path.
+  // Re-render the picker with the same reload notice as the GET instead of
+  // connecting. `approvePendingAuthorization` has not run, so the pending
+  // record is untouched and this exact submit can be retried after a reload;
+  // `approveAndRedirect` is never reached on this branch. A POST without the
+  // box never lands here: leaving it unticked always connects.
+  if (parsedForm.data.admin_enabled === 'on' && adminCheckFailed) {
+    return orgListPage(null, false, ADMIN_CHECK_NOTICE);
+  }
+  // The POST re-derives admin eligibility above instead of trusting the
+  // submitted checkbox, the same way it re-checks the org membership: a client
+  // could otherwise grant itself admin procedures by editing the form, and only
+  // the literal `on` from an eligible identity counts.
+  const wantsAdmin = parsedForm.data.admin_enabled === 'on' && adminEligible;
   const submitted = parsedForm.data.organization_id;
+
+  // The per-request authenticator read above is the gate's truth: an admin
+  // whose authenticator is already verified sees the ticked checkbox and no
+  // code field, so a ticked box mints with no code at all.
+  const verifiedAuthenticator = authenticator?.verified === true;
+
+  // The OTP gate for a ticked opt-in, and only before the authenticator is
+  // verified. Once it is, the checkbox alone toggles the feature: `otp_code` is
+  // never read and `confirmAuthenticator` is never called, so an enrolled
+  // admin connects on the tick alone. For the unverified admin a missing code
+  // or one that fails to verify re-renders the picker with the enrolment
+  // subsection revealed and mints nothing — no `approvePendingAuthorization`,
+  // no `completeAuthorization` — so the same submit can be retried with the
+  // right code; the accepted code there is what marks the authenticator
+  // verified. `otp_code` is ignored entirely when the box is not ticked.
+  if (wantsAdmin && !verifiedAuthenticator) {
+    const code = (parsedForm.data.otp_code ?? '').trim();
+    if (code.length === 0) {
+      return orgListPage(OTP_REQUIRED_MESSAGE, true);
+    }
+    if (!(await deps.store.confirmAuthenticator(record.kiloUserId, code, nowIso))) {
+      return orgListPage(OTP_INVALID_MESSAGE, true);
+    }
+  }
+
   if (submitted === PERSONAL_ORG_ID) {
-    return approveAndRedirect(null, message => personalOnlyPage(message));
+    return approveAndRedirect(null, wantsAdmin, message => personalOnlyPage(message));
   }
   // Concrete orgs stay validated against the freshly-fetched membership list:
   // a client cannot authorize an org it is not a member of by editing the form.
@@ -471,21 +627,16 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
   try {
     options = await fetchOrgOptions(deps, kiloToken);
   } catch {
-    return personalOnlyPage(
-      'Could not load your organizations right now — only the personal account is offered. Choose it, or retry.'
-    );
+    return personalOnlyPage(ORG_LIST_UNAVAILABLE_MESSAGE);
   }
   const chosen = options.find(option => option.id === submitted);
   if (!chosen) {
-    return orgPickerPage({
-      clientName,
-      actionUrl,
-      options,
-      error: 'That organization is not available for this account.',
-    });
+    return renderPicker({ options, error: 'That organization is not available for this account.' });
   }
-  return approveAndRedirect(chosen.id === PERSONAL_ORG_ID ? null : chosen.id, message =>
-    orgPickerPage({ clientName, actionUrl, options, error: message })
+  return approveAndRedirect(
+    chosen.id === PERSONAL_ORG_ID ? null : chosen.id,
+    wantsAdmin,
+    (message: string) => renderPicker({ options, error: message })
   );
 }
 
@@ -496,7 +647,7 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
  */
 export function createDefaultHandler(deps: ConsentDeps): ExportedHandler<Env> {
   return {
-    async fetch(request, env): Promise<Response> {
+    async fetch(request, env, _ctx): Promise<Response> {
       const url = new URL(request.url);
       switch (url.pathname) {
         case AUTH_PATHS.authorize:

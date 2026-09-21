@@ -7,7 +7,7 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
-import { getOpenAiChatGptStoredConnection } from './store';
+import { getOpenAiChatGptStoredConnection, type OpenAiChatGptOwner } from './store';
 import { isOpenAiModelServed } from './served-models';
 import { OPENAI_CHATGPT_API_URL } from './upstream';
 
@@ -83,6 +83,11 @@ export type OpenAiChatGptRoutingInput = {
   requestedModel: string;
   /** Null for anonymous callers, who can never own a connection. */
   userId: string | null;
+  /**
+   * The organization the request runs for. Set means the request must use that
+   * organization's connection and never the caller's personal one.
+   */
+  organizationId: string | undefined;
 };
 
 export type OpenAiChatGptRoutingResult =
@@ -110,6 +115,19 @@ function isOpenAiChatGptModel(requestedModel: string): boolean {
 }
 
 /**
+ * Resolves the connection owner for a request. The connection is inherently
+ * personal, so the owner is always the caller and the organization only scopes
+ * which of their connections applies. An organization request uses the
+ * caller's connection for that organization and never their personal one, so an
+ * organization without the caller's connection falls through to the API path.
+ * Anonymous callers have no owner.
+ */
+function openAiChatGptOwner(input: OpenAiChatGptRoutingInput): OpenAiChatGptOwner | null {
+  if (!input.userId) return null;
+  return { kiloUserId: input.userId, organizationId: input.organizationId ?? null };
+}
+
+/**
  * An enabled, readable ChatGPT connection makes a delegated OpenAI model
  * eligible. The partner project key is deliberately not part of this check: a
  * missing deployment credential must not hide the person's connection state.
@@ -119,10 +137,11 @@ function isOpenAiChatGptModel(requestedModel: string): boolean {
  * person with an api-kind error instead of their existing provider.
  */
 export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput): Promise<boolean> {
-  const { request, requestedModel, userId } = input;
+  const { request, requestedModel } = input;
 
   if (request.kind !== 'responses') return false;
-  if (!userId) return false;
+  const owner = openAiChatGptOwner(input);
+  if (!owner) return false;
   if (!isOpenAiChatGptModel(requestedModel)) return false;
 
   // The catalog can list an OpenAI model the plain API does not serve. A
@@ -134,7 +153,7 @@ export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput):
     return false;
   }
 
-  const stored = await getOpenAiChatGptStoredConnection(userId);
+  const stored = await getOpenAiChatGptStoredConnection(owner);
   // The payload's `status` mirrors a save or a terminal failure, but a person
   // can also disable the row through the ordinary BYOK toggle, which leaves the
   // payload saying `connected`. Both must hold for the route to be eligible.
@@ -148,10 +167,10 @@ export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput):
  * routing uses, so a model is tagged only when the delegated route can carry it.
  */
 export async function getOpenAiChatGptByokModelIds(
-  userId: string,
+  owner: OpenAiChatGptOwner,
   candidateModelIds: readonly string[]
 ): Promise<Set<string> | null> {
-  const stored = await getOpenAiChatGptStoredConnection(userId);
+  const stored = await getOpenAiChatGptStoredConnection(owner);
   if (stored?.isEnabled !== true || stored.connection.status !== 'connected') return null;
 
   const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
@@ -173,9 +192,9 @@ export async function getOpenAiChatGptByokModelIds(
  */
 export async function tagOpenAiChatGptByokModels<
   T extends { id: string; hasUserByokAvailable?: boolean },
->(userId: string, models: T[]): Promise<T[]> {
+>(owner: OpenAiChatGptOwner, models: T[]): Promise<T[]> {
   const byokModelIds = await getOpenAiChatGptByokModelIds(
-    userId,
+    owner,
     models.map(model => model.id)
   );
   if (!byokModelIds) return models;
@@ -249,10 +268,11 @@ export function buildOpenAiChatGptProvider(apiKey: string, accessToken: string):
 export async function checkOpenAiChatGptByok(
   input: OpenAiChatGptRoutingInput
 ): Promise<OpenAiChatGptRoutingResult | null> {
-  if (input.userId === null) return null;
+  const owner = openAiChatGptOwner(input);
+  if (!owner) return null;
   if (!(await isOpenAiChatGptEligible(input))) return null;
 
-  const outcome = await resolveOpenAiChatGptAccessToken(input.userId);
+  const outcome = await resolveOpenAiChatGptAccessToken(owner);
 
   if (outcome.kind === 'terminal') {
     return { kind: 'reconnect', message: OPENAI_CHATGPT_RECONNECT_MESSAGE };

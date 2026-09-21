@@ -9,6 +9,8 @@ import {
 } from 'react';
 import { createStore, Provider } from 'jotai';
 import { QueryClientProvider } from '@tanstack/react-query';
+import * as Clipboard from 'expo-clipboard';
+import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { type Pressable } from 'react-native';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
@@ -32,7 +34,7 @@ import { ChildSessionModelLabel } from '@/components/agents/child-session-model-
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
 import { MessageBubble } from '@/components/agents/message-bubble';
-import { assistantMessage } from '@/components/agents/message-bubble-test-utils';
+import { assistantMessage, userMessage } from '@/components/agents/message-bubble-test-utils';
 import {
   exitRemoteSessionWithFeedback,
   type RetryableExitFailure,
@@ -61,7 +63,9 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { i18n } from '@/i18n';
-import { renderWithProviders } from '@/test/render-with-providers';
+import { captureEvent, SESSION_VIEWED_EVENT } from '@/lib/analytics/posthog';
+import { recordLastOpenedSession } from '@/lib/last-opened-session';
+import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
 const connectionHealth = vi.hoisted(() => ({
@@ -94,6 +98,10 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 // Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
 // rendering and unrelated composer, account, model-picker, and router dependencies.
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
+const routerSetParams = vi.hoisted(() => vi.fn());
+const handoffAdvertiserCalls = vi.hoisted(() => ({
+  props: [] as { anchorMessageId?: string | null }[],
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 // The header's offline-banner reservation reads the committed connectivity
 // hook; these states are online, and the hook module pulls NetInfo (unmocked
@@ -146,6 +154,7 @@ vi.mock('expo-router', () => ({
     push: (href: string) => {
       navigationRoutes.push(href);
     },
+    setParams: routerSetParams,
   }),
 }));
 // `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
@@ -169,12 +178,13 @@ vi.mock('expo-haptics', () => ({
 vi.mock('@/components/agents/mobile-session-manager', () => ({
   isCancelQueuedUpgradeRequired: vi.fn(),
 }));
-vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
   Bot: 'Bot',
   ChevronDown: 'ChevronDown',
   CircleDot: 'CircleDot',
   Clock: 'Clock',
+  Link2: 'Link2',
   Loader2: 'Loader2',
   MessageSquare: 'MessageSquare',
 }));
@@ -222,8 +232,21 @@ vi.mock('@/components/agents/context-usage-ring', () => ({
 // The real context sheet (rendered so the auto-approve row can be asserted)
 // reaches `copySessionId`, which imports the native `expo-clipboard` module that
 // cannot load in this DOM-free node suite. Mock the boundary, as the mounted
-// context-sheet suite does.
+// context-sheet suite does. The session header's copy-link action reaches the
+// same native module through the real chat-link copy path.
+vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
 vi.mock('@/components/agents/session-row-actions', () => ({ copySessionId: vi.fn() }));
+// The copy-link path reaches the browser helper; its native module cannot load here.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+// The handoff advertiser owns the OS entry point (Head plus Android's launcher
+// module) and has its own mounted suite; recording its props here proves the
+// screen hands it the live position.
+vi.mock('@/lib/session-handoff', () => ({
+  SessionHandoffAdvertiser: (props: { anchorMessageId?: string | null }) => {
+    handoffAdvertiserCalls.props.push(props);
+    return null;
+  },
+}));
 vi.mock('@/components/agents/session-pr-badge', () => ({ SessionPrBadge: 'SessionPrBadge' }));
 vi.mock('@/components/agents/session-status-indicator', () => ({
   SessionStatusIndicator: 'SessionStatusIndicator',
@@ -338,8 +361,14 @@ vi.mock('@/lib/a11y/announce', () => ({
   moveA11yFocus: () => false,
   announceForA11y: vi.fn(),
 }));
+// `test-user` by default; the last-opened test flips it to `undefined` to model
+// the identity resolving after the session's first render.
+const currentUserId = vi.hoisted(() => ({ value: 'test-user' as string | undefined }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
-  useCurrentUserId: () => ({ userId: 'test-user', isLoading: false }),
+  useCurrentUserId: () => ({ userId: currentUserId.value, isLoading: false }),
+}));
+vi.mock('@/lib/last-opened-session', () => ({
+  recordLastOpenedSession: vi.fn(),
 }));
 vi.mock('@/lib/hooks/use-available-models', () => ({
   useAvailableModels: () => ({ models: [], isLoading: false }),
@@ -555,6 +584,7 @@ beforeEach(() => {
   globalContext.setOrganizationId.mockClear();
   rootPageNextCursor = null;
   condensePreference.value = false;
+  currentUserId.value = 'test-user';
   connectionHealth.isConnected = true;
   connectionHealth.reconnectExhausted = false;
   connectionHealth.retryConnection.mockClear();
@@ -564,13 +594,20 @@ type MountDetailsOptions = {
   metadataReady?: Promise<undefined>;
   displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
   cachedRows?: StoredMessage[] | null;
+  /** The route's `?at=` param the screen mounts with. */
+  resumeAt?: string | null;
 };
 
 async function mountDetails(
   rootMessages: StoredMessage[] | null = [taskMessage(ROOT_ID, CHILD_IDS)],
   options: MountDetailsOptions = {}
 ) {
-  const { metadataReady, displayScope = PERSONAL_DISPLAY_SCOPE, cachedRows = null } = options;
+  const {
+    metadataReady,
+    displayScope = PERSONAL_DISPLAY_SCOPE,
+    cachedRows = null,
+    resumeAt,
+  } = options;
   const store = createStore();
   // `null` stalls the root page: the request never resolves, so the open never
   // receives first content (the endless-skeleton case).
@@ -656,11 +693,17 @@ async function mountDetails(
     manager.destroy();
     connection.destroy();
   });
-  const element = (id: KiloSessionId) =>
+  let currentRootId: KiloSessionId = ROOT_ID;
+  const element = (id: KiloSessionId, at: string | null | undefined = resumeAt) =>
     createElement(
       Provider,
       { store },
-      createElement(SessionDetailContent, { key: id, sessionId: id, displayScope })
+      createElement(SessionDetailContent, {
+        key: id,
+        sessionId: id,
+        displayScope,
+        ...(at === undefined ? {} : { resumeAt: at }),
+      })
     );
   const view = await renderWithProviders(element(ROOT_ID));
   onTestFinished(view.unmount);
@@ -697,8 +740,25 @@ async function mountDetails(
     },
     switchRoot: async (id: KiloSessionId) => {
       await act(async () => {
+        currentRootId = id;
         view.renderer.update(
           createElement(QueryClientProvider, { client: view.queryClient }, element(id))
+        );
+        await Promise.resolve();
+      });
+    },
+    /**
+     * Deliver a new route `at` to the already-mounted screen (the `withAnchor`
+     * dedupe path updates params instead of remounting the route).
+     */
+    updateResumeAt: async (next: string | null) => {
+      await act(async () => {
+        view.renderer.update(
+          createElement(
+            QueryClientProvider,
+            { client: view.queryClient },
+            element(currentRootId, next)
+          )
         );
         await Promise.resolve();
       });
@@ -2154,6 +2214,41 @@ describe('SessionDetailContent goal visibility', () => {
   });
 });
 
+describe('SessionDetailContent last-opened record', () => {
+  it('records the viewed session when the identity resolves after the first render', async () => {
+    // A cold start: the session renders before `user.getMe` answers, so the
+    // first visit sees no `userId`.
+    currentUserId.value = undefined;
+    const record = vi.mocked(recordLastOpenedSession);
+    const capture = vi.mocked(captureEvent);
+    record.mockClear();
+    capture.mockClear();
+    onTestFinished(() => {
+      currentUserId.value = 'test-user';
+    });
+
+    const view = await mountDetails();
+
+    // The view event proves the once-per-session latch already closed while the
+    // identity was unknown.
+    await waitFor(() => capture.mock.calls.some(call => call[0] === SESSION_VIEWED_EVENT));
+    expect(record).not.toHaveBeenCalled();
+
+    // The identity resolves: the record must still land for this session.
+    currentUserId.value = 'test-user';
+    await view.switchRoot(ROOT_ID);
+
+    await waitFor(() => record.mock.calls.length > 0);
+    expect(record).toHaveBeenCalledExactlyOnceWith(ROOT_ID, 'test-user');
+
+    // A later render of the same viewed session must not record again.
+    capture.mockClear();
+    await view.switchRoot(ROOT_ID);
+    expect(record).toHaveBeenCalledOnce();
+    expect(capture).not.toHaveBeenCalled();
+  });
+});
+
 describe('SessionDetailContent goal edit dialog', () => {
   // The reported goal shape: one very long unbroken word plus a long sentence.
   const longGoal: SessionGoal = {
@@ -2194,3 +2289,279 @@ describe('SessionDetailContent goal edit dialog', () => {
     });
   });
 });
+
+// The screen's live position: the transcript list reports the topmost visible
+// message, and the screen publishes it to the OS handoff, the copy-link action,
+// and the route's search params.
+describe('SessionDetailContent live position', () => {
+  it('publishes the transcript position to the handoff, the copy action, and the route', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+    routerSetParams.mockClear();
+    handoffAdvertiserCalls.props.length = 0;
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange?.('msg-77');
+    });
+
+    // The handoff advertises the position the transcript is showing.
+    expect(handoffAdvertiserCalls.props.at(-1)?.anchorMessageId).toBe('msg-77');
+
+    // The header's copy action copies that same position's universal link.
+    const copy = view.renderer.root.findByProps({
+      accessibilityLabel: i18n.t('common.copyLink'),
+    });
+    await act(async () => {
+      (copy.props as { onPress: () => void }).onPress();
+      await Promise.resolve();
+    });
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
+      sessionResumeUrl({ sessionId: ROOT_ID, anchorMessageId: 'msg-77' })
+    );
+
+    // The route's search params carry it after the publish debounce.
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+    expect(routerSetParams).toHaveBeenCalledWith({ at: 'msg-77' });
+  });
+});
+
+// A resume link delivered onto a screen that already shows the session arrives
+// as a new `resumeAt` param (dedupe updates params, it does not remount): the
+// screen must adopt the link's position, while the route echoing back what this
+// screen itself published must not re-scroll the viewport.
+describe('SessionDetailContent resume link', () => {
+  function resumeAnchorOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    return (list.props as ComponentProps<typeof SessionMessageList>).resumeAt;
+  }
+
+  it('adopts a resume link delivered to the already-mounted screen', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {
+      resumeAt: 'msg-a',
+    });
+    expect(resumeAnchorOf(view)).toBe('msg-a');
+
+    await view.updateResumeAt('msg-b');
+
+    expect(resumeAnchorOf(view)).toBe('msg-b');
+  });
+
+  it('cancels a pending position publish when a newer resume link is adopted', async () => {
+    routerSetParams.mockClear();
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {
+      resumeAt: 'msg-a',
+    });
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    const onAnchorChange = (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange;
+    // The viewport moves, arming the debounced publish...
+    act(() => {
+      onAnchorChange?.('msg-c');
+    });
+    // ...and a resume link lands before the debounce fires.
+    await view.updateResumeAt('msg-b');
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+
+    expect(resumeAnchorOf(view)).toBe('msg-b');
+    // The pre-link position must not overwrite the link's position on the route.
+    expect(routerSetParams).not.toHaveBeenCalledWith({ at: 'msg-c' });
+  });
+
+  it('keeps the current position when the route echoes the anchor this screen published', async () => {
+    routerSetParams.mockClear();
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], {
+      resumeAt: 'msg-a',
+    });
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    act(() => {
+      (list.props as ComponentProps<typeof SessionMessageList>).onAnchorChange?.('msg-c');
+    });
+
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, 600);
+      });
+    });
+    expect(routerSetParams).toHaveBeenCalledWith({ at: 'msg-c' });
+
+    await view.updateResumeAt('msg-c');
+
+    expect(resumeAnchorOf(view)).toBe('msg-a');
+  });
+});
+
+// A send takes the transcript position over: both composer send paths must
+// tell the list to follow the output the send produces, so a transcript parked
+// on a `?at=` anchor with follow off never strands the sent message and its
+// reply off-screen (mobile-app e2e e1).
+describe('SessionDetailContent send transcript take-over', () => {
+  function makeSendable(view: Awaited<ReturnType<typeof mountDetails>>) {
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.canSend, true);
+    });
+  }
+
+  function followTailNonceOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (!list) {
+      throw new Error('transcript list did not render');
+    }
+    return (list.props as ComponentProps<typeof SessionMessageList>).followTailNonce;
+  }
+
+  it('takes the position over when a prompt is sent from a resumed anchor', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], { resumeAt: 'msg-a' });
+    makeSendable(view);
+    expect(followTailNonceOf(view)).toBe(0);
+
+    const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))[0];
+    if (!composer) {
+      throw new Error('composer did not render');
+    }
+    const onSend = composer.props.onSend as (text: string) => Promise<void>;
+    await act(async () => {
+      // The transport outcome does not gate the take-over: the viewport must
+      // follow the send as soon as the user commits it.
+      await onSend('follow-after-resume').catch(() => undefined);
+    });
+
+    expect(followTailNonceOf(view)).toBe(1);
+  });
+
+  it('takes the position over when a slash command is sent from a resumed anchor', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')], { resumeAt: 'msg-a' });
+    makeSendable(view);
+
+    const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))[0];
+    if (!composer) {
+      throw new Error('composer did not render');
+    }
+    const onSendCommand = composer.props.onSendCommand as (
+      command: string,
+      argumentsText: string
+    ) => Promise<boolean>;
+    await act(async () => {
+      await onSendCommand('review', '').catch(() => undefined);
+    });
+
+    expect(followTailNonceOf(view)).toBe(1);
+  });
+});
+
+describe('session detail duplicate failure state', () => {
+  // Stored messages are ordered by id, which is time-sortable ascending, so the
+  // user row must sort before the assistant row for the Retry prompt to resolve.
+  const USER_ID = 'msg_1761000000000_user';
+  const ASSISTANT_ID = 'msg_1761000000010_assistant';
+
+  function rootUserMessage(text: string): StoredMessage {
+    const message = userMessage(USER_ID);
+    return {
+      info: { ...message.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({ id: `${USER_ID}-text`, sessionID: ROOT_ID, messageID: USER_ID, text }),
+      ],
+    };
+  }
+
+  function rootFailedAssistantMessage(text: string): StoredMessage {
+    const message = assistantMessage(ASSISTANT_ID);
+    message.info = { ...message.info, sessionID: ROOT_ID };
+    (message.info as { error?: { name: string; data: unknown } }).error = {
+      name: 'APIError',
+      data: { message: 'raw provider text' },
+    };
+    return {
+      info: message.info,
+      parts: [
+        stubTextPart({
+          id: `${ASSISTANT_ID}-text`,
+          sessionID: ROOT_ID,
+          messageID: ASSISTANT_ID,
+          text,
+        }),
+      ],
+    };
+  }
+
+  async function mountFailedTurn(indicator: SessionStatusIndicator) {
+    const view = await mountDetails([
+      rootUserMessage('please refactor'),
+      rootFailedAssistantMessage('matching the requested refactor.'),
+    ]);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        indicator
+      );
+    });
+    return view;
+  }
+
+  it('states the failure once: no repeated detail line and no repeated footer error', async () => {
+    const view = await mountFailedTurn({ type: 'error', message: 'simulated error', timestamp: 0 });
+    const text = renderedText(view.renderer.root);
+    expect(text).toContain('Response failed');
+    expect(text).not.toContain('The response failed.');
+    expect(indicatorNodes(view)).toHaveLength(0);
+  });
+
+  it('keeps a classified session error the message row does not carry', async () => {
+    const view = await mountFailedTurn({
+      type: 'error',
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      timestamp: 0,
+    });
+    const nodes = indicatorNodes(view);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]?.props).toMatchObject({
+      indicator: { message: expect.stringContaining('Insufficient credits') },
+    });
+  });
+
+  it('keeps the footer line when the transcript drops the failed row it names', async () => {
+    // A failed assistant row whose parts render nothing is dropped by
+    // `mergeSessionTranscript`; it owns no row, so the footer is the failure's
+    // only surface and must not be suppressed by it.
+    const dropped = rootFailedAssistantMessage('partial reply');
+    dropped.parts = [];
+    const view = await mountDetails([rootUserMessage('please refactor'), dropped]);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'error', message: 'simulated error', timestamp: 0 }
+      );
+    });
+    const nodes = indicatorNodes(view);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]?.props).toMatchObject({
+      indicator: { message: 'simulated error' },
+    });
+  });
+});
+
+function indicatorNodes(view: Awaited<ReturnType<typeof mountDetails>>) {
+  return view.renderer.root.findAll(node => Object.is(node.type, 'SessionStatusIndicator'));
+}

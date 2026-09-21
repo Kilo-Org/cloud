@@ -163,6 +163,7 @@
     "useDifferentEmail": "ប្រើអ៊ីមែលផ្សេង",
     "signInWithApple": "ចូលជាមួយ Apple",
     "signInWithGoogle": "ចូលជាមួយ Google",
+    "signInWithPasskey": "ចូលដោយប្រើកូនសោចូល",
     "emailAddress": "អាសយដ្ឋានអ៊ីមែល",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "បន្តជាមួយអ៊ីមែល",
@@ -175,6 +176,10 @@
     "termsConnector": " និង ",
     "termsSuffix": "។",
     "moreSignInOptions": "ជម្រើសចូលបន្ថែម",
+    "passkeyCancelled": "ការចូលដោយកូនសោចូលត្រូវបានបោះបង់។ សូមព្យាយាមម្តងទៀត។",
+    "passkeyNotFound": "មិនមានកូនសោចូលដែលបានរក្សាទុកសម្រាប់ឧបករណ៍នេះទេ។ សូមចូលដោយ Apple, Google ឬអ៊ីមែលរបស់អ្នកជំនួសវិញ។",
+    "passkeyUnsupported": "កូនសោចូលមិនមាននៅលើឧបករណ៍នេះទេ។ សូមចូលដោយ Apple, Google ឬអ៊ីមែលរបស់អ្នកជំនួសវិញ។",
+    "passkeyFailed": "មិនអាចចូលដោយកូនសោចូលបានទេ។ សូមព្យាយាមម្តងទៀត។",
     "couldNotCompleteSignIn": "មិនអាចបញ្ចប់ការចូលបានទេ។ សូមព្យាយាមម្តងទៀត។",
     "sessionEnded": "វគ្គរបស់អ្នកបានបញ្ចប់។ សូមចូលម្តងទៀត។",
     "signInCodeExpired": "លេខកូដចូលរបស់អ្នកផុតកំណត់ហើយ។ សូមព្យាយាមម្តងទៀត។",
@@ -225,7 +230,28 @@
     "providerTestAccount": "គណនីសាកល្បង",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO សម្រាប់សហគ្រាស"
+    "providerEnterpriseSso": "SSO សម្រាប់សហគ្រាស",
+    "passkeysTitle": "កូនសោចូល",
+    "passkeysSubtitle": "ចូលដោយគ្មានពាក្យសម្ងាត់",
+    "passkeysEmpty": "មិនទាន់មានកូនសោចូលទេ",
+    "passkeysEmptyHint": "$t(profile.addPasskey) ដើម្បីចូលដោយគ្មានពាក្យសម្ងាត់។",
+    "passkeysCouldNotLoad": "មិនអាចផ្ទុកកូនសោចូលបានទេ",
+    "passkeysLoadFailed": "កូនសោចូលមិនមានរហូតដល់វាផ្ទុករួច។",
+    "addPasskey": "បន្ថែមកូនសោចូល",
+    "passkeyDefaultName": "កូនសោចូល",
+    "passkeyAddedOn": "បានបន្ថែម {{date}}",
+    "passkeyAdded": "បានបន្ថែមកូនសោចូល។",
+    "passkeyAddFailed": "មិនអាចបន្ថែមកូនសោចូលបានទេ។ សូមព្យាយាមម្តងទៀត។",
+    "passkeyAddUnsupported": "ឧបករណ៍នេះមិនអាចបង្កើតកូនសោចូលបានទេ។",
+    "passkeyAddCancelled": "ការបង្កើតកូនសោចូលត្រូវបានបោះបង់។",
+    "passkeyRemoved": "បានដកកូនសោចូលចេញ។",
+    "passkeyRemoveFailed": "មិនអាចដកកូនសោចូលនោះចេញបានទេ។ សូមព្យាយាមម្តងទៀត។",
+    "passkeyRenamed": "បានប្តូរឈ្មោះកូនសោចូល។",
+    "passkeyName": "ឈ្មោះកូនសោចូល",
+    "renamePasskey": "ប្តូរឈ្មោះកូនសោចូល",
+    "removePasskey": "ដកកូនសោចូលចេញ",
+    "removePasskeyTitle": "ដកកូនសោចូលចេញ?",
+    "removePasskeyMessage": "អ្នកនឹងមិនអាចចូលដោយកូនសោចូលនេះបានទៀតទេ។"
   },
   "preferences": {
     "general": "ទូទៅ",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "បានផ្ទុកឯកសារ {{displayCount}} ក្នុងចំណោម {{total}}",
       "filesStillLoading": "ឯកសារកំពុងផ្ទុកនៅឡើយ។ ទាញដើម្បីផ្ទុកឡើងវិញ។",
       "goToOverview": "ទៅកាន់ទិដ្ឋភាពទូទៅ",
-      "goToOverviewTab": "ទៅកាន់ផ្ទាំងទិដ្ឋភាពទូទៅ"
+      "goToOverviewTab": "ទៅកាន់ផ្ទាំងទិដ្ឋភាពទូទៅ",
+      "expandAllLines_one": "បង្ហាញបន្ទាត់ទាំង {{displayCount}}",
+      "expandAllLines_other": "បង្ហាញបន្ទាត់ទាំង {{displayCount}}",
+      "expandLines_one": "បង្ហាញ {{displayCount}} បន្ទាត់ ({{start}}–{{end}})",
+      "expandLines_other": "បង្ហាញ {{displayCount}} បន្ទាត់ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "បង្ហាញបរិបទចំនួន {{displayCount}} បន្ទាត់",
+      "expandLinesOfContext_other": "បង្ហាញបរិបទចំនួន {{displayCount}} បន្ទាត់",
+      "expandMoreLines_one": "បង្ហាញបន្ថែម {{displayCount}} បន្ទាត់ ({{start}}–{{end}})",
+      "expandMoreLines_other": "បង្ហាញបន្ថែម {{displayCount}} បន្ទាត់ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "បានផ្ទុកឯកសារ {{loaded}} ក្នុងចំណោម {{total}}",
+      "loadedOfTotalFiles_other": "បានផ្ទុកឯកសារ {{loaded}} ក្នុងចំណោម {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ គ្មានសញ្ញាចុះបន្ទាត់នៅចុងឯកសារទេ។",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "លែងទាន់សម័យនៅ {{path}}"
       },
       "deletedUser": "អ្នកប្រើប្រាស់ដែលបានលុបគណនី",
-      "replyForbiddenTerm": "អ្នកគ្មានសិទ្ធិឆ្លើយតបលើ{{term}}នេះទេ។"
+      "replyForbiddenTerm": "អ្នកគ្មានសិទ្ធិឆ្លើយតបលើ{{term}}នេះទេ។",
+      "moreLinesAbove_one": "… នៅមាន {{displayCount}} បន្ទាត់ទៀតខាងលើ។",
+      "moreLinesAbove_other": "… នៅមាន {{displayCount}} បន្ទាត់ទៀតខាងលើ។"
     },
     "couldNotOpenGitHubAppSettings": "មិនអាចបើកការកំណត់កម្មវិធី GitHub បានទេ។",
     "installKiloGitHubApp": "ដំឡើងកម្មវិធី Kilo សម្រាប់ GitHub",
@@ -706,7 +744,9 @@
       "statusContext": "បរិបទ",
       "lineLabel": "បន្ទាត់ {{line}} ({{status}})៖ {{text}}",
       "lineLabelNoNumber": "{{status}}៖ {{text}}",
-      "emptyLine": "(ទទេ)"
+      "emptyLine": "(ទទេ)",
+      "truncationBanner_one": "កំពុងបង្ហាញឯកសារដែលបានកែប្រែ {{limit}} ដំបូង ក្នុងចំណោម {{total}} ដោយសារដែនកំណត់របស់ GitHub API។",
+      "truncationBanner_other": "កំពុងបង្ហាញឯកសារដែលបានកែប្រែ {{limit}} ដំបូង ក្នុងចំណោម {{total}} ដោយសារដែនកំណត់របស់ GitHub API។"
     },
     "linkPasteClipboardEmpty": "ក្ដារតម្បៀតខ្ទាស់ទទេ។",
     "linkPasteNotAPullRequest": "មិនមែនជាតំណសំណើបញ្ចូលកូដ ឬ សំណើបញ្ចូលទេ",
@@ -783,7 +823,7 @@
     "previewFullDescription": "ការជូនដំណឹងបង្ហាញអត្ថបទសារនៅលើអេក្រង់ចាក់សោរបស់អ្នក។",
     "previewGenericDescription": "ការជូនដំណឹងបង្ហាញថាមានអ្វីមួយបានកើតឡើង។ បើក Kilo ដើម្បីអានវា។",
     "channel": {
-      "agent": "វគ្គភ្នាក់ងារ",
+      "agentProgress": "វឌ្ឍនភាពភ្នាក់ងារ",
       "chat": "សារជជែក",
       "kiloclaw": "សកម្មភាព KiloClaw",
       "balance": "ការជូនដំណឹងអំពីសមតុល្យ",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "ម៉ាស៊ីនរួចរាល់/បរាជ័យ សកម្មភាពតាមកាលវិភាគ",
       "balanceAlertsSubtitle": "ការព្រមានពេលសមតុល្យរបស់អង្គការទាប",
       "securityFindingsSubtitle": "ការរកឃើញថ្មី និងការរំលឹក SLA"
+    },
+    "action": {
+      "openSession": "បើកវគ្គ"
+    },
+    "needsInputAction": {
+      "approved": "សំណើត្រូវបានអនុម័ត",
+      "replied": "បានផ្ញើចម្លើយ",
+      "failed": "មិនអាចឆ្លើយបានទេ។ ចុចម្តងទៀតដើម្បីព្យាយាមម្តងទៀត។",
+      "unavailable": "សំណើនេះលែងរង់ចាំទៀតហើយ។"
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "ការផ្ទុកឡើងបានបរាជ័យ។",
       "failedToUploadFile": "មិនអាចផ្ទុកឯកសារឡើងបានទេ៖ {{reason}}។",
       "nothingToPaste": "គ្មានអ្វីសម្រាប់បិទភ្ជាប់ទេ។",
-      "metadataStripFailed": "មិនអាចដកទិន្នន័យមេតារូបថតចេញបានទេ។"
+      "metadataStripFailed": "មិនអាចដកទិន្នន័យមេតារូបថតចេញបានទេ។",
+      "limit_one": "អ្នកអាចភ្ជាប់ឯកសារបានរហូតដល់ {{displayCount}}។",
+      "limit_other": "អ្នកអាចភ្ជាប់ឯកសារបានរហូតដល់ {{displayCount}}។"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}} {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "ធ្វើសមកាលកម្មបញ្ហាដែលរកឃើញ",
       "syncNow": "ធ្វើសមកាលកម្មឥឡូវនេះ",
       "syncQueued": "បានដាក់ការធ្វើសមកាលកម្មក្នុងជួររង់ចាំ",
-      "syncStatusUnavailable": "មិនអាចមើលស្ថានភាពសមកាលកម្មបានទេ។"
+      "syncStatusUnavailable": "មិនអាចមើលស្ថានភាពសមកាលកម្មបានទេ។",
+      "daysOverdue_one": "ហួសកំណត់ {{displayCount}} ថ្ងៃ",
+      "daysOverdue_other": "ហួសកំណត់ {{displayCount}} ថ្ងៃ",
+      "findingsCount_one": "បញ្ហាដែលរកឃើញចំនួន {{displayCount}}",
+      "findingsCount_other": "បញ្ហាដែលរកឃើញចំនួន {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "បញ្ហាដែលរកឃើញនៅបើក",
@@ -2135,20 +2190,7 @@
       "continueFrom": "កំពុងបន្តវគ្គ {{title}}។",
       "importingSession": "កំពុងនាំចូលវគ្គ",
       "cliCannotContinue": "CLI នេះមិនអាចបន្តវគ្គបានទេ។ ជ្រើសរើស Cloud Agent ឬ CLI ផ្សេងទៀត។",
-      "importFailed": "មិនអាចនាំចូលវគ្គនេះបានទេ។",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "លំនាំដើម · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "តូច",
-      "sandboxInstanceShared": "រួម",
-      "sandboxInstanceLarge": "ធំ",
-      "sandboxInstanceDevcontainer": "Dev container",
-      "sandboxInstanceProviderDefault": "លំនាំដើមរបស់អ្នកផ្ដល់សេវា",
-      "sandboxCouldNotLoad": "មិនអាចផ្ទុកជម្រើស Sandbox បានទេ",
-      "sandboxUnavailable": "Sandbox នេះមិនអាចប្រើបានទេ។ សូមជ្រើសរើស Sandbox ផ្សេងទៀត ឬលំនាំដើម។",
-      "sandboxUseDefault": "ប្រើលំនាំដើម"
+      "importFailed": "មិនអាចនាំចូលវគ្គនេះបានទេ។"
     },
     "partRenderer": {
       "updatedFileCount_one": "បានធ្វើបច្ចុប្បន្នភាពឯកសារចំនួន {{displayCount}}។",
@@ -2172,7 +2214,13 @@
       "updateTodos": "ធ្វើបច្ចុប្បន្នភាពបញ្ជីកិច្ចការ",
       "linesBadge": "{{displayCount}} បន្ទាត់",
       "filesBadge": "ឯកសារ {{displayCount}}",
-      "matchesBadge": "ត្រូវគ្នា {{displayCount}}"
+      "matchesBadge": "ត្រូវគ្នា {{displayCount}}",
+      "filesBadge_one": "ឯកសារ {{displayCount}}",
+      "filesBadge_other": "ឯកសារ {{displayCount}}",
+      "linesBadge_one": "{{displayCount}} បន្ទាត់",
+      "linesBadge_other": "{{displayCount}} បន្ទាត់",
+      "matchesBadge_one": "ត្រូវគ្នា {{displayCount}}",
+      "matchesBadge_other": "ត្រូវគ្នា {{displayCount}}"
     },
     "readToolMarkdown": {
       "linesTruncated": "បន្ទាត់ {{start}}–{{end}} (បានកាត់ឱ្យខ្លី)",
@@ -2462,7 +2510,11 @@
       "files": "ឯកសារ",
       "couldNotOpenPhotoPicker": "មិនអាចបើកផ្ទាំងជ្រើសរើសរូបថតបានទេ។ ចាប់ផ្តើម Kilo ឡើងវិញ ហើយព្យាយាមម្តងទៀត។",
       "maxFilesAllowed": "អាចភ្ជាប់ឯកសារបានច្រើនបំផុតចំនួន {{displayCount}}។",
-      "onlyAddingFiles": "កំពុងបន្ថែមឯកសារតែ {{accepted}} ក្នុងចំណោម {{total}} (អតិបរមា {{max}})"
+      "onlyAddingFiles": "កំពុងបន្ថែមឯកសារតែ {{accepted}} ក្នុងចំណោម {{total}} (អតិបរមា {{max}})",
+      "maxFilesAllowed_one": "អាចភ្ជាប់ឯកសារបានច្រើនបំផុតចំនួន {{displayCount}}។",
+      "maxFilesAllowed_other": "អាចភ្ជាប់ឯកសារបានច្រើនបំផុតចំនួន {{displayCount}}។",
+      "onlyAddingFiles_one": "កំពុងបន្ថែមឯកសារតែ {{accepted}} ក្នុងចំណោម {{total}} (អតិបរមា {{max}})",
+      "onlyAddingFiles_other": "កំពុងបន្ថែមឯកសារតែ {{accepted}} ក្នុងចំណោម {{total}} (អតិបរមា {{max}})"
     },
     "composer": {
       "addAttachment": "បន្ថែមឯកសារភ្ជាប់",
@@ -2480,7 +2532,9 @@
       "discardAttachmentsMessage": "ឯកសារដែលបានផ្ទុកឡើង តែមិនទាន់ភ្ជាប់ទៅសារដែលបានផ្ញើ នឹងត្រូវលុប។",
       "discardAttachmentsTitle": "បោះបង់ឯកសារភ្ជាប់?",
       "charactersRemaining": "នៅសល់ {{count}} តួអក្សរ",
-      "insertNewline": "បញ្ចូលបន្ទាត់ថ្មី"
+      "insertNewline": "បញ្ចូលបន្ទាត់ថ្មី",
+      "charactersRemaining_one": "នៅសល់ {{count}} តួអក្សរ",
+      "charactersRemaining_other": "នៅសល់ {{count}} តួអក្សរ"
     },
     "chatLink": {
       "linkCopied": "បានចម្លងតំណ",
@@ -2552,7 +2606,9 @@
       "stepsCount_one": "{{steps}} ជំហាន",
       "stepsCount": "ជំហាន {{steps}}",
       "stepsCount_other": "ជំហាន {{steps}}",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "ម៉ូដែល ({{displayCount}})",
+      "modelsCount_other": "ម៉ូដែល ({{displayCount}})"
     },
     "autoApprove": {
       "title": "ការអនុម័តស្វ័យប្រវត្តិ",
@@ -2592,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "ការហៅឧបករណ៍",
-      "condensedLabel": "{{itemCount}} ធាតុ; {{last}}"
+      "condensedLabel": "{{itemCount}} ធាតុ; {{last}}",
+      "condensedLabel_one": "{{itemCount}} ធាតុ; {{last}}",
+      "condensedLabel_other": "{{itemCount}} ធាតុ; {{last}}"
     }
   },
   "bootstrap": {
@@ -2727,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "វគ្គនេះមិនអាចទទួលឯកសារបានទេ",
     "cliCantReceiveFilesMessage": "Kilo CLI ដែលកំពុងដំណើរការវគ្គនេះមិនអាចទទួលឯកសារបានទេ។ ធ្វើបច្ចុប្បន្នភាព CLI នៅលើម៉ាស៊ីននោះ ឬចែករំលែកទៅវគ្គថ្មីវិញ។",
     "contentlessMessage": "គ្មានអ្វីត្រូវចែករំលែកទេ ព្រោះមិនមានអត្ថបទ ឬឯកសារភ្ជាប់មកជាមួយ។",
-    "couldNotReadContent": "មិនអាចអានខ្លឹមសារដែលបានចែករំលែកបានទេ។"
+    "couldNotReadContent": "មិនអាចអានខ្លឹមសារដែលបានចែករំលែកបានទេ។",
+    "onlyFirstFilesAttached_one": "នឹងភ្ជាប់តែឯកសារ {{displayCount}} ដំបូងប៉ុណ្ណោះ។",
+    "onlyFirstFilesAttached_other": "នឹងភ្ជាប់តែឯកសារ {{displayCount}} ដំបូងប៉ុណ្ណោះ។"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3097,7 +3157,9 @@
     "couldNotApprove": "មិនអាចយល់ព្រមបានទេ",
     "couldNotStart": "មិនអាចចាប់ផ្ដើមបានទេ",
     "channelName": "ភ្នាក់ងារសកម្ម",
-    "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។"
+    "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។",
+    "openSession": "បើក",
+    "approveFailed": "មិនអាចយល់ព្រមបានទេ។ ប៉ះ $t(common.approve) ដើម្បីព្យាយាមម្តងទៀត។"
   },
   "transcriptionModel": {
     "title": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទ",
@@ -3138,5 +3200,8 @@
       "repositoryUnknown": "Kilo មិនស្គាល់ {{repository}} ជាឃ្លាំងកូដ GitHub ឬ GitLab ទេ។ ជ្រើសរើសឃ្លាំងកូដផ្សេងនៅក្នុង Kilo។",
       "repositoryUnsupported": "{{repository}} គឺជាឃ្លាំងកូដ Bitbucket — ចាប់ផ្តើមភ្នាក់ងារមិនអាចប្រើវាបាននៅឡើយទេ។ ជ្រើសរើសឃ្លាំងកូដផ្សេងនៅក្នុង Kilo។"
     }
+  },
+  "launcher": {
+    "openLastSession": "បើកវគ្គចុងក្រោយ"
   }
 }

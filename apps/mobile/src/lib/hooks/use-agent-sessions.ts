@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
-import { useActiveSessions } from '@/lib/active-sessions-live-sync-mount';
+import { useActiveSessions } from '@/lib/active-sessions-query';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import {
@@ -381,6 +381,12 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // vs "keep showing stale data") should use these instead of `isError`.
     storedIsError: stored.isError,
     storedIsSuccess: stored.isSuccess,
+    // A paused stored query (offline, no cached page) is neither loading nor
+    // errored, but it has no rows and will not resolve until the network
+    // returns. Callers that gate on "nothing to show" must treat paused as
+    // unresolved rather than as a settled page, so they can offer a retry
+    // instead of a skeleton that never settles.
+    storedIsPaused: stored.isPaused,
     storedFetchedSinceMount,
     // React Query v5's `isLoading` is `isPending && isFetching`, so it is false
     // on the first render (the observer has not started the fetch yet) and
@@ -399,6 +405,11 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // rendered row count, because active-set exclusion can hide whole pages.
     storedLoadedPageCount: stored.data?.pages.length ?? 0,
     activeIsError: active.isError,
+    // A paused active query is neither loading (`isLoading` is
+    // `isPending && isFetching`, and a paused query is not fetching) nor
+    // errored, yet its liveness result is unresolved. Callers that gate on
+    // "nothing live" must treat paused as unknown, not as settled empty.
+    activeIsPaused: active.isPaused,
     hasNextPage: stored.hasNextPage,
     isFetchingNextPage: stored.isFetchingNextPage,
     fetchNextPage,

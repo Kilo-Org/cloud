@@ -144,6 +144,26 @@ export function readAgentPushPreference(
   return readFromSnapshot(snapshot)[category];
 }
 
+/**
+ * Read a single category's value, or `undefined` while the server-resolved row
+ * has not loaded. {@link readAgentPushPreference}'s default-ON fallback is right
+ * for a rendered control (a user with no stored row really has the category on),
+ * but a caller that *acts* on the value must not read an unloaded cache as ON:
+ * the app-owned needs-input carrier would then alert a category the user turned
+ * off after a restart. `undefined` means "not loaded yet — withhold".
+ */
+export function readAgentPushPreferenceIfLoaded(
+  queryClient: Pick<QueryClient, 'getQueryData'>,
+  queryKey: readonly unknown[],
+  category: NotificationCategoryKey = 'agentUpdates'
+): boolean | undefined {
+  const snapshot = queryClient.getQueryData(queryKey) as NotificationPreferencesSnapshot;
+  if (snapshot === undefined) {
+    return undefined;
+  }
+  return readFromSnapshot(snapshot)[category];
+}
+
 type OptimisticArgs = Readonly<{
   queryClient: Pick<QueryClient, 'cancelQueries' | 'getQueryData' | 'setQueryData'>;
   queryKey: readonly unknown[];

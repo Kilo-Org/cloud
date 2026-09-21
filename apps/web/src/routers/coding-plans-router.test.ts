@@ -838,6 +838,107 @@ describe('coding plans router', () => {
     });
   });
 
+  it('queues available inventory for manual revocation by the requested count and returns their upstream plan IDs', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+    const items = await Promise.all([insertInventory(), insertInventory(), insertInventory()]);
+
+    const result = await caller.codingPlans.adminReduceInventory({ planId: PLAN_ID, count: 2 });
+
+    expect(result.queued).toHaveLength(2);
+    const queuedIds = result.queued.map(item => item.id);
+    expect(new Set(queuedIds).size).toBe(2);
+    expect(items.map(item => item.upstream_plan_id)).toEqual(
+      expect.arrayContaining(result.queued.map(item => item.upstreamPlanId))
+    );
+
+    const rows = await db.select().from(coding_plan_key_inventory);
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      const wasQueued = queuedIds.includes(row.id);
+      expect(row.status).toBe(wasQueued ? 'revocation_pending' : 'available');
+      expect(row.encrypted_api_key).toEqual(wasQueued ? null : expect.anything());
+      if (wasQueued) {
+        expect(row.revocation_requested_at).not.toBeNull();
+        expect(row.upstream_plan_id).toBe(
+          result.queued.find(item => item.id === row.id)?.upstreamPlanId
+        );
+      }
+    }
+
+    const queue = await caller.codingPlans.adminRevocationQueue({});
+    expect(queue.map(item => item.inventoryKeyId).sort()).toEqual(queuedIds.sort());
+  });
+
+  it('queues fewer than requested when not enough available inventory exists for the plan', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+    await insertInventory();
+
+    const result = await caller.codingPlans.adminReduceInventory({ planId: PLAN_ID, count: 5 });
+
+    expect(result.queued).toHaveLength(1);
+    const [row] = await db.select().from(coding_plan_key_inventory);
+    expect(row.status).toBe('revocation_pending');
+  });
+
+  it('never queues assigned inventory or inventory referenced by a live subscription', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(admin.id);
+    const assigned = await insertInventory({
+      status: 'assigned',
+      assigned_to_user_id: user.id,
+      assigned_at: new Date().toISOString(),
+    });
+    const pendingRevocation = await insertInventory({
+      status: 'revocation_pending',
+      revocation_requested_at: new Date().toISOString(),
+    });
+    await db
+      .insert(coding_plan_subscriptions)
+      .values(subscriptionValues(user.id, { key_inventory_id: assigned.id, status: 'active' }));
+
+    const result = await caller.codingPlans.adminReduceInventory({ planId: PLAN_ID, count: 5 });
+
+    expect(result.queued).toHaveLength(0);
+    const rowsById = new Map(
+      (await db.select().from(coding_plan_key_inventory)).map(row => [row.id, row])
+    );
+    expect(rowsById.get(assigned.id)?.status).toBe('assigned');
+    expect(rowsById.get(pendingRevocation.id)?.status).toBe('revocation_pending');
+  });
+
+  it('queues an available credential even when a canceled subscription still references it via a stale key_inventory_id', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(admin.id);
+    // Simulates a credential that was assigned, revoked, and manually
+    // recycled back to "available" via replaceManualCredentialRevocation.
+    // The original (now canceled) subscription's key_inventory_id is never
+    // cleared, so this row is still "available" but has a stale FK pointing
+    // at it from a subscription that is no longer live.
+    const recycled = await insertInventory({ status: 'available' });
+    await db
+      .insert(coding_plan_subscriptions)
+      .values(subscriptionValues(user.id, { key_inventory_id: recycled.id, status: 'canceled' }));
+
+    const result = await caller.codingPlans.adminReduceInventory({ planId: PLAN_ID, count: 1 });
+
+    expect(result.queued).toHaveLength(1);
+    expect(result.queued[0].id).toBe(recycled.id);
+  });
+
+  it('rejects non-admin callers reducing inventory', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+    await insertInventory();
+
+    await expect(
+      caller.codingPlans.adminReduceInventory({ planId: PLAN_ID, count: 1 })
+    ).rejects.toThrow();
+  });
+
   it('restricts manual remediation and returns the upstream identifier needed to deprovision', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();

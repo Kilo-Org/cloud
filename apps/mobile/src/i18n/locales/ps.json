@@ -163,6 +163,7 @@
     "useDifferentEmail": "بل برېښنالیک وکاروئ",
     "signInWithApple": "د Apple له لارې ننوځئ",
     "signInWithGoogle": "د Google له لارې ننوځئ",
+    "signInWithPasskey": "د ننوتلو کیلي سره ننوځئ",
     "emailAddress": "د برېښنالیک پته",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "د برېښنالیک له لارې دوام ورکړئ",
@@ -175,6 +176,10 @@
     "termsConnector": " او ",
     "termsSuffix": ".",
     "moreSignInOptions": "د ننوتلو نور غوراوي",
+    "passkeyCancelled": "د ننوتلو کیلي سره ننوتل لغوه شول. بیا هڅه وکړئ.",
+    "passkeyNotFound": "د دې وسیلې لپاره د ننوتلو کیلي خوندي نه ده. پرځای یې د Apple، Google یا خپل بریښنالیک سره ننوځئ.",
+    "passkeyUnsupported": "د ننوتلو کیلي په دې وسیله کې شتون نلري. پرځای یې د Apple، Google یا خپل بریښنالیک سره ننوځئ.",
+    "passkeyFailed": "د ننوتلو کیلي سره ننوتل ونشول. بیا هڅه وکړئ.",
     "couldNotCompleteSignIn": "ننوتل بشپړ نه شول. مهرباني وکړئ بیا هڅه وکړئ.",
     "sessionEnded": "ستاسو ناسته پای ته ورسېده. مهرباني وکړئ بیا ننوځئ.",
     "signInCodeExpired": "ستاسو د ننوتلو د کوډ موده پای ته رسېدلې ده. مهرباني وکړئ بیا هڅه وکړئ.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "د ازموینې حساب",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "سازماني SSO"
+    "providerEnterpriseSso": "سازماني SSO",
+    "passkeysTitle": "د ننوتلو کیلي",
+    "passkeysSubtitle": "پرته له پټنوم ننوځئ",
+    "passkeysEmpty": "تر اوسه د ننوتلو کیلي نشته",
+    "passkeysEmptyHint": "$t(profile.addPasskey) ترڅو پرته له پټنوم ننوځئ.",
+    "passkeysCouldNotLoad": "د ننوتلو کیلي پورته نشو",
+    "passkeysLoadFailed": "د ننوتلو کیلي شتون نلري ترڅو دا پورته شي.",
+    "addPasskey": "د ننوتلو کیلي اضافه کړئ",
+    "passkeyDefaultName": "د ننوتلو کیلي",
+    "passkeyAddedOn": "{{date}} اضافه شوه",
+    "passkeyAdded": "د ننوتلو کیلي اضافه شوه.",
+    "passkeyAddFailed": "د ننوتلو کیلي اضافه نشو. بیا هڅه وکړئ.",
+    "passkeyAddUnsupported": "دا وسیله د ننوتلو کیلي جوړولی نشي.",
+    "passkeyAddCancelled": "د ننوتلو کیلي جوړول لغوه شول.",
+    "passkeyRemoved": "د ننوتلو کیلي لیرې شوه.",
+    "passkeyRemoveFailed": "هغه د ننوتلو کیلي لیرې نشوه. بیا هڅه وکړئ.",
+    "passkeyRenamed": "د ننوتلو کیلي نوم بدل شو.",
+    "passkeyName": "د ننوتلو کیلي نوم",
+    "renamePasskey": "د ننوتلو کیلي نوم بدل کړئ",
+    "removePasskey": "د ننوتلو کیلي لیرې کړئ",
+    "removePasskeyTitle": "د ننوتلو کیلي لیرې شي؟",
+    "removePasskeyMessage": "تاسو به نور د دې ننوتلو کیلي سره ونشئ کولای."
   },
   "preferences": {
     "general": "عمومي",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "له {{total}} څخه {{displayCount}} فایلونه بار شول",
       "filesStillLoading": "فایلونه لا هم بارېږي. د تازه کولو لپاره ښکته راکش کړئ.",
       "goToOverview": "عمومي کتنې ته لاړ شئ",
-      "goToOverviewTab": "د عمومي کتنې ټب ته لاړ شئ"
+      "goToOverviewTab": "د عمومي کتنې ټب ته لاړ شئ",
+      "expandAllLines_one": "ټولې {{displayCount}} کرښې ښکاره کړئ",
+      "expandAllLines_other": "ټولې {{displayCount}} کرښې ښکاره کړئ",
+      "expandLines_one": "{{displayCount}} کرښې ښکاره کړئ ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} کرښې ښکاره کړئ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "{{displayCount}} شاوخوا کرښې ښکاره کړئ",
+      "expandLinesOfContext_other": "{{displayCount}} شاوخوا کرښې ښکاره کړئ",
+      "expandMoreLines_one": "{{displayCount}} نورې کرښې ښکاره کړئ ({{start}}–{{end}})",
+      "expandMoreLines_other": "{{displayCount}} نورې کرښې ښکاره کړئ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "له {{total}} فایلونو څخه {{loaded}} بار شوي",
+      "loadedOfTotalFiles_other": "له {{total}} فایلونو څخه {{loaded}} بار شوي"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ د فایل په پای کې نوې کرښه نشته.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "په {{path}} کې پخوانۍ تبصره"
       },
       "deletedUser": "ړنګ شوی کارن",
-      "replyForbiddenTerm": "تاسو دې {{term}} ته د ځواب ورکولو اجازه نه لرئ."
+      "replyForbiddenTerm": "تاسو دې {{term}} ته د ځواب ورکولو اجازه نه لرئ.",
+      "moreLinesAbove_one": "… پورته {{displayCount}} نورې کرښې شته.",
+      "moreLinesAbove_other": "… پورته {{displayCount}} نورې کرښې شته."
     },
     "couldNotOpenGitHubAppSettings": "د GitHub اپ امستنې پرانیستل نه شوې.",
     "installKiloGitHubApp": "د Kilo د GitHub اپلیکیشن نصب کړئ",
@@ -574,7 +612,7 @@
       "pending": "{{displayCount}} په تمه",
       "skipped": "{{displayCount}} پرېښودل شوې",
       "checksCount": "{{displayCount}} ازموینې",
-      "checksCount_one": "{{displayCount}} ازموینه",
+      "checksCount_one": "{{displayCount}} ازموینې",
       "checksCount_other": "{{displayCount}} ازموینې",
       "checkDetails": "د ازموینې جزئیات"
     },
@@ -706,7 +744,9 @@
       "statusContext": "شاوخوا کرښه",
       "lineLabel": "{{status}} کرښه {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} کرښه: {{text}}",
-      "emptyLine": "(خالي)"
+      "emptyLine": "(خالي)",
+      "truncationBanner_one": "له {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کېږي — دا د GitHub API حد دی.",
+      "truncationBanner_other": "له {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کېږي — دا د GitHub API حد دی."
     },
     "linkPasteClipboardEmpty": "کلیپبورډ تش دی.",
     "linkPasteNotAPullRequest": "د پول ریکویسټ یا د یوځای کولو غوښتنې لینک نه دی",
@@ -783,7 +823,7 @@
     "previewFullDescription": "خبرتیاوې د قلف پر سکرین د پیغام متن ښیي.",
     "previewGenericDescription": "خبرتیاوې یوازې د یوې پېښې خبر درکوي. د پیغام د لوستلو لپاره Kilo پرانیزئ.",
     "channel": {
-      "agent": "د ایجنټ ناستې",
+      "agentProgress": "د ایجنټ پرمختګ",
       "chat": "د خبرو اترو پیغامونه",
       "kiloclaw": "د KiloClaw فعالیت",
       "balance": "د بیلانس خبرتیاوې",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "چمتو یا ناکام انسټانس، مهالویش شوې کړنې",
       "balanceAlertsSubtitle": "د سازمان د کم بیلانس خبرداري",
       "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې"
+    },
+    "action": {
+      "openSession": "ناسته پرانیزئ"
+    },
+    "needsInputAction": {
+      "approved": "غوښتنه منظور شوه",
+      "replied": "ځواب ولېږل شو",
+      "failed": "ځواب ورکړل نه شو. بیا هڅه کولو لپاره بیا ټک ورکړئ.",
+      "unavailable": "دا غوښتنه نور انتظار نه کوي."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "پورته کول ناکام شول.",
       "failedToUploadFile": "فایل پورته نه شو: {{reason}}.",
       "nothingToPaste": "د پیسټ کولو لپاره څه نشته.",
-      "metadataStripFailed": "د انځور میټاډاټا لرې نه شوه."
+      "metadataStripFailed": "د انځور میټاډاټا لرې نه شوه.",
+      "limit_one": "تاسو کولی شئ تر {{displayCount}} پورې فایلونه ونښلوئ.",
+      "limit_other": "تاسو کولی شئ تر {{displayCount}} پورې فایلونه ونښلوئ."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "موندنې هممهاله کړئ",
       "syncNow": "اوس هممهاله کړئ",
       "syncQueued": "هممهاله کول په کتار کې واچول شول",
-      "syncStatusUnavailable": "د هممهاله کېدو حالت نه دی معلوم."
+      "syncStatusUnavailable": "د هممهاله کېدو حالت نه دی معلوم.",
+      "daysOverdue_one": "{{displayCount}} ورځې له مهلته تېرې",
+      "daysOverdue_other": "{{displayCount}} ورځې له مهلته تېرې",
+      "findingsCount_one": "{{displayCount}} موندنې",
+      "findingsCount_other": "{{displayCount}} موندنې"
     },
     "dashboardMetrics": {
       "openFindings": "پرانیستې موندنې",
@@ -2135,20 +2190,7 @@
       "continueFrom": "د {{title}} ناستې دوام روان دی.",
       "importingSession": "ناسته واردېږي",
       "cliCannotContinue": "دا CLI ناستې ته دوام نه شي ورکولی. Cloud Agent یا بل CLI غوره کړئ.",
-      "importFailed": "دا ناسته وارده نه شوه.",
-      "sandbox": "سینډباکس",
-      "sandboxAccessibility": "سینډباکس: {{label}}",
-      "sandboxDefaultWithDestination": "تلوالیز · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "کوچنی",
-      "sandboxInstanceShared": "شریک",
-      "sandboxInstanceLarge": "لوی",
-      "sandboxInstanceDevcontainer": "د Dev کانټینر",
-      "sandboxInstanceProviderDefault": "د چمتوکونکي تلوالیز",
-      "sandboxCouldNotLoad": "د سینډباکس ټاکنې بار نه شوې",
-      "sandboxUnavailable": "دا سینډباکس موجود نه دی. بل سینډباکس یا تلوالیز وټاکه.",
-      "sandboxUseDefault": "تلوالیز کارول"
+      "importFailed": "دا ناسته وارده نه شوه."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل تازه شو.",
@@ -2172,7 +2214,13 @@
       "updateTodos": "د دندو لېست تازه کړئ",
       "linesBadge": "{{displayCount}} کرښې",
       "filesBadge": "{{displayCount}} فایلونه",
-      "matchesBadge": "{{displayCount}} پایلې"
+      "matchesBadge": "{{displayCount}} پایلې",
+      "filesBadge_one": "{{displayCount}} فایلونه",
+      "filesBadge_other": "{{displayCount}} فایلونه",
+      "linesBadge_one": "{{displayCount}} کرښې",
+      "linesBadge_other": "{{displayCount}} کرښې",
+      "matchesBadge_one": "{{displayCount}} پایلې",
+      "matchesBadge_other": "{{displayCount}} پایلې"
     },
     "readToolMarkdown": {
       "linesTruncated": "کرښې {{start}}–{{end}} (لنډې شوې)",
@@ -2462,7 +2510,11 @@
       "files": "فایلونه",
       "couldNotOpenPhotoPicker": "د انځور غوره کولو کړکۍ پرانیستل نه شوه. Kilo بیا پیل کړئ او بیا هڅه وکړئ.",
       "maxFilesAllowed": "تر {{displayCount}} فایلونو پورې اجازه شته.",
-      "onlyAddingFiles": "له {{total}} فایلونو څخه یوازې {{accepted}} زیاتېږي (حد: {{max}})"
+      "onlyAddingFiles": "له {{total}} فایلونو څخه یوازې {{accepted}} زیاتېږي (حد: {{max}})",
+      "maxFilesAllowed_one": "تر {{displayCount}} فایلونو پورې اجازه شته.",
+      "maxFilesAllowed_other": "تر {{displayCount}} فایلونو پورې اجازه شته.",
+      "onlyAddingFiles_one": "له {{total}} فایلونو څخه یوازې {{accepted}} زیاتېږي (حد: {{max}})",
+      "onlyAddingFiles_other": "له {{total}} فایلونو څخه یوازې {{accepted}} زیاتېږي (حد: {{max}})"
     },
     "composer": {
       "addAttachment": "ضمیمه ورزیاته کړئ",
@@ -2480,7 +2532,9 @@
       "discardAttachmentsMessage": "هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي.",
       "discardAttachmentsTitle": "ضمیمې ړنګې کړم؟",
       "charactersRemaining": "{{count}} توري پاتې دي",
-      "insertNewline": "نوې کرښه دننه کړئ"
+      "insertNewline": "نوې کرښه دننه کړئ",
+      "charactersRemaining_one": "{{count}} توري پاتې دي",
+      "charactersRemaining_other": "{{count}} توري پاتې دي"
     },
     "chatLink": {
       "linkCopied": "لینک کاپي شو",
@@ -2552,7 +2606,9 @@
       "stepsCount_one": "{{steps}} ګام",
       "stepsCount": "{{steps}} ګامونه",
       "stepsCount_other": "{{steps}} ګامونه",
-      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
+      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
+      "modelsCount_one": "ماډل ({{displayCount}})",
+      "modelsCount_other": "ماډلونه ({{displayCount}})"
     },
     "autoApprove": {
       "title": "اتوماتیک تصویب",
@@ -2592,7 +2648,9 @@
     },
     "toolRun": {
       "sheetTitle": "د وسیلې غوښتنې",
-      "condensedLabel": "{{itemCount}} توکي; {{last}}"
+      "condensedLabel": "{{itemCount}} توکي; {{last}}",
+      "condensedLabel_one": "{{itemCount}} توکي; {{last}}",
+      "condensedLabel_other": "{{itemCount}} توکي; {{last}}"
     }
   },
   "bootstrap": {
@@ -2727,7 +2785,9 @@
     "cliCantReceiveFilesTitle": "دا ناسته فایلونه نه شي ترلاسه کولی",
     "cliCantReceiveFilesMessage": "هغه Kilo CLI چې دا ناسته چلوي، فایلونه نه شي ترلاسه کولی. په هغه ماشین کې CLI تازه کړئ، یا منځپانګه له نوې ناستې سره شریکه کړئ.",
     "contentlessMessage": "د شریکولو لپاره هېڅ نشته — هېڅ متن یا فایل نه و شامل شوی.",
-    "couldNotReadContent": "شریکه شوې منځپانګه ونه لوستل شوه."
+    "couldNotReadContent": "شریکه شوې منځپانګه ونه لوستل شوه.",
+    "onlyFirstFilesAttached_one": "یوازې لومړني {{displayCount}} فایلونه به ضمیمه شي.",
+    "onlyFirstFilesAttached_other": "یوازې لومړني {{displayCount}} فایلونه به ضمیمه شي."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3097,7 +3157,9 @@
     "couldNotApprove": "منظور نه شو",
     "couldNotStart": "پیل نه شو",
     "channelName": "فعال اجنټان",
-    "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ."
+    "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ.",
+    "openSession": "پرانیستل",
+    "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ."
   },
   "transcriptionModel": {
     "title": "د غږ د متن ته بدلولو ماډل",
@@ -3138,5 +3200,8 @@
       "repositoryUnknown": "Kilo {{repository}} د GitHub یا GitLab زېرمتون په توګه نه پېژني. په Kilo کې بل زېرمتون وټاکئ.",
       "repositoryUnsupported": "{{repository}} د Bitbucket زېرمتون دی — اجنټ پیل کړئ لاهم نشي کولی ترې وکار اخلي. په Kilo کې بل زېرمتون وټاکئ."
     }
+  },
+  "launcher": {
+    "openLastSession": "وروستۍ ناسته پرانیزئ"
   }
 }

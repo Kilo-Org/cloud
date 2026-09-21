@@ -81,6 +81,7 @@ function runRow(input: {
   runCount: number;
   failureStage?: string;
   failureCode?: string;
+  failureReason?: string;
 }) {
   return {
     generation: input.generation,
@@ -89,6 +90,7 @@ function runRow(input: {
     responsibility: input.responsibility ?? 'unknown',
     failureStage: input.failureStage ?? 'unknown',
     failureCode: input.failureCode ?? 'unclassified',
+    failureReason: input.failureReason ?? 'unclassified',
     runCount: input.runCount,
   };
 }
@@ -111,9 +113,12 @@ describe('cloud agent outcome aggregate assembly', () => {
       expect(entry.followUp.settled).toBe(0);
       expect(entry.totals.settled).toBe(0);
       expect(entry.totals.allFailed).toBe(0);
+      expect(entry.totals.providerFailed).toBe(0);
       expect(entry.totals.platformFailureShare).toBeNull();
       expect(entry.totals.unknownClassificationShare).toBeNull();
+      expect(entry.totals.unknownSettledShare).toBeNull();
       expect(entry.distinctPlatformAffectedSessions).toBe(0);
+      expect(entry.distinctProviderAffectedSessions).toBe(0);
       expect(entry.distinctUnknownAffectedSessions).toBe(0);
       expect(entry.sessionSetupFailures).toEqual([]);
       expect(entry.sessionSetupFailureCount).toBe(0);
@@ -153,6 +158,7 @@ describe('cloud agent outcome aggregate assembly', () => {
         {
           generation: 'legacy',
           distinctPlatformAffectedSessions: 1,
+          distinctProviderAffectedSessions: 0,
           distinctUnknownAffectedSessions: 1,
         },
       ],
@@ -174,11 +180,18 @@ describe('cloud agent outcome aggregate assembly', () => {
       { stage: 'pre_dispatch', count: 1 },
     ]);
     expect(legacy.initial.failureStageCodes).toEqual([
-      { stage: 'agent_activity', code: 'assistant_error', responsibility: 'unknown', count: 1 },
+      {
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        responsibility: 'unknown',
+        reason: 'unclassified',
+        count: 1,
+      },
       {
         stage: 'pre_dispatch',
         code: 'sandbox_connect_failed',
         responsibility: 'platform',
+        reason: 'unclassified',
         count: 1,
       },
     ]);
@@ -223,9 +236,27 @@ describe('cloud agent outcome aggregate assembly', () => {
 
     const legacy = generations[0];
     expect(legacy.initial.failureStageCodes).toEqual([
-      { stage: 'agent_activity', code: 'assistant_error', responsibility: 'platform', count: 2 },
-      { stage: 'agent_activity', code: 'assistant_error', responsibility: 'unknown', count: 1 },
-      { stage: 'agent_activity', code: 'assistant_error', responsibility: 'user', count: 3 },
+      {
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        responsibility: 'platform',
+        reason: 'unclassified',
+        count: 2,
+      },
+      {
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        responsibility: 'unknown',
+        reason: 'unclassified',
+        count: 1,
+      },
+      {
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        responsibility: 'user',
+        reason: 'unclassified',
+        count: 3,
+      },
     ]);
     expect(legacy.initial.platformFailed).toBe(2);
     expect(legacy.initial.userFailed).toBe(3);
@@ -233,6 +264,157 @@ describe('cloud agent outcome aggregate assembly', () => {
     expect(legacy.initial.allFailed).toBe(
       legacy.initial.failureStageCodes.reduce((sum, entry) => sum + entry.count, 0)
     );
+  });
+
+  it('counts a provider responsibility as providerFailed without inflating unknownFailed', () => {
+    const generations = assembleGenerationAggregates(
+      [
+        runRow({
+          generation: 'legacy',
+          role: 'initial',
+          status: 'failed',
+          responsibility: 'provider',
+          runCount: 2,
+          failureStage: 'agent_activity',
+          failureCode: 'assistant_error',
+          failureReason: 'provider_unavailable',
+        }),
+        runRow({
+          generation: 'legacy',
+          role: 'initial',
+          status: 'failed',
+          responsibility: 'unknown',
+          runCount: 1,
+          failureStage: 'agent_activity',
+          failureCode: 'assistant_error',
+          failureReason: 'assistant_unknown',
+        }),
+      ],
+      [
+        {
+          generation: 'legacy',
+          distinctPlatformAffectedSessions: 0,
+          distinctProviderAffectedSessions: 1,
+          distinctUnknownAffectedSessions: 1,
+        },
+      ],
+      []
+    );
+
+    const legacy = generations[0];
+    expect(legacy.initial.providerFailed).toBe(2);
+    expect(legacy.initial.unknownFailed).toBe(1);
+    expect(legacy.initial.platformFailed).toBe(0);
+    expect(legacy.initial.userFailed).toBe(0);
+    expect(legacy.initial.allFailed).toBe(3);
+    expect(legacy.distinctProviderAffectedSessions).toBe(1);
+    expect(legacy.distinctUnknownAffectedSessions).toBe(1);
+    expect(legacy.initial.failureStageCodes).toEqual([
+      {
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        responsibility: 'provider',
+        reason: 'provider_unavailable',
+        count: 2,
+      },
+      {
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        responsibility: 'unknown',
+        reason: 'assistant_unknown',
+        count: 1,
+      },
+    ]);
+  });
+
+  it('keeps the same stage, code and responsibility separate per failure reason', () => {
+    const generations = assembleGenerationAggregates(
+      [
+        runRow({
+          generation: 'legacy',
+          role: 'initial',
+          status: 'failed',
+          responsibility: 'provider',
+          runCount: 1,
+          failureStage: 'agent_activity',
+          failureCode: 'assistant_error',
+          failureReason: 'provider_unavailable',
+        }),
+        runRow({
+          generation: 'legacy',
+          role: 'initial',
+          status: 'failed',
+          responsibility: 'provider',
+          runCount: 4,
+          failureStage: 'agent_activity',
+          failureCode: 'assistant_error',
+          failureReason: 'request_timeout',
+        }),
+      ],
+      [],
+      []
+    );
+
+    const legacy = generations[0];
+    expect(legacy.initial.failureStageCodes).toEqual([
+      {
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        responsibility: 'provider',
+        reason: 'provider_unavailable',
+        count: 1,
+      },
+      {
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        responsibility: 'provider',
+        reason: 'request_timeout',
+        count: 4,
+      },
+    ]);
+    expect(legacy.initial.failureStages).toEqual([{ stage: 'agent_activity', count: 5 }]);
+    expect(legacy.initial.providerFailed).toBe(5);
+  });
+
+  it('computes unknownSettledShare over settled while unknownClassificationShare stays over allFailed', () => {
+    const generations = assembleGenerationAggregates(
+      [
+        runRow({ generation: 'legacy', role: 'initial', status: 'completed', runCount: 4 }),
+        runRow({
+          generation: 'legacy',
+          role: 'initial',
+          status: 'failed',
+          responsibility: 'unknown',
+          runCount: 1,
+          failureStage: 'agent_activity',
+          failureCode: 'assistant_error',
+          failureReason: 'assistant_unknown',
+        }),
+        runRow({
+          generation: 'legacy',
+          role: 'initial',
+          status: 'failed',
+          responsibility: 'platform',
+          runCount: 1,
+          failureStage: 'pre_dispatch',
+          failureCode: 'sandbox_connect_failed',
+          failureReason: 'sandbox_connectivity',
+        }),
+      ],
+      [],
+      []
+    );
+
+    const legacy = generations[0];
+    expect(legacy.initial.allFailed).toBe(
+      legacy.initial.platformFailed +
+        legacy.initial.providerFailed +
+        legacy.initial.userFailed +
+        legacy.initial.unknownFailed
+    );
+    expect(legacy.initial.settled).toBe(6);
+    expect(legacy.initial.unknownSettledShare).toBeCloseTo(1 / 6);
+    expect(legacy.initial.unknownClassificationShare).toBeCloseTo(1 / 2);
   });
 
   it('separates initial runs from follow-up runs and recomputes totals from summed counts', () => {
@@ -355,15 +537,29 @@ describe('cloud agent outcome aggregate wiring', () => {
 
     const responsibility = render(runSelect.responsibility as SQL);
     expect(responsibility.sql).toContain('"failure_responsibility" is null');
-    expect(responsibility.sql).toContain(`"failure_responsibility" not in ('platform', 'user')`);
+    expect(responsibility.sql).toContain(
+      `"failure_responsibility" not in ('platform', 'provider', 'user')`
+    );
 
     const distinctUnknown = render(distinctSelect.distinctUnknownAffectedSessions as SQL);
     expect(distinctUnknown.sql).toContain(
       'count(distinct "cloud_agent_session_runs"."cloud_agent_session_id") filter (where'
     );
     expect(distinctUnknown.sql).toContain('"failure_responsibility" is null');
-    expect(distinctUnknown.sql).toContain(`"failure_responsibility" not in ('platform', 'user')`);
+    expect(distinctUnknown.sql).toContain(
+      `"failure_responsibility" not in ('platform', 'provider', 'user')`
+    );
     expect(distinctUnknown.sql).toContain('::int');
+
+    const distinctProvider = render(distinctSelect.distinctProviderAffectedSessions as SQL);
+    expect(distinctProvider.sql).toContain(
+      'count(distinct "cloud_agent_session_runs"."cloud_agent_session_id") filter (where "cloud_agent_session_runs"."failure_responsibility" = \'provider\')'
+    );
+    expect(distinctProvider.sql).toContain('::int');
+
+    const failureReason = render(runSelect.failureReason as SQL);
+    expect(failureReason.sql).toContain('coalesce("cloud_agent_session_runs"."failure_reason", ');
+    expect(failureReason.sql).toContain("'unclassified'");
 
     const distinctPlatform = render(distinctSelect.distinctPlatformAffectedSessions as SQL);
     expect(distinctPlatform.sql).toContain(
@@ -388,7 +584,30 @@ describe('cloud agent outcome aggregate wiring', () => {
 
 describe('runCloudAgentOutcomeCollection emission', () => {
   it('emits one complete record per window and no failed record', async () => {
-    getPgDbMock.mockReturnValue(makeDb([[], [], [], [], [], [], [], [], []]).db);
+    getPgDbMock.mockReturnValue(
+      makeDb([
+        [
+          runRow({
+            generation: 'legacy',
+            role: 'initial',
+            status: 'failed',
+            responsibility: 'provider',
+            runCount: 2,
+            failureStage: 'agent_activity',
+            failureCode: 'assistant_error',
+            failureReason: 'provider_unavailable',
+          }),
+        ],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+      ]).db
+    );
 
     await runCloudAgentOutcomeCollection({} as never, new Date('2026-02-01T00:10:00.000Z'));
 
@@ -399,7 +618,18 @@ describe('runCloudAgentOutcomeCollection emission', () => {
     expect(record.logTag).toBe(AGGREGATE_METRIC);
     expect(record.collectionStatus).toBe('complete');
     expect(record.limitations).toEqual([...OUTCOME_AGGREGATE_LIMITATIONS]);
-    expect((record.generations as unknown[]).length).toBe(2);
+    const generations = record.generations as Array<{
+      totals: { providerFailed: number; failureStageCodes: unknown[] };
+    }>;
+    expect(generations.length).toBe(2);
+    expect(generations[0]?.totals.failureStageCodes).toContainEqual({
+      stage: 'agent_activity',
+      code: 'assistant_error',
+      responsibility: 'provider',
+      reason: 'provider_unavailable',
+      count: 2,
+    });
+    expect(generations[0]?.totals.providerFailed).toBe(2);
   });
 
   it('emits exactly one failed record with no counts when a query fails', async () => {

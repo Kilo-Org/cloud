@@ -194,6 +194,7 @@ export function TtfbAlertingContent() {
           <Search className="text-muted-foreground absolute top-2.5 left-2 h-4 w-4" />
           <Input
             placeholder="Search by name or OpenRouter ID..."
+            aria-label="Search models"
             value={searchTerm}
             onChange={e => handleSearchChange(e.target.value)}
             className="pl-8"

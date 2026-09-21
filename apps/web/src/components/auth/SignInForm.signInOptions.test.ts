@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires -- Jest node-environment mocks must be registered before loading the component. */
 // The sign-in landing keeps the email prompt but must also offer the OAuth
-// providers (including 'Sign in with ChatGPT'), the same group the sign-up page
+// providers (including 'Continue with ChatGPT'), the same group the sign-up page
 // renders. The ChatGPT option is behind the PostHog flag, which for a
 // signed-out visitor is evaluated against the email the visitor typed; the hook
 // is stubbed here and the filter is asserted. The provider buttons and the
@@ -109,7 +109,7 @@ describe('SignInForm sign-in options', () => {
       createElement(SignInForm, { searchParams: {}, title: 'Welcome.' })
     );
 
-    expect(html).not.toContain('Sign in with ChatGPT');
+    expect(html).not.toContain('Continue with ChatGPT');
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
     // Nothing is known before a submit, so the hook gets no address.
@@ -123,7 +123,7 @@ describe('SignInForm sign-in options', () => {
       createElement(SignInForm, { searchParams: {}, title: 'Welcome.' })
     );
 
-    expect(html.match(/Sign in with ChatGPT/g)).toHaveLength(1);
+    expect(html.match(/Continue with ChatGPT/g)).toHaveLength(1);
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
     // Typing alone is not evaluated; the hook waits for the submit.
@@ -170,7 +170,7 @@ describe('SignInForm sign-in options', () => {
       createElement(SignInForm, { searchParams: {}, isSignUp: true, title: 'Create your account' })
     );
 
-    expect(html).not.toContain('Sign in with ChatGPT');
+    expect(html).not.toContain('Continue with ChatGPT');
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
   });
@@ -182,6 +182,6 @@ describe('SignInForm sign-in options', () => {
       createElement(SignInForm, { searchParams: {}, isSignUp: true, title: 'Create your account' })
     );
 
-    expect(html.match(/Sign in with ChatGPT/g)).toHaveLength(1);
+    expect(html.match(/Continue with ChatGPT/g)).toHaveLength(1);
   });
 });

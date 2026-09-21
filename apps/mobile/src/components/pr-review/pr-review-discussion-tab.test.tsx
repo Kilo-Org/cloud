@@ -177,6 +177,16 @@ describe('PrReviewDiscussionTab full-body states', () => {
     expectCtaPresence(renderer, true);
   });
 
+  it('hands the list the empty state a fully hidden discussion falls back to', () => {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    const list = mountTab().root.find(node => String(node.type) === 'PrReviewDiscussionList');
+
+    // The list's blocked / muted filter can remove every row the page
+    // returned; the tab hands it the empty state so the body never renders
+    // blank, and the copy stays on one surface.
+    expect(list.props.emptyState).toBeDefined();
+  });
+
   it('renders the comment CTA bar on the empty view and opens the composer', () => {
     const renderer = mountTab();
     expect(renderer.root.find(node => String(node.type) === 'EmptyState')).toBeDefined();

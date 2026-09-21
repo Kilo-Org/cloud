@@ -9,6 +9,10 @@ import { PrReviewDiscussionList } from './pr-review-discussion-list';
 type TaggedOptions = { tag: string; input?: unknown };
 
 const observed = vi.hoisted(() => ({ options: [] as TaggedOptions[] }));
+const moderation = vi.hoisted(() => ({
+  blockedLogins: [] as string[],
+  mutedLogins: [] as string[],
+}));
 
 // Records every query the list mounts and answers the overview with a viewer
 // login, so a test can assert BOTH which namespace was asked and what the
@@ -20,7 +24,9 @@ vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: TaggedOptions) => {
     observed.options.push(options);
     if (options.tag === 'moderation') {
-      return { data: { blockedLogins: [], mutedLogins: [] } };
+      return {
+        data: { blockedLogins: moderation.blockedLogins, mutedLogins: moderation.mutedLogins },
+      };
     }
     return { data: { repo: { viewerLogin: 'octocat' } } };
   },
@@ -84,10 +90,13 @@ const listItems: readonly DiscussionListItem[] = [
   },
 ];
 
-function mountList(scope?: {
-  ref: { platform: 'gitlab'; projectPath: string; mrIid: number };
-  organizationId: string | null;
-}) {
+function mountList(
+  scope?: {
+    ref: { platform: 'gitlab'; projectPath: string; mrIid: number };
+    organizationId: string | null;
+  },
+  overrides: Partial<Parameters<typeof PrReviewDiscussionList>[0]> = {}
+) {
   const list = (
     <PrReviewDiscussionList
       owner="group/sub"
@@ -104,6 +113,7 @@ function mountList(scope?: {
       laterPageError={false}
       onLoadMore={noop}
       onRetryLoadMore={noop}
+      {...overrides}
     />
   );
   const created: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
@@ -173,6 +183,92 @@ describe('PrReviewDiscussionList viewer query', () => {
       projectPath: 'group/sub/repo',
       mrIid: 12,
     });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('PrReviewDiscussionList hidden-author filtering', () => {
+  beforeEach(() => {
+    moderation.blockedLogins = [];
+    moderation.mutedLogins = [];
+  });
+
+  it('renders the tab empty state, not the rows, when every author is hidden', () => {
+    moderation.blockedLogins = ['octocat'];
+
+    const renderer = mountList(undefined, { emptyState: createElement('EmptyStateMarker') });
+
+    expect(renderer.root.findAll(node => String(node.type) === 'CommentRow')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyStateMarker')).toHaveLength(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the load-more footer reachable under the filtered-empty state', () => {
+    moderation.blockedLogins = ['octocat'];
+
+    const renderer = mountList(undefined, {
+      emptyState: createElement('EmptyStateMarker'),
+      hasNextPage: true,
+    });
+
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyStateMarker')).toHaveLength(1);
+    expect(
+      renderer.root
+        .findAll(node => String(node.type) === 'Button')
+        .map(button => button.props.accessibilityLabel)
+    ).toContain('prReview.discussion.loadMoreComments');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the later-page retry reachable under the filtered-empty state', () => {
+    moderation.mutedLogins = ['octocat'];
+
+    const renderer = mountList(undefined, {
+      emptyState: createElement('EmptyStateMarker'),
+      laterPageError: true,
+    });
+
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyStateMarker')).toHaveLength(1);
+    expect(
+      renderer.root
+        .findAll(node => String(node.type) === 'Button')
+        .map(button => button.props.accessibilityLabel)
+    ).toContain('prReview.discussion.retryLoadingMore');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the rows and drops the empty state when the author is visible', () => {
+    const renderer = mountList(undefined, { emptyState: createElement('EmptyStateMarker') });
+
+    expect(renderer.root.findAll(node => String(node.type) === 'CommentRow')).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyStateMarker')).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('renders no copy of its own when no empty state was handed down', () => {
+    moderation.blockedLogins = ['octocat'];
+
+    const renderer = mountList();
+
+    // The copy belongs to the tab; the list never invents a message. With no
+    // empty state to fall back to, it keeps the list contract (here: no rows).
+    expect(renderer.root.findAll(node => String(node.type) === 'CommentRow')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyStateMarker')).toHaveLength(0);
 
     act(() => {
       renderer.unmount();

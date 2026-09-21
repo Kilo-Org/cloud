@@ -31,6 +31,13 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// Without this mock the real externalized module loads and its CJS build
+// `require`s react-native, whose Flow source V8 cannot parse — the suite
+// fails to load.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',

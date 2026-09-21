@@ -99,6 +99,13 @@ vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
+// The environment row's pending state asserts on the Skeleton host element; the
+// real component animates through Reanimated, which this node-environment suite
+// does not load.
+vi.mock('@/components/ui/skeleton', () => ({
+  Skeleton: 'Skeleton',
+}));
+
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
 }));

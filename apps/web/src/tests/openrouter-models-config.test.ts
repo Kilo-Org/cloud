@@ -29,7 +29,6 @@ describe('OpenRouter Models Config', () => {
     expect(PRIMARY_DEFAULT_MODEL).toBe(GLM_FLASH_CURRENT_MODEL_ID);
 
     const expectedModels = [
-      CLAUDE_OPUS_CURRENT_MODEL_ID,
       GPT_CURRENT_MODEL_ID,
       DEEPSEEK_V4_1_FLASH_MODEL_ID,
       GLM_FLASH_CURRENT_MODEL_ID,
@@ -38,6 +37,7 @@ describe('OpenRouter Models Config', () => {
     expectedModels.forEach(model => {
       expect(preferredModels).toContain(model);
     });
+    expect(preferredModels).not.toContain(CLAUDE_OPUS_CURRENT_MODEL_ID);
 
     const deemphasizedAutoModels = [KILO_AUTO_BALANCED_MODEL.id, KILO_AUTO_FRONTIER_MODEL.id];
     deemphasizedAutoModels.forEach(model => {

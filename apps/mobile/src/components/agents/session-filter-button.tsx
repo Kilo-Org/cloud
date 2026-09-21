@@ -3,13 +3,9 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { filterButtonAccessibilityLabel } from '@/components/agents/session-filter-button-label';
-import {
-  COMPACT_CONTROL_BOX_CLASS,
-  COMPACT_CONTROL_HIT_SLOP,
-} from '@/components/agents/session-list-tap-target';
 import { Text } from '@/components/ui/text';
+import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
 
 type SessionFilterButtonProps = {
   /** How many filters are applied. Zero renders the plain muted icon. */
@@ -35,10 +31,11 @@ export function SessionFilterButton({
   return (
     <Pressable
       onPress={onPress}
-      // 28pt box plus 8pt of slop on every side: the layout bounds clear the
-      // 28dp bar on their own, and the slop reaches the 44pt touch target
-      // without crossing the 16px gap to the neighbouring header control.
-      hitSlop={COMPACT_CONTROL_HIT_SLOP}
+      // The frame is the tap target the size audit measures, not the 20pt
+      // glyph: `h-11 w-11` is 38.5pt on device, and the 3pt slop carries it to
+      // the 44pt minimum. It fits the header's own `min-h-11` row, so the
+      // header keeps its height.
+      hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
       accessibilityRole="button"
       // The count is spoken as part of the name, so no new translated string is
       // needed to announce "Filter sessions, 2".
@@ -47,10 +44,9 @@ export function SessionFilterButton({
         activeCount
       )}
       testID={testID}
-      className={cn(COMPACT_CONTROL_BOX_CLASS, 'items-center justify-center active:opacity-70')}
+      className="h-11 w-11 shrink-0 items-center justify-center active:opacity-70"
     >
-      {/* The icon keeps its own bounds, so growing the box for the tap target
-          never moves the badge off the icon's corner. */}
+      {/* The badge stays pinned to the glyph's corner, not the frame's. */}
       <View>
         <SlidersHorizontal
           size={20}

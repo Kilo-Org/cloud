@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} வரி",
       "linesBadge_other": "{{displayCount}} வரிகள்",
       "matchesBadge_one": "{{displayCount}} பொருத்தம்",
-      "matchesBadge_other": "{{displayCount}} பொருத்தங்கள்"
+      "matchesBadge_other": "{{displayCount}} பொருத்தங்கள்",
+      "noOutput": "வெளியீடு இல்லை."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} வரிகள் (முழுவதும் காட்டப்படவில்லை)",
@@ -3153,7 +3154,9 @@
     "couldNotApprove": "ஒப்புதல் அளிக்க முடியவில்லை",
     "couldNotStart": "தொடங்க முடியவில்லை",
     "channelName": "செயலில் உள்ள ஏஜெண்டுகள்",
-    "activityKitDisabledBody": "பூட்டுத் திரையில் செயலில் உள்ள ஏஜெண்டுகளைப் பார்க்க, அமைப்புகளில் நேரலைச் செயல்பாடுகளை இயக்கவும்."
+    "activityKitDisabledBody": "பூட்டுத் திரையில் செயலில் உள்ள ஏஜெண்டுகளைப் பார்க்க, அமைப்புகளில் நேரலைச் செயல்பாடுகளை இயக்கவும்.",
+    "openSession": "திற",
+    "approveFailed": "ஒப்புதல் அளிக்க முடியவில்லை. மீண்டும் முயற்சிக்க $t(common.approve) தட்டவும்."
   },
   "transcriptionModel": {
     "title": "உரையாக்க மாதிரி",
@@ -3178,15 +3181,7 @@
     "remoteOptionTitle": "உங்கள் கணினி",
     "remoteOptionBody": "உங்கள் சொந்த இயந்திரத்தில் `kilo remote` CLI மூலம் Kilo-ஐ இயக்கவும்.",
     "skip": "சுற்றுலாவைத் தவிர்",
-    "tutorialLabel": "பயிற்சி",
-    "remoteTitle": "உங்கள் முதல் தொலை அமர்வைத் தொடங்கு",
-    "remoteBody": "உங்கள் கணினியை இணைத்து, பின்னர் இங்கிருந்து அமர்வைத் தொடங்கு.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "இதுவரை எந்தக் கணினியும் இணைக்கப்படவில்லை",
-    "remoteEmptyBody": "அதை இணைக்க உங்கள் கணினியில் `kilo remote`-ஐ இயக்கவும்.",
-    "remoteFound": "கணினி இணைக்கப்பட்டது",
-    "checkAgain": "மீண்டும் சரிபார்",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "பயிற்சி"
   },
   "appActions": {
     "start": {

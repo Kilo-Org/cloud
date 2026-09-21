@@ -5,12 +5,8 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
-import {
-  COMPACT_CONTROL_BOX_CLASS,
-  COMPACT_CONTROL_HIT_SLOP,
-} from '@/components/agents/session-list-tap-target';
 
 type SessionListSearchHeaderProps = {
   inputRef: RefObject<TextInput | null>;
@@ -49,7 +45,9 @@ export function SessionListSearchHeader({
     <View>
       <View
         style={fieldMargins}
-        className="my-2 flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
+        // `min-h-[44px]`: the field reserves the X's target height, so the
+        // field never grows when the first keystroke reveals that button.
+        className="my-2 min-h-[44px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4"
       >
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
         <View className="h-[18px] w-[18px] items-center justify-center">
@@ -68,11 +66,8 @@ export function SessionListSearchHeader({
           ref={inputRef}
           accessibilityLabel={t('agents.search.searchSessions')}
           // Height comes from `min-h`, never `py`: iOS insets the already-centered
-          // text rect by the padding and draws the placeholder low. 28px matches
-          // the clear control's box, so the field keeps one height whether or
-          // not that box is mounted — the list below never steps on the X
-          // appearing.
-          className="min-h-[28px] flex-1 text-[15px] leading-[normal] text-foreground"
+          // text rect by the padding and draws the placeholder low.
+          className="min-h-[26px] flex-1 text-[15px] leading-[normal] text-foreground"
           placeholder={t('agents.search.searchSessionsPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           onChangeText={onChangeText}
@@ -86,14 +81,12 @@ export function SessionListSearchHeader({
             onPress={onClearSearch}
             accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
-            // 28pt box plus slop: the layout bounds clear the 28dp bar on their
-            // own, and the slop reaches the 44pt touch target across (the search
-            // field's own height caps it vertically).
-            hitSlop={COMPACT_CONTROL_HIT_SLOP}
-            className={cn(
-              COMPACT_CONTROL_BOX_CLASS,
-              'items-center justify-center active:opacity-70'
-            )}
+            // The frame, not the 16pt glyph, is what the size audit measures:
+            // `h-11 w-11` is 38.5pt on device and the 3pt slop carries it to
+            // the 44pt minimum. `-mr-2` keeps the glyph near its old inset and
+            // the frame's left edge inside the field's right padding.
+            hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
+            className="-mr-2 h-11 w-11 items-center justify-center active:opacity-70"
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>

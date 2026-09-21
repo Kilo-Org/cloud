@@ -2,6 +2,7 @@ import { AppState, Linking } from 'react-native';
 import { type WidgetTaskHandlerProps } from 'react-native-android-widget';
 
 import { i18n } from '@/i18n';
+import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import {
   getLiveActivityEnabled,
   subscribeLiveActivityEnabled,
@@ -15,10 +16,6 @@ import {
   runWidgetAction,
   type WidgetAction,
 } from '@/lib/glanceable/widget-actions';
-import {
-  getResolvedLanguage,
-  whenLanguagePreferenceLoaded,
-} from '@/lib/hooks/use-language-preference';
 
 import { renderActiveAgentsWidget } from './active-agents-widget';
 import { androidSink, getCurrentWidgetProps, handleAppStateActive } from './android-sink';
@@ -60,19 +57,17 @@ function translate(key: string): string {
 }
 
 /**
- * Switch i18n to the user's language before a widget render.
+ * Switch i18n to the user's language before a headless render or press.
  *
- * A widget redraw runs as a headless JS task with no Activity, so the app's
- * root never mounts and nothing else applies the language — without this the
- * placed widget renders English whatever the user chose. Exported because the
- * headless approve task runs the same way and must speak one language with it.
+ * A widget redraw and the notification's Approve both run as headless JS tasks
+ * with no Activity, so the app's root never mounts and nothing else applies the
+ * language — without this the placed widget renders English whatever the user
+ * chose. Exported because the headless approve task runs the same way and must
+ * speak one language with it; the language step itself is `applyStoredLanguage`,
+ * the same one `handleWidgetTask` takes.
  */
 export async function applyWidgetLanguage(): Promise<void> {
-  await whenLanguagePreferenceLoaded();
-  const language = getResolvedLanguage();
-  if (i18n.language !== language) {
-    await i18n.changeLanguage(language);
-  }
+  await applyStoredLanguage();
 }
 
 /** The custom click actions the widget's own rows emit (never OPEN_APP/OPEN_URI). */
@@ -137,7 +132,7 @@ async function handleWidgetAction(
 export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<void> {
   const { widgetInfo, renderWidget, widgetAction, clickAction } = task;
 
-  await applyWidgetLanguage();
+  await applyStoredLanguage();
 
   // Re-read native storage even in a live process. An old alarm can already have
   // queued this task when newer work or a privacy blank replaces its deadline.

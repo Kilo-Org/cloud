@@ -2216,7 +2216,8 @@
       "linesBadge_one": "layuka {{displayCount}}",
       "linesBadge_other": "layuka {{displayCount}}",
       "matchesBadge_one": "sakamako {{displayCount}}",
-      "matchesBadge_other": "sakamako {{displayCount}}"
+      "matchesBadge_other": "sakamako {{displayCount}}",
+      "noOutput": "Babu fitarwa."
     },
     "readToolMarkdown": {
       "linesTruncated": "layuka {{start}}–{{end}} (an rage)",
@@ -3153,7 +3154,9 @@
     "couldNotApprove": "Ba a iya amincewa ba",
     "couldNotStart": "Ba a iya farawa ba",
     "channelName": "Wakilai da ke aiki",
-    "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle."
+    "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle.",
+    "openSession": "Buɗe",
+    "approveFailed": "An kasa amincewa. Danna $t(common.approve) don sake gwadawa."
   },
   "transcriptionModel": {
     "title": "Samfurin mayar da magana zuwa rubutu",
@@ -3178,15 +3181,7 @@
     "remoteOptionTitle": "Kwamfutarka",
     "remoteOptionBody": "Gudanar da Kilo a na'urarka ta hanyar CLI na `kilo remote`.",
     "skip": "Tsallake kaita",
-    "tutorialLabel": "Koyarwa",
-    "remoteTitle": "Fara zaman nesa na farko",
-    "remoteBody": "Haɗa kwamfutarka, sai ka fara zaman daga nan.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Babu kwamfuta da aka haɗa tukuna",
-    "remoteEmptyBody": "Don haɗa shi, gudanar da `kilo remote` a kwamfutarka.",
-    "remoteFound": "An haɗa kwamfuta",
-    "checkAgain": "Sake dubawa",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Koyarwa"
   },
   "appActions": {
     "start": {

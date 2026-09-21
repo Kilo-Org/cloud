@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} reël",
       "linesBadge_other": "{{displayCount}} reëls",
       "matchesBadge_one": "{{displayCount}} treffer",
-      "matchesBadge_other": "{{displayCount}} treffers"
+      "matchesBadge_other": "{{displayCount}} treffers",
+      "noOutput": "Geen uitset nie."
     },
     "readToolMarkdown": {
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",
@@ -3153,7 +3154,9 @@
     "couldNotApprove": "Kon nie goedkeur nie",
     "couldNotStart": "Kon nie begin nie",
     "channelName": "Aktiewe agente",
-    "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien."
+    "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
+    "openSession": "Oop",
+    "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer."
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",
@@ -3178,15 +3181,7 @@
     "remoteOptionTitle": "Jou rekenaar",
     "remoteOptionBody": "Voer Kilo op jou eie masjien uit deur die `kilo remote`-CLI.",
     "skip": "Slaan toer oor",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Begin jou eerste afstandsessie",
-    "remoteBody": "Koppel jou rekenaar en begin dan die sessie van hier af.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Nog geen rekenaar gekoppel nie",
-    "remoteEmptyBody": "Voer `kilo remote` op jou rekenaar uit om dit te koppel.",
-    "remoteFound": "Rekenaar gekoppel",
-    "checkAgain": "Kontroleer weer",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

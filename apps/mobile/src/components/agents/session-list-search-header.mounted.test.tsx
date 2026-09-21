@@ -6,11 +6,6 @@ import { type TextInput } from 'react-native';
 
 import '@/i18n';
 import { SessionListSearchHeader } from './session-list-search-header';
-import {
-  COMPACT_CONTROL_BOX_CLASS,
-  COMPACT_CONTROL_BOX_SIZE,
-  COMPACT_CONTROL_HIT_SLOP,
-} from './session-list-tap-target';
 
 const state = vi.hoisted(() => ({
   insets: { top: 59, right: 0, bottom: 34, left: 0 },
@@ -74,14 +69,6 @@ function searchInput(renderer: TestRenderer.ReactTestRenderer) {
   return input;
 }
 
-function clearSearchButton(renderer: TestRenderer.ReactTestRenderer) {
-  const button = renderer.root.findAll(node => node.type === ('Pressable' as ElementType)).at(0);
-  if (!button) {
-    throw new Error('clear-search control was not found');
-  }
-  return button;
-}
-
 describe('SessionListSearchHeader landscape sensor insets', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -122,42 +109,5 @@ describe('SessionListSearchHeader landscape sensor insets', () => {
     const classes = searchInput(renderer).props.className as string;
     expect(classes).toContain('min-h-');
     expect(classes).not.toMatch(/(?:^|\s)py-/);
-  });
-});
-
-describe('SessionListSearchHeader clear-search tap target', () => {
-  beforeEach(() => {
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  });
-  afterEach(() => {
-    act(() => {
-      for (const renderer of renderers.splice(0)) {
-        renderer.unmount();
-      }
-    });
-  });
-
-  it('renders the clear control as a 28pt box whose slop reaches the 44pt target', async () => {
-    const renderer = await mount(<SessionListSearchHeader {...baseProps} hasText />);
-    const clear = clearSearchButton(renderer);
-    // The box has to measure 28pt on its own: the layout bounds are what a
-    // control is read as, and `hitSlop` never widens them. Hence the arbitrary
-    // px class, not the rem-scaled h-7 (rem is 14px here, so h-7 is 24.5pt).
-    expect(clear.props.className as string).toContain(COMPACT_CONTROL_BOX_CLASS);
-    expect(clear.props.className as string).not.toMatch(/\bh-7\b|\bw-7\b/);
-    expect(COMPACT_CONTROL_BOX_SIZE).toBeGreaterThanOrEqual(28);
-    expect(clear.props.hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP);
-    expect(COMPACT_CONTROL_BOX_SIZE + 2 * COMPACT_CONTROL_HIT_SLOP).toBeGreaterThanOrEqual(44);
-  });
-
-  it('keeps the field one height whether or not the clear control is mounted', async () => {
-    // The 28pt box is the tallest thing in the row, so the input's own
-    // min-height matches it: otherwise the row would grow 2pt as the first
-    // character mounts the X, stepping the list below.
-    const boxClass = `min-h-[${COMPACT_CONTROL_BOX_SIZE}px]`;
-    const withText = await mount(<SessionListSearchHeader {...baseProps} hasText />);
-    const withoutText = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(searchInput(withText).props.className as string).toContain(boxClass);
-    expect(searchInput(withoutText).props.className as string).toContain(boxClass);
   });
 });

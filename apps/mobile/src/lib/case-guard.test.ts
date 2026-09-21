@@ -125,4 +125,11 @@ describe('case guard', () => {
       expect(code, `${relativePath} must not re-case a label`).not.toContain('capitalize');
     }
   });
+
+  it('classifies passkey errors without a bare case call or a file-wide exemption', () => {
+    const path = 'lib/auth/passkey-client.ts';
+    expect(Object.hasOwn(ALLOWED_NON_DISPLAY, path)).toBe(false);
+    const code = stripComments(readFileSync(join(SRC, path), 'utf8'));
+    expect([...code.matchAll(BARE_CASE_CALL)]).toEqual([]);
+  });
 });

@@ -533,9 +533,9 @@ test('workflow uses fewer requests and fewer body bytes than eval rounds', async
                   {
                     function: {
                       arguments: JSON.stringify({
-                        code: 'return document.querySelector("h1")?.textContent ?? "";',
+                        function: '() => document.querySelector("h1")?.textContent ?? ""',
                       }),
-                      name: 'eval',
+                      name: 'kilo_browser_evaluate',
                     },
                     id: 'call_eval_a1',
                     index: 0,
@@ -556,9 +556,9 @@ test('workflow uses fewer requests and fewer body bytes than eval rounds', async
                   {
                     function: {
                       arguments: JSON.stringify({
-                        code: 'return document.querySelector("p")?.textContent ?? "";',
+                        function: '() => document.querySelector("p")?.textContent ?? ""',
                       }),
-                      name: 'eval',
+                      name: 'kilo_browser_evaluate',
                     },
                     id: 'call_eval_a2',
                     index: 0,

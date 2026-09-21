@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} បន្ទាត់",
       "linesBadge_other": "{{displayCount}} បន្ទាត់",
       "matchesBadge_one": "ត្រូវគ្នា {{displayCount}}",
-      "matchesBadge_other": "ត្រូវគ្នា {{displayCount}}"
+      "matchesBadge_other": "ត្រូវគ្នា {{displayCount}}",
+      "noOutput": "គ្មានលទ្ធផលទេ។"
     },
     "readToolMarkdown": {
       "linesTruncated": "បន្ទាត់ {{start}}–{{end}} (បានកាត់ឱ្យខ្លី)",
@@ -3180,15 +3181,7 @@
     "remoteOptionTitle": "កុំព្យូទ័ររបស់អ្នក",
     "remoteOptionBody": "ដំណើរការ Kilo លើម៉ាស៊ីនរបស់អ្នកតាមរយៈ CLI `kilo remote`។",
     "skip": "រំលងដំណើរ",
-    "tutorialLabel": "ការណែនាំ",
-    "remoteTitle": "ចាប់ផ្តើមវគ្គចម្ងាយដំបូងរបស់អ្នក",
-    "remoteBody": "ភ្ជាប់កុំព្យូទ័ររបស់អ្នក បន្ទាប់មកចាប់ផ្តើមវគ្គពីទីនេះ។",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "មិនទាន់មានកុំព្យូទ័របានភ្ជាប់ទេ",
-    "remoteEmptyBody": "ដើម្បីភ្ជាប់វា ចូលដំណើរការ `kilo remote` លើកុំព្យូទ័ររបស់អ្នក។",
-    "remoteFound": "បានភ្ជាប់កុំព្យូទ័រ",
-    "checkAgain": "ពិនិត្យម្តងទៀត",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ការណែនាំ"
   },
   "appActions": {
     "start": {

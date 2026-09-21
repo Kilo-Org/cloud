@@ -184,8 +184,17 @@ export function SessionRow({
         <View className="mb-[3px] flex-row items-center justify-between">
           {/* flex-1 basis 0: the right cluster is sized first at its full
               natural width, so a long agent label truncates instead of
-              crowding the status glyph and relative time out of the row. */}
-          <Eyebrow className={cn('min-w-0 flex-1', color.hueTextClass)} numberOfLines={1}>
+              crowding the status glyph and relative time out of the row.
+              The label is the repo identifier, so it ellipsizes in the middle
+              rather than at the tail: a tail ellipsis hides the distinguishing
+              suffix ("TAX-REPORT-GENERA…"), while middle keeps both ends legible
+              (the long-identifier convention in `KvRow` and `SheetHeader`). The
+              one-line clamp still bounds the eyebrow. */}
+          <Eyebrow
+            className={cn('min-w-0 flex-1', color.hueTextClass)}
+            numberOfLines={1}
+            ellipsizeMode="middle"
+          >
             {agentLabel}
           </Eyebrow>
           {eyebrowRight}

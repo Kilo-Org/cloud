@@ -5,7 +5,6 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Switch, View } from 'react-native';
 
-import { CenteredState } from '@/components/centered-state';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
@@ -225,12 +224,14 @@ export function SettingsOverviewScreen({
     );
   };
 
-  const Body = data.isEnabled ? TabScreenScrollView : CenteredState;
-
+  // The settings card is a control surface, not an empty state, so it stays
+  // top-aligned in both enabled and disabled states — matching the Account
+  // settings list and the loading skeleton. Centring it left a large void
+  // above the card (explorer security-agent-settings, 2026-09-20).
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('securityAgent.dashboard.settings')} headerRight={auditAction} />
-      <Body className="flex-1">
+      <TabScreenScrollView className="flex-1">
         <View className="gap-6 px-6 py-4">
           <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
             <View className="flex-1 pr-3">
@@ -333,7 +334,7 @@ export function SettingsOverviewScreen({
             </View>
           )}
         </View>
-      </Body>
+      </TabScreenScrollView>
     </View>
   );
 }

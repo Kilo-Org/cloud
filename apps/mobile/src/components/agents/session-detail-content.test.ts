@@ -18,6 +18,7 @@ import {
   createSessionManager,
   createUserWebConnection,
   type KiloSessionId,
+  type MessageDeliveryState,
   type ReasoningPart,
   type SessionGoal,
   type SessionManager,
@@ -34,7 +35,7 @@ import { ChildSessionModelLabel } from '@/components/agents/child-session-model-
 import { ChildSessionSheet } from '@/components/agents/child-session-sheet';
 import { getTaskToolSessionId } from '@/components/agents/child-session-card-state';
 import { MessageBubble } from '@/components/agents/message-bubble';
-import { assistantMessage } from '@/components/agents/message-bubble-test-utils';
+import { assistantMessage, userMessage } from '@/components/agents/message-bubble-test-utils';
 import {
   exitRemoteSessionWithFeedback,
   type RetryableExitFailure,
@@ -889,6 +890,56 @@ describe('session detail status placement', () => {
       expect(view.renderer.root.findAllByType(EmptyState)).toHaveLength(0);
     }
   );
+});
+
+describe('session detail failed delivery retry', () => {
+  it('stops showing the failed delivery once the retry is accepted', async () => {
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: 'Continue',
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    expect(renderedText(view.renderer.root)).toContain(
+      i18n.t('agentChat.messageFailure.deliveryTitle')
+    );
+
+    const send = vi.spyOn(view.manager, 'send').mockResolvedValue(true);
+    const clearFailedMessage = vi.spyOn(view.manager, 'clearFailedMessage');
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(send).toHaveBeenCalledTimes(1);
+    // The clear carries the session that owns the retried row, so the
+    // resolution is never recorded under a session the user switched to while
+    // the re-send was in flight.
+    expect(clearFailedMessage).toHaveBeenCalledExactlyOnceWith('msg-failed', ROOT_ID);
+  });
 });
 
 describe('session detail slow load', () => {
@@ -2168,6 +2219,23 @@ describe('SessionDetailContent goal visibility', () => {
     expect(section[0]?.props.goal).toEqual(pausedGoal);
   });
 
+  it('sits the goal row a small margin under the header', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    // The screen shrinks the shared header padding for this screen only; the
+    // override replaces the ScreenHeader default `pb-3` through twMerge.
+    const header = view.renderer.root.findByType(ScreenHeader);
+    expect(header.props.className).toContain('pb-1');
+    expect(header.props.className).not.toContain('pb-3');
+
+    // The goal row still renders directly below the header.
+    const ordered = view.renderer.root.findAll(
+      node => Object.is(node.type, ScreenHeader) || Object.is(node.type, SessionGoalSection)
+    );
+    expect(ordered.map(node => node.type)).toEqual([ScreenHeader, SessionGoalSection]);
+  });
+
   it('hides the fixed goal row for a read-only session whose snapshot carries a goal', async () => {
     goalMountOptions = { goal: pausedGoal, resolvedType: 'read-only' };
     const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
@@ -2469,3 +2537,99 @@ describe('SessionDetailContent send transcript take-over', () => {
     expect(followTailNonceOf(view)).toBe(1);
   });
 });
+
+describe('session detail duplicate failure state', () => {
+  // Stored messages are ordered by id, which is time-sortable ascending, so the
+  // user row must sort before the assistant row for the Retry prompt to resolve.
+  const USER_ID = 'msg_1761000000000_user';
+  const ASSISTANT_ID = 'msg_1761000000010_assistant';
+
+  function rootUserMessage(text: string): StoredMessage {
+    const message = userMessage(USER_ID);
+    return {
+      info: { ...message.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({ id: `${USER_ID}-text`, sessionID: ROOT_ID, messageID: USER_ID, text }),
+      ],
+    };
+  }
+
+  function rootFailedAssistantMessage(text: string): StoredMessage {
+    const message = assistantMessage(ASSISTANT_ID);
+    message.info = { ...message.info, sessionID: ROOT_ID };
+    (message.info as { error?: { name: string; data: unknown } }).error = {
+      name: 'APIError',
+      data: { message: 'raw provider text' },
+    };
+    return {
+      info: message.info,
+      parts: [
+        stubTextPart({
+          id: `${ASSISTANT_ID}-text`,
+          sessionID: ROOT_ID,
+          messageID: ASSISTANT_ID,
+          text,
+        }),
+      ],
+    };
+  }
+
+  async function mountFailedTurn(indicator: SessionStatusIndicator) {
+    const view = await mountDetails([
+      rootUserMessage('please refactor'),
+      rootFailedAssistantMessage('matching the requested refactor.'),
+    ]);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        indicator
+      );
+    });
+    return view;
+  }
+
+  it('states the failure once: no repeated detail line and no repeated footer error', async () => {
+    const view = await mountFailedTurn({ type: 'error', message: 'simulated error', timestamp: 0 });
+    const text = renderedText(view.renderer.root);
+    expect(text).toContain('Response failed');
+    expect(text).not.toContain('The response failed.');
+    expect(indicatorNodes(view)).toHaveLength(0);
+  });
+
+  it('keeps a classified session error the message row does not carry', async () => {
+    const view = await mountFailedTurn({
+      type: 'error',
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      timestamp: 0,
+    });
+    const nodes = indicatorNodes(view);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]?.props).toMatchObject({
+      indicator: { message: expect.stringContaining('Insufficient credits') },
+    });
+  });
+
+  it('keeps the footer line when the transcript drops the failed row it names', async () => {
+    // A failed assistant row whose parts render nothing is dropped by
+    // `mergeSessionTranscript`; it owns no row, so the footer is the failure's
+    // only surface and must not be suppressed by it.
+    const dropped = rootFailedAssistantMessage('partial reply');
+    dropped.parts = [];
+    const view = await mountDetails([rootUserMessage('please refactor'), dropped]);
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'error', message: 'simulated error', timestamp: 0 }
+      );
+    });
+    const nodes = indicatorNodes(view);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]?.props).toMatchObject({
+      indicator: { message: 'simulated error' },
+    });
+  });
+});
+
+function indicatorNodes(view: Awaited<ReturnType<typeof mountDetails>>) {
+  return view.renderer.root.findAll(node => Object.is(node.type, 'SessionStatusIndicator'));
+}

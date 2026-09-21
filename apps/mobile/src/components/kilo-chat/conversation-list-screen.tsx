@@ -109,7 +109,12 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const listQuery = useConversations(client, sandboxId);
   const createConversation = useCreateConversation(client);
   const leaveConversation = useLeaveConversation(client);
-  const now = useNowTicker(60_000);
+  // The rows' relative timestamps are minute-bucketed, so the clock has to be
+  // sampled at least twice per bucket: a 60s tick is phase-locked to this
+  // screen's mount and would let a just-created row read "Just now" for up to
+  // 60s past the minute it turned one minute old. Same clock as the open
+  // conversation, so both surfaces share one timer.
+  const now = useNowTicker(10_000);
 
   const hasNextPage = listQuery.hasNextPage;
   const isFetchingNextPage = listQuery.isFetchingNextPage;
@@ -266,6 +271,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
                   <ConversationRow
                     conversation={item.conversation}
                     sandboxId={sandboxId}
+                    now={now}
                     onPress={handleRowPress}
                     onLeave={handleLeave}
                   />

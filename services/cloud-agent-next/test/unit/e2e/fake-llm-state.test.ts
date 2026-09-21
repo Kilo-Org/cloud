@@ -5,11 +5,12 @@
  * only and are what the Durable Object persists and hydrates.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   MAX_PERSISTED_SCENARIOS,
   MAX_PERSISTED_TAG_LENGTH,
+  MAX_SLOW_DELAY_MS,
   createFakeLlmState,
   handleFakeLlmRequest,
   hydrateFakeLlmState,
@@ -74,6 +75,60 @@ async function touchTag(state: FakeLlmState, tag: string): Promise<void> {
       }),
   };
   await handleFakeLlmRequest(request, stubEmit(), state, { adminToken: TEST_ADMIN_TOKEN });
+}
+
+function slowChatRequest(content: string): FakeLlmRequest {
+  return {
+    method: 'POST',
+    url: '/api/openrouter/chat/completions',
+    headers: { 'content-type': 'application/json' },
+    readText: async () =>
+      JSON.stringify({
+        model: 'kilo/fake-deterministic',
+        messages: [{ role: 'user', content }],
+        stream: true,
+      }),
+  };
+}
+
+/**
+ * Minimal emit that records SSE traffic. `alreadyClosed` mirrors the Worker
+ * adapter, which invokes a listener synchronously when the stream is already
+ * gone; `closeAfterContentChunks` simulates a client disconnect mid-stream.
+ */
+function recordingEmit(
+  options: { alreadyClosed?: boolean; closeAfterContentChunks?: number } = {}
+): { emit: FakeLlmEmit; contentChunks: () => number } {
+  const listeners: Array<() => void> = [];
+  let contentChunks = 0;
+
+  return {
+    contentChunks: () => contentChunks,
+    emit: {
+      start() {},
+      sse(chunk) {
+        const content = (chunk as { choices?: Array<{ delta?: { content?: unknown } }> })
+          .choices?.[0]?.delta?.content;
+        if (typeof content !== 'string' || content.length === 0) return;
+        contentChunks += 1;
+        if (contentChunks === options.closeAfterContentChunks) {
+          for (const listener of listeners) listener();
+        }
+      },
+      done() {},
+      json() {},
+      empty() {},
+      fail() {},
+      end() {},
+      isStarted() {
+        return false;
+      },
+      onClose(listener) {
+        if (options.alreadyClosed) listener();
+        else listeners.push(listener);
+      },
+    },
+  };
 }
 
 describe('serializeFakeLlmState', () => {
@@ -217,5 +272,45 @@ describe('hydrateFakeLlmState', () => {
     expect(hydrated.scenarios.get('first-touched-beyond-bound')?.requests).toBe(4);
     // The live map is untouched by the snapshot bound.
     expect(state.scenarios.get('old-reused')?.requests).toBe(2);
+  });
+});
+
+describe('slow scenario limits', () => {
+  it('clamps a delay above MAX_SLOW_DELAY_MS to the cap', async () => {
+    vi.useFakeTimers();
+    try {
+      const { emit, contentChunks } = recordingEmit();
+      const state = createFakeLlmState();
+      const pending = handleFakeLlmRequest(
+        slowChatRequest(`__fake__:slow:2:${MAX_SLOW_DELAY_MS * 10}`),
+        emit,
+        state,
+        { adminToken: TEST_ADMIN_TOKEN }
+      );
+
+      // Only the synchronous role chunk exists until the clamped sleep elapses.
+      expect(contentChunks()).toBe(0);
+      await vi.advanceTimersByTimeAsync(MAX_SLOW_DELAY_MS + 1);
+      expect(contentChunks()).toBe(2);
+      await pending;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops emitting content when the emit is already closed', async () => {
+    const { emit, contentChunks } = recordingEmit({ alreadyClosed: true });
+    await handleFakeLlmRequest(slowChatRequest('__fake__:slow:3:0'), emit, createFakeLlmState(), {
+      adminToken: TEST_ADMIN_TOKEN,
+    });
+    expect(contentChunks()).toBe(0);
+  });
+
+  it('stops emitting content after the emit closes mid-loop', async () => {
+    const { emit, contentChunks } = recordingEmit({ closeAfterContentChunks: 1 });
+    await handleFakeLlmRequest(slowChatRequest('__fake__:slow:3:0'), emit, createFakeLlmState(), {
+      adminToken: TEST_ADMIN_TOKEN,
+    });
+    expect(contentChunks()).toBe(1);
   });
 });

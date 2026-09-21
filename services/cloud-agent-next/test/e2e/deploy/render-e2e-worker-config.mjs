@@ -19,7 +19,15 @@ const E2E_MAX_INSTANCES = 20;
 
 export function buildE2eWorkerConfig(sourceConfig, overrides) {
   const { workerUrl, kiloOpenRouterBase } = overrides;
-  const e2eUserId = overrides.e2eUserId?.trim() || '*';
+  const e2eUserId = overrides.e2eUserId?.trim();
+  if (!e2eUserId) {
+    throw new Error(
+      'E2E_USER_ID is required: this render enrolls it in CONTROL_PLANE_IDS and ' +
+        'WORKTREE_CREATION_ENABLED_IDS, and the e2e Worker writes to production ' +
+        'Postgres and R2. Pass an explicit Kilo user id; pass * only to ' +
+        'deliberately enrol every authenticated Kilo user.'
+    );
+  }
   const config = structuredClone(sourceConfig);
 
   config.$schema = '../node_modules/wrangler/config-schema.json';
@@ -57,13 +65,23 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
   };
 
   config.migrations = (config.migrations ?? [])
-    .map(entry => ({
-      ...entry,
-      new_sqlite_classes: (entry.new_sqlite_classes ?? []).filter(
-        className => !removedContainerClasses.has(className)
-      ),
-    }))
-    .filter(entry => entry.new_sqlite_classes.length > 0);
+    .map(entry => {
+      const migration = { ...entry };
+      if (entry.new_sqlite_classes) {
+        migration.new_sqlite_classes = entry.new_sqlite_classes.filter(
+          className => !removedContainerClasses.has(className)
+        );
+      }
+      if (entry.new_classes) {
+        migration.new_classes = entry.new_classes.filter(
+          className => !removedContainerClasses.has(className)
+        );
+      }
+      return migration;
+    })
+    .filter(
+      entry => (entry.new_sqlite_classes?.length ?? 0) + (entry.new_classes?.length ?? 0) > 0
+    );
 
   config.vars = {
     ...config.vars,
@@ -156,11 +174,18 @@ if (isMain) {
 
   const kiloOpenRouterBase = `${parsedFakeLlmBaseUrl.origin}${parsedFakeLlmBaseUrl.pathname}`;
   const sourceConfig = parse(readFileSync(sourceConfigPath, 'utf8'));
-  const rendered = buildE2eWorkerConfig(sourceConfig, {
-    workerUrl,
-    kiloOpenRouterBase,
-    e2eUserId,
-  });
+
+  let rendered;
+  try {
+    rendered = buildE2eWorkerConfig(sourceConfig, {
+      workerUrl,
+      kiloOpenRouterBase,
+      e2eUserId,
+    });
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
 
   mkdirSync(dirname(targetConfigPath), { recursive: true });
   writeFileSync(targetConfigPath, `${JSON.stringify(rendered, null, 2)}\n`);

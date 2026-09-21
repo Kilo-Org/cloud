@@ -765,6 +765,15 @@ export const MAX_REALISTIC_PIECES = 512;
  */
 export const MAX_TOOL_STREAM_BYTES = 1024 * 1024;
 
+/**
+ * Upper bound for the `slow:<n>:<ms>:<bytes>` per-chunk delay. Without it a
+ * directive such as `slow:200:3600000` parks a Durable Object for hours after
+ * the SSE stream is gone. Existing scenarios use at most 250 ms and the
+ * documented example is 200 ms, so this keeps them intact with wide headroom
+ * while bounding one call to `n * MAX_SLOW_DELAY_MS`.
+ */
+export const MAX_SLOW_DELAY_MS = 5_000;
+
 export function buildRealisticReasoning(text: string): string[] {
   const fingerprint = createHash('sha256').update(text).digest('hex').slice(0, 16);
   const reasoningSeed = `input=${fingerprint} chars=${text.length}`;
@@ -836,6 +845,20 @@ function parkGate(ctx: ScenarioContext, tag: string, completion: string): void {
     });
   };
 
+  const waiters = ctx.state.gates.get(tag) ?? [];
+  waiters.push({ emit: ctx.emit, model: ctx.model, release, cleanup });
+  ctx.state.gates.set(tag, waiters);
+  logEvent('scenario.parked', {
+    reqId: ctx.reqLogId,
+    scenario: 'gate',
+    tag,
+    waiterCount: waiters.length,
+  });
+
+  // Register the close listener only after the waiter is visible in `gates`:
+  // an emit that is already closed (client aborted before the turn parked)
+  // invokes `onClose` synchronously, so cleanup removes the waiter instead of
+  // leaving a phantom entry that teardown can never reach.
   ctx.emit.onClose(() => {
     cleanup();
     if (!releasedByTest) {
@@ -846,16 +869,6 @@ function parkGate(ctx: ScenarioContext, tag: string, completion: string): void {
         reason: 'client-closed',
       });
     }
-  });
-
-  const waiters = ctx.state.gates.get(tag) ?? [];
-  waiters.push({ emit: ctx.emit, model: ctx.model, release, cleanup });
-  ctx.state.gates.set(tag, waiters);
-  logEvent('scenario.parked', {
-    reqId: ctx.reqLogId,
-    scenario: 'gate',
-    tag,
-    waiterCount: waiters.length,
   });
 }
 
@@ -949,11 +962,19 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     const raw = args[0] ?? '';
     const parts = raw.split(':');
     const n = Math.min(200, Math.max(1, Number.parseInt(parts[0] ?? '1', 10) || 1));
-    const delayMs = Math.max(0, Number.parseInt(parts[1] ?? '0', 10) || 0);
+    const delayMs = Math.min(
+      MAX_SLOW_DELAY_MS,
+      Math.max(0, Number.parseInt(parts[1] ?? '0', 10) || 0)
+    );
     const chunkBytes = Math.min(2048, Math.max(0, Number.parseInt(parts[2] ?? '0', 10) || 0));
     writeChunk(ctx.emit, makeChunk(ctx.id, ctx.model, { role: 'assistant', content: '' }));
+    let closed = false;
+    ctx.emit.onClose(() => {
+      closed = true;
+    });
     let totalContent = 0;
     for (let i = 0; i < n; i++) {
+      if (closed) break;
       let piece: string;
       if (chunkBytes > 0) {
         const token = ` w${i} `;

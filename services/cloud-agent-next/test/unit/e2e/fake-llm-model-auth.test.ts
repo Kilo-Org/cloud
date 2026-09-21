@@ -158,6 +158,19 @@ describe('verifyModelRouteBearer', () => {
     });
   });
 
+  it('reports 500 instead of throwing when the Secrets Store get() rejects', async () => {
+    const binding: NextAuthSecretBinding = {
+      get: async () => {
+        throw new Error('secrets store unavailable');
+      },
+    };
+    await expect(verifyModelRouteBearer('Bearer abc.def.ghi', binding)).resolves.toMatchObject({
+      ok: false,
+      status: 500,
+      message: 'NEXTAUTH_SECRET could not be resolved on the fake LLM worker',
+    });
+  });
+
   it('rejects a malformed bearer', async () => {
     await expect(verifyModelRouteBearer('Bearer not-a-jwt', SECRET)).resolves.toMatchObject({
       ok: false,

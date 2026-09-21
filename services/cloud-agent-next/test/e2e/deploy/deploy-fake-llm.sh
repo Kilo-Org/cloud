@@ -186,10 +186,16 @@ health_checks() {
     exit 1
   fi
 
-  printf '+ curl -fsS -H "Authorization: Bearer $%s" %s/%s\n' \
-    "$ADMIN_TOKEN_VAR" "$FAKE_LLM_WORKER_URL" "$CONTROL_ROUTE" >&2
-  curl -fsS --max-time 15 -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-    "${FAKE_LLM_WORKER_URL}/${CONTROL_ROUTE}" >/dev/null
+  # The bearer goes to curl over stdin (`--config -`), never as an argv element:
+  # an argv header is readable from `ps` / `/proc/<pid>/cmdline` while the
+  # request is in flight. The printed line is illustrative and never names the
+  # token's source (it can come from the environment or E2E_AUTH_FILE).
+  printf '+ printf header "Authorization: Bearer [redacted]" | curl -fsS --config - %s/%s  (resolved admin token)\n' \
+    "$FAKE_LLM_WORKER_URL" "$CONTROL_ROUTE" >&2
+  local header_value=${ADMIN_TOKEN//\\/\\\\}
+  header_value=${header_value//\"/\\\"}
+  printf 'header = "Authorization: Bearer %s"\n' "$header_value" |
+    curl -fsS --max-time 15 --config - "${FAKE_LLM_WORKER_URL}/${CONTROL_ROUTE}" >/dev/null
   printf 'Token accepted on /%s\n' "$CONTROL_ROUTE"
 
   printf 'FAKE_LLM_BASE_URL=%s\n' "$FAKE_LLM_BASE_URL"

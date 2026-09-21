@@ -150,6 +150,33 @@ describe('buildE2eWorkerConfig', () => {
     expect([...migratedClasses].sort()).toEqual([...bindingClasses].sort());
   });
 
+  it('keeps and filters non-SQLite new_classes migrations', () => {
+    const source = {
+      containers: [{ class_name: 'Sandbox' }, { class_name: 'SandboxSmall' }],
+      migrations: [
+        { tag: 'v1', new_sqlite_classes: ['CloudAgentSession'] },
+        { tag: 'v2', new_classes: ['LegacyDo', 'Sandbox'] },
+      ],
+    };
+    const config = buildE2eWorkerConfig(source, overrides);
+    expect(config.migrations).toEqual([
+      { tag: 'v1', new_sqlite_classes: ['CloudAgentSession'] },
+      { tag: 'v2', new_classes: ['LegacyDo'] },
+    ]);
+  });
+
+  it('drops a migration whose new_classes are all removed', () => {
+    const source = {
+      containers: [{ class_name: 'Sandbox' }, { class_name: 'SandboxSmall' }],
+      migrations: [
+        { tag: 'v1', new_sqlite_classes: ['CloudAgentSession'] },
+        { tag: 'v2', new_classes: ['Sandbox'] },
+      ],
+    };
+    const config = buildE2eWorkerConfig(source, overrides);
+    expect(config.migrations).toEqual([{ tag: 'v1', new_sqlite_classes: ['CloudAgentSession'] }]);
+  });
+
   it('renders identical migrations and bindings on repeated calls', () => {
     const first = buildE2eWorkerConfig(readSourceConfig(), overrides);
     const second = buildE2eWorkerConfig(readSourceConfig(), overrides);
@@ -199,20 +226,18 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.vars.KILO_SESSION_INGEST_URL).toBe('https://ingest.kilosessions.ai');
   });
 
-  it('defaults both enrolled ids to * when E2E_USER_ID is unset', () => {
-    const previous = process.env.E2E_USER_ID;
-    delete process.env.E2E_USER_ID;
-    try {
-      const config = buildE2eWorkerConfig(readSourceConfig(), {
-        ...overrides,
-        e2eUserId: process.env.E2E_USER_ID,
-      });
-      expect(config.vars.CONTROL_PLANE_IDS).toBe('*');
-      expect(config.vars.WORKTREE_CREATION_ENABLED_IDS).toBe('*');
-    } finally {
-      if (previous === undefined) delete process.env.E2E_USER_ID;
-      else process.env.E2E_USER_ID = previous;
+  it('fails the render when E2E_USER_ID is absent or empty', () => {
+    for (const e2eUserId of [undefined, '', '   ']) {
+      expect(() => buildE2eWorkerConfig(readSourceConfig(), { ...overrides, e2eUserId })).toThrow(
+        /E2E_USER_ID/
+      );
     }
+  });
+
+  it('enrols every authenticated user only for an explicit *', () => {
+    const config = buildE2eWorkerConfig(readSourceConfig(), { ...overrides, e2eUserId: ' * ' });
+    expect(config.vars.CONTROL_PLANE_IDS).toBe('*');
+    expect(config.vars.WORKTREE_CREATION_ENABLED_IDS).toBe('*');
   });
 
   it('adds the NEXTAUTH_SECRET binding and keeps existing bindings', () => {

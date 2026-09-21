@@ -70,13 +70,13 @@ The commands below run from `services/cloud-agent-next` (or use the full path fr
 4. Render and deploy the e2e Worker:
 
    ```sh
-   FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh dry-run
-   FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy
+   E2E_USER_ID=<id> FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh dry-run
+   E2E_USER_ID=<id> FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy
    ```
 
-   The deployed test Worker accepts sessions from any authenticated Kilo user,
-   and it writes to production Postgres and R2; pass a real user id to restrict
-   the deployment.
+   The deployed test Worker enrolls `E2E_USER_ID` for control-plane and
+   worktree-session creation, and it writes to production Postgres and R2; pass
+   `*` only as a deliberate opt-in to enrol every authenticated Kilo user.
 
 5. Run the driver with the same admin token available (exported
    `FAKE_LLM_ADMIN_TOKEN`, or `E2E_AUTH_FILE`). The driver reads it through
@@ -102,7 +102,7 @@ never prints the token value.
 
 | Name | Required | Meaning |
 |---|---|---|
-| `E2E_USER_ID` | no | Defaults to `*`. The deployed test Worker then accepts sessions from any authenticated Kilo user, and it writes to production Postgres and R2. Pass a real user id when the deployment is meant to be restricted. Owns both `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS`. |
+| `E2E_USER_ID` | yes | Required. The Kilo user id enrolled in `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS`. The deployed test Worker writes to production Postgres and R2, so pass `*` only as a deliberate opt-in to enrol every authenticated Kilo user. |
 | `E2E_AUTH_FILE` | no | JSON file for a deployed run (Kilo token, user id, email, fake-llm admin token). `deploy-fake-llm.sh` reads its `fakeLlmAdminToken` field when `FAKE_LLM_ADMIN_TOKEN` is unset or empty. |
 | `FAKE_LLM_BASE_URL` | yes | Must be `https://<fake-host>/api/openrouter`. |
 | `FAKE_LLM_ADMIN_TOKEN` | yes | Bearer for the fake's `/test/*` routes. Uploaded as the Worker secret by `deploy-fake-llm.sh` and exported for the driver. When unset or empty, the script resolves it from `E2E_AUTH_FILE`. Never the development default. |

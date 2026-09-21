@@ -20,8 +20,8 @@ import { createHmac } from 'node:crypto';
 import { env, evictDurableObject, runInDurableObject, SELF } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 
-import { FAKE_LLM_STATE_STORAGE_KEY } from '../e2e/fake-llm-core.js';
-import { closedInternalErrorResponse, createWorkerEmit } from '../e2e/fake-llm-worker.js';
+import { FAKE_LLM_STATE_STORAGE_KEY, scenarioRegistry } from '../e2e/fake-llm-core.js';
+import { createWorkerEmit } from '../e2e/fake-llm-worker.js';
 
 type FakeLlmTestEnv = {
   FAKE_LLM: DurableObjectNamespace;
@@ -419,13 +419,34 @@ describe('deployed fake llm worker', () => {
   });
 
   it('answers a bodyless 500 when the handler completes without a shape', async () => {
-    const emit = createWorkerEmit(new Request(`${ORIGIN}/test/requests`));
-    await Promise.race([emit.shaped, Promise.resolve()]);
+    const tag = `no-shape-${Date.now()}`;
+    const stub = testEnv.FAKE_LLM.get(testEnv.FAKE_LLM.idFromName(DO_NAME));
 
-    expect(emit.shapedWon()).toBe(false);
-    const response = emit.shapedWon() ? emit.toResponse() : closedInternalErrorResponse();
-    expect(response.status).toBe(500);
-    expect(await response.text()).toBe('');
+    // No shipped directive completes without shaping, so register a no-op
+    // scenario for this test only. It drives `FakeLlmState.fetch` itself — the
+    // path that owns the fallback — instead of calling the helper directly.
+    scenarioRegistry[tag] = () => {};
+    try {
+      const observed = await runInDurableObject(stub, async instance => {
+        const doInstance = instance as unknown as { fetch(request: Request): Promise<Response> };
+        const response = await doInstance.fetch(
+          new Request(`${ORIGIN}/api/openrouter/chat/completions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'kilo/fake-deterministic',
+              messages: [{ role: 'user', content: `__fake__:${tag}` }],
+              stream: true,
+            }),
+          })
+        );
+        return { status: response.status, body: await response.text() };
+      });
+
+      expect(observed).toEqual({ status: 500, body: '' });
+    } finally {
+      delete scenarioRegistry[tag];
+    }
   });
 
   it('guards every /test/* control route with the admin bearer', async () => {
@@ -456,6 +477,39 @@ describe('deployed fake llm worker', () => {
       headers: adminHeaders(),
     });
     expect(await drain(authorized)).toBe(404);
+  });
+
+  it('leaves no phantom waiter when the emit is already closed', async () => {
+    const tag = `preclosed-${Date.now()}`;
+    const stub = testEnv.FAKE_LLM.get(testEnv.FAKE_LLM.idFromName(DO_NAME));
+
+    const observed = await runInDurableObject(stub, async instance => {
+      const doInstance = instance as unknown as {
+        fetch(request: Request): Promise<Response>;
+        core: { gates: Map<string, unknown[]>; liveResponses: Set<unknown> };
+      };
+      const controller = new AbortController();
+      controller.abort();
+      const response = await doInstance.fetch(
+        new Request(`${ORIGIN}/api/openrouter/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'kilo/fake-deterministic',
+            messages: [{ role: 'user', content: `__fake__:gate:${tag}` }],
+            stream: true,
+          }),
+          signal: controller.signal,
+        })
+      );
+      await response.body?.cancel();
+      return {
+        waiters: doInstance.core.gates.get(tag)?.length ?? 0,
+        live: doInstance.core.liveResponses.size,
+      };
+    });
+
+    expect(observed).toEqual({ waiters: 0, live: 0 });
   });
 
   it('returns waiters to zero when the parked stream is cancelled', async () => {

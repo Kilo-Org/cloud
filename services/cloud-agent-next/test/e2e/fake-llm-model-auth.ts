@@ -94,7 +94,18 @@ export async function verifyModelRouteBearer(
     return { ok: false, status: 401, message: 'model authorization required' };
   }
 
-  const secret = await resolveNextAuthSecret(secretBinding);
+  let secret: string | null;
+  try {
+    secret = await resolveNextAuthSecret(secretBinding);
+  } catch {
+    // A Secrets Store `get()` can reject transiently; surface it as the same
+    // structured 500 the missing-secret path uses instead of an opaque throw.
+    return {
+      ok: false,
+      status: 500,
+      message: 'NEXTAUTH_SECRET could not be resolved on the fake LLM worker',
+    };
+  }
   if (!secret) {
     return {
       ok: false,

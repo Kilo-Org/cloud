@@ -40,8 +40,10 @@ Commands:
 
 Required environment:
   FAKE_LLM_BASE_URL  https://<fake-host>/api/openrouter
+  E2E_USER_ID        Kilo user id enrolled in CONTROL_PLANE_IDS and
+                     WORKTREE_CREATION_ENABLED_IDS. Pass * only as a deliberate
+                     opt-in to enrol every authenticated Kilo user.
 Optional environment:
-  E2E_USER_ID        Defaults to * (no enrollment restriction)
   WORKER_URL         Defaults to https://cloud-agent-e2e-test.engineering-e11.workers.dev
 USAGE
 }

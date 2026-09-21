@@ -91,6 +91,7 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
       <View className="items-center gap-4">
         <TourStepHeader
           icon={<Sparkles size={36} color={colors.foreground} />}
+          eyebrow={t('tour.eyebrow')}
           title={t('tour.forkTitle')}
           body={t('tour.forkSubtitle')}
         />
@@ -200,11 +201,11 @@ export function TourScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        eyebrow={t('tour.eyebrow')}
-        showBackButton={path === 'remote'}
-        onBack={toFork}
-      />
+      {/* Bare top/back bar: the step bodies carry their own centred title and
+          eyebrow (`TourStepHeader`), so the header passes no copy of its own
+          (see `screen-header.tsx`). The back control stays on the computer
+          step. */}
+      <ScreenHeader showBackButton={path === 'remote'} onBack={toFork} />
 
       <View className="flex-1">
         {path === 'fork' ? <ForkStep onChoose={choosePath} /> : null}

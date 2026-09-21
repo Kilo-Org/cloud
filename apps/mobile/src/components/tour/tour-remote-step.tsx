@@ -187,6 +187,7 @@ export function TourRemoteStep({ onChooseComputer }: Readonly<TourRemoteStepProp
 
       <TourStepHeader
         icon={<Server size={36} color={colors.foreground} />}
+        eyebrow={t('tour.eyebrow')}
         title={t('tour.remoteTitle')}
         body={t('tour.remoteBody')}
       />

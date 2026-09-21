@@ -162,6 +162,20 @@ describe('TourRemoteStep', () => {
     unmount();
   });
 
+  it('carries the tour eyebrow in the step header, above the reserved slot', async () => {
+    const { renderer, unmount } = await mountStep();
+
+    const header = renderer.root.findByType(TourStepHeader);
+    expect(header.props.eyebrow).toBe('tour.eyebrow');
+    // The header sits above the slot, so a loading -> list -> error swap inside
+    // the slot can never move the label.
+    const slot = layoutSlot(renderer);
+    expect(hasTextIn(slot, 'tour.eyebrow')).toBe(false);
+    expect(hasText(renderer, 'tour.eyebrow')).toBe(true);
+
+    unmount();
+  });
+
   it('centres the step body in the band between the header and the action bar', async () => {
     fetchInstances.mockResolvedValue({ instances: [] });
     const { renderer, unmount } = await mountStep();

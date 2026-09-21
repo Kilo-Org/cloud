@@ -7,6 +7,7 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { TourScreen } from './tour-screen';
+import { TourStepHeader } from './tour-step-header';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -120,6 +121,7 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
+vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   Cloud: 'Cloud',
@@ -220,6 +222,14 @@ describe('TourScreen', () => {
     expect(hasText(renderer, 'tour.cloudOptionTitle')).toBe(true);
     expect(hasText(renderer, 'tour.remoteOptionTitle')).toBe(true);
     expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(0);
+
+    // Regression guard: the eyebrow used to sit alone in the screen header,
+    // which passes no title for it to name, stranding it at the top-left above
+    // a half-band dead gap. The bare back bar must not receive it; the fork's
+    // centred step header must, so the label sits over the heading.
+    const screenHeader = renderer.root.findByType('ScreenHeader' as ElementType);
+    expect(screenHeader.props).not.toHaveProperty('eyebrow');
+    expect(renderer.root.findByType(TourStepHeader).props.eyebrow).toBe('tour.eyebrow');
 
     unmount();
   });

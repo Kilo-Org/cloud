@@ -128,8 +128,12 @@ const { ProdNonSSOAuthProviders } = require('@/lib/auth/provider-metadata') as {
  * The bar, in class names: a 44px minimum height, growing with a coarse
  * pointer. `min-h-11` is 11 x Tailwind's 0.25rem spacing and
  * `min-h-control-touch` reads the design system's 44px token directly.
+ *
+ * Both boundaries matter: without the leading one the pattern also matches
+ * `max-h-11` (a cap, not a floor) or `sm:h-11` / `hover:h-11` (a non-coarse
+ * variant), none of which guarantee a 44px target on a coarse pointer.
  */
-const TOUCH_TARGET = /(?:pointer-coarse:)?(?:min-)?h-(?:11|control-touch)(?![\w-])/;
+const TOUCH_TARGET = /(?<![\w:-])(?:pointer-coarse:)?(?:min-)?h-(?:11|control-touch)(?![\w-])/;
 
 /** Apple's hit-region minimum, in points. */
 const HIT_REGION_MIN_PX = 44;
@@ -182,7 +186,36 @@ describe('sign-in touch targets', () => {
     const globals = readFileSync(resolve(__dirname, '../../app/globals.css'), 'utf8');
 
     expect(globals).toContain('--control-size-touch: 44px');
-    expect(globals).not.toMatch(/html\s*\{[^}]*font-size/);
+    // Every px assertion in this suite reads `min-h-11` as 11 x 0.25rem and
+    // the root at the browser default, so a root font size (via `font-size`
+    // or the `font:` shorthand) or a `--spacing` override would silently
+    // invalidate the 44px math while the suite stayed green.
+    expect(globals).not.toMatch(/(?:html|:root)\s*\{[^}]*\bfont(?:-size)?\s*:/);
+    expect(globals).not.toMatch(/(?:^|[\s;{])--spacing\s*:/m);
+  });
+
+  it('reads the touch target only from a standalone class', () => {
+    for (const accepted of [
+      'pointer-coarse:min-h-11',
+      'min-h-11',
+      'min-h-control-touch',
+      'pointer-coarse:min-h-control-touch',
+      'px-4 pointer-coarse:min-h-11',
+    ]) {
+      expect({ accepted, ok: hasTouchTarget(`<button class="${accepted}">`) }).toEqual({
+        accepted,
+        ok: true,
+      });
+    }
+
+    // `max-h-11` caps instead of flooring, and a non-coarse variant does not
+    // guarantee the height on the coarse pointer Apple audits.
+    for (const rejected of ['max-h-11', 'sm:h-11', 'hover:h-11', 'h-10']) {
+      expect({ rejected, ok: hasTouchTarget(`<button class="${rejected}">`) }).toEqual({
+        rejected,
+        ok: false,
+      });
+    }
   });
 
   it('grows the provider button to the touch target on a coarse pointer', () => {
@@ -203,7 +236,10 @@ describe('sign-in touch targets', () => {
     expect(controlsWithoutTouchTarget(html)).toEqual([]);
   });
 
-  it('leaves no control under the touch target on the provider view', () => {
+  // `isSignUp` omitted means the normal sign-in landing: the email input with
+  // the provider buttons offered beside it, not the provider-only view (that
+  // one is the sign-up test below).
+  it('leaves no control under the touch target on the default sign-in view', () => {
     const html = render(createElement(SignInForm, { searchParams: {}, title: 'Welcome.' }));
 
     expect(html).toContain('Continue with Email');
@@ -364,6 +400,7 @@ describe('sign-in touch targets', () => {
   });
 });
 
+/** Provider buttons carrying the touch target, in whichever spelling. */
 function prodButtonCount(html: string): number {
-  return (html.match(/pointer-coarse:min-h-11/g) ?? []).length;
+  return interactiveTags(html).filter(hasTouchTarget).length;
 }

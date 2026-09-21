@@ -124,20 +124,17 @@ vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
-// The profile row renders a loading skeleton, and `@/components/ui/skeleton`
-// pulls `react-native-reanimated`, which this pure suite does not set up.
+// The profile row and the environment row both render a loading `Skeleton`,
+// whose module imports `react-native-reanimated`: this pure suite does not set
+// Reanimated up, and this project runs in plain Node, where the
+// Reanimated/worklets native entry cannot resolve (the published worklets
+// build uses bundler-style extensionless imports). The primitive is a stub like
+// every other UI element above; its own rendering is not under test here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
 }));
-
-// The environment row's loading state renders `Skeleton`, whose module imports
-// react-native-reanimated: this project runs in plain Node, where the
-// Reanimated/worklets native entry cannot resolve (the published worklets
-// build uses bundler-style extensionless imports). The primitive is a stub like
-// every other UI element above; its own rendering is not under test here.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 // ── hooks ──────────────────────────────────────────────────────────
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

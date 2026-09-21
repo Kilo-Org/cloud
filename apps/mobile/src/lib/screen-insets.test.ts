@@ -36,16 +36,29 @@ const ENTRY_POINT = 'screen-insets.ts';
 const PROFILE_SCREEN = '../components/profile-screen.tsx';
 
 /**
- * The lines that read the screen's side insets and turn them into layout
- * margins. The screen may branch on the platform for unrelated behaviour (the
- * sign-out confirmation is an in-app dialog on Android and a native alert on
- * iOS), so only this alignment path is held to the shared implementation.
+ * The Profile screen's alignment path: from the line that reads
+ * `useScreenSideInsets` through the line that first applies a side inset. Only
+ * this path must stay free of per-platform branches. A fork elsewhere in the
+ * screen — the Android sign-out confirmation, for example — is not on the
+ * insets path and must not fail the guard.
  */
-function alignmentPath(profile: string): string {
-  return profile
-    .split('\n')
-    .filter(line => /useScreenSideInsets|marginLeft|marginRight/.test(line))
-    .join('\n');
+function alignmentPath(profileSource: string): string {
+  const lines = profileSource.split('\n');
+  const start = lines.findIndex(line => line.includes('useScreenSideInsets()'));
+  if (start === -1) {
+    throw new Error(`${PROFILE_SCREEN} does not read its side insets from ${ENTRY_POINT}`);
+  }
+  const end = lines.findIndex(
+    (line, index) => index >= start && /margin(?:Left|Right|Start|End)/.test(line)
+  );
+  if (end === -1) {
+    // Naming the insets differently, or applying them as padding, would shrink
+    // the scanned path to its first line and leave the guard passing on nothing.
+    throw new Error(
+      `${PROFILE_SCREEN} applies its side insets without a margin declaration; update this guard`
+    );
+  }
+  return lines.slice(start, end + 1).join('\n');
 }
 
 describe('screen side insets: one implementation for both platforms', () => {
@@ -62,6 +75,8 @@ describe('screen side insets: one implementation for both platforms', () => {
       SAFE_AREA_MODULE
     );
     const alignment = alignmentPath(profile);
+    // `alignmentPath` starts at the `useScreenSideInsets` line, so this also
+    // proves the path it scans is the screen's insets read, not an empty slice.
     expect(
       alignment,
       `${PROFILE_SCREEN} does not read its side insets from the entry point`

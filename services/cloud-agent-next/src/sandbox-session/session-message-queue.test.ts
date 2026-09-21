@@ -1276,6 +1276,29 @@ function controlDiagnostics(
     .filter(call => call.diagnosticEvent === diagnosticEvent);
 }
 
+function captureCloudAgentReports(
+  fixture: ReturnType<typeof sessionFixture>
+): CloudAgentQueueReport[] {
+  const reports: CloudAgentQueueReport[] = [];
+  (
+    fixture.env as unknown as { CLOUD_AGENT_REPORT_QUEUE: { send: unknown } }
+  ).CLOUD_AGENT_REPORT_QUEUE = {
+    send: async (report: CloudAgentQueueReport) => {
+      reports.push(report);
+    },
+  };
+  return reports;
+}
+
+function failedRunReport(
+  reports: readonly CloudAgentQueueReport[],
+  messageId: string
+): CloudAgentQueueReport['run'] | undefined {
+  return reports.find(
+    report => report.run.messageId === messageId && report.run.status === 'failed'
+  )?.run;
+}
+
 function installModernRuntimeAuthorization(fixture: ReturnType<typeof sessionFixture>) {
   const authorizationId = '44444444-4444-4444-8444-444444444444';
   const token = jwt.sign(
@@ -7010,6 +7033,178 @@ describe('SandboxSession orchestration', () => {
       failureCode: 'wrapper_no_output',
       failureResponsibility: 'platform',
       failureReason: 'wrapper_liveness',
+    });
+  });
+
+  it('classifies a live wrapper outcome carrying bounded assistant facts', async () => {
+    const fixture = sessionFixture();
+    const reports = captureCloudAgentReports(fixture);
+    await fixture.admit('a');
+    await fixture.flush();
+    // The default fixture has no operation-results capability, so the prompt is
+    // dispatched without an operation proof and the live outcome is accepted.
+    expect(fixture.record('a')?.operations?.prompt).toBeUndefined();
+
+    await fixture.rawEvent('session.message.outcome', {
+      messageId: 'a',
+      status: 'failed',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'unknown',
+    });
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      terminalSource: 'wrapper_outcome',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'unknown',
+    });
+    expect(failedRunReport(reports, 'a')).toMatchObject({
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      failureResponsibility: 'provider',
+      failureReason: 'rate_limited',
+    });
+  });
+
+  it('attributes a live wrapper outcome to the user for insufficient credits', async () => {
+    const fixture = sessionFixture();
+    const reports = captureCloudAgentReports(fixture);
+    await fixture.admit('a');
+    await fixture.flush();
+    // The default fixture has no operation-results capability, so the prompt is
+    // dispatched without an operation proof and the live outcome is accepted.
+    expect(fixture.record('a')?.operations?.prompt).toBeUndefined();
+
+    await fixture.rawEvent('session.message.outcome', {
+      messageId: 'a',
+      status: 'failed',
+      assistantReason: 'insufficient_credits',
+      providerOwnership: 'unknown',
+    });
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      terminalSource: 'wrapper_outcome',
+      assistantReason: 'insufficient_credits',
+      providerOwnership: 'unknown',
+    });
+    expect(failedRunReport(reports, 'a')).toMatchObject({
+      failureStage: 'agent_activity',
+      failureCode: 'payment_required',
+      failureResponsibility: 'user',
+      failureReason: 'insufficient_credits',
+    });
+  });
+
+  it('classifies a nested operation-result outcome carrying bounded assistant facts', async () => {
+    const fixture = sessionFixture();
+    const reports = captureCloudAgentReports(fixture);
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    const authorization = fixture.record('a')?.operations?.prompt?.authorization;
+    if (!authorization) throw new Error('Missing prompt operation authorization');
+    const completedAt = authorization.dispatchDeadlineAt + 1;
+    const delivery: SessionOperationDelivery = {
+      version: 2,
+      authorization,
+      completedAt,
+      result: { ok: true, result: { messageId: 'a', status: 'accepted' } },
+      outcome: {
+        messageId: 'a',
+        status: 'failed',
+        assistantReason: 'rate_limited',
+        providerOwnership: 'unknown',
+      },
+      events: [],
+      preparing: [],
+    };
+    delegateRequest(fixture, 'session.operation.get', async input => {
+      expect(input).toMatchObject({
+        expectedWrapperInstanceId: RUNTIME_ID,
+        payload: authorization,
+      });
+      return controlResponse({ state: 'completed', delivery });
+    });
+    delegateRequest(fixture, 'session.operation.ack', async () =>
+      controlResponse({ acknowledged: true })
+    );
+
+    vi.setSystemTime(authorization.dispatchDeadlineAt + 1);
+    fixture.reload();
+    await fixture.fireAlarm();
+    await fixture.flush();
+    // The report obligation recorded by the operation-result commit is enqueued
+    // after this alarm's repair pass, so a second wake delivers it.
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      terminalSource: 'operation_result',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'unknown',
+    });
+    expect(failedRunReport(reports, 'a')).toMatchObject({
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      failureResponsibility: 'provider',
+      failureReason: 'rate_limited',
+    });
+  });
+
+  it('does not treat a coordinator token sent as wrapper text as a coordinator cause', async () => {
+    const fixture = sessionFixture();
+    const reports = captureCloudAgentReports(fixture);
+    await fixture.admit('a');
+    await fixture.flush();
+
+    await fixture.rawEvent('session.message.outcome', {
+      messageId: 'a',
+      status: 'failed',
+      reason: 'kilo_unhealthy',
+    });
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')?.terminalSource).toBe('wrapper_outcome');
+    expect(failedRunReport(reports, 'a')).toMatchObject({
+      failureStage: 'unknown',
+      failureCode: 'unclassified',
+      failureResponsibility: 'unknown',
+      failureReason: 'unclassified',
+    });
+  });
+
+  it('keeps arbitrary wrapper text unclassified', async () => {
+    const fixture = sessionFixture();
+    const reports = captureCloudAgentReports(fixture);
+    await fixture.admit('a');
+    await fixture.flush();
+
+    await fixture.rawEvent('session.message.outcome', {
+      messageId: 'a',
+      status: 'failed',
+      reason: 'some wrapper text',
+    });
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')?.terminalSource).toBe('wrapper_outcome');
+    expect(failedRunReport(reports, 'a')).toMatchObject({
+      failureStage: 'unknown',
+      failureCode: 'unclassified',
+      failureResponsibility: 'unknown',
+      failureReason: 'unclassified',
     });
   });
 

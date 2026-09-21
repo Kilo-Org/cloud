@@ -248,6 +248,16 @@ export function NewSessionRepositorySection({
           }}
         >
           <ExternalLink size={16} color={colors.foreground} />
+          {/*
+            The label owns the row's remaining width and is pinned to one line.
+            A box sized to the label's own measured width is a fraction narrower
+            than the glyphs Android lays out, so "Open GitLab" wrapped onto two
+            lines and grew the button taller than its one-line siblings; giving
+            the label the free space keeps its box wider than the text, and
+            `numberOfLines` pins the line. The logical `me-[23px]` inset keeps
+            the centered label clear of the leading glyph in RTL as well, which
+            the physical `mr-` would not.
+          */}
           <Text className="me-[23px] flex-1 text-center" numberOfLines={1}>
             {t(selectedRepository === null ? copy.openLabel : copy.connectTitle)}
           </Text>

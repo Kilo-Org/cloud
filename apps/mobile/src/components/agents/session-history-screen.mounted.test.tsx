@@ -70,6 +70,13 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   AppState: { addEventListener: appState.addEventListener },
 }));
+// The modal mock below still loads the real module through `importOriginal`,
+// which imports `react-native-safe-area-context`; that package's `react-native`
+// entry points at its untranspiled `src/` TypeScript, which vitest cannot parse,
+// so stub the hook here.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', X: 'X' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

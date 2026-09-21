@@ -37,7 +37,8 @@ type PasskeySignInButtonProps = {
  *
  * While the client has not yet read the browser's credential API the control's
  * final height is unknown, so its slot is reserved at the button's `h-10`
- * height; resolving support then swaps in the button (or, with no credential
+ * height (growing to the 44px touch target with the button on a coarse
+ * pointer); resolving support then swaps in the button (or, with no credential
  * API, nothing) without moving the providers below it.
  *
  * Not rendered at all when the browser has no credential API, and replaced by
@@ -48,7 +49,8 @@ export function PasskeySignInButton({ callbackUrl }: PasskeySignInButtonProps) {
   const { isSupported, isPending, failure, signInWithPasskey } = usePasskeySignIn({ callbackUrl });
 
   // Loading state: reserved slot, same height as the button it may become.
-  if (isSupported === null) return <div aria-hidden className="h-10 w-full" />;
+  if (isSupported === null)
+    return <div aria-hidden className="h-10 w-full pointer-coarse:min-h-11" />;
 
   // Empty state: no `window.PublicKeyCredential`, so no dead control appears.
   if (!isSupported) return null;

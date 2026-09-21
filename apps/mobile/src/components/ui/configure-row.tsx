@@ -1,10 +1,11 @@
 import { type LucideIcon } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { IconTile } from '@/components/ui/icon-tile';
 import { type ReactNode } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
-import { toneColor, type ToneKey } from '@/lib/agent-color';
+import { type Tint, toneColor, type ToneKey } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -22,9 +23,19 @@ const CONFIGURE_ROW_STACK_FONT_SCALE = 1.8;
  * different accent tints. The neutral tile matches the sibling settings rows
  * (PreferenceRow, notifications CategoryRow), which use the un-tinted
  * secondary-foreground icon.
+ *
+ * It is shaped as a `Tint` so the shared `IconTile` renders it: the tile
+ * classes are the same neutral pair the row used inline, and the icon keeps
+ * the secondary-foreground stroke.
  */
-const NEUTRAL_TILE_BG_CLASS = 'bg-hair-soft';
-const NEUTRAL_TILE_BORDER_CLASS = 'border-border';
+const NEUTRAL_TINT = {
+  hueClass: 'bg-hair-soft',
+  hueTextClass: 'text-secondary-foreground',
+  hueBorderClass: 'border-border',
+  tileBgClass: 'bg-hair-soft',
+  tileBorderClass: 'border-border',
+  hueThemeKey: 'secondaryForeground',
+} as const satisfies Tint;
 
 type ConfigureRowProps = {
   icon: LucideIcon;
@@ -66,8 +77,9 @@ export function ConfigureRow({
   const colors = useThemeColors();
   const { fontScale } = useWindowDimensions();
   const stack = fontScale >= CONFIGURE_ROW_STACK_FONT_SCALE;
-  const tint = tone ? toneColor(tone) : undefined;
-  const iconColor = tint ? colors[tint.hueThemeKey] : colors.secondaryForeground;
+  // A semantic tone overrides the shared neutral tile; a title never hashes
+  // into an agent hue here.
+  const tint: Tint = tone ? toneColor(tone) : NEUTRAL_TINT;
   // Inert rows (no onPress) and disabled rows are not tappable — hide the
   // chevron so they don't look tappable, and never render pressed feedback.
   const showChevron = Boolean(onPress) && !disabled;
@@ -75,17 +87,7 @@ export function ConfigureRow({
     trailing ??
     (showChevron ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null);
 
-  const iconTile = (
-    <View
-      className={cn(
-        'h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg border',
-        tint ? tint.tileBgClass : NEUTRAL_TILE_BG_CLASS,
-        tint ? tint.tileBorderClass : NEUTRAL_TILE_BORDER_CLASS
-      )}
-    >
-      <Icon size={16} color={iconColor} />
-    </View>
-  );
+  const iconTile = <IconTile icon={Icon} tint={tint} />;
 
   const textBlock = (
     <View className={cn('min-w-0', stack ? 'w-full' : 'flex-1')}>

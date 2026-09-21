@@ -838,8 +838,11 @@
       "sessionStatusTitle": "سیشن کی حالت",
       "sessionStatusSubtitle": "مکمل / ناکام / کنٹرول کے لیے تیار",
       "kiloclawActivitySubtitle": "انسٹینس تیار یا ناکام، مقررہ وقت کے کام",
+      "kiloclawActivityUnavailable": "KiloClaw کی سرگرمی حاصل کرنے کے لیے KiloClaw انسٹینس شروع کریں۔",
       "balanceAlertsSubtitle": "تنظیم کا بیلنس کم ہونے کے انتباہات",
-      "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں"
+      "balanceAlertsUnavailable": "بیلنس انتباہات حاصل کرنے کے لیے کسی تنظیم میں شامل ہوں۔",
+      "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں",
+      "securityFindingsUnavailable": "سیکیورٹی دریافتیں حاصل کرنے کے لیے ایک دائرے پر Kilo سیکیورٹی ایجنٹ فعال کریں۔"
     },
     "action": {
       "openSession": "سیشن کھولیں"

@@ -4,6 +4,7 @@
  * has seven keys; the KiloClaw row is hidden when useKiloClawTabVisible is false.
  * Extracting subcomponents would re-encode the same hooks. The screen stays a
  * single rendered surface. */
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import * as Notifications from 'expo-notifications';
@@ -158,10 +159,30 @@ const CATEGORY_META = [
 type CategoryMeta = (typeof CATEGORY_META)[number];
 
 /** Per-category availability from the preferences response `capabilities` map. */
-type NotificationCategoryCapability = Readonly<{
-  available: boolean;
-  unavailableReason: string | null;
-}>;
+type NotificationPreferencesResponse =
+  inferRouterOutputs<MobileRouter>['user']['getNotificationPreferences'];
+type NotificationCategoryCapability =
+  NotificationPreferencesResponse['capabilities'][NotificationCategoryKey];
+type UnavailableReasonCode = NonNullable<NotificationCategoryCapability['unavailableReasonCode']>;
+
+/**
+ * The server sends a machine-readable reason code, never a sentence: each code
+ * maps to a catalog key so the row reads in the reader's language. Literal
+ * values, never a template, so the catalog check can see the keys.
+ */
+const UNAVAILABLE_REASON_KEY = {
+  organizationRequired: 'notifications.category.balanceAlertsUnavailable',
+  securityAgentRequired: 'notifications.category.securityFindingsUnavailable',
+  kiloclawInstanceRequired: 'notifications.category.kiloclawActivityUnavailable',
+} satisfies Record<UnavailableReasonCode, string>;
+
+/** A code from a newer server must fall back, never render raw. */
+function unavailableReasonKey(code: string | null | undefined): string | undefined {
+  if (code == null || !(code in UNAVAILABLE_REASON_KEY)) {
+    return undefined;
+  }
+  return UNAVAILABLE_REASON_KEY[code as UnavailableReasonCode];
+}
 
 type CategoryRowProps = Readonly<{
   meta: CategoryMeta;
@@ -195,14 +216,16 @@ function CategoryRow({
     : (preferences?.[meta.key] ?? readAgentPushPreference(queryClient, queryKey, meta.key));
   const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
   // An unavailable category is a terminal, non-retryable state: the switch is
-  // disabled and the server reason replaces the subtitle. A missing entry (the
-  // `noUncheckedIndexedAccess` widening) defaults to available.
+  // disabled and the server's reason code resolves to catalog copy. A missing
+  // entry (the `noUncheckedIndexedAccess` widening) defaults to available; an
+  // unknown code falls back to the category's own localized subtitle.
   const unavailable = capability?.available === false;
   const isDisabled = disabled || !editable || unavailable;
   const title = t(meta.titleKey);
-  const subtitle = unavailable
-    ? (capability.unavailableReason ?? t(meta.subtitleKey))
-    : t(meta.subtitleKey);
+  const reasonKey = unavailable
+    ? unavailableReasonKey(capability.unavailableReasonCode)
+    : undefined;
+  const subtitle = reasonKey ? t(reasonKey) : t(meta.subtitleKey);
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />
@@ -776,7 +799,7 @@ export function NotificationsScreen() {
                     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
                     preferences.capabilities?.[meta.key] ?? {
                       available: true,
-                      unavailableReason: null,
+                      unavailableReasonCode: null,
                     }
                   }
                   disabled={!notificationsEnabled}

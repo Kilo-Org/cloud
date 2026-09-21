@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Sessiestatus",
       "sessionStatusSubtitle": "klaar / misluk / gereed om te beheer",
       "kiloclawActivitySubtitle": "instansie gereed/misluk, geskeduleerde aksies",
+      "kiloclawActivityUnavailable": "Begin 'n KiloClaw-instansie om KiloClaw-aktiwiteit te kry.",
       "balanceAlertsSubtitle": "waarskuwings oor die organisasie se lae saldo",
-      "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe"
+      "balanceAlertsUnavailable": "Sluit by 'n organisasie aan om balanswaarskuwings te kry.",
+      "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe",
+      "securityFindingsUnavailable": "Aktiveer Kilo Sekuriteitsagent op 'n bestek om sekuriteitsbevindings te kry."
     },
     "action": {
       "openSession": "Maak sessie oop"

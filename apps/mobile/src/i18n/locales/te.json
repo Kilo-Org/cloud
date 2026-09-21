@@ -838,8 +838,11 @@
       "sessionStatusTitle": "సెషన్ స్థితి",
       "sessionStatusSubtitle": "పూర్తయింది / విఫలమైంది / నియంత్రించడానికి సిద్ధం",
       "kiloclawActivitySubtitle": "ఇన్‌స్టాన్స్ సిద్ధం/విఫలం, నిర్ణీత సమయాల్లో జరిగే చర్యలు",
+      "kiloclawActivityUnavailable": "KiloClaw కార్యకలాపాన్ని పొందడానికి KiloClaw ఇన్‌స్టాన్స్‌ను ప్రారంభించండి.",
       "balanceAlertsSubtitle": "సంస్థ బ్యాలెన్స్ తగ్గినప్పుడు హెచ్చరికలు",
-      "securityFindingsSubtitle": "కొత్త భద్రతా సమస్యలు, SLA రిమైండర్లు"
+      "balanceAlertsUnavailable": "బ్యాలెన్స్ హెచ్చరికలను పొందడానికి సంస్థలో చేరండి.",
+      "securityFindingsSubtitle": "కొత్త భద్రతా సమస్యలు, SLA రిమైండర్లు",
+      "securityFindingsUnavailable": "భద్రతా సమస్యలను పొందడానికి ఒక పరిధిలో Kilo భద్రతా ఏజెంట్‌ను ప్రారంభించండి."
     },
     "action": {
       "openSession": "సెషన్‌ను తెరవండి"

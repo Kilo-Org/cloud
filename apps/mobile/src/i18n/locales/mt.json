@@ -886,8 +886,11 @@
       "sessionStatusTitle": "Status tas-sessjoni",
       "sessionStatusSubtitle": "tlestiet / falliet / lesta biex tikkontrollaha",
       "kiloclawActivitySubtitle": "istanza lesta jew falliet, azzjonijiet skedati",
+      "kiloclawActivityUnavailable": "Ibda istanza KiloClaw biex tikseb attività ta' KiloClaw.",
       "balanceAlertsSubtitle": "twissijiet ta' bilanċ baxx tal-organizzazzjoni",
-      "securityFindingsSubtitle": "sejbiet ġodda u tfakkiriet tal-SLA"
+      "balanceAlertsUnavailable": "Ingħaqad ma' organizzazzjoni biex tikseb twissijiet dwar il-bilanċ.",
+      "securityFindingsSubtitle": "sejbiet ġodda u tfakkiriet tal-SLA",
+      "securityFindingsUnavailable": "Ippermetti l-Aġent tas-sigurtà Kilo fuq firxa biex tikseb sejbiet tas-sigurtà."
     },
     "action": {
       "openSession": "Iftaħ is-sessjoni"

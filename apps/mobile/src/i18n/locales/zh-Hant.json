@@ -334,8 +334,11 @@
       "sessionStatusTitle": "工作階段狀態",
       "sessionStatusSubtitle": "已完成／失敗／可開始控制",
       "kiloclawActivitySubtitle": "執行個體就緒或失敗、排程動作",
+      "kiloclawActivityUnavailable": "啟動 KiloClaw 執行個體以接收 KiloClaw 活動。",
       "balanceAlertsSubtitle": "組織餘額不足警告",
-      "securityFindingsSubtitle": "新發現的安全問題與 SLA 提醒"
+      "balanceAlertsUnavailable": "加入組織以接收餘額提醒。",
+      "securityFindingsSubtitle": "新發現的安全問題與 SLA 提醒",
+      "securityFindingsUnavailable": "在某個範圍啟用 Kilo 資安代理程式以接收安全問題。"
     },
     "action": {
       "openSession": "開啟工作階段"

@@ -870,8 +870,11 @@
       "sessionStatusTitle": "Stav relácie",
       "sessionStatusSubtitle": "dokončená / zlyhala / pripravená na ovládanie",
       "kiloclawActivitySubtitle": "pripravená inštancia, zlyhanie inštancie, naplánované akcie",
+      "kiloclawActivityUnavailable": "Spustite inštanciu KiloClaw, aby ste získali aktivitu KiloClaw.",
       "balanceAlertsSubtitle": "upozornenia na nízky zostatok organizácie",
-      "securityFindingsSubtitle": "nové zistenia a pripomienky SLA"
+      "balanceAlertsUnavailable": "Pripojte sa k organizácii, aby ste získali upozornenia na zostatok.",
+      "securityFindingsSubtitle": "nové zistenia a pripomienky SLA",
+      "securityFindingsUnavailable": "Zapnite Bezpečnostného agenta Kilo v rozsahu, aby ste získali bezpečnostné zistenia."
     },
     "action": {
       "openSession": "Otvoriť reláciu"

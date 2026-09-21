@@ -854,8 +854,11 @@
       "sessionStatusTitle": "Estat de la sessió",
       "sessionStatusSubtitle": "finalitzada / fallida / a punt per controlar",
       "kiloclawActivitySubtitle": "instància a punt/fallida, accions programades",
+      "kiloclawActivityUnavailable": "Inicia una instància de KiloClaw per rebre activitat de KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baix de l'organització",
-      "securityFindingsSubtitle": "noves deteccions i recordatoris d'SLA"
+      "balanceAlertsUnavailable": "Uneix-te a una organització per rebre avisos de saldo.",
+      "securityFindingsSubtitle": "noves deteccions i recordatoris d'SLA",
+      "securityFindingsUnavailable": "Activa l'Agent de seguretat de Kilo en un àmbit per rebre deteccions de seguretat."
     },
     "action": {
       "openSession": "Obre la sessió"

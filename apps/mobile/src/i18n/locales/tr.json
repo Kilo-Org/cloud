@@ -334,8 +334,11 @@
       "sessionStatusTitle": "Oturum durumu",
       "sessionStatusSubtitle": "bitti / başarısız / kontrol edilmeye hazır",
       "kiloclawActivitySubtitle": "örnek hazır/başarısız, zamanlanmış eylemler",
+      "kiloclawActivityUnavailable": "KiloClaw etkinliği almak için bir KiloClaw örneği başlat.",
       "balanceAlertsSubtitle": "düşük kuruluş bakiyesi uyarıları",
-      "securityFindingsSubtitle": "yeni bulgular ve SLA hatırlatmaları"
+      "balanceAlertsUnavailable": "Bakiye uyarıları almak için bir kuruluşa katıl.",
+      "securityFindingsSubtitle": "yeni bulgular ve SLA hatırlatmaları",
+      "securityFindingsUnavailable": "Güvenlik bulguları almak için bir kapsamda Kilo Güvenlik ajanını etkinleştir."
     },
     "action": {
       "openSession": "Oturumu aç"

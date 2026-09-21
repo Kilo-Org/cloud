@@ -838,8 +838,11 @@
       "sessionStatusTitle": "دۆخی سێشن",
       "sessionStatusSubtitle": "تەواوبوو / سەرنەکەوتوو / ئامادە بۆ کۆنترۆڵکردن",
       "kiloclawActivitySubtitle": "نموونەی ئامادە یان سەرنەکەوتوو، کردارە کاتدیاریکراوەکان",
+      "kiloclawActivityUnavailable": "دەستپێکردنی نموونەیەکی KiloClaw بۆ وەرگرتنی چالاکی KiloClaw.",
       "balanceAlertsSubtitle": "ئاگادارکردنەوەکانی کەمی باڵانسی ڕێکخراوە",
-      "securityFindingsSubtitle": "دۆزینەوە نوێکان و بیرخستنەوەکانی SLA"
+      "balanceAlertsUnavailable": "بەشداریکردن لە ڕێکخراوێک بۆ وەرگرتنی ئاگادارکردنەوەکانی باڵانس.",
+      "securityFindingsSubtitle": "دۆزینەوە نوێکان و بیرخستنەوەکانی SLA",
+      "securityFindingsUnavailable": "چالاککردنی بریکاری ئاسایشی Kilo لە مەودایەکدا بۆ وەرگرتنی دۆزینەوە ئەمنییەکان."
     },
     "action": {
       "openSession": "کردنەوەی سێشن"

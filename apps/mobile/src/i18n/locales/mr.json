@@ -838,8 +838,11 @@
       "sessionStatusTitle": "सत्राची स्थिती",
       "sessionStatusSubtitle": "पूर्ण / अयशस्वी / नियंत्रणासाठी तयार",
       "kiloclawActivitySubtitle": "इन्स्टन्स तयार/अयशस्वी, नियोजित क्रिया",
+      "kiloclawActivityUnavailable": "KiloClaw क्रियाकलाप मिळवण्यासाठी KiloClaw इन्स्टन्स सुरू करा.",
       "balanceAlertsSubtitle": "संस्थेची शिल्लक कमी झाल्याच्या सूचना",
-      "securityFindingsSubtitle": "नवीन निष्कर्ष आणि SLA स्मरणपत्रे"
+      "balanceAlertsUnavailable": "शिल्लक सूचना मिळवण्यासाठी संस्थेत सामील व्हा.",
+      "securityFindingsSubtitle": "नवीन निष्कर्ष आणि SLA स्मरणपत्रे",
+      "securityFindingsUnavailable": "सुरक्षा निष्कर्ष मिळवण्यासाठी एका व्याप्तीवर Kilo सुरक्षा एजंट सुरू करा."
     },
     "action": {
       "openSession": "सत्र उघडा"

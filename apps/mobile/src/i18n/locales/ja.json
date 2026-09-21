@@ -334,8 +334,11 @@
       "sessionStatusTitle": "セッションの状態",
       "sessionStatusSubtitle": "完了 / 失敗 / 操作可能",
       "kiloclawActivitySubtitle": "インスタンスの準備完了や失敗、予定された操作",
+      "kiloclawActivityUnavailable": "KiloClawアクティビティを受け取るには、KiloClawインスタンスを開始してください。",
       "balanceAlertsSubtitle": "組織の残高低下に関する警告",
-      "securityFindingsSubtitle": "新たな検出結果とSLAのリマインダー"
+      "balanceAlertsUnavailable": "残高アラートを受け取るには、組織に参加してください。",
+      "securityFindingsSubtitle": "新たな検出結果とSLAのリマインダー",
+      "securityFindingsUnavailable": "セキュリティの検出結果を受け取るには、スコープでKiloセキュリティエージェントを有効にしてください。"
     },
     "action": {
       "openSession": "セッションを開く"

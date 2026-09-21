@@ -838,8 +838,11 @@
       "sessionStatusTitle": "સત્રની સ્થિતિ",
       "sessionStatusSubtitle": "પૂર્ણ / નિષ્ફળ / નિયંત્રિત કરવા તૈયાર",
       "kiloclawActivitySubtitle": "ઇન્સ્ટન્સ તૈયાર/નિષ્ફળ, નિર્ધારિત ક્રિયાઓ",
+      "kiloclawActivityUnavailable": "KiloClaw પ્રવૃત્તિ મેળવવા માટે KiloClaw ઇન્સ્ટન્સ શરૂ કરો.",
       "balanceAlertsSubtitle": "સંસ્થાનું બેલેન્સ ઓછું થવાની ચેતવણીઓ",
-      "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર"
+      "balanceAlertsUnavailable": "બેલેન્સ ચેતવણીઓ મેળવવા માટે સંસ્થામાં જોડાઓ.",
+      "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર",
+      "securityFindingsUnavailable": "સુરક્ષા તારણો મેળવવા માટે એક અવકાશમાં Kilo સુરક્ષા એજન્ટ સક્ષમ કરો."
     },
     "action": {
       "openSession": "સેશન ખોલો"

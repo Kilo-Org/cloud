@@ -334,8 +334,11 @@
       "sessionStatusTitle": "Стан сеансу",
       "sessionStatusSubtitle": "завершено / помилка / готовність до керування",
       "kiloclawActivitySubtitle": "готовність або помилка екземпляра, заплановані дії",
+      "kiloclawActivityUnavailable": "Запустіть екземпляр KiloClaw, щоб отримувати активність KiloClaw.",
       "balanceAlertsSubtitle": "попередження про низький баланс організації",
-      "securityFindingsSubtitle": "нові виявлені проблеми та нагадування про SLA"
+      "balanceAlertsUnavailable": "Приєднайтеся до організації, щоб отримувати попередження про баланс.",
+      "securityFindingsSubtitle": "нові виявлені проблеми та нагадування про SLA",
+      "securityFindingsUnavailable": "Увімкніть Агента безпеки Kilo в області, щоб отримувати виявлені проблеми."
     },
     "action": {
       "openSession": "Відкрити сеанс"

@@ -886,8 +886,11 @@
       "sessionStatusTitle": "Stádas seisiúin",
       "sessionStatusSubtitle": "críochnaithe / teipthe / réidh le rialú",
       "kiloclawActivitySubtitle": "ásc réidh nó teipthe, gníomhartha sceidealaithe",
+      "kiloclawActivityUnavailable": "Tosaigh ásc KiloClaw chun gníomhaíocht KiloClaw a fháil.",
       "balanceAlertsSubtitle": "rabhaidh faoi iarmhéid íseal na heagraíochta",
-      "securityFindingsSubtitle": "torthaí nua agus meabhrúcháin SLA"
+      "balanceAlertsUnavailable": "Bí páirteach in eagraíocht chun rabhaidh iarmhéid a fháil.",
+      "securityFindingsSubtitle": "torthaí nua agus meabhrúcháin SLA",
+      "securityFindingsUnavailable": "Cumasaigh Gníomhaire slándála Kilo ar raon chun torthaí slándála a fháil."
     },
     "action": {
       "openSession": "Oscail an seisiún"

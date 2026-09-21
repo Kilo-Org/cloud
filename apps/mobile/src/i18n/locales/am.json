@@ -838,8 +838,11 @@
       "sessionStatusTitle": "የክፍለ ጊዜ ሁኔታ",
       "sessionStatusSubtitle": "የተጠናቀቀ / ያልተሳካ / ለመቆጣጠር ዝግጁ",
       "kiloclawActivitySubtitle": "ዝግጁ የሆነ/ያልተሳካ ሂደት፣ መርሐግብር የተያዘላቸው ተግባሮች",
+      "kiloclawActivityUnavailable": "የKiloClaw እንቅስቃሴ ለማግኘት የKiloClaw ሂደት ይጀምሩ።",
       "balanceAlertsSubtitle": "ዝቅተኛ የድርጅት ቀሪ ሂሳብ ማስጠንቀቂያዎች",
-      "securityFindingsSubtitle": "አዳዲስ ግኝቶችና የSLA ማስታወሻዎች"
+      "balanceAlertsUnavailable": "የቀሪ ሂሳብ ማስጠንቀቂያዎችን ለማግኘት ድርጅት ይቀላቀሉ።",
+      "securityFindingsSubtitle": "አዳዲስ ግኝቶችና የSLA ማስታወሻዎች",
+      "securityFindingsUnavailable": "የደህንነት ግኝቶችን ለማግኘት የKilo የደህንነት ወኪልን በአንድ ወሰን ላይ ያንቁ።"
     },
     "action": {
       "openSession": "ክፍለ ጊዜውን ክፈት"

@@ -838,8 +838,11 @@
       "sessionStatusTitle": "وضعیت نشست",
       "sessionStatusSubtitle": "تمام‌شده / ناموفق / آمادهٔ کنترل",
       "kiloclawActivitySubtitle": "نمونه آماده/ناموفق، اقدامات زمان‌بندی‌شده",
+      "kiloclawActivityUnavailable": "برای دریافت فعالیت KiloClaw، یک نمونه KiloClaw راه‌اندازی کنید.",
       "balanceAlertsSubtitle": "هشدارهای موجودی کم سازمان",
-      "securityFindingsSubtitle": "یافته‌های جدید و یادآوری‌های SLA"
+      "balanceAlertsUnavailable": "برای دریافت هشدارهای موجودی، به یک سازمان بپیوندید.",
+      "securityFindingsSubtitle": "یافته‌های جدید و یادآوری‌های SLA",
+      "securityFindingsUnavailable": "برای دریافت یافته‌های امنیتی، عامل امنیتی Kilo را در یک محدوده فعال کنید."
     },
     "action": {
       "openSession": "باز کردن نشست"

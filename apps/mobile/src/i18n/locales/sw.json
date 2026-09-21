@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Hali ya kikao",
       "sessionStatusSubtitle": "kimekamilika / kimeshindikana / kiko tayari kudhibitiwa",
       "kiloclawActivitySubtitle": "nakala iko tayari au imeshindikana, vitendo vilivyoratibiwa",
+      "kiloclawActivityUnavailable": "Anzisha instance ya KiloClaw ili kupata shughuli za KiloClaw.",
       "balanceAlertsSubtitle": "maonyo ya salio la chini la shirika",
-      "securityFindingsSubtitle": "matokeo mapya na vikumbusho vya SLA"
+      "balanceAlertsUnavailable": "Jiunge na shirika ili kupata maonyo ya salio.",
+      "securityFindingsSubtitle": "matokeo mapya na vikumbusho vya SLA",
+      "securityFindingsUnavailable": "Washa Wakala wa usalama wa Kilo kwenye wigo ili kupata matokeo ya usalama."
     },
     "action": {
       "openSession": "Fungua kikao"

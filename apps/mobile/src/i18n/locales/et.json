@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Seansi olek",
       "sessionStatusSubtitle": "lõppenud / ebaõnnestunud / juhtimiseks valmis",
       "kiloclawActivitySubtitle": "eksemplar valmis/ebaõnnestunud, ajastatud toimingud",
+      "kiloclawActivityUnavailable": "Käivita KiloClaw eksemplar, et saada KiloClawi tegevust.",
       "balanceAlertsSubtitle": "organisatsiooni madala saldo hoiatused",
-      "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused"
+      "balanceAlertsUnavailable": "Liitu organisatsiooniga, et saada saldo hoiatusi.",
+      "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused",
+      "securityFindingsUnavailable": "Luba Kilo turvaagent ühes ulatuses, et saada turvalisuse leide."
     },
     "action": {
       "openSession": "Ava seanss"

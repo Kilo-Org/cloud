@@ -110,9 +110,27 @@ describe('classifyPasskeyError', () => {
     ).toBe('unsupported');
   });
 
-  it('matches case-insensitively', () => {
-    expect(classifyPasskeyError({ message: 'USER  CANCELLED' })).toBe('cancelled');
-    expect(classifyPasskeyError({ message: 'nocredentials' })).toBe('no-passkey');
+  it.each(['name', 'message', 'code'])(
+    'matches native %s identifiers case-insensitively',
+    field => {
+      expect(classifyPasskeyError({ [field]: 'USER  CANCELLED' })).toBe('cancelled');
+      expect(classifyPasskeyError({ [field]: 'nocredentials' })).toBe('no-passkey');
+      expect(classifyPasskeyError({ [field]: 'NOCREDENTIALS' })).toBe('no-passkey');
+      expect(classifyPasskeyError({ [field]: 'NOTALLOWEDERROR' })).toBe('no-passkey');
+      expect(classifyPasskeyError({ [field]: 'NOTSUPPORTED' })).toBe('unsupported');
+      expect(classifyPasskeyError({ [field]: 'NOTCONFIGURED' })).toBe('unsupported');
+    }
+  );
+
+  it.each([
+    [{ name: 'USERCANCELLEDEXCEPTION' }, 'login.passkeyCancelled'],
+    [{ message: 'NOCREDENTIALS' }, 'login.passkeyNotFound'],
+    [{ name: 'NOTALLOWEDERROR' }, 'login.passkeyNotFound'],
+    [{ code: 'NOTCONFIGURED' }, 'login.passkeyUnsupported'],
+    [{ message: 'NOTSUPPORTED' }, 'login.passkeyUnsupported'],
+    [{ code: 'UNKNOWNERROR' }, 'login.passkeyFailed'],
+  ])('maps native error %j to catalog-owned copy', (nativeError, key) => {
+    expect(passkeyFailureKey(classifyPasskeyError(nativeError))).toBe(key);
   });
 
   it('falls back to the generic failure for anything else', () => {

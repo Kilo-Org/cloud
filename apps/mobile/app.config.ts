@@ -424,6 +424,9 @@ const config: ExpoConfig = {
         ],
       },
     ],
+    // The iOS File Provider extension that shows the artifact mirror in the
+    // Files app: its Xcode target, Pods integration and EAS app-extension entry.
+    './plugins/withArtifactFileProvider',
     // The iOS notification service extension that drops an agent-progress push
     // the active Focus excluded. The foreground handler in
     // src/lib/notifications.ts cannot see a background delivery, so this

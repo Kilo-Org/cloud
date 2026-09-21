@@ -2200,7 +2200,7 @@
       "discardDraftMessage": "Your prompt will be lost.",
       "discardWithUploadsMessage": "Your prompt and any unclaimed uploads will be deleted.",
       "discardFailed": "Could not discard the draft. Please try again.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Run kilo remote on your computer, or /remote in a running CLI session, to control a local kilo process.",
       "continueFrom": "Continuing {{title}}",
       "importingSession": "Importing session",
       "cliCannotContinue": "This CLI cannot continue a session. Pick Cloud Agent or another CLI.",
@@ -2258,7 +2258,7 @@
       "cloudAgent": "Cloud Agent",
       "cloudAgentDescription": "Run on Kilo's cloud sandbox",
       "noCliInstances": "No CLI instances connected",
-      "noCliInstancesDescription": "Run `kilo remote` in a project on your computer, or update Kilo CLI if one is already running.",
+      "noCliInstancesDescription": "Run kilo remote in a project on your computer, or update Kilo CLI if one is already running.",
       "instanceOnProject": "{{name}} on {{project}}",
       "instanceOnProjectSuffix": "{{name}} on {{project}} ({{suffix}})",
       "runOnCloudAgent": "Run on Cloud Agent"
@@ -3166,7 +3166,8 @@
     "channelName": "Active agents",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
     "openSession": "Open",
-    "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again."
+    "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again.",
+    "newestResult": "Newest result"
   },
   "transcriptionModel": {
     "title": "Transcription model",
@@ -3189,7 +3190,7 @@
     "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
     "cloudOptionBody": "Run Kilo in a sandboxed cloud environment with nothing to install.",
     "remoteOptionTitle": "Your computer",
-    "remoteOptionBody": "Run Kilo on your own machine through the `kilo remote` CLI.",
+    "remoteOptionBody": "Run Kilo on your own machine through the kilo remote CLI.",
     "skip": "Skip tour",
     "tutorialLabel": "Tutorial"
   },

@@ -110,6 +110,7 @@ function InlineRetry({ label, color, onPress }: InlineRetryProps) {
   );
 }
 
+/** One row per notification category. */
 const CATEGORY_META = [
   {
     key: 'chatMessages',
@@ -180,7 +181,15 @@ const CATEGORY_UNAVAILABLE_SUBTITLE_KEYS: ReadonlyMap<NotificationCategoryKey, s
 
 type CategoryMeta = (typeof CATEGORY_META)[number];
 
-/** Per-category availability from the preferences response `capabilities` map. */
+/**
+ * Per-category availability from the preferences response `capabilities` map.
+ * The same entry carries the server's `unavailableReason`: an English-only
+ * sentence that must never render where a catalog key exists, because the
+ * screen is localized and the server cannot translate it. `CategoryRow` reads
+ * the reason from `CATEGORY_UNAVAILABLE_SUBTITLE_KEYS` for those categories,
+ * and falls back to this field only for one that has no key yet (the spend
+ * row).
+ */
 type NotificationCategoryCapability = Readonly<{
   available: boolean;
   unavailableReason: string | null;
@@ -219,10 +228,12 @@ function CategoryRow({
   const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
   // An unavailable category is a terminal, non-retryable state: the switch is
   // disabled and the row renders its own catalog copy for the reason. The
-  // server's `unavailableReason` is English prose and must never render where a
-  // catalog key exists; a category without one (the spend row) falls back to
-  // the reason the server sent. A missing entry (the `noUncheckedIndexedAccess`
-  // widening) defaults to available.
+  // server's `unavailableReason` is English prose and cannot be translated, so
+  // the unavailable state is carried by the muted title and the disabled
+  // switch, and the reason comes from `CATEGORY_UNAVAILABLE_SUBTITLE_KEYS`. A
+  // category without a catalog key (the spend row) falls back to the reason the
+  // server sent. A missing entry (the `noUncheckedIndexedAccess` widening)
+  // defaults to available.
   const unavailable = capability?.available === false;
   const isDisabled = disabled || !editable || unavailable;
   const title = t(meta.titleKey);

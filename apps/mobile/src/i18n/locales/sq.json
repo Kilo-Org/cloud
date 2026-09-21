@@ -3166,7 +3166,8 @@
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
     "openSession": "Hap",
-    "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri."
+    "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri.",
+    "newestResult": "Rezultati më i ri"
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",

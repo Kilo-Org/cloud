@@ -3166,7 +3166,8 @@
     "channelName": "ເອເຈນທີ່ກຳລັງເຮັດວຽກ",
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ.",
     "openSession": "ເປີດ",
-    "approveFailed": "ບໍ່ສາມາດອະນຸມັດໄດ້. ແຕະ $t(common.approve) ເພື່ອລອງອີກຄັ້ງ."
+    "approveFailed": "ບໍ່ສາມາດອະນຸມັດໄດ້. ແຕະ $t(common.approve) ເພື່ອລອງອີກຄັ້ງ.",
+    "newestResult": "ຜົນຫຼ້າສຸດ"
   },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",

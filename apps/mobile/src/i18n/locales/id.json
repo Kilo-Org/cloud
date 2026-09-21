@@ -3166,7 +3166,8 @@
     "channelName": "Agen aktif",
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci.",
     "openSession": "Buka",
-    "approveFailed": "Tidak dapat menyetujui. Ketuk $t(common.approve) untuk mencoba lagi."
+    "approveFailed": "Tidak dapat menyetujui. Ketuk $t(common.approve) untuk mencoba lagi.",
+    "newestResult": "Hasil terbaru"
   },
   "transcriptionModel": {
     "title": "Model transkripsi",

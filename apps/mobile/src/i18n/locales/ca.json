@@ -3209,7 +3209,8 @@
     "channelName": "Agents actius",
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig.",
     "openSession": "Obre",
-    "approveFailed": "No s'ha pogut aprovar. Toca $t(common.approve) per tornar-ho a provar."
+    "approveFailed": "No s'ha pogut aprovar. Toca $t(common.approve) per tornar-ho a provar.",
+    "newestResult": "Resultat més recent"
   },
   "transcriptionModel": {
     "title": "Model de transcripció",

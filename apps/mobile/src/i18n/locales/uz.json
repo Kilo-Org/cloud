@@ -3166,7 +3166,8 @@
     "channelName": "Faol agentlar",
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing.",
     "openSession": "Ochish",
-    "approveFailed": "Tasdiqlab bo'lmadi. Qayta urinish uchun $t(common.approve) ga teging."
+    "approveFailed": "Tasdiqlab bo'lmadi. Qayta urinish uchun $t(common.approve) ga teging.",
+    "newestResult": "Eng yangi natija"
   },
   "transcriptionModel": {
     "title": "Matnga aylantirish modeli",

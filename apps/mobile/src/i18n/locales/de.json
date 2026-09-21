@@ -3166,7 +3166,8 @@
     "channelName": "Aktive Agenten",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen.",
     "openSession": "Öffnen",
-    "approveFailed": "Genehmigen fehlgeschlagen. Tippe auf $t(common.approve), um es erneut zu versuchen."
+    "approveFailed": "Genehmigen fehlgeschlagen. Tippe auf $t(common.approve), um es erneut zu versuchen.",
+    "newestResult": "Neuestes Ergebnis"
   },
   "transcriptionModel": {
     "title": "Transkriptionsmodell",

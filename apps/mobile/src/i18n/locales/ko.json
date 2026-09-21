@@ -3166,7 +3166,8 @@
     "channelName": "활성 에이전트",
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요.",
     "openSession": "열기",
-    "approveFailed": "승인하지 못했습니다. 다시 시도하려면 $t(common.approve)을 탭하세요."
+    "approveFailed": "승인하지 못했습니다. 다시 시도하려면 $t(common.approve)을 탭하세요.",
+    "newestResult": "최신 결과"
   },
   "transcriptionModel": {
     "title": "음성 텍스트 변환 모델",

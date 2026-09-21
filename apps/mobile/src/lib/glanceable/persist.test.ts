@@ -138,4 +138,24 @@ describe('restorePersistedGlanceable', () => {
     expect(getLastGlanceableSnapshot()).toEqual(stored);
     expect(getLocalScopeKey()).toBe(stored.scopeKey);
   });
+
+  // The mirror written by the previous release at schema version 1 carries no
+  // newest-result keys. Rejecting it would drop the last counts and scope key
+  // of a widget that survived the app upgrade, so it restores with the fact
+  // absent.
+  it('restores a record written before the newest-result fields existed', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    const { newestResultKind: _kind, newestResultAt: _at, ...previousRelease } = stored;
+    store.set(SNAPSHOT_KEY, JSON.stringify(previousRelease));
+    store.set(SCOPE_KEY, stored.scopeKey);
+
+    await restorePersistedGlanceable();
+
+    expect(getLastGlanceableSnapshot()).toEqual({
+      ...previousRelease,
+      newestResultKind: null,
+      newestResultAt: null,
+    });
+    expect(getLocalScopeKey()).toBe(stored.scopeKey);
+  });
 });

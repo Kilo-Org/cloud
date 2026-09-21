@@ -113,6 +113,14 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     updatedAt: z.string(),
     expiresAt: z.string(),
     needsInputSince: z.string().nullable(),
+    // The newest agent state change: its kind in the shared three-state
+    // vocabulary and when it happened. Optional on input with a null default,
+    // so a payload from a server that predates the fact still parses while the
+    // parsed (output) type stays total — the mobile client spreads the parsed
+    // fields straight into a `GlanceableAgentsSnapshot`. Remove the optional
+    // and the default when every server sends both keys.
+    newestResultKind: z.enum(['needsInput', 'running', 'idle']).nullable().default(null),
+    newestResultAt: z.string().nullable().default(null),
   }),
 ]);
 

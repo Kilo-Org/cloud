@@ -176,6 +176,17 @@ describe('classifyPasskeyError', () => {
   );
 
   it.each([
+    ['USERCANCELLED', 'login.passkeyCancelled'],
+    ['NOCREDENTIALS', 'login.passkeyNotFound'],
+    ['NOTALLOWED', 'login.passkeyNotFound'],
+    ['NOTSUPPORTED', 'login.passkeyUnsupported'],
+    ['NOTCONFIGURED', 'login.passkeyUnsupported'],
+    ['UNKNOWNERROR', 'login.passkeyFailed'],
+  ])('maps the normalized native code %s to catalog-owned display copy', (code, key) => {
+    expect(passkeyFailureKey(classifyPasskeyError({ code }))).toBe(key);
+  });
+
+  it.each([
     [{ name: 'USERCANCELLEDEXCEPTION' }, 'login.passkeyCancelled'],
     [{ message: 'NOCREDENTIALS' }, 'login.passkeyNotFound'],
     [{ name: 'NOTALLOWEDERROR' }, 'login.passkeyNotFound'],

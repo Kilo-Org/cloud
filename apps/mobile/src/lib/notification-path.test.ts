@@ -117,6 +117,8 @@ describe('notificationPathForData', () => {
         updatedAt: '2026-01-01T00:00:00.000Z',
         expiresAt: '2026-01-01T08:00:00.000Z',
         needsInputSince: '2026-01-01T00:00:00.000Z',
+        newestResultKind: 'running',
+        newestResultAt: '2026-01-01T00:00:00.000Z',
       })
     ).toBe('/(app)/(tabs)/(2_agents)');
   });

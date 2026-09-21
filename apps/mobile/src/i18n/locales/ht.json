@@ -3166,7 +3166,8 @@
     "channelName": "Ajan aktif",
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an.",
     "openSession": "Louvri",
-    "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò."
+    "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò.",
+    "newestResult": "Dènye rezilta"
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",

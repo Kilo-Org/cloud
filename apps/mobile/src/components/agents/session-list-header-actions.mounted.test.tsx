@@ -65,6 +65,17 @@ function slopDp(hitSlop: unknown): number {
   return 0;
 }
 
+/** One side's reach, from a hitSlop that is one number for every side or per-side insets. */
+function slopSideDp(hitSlop: unknown, side: keyof Insets): number {
+  if (typeof hitSlop === 'number') {
+    return hitSlop;
+  }
+  if (hitSlop && typeof hitSlop === 'object') {
+    return (hitSlop as Partial<Insets>)[side] ?? 0;
+  }
+  return 0;
+}
+
 function pressesWithLabel(root: I, label: string): I[] {
   return root.findAll(
     node =>
@@ -135,16 +146,6 @@ async function compiledGapDp(rowClassName: string): Promise<number> {
 }
 
 type Insets = { top: number; right: number; bottom: number; left: number };
-
-/**
- * One side's reach from a `hitSlop` that is either a per-side number
- * (`touch-target.ts` gives the filter control one value for every side) or an
- * `Insets` object (`tap-target.ts` gives the new-session control per-side
- * values).
- */
-function sideSlopDp(hitSlop: number | Insets, side: keyof Insets): number {
-  return typeof hitSlop === 'number' ? hitSlop : hitSlop[side];
-}
 
 /**
  * A control's hitSlop as per-side insets. Controls here use either shape: the
@@ -245,14 +246,15 @@ describe('SessionListHeaderActions new-session control', () => {
     const newSessionSlop = hitSlopInsets(newSession.props.hitSlop);
     const filterSlop = hitSlopInsets(filter.props.hitSlop);
     // The new-session control sits left of the filter, so the gap has to fit
-    // both facing slops; more than the gap means the two regions overlap.
+    // both facing slops; more than the gap means the two regions overlap. Either
+    // control may express hitSlop as one number or as per-side insets.
     expect(
-      sideSlopDp(newSessionSlop, 'right') + sideSlopDp(filterSlop, 'left')
+      slopSideDp(newSessionSlop, 'right') + slopSideDp(filterSlop, 'left')
     ).toBeLessThanOrEqual(gapDp);
     // Capping the right side must not drop the control below the design target.
     const box = boxDp(newSession.props.className as string);
     expect(
-      box.width + sideSlopDp(newSessionSlop, 'left') + sideSlopDp(newSessionSlop, 'right')
+      box.width + slopSideDp(newSessionSlop, 'left') + slopSideDp(newSessionSlop, 'right')
     ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
 
     act(() => {

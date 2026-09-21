@@ -445,6 +445,14 @@ export async function applyMetadataChanges(
       const delivery = refreshGlanceableSessions(env, {
         userId: kiloUserId,
         cliSessionIds: [sessionId],
+        // A permission wait appearing or clearing gates the Approve control on
+        // the locked/background surfaces, so it must not wait for the shared
+        // delivery window. This caller is the one that saw the previous status.
+        approvalChangedSessionIds:
+          notification.previousStatus === 'permission' ||
+          notification.session.status === 'permission'
+            ? [sessionId]
+            : [],
       });
       if (ctx) ctx.waitUntil(delivery);
       else await delivery;
@@ -476,7 +484,9 @@ export async function flushPartialMetadataChanges(
  * Only rows currently in `question`/`permission` are updated (to `retry`). Uses a
  * conditional write so concurrent non-attention updates are not overwritten. Emits
  * `session.status.updated` via the metadata path only — never enters the ingest
- * completion pipeline, so no "Task completed" push can fire.
+ * completion pipeline, so no "Task completed" push can fire. A cleared
+ * `permission` also asks for an approval-exempt glanceable refresh: the Approve
+ * control must disappear here, ten minutes after the CLI that held it left.
  */
 export async function resetAttentionStatusOnCliDisconnect(
   env: Env,
@@ -565,4 +575,21 @@ export async function resetAttentionStatusOnCliDisconnect(
     },
     ctx
   );
+
+  if (notification.previousStatus === 'permission') {
+    // This is the deferred half of a CLI disconnect: the live session left the
+    // aggregate when the socket closed, but a session that stays
+    // snapshot-visible (a cloud agent, whose row is merged from Postgres rather
+    // than the live list) kept showing the permission the whole absence window.
+    // The Approve control gates on `permission`, so clearing it must not wait
+    // for the shared delivery window — the same exemption an in-band
+    // `permission -> busy` move gets in `applyMetadataChanges`.
+    const delivery = refreshGlanceableSessions(env, {
+      userId: kiloUserId,
+      cliSessionIds: [sessionId],
+      approvalChangedSessionIds: [sessionId],
+    });
+    if (ctx) ctx.waitUntil(delivery);
+    else await delivery;
+  }
 }

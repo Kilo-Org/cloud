@@ -181,6 +181,17 @@ export function tabLabelFits(label: string, tabWidth: number, fontScale = 1): bo
   return tabLabelWidth(label, fontScale) <= available;
 }
 
+/**
+ * Line count for a bottom-tab label: one line, tail-truncated, unless the copy
+ * carries its own break (`tabs.kiloclawWrapped` = "Kilo\nClaw"). A two-line
+ * wrap of a single word wider than its tab breaks it mid-word and leaves the
+ * bar unreadable (155c33b5), so no label is allowed to wrap on its own; the
+ * explicit break is the only way to reach two lines.
+ */
+export function tabLabelNumberOfLines(label: string): 1 | 2 {
+  return label.includes('\n') ? 2 : 1;
+}
+
 export function shouldHideTabBar(pathname: string): boolean {
   const parts = pathname.split('/').filter(Boolean);
   const isKiloClawInstancePicker = parts[0] === 'chat' && parts.length === 3;

@@ -153,13 +153,22 @@ export function AgentSessionListScreen() {
   const navigateToSession = useAgentSessionNavigator();
 
   const seeAllLabel = t('home.seeAll');
-  const headerRight = (
-    <View className="min-h-11 min-w-0 flex-row items-center gap-4">
+  // The list controls take the header's `context` slot, one line below the
+  // title, so the 30px title owns the whole title row (Quick Chat puts its
+  // account control in the same slot). Sharing that row through `headerRight`,
+  // the slot's half-row cap squeezed both columns on a narrow viewport until
+  // the title broke mid-word and this label stacked onto two lines (device
+  // capture at 480x1040: "Age / nts" beside "SEE / ALL"). On its own row the
+  // control keeps the header's full width at every display size, and the
+  // reserved row height keeps the header from moving when the filter button
+  // appears with the loaded sessions.
+  const headerActions = (
+    <View className="min-h-11 min-w-0 flex-row items-center justify-end gap-4">
       <Pressable
         onPress={() => {
           router.push('/(app)/(tabs)/(2_agents)/history' as Href);
         }}
-        // left slop capped against the large title, right slop reaches 44pt wide
+        // left slop capped against the gap, right slop reaches 44pt wide
         hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
         accessibilityRole="button"
         accessibilityLabel={seeAllLabel}
@@ -316,7 +325,7 @@ export function AgentSessionListScreen() {
           size="large"
           showBackButton={false}
           className="px-[22px] pb-1"
-          headerRight={headerRight}
+          context={headerActions}
         />
         {hasLiveRows || isSearching ? (
           <SessionListSearchHeader

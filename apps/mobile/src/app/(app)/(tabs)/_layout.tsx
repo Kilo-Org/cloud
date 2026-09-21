@@ -7,8 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
+import { TabBarLabel } from '@/components/tab-bar-label';
 import { BlurBar } from '@/components/ui/blur-bar';
-import { Text } from '@/components/ui/text';
 import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
 import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
@@ -55,22 +55,6 @@ function TabBarBackground() {
   );
 }
 
-function TabLabel({ label, focused }: Readonly<{ label: string; focused: boolean }>) {
-  return (
-    <Text
-      accessible={false}
-      className={
-        focused
-          ? 'w-full text-center font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px] text-foreground'
-          : 'w-full text-center font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px] text-muted-foreground'
-      }
-      numberOfLines={2}
-    >
-      {label}
-    </Text>
-  );
-}
-
 export default function TabsLayout() {
   const router = useRouter();
   const pathname = usePathname();
@@ -84,8 +68,14 @@ export default function TabsLayout() {
   const tabFlags = { showKiloClaw: showKiloClawTab, showQuickChat: showQuickChatTab };
   const tabCount = visibleTabCount(showKiloClawTab, showQuickChatTab);
   // The label box is the tab item minus the bar's side safe areas and the
-  // tab item's own padding (subtracted inside `tabLabelFits`).
-  const tabItemWidth = (width - left - right) / tabCount;
+  // tab item's own padding (subtracted inside `tabLabelFits`). A window whose
+  // width was never measured leaves the box unknown — the same missing
+  // measurement `shouldStackHeaderActions` treats as its default — so the
+  // width rule stays out of it and the font-scale rule alone decides.
+  const tabBarContentWidth = width - left - right;
+  const tabItemWidth = Number.isFinite(tabBarContentWidth)
+    ? tabBarContentWidth / tabCount
+    : undefined;
   const { t } = useTranslation();
   const homeLabel = t('tabs.home');
   const kiloclawLabel =
@@ -94,7 +84,7 @@ export default function TabsLayout() {
   const chatLabel = t('common.chat');
   const profileLabel = t('common.profile');
   // The label set in render order, so the visible/dropped decision measures
-  // exactly the strings each `TabLabel` renders.
+  // exactly the strings each `TabBarLabel` renders.
   const tabLabels = [
     homeLabel,
     ...(showKiloClawTab ? [kiloclawLabel] : []),
@@ -168,6 +158,14 @@ export default function TabsLayout() {
           tabBarActiveTintColor: colors.foreground,
           tabBarInactiveTintColor: colors.mutedForeground,
           tabBarBackground: TabBarBackground,
+          // The bar is absolutely positioned and Android's edge-to-edge window
+          // does not resize for the IME, so the raised keyboard covers the bar's
+          // lower half: the icons peek out above it with no label row under them
+          // (explorer finding, agents-search-empty). The navigator's built-in
+          // hide-on-keyboard steps the whole bar out of the IME's way instead of
+          // leaving that clipped strip. The content clearance below the bar does
+          // not change, so hiding and restoring it moves nothing.
+          tabBarHideOnKeyboard: true,
           tabBarIconStyle: TAB_BAR_ICON_STYLE,
           tabBarLabelPosition: 'below-icon',
           tabBarStyle: {
@@ -192,7 +190,7 @@ export default function TabsLayout() {
               tabBarPosition('home', tabFlags) ?? 1,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={homeLabel} focused={focused} />,
+            tabBarLabel: ({ focused }) => <TabBarLabel label={homeLabel} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -209,7 +207,10 @@ export default function TabsLayout() {
               tabBarPosition('kiloclaw', tabFlags) ?? 2,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={kiloclawLabel} focused={focused} />,
+            // The pre-wrapped copy is chosen once, from the same font scale the
+            // width decision measures, so `tabLabels` and the rendered label
+            // cannot disagree about which string is on the bar.
+            tabBarLabel: ({ focused }) => <TabBarLabel label={kiloclawLabel} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <MessageSquare size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -234,7 +235,7 @@ export default function TabsLayout() {
               tabBarPosition('agents', tabFlags) ?? 2,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={agentsLabel} focused={focused} />,
+            tabBarLabel: ({ focused }) => <TabBarLabel label={agentsLabel} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -251,7 +252,7 @@ export default function TabsLayout() {
               tabBarPosition('chat', tabFlags) ?? 3,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={chatLabel} focused={focused} />,
+            tabBarLabel: ({ focused }) => <TabBarLabel label={chatLabel} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -267,7 +268,7 @@ export default function TabsLayout() {
               tabCount,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={profileLabel} focused={focused} />,
+            tabBarLabel: ({ focused }) => <TabBarLabel label={profileLabel} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),

@@ -31,6 +31,14 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// ProfileScreen reads the landscape side insets, so the real native module
+// would load here. Its build requires `react-native` itself, whose Flow source
+// the vitest transform cannot parse (see `test/render-with-providers.tsx`), so
+// the harness mocks it exactly as `profile-screen.queries.mounted.test.tsx` does.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',

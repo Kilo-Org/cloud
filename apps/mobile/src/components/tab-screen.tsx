@@ -1,3 +1,4 @@
+import { type Ref } from 'react';
 import { ScrollView, type ScrollViewProps } from 'react-native';
 
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
@@ -13,8 +14,9 @@ export function TabScreenScrollView({
   children,
   style,
   refreshControl,
+  ref,
   ...props
-}: ScrollViewProps) {
+}: ScrollViewProps & { ref?: Ref<ScrollView> }) {
   const paddingBottom = useTabBarBottomPadding();
   // Reserve the tab bar's space in the layout: the bar is an absolute blur
   // overlay, and rows parked behind it read as clipped (b911 vr1 spot check,
@@ -26,6 +28,7 @@ export function TabScreenScrollView({
   return (
     <ScrollView
       {...props}
+      ref={ref}
       refreshControl={refreshControl}
       style={[style, { marginBottom: paddingBottom }]}
     >

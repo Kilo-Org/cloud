@@ -7,8 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
+import { TabBarLabel } from '@/components/tab-bar-label';
 import { BlurBar } from '@/components/ui/blur-bar';
-import { Text } from '@/components/ui/text';
 import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
 import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
@@ -51,22 +51,6 @@ function TabBarBackground() {
     <BlurBar className="absolute inset-0">
       <View className="flex-1" />
     </BlurBar>
-  );
-}
-
-function TabLabel({ label, focused }: Readonly<{ label: string; focused: boolean }>) {
-  return (
-    <Text
-      accessible={false}
-      className={
-        focused
-          ? 'w-full text-center font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px] text-foreground'
-          : 'w-full text-center font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px] text-muted-foreground'
-      }
-      numberOfLines={2}
-    >
-      {label}
-    </Text>
   );
 }
 
@@ -186,7 +170,7 @@ export default function TabsLayout() {
               tabBarPosition('home', tabFlags) ?? 1,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.home')} focused={focused} />,
+            tabBarLabel: ({ focused }) => <TabBarLabel label={t('tabs.home')} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -204,7 +188,7 @@ export default function TabsLayout() {
               tabCount
             ),
             tabBarLabel: ({ focused }) => (
-              <TabLabel
+              <TabBarLabel
                 label={
                   fontScale > TAB_LABEL_WRAP_FONT_SCALE
                     ? t('tabs.kiloclawWrapped')
@@ -237,7 +221,9 @@ export default function TabsLayout() {
               tabBarPosition('agents', tabFlags) ?? 2,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('common.agents')} focused={focused} />,
+            tabBarLabel: ({ focused }) => (
+              <TabBarLabel label={t('common.agents')} focused={focused} />
+            ),
             tabBarIcon: ({ color, focused }) => (
               <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -254,7 +240,9 @@ export default function TabsLayout() {
               tabBarPosition('chat', tabFlags) ?? 3,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('common.chat')} focused={focused} />,
+            tabBarLabel: ({ focused }) => (
+              <TabBarLabel label={t('common.chat')} focused={focused} />
+            ),
             tabBarIcon: ({ color, focused }) => (
               <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -271,7 +259,7 @@ export default function TabsLayout() {
               tabCount
             ),
             tabBarLabel: ({ focused }) => (
-              <TabLabel label={t('common.profile')} focused={focused} />
+              <TabBarLabel label={t('common.profile')} focused={focused} />
             ),
             tabBarIcon: ({ color, focused }) => (
               <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />

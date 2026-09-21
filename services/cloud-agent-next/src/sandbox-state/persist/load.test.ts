@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { loadAllocation, loadSession } from './load.js';
+import { loadAllocation, loadAllocationSync, loadSession } from './load.js';
 import { ALLOCATION_KEY, storeAllocation, type CanonicalStorage } from './store.js';
-import { isAllocationRecordKey, seedAllocationRecord, seedSessionValue } from './access.js';
+import {
+  isAllocationRecordKey,
+  seedAllocationRecord,
+  seedSessionValue,
+  type SyncRecordReader,
+} from './access.js';
 import { decideSession } from '../session/reduce.js';
 import { allocationEffect } from '../model/allocation.js';
 import { POLICY } from '../schedule.js';
@@ -212,6 +217,59 @@ describe('canonical load — allocation dispatch', () => {
       storageWith(seedAllocationRecord({}, { ...legacyRunning, version: 2 }))
     );
     expect(tolerated.ok).toBe(true);
+  });
+});
+
+describe('canonical load — sync/async parity', () => {
+  function syncStorageWith(values: Record<string, unknown>): SyncRecordReader {
+    return { get: (key: string) => values[key] };
+  }
+
+  const cases: { name: string; values: Record<string, unknown> }[] = [
+    {
+      name: 'valid canonical',
+      values: {
+        [ALLOCATION_KEY]: { v: 2, resumable: true, state: { kind: 'stopped', summary: null } },
+      },
+    },
+    {
+      name: 'malformed canonical',
+      values: { [ALLOCATION_KEY]: { v: 2, resumable: true, state: { kind: 'nope' } } },
+    },
+    { name: 'legacy-only flat record', values: seedAllocationRecord({}, legacyRunning) },
+    { name: 'both absent', values: {} },
+  ];
+
+  it.each(cases)('agrees for $name', async ({ values }) => {
+    const asyncResult = await loadAllocation(storageWith({ ...values }), true);
+    const syncResult = loadAllocationSync(syncStorageWith({ ...values }), true);
+    expect(syncResult).toStrictEqual(asyncResult);
+  });
+
+  it('valid canonical resolves from the canonical source', () => {
+    const result = loadAllocationSync(
+      syncStorageWith({
+        [ALLOCATION_KEY]: { v: 2, resumable: true, state: { kind: 'stopped', summary: null } },
+      })
+    );
+    expect(result).toMatchObject({ ok: true, source: 'canonical' });
+  });
+
+  it('malformed canonical fails closed without reading the legacy key', () => {
+    const reads: string[] = [];
+    const storage: SyncRecordReader = {
+      get: (key: string) => {
+        reads.push(key);
+        return { [ALLOCATION_KEY]: { v: 2, resumable: true, state: { kind: 'nope' } } }[key];
+      },
+    };
+    const result = loadAllocationSync(storage);
+    expect(result).toEqual({
+      ok: false,
+      reason: 'invalid_canonical_allocation',
+      key: ALLOCATION_KEY,
+    });
+    expect(reads.some(isAllocationRecordKey)).toBe(false);
   });
 });
 

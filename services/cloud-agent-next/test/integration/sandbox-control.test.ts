@@ -132,6 +132,7 @@ import {
   isSandboxAcquisitionLostError,
   requestFrameSchema,
   responseFrameSchema,
+  sandboxEventBatchResultSchema,
   sessionOperationAckSchema,
   sessionOperationAuthorizationSchema,
   sessionPromptPayloadSchema,
@@ -140,6 +141,7 @@ import {
   SANDBOX_CONTROL_WS_TAG,
   type RequestFrame,
   type ResponseFrame,
+  type SandboxEventPublicationPayload,
   type SessionAttachPayload,
   type SessionOperationDelivery,
   sandboxControlSocketAttachmentSchema,
@@ -152,6 +154,7 @@ import {
 } from '../../src/shared/worktree-changes-wire.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import type { StoredEvent } from '../../src/websocket/types.js';
+import type { ControlDiagnosticFields } from '../../src/sandbox-control/diagnostics.js';
 import {
   WORKTREE_CHANGES_KEY,
   WORKTREE_FILE_PREFIX,
@@ -487,6 +490,7 @@ function sendHello(
     nativeRuntimeRetirement?: boolean;
     workingBranches?: boolean;
     connectionRecovery?: boolean;
+    eventReceipts?: boolean;
   } = {}
 ): void {
   const capabilities = {
@@ -497,6 +501,7 @@ function sendHello(
     ...(identity.nativeRuntimeRetirement ? { nativeRuntimeRetirement: true } : {}),
     ...(identity.workingBranches ? { workingBranches: true } : {}),
     ...(identity.connectionRecovery ? { connectionRecovery: true } : {}),
+    ...(identity.eventReceipts ? { eventReceipts: true, eventBatches: true } : {}),
   };
   ws.send(
     JSON.stringify({
@@ -525,6 +530,7 @@ async function completeHello(
     nativeRuntimeRetirement?: boolean;
     workingBranches?: boolean;
     connectionRecovery?: boolean;
+    eventReceipts?: boolean;
   } = {}
 ): Promise<void> {
   sendHello(ws, requestId, identity);
@@ -540,6 +546,7 @@ async function completeHello(
           kiloVersionHeartbeat: true,
           sessionOperationResults: true,
           ...(identity.connectionRecovery ? { connectionRecovery: true } : {}),
+          ...(identity.eventReceipts ? { eventReceipts: true } : {}),
           eventBatches: true,
           kiloLocalPhase: true,
         },
@@ -7193,7 +7200,11 @@ describe('SandboxControl passive status', () => {
             },
           })
         );
-        expect([...fresh['sessionForwarding'].values()]).toEqual([]);
+        expect(fresh['sessionForwarding'].stats()).toEqual({
+          waiting: 0,
+          inFlight: 0,
+          bufferedBytes: 0,
+        });
         expect(forwardingTasks.length).toBeGreaterThan(0);
         expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
           status: 'active',
@@ -7491,6 +7502,7 @@ async function worktreeFixture(
     sessionOperationResults?: boolean;
     sessionId?: `workspace_${string}`;
     callbackTarget?: CallbackTarget;
+    eventReceipts?: boolean;
   } = {}
 ) {
   const suffix = crypto.randomUUID();
@@ -7583,6 +7595,7 @@ async function worktreeFixture(
   await completeHello(ws, `hello_${suffix}`, {
     wrapperInstanceId,
     sessionOperationResults: options.sessionOperationResults,
+    ...(options.eventReceipts ? { eventReceipts: true } : {}),
   });
   const captures: RequestFrame[] = [];
   const inbox: RequestFrame[] = [];
@@ -7719,6 +7732,32 @@ async function worktreeFixture(
       );
       return response;
     },
+    async sendBatch(items: SandboxEventPublicationPayload[]): Promise<ResponseFrame> {
+      const requestId = crypto.randomUUID();
+      const response = new Promise<ResponseFrame>(resolve => resultWaiters.set(requestId, resolve));
+      ws.send(
+        JSON.stringify({
+          type: 'request',
+          requestId,
+          operation: 'sandbox.event.publishBatch',
+          payload: { items },
+        })
+      );
+      return response;
+    },
+    async sendPublication(item: SandboxEventPublicationPayload): Promise<ResponseFrame> {
+      const requestId = crypto.randomUUID();
+      const response = new Promise<ResponseFrame>(resolve => resultWaiters.set(requestId, resolve));
+      ws.send(
+        JSON.stringify({
+          type: 'request',
+          requestId,
+          operation: 'sandbox.event.publish',
+          payload: item,
+        })
+      );
+      return response;
+    },
     fail(
       request: RequestFrame,
       retryable = false,
@@ -7793,6 +7832,155 @@ async function worktreeFixture(
 
 function captureRevision(request: RequestFrame): number {
   return (request.payload as { revision: number }).revision;
+}
+
+type ForwardDiagnosticEmission = {
+  event: string;
+  fields: ControlDiagnosticFields;
+};
+
+async function captureControlDiagnostics(
+  control: ReturnType<typeof env.SANDBOX_CONTROL.getByName>
+): Promise<{ emissions: ForwardDiagnosticEmission[]; restore: () => void }> {
+  return runInDurableObject(control, instance => {
+    const emissions: ForwardDiagnosticEmission[] = [];
+    const prototype = Object.getPrototypeOf(instance) as {
+      logDiagnostic: (
+        event: string,
+        fields: ControlDiagnosticFields,
+        level?: 'info' | 'warn'
+      ) => void;
+    };
+    const original = prototype.logDiagnostic;
+    const spy = vi
+      .spyOn(prototype, 'logDiagnostic')
+      .mockImplementation((event: string, fields: ControlDiagnosticFields, level) => {
+        emissions.push({ event, fields });
+        original.call(instance, event, fields, level);
+      });
+    return { emissions, restore: () => spy.mockRestore() };
+  });
+}
+
+function forwardQueueStats(control: ReturnType<typeof env.SANDBOX_CONTROL.getByName>): Promise<{
+  waiting: number;
+  inFlight: number;
+  bufferedBytes: number;
+}> {
+  return runInDurableObject(control, instance => instance['sessionForwarding'].stats());
+}
+
+function batchSessionEventItem(
+  sequence: number,
+  session: { directory: string; kiloSessionId: string },
+  marker: string
+): SandboxEventPublicationPayload {
+  return {
+    event: 'session.event',
+    receiptId: crypto.randomUUID(),
+    sequence,
+    session: {
+      directory: session.directory,
+      kiloSessionId: session.kiloSessionId,
+      rootKiloSessionId: session.kiloSessionId,
+    },
+    payload: {
+      type: 'session.status',
+      properties: { sessionID: session.kiloSessionId, status: { type: 'busy' }, marker },
+    },
+  };
+}
+
+function persistedKilocodeMarkers(state: DurableObjectState): (string | undefined)[] {
+  return persistedSessionEvents(state, ['kilocode']).map(event => {
+    const parsed = JSON.parse(event.payload) as { properties?: { marker?: string } };
+    return parsed.properties?.marker;
+  });
+}
+
+type SandboxEventBatchReceiver = SandboxSession['receiveSandboxControlEventBatch'];
+type SandboxEventBatchResponse = Awaited<ReturnType<SandboxEventBatchReceiver>>;
+
+async function gateEventBatchReceiver(
+  session: ReturnType<typeof env.SANDBOX_SESSION.getByName>
+): Promise<{
+  isReached: () => boolean;
+  release: () => void;
+  received: () => SandboxEventBatchResponse | undefined;
+  invocations: () => number;
+  restore: () => void;
+}> {
+  const release = Promise.withResolvers<void>();
+  const gate = await runInDurableObject(session, instance => {
+    const prototype = Object.getPrototypeOf(instance) as SandboxSession;
+    const original = instance.receiveSandboxControlEventBatch.bind(instance);
+    let reached = false;
+    let received: SandboxEventBatchResponse | undefined;
+    let gated = false;
+    let invocations = 0;
+    const spy = vi.spyOn(prototype, 'receiveSandboxControlEventBatch').mockImplementation(input => {
+      invocations++;
+      if (gated) return original(input);
+      gated = true;
+      reached = true;
+      return release.promise
+        .then(() => original(input))
+        .then(result => {
+          received = result;
+          return result;
+        });
+    });
+    return {
+      isReached: () => reached,
+      received: () => received,
+      invocations: () => invocations,
+      restore: () => spy.mockRestore(),
+    };
+  });
+  return { ...gate, release: () => release.resolve() };
+}
+
+async function gateEveryEventBatchReceiver(
+  session: ReturnType<typeof env.SANDBOX_SESSION.getByName>,
+  count: number
+): Promise<{
+  invocations: () => number;
+  release: (index: number) => void;
+  restore: () => void;
+}> {
+  const releases = Array.from({ length: count }, () => Promise.withResolvers<void>());
+  const gate = await runInDurableObject(session, instance => {
+    const prototype = Object.getPrototypeOf(instance) as SandboxSession;
+    const original = instance.receiveSandboxControlEventBatch.bind(instance);
+    let invocations = 0;
+    const spy = vi.spyOn(prototype, 'receiveSandboxControlEventBatch').mockImplementation(input => {
+      const release = releases[invocations]?.promise ?? Promise.resolve();
+      invocations++;
+      return release.then(() => original(input));
+    });
+    return {
+      invocations: () => invocations,
+      restore: () => spy.mockRestore(),
+    };
+  });
+  return { ...gate, release: (index: number) => releases[index]?.resolve() };
+}
+
+async function gateOperationResultReceiver(
+  session: ReturnType<typeof env.SANDBOX_SESSION.getByName>
+): Promise<{ isReached: () => boolean; release: () => void; restore: () => void }> {
+  const release = Promise.withResolvers<void>();
+  const gate = await runInDurableObject(session, instance => {
+    const prototype = Object.getPrototypeOf(instance) as SandboxSession;
+    const original = instance.receiveSandboxOperationResult.bind(instance);
+    let reached = false;
+    const spy = vi.spyOn(prototype, 'receiveSandboxOperationResult').mockImplementation(input => {
+      reached = true;
+      return release.promise.then(() => original(input));
+    });
+    return { isReached: () => reached, restore: () => spy.mockRestore() };
+  });
+  return { ...gate, release: () => release.resolve() };
 }
 
 describe('SandboxSession operation authorization admission', () => {
@@ -15507,6 +15695,862 @@ describe('SandboxSession targeted deletion', () => {
     } finally {
       wrapper.close();
       authorization.mockReset();
+    }
+  });
+});
+
+describe('SandboxControl event batch forwarding', () => {
+  it('logs per-frame size and item count for forwarded batches and persists every item in global order', async () => {
+    const fixture = await worktreeFixture({ eventReceipts: true });
+    const diagnostics = await captureControlDiagnostics(fixture.control);
+    const receiver = await gateEventBatchReceiver(fixture.session);
+    try {
+      const identity = { directory: fixture.directory, kiloSessionId: fixture.kiloSessionId };
+      const frameMarkers = [
+        ['frame_0_item_0', 'frame_0_item_1', 'frame_0_item_2'],
+        ['frame_1_item_0', 'frame_1_item_1'],
+        ['frame_2_item_0', 'frame_2_item_1', 'frame_2_item_2', 'frame_2_item_3'],
+      ];
+      const batches = frameMarkers.map((markers, frameIndex) =>
+        markers.map((marker, itemIndex) =>
+          batchSessionEventItem(frameIndex * 10 + itemIndex + 1, identity, marker)
+        )
+      );
+
+      const responses = batches.map(items => fixture.sendBatch(items));
+      await vi.waitFor(() => expect(receiver.isReached()).toBe(true));
+      await vi.waitFor(async () => {
+        const stats = await forwardQueueStats(fixture.control);
+        expect(stats.waiting + stats.inFlight).toBe(batches.length);
+      });
+
+      receiver.release();
+      const settled = await Promise.all(responses);
+
+      const runs = diagnostics.emissions.filter(emission => emission.event === 'forward_run');
+      const expectedRuns = [
+        { runMembers: 1, sentItems: 3 },
+        { runMembers: 2, sentItems: 6 },
+      ];
+      expect(runs).toHaveLength(expectedRuns.length);
+      for (const [index, expected] of expectedRuns.entries()) {
+        expect(runs[index]?.fields).toMatchObject({
+          sessionId: fixture.sessionId,
+          operation: 'receiveSandboxControlEventBatch',
+          runMembers: expected.runMembers,
+          sentItems: expected.sentItems,
+          result: 'delivered',
+          applied: true,
+          sessionAdmissionDepth: expect.any(Number),
+          queueWaitMs: expect.any(Number),
+          attempts: expect.any(Number),
+          rpcWaitMs: expect.any(Number),
+        });
+        expect(runs[index]?.fields.sentBytes as number).toBeGreaterThan(0);
+      }
+
+      for (const [frameIndex, items] of batches.entries()) {
+        const response = settled[frameIndex]!;
+        expect(response.ok).toBe(true);
+        const outcomes = sandboxEventBatchResultSchema.parse(response.result).outcomes;
+        expect(outcomes).toEqual(
+          items.map(item => ({ receiptId: item.receiptId, status: 'applied' }))
+        );
+      }
+
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect(persistedKilocodeMarkers(state)).toEqual(frameMarkers.flat());
+      });
+    } finally {
+      receiver.restore();
+      diagnostics.restore();
+      fixture.close();
+    }
+  });
+
+  it('records a delivery-owned stale drop when the connection rotates after the receiver applies', async () => {
+    const fixture = await worktreeFixture({ eventReceipts: true });
+    const diagnostics = await captureControlDiagnostics(fixture.control);
+    const receiver = await gateEventBatchReceiver(fixture.session);
+    try {
+      const identity = { directory: fixture.directory, kiloSessionId: fixture.kiloSessionId };
+      const items = [batchSessionEventItem(1, identity, 'rejected_but_persisted')];
+      // Replacing the connection suppresses the wrapper frame, so the session
+      // DO's real outcome is the observable applied response for the receipt.
+      const pendingResponse = fixture.sendBatch(items);
+      void pendingResponse;
+      await vi.waitFor(() => expect(receiver.isReached()).toBe(true));
+
+      await fixture.rotateSocket();
+      receiver.release();
+
+      await vi.waitFor(() => {
+        expect(receiver.received()?.outcomes).toEqual([
+          { receiptId: items[0]!.receiptId, status: 'applied' },
+        ]);
+      });
+
+      await vi.waitFor(() => {
+        expect(
+          diagnostics.emissions.some(
+            emission =>
+              emission.event === 'forward_dropped' && emission.fields.reason === 'stale_after_send'
+          )
+        ).toBe(true);
+      });
+      const stale = diagnostics.emissions.find(
+        emission =>
+          emission.event === 'forward_dropped' && emission.fields.reason === 'stale_after_send'
+      );
+      expect(stale?.fields).toMatchObject({
+        reason: 'stale_after_send',
+        sessionId: fixture.sessionId,
+        frameItems: 1,
+        forwardSequence: expect.any(Number),
+      });
+      // The stale outcome is delivery-owned. The queue must not append a
+      // second rejection record for the same constituent.
+      expect(stale?.fields.rejectStage).toBeUndefined();
+      expect(
+        diagnostics.emissions.filter(
+          emission =>
+            emission.event === 'forward_dropped' &&
+            emission.fields.reason === 'forwarding_frame_rejected'
+        )
+      ).toEqual([]);
+
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect(persistedKilocodeMarkers(state)).toContain('rejected_but_persisted');
+      });
+    } finally {
+      receiver.restore();
+      diagnostics.restore();
+      fixture.close();
+    }
+  });
+
+  it('performs no awaited storage reads during one real batch forward', async () => {
+    const fixture = await worktreeFixture({ eventReceipts: true });
+    const getSpy = await runInDurableObject(fixture.control, instance =>
+      vi.spyOn(instance['ctx'].storage, 'get')
+    );
+    try {
+      const identity = { directory: fixture.directory, kiloSessionId: fixture.kiloSessionId };
+      const items = [0, 1].map(index =>
+        batchSessionEventItem(index + 1, identity, `read_${index}`)
+      );
+      const before = getSpy.mock.calls.length;
+      const response = await fixture.sendBatch(items);
+      const reads = getSpy.mock.calls.slice(before).map(call => call[0]);
+      expect(response.ok).toBe(true);
+      expect(reads).toEqual([]);
+
+      const outcomes = sandboxEventBatchResultSchema.parse(response.result).outcomes;
+      expect(outcomes.map(outcome => outcome.receiptId)).toEqual(items.map(item => item.receiptId));
+      expect(outcomes.every(outcome => outcome.status === 'applied')).toBe(true);
+
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect(persistedKilocodeMarkers(state)).toEqual(['read_0', 'read_1']);
+      });
+    } finally {
+      getSpy.mockRestore();
+      fixture.close();
+    }
+  });
+
+  it('coalesces a waiting run of batch frames into fewer RPCs while preserving item order and receipts', async () => {
+    const fixture = await worktreeFixture({ eventReceipts: true });
+    const diagnostics = await captureControlDiagnostics(fixture.control);
+    const receiver = await gateEventBatchReceiver(fixture.session);
+    try {
+      const identity = { directory: fixture.directory, kiloSessionId: fixture.kiloSessionId };
+      const frameMarkers = [
+        ['c_frame_0_item_0', 'c_frame_0_item_1'],
+        ['c_frame_1_item_0'],
+        ['c_frame_2_item_0', 'c_frame_2_item_1', 'c_frame_2_item_2'],
+        ['c_frame_3_item_0'],
+        ['c_frame_4_item_0', 'c_frame_4_item_1'],
+      ];
+      const batches = frameMarkers.map((markers, frameIndex) =>
+        markers.map((marker, itemIndex) =>
+          batchSessionEventItem(frameIndex * 10 + itemIndex + 1, identity, marker)
+        )
+      );
+
+      const responses = batches.map(items => fixture.sendBatch(items));
+      await vi.waitFor(() => expect(receiver.isReached()).toBe(true));
+      await vi.waitFor(async () => {
+        const stats = await forwardQueueStats(fixture.control);
+        expect(stats.waiting + stats.inFlight).toBe(batches.length);
+      });
+      receiver.release();
+      const settled = await Promise.all(responses);
+
+      const invocations = receiver.invocations();
+      expect(invocations).toBeGreaterThan(0);
+      expect(invocations).toBeLessThan(batches.length);
+
+      for (const [frameIndex, items] of batches.entries()) {
+        const response = settled[frameIndex]!;
+        expect(response.ok).toBe(true);
+        const outcomes = sandboxEventBatchResultSchema.parse(response.result).outcomes;
+        expect(outcomes).toEqual(
+          items.map(item => ({ receiptId: item.receiptId, status: 'applied' }))
+        );
+      }
+
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect(persistedKilocodeMarkers(state)).toEqual(frameMarkers.flat());
+      });
+    } finally {
+      receiver.restore();
+      diagnostics.restore();
+      fixture.close();
+    }
+  });
+
+  it('attributes a merged-run fence change to every constituent, not only the head', async () => {
+    const fixture = await worktreeFixture({ eventReceipts: true });
+    const diagnostics = await captureControlDiagnostics(fixture.control);
+    const receiver = await gateEveryEventBatchReceiver(fixture.session, 2);
+    const fence = await runInDurableObject(fixture.control, instance => {
+      const prototype = Object.getPrototypeOf(instance) as {
+        isCurrentSessionForward: (...args: unknown[]) => boolean;
+      };
+      const spy = vi.spyOn(prototype, 'isCurrentSessionForward');
+      return { calls: () => spy.mock.calls.length, restore: () => spy.mockRestore() };
+    });
+    // Rotation suppresses the wrapper socket response, so the control-side run
+    // results are the only observable of what each constituent was actually
+    // handed back.
+    const captured = await runInDurableObject(fixture.control, instance => {
+      const prototype = Object.getPrototypeOf(instance) as {
+        deliverBatchRun: (...args: never[]) => Promise<unknown>;
+      };
+      const original = instance['deliverBatchRun'].bind(instance) as (
+        ...args: never[]
+      ) => Promise<SandboxEventBatchResult[]>;
+      const runs: SandboxEventBatchResult[][] = [];
+      const spy = vi.spyOn(prototype, 'deliverBatchRun').mockImplementation(async (...args) => {
+        const results = await original(...args);
+        runs.push(results);
+        return results;
+      });
+      return { runs: () => runs, restore: () => spy.mockRestore() };
+    });
+    try {
+      const identity = { directory: fixture.directory, kiloSessionId: fixture.kiloSessionId };
+      const frameMarkers = [
+        ['fence_head_item_0', 'fence_head_item_1'],
+        ['fence_merged_item_0'],
+        ['fence_merged_item_1', 'fence_merged_item_2'],
+      ];
+      const batches = frameMarkers.map((markers, frameIndex) =>
+        markers.map((marker, itemIndex) =>
+          batchSessionEventItem(frameIndex * 10 + itemIndex + 1, identity, marker)
+        )
+      );
+
+      // The first batch runs alone; the second and third are admitted while its
+      // RPC is gated, so they coalesce into one merged run.
+      void fixture.sendBatch(batches[0]!);
+      await vi.waitFor(() => expect(receiver.invocations()).toBe(1));
+      for (const items of batches.slice(1)) void fixture.sendBatch(items);
+      await vi.waitFor(async () => {
+        const stats = await forwardQueueStats(fixture.control);
+        expect(stats.waiting + stats.inFlight).toBe(batches.length);
+      });
+      receiver.release(0);
+      await vi.waitFor(() => expect(receiver.invocations()).toBe(2));
+
+      await fixture.rotateSocket();
+      receiver.release(1);
+
+      const dropsByReason = (reason: string) =>
+        diagnostics.emissions.filter(
+          emission => emission.event === 'forward_dropped' && emission.fields.reason === reason
+        );
+      const mergedMembers = batches.slice(1);
+      await vi.waitFor(() =>
+        expect(dropsByReason('stale_after_send')).toHaveLength(mergedMembers.length)
+      );
+
+      // Exactly one delivery-owned stale record per merged constituent,
+      // correlated by the constituent's own frame item count and sequence.
+      const stale = dropsByReason('stale_after_send');
+      const staleSequences = stale
+        .map(emission => emission.fields.forwardSequence as number)
+        .sort((left, right) => left - right);
+      expect(new Set(staleSequences).size).toBe(mergedMembers.length);
+      expect(
+        stale
+          .map(emission => emission.fields.frameItems as number)
+          .sort((left, right) => left - right)
+      ).toEqual([...mergedMembers.map(items => items.length)].sort((left, right) => left - right));
+      for (const emission of stale) {
+        expect(emission.fields.sessionId).toBe(fixture.sessionId);
+        expect(emission.fields.rejectStage).toBeUndefined();
+      }
+
+      // A delivery-owned stale record must not be duplicated by a queue rejection.
+      expect(dropsByReason('forwarding_frame_rejected')).toEqual([]);
+
+      // Three batches reached the receiver as two RPCs: the second and third
+      // were coalesced into one merged run.
+      expect(receiver.invocations()).toBe(2);
+      // Two runs (one single-member, one two-member) each evaluate the
+      // execution-time fence three times: once for run eligibility plus the
+      // pre-send and post-send checks in the shared delivery boundary. A
+      // per-member evaluation in the merged run would make this eight.
+      expect(fence.calls()).toBe(6);
+
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect(persistedKilocodeMarkers(state)).toEqual(frameMarkers.flat());
+      });
+
+      // The merged run returned exactly one result per constituent, each with
+      // that constituent's own receiptIds: the non-head result is a real slice,
+      // not a fallback and not the head's result.
+      await vi.waitFor(() => expect(captured.runs()).toHaveLength(2));
+      const runResults = captured.runs();
+      expect(runResults[0]!).toEqual([
+        {
+          outcomes: batches[0]!.map(item => ({ receiptId: item.receiptId, status: 'applied' })),
+        },
+      ]);
+      const mergedRunResults = runResults[1]!;
+      expect(mergedRunResults).toHaveLength(mergedMembers.length);
+      for (const [index, memberResult] of mergedRunResults.entries()) {
+        const expectedItems = mergedMembers[index]!;
+        expect(memberResult.outcomes).toHaveLength(expectedItems.length);
+        expect(memberResult.outcomes).toEqual(
+          expectedItems.map(item => ({ receiptId: item.receiptId, status: 'applied' }))
+        );
+      }
+      expect(mergedRunResults[0]!.outcomes).not.toEqual(mergedRunResults[1]!.outcomes);
+    } finally {
+      captured.restore();
+      fence.restore();
+      receiver.restore();
+      diagnostics.restore();
+      fixture.close();
+    }
+  });
+
+  it('keeps one pump per session and stops queued forwards at dispatch after the connection is replaced', async () => {
+    const fixture = await worktreeFixture({ eventReceipts: true });
+    const diagnostics = await captureControlDiagnostics(fixture.control);
+    const receiver = await gateEventBatchReceiver(fixture.session);
+    try {
+      const identity = { directory: fixture.directory, kiloSessionId: fixture.kiloSessionId };
+      const head = [batchSessionEventItem(1, identity, 'serialize_head')];
+      const queuedBatch = [
+        batchSessionEventItem(2, identity, 'serialize_batch_a'),
+        batchSessionEventItem(3, identity, 'serialize_batch_b'),
+      ];
+      const queuedFrame = batchSessionEventItem(4, identity, 'serialize_frame');
+
+      void fixture.sendBatch(head);
+      await vi.waitFor(() => expect(receiver.isReached()).toBe(true));
+
+      // While the head run is held, one batch and one single frame for the same
+      // session are admitted; both must share the single active pump.
+      void fixture.sendBatch(queuedBatch);
+      void fixture.sendPublication(queuedFrame);
+      await vi.waitFor(async () => {
+        const stats = await forwardQueueStats(fixture.control);
+        expect(stats.waiting).toBe(2);
+      });
+      expect(
+        await runInDurableObject(
+          fixture.control,
+          instance => instance['sessionForwarding'].get(fixture.sessionId) !== undefined
+        )
+      ).toBe(true);
+
+      // Replacing the connection before the held run drains must stop both
+      // queued forwards at the dispatch authority check.
+      await fixture.rotateSocket();
+      receiver.release();
+
+      const drops = () =>
+        diagnostics.emissions.filter(emission => emission.event === 'forward_dropped');
+      await vi.waitFor(() =>
+        expect(
+          drops().filter(emission => emission.fields.reason === 'stale_before_enqueue')
+        ).toHaveLength(2)
+      );
+
+      const staleBeforeDispatch = drops().filter(
+        emission => emission.fields.reason === 'stale_before_enqueue'
+      );
+      expect(
+        staleBeforeDispatch.map(emission => emission.fields.frameItems as number).sort()
+      ).toEqual([1, 2]);
+      for (const emission of staleBeforeDispatch) {
+        expect(emission.fields.sessionId).toBe(fixture.sessionId);
+        expect(emission.fields.forwardSequence).toEqual(expect.any(Number));
+      }
+      // The held head had already passed the dispatch authority check when the
+      // connection changed, so it settles as a delivery-owned stale outcome.
+      expect(
+        drops().filter(emission => emission.fields.reason === 'stale_after_send')
+      ).toHaveLength(1);
+      // Only the head reached the receiver; neither queued forward was dispatched.
+      expect(receiver.invocations()).toBe(1);
+      await vi.waitFor(async () => {
+        expect(
+          await runInDurableObject(
+            fixture.control,
+            instance => instance['sessionForwarding'].get(fixture.sessionId) !== undefined
+          )
+        ).toBe(false);
+      });
+
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect(persistedKilocodeMarkers(state)).toEqual(['serialize_head']);
+      });
+
+      const skippedRuns = diagnostics.emissions.filter(
+        emission => emission.event === 'forward_run' && emission.fields.result === 'skipped'
+      );
+      expect(skippedRuns).toHaveLength(3);
+
+      const batchSkipped = skippedRuns.filter(
+        emission => emission.fields.operation === 'receiveSandboxControlEventBatch'
+      );
+      expect(batchSkipped).toHaveLength(2);
+      // The held head was dispatched and its captured constituent result
+      // survived the connection change; the run itself settles as skipped.
+      expect(batchSkipped.find(emission => emission.fields.sentItems === 1)?.fields).toMatchObject({
+        runMembers: 1,
+        sentItems: 1,
+        attempts: 1,
+        rpcWaitMs: expect.any(Number),
+        appliedCount: 1,
+        rejectedCount: 0,
+        unknownCount: 0,
+        unattemptedCount: 0,
+      });
+      // The queued batch never dispatched: a skipped record with nothing attempted.
+      expect(batchSkipped.find(emission => emission.fields.sentItems === 2)?.fields).toMatchObject({
+        runMembers: 1,
+        sentItems: 2,
+        attempts: 0,
+        rpcWaitMs: 0,
+        appliedCount: 0,
+        rejectedCount: 0,
+        unknownCount: 0,
+        unattemptedCount: 2,
+      });
+
+      // The queued single frame never dispatched either, and is recorded as its
+      // own skipped run rather than silently dropped.
+      const singleSkipped = skippedRuns.filter(
+        emission => emission.fields.operation === 'receiveSandboxControlEvent'
+      );
+      expect(singleSkipped).toHaveLength(1);
+      expect(singleSkipped[0]?.fields).toMatchObject({
+        runMembers: 1,
+        sentItems: 1,
+        attempts: 0,
+        rpcWaitMs: 0,
+        appliedCount: 0,
+        rejectedCount: 0,
+        unknownCount: 0,
+        unattemptedCount: 1,
+      });
+    } finally {
+      receiver.restore();
+      diagnostics.restore();
+      fixture.close();
+    }
+  });
+
+  it('drains a held run and rejects a later same-session enqueue after the route is detached', async () => {
+    const fixture = await worktreeFixture({ eventReceipts: true });
+    const diagnostics = await captureControlDiagnostics(fixture.control);
+    const receiver = await gateEventBatchReceiver(fixture.session);
+    try {
+      const identity = { directory: fixture.directory, kiloSessionId: fixture.kiloSessionId };
+      const head = [batchSessionEventItem(1, identity, 'detached_head')];
+      const queued = [batchSessionEventItem(2, identity, 'detached_queued')];
+
+      const headResponse = fixture.sendBatch(head);
+      await vi.waitFor(() => expect(receiver.isReached()).toBe(true));
+
+      await fixture.control.detachSession(fixture.sessionId);
+      void fixture.sendBatch(queued);
+
+      await vi.waitFor(() =>
+        expect(
+          diagnostics.emissions.some(
+            emission =>
+              emission.event === 'forward_dropped' && emission.fields.reason === 'unroutable'
+          )
+        ).toBe(true)
+      );
+      // The removed route rejects the new enqueue before it is admitted, so the
+      // held lane remains the single drain-lookup target.
+      expect(
+        await runInDurableObject(
+          fixture.control,
+          instance => instance['sessionForwarding'].get(fixture.sessionId) !== undefined
+        )
+      ).toBe(true);
+
+      receiver.release();
+      // The receiver had already applied the head; the detached route is a
+      // delivery-owned stale outcome, not a receiver failure.
+      const settledHead = await headResponse;
+      expect(settledHead.ok).toBe(true);
+      expect(sandboxEventBatchResultSchema.parse(settledHead.result).outcomes).toEqual([
+        { receiptId: head[0]!.receiptId, status: 'applied' },
+      ]);
+      expect(receiver.invocations()).toBe(1);
+      // The detached head run completes as a skipped run. The pre-enqueue
+      // `unroutable` rejection is not an admitted run, so it records no
+      // `forward_run` at all.
+      const routeDetachRuns = diagnostics.emissions.filter(
+        emission => emission.event === 'forward_run'
+      );
+      expect(routeDetachRuns).toHaveLength(1);
+      expect(routeDetachRuns[0]?.fields).toMatchObject({
+        operation: 'receiveSandboxControlEventBatch',
+        result: 'skipped',
+        runMembers: 1,
+        sentItems: 1,
+        attempts: 1,
+        rpcWaitMs: expect.any(Number),
+        appliedCount: 1,
+        rejectedCount: 0,
+        unknownCount: 0,
+        unattemptedCount: 0,
+      });
+      await vi.waitFor(async () => {
+        expect(
+          await runInDurableObject(
+            fixture.control,
+            instance => instance['sessionForwarding'].get(fixture.sessionId) !== undefined
+          )
+        ).toBe(false);
+      });
+    } finally {
+      receiver.restore();
+      diagnostics.restore();
+      fixture.close();
+    }
+  });
+
+  it('stops admitted runs at the deletion-gated dispatch check without reaching the receiver', async () => {
+    const fixture = await worktreeFixture({ eventReceipts: true });
+    const diagnostics = await captureControlDiagnostics(fixture.control);
+    const receiver = await gateEventBatchReceiver(fixture.session);
+    try {
+      const identity = { directory: fixture.directory, kiloSessionId: fixture.kiloSessionId };
+      const head = [batchSessionEventItem(1, identity, 'gate_head')];
+      const queuedBatch = [
+        batchSessionEventItem(2, identity, 'gate_batch_a'),
+        batchSessionEventItem(3, identity, 'gate_batch_b'),
+      ];
+      const queuedFrame = batchSessionEventItem(4, identity, 'gate_frame');
+
+      const headResponse = fixture.sendBatch(head);
+      await vi.waitFor(() => expect(receiver.isReached()).toBe(true));
+
+      // Admit a batch and a single frame while the head run is held; both wait
+      // for dispatch behind it.
+      const batchResponse = fixture.sendBatch(queuedBatch);
+      const frameResponse = fixture.sendPublication(queuedFrame);
+      await vi.waitFor(async () => {
+        const stats = await forwardQueueStats(fixture.control);
+        expect(stats.waiting).toBe(2);
+      });
+
+      // Activate a worktree-deletion gate after admission but before the queued
+      // runs dispatch. `resolveForwardEligibility` does not inspect deletion
+      // gates, while `isCurrentSessionForward` does, so both queued runs must
+      // stop at the dispatch-time guard.
+      await runInDurableObject(fixture.control, instance => {
+        instance['deletingWorktrees'].add(fixture.worktreeId);
+      });
+
+      receiver.release();
+      const [headSettled, batchSettled, frameSettled] = await Promise.all([
+        headResponse,
+        batchResponse,
+        frameResponse,
+      ]);
+
+      // Only the already-dispatched head reached the receiver.
+      expect(receiver.invocations()).toBe(1);
+
+      const staleBeforeSend = diagnostics.emissions.filter(
+        emission =>
+          emission.event === 'forward_dropped' && emission.fields.reason === 'stale_before_send'
+      );
+      expect(staleBeforeSend).toHaveLength(2);
+      expect(staleBeforeSend.map(emission => emission.fields.frameItems as number).sort()).toEqual([
+        1, 2,
+      ]);
+      for (const emission of staleBeforeSend) {
+        expect(emission.fields.sessionId).toBe(fixture.sessionId);
+        expect(emission.fields.forwardSequence).toEqual(expect.any(Number));
+      }
+
+      const gatedRuns = diagnostics.emissions.filter(
+        emission =>
+          emission.event === 'forward_run' &&
+          emission.fields.result === 'skipped' &&
+          emission.fields.attempts === 0
+      );
+      expect(gatedRuns).toHaveLength(2);
+      expect(
+        gatedRuns.find(emission => emission.fields.operation === 'receiveSandboxControlEventBatch')
+          ?.fields
+      ).toMatchObject({
+        runMembers: 1,
+        sentItems: 2,
+        attempts: 0,
+        rpcWaitMs: 0,
+        appliedCount: 0,
+        rejectedCount: 0,
+        unknownCount: 0,
+        unattemptedCount: 2,
+      });
+      expect(
+        gatedRuns.find(emission => emission.fields.operation === 'receiveSandboxControlEvent')
+          ?.fields
+      ).toMatchObject({
+        runMembers: 1,
+        sentItems: 1,
+        attempts: 0,
+        rpcWaitMs: 0,
+        appliedCount: 0,
+        rejectedCount: 0,
+        unknownCount: 0,
+        unattemptedCount: 1,
+      });
+
+      // The head had already passed its dispatch check, so it settles as a
+      // delivery-owned skipped run whose captured outcome survives.
+      const headSkipped = diagnostics.emissions.filter(
+        emission =>
+          emission.event === 'forward_run' &&
+          emission.fields.result === 'skipped' &&
+          emission.fields.attempts === 1
+      );
+      expect(headSkipped).toHaveLength(1);
+      expect(headSkipped[0]?.fields).toMatchObject({
+        operation: 'receiveSandboxControlEventBatch',
+        runMembers: 1,
+        sentItems: 1,
+        appliedCount: 1,
+        unattemptedCount: 0,
+      });
+
+      // The gated runs settle with unattempted outcomes, not applied ones.
+      expect(sandboxEventBatchResultSchema.parse(batchSettled.result).outcomes).toEqual(
+        queuedBatch.map(item => ({
+          receiptId: item.receiptId,
+          status: 'unattempted',
+          retryable: true,
+        }))
+      );
+      expect(frameSettled).toMatchObject({
+        ok: false,
+        error: { code: 'not_ready', retryable: true },
+      });
+      expect(sandboxEventBatchResultSchema.parse(headSettled.result).outcomes).toEqual([
+        { receiptId: head[0]!.receiptId, status: 'applied' },
+      ]);
+
+      // Released accounting: the queue drains with no residual work.
+      await vi.waitFor(async () => {
+        expect(await forwardQueueStats(fixture.control)).toEqual({
+          waiting: 0,
+          inFlight: 0,
+          bufferedBytes: 0,
+        });
+      });
+
+      // Releasing the deletion gate restores normal dispatch for later work.
+      await runInDurableObject(fixture.control, instance => {
+        instance['deletingWorktrees'].delete(fixture.worktreeId);
+      });
+      const later = [batchSessionEventItem(5, identity, 'gate_later')];
+      const laterResponse = await fixture.sendBatch(later);
+      expect(laterResponse.ok).toBe(true);
+      expect(sandboxEventBatchResultSchema.parse(laterResponse.result).outcomes).toEqual([
+        { receiptId: later[0]!.receiptId, status: 'applied' },
+      ]);
+      expect(receiver.invocations()).toBe(2);
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect(persistedKilocodeMarkers(state)).toEqual(['gate_head', 'gate_later']);
+      });
+    } finally {
+      receiver.restore();
+      diagnostics.restore();
+      fixture.close();
+    }
+  });
+
+  it('forwards a waiting head older than the stop-attempt deadline without an age-based drop', async () => {
+    const fixture = await worktreeFixture({ eventReceipts: true });
+    const diagnostics = await captureControlDiagnostics(fixture.control);
+    const receiver = await gateEventBatchReceiver(fixture.session);
+    const clock = vi.spyOn(Date, 'now');
+    try {
+      const identity = { directory: fixture.directory, kiloSessionId: fixture.kiloSessionId };
+      const frameMarkers = [['age_in_flight'], ['age_waiting_head'], ['age_waiting_tail']];
+      const batches = frameMarkers.map((markers, frameIndex) =>
+        markers.map((marker, itemIndex) =>
+          batchSessionEventItem(frameIndex * 10 + itemIndex + 1, identity, marker)
+        )
+      );
+
+      const responses = batches.map(items => fixture.sendBatch(items));
+      await vi.waitFor(() => expect(receiver.isReached()).toBe(true));
+      // Admit the two compatible batches while the head run is held: they wait
+      // behind it and merge into one run when it drains.
+      await vi.waitFor(async () => {
+        const stats = await forwardQueueStats(fixture.control);
+        expect(stats.waiting).toBe(2);
+      });
+
+      // Admit first, age second, release last: the waiting head is already past
+      // the stop-attempt budget when its run dispatches.
+      const start = Date.now();
+      clock.mockReturnValue(start + DEADLINE_MS.stopAttempt * 2);
+      receiver.release();
+
+      const settled = await Promise.all(responses);
+
+      for (const [frameIndex, items] of batches.entries()) {
+        const response = settled[frameIndex]!;
+        expect(response.ok).toBe(true);
+        expect(sandboxEventBatchResultSchema.parse(response.result).outcomes).toEqual(
+          items.map(item => ({ receiptId: item.receiptId, status: 'applied' }))
+        );
+      }
+      // The aged waiting head and its compatible constituent reached the
+      // receiver in one run with no age-based rejection.
+      expect(receiver.invocations()).toBe(2);
+      expect(
+        diagnostics.emissions.filter(emission => emission.event === 'forward_dropped')
+      ).toEqual([]);
+
+      const runs = diagnostics.emissions.filter(emission => emission.event === 'forward_run');
+      expect(runs).toHaveLength(2);
+      expect(runs[1]?.fields).toMatchObject({
+        operation: 'receiveSandboxControlEventBatch',
+        runMembers: 2,
+        sentItems: 2,
+        sessionAdmissionDepth: expect.any(Number),
+        queueWaitMs: expect.any(Number),
+        attempts: expect.any(Number),
+        rpcWaitMs: expect.any(Number),
+      });
+      expect(runs[1]?.fields.queueWaitMs as number).toBeGreaterThan(DEADLINE_MS.stopAttempt);
+    } finally {
+      clock.mockRestore();
+      receiver.restore();
+      diagnostics.restore();
+      fixture.close();
+    }
+  });
+
+  it('rejects an operation result once its forwarding deadline passes while the receiver RPC is held', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => Response.json({ valid: true }));
+    const fixture = await worktreeFixture({ sessionOperationResults: true });
+    const diagnostics = await captureControlDiagnostics(fixture.control);
+    const receiver = await gateOperationResultReceiver(fixture.session);
+    const clock = vi.spyOn(Date, 'now');
+    const messageId = 'msg_operation_result_deadline';
+    try {
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'hold this operation result' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+      await fixture.promptSeen;
+      const prompt = fixture.prompts[0];
+      if (!prompt) throw new Error('Missing prompt operation request');
+      const authorization = sessionOperationAuthorizationSchema.parse(prompt.authorization);
+      const delivery: SessionOperationDelivery = {
+        version: 2,
+        authorization,
+        completedAt: Date.now(),
+        result: { ok: true, result: { messageId, status: 'accepted' } },
+        outcome: { messageId, status: 'completed' },
+        events: [],
+        preparing: [],
+      };
+
+      const pending = fixture.sendOperationResult(delivery);
+      await vi.waitFor(() => expect(receiver.isReached()).toBe(true));
+
+      // The pre-RPC authorization check already passed. Advancing past the
+      // stop-attempt budget while the RPC is held trips the post-RPC check, so
+      // no acknowledgement is produced for the aged result.
+      const start = Date.now();
+      clock.mockReturnValue(start + DEADLINE_MS.stopAttempt + 1);
+      receiver.release();
+
+      await expect(pending).resolves.toMatchObject({
+        ok: false,
+        error: { code: 'not_ready' },
+      });
+      await vi.waitFor(() => {
+        expect(
+          diagnostics.emissions.filter(
+            emission =>
+              emission.event === 'forward_run' &&
+              emission.fields.operation === 'receiveSandboxOperationResult'
+          )
+        ).toHaveLength(1);
+      });
+      const operationRuns = diagnostics.emissions.filter(
+        emission =>
+          emission.event === 'forward_run' &&
+          emission.fields.operation === 'receiveSandboxOperationResult'
+      );
+      expect(operationRuns).toHaveLength(1);
+      // The send was attempted before the post-RPC deadline check tripped, so
+      // the run is classified as unknown rather than unattempted.
+      expect(operationRuns[0]?.fields).toMatchObject({
+        result: 'failed',
+        runMembers: 1,
+        sentItems: 1,
+        attempts: 1,
+        rpcWaitMs: expect.any(Number),
+        appliedCount: 0,
+        rejectedCount: 0,
+        unknownCount: 1,
+        unattemptedCount: 0,
+      });
+
+      const failedDrops = diagnostics.emissions.filter(
+        emission =>
+          emission.event === 'forward_dropped' &&
+          emission.fields.operation === 'receiveSandboxOperationResult'
+      );
+      expect(failedDrops).toHaveLength(1);
+      expect(failedDrops[0]?.fields).toMatchObject({
+        reason: 'forwarding_failed',
+        sessionId: fixture.sessionId,
+        frameItems: 1,
+        forwardSequence: expect.any(Number),
+      });
+    } finally {
+      clock.mockRestore();
+      receiver.restore();
+      diagnostics.restore();
+      fixture.close();
+      fetchMock.mockRestore();
     }
   });
 });

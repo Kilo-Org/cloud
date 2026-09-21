@@ -6,12 +6,17 @@
  */
 import type { AllocationRecord } from '../model/allocation.js';
 import type { SessionAggregate } from '../model/session.js';
-import { encodeSessionEnvelope, eraseAllocationRecord, writeSessionValue } from './access.js';
+import {
+  CANONICAL_ALLOCATION_KEY,
+  encodeSessionEnvelope,
+  eraseAllocationRecord,
+  writeSessionValue,
+} from './access.js';
 
 export { encodeSessionEnvelope };
 
-/** Canonical allocation key; the current raw allocation key is owned by access.ts. */
-export const ALLOCATION_KEY = 'sandbox_allocation_state';
+/** Canonical allocation key, re-exported for existing importers. Owned by access.ts. */
+export const ALLOCATION_KEY = CANONICAL_ALLOCATION_KEY;
 
 export type CanonicalStorage = {
   get<T = unknown>(key: string): Promise<T | undefined>;
@@ -27,7 +32,7 @@ export async function storeAllocation(
   storage: CanonicalStorage,
   record: AllocationRecord
 ): Promise<void> {
-  await storage.put(ALLOCATION_KEY, record);
+  await storage.put(CANONICAL_ALLOCATION_KEY, record);
 }
 
 export async function storeSession(
@@ -44,5 +49,5 @@ export async function storeSession(
  * resurrection. The session aggregate is untouched.
  */
 export async function eraseAllocation(storage: ErasableStorage): Promise<void> {
-  await eraseAllocationRecord(storage, [ALLOCATION_KEY]);
+  await eraseAllocationRecord(storage, [CANONICAL_ALLOCATION_KEY]);
 }

@@ -3482,10 +3482,11 @@ describe('SandboxControl lifecycle boundaries', () => {
         );
         expect(withFields).toHaveBeenCalledWith(
           expect.objectContaining({
-            diagnosticEvent: 'forward_result',
+            diagnosticEvent: 'forward_run',
             operation: 'receiveSandboxControlEventBatch',
             result: 'delivered',
             applied: false,
+            rejectedCount: 2,
           })
         );
       } finally {
@@ -3998,17 +3999,14 @@ describe('SandboxControl lifecycle boundaries', () => {
       expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(1);
 
       expect(withFields).not.toHaveBeenCalledWith(
-        expect.objectContaining({ diagnosticEvent: 'forward_result' })
-      );
-      expect(withFields).not.toHaveBeenCalledWith(
-        expect.objectContaining({ diagnosticEvent: 'forward_settled' })
+        expect.objectContaining({ diagnosticEvent: 'forward_run' })
       );
 
       late.resolve({ applied: true });
-      await expect(first).resolves.toEqual({ applied: false, retryable: true });
+      await expect(first).resolves.toEqual({ applied: true });
       expect(withFields).toHaveBeenCalledWith(
         expect.objectContaining({
-          diagnosticEvent: 'forward_result',
+          diagnosticEvent: 'forward_run',
           result: 'delivered_late',
           applied: true,
         })

@@ -3993,6 +3993,7 @@ export class SandboxControl extends DurableObject<Env> {
             {
               sessionId: route.sessionId,
               operation: 'receiveSandboxOperationResult',
+              eventType: diagnostic.eventType,
               runMembers: 1,
               sentItems: 1,
               sentBytes: frameBytes,
@@ -4139,6 +4140,7 @@ export class SandboxControl extends DurableObject<Env> {
           this.logSkippedForwardRun({
             sessionId: fields.sessionId,
             operation,
+            eventType: fields.eventType,
             queueWaitMs: Date.now() - queuedAt,
             sessionAdmissionDepth: members[0]?.admissionDepth ?? 0,
             runMembers: 1,
@@ -4257,6 +4259,7 @@ export class SandboxControl extends DurableObject<Env> {
   private logSkippedForwardRun(input: {
     sessionId: string | number | boolean | null | undefined;
     operation: ForwardOperation;
+    eventType: string | number | boolean | null | undefined;
     queueWaitMs: number;
     sessionAdmissionDepth: number;
     runMembers: number;
@@ -4284,6 +4287,7 @@ export class SandboxControl extends DurableObject<Env> {
   ): Promise<SandboxEventBatchResult[]> {
     const queueWaitMs = Date.now() - (members[0]?.item.queuedAt ?? Date.now());
     const sessionAdmissionDepth = members[0]?.admissionDepth ?? 0;
+    const eventType = members[0]?.item.fields.eventType;
     const sentItems = members.reduce((sum, member) => sum + member.items, 0);
     const sentBytes = members.reduce((sum, member) => sum + member.bytes, 0);
     const eligibility = this.resolveForwardEligibility(identity, connection, admission);
@@ -4296,6 +4300,7 @@ export class SandboxControl extends DurableObject<Env> {
       this.logSkippedForwardRun({
         sessionId: admission.sessionId,
         operation: 'receiveSandboxControlEventBatch',
+        eventType,
         queueWaitMs,
         sessionAdmissionDepth,
         runMembers: members.length,
@@ -4310,6 +4315,7 @@ export class SandboxControl extends DurableObject<Env> {
       this.logSkippedForwardRun({
         sessionId: admission.sessionId,
         operation: 'receiveSandboxControlEventBatch',
+        eventType,
         queueWaitMs,
         sessionAdmissionDepth,
         runMembers: members.length,
@@ -4365,6 +4371,7 @@ export class SandboxControl extends DurableObject<Env> {
       {
         sessionId: admission.sessionId,
         operation: 'receiveSandboxControlEventBatch',
+        eventType,
         runMembers: members.length,
         sentItems,
         sentBytes,
@@ -4469,6 +4476,7 @@ export class SandboxControl extends DurableObject<Env> {
       this.logSkippedForwardRun({
         sessionId: diagnostic.sessionId,
         operation,
+        eventType: diagnostic.eventType,
         queueWaitMs: queueWaitMs ?? 0,
         sessionAdmissionDepth:
           typeof diagnostic.sessionAdmissionDepth === 'number'
@@ -4495,6 +4503,7 @@ export class SandboxControl extends DurableObject<Env> {
       {
         sessionId: diagnostic.sessionId,
         operation,
+        eventType: diagnostic.eventType,
         runMembers: 1,
         sentItems: diagnostic.frameItems,
         sentBytes: diagnostic.frameBytes,
@@ -4506,8 +4515,8 @@ export class SandboxControl extends DurableObject<Env> {
         rpcWaitMs: delivery.rpcWaitMs,
         appliedCount: outcome.delivered && applied ? 1 : 0,
         rejectedCount: outcome.delivered && !applied ? 1 : 0,
-        unknownCount: delivery.failed ? 1 : 0,
-        unattemptedCount: delivery.skipped ? 1 : 0,
+        unknownCount: !outcome.delivered && delivery.attempts > 0 ? 1 : 0,
+        unattemptedCount: !outcome.delivered && delivery.attempts === 0 ? 1 : 0,
       },
       outcome.level
     );

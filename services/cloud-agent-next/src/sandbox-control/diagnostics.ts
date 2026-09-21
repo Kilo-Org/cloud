@@ -94,6 +94,7 @@ export function logControlDiagnostic(
       level === 'info' &&
       fields.eventType === 'message.part.delta' &&
       (DELTA_PROGRESS_EVENTS.has(event) ||
+        (event === 'forward_run' && fields.result === 'delivered' && fields.applied === true) ||
         (event === 'session_event_result' && fields.applied === true))
     ) {
       return;

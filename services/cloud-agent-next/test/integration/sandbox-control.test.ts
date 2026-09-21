@@ -7837,6 +7837,7 @@ function captureRevision(request: RequestFrame): number {
 type ForwardDiagnosticEmission = {
   event: string;
   fields: ControlDiagnosticFields;
+  level?: 'info' | 'warn' | 'error';
 };
 
 async function captureControlDiagnostics(
@@ -7855,7 +7856,7 @@ async function captureControlDiagnostics(
     const spy = vi
       .spyOn(prototype, 'logDiagnostic')
       .mockImplementation((event: string, fields: ControlDiagnosticFields, level) => {
-        emissions.push({ event, fields });
+        emissions.push({ event, fields, level });
         original.call(instance, event, fields, level);
       });
     return { emissions, restore: () => spy.mockRestore() };
@@ -7981,6 +7982,65 @@ async function gateOperationResultReceiver(
     return { isReached: () => reached, restore: () => spy.mockRestore() };
   });
   return { ...gate, release: () => release.resolve() };
+}
+
+function deltaPublicationItem(
+  sequence: number,
+  session: { directory: string; kiloSessionId: string },
+  marker: string
+): SandboxEventPublicationPayload {
+  return {
+    event: 'session.event',
+    receiptId: crypto.randomUUID(),
+    sequence,
+    session: {
+      directory: session.directory,
+      kiloSessionId: session.kiloSessionId,
+      rootKiloSessionId: session.kiloSessionId,
+    },
+    payload: {
+      type: 'message.part.delta',
+      properties: {
+        sessionID: session.kiloSessionId,
+        messageID: `msg_${marker}`,
+        partID: `part_${marker}`,
+        field: 'text',
+        delta: marker,
+      },
+    },
+  };
+}
+
+async function gateEventReceiver(
+  session: ReturnType<typeof env.SANDBOX_SESSION.getByName>
+): Promise<{ isReached: () => boolean; release: () => void; restore: () => void }> {
+  const release = Promise.withResolvers<void>();
+  const gate = await runInDurableObject(session, instance => {
+    const prototype = Object.getPrototypeOf(instance) as SandboxSession;
+    const original = instance.receiveSandboxControlEvent.bind(instance);
+    let reached = false;
+    let gated = false;
+    const spy = vi.spyOn(prototype, 'receiveSandboxControlEvent').mockImplementation(input => {
+      if (gated) return original(input);
+      gated = true;
+      reached = true;
+      return release.promise.then(() => original(input));
+    });
+    return { isReached: () => reached, restore: () => spy.mockRestore() };
+  });
+  return { ...gate, release: () => release.resolve() };
+}
+
+async function failEventReceiver(
+  session: ReturnType<typeof env.SANDBOX_SESSION.getByName>
+): Promise<{ restore: () => void }> {
+  const spy = await runInDurableObject(session, instance => {
+    const prototype = Object.getPrototypeOf(instance) as SandboxSession;
+    return vi.spyOn(prototype, 'receiveSandboxControlEvent').mockImplementation(() => {
+      throw new Error('injected receiver failure');
+    });
+  });
+  return { restore: () => spy.mockRestore() };
 }
 
 describe('SandboxSession operation authorization admission', () => {
@@ -16390,6 +16450,86 @@ describe('SandboxControl event batch forwarding', () => {
       });
     } finally {
       receiver.restore();
+      diagnostics.restore();
+      fixture.close();
+    }
+  });
+
+  it('records a single-frame delta run with its eventType when the post-send fence skips it', async () => {
+    const fixture = await worktreeFixture({ eventReceipts: true });
+    const diagnostics = await captureControlDiagnostics(fixture.control);
+    try {
+      const identity = { directory: fixture.directory, kiloSessionId: fixture.kiloSessionId };
+      const deltaRuns = () =>
+        diagnostics.emissions.filter(
+          emission =>
+            emission.event === 'forward_run' && emission.fields.eventType === 'message.part.delta'
+        );
+
+      // An applied delta single frame carries the eventType/result/applied the
+      // delta-progress suppression predicate matches.
+      const applied = await fixture.sendPublication(
+        deltaPublicationItem(1, identity, 'delta_applied')
+      );
+      expect(applied.ok).toBe(true);
+      const appliedRun = await vi.waitFor(() => {
+        const run = deltaRuns().find(emission => emission.fields.result === 'delivered');
+        expect(run).toBeDefined();
+        return run!;
+      });
+      expect(appliedRun.fields).toMatchObject({
+        operation: 'receiveSandboxControlEvent',
+        applied: true,
+        attempts: 1,
+      });
+
+      // A delta whose RPC is dispatched and then skipped by the post-send
+      // identity fence is logged with the eventType the guard needs, and is
+      // unknown rather than unattempted because the send was attempted.
+      const receiver = await gateEventReceiver(fixture.session);
+      try {
+        const skipped = fixture.sendPublication(deltaPublicationItem(2, identity, 'delta_skipped'));
+        await vi.waitFor(() => expect(receiver.isReached()).toBe(true));
+        await fixture.rotateSocket();
+        receiver.release();
+        // The response may be lost when the connection is replaced; the run
+        // record is the durable evidence.
+        void skipped.catch(() => undefined);
+      } finally {
+        receiver.restore();
+      }
+      const skippedRun = await vi.waitFor(() => {
+        const run = deltaRuns().find(emission => emission.fields.result === 'skipped');
+        expect(run).toBeDefined();
+        return run!;
+      });
+      expect(skippedRun.fields).toMatchObject({
+        operation: 'receiveSandboxControlEvent',
+        attempts: 1,
+        unknownCount: 1,
+        unattemptedCount: 0,
+      });
+
+      // A dispatched-and-failed delta is still logged, at warn level.
+      const failing = await failEventReceiver(fixture.session);
+      try {
+        const failed = await fixture.sendPublication(
+          deltaPublicationItem(3, identity, 'delta_failed')
+        );
+        expect(failed.ok).toBe(false);
+      } finally {
+        failing.restore();
+      }
+      const failedRun = await vi.waitFor(() => {
+        const run = deltaRuns().find(emission => emission.fields.result === 'failed');
+        expect(run).toBeDefined();
+        return run!;
+      });
+      expect(failedRun).toMatchObject({
+        level: 'warn',
+        fields: { attempts: 1, unknownCount: 1, unattemptedCount: 0 },
+      });
+    } finally {
       diagnostics.restore();
       fixture.close();
     }

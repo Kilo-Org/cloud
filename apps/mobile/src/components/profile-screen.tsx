@@ -2,7 +2,6 @@
 import { useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BookOpenCheck,
@@ -17,10 +16,9 @@ import {
   SlidersHorizontal,
   Trash2,
 } from '@/components/ui/icons';
-import { Alert, Platform, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
-import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -81,11 +79,6 @@ export function ProfileScreen() {
   const isAuthenticated = token != null;
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
-  // Android's native alert paints every button with the theme accent, so
-  // `Alert.alert`'s destructive style never shows the red affordance there.
-  // Android opens the in-app confirmation instead; iOS keeps the native alert,
-  // which already renders the destructive sign-out choice in red.
-  const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
   const {
     data,
     isLoading,
@@ -136,11 +129,12 @@ export function ProfileScreen() {
     ]);
   };
 
+  // The sign-out confirmation is the shared native alert on both platforms:
+  // Android's AppCompat dialog takes its panel and action accent from the
+  // activity theme, which plugins/withAndroidAlertDialogTheme points at the app
+  // tokens, and iOS renders the same call as a `UIAlertController` that already
+  // follows the device appearance.
   const confirmSignOut = () => {
-    if (Platform.OS === 'android') {
-      setSignOutConfirmVisible(true);
-      return;
-    }
     Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
@@ -389,21 +383,6 @@ export function ProfileScreen() {
           </Text>
         </View>
       </TabScreenScrollView>
-
-      {signOutConfirmVisible && (
-        <DestructiveConfirmDialog
-          title={t('profile.signOutTitle')}
-          message={t('profile.signOutMessage')}
-          confirmLabel={t('common.signOut')}
-          onCancel={() => {
-            setSignOutConfirmVisible(false);
-          }}
-          onConfirm={() => {
-            setSignOutConfirmVisible(false);
-            void signOut();
-          }}
-        />
-      )}
     </View>
   );
 }

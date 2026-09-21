@@ -248,12 +248,16 @@ export function NewSessionRepositorySection({
           }}
         >
           <ExternalLink size={16} color={colors.foreground} />
-          {/* One line per action label: the row's height is the button's, so a
-              label that wraps ("Open GitLab" broke onto two lines beside the
-              one-line "Open GitHub" sibling — explorer new-session-filled /
-              new-session-kb-down) has nowhere to grow. A longer locale
-              ellipsizes; the full copy stays the accessible name. */}
-          <Text numberOfLines={1}>
+          {/*
+            The label owns the row's remaining width and is pinned to one line.
+            A box sized to the label's own measured width is a fraction narrower
+            than the glyphs Android lays out, so "Open GitLab" wrapped onto two
+            lines and grew the button taller than its one-line siblings; giving
+            the label the free space keeps its box wider than the text, and
+            `numberOfLines` pins the line. The explorer captures
+            new-session-filled and new-session-kb-down both showed that wrap.
+          */}
+          <Text className="flex-1 text-center" numberOfLines={1}>
             {t(selectedRepository === null ? copy.openLabel : copy.connectTitle)}
           </Text>
         </Button>

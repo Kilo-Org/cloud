@@ -22,6 +22,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { TabBarLabelContext } from '@/lib/tab-bar-clearance';
 import {
   getEffectiveTabBarHeight,
   getTabBarHorizontalInset,
@@ -76,21 +77,40 @@ export default function TabsLayout() {
   const segments = useSegments();
   const colors = useThemeColors();
   const { bottom, left, right } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
   const hideTabs = shouldHideTabBar(pathname);
-  const showTabLabel = shouldShowTabLabel(fontScale);
-  const tabBarHeight = getEffectiveTabBarHeight({
-    bottomInset: bottom,
-    platform: Platform.OS,
-    fontScale,
-  });
-  const tabBarHorizontalInset = getTabBarHorizontalInset({ left, right });
-  const tabIconSize = getTabBarIconSize(fontScale);
   const showKiloClawTab = useKiloClawTabVisible();
   const showQuickChatTab = useFeatureFlag(FEATURE_FLAG_QUICK_CHAT, false);
   const tabFlags = { showKiloClaw: showKiloClawTab, showQuickChat: showQuickChatTab };
   const tabCount = visibleTabCount(showKiloClawTab, showQuickChatTab);
+  // The label box is the tab item minus the bar's side safe areas and the
+  // tab item's own padding (subtracted inside `tabLabelFits`).
+  const tabItemWidth = (width - left - right) / tabCount;
   const { t } = useTranslation();
+  const homeLabel = t('tabs.home');
+  const kiloclawLabel =
+    fontScale > TAB_LABEL_WRAP_FONT_SCALE ? t('tabs.kiloclawWrapped') : t('common.kiloclaw');
+  const agentsLabel = t('common.agents');
+  const chatLabel = t('common.chat');
+  const profileLabel = t('common.profile');
+  // The label set in render order, so the visible/dropped decision measures
+  // exactly the strings each `TabLabel` renders.
+  const tabLabels = [
+    homeLabel,
+    ...(showKiloClawTab ? [kiloclawLabel] : []),
+    agentsLabel,
+    ...(showQuickChatTab ? [chatLabel] : []),
+    profileLabel,
+  ];
+  const showTabLabel = shouldShowTabLabel(fontScale, tabItemWidth, tabLabels);
+  const tabBarHeight = getEffectiveTabBarHeight({
+    bottomInset: bottom,
+    platform: Platform.OS,
+    fontScale,
+    showLabel: showTabLabel,
+  });
+  const tabBarHorizontalInset = getTabBarHorizontalInset({ left, right });
+  const tabIconSize = getTabBarIconSize(fontScale);
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const { activeSessions, isLoading, isError } = useLiveAgentSessions({
     organizationId,
@@ -136,7 +156,10 @@ export default function TabsLayout() {
     }
   }, [showQuickChatTab, onChatTab, router]);
 
-  return (
+  // The label decision is published to the tab screens, whose content
+  // clearance must match the height this layout renders (the width rule can
+  // drop the labels without the callers seeing the window width).
+  const tabsLayout = (
     <StateSurfaceInsets bottomInset={hideTabs ? 0 : tabBarHeight + 16}>
       <Tabs
         screenOptions={{
@@ -169,7 +192,7 @@ export default function TabsLayout() {
               tabBarPosition('home', tabFlags) ?? 1,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.home')} focused={focused} />,
+            tabBarLabel: ({ focused }) => <TabLabel label={homeLabel} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <House size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -186,16 +209,7 @@ export default function TabsLayout() {
               tabBarPosition('kiloclaw', tabFlags) ?? 2,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => (
-              <TabLabel
-                label={
-                  fontScale > TAB_LABEL_WRAP_FONT_SCALE
-                    ? t('tabs.kiloclawWrapped')
-                    : t('common.kiloclaw')
-                }
-                focused={focused}
-              />
-            ),
+            tabBarLabel: ({ focused }) => <TabLabel label={kiloclawLabel} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <MessageSquare size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -220,7 +234,7 @@ export default function TabsLayout() {
               tabBarPosition('agents', tabFlags) ?? 2,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('common.agents')} focused={focused} />,
+            tabBarLabel: ({ focused }) => <TabLabel label={agentsLabel} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -237,7 +251,7 @@ export default function TabsLayout() {
               tabBarPosition('chat', tabFlags) ?? 3,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('common.chat')} focused={focused} />,
+            tabBarLabel: ({ focused }) => <TabLabel label={chatLabel} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -253,9 +267,7 @@ export default function TabsLayout() {
               tabCount,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => (
-              <TabLabel label={t('common.profile')} focused={focused} />
-            ),
+            tabBarLabel: ({ focused }) => <TabLabel label={profileLabel} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -271,4 +283,5 @@ export default function TabsLayout() {
       </Tabs>
     </StateSurfaceInsets>
   );
+  return <TabBarLabelContext value={showTabLabel}>{tabsLayout}</TabBarLabelContext>;
 }

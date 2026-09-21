@@ -35,6 +35,15 @@ const SAFE_AREA_MODULE = /react-native-safe-area-context/;
 const ENTRY_POINT = 'screen-insets.ts';
 const PROFILE_SCREEN = '../components/profile-screen.tsx';
 
+/**
+ * The Profile screen's one deliberate platform fork: the sign-out confirmation
+ * (#6393) shows the in-app destructive dialog on Android and the native alert
+ * on iOS. It is not on the side-inset alignment path, so it is removed before
+ * the branch scan; a fork anywhere else in the file still fails.
+ */
+const SIGN_OUT_PLATFORM_FORK =
+  /if \(Platform\.OS === 'android'\) \{\n\s+setSignOutConfirmVisible\(true\);\n\s+return;\n\s+\}/;
+
 describe('screen side insets: one implementation for both platforms', () => {
   it('reads the native safe-area module only in the entry point, with no platform branch', () => {
     const entry = source(ENTRY_POINT);
@@ -48,6 +57,13 @@ describe('screen side insets: one implementation for both platforms', () => {
     expect(profile, `${PROFILE_SCREEN} imports the native safe-area module again`).not.toMatch(
       SAFE_AREA_MODULE
     );
-    expect(profile, `${PROFILE_SCREEN} carries a per-platform branch`).not.toMatch(PLATFORM_BRANCH);
+    expect(
+      profile,
+      `${PROFILE_SCREEN} no longer carries the sign-out platform fork this suite excludes`
+    ).toMatch(SIGN_OUT_PLATFORM_FORK);
+    expect(
+      profile.replace(SIGN_OUT_PLATFORM_FORK, ''),
+      `${PROFILE_SCREEN} carries a per-platform branch`
+    ).not.toMatch(PLATFORM_BRANCH);
   });
 });

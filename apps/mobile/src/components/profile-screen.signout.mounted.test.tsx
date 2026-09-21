@@ -31,6 +31,14 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// `@/lib/screen-insets` reads the native module; its commonjs build is not
+// transformable here and the side insets are irrelevant to the sign-out flow.
+const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => insetsState,
+}));
+
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',

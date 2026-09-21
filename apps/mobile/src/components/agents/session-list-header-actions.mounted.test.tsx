@@ -53,16 +53,25 @@ function boxDp(className: string): { width: number; height: number } {
   return { width: size('w'), height: size('h') };
 }
 
-/** The smallest per-side reach a hitSlop expresses, in dp. */
-function slopDp(hitSlop: unknown): number {
+/** The reach a hitSlop expresses on one side, in dp; a number reaches every side. */
+function sideSlopDp(hitSlop: unknown, side: 'top' | 'right' | 'bottom' | 'left'): number {
   if (typeof hitSlop === 'number') {
     return hitSlop;
   }
   if (hitSlop && typeof hitSlop === 'object') {
-    const sides = Object.values(hitSlop as Record<string, number | undefined>);
-    return Math.min(...sides.map(side => side ?? 0));
+    return (hitSlop as Record<string, number | undefined>)[side] ?? 0;
   }
   return 0;
+}
+
+/** The smallest per-side reach a hitSlop expresses, in dp. */
+function slopDp(hitSlop: unknown): number {
+  return Math.min(
+    sideSlopDp(hitSlop, 'top'),
+    sideSlopDp(hitSlop, 'right'),
+    sideSlopDp(hitSlop, 'bottom'),
+    sideSlopDp(hitSlop, 'left')
+  );
 }
 
 function pressesWithLabel(root: I, label: string): I[] {
@@ -209,10 +218,11 @@ describe('SessionListHeaderActions new-session control', () => {
     expect(gapDp).toBe(14);
 
     const newSessionSlop = newSession.props.hitSlop as Insets;
-    const filterSlop = filter.props.hitSlop as Insets;
+    // The filter's slop is uniform, so its left reach is the same on every side.
+    const filterLeftSlop = sideSlopDp(filter.props.hitSlop, 'left');
     // The new-session control sits left of the filter, so the gap has to fit
     // both facing slops; more than the gap means the two regions overlap.
-    expect(newSessionSlop.right + filterSlop.left).toBeLessThanOrEqual(gapDp);
+    expect(newSessionSlop.right + filterLeftSlop).toBeLessThanOrEqual(gapDp);
     // Capping the right side must not drop the control below the design target.
     const box = boxDp(newSession.props.className as string);
     expect(box.width + newSessionSlop.left + newSessionSlop.right).toBeGreaterThanOrEqual(

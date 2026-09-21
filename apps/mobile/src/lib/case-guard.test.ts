@@ -40,11 +40,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/use-new-session-repos.ts': 'repo key normalization',
   'lib/organization-invoice-download.ts': 'filename comparison',
   'lib/agent-attachments/validate.ts': 'file-extension normalization',
-  'lib/auth/passkey-client.ts':
-    'native passkey error and credential-API error classification key; not display text, display copy uses catalog keys',
   'lib/auth/use-native-auth.ts': 'email normalization',
-  'lib/auth/passkey-client.ts': 'native credential-API error classification, never display text',
-  'lib/auth/passkey-client.ts': 'credential-error classification',
   'lib/telemetry/install-error-reporting.ts': 'hostname comparison',
   'lib/pr-review/diff/highlight.ts': 'file-extension normalization',
   'lib/pr-review/diff/navigator-file-filter.ts': 'search folding',

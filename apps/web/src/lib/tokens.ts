@@ -214,6 +214,26 @@ function tryJwtVerify(token: string) {
   }
 }
 
+/**
+ * True when the request presented a credential that failed verification, rather
+ * than presenting none.
+ *
+ * `validateAuthorizationHeader` reports why it refused a request in `reason`.
+ * `missing_credentials` means no bearer token was sent, and `audience_not_allowed`
+ * means a valid token was sent to an endpoint it is not scoped for — an expected
+ * fall-through, not a broken credential. Every other reason, including
+ * `invalid_token` and `token_version_outdated`, means the caller supplied a
+ * credential that could not be accepted.
+ *
+ * Such a request must not be answered as an anonymous caller. The caller
+ * believes it is authenticated, so downgrading it silently drops the account,
+ * its organization, its BYOK keys and its credits, and hides the broken
+ * credential from the client that sent it.
+ */
+export function isRejectedCredentialReason(reason: string | undefined): boolean {
+  return reason === 'invalid_token' || reason === 'token_version_outdated';
+}
+
 export function validateAuthorizationHeader(
   headers: Headers,
   options?: { expectedAudience?: string; runtimeProxyAttestationVerified?: boolean }
@@ -222,7 +242,10 @@ export function validateAuthorizationHeader(
   const authHeader = headers.get('authorization');
   if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
     warnExceptInTest('Authorization header missing or invalid');
-    return { error: 'Unauthorized - authentication required' };
+    return {
+      error: 'Unauthorized - authentication required',
+      reason: 'missing_credentials',
+    };
   }
 
   const token = authHeader.substring(7);
@@ -230,7 +253,10 @@ export function validateAuthorizationHeader(
 
   if (!payload) {
     warnExceptInTest(`Invalid token (${traceability_logging_id})`);
-    return { error: `Invalid token (${traceability_logging_id})` };
+    return {
+      error: `Invalid token (${traceability_logging_id})`,
+      reason: 'invalid_token',
+    };
   }
 
   if (
@@ -240,7 +266,10 @@ export function validateAuthorizationHeader(
     })
   ) {
     warnExceptInTest(`Invalid token (${traceability_logging_id})`);
-    return { error: `Invalid token (${traceability_logging_id})` };
+    return {
+      error: `Invalid token (${traceability_logging_id})`,
+      reason: 'audience_not_allowed',
+    };
   }
 
   if (payload.version != JWT_TOKEN_VERSION) {
@@ -248,7 +277,10 @@ export function validateAuthorizationHeader(
       version: payload.version,
       kiloUserId: payload.kiloUserId,
     });
-    return { error: `Token version outdated, please re-authenticate (${traceability_logging_id})` };
+    return {
+      error: `Token version outdated, please re-authenticate (${traceability_logging_id})`,
+      reason: 'token_version_outdated',
+    };
   }
 
   if (
@@ -262,7 +294,10 @@ export function validateAuthorizationHeader(
     );
     if (!runtimeAuthorization.success || !options?.runtimeProxyAttestationVerified) {
       warnExceptInTest(`Invalid token (${traceability_logging_id})`);
-      return { error: `Invalid token (${traceability_logging_id})` };
+      return {
+        error: `Invalid token (${traceability_logging_id})`,
+        reason: 'runtime_attestation_required',
+      };
     }
   }
 

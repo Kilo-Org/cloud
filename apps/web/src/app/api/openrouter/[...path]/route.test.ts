@@ -3,7 +3,11 @@ import type { User } from '@kilocode/db/schema';
 import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@/lib/user/server';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { JWT_TOKEN_VERSION, validateAuthorizationHeader } from '@/lib/tokens';
+import {
+  JWT_TOKEN_VERSION,
+  validateAuthorizationHeader,
+  isRejectedCredentialReason,
+} from '@/lib/tokens';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
@@ -17,7 +21,7 @@ import {
   isValidOpenRouterModelId,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
+import { accountForMicrodollarUsage, INVALID_TOKEN_CODE } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ReasoningDetailsTransform, type Provider } from '@/lib/ai-gateway/providers/types';
 import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
 import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
@@ -212,6 +216,19 @@ function signedToken(audience: string) {
   );
 }
 
+function signedTokenWithVersion(audience: string, version: number) {
+  return jwt.sign(
+    {
+      version,
+      kiloUserId: 'user-123',
+      apiTokenPepper: 'test-pepper',
+      aud: audience,
+    },
+    NEXTAUTH_SECRET,
+    { algorithm: 'HS256' }
+  );
+}
+
 function setSignedTokenAuth(token: string, authenticatedResult: AuthResult) {
   mockedGetUserFromAuth.mockImplementation(async options => {
     const validation = validateAuthorizationHeader(
@@ -222,6 +239,7 @@ function setSignedTokenAuth(token: string, authenticatedResult: AuthResult) {
       return {
         user: null,
         authFailedResponse: new Response(validation.error, { status: 401 }),
+        credentialsRejected: isRejectedCredentialReason(validation.reason),
         organizationId: undefined,
       } as AuthResult;
     }
@@ -384,6 +402,60 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
     });
     expect(mockedGetProvider).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed token instead of answering as anonymous', async () => {
+    setSignedTokenAuth('not-a-jwt', {
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 99,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest(makeBody(stepfun_37_flash_free_model.public_id), {
+        // Even a free model must not be served anonymously to a caller that
+        // sent a credential: the caller believes it is authenticated.
+        authorization: 'Bearer not-a-jwt',
+      }) as never
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: INVALID_TOKEN_CODE },
+    });
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects an outdated token version instead of answering as anonymous', async () => {
+    const token = signedTokenWithVersion(KILO_GATEWAY_AUDIENCE, JWT_TOKEN_VERSION - 1);
+    setSignedTokenAuth(token, {
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 99,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest(makeBody(stepfun_37_flash_free_model.public_id), {
+        authorization: `Bearer ${token}`,
+      }) as never
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: INVALID_TOKEN_CODE },
+    });
+    expect(mockedGetProvider).not.toHaveBeenCalled();
   });
 
   it('returns 402 for a zero balance without an in-flight auto top-up', async () => {

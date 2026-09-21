@@ -141,6 +141,7 @@ import {
   SANDBOX_CONTROL_WS_TAG,
   type RequestFrame,
   type ResponseFrame,
+  type SandboxEventBatchResult,
   type SandboxEventPublicationPayload,
   type SessionAttachPayload,
   type SessionOperationDelivery,

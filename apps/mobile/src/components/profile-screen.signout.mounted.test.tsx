@@ -164,57 +164,31 @@ describe('ProfileScreen sign-out confirmation', () => {
   }
 
   // The finding: the native Android alert painted sign-out and cancel the same
-  // teal, so the destructive choice had no distinct affordance. Android renders
-  // the in-app dialog whose sign-out control carries the destructive (red)
-  // variant.
-  it('opens the in-app dialog whose destructive control signs out on android', async () => {
-    platform.os = 'android';
-    const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
+  // teal, so the destructive choice had no distinct affordance. Sign-out uses
+  // one cross-platform implementation, the shared in-app dialog, whose
+  // destructive control carries the destructive (red) variant on both
+  // platforms.
+  it.each(['android', 'ios'] as const)(
+    'opens the in-app dialog whose destructive control signs out on %s',
+    async os => {
+      platform.os = os;
+      const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
 
-    pressSignOutTile(renderer);
+      pressSignOutTile(renderer);
 
-    // Android never falls back to the native alert.
-    expect(alertFn).not.toHaveBeenCalled();
-    // Opening the confirmation signs nobody out; only its destructive control does.
-    expect(signOutFn).not.toHaveBeenCalled();
-    const confirm = renderer.root.find(
-      node => isType(node, 'Button') && node.props.variant === 'destructive'
-    );
-    act(() => {
-      (confirm.props as { onPress?: () => void }).onPress?.();
-    });
-    expect(signOutFn).toHaveBeenCalledTimes(1);
+      // The native alert is never used for sign-out on either platform.
+      expect(alertFn).not.toHaveBeenCalled();
+      // Opening the confirmation signs nobody out; only its destructive control does.
+      expect(signOutFn).not.toHaveBeenCalled();
+      const confirm = renderer.root.find(
+        node => isType(node, 'Button') && node.props.variant === 'destructive'
+      );
+      act(() => {
+        (confirm.props as { onPress?: () => void }).onPress?.();
+      });
+      expect(signOutFn).toHaveBeenCalledTimes(1);
 
-    unmount();
-  });
-
-  // `apps/mobile/AGENTS.md`: "Prefer native sheets, alerts, pickers, gestures,
-  // and keyboard behavior. Confirm destructive actions with `Alert.alert()`."
-  // iOS keeps the native alert, whose `style: 'destructive'` already renders the
-  // sign-out choice in red.
-  it('keeps the native alert whose destructive button signs out on ios', async () => {
-    platform.os = 'ios';
-    const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
-
-    pressSignOutTile(renderer);
-
-    // No in-app dialog on iOS: the confirmation is the native alert.
-    expect(
-      renderer.root.findAll(node => isType(node, 'Button') && node.props.variant === 'destructive')
-    ).toHaveLength(0);
-    expect(alertFn).toHaveBeenCalledTimes(1);
-    // Opening the confirmation signs nobody out; only the destructive alert
-    // button does.
-    expect(signOutFn).not.toHaveBeenCalled();
-    const buttons = alertFn.mock.calls[0]?.[2] as
-      | { style?: string; onPress?: () => void }[]
-      | undefined;
-    const destructive = buttons?.find(button => button.style === 'destructive');
-    act(() => {
-      destructive?.onPress?.();
-    });
-    expect(signOutFn).toHaveBeenCalledTimes(1);
-
-    unmount();
-  });
+      unmount();
+    }
+  );
 });

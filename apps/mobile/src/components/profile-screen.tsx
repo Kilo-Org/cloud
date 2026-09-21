@@ -20,10 +20,7 @@ import {
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
-import {
-  DestructiveConfirmDialog,
-  usesInAppDestructiveConfirm,
-} from '@/components/destructive-confirm-dialog';
+import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -86,8 +83,8 @@ export function ProfileScreen() {
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   // Android's native alert paints every button with the theme accent, so
   // `Alert.alert`'s destructive style never shows the red affordance there.
-  // Android opens the in-app confirmation instead; iOS keeps the native alert,
-  // which already renders the destructive sign-out choice in red.
+  // Sign-out opens the shared in-app confirmation on both platforms, so the
+  // destructive choice carries the red affordance everywhere.
   const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
   const {
     data,
@@ -140,18 +137,7 @@ export function ProfileScreen() {
   };
 
   const confirmSignOut = () => {
-    if (usesInAppDestructiveConfirm()) {
-      setSignOutConfirmVisible(true);
-      return;
-    }
-    Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.signOut'),
-        style: 'destructive',
-        onPress: () => void signOut(),
-      },
-    ]);
+    setSignOutConfirmVisible(true);
   };
 
   const showPrivacyChoices = () => {

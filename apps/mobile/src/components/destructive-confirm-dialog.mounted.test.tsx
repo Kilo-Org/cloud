@@ -10,7 +10,6 @@ import { DestructiveConfirmDialog } from './destructive-confirm-dialog';
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Modal: 'Modal',
-  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
@@ -85,8 +84,9 @@ afterEach(() => {
 
 describe('DestructiveConfirmDialog', () => {
   // The finding's defect is that the destructive sign-out action had the same
-  // affordance as the neutral cancel on Android. The confirm control must carry
-  // the destructive (red) fill while cancel stays a neutral outline.
+  // affordance as the neutral cancel. The confirm control must carry the
+  // destructive (red) fill while cancel stays a neutral outline, on both
+  // platforms.
   it('gives the confirm action the destructive fill and cancel a neutral one', () => {
     const root = mount();
 
@@ -133,7 +133,7 @@ describe('DestructiveConfirmDialog', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it('dismisses without confirming on the Android back request', () => {
+  it('dismisses without confirming when the modal requests close', () => {
     const root = mount();
 
     act(() => {

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Modal, Platform, Pressable, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -13,29 +13,14 @@ type DestructiveConfirmDialogProps = {
 };
 
 /**
- * Whether a destructive confirmation must render in-app instead of as the
- * native `Alert.alert`.
- *
- * Android's native `AlertDialog` paints every button with the theme accent, so
- * `Alert.alert`'s `style: 'destructive'` never reaches the screen there. iOS
- * honors the style and keeps the native alert, which renders the destructive
- * choice in red.
- *
- * Read per call, never once at module load, so a test (and a runtime that
- * changes platform) sees the current platform.
- */
-export function usesInAppDestructiveConfirm(): boolean {
-  return Platform.OS === 'android';
-}
-
-/**
  * In-app confirmation for a destructive action, rendered with the destructive
  * (red) button variant.
  *
- * Android's native `AlertDialog` paints every button with the theme accent, so
- * `Alert.alert`'s `style: 'destructive'` never reaches the screen there (iOS
- * honors it and keeps the native alert). Android renders this surface instead,
- * so the destructive choice still carries the red affordance.
+ * One implementation on both platforms: `Alert.alert` has no cross-platform
+ * destructive affordance. Android's native `AlertDialog` paints every button
+ * with the theme accent, so `Alert.alert`'s `style: 'destructive'` never
+ * reaches the screen there, while this `Modal`-based surface renders the red
+ * choice on Android and iOS alike.
  *
  * Mount it only while it should be open (e.g. `{confirming && <DestructiveConfirmDialog ... />}`),
  * the same lifecycle `RenameModal` uses.

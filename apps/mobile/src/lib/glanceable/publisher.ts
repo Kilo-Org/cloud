@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one publisher state machine: derive, gate, renew, coalesce, and terminal end */
 import {
   buildGlanceableSnapshot,
   GLANCEABLE_COALESCE_MS,
@@ -16,6 +17,7 @@ import {
   type GlanceableSink,
   type GlanceableSinkContext,
   guardSink,
+  writeGlanceableFrame,
 } from './sink-registry';
 import { getSurfaceExtras, setSurfaceExtras } from './surface-extras';
 import { selectWaitingAsk, type WaitingAsk, type WaitingAskRow } from './waiting-ask';
@@ -86,6 +88,27 @@ type TimerHandle = ReturnType<typeof setTimeout>;
  */
 export const GLANCEABLE_RENEW_MARGIN_MS = GLANCEABLE_STALE_MS / 2;
 
+/**
+ * Ceiling for the renewal retry backoff. A sink that rejects every write never
+ * advances the published deadline, so without a bound the unchanged-content
+ * renewal would re-emit on every heartbeat — the in-app amplification the heat
+ * fix removed. The wait doubles from the coalesce window to this ceiling, so a
+ * transient ActivityKit failure is still retried within seconds while a
+ * permanently broken surface is attempted at most once per five minutes.
+ */
+export const GLANCEABLE_RENEW_RETRY_MAX_MS = 5 * 60_000;
+
+/**
+ * Wait before the next renewal attempt, from the number of consecutive writes
+ * whose sinks rejected them: one coalesce window for the first, then doubling
+ * up to the ceiling. A landed write clears the count, so a surface that
+ * recovers is back to the normal renewal cadence at once.
+ */
+export function glanceableRenewRetryDelayMs(failures: number): number {
+  const delay = GLANCEABLE_COALESCE_MS * 2 ** Math.max(0, failures - 1);
+  return Math.min(delay, GLANCEABLE_RENEW_RETRY_MAX_MS);
+}
+
 export class GlanceablePublisher {
   private readonly sinks: readonly GlanceableSink[];
   private readonly now: () => number;
@@ -99,12 +122,26 @@ export class GlanceablePublisher {
   private current: GlanceableAgentsSnapshot | null;
   private activityStarted: boolean;
   /**
-   * `updatedAt` of the snapshot last written to a sink, i.e. the frame the
-   * native stale deadline keys off. A heartbeat whose visible content did not
-   * change leaves it alone, so the renewal gate can tell how close that
-   * deadline is.
+   * `updatedAt` of the frame the native surface accepted, i.e. the one its stale
+   * deadline keys off. A heartbeat whose visible content did not change leaves
+   * it alone, so the renewal gate can tell how close that deadline is. A
+   * rejected write leaves it alone too, so the frame the surface actually holds
+   * is still the one measured.
    */
   private lastPublishedAt: number | null = null;
+  /**
+   * Consecutive writes whose sinks rejected them. The renewal retry spaces
+   * itself by this count, so a sink that throws on every call cannot make the
+   * heartbeat re-emit every few seconds. A landed write clears it.
+   */
+  private writeFailures = 0;
+  /**
+   * When the last write was attempted, accepted or not. The renewal gate
+   * anchors the backoff here, so a rejected renewal spends its wait instead of
+   * the heartbeat re-emitting every time. Non-null is also the "a write was
+   * attempted in this process" latch the restart reconciliation reads.
+   */
+  private lastWriteAttemptAt: number | null = null;
   private coalesceTimer: TimerHandle | null = null;
   private terminalTimer: TimerHandle | null = null;
   private pendingCoalesced: {
@@ -183,10 +220,20 @@ export class GlanceablePublisher {
     // call is what retries a Live Activity start the sink could not raise (a
     // transient ActivityKit failure, or a start deferred behind a dismissal),
     // and leaving it out of the renewal would strand that surface until the
-    // counts next changed. Keep the revision monotonic for the next real emit,
-    // and leave any pending coalesced emit alone. The first eligible emit
+    // count next changed. Keep the revision monotonic for the next real emit,
+    // and leave any pending coalesced emit alone. A renewal the sinks rejected is
+    // retried on a doubling backoff rather than on every heartbeat, so a
+    // permanently broken surface cannot re-emit forever. The first eligible emit
     // (nothing started yet) is exempt: it is what raises the surface.
+    //
+    // Nothing attempted yet in this process is exempt too. The native surfaces
+    // outlive the JS process: after a restart inside the 8 s terminal window the
+    // persisted snapshot is already empty, so an unchanged empty heartbeat would
+    // return here and the Android sink's `!notificationActive → endNotification`
+    // dismissal would never run, leaving the orphaned ongoing card in the shade.
+    // Let the first write through so each sink reconciles the surface it finds.
     if (
+      this.lastWriteAttemptAt !== null &&
       this.current !== null &&
       hasSameGlanceableContent(
         { snapshot: this.current, newestSessionTitle: previousTitle },
@@ -194,10 +241,7 @@ export class GlanceablePublisher {
       ) &&
       (this.activityStarted || !isEligibleGlanceableWork(snapshot))
     ) {
-      if (
-        isEligibleGlanceableWork(snapshot) &&
-        (this.lastPublishedAt === null || now - this.lastPublishedAt >= GLANCEABLE_RENEW_MARGIN_MS)
-      ) {
+      if (isEligibleGlanceableWork(snapshot) && this.isRenewalDue(now)) {
         // The renewal frame carries the same visible content as any pending
         // coalesced emit but a newer revision, so emitting it supersedes that
         // timer: leaving the timer armed would republish the older frame after
@@ -350,27 +394,49 @@ export class GlanceablePublisher {
     return skip === undefined ? sessions : sessions.filter(row => row.id !== skip);
   }
 
-  private emit(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext): void {
-    this.lastPublishedAt = Date.parse(snapshot.updatedAt);
-    for (const sink of this.sinks) {
-      // Guarded separately: a failing widget timeline write must not skip the
-      // Live Activity start that follows it.
-      guardSink('emit_publish', () => {
-        sink.publish(snapshot);
-      });
-      guardSink('emit_start_or_update', () => {
-        sink.startOrUpdate(snapshot, ctx);
-      });
+  /**
+   * Whether an unchanged heartbeat should renew the native surface. The last
+   * accepted frame must be at or past the renewal margin (or none was ever
+   * accepted), and the backoff from a rejected write must have elapsed. The
+   * backoff is what keeps a sink that rejects every write from re-emitting on
+   * every heartbeat: the rejected attempt spends the wait, which doubles to a
+   * ceiling, instead of the published deadline staying frozen and re-arming the
+   * renewal each heartbeat.
+   */
+  private isRenewalDue(now: number): boolean {
+    if (this.lastPublishedAt !== null && now - this.lastPublishedAt < GLANCEABLE_RENEW_MARGIN_MS) {
+      return false;
     }
+    return (
+      this.lastWriteAttemptAt === null ||
+      now - this.lastWriteAttemptAt >= glanceableRenewRetryDelayMs(this.writeFailures)
+    );
+  }
+
+  private emit(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext): void {
+    this.writeFrame(snapshot, ctx);
   }
 
   private publish(snapshot: GlanceableAgentsSnapshot): void {
-    this.lastPublishedAt = Date.parse(snapshot.updatedAt);
-    for (const sink of this.sinks) {
-      guardSink('publish', () => {
-        sink.publish(snapshot);
-      });
+    this.writeFrame(snapshot, null);
+  }
+
+  /**
+   * Write one frame through the sinks and record the outcome. The published
+   * deadline is the frame the native surface accepted, so it advances only when
+   * every sink write landed. A rejected write is not dropped: it raises the
+   * failure count, which holds the renewal gate on its backoff so the frame is
+   * retried while the counts stay stable, instead of the heartbeat re-emitting
+   * every few seconds.
+   */
+  private writeFrame(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext | null): void {
+    this.lastWriteAttemptAt = this.now();
+    if (writeGlanceableFrame(this.sinks, snapshot, ctx)) {
+      this.lastPublishedAt = Date.parse(snapshot.updatedAt);
+      this.writeFailures = 0;
+      return;
     }
+    this.writeFailures += 1;
   }
 
   private scheduleCoalesced(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext): void {

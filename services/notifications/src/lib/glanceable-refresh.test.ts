@@ -8,6 +8,7 @@ import {
   flushDueGlanceableRefreshes,
   flushDueGlanceableRefreshesSafely,
   GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+  GLANCEABLE_REFRESH_RETRY_MAX_MS,
   refreshGlanceableSnapshot,
 } from './glanceable-refresh';
 
@@ -285,6 +286,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       organizationId: null,
       dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
       deferredAt: now,
+      attempts: 1,
     });
   });
 
@@ -424,6 +426,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       organizationId: null,
       dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
       deferredAt: now,
+      attempts: 1,
     });
   });
 
@@ -481,6 +484,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       organizationId: null,
       dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
       deferredAt: now,
+      attempts: 1,
     });
   });
 
@@ -530,6 +534,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       organizationId: null,
       dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
       deferredAt: now,
+      attempts: 1,
     });
   });
 
@@ -584,6 +589,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       organizationId: null,
       dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
       deferredAt: now,
+      attempts: 1,
     });
   });
 
@@ -676,6 +682,7 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       organizationId: null,
       dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
       deferredAt: base + 2_000,
+      attempts: 1,
     });
   });
 
@@ -1058,8 +1065,113 @@ describe('refreshGlanceableSnapshot delivery window', () => {
       organizationId: null,
       dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
       deferredAt: now,
+      attempts: 1,
     });
     expect(h.builds).toBe(1);
+  });
+
+  it('does not re-arm when a delivery landed while the throwing refresh ran', async () => {
+    const h = makeHarness();
+    const now = 12_500_000;
+    const key = pendingKey('user-throw-delivered', null);
+    await h.storage.put(key, {
+      userId: 'user-throw-delivered',
+      organizationId: null,
+      dueAt: now - 1,
+    });
+    // A concurrent approval-exempt delivery lands while this refresh is in
+    // flight, then the refresh's build throws. The re-arm reads the delivery
+    // record and the slot in one transaction, so it must see the landed
+    // delivery and skip: a plain get-then-put would leave a record behind that
+    // later fires a redundant device wake.
+    h.deps.buildSnapshot = async () => {
+      await h.storage.put(deliveryKey('user-throw-delivered', null), {
+        deliveredAt: now,
+        outcome: 'delivered',
+      });
+      throw new Error('route down');
+    };
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(
+      flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now)
+    ).resolves.toBeNull();
+    expect(await h.storage.get(key)).toBeUndefined();
+  });
+
+  it('escalates the trailing re-arm backoff and caps it', async () => {
+    const h = makeHarness();
+    const now = 14_000_000;
+    const key = pendingKey('user-backoff', null);
+    // Four consecutive failed attempts: the fifth waits sixteen windows (the
+    // doubling from one window), and the twenty-first is clamped to the ceiling
+    // so a permanently failing route cannot keep rebuilding every window
+    // forever.
+    await h.storage.put(key, {
+      userId: 'user-backoff',
+      organizationId: null,
+      dueAt: now - 1,
+      deferredAt: now - 500_000,
+      attempts: 4,
+    });
+    h.setNext(null);
+
+    await expect(
+      flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now)
+    ).resolves.toBe(now + 16 * GLANCEABLE_DELIVERY_MIN_INTERVAL_MS);
+    expect(await h.storage.get(key)).toMatchObject({
+      deferredAt: now - 500_000,
+      attempts: 5,
+      dueAt: now + 16 * GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+    });
+
+    await h.storage.put(key, {
+      userId: 'user-backoff',
+      organizationId: null,
+      dueAt: now - 1,
+      deferredAt: now - 500_000,
+      attempts: 20,
+    });
+    await expect(
+      flushDueGlanceableRefreshes(asStorage(h.storage), h.deps, () => now)
+    ).resolves.toBe(now + GLANCEABLE_REFRESH_RETRY_MAX_MS);
+    expect(await h.storage.get(key)).toMatchObject({
+      attempts: 21,
+      dueAt: now + GLANCEABLE_REFRESH_RETRY_MAX_MS,
+    });
+  });
+
+  it('resets the retry backoff when a newer change defers inside the window', async () => {
+    const h = makeHarness();
+    const base = 15_000_000;
+    let now = base;
+    const scope = { userId: 'user-backoff-reset', organizationId: null };
+    const key = pendingKey('user-backoff-reset', null);
+
+    // A delivery opens the window and a later heartbeat re-arms a retried
+    // record, so the slot carries a backed-off count.
+    h.setNext(snapshot({ running: 1 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+    await h.storage.put(key, {
+      userId: 'user-backoff-reset',
+      organizationId: null,
+      dueAt: now,
+      deferredAt: now - 400_000,
+      attempts: 7,
+    });
+
+    // A fresh change inside the window is a new deferral, not a retry: it gets
+    // the window's normal deadline and drops the failed-attempt count so the
+    // next failure backs off from one window again.
+    now = base + 2_000;
+    h.setNext(snapshot({ running: 2 }));
+    await refreshGlanceableSnapshot(scope, asStorage(h.storage), h.deps, () => now);
+    expect(await h.storage.get(key)).toEqual({
+      userId: 'user-backoff-reset',
+      organizationId: null,
+      dueAt: base + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      deferredAt: now,
+    });
   });
 
   it('keeps a deferral written while a throwing trailing refresh ran', async () => {
@@ -1191,6 +1303,10 @@ describe('NotificationChannelDO alarm glanceable flush', () => {
     const stub = env.NOTIFICATION_CHANNEL_DO.get(id);
     const now = Date.now();
     const dueAt = now + 30_000;
+    // Proves the flush actually failed rather than quietly succeeding: a
+    // successful sweep skips the not-yet-due record and folds the same `dueAt`,
+    // so the GC and deadline assertions alone cannot tell the two apart.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     await runInDurableObject(stub, async (_instance, state) => {
       await state.storage.put('idem:expired', { stage: 'delivered', ts: now - 2 * 60 * 60 * 1000 });
@@ -1202,7 +1318,7 @@ describe('NotificationChannelDO alarm glanceable flush', () => {
       });
     });
 
-    await runInDurableObject(stub, async (instance, state) => {
+    const rejections = await runInDurableObject(stub, async (instance, state) => {
       // The flush's first pending-prefix read rejects; the guard must absorb it
       // so the GC below still runs. Later reads (the fold) succeed.
       const mutable = state.storage as unknown as {
@@ -1210,8 +1326,10 @@ describe('NotificationChannelDO alarm glanceable flush', () => {
       };
       const originalList = state.storage.list.bind(state.storage);
       let pendingLists = 0;
+      let rejected = 0;
       mutable.list = (options?: { prefix?: string }) => {
         if (options?.prefix === 'glanceable-pending:' && ++pendingLists === 1) {
+          rejected += 1;
           return Promise.reject(new Error('storage unavailable'));
         }
         return originalList(options);
@@ -1221,6 +1339,7 @@ describe('NotificationChannelDO alarm glanceable flush', () => {
       } finally {
         delete (mutable as { list?: unknown }).list;
       }
+      return rejected;
     });
 
     const result = await runInDurableObject(stub, async (_instance, state) => ({
@@ -1232,6 +1351,14 @@ describe('NotificationChannelDO alarm glanceable flush', () => {
       alarm: await state.storage.getAlarm(),
     }));
 
+    // The sweep's own read was rejected and the guard absorbed it with the
+    // content-free warning; without these two the test cannot tell a failed
+    // flush from a successful one.
+    expect(rejections).toBe(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Glanceable trailing refresh sweep failed',
+      expect.objectContaining({ error: 'storage unavailable' })
+    );
     // A failing flush no longer skips the sweep's storage reclamation.
     expect(result.idem).toBeUndefined();
     expect(result.rl).toBeUndefined();

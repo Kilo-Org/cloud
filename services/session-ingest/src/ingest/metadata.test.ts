@@ -415,6 +415,49 @@ describe('resetAttentionStatusOnCliDisconnect', () => {
     );
   });
 
+  it('asks for an approval-exempt refresh when a permission wait clears', async () => {
+    const db = createTransactionDb({ initialStatus: 'permission' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const refreshParams: RefreshGlanceableSessionsParams[] = [];
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      NOTIFICATIONS: {
+        async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams) {
+          refreshParams.push(params);
+        },
+      },
+    } as never;
+
+    await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+
+    // The deferred `permission -> retry` write is what actually clears the
+    // stored attention, so it — not the socket close ten minutes earlier — must
+    // get the window exemption that makes the Approve control disappear.
+    expect(refreshParams).toEqual([
+      { userId: 'usr_1', cliSessionIds: ['ses_1'], approvalChangedSessionIds: ['ses_1'] },
+    ]);
+  });
+
+  it('does not exempt a cleared question from the delivery window', async () => {
+    const db = createTransactionDb({ initialStatus: 'question' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const refreshParams: RefreshGlanceableSessionsParams[] = [];
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      NOTIFICATIONS: {
+        async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams) {
+          refreshParams.push(params);
+        },
+      },
+    } as never;
+
+    await resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1');
+
+    // A question is not an approval: it keeps counting as needs-input after the
+    // clear, so no wake is worth spending the window on.
+    expect(refreshParams).toEqual([]);
+  });
+
   it.each(['busy', 'idle', 'retry', null] as const)(
     'no-ops without write or notify when stored status is %s',
     async status => {

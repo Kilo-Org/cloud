@@ -1947,10 +1947,17 @@ export class UserConnectionDO extends DurableObject<Env> {
         refreshGlanceableSessions(this.env, {
           userId: attachment.kiloUserId,
           cliSessionIds: rootSessionIds,
-          // A disconnecting CLI drops a permission wait to `retry`, which
-          // clears the Approve control on the locked surfaces. The in-memory
-          // status is the last one the CLI reported; the attention reset above
-          // writes the DB but does not touch this list.
+          // A disconnecting CLI leaves the live aggregate, so the snapshot the
+          // locked surfaces build no longer carries its permission: the Approve
+          // control clears now rather than behind the delivery window. The
+          // attention reset above does not write the stored status — it holds
+          // the clear for the CLI absence window — so this exemption covers the
+          // aggregate drop, and the deferred write fires its own exemption in
+          // `resetAttentionStatusOnCliDisconnect` for a session that stays
+          // snapshot-visible (a cloud agent merged from Postgres, not the live
+          // list). Only the scopes whose roots moved are named: this batch
+          // aggregates every connection, so a request-level flag would exempt
+          // scopes that had no approval change.
           approvalChangedSessionIds: rootSessionIds.filter(id => permissionRootIds.has(id)),
         })
       );

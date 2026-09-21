@@ -10,6 +10,26 @@ import { deliverGlanceableSnapshot, type GlanceableDeliveryDeps } from './glance
  */
 export const GLANCEABLE_DELIVERY_MIN_INTERVAL_MS = 10_000;
 
+/**
+ * Ceiling for the trailing-refresh retry backoff. A permanently failing build
+ * or transport re-arms its pending record instead of dropping the deferred
+ * counts, so without a ceiling it would rebuild and resend every window
+ * forever. Backing off to at most one attempt per five minutes bounds that
+ * loop while still landing the counts once the route recovers.
+ */
+export const GLANCEABLE_REFRESH_RETRY_MAX_MS = 5 * 60_000;
+
+/**
+ * Wait before the next trailing attempt, from the number of consecutive
+ * attempts that failed to deliver a snapshot: one window for the first, then
+ * doubling up to the ceiling. A landed delivery or a fresh deferral drops the
+ * count, so a route that recovers is back to the normal cadence at once.
+ */
+export function glanceableRetryDelayMs(attempts: number): number {
+  const delay = GLANCEABLE_DELIVERY_MIN_INTERVAL_MS * 2 ** Math.max(0, attempts - 1);
+  return Math.min(delay, GLANCEABLE_REFRESH_RETRY_MAX_MS);
+}
+
 const scopeSchema = z.object({
   userId: z.string().min(1),
   organizationId: z.string().min(1).nullable(),
@@ -49,6 +69,11 @@ const pendingRefreshSchema = z.object({
   // the same `dueAt` when they defer inside the same window. Optional for
   // records written before this field existed.
   deferredAt: z.number().optional(),
+  // Consecutive trailing attempts that failed to deliver this change. Each
+  // re-arm increments it so a permanently failing build or transport backs off
+  // instead of re-arming every window forever; a new deferral or a landed
+  // delivery clears it. Optional for records written before this field existed.
+  attempts: z.number().int().nonnegative().optional(),
 });
 type PendingGlanceableRefresh = z.infer<typeof pendingRefreshSchema>;
 type DeliveryState = z.infer<typeof deliveryStateSchema>;
@@ -57,6 +82,11 @@ const PENDING_PREFIX = 'glanceable-pending:';
 
 function pendingKey(scope: { userId: string; organizationId: string | null }): string {
   return `${PENDING_PREFIX}${JSON.stringify([scope.userId, scope.organizationId])}`;
+}
+
+/** The delivery record's key, so the sweep can read it before it runs a refresh. */
+function deliveryStateKey(scope: { userId: string; organizationId: string | null }): string {
+  return `glanceable:${JSON.stringify([scope.userId, scope.organizationId])}:delivery`;
 }
 
 /**
@@ -101,6 +131,10 @@ function isSameDeferral(
  * left to retry it. A record without an outcome predates the field and only
  * ever meant a delivery. A pending record already in the slot is a newer
  * deferral this flush did not consume; leave its deadline alone.
+ *
+ * Each re-arm increments the consumed record's `attempts` and spaces the
+ * deadline by `glanceableRetryDelayMs`, so a build or transport that keeps
+ * failing retries at a bounded rate instead of every window forever.
  */
 async function rearmTrailingRefresh(
   scope: { userId: string; organizationId: string | null },
@@ -108,10 +142,12 @@ async function rearmTrailingRefresh(
   deliveryKey: string,
   deliveryAtStart: DeliveryState | undefined,
   deferredChangeAt: number | undefined,
+  retryAttempts: number | undefined,
   nowMs: () => number
 ): Promise<void> {
   const pendingK = pendingKey(scope);
   const now = nowMs();
+  const attempts = (retryAttempts ?? 0) + 1;
   await storage.transaction(async tx => {
     const landed = deliveryStateSchema.optional().parse(await tx.get(deliveryKey));
     if (
@@ -125,8 +161,9 @@ async function rearmTrailingRefresh(
     await tx.put<PendingGlanceableRefresh>(pendingK, {
       userId: scope.userId,
       organizationId: scope.organizationId,
-      dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
+      dueAt: now + glanceableRetryDelayMs(attempts),
       deferredAt: deferredChangeAt ?? now,
+      attempts,
     });
   });
 }
@@ -137,11 +174,16 @@ export async function refreshGlanceableSnapshot(
   storage: DurableObjectStorage,
   deps: GlanceableDeliveryDeps,
   nowMs: () => number = Date.now,
-  options: { trailing?: boolean; approvalChanged?: boolean; deferredAt?: number } = {}
+  options: {
+    trailing?: boolean;
+    approvalChanged?: boolean;
+    deferredAt?: number;
+    attempts?: number;
+  } = {}
 ): Promise<void> {
   const scope = scopeSchema.parse(params);
   const key = `glanceable:${JSON.stringify([scope.userId, scope.organizationId])}`;
-  const deliveryKey = `${key}:delivery`;
+  const deliveryKey = deliveryStateKey(scope);
   // Rate-limit the device wake per scope. A change inside the window is
   // deferred to the alarm rather than dropping it, so the final counts land.
   // `needsApproval` is exempt: it gates the Approve control, which must appear
@@ -211,7 +253,15 @@ export async function refreshGlanceableSnapshot(
     // credentials fail, and the flush has already consumed the pending record,
     // so re-arm the next window instead of dropping the change with no alarm.
     if (options.trailing === true) {
-      await rearmTrailingRefresh(scope, storage, deliveryKey, delivery, options.deferredAt, nowMs);
+      await rearmTrailingRefresh(
+        scope,
+        storage,
+        deliveryKey,
+        delivery,
+        options.deferredAt,
+        options.attempts,
+        nowMs
+      );
     }
     return;
   }
@@ -241,7 +291,15 @@ export async function refreshGlanceableSnapshot(
     // deferred change unless a delivery actually landed, exactly as the
     // no-snapshot branch above does.
     if (options.trailing === true) {
-      await rearmTrailingRefresh(scope, storage, deliveryKey, delivery, options.deferredAt, nowMs);
+      await rearmTrailingRefresh(
+        scope,
+        storage,
+        deliveryKey,
+        delivery,
+        options.deferredAt,
+        options.attempts,
+        nowMs
+      );
     }
     return;
   }
@@ -396,15 +454,19 @@ export async function flushDueGlanceableRefreshes(
   const pending = await storage.list<PendingGlanceableRefresh>({ prefix: PENDING_PREFIX });
   for (const [key, record] of pending) {
     if (record.dueAt > nowMs()) continue;
+    const scope = { userId: record.userId, organizationId: record.organizationId };
+    const deliveryKey = deliveryStateKey(scope);
+    // The re-arm below tells a delivery that landed while the refresh ran apart
+    // from one already recorded by comparing this read with the record's at
+    // re-arm time, so it must happen before the refresh starts.
+    const deliveryAtStart = deliveryStateSchema.optional().parse(await storage.get(deliveryKey));
     await storage.delete(key);
     try {
-      await refreshGlanceableSnapshot(
-        { userId: record.userId, organizationId: record.organizationId },
-        storage,
-        deps,
-        nowMs,
-        { trailing: true, deferredAt: record.deferredAt }
-      );
+      await refreshGlanceableSnapshot(scope, storage, deps, nowMs, {
+        trailing: true,
+        deferredAt: record.deferredAt,
+        attempts: record.attempts,
+      });
     } catch (error) {
       console.warn('Glanceable trailing refresh failed', {
         scope: [record.userId, record.organizationId],
@@ -414,22 +476,25 @@ export async function flushDueGlanceableRefreshes(
       // rejected (a network/DNS failure on the snapshot route) or the transport
       // rejected. The pending record was consumed above, so re-arm the next
       // window or the deferred counts are dropped with no alarm left to retry
-      // them. A record written while the refresh ran already owns the key and a
-      // later deadline; only an empty slot is re-armed. The next window, not
-      // now, so a persistently failing route is retried once per window instead
-      // of spinning the alarm. Keep the consumed record's write time: a delivery
-      // that lands later covers that change and cancels this record, while a
-      // fresh `now` would look newer than the delivery's snapshot and survive as
-      // a redundant wake.
-      if ((await storage.get(key)) === undefined) {
-        const now = nowMs();
-        await storage.put<PendingGlanceableRefresh>(key, {
-          userId: record.userId,
-          organizationId: record.organizationId,
-          dueAt: now + GLANCEABLE_DELIVERY_MIN_INTERVAL_MS,
-          deferredAt: record.deferredAt ?? now,
-        });
-      }
+      // them. Re-arm through the same transaction-hardened helper the trailing
+      // refresh uses, not a plain get-then-put: a delivery landing between the
+      // slot check and the write would leave a record behind that later fires a
+      // redundant device wake. A record written while the refresh ran already
+      // owns the key and a later deadline; only an empty slot is re-armed. Keep
+      // the consumed record's write time: a delivery that lands later covers
+      // that change and cancels this record, while a fresh `now` would look
+      // newer than the delivery's snapshot and survive as a redundant wake. The
+      // re-arm escalates the consumed record's backoff so a permanently failing
+      // route is retried at a bounded rate, not once per window forever.
+      await rearmTrailingRefresh(
+        scope,
+        storage,
+        deliveryKey,
+        deliveryAtStart,
+        record.deferredAt,
+        record.attempts,
+        nowMs
+      );
     }
   }
 

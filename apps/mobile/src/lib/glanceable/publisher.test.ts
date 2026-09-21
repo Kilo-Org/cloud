@@ -13,7 +13,9 @@ import {
 import { getTerminalBlankEpoch, writeSignedOutSnapshotAndEnd } from './cleanup';
 import {
   GLANCEABLE_RENEW_MARGIN_MS,
+  GLANCEABLE_RENEW_RETRY_MAX_MS,
   GlanceablePublisher,
+  glanceableRenewRetryDelayMs,
   hasSameGlanceableContent,
 } from './publisher';
 import {
@@ -292,6 +294,110 @@ describe('GlanceablePublisher', () => {
     // The single renewal re-emits the start so a failed start is retried; the
     // other 89 heartbeats write nothing.
     expect(count(calls, 'startOrUpdate')).toBe(2);
+    publisher.dispose();
+  });
+
+  it('spaces a rejected renewal retry with a doubling backoff instead of every heartbeat', () => {
+    // The wait doubles from one coalesce window to the five-minute ceiling, so a
+    // transient failure is retried promptly and a permanently broken surface is
+    // attempted at a bounded rate.
+    expect(glanceableRenewRetryDelayMs(0)).toBe(GLANCEABLE_COALESCE_MS);
+    expect(glanceableRenewRetryDelayMs(1)).toBe(GLANCEABLE_COALESCE_MS);
+    expect(glanceableRenewRetryDelayMs(2)).toBe(2 * GLANCEABLE_COALESCE_MS);
+    expect(glanceableRenewRetryDelayMs(20)).toBe(GLANCEABLE_RENEW_RETRY_MAX_MS);
+
+    // A sink that rejects every write never advances the published deadline, so
+    // without a bound the unchanged-content renewal would re-emit on every
+    // heartbeat.
+    vi.useFakeTimers();
+    let now = NOW;
+    let attempts = 0;
+    const sink: GlanceableSink = {
+      publish() {
+        // This case observes only the start/update attempts.
+      },
+      startOrUpdate() {
+        attempts += 1;
+        if (attempts > 1) {
+          throw new Error('ActivityKit start failed');
+        }
+      },
+      endImmediate() {
+        // The counts never go empty here.
+      },
+    };
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now, coalesceMs: 1000 });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(attempts).toBe(1);
+
+    // The renewal at the margin is rejected and spends the first backoff: the
+    // next attempt waits one coalesce window, not a full renewal margin.
+    now += GLANCEABLE_RENEW_MARGIN_MS;
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(attempts).toBe(2);
+
+    // 179 more 10 s heartbeats span another 30 minutes. The retries space out
+    // 10 s, 20 s, 40 s ... to the five-minute ceiling, so the whole span takes
+    // eleven attempts rather than one per heartbeat.
+    for (let heartbeat = 0; heartbeat < 179; heartbeat += 1) {
+      now += 10_000;
+      publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    }
+    expect(attempts).toBe(11);
+    publisher.dispose();
+  });
+
+  it('backs off a rejected first write instead of letting every heartbeat through', () => {
+    // The restart reconciliation lets the first heartbeat write through even
+    // when nothing was published yet. If that first write is rejected, the
+    // latch must not keep letting every heartbeat through: the renewal backoff
+    // spaces the retries, exactly as it does once a frame has landed.
+    vi.useFakeTimers();
+    let now = NOW;
+    let attempts = 0;
+    const sink: GlanceableSink = {
+      publish() {
+        // This case observes only the start/update attempts.
+      },
+      startOrUpdate() {
+        attempts += 1;
+        throw new Error('ActivityKit start failed');
+      },
+      endImmediate() {
+        // The counts never go empty here.
+      },
+    };
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now, coalesceMs: 1000 });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(attempts).toBe(1);
+
+    // Inside the first backoff a heartbeat must not re-emit.
+    now += 1000;
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(attempts).toBe(1);
+
+    // Once the backoff elapses the renewal retries.
+    now += GLANCEABLE_COALESCE_MS - 1000;
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(attempts).toBe(2);
+    publisher.dispose();
+  });
+
+  it('renders the first heartbeat after a restart even when the persisted snapshot matches', () => {
+    // The native surfaces outlive the JS process. A death inside the 8 s
+    // terminal window leaves the ongoing card in the shade while the persisted
+    // snapshot is already empty, so an unchanged empty heartbeat must still
+    // reach the sinks: that is where the Android sink dismisses the orphan
+    // (`!notificationActive -> endNotification`). Suppressing it strands the
+    // card until the counts next change.
+    const { sink, calls } = makeSink();
+    const restored = snapshotFor([], NOW - 60_000, 7);
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, initial: restored });
+
+    publisher.handleSessions([], PUB_CTX);
+
+    expect(count(calls, 'publish')).toBe(1);
+    expect(lastSnapshot(calls, 'publish').running).toBe(0);
     publisher.dispose();
   });
 

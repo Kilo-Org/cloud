@@ -129,7 +129,10 @@ export function useAgentSessionListData(options: {
   }, [dateGroups, effectiveSearchQuery, search.dateGroups]);
   const projectOptions = useMemo(() => {
     const byGitUrl = new Map<string, { gitUrl: string; displayName: string }>();
-    for (const project of recentRepositories?.repositories.slice(0, 3) ?? []) {
+    // The server already bounds `recentRepositories` (LIMIT 10); offer every row
+    // it returns so older repositories stay filterable. A client-side cap here
+    // silently drops the rows the user needs to narrow the list.
+    for (const project of recentRepositories?.repositories ?? []) {
       byGitUrl.set(project.gitUrl, {
         gitUrl: project.gitUrl,
         displayName: formatGitUrlProject(project.gitUrl),

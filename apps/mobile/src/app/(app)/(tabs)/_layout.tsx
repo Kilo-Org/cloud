@@ -145,6 +145,14 @@ export default function TabsLayout() {
           tabBarActiveTintColor: colors.foreground,
           tabBarInactiveTintColor: colors.mutedForeground,
           tabBarBackground: TabBarBackground,
+          // The bar is absolutely positioned and Android's edge-to-edge window
+          // does not resize for the IME, so the raised keyboard covers the bar's
+          // lower half: the icons peek out above it with no label row under them
+          // (explorer finding, agents-search-empty). The navigator's built-in
+          // hide-on-keyboard steps the whole bar out of the IME's way instead of
+          // leaving that clipped strip. The content clearance below the bar does
+          // not change, so hiding and restoring it moves nothing.
+          tabBarHideOnKeyboard: true,
           tabBarIconStyle: TAB_BAR_ICON_STYLE,
           tabBarLabelPosition: 'below-icon',
           tabBarStyle: {

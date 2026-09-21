@@ -14,7 +14,7 @@ import {
 
 import { AgentSessionProvider } from './session-provider';
 
-type ManagerFactoryOptions = { store: unknown; organizationId?: string };
+type ManagerFactoryOptions = { store: unknown; userId: string; organizationId?: string };
 
 const mocks = vi.hoisted(() => {
   const manager = {
@@ -72,7 +72,6 @@ describe('AgentSessionProvider live manager registry', () => {
 
     expect(mocks.createManager).toHaveBeenCalledTimes(1);
     const options = mocks.createManager.mock.calls[0]?.[0];
-    expect(options).not.toHaveProperty('userId');
     const registered = getLiveSessionManager('provider-session-a');
     expect(registered?.manager).toBe(mocks.manager);
     // The store must travel with the manager: the orchestrator reads the
@@ -101,9 +100,7 @@ describe('AgentSessionProvider live manager registry', () => {
     );
 
     expect(getAuthenticatedOwner().userId).toBeNull();
-    // The manager call carries no transcript-cache scope (the cache is gone);
-    // the restored id only keeps this manager alive until confirmation.
-    expect(mocks.createManager.mock.calls[0]?.[0]).not.toHaveProperty('userId');
+    expect(mocks.createManager.mock.calls[0]?.[0].userId).toBe('user-1');
     const registered = getLiveSessionManager('restored-session');
     expect(registered?.manager).toBe(mocks.manager);
     expect(mocks.manager.destroy).not.toHaveBeenCalled();
@@ -127,6 +124,7 @@ describe('AgentSessionProvider live manager registry', () => {
     beginAuthenticatedOwner();
     const { unmount } = await renderWithProviders(createElement(AgentSessionProvider, null, null));
 
+    expect(mocks.createManager.mock.calls[0]?.[0].userId).toBe('');
     expect(mocks.manager.destroy).toHaveBeenCalledTimes(1);
     unmount();
   });

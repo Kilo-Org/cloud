@@ -38,11 +38,16 @@ export const COMPOSER_CHROME_HEIGHT = 120 + STARTER_ROW_HEIGHT;
 
 /**
  * New-session prompt chrome other than the input: the control row + toolbar +
- * attachment strip + Start button + starter row. The prompt lives in a
- * scrollable form, so the cap is a soft bound that keeps the input from
- * pushing the Start control off-screen at large text.
+ * attachment strip + Start button + counter. The prompt lives in a scrollable
+ * form, so the cap is a soft bound that keeps the input from pushing the Start
+ * control off-screen at large text.
+ *
+ * No starter-row reserve: the new-session screen renders no starter chips, and
+ * reserving their height dropped the keyboard-open cap below the input's
+ * 3-line minimum. The cap then floored at the minimum, so a 4-line prompt could
+ * not grow past it and its last line was clipped at the input's bottom edge.
  */
-export const NEW_SESSION_PROMPT_CHROME_HEIGHT = 176 + STARTER_ROW_HEIGHT;
+export const NEW_SESSION_PROMPT_CHROME_HEIGHT = 176;
 
 /**
  * Width of the real text area inside the composer input row.
@@ -76,6 +81,25 @@ export const COMPOSER_INPUT_MAX_HEIGHT = 124;
  * first task can be several lines.
  */
 export const NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT = 160;
+
+/**
+ * New-session prompt TextInput geometry, mirroring the input's own classes:
+ * `leading-6` lines, `py-2` vertical padding, and the three-line floor an empty
+ * prompt starts at. Exported so the clipped-last-line regression test measures
+ * the frame the prompt actually renders instead of re-declaring the numbers.
+ */
+export const NEW_SESSION_PROMPT_LINE_HEIGHT = 24;
+export const NEW_SESSION_PROMPT_VERTICAL_PADDING = 16;
+export const NEW_SESSION_PROMPT_DEFAULT_LINES = 3;
+
+/**
+ * Rendered height of `lineCount` prompt lines: the (font-scaled) line box plus
+ * the input's vertical padding. The new-session prompt's minimum height uses
+ * this with `NEW_SESSION_PROMPT_DEFAULT_LINES`.
+ */
+export function resolveNewSessionPromptHeight(lineHeight: number, lineCount: number): number {
+  return lineHeight * lineCount + NEW_SESSION_PROMPT_VERTICAL_PADDING;
+}
 
 /**
  * Remaining-space cap for the composer input, bounded by an absolute cap. The

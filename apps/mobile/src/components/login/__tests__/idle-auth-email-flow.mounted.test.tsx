@@ -18,6 +18,7 @@ vi.mock('@/lib/config', () => ({
 
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
   useColorScheme: () => 'light',
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',

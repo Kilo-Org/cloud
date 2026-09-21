@@ -27,11 +27,16 @@ import {
 } from '@/lib/cloud-agent-stream-ticket';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import { trpcClient } from '@/lib/trpc';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 import { createNativeUserWebConnectionLifecycleHooks } from '@/lib/user-web-connection-lifecycle';
 import { answerSessionPermission } from '@/lib/glanceable/approve-ask';
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
 import { cacheFilePart } from '@/components/agents/file-part-cache';
+import {
+  persistResolvedDeliveryFailure,
+  readResolvedDeliveryFailures,
+} from '@/lib/persist/resolved-delivery-failures';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { i18n } from '@/i18n';
 
@@ -168,9 +173,10 @@ type CreateMobileAgentSessionManagerOptions = {
   userWebConnection: UserWebConnection;
   organizationId?: string;
   /**
-   * The authenticated owner, accepted for the headless notification manager
-   * that scopes its work by the active user id. The manager's own persisted
-   * transcript cache is gone, so this scope is no longer read here.
+   * The authenticated owner the resolved-delivery-failure memory is scoped to.
+   * The manager's own persisted transcript cache is gone, so this scope is only
+   * read by that memory; an absent owner skips it rather than writing to a
+   * shared anonymous scope.
    */
   userId?: string;
 };
@@ -181,6 +187,7 @@ export function createMobileAgentSessionManager({
   store,
   userWebConnection,
   organizationId: initialOrganizationId,
+  userId,
 }: Readonly<CreateMobileAgentSessionManagerOptions>): SessionManager {
   // The route resolves the session's organization from its metadata read, but
   // that read can be paused (offline) or stalled when the route mounts the
@@ -199,12 +206,25 @@ export function createMobileAgentSessionManager({
     sessionId: KiloSessionId;
     cloudAgentSessionId: CloudAgentSessionId | null;
   } | null = null;
+  // The auth epoch this manager was created under. A resolved-delivery-failure
+  // write captured before a sign-out/sign-in must not land in the previous
+  // account's scope, so the write path re-checks this epoch. An empty owner
+  // skips the memory entirely.
+  const resolvedDeliveryOwner = { userId: userId ?? '', authEpoch: currentAuthEpoch() };
   return createSessionManager({
     store,
     websocketBaseUrl: CLOUD_AGENT_WS_URL,
     websocketHeaders: { Origin: WEB_BASE_URL },
     lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
     userWebConnection,
+    // Durable memory of retried delivery failures, so the DO's stored-event
+    // replay on the next open cannot restore a footer the retry cleared.
+    // eslint-disable-next-line @typescript-eslint/promise-function-async -- passthrough returns the promise directly
+    readResolvedDeliveryFailures: (id: KiloSessionId) =>
+      readResolvedDeliveryFailures(resolvedDeliveryOwner.userId, id),
+    persistResolvedDeliveryFailure: (id: KiloSessionId, messageId: string) => {
+      void persistResolvedDeliveryFailure(resolvedDeliveryOwner, id, messageId);
+    },
     // A tRPC call whose client control-plane deadline expired never got an
     // answer: the open is stalled, not failed. The manager keeps the skeleton
     // (then the slow-load state with Retry) instead of a premature error

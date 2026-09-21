@@ -94,6 +94,14 @@ vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
   fetchMobileSessionSnapshotPage: vi.fn(),
 }));
+// Keep the real queue-error classifier without loading the native encrypted KV:
+// `mobile-session-manager.ts`'s resolved-delivery-failure memory shares that
+// chain, so without this mock it pulls the native encrypted KV (and its
+// `react-native` promise shim) into this node suite.
+vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
+  readResolvedDeliveryFailures: vi.fn(async () => []),
+  persistResolvedDeliveryFailure: vi.fn(async () => undefined),
+}));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
   CLOUD_AGENT_WS_URL: 'wss://ws.test',

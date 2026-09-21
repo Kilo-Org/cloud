@@ -36,17 +36,18 @@ export function AgentSessionProvider({
   const userWebConnection = useUserWebConnection();
   const storeRef = useRef(createStore());
   const managerRef = useRef<SessionManager | null>(null);
-  // Capture the owner before the manager is created so the effect below can
-  // fence this manager to the account that mounted it. The route keys the
-  // provider on the resolved scope, so a new account gets a new manager; a
-  // restored id keeps the manager alive only while the live owner is
-  // unconfirmed, and `?? ''` means neither scope is known.
+  // Capture the owner before the manager is created so its resolved-delivery
+  // failure memory is scoped to this account. The route keys the provider on
+  // the owner, so a new account gets a new manager; the scope falls back to the
+  // restored id only while the live owner is unconfirmed, and `?? ''` makes the
+  // manager skip the memory if neither is known.
   const owner = useRef(getAuthenticatedOwner()).current;
   const scopeUserId = owner.userId ?? restoredUserId ?? '';
   managerRef.current ??= createMobileAgentSessionManager({
     store: storeRef.current,
     userWebConnection,
     organizationId,
+    userId: scopeUserId,
   });
 
   // The provider only mounts on the agent-chat route, so the route's session id

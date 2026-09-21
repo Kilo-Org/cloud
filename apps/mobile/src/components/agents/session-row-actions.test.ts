@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 
-import { showSessionActionMenu } from './session-row-actions';
+import { copySessionLink, showSessionActionMenu } from './session-row-actions';
 
 const reactNativeMock = vi.hoisted(() => ({
   alert: vi.fn(),
@@ -200,5 +203,50 @@ describe('showSessionActionMenu', () => {
     expect(onCopySessionId).not.toHaveBeenCalled();
     expect(onRename).not.toHaveBeenCalled();
     expect(onDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe('copySessionLink', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('copies the anchored resume URL and commits with the success haptic', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+
+    await expect(copySessionLink('ses-1', 'msg_7')).resolves.toBe(true);
+
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
+      sessionResumeUrl({ sessionId: 'ses-1', anchorMessageId: 'msg_7' })
+    );
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith(
+      Haptics.NotificationFeedbackType.Success
+    );
+  });
+
+  it('copies the session-top link when the position is unknown', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
+
+    await expect(copySessionLink('ses-1', null)).resolves.toBe(true);
+
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith(
+      sessionResumeUrl({ sessionId: 'ses-1', anchorMessageId: null })
+    );
+  });
+
+  it('reports failure without the success haptic when the clipboard rejects', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockRejectedValue(new Error('clipboard unavailable'));
+
+    await expect(copySessionLink('ses-1', 'msg_7')).resolves.toBe(false);
+
+    expect(Haptics.notificationAsync).not.toHaveBeenCalled();
+  });
+
+  it('reports failure when the clipboard resolves false', async () => {
+    vi.mocked(Clipboard.setStringAsync).mockResolvedValue(false);
+
+    await expect(copySessionLink('ses-1', null)).resolves.toBe(false);
+
+    expect(Haptics.notificationAsync).not.toHaveBeenCalled();
   });
 });

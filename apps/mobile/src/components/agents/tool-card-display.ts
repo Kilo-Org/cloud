@@ -265,10 +265,12 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
         subtitle:
           // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- a whitespace-only state title must fall through to the projected name; ?? would keep it
           stateTitle?.trim() || (summary !== undefined ? truncateText(summary, 60) : detail.name),
-        // Only the state title and the projected argument summary carry agent
-        // prose; the projected name is an id or a known-tool label, so it stays
-        // out of translation like the fallback labels above.
-        translatable: Boolean(stateTitle?.trim()) || summary !== undefined,
+        // The state title and the projected argument summary are agent prose.
+        // A known-tool label (`Publish Image`) is raw English app copy with no
+        // catalog, so it must reach the gateway like agent prose; a raw tool id
+        // or an `mcp` `server/tool` identifier is an id and stays out, like the
+        // already-localized fallback labels above.
+        translatable: Boolean(stateTitle?.trim()) || summary !== undefined || detail.nameIsLabel,
       };
     }
   }

@@ -2,7 +2,17 @@ import type { ToolPart } from '../opencode.gen';
 
 export type ToolDetailField = { key: string; value: string };
 
-export type ToolDetailSummary = { name: string; summary?: string };
+export type ToolDetailSummary = {
+  name: string;
+  summary?: string;
+  /**
+   * Whether `name` is a friendly known-tool label rather than a raw tool id or
+   * an `mcp` `server/tool` identifier. The label is English app prose (there is
+   * no catalog for a shared package), so a consumer that translates tool text
+   * must send it to the gateway; an identifier never is.
+   */
+  nameIsLabel: boolean;
+};
 
 export type ToolDetail = {
   status: 'pending' | 'running' | 'completed' | 'error';
@@ -30,6 +40,13 @@ const labelKeys = ['description', 'query', 'url', 'filePath', 'path', 'pattern',
 
 const DEFAULT_VALUE_MAX_LENGTH = 4000;
 const MAX_JSON_OUTPUT_LENGTH = 20000;
+/**
+ * The row projection truncates the summary to 60 characters, so the whitespace
+ * collapse only ever needs a short prefix of each candidate. Bounding it before
+ * the collapse keeps the per-render row path O(1) in argument size instead of
+ * regex-scanning a multi-hundred-KB string scalar on every render.
+ */
+const SUMMARY_SOURCE_MAX_LENGTH = 200;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -39,20 +56,35 @@ function collapseWhitespace(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
-function resolveName(tool: string, input: Record<string, unknown>): string {
+/** Trims and bounds one summary candidate before the whitespace collapse. */
+function capSummarySource(value: string): string {
+  const trimmed = value.trim();
+  return trimmed.length > SUMMARY_SOURCE_MAX_LENGTH
+    ? trimmed.slice(0, SUMMARY_SOURCE_MAX_LENGTH)
+    : trimmed;
+}
+
+function resolveName(
+  tool: string,
+  input: Record<string, unknown>
+): {
+  name: string;
+  isLabel: boolean;
+} {
   const byTool = knownTools.get(tool);
-  if (byTool !== undefined) return byTool;
+  if (byTool !== undefined) return { name: byTool, isLabel: true };
 
   if (tool === 'mcp') {
     const serverName = typeof input.server_name === 'string' ? input.server_name : undefined;
     const toolName = typeof input.tool_name === 'string' ? input.tool_name : undefined;
     if (serverName?.trim() && toolName?.trim()) {
       const key = `${serverName}/${toolName}`;
-      return knownTools.get(key) ?? key;
+      const known = knownTools.get(key);
+      return known !== undefined ? { name: known, isLabel: true } : { name: key, isLabel: false };
     }
   }
 
-  return tool;
+  return { name: tool, isLabel: false };
 }
 
 function resolveArguments(tool: string, input: Record<string, unknown>): Record<string, unknown> {
@@ -64,16 +96,23 @@ function resolveArguments(tool: string, input: Record<string, unknown>): Record<
 
 function questionSummary(input: Record<string, unknown>): string | undefined {
   const questions = input.questions;
+  let question: string | undefined;
   if (Array.isArray(questions) && isRecord(questions[0])) {
     const firstQuestion = questions[0].question;
     if (typeof firstQuestion === 'string' && firstQuestion.trim().length > 0) {
-      return firstQuestion;
+      question = firstQuestion;
     }
   }
-  if (typeof input.question === 'string' && input.question.trim().length > 0) {
-    return input.question;
+  if (
+    question === undefined &&
+    typeof input.question === 'string' &&
+    input.question.trim().length > 0
+  ) {
+    question = input.question;
   }
-  return undefined;
+  // Bound the question text: the collapse must not regex-scan an unbounded
+  // question on the per-render row path.
+  return question === undefined ? undefined : capSummarySource(question);
 }
 
 function getArgumentSummary(args: Record<string, unknown>): string | undefined {
@@ -87,9 +126,15 @@ function getArgumentSummary(args: Record<string, unknown>): string | undefined {
         (typeof value === 'number' && Number.isFinite(value)) ||
         typeof value === 'boolean')
   );
-  const summary = [label, scalar ? `${scalar[0]}=${String(scalar[1])}` : undefined]
-    .filter((part): part is string => Boolean(part))
-    .join(' · ');
+  const parts: string[] = [];
+  if (label !== undefined) parts.push(capSummarySource(label));
+  if (scalar !== undefined) {
+    const [key, value] = scalar;
+    // Bound a string scalar before interpolating it, so a huge argument value
+    // never reaches the collapse as one string.
+    parts.push(`${key}=${typeof value === 'string' ? capSummarySource(value) : String(value)}`);
+  }
+  const summary = parts.filter(part => part.length > 0).join(' · ');
   return summary === '' ? undefined : collapseWhitespace(summary);
 }
 
@@ -123,7 +168,8 @@ function resolveNameAndSummary(
     tool === 'question'
       ? questionSummary(input)
       : getArgumentSummary(summaryArguments(tool, input, args));
-  const result: ToolDetailSummary = { name: resolveName(tool, input) };
+  const resolved = resolveName(tool, input);
+  const result: ToolDetailSummary = { name: resolved.name, nameIsLabel: resolved.isLabel };
   if (summary !== undefined) result.summary = collapseWhitespace(summary);
   return result;
 }
@@ -233,6 +279,11 @@ function hasImpreciseNumberLiteral(text: string): boolean {
 export function formatToolDetailOutput(text: string): { text: string; isJson: boolean } {
   const trimmed = text.trim();
   if (trimmed.length === 0) return { text, isJson: false };
+  // An oversized payload can never fit the pretty-print cap, so discard it
+  // before parsing: `buildToolDetail` runs on every render of the open sheet,
+  // and parsing, regex-scanning and re-stringifying a multi-MB result only to
+  // throw the work away is the worst case for the most common large output.
+  if (trimmed.length > MAX_JSON_OUTPUT_LENGTH) return { text, isJson: false };
   try {
     const parsed: unknown = JSON.parse(trimmed);
     if (parsed === null || typeof parsed !== 'object') {

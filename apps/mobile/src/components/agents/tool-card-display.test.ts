@@ -608,6 +608,27 @@ describe('getToolDisplay translatable provenance', () => {
     ).toBe(false);
   });
 
+  it('translates a known-tool label even though it is a projected name', () => {
+    // `Publish Image` is raw English app copy with no catalog, so it must reach
+    // the gateway; the surrounding identifiers must not.
+    expect(
+      getToolDisplay(makeToolPart('app-builder-images_transfer_image', completed())).translatable
+    ).toBe(true);
+    expect(
+      getToolDisplay(
+        makeToolPart(
+          'mcp',
+          completed({ server_name: 'app-builder-images', tool_name: 'transfer_image' })
+        )
+      ).translatable
+    ).toBe(true);
+    expect(
+      getToolDisplay(
+        makeToolPart('mcp', completed({ server_name: 'filesystem', tool_name: 'read_file' }))
+      ).translatable
+    ).toBe(false);
+  });
+
   it('translates the generic state title the tool summarized', () => {
     expect(
       getToolDisplay({

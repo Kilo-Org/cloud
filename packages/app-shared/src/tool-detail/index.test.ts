@@ -303,7 +303,11 @@ describe('buildToolDetailSummary', () => {
     };
     const full = detail('lookup', part.state);
 
-    expect(buildToolDetailSummary(part)).toEqual({ name: full.name, summary: full.summary });
+    expect(buildToolDetailSummary(part)).toEqual({
+      name: full.name,
+      summary: full.summary,
+      nameIsLabel: false,
+    });
     expect(full.name).toBe('lookup');
     expect(full.summary).toBe('Find matching records · count=0');
   });
@@ -314,7 +318,35 @@ describe('buildToolDetailSummary', () => {
       state: pending({ questions: [{ question: 'Which one?' }] }),
     };
 
-    expect(buildToolDetailSummary(part)).toEqual({ name: 'question', summary: 'Which one?' });
+    expect(buildToolDetailSummary(part)).toEqual({
+      name: 'question',
+      summary: 'Which one?',
+      nameIsLabel: false,
+    });
+  });
+
+  it('marks a known-tool label as a label and a server/tool id as an identifier', () => {
+    expect(buildToolDetailSummary({ tool: 'mcp', state: pending({}) }).nameIsLabel).toBe(false);
+    expect(
+      buildToolDetailSummary({
+        tool: 'mcp',
+        state: pending({ server_name: 'app-builder-images', tool_name: 'transfer_image' }),
+      })
+    ).toEqual({ name: 'Publish Image', nameIsLabel: true });
+    expect(
+      buildToolDetailSummary({
+        tool: 'mcp',
+        state: pending({ server_name: 'filesystem', tool_name: 'read_file' }),
+      })
+    ).toEqual({ name: 'filesystem/read_file', nameIsLabel: false });
+  });
+
+  it('bounds the summary of a huge string argument', () => {
+    // The row truncates the summary to 60 characters; the projection must not
+    // regex-scan a multi-hundred-KB argument on every render.
+    const result = detail('lookup', pending({ content: 'a'.repeat(100_000) }));
+
+    expect(result.summary).toBe(`content=${'a'.repeat(200)}`);
   });
 
   it('does not parse or pretty-print the completed output', () => {
@@ -323,7 +355,11 @@ describe('buildToolDetailSummary', () => {
     const parse = vi.spyOn(JSON, 'parse');
 
     try {
-      expect(buildToolDetailSummary(part)).toEqual({ name: 'lookup', summary: 'a=1' });
+      expect(buildToolDetailSummary(part)).toEqual({
+        name: 'lookup',
+        summary: 'a=1',
+        nameIsLabel: false,
+      });
       expect(parse.mock.calls.some(([text]) => text === output)).toBe(false);
     } finally {
       parse.mockRestore();
@@ -351,6 +387,30 @@ describe('formatToolDetailOutput', () => {
   it('returns pretty text over the size cap raw', () => {
     const raw = JSON.stringify({ s: 'x'.repeat(25000) });
     expect(formatToolDetailOutput(raw)).toEqual({ text: raw, isJson: false });
+  });
+
+  it('discards an oversized payload before parsing it', () => {
+    // `buildToolDetail` runs on every render of the open sheet, so an oversized
+    // result must not pay the parse, the regex scan and the re-stringify only to
+    // fail the size cap afterwards.
+    const raw = JSON.stringify({ s: 'x'.repeat(25000) });
+    const parse = vi.spyOn(JSON, 'parse');
+
+    try {
+      expect(formatToolDetailOutput(raw)).toEqual({ text: raw, isJson: false });
+      expect(parse.mock.calls.some(([text]) => text === raw)).toBe(false);
+    } finally {
+      parse.mockRestore();
+    }
+  });
+
+  it('ignores digit runs inside a string when guarding number literals', () => {
+    const raw = '{"a":"12345678901234567890"}';
+
+    expect(formatToolDetailOutput(raw)).toEqual({
+      text: '{\n  "a": "12345678901234567890"\n}',
+      isJson: true,
+    });
   });
 
   it('returns a number literal that cannot round-trip raw', () => {

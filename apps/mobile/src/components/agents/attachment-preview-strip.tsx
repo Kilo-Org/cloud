@@ -27,6 +27,7 @@ import { moveA11yFocus } from '@/lib/a11y/announce';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { cn } from '@/lib/utils';
 import {
   type AgentAttachment,
@@ -144,6 +145,7 @@ function AttachmentChip({
 }: Readonly<AttachmentChipProps>) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const { t } = useTranslation();
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -264,6 +266,7 @@ function AttachmentChip({
     }
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         options: [
           t('agentChat.filePart.openAsText'),
           t('agentChat.filePart.openInExternalApp'),

@@ -67,7 +67,8 @@ export function AppRootProviders({
               {languageReady ? <AppUnlockAnnouncements /> : null}
               <OrganizationProvider>
                 <ToolSummaryTranslationRuntimeBootstrap />
-                <ActionSheetProvider>
+                {/* Use one renderer so iOS and Android both honor the app palette and safe area. */}
+                <ActionSheetProvider useCustomActionSheet>
                   <>
                     {children}
                     <OfflineBanner />

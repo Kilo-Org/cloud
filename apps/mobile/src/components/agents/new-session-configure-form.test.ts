@@ -124,8 +124,11 @@ vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
-// The profile row renders a loading skeleton, and `@/components/ui/skeleton`
-// pulls `react-native-reanimated`, which this pure suite does not set up.
+// The environment/profile row renders a `Skeleton` through the real component,
+// whose Reanimated import resolves to an extensionless ESM entry Node cannot
+// load in this project: `@/components/ui/skeleton` pulls
+// `react-native-reanimated`, which this pure suite does not set up. The mocked
+// primitive keeps the `Skeleton` element assertion.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({

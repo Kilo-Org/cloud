@@ -34,6 +34,10 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// The screen reads its landscape side insets through `@/lib/screen-insets`,
+// whose native module is not transformable in this project; the hoisted
+// `safeArea` mock keeps the alignment path inert. The sign-out cases assert no
+// inset behaviour.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
 }));

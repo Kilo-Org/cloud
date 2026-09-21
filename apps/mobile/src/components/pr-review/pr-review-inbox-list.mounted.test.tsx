@@ -238,7 +238,43 @@ describe('PrReviewInboxList side insets (landscape)', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(1);
   });
+
+  it('lets the repo · time text shrink so the term chip stays inside the row', () => {
+    const renderer = mountInboxList();
+
+    // At font scale 2 the unshrunk text took the whole row and pushed the chip
+    // past the right edge, where the row clipped it mid-label.
+    const meta = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Text' &&
+        flattenTextChildren(node.props.children) === 'octocat/hello-world#7 · just now'
+    );
+    expect(meta).toHaveLength(1);
+    expect(meta[0]?.props.className).toContain('min-w-0');
+    expect(meta[0]?.props.className).toContain('shrink');
+
+    const chips = renderer.root.findAll(
+      node =>
+        String(node.type) === 'View' &&
+        typeof node.props.className === 'string' &&
+        node.props.className.includes('rounded-full')
+    );
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips) {
+      expect(chip.props.className).toContain('shrink-0');
+    }
+  });
 });
+
+function flattenTextChildren(children: unknown): string {
+  if (typeof children === 'string') {
+    return children;
+  }
+  if (Array.isArray(children)) {
+    return children.map(child => flattenTextChildren(child)).join('');
+  }
+  return '';
+}
 
 // The explorer found the `Conversation-only fixture` row pushing its provider
 // chip off the right edge ("Pull re") because the long repo/time metadata kept

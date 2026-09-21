@@ -309,8 +309,11 @@ const config: ExpoConfig = {
         options: SENTRY_NATIVE_OPTIONS,
       },
     ],
+    // One native splash configuration and shared AnimatedSplashOverlay lifecycle
+    // for iOS and Android. The wrapper documents the native backing-surface
+    // capability exception and owns its mod ordering with expo-splash-screen.
     [
-      'expo-splash-screen',
+      './plugins/withBrandedSplash',
       {
         image: './assets/images/logo-mark.png',
         backgroundColor: '#FAF74F',

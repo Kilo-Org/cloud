@@ -156,6 +156,55 @@ export function resolveComposerMaxHeight({
 }
 
 /**
+ * Clearance the measured-viewport floor keeps between the card's last row (the
+ * mode/model toolbar) and the frame's bottom edge, in unscaled points. The
+ * frame's bottom edge is the keyboard's top edge while the IME is up, and the
+ * pills must clear it whole: half a text line is enough that a device whose
+ * frame lands a few points short of a second line still keeps the single line
+ * the pills need, and small enough that the input still takes the line back
+ * when the IME withdraws.
+ */
+export const COMPOSER_VIEWPORT_FLOOR_CLEARANCE = 12;
+
+/**
+ * Remaining-space floor measured against the viewport the composer actually
+ * scrolls in, instead of against the window minus a guessed header.
+ *
+ * `resolveComposerMinHeight` subtracts the window's safe-area insets, the
+ * keyboard, and the session header from the whole window. The frame the
+ * composer lives in has already had all three taken out of it — the header is
+ * a sibling above the scroll frame, and the IME padding shrinks the frame — so
+ * the window subtraction double-counts them. On the short landscape viewport
+ * that under-count is a whole line: the input stayed at one line after the
+ * keyboard withdrew, while the frame had grown by 24dp (e7, 2026-09-21).
+ *
+ * Measured against the frame, the floor rises and falls with the keyboard by
+ * construction: with the IME up the frame is short and the input keeps the
+ * single line the pills need; when the IME withdraws the frame grows back and
+ * the input grows back with it, up to `defaultLines`.
+ */
+export function resolveComposerMinHeightForViewport({
+  viewportHeight,
+  composerChromeHeight,
+  lineHeight,
+  verticalPadding,
+  defaultLines,
+  minLines = 1,
+}: {
+  viewportHeight: number;
+  composerChromeHeight: number;
+  lineHeight: number;
+  verticalPadding: number;
+  defaultLines: number;
+  minLines?: number;
+}): number {
+  const available = viewportHeight - composerChromeHeight - COMPOSER_VIEWPORT_FLOOR_CLEARANCE;
+  const lines = Math.floor((available - verticalPadding) / lineHeight);
+  const bounded = Math.min(Math.max(lines, minLines), defaultLines);
+  return bounded * lineHeight + verticalPadding;
+}
+
+/**
  * Remaining-space floor for the composer input: the counterpart of the max cap.
  * The max bounds how tall the input may GROW; this bounds how tall it may
  * INSIST on being. It subtracts the same terms as `resolveComposerMaxHeight`

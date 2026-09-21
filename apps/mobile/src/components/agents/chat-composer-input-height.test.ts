@@ -11,6 +11,7 @@ import {
   NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
   resolveComposerMaxHeight,
   resolveComposerMinHeight,
+  resolveComposerMinHeightForViewport,
   resolveComposerTextContentWidth,
   resolveNewSessionPromptCardChromeHeight,
   SESSION_HEADER_HEIGHT,
@@ -166,6 +167,66 @@ describe('resolveComposerMinHeight', () => {
   it('snaps to whole lines at a scaled line height', () => {
     // floor((369 - 16) / 32) = 11 -> clamped to 3 lines of 32 + 16 padding.
     expect(resolveComposerMinHeight({ ...MIN_HEIGHT_ARGS, lineHeight: 32 })).toBe(112);
+  });
+});
+
+describe('resolveComposerMinHeightForViewport', () => {
+  const VIEWPORT_ARGS = {
+    composerChromeHeight: NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT,
+    lineHeight: 24,
+    verticalPadding: 16,
+    defaultLines: 3,
+  } as const;
+
+  it('keeps one line while the keyboard holds the frame at the reported landscape height', () => {
+    // 628px / 3.5 = 179dp above the IME (e7-s3); floor((179 - 125 - 16) / 24) = 1.
+    expect(resolveComposerMinHeightForViewport({ ...VIEWPORT_ARGS, viewportHeight: 179 })).toBe(40);
+  });
+
+  it('grows back once the keyboard releases the frame', () => {
+    // 712px / 3.5 = 203dp with the IME hidden (e7-s4); floor((203 - 125 - 16) / 24) = 2.
+    expect(resolveComposerMinHeightForViewport({ ...VIEWPORT_ARGS, viewportHeight: 203 })).toBe(64);
+  });
+
+  it('reaches the three-line default when the frame has room', () => {
+    expect(resolveComposerMinHeightForViewport({ ...VIEWPORT_ARGS, viewportHeight: 823 })).toBe(88);
+  });
+
+  it('gives the input its three lines back at a large font scale', () => {
+    // 914dp portrait, 336dp IME: 914 - 24(top) - 43(header) - 24(bottom) - 336 = 487dp frame.
+    expect(
+      resolveComposerMinHeightForViewport({
+        ...VIEWPORT_ARGS,
+        viewportHeight: 487,
+        lineHeight: 48,
+        composerChromeHeight: resolveNewSessionPromptCardChromeHeight(2),
+      })
+    ).toBe(160);
+  });
+
+  it('keeps one line on a frame that lands just short of a second line', () => {
+    // The measured density-560 landscape frame is 217.5dp with the IME down
+    // and 193.5dp with it up: (193.5 - 125 - 12 - 16) / 24 = 1.68 -> one line,
+    // while the released frame takes the line back: (217.5 - 153) / 24 = 2.68.
+    expect(resolveComposerMinHeightForViewport({ ...VIEWPORT_ARGS, viewportHeight: 193.5 })).toBe(
+      40
+    );
+    expect(resolveComposerMinHeightForViewport({ ...VIEWPORT_ARGS, viewportHeight: 217.5 })).toBe(
+      64
+    );
+  });
+
+  it('never returns a negative or zero height on a degenerate frame', () => {
+    expect(resolveComposerMinHeightForViewport({ ...VIEWPORT_ARGS, viewportHeight: 40 })).toBe(40);
+    expect(resolveComposerMinHeightForViewport({ ...VIEWPORT_ARGS, viewportHeight: 0 })).toBe(40);
+  });
+
+  it('scales the floor with the measured frame rather than the window', () => {
+    const args = { ...VIEWPORT_ARGS, viewportHeight: 203 };
+    // One extra line of frame is one extra line of input.
+    expect(resolveComposerMinHeightForViewport({ ...args, viewportHeight: 227 })).toBe(
+      resolveComposerMinHeightForViewport(args) + 24
+    );
   });
 });
 

@@ -211,6 +211,12 @@ export function NewSessionRepositorySection({
         contentClassName="gap-3"
         titleClassName="font-semibold"
         title={t(copy.connectTitle)}
+        // The card stacks under the repository picker in a scrolling column,
+        // and the picker's height settles asynchronously (repos load, the
+        // selection changes). An animated layout here interpolates the card's
+        // frame against a sibling that has already snapped, so it paints over
+        // the picker's bottom edge for the length of the transition.
+        animateLayout={false}
         expanded={!collapsedCtas.includes(platform)}
         onToggle={() => {
           setConnectCtaCollapsed(platform, !collapsedCtas.includes(platform));

@@ -33,6 +33,7 @@ import {
   NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
   resolveComposerMaxHeight,
   resolveComposerMinHeight,
+  resolveComposerMinHeightForViewport,
   resolveNewSessionPromptCardChromeHeight,
   SESSION_HEADER_HEIGHT,
 } from '@/components/agents/chat-composer-input-height';
@@ -120,6 +121,7 @@ export function NewSessionPrompt({
   shareId,
   voiceInputSettlerRef,
   initialPrompt,
+  promptViewportHeight = 0,
   onStartSession,
   isCloneEntry = false,
 }: Readonly<NewSessionPromptComponentProps>) {
@@ -154,19 +156,31 @@ export function NewSessionPrompt({
   // density) so the card's control row and mode/model toolbar stay above the
   // keyboard. With room it is still the three-line default. The floor scales
   // only the rows that grow with `fontScale` (the pill's text line); the header
-  // row is pinned by its own `min-h-14` and does not. The max cap below stays
+  // row is pinned by its own `min-h-14` and does not. The host's measured frame
+  // is the floor's yardstick once it exists; the window-based floor covers the
+  // first frame, before the host has laid out. The max cap below stays
   // deliberately conservative — only the floor hands lines back.
-  const promptMinHeight = resolveComposerMinHeight({
-    windowHeight,
-    safeAreaInsetTop: insets.top,
-    safeAreaInsetBottom: insets.bottom,
-    keyboardHeight,
-    sessionHeaderHeight: SESSION_HEADER_HEIGHT,
-    composerChromeHeight: resolveNewSessionPromptCardChromeHeight(fontScale),
-    lineHeight: promptLineHeight,
-    verticalPadding: PROMPT_INPUT_VERTICAL_PADDING,
-    defaultLines: PROMPT_INPUT_DEFAULT_LINES,
-  });
+  const promptCardChromeHeight = resolveNewSessionPromptCardChromeHeight(fontScale);
+  const promptMinHeight =
+    promptViewportHeight > 0
+      ? resolveComposerMinHeightForViewport({
+          viewportHeight: promptViewportHeight,
+          composerChromeHeight: promptCardChromeHeight,
+          lineHeight: promptLineHeight,
+          verticalPadding: PROMPT_INPUT_VERTICAL_PADDING,
+          defaultLines: PROMPT_INPUT_DEFAULT_LINES,
+        })
+      : resolveComposerMinHeight({
+          windowHeight,
+          safeAreaInsetTop: insets.top,
+          safeAreaInsetBottom: insets.bottom,
+          keyboardHeight,
+          sessionHeaderHeight: SESSION_HEADER_HEIGHT,
+          composerChromeHeight: promptCardChromeHeight,
+          lineHeight: promptLineHeight,
+          verticalPadding: PROMPT_INPUT_VERTICAL_PADDING,
+          defaultLines: PROMPT_INPUT_DEFAULT_LINES,
+        });
   const promptMaxHeight = resolveComposerMaxHeight({
     windowHeight,
     safeAreaInsetTop: insets.top,

@@ -1,5 +1,48 @@
+import type {
+  CloudAgentAssistantFailureReason,
+  CloudAgentProviderOwnership,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
 import { SandboxRuntimeVersionSchema } from './sandbox-status.js';
+
+// Bounded assistant-failure facts are duplicated locally (type-only import
+// above) so the standalone wrapper bundle never contains worker-utils. The
+// exhaustiveness guards and the equality test in
+// control-plane-failure-fence.test.ts contain the drift risk.
+export const CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES = [
+  'insufficient_credits',
+  'rate_limited',
+  'model_unavailable',
+  'provider_authentication',
+  'provider_unavailable',
+  'timeout',
+  'invalid_request',
+  'context_limit',
+  'output_limit',
+  'content_filter',
+  'structured_output',
+  'unknown',
+] as const satisfies readonly CloudAgentAssistantFailureReason[];
+
+export const CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES = [
+  'managed',
+  'byok',
+  'unknown',
+] as const satisfies readonly CloudAgentProviderOwnership[];
+
+type AssertNever<_T extends never> = true;
+type _AssistantFailureReasonDriftGuard = AssertNever<
+  Exclude<
+    CloudAgentAssistantFailureReason,
+    (typeof CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES)[number]
+  >
+>;
+type _ProviderOwnershipDriftGuard = AssertNever<
+  Exclude<CloudAgentProviderOwnership, (typeof CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES)[number]>
+>;
+
+const cloudAgentAssistantFailureReasonSchema = z.enum(CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES);
+const cloudAgentProviderOwnershipSchema = z.enum(CLOUD_AGENT_PROVIDER_OWNERSHIP_VALUES);
 
 export {
   MAX_WORKTREE_CHANGES_BYTES,
@@ -725,6 +768,8 @@ export const sessionMessageOutcomeSchema = z
     status: z.enum(['completed', 'failed', 'cancelled']),
     reason: z.string().max(4096).optional(),
     gateResult: z.enum(['pass', 'fail']).optional(),
+    assistantReason: cloudAgentAssistantFailureReasonSchema.optional(),
+    providerOwnership: cloudAgentProviderOwnershipSchema.optional(),
   })
   .strict()
   .superRefine((value, context) => {

@@ -2,8 +2,9 @@ import { readDb } from '@/lib/drizzle';
 import { app_min_versions } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
-export async function GET() {
+export const GET = withRestTiming('/api/app/min-version', async (_request: Request) => {
   try {
     const row = await readDb
       .select({
@@ -24,4 +25,4 @@ export async function GET() {
     captureException(error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+});

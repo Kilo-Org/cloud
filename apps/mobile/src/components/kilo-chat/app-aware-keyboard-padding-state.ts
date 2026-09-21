@@ -10,6 +10,9 @@ type KeyboardPaddingPlatformEvents = {
   hide: 'keyboardDidHide' | 'keyboardWillHide';
 };
 
+// The one keyboard-event difference the platforms keep: Android has no
+// `keyboardWillShow`/`keyboardWillHide`, so it reports the did-show pair while
+// iOS reports the will-show pair that lands with the keyboard animation.
 export function resolveKeyboardPaddingEventsForPlatform(
   platform: string
 ): KeyboardPaddingPlatformEvents | null {

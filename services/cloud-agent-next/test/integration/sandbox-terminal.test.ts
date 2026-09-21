@@ -1,5 +1,6 @@
 import { SELF, env, runInDurableObject } from 'cloudflare:test';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { waitFor } from './wait-for.js';
 import { createMemoryProviderAdapter } from '../../src/sandbox-control/provider.js';
 import { deriveKiloSandboxTargets } from '../../src/kilo/kilo-targets.js';
 import {
@@ -467,7 +468,7 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
     })
   );
 
-  await vi.waitFor(async () => {
+  await waitFor(async () => {
     await expect(
       runInDurableObject(controlStub, instance => instance.getStatus())
     ).resolves.toMatchObject({
@@ -491,7 +492,7 @@ async function createFixture(ownerId?: string, organizationId?: string): Promise
   );
   if (!admission.success) throw new Error(`Session admission failed: ${admission.error}`);
   await prepared.promise;
-  await vi.waitFor(async () => {
+  await waitFor(async () => {
     await expect(sessionStub.getMessageResult(messageId)).resolves.toMatchObject({
       type: 'found',
       result: { status: 'running' },

@@ -136,13 +136,13 @@ describe('Cloud Agent report emitter', () => {
   });
 
   it.each([
-    ['agent_activity', 'payment_required', 'insufficient_credits'],
-    ['agent_activity', 'model_missing', 'model_unavailable'],
-    ['post_dispatch_no_activity', 'payment_required', 'insufficient_credits'],
-    ['post_dispatch_no_activity', 'model_missing', 'model_unavailable'],
+    ['agent_activity', 'payment_required', 'user', 'insufficient_credits'],
+    ['agent_activity', 'model_missing', 'provider', 'model_unavailable'],
+    ['post_dispatch_no_activity', 'payment_required', 'user', 'insufficient_credits'],
+    ['post_dispatch_no_activity', 'model_missing', 'provider', 'model_unavailable'],
   ] as const)(
-    'preserves %s/%s with user reason %s',
-    async (failureStage, failureCode, expectedFailureReason) => {
+    'preserves %s/%s with responsibility %s and reason %s',
+    async (failureStage, failureCode, expectedFailureResponsibility, expectedFailureReason) => {
       const reports: CloudAgentQueueReport[] = [];
       await emitRunStateReport({
         queue: { send: async report => void reports.push(report) },
@@ -153,7 +153,7 @@ describe('Cloud Agent report emitter', () => {
       expect(reports[0]?.run).toMatchObject({
         failureStage,
         failureCode,
-        failureResponsibility: 'user',
+        failureResponsibility: expectedFailureResponsibility,
         failureReason: expectedFailureReason,
       });
     }
@@ -336,7 +336,7 @@ describe('Cloud Agent report emitter', () => {
     );
   });
 
-  it('attributes an absent model chosen by managed auto-routing to platform configuration', async () => {
+  it('attributes an absent model to the provider even when managed auto-routing selected it', async () => {
     const reports: CloudAgentQueueReport[] = [];
     await emitRunStateReport({
       queue: { send: async report => void reports.push(report) },
@@ -353,8 +353,8 @@ describe('Cloud Agent report emitter', () => {
 
     expect(reports[0]?.run).toMatchObject({
       failureCode: 'model_missing',
-      failureResponsibility: 'platform',
-      failureReason: 'managed_model_configuration',
+      failureResponsibility: 'provider',
+      failureReason: 'model_unavailable',
     });
   });
 
@@ -491,7 +491,7 @@ describe('Cloud Agent report emitter', () => {
       'Assistant request was rate limited'
     );
     expect(reports[0]?.run).toMatchObject({
-      failureResponsibility: 'user',
+      failureResponsibility: 'provider',
       failureReason: 'rate_limited',
     });
     expect(JSON.stringify(reports)).not.toContain('usage_limit_exceeded');
@@ -538,7 +538,7 @@ describe('Cloud Agent report emitter', () => {
     expect(metric).toHaveBeenCalledWith('Cloud Agent failure classified', {
       metric: 'cloud_agent_failure_classified',
       count: 1,
-      responsibility: 'platform',
+      responsibility: 'provider',
       reason: 'managed_provider_unavailable',
       stage: 'agent_activity',
       code: 'assistant_error',

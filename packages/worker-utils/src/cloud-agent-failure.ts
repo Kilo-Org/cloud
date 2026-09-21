@@ -196,7 +196,6 @@ type RunFailureFacts = {
   workspaceSubtype?: WorkspaceFailureSubtype;
   assistantReason?: CloudAgentAssistantFailureReason;
   providerOwnership?: CloudAgentProviderOwnership;
-  managedModelSelection?: boolean;
 };
 
 type SetupFailureFacts = {
@@ -292,25 +291,19 @@ function classifyAdmissionFailure(
 }
 
 /**
- * Assistant limits whose responsibility depends on whose credential the model
- * ran under: the user's own key makes the request shape/quota their problem,
- * our managed key makes it ours, and an unknown owner stays unknown.
+ * The model-serving path is one `provider` bucket: our gateway and the upstream
+ * provider are indistinguishable from the cloud agent's point of view, so
+ * ownership does not change the responsibility for a provider outage, rate
+ * limit, timeout or model-availability failure. Only a failure whose handling
+ * the cloud agent platform itself controls stays `platform`.
  */
-const OWNERSHIP_DEPENDENT_ASSISTANT_LIMITS = {
-  invalid_request: 'assistant_invalid_request',
-  context_limit: 'assistant_context_limit',
-  output_limit: 'assistant_output_limit',
-} as const;
-
 function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClassification {
   if (input.code === 'payment_required' || input.assistantReason === 'insufficient_credits') {
     return classified('user', 'insufficient_credits');
   }
-  if (input.assistantReason === 'rate_limited') return classified('user', 'rate_limited');
+  if (input.assistantReason === 'rate_limited') return classified('provider', 'rate_limited');
   if (input.code === 'model_missing' || input.assistantReason === 'model_unavailable') {
-    return input.managedModelSelection
-      ? classified('platform', 'managed_model_configuration')
-      : classified('user', 'model_unavailable');
+    return classified('provider', 'model_unavailable');
   }
   if (input.assistantReason === 'provider_authentication') {
     if (input.providerOwnership === 'byok') {
@@ -322,33 +315,33 @@ function classifyAssistantFailure(input: RunFailureFacts): CloudAgentFailureClas
     return classified('unknown', 'provider_ownership_unknown');
   }
   if (input.assistantReason === 'timeout') {
-    if (input.providerOwnership === 'managed') {
-      return classified('platform', 'request_timeout');
+    if (input.providerOwnership === 'unknown' || input.providerOwnership === undefined) {
+      return classified('provider', 'provider_ownership_unknown');
     }
-    return input.providerOwnership === 'byok'
-      ? classified('unknown', 'request_timeout')
-      : classified('unknown', 'provider_ownership_unknown');
+    return classified('provider', 'request_timeout');
   }
   if (input.assistantReason === 'provider_unavailable') {
     if (input.providerOwnership === 'managed') {
-      return classified('platform', 'managed_provider_unavailable');
+      return classified('provider', 'managed_provider_unavailable');
     }
     return input.providerOwnership === 'byok'
-      ? classified('unknown', 'provider_unavailable')
-      : classified('unknown', 'provider_ownership_unknown');
+      ? classified('provider', 'provider_unavailable')
+      : classified('provider', 'provider_ownership_unknown');
   }
-  if (
-    input.assistantReason === 'invalid_request' ||
-    input.assistantReason === 'context_limit' ||
-    input.assistantReason === 'output_limit'
-  ) {
+  if (input.assistantReason === 'context_limit') {
+    return classified('provider', 'assistant_context_limit');
+  }
+  if (input.assistantReason === 'output_limit') {
+    return classified('provider', 'assistant_output_limit');
+  }
+  if (input.assistantReason === 'invalid_request') {
     const responsibility =
       input.providerOwnership === 'byok'
         ? 'user'
         : input.providerOwnership === 'managed'
           ? 'platform'
           : 'unknown';
-    return classified(responsibility, OWNERSHIP_DEPENDENT_ASSISTANT_LIMITS[input.assistantReason]);
+    return classified(responsibility, 'assistant_invalid_request');
   }
   if (input.assistantReason === 'content_filter') {
     return classified('user', 'assistant_content_filter');

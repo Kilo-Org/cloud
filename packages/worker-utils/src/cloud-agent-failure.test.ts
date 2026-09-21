@@ -49,14 +49,20 @@ describe('CloudAgentCallbackFailureSchema', () => {
 });
 
 describe('classifyCloudAgentFailure', () => {
-  it.each([
-    ['payment_required', 'insufficient_credits'],
-    ['model_missing', 'model_unavailable'],
-  ] as const)('classifies explicit %s as user action', (code, reason) => {
-    expect(classifyCloudAgentFailure({ source: 'run', stage: 'agent_activity', code })).toEqual({
-      responsibility: 'user',
-      reason,
-    });
+  it('classifies explicit payment_required as a user action', () => {
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'payment_required',
+      })
+    ).toEqual({ responsibility: 'user', reason: 'insufficient_credits' });
+  });
+
+  it('classifies an explicit model_missing as an unavailable model', () => {
+    expect(
+      classifyCloudAgentFailure({ source: 'run', stage: 'agent_activity', code: 'model_missing' })
+    ).toEqual({ responsibility: 'provider', reason: 'model_unavailable' });
   });
 
   it('preserves ambiguous assistant failures as unknown', () => {
@@ -95,10 +101,10 @@ describe('classifyCloudAgentFailure', () => {
     ['provider_authentication', 'managed', 'platform', 'managed_provider_authentication'],
     ['provider_authentication', 'unknown', 'unknown', 'provider_ownership_unknown'],
     ['provider_authentication', undefined, 'unknown', 'provider_ownership_unknown'],
-    ['provider_unavailable', 'byok', 'unknown', 'provider_unavailable'],
-    ['provider_unavailable', 'managed', 'platform', 'managed_provider_unavailable'],
-    ['provider_unavailable', 'unknown', 'unknown', 'provider_ownership_unknown'],
-    ['provider_unavailable', undefined, 'unknown', 'provider_ownership_unknown'],
+    ['provider_unavailable', 'byok', 'provider', 'provider_unavailable'],
+    ['provider_unavailable', 'managed', 'provider', 'managed_provider_unavailable'],
+    ['provider_unavailable', 'unknown', 'provider', 'provider_ownership_unknown'],
+    ['provider_unavailable', undefined, 'provider', 'provider_ownership_unknown'],
   ] as const)(
     'classifies %s with %s ownership without losing the known cause',
     (assistantReason, providerOwnership, responsibility, reason) => {
@@ -115,10 +121,10 @@ describe('classifyCloudAgentFailure', () => {
   );
 
   it.each([
-    ['managed', 'platform', 'request_timeout'],
-    ['byok', 'unknown', 'request_timeout'],
-    ['unknown', 'unknown', 'provider_ownership_unknown'],
-    [undefined, 'unknown', 'provider_ownership_unknown'],
+    ['managed', 'provider', 'request_timeout'],
+    ['byok', 'provider', 'request_timeout'],
+    ['unknown', 'provider', 'provider_ownership_unknown'],
+    [undefined, 'provider', 'provider_ownership_unknown'],
   ] as const)(
     'retains request_timeout with %s ownership',
     (providerOwnership, responsibility, reason) => {
@@ -135,21 +141,35 @@ describe('classifyCloudAgentFailure', () => {
     }
   );
 
+  it('attributes invalid_request by provider ownership without collapsing the cause', () => {
+    const cases = [
+      ['byok', 'user'],
+      ['managed', 'platform'],
+      ['unknown', 'unknown'],
+      [undefined, 'unknown'],
+    ] as const;
+
+    for (const [providerOwnership, responsibility] of cases) {
+      const failure = classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: 'invalid_request',
+        providerOwnership,
+      });
+
+      expect(failure).toEqual({ responsibility, reason: 'assistant_invalid_request' });
+      expect(CloudAgentFailureReasonSchema.parse(failure.reason)).toBe('assistant_invalid_request');
+    }
+  });
+
   it.each([
-    ['invalid_request', 'assistant_invalid_request'],
     ['context_limit', 'assistant_context_limit'],
     ['output_limit', 'assistant_output_limit'],
   ] as const)(
-    'attributes %s by provider ownership without collapsing the cause',
+    'attributes %s to the provider regardless of provider ownership',
     (assistantReason, expectedReason) => {
-      const cases = [
-        ['byok', 'user'],
-        ['managed', 'platform'],
-        ['unknown', 'unknown'],
-        [undefined, 'unknown'],
-      ] as const;
-
-      for (const [providerOwnership, responsibility] of cases) {
+      for (const providerOwnership of [...CLOUD_AGENT_PROVIDER_OWNERSHIPS, undefined]) {
         const failure = classifyCloudAgentFailure({
           source: 'run',
           stage: 'agent_activity',
@@ -158,7 +178,7 @@ describe('classifyCloudAgentFailure', () => {
           providerOwnership,
         });
 
-        expect(failure).toEqual({ responsibility, reason: expectedReason });
+        expect(failure).toEqual({ responsibility: 'provider', reason: expectedReason });
         expect(CloudAgentFailureReasonSchema.parse(failure.reason)).toBe(expectedReason);
       }
     }
@@ -187,43 +207,47 @@ describe('classifyCloudAgentFailure', () => {
     }
   });
 
-  it.each(['insufficient_credits', 'rate_limited'] as const)(
-    'keeps %s as user responsibility regardless of provider ownership',
-    assistantReason => {
+  it('keeps insufficient_credits as user responsibility regardless of provider ownership', () => {
+    for (const providerOwnership of [...CLOUD_AGENT_PROVIDER_OWNERSHIPS, undefined]) {
+      expect(
+        classifyCloudAgentFailure({
+          source: 'run',
+          stage: 'agent_activity',
+          code: 'assistant_error',
+          assistantReason: 'insufficient_credits',
+          providerOwnership,
+        })
+      ).toEqual({ responsibility: 'user', reason: 'insufficient_credits' });
+    }
+  });
+
+  it('attributes rate_limited to the provider regardless of provider ownership', () => {
+    for (const providerOwnership of [...CLOUD_AGENT_PROVIDER_OWNERSHIPS, undefined]) {
+      expect(
+        classifyCloudAgentFailure({
+          source: 'run',
+          stage: 'agent_activity',
+          code: 'assistant_error',
+          assistantReason: 'rate_limited',
+          providerOwnership,
+        })
+      ).toEqual({ responsibility: 'provider', reason: 'rate_limited' });
+    }
+  });
+
+  it.each(['assistant_error', 'model_missing'] as const)(
+    'attributes an unavailable model on %s to the provider regardless of ownership',
+    code => {
       for (const providerOwnership of [...CLOUD_AGENT_PROVIDER_OWNERSHIPS, undefined]) {
         expect(
           classifyCloudAgentFailure({
             source: 'run',
             stage: 'agent_activity',
-            code: 'assistant_error',
-            assistantReason,
+            code,
+            assistantReason: 'model_unavailable',
             providerOwnership,
           })
-        ).toEqual({ responsibility: 'user', reason: assistantReason });
-      }
-    }
-  );
-
-  it.each([true, false, undefined])(
-    'uses managed model selection %s rather than provider ownership for model failures',
-    managedModelSelection => {
-      for (const providerOwnership of [...CLOUD_AGENT_PROVIDER_OWNERSHIPS, undefined]) {
-        for (const code of ['assistant_error', 'model_missing'] as const) {
-          expect(
-            classifyCloudAgentFailure({
-              source: 'run',
-              stage: 'agent_activity',
-              code,
-              assistantReason: 'model_unavailable',
-              providerOwnership,
-              managedModelSelection,
-            })
-          ).toEqual(
-            managedModelSelection
-              ? { responsibility: 'platform', reason: 'managed_model_configuration' }
-              : { responsibility: 'user', reason: 'model_unavailable' }
-          );
-        }
+        ).toEqual({ responsibility: 'provider', reason: 'model_unavailable' });
       }
     }
   );
@@ -342,9 +366,9 @@ describe('classifyCloudAgentFailure', () => {
 const ASSISTANT_FAILURE_CODES = ['assistant_error', 'payment_required', 'model_missing'] as const;
 
 /**
- * Pre-chunk golden table: the exact classifications the classifier emitted
- * before `provider` joined the responsibility enum. Chunk 1 must not change
- * these values. A deliberate classifier change updates this table.
+ * Golden table: the exact classification the classifier emits for every
+ * non-assistant run failure code. These are unchanged by the `provider`
+ * responsibility; a deliberate classifier change updates this table.
  */
 const NON_ASSISTANT_FAILURE_CLASSIFICATIONS = {
   sandbox_connect_failed: { responsibility: 'platform', reason: 'sandbox_connectivity' },
@@ -369,7 +393,6 @@ const NON_ASSISTANT_FAILURE_CLASSIFICATIONS = {
 const OWNERSHIP_MATRIX_INPUTS = {
   assistantReasons: [...CLOUD_AGENT_ASSISTANT_FAILURE_REASONS, undefined],
   providerOwnerships: [...CLOUD_AGENT_PROVIDER_OWNERSHIPS, undefined],
-  managedModelSelections: [true, false, undefined],
 } as const;
 
 /** Fixed expected classifications for every declared workspace failure subtype. */
@@ -457,14 +480,12 @@ type AssistantMatrixInput = {
   code: (typeof ASSISTANT_FAILURE_CODES)[number];
   assistantReason?: CloudAgentAssistantFailureReason;
   providerOwnership?: CloudAgentProviderOwnership;
-  managedModelSelection?: boolean;
 };
 
 type AssistantMatrixMatch = {
   code?: readonly AssistantMatrixInput['code'][];
   assistantReason?: readonly (CloudAgentAssistantFailureReason | undefined)[];
   providerOwnership?: readonly (CloudAgentProviderOwnership | undefined)[];
-  managedModelSelection?: readonly (boolean | undefined)[];
 };
 
 /** Assistant `model_missing` ignores the reason unless a user-action override matches. */
@@ -483,18 +504,18 @@ const MODEL_MISSING_MODEL_REASONS = [
 ] as const;
 
 /**
- * Pre-chunk expected classifications written as fixed data, not as a second
- * copy of `classifyAssistantFailure`. Each row names the distinguishing inputs
- * it covers; an omitted field matches any value. Every row's `expected` is a
- * literal from the pre-chunk contract, so a changed classifier cell fails the
- * matrix instead of being absorbed by editing a twin in lockstep.
+ * Expected classifications written as fixed data, not as a second copy of
+ * `classifyAssistantFailure`. Each row names the distinguishing inputs it
+ * covers; an omitted field matches any value. Every row's `expected` is a
+ * literal from the contract, so a changed classifier cell fails the matrix
+ * instead of being absorbed by editing a twin in lockstep.
  */
-const PRE_CHUNK_ASSISTANT_DEFAULT: CloudAgentFailureClassification = {
+const ASSISTANT_FAILURE_DEFAULT: CloudAgentFailureClassification = {
   responsibility: 'unknown',
   reason: 'assistant_unknown',
 };
 
-const PRE_CHUNK_ASSISTANT_CLASSIFICATIONS: ReadonlyArray<{
+const ASSISTANT_FAILURE_CLASSIFICATIONS: ReadonlyArray<{
   match: AssistantMatrixMatch;
   expected: CloudAgentFailureClassification;
 }> = [
@@ -509,23 +530,14 @@ const PRE_CHUNK_ASSISTANT_CLASSIFICATIONS: ReadonlyArray<{
   },
   {
     match: { code: ['assistant_error'], assistantReason: ['rate_limited'] },
-    expected: { responsibility: 'user', reason: 'rate_limited' },
+    expected: { responsibility: 'provider', reason: 'rate_limited' },
   },
   {
     match: {
       code: ['assistant_error'],
       assistantReason: ['model_unavailable'],
-      managedModelSelection: [true],
     },
-    expected: { responsibility: 'platform', reason: 'managed_model_configuration' },
-  },
-  {
-    match: {
-      code: ['assistant_error'],
-      assistantReason: ['model_unavailable'],
-      managedModelSelection: [false, undefined],
-    },
-    expected: { responsibility: 'user', reason: 'model_unavailable' },
+    expected: { responsibility: 'provider', reason: 'model_unavailable' },
   },
   {
     match: {
@@ -557,7 +569,7 @@ const PRE_CHUNK_ASSISTANT_CLASSIFICATIONS: ReadonlyArray<{
       assistantReason: ['timeout'],
       providerOwnership: ['managed'],
     },
-    expected: { responsibility: 'platform', reason: 'request_timeout' },
+    expected: { responsibility: 'provider', reason: 'request_timeout' },
   },
   {
     match: {
@@ -565,7 +577,7 @@ const PRE_CHUNK_ASSISTANT_CLASSIFICATIONS: ReadonlyArray<{
       assistantReason: ['timeout'],
       providerOwnership: ['byok'],
     },
-    expected: { responsibility: 'unknown', reason: 'request_timeout' },
+    expected: { responsibility: 'provider', reason: 'request_timeout' },
   },
   {
     match: {
@@ -573,7 +585,7 @@ const PRE_CHUNK_ASSISTANT_CLASSIFICATIONS: ReadonlyArray<{
       assistantReason: ['timeout'],
       providerOwnership: ['unknown', undefined],
     },
-    expected: { responsibility: 'unknown', reason: 'provider_ownership_unknown' },
+    expected: { responsibility: 'provider', reason: 'provider_ownership_unknown' },
   },
   {
     match: {
@@ -581,7 +593,7 @@ const PRE_CHUNK_ASSISTANT_CLASSIFICATIONS: ReadonlyArray<{
       assistantReason: ['provider_unavailable'],
       providerOwnership: ['managed'],
     },
-    expected: { responsibility: 'platform', reason: 'managed_provider_unavailable' },
+    expected: { responsibility: 'provider', reason: 'managed_provider_unavailable' },
   },
   {
     match: {
@@ -589,7 +601,7 @@ const PRE_CHUNK_ASSISTANT_CLASSIFICATIONS: ReadonlyArray<{
       assistantReason: ['provider_unavailable'],
       providerOwnership: ['byok'],
     },
-    expected: { responsibility: 'unknown', reason: 'provider_unavailable' },
+    expected: { responsibility: 'provider', reason: 'provider_unavailable' },
   },
   {
     match: {
@@ -597,7 +609,7 @@ const PRE_CHUNK_ASSISTANT_CLASSIFICATIONS: ReadonlyArray<{
       assistantReason: ['provider_unavailable'],
       providerOwnership: ['unknown', undefined],
     },
-    expected: { responsibility: 'unknown', reason: 'provider_ownership_unknown' },
+    expected: { responsibility: 'provider', reason: 'provider_ownership_unknown' },
   },
   {
     match: {
@@ -627,49 +639,15 @@ const PRE_CHUNK_ASSISTANT_CLASSIFICATIONS: ReadonlyArray<{
     match: {
       code: ['assistant_error'],
       assistantReason: ['context_limit'],
-      providerOwnership: ['byok'],
     },
-    expected: { responsibility: 'user', reason: 'assistant_context_limit' },
-  },
-  {
-    match: {
-      code: ['assistant_error'],
-      assistantReason: ['context_limit'],
-      providerOwnership: ['managed'],
-    },
-    expected: { responsibility: 'platform', reason: 'assistant_context_limit' },
-  },
-  {
-    match: {
-      code: ['assistant_error'],
-      assistantReason: ['context_limit'],
-      providerOwnership: ['unknown', undefined],
-    },
-    expected: { responsibility: 'unknown', reason: 'assistant_context_limit' },
+    expected: { responsibility: 'provider', reason: 'assistant_context_limit' },
   },
   {
     match: {
       code: ['assistant_error'],
       assistantReason: ['output_limit'],
-      providerOwnership: ['byok'],
     },
-    expected: { responsibility: 'user', reason: 'assistant_output_limit' },
-  },
-  {
-    match: {
-      code: ['assistant_error'],
-      assistantReason: ['output_limit'],
-      providerOwnership: ['managed'],
-    },
-    expected: { responsibility: 'platform', reason: 'assistant_output_limit' },
-  },
-  {
-    match: {
-      code: ['assistant_error'],
-      assistantReason: ['output_limit'],
-      providerOwnership: ['unknown', undefined],
-    },
-    expected: { responsibility: 'unknown', reason: 'assistant_output_limit' },
+    expected: { responsibility: 'provider', reason: 'assistant_output_limit' },
   },
   {
     match: { code: ['assistant_error'], assistantReason: ['content_filter'] },
@@ -679,30 +657,21 @@ const PRE_CHUNK_ASSISTANT_CLASSIFICATIONS: ReadonlyArray<{
     match: { code: ['assistant_error'], assistantReason: ['structured_output'] },
     expected: { responsibility: 'platform', reason: 'assistant_structured_output' },
   },
-  // `model_missing` resolves to the managed-model branch for every reason except the overrides above.
+  // `model_missing` resolves to the unavailable-model branch for every reason except the overrides above.
   {
     match: { code: ['model_missing'], assistantReason: ['insufficient_credits'] },
     expected: { responsibility: 'user', reason: 'insufficient_credits' },
   },
   {
     match: { code: ['model_missing'], assistantReason: ['rate_limited'] },
-    expected: { responsibility: 'user', reason: 'rate_limited' },
+    expected: { responsibility: 'provider', reason: 'rate_limited' },
   },
   {
     match: {
       code: ['model_missing'],
       assistantReason: MODEL_MISSING_MODEL_REASONS,
-      managedModelSelection: [true],
     },
-    expected: { responsibility: 'platform', reason: 'managed_model_configuration' },
-  },
-  {
-    match: {
-      code: ['model_missing'],
-      assistantReason: MODEL_MISSING_MODEL_REASONS,
-      managedModelSelection: [false, undefined],
-    },
-    expected: { responsibility: 'user', reason: 'model_unavailable' },
+    expected: { responsibility: 'provider', reason: 'model_unavailable' },
   },
 ];
 
@@ -710,8 +679,7 @@ function matchesAssistantMatrix(match: AssistantMatrixMatch, input: AssistantMat
   return (
     (match.code?.includes(input.code) ?? true) &&
     (match.assistantReason?.includes(input.assistantReason) ?? true) &&
-    (match.providerOwnership?.includes(input.providerOwnership) ?? true) &&
-    (match.managedModelSelection?.includes(input.managedModelSelection) ?? true)
+    (match.providerOwnership?.includes(input.providerOwnership) ?? true)
   );
 }
 
@@ -724,47 +692,42 @@ describe('classifyCloudAgentFailure ownership matrix', () => {
     expect(covered).toEqual(new Set(CLOUD_AGENT_FAILURE_CODES));
   });
 
-  it('emits the pre-chunk classification for every non-assistant code and assistant input', () => {
+  it('emits the fixed classification for every non-assistant code and assistant input', () => {
     for (const [code, expected] of Object.entries(NON_ASSISTANT_FAILURE_CLASSIFICATIONS)) {
       for (const assistantReason of OWNERSHIP_MATRIX_INPUTS.assistantReasons) {
         for (const providerOwnership of OWNERSHIP_MATRIX_INPUTS.providerOwnerships) {
-          for (const managedModelSelection of OWNERSHIP_MATRIX_INPUTS.managedModelSelections) {
-            expect(
-              classifyCloudAgentFailure({
-                source: 'run',
-                stage: 'agent_activity',
-                code: code as CloudAgentFailureCode,
-                assistantReason,
-                providerOwnership,
-                managedModelSelection,
-              })
-            ).toEqual(expected);
-          }
+          expect(
+            classifyCloudAgentFailure({
+              source: 'run',
+              stage: 'agent_activity',
+              code: code as CloudAgentFailureCode,
+              assistantReason,
+              providerOwnership,
+            })
+          ).toEqual(expected);
         }
       }
     }
   });
 
-  it('emits the pre-chunk classification for every assistant code combination', () => {
+  it('emits the fixed classification for every assistant code combination', () => {
     for (const code of ASSISTANT_FAILURE_CODES) {
       for (const assistantReason of OWNERSHIP_MATRIX_INPUTS.assistantReasons) {
         for (const providerOwnership of OWNERSHIP_MATRIX_INPUTS.providerOwnerships) {
-          for (const managedModelSelection of OWNERSHIP_MATRIX_INPUTS.managedModelSelections) {
-            const input = { code, assistantReason, providerOwnership, managedModelSelection };
-            const matches = PRE_CHUNK_ASSISTANT_CLASSIFICATIONS.filter(row =>
-              matchesAssistantMatrix(row.match, input)
-            );
-            expect(matches.length).toBeLessThanOrEqual(1);
-            const expected = matches[0]?.expected ?? PRE_CHUNK_ASSISTANT_DEFAULT;
+          const input = { code, assistantReason, providerOwnership };
+          const matches = ASSISTANT_FAILURE_CLASSIFICATIONS.filter(row =>
+            matchesAssistantMatrix(row.match, input)
+          );
+          expect(matches.length).toBeLessThanOrEqual(1);
+          const expected = matches[0]?.expected ?? ASSISTANT_FAILURE_DEFAULT;
 
-            expect(
-              classifyCloudAgentFailure({
-                source: 'run',
-                stage: 'agent_activity',
-                ...input,
-              })
-            ).toEqual(expected);
-          }
+          expect(
+            classifyCloudAgentFailure({
+              source: 'run',
+              stage: 'agent_activity',
+              ...input,
+            })
+          ).toEqual(expected);
         }
       }
     }
@@ -780,19 +743,16 @@ describe('classifyCloudAgentFailure ownership matrix', () => {
     for (const workspaceSubtype of WORKSPACE_FAILURE_SUBTYPES) {
       for (const assistantReason of OWNERSHIP_MATRIX_INPUTS.assistantReasons) {
         for (const providerOwnership of OWNERSHIP_MATRIX_INPUTS.providerOwnerships) {
-          for (const managedModelSelection of OWNERSHIP_MATRIX_INPUTS.managedModelSelections) {
-            expect(
-              classifyCloudAgentFailure({
-                source: 'run',
-                stage: 'pre_dispatch',
-                code: 'workspace_setup_failed',
-                workspaceSubtype,
-                assistantReason,
-                providerOwnership,
-                managedModelSelection,
-              })
-            ).toEqual(WORKSPACE_FAILURE_CLASSIFICATIONS[workspaceSubtype]);
-          }
+          expect(
+            classifyCloudAgentFailure({
+              source: 'run',
+              stage: 'pre_dispatch',
+              code: 'workspace_setup_failed',
+              workspaceSubtype,
+              assistantReason,
+              providerOwnership,
+            })
+          ).toEqual(WORKSPACE_FAILURE_CLASSIFICATIONS[workspaceSubtype]);
         }
       }
     }

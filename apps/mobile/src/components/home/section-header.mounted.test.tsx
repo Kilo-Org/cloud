@@ -60,8 +60,6 @@ describe('SectionHeader mounted layout', () => {
         'max-w-full',
         'font-mono-medium',
         'text-[10px]',
-        'tracking-[1.5px]',
-        'uppercase',
         'text-muted-foreground',
       ])
     );
@@ -81,14 +79,7 @@ describe('SectionHeader mounted layout', () => {
       expect.arrayContaining(['grow', 'max-w-full'])
     );
     expect((text.props.className as string).split(' ')).toEqual(
-      expect.arrayContaining([
-        alignment,
-        'font-mono-medium',
-        'text-[11px]',
-        'tracking-[1.5px]',
-        'uppercase',
-        'text-primary',
-      ])
+      expect.arrayContaining([alignment, 'font-mono-medium', 'text-[11px]', 'text-primary'])
     );
     expect(text.props.numberOfLines).toBeUndefined();
     expect(text.props.allowFontScaling).not.toBe(false);
@@ -96,6 +87,9 @@ describe('SectionHeader mounted layout', () => {
     expect(text.children).toEqual(['See all']);
   });
 
+  // The inline override only has a class to beat in LTR: there the eyebrow
+  // variant and the action keep `tracking-[1.5px]`, and the joined-script
+  // children still get `letterSpacing: 0` on top of it.
   it('clears the tracked letter-spacing on the Arabic label and action', () => {
     const root = mount(
       createElement(SectionHeader, {
@@ -113,6 +107,38 @@ describe('SectionHeader mounted layout', () => {
     expect((label.props.className as string).split(' ')).toContain('tracking-[1.5px]');
     expect(label.props.style).toContainEqual({ letterSpacing: 0 });
     expect(actionText.props.style).toContainEqual({ letterSpacing: 0 });
+  });
+
+  // Finding home-ar-loading: the Arabic section labels carried the Latin
+  // uppercase letter-spacing, whose glyph gaps break a cursive script's joins
+  // ('ال جلسا ت'). The display treatment is LTR-only.
+  it.each([
+    { isRTL: false, tracked: true },
+    { isRTL: true, tracked: false },
+  ])('letterspaces the section labels only outside RTL (RTL=$isRTL)', ({ isRTL, tracked }) => {
+    i18nManager.isRTL = isRTL;
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'الجلسات الجارية الآن',
+        actionLabel: 'عرض الكل',
+        onActionPress: () => undefined,
+      })
+    );
+    const action = root.findByProps({ accessibilityRole: 'button' });
+    const text = action.find(node => Object.is(node.type, 'Text'));
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
+    );
+
+    for (const node of [label, text]) {
+      const classes = (node.props.className as string).split(' ');
+      if (tracked) {
+        expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
+      } else {
+        expect(classes).not.toContain('uppercase');
+        expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+      }
+    }
   });
 
   it('keeps the complete accessible action name and activates the supplied destination', () => {

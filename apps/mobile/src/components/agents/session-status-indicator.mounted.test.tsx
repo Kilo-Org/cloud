@@ -5,7 +5,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { type SessionStatusIndicator as SessionStatusIndicatorType } from '@kilocode/cloud-agent-sdk';
 
 import { SessionStatusIndicator } from './session-status-indicator';
-import '@/i18n';
+import { i18n } from '@/i18n';
+import de from '@/i18n/locales/de.json';
+import en from '@/i18n/locales/en.json';
 
 // The real `@/components/ui/text` loads `@rn-primitives/slot`, whose node_modules
 // `.mjs` contains JSX that this pipeline cannot transform. Provide a real context
@@ -92,14 +94,34 @@ describe('SessionStatusIndicator mounted', () => {
     ).resolves.toEqual(['Not enough credits to run Cloud Agent. Add credits and try again.']);
   });
 
-  // The SDK writes these lines itself; they are its own fixed copy, not a
-  // provider or transport string, so the indicator shows them as-is.
+  // The SDK codes the fixed lines it writes itself, so the status line renders
+  // the app's catalog copy instead of the SDK's English message.
   it.each([
-    ['Agent connection lost'],
-    ['Session terminated'],
-    ['Failed to stop execution'],
-  ] as const)('renders the SDK fixed copy for %s', async message => {
-    await expect(textNodes({ type: 'error', message, timestamp: 0 })).resolves.toEqual([message]);
+    ['agent-connection-lost', 'Agent connection lost', 'Connection lost'],
+    ['session-terminated', 'Session terminated', 'The response failed.'],
+    ['failed-to-stop-execution', 'Failed to stop execution', 'Failed to stop execution'],
+  ] as const)('renders the %s code as catalog copy', async (code, message, expected) => {
+    await expect(textNodes({ type: 'error', message, code, timestamp: 0 })).resolves.toEqual([
+      expected,
+    ]);
+  });
+
+  // The code is locale-free, so the same indicator renders in the reader's
+  // language once the catalog changes. German already carries this key.
+  it('renders the German copy for the agent-connection-lost code', async () => {
+    await i18n.changeLanguage('de');
+    try {
+      await expect(
+        textNodes({
+          type: 'error',
+          message: 'Agent connection lost',
+          code: 'agent-connection-lost',
+          timestamp: 0,
+        })
+      ).resolves.toEqual([de.agentChat.sessionConnection.connectionLost]);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('renders the delivery copy for the SDK delivery status', async () => {
@@ -119,13 +141,32 @@ describe('SessionStatusIndicator mounted', () => {
     expect(texts.join(' ')).not.toContain('Service Unavailable');
   });
 
-  it('leaves a progress message alone', async () => {
+  // A coded progress line renders catalog copy; a code-less line (autocommit
+  // event text) keeps the message the SDK forwarded.
+  it('renders catalog copy for a coded progress line', async () => {
+    await expect(
+      textNodes({
+        type: 'progress',
+        message: 'Setting up environment…',
+        code: 'setting-up-environment',
+        timestamp: 0,
+      })
+    ).resolves.toEqual([en.agentChat.composer.preparingPlaceholder]);
+  });
+
+  it('leaves a code-less progress message alone', async () => {
     await expect(
       textNodes({ type: 'progress', message: 'Setting up environment…', timestamp: 0 })
     ).resolves.toEqual(['Setting up environment…']);
   });
 
-  it('leaves an info message alone', async () => {
+  it('renders catalog copy for a coded info line', async () => {
+    await expect(
+      textNodes({ type: 'info', message: 'Autocommit completed', code: 'committed', timestamp: 0 })
+    ).resolves.toEqual([en.agentChat.session.committed]);
+  });
+
+  it('leaves a code-less info message alone', async () => {
     await expect(
       textNodes({ type: 'info', message: 'Session stopped', timestamp: 0 })
     ).resolves.toEqual(['Session stopped']);

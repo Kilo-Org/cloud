@@ -144,6 +144,30 @@ async function compiledGapDp(rowClassName: string): Promise<number> {
 
 type Insets = { top: number; right: number; bottom: number; left: number };
 
+/**
+ * A control's hitSlop as per-side insets. Controls here use either shape: the
+ * shared `IconButton` passes per-side insets, while `SessionFilterButton` keeps
+ * the scalar `@/lib/a11y/touch-target` slop, where one number applies to every
+ * side.
+ */
+function hitSlopInsets(hitSlop: unknown): Insets {
+  if (typeof hitSlop === 'number') {
+    return { top: hitSlop, right: hitSlop, bottom: hitSlop, left: hitSlop };
+  }
+  if (hitSlop && typeof hitSlop === 'object') {
+    const insets = hitSlop as Partial<Insets>;
+    if (typeof insets.right === 'number' && typeof insets.left === 'number') {
+      return {
+        top: insets.top ?? 0,
+        right: insets.right,
+        bottom: insets.bottom ?? 0,
+        left: insets.left,
+      };
+    }
+  }
+  throw new Error(`no measurable hitSlop in ${JSON.stringify(hitSlop)}`);
+}
+
 const noop = (): void => undefined;
 
 async function mountHeader(showNewSession: boolean, onNewSession: () => void): Promise<R> {
@@ -216,13 +240,13 @@ describe('SessionListHeaderActions new-session control', () => {
     // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
     expect(gapDp).toBe(14);
 
-    const newSessionSlop = newSession.props.hitSlop;
-    const filterSlop = filter.props.hitSlop;
+    // `hitSlopInsets` validates and normalizes either shape; `sideSlop` then
+    // reads the facing side, because the filter expresses its slop as one dp
+    // value for every side while the new-session control caps its right side.
+    const newSessionSlop = hitSlopInsets(newSession.props.hitSlop);
+    const filterSlop = hitSlopInsets(filter.props.hitSlop);
     // The new-session control sits left of the filter, so the gap has to fit
     // both facing slops; more than the gap means the two regions overlap.
-    // The filter expresses its slop as one dp value for every side, while the
-    // new-session control caps its right side, so read each side through
-    // `sideSlop` rather than assuming both are per-side objects.
     expect(sideSlop(newSessionSlop, 'right') + sideSlop(filterSlop, 'left')).toBeLessThanOrEqual(
       gapDp
     );

@@ -713,6 +713,14 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
   if (sessionNextAuthUrl !== undefined) {
     sessionEnv.NEXTAUTH_URL = sessionNextAuthUrl;
   }
+  // The enriched tRPC timing line carries the client dimensions and the
+  // per-call `x-kilo-request-id` that joins it with the app's client_latency
+  // sample, and mobile traffic logs at 100% while other clients stay sampled.
+  // Emit it in local development without an operator remembering the switch;
+  // production keeps its own deployment setting.
+  if (serviceNames.includes('nextjs')) {
+    sessionEnv.TRPC_TIMING_LOGGING = '1';
+  }
   if (process.env.DEBUG_SHOW_DEV_UI !== undefined && process.env.DEBUG_SHOW_DEV_UI !== '') {
     sessionEnv.DEBUG_SHOW_DEV_UI = process.env.DEBUG_SHOW_DEV_UI;
   }

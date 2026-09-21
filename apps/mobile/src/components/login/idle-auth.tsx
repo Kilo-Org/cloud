@@ -7,7 +7,7 @@ import {
 } from 'expo-apple-authentication';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, useColorScheme, View } from 'react-native';
+import { Platform, Pressable, useColorScheme, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -17,10 +17,16 @@ import { GoogleLogo } from '@/components/login/google-logo';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
+import {
+  INLINE_LINK_BOX_CLASS,
+  INLINE_LINK_CONNECTOR_CLASS,
+  INLINE_LINK_HIT_SLOP_DP,
+} from '@/lib/a11y/tap-target';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
 import { setLoginEmailDraft, setSsoRecoveryDraft, type SsoRecoveryDraft } from '@/lib/login-draft';
+import { cn } from '@/lib/utils';
 
 export function IdleAuth({
   start,
@@ -336,23 +342,37 @@ export function IdleAuth({
         {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
         <Text>{t('common.continue')}</Text>
       </Button>
-      <Text className="text-xs text-muted-foreground">
-        {t('login.termsPrefix')}{' '}
-        <Text
-          className="text-xs text-primary underline"
+      <View className="flex-row flex-wrap items-center justify-center">
+        {/* The sentence is a row of nodes, not one Text with nested handlers: an
+            inline link's own box is what the control-size audit measures, so
+            each link carries the shared inline-link box and its own reach. The
+            connector between them reserves at least both facing slops, so the
+            two touch regions never overlap in a catalog with a short
+            conjunction. */}
+        <Text className="text-xs text-muted-foreground">{t('login.termsPrefix')} </Text>
+        <Pressable
+          className={cn(INLINE_LINK_BOX_CLASS, 'px-1')}
+          hitSlop={INLINE_LINK_HIT_SLOP_DP}
+          accessibilityRole="link"
+          accessibilityLabel={t('login.terms')}
           onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
         >
-          {t('login.terms')}
+          <Text className="text-xs text-primary underline">{t('login.terms')}</Text>
+        </Pressable>
+        <Text className={cn('text-xs text-muted-foreground', INLINE_LINK_CONNECTOR_CLASS)}>
+          {t('login.termsConnector')}
         </Text>
-        {t('login.termsConnector')}
-        <Text
-          className="text-xs text-primary underline"
+        <Pressable
+          className={cn(INLINE_LINK_BOX_CLASS, 'px-1')}
+          hitSlop={INLINE_LINK_HIT_SLOP_DP}
+          accessibilityRole="link"
+          accessibilityLabel={t('common.privacyPolicy')}
           onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
         >
-          {t('common.privacyPolicy')}
-        </Text>
-        {t('login.termsSuffix')}
-      </Text>
+          <Text className="text-xs text-primary underline">{t('common.privacyPolicy')}</Text>
+        </Pressable>
+        <Text className="text-xs text-muted-foreground">{t('login.termsSuffix')}</Text>
+      </View>
       <Button
         variant="ghost"
         disabled={authBusy}

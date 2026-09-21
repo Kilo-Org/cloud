@@ -334,8 +334,11 @@
       "sessionStatusTitle": "Стан сеансу",
       "sessionStatusSubtitle": "завершено / помилка / готовність до керування",
       "kiloclawActivitySubtitle": "готовність або помилка екземпляра, заплановані дії",
+      "kiloclawActivityUnavailable": "Запустіть екземпляр KiloClaw, щоб отримувати активність KiloClaw.",
       "balanceAlertsSubtitle": "попередження про низький баланс організації",
-      "securityFindingsSubtitle": "нові виявлені проблеми та нагадування про SLA"
+      "balanceAlertsUnavailable": "Приєднайтеся до організації, щоб отримувати сповіщення про низький баланс.",
+      "securityFindingsSubtitle": "нові виявлені проблеми та нагадування про SLA",
+      "securityFindingsUnavailable": "Увімкніть Агента безпеки Kilo в області, щоб отримувати виявлені проблеми безпеки."
     },
     "action": {
       "openSession": "Відкрити сеанс"
@@ -1596,6 +1599,10 @@
       "couldNotLoad": "Не вдалося завантажити сеанс.",
       "failedToLoadDetails": "Не вдалося завантажити відомості про сеанс.",
       "failedToStopExecution": "Не вдалося зупинити виконання.",
+      "stopped": "Сеанс зупинено",
+      "committing": "Комітимо…",
+      "committed": "Коміт створено",
+      "commitFailed": "Не вдалося створити коміт",
       "renameSession": "Перейменувати сеанс",
       "renamePlaceholder": "Назва сеансу",
       "transcriptAccessibility": "Історія повідомлень сеансу",

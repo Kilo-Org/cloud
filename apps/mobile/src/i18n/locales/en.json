@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Session status",
       "sessionStatusSubtitle": "finished / failed / ready to control",
       "kiloclawActivitySubtitle": "instance ready/failed, scheduled actions",
+      "kiloclawActivityUnavailable": "Start a KiloClaw instance to get KiloClaw activity.",
       "balanceAlertsSubtitle": "low organization balance warnings",
-      "securityFindingsSubtitle": "new findings and SLA reminders"
+      "balanceAlertsUnavailable": "Join an organization to get balance alerts.",
+      "securityFindingsSubtitle": "new findings and SLA reminders",
+      "securityFindingsUnavailable": "Enable Kilo Security Agent on a scope to get security findings."
     },
     "action": {
       "openSession": "Open session"
@@ -2084,6 +2087,10 @@
       "couldNotLoad": "Could not load session",
       "failedToLoadDetails": "Failed to load session details",
       "failedToStopExecution": "Failed to stop execution",
+      "stopped": "Session stopped",
+      "committing": "Committing…",
+      "committed": "Committed",
+      "commitFailed": "Commit failed",
       "renameSession": "Rename session",
       "renamePlaceholder": "Session name",
       "transcriptAccessibility": "Session transcript",

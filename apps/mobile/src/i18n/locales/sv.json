@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Sessionsstatus",
       "sessionStatusSubtitle": "avslutad / misslyckad / redo att styras",
       "kiloclawActivitySubtitle": "instans klar eller misslyckad, schemalagda åtgärder",
+      "kiloclawActivityUnavailable": "Starta en KiloClaw-instans för att få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "varningar om lågt organisationssaldo",
-      "securityFindingsSubtitle": "nya säkerhetsfynd och SLA-påminnelser"
+      "balanceAlertsUnavailable": "Gå med i en organisation för att få varningar om lågt saldo.",
+      "securityFindingsSubtitle": "nya säkerhetsfynd och SLA-påminnelser",
+      "securityFindingsUnavailable": "Aktivera Kilo-säkerhetsagenten i en omfattning för att få säkerhetsanmärkningar."
     },
     "action": {
       "openSession": "Öppna session"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Det gick inte att läsa in sessionen.",
       "failedToLoadDetails": "Det gick inte att läsa in sessionsinformationen.",
       "failedToStopExecution": "Det gick inte att stoppa körningen.",
+      "stopped": "Sessionen stoppad",
+      "committing": "Committar…",
+      "committed": "Committad",
+      "commitFailed": "Committen misslyckades",
       "renameSession": "Byt namn på sessionen",
       "renamePlaceholder": "Sessionens namn",
       "transcriptAccessibility": "Meddelandehistorik",

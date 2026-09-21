@@ -2463,9 +2463,13 @@ describe('SandboxControl lifecycle boundaries', () => {
           identity
         );
       }
-      const before = await loadDeadlines(h.storage);
-      const idleAt = before.idleStop;
+      const armed = await loadDeadlines(h.storage);
+      const idleAt = armed.idleStop;
       if (idleAt === undefined) throw new Error('Missing idle deadline');
+      vi.setSystemTime(idleAt - DEADLINE_MS.heartbeatExpiry / 2);
+      await h.hooks.onHeartbeat?.({ state: 'idle', kilo: { ready: true }, sessions: [] }, identity);
+      const before = await loadDeadlines(h.storage);
+      expect(before.idleStop).toBe(idleAt);
       vi.setSystemTime(idleAt - 1);
       await h.create();
       expect((await loadDeadlines(h.storage)).idleStop).toBe(idleAt);

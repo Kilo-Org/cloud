@@ -870,8 +870,11 @@
       "sessionStatusTitle": "Sesijos būsena",
       "sessionStatusSubtitle": "baigta / nepavyko / paruošta valdyti",
       "kiloclawActivitySubtitle": "egzemplioriaus parengtis ar klaida, suplanuoti veiksmai",
+      "kiloclawActivityUnavailable": "Paleiskite KiloClaw egzempliorių, kad gautumėte KiloClaw veiklą.",
       "balanceAlertsSubtitle": "įspėjimai apie mažą organizacijos likutį",
-      "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai"
+      "balanceAlertsUnavailable": "Prisijunkite prie organizacijos, kad gautumėte mažo likučio įspėjimus.",
+      "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai",
+      "securityFindingsUnavailable": "Įjunkite Kilo saugos agentą apimtyje, kad gautumėte saugos problemas."
     },
     "action": {
       "openSession": "Atidaryti sesiją"
@@ -2132,6 +2135,10 @@
       "couldNotLoad": "Nepavyko įkelti sesijos.",
       "failedToLoadDetails": "Nepavyko įkelti sesijos informacijos.",
       "failedToStopExecution": "Nepavyko sustabdyti vykdymo.",
+      "stopped": "Sesija sustabdyta",
+      "committing": "Įrašoma…",
+      "committed": "Įrašyta",
+      "commitFailed": "Nepavyko įrašyti",
       "renameSession": "Pervadinti sesiją",
       "renamePlaceholder": "Sesijos pavadinimas",
       "transcriptAccessibility": "Sesijos pokalbio išrašas",

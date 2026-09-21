@@ -838,8 +838,11 @@
       "sessionStatusTitle": "Sessiya holati",
       "sessionStatusSubtitle": "tugadi / xatolik yuz berdi / boshqarishga tayyor",
       "kiloclawActivitySubtitle": "nusxa tayyor yoki xatolik yuz berdi, rejalashtirilgan amallar",
+      "kiloclawActivityUnavailable": "KiloClaw faoliyatini olish uchun KiloClaw nusxasini ishga tushiring.",
       "balanceAlertsSubtitle": "tashkilot balansi kamaygani haqida ogohlantirishlar",
-      "securityFindingsSubtitle": "aniqlangan yangi zaifliklar va SLA eslatmalari"
+      "balanceAlertsUnavailable": "Balans ogohlantirishlarini olish uchun tashkilotga qo'shiling.",
+      "securityFindingsSubtitle": "aniqlangan yangi zaifliklar va SLA eslatmalari",
+      "securityFindingsUnavailable": "Xavfsizlik muammolarini olish uchun Kilo Xavfsizlik agentini qamrovda yoqing."
     },
     "action": {
       "openSession": "Sessiyani ochish"
@@ -2076,6 +2079,10 @@
       "couldNotLoad": "Sessiyani yuklab bo'lmadi.",
       "failedToLoadDetails": "Sessiya tafsilotlarini yuklab bo'lmadi.",
       "failedToStopExecution": "Bajarishni to'xtatib bo'lmadi.",
+      "stopped": "Sessiya to'xtatildi",
+      "committing": "Kommit qilinmoqda…",
+      "committed": "Kommit qilindi",
+      "commitFailed": "Kommit amalga oshmadi",
       "renameSession": "Sessiya nomini o'zgartirish",
       "renamePlaceholder": "Sessiya nomi",
       "transcriptAccessibility": "Sessiya yozishmalari",

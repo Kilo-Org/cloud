@@ -870,8 +870,11 @@
       "sessionStatusTitle": "Stav relace",
       "sessionStatusSubtitle": "dokončeno / selhalo / připraveno k ovládání",
       "kiloclawActivitySubtitle": "instance připravena/selhala, naplánované akce",
+      "kiloclawActivityUnavailable": "Spusťte instanci KiloClaw, abyste získali aktivitu KiloClaw.",
       "balanceAlertsSubtitle": "upozornění na nízký zůstatek organizace",
-      "securityFindingsSubtitle": "nové nálezy a připomenutí lhůt SLA"
+      "balanceAlertsUnavailable": "Přidejte se k organizaci, abyste dostávali upozornění na nízký zůstatek.",
+      "securityFindingsSubtitle": "nové nálezy a připomenutí lhůt SLA",
+      "securityFindingsUnavailable": "Zapněte bezpečnostního agenta Kilo v určitém rozsahu, abyste dostávali bezpečnostní zjištění."
     },
     "action": {
       "openSession": "Otevřít relaci"
@@ -2132,6 +2135,10 @@
       "couldNotLoad": "Relaci se nepodařilo načíst.",
       "failedToLoadDetails": "Podrobnosti relace se nepodařilo načíst.",
       "failedToStopExecution": "Běh se nepodařilo zastavit.",
+      "stopped": "Relace zastavena",
+      "committing": "Vytváří se commit…",
+      "committed": "Commit vytvořen",
+      "commitFailed": "Vytvoření commitu se nezdařilo",
       "renameSession": "Přejmenovat relaci",
       "renamePlaceholder": "Název relace",
       "transcriptAccessibility": "Přepis relace",

@@ -33,7 +33,7 @@ const MODAL_HEADER_TOP_PADDING = 32;
  * take their own row under the title, the reflow the design system asks of
  * narrow product UI. Wider windows keep the single-row layout byte-identical.
  */
-export const HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH = 120;
+const HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH = 120;
 
 /**
  * The horizontal gutter a header's content sits inside. The list screens use
@@ -41,7 +41,7 @@ export const HEADER_SINGLE_ROW_MIN_CONTENT_WIDTH = 120;
  * narrower, so the check reflows a hair early for those callers instead of
  * squeezing them.
  */
-export const HEADER_CONTENT_GUTTER = 44;
+const HEADER_CONTENT_GUTTER = 44;
 
 /**
  * Whether the header's actions drop to their own row instead of sharing the

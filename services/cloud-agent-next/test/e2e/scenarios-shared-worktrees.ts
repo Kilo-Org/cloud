@@ -43,6 +43,7 @@ import {
   awaitDurableTerminal,
   createOwnedSessionRegistry,
   createScenarioDeadline,
+  foldStream,
   requireRunning,
   sendTurn,
   sessionSandboxObservation,
@@ -400,7 +401,7 @@ async function runWorktreeChat(
         `boot turn ${bootMessageId} did not complete with ${JSON.stringify(bootMarker)}; observed ${JSON.stringify(bootText)}`
       );
     }
-    events.push(...bootStream.events);
+    bootStream = foldStream(events, bootStream);
 
     // Acquire the boot allocation only after the boot turn completed: the
     // completed turn proves the sandbox is up, so the bounded wait cannot race
@@ -472,7 +473,7 @@ async function runWorktreeChat(
         `allocation reference changed on the hot turn: boot=${allocationRef}; before=${before ?? 'none'}; after=${after ?? 'none'}`
       );
     }
-    events.push(...hot.stream.events);
+    hotStream = foldStream(events, hotStream);
 
     result = {
       name: scenarioName,

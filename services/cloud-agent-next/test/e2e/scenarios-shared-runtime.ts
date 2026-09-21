@@ -354,6 +354,21 @@ export async function requireContainer(
 }
 
 /**
+ * Fold one stream's buffered events into the scenario's diagnostic list exactly
+ * once, then close it. Returns `undefined` so the caller can clear its hold with
+ * `stream = foldStream(events, stream)`: a failure path that reads the caller's
+ * stream variable then adds only streams that were opened but not yet folded,
+ * never a stream already folded. Closing before clearing mirrors `runColdHot`;
+ * `close()` is idempotent, so a caller's `finally` sweep stays valid.
+ */
+export function foldStream(events: StreamEvent[], stream: StreamConnection | undefined): undefined {
+  if (!stream) return undefined;
+  events.push(...stream.events);
+  stream.close();
+  return undefined;
+}
+
+/**
  * Read the session's current allocation reference under the scenario deadline.
  * The `sessionSandbox` capability is not signal-aware, so `within` bounds the
  * await only; `null` means the surface reported no reference, never a release.

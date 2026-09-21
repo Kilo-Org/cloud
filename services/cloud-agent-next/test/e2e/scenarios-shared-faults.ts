@@ -34,6 +34,7 @@ import {
   messageIdFromEvent,
   openConnectedStream,
   prepareBrowserSession,
+  releaseGate,
   waitForGateEngaged,
   type DriverConfig,
   type StreamConnection,
@@ -85,6 +86,8 @@ const TURN_BUDGET_MS = 120_000;
 const RECOVERY_BUDGET_MS = 8 * 60_000;
 /** Bounded wait for a create that outlived the scenario deadline. */
 const LATE_CREATE_SETTLE_MS = 30_000;
+/** Bound for cleanup control calls, matching the other shared scenario files. */
+const CLEANUP_TIMEOUT_MS = 15_000;
 /** The paced hold `kill-mid-flight`'s successor and the inflight freeze use. */
 const INFLIGHT_HOLD_DIRECTIVE = 'slow:120:1000:16';
 const PACED_PROGRESS_BUDGET_MS = 90_000;
@@ -464,6 +467,15 @@ async function runKillMidFlight(
         /* ignore */
       }
     }
+    // Always release the parked gate: an early throw before `killOwnedContainer`
+    // would otherwise leave the fake's gate parked forever. A missing waiter
+    // returns 404 and the catch swallows it, so no flag is needed. The call is
+    // bounded so a wedged fake cannot outlive the scenario's own cleanup.
+    await releaseGate(
+      scenarioConfig.fakeLlmUrl,
+      gateTag,
+      AbortSignal.timeout(CLEANUP_TIMEOUT_MS)
+    ).catch(() => {});
     for (const late of await creations.settleAll(LATE_CREATE_SETTLE_MS)) {
       owned.register(late);
     }

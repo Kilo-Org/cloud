@@ -65,6 +65,7 @@ import {
   buildAuthRejectProbes,
   classifyAuthProbe,
   collectChildMessageText,
+  correlatedProgressSummary,
   echoDirectivePayload,
   echoPayloadMatches,
   hasCorrelatedStreamProgress,
@@ -983,6 +984,19 @@ describe('hasCorrelatedStreamProgress', () => {
     ];
 
     expect(hasCorrelatedStreamProgress(events, COLD_MESSAGE_ID)).toBe(true);
+  });
+
+  it('reports part updates even when no child message id was established', () => {
+    // `parts` is a raw count of `message.part.updated` events, so a stream that
+    // shows parts before any assistant child is known still distinguishes "no
+    // events for this turn" from "events but no correlated child"; the pass rule
+    // itself stays false without a correlated child.
+    const events = [textPartEvent(COLD_TEXT_PART_ID, 'message_unrelated', '')];
+
+    expect(hasCorrelatedStreamProgress(events, COLD_MESSAGE_ID)).toBe(false);
+    expect(correlatedProgressSummary(events, COLD_MESSAGE_ID)).toContain(
+      'children=0 parts=1 correlated=0'
+    );
   });
 });
 

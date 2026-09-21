@@ -31,6 +31,7 @@ import {
   awaitDurableTerminal,
   createOwnedSessionRegistry,
   createScenarioDeadline,
+  foldStream,
   readAllocation,
   sendTurn,
   sessionSandboxObservation,
@@ -259,7 +260,7 @@ async function runLongConversation(
         );
       }
     }
-    events.push(...coldStream.events);
+    coldStream = foldStream(events, coldStream);
 
     const allocationRef = await waitForPresentAllocation(
       deadline,
@@ -425,7 +426,12 @@ async function runLeaveAndReturn(
     conversation,
     ok: false,
     message,
-    events: [...events, ...(bootStream?.events ?? []), ...(resumeStream?.events ?? [])],
+    events: [
+      ...events,
+      ...(bootStream?.events ?? []),
+      ...(resumeStream?.events ?? []),
+      ...(replayStream?.events ?? []),
+    ],
     durationMs: Date.now() - startedAt,
   });
 
@@ -467,7 +473,7 @@ async function runLeaveAndReturn(
       );
     }
     const bootMessageId = session.messageId;
-    events.push(...bootStream.events);
+    bootStream = foldStream(events, bootStream);
 
     const intervalStart = Date.now();
     const providerRef = await waitForPresentAllocation(
@@ -570,7 +576,7 @@ async function runLeaveAndReturn(
         `resume turn ${resume.messageId} did not complete with ${JSON.stringify(resumeMarker)}; observed ${JSON.stringify(resumeText)}`
       );
     }
-    events.push(...resume.stream.events);
+    resumeStream = foldStream(events, resumeStream);
 
     replayStream = await deadline.within('replay stream', signal =>
       openConnectedStream(scenarioConfig, sessionId, true, undefined, signal)

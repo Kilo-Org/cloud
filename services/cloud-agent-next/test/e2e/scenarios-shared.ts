@@ -196,8 +196,6 @@ function collectCorrelatedProgress(
     nonEmptyText: 0,
     maxTextLength: 0,
   };
-  if (childMessageIds.size === 0) return stats;
-
   for (const event of events) {
     if (event.streamEventType !== 'kilocode') continue;
     const data = asRecord(event.data);

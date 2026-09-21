@@ -16,7 +16,8 @@ cloud-agent-next refactor.
    For control-plane scenarios, enroll the E2E user in `CONTROL_PLANE_IDS`.
    The worktree-creating scenarios (`worktree-chat`, `worktree-multi-chat`,
    `long-conversation`, `leave-and-return`, `large-stream`, `concurrent-chats`,
-   `question-idle-resume`, and the four `sandboxFaults` scenarios) additionally
+   `interrupt-then-continue`, `question-idle-resume`, and the four `sandboxFaults`
+   scenarios) additionally
    require `WORKTREE_CREATION_ENABLED_IDS`; use the seeded enrolled user
    (`E2E_USER_EMAIL`) rather than a fresh per-run user.
    Both accept comma-separated user or org IDs or `*`. Production defaults to empty/off;
@@ -352,8 +353,10 @@ requires `deployedHttpAuthBoundary`, so it is `unsupported` under the local
 profile; the four `sandboxFaults` scenarios (`external-kill`, `kill-mid-flight`,
 `wrapper-freeze-settled-reap`, `wrapper-freeze-inflight-reap`) are `unsupported`
 deployed, and `kill-mid-flight` also needs the local-only `gates` marker.
-`cold-hot`, `unknown-model` and the rest need no declared capability and run
-under both, while container identity stays a capability-gated assertion.
+Only `cold-hot` and `unknown-model` declare no capability. Every other scenario
+that runs under both declares `sessionSandbox`, which both profiles provide;
+`auth-reject` and the four `sandboxFaults` scenarios are the exceptions named
+above. Container identity stays a capability-gated assertion.
 
 Scenario matrix:
 

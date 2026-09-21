@@ -98,14 +98,21 @@ describe('resolveNewSessionPromptMinHeight', () => {
   });
 
   it('a taller error row only lowers the fitted floor', () => {
-    const plain = resolveNewSessionPromptMinHeight({ ...PREFERRED, ...EXPLORER });
+    // A frame with room for the preferred floor, so adding the error row's
+    // height must cross a whole-line boundary instead of clamping to the
+    // one-line floor (where plain and error-row results would be equal).
+    const frameHeight = 225;
+    const plain = resolveNewSessionPromptMinHeight({ ...PREFERRED, ...EXPLORER, frameHeight });
     const withErrorRow = resolveNewSessionPromptMinHeight({
       ...PREFERRED,
       ...EXPLORER,
+      frameHeight,
       cardChromeHeight: EXPLORER.cardChromeHeight + 40,
     });
 
-    expect(withErrorRow).toBeLessThanOrEqual(plain);
+    expect(plain).toBe(PREFERRED_MIN_HEIGHT);
+    expect(withErrorRow).toBeLessThan(plain);
+    expect(withErrorRow).toBe(PREFERRED_MIN_HEIGHT - LINE_HEIGHT);
     expect(withErrorRow).toBeGreaterThanOrEqual(LINE_HEIGHT + 16);
   });
 });

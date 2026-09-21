@@ -15,6 +15,7 @@ import { useComposerRevealScroll } from '@/components/agents/use-composer-reveal
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
 /**
@@ -210,7 +211,7 @@ export function NewSessionConfigureForm({
       ) : null}
 
       <Text className="mt-2 text-xs text-muted-foreground">
-        {t('agentChat.newSession.remoteHint')}
+        {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
       </Text>
 
       {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}

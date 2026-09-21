@@ -121,9 +121,9 @@ vi.mock('@/components/ui/button', () => ({
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
 // Skeleton imports react-native-reanimated (and its react-native-worklets
-// entry), which the node-environment pure project cannot load. The profile row
-// renders it while the environment query is pending; stub it like the sibling
-// pure suites do.
+// entry), which the node-environment pure project cannot load: `renderProfileRow`
+// reaches the shimmed Skeleton while the environment query is pending, and every
+// sibling pure spec stubs it the same way.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/segmented-control', () => ({
@@ -835,6 +835,9 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    // The help draws the commands as prose: the authoring markers must not
+    // reach the screen.
+    expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const remote = NewSessionConfigureForm({
@@ -845,6 +848,7 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 
   // ── Case 14: reorder wiring lock ──

@@ -110,6 +110,7 @@ function InlineRetry({ label, color, onPress }: InlineRetryProps) {
   );
 }
 
+/** One row per notification category. */
 const CATEGORY_META = [
   {
     key: 'chatMessages',
@@ -170,7 +171,13 @@ const CATEGORY_UNAVAILABLE_SUBTITLE_KEYS: ReadonlyMap<NotificationCategoryKey, s
 
 type CategoryMeta = (typeof CATEGORY_META)[number];
 
-/** Per-category availability from the preferences response `capabilities` map. */
+/**
+ * Per-category availability from the preferences response `capabilities` map.
+ * The same entry carries the server's `unavailableReason`: an English-only
+ * sentence that is deliberately never rendered, because the screen is localized
+ * and the server cannot translate it. `CategoryRow` reads the reason from
+ * `CATEGORY_UNAVAILABLE_SUBTITLE_KEYS` instead.
+ */
 type NotificationCategoryCapability = Readonly<{ available: boolean }>;
 
 type CategoryRowProps = Readonly<{
@@ -207,8 +214,10 @@ function CategoryRow({
   // An unavailable category is a terminal, non-retryable state: the switch is
   // disabled and the row renders its own catalog copy for the reason. The
   // server's `unavailableReason` is English prose and must never render — it
-  // cannot be translated. A missing entry (the `noUncheckedIndexedAccess`
-  // widening) defaults to available.
+  // cannot be translated — so the unavailable state is carried by the muted
+  // title and the disabled switch, and the reason comes from
+  // `CATEGORY_UNAVAILABLE_SUBTITLE_KEYS`. A missing entry (the
+  // `noUncheckedIndexedAccess` widening) defaults to available.
   const unavailable = capability?.available === false;
   const isDisabled = disabled || !editable || unavailable;
   const title = t(meta.titleKey);

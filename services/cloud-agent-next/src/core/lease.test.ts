@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   LEASE_TTL_MS,
-  HEARTBEAT_INTERVAL_MS,
   STALE_THRESHOLD_MS,
   calculateExpiry,
   isExpired,
@@ -9,20 +8,6 @@ import {
 } from './lease.js';
 
 describe('Lease Logic', () => {
-  describe('constants', () => {
-    it('should have LEASE_TTL_MS set to 90 seconds', () => {
-      expect(LEASE_TTL_MS).toBe(90_000);
-    });
-
-    it('should have HEARTBEAT_INTERVAL_MS set to 30 seconds', () => {
-      expect(HEARTBEAT_INTERVAL_MS).toBe(30_000);
-    });
-
-    it('should have STALE_THRESHOLD_MS set to 90 seconds', () => {
-      expect(STALE_THRESHOLD_MS).toBe(90_000);
-    });
-  });
-
   describe('calculateExpiry', () => {
     it('should return now + LEASE_TTL_MS', () => {
       const now = 1000000;

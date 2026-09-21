@@ -8,6 +8,7 @@ import {
   COMMENT_TRAILING_CONTROLS_GAP_DP,
   commentTrailingControlsClearanceDp,
   FIX_WITH_KILO_HIT_SLOP,
+  FIX_WITH_KILO_VISUAL_DP,
 } from '@/lib/pr-review/comment-trailing-controls';
 
 describe('comment trailing controls tap areas', () => {
@@ -26,14 +27,16 @@ describe('comment trailing controls tap areas', () => {
   });
 
   it('keeps both controls at the 44pt minimum touch target', () => {
-    // The pill is ~26pt tall; the overflow reaches 44pt from its frame plus
-    // the slop on every side.
+    // The pill renders 23pt tall (FIX_WITH_KILO_VISUAL_DP: a 1rem `text-xs`
+    // line box, `py-1` per side and the border, at NativeWind's 14pt rem), so
+    // the overflow reaches 44pt from its frame plus the slop on every side and
+    // the pill needs its own vertical slop to get there.
     expect(
       COMMENT_ACTIONS_FRAME_DP + COMMENT_ACTIONS_HIT_SLOP.top + COMMENT_ACTIONS_HIT_SLOP.bottom
     ).toBeGreaterThanOrEqual(44);
-    expect(FIX_WITH_KILO_HIT_SLOP.top + FIX_WITH_KILO_HIT_SLOP.bottom + 26).toBeGreaterThanOrEqual(
-      44
-    );
+    expect(
+      FIX_WITH_KILO_HIT_SLOP.top + FIX_WITH_KILO_HIT_SLOP.bottom + FIX_WITH_KILO_VISUAL_DP
+    ).toBeGreaterThanOrEqual(44);
   });
 
   it('derives the clearance from the gap and the two facing slops', () => {

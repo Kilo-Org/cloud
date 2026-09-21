@@ -272,6 +272,26 @@ test('binds the container usage meter under its unsuffixed Wrangler name', () =>
   assert.equal(meter.command.filter(part => part === '--ip').length, 1);
 });
 
+test('starts the latency-ingest worker whenever the mobile stack starts', () => {
+  // The mobile app POSTs its client-observed latency batches to the
+  // latency-ingest worker in every dev session (LATENCY_INGEST_URL in the
+  // mobile env resolves to its wrangler port), so starting the mobile service
+  // must pull the worker in transitively — otherwise the app POSTs to a dead
+  // listener and the ingest path cannot be observed locally.
+  const mobileTargets = resolveTargets(['mobile']);
+
+  assert.ok(
+    mobileTargets.includes('latency-ingest'),
+    `expected latency-ingest in mobile start targets, got: ${mobileTargets.join(', ')}`
+  );
+
+  const worker = getService('latency-ingest');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/latency-ingest');
+  assert.equal(worker.port, 8816 + portOffset);
+  assert.deepEqual(worker.dependsOn, []);
+});
+
 test('starts Storybook with Storybook v10 port flags', () => {
   const service = getService('storybook');
 

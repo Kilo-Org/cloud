@@ -12,6 +12,10 @@ const mockSubscriptionsV2Get = jest.fn().mockImplementation(() => ({
 
 const mockAcknowledge = jest.fn<(request: unknown) => Promise<void>>().mockResolvedValue(undefined);
 
+const mockSubscriptionsV2Revoke = jest
+  .fn<(request: unknown) => Promise<void>>()
+  .mockResolvedValue(undefined);
+
 const mockOrdersGet = jest.fn().mockImplementation(() => ({ data: { orderId: 'paid-order' } }));
 
 const mockAndroidPublisher = jest.fn().mockImplementation((...args: unknown[]) => ({
@@ -21,6 +25,7 @@ const mockAndroidPublisher = jest.fn().mockImplementation((...args: unknown[]) =
     subscriptions: { acknowledge: mockAcknowledge },
     subscriptionsv2: {
       get: mockSubscriptionsV2Get,
+      revoke: mockSubscriptionsV2Revoke,
     },
   },
 }));
@@ -128,6 +133,37 @@ describe('google-play-sdk', () => {
     await expect(
       acknowledgeGooglePlaySubscriptionPurchase('kilopass_tier19', 'test-token')
     ).rejects.toThrow('provider unavailable');
+  });
+
+  it('revokes with a full refund and tolerates an already revoked subscription', async () => {
+    const { revokeGooglePlaySubscriptionPurchase } = loadGooglePlaySdk();
+
+    await revokeGooglePlaySubscriptionPurchase('test-token');
+    expect(mockSubscriptionsV2Revoke).toHaveBeenCalledWith({
+      packageName: 'com.kilocode.kiloapp',
+      token: 'test-token',
+      requestBody: { revocationContext: { fullRefund: {} } },
+    });
+
+    // A retried notification finds the subscription revoked and Play rejects the
+    // repeat call; a subscription that no longer renews means success.
+    mockSubscriptionsV2Revoke.mockRejectedValueOnce(new Error('already revoked'));
+    mockSubscriptionsV2Get.mockReturnValueOnce({
+      data: { subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED' },
+    });
+    await expect(revokeGooglePlaySubscriptionPurchase('test-token')).resolves.toBeUndefined();
+  });
+
+  it('propagates a failed revoke while the subscription still renews', async () => {
+    const { revokeGooglePlaySubscriptionPurchase } = loadGooglePlaySdk();
+
+    mockSubscriptionsV2Revoke.mockRejectedValueOnce(new Error('provider unavailable'));
+    mockSubscriptionsV2Get.mockReturnValueOnce({
+      data: { subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE' },
+    });
+    await expect(revokeGooglePlaySubscriptionPurchase('test-token')).rejects.toThrow(
+      'provider unavailable'
+    );
   });
 
   it('throws when the service account JSON is not set', () => {

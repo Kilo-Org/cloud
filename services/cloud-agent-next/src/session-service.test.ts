@@ -1873,6 +1873,7 @@ describe('SessionService.prepareWorkspace', () => {
         outboundContainerId: 'containment-small-sandbox-do-id',
         orgId: undefined,
         allowUserAuthorization: false,
+        accessPurpose: 'workflow',
       }
     );
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
@@ -2704,6 +2705,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         outboundContainerId: 'containment-small-sandbox-do-id',
         orgId: undefined,
         allowUserAuthorization: true,
+        accessPurpose: 'workflow',
       }
     );
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
@@ -3522,6 +3524,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         outboundContainerId: 'containment-small-sandbox-do-id',
         orgId: undefined,
         allowUserAuthorization: true,
+        accessPurpose: 'workflow',
       }
     );
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
@@ -3582,6 +3585,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         outboundContainerId: 'containment-small-sandbox-do-id',
         orgId: undefined,
         allowUserAuthorization: true,
+        accessPurpose: 'workflow',
       }
     );
   });
@@ -3607,6 +3611,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
           outboundContainerId: 'containment-small-sandbox-do-id',
           orgId: undefined,
           allowUserAuthorization: false,
+          accessPurpose: 'workflow',
         }
       );
     }

@@ -211,6 +211,7 @@ export type GitAuthorConfig = {
 };
 
 type ManagedGitHubAuthParams = {
+  accessPurpose?: 'workflow' | 'agent';
   githubRepo: string;
   userId: string;
   orgId?: string;
@@ -437,6 +438,9 @@ type RedeemKiloSessionCapabilityResult =
     };
 
 export type GitTokenService = {
+  authorizeCloudAgentGitHubRepo?(
+    params: Omit<ManagedGitHubAuthParams, 'allowUserAuthorization'>
+  ): Promise<{ success: true } | { success: false; reason: string }>;
   getTokenForRepo(params: {
     githubRepo: string;
     userId: string;

@@ -145,6 +145,7 @@ export type {
 export type ManagedGitHubFallbackReason = UserAuthorizationFallbackReason | 'lite_installation';
 
 export type GetCloudAgentAuthForRepoParams = GetTokenForRepoParams & {
+  accessPurpose?: 'workflow' | 'agent';
   allowUserAuthorization?: boolean;
 };
 
@@ -751,8 +752,14 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     this.githubUserAuthorizationService = new GitHubUserAuthorizationService(env);
   }
 
-  private async refreshGitHubInstallationLogins(params: GetTokenForRepoParams): Promise<void> {
-    const candidates = await this.installationLookupService.findRefreshCandidates(params);
+  private async refreshGitHubInstallationLogins(
+    params: GetCloudAgentAuthForRepoParams,
+    authorizationMode: 'generic' | 'managed' = 'generic'
+  ): Promise<void> {
+    const candidates = await this.installationLookupService.findRefreshCandidates(
+      params,
+      authorizationMode
+    );
     if (!candidates.success) {
       return;
     }
@@ -818,13 +825,13 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     return installation;
   }
 
-  private async findManagedInstallationWithLoginRepair(params: GetTokenForRepoParams) {
+  private async findManagedInstallationWithLoginRepair(params: GetCloudAgentAuthForRepoParams) {
     let installation = await this.installationLookupService.findManagedInstallationForRepo(params);
     if (
       !installation.success &&
       this.shouldRepairGitHubInstallationLogin(params, installation.reason)
     ) {
-      await this.refreshGitHubInstallationLogins(params);
+      await this.refreshGitHubInstallationLogins(params, 'managed');
       installation = await this.installationLookupService.findManagedInstallationForRepo(params);
     }
     return installation;
@@ -881,6 +888,22 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       }
       throw error;
     }
+  }
+
+  async authorizeCloudAgentGitHubRepo(
+    params: GetCloudAgentAuthForRepoParams
+  ): Promise<{ success: true } | GetTokenForRepoFailure> {
+    const installation = await this.findManagedInstallationWithLoginRepair(params);
+    if (!installation.success) {
+      return {
+        success: false,
+        reason:
+          installation.reason === 'ambiguous_installation'
+            ? 'no_installation_found'
+            : installation.reason,
+      };
+    }
+    return { success: true };
   }
 
   async getCloudAgentAuthForRepo(
@@ -969,6 +992,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
       capability = new GitHubSessionCapabilityCodec(encryptionKey).issue({
         userId: params.userId,
+        accessPurpose: params.accessPurpose ?? 'workflow',
         ...(params.outboundContainerId !== undefined
           ? { outboundContainerId: params.outboundContainerId }
           : {}),
@@ -1022,6 +1046,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
     const authParams = {
       userId: claims.userId,
+      accessPurpose: claims.accessPurpose ?? 'workflow',
       ...(claims.orgId !== undefined ? { orgId: claims.orgId } : {}),
       ...(claims.integrationId !== undefined
         ? { expectedIntegrationId: claims.integrationId }
@@ -1080,7 +1105,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
   }
 
   private async redeemPinnedUserAuthorization(
-    params: GetTokenForRepoParams
+    params: GetCloudAgentAuthForRepoParams
   ): Promise<GetCloudAgentAuthForRepoResult | null> {
     const installation = await this.findManagedInstallationWithLoginRepair(params);
     if (!installation.success && installation.reason === 'integration_mismatch') {

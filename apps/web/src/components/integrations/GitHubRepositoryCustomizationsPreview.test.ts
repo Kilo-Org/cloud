@@ -155,6 +155,7 @@ type RepositoryCustomizationsData = {
   access: 'all' | 'selected';
   defaultModel: string;
   defaultPrReviews: 'on' | 'off';
+  canEditReviews: boolean;
   repositories: RepositoryCustomization[];
 };
 
@@ -165,6 +166,7 @@ function createRepositoryCustomizationsData(): RepositoryCustomizationsData {
     access: 'all',
     defaultModel: 'model-a',
     defaultPrReviews: 'on',
+    canEditReviews: true,
     repositories: [
       {
         id: 1,
@@ -438,6 +440,29 @@ describe('GitHubRepositoryCustomizations (live)', () => {
       settings: { modelSlug: 'model-b', prReviewMode: null },
     });
     expect(row(container, 'first/repo-0').textContent).toContain('Model: Model B');
+  });
+
+  it('hides review controls for agent access and saves model overrides without review fields', async () => {
+    mockRepositoryCustomizationsData = {
+      ...createRepositoryCustomizationsData(),
+      canEditReviews: false,
+    };
+    const { container } = render();
+    expect(container.textContent).toContain('Slack and Cloud Agent only');
+    expect(container.textContent).not.toContain('PR reviews:');
+    expect(container.querySelector('select[id="first-default-reviews"]')).toBeNull();
+    await click(button(container, 'Edit first/repo-0'));
+    const editor = find<HTMLElement>(container, '[role="dialog"]');
+    expect(editor.textContent).not.toContain('PR reviews');
+    chooseModelSource(editor, true);
+    await select(editor, '4-custom-model', 'model-b');
+    await click(button(editor, 'Save changes'));
+    expect(mockUpdateRepositorySettingsMutateAsync).toHaveBeenCalledWith({
+      organizationId: undefined,
+      integrationId: 'first',
+      repositoryId: 4,
+      settings: { modelSlug: 'model-b' },
+    });
   });
 
   it('disables the default model control while saving and reverts it if the save fails', async () => {

@@ -162,7 +162,7 @@ export function InstallationCustomizations({
       name: repository.name,
       private: repository.private,
       model: repository.model,
-      prReviews: repository.prReviews,
+      prReviews: data.canEditReviews ? repository.prReviews : null,
     })),
   };
 
@@ -173,7 +173,7 @@ export function InstallationCustomizations({
         integrationId,
         settings: {
           modelSlug: settings.model,
-          prReviewMode: settings.prReviews,
+          ...(data?.canEditReviews ? { prReviewMode: settings.prReviews } : {}),
         },
       });
       if (!result.success) {
@@ -209,7 +209,7 @@ export function InstallationCustomizations({
         repositoryId: Number(repositoryId),
         settings: {
           modelSlug: settings.model,
-          prReviewMode: settings.prReviews,
+          ...(data?.canEditReviews ? { prReviewMode: settings.prReviews } : {}),
         },
       });
       if (!result.success) {
@@ -313,7 +313,7 @@ export function InstallationCustomizations({
               <div className="space-y-1.5">
                 <h3 className="text-sm font-medium">Default AI model</h3>
                 <p className="max-w-lg text-sm text-muted-foreground">
-                  Used for GitHub bot mentions in repositories without a custom model. Changing the
+                  Used for agent sessions in repositories without a custom model. Changing the
                   default won’t affect custom models.
                 </p>
               </div>
@@ -340,35 +340,42 @@ export function InstallationCustomizations({
                 }}
               />
             </div>
-            <div className="grid gap-4 md:grid-cols-[1fr_20rem] md:items-start">
-              <div className="space-y-1.5">
-                <Label htmlFor={`${installation.id}-default-reviews`}>
-                  Default pull request reviews
-                </Label>
-                <p className="max-w-lg text-sm text-muted-foreground">
-                  Review pull requests automatically on new pull requests, or turn reviews off
-                  entirely. Repository overrides are unaffected.
-                </p>
+            {data.canEditReviews ? (
+              <div className="grid gap-4 md:grid-cols-[1fr_20rem] md:items-start">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`${installation.id}-default-reviews`}>
+                    Default pull request reviews
+                  </Label>
+                  <p className="max-w-lg text-sm text-muted-foreground">
+                    Review pull requests automatically on new pull requests, or turn reviews off
+                    entirely. Repository overrides are unaffected.
+                  </p>
+                </div>
+                <ReviewModeSelect
+                  id={`${installation.id}-default-reviews`}
+                  value={defaultPrReviews}
+                  disabled={savingDefaults}
+                  onValueChange={async mode => {
+                    if (mode === null) return;
+                    setPendingPrReviews(mode);
+                    setSavingDefaults(true);
+                    setPage(1);
+                    setAnnouncement(`Default PR reviews updated to ${reviewModeName(mode)}.`);
+                    const success = await saveDefaults({ prReviews: mode });
+                    setPendingPrReviews(null);
+                    setSavingDefaults(false);
+                    if (!success) {
+                      setAnnouncement(`Couldn't update default PR reviews. Please try again.`);
+                    }
+                  }}
+                />
               </div>
-              <ReviewModeSelect
-                id={`${installation.id}-default-reviews`}
-                value={defaultPrReviews}
-                disabled={savingDefaults}
-                onValueChange={async mode => {
-                  if (mode === null) return;
-                  setPendingPrReviews(mode);
-                  setSavingDefaults(true);
-                  setPage(1);
-                  setAnnouncement(`Default PR reviews updated to ${reviewModeName(mode)}.`);
-                  const success = await saveDefaults({ prReviews: mode });
-                  setPendingPrReviews(null);
-                  setSavingDefaults(false);
-                  if (!success) {
-                    setAnnouncement(`Couldn't update default PR reviews. Please try again.`);
-                  }
-                }}
-              />
-            </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Agent access supports Slack and Cloud Agent only. Pull request reviews are managed
+                by the original connection.
+              </p>
+            )}
           </div>
           <section
             className="border-t border-border"
@@ -560,6 +567,7 @@ export function InstallationCustomizations({
               models={models}
               defaultModel={defaultModel}
               defaultPrReviews={defaultPrReviews}
+              canEditReviews={data.canEditReviews}
               account={installation.account}
               onCancel={() => setEditingRepository(null)}
               onSave={async settings => {
@@ -662,6 +670,7 @@ function RepositorySettingsEditor({
   models,
   defaultModel,
   defaultPrReviews,
+  canEditReviews,
   account,
   onSave,
   onCancel,
@@ -670,6 +679,7 @@ function RepositorySettingsEditor({
   models: ModelOption[];
   defaultModel: string;
   defaultPrReviews: PreviewReviewMode;
+  canEditReviews: boolean;
   account: string;
   onSave: (settings: Pick<PreviewRepository, 'model' | 'prReviews'>) => void;
   onCancel: () => void;
@@ -749,26 +759,28 @@ function RepositorySettingsEditor({
             )}
           </div>
         </fieldset>
-        <div className="space-y-3 border-t border-border pt-6">
-          <Label htmlFor={`${repository.id}-reviews`}>Pull request reviews</Label>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            On reviews pull requests automatically. Off disables automatic reviews for this
-            repository.
-          </p>
-          <ReviewModeSelect
-            id={`${repository.id}-reviews`}
-            value={prReviews}
-            defaultMode={defaultPrReviews}
-            onValueChange={setPrReviews}
-          />
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            {prReviews === null
-              ? `Follows the default for ${account}, including future changes.`
-              : prReviews === defaultPrReviews
-                ? 'This matches today’s default, but remains an explicit override.'
-                : 'Applies only to this repository, even when the integration default changes.'}
-          </p>
-        </div>
+        {canEditReviews && (
+          <div className="space-y-3 border-t border-border pt-6">
+            <Label htmlFor={`${repository.id}-reviews`}>Pull request reviews</Label>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              On reviews pull requests automatically. Off disables automatic reviews for this
+              repository.
+            </p>
+            <ReviewModeSelect
+              id={`${repository.id}-reviews`}
+              value={prReviews}
+              defaultMode={defaultPrReviews}
+              onValueChange={setPrReviews}
+            />
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {prReviews === null
+                ? `Follows the default for ${account}, including future changes.`
+                : prReviews === defaultPrReviews
+                  ? 'This matches today’s default, but remains an explicit override.'
+                  : 'Applies only to this repository, even when the integration default changes.'}
+            </p>
+          </div>
+        )}
         <div className="space-y-3 rounded-lg bg-muted/40 p-4">
           <p className="text-xs text-muted-foreground">Effective settings</p>
           <dl className="space-y-3 text-sm">
@@ -781,15 +793,17 @@ function RepositorySettingsEditor({
                 </span>
               </dd>
             </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">PR reviews</dt>
-              <dd className="mt-1">
-                {reviewModeName(prReviews ?? defaultPrReviews)}{' '}
-                <span className="text-xs text-muted-foreground">
-                  · {prReviews === null ? 'Default' : 'Custom'}
-                </span>
-              </dd>
-            </div>
+            {canEditReviews && (
+              <div>
+                <dt className="text-xs text-muted-foreground">PR reviews</dt>
+                <dd className="mt-1">
+                  {reviewModeName(prReviews ?? defaultPrReviews)}{' '}
+                  <span className="text-xs text-muted-foreground">
+                    · {prReviews === null ? 'Default' : 'Custom'}
+                  </span>
+                </dd>
+              </div>
+            )}
           </dl>
           {!isInherited && model === defaultModel && (
             <p className="text-xs leading-relaxed text-muted-foreground">

@@ -66,6 +66,9 @@ function createBroker() {
   let serial = 0;
   const kiloSubjects = new Map<string, KiloSubject>();
   const broker = {
+    authorizeCloudAgentGitHubRepo: vi.fn<
+      NonNullable<GitTokenService['authorizeCloudAgentGitHubRepo']>
+    >(async () => ({ success: true })),
     getTokenForRepo: vi.fn<GitTokenService['getTokenForRepo']>(async () => ({
       success: true,
       token: GITHUB_TOKEN,
@@ -252,6 +255,87 @@ function vercelMetadata(
 }
 
 describe('trusted worktree credential preparation', () => {
+  it.each(['cloudflare', 'vercel'] as const)(
+    'preserves agent purpose and exact association through %s credentials and renewal',
+    async provider => {
+      const { broker } = createBroker();
+      const env = environment(broker);
+      const data = metadata({
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId: INTEGRATION_ID,
+          githubAccessPurpose: 'agent',
+        },
+        workspace: {
+          sandboxId: provider === 'vercel' ? VERCEL_SANDBOX_ID : SANDBOX_ID,
+          sandboxProvider: provider,
+        },
+      });
+      const first = await prepare(env, data);
+      const second = await prepare(env, data, first.grant, NOW + 3 * HOUR);
+      expect(second.grant.repository).toMatchObject({
+        expectedIntegrationId: INTEGRATION_ID,
+        accessPurpose: 'agent',
+      });
+      const rpc =
+        provider === 'cloudflare'
+          ? broker.issueGitHubSessionCapability
+          : broker.getCloudAgentAuthForRepo;
+      expect(rpc).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          accessPurpose: 'agent',
+          expectedIntegrationId: INTEGRATION_ID,
+          orgId: INTEGRATION_ID,
+          userId: 'user-a',
+        })
+      );
+      if (provider === 'vercel')
+        expect(rpc).toHaveBeenLastCalledWith(
+          expect.objectContaining({ allowUserAuthorization: false })
+        );
+      expect(broker.getTokenForRepo).not.toHaveBeenCalled();
+      await expect(
+        prepare(
+          env,
+          metadata({
+            ...data,
+            repository: {
+              type: 'github',
+              repo: 'acme/repo',
+              githubIntegrationId: INTEGRATION_ID,
+              githubAccessPurpose: 'workflow',
+            },
+          }),
+          second.grant
+        )
+      ).rejects.toThrow('Invalid contained worktree credentials');
+    }
+  );
+
+  it('rechecks revoked agent access before returning a warm cached capability', async () => {
+    const { broker } = createBroker();
+    const env = environment(broker);
+    const data = metadata({
+      repository: {
+        type: 'github',
+        repo: 'acme/repo',
+        githubIntegrationId: INTEGRATION_ID,
+        githubAccessPurpose: 'agent',
+      },
+    });
+    const { grant } = await prepare(env, data);
+    broker.authorizeCloudAgentGitHubRepo.mockResolvedValue({
+      success: false,
+      reason: 'integration_mismatch',
+    });
+    broker.issueGitHubSessionCapability.mockClear();
+    await expect(prepare(env, data, grant, NOW + 1000)).rejects.toThrow(
+      'GitHub credential is unavailable'
+    );
+    expect(broker.issueGitHubSessionCapability).not.toHaveBeenCalled();
+    expect(broker.getTokenForRepo).not.toHaveBeenCalled();
+  });
   beforeEach(() => vi.clearAllMocks());
 
   it('contains Kilo and managed GitHub tokens and derives targets from the real Kilo token', async () => {
@@ -302,6 +386,7 @@ describe('trusted worktree credential preparation', () => {
       targets: grant.kilo.targets,
     });
     expect(broker.issueGitHubSessionCapability).toHaveBeenCalledWith({
+      accessPurpose: 'workflow',
       userId: 'user-a',
       orgId: INTEGRATION_ID,
       githubRepo: 'acme/repo',
@@ -986,6 +1071,7 @@ describe('direct worktree credentials', () => {
         KILOCODE_ORGANIZATION_ID: INTEGRATION_ID,
       });
       expect(broker.getCloudAgentAuthForRepo).toHaveBeenCalledWith({
+        accessPurpose: 'workflow',
         githubRepo: 'acme/repo',
         userId: 'user-a',
         orgId: INTEGRATION_ID,
@@ -1606,7 +1692,7 @@ describe('credential failure safety', () => {
     },
     {
       name: 'Vercel GitHub',
-      rpc: 'getTokenForRepo',
+      rpc: 'getCloudAgentAuthForRepo',
       data: vercelMetadata(),
       message: 'GitHub credential is unavailable',
     },
@@ -1636,7 +1722,7 @@ describe('credential failure safety', () => {
         ).toBeNull();
         expect(broker.getTokenForRepo).not.toHaveBeenCalled();
       }
-      expect(broker.getCloudAgentAuthForRepo).not.toHaveBeenCalled();
+      if (name !== 'Vercel GitHub') expect(broker.getCloudAgentAuthForRepo).not.toHaveBeenCalled();
       expect(broker.getGitLabToken).not.toHaveBeenCalled();
       expect(broker.getBitbucketToken).not.toHaveBeenCalled();
       expectSecretSafeLogs();
@@ -1988,9 +2074,11 @@ describe('native Vercel worktree policies', () => {
     const env = environment(broker);
     const data = vercelMetadata({ profile: { envVars: { GH_TOKEN: GITHUB_TOKEN } } });
     const first = await prepare(env, data);
-    broker.getTokenForRepo.mockResolvedValue({
+    broker.getCloudAgentAuthForRepo.mockResolvedValue({
       success: true,
-      token: 'test-renewed-github-token',
+      githubToken: 'test-renewed-github-token',
+      source: 'installation',
+      gitAuthor: { name: 'bot', email: 'bot@example.com' },
       installationId: '42',
       accountLogin: 'acme',
       appType: 'standard',
@@ -1999,7 +2087,9 @@ describe('native Vercel worktree policies', () => {
     expect(second.grant.scm?.alias).toBe(first.grant.scm?.alias);
     expect(second.payload.env?.GH_TOKEN).toBe(first.grant.scm?.alias);
     expect(second.grant.scm?.nativeToken).toBe('test-renewed-github-token');
-    expect(broker.getTokenForRepo).toHaveBeenLastCalledWith({
+    expect(broker.getCloudAgentAuthForRepo).toHaveBeenLastCalledWith({
+      accessPurpose: 'workflow',
+      allowUserAuthorization: false,
       githubRepo: 'acme/repo',
       userId: 'user-a',
       orgId: INTEGRATION_ID,
@@ -2041,7 +2131,7 @@ describe('native Vercel worktree policies', () => {
       expect(payload.git?.token).toBe(grant.scm?.alias);
       expect(JSON.stringify(payload)).not.toContain(GITHUB_TOKEN);
       expect(JSON.stringify(payload)).not.toContain(KILO_TOKEN);
-      expect(broker.getTokenForRepo).toHaveBeenCalledTimes(explicit ? 0 : 1);
+      expect(broker.getCloudAgentAuthForRepo).toHaveBeenCalledTimes(explicit ? 0 : 1);
     }
   );
 });

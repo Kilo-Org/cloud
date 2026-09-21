@@ -15,7 +15,6 @@ import {
   canOrganizationCreateSharedGitHubConnection,
   canOrganizationUseMultipleGitHubInstallations,
 } from '@/lib/integrations/github/multiple-installations';
-import { evaluateGitHubSharingCompatibility } from '@/lib/integrations/github/sharing-compatibility';
 import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-attempts';
 import { parsePlatformRepositoryCache } from '@/lib/integrations/core/schemas';
 import {
@@ -260,55 +259,34 @@ export async function connectVerifiedGitHubInstallation(
       return { ok: false, reason: 'installation_unavailable' };
     }
 
-    // A locally disconnected other-owner association has relinquished the
-    // installation and is no longer an active incumbent tenant, so it must
-    // not force a destination through sharing-admission on its own; only an
-    // *actively connected* other owner represents real concurrent sharing
-    // that needs approval and a compatibility check.
-    const activeOtherOwnerAssociations = otherOwnerAssociations.filter(
-      association => association.github_disconnected_at === null
-    );
-
-    // A personal (non-org) owner can never become a NEW second tenant on an
-    // installation an active other owner already holds. Gate this on the
-    // caller having no association of its own: an incumbent personal owner
-    // reconnecting or refreshing their own existing association is not a
-    // new claim, and must not be locked out by another tenant that attached
-    // afterwards (see the sharing-admission branch below for how that other
-    // tenant was admitted). A purely disconnected other-owner row is not an
-    // active incumbent either, so it does not block a personal owner here.
-    if (!existing && activeOtherOwnerAssociations.length > 0 && owner.type !== 'org') {
+    if (existing && existing.github_connection_role === null) {
+      return { ok: false, reason: 'installation_unavailable' };
+    }
+    const role: 'workflow' | 'agent_only' =
+      existing?.github_connection_role ??
+      (otherOwnerAssociations.length > 0 ? 'agent_only' : 'workflow');
+    if (!existing && role === 'agent_only' && owner.type !== 'org') {
       return { ok: false, reason: 'claimed_by_other_owner' };
     }
 
     const requiresSharingAdmission =
-      activeOtherOwnerAssociations.length > 0 &&
-      (!existing ||
-        existing.github_disconnected_at !== null ||
-        canonical.sharing_mode !== 'web_cloud_agent');
+      role === 'agent_only' && (!existing || existing.github_disconnected_at !== null);
     if (requiresSharingAdmission) {
-      if (!canOrganizationCreateSharedGitHubConnection(owner.id)) {
+      if (owner.type !== 'org' || !canOrganizationCreateSharedGitHubConnection(owner.id)) {
         return { ok: false, reason: 'shared_installation_disabled' };
       }
-      if (activeOtherOwnerAssociations.some(association => !association.github_installation_id)) {
+      if (
+        otherOwnerAssociations.some(
+          association => !association.github_installation_id || !association.github_connection_role
+        )
+      ) {
         return { ok: false, reason: 'installation_unavailable' };
       }
-      const compatibility = await evaluateGitHubSharingCompatibility(tx, canonical.id, owner);
-      if (!compatibility.compatible) {
-        return { ok: false, reason: 'incompatible_workflow' };
-      }
-      await tx
-        .update(github_app_installations)
-        .set({
-          sharing_mode: 'web_cloud_agent',
-          sharing_admission_checked_at: now,
-          updated_at: now,
-        })
-        .where(eq(github_app_installations.id, canonical.id));
     }
 
     const values = {
       github_installation_id: canonical.id,
+      github_connection_role: role,
       platform_account_id: data.platformAccountId,
       platform_account_login: data.platformAccountLogin,
       permissions: data.permissions,
@@ -446,28 +424,6 @@ export async function disconnectGitHubInstallation(
       { owner, platform: PLATFORM.GITHUB, integrationId },
       tx
     );
-    if (integration.canonicalId) {
-      const connectedAssociations = await tx
-        .select({ id: platform_integrations.id })
-        .from(platform_integrations)
-        .where(
-          and(
-            eq(platform_integrations.github_installation_id, integration.canonicalId),
-            isNull(platform_integrations.github_disconnected_at)
-          )
-        )
-        .for('update');
-      if (connectedAssociations.length === 1) {
-        await tx
-          .update(github_app_installations)
-          .set({
-            sharing_mode: 'exclusive',
-            sharing_admission_checked_at: null,
-            updated_at: new Date().toISOString(),
-          })
-          .where(eq(github_app_installations.id, integration.canonicalId));
-      }
-    }
     return cancelled;
   });
   // Settle only after this transaction has committed — see the
@@ -485,6 +441,7 @@ export async function uninstallExclusiveGitHubInstallation(input: {
       .select({
         installationId: platform_integrations.platform_installation_id,
         appType: platform_integrations.github_app_type,
+        role: platform_integrations.github_connection_role,
       })
       .from(platform_integrations)
       .where(
@@ -496,6 +453,8 @@ export async function uninstallExclusiveGitHubInstallation(input: {
       )
       .limit(1);
     if (!identity?.installationId) throw new Error('GitHub connection not found');
+    if (identity.role !== 'workflow')
+      throw new Error('GitHub installation must be disconnected locally');
     const appType = identity.appType ?? 'standard';
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${identity.installationId}`}))`
@@ -512,18 +471,9 @@ export async function uninstallExclusiveGitHubInstallation(input: {
       )
       .for('update');
     if (!lockedTarget) throw new Error('GitHub connection not found');
-    // Resolve the canonical installation by its stable identity
-    // (github_app_type, installation_id) rather than through the target
-    // row's own binding. A legacy association may be unbound
-    // (github_installation_id IS NULL) — the canonical backfill skipped rows
-    // that were already disconnected or suspended — and reading the sharing
-    // mode only from a bound target would let such a row skip the
-    // shared-installation guard entirely.
-    const [canonical] = await tx
-      .select({
-        id: github_app_installations.id,
-        sharingMode: github_app_installations.sharing_mode,
-      })
+    // Legacy associations can be unbound, so lock and check siblings by upstream identity.
+    await tx
+      .select({ id: github_app_installations.id })
       .from(github_app_installations)
       .where(
         and(
@@ -532,19 +482,6 @@ export async function uninstallExclusiveGitHubInstallation(input: {
         )
       )
       .for('update');
-    if (canonical && canonical.sharingMode !== 'exclusive') {
-      throw new Error('GitHub installation must be disconnected locally');
-    }
-    // Uninstalling upstream is only safe when no *other* tenant association
-    // still depends on this installation. The target association itself may
-    // be either currently connected or already locally disconnected — either
-    // way it is the one being removed, so its own state must not gate this
-    // check the way it did previously (which made an already-disconnected
-    // association impossible to ever hard-uninstall). Siblings are matched by
-    // the stable installation identity, not by the target's binding mode:
-    // matching on the binding would make an unbound legacy row invisible to a
-    // bound, actively connected sibling and delete the upstream installation
-    // out from under that sibling's tenant.
     const otherConnectedAssociations = await tx
       .select({ id: platform_integrations.id })
       .from(platform_integrations)
@@ -859,17 +796,39 @@ export async function isSharedGitHubInstallation(
   installationId: string,
   appType: 'standard' | 'lite'
 ): Promise<boolean> {
-  const [installation] = await db
-    .select({ sharingMode: github_app_installations.sharing_mode })
-    .from(github_app_installations)
+  const associations = await db
+    .select({ role: platform_integrations.github_connection_role })
+    .from(platform_integrations)
     .where(
       and(
-        eq(github_app_installations.github_app_type, appType),
-        eq(github_app_installations.installation_id, installationId)
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        effectiveAppTypeCondition(appType),
+        eq(platform_integrations.platform_installation_id, installationId)
+      )
+    )
+    .limit(2);
+  return associations.length > 1 || associations[0]?.role === 'agent_only';
+}
+
+export async function canUninstallGitHubInstallation(
+  integration: typeof platform_integrations.$inferSelect
+): Promise<boolean> {
+  if (integration.github_connection_role !== 'workflow' || !integration.platform_installation_id)
+    return false;
+  const [other] = await db
+    .select({ id: platform_integrations.id })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        eq(platform_integrations.platform_installation_id, integration.platform_installation_id),
+        effectiveAppTypeCondition(integration.github_app_type ?? 'standard'),
+        ne(platform_integrations.id, integration.id),
+        isNull(platform_integrations.github_disconnected_at)
       )
     )
     .limit(1);
-  return installation?.sharingMode === 'web_cloud_agent';
+  return !other;
 }
 
 export async function materializeGitHubInstallationIdentity(input: {
@@ -1091,10 +1050,17 @@ export async function bindGitHubIntegrationToCanonicalInstallation(
     if (!canonical) throw new Error('Canonical GitHub installation is not active');
     const bound = await tx
       .update(platform_integrations)
-      .set({ github_installation_id: canonical.id, updated_at: new Date().toISOString() })
+      .set({
+        github_installation_id: canonical.id,
+        updated_at: new Date().toISOString(),
+      })
       .where(
         and(
           eq(platform_integrations.id, input.integrationId),
+          or(
+            eq(platform_integrations.github_connection_role, 'workflow'),
+            eq(platform_integrations.github_connection_role, 'agent_only')
+          ),
           eq(platform_integrations.platform, PLATFORM.GITHUB),
           eq(platform_integrations.platform_installation_id, input.installationId),
           effectiveAppTypeCondition(input.appType),

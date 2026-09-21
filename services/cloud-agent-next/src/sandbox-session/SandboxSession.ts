@@ -2568,6 +2568,21 @@ export class SandboxSession extends DurableObject<Env> {
       : undefined;
     const existing = this.terminalLifecycle.getStoredMetadata();
     if (existing) {
+      if (
+        existing.identity.userId !== input.identity.userId ||
+        existing.identity.orgId !== input.identity.orgId ||
+        existing.repository?.type !== input.repository?.type ||
+        (existing.repository?.type === 'github' &&
+          (input.repository?.type !== 'github' ||
+            existing.repository.repo !== input.repository.repo ||
+            existing.repository.githubIntegrationId !== input.repository.githubIntegrationId ||
+            (existing.repository.githubAccessPurpose ?? 'workflow') !==
+              (input.repository.githubAccessPurpose ?? 'workflow')))
+      )
+        return {
+          success: false,
+          error: 'Repository authorization does not match registered session',
+        };
       try {
         validateControlSessionOptions(existing);
       } catch (error) {

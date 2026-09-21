@@ -58,6 +58,19 @@ function createEnv(service: Partial<GitTokenService>) {
 }
 
 describe('broker exception safety', () => {
+  it('never falls back to generic credentials for an agent-purpose association', async () => {
+    const service = createGitTokenService();
+    const result = await resolveCloudAgentGitHubAuthForRepo(createEnv(service), {
+      userId: 'oauth/github-actor',
+      orgId: '123e4567-e89b-12d3-a456-426614174030',
+      githubRepo: 'acme/repo',
+      expectedIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+      accessPurpose: 'agent',
+      allowUserAuthorization: false,
+    });
+    expect(result).toMatchObject({ success: false, error: { reason: 'service_not_configured' } });
+    expect(service.getTokenForRepo).not.toHaveBeenCalled();
+  });
   const params = { userId: 'user_1', outboundContainerId: 'container-test' };
   const bitbucketParams = {
     ...params,

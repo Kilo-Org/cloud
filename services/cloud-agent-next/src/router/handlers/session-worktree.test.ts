@@ -713,6 +713,50 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
 
+  it.each(['purpose', 'association'] as const)(
+    'retains trusted GitHub purpose in siblings and rejects recovered %s substitution',
+    async mismatch => {
+      const metadata = sourceMetadataWithPreset('vercel-small');
+      if (metadata.repository?.type !== 'github') throw new Error('Expected GitHub fixture');
+      metadata.repository.githubAccessPurpose = 'agent';
+      metadata.repository.githubIntegrationId = '123e4567-e89b-12d3-a456-426614174022';
+      const source = ownershipRow({ organizationId: ORGANIZATION_ID });
+      const { caller, input, destinationStub } = fixture({
+        metadata,
+        organizationId: ORGANIZATION_ID,
+        ownershipResults: [[source], [source]],
+      });
+      destinationStub.registerSession.mockRejectedValueOnce(
+        new Error('registration response lost')
+      );
+      await expect(caller.createWorktreeChat(input)).rejects.toThrow('registration response lost');
+      expect(destinationStub.registerSession.mock.calls[0]?.[0]?.repository).toMatchObject({
+        githubAccessPurpose: 'agent',
+        githubIntegrationId: metadata.repository.githubIntegrationId,
+      });
+      const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+      const registered = destinationMetadata(metadata);
+      if (registered.repository?.type !== 'github') throw new Error('Expected GitHub fixture');
+      if (mismatch === 'purpose') registered.repository.githubAccessPurpose = 'workflow';
+      else registered.repository.githubIntegrationId = '123e4567-e89b-12d3-a456-426614174099';
+      destinationStub.getMetadata.mockResolvedValueOnce(registered);
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_reconcile_pending',
+        row: ledgerRow({
+          organization_id: ORGANIZATION_ID,
+          status: 'reconcile_pending',
+          canonical_result: progress,
+        }),
+      });
+      await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'operation_key_reuse_mismatch',
+      });
+      expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
+      expect(settleOperationMock).not.toHaveBeenCalled();
+    }
+  );
+
   it('replays the inherited preset after rollouts are disabled without re-registering', async () => {
     const metadata = sourceMetadataWithPreset('vercel-large');
     const source = ownershipRow({ organizationId: ORGANIZATION_ID });

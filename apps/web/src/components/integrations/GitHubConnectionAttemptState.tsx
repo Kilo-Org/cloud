@@ -99,6 +99,10 @@ export function GitHubConnectionAttemptState(props: {
   if (props.candidates?.length) {
     return (
       <div className="mt-3 grid gap-2">
+        <p className="text-sm text-muted-foreground">
+          An installation already connected to another Kilo owner grants Slack and Cloud Agent
+          access here. Its existing workflows stay with the original owner.
+        </p>
         {props.candidates.map(candidate => (
           <Button
             key={candidate.installationId}

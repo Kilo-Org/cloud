@@ -3834,6 +3834,27 @@ describe('createSessionWithLedger changed-intent rejection', () => {
       retry: makeRequest({ agent: { mode: 'code', model: 'gpt-4' }, options: ORIGINAL_OPTIONS }),
     },
     {
+      name: 'the GitHub access purpose',
+      original: makeRequest({
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+          githubAccessPurpose: 'workflow',
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+      retry: makeRequest({
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+          githubAccessPurpose: 'agent',
+        },
+        options: ORIGINAL_OPTIONS,
+      }),
+    },
+    {
       name: 'the organization',
       identityConflict: true,
       retry: makeRequest({

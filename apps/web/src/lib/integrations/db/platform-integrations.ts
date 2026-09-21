@@ -39,6 +39,8 @@ function installationLookupConditions(
     eq(platform_integrations.platform, platform),
     eq(platform_integrations.platform_installation_id, installationId),
   ];
+  if (platform === PLATFORM.GITHUB)
+    conditions.push(eq(platform_integrations.github_connection_role, 'workflow'));
   if (githubAppType) {
     const appTypeCondition =
       githubAppType === 'standard'
@@ -59,13 +61,13 @@ export async function findIntegrationByInstallationId(
 ) {
   if (!installationId) return null;
 
-  const [integration] = await db
+  const integrations = await db
     .select()
     .from(platform_integrations)
     .where(and(...installationLookupConditions(platform, installationId, githubAppType)))
-    .limit(1);
+    .limit(platform === PLATFORM.GITHUB ? 2 : 1);
 
-  return integration || null;
+  return integrations.length === 1 ? integrations[0] : null;
 }
 
 /**
@@ -81,7 +83,7 @@ export async function findConnectedIntegrationByInstallationId(
 ) {
   if (!installationId) return null;
 
-  const [integration] = await db
+  const integrations = await db
     .select()
     .from(platform_integrations)
     .where(
@@ -90,9 +92,9 @@ export async function findConnectedIntegrationByInstallationId(
         isNull(platform_integrations.github_disconnected_at)
       )
     )
-    .limit(1);
+    .limit(platform === PLATFORM.GITHUB ? 2 : 1);
 
-  return integration || null;
+  return integrations.length === 1 ? integrations[0] : null;
 }
 
 export async function findGitHubBotLinkIntegrations(input: {
@@ -114,23 +116,27 @@ export async function findGitHubBotLinkIntegrations(input: {
       eq(platform_integrations.github_installation_id, github_app_installations.id)
     )
     .where(
-      input.platformIntegrationId
-        ? eq(platform_integrations.id, input.platformIntegrationId)
-        : and(
-            eq(platform_integrations.platform, PLATFORM.GITHUB),
-            eq(platform_integrations.platform_installation_id, input.installationId),
-            input.appType === 'standard'
-              ? or(
-                  eq(platform_integrations.github_app_type, 'standard'),
-                  isNull(platform_integrations.github_app_type)
-                )
-              : eq(platform_integrations.github_app_type, 'lite')
-          )
+      and(
+        eq(platform_integrations.github_connection_role, 'workflow'),
+        input.platformIntegrationId
+          ? eq(platform_integrations.id, input.platformIntegrationId)
+          : and(
+              eq(platform_integrations.platform, PLATFORM.GITHUB),
+              eq(platform_integrations.platform_installation_id, input.installationId),
+              input.appType === 'standard'
+                ? or(
+                    eq(platform_integrations.github_app_type, 'standard'),
+                    isNull(platform_integrations.github_app_type)
+                  )
+                : eq(platform_integrations.github_app_type, 'lite')
+            )
+      )
     )
     .limit(input.platformIntegrationId ? 1 : 2);
   return rows.flatMap(({ integration, canonical }) => {
     if (
       integration.platform !== PLATFORM.GITHUB ||
+      integration.github_connection_role !== 'workflow' ||
       integration.platform_installation_id !== input.installationId ||
       (integration.github_app_type ?? 'standard') !== input.appType ||
       !isPlatformIntegrationHealthy(integration)
@@ -147,8 +153,7 @@ export async function findGitHubBotLinkIntegrations(input: {
       canonical.lifecycle_state === 'active' &&
       !canonical.suspended_at &&
       !canonical.deleted_at &&
-      !canonical.auth_invalid_at &&
-      (input.platformIntegrationId !== undefined || canonical.sharing_mode === 'exclusive');
+      !canonical.auth_invalid_at;
     return canonicalUsable ? [integration] : [];
   });
 }
@@ -192,14 +197,21 @@ export async function findIntegrationByInstallationIdForOwner(
  * Gets an organization's preferred integration, including an unhealthy row
  * when no healthy integration exists. Use this for status and recovery UI.
  */
-export async function getIntegrationForOrganization(organizationId: string, platform: string) {
+export async function getIntegrationForOrganization(
+  organizationId: string,
+  platform: string,
+  purpose: 'workflow' | 'management' = 'workflow'
+) {
   const [integration] = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
         eq(platform_integrations.owned_by_organization_id, organizationId),
-        eq(platform_integrations.platform, platform)
+        eq(platform_integrations.platform, platform),
+        platform === PLATFORM.GITHUB && purpose === 'workflow'
+          ? eq(platform_integrations.github_connection_role, 'workflow')
+          : undefined
       )
     )
     .orderBy(
@@ -226,6 +238,7 @@ export async function getPrimaryGitHubIntegrationForOrganization(organizationId:
       and(
         eq(platform_integrations.owned_by_organization_id, organizationId),
         eq(platform_integrations.platform, PLATFORM.GITHUB),
+        eq(platform_integrations.github_connection_role, 'workflow'),
         platformIntegrationHealthSql()
       )
     )
@@ -299,6 +312,14 @@ export async function upsertPlatformIntegration(data: {
   repositories?: PlatformRepository[] | null;
   installedAt?: string;
 }) {
+  if (data.platform === PLATFORM.GITHUB) {
+    const result = await upsertPlatformIntegrationForOwner(
+      { type: 'org', id: data.organizationId },
+      data
+    );
+    if (!result.ok) throw new Error('GitHub installation is unavailable');
+    return;
+  }
   await db
     .insert(platform_integrations)
     .values({
@@ -711,14 +732,26 @@ export async function deleteGitHubInstallationRecords(
 /**
  * Gets all platform integrations for an organization (supports multiple)
  */
-export async function getIntegrationsByOrganization(organizationId: string, platform: string) {
+export async function getIntegrationsByOrganization(
+  organizationId: string,
+  platform: string,
+  purpose: 'workflow' | 'agent' | 'management' = 'workflow'
+) {
   return await db
     .select()
     .from(platform_integrations)
     .where(
       and(
         eq(platform_integrations.owned_by_organization_id, organizationId),
-        eq(platform_integrations.platform, platform)
+        eq(platform_integrations.platform, platform),
+        platform === PLATFORM.GITHUB && purpose === 'workflow'
+          ? eq(platform_integrations.github_connection_role, 'workflow')
+          : platform === PLATFORM.GITHUB && purpose === 'agent'
+            ? or(
+                eq(platform_integrations.github_connection_role, 'workflow'),
+                eq(platform_integrations.github_connection_role, 'agent_only')
+              )
+            : undefined
       )
     )
     .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id));
@@ -952,24 +985,61 @@ export async function autoCompleteInstallation(
     pendingApproval?.github_requester?.id
   );
 
-  await (transaction ?? db)
-    .update(platform_integrations)
-    .set({
-      platform_installation_id: installationData.installation_id,
-      platform_account_id: installationData.account_id,
-      platform_account_login: installationData.account_login,
-      repository_access: installationData.repository_selection,
-      integration_status: INTEGRATION_STATUS.ACTIVE,
-      permissions: installationData.permissions as IntegrationPermissions,
-      scopes: installationData.events,
-      installed_at: new Date(installationData.created_at).toISOString(),
-      metadata: completedMetadata,
-      auth_invalid_at: null,
-      auth_invalid_reason: null,
-      ...authorizationProvenance,
-      updated_at: new Date().toISOString(),
-    })
-    .where(eq(platform_integrations.id, integrationId));
+  const execute = async (tx: DrizzleTransaction) => {
+    const [pending] = await tx
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integrationId))
+      .limit(1);
+    if (
+      !pending ||
+      pending.platform !== PLATFORM.GITHUB ||
+      pending.integration_status !== INTEGRATION_STATUS.PENDING
+    )
+      throw new Error('Pending GitHub connection not found');
+    const appType = pending.github_app_type ?? 'standard';
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${installationData.installation_id}`}))`
+    );
+    const [peer] = await tx
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          eq(platform_integrations.platform_installation_id, installationData.installation_id),
+          ne(platform_integrations.id, integrationId),
+          sql`COALESCE(${platform_integrations.github_app_type}, 'standard') = ${appType}`
+        )
+      )
+      .limit(1);
+    if (peer) throw new Error('GitHub installation is already connected');
+    await tx
+      .update(platform_integrations)
+      .set({
+        platform_installation_id: installationData.installation_id,
+        github_connection_role: 'workflow',
+        platform_account_id: installationData.account_id,
+        platform_account_login: installationData.account_login,
+        repository_access: installationData.repository_selection,
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        permissions: installationData.permissions as IntegrationPermissions,
+        scopes: installationData.events,
+        installed_at: new Date(installationData.created_at).toISOString(),
+        metadata: completedMetadata,
+        auth_invalid_at: null,
+        auth_invalid_reason: null,
+        ...authorizationProvenance,
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(platform_integrations.id, integrationId),
+          eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING)
+        )
+      );
+  };
+  await (transaction ? execute(transaction) : db.transaction(execute));
 }
 
 /**
@@ -994,6 +1064,8 @@ export async function getIntegrationForOwner(
       : eq(platform_integrations.owned_by_organization_id, owner.id);
 
   const conditions = [ownershipCondition, eq(platform_integrations.platform, platform)];
+  if (platform === PLATFORM.GITHUB)
+    conditions.push(eq(platform_integrations.github_connection_role, 'workflow'));
   if (status) {
     conditions.push(eq(platform_integrations.integration_status, status));
   }
@@ -1224,10 +1296,19 @@ export async function upsertPlatformIntegrationForOwner(
               : eq(platform_integrations.github_app_type, 'lite')
           )
         )
-        .limit(2)
         .for('update');
-      if (peers.length > 1) return { ok: false, reason: 'claimed_by_other_owner' };
-      const existing = peers[0];
+      const existing = peers.find(peer =>
+        owner.type === 'org'
+          ? peer.owned_by_organization_id === owner.id
+          : peer.owned_by_user_id === owner.id
+      );
+      if (
+        (!existing && peers.length > 0) ||
+        (existing &&
+          existing.github_connection_role !== 'workflow' &&
+          existing.integration_status !== 'pending')
+      )
+        return { ok: false, reason: 'claimed_by_other_owner' };
       const sameOwner =
         existing &&
         ((owner.type === 'user' &&
@@ -1264,13 +1345,16 @@ export async function upsertPlatformIntegrationForOwner(
       }
 
       if (!existing) {
-        await tx.insert(platform_integrations).values(values);
+        await tx
+          .insert(platform_integrations)
+          .values({ ...values, github_connection_role: 'workflow' });
         return { ok: true };
       }
       await tx
         .update(platform_integrations)
         .set({
           platform_account_id: values.platform_account_id,
+          github_connection_role: existing.github_connection_role ?? 'workflow',
           platform_account_login: values.platform_account_login,
           permissions: values.permissions,
           scopes: values.scopes,

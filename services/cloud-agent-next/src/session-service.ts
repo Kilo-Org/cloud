@@ -1742,6 +1742,7 @@ export class SessionService {
         githubRepo: github.repo,
         userId: metadata.identity.userId,
         orgId: metadata.identity.orgId,
+        accessPurpose: github.githubAccessPurpose ?? 'workflow',
         ...(github.githubIntegrationId
           ? { expectedIntegrationId: github.githubIntegrationId }
           : {}),

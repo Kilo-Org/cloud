@@ -55,7 +55,11 @@ describe('shared GitHub installation admission', () => {
 
   it('admits only exact organization UUIDs from the sharing allowlist', () => {
     mockedGetEnvVariable.mockImplementation(name =>
-      name === 'GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS' ? organizationId : ''
+      name === 'GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS'
+        ? organizationId
+        : name === 'GITHUB_AGENT_ONLY_CONNECTIONS_ENABLED'
+          ? 'true'
+          : ''
     );
 
     expect(canOrganizationCreateSharedGitHubConnection(organizationId)).toBe(true);

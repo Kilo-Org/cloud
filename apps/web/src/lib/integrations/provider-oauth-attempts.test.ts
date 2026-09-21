@@ -13,6 +13,9 @@ import { anonymizeCloudUserData } from '@/lib/user';
 import { markOrganizationAsDeleted } from '@/lib/organizations/organizations';
 
 describe('provider OAuth attempts', () => {
+  beforeEach(() => {
+    process.env.GITHUB_AGENT_ONLY_CONNECTIONS_ENABLED = 'true';
+  });
   afterEach(cleanupDbForTest);
 
   it('is single-use and bound to actor, owner, provider, and expiry', async () => {
@@ -171,7 +174,7 @@ describe('provider OAuth attempts', () => {
         { type: 'org', id: organizationB.id },
         { ...github, kiloUserId: destinationUser.id }
       )
-    ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+    ).resolves.toMatchObject({ ok: true });
     await cancelProviderOAuthAttempt({
       actorUserId: destinationUser.id,
       owner: { type: 'org', id: organizationB.id },
@@ -194,7 +197,7 @@ describe('provider OAuth attempts', () => {
           { type: 'org', id: organizationB.id },
           { ...github, kiloUserId: destinationUser.id }
         )
-      ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+      ).resolves.toMatchObject({ ok: true });
       await db
         .delete(platform_integrations)
         .where(
@@ -212,7 +215,7 @@ describe('provider OAuth attempts', () => {
     ).resolves.toMatchObject({ ok: true });
   });
 
-  it('blocks provider start after shared GitHub attach', async () => {
+  it('allows Slack provider start after secondary GitHub attach', async () => {
     const incumbent = await insertTestUser();
     const destinationUser = await insertTestUser();
     const organizationA = await createTestOrganization('Shared start A', incumbent.id, 0);
@@ -241,10 +244,10 @@ describe('provider OAuth attempts', () => {
       beginProviderOAuthAttempt({
         actorUserId: destinationUser.id,
         owner: { type: 'org', id: organizationB.id },
-        provider: 'linear',
+        provider: 'slack',
         state: 'state-blocked',
       })
-    ).rejects.toThrow('not available for shared GitHub installations');
+    ).resolves.toBeUndefined();
   });
 
   it('explicitly removes personal and organization attempts during soft deletion', async () => {
@@ -426,7 +429,7 @@ describe('provider OAuth attempts', () => {
     expect(reservationResult.status).toBe('fulfilled');
     expect(attachResult).toEqual({
       status: 'fulfilled',
-      value: { ok: false, reason: 'incompatible_workflow' },
+      value: expect.objectContaining({ ok: true }),
     });
   });
 
@@ -500,14 +503,7 @@ describe('provider OAuth attempts', () => {
     ]);
     if (observationError) throw observationError;
     expect(attachResult).toMatchObject({ status: 'fulfilled', value: { ok: true } });
-    expect(startResult.status).toBe('rejected');
-    if (startResult.status === 'rejected') {
-      expect(startResult.reason).toEqual(
-        expect.objectContaining({
-          message: 'This workflow is not available for shared GitHub installations yet',
-        })
-      );
-    }
+    expect(startResult.status).toBe('fulfilled');
   });
 });
 

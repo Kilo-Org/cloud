@@ -188,7 +188,15 @@ export default async function spawnCloudAgentSession(
       return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
     }
 
-    const repository = await resolveGitHubRepositoryForOwner(owner, args.githubRepo);
+    const githubAccessPurpose =
+      options?.chatPlatform === 'slack' && platformIntegration.platform === 'slack'
+        ? 'agent'
+        : 'workflow';
+    const repository = await resolveGitHubRepositoryForOwner(
+      owner,
+      args.githubRepo,
+      githubAccessPurpose
+    );
     if (!repository) {
       return {
         response:
@@ -223,6 +231,7 @@ export default async function spawnCloudAgentSession(
       mode,
       model: effectiveModel,
       githubIntegrationId: repository.githubIntegrationId,
+      githubAccessPurpose,
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,
       callbackTarget,

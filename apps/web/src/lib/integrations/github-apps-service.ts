@@ -201,7 +201,8 @@ export async function listRepositories(
     const repos = await fetchGitHubRepositories(
       integration.platform_installation_id,
       appType,
-      integration.id
+      integration.id,
+      'management'
     );
     await updateRepositoriesForIntegration(integrationId, repos);
     return {
@@ -263,7 +264,8 @@ export async function cancelPendingInstallation(owner: Owner, integrationId?: st
 export async function listBranches(
   owner: Owner,
   integrationId: string,
-  repositoryFullName: string
+  repositoryFullName: string,
+  purpose: 'workflow' | 'agent' = 'workflow'
 ) {
   const ownershipCondition =
     owner.type === 'user'
@@ -301,7 +303,8 @@ export async function listBranches(
     integration.platform_installation_id,
     repositoryFullName,
     appType,
-    integration.id
+    integration.id,
+    purpose
   );
 
   return { branches };
@@ -372,6 +375,7 @@ export async function getRepositoryCustomizations(owner: Owner, integrationId: s
     access: integration.repository_access,
     defaultModel: defaults.modelSlug,
     defaultPrReviews: defaults.prReviewMode,
+    canEditReviews: integration.github_connection_role === 'workflow',
     repositories: repositories.map(repository => {
       const customization = customizationByRepositoryId.get(String(repository.id));
       return {
@@ -399,6 +403,9 @@ export async function updateInstallationSettings(
   const integration = await getGitHubIntegrationById(owner, integrationId);
   if (!integration) {
     return { success: false, error: 'No GitHub App installation found' };
+  }
+  if (settings.prReviewMode !== undefined && integration.github_connection_role !== 'workflow') {
+    return { success: false, error: 'Agent access connections support Slack and Cloud Agent only' };
   }
 
   if (
@@ -438,6 +445,9 @@ export async function updateRepositorySettings(
   const integration = await getGitHubIntegrationById(owner, integrationId);
   if (!integration) {
     return { success: false, error: 'No GitHub App installation found' };
+  }
+  if (settings.prReviewMode !== undefined && integration.github_connection_role !== 'workflow') {
+    return { success: false, error: 'Agent access connections support Slack and Cloud Agent only' };
   }
 
   const repositories = requireNumericPlatformRepositories(integration.repositories) ?? [];

@@ -171,6 +171,9 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     mockSyncIntegrationInstallationDetails(integrationId, details),
 }));
 jest.mock('@/lib/integrations/db/github-installations', () => ({
+  canUninstallGitHubInstallation: jest.fn(
+    async (integration: PlatformIntegration) => integration.github_connection_role === 'workflow'
+  ),
   disconnectGitHubInstallation: jest.fn(),
   bindGitHubIntegrationToCanonicalInstallation: (input: unknown) =>
     mockBindGitHubIntegrationToCanonicalInstallation(input),
@@ -310,6 +313,7 @@ function organizationIntegration(): PlatformIntegration {
     github_app_type: 'standard',
     github_installation_id: null,
     github_disconnected_at: null,
+    github_connection_role: 'workflow',
     github_authorized_by_user_id: null,
     github_authorized_user_id: null,
     github_authorized_at: null,
@@ -323,6 +327,7 @@ describe('githubAppsRouter organization install capability', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+    process.env.GITHUB_AGENT_ONLY_CONNECTIONS_ENABLED = 'true';
     process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS =
       '9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55';
     process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = '';
@@ -400,6 +405,21 @@ describe('githubAppsRouter organization install capability', () => {
 
     expect(listed.canAdd).toBe(false);
     expect(listed.installations).toHaveLength(1);
+  });
+
+  it('exposes local disconnect independently from upstream uninstall for an agent connection', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([
+      { ...organizationIntegration(), github_connection_role: 'agent_only' },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+    const listed = await caller.listOrganizationInstallations({ organizationId });
+    expect(listed.installations[0]).toMatchObject({
+      connectionRole: 'agent_only',
+      canDisconnect: true,
+      canUninstall: false,
+      canManageModel: true,
+    });
   });
 
   it('does not let a locally disconnected connection block adding another installation', async () => {

@@ -17,7 +17,7 @@ import {
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentGitLabSessionCapability,
   issueCloudAgentKiloSessionCapability,
-  resolveGitHubTokenForRepo,
+  authorizeCloudAgentGitHubRepo,
   resolveCloudAgentGitHubAuthForRepo,
   resolveManagedGitLabToken,
   resolveManagedBitbucketToken,
@@ -103,6 +103,7 @@ const repositorySchema = z.discriminatedUnion('type', [
       repo: z.string().min(1),
       authentication: z.enum(['managed', 'explicit']),
       expectedIntegrationId: z.string().uuid().optional(),
+      accessPurpose: z.enum(['workflow', 'agent']).optional(),
       allowUserAuthorization: z.boolean(),
     })
     .strict(),
@@ -470,6 +471,7 @@ function repositoryFromMetadata(
       ...(repository.githubIntegrationId
         ? { expectedIntegrationId: repository.githubIntegrationId }
         : {}),
+      ...(repository.githubAccessPurpose ? { accessPurpose: repository.githubAccessPurpose } : {}),
       allowUserAuthorization:
         metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
         metadata.identity.createdOnPlatform === 'slack',
@@ -578,6 +580,16 @@ async function refreshScmCapability(
 ): Promise<SessionCredentialGrant> {
   const repository = grant.repository;
   if (!repository || repository.type === 'git') return grant;
+  if (repository.type === 'github' && repository.expectedIntegrationId) {
+    const authorized = await authorizeCloudAgentGitHubRepo(env, {
+      githubRepo: repository.repo,
+      userId: grant.userId,
+      orgId: grant.orgId,
+      expectedIntegrationId: repository.expectedIntegrationId,
+      accessPurpose: repository.accessPurpose ?? 'workflow',
+    });
+    if (!authorized.success) throw new Error('GitHub credential is unavailable');
+  }
   if (isCapabilityCurrent(grant.scm?.capability, outboundContainerId, now)) return grant;
   const common = {
     userId: grant.userId,
@@ -590,6 +602,7 @@ async function refreshScmCapability(
     const issued = await issueCloudAgentGitHubSessionCapability(env, {
       ...common,
       githubRepo: repository.repo,
+      accessPurpose: repository.accessPurpose ?? 'workflow',
       allowUserAuthorization: repository.allowUserAuthorization,
       ...(repository.expectedIntegrationId
         ? { expectedIntegrationId: repository.expectedIntegrationId }
@@ -804,6 +817,7 @@ async function resolveDirectScmCredentials(
       const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
         ...common,
         githubRepo: repository.repo,
+        accessPurpose: repository.accessPurpose ?? 'workflow',
         allowUserAuthorization: repository.allowUserAuthorization,
         ...(repository.expectedIntegrationId
           ? { expectedIntegrationId: repository.expectedIntegrationId }
@@ -1001,8 +1015,10 @@ export async function prepareSessionCredentials(input: {
   } else if (repository?.type === 'github') {
     let nativeToken = payload.git?.token;
     if (repository.authentication === 'managed') {
-      const resolved = await resolveGitHubTokenForRepo(env, {
+      const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
         githubRepo: repository.repo,
+        accessPurpose: repository.accessPurpose ?? 'workflow',
+        allowUserAuthorization: false,
         userId: grant.userId,
         ...(grant.orgId ? { orgId: grant.orgId } : {}),
         ...(repository.expectedIntegrationId
@@ -1010,7 +1026,7 @@ export async function prepareSessionCredentials(input: {
           : {}),
       });
       if (!resolved.success) throw new Error('GitHub credential is unavailable');
-      nativeToken = resolved.value.token;
+      nativeToken = resolved.value.githubToken;
     }
     if (!nativeToken) invalidCredentials();
     grant = {

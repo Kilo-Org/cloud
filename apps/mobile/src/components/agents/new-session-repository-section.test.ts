@@ -129,6 +129,11 @@ function renderedText(renderer: TestRenderer.ReactTestRenderer): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
+/** The Text node that renders exactly `text`, so its own props can be asserted. */
+function labelNode(renderer: TestRenderer.ReactTestRenderer, text: string) {
+  return renderer.root.findAllByType('Text' as never).find(node => node.children.includes(text));
+}
+
 /** The headers of the connect cards; the section renders no other pressable. */
 function pressables(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root.findAllByType('Pressable' as never);
@@ -316,5 +321,37 @@ describe('NewSessionRepositorySection connect card collapse', () => {
 
     expect(renderedText(renderer)).not.toContain(i18n.t('common.connectGithub'));
     expect(pressables(renderer)).toHaveLength(0);
+  });
+});
+
+describe('NewSessionRepositorySection open label', () => {
+  it('keeps the open label on one line in the row remaining width', () => {
+    // The label measured a fraction narrower than the glyphs Android lays out,
+    // so it wrapped onto a second line inside a button with room for one.
+    const renderer = mountSection({ groups: [group('gitlab', 'connect')] });
+
+    const label = labelNode(renderer, i18n.t('agentChat.newSession.openGitlab'));
+
+    expect(label).toBeDefined();
+    expect(label?.props.numberOfLines).toBe(1);
+    expect(label?.props.className).toContain('flex-1');
+    expect(label?.props.className).toContain('text-center');
+  });
+
+  it('offsets the label with a logical inline-end margin so RTL stays centred', () => {
+    const renderer = mountSection({ groups: [group('gitlab', 'connect')] });
+
+    const className = labelNode(renderer, i18n.t('agentChat.newSession.openGitlab'))?.props
+      .className as string;
+
+    expect(className).toContain('me-[23px]');
+    expect(className).not.toMatch(/\bmr-|margin-?[rR]ight/);
+  });
+
+  it('renders no open label in the connected-empty card', () => {
+    const renderer = mountSection({ groups: [group('gitlab', 'connected-empty')] });
+
+    expect(renderedText(renderer)).toContain(i18n.t('agentChat.newSession.gitlabConnected'));
+    expect(labelNode(renderer, i18n.t('agentChat.newSession.openGitlab'))).toBeUndefined();
   });
 });

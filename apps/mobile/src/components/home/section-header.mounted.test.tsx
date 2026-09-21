@@ -36,65 +36,71 @@ afterEach(() => {
 
 describe('SectionHeader mounted layout', () => {
   // Host props protect the layout contract; only native I4 can prove scaled glyph rendering.
-  it.each([
-    { isRTL: false, alignment: 'text-right' },
-    { isRTL: true, alignment: 'text-left' },
-  ])('gives both labels spare width and wrapping with RTL=$isRTL', ({ isRTL, alignment }) => {
-    i18nManager.isRTL = isRTL;
-    const root = mount(
-      createElement(SectionHeader, {
-        label: 'Live now',
-        actionLabel: 'See all',
-        onActionPress: () => undefined,
-      })
-    );
-    const action = root.findByProps({ accessibilityRole: 'button' });
-    const text = action.find(node => Object.is(node.type, 'Text'));
-    const label = root.find(
-      node => Object.is(node.type, 'Text') && node.children.includes('Live now')
-    );
+  it.each([{ isRTL: false }, { isRTL: true }])(
+    'gives both labels spare width and wrapping with RTL=$isRTL',
+    ({ isRTL }) => {
+      i18nManager.isRTL = isRTL;
+      const root = mount(
+        createElement(SectionHeader, {
+          label: 'Live now',
+          actionLabel: 'See all',
+          onActionPress: () => undefined,
+        })
+      );
+      const action = root.findByProps({ accessibilityRole: 'button' });
+      const text = action.find(node => Object.is(node.type, 'Text'));
+      const label = root.find(
+        node => Object.is(node.type, 'Text') && node.children.includes('Live now')
+      );
 
-    expect((label.props.className as string).split(' ')).toEqual(
-      expect.arrayContaining([
-        'grow',
-        'max-w-full',
-        'font-mono-medium',
-        'text-[10px]',
-        'tracking-[1.5px]',
-        'uppercase',
-        'text-muted-foreground',
-      ])
-    );
-    expect(label.props.numberOfLines).toBeUndefined();
-    expect(label.props.allowFontScaling).not.toBe(false);
-    expect(label.props.maxFontSizeMultiplier).toBeUndefined();
-    expect(label.props.adjustsFontSizeToFit).not.toBe(true);
-    expect(label.children).toEqual(['Live now']);
-    if (isRTL) {
-      expect(label.props.style).toContainEqual({ writingDirection: 'rtl' });
+      expect((label.props.className as string).split(' ')).toEqual(
+        expect.arrayContaining([
+          'grow',
+          'max-w-full',
+          'font-mono-medium',
+          'text-[10px]',
+          'tracking-[1.5px]',
+          'uppercase',
+          'text-muted-foreground',
+        ])
+      );
+      expect(label.props.numberOfLines).toBeUndefined();
+      expect(label.props.allowFontScaling).not.toBe(false);
+      expect(label.props.maxFontSizeMultiplier).toBeUndefined();
+      expect(label.props.adjustsFontSizeToFit).not.toBe(true);
+      expect(label.children).toEqual(['Live now']);
+      if (isRTL) {
+        expect(label.props.style).toContainEqual({ writingDirection: 'rtl' });
+      }
+
+      expect((action.parent?.props.className as string | undefined)?.split(' ')).toContain(
+        'flex-wrap'
+      );
+      // items-end sits the link on the card edge: the Pressable is a column box,
+      // and Yoga mirrors flex-end with the layout direction.
+      expect((action.props.className as string).split(' ')).toEqual(
+        expect.arrayContaining(['grow', 'max-w-full', 'items-end'])
+      );
+      // With the Text no longer stretched, a physical text-align is a no-op on
+      // one platform and wrong on the other; items-end owns the alignment.
+      const textClasses = (text.props.className as string).split(' ');
+      expect(textClasses).not.toContain('text-left');
+      expect(textClasses).not.toContain('text-right');
+      expect(textClasses).toEqual(
+        expect.arrayContaining([
+          'font-mono-medium',
+          'text-[11px]',
+          'tracking-[1.5px]',
+          'uppercase',
+          'text-primary',
+        ])
+      );
+      expect(text.props.numberOfLines).toBeUndefined();
+      expect(text.props.allowFontScaling).not.toBe(false);
+      expect(text.props.maxFontSizeMultiplier).toBeUndefined();
+      expect(text.children).toEqual(['See all']);
     }
-
-    expect((action.parent?.props.className as string | undefined)?.split(' ')).toContain(
-      'flex-wrap'
-    );
-    expect((action.props.className as string).split(' ')).toEqual(
-      expect.arrayContaining(['grow', 'max-w-full'])
-    );
-    expect((text.props.className as string).split(' ')).toEqual(
-      expect.arrayContaining([
-        alignment,
-        'font-mono-medium',
-        'text-[11px]',
-        'tracking-[1.5px]',
-        'uppercase',
-        'text-primary',
-      ])
-    );
-    expect(text.props.numberOfLines).toBeUndefined();
-    expect(text.props.allowFontScaling).not.toBe(false);
-    expect(text.props.maxFontSizeMultiplier).toBeUndefined();
-    expect(text.children).toEqual(['See all']);
-  });
+  );
 
   it('drops the Latin label treatment for the finding copy in an RTL interface', () => {
     i18nManager.isRTL = true;
@@ -121,6 +127,8 @@ describe('SectionHeader mounted layout', () => {
     expect(actionClasses.some(token => token.startsWith('font-mono'))).toBe(false);
     expect(actionClasses.some(token => token.startsWith('tracking'))).toBe(false);
     expect(actionClasses).toContain('text-primary');
+    // The link sits on the card's RTL edge, not near the middle of the row.
+    expect((action.props.className as string).split(' ')).toContain('items-end');
   });
 
   it('keeps the complete accessible action name and activates the supplied destination', () => {

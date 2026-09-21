@@ -501,6 +501,21 @@ describe('NotificationsScreen category availability', () => {
     expect(textWithChildren(renderer.root, 'madeUpCode').length).toBe(0);
   });
 
+  it('non-retryable unhappy: an inherited prototype name as the reason code falls back to the subtitle', async () => {
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          securityFindings: { available: false, unavailableReasonCode: 'constructor' },
+        }),
+      })
+    );
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
+    expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
+  });
+
   it('retryable unhappy: a category save failure rolls back the optimistic flip', async () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     setPreferenceMutationFn.mockRejectedValue({

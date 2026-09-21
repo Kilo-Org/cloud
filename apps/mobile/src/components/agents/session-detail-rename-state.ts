@@ -1,3 +1,6 @@
+import { i18n } from '@/i18n';
+import { resolveSessionDisplayTitle } from '@/lib/session-title';
+
 export type RenameState = {
   isModalOpen: boolean;
   optimisticTitle: string | null;
@@ -61,9 +64,16 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
-  const baseTitle = input.isLoaded
-    ? (input.serverTitle ?? input.fallbackTitle)
-    : input.fallbackTitle;
+  // The server writes a creation-default placeholder title ("New session -
+  // <ISO>"); it must never reach the header or the rename modal. Resolve both
+  // the authoritative title and the loading fallback through the same guard,
+  // then fall back to the generic label so a session whose only title is the
+  // placeholder still shows a human label. The user's optimistic rename is
+  // never filtered.
+  const serverTitle = resolveSessionDisplayTitle(input.serverTitle);
+  const fallbackTitle =
+    resolveSessionDisplayTitle(input.fallbackTitle) ?? i18n.t('agentChat.session.title');
+  const baseTitle = input.isLoaded ? (serverTitle ?? fallbackTitle) : fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
     title,

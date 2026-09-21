@@ -31,6 +31,23 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// `@/lib/screen-insets` (through the profile screen) imports
+// `react-native-safe-area-context`, whose module graph loads the real
+// `react-native` — Flow syntax node's ESM loader cannot parse. The sign-out
+// flow does not read insets, so return zeros like the other mounted suites.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
+// Unmocked profile-screen imports (`@/lib/external-link` and the secure-store
+// hooks) reach `sonner-native`, whose module graph also loads the real
+// `react-native`. The screen's toast surface is irrelevant to the sign-out
+// flow, so stub it like the other mounted suites
+// (e.g. `language-picker-sheet.mounted.test.tsx`) do.
+vi.mock('sonner-native', () => ({
+  toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() },
+}));
+
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('expo-application', () => ({
   nativeApplicationVersion: '1.0.0',

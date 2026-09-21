@@ -136,6 +136,17 @@ async function compiledGapDp(rowClassName: string): Promise<number> {
 
 type Insets = { top: number; right: number; bottom: number; left: number };
 
+/** One side of a `hitSlop`; RN also accepts a number meaning every side. */
+function slopSide(hitSlop: unknown, side: keyof Insets): number {
+  if (typeof hitSlop === 'number') {
+    return hitSlop;
+  }
+  if (hitSlop && typeof hitSlop === 'object') {
+    return (hitSlop as Record<string, number | undefined>)[side] ?? 0;
+  }
+  return 0;
+}
+
 const noop = (): void => undefined;
 
 async function mountHeader(showNewSession: boolean, onNewSession: () => void): Promise<R> {
@@ -208,16 +219,20 @@ describe('SessionListHeaderActions new-session control', () => {
     // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
     expect(gapDp).toBe(14);
 
-    const newSessionSlop = newSession.props.hitSlop as Insets;
-    const filterSlop = filter.props.hitSlop as Insets;
+    // The filter control expresses its slop as a number (every side), the
+    // new-session control as a per-side object; `slopSide` reads both shapes.
     // The new-session control sits left of the filter, so the gap has to fit
     // both facing slops; more than the gap means the two regions overlap.
-    expect(newSessionSlop.right + filterSlop.left).toBeLessThanOrEqual(gapDp);
+    expect(
+      slopSide(newSession.props.hitSlop, 'right') + slopSide(filter.props.hitSlop, 'left')
+    ).toBeLessThanOrEqual(gapDp);
     // Capping the right side must not drop the control below the design target.
     const box = boxDp(newSession.props.className as string);
-    expect(box.width + newSessionSlop.left + newSessionSlop.right).toBeGreaterThanOrEqual(
-      TOUCH_TARGET_DP
-    );
+    expect(
+      box.width +
+        slopSide(newSession.props.hitSlop, 'left') +
+        slopSide(newSession.props.hitSlop, 'right')
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
 
     act(() => {
       renderer.unmount();

@@ -1,13 +1,22 @@
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, View } from 'react-native';
+import { Alert, Modal, Platform, Pressable, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 
-type DestructiveConfirmDialogProps = {
+type DestructiveConfirmContent = {
   title: string;
   message: string;
   confirmLabel: string;
+};
+
+type DestructiveConfirm = {
+  confirm: () => void;
+  dialog: ReactNode;
+};
+
+type DestructiveConfirmDialogProps = DestructiveConfirmContent & {
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -60,4 +69,55 @@ export function DestructiveConfirmDialog({
       </Pressable>
     </Modal>
   );
+}
+
+/**
+ * Opens the platform-appropriate confirmation for one destructive action.
+ *
+ * iOS keeps the native `Alert.alert`, whose `style: 'destructive'` already
+ * renders the choice in red (`apps/mobile/AGENTS.md`: "Confirm destructive
+ * actions with `Alert.alert()`"). Android's native alert paints every button
+ * with the theme accent, so `confirm` opens the in-app dialog instead and the
+ * returned `dialog` element carries the destructive affordance there.
+ *
+ * Call `confirm` from the control that should ask first, and render `dialog`
+ * next to the screen's other overlays:
+ *
+ * ```
+ * const { confirm, dialog } = useDestructiveConfirm(content, onConfirmed);
+ * // <ActionTile onPress={confirm} ... />
+ * // {dialog}
+ * ```
+ */
+export function useDestructiveConfirm(
+  content: DestructiveConfirmContent,
+  onConfirm: () => void
+): DestructiveConfirm {
+  const { t } = useTranslation();
+  const [visible, setVisible] = useState(false);
+  const confirm = () => {
+    if (Platform.OS === 'android') {
+      setVisible(true);
+      return;
+    }
+    Alert.alert(content.title, content.message, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: content.confirmLabel, style: 'destructive', onPress: onConfirm },
+    ]);
+  };
+  const dialog = visible ? (
+    <DestructiveConfirmDialog
+      title={content.title}
+      message={content.message}
+      confirmLabel={content.confirmLabel}
+      onCancel={() => {
+        setVisible(false);
+      }}
+      onConfirm={() => {
+        setVisible(false);
+        onConfirm();
+      }}
+    />
+  ) : null;
+  return { confirm, dialog };
 }

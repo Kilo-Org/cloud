@@ -109,6 +109,63 @@ describe('getSessionDetailRenameState', () => {
       }).modalInitialValue
     ).toBe('Pending');
   });
+
+  it('never shows the creation-default server title, using the fallback instead', () => {
+    const state = getSessionDetailRenameState({
+      fallbackTitle,
+      isLoaded: true,
+      serverTitle: 'New session - 2026-09-21T15:44:47.176Z',
+      renameState: { ...initialRenameState(), isModalOpen: true },
+    });
+    expect(state.title).toBe(fallbackTitle);
+    // The rename modal must prefill the label the header shows, not the raw
+    // timestamp the server wrote at creation.
+    expect(state.modalInitialValue).toBe(fallbackTitle);
+    expect(state.modalInitialValue).not.toContain('2026-09-21T15:44:47.176Z');
+  });
+
+  it('never shows a creation-default fallback title while loading', () => {
+    const state = getSessionDetailRenameState({
+      fallbackTitle: 'New session - 2026-09-21T15:44:47.176Z',
+      isLoaded: false,
+      serverTitle: undefined,
+      renameState: initialRenameState(),
+    });
+    expect(state.title).toBe('Session');
+    expect(state.title).not.toContain('2026-09-21T15:44:47.176Z');
+  });
+
+  it('resolves a live creation-default title to the fallback through the header state', () => {
+    const liveTitle = titleFromSessionUpdatedEvent(
+      'ses-1',
+      sessionUpdatedPayload({ title: 'New session - 2026-09-21T15:44:47.176Z' })
+    );
+    // The event helper keeps passing the raw value through; the header state
+    // is what filters it.
+    expect(liveTitle).toBe('New session - 2026-09-21T15:44:47.176Z');
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: liveTitle,
+        renameState: initialRenameState(),
+      }).title
+    ).toBe(fallbackTitle);
+  });
+
+  it('never filters the user optimistic rename, even when it looks like a default', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-21T15:44:47.176Z',
+        renameState: {
+          ...initialRenameState(),
+          optimisticTitle: 'New session - 2026-01-01T00:00:00.000Z',
+        },
+      }).title
+    ).toBe('New session - 2026-01-01T00:00:00.000Z');
+  });
 });
 
 describe('renameStateReducer', () => {

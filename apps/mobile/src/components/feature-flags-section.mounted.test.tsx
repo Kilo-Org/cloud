@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -34,11 +34,21 @@ async function mount(): Promise<ReactTestRenderer> {
   return view.renderer;
 }
 
+/** Every rendered Text node, so a test can compare where each line sits. */
+function textNodes(tree: ReactTestRenderer): ReactTestInstance[] {
+  return tree.root.findAll(
+    node => typeof node.type === 'string' && (node.type as string) === 'Text'
+  );
+}
+
+/** One Text node's copy (composed lines arrive as arrays). */
+function textOf(node: ReactTestInstance): string {
+  return [node.props.children].flat().join('');
+}
+
 /** All rendered Text strings, flattened (composed lines arrive as arrays). */
 function textLines(tree: ReactTestRenderer): string[] {
-  return tree.root
-    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
-    .map(node => [node.props.children].flat().join(''));
+  return textNodes(tree).map(node => textOf(node));
 }
 
 beforeEach(() => {
@@ -95,6 +105,29 @@ describe('FeatureFlagsSection', () => {
     expect(lines).toContain('mobile-quick-chat');
     expect(lines).toContain('Off · default · < 1.0.6');
     expect(lines).toContain('v1.0.5');
+  });
+
+  it('keeps the build string on the section label row, not in the flag list', async () => {
+    posthog.statuses = [applied, skipped];
+    const tree = await mount();
+
+    const texts = textNodes(tree);
+    const header = texts.find(node => textOf(node) === 'Feature flags');
+    const version = texts.find(node => textOf(node) === 'v1.0.5');
+    expect(header).toBeDefined();
+    expect(version).toBeDefined();
+
+    // The build string sits on the section label's row...
+    expect(version?.parent).toBe(header?.parent);
+    expect(version?.parent?.children).toHaveLength(2);
+    expect(version?.parent?.children).toContain(header);
+    expect(version?.parent?.props.className).toContain('flex-row');
+
+    // ...and is not a child of the container that holds the flag rows.
+    const flagKey = texts.find(node => textOf(node) === 'mobile-pr-review');
+    const flagList = flagKey?.parent?.parent;
+    expect(flagList).toBeDefined();
+    expect(flagList?.children).not.toContain(version);
   });
 
   it('marks a flag the build skips as default in use with the minimum version', async () => {

@@ -95,6 +95,19 @@ vi.mock('@/components/ui/button', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
+// The real `ui/skeleton` loads `react-native-reanimated` (and through it
+// `react-native-worklets`), whose node_modules build cannot be imported under
+// node's ESM loader. The form only asserts rendered text, so the loading
+// placeholder is an inert string like the other leaf mocks above.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
+// `use-new-session-creator` and the repository hooks reach `sonner-native`,
+// whose module graph loads the real `react-native` (Flow syntax node cannot
+// parse). Stub the toast surface the same way `chat-composer.test.ts` does.
+vi.mock('sonner-native', () => ({
+  toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() },
+}));
+
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));

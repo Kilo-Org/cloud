@@ -18,17 +18,21 @@ vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),
 }));
 vi.mock('sonner-native', () => ({
-  toast: { error: vi.fn(), success: vi.fn() },
+  toast: { error: toastError, success: vi.fn() },
 }));
 // Capture the config passed to createSessionManager so the getTicket closure
 // can be asserted directly, mirroring the extension suite.
-const { configHolder, mockCreateSessionManager } = vi.hoisted(() => {
+const { configHolder, mockCreateSessionManager, toastError } = vi.hoisted(() => {
   const holder: { current: SessionManagerConfig | null } = { current: null };
   const createSessionManagerMock = vi.fn((config: SessionManagerConfig): SessionManager => {
     holder.current = config;
     return { atoms: {} } as unknown as SessionManager;
   });
-  return { configHolder: holder, mockCreateSessionManager: createSessionManagerMock };
+  return {
+    configHolder: holder,
+    mockCreateSessionManager: createSessionManagerMock,
+    toastError: vi.fn(),
+  };
 });
 vi.mock('@kilocode/cloud-agent-sdk', () => ({
   createSessionManager: mockCreateSessionManager,
@@ -40,7 +44,6 @@ vi.mock('@/components/agents/mobile-session-transport-payload', () => ({
   normalizeTransportPayload: vi.fn((x: unknown) => x),
 }));
 vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
-  formatSafeCloudAgentFailureDiagnostic: vi.fn(),
   withCloudAgentDiagnostics: vi.fn((_op: string, _org: unknown, fn: () => unknown) => fn()),
 }));
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
@@ -570,6 +573,40 @@ describe('createMobileAgentSessionManager api.send', () => {
       payload: 'hi',
       messageId: 'm-1',
     });
+  });
+});
+
+describe('createMobileAgentSessionManager onSendFailed', () => {
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+    toastError.mockClear();
+  });
+
+  function setup(): SessionManagerConfig {
+    const options = {
+      store: {},
+      userWebConnection: {},
+    };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    return config;
+  }
+
+  it('states a failed send without a developer-worded banner', () => {
+    // The SDK's composer status line already states the failure in translated
+    // copy, so a 402-shaped error must not also reach the toast with its raw
+    // HTTP code and English server message.
+    const config = setup();
+    expect(config.onSendFailed).toBeTypeOf('function');
+    config.onSendFailed?.('hello', 'Insufficient credits: $1 minimum required', {
+      data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+      message: 'Insufficient credits: $1 minimum required',
+    });
+    expect(toastError).not.toHaveBeenCalled();
   });
 });
 

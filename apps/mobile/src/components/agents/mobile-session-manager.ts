@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- fetchSession NOT_FOUND retry helpers stay with the manager (M1). */
-import { toast } from 'sonner-native';
 import {
   type CloudAgentSessionId,
   createSessionManager,
@@ -13,10 +12,7 @@ import {
   type UserWebConnection,
 } from '@kilocode/cloud-agent-sdk';
 import { normalizeTransportPayload } from '@/components/agents/mobile-session-transport-payload';
-import {
-  formatSafeCloudAgentFailureDiagnostic,
-  withCloudAgentDiagnostics,
-} from '@/components/agents/mobile-session-diagnostics';
+import { withCloudAgentDiagnostics } from '@/components/agents/mobile-session-diagnostics';
 import { RequestDeadlineError } from '@kilocode/event-service';
 import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
 import { type AgentMode } from '@/components/agents/mode-normalize';
@@ -42,7 +38,6 @@ import {
   readResolvedDeliveryFailures,
 } from '@/lib/persist/resolved-delivery-failures';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
-import { i18n } from '@/i18n';
 
 export { StreamTicketResponseSchema };
 
@@ -455,13 +450,14 @@ export function createMobileAgentSessionManager({
         );
       });
     },
-    onSendFailed: (_messageText, displayMessage, error) => {
-      toast.error(
-        formatSafeCloudAgentFailureDiagnostic('send', error, organizationId) ??
-          displayMessage ??
-          i18n.t('agentChat.messageFailure.sendFailed')
-      );
-    },
+    // A failed send is stated once, by the SDK: right after this hook it sets
+    // the composer's error status line from the same error
+    // (`packages/cloud-agent-sdk/src/session-manager.ts:2539`) and the composer
+    // keeps the draft for a retry. Mobile adds no banner of its own, so this
+    // hook stays a no-op rather than stacking a second, developer-worded copy
+    // of the failure under it.
+    // oxlint-disable-next-line no-empty-function -- the SDK's composer status line owns the failed send
+    onSendFailed: () => {},
     fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {
       const sessionResult = await fetchSessionWithNotFoundRetry(kiloSessionId);
       // The route mounted before its metadata read could settle (offline or

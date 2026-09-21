@@ -46,19 +46,23 @@ export function FeatureFlagsSection() {
   }
   return (
     <View className="mt-3 gap-3">
-      <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('preferences.featureFlags')}
-      </Text>
+      {/* The build string belongs to the section label, not to the flag list:
+          as a trailing child it read as one more settings entry. */}
+      <View className="flex-row items-baseline justify-between">
+        <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+          {t('preferences.featureFlags')}
+        </Text>
+        <Text variant="muted" className="text-xs">
+          {t('preferences.featureFlagsBuild', {
+            version: statuses[0]?.appVersion ?? '?',
+          })}
+        </Text>
+      </View>
       <View className="gap-3">
         {statuses.map(status => (
           <FlagRow key={status.key} status={status} />
         ))}
       </View>
-      <Text variant="muted" className="text-xs">
-        {t('preferences.featureFlagsBuild', {
-          version: statuses[0]?.appVersion ?? '?',
-        })}
-      </Text>
     </View>
   );
 }

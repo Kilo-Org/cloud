@@ -146,9 +146,14 @@ describe('ActionTile mounted treatment', () => {
     expect(pressable.props.accessibilityRole).toBe('button');
   });
 
-  it('gives ConfigureRow and ActionTile the identical tile treatment', () => {
+  it('gives ConfigureRow and ActionTile the identical tile treatment for a semantic tone', () => {
+    // An untoned ConfigureRow is deliberately neutral now — a settings list must
+    // not hash each row title into the agent hue ramp (configure-row.mounted.test
+    // .tsx locks that) — so the shared treatment this test guards is the tone
+    // path: `danger` on the settings row resolves through the same `toneColor`
+    // the destructive profile action row uses.
     const configureRoot = render(
-      createElement(ConfigureRow, { icon: SlidersHorizontal, title: 'Feedback' })
+      createElement(ConfigureRow, { icon: SlidersHorizontal, title: 'Feedback', tone: 'danger' })
     );
     const configureTile = tileClassName(configureRoot);
 
@@ -156,6 +161,7 @@ describe('ActionTile mounted treatment', () => {
       createElement(ActionTile, {
         icon: MessageSquare,
         label: 'Feedback',
+        destructive: true,
         onPress: () => undefined,
       })
     );

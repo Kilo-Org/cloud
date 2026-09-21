@@ -120,6 +120,10 @@ vi.mock('@/components/ui/button', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
+// `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
+// import cannot resolve in the pure project; every sibling pure spec mocks it.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));

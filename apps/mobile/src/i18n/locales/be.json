@@ -163,6 +163,7 @@
     "useDifferentEmail": "Выкарыстаць іншы адрас пошты",
     "signInWithApple": "Увайсці праз Apple",
     "signInWithGoogle": "Увайсці праз Google",
+    "signInWithPasskey": "Увайсці з ключом доступу",
     "emailAddress": "Адрас электроннай пошты",
     "emailPlaceholder": "імя@example.com",
     "continueWithEmail": "Працягнуць праз электронную пошту",
@@ -175,6 +176,10 @@
     "termsConnector": " і ",
     "termsSuffix": ".",
     "moreSignInOptions": "Іншыя спосабы ўваходу",
+    "passkeyCancelled": "Уваход з ключом доступу скасаваны. Паспрабуйце яшчэ раз.",
+    "passkeyNotFound": "Для гэтай прылады не захаваны ніводны ключ доступу. Увайдзіце праз Apple, Google або сваю электронную пошту.",
+    "passkeyUnsupported": "Ключы доступу недаступныя на гэтай прыладзе. Увайдзіце праз Apple, Google або сваю электронную пошту.",
+    "passkeyFailed": "Не ўдалося ўвайсці з ключом доступу. Паспрабуйце яшчэ раз.",
     "couldNotCompleteSignIn": "Не атрымалася завяршыць уваход. Паспрабуйце яшчэ раз.",
     "sessionEnded": "Ваш сеанс скончыўся. Увайдзіце яшчэ раз.",
     "signInCodeExpired": "Тэрмін дзеяння кода ўваходу скончыўся. Паспрабуйце яшчэ раз.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Тэставы ўліковы запіс",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Карпаратыўны SSO"
+    "providerEnterpriseSso": "Карпаратыўны SSO",
+    "passkeysTitle": "Ключы доступу",
+    "passkeysSubtitle": "Увайсці без пароля",
+    "passkeysEmpty": "Ключоў доступу пакуль няма",
+    "passkeysEmptyHint": "$t(profile.addPasskey), каб увайсці без пароля.",
+    "passkeysCouldNotLoad": "Не ўдалося загрузіць ключы доступу",
+    "passkeysLoadFailed": "Ключы доступу недаступныя, пакуль гэта не загрузіцца.",
+    "addPasskey": "Дадаць ключ доступу",
+    "passkeyDefaultName": "Ключ доступу",
+    "passkeyAddedOn": "Дададзены {{date}}",
+    "passkeyAdded": "Ключ доступу дададзены.",
+    "passkeyAddFailed": "Не ўдалося дадаць ключ доступу. Паспрабуйце яшчэ раз.",
+    "passkeyAddUnsupported": "Гэта прылада не можа ствараць ключы доступу.",
+    "passkeyAddCancelled": "Стварэнне ключа доступу скасавана.",
+    "passkeyRemoved": "Ключ доступу выдалены.",
+    "passkeyRemoveFailed": "Не ўдалося выдаліць гэты ключ доступу. Паспрабуйце яшчэ раз.",
+    "passkeyRenamed": "Ключ доступу перайменаваны.",
+    "passkeyName": "Назва ключа доступу",
+    "renamePasskey": "Перайменаваць ключ доступу",
+    "removePasskey": "Выдаліць ключ доступу",
+    "removePasskeyTitle": "Выдаліць ключ доступу?",
+    "removePasskeyMessage": "Вы больш не зможаце ўвайсці з гэтым ключом доступу."
   },
   "preferences": {
     "general": "Агульныя",
@@ -347,7 +373,27 @@
       "fileLoadedCount_few": "Загружаны {{displayCount}} файлы",
       "fileLoadedCount_many": "Загружана {{displayCount}} файлаў",
       "fileLoadedOfTotalCount_few": "Загружаны {{displayCount}} файлы з {{total}}",
-      "fileLoadedOfTotalCount_many": "Загружана {{displayCount}} файлаў з {{total}}"
+      "fileLoadedOfTotalCount_many": "Загружана {{displayCount}} файлаў з {{total}}",
+      "expandAllLines_one": "Разгарнуць усе радкі: {{displayCount}}",
+      "expandAllLines_other": "Разгарнуць усе радкі: {{displayCount}}",
+      "expandAllLines_few": "Разгарнуць усе радкі: {{displayCount}}",
+      "expandAllLines_many": "Разгарнуць усе радкі: {{displayCount}}",
+      "expandLines_one": "Разгарнуць радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandLines_other": "Разгарнуць радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandLines_few": "Разгарнуць радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandLines_many": "Разгарнуць радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandLinesOfContext_one": "Разгарнуць радкі кантэксту: {{displayCount}}",
+      "expandLinesOfContext_other": "Разгарнуць радкі кантэксту: {{displayCount}}",
+      "expandLinesOfContext_few": "Разгарнуць радкі кантэксту: {{displayCount}}",
+      "expandLinesOfContext_many": "Разгарнуць радкі кантэксту: {{displayCount}}",
+      "expandMoreLines_one": "Разгарнуць дадатковыя радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandMoreLines_other": "Разгарнуць дадатковыя радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandMoreLines_few": "Разгарнуць дадатковыя радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandMoreLines_many": "Разгарнуць дадатковыя радкі ({{displayCount}}): {{start}}–{{end}}",
+      "loadedOfTotalFiles_one": "загружана {{loaded}} з {{total}} файлаў",
+      "loadedOfTotalFiles_other": "загружана {{loaded}} з {{total}} файлаў",
+      "loadedOfTotalFiles_few": "загружана {{loaded}} з {{total}} файлаў",
+      "loadedOfTotalFiles_many": "загружана {{loaded}} з {{total}} файлаў"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ няма пераносу радка ў канцы файла",
@@ -543,7 +589,11 @@
         "outdatedOnPath": "Састарэлы каментар: {{path}}"
       },
       "deletedUser": "выдалены карыстальнік",
-      "replyForbiddenTerm": "У вас няма правоў адказваць у {{term}}."
+      "replyForbiddenTerm": "У вас няма правоў адказваць у {{term}}.",
+      "moreLinesAbove_one": "… дадатковыя радкі вышэй: {{displayCount}}",
+      "moreLinesAbove_other": "… дадатковыя радкі вышэй: {{displayCount}}",
+      "moreLinesAbove_few": "… дадатковыя радкі вышэй: {{displayCount}}",
+      "moreLinesAbove_many": "… дадатковыя радкі вышэй: {{displayCount}}"
     },
     "couldNotOpenGitHubAppSettings": "Не атрымалася адкрыць налады праграмы GitHub.",
     "installKiloGitHubApp": "Усталяваць праграму Kilo для GitHub",
@@ -724,7 +774,11 @@
       "statusContext": "Кантэкст",
       "lineLabel": "{{status}}, радок {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(пуста)"
+      "emptyLine": "(пуста)",
+      "truncationBanner_one": "Паказаны першыя {{limit}} з {{total}} змененых файлаў праз абмежаванне API GitHub.",
+      "truncationBanner_other": "Паказаны першыя {{limit}} з {{total}} змененых файлаў праз абмежаванне API GitHub.",
+      "truncationBanner_few": "Паказаны першыя {{limit}} з {{total}} змененых файлаў праз абмежаванне API GitHub.",
+      "truncationBanner_many": "Паказаны першыя {{limit}} з {{total}} змененых файлаў праз абмежаванне API GitHub."
     },
     "linkPasteClipboardEmpty": "Буфер абмену пусты.",
     "linkPasteNotAPullRequest": "Гэта не спасылка на запыт на зліццё або merge-запыт",
@@ -801,7 +855,7 @@
     "previewFullDescription": "Апавяшчэнні паказваюць тэкст паведамлення на экране блакіроўкі.",
     "previewGenericDescription": "Апавяшчэнні толькі паведамляюць пра падзею. Адкрыйце Kilo, каб прачытаць паведамленне.",
     "channel": {
-      "agent": "Сеансы агента",
+      "agentProgress": "Ход выканання агента",
       "chat": "Паведамленні ў чаце",
       "kiloclaw": "Актыўнасць KiloClaw",
       "balance": "Апавяшчэнні аб балансе",
@@ -818,6 +872,15 @@
       "kiloclawActivitySubtitle": "экзэмпляр гатовы або завяршыўся з памылкай, запланаваныя дзеянні",
       "balanceAlertsSubtitle": "папярэджанні аб нізкім балансе арганізацыі",
       "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA"
+    },
+    "action": {
+      "openSession": "Адкрыць сеанс"
+    },
+    "needsInputAction": {
+      "approved": "Запыт ухвалены",
+      "replied": "Адказ дасланы",
+      "failed": "Не ўдалося адказаць. Націсніце яшчэ раз, каб паўтарыць.",
+      "unavailable": "Гэты запыт больш не чакае."
     }
   },
   "tabs": {
@@ -898,7 +961,11 @@
       "uploadFailed": "Не атрымалася загрузіць далучэнне.",
       "failedToUploadFile": "Не атрымалася загрузіць файл: {{reason}}.",
       "nothingToPaste": "Няма чаго ўставіць.",
-      "metadataStripFailed": "Не атрымалася выдаліць метаданыя фота."
+      "metadataStripFailed": "Не атрымалася выдаліць метаданыя фота.",
+      "limit_one": "Вы можаце далучыць да {{displayCount}} файл.",
+      "limit_other": "Вы можаце далучыць да {{displayCount}} файлаў.",
+      "limit_few": "Вы можаце далучыць да {{displayCount}} файлы.",
+      "limit_many": "Вы можаце далучыць да {{displayCount}} файлаў."
     },
     "attachmentPreview": {
       "accessibility": "Файл: {{filename}}, {{status}}",
@@ -1648,7 +1715,15 @@
       "syncFindings": "Сінхранізаваць праблемы",
       "syncNow": "Сінхранізаваць зараз",
       "syncQueued": "Сінхранізацыя ў чарзе",
-      "syncStatusUnavailable": "Стан сінхранізацыі недаступны."
+      "syncStatusUnavailable": "Стан сінхранізацыі недаступны.",
+      "daysOverdue_one": "Дзень пратэрміноўкі: {{displayCount}}",
+      "daysOverdue_other": "Дзён пратэрміноўкі: {{displayCount}}",
+      "daysOverdue_few": "Дні пратэрміноўкі: {{displayCount}}",
+      "daysOverdue_many": "Дзён пратэрміноўкі: {{displayCount}}",
+      "findingsCount_one": "Праблема: {{displayCount}}",
+      "findingsCount_other": "Праблем: {{displayCount}}",
+      "findingsCount_few": "Праблемы: {{displayCount}}",
+      "findingsCount_many": "Праблем: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Адкрытыя праблемы",
@@ -2167,20 +2242,7 @@
       "continueFrom": "Працягваецца сеанс «{{title}}».",
       "importingSession": "Імпартаванне сеанса",
       "cliCannotContinue": "Гэты CLI не падтрымлівае працяг сеанса. Выберыце Cloud Agent або іншы CLI.",
-      "importFailed": "Не ўдалося імпартаваць гэты сеанс.",
-      "sandbox": "Пясочница",
-      "sandboxAccessibility": "Пясочница: {{label}}",
-      "sandboxDefaultWithDestination": "Па змаўчанні · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Малы",
-      "sandboxInstanceShared": "Агульны",
-      "sandboxInstanceLarge": "Вялікі",
-      "sandboxInstanceDevcontainer": "Кантэйнер распрацоўкі",
-      "sandboxInstanceProviderDefault": "Па змаўчанні пастаўшчыка",
-      "sandboxCouldNotLoad": "Не ўдалося загрузіць варыянты пясочніцы",
-      "sandboxUnavailable": "Гэта пясочница недаступная. Выберыце іншую пясочницу або Па змаўчанні.",
-      "sandboxUseDefault": "Выкарыстоўваць па змаўчанні"
+      "importFailed": "Не ўдалося імпартаваць гэты сеанс."
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл.",
@@ -2206,7 +2268,20 @@
       "updateTodos": "Абнавіць спіс задач",
       "linesBadge": "радкоў: {{displayCount}}",
       "filesBadge": "файлаў: {{displayCount}}",
-      "matchesBadge": "супадзенняў: {{displayCount}}"
+      "matchesBadge": "супадзенняў: {{displayCount}}",
+      "filesBadge_one": "файл: {{displayCount}}",
+      "filesBadge_other": "файлаў: {{displayCount}}",
+      "filesBadge_few": "файлы: {{displayCount}}",
+      "filesBadge_many": "файлаў: {{displayCount}}",
+      "linesBadge_one": "радок: {{displayCount}}",
+      "linesBadge_other": "радкоў: {{displayCount}}",
+      "linesBadge_few": "радкі: {{displayCount}}",
+      "linesBadge_many": "радкоў: {{displayCount}}",
+      "matchesBadge_one": "супадзенне: {{displayCount}}",
+      "matchesBadge_other": "супадзенняў: {{displayCount}}",
+      "matchesBadge_few": "супадзенні: {{displayCount}}",
+      "matchesBadge_many": "супадзенняў: {{displayCount}}",
+      "noOutput": "Няма вываду."
     },
     "readToolMarkdown": {
       "linesTruncated": "радкі {{start}}–{{end}} (скарочана)",
@@ -2502,7 +2577,15 @@
       "files": "Файлы",
       "couldNotOpenPhotoPicker": "Не ўдалося адкрыць акно выбару фота. Перазапусціце Kilo і паспрабуйце яшчэ раз.",
       "maxFilesAllowed": "Максімальная колькасць файлаў: {{displayCount}}.",
-      "onlyAddingFiles": "Дадаецца файлаў: {{accepted}} з {{total}} (макс. {{max}})"
+      "onlyAddingFiles": "Дадаецца файлаў: {{accepted}} з {{total}} (макс. {{max}})",
+      "maxFilesAllowed_one": "Максімальная колькасць файлаў: {{displayCount}}.",
+      "maxFilesAllowed_other": "Максімальная колькасць файлаў: {{displayCount}}.",
+      "maxFilesAllowed_few": "Максімальная колькасць файлаў: {{displayCount}}.",
+      "maxFilesAllowed_many": "Максімальная колькасць файлаў: {{displayCount}}.",
+      "onlyAddingFiles_one": "Дадаецца файлаў: {{accepted}} з {{total}} (макс. {{max}})",
+      "onlyAddingFiles_other": "Дадаецца файлаў: {{accepted}} з {{total}} (макс. {{max}})",
+      "onlyAddingFiles_few": "Дадаецца файлаў: {{accepted}} з {{total}} (макс. {{max}})",
+      "onlyAddingFiles_many": "Дадаецца файлаў: {{accepted}} з {{total}} (макс. {{max}})"
     },
     "composer": {
       "addAttachment": "Дадаць укладанне",
@@ -2520,7 +2603,11 @@
       "discardAttachmentsMessage": "Загружаныя файлы, не прымацаваныя да адпраўленых паведамленняў, будуць выдаленыя.",
       "discardAttachmentsTitle": "Выдаліць укладанні?",
       "charactersRemaining": "Засталося сімвалаў: {{count}}",
-      "insertNewline": "Уставіць новы радок"
+      "insertNewline": "Уставіць новы радок",
+      "charactersRemaining_one": "Засталося сімвал: {{count}}",
+      "charactersRemaining_other": "Засталося сімвалаў: {{count}}",
+      "charactersRemaining_few": "Засталося сімвалы: {{count}}",
+      "charactersRemaining_many": "Засталося сімвалаў: {{count}}"
     },
     "chatLink": {
       "linkCopied": "Спасылка скапіяваная",
@@ -2594,7 +2681,11 @@
       "stepsCount_other": "{{steps}} кроку",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} крокі",
-      "stepsCount_many": "{{steps}} крокаў"
+      "stepsCount_many": "{{steps}} крокаў",
+      "modelsCount_one": "Мадэль ({{displayCount}})",
+      "modelsCount_other": "Мадэлі ({{displayCount}})",
+      "modelsCount_few": "Мадэлі ({{displayCount}})",
+      "modelsCount_many": "Мадэлі ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Аўтаматычнае адабрэнне",
@@ -2634,7 +2725,11 @@
     },
     "toolRun": {
       "sheetTitle": "Выклікі інструментаў",
-      "condensedLabel": "{{itemCount}} элементаў; {{last}}"
+      "condensedLabel": "{{itemCount}} элементаў; {{last}}",
+      "condensedLabel_one": "{{itemCount}} элемент; {{last}}",
+      "condensedLabel_other": "{{itemCount}} элементаў; {{last}}",
+      "condensedLabel_few": "{{itemCount}} элементы; {{last}}",
+      "condensedLabel_many": "{{itemCount}} элементаў; {{last}}"
     }
   },
   "bootstrap": {
@@ -2769,7 +2864,11 @@
     "cliCantReceiveFilesTitle": "Гэты сеанс не можа атрымліваць файлы",
     "cliCantReceiveFilesMessage": "Kilo CLI, у якім працуе гэты сеанс, не можа атрымліваць файлы. Абнаві CLI на тым камп'ютары або адпраў файлы ў новы сеанс.",
     "contentlessMessage": "Няма чаго адпраўляць — не дададзены ні тэкст, ні файлы.",
-    "couldNotReadContent": "Не атрымалася прачытаць змесціва для адпраўкі."
+    "couldNotReadContent": "Не атрымалася прачытаць змесціва для адпраўкі.",
+    "onlyFirstFilesAttached_one": "Будуць далучаны толькі першыя файлы ў колькасці {{displayCount}}.",
+    "onlyFirstFilesAttached_other": "Будуць далучаны толькі першыя файлы ў колькасці {{displayCount}}.",
+    "onlyFirstFilesAttached_few": "Будуць далучаны толькі першыя файлы ў колькасці {{displayCount}}.",
+    "onlyFirstFilesAttached_many": "Будуць далучаны толькі першыя файлы ў колькасці {{displayCount}}."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3141,7 +3240,9 @@
     "couldNotApprove": "Не ўдалося ўхваліць",
     "couldNotStart": "Не ўдалося запусціць",
     "channelName": "Актыўныя агенты",
-    "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі."
+    "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі.",
+    "openSession": "Адкрыць",
+    "approveFailed": "Не ўдалося ўхваліць. Націсніце $t(common.approve), каб паспрабаваць яшчэ раз."
   },
   "transcriptionModel": {
     "title": "Мадэль распазнавання маўлення",
@@ -3166,15 +3267,7 @@
     "remoteOptionTitle": "Ваш камп'ютар",
     "remoteOptionBody": "Запускайце Kilo на ўласнай машыне праз CLI `kilo remote`.",
     "skip": "Прапусціць агляд",
-    "tutorialLabel": "Навучанне",
-    "remoteTitle": "Пачніце свой першы аддалены сеанс",
-    "remoteBody": "Падключыце свой камп'ютар, а затым пачніце сеанс адсюль.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Яшчэ няма падключанага камп'ютара",
-    "remoteEmptyBody": "Каб падключыць яго, выканайце `kilo remote` на сваім камп'ютары.",
-    "remoteFound": "Камп'ютар падключаны",
-    "checkAgain": "Праверыць яшчэ раз",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Навучанне"
   },
   "appActions": {
     "start": {
@@ -3182,5 +3275,8 @@
       "repositoryUnknown": "Kilo не распазнае {{repository}} як рэпазіторый GitHub або GitLab. Выберыце іншы рэпазіторый у Kilo.",
       "repositoryUnsupported": "{{repository}} — гэта рэпазіторый Bitbucket, і Запусціць агента пакуль не можа яго выкарыстоўваць. Выберыце іншы рэпазіторый у Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Адкрыць апошні сеанс"
   }
 }

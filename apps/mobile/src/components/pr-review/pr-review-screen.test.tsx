@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Submit-review, share, and inset reachability tests share the direct-invocation screen harness. */
+/* eslint-disable max-lines -- Submit-review, share, merge, and inset reachability tests share the direct-invocation screen harness. */
 // P1-F-46b: the "Submit review" affordance must be reachable from the
 // Overview tab (header right) and the Files tab (floating action bar,
 // see `pr-diff-floating-actions.test.tsx`). The Discussion tab is
@@ -88,6 +88,7 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@/components/ui/icons', () => ({
   Check: () => null,
+  GitMerge: () => null,
   GitPullRequest: () => null,
   Share: () => null,
 }));
@@ -272,6 +273,59 @@ describe('PrReviewScreen Submit review reachability (P1-F-46b)', () => {
   });
 });
 
+// The header caps a trailing action at half the row (ScreenHeader's
+// `max-w-[50%]`). A button whose label cannot shrink overflows that cap and is
+// clipped by the screen edge at large font scales — the explorer found the
+// Overview "Submit review" label cut off at font scale 2. The button and its
+// label must shrink and wrap instead, like the Agents header action.
+describe('PrReviewScreen Submit review header fit', () => {
+  function findSubmitButton(): React.ReactElement | null {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    return findElement({
+      node: element,
+      type: 'Button',
+      prop: 'accessibilityLabel',
+      value: 'Submit review',
+    });
+  }
+
+  it('lets the Submit review button shrink inside the header action slot', () => {
+    const button = findSubmitButton();
+    if (!button) {
+      throw new Error('Submit review button not found');
+    }
+    const className = (button.props as { className?: string }).className ?? '';
+    expect(className).toContain('shrink');
+    expect(className).not.toContain('shrink-0');
+    expect(className).toContain('min-w-0');
+  });
+
+  it('lets the Submit review label wrap instead of drawing off-screen', () => {
+    const button = findSubmitButton();
+    if (!button) {
+      throw new Error('Submit review button not found');
+    }
+    const label = findElement({
+      node: button,
+      type: 'Text',
+      prop: 'className',
+      value: 'shrink text-center',
+    });
+    if (!label) {
+      throw new Error('Submit review label not found');
+    }
+    const labelProps = label.props as {
+      numberOfLines?: number;
+      allowFontScaling?: boolean;
+    };
+    // Wrapping, not truncation: no line cap and no disabled scaling, so a
+    // large font scale grows the button instead of clipping the label.
+    expect(labelProps.numberOfLines).toBeUndefined();
+    expect(labelProps.allowFontScaling).not.toBe(false);
+  });
+});
+
 describe('PrReviewScreen share action', () => {
   beforeEach(() => {
     prQueryResult = {
@@ -288,7 +342,7 @@ describe('PrReviewScreen share action', () => {
     const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
     const shareButton = findElement({
       node: element,
-      type: 'Pressable',
+      type: 'Button',
       prop: 'accessibilityLabel',
       value: 'Share pull request',
     });
@@ -300,7 +354,7 @@ describe('PrReviewScreen share action', () => {
     const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
     const shareButton = findElement({
       node: element,
-      type: 'Pressable',
+      type: 'Button',
       prop: 'accessibilityLabel',
       value: 'Share pull request',
     });
@@ -327,7 +381,7 @@ describe('PrReviewScreen share action', () => {
     const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
     const shareButton = findElement({
       node: element,
-      type: 'Pressable',
+      type: 'Button',
       prop: 'accessibilityLabel',
       value: 'Share pull request',
     });
@@ -341,6 +395,118 @@ describe('PrReviewScreen share action', () => {
     expect(shareMock).toHaveBeenCalledWith({
       message: 'Fix the thing\nhttps://github.com/octocat/hello/pull/7',
     });
+  });
+});
+
+// Owner request item 3: the header carries a Merge icon button while the PR is
+// mergeable, opening the same merge sheet the Overview section pushes. A
+// merged/closed PR keeps Share + Submit review and gains no Merge affordance.
+describe('PrReviewScreen Merge action (owner request item 3)', () => {
+  const MERGEABLE_OVERVIEW = {
+    state: 'open',
+    mergeable: true,
+    mergeableState: 'clean',
+    number: 7,
+    repo: { allowMergeCommit: true, allowSquashMerge: true, allowRebaseMerge: false },
+  };
+
+  function findHeaderMergeButton(): React.ReactElement | null {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    return findElement({
+      node: element,
+      type: 'Button',
+      prop: 'accessibilityLabel',
+      value: 'Merge now',
+    });
+  }
+
+  beforeEach(() => {
+    routerPush.mockClear();
+  });
+  afterEach(() => {
+    routerPush.mockReset();
+    vi.mocked(React.useContext).mockReturnValue(null);
+  });
+
+  it('renders the Merge affordance for a mergeable open pull request', () => {
+    prQueryResult = {
+      data: MERGEABLE_OVERVIEW,
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    expect(findHeaderMergeButton()).not.toBeNull();
+  });
+
+  it('opens the merge sheet with the default method on press', () => {
+    prQueryResult = {
+      data: MERGEABLE_OVERVIEW,
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    const button = findHeaderMergeButton();
+    if (!button) {
+      throw new Error('Merge button not found');
+    }
+    const onPress = (button.props as { onPress?: () => void }).onPress;
+    onPress?.();
+
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: '/(app)/pr-review/[owner]/[repo]/[number]/merge',
+      params: { owner: 'octocat', repo: 'hello', number: '7', mode: 'merge', method: 'merge' },
+    });
+  });
+
+  it('does not render the Merge affordance for a merged pull request', () => {
+    prQueryResult = {
+      data: { state: 'merged', mergeable: null, mergeableState: null },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    expect(findHeaderMergeButton()).toBeNull();
+  });
+
+  it('offers Merge for an open provider merge request and pushes its own sheet route', () => {
+    // A GitLab/Bitbucket arm normalizes `mergeable` to null, so the gate keys
+    // off the request state and the sheet reads the provider restrictions.
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 },
+      organizationId: null,
+    });
+    prQueryResult = {
+      data: {
+        state: 'open',
+        mergeable: null,
+        mergeableState: null,
+        number: 12,
+        repo: { allowMergeCommit: true, allowSquashMerge: true, allowRebaseMerge: false },
+      },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'group/sub', repo: 'repo', number: 12 });
+    const button = findElement({
+      node: element,
+      type: 'Button',
+      prop: 'accessibilityLabel',
+      value: 'Merge now',
+    });
+    expect(button).not.toBeNull();
+    if (!button) {
+      throw new Error('Merge button not found for the provider arm');
+    }
+    const onPress = (button.props as { onPress?: () => void }).onPress;
+    onPress?.();
+
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/group/sub/repo/12/merge?mode=merge&method=merge'
+    );
   });
 });
 

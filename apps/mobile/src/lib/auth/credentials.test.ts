@@ -27,8 +27,6 @@ vi.mock('expo-secure-store', () => ({
   }),
 }));
 
-vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
-
 // The sign-out deletes live in auth-context.tsx; mounting it pulls in the full
 // teardown graph, so stub every side-effecting collaborator.
 vi.mock('@sentry/react-native', () => ({
@@ -86,12 +84,23 @@ vi.mock('@/lib/kiloclaw-tab-ownership', () => ({
 vi.mock('@/lib/last-active-instance', () => ({
   clearLastActiveInstance: vi.fn().mockResolvedValue(undefined),
 }));
+// The sign-out block clears the launcher surfaces and the last-opened record.
+// Stub them like the rest of the teardown graph: the native wrapper imports
+// `expo`, which needs `__DEV__` and cannot load in the node test environment.
+vi.mock('@/lib/last-opened-session', () => ({ clearLastOpenedSession: vi.fn() }));
+vi.mock('@/lib/native-launcher-surfaces', () => ({ clearLauncherSurfaces: vi.fn() }));
 vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));
 vi.mock('@/lib/persist/read-cache', () => ({
   clearCacheScopeForSignOut: vi.fn().mockResolvedValue(undefined),
   readCachedUserId: vi.fn().mockReturnValue(null),
+}));
+// The offline tool-summary translation scope: `clearToolSummaryTranslationsForSignOut`
+// imports the encrypted KV store, whose expo-crypto binding crashes the node
+// environment, so the sign-out graph must not load the real module here.
+vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
+  clearToolSummaryTranslationsForSignOut: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@/lib/pr-review/recent-prs', () => ({
   clearRecentPrs: vi.fn().mockResolvedValue(undefined),
@@ -137,8 +146,30 @@ vi.mock('@/lib/temp-file-registry', () => ({
   reapTempFiles: vi.fn(),
 }));
 
+// The artifact mirror members of the same teardown read expo-file-system and
+// the native provider bridge. This suite asserts the credential deletes, and
+// the mirror's own suite covers the wipe and its provider signal.
+vi.mock('@/lib/artifacts/artifact-mirror', () => ({
+  clearArtifactMirror: vi.fn(),
+}));
+
+vi.mock('@/lib/artifacts/artifact-mirror-sync', () => ({
+  resetArtifactMirrorSyncState: vi.fn(),
+}));
+
+vi.mock('@/lib/artifacts/artifact-provider-native', () => ({
+  notifyArtifactsChanged: vi.fn(),
+}));
+
+// The sign-out teardown's OS search clear reaches the root `expo` entry, which
+// reads `__DEV__` at import time and does not parse under the node test
+// environment. The clear is a no-op here.
+vi.mock('@/lib/native-system-search', () => ({
+  clearSystemSearchIndex: vi.fn().mockResolvedValue(undefined),
+}));
+
 import * as SecureStore from 'expo-secure-store';
-import { persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
+import { performRefresh, persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { clearActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
 import {
@@ -206,6 +237,56 @@ describe('bearer credential writes', () => {
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, expectedOptions);
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, expectedOptions);
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(TOKEN_EXPIRES_AT_KEY, expectedOptions);
+  });
+});
+
+describe('refresh rotation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store.clear();
+    clearActiveToken();
+    setSignOutTeardownActive(false);
+  });
+
+  it('retries a rejected refresh-token read and still rotates the token', async () => {
+    store.set(REFRESH_TOKEN_KEY, 'r1');
+    // The keychain rejects the first read — the transient class on a device
+    // that just foregrounded — and resolves the stored value on the retry.
+    let reads = 0;
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      reads += 1;
+      if (reads === 1) {
+        throw new Error('keychain temporarily unavailable');
+      }
+      return store.get(key) ?? null;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ token: 't2', refreshToken: 'r2', expiresIn: 3600 }, { status: 200 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const outcome = await performRefresh();
+
+      expect(outcome.ok).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 't2', expectedOptions);
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        REFRESH_TOKEN_KEY,
+        'r2',
+        expectedOptions
+      );
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        TOKEN_EXPIRES_AT_KEY,
+        expect.any(String),
+        expectedOptions
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

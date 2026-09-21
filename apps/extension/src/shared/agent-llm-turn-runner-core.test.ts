@@ -1,7 +1,7 @@
 /* eslint-disable max-lines, sort-keys, no-promise-executor-return, promise/avoid-new, promise/prefer-await-to-then, jest/no-conditional-in-test, consistent-type-imports, jest/no-untyped-mock-factory, vitest/prefer-import-in-mock -- Retry fixtures need attempt-conditional fakes and raw promises; the typed stream-client mock needs importOriginal. */
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createSafeToolCall, createUserMessage } from './agent-conversation';
+import { createToolCall, createToolResult, createUserMessage } from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
 import type { FetchLike } from './auth';
 import { maxAgentToolRounds } from './agent-tool-round-limit';
@@ -11,6 +11,7 @@ import type {
   KiloGatewayToolDefinition,
 } from './kilo-api-client';
 import { runLlmTurn } from './agent-llm-turn-runner-core';
+import { buildGatewayMessagesFromEvents } from './agent-llm-harness';
 
 const kiloApiClientMocks = vi.hoisted(() => ({
   fetchKiloGatewayChatCompletionStream: vi.fn(),
@@ -29,13 +30,14 @@ vi.mock('./kilo-api-client', async importOriginal => {
 });
 
 const stringBodySchema = z.string();
+const requestBodySchema = z.looseObject({ messages: z.array(z.unknown()) });
 
 // The stream gate validates streamed tool-call names against the offered `tools` set.
-// Fixtures stream a `get_page_snapshot` call, so the offered set must include that name.
+// Fixtures stream a `kilo_browser_snapshot` call, so the offered set must include that name.
 const getPageSnapshotTool: KiloGatewayToolDefinition = {
   function: {
     description: 'Read a bounded, sanitized snapshot of the selected browser tab.',
-    name: 'get_page_snapshot',
+    name: 'kilo_browser_snapshot',
     parameters: { type: 'object' },
   },
   type: 'function',
@@ -44,7 +46,7 @@ const getPageSnapshotTool: KiloGatewayToolDefinition = {
 function* createGatewayResponses(): Generator<Response, Response> {
   yield streamResponse([
     'data: {"choices":[{"delta":{"content":"Reading"}}]}\n\n',
-    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]}}]}\n\n',
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]}}]}\n\n',
     'data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":5,"total_tokens":105,"cost":0.0007}}\n\n',
     'data: [DONE]\n\n',
   ]);
@@ -59,7 +61,7 @@ function* createGatewayResponses(): Generator<Response, Response> {
 function* createToolOnlyGatewayResponses(rounds: number): Generator<Response, Response> {
   for (let index = 0; index < rounds; index += 1) {
     yield streamResponse([
-      `data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_${index}","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]}}]}\n\n`,
+      `data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_${index}","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]}}]}\n\n`,
       'data: [DONE]\n\n',
     ]);
   }
@@ -154,8 +156,9 @@ describe('agent LLM turn runner core', () => {
       signal: undefined,
       toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
         toolCalls.map(toolCall =>
-          createSafeToolCall({
-            name: 'get_page_snapshot',
+          createToolCall({
+            arguments: {},
+            name: 'kilo_browser_snapshot',
             providerToolCallId: toolCall.id,
             tabId: 123,
           })
@@ -179,7 +182,7 @@ describe('agent LLM turn runner core', () => {
     expect(appendedEvents).toMatchObject([
       { role: 'assistant', text: 'Reading', type: 'message' },
       {
-        name: 'get_page_snapshot',
+        name: 'kilo_browser_snapshot',
         providerToolCallId: 'call_snapshot',
         tabId: 123,
         type: 'tool-call',
@@ -192,6 +195,71 @@ describe('agent LLM turn runner core', () => {
       { costUsd: 0.0007, promptTokens: 100 },
       { costUsd: 0.001, promptTokens: 200 },
     ]);
+  });
+
+  it('replays a pre-resolved refusal and never executes the refused call', async () => {
+    const appendedEvents: AgentConversationEvent[] = [];
+    const fetchCalls: { readonly messages: readonly unknown[] }[] = [];
+    const executeToolCall = vi.fn();
+    const responses = createGatewayResponses();
+    const fetch: FetchLike = (_input, init) => {
+      fetchCalls.push(requestBodySchema.parse(JSON.parse(stringBodySchema.parse(init?.body))));
+
+      return responses.next().value;
+    };
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: events => {
+        appendedEvents.push(...events);
+      },
+      conversationEvents: [createUserMessage('Click save')],
+      executeToolCall,
+      failureMessage: String,
+      fetch,
+      maxToolRounds: 4,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'The model did not return a response.',
+      signal: undefined,
+      toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) => {
+        const [toolCall] = toolCalls;
+
+        if (toolCall === undefined) {
+          return [];
+        }
+
+        const callEvent = createToolCall({
+          arguments: {},
+          name: 'kilo_browser_click',
+          providerToolCallId: toolCall.id,
+          tabId: 123,
+        });
+
+        return [
+          callEvent,
+          createToolResult({ error: 'Refused.', ok: false, toolCallId: callEvent.id }),
+        ];
+      },
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many tool rounds.',
+      tools: [getPageSnapshotTool],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    expect(executeToolCall).not.toHaveBeenCalled();
+    expect(appendedEvents.map(event => event.type)).toStrictEqual([
+      'message',
+      'tool-call',
+      'tool-result',
+      'message',
+    ]);
+    expect(fetchCalls).toHaveLength(2);
+    expect(fetchCalls[1]?.messages).toContainEqual({
+      content: '{"error":"Refused.","ok":false}',
+      role: 'tool',
+      tool_call_id: 'call_snapshot',
+    });
   });
 
   it('allows the shared maxAgentToolRounds tool rounds before asking the user to continue', async () => {
@@ -214,8 +282,9 @@ describe('agent LLM turn runner core', () => {
       signal: undefined,
       toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
         toolCalls.map(toolCall =>
-          createSafeToolCall({
-            name: 'get_page_snapshot',
+          createToolCall({
+            arguments: {},
+            name: 'kilo_browser_snapshot',
             providerToolCallId: toolCall.id,
             tabId: 123,
           })
@@ -382,7 +451,7 @@ describe('prepareTools', () => {
     {
       function: {
         description: 'A tool supplied by prepareTools.',
-        name: 'get_page_snapshot',
+        name: 'kilo_browser_snapshot',
         parameters: { type: 'object' },
       },
       type: 'function',
@@ -438,7 +507,7 @@ describe('prepareTools', () => {
       {
         function: {
           description: 'First attempt tool list.',
-          name: 'get_page_snapshot',
+          name: 'kilo_browser_snapshot',
           parameters: { type: 'object' },
         },
         type: 'function',
@@ -448,7 +517,7 @@ describe('prepareTools', () => {
       {
         function: {
           description: 'Second attempt tool list.',
-          name: 'get_page_snapshot',
+          name: 'kilo_browser_snapshot',
           parameters: { type: 'object' },
         },
         type: 'function',
@@ -554,10 +623,11 @@ describe('stream retry', () => {
     noResponseMessage: 'no response',
     toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
       toolCalls.flatMap(toolCall =>
-        toolCall.name === 'get_page_snapshot'
+        toolCall.name === 'kilo_browser_snapshot'
           ? [
-              createSafeToolCall({
-                name: 'get_page_snapshot',
+              createToolCall({
+                arguments: {},
+                name: 'kilo_browser_snapshot',
                 tabId: 1,
                 providerToolCallId: toolCall.id,
               }),
@@ -824,8 +894,9 @@ describe('identical failing tool call guard', () => {
       signal: undefined,
       toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
         toolCalls.map(toolCall => ({
-          ...createSafeToolCall({
-            name: 'get_page_snapshot',
+          ...createToolCall({
+            arguments: {},
+            name: 'kilo_browser_snapshot',
             providerToolCallId: toolCall.id,
             tabId: 123,
           }),
@@ -883,8 +954,9 @@ describe('per-tool failure cap', () => {
       signal: undefined,
       toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
         toolCalls.map(toolCall =>
-          createSafeToolCall({
-            name: 'get_page_snapshot',
+          createToolCall({
+            arguments: {},
+            name: 'kilo_browser_snapshot',
             providerToolCallId: toolCall.id,
             tabId: 123,
           })
@@ -900,7 +972,7 @@ describe('per-tool failure cap', () => {
     expect(fetchCount).toBe(27);
     const lastEvent = appendedEvents.at(-1);
     expect(JSON.stringify(lastEvent)).toContain(
-      'Stopped: get_page_snapshot failed 25 times this turn'
+      'Stopped: kilo_browser_snapshot failed 25 times this turn'
     );
   });
 });
@@ -921,10 +993,11 @@ describe('continue nudge', () => {
     tooManyToolRoundsMessage: 'too many rounds',
     toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
       toolCalls.flatMap(toolCall =>
-        toolCall.name === 'get_page_snapshot'
+        toolCall.name === 'kilo_browser_snapshot'
           ? [
-              createSafeToolCall({
-                name: 'get_page_snapshot',
+              createToolCall({
+                arguments: {},
+                name: 'kilo_browser_snapshot',
                 providerToolCallId: toolCall.id,
                 tabId: 1,
               }),
@@ -944,7 +1017,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );
@@ -985,7 +1058,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );
@@ -1061,7 +1134,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );
@@ -1094,7 +1167,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );
@@ -1119,7 +1192,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );
@@ -1144,7 +1217,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );
@@ -1171,7 +1244,7 @@ describe('continue nudge', () => {
       if (calls === 1) {
         return Promise.resolve(
           streamResponse([
-            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
             'data: [DONE]\n\n',
           ])
         );
@@ -1195,5 +1268,71 @@ describe('continue nudge', () => {
     await runLlmTurn(nudgeOptions(fetch, []));
 
     expect(calls).toBe(3);
+  });
+});
+
+describe('reasoning details on persisted tool calls', () => {
+  it('persists the streamed reasoning details on the first tool call so the gateway replay carries them', async () => {
+    const reasoningDetails = [
+      { format: 'unknown', index: 0, text: 'Thinking about the page.', type: 'reasoning.text' },
+    ];
+    const appendedEvents: AgentConversationEvent[] = [];
+    let calls = 0;
+    const fetch: FetchLike = () => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(
+          streamResponse([
+            `data: {"choices":[{"delta":{"reasoning_details":${JSON.stringify(reasoningDetails)}}}]}\n\n`,
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snap","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+            'data: [DONE]\n\n',
+          ])
+        );
+      }
+      return Promise.resolve(
+        streamResponse([
+          'data: {"choices":[{"delta":{"content":"Done."},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+    };
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: events => {
+        appendedEvents.push(...events);
+      },
+      conversationEvents: [createUserMessage('Read the page')],
+      executeToolCall: () => Promise.resolve({ ok: true as const, value: { text: 'ok' } }),
+      failureMessage: String,
+      fetch,
+      maxToolRounds: 4,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'No response.',
+      onUsage: () => {},
+      signal: undefined,
+      toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
+        toolCalls.map(toolCall =>
+          createToolCall({
+            arguments: {},
+            name: 'kilo_browser_snapshot',
+            providerToolCallId: toolCall.id,
+            tabId: 123,
+          })
+        ),
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many tool rounds.',
+      tools: [getPageSnapshotTool],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    const persistedToolCall = appendedEvents.find(event => event.type === 'tool-call');
+    expect(persistedToolCall).toMatchObject({ reasoningDetails });
+
+    const assistantMessage = buildGatewayMessagesFromEvents(appendedEvents).find(
+      message => message.role === 'assistant'
+    );
+    expect(assistantMessage?.reasoning_details).toStrictEqual(reasoningDetails);
   });
 });

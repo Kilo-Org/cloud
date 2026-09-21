@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- Favorite-id helpers cover every representation. */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import {
@@ -10,6 +11,10 @@ import {
   favoriteToggleAction,
   isFavoriteOption,
 } from './model-picker-rows';
+
+afterEach(async () => {
+  await i18n.changeLanguage('en');
+});
 
 const noFavorites = new Set<string>();
 
@@ -182,6 +187,20 @@ describe('buildModelPickerRows', () => {
       { key: 'provider:anthropic-local', title: 'ANTHROPIC LOCAL', type: 'header' },
       { key: 'model:remote-model-1', model: reordered[1], isFavorite: false, type: 'model' },
     ]);
+  });
+
+  it('uppercases a provider group title with the active locale (Turkish i → İ)', async () => {
+    await i18n.changeLanguage('tr');
+    const model: SessionModelOption = {
+      ...remoteWorkspaceClaude,
+      provider: { id: 'kilo-instance', name: 'Kilo instance' },
+    };
+    expect(buildModelPickerRows({ models: [model], search: '', favoriteIds: noFavorites })).toEqual(
+      [
+        { key: 'provider:kilo-instance', title: 'KİLO İNSTANCE', type: 'header' },
+        { key: 'model:remote-model-0', model, isFavorite: false, type: 'model' },
+      ]
+    );
   });
 });
 

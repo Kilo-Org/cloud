@@ -163,6 +163,7 @@
     "useDifferentEmail": "किसी दूसरे ईमेल पते का उपयोग करें",
     "signInWithApple": "Apple से साइन इन करें",
     "signInWithGoogle": "Google से साइन इन करें",
+    "signInWithPasskey": "पासकी से साइन इन करें",
     "emailAddress": "ईमेल पता",
     "emailPlaceholder": "aap@example.com",
     "continueWithEmail": "ईमेल के साथ जारी रखें",
@@ -175,6 +176,10 @@
     "termsConnector": " और ",
     "termsSuffix": "।",
     "moreSignInOptions": "साइन इन करने के और विकल्प",
+    "passkeyCancelled": "पासकी से साइन इन रद्द कर दिया गया। कृपया फिर से प्रयास करें।",
+    "passkeyNotFound": "इस डिवाइस के लिए कोई पासकी सहेजी नहीं गई है। इसके बजाय Apple, Google या अपने ईमेल से साइन इन करें।",
+    "passkeyUnsupported": "इस डिवाइस पर पासकी उपलब्ध नहीं हैं। इसके बजाय Apple, Google या अपने ईमेल से साइन इन करें।",
+    "passkeyFailed": "पासकी से साइन इन नहीं हो सका। कृपया फिर से प्रयास करें।",
     "couldNotCompleteSignIn": "साइन इन पूरा नहीं हो सका। कृपया फिर से कोशिश करें।",
     "sessionEnded": "आपका सत्र समाप्त हो गया। कृपया फिर से साइन इन करें।",
     "signInCodeExpired": "आपके साइन-इन कोड की समय सीमा खत्म हो गई है। कृपया फिर से कोशिश करें।",
@@ -225,7 +230,28 @@
     "providerTestAccount": "परीक्षण खाता",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "एंटरप्राइज़ SSO"
+    "providerEnterpriseSso": "एंटरप्राइज़ SSO",
+    "passkeysTitle": "पासकी",
+    "passkeysSubtitle": "बिना पासवर्ड साइन इन करें",
+    "passkeysEmpty": "अभी तक कोई पासकी नहीं",
+    "passkeysEmptyHint": "$t(profile.addPasskey) करके बिना पासवर्ड साइन इन करें।",
+    "passkeysCouldNotLoad": "पासकी लोड नहीं हो सकीं",
+    "passkeysLoadFailed": "यह लोड होने तक पासकी उपलब्ध नहीं हैं।",
+    "addPasskey": "पासकी जोड़ें",
+    "passkeyDefaultName": "पासकी",
+    "passkeyAddedOn": "{{date}} को जोड़ा गया",
+    "passkeyAdded": "पासकी जोड़ दी गई।",
+    "passkeyAddFailed": "पासकी जोड़ी नहीं जा सकी। फिर से प्रयास करें।",
+    "passkeyAddUnsupported": "यह डिवाइस पासकी नहीं बना सकता।",
+    "passkeyAddCancelled": "पासकी बनाना रद्द कर दिया गया।",
+    "passkeyRemoved": "पासकी हटा दी गई।",
+    "passkeyRemoveFailed": "वह पासकी हटाई नहीं जा सकी। फिर से प्रयास करें।",
+    "passkeyRenamed": "पासकी का नाम बदल दिया गया।",
+    "passkeyName": "पासकी का नाम",
+    "renamePasskey": "पासकी का नाम बदलें",
+    "removePasskey": "पासकी हटाएँ",
+    "removePasskeyTitle": "पासकी हटाएँ?",
+    "removePasskeyMessage": "अब आप इस पासकी से साइन इन नहीं कर पाएँगे।"
   },
   "preferences": {
     "general": "सामान्य",
@@ -293,7 +319,7 @@
     "previewFullDescription": "सूचनाएँ आपकी लॉक स्क्रीन पर संदेश का टेक्स्ट दिखाती हैं।",
     "previewGenericDescription": "सूचनाएँ केवल नई गतिविधि की जानकारी देती हैं। संदेश पढ़ने के लिए Kilo खोलें।",
     "channel": {
-      "agent": "एजेंट के सत्र",
+      "agentProgress": "एजेंट की प्रगति",
       "chat": "चैट के संदेश",
       "kiloclaw": "KiloClaw की गतिविधि",
       "balance": "बैलेंस की चेतावनियाँ",
@@ -310,6 +336,15 @@
       "kiloclawActivitySubtitle": "इंस्टेंस तैयार/विफल, तय समय पर होने वाले कार्य",
       "balanceAlertsSubtitle": "संगठन का बैलेंस कम होने की चेतावनियाँ",
       "securityFindingsSubtitle": "नई सुरक्षा समस्याएँ और SLA के रिमाइंडर"
+    },
+    "action": {
+      "openSession": "सत्र खोलें"
+    },
+    "needsInputAction": {
+      "approved": "अनुरोध स्वीकृत हुआ",
+      "replied": "जवाब भेज दिया गया",
+      "failed": "जवाब नहीं दिया जा सका. फिर से कोशिश करने के लिए दोबारा टैप करें.",
+      "unavailable": "यह अनुरोध अब इंतज़ार नहीं कर रहा।"
     }
   },
   "tabs": {
@@ -366,7 +401,9 @@
       "uploadFailed": "अपलोड विफल हुआ।",
       "failedToUploadFile": "फ़ाइल अपलोड नहीं हो सकी: {{reason}}।",
       "nothingToPaste": "पेस्ट करने के लिए कुछ नहीं है।",
-      "metadataStripFailed": "फ़ोटो का मेटाडेटा हटाया नहीं जा सका।"
+      "metadataStripFailed": "फ़ोटो का मेटाडेटा हटाया नहीं जा सका।",
+      "limit_one": "आप अधिकतम {{displayCount}} फ़ाइल संलग्न कर सकते हैं।",
+      "limit_other": "आप अधिकतम {{displayCount}} फ़ाइलें संलग्न कर सकते हैं।"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, स्थिति: {{status}}",
@@ -1159,7 +1196,11 @@
       "syncNow": "अभी सिंक करें",
       "syncQueued": "सिंक का अनुरोध कतार में जोड़ा गया।",
       "syncStatusUnavailable": "सिंक की स्थिति उपलब्ध नहीं है।",
-      "withinDeadline": "समय सीमा के भीतर"
+      "withinDeadline": "समय सीमा के भीतर",
+      "daysOverdue_one": "समय सीमा से {{displayCount}} दिन की देरी",
+      "daysOverdue_other": "समय सीमा से {{displayCount}} दिन की देरी",
+      "findingsCount_one": "{{displayCount}} समस्या",
+      "findingsCount_other": "{{displayCount}} समस्याएँ"
     },
     "dashboardMetrics": {
       "openFindings": "अनसुलझी समस्याएँ",
@@ -1641,20 +1682,7 @@
       "continueFrom": "{{title}} जारी रखा जा रहा है।",
       "importingSession": "सत्र आयात किया जा रहा है",
       "cliCannotContinue": "यह CLI सत्र जारी नहीं रख सकता। Cloud Agent या कोई अन्य CLI चुनें।",
-      "importFailed": "यह सत्र आयात नहीं हो सका।",
-      "sandbox": "सैंडबॉक्स",
-      "sandboxAccessibility": "सैंडबॉक्स: {{label}}",
-      "sandboxDefaultWithDestination": "डिफ़ॉल्ट · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "छोटा",
-      "sandboxInstanceShared": "साझा",
-      "sandboxInstanceLarge": "बड़ा",
-      "sandboxInstanceDevcontainer": "डेव कंटेनर",
-      "sandboxInstanceProviderDefault": "प्रदाता का डिफ़ॉल्ट",
-      "sandboxCouldNotLoad": "सैंडबॉक्स विकल्प लोड नहीं हो सके",
-      "sandboxUnavailable": "यह सैंडबॉक्स उपलब्ध नहीं है। कोई अन्य सैंडबॉक्स या डिफ़ॉल्ट चुनें।",
-      "sandboxUseDefault": "डिफ़ॉल्ट का उपयोग करें"
+      "importFailed": "यह सत्र आयात नहीं हो सका।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} फ़ाइल अपडेट की गई।",
@@ -1942,7 +1970,11 @@
       "files": "फ़ाइलें",
       "couldNotOpenPhotoPicker": "फ़ोटो चुनने की स्क्रीन नहीं खुल सकी। Kilo फिर से शुरू करें और दोबारा कोशिश करें।",
       "maxFilesAllowed": "ज़्यादा से ज़्यादा {{displayCount}} फ़ाइलें जोड़ सकते हैं।",
-      "onlyAddingFiles": "{{total}} में से केवल {{accepted}} फ़ाइलें जोड़ी जा रही हैं (अधिकतम {{max}})"
+      "onlyAddingFiles": "{{total}} में से केवल {{accepted}} फ़ाइलें जोड़ी जा रही हैं (अधिकतम {{max}})",
+      "maxFilesAllowed_one": "ज़्यादा से ज़्यादा {{displayCount}} फ़ाइल जोड़ सकते हैं।",
+      "maxFilesAllowed_other": "ज़्यादा से ज़्यादा {{displayCount}} फ़ाइलें जोड़ सकते हैं।",
+      "onlyAddingFiles_one": "{{total}} में से केवल {{accepted}} फ़ाइलें जोड़ी जा रही हैं (अधिकतम {{max}})",
+      "onlyAddingFiles_other": "{{total}} में से केवल {{accepted}} फ़ाइलें जोड़ी जा रही हैं (अधिकतम {{max}})"
     },
     "composer": {
       "addAttachment": "अटैचमेंट जोड़ें",
@@ -1960,7 +1992,9 @@
       "discardAttachmentsMessage": "अपलोड की गई ऐसी फ़ाइलें हटा दी जाएँगी जो किसी भेजे गए संदेश से जुड़ी नहीं हैं।",
       "discardAttachmentsTitle": "अटैचमेंट हटाएँ?",
       "charactersRemaining": "{{count}} अक्षर शेष",
-      "insertNewline": "नई पंक्ति डालें"
+      "insertNewline": "नई पंक्ति डालें",
+      "charactersRemaining_one": "{{count}} अक्षर शेष",
+      "charactersRemaining_other": "{{count}} अक्षर शेष"
     },
     "chatLink": {
       "linkCopied": "लिंक कॉपी किया गया",
@@ -2032,7 +2066,9 @@
       "tokensWithPercentage": "टोकन ({{percentage}})",
       "totalCost": "कुल लागत",
       "usageReflectsLatest": "यह उपयोग सहायक के सबसे हाल में पूरे हुए उत्तर पर आधारित है।",
-      "used": "उपयोग हुआ"
+      "used": "उपयोग हुआ",
+      "modelsCount_one": "मॉडल ({{displayCount}})",
+      "modelsCount_other": "मॉडल ({{displayCount}})"
     },
     "suggestion": {
       "dismiss": "सुझाव ख़ारिज करें",
@@ -2058,7 +2094,14 @@
       "updateTodos": "कार्य सूची अपडेट करें",
       "linesBadge": "{{displayCount}} पंक्तियाँ",
       "filesBadge": "{{displayCount}} फ़ाइलें",
-      "matchesBadge": "{{displayCount}} मिलान"
+      "matchesBadge": "{{displayCount}} मिलान",
+      "filesBadge_one": "{{displayCount}} फ़ाइल",
+      "filesBadge_other": "{{displayCount}} फ़ाइलें",
+      "linesBadge_one": "{{displayCount}} पंक्ति",
+      "linesBadge_other": "{{displayCount}} पंक्तियाँ",
+      "matchesBadge_one": "{{displayCount}} मिलान",
+      "matchesBadge_other": "{{displayCount}} मिलान",
+      "noOutput": "कोई आउटपुट नहीं है।"
     },
     "autoApprove": {
       "title": "स्वतः अनुमोदन",
@@ -2098,7 +2141,9 @@
     },
     "toolRun": {
       "sheetTitle": "टूल कॉल",
-      "condensedLabel": "{{itemCount}} आइटम; {{last}}"
+      "condensedLabel": "{{itemCount}} आइटम; {{last}}",
+      "condensedLabel_one": "{{itemCount}} आइटम; {{last}}",
+      "condensedLabel_other": "{{itemCount}} आइटम; {{last}}"
     }
   },
   "bootstrap": {
@@ -2233,7 +2278,9 @@
     "cliCantReceiveFilesTitle": "यह सत्र फ़ाइलें प्राप्त नहीं कर सकता",
     "cliCantReceiveFilesMessage": "इस सत्र को चलाने वाला Kilo CLI फ़ाइलें प्राप्त नहीं कर सकता। उस मशीन पर CLI अपडेट करें या किसी नए सत्र में साझा करें।",
     "contentlessMessage": "साझा करने के लिए कुछ नहीं है — कोई टेक्स्ट या फ़ाइल शामिल नहीं थी।",
-    "couldNotReadContent": "साझा की गई सामग्री पढ़ी नहीं जा सकी।"
+    "couldNotReadContent": "साझा की गई सामग्री पढ़ी नहीं जा सकी।",
+    "onlyFirstFilesAttached_one": "केवल पहली {{displayCount}} फ़ाइल संलग्न की जाएँगी।",
+    "onlyFirstFilesAttached_other": "केवल पहली {{displayCount}} फ़ाइलें संलग्न की जाएँगी।"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2541,7 +2588,9 @@
         "outdatedOnPath": "पुराने कोड पर: {{path}}"
       },
       "deletedUser": "हटाया गया उपयोगकर्ता",
-      "replyForbiddenTerm": "आपको इस {{term}} पर उत्तर देने की अनुमति नहीं है।"
+      "replyForbiddenTerm": "आपको इस {{term}} पर उत्तर देने की अनुमति नहीं है।",
+      "moreLinesAbove_one": "… ऊपर {{displayCount}} और पंक्ति है।",
+      "moreLinesAbove_other": "… ऊपर {{displayCount}} और पंक्तियाँ हैं।"
     },
     "entry": {
       "eyebrow": "URL से पुल रिक्वेस्ट या मर्ज रिक्वेस्ट खोलें",
@@ -2639,7 +2688,17 @@
       "loadingLines": "पंक्तियाँ लोड हो रही हैं — {{total}} में से {{loaded}}…",
       "loadingMoreFiles": "और फ़ाइलें लोड हो रही हैं…",
       "retryLoadingContext": "संदर्भ फिर से लोड करें",
-      "retryLoadingNextPage": "अगला पेज फिर से लोड करें"
+      "retryLoadingNextPage": "अगला पेज फिर से लोड करें",
+      "expandAllLines_one": "सभी {{displayCount}} पंक्ति दिखाएँ",
+      "expandAllLines_other": "सभी {{displayCount}} पंक्तियाँ दिखाएँ",
+      "expandLines_one": "{{displayCount}} पंक्ति दिखाएँ ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} पंक्तियाँ दिखाएँ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "संदर्भ की {{displayCount}} पंक्ति दिखाएँ",
+      "expandLinesOfContext_other": "संदर्भ की {{displayCount}} पंक्तियाँ दिखाएँ",
+      "expandMoreLines_one": "{{displayCount}} और पंक्ति दिखाएँ ({{start}}–{{end}})",
+      "expandMoreLines_other": "{{displayCount}} और पंक्तियाँ दिखाएँ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}}/{{total}} फ़ाइलें लोड हुईं",
+      "loadedOfTotalFiles_other": "{{loaded}}/{{total}} फ़ाइलें लोड हुईं"
     },
     "inbox": {
       "couldNotLoad": "इनबॉक्स लोड नहीं हो सका।",
@@ -2836,7 +2895,9 @@
       "statusContext": "संदर्भ",
       "lineLabel": "{{status}} पंक्ति {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(खाली)"
+      "emptyLine": "(खाली)",
+      "truncationBanner_one": "बदली गई {{total}} फ़ाइलों में से पहली {{limit}} फ़ाइलें दिखाई जा रही हैं — GitHub API की सीमा के कारण।",
+      "truncationBanner_other": "बदली गई {{total}} फ़ाइलों में से पहली {{limit}} फ़ाइलें दिखाई जा रही हैं — GitHub API की सीमा के कारण।"
     },
     "linkPasteClipboardEmpty": "क्लिपबोर्ड खाली है।",
     "linkPasteNotAPullRequest": "यह पुल रिक्वेस्ट या मर्ज रिक्वेस्ट का लिंक नहीं है",
@@ -3093,7 +3154,9 @@
     "couldNotApprove": "स्वीकृत नहीं किया जा सका",
     "couldNotStart": "शुरू नहीं किया जा सका",
     "channelName": "सक्रिय एजेंट",
-    "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।"
+    "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।",
+    "openSession": "खोलें",
+    "approveFailed": "स्वीकार नहीं किया जा सका। फिर से कोशिश करने के लिए $t(common.approve) पर टैप करें।"
   },
   "transcriptionModel": {
     "title": "आवाज़ को टेक्स्ट में बदलने का मॉडल",
@@ -3118,15 +3181,7 @@
     "remoteOptionTitle": "आपका कंप्यूटर",
     "remoteOptionBody": "अपने मशीन पर `kilo remote` CLI से Kilo चलाएँ।",
     "skip": "टूर छोड़ें",
-    "tutorialLabel": "ट्यूटोरियल",
-    "remoteTitle": "अपना पहला रिमोट सत्र शुरू करें",
-    "remoteBody": "अपना कंप्यूटर कनेक्ट करें, फिर यहाँ से सत्र शुरू करें।",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "अभी कोई कंप्यूटर कनेक्ट नहीं हुआ है",
-    "remoteEmptyBody": "उसे कनेक्ट करने के लिए अपने कंप्यूटर पर `kilo remote` चलाएँ।",
-    "remoteFound": "कंप्यूटर कनेक्ट हो गया",
-    "checkAgain": "फ़िर से जाँचें",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ट्यूटोरियल"
   },
   "appActions": {
     "start": {
@@ -3134,5 +3189,8 @@
       "repositoryUnknown": "Kilo, {{repository}} को GitHub या GitLab रिपॉज़िटरी के रूप में नहीं पहचानता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।",
       "repositoryUnsupported": "{{repository}} एक Bitbucket रिपॉज़िटरी है — एजेंट शुरू करें अभी इसका उपयोग नहीं कर सकता। Kilo में कोई दूसरी रिपॉज़िटरी चुनें।"
     }
+  },
+  "launcher": {
+    "openLastSession": "पिछला सत्र खोलें"
   }
 }

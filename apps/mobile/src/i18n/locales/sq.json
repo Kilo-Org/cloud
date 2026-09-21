@@ -163,6 +163,7 @@
     "useDifferentEmail": "Përdor një email tjetër",
     "signInWithApple": "Hyr me Apple",
     "signInWithGoogle": "Hyr me Google",
+    "signInWithPasskey": "Hyr me një çelës hyrjeje",
     "emailAddress": "Adresa e emailit",
     "emailPlaceholder": "ti@example.com",
     "continueWithEmail": "Vazhdo me email",
@@ -175,6 +176,10 @@
     "termsConnector": " dhe ",
     "termsSuffix": ".",
     "moreSignInOptions": "Më shumë opsione hyrjeje",
+    "passkeyCancelled": "Hyrja me çelës hyrjeje u anulua. Provo përsëri.",
+    "passkeyNotFound": "Nuk ka asnjë çelës hyrjeje të ruajtur për këtë pajisje. Hyr në vend të kësaj me Apple, Google ose emailin tënd.",
+    "passkeyUnsupported": "Çelësat e hyrjes nuk janë të disponueshëm në këtë pajisje. Hyr në vend të kësaj me Apple, Google ose emailin tënd.",
+    "passkeyFailed": "Nuk u arrit të hyhej me një çelës hyrjeje. Provo përsëri.",
     "couldNotCompleteSignIn": "Nuk u arrit të përfundohej hyrja. Provo përsëri.",
     "sessionEnded": "Sesioni yt përfundoi. Hyr përsëri.",
     "signInCodeExpired": "Kodi yt i hyrjes ka skaduar. Provo përsëri.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Llogari testimi",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO për ndërmarrje"
+    "providerEnterpriseSso": "SSO për ndërmarrje",
+    "passkeysTitle": "Çelësat e hyrjes",
+    "passkeysSubtitle": "Hyr pa fjalëkalim",
+    "passkeysEmpty": "Ende asnjë çelës hyrjeje",
+    "passkeysEmptyHint": "$t(profile.addPasskey) për të hyrë pa fjalëkalim.",
+    "passkeysCouldNotLoad": "Çelësat e hyrjes nuk u ngarkuan",
+    "passkeysLoadFailed": "Çelësat e hyrjes janë të padisponueshëm derisa të ngarkohet kjo.",
+    "addPasskey": "Shto një çelës hyrjeje",
+    "passkeyDefaultName": "Çelës hyrjeje",
+    "passkeyAddedOn": "Shtuar {{date}}",
+    "passkeyAdded": "Çelësi i hyrjes u shtua.",
+    "passkeyAddFailed": "Nuk u arrit të shtohej një çelës hyrjeje. Provo përsëri.",
+    "passkeyAddUnsupported": "Kjo pajisje nuk mund të krijojë çelësa hyrjeje.",
+    "passkeyAddCancelled": "Krijimi i çelësit të hyrjes u anulua.",
+    "passkeyRemoved": "Çelësi i hyrjes u hoq.",
+    "passkeyRemoveFailed": "Ai çelës hyrjeje nuk u hoq dot. Provo përsëri.",
+    "passkeyRenamed": "Çelësi i hyrjes u riemërtua.",
+    "passkeyName": "Emri i çelësit të hyrjes",
+    "renamePasskey": "Riemërto çelësin e hyrjes",
+    "removePasskey": "Hiq çelësin e hyrjes",
+    "removePasskeyTitle": "Të hiqet çelësi i hyrjes?",
+    "removePasskeyMessage": "Nuk do të mund të hysh më me këtë çelës hyrjeje."
   },
   "preferences": {
     "general": "Të përgjithshme",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} nga {{total}} skedarë të ngarkuar",
       "filesStillLoading": "Skedarët po ngarkohen ende. Tërhiq poshtë për të rifreskuar.",
       "goToOverview": "Shko te përmbledhja",
-      "goToOverviewTab": "Shko te skeda e përmbledhjes"
+      "goToOverviewTab": "Shko te skeda e përmbledhjes",
+      "expandAllLines_one": "Shfaq të gjithë {{displayCount}} rresht",
+      "expandAllLines_other": "Shfaq të gjithë {{displayCount}} rreshtat",
+      "expandLines_one": "Shfaq {{displayCount}} rresht ({{start}}–{{end}})",
+      "expandLines_other": "Shfaq {{displayCount}} rreshta ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Shfaq {{displayCount}} rresht konteksti",
+      "expandLinesOfContext_other": "Shfaq {{displayCount}} rreshta konteksti",
+      "expandMoreLines_one": "Shfaq edhe {{displayCount}} rresht ({{start}}–{{end}})",
+      "expandMoreLines_other": "Shfaq edhe {{displayCount}} rreshta ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} nga {{total}} skedarë të ngarkuar",
+      "loadedOfTotalFiles_other": "{{loaded}} nga {{total}} skedarë të ngarkuar"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "mungon rreshti i ri në fund të skedarit.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "I vjetëruar te {{path}}"
       },
       "deletedUser": "përdorues i fshirë",
-      "replyForbiddenTerm": "Nuk ke leje të përgjigjesh në këtë {{term}}."
+      "replyForbiddenTerm": "Nuk ke leje të përgjigjesh në këtë {{term}}.",
+      "moreLinesAbove_one": "… {{displayCount}} rresht tjetër më sipër",
+      "moreLinesAbove_other": "… {{displayCount}} rreshta të tjerë më sipër"
     },
     "couldNotOpenGitHubAppSettings": "Cilësimet e aplikacionit GitHub nuk u hapën.",
     "installKiloGitHubApp": "Instalo aplikacionin Kilo për GitHub",
@@ -706,7 +744,9 @@
       "statusContext": "Kontekst",
       "lineLabel": "rreshti {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(bosh)"
+      "emptyLine": "(bosh)",
+      "truncationBanner_one": "Po shfaqen {{limit}} skedarët e parë nga {{total}} skedarë të ndryshuar, për shkak të kufirit të API-së së GitHub.",
+      "truncationBanner_other": "Po shfaqen {{limit}} skedarët e parë nga {{total}} skedarë të ndryshuar, për shkak të kufirit të API-së së GitHub."
     },
     "linkPasteClipboardEmpty": "Kujtesa e kopjimit është bosh.",
     "linkPasteNotAPullRequest": "Kjo nuk është lidhje për një kërkesë për bashkim ose kërkesë integrimi",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Njoftimet shfaqin tekstin e mesazhit në ekranin e kyçjes.",
     "previewGenericDescription": "Njoftimet tregojnë se diçka ndodhi. Hap Kilo për ta lexuar.",
     "channel": {
-      "agent": "Seancat e agjentit",
+      "agentProgress": "Ecuria e agjentit",
       "chat": "Mesazhet e bisedës",
       "kiloclaw": "Aktiviteti i KiloClaw",
       "balance": "Njoftimet për gjendjen e llogarisë",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "instancë gati / e dështuar, veprime të planifikuara",
       "balanceAlertsSubtitle": "paralajmërime për gjendje të ulët të organizatës",
       "securityFindingsSubtitle": "gjetje të reja dhe kujtesa për SLA"
+    },
+    "action": {
+      "openSession": "Hap seancën"
+    },
+    "needsInputAction": {
+      "approved": "Kërkesa u miratua",
+      "replied": "Përgjigja u dërgua",
+      "failed": "Nuk mundi të përgjigjej. Prekni përsëri për të provuar përsëri.",
+      "unavailable": "Kjo kërkesë nuk pret më."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "Ngarkimi dështoi.",
       "failedToUploadFile": "Ngarkimi i skedarit dështoi: {{reason}}.",
       "nothingToPaste": "Nuk ka asgjë për të ngjitur.",
-      "metadataStripFailed": "Nuk u hoqën të dhënat shtesë të fotos."
+      "metadataStripFailed": "Nuk u hoqën të dhënat shtesë të fotos.",
+      "limit_one": "Mund të bashkëngjitësh deri në {{displayCount}} skedar.",
+      "limit_other": "Mund të bashkëngjitësh deri në {{displayCount}} skedarë."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Sinkronizo gjetjet",
       "syncNow": "Sinkronizo tani",
       "syncQueued": "Sinkronizimi u vendos në radhë",
-      "syncStatusUnavailable": "Statusi i sinkronizimit nuk është i disponueshëm."
+      "syncStatusUnavailable": "Statusi i sinkronizimit nuk është i disponueshëm.",
+      "daysOverdue_one": "{{displayCount}} ditë me vonesë",
+      "daysOverdue_other": "{{displayCount}} ditë me vonesë",
+      "findingsCount_one": "{{displayCount}} gjetje",
+      "findingsCount_other": "{{displayCount}} gjetje"
     },
     "dashboardMetrics": {
       "openFindings": "Gjetje të hapura",
@@ -2131,20 +2186,7 @@
       "continueFrom": "Po vazhdon seanca {{title}}.",
       "importingSession": "Duke importuar seancën",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidh Cloud Agent ose një CLI tjetër.",
-      "importFailed": "Nuk u arrit të importohej kjo seancë.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Parazgjedhje · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "E vogël",
-      "sandboxInstanceShared": "E përbashkët",
-      "sandboxInstanceLarge": "E madhe",
-      "sandboxInstanceDevcontainer": "Kontejner zhvillimi",
-      "sandboxInstanceProviderDefault": "Parazgjedhje e ofruesit",
-      "sandboxCouldNotLoad": "Nuk mund të ngarkoheshin opsionet e sandbox-it",
-      "sandboxUnavailable": "Ky sandbox nuk është i disponueshëm. Zgjidhni një sandbox tjetër ose Parazgjedhjen.",
-      "sandboxUseDefault": "Përdor Parazgjedhjen"
+      "importFailed": "Nuk u arrit të importohej kjo seancë."
     },
     "partRenderer": {
       "updatedFileCount_one": "U përditësua {{displayCount}} skedar.",
@@ -2168,7 +2210,14 @@
       "updateTodos": "Përditëso listën e detyrave",
       "linesBadge": "{{displayCount}} rreshta",
       "filesBadge": "{{displayCount}} skedarë",
-      "matchesBadge": "{{displayCount}} përputhje"
+      "matchesBadge": "{{displayCount}} përputhje",
+      "filesBadge_one": "{{displayCount}} skedar",
+      "filesBadge_other": "{{displayCount}} skedarë",
+      "linesBadge_one": "{{displayCount}} rresht",
+      "linesBadge_other": "{{displayCount}} rreshta",
+      "matchesBadge_one": "{{displayCount}} përputhje",
+      "matchesBadge_other": "{{displayCount}} përputhje",
+      "noOutput": "Nuk ka dalje."
     },
     "readToolMarkdown": {
       "linesTruncated": "rreshtat {{start}}–{{end}} (përmbajtje e shkurtuar)",
@@ -2458,7 +2507,11 @@
       "files": "Skedarë",
       "couldNotOpenPhotoPicker": "Nuk u hap zgjedhësi i fotove. Rinis Kilo dhe provo përsëri.",
       "maxFilesAllowed": "Lejohen jo më shumë se {{displayCount}} skedarë.",
-      "onlyAddingFiles": "Duke shtuar vetëm {{accepted}} nga {{total}} skedarët (maksimumi {{max}})"
+      "onlyAddingFiles": "Duke shtuar vetëm {{accepted}} nga {{total}} skedarët (maksimumi {{max}})",
+      "maxFilesAllowed_one": "Lejohen jo më shumë se {{displayCount}} skedar.",
+      "maxFilesAllowed_other": "Lejohen jo më shumë se {{displayCount}} skedarë.",
+      "onlyAddingFiles_one": "Duke shtuar vetëm {{accepted}} nga {{total}} skedarët (maksimumi {{max}})",
+      "onlyAddingFiles_other": "Duke shtuar vetëm {{accepted}} nga {{total}} skedarët (maksimumi {{max}})"
     },
     "composer": {
       "addAttachment": "Shto bashkëngjitje",
@@ -2476,7 +2529,9 @@
       "discardAttachmentsMessage": "Skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
       "discardAttachmentsTitle": "Të hiqen bashkëngjitjet?",
       "charactersRemaining": "Mbeten {{count}} karaktere",
-      "insertNewline": "Shto një rresht të ri"
+      "insertNewline": "Shto një rresht të ri",
+      "charactersRemaining_one": "Mbetet {{count}} karakter",
+      "charactersRemaining_other": "Mbeten {{count}} karaktere"
     },
     "chatLink": {
       "linkCopied": "Lidhja u kopjua",
@@ -2548,7 +2603,9 @@
       "stepsCount_one": "{{steps}} hap",
       "stepsCount": "{{steps}} hapa",
       "stepsCount_other": "{{steps}} hapa",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modelet ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Miratim automatik",
@@ -2588,7 +2645,9 @@
     },
     "toolRun": {
       "sheetTitle": "Thirrjet e mjeteve",
-      "condensedLabel": "{{itemCount}} elemente; {{last}}"
+      "condensedLabel": "{{itemCount}} elemente; {{last}}",
+      "condensedLabel_one": "{{itemCount}} element; {{last}}",
+      "condensedLabel_other": "{{itemCount}} elemente; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2782,9 @@
     "cliCantReceiveFilesTitle": "Kjo seancë nuk mund të marrë skedarë",
     "cliCantReceiveFilesMessage": "Kilo CLI që ekzekuton këtë seancë nuk mund të marrë skedarë. Përditëso CLI-në në atë kompjuter ose ndaje përmbajtjen në një seancë të re.",
     "contentlessMessage": "Nuk ka asgjë për të ndarë. Nuk u përfshi asnjë tekst ose skedar.",
-    "couldNotReadContent": "Nuk u lexua përmbajtja e ndarë."
+    "couldNotReadContent": "Nuk u lexua përmbajtja e ndarë.",
+    "onlyFirstFilesAttached_one": "Vetëm {{displayCount}} skedar e parë do të bashkëngjiten.",
+    "onlyFirstFilesAttached_other": "Vetëm {{displayCount}} skedarët e parë do të bashkëngjiten."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3154,9 @@
     "couldNotApprove": "Miratimi dështoi",
     "couldNotStart": "Nisja dështoi",
     "channelName": "Agjentët aktivë",
-    "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
+    "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
+    "openSession": "Hap",
+    "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri."
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",
@@ -3118,15 +3181,7 @@
     "remoteOptionTitle": "Kompjuteri yt",
     "remoteOptionBody": "Ekzekuto Kilo në makinën tënde përmes CLI-së `kilo remote`.",
     "skip": "Kapërce turin",
-    "tutorialLabel": "Tutoriali",
-    "remoteTitle": "Nis sesionin tënd të parë në distancë",
-    "remoteBody": "Lidh kompjuterin tënd, pastaj nis sesionin nga këtu.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ende pa kompjuter të lidhur",
-    "remoteEmptyBody": "Për ta lidhur, ekzekuto `kilo remote` në kompjuterin tënd.",
-    "remoteFound": "Kompjuteri u lidh",
-    "checkAgain": "Kontrollo përsëri",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutoriali"
   },
   "appActions": {
     "start": {
@@ -3134,5 +3189,8 @@
       "repositoryUnknown": "Kilo nuk e njeh {{repository}} si depo GitHub ose GitLab. Zgjidh një depo tjetër në Kilo.",
       "repositoryUnsupported": "{{repository}} është një depo Bitbucket — Fillo agjentin nuk mund ta përdorë ende. Zgjidh një depo tjetër në Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Hap sesionin e fundit"
   }
 }

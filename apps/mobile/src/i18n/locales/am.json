@@ -163,6 +163,7 @@
     "useDifferentEmail": "ሌላ ኢሜይል ይጠቀሙ",
     "signInWithApple": "በApple ይግቡ",
     "signInWithGoogle": "በGoogle ይግቡ",
+    "signInWithPasskey": "በፓስኪ ይግቡ",
     "emailAddress": "የኢሜይል አድራሻ",
     "emailPlaceholder": "ስም@example.com",
     "continueWithEmail": "በኢሜይል ይቀጥሉ",
@@ -175,6 +176,10 @@
     "termsConnector": " እና ",
     "termsSuffix": "።",
     "moreSignInOptions": "ተጨማሪ የመግቢያ አማራጮች",
+    "passkeyCancelled": "በፓስኪ መግባት ተሰርዟል። እባክዎ እንደገና ይሞክሩ።",
+    "passkeyNotFound": "ለዚህ መሣሪያ ምንም ፓስኪ አልተቀመጠም። በምትኩ በApple፣ በGoogle ወይም በኢሜይልዎ ይግቡ።",
+    "passkeyUnsupported": "ፓስኪዎች በዚህ መሣሪያ ላይ አይገኙም። በምትኩ በApple፣ በGoogle ወይም በኢሜይልዎ ይግቡ።",
+    "passkeyFailed": "በፓስኪ መግባት አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
     "couldNotCompleteSignIn": "መግባትን ማጠናቀቅ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
     "sessionEnded": "ክፍለ ጊዜዎ አልቋል። እባክዎ እንደገና ይግቡ።",
     "signInCodeExpired": "የመግቢያ ኮድዎ ጊዜው አልፏል። እባክዎ እንደገና ይሞክሩ።",
@@ -225,7 +230,28 @@
     "providerTestAccount": "የሙከራ መለያ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "የድርጅት SSO"
+    "providerEnterpriseSso": "የድርጅት SSO",
+    "passkeysTitle": "ፓስኪዎች",
+    "passkeysSubtitle": "ያለ የይለፍ ቃል ይግቡ",
+    "passkeysEmpty": "እስካሁን ምንም ፓስኪ የለም",
+    "passkeysEmptyHint": "$t(profile.addPasskey) ያለ የይለፍ ቃል ለመግባት።",
+    "passkeysCouldNotLoad": "ፓስኪዎችን መጫን አልተቻለም",
+    "passkeysLoadFailed": "ይህ እስኪጫን ድረስ ፓስኪዎች አይገኙም።",
+    "addPasskey": "ፓስኪ ያክሉ",
+    "passkeyDefaultName": "ፓስኪ",
+    "passkeyAddedOn": "{{date}} ተጨምሯል",
+    "passkeyAdded": "ፓስኪ ተጨምሯል።",
+    "passkeyAddFailed": "ፓስኪ ማከል አልተቻለም። እንደገና ይሞክሩ።",
+    "passkeyAddUnsupported": "ይህ መሣሪያ ፓስኪዎችን መፍጠር አይችልም።",
+    "passkeyAddCancelled": "ፓስኪ መፍጠር ተሰርዟል።",
+    "passkeyRemoved": "ፓስኪ ተወግዷል።",
+    "passkeyRemoveFailed": "ያንን ፓስኪ ማስወገድ አልተቻለም። እንደገና ይሞክሩ።",
+    "passkeyRenamed": "ፓስኪ ተሰይሟል።",
+    "passkeyName": "የፓስኪ ስም",
+    "renamePasskey": "ፓስኪ ስም ይቀይሩ",
+    "removePasskey": "ፓስኪ ያስወግዱ",
+    "removePasskeyTitle": "ፓስኪ ይወገድ?",
+    "removePasskeyMessage": "በዚህ ፓስኪ ከእንግዲህ መግባት አይችሉም።"
   },
   "preferences": {
     "general": "አጠቃላይ",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "ከ{{total}} ፋይሎች {{displayCount}} ተጭነዋል",
       "filesStillLoading": "ፋይሎች አሁንም በመጫን ላይ ናቸው። ለማደስ ጎትት።",
       "goToOverview": "ወደ አጠቃላይ እይታ ሂድ",
-      "goToOverviewTab": "ወደ አጠቃላይ እይታ ትር ሂድ"
+      "goToOverviewTab": "ወደ አጠቃላይ እይታ ትር ሂድ",
+      "expandAllLines_one": "ሁሉንም {{displayCount}} መስመር አሳይ",
+      "expandAllLines_other": "ሁሉንም {{displayCount}} መስመሮች አሳይ",
+      "expandLines_one": "{{displayCount}} መስመር አሳይ ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} መስመሮችን አሳይ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "{{displayCount}} የአውድ መስመር አሳይ",
+      "expandLinesOfContext_other": "{{displayCount}} የአውድ መስመሮችን አሳይ",
+      "expandMoreLines_one": "ተጨማሪ {{displayCount}} መስመር አሳይ ({{start}}–{{end}})",
+      "expandMoreLines_other": "ተጨማሪ {{displayCount}} መስመሮችን አሳይ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "ከ{{total}} ፋይሎች ውስጥ {{loaded}} ተጭነዋል",
+      "loadedOfTotalFiles_other": "ከ{{total}} ፋይሎች ውስጥ {{loaded}} ተጭነዋል"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ በፋይሉ መጨረሻ አዲስ መስመር የለም",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "በ{{path}} ላይ፣ ከአሁኑ ኮድ ጋር አይዛመድም"
       },
       "deletedUser": "የተሰረዘ ተጠቃሚ",
-      "replyForbiddenTerm": "ለዚህ {{term}} ምላሽ ለመስጠት ፈቃድ የለህም።"
+      "replyForbiddenTerm": "ለዚህ {{term}} ምላሽ ለመስጠት ፈቃድ የለህም።",
+      "moreLinesAbove_one": "… ከላይ ተጨማሪ {{displayCount}} መስመር አለ።",
+      "moreLinesAbove_other": "… ከላይ ተጨማሪ {{displayCount}} መስመሮች አሉ።"
     },
     "couldNotOpenGitHubAppSettings": "የGitHub መተግበሪያ ቅንብሮችን መክፈት አልተቻለም።",
     "installKiloGitHubApp": "የKilo GitHub መተግበሪያን ጫን",
@@ -706,7 +744,9 @@
       "statusContext": "አውድ",
       "lineLabel": "መስመር {{line}}፣ {{status}}፦ {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(ባዶ)"
+      "emptyLine": "(ባዶ)",
+      "truncationBanner_one": "ከተለወጡት {{total}} ፋይሎች ውስጥ የመጀመሪያዎቹ {{limit}} ብቻ ይታያሉ — የGitHub API ገደብ ነው።",
+      "truncationBanner_other": "ከተለወጡት {{total}} ፋይሎች ውስጥ የመጀመሪያዎቹ {{limit}} ብቻ ይታያሉ — የGitHub API ገደብ ነው።"
     },
     "linkPasteClipboardEmpty": "ቅንጥብ ሰሌዳው ባዶ ነው።",
     "linkPasteNotAPullRequest": "የማዋሃድ ጥያቄ አገናኝ አይደለም",
@@ -783,7 +823,7 @@
     "previewFullDescription": "ማሳወቂያዎች በመቆለፊያ ማያ ገጽዎ ላይ የመልእክቱን ጽሑፍ ያሳያሉ።",
     "previewGenericDescription": "ማሳወቂያዎች አንድ ነገር እንደተከሰተ ያሳያሉ። መልእክቱን ለማንበብ Kiloን ይክፈቱ።",
     "channel": {
-      "agent": "የወኪል ክፍለ ጊዜዎች",
+      "agentProgress": "የወኪል እድገት",
       "chat": "የውይይት መልእክቶች",
       "kiloclaw": "የKiloClaw እንቅስቃሴ",
       "balance": "የቀሪ ሂሳብ ማስጠንቀቂያዎች",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "ዝግጁ የሆነ/ያልተሳካ ሂደት፣ መርሐግብር የተያዘላቸው ተግባሮች",
       "balanceAlertsSubtitle": "ዝቅተኛ የድርጅት ቀሪ ሂሳብ ማስጠንቀቂያዎች",
       "securityFindingsSubtitle": "አዳዲስ ግኝቶችና የSLA ማስታወሻዎች"
+    },
+    "action": {
+      "openSession": "ክፍለ ጊዜውን ክፈት"
+    },
+    "needsInputAction": {
+      "approved": "ጥያቄው ጸድቋል",
+      "replied": "መልስ ተልኳል",
+      "failed": "መልስ መስጠት አልተቻለም። እንደገና ለመሞከር እንደገና ይንኩ።",
+      "unavailable": "ይህ ጥያቄ ከእንግዲህ አይጠብቅም።"
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "ፋይሉን መስቀል አልተሳካም።",
       "failedToUploadFile": "ፋይሉን መስቀል አልተሳካም፦ {{reason}}።",
       "nothingToPaste": "የሚለጠፍ ነገር የለም።",
-      "metadataStripFailed": "የፎቶውን ተጨማሪ መረጃ ማስወገድ አልተቻለም።"
+      "metadataStripFailed": "የፎቶውን ተጨማሪ መረጃ ማስወገድ አልተቻለም።",
+      "limit_one": "እስከ {{displayCount}} ፋይል ማያያዝ ይችላሉ።",
+      "limit_other": "እስከ {{displayCount}} ፋይሎች ማያያዝ ይችላሉ።"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}፣ {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "ግኝቶችን ያመሳስሉ",
       "syncNow": "አሁን ያመሳስሉ",
       "syncQueued": "ማመሳሰል ወደ ወረፋ ገብቷል።",
-      "syncStatusUnavailable": "የማመሳሰል ሁኔታን ማግኘት አልተቻለም።"
+      "syncStatusUnavailable": "የማመሳሰል ሁኔታን ማግኘት አልተቻለም።",
+      "daysOverdue_one": "{{displayCount}} ቀን ዘግይቷል",
+      "daysOverdue_other": "{{displayCount}} ቀናት ዘግይቷል",
+      "findingsCount_one": "{{displayCount}} ግኝት",
+      "findingsCount_other": "{{displayCount}} ግኝቶች"
     },
     "dashboardMetrics": {
       "openFindings": "ክፍት ግኝቶች",
@@ -2131,20 +2186,7 @@
       "continueFrom": "{{title}} እየቀጠለ ነው።",
       "importingSession": "ክፍለ ጊዜውን በማስመጣት ላይ",
       "cliCannotContinue": "ይህ CLI ክፍለ ጊዜን መቀጠል አይችልም። Cloud Agent ወይም ሌላ CLI ይምረጡ።",
-      "importFailed": "ይህን ክፍለ ጊዜ ማስመጣት አልተቻለም።",
-      "sandbox": "ሳንድባክስ",
-      "sandboxAccessibility": "ሳንድባክስ፦ {{label}}",
-      "sandboxDefaultWithDestination": "ነባሪ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "ትንሽ",
-      "sandboxInstanceShared": "የጋራ",
-      "sandboxInstanceLarge": "ትልቅ",
-      "sandboxInstanceDevcontainer": "የዴቭ ኮንቴይነር",
-      "sandboxInstanceProviderDefault": "የአቅራቢ ነባሪ",
-      "sandboxCouldNotLoad": "የሳንድባክስ አማራጮችን መጫን አልተቻለም",
-      "sandboxUnavailable": "ይህ ሳንድባክስ አይገኝም። ሌላ ሳንድባክስ ወይም ነባሪን ይምረጡ።",
-      "sandboxUseDefault": "ነባሪን ተጠቀም"
+      "importFailed": "ይህን ክፍለ ጊዜ ማስመጣት አልተቻለም።"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል።",
@@ -2168,7 +2210,14 @@
       "updateTodos": "የተግባር ዝርዝሩን ያዘምኑ",
       "linesBadge": "{{displayCount}} መስመሮች",
       "filesBadge": "{{displayCount}} ፋይሎች",
-      "matchesBadge": "{{displayCount}} ተዛማጆች"
+      "matchesBadge": "{{displayCount}} ተዛማጆች",
+      "filesBadge_one": "{{displayCount}} ፋይል",
+      "filesBadge_other": "{{displayCount}} ፋይሎች",
+      "linesBadge_one": "{{displayCount}} መስመር",
+      "linesBadge_other": "{{displayCount}} መስመሮች",
+      "matchesBadge_one": "{{displayCount}} ተዛማጅ",
+      "matchesBadge_other": "{{displayCount}} ተዛማጆች",
+      "noOutput": "ምንም ውጤት የለም።"
     },
     "readToolMarkdown": {
       "linesTruncated": "መስመሮች {{start}}–{{end}} (በከፊል የታዩ)",
@@ -2458,7 +2507,11 @@
       "files": "ፋይሎች",
       "couldNotOpenPhotoPicker": "የፎቶ መምረጫውን መክፈት አልተቻለም። Kiloን እንደገና ያስጀምሩና ይሞክሩ።",
       "maxFilesAllowed": "ቢበዛ {{displayCount}} ፋይሎች ይፈቀዳሉ።",
-      "onlyAddingFiles": "ከ{{total}} ፋይሎች {{accepted}} ብቻ በመጨመር ላይ (ቢበዛ {{max}})"
+      "onlyAddingFiles": "ከ{{total}} ፋይሎች {{accepted}} ብቻ በመጨመር ላይ (ቢበዛ {{max}})",
+      "maxFilesAllowed_one": "ቢበዛ {{displayCount}} ፋይል ይፈቀዳሉ።",
+      "maxFilesAllowed_other": "ቢበዛ {{displayCount}} ፋይሎች ይፈቀዳሉ።",
+      "onlyAddingFiles_one": "ከ{{total}} ፋይሎች {{accepted}} ብቻ በመጨመር ላይ (ቢበዛ {{max}})",
+      "onlyAddingFiles_other": "ከ{{total}} ፋይሎች {{accepted}} ብቻ በመጨመር ላይ (ቢበዛ {{max}})"
     },
     "composer": {
       "addAttachment": "አባሪ ጨምር",
@@ -2476,7 +2529,9 @@
       "discardAttachmentsMessage": "ከተላኩ መልእክቶች ጋር ያልተያያዙ የተሰቀሉ ፋይሎች ይሰረዛሉ።",
       "discardAttachmentsTitle": "አባሪዎቹን ማስወገድ ይፈልጋሉ?",
       "charactersRemaining": "{{count}} ቁምፊዎች ቀርተዋል",
-      "insertNewline": "አዲስ መስመር ያስገቡ"
+      "insertNewline": "አዲስ መስመር ያስገቡ",
+      "charactersRemaining_one": "{{count}} ቁምፊ ቀርቷል",
+      "charactersRemaining_other": "{{count}} ቁምፊዎች ቀርተዋል"
     },
     "chatLink": {
       "linkCopied": "አገናኙ ተቀድቷል",
@@ -2548,7 +2603,9 @@
       "stepsCount_one": "{{steps}} እርምጃ",
       "stepsCount": "{{steps}} እርምጃዎች",
       "stepsCount_other": "{{steps}} እርምጃዎች",
-      "modelAccessibilityLabel": "{{name}}፣ {{provider}}፣ {{steps}}፣ {{cost}}"
+      "modelAccessibilityLabel": "{{name}}፣ {{provider}}፣ {{steps}}፣ {{cost}}",
+      "modelsCount_one": "ሞዴል ({{displayCount}})",
+      "modelsCount_other": "ሞዴሎች ({{displayCount}})"
     },
     "autoApprove": {
       "title": "ራስ-ሰር ማጽደቅ",
@@ -2588,7 +2645,9 @@
     },
     "toolRun": {
       "sheetTitle": "የመሳሪያ ጥሪዎች",
-      "condensedLabel": "{{itemCount}} ንጥሎች; {{last}}"
+      "condensedLabel": "{{itemCount}} ንጥሎች; {{last}}",
+      "condensedLabel_one": "{{itemCount}} ንጥል; {{last}}",
+      "condensedLabel_other": "{{itemCount}} ንጥሎች; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2782,9 @@
     "cliCantReceiveFilesTitle": "ይህ ክፍለ ጊዜ ፋይሎችን መቀበል አይችልም",
     "cliCantReceiveFilesMessage": "ይህን ክፍለ ጊዜ የሚያስኬደው Kilo CLI ፋይሎችን መቀበል አይችልም። በዚያ ኮምፒውተር ላይ CLIን አዘምን ወይም ወደ አዲስ ክፍለ ጊዜ አጋራ።",
     "contentlessMessage": "የሚጋራ ነገር የለም — ጽሑፍ ወይም ፋይል አልተካተተም።",
-    "couldNotReadContent": "የተጋራውን ይዘት ማንበብ አልተቻለም።"
+    "couldNotReadContent": "የተጋራውን ይዘት ማንበብ አልተቻለም።",
+    "onlyFirstFilesAttached_one": "የመጀመሪያዎቹ {{displayCount}} ፋይል ብቻ ይያያዛሉ።",
+    "onlyFirstFilesAttached_other": "የመጀመሪያዎቹ {{displayCount}} ፋይሎች ብቻ ይያያዛሉ።"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3154,9 @@
     "couldNotApprove": "ማጽደቅ አልተቻለም",
     "couldNotStart": "መጀመር አልተቻለም",
     "channelName": "ንቁ ወኪሎች",
-    "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።"
+    "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።",
+    "openSession": "ክፈት",
+    "approveFailed": "ማጽደቅ አልተቻለም። እንደገና ለመሞከር $t(common.approve) ይንኩ።"
   },
   "transcriptionModel": {
     "title": "የድምጽ ወደ ጽሑፍ ሞዴል",
@@ -3118,15 +3181,7 @@
     "remoteOptionTitle": "የእርስዎ ኮምፒውተር",
     "remoteOptionBody": "`kilo remote` በሚባለው CLI በመጠቀም Kiloን በራስዎ ማሽን ላይ ያስኪዱ።",
     "skip": "ጉዞውን ዕለጥ",
-    "tutorialLabel": "መመሪያ",
-    "remoteTitle": "የመጀመሪያውን ሩቅ ክፍለ ጊዜ ይጀምሩ",
-    "remoteBody": "ኮምፒውተርዎን ያገናኙ፣ ከዚያ ክፍለ ጊዜውን ከዚህ ይጀምሩ።",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "እስካሁን የተገናኘ ኮምፒውተር የለም",
-    "remoteEmptyBody": "ለማገናኘት በኮምፒውተርዎ ላይ `kilo remote`ን ያስኪዱ።",
-    "remoteFound": "ኮምፒውተር ተገናኝቷል",
-    "checkAgain": "እንደገና ይፈትሹ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "መመሪያ"
   },
   "appActions": {
     "start": {
@@ -3134,5 +3189,8 @@
       "repositoryUnknown": "Kilo {{repository}}ን እንደ GitHub ወይም GitLab ማከማቻ አያውቅም። በKilo ውስጥ ሌላ ማከማቻ ይምረጡ።",
       "repositoryUnsupported": "{{repository}} የBitbucket ማከማቻ ነው — ወኪል ይጀምሩ ገና ሊጠቀምበት አይችልም። በKilo ውስጥ ሌላ ማከማቻ ይምረጡ።"
     }
+  },
+  "launcher": {
+    "openLastSession": "የመጨረሻውን ክፍለ ጊዜ ክፈት"
   }
 }

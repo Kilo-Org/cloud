@@ -163,6 +163,7 @@
     "useDifferentEmail": "Yi amfani da wani imel daban",
     "signInWithApple": "Shiga da Apple",
     "signInWithGoogle": "Shiga da Google",
+    "signInWithPasskey": "Shiga da maɓallin shiga",
     "emailAddress": "Adireshin imel",
     "emailPlaceholder": "kai@example.com",
     "continueWithEmail": "Ci gaba da imel",
@@ -175,6 +176,10 @@
     "termsConnector": " da ",
     "termsSuffix": ".",
     "moreSignInOptions": "Ƙarin zaɓuɓɓukan shiga",
+    "passkeyCancelled": "An soke shiga da maɓallin shiga. Sake gwadawa.",
+    "passkeyNotFound": "Ba a adana maɓallin shiga don wannan na'urar ba. Maimakon haka, shiga da Apple, Google ko imel ɗinka.",
+    "passkeyUnsupported": "Maɓallan shiga ba su samuwa a wannan na'urar ba. Maimakon haka, shiga da Apple, Google ko imel ɗinka.",
+    "passkeyFailed": "Ba a iya shiga da maɓallin shiga ba. Sake gwadawa.",
     "couldNotCompleteSignIn": "An kasa kammala shiga. Sake gwadawa.",
     "sessionEnded": "Zamanka ya ƙare. Sake shiga.",
     "signInCodeExpired": "Wa'adin lambar shigarka ya ƙare. Sake gwadawa.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Asusun gwaji",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO na kamfani"
+    "providerEnterpriseSso": "SSO na kamfani",
+    "passkeysTitle": "Maɓallan shiga",
+    "passkeysSubtitle": "Shiga ba tare da kalmar sirri ba",
+    "passkeysEmpty": "Babu maɓallin shiga tukuna",
+    "passkeysEmptyHint": "$t(profile.addPasskey) don shiga ba tare da kalmar sirri ba.",
+    "passkeysCouldNotLoad": "Ba a iya loda maɓallan shiga ba",
+    "passkeysLoadFailed": "Maɓallan shiga ba su samuwa har sai an loda wannan.",
+    "addPasskey": "Ƙara maɓallin shiga",
+    "passkeyDefaultName": "Maɓallin shiga",
+    "passkeyAddedOn": "An ƙara {{date}}",
+    "passkeyAdded": "An ƙara maɓallin shiga.",
+    "passkeyAddFailed": "Ba a iya ƙara maɓallin shiga ba. Sake gwadawa.",
+    "passkeyAddUnsupported": "Wannan na'urar ba za ta iya ƙirƙirar maɓallan shiga ba.",
+    "passkeyAddCancelled": "An soke ƙirƙirar maɓallin shiga.",
+    "passkeyRemoved": "An cire maɓallin shiga.",
+    "passkeyRemoveFailed": "Ba a iya cire wannan maɓallin shiga ba. Sake gwadawa.",
+    "passkeyRenamed": "An sake sunan maɓallin shiga.",
+    "passkeyName": "Sunan maɓallin shiga",
+    "renamePasskey": "Sake sunan maɓallin shiga",
+    "removePasskey": "Cire maɓallin shiga",
+    "removePasskeyTitle": "Cire maɓallin shiga?",
+    "removePasskeyMessage": "Ba za ka iya shiga da wannan maɓallin shiga ba kuma."
   },
   "preferences": {
     "general": "Gaba ɗaya",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "An loda fayiloli {{displayCount}} cikin {{total}}",
       "filesStillLoading": "Har yanzu ana loda fayilolin. Ja don sabuntawa.",
       "goToOverview": "Je zuwa taƙaitaccen bayani",
-      "goToOverviewTab": "Je zuwa shafin taƙaitaccen bayani"
+      "goToOverviewTab": "Je zuwa shafin taƙaitaccen bayani",
+      "expandAllLines_one": "Nuna duk layuka {{displayCount}}",
+      "expandAllLines_other": "Nuna duk layuka {{displayCount}}",
+      "expandLines_one": "Nuna layuka {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_other": "Nuna layuka {{displayCount}} ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Nuna layuka {{displayCount}} da ke kewaye",
+      "expandLinesOfContext_other": "Nuna layuka {{displayCount}} da ke kewaye",
+      "expandMoreLines_one": "Nuna ƙarin layuka {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_other": "Nuna ƙarin layuka {{displayCount}} ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "an loda fayiloli {{loaded}} cikin {{total}}",
+      "loadedOfTotalFiles_other": "an loda fayiloli {{loaded}} cikin {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ babu sabon layi a ƙarshen fayil",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Bai dace da sabon yanayin {{path}} ba"
       },
       "deletedUser": "mai amfani da aka share",
-      "replyForbiddenTerm": "Ba ka da izinin amsa wannan {{term}}."
+      "replyForbiddenTerm": "Ba ka da izinin amsa wannan {{term}}.",
+      "moreLinesAbove_one": "… akwai ƙarin layuka {{displayCount}} a sama.",
+      "moreLinesAbove_other": "… akwai ƙarin layuka {{displayCount}} a sama."
     },
     "couldNotOpenGitHubAppSettings": "An kasa buɗe saitunan manhajar GitHub.",
     "installKiloGitHubApp": "Shigar da manhajar Kilo ta GitHub",
@@ -574,7 +612,7 @@
       "pending": "{{displayCount}} suna jira",
       "skipped": "an tsallake {{displayCount}}",
       "checksCount": "gwaje-gwaje {{displayCount}}",
-      "checksCount_one": "gwaji {{displayCount}}",
+      "checksCount_one": "gwaje-gwaje {{displayCount}}",
       "checksCount_other": "gwaje-gwaje {{displayCount}}",
       "checkDetails": "cikakken bayanin gwaji"
     },
@@ -706,7 +744,9 @@
       "statusContext": "Layukan da ke kewaye",
       "lineLabel": "layi {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(marar komai)"
+      "emptyLine": "(marar komai)",
+      "truncationBanner_one": "Ana nuna fayiloli {{limit}} na farko cikin {{total}} da aka canza — iyakar API na GitHub.",
+      "truncationBanner_other": "Ana nuna fayiloli {{limit}} na farko cikin {{total}} da aka canza — iyakar API na GitHub."
     },
     "linkPasteClipboardEmpty": "Babu komai a allon kwafi.",
     "linkPasteNotAPullRequest": "Ba mahaɗin buƙatar haɗa canje-canje ko buƙatar haɗawa ba ne",
@@ -783,7 +823,7 @@
     "previewFullDescription": "Sanarwa suna nuna rubutun saƙo a allon kullenka.",
     "previewGenericDescription": "Sanarwa suna nuna cewa wani abu ya faru. Buɗe Kilo don karanta shi.",
     "channel": {
-      "agent": "Zamannin wakilai",
+      "agentProgress": "Ci gaban wakilai",
       "chat": "Saƙonnin tattaunawa",
       "kiloclaw": "Ayyukan KiloClaw",
       "balance": "Faɗakarwar ragowar kuɗi",
@@ -800,6 +840,15 @@
       "kiloclawActivitySubtitle": "kwafin shirin ya shirya ko ya gaza, ayyukan da aka tsara",
       "balanceAlertsSubtitle": "gargaɗin ƙarancin kuɗin ƙungiya",
       "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA"
+    },
+    "action": {
+      "openSession": "Buɗe zaman"
+    },
+    "needsInputAction": {
+      "approved": "An amince da buƙatar",
+      "replied": "An tura amsa",
+      "failed": "Ba a iya amsawa ba. Sake danna don sake gwadawa.",
+      "unavailable": "Wannan buƙatar ba ta jira ba."
     }
   },
   "tabs": {
@@ -880,7 +929,9 @@
       "uploadFailed": "An kasa ɗora fayil ɗin.",
       "failedToUploadFile": "An kasa ɗora fayil: {{reason}}.",
       "nothingToPaste": "Babu abin da za a manna.",
-      "metadataStripFailed": "An kasa cire ƙarin bayanan da ke cikin fayil ɗin hoton."
+      "metadataStripFailed": "An kasa cire ƙarin bayanan da ke cikin fayil ɗin hoton.",
+      "limit_one": "Za ka iya haɗa fayiloli har {{displayCount}}.",
+      "limit_other": "Za ka iya haɗa fayiloli har {{displayCount}}."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1675,11 @@
       "syncFindings": "Daidaita matsalolin da aka gano",
       "syncNow": "Daidaita yanzu",
       "syncQueued": "An saka daidaitawa a jerin jira",
-      "syncStatusUnavailable": "Ba a iya samun halin daidaitawa ba."
+      "syncStatusUnavailable": "Ba a iya samun halin daidaitawa ba.",
+      "daysOverdue_one": "Wa'adin ya wuce da kwanaki {{displayCount}}",
+      "daysOverdue_other": "Wa'adin ya wuce da kwanaki {{displayCount}}",
+      "findingsCount_one": "Matsaloli {{displayCount}} da aka gano",
+      "findingsCount_other": "Matsaloli {{displayCount}} da aka gano"
     },
     "dashboardMetrics": {
       "openFindings": "Matsalolin da ba a warware ba",
@@ -2131,20 +2186,7 @@
       "continueFrom": "Ana ci gaba da {{title}}.",
       "importingSession": "Ana shigo da zaman",
       "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zaman ba. Zaɓi Cloud Agent ko wani CLI.",
-      "importFailed": "An kasa shigo da wannan zaman.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Tsoho · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Ƙarami",
-      "sandboxInstanceShared": "Raba",
-      "sandboxInstanceLarge": "Babba",
-      "sandboxInstanceDevcontainer": "Kwantena Dev",
-      "sandboxInstanceProviderDefault": "Tsohowar mai bayarwa",
-      "sandboxCouldNotLoad": "Ba a iya lodin zaɓuɓɓukan sandbox ba",
-      "sandboxUnavailable": "Wannan sandbox ba ake samunsa ba. Zaɓi wani sandbox ko Tsoho.",
-      "sandboxUseDefault": "Yi amfani da Tsoho"
+      "importFailed": "An kasa shigo da wannan zaman."
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta fayil {{displayCount}}.",
@@ -2168,7 +2210,14 @@
       "updateTodos": "Sabunta jerin ayyuka",
       "linesBadge": "layuka {{displayCount}}",
       "filesBadge": "fayiloli {{displayCount}}",
-      "matchesBadge": "sakamako {{displayCount}}"
+      "matchesBadge": "sakamako {{displayCount}}",
+      "filesBadge_one": "fayiloli {{displayCount}}",
+      "filesBadge_other": "fayiloli {{displayCount}}",
+      "linesBadge_one": "layuka {{displayCount}}",
+      "linesBadge_other": "layuka {{displayCount}}",
+      "matchesBadge_one": "sakamako {{displayCount}}",
+      "matchesBadge_other": "sakamako {{displayCount}}",
+      "noOutput": "Babu fitarwa."
     },
     "readToolMarkdown": {
       "linesTruncated": "layuka {{start}}–{{end}} (an rage)",
@@ -2458,7 +2507,11 @@
       "files": "Fayiloli",
       "couldNotOpenPhotoPicker": "An kasa buɗe wurin zaɓar hoto. Sake kunna Kilo ka sake gwadawa.",
       "maxFilesAllowed": "Ba za ka iya ƙara fiye da fayiloli {{displayCount}} ba.",
-      "onlyAddingFiles": "Ana ƙara fayiloli {{accepted}} kawai cikin {{total}} (iyaka {{max}})"
+      "onlyAddingFiles": "Ana ƙara fayiloli {{accepted}} kawai cikin {{total}} (iyaka {{max}})",
+      "maxFilesAllowed_one": "Ba za ka iya ƙara fiye da fayiloli {{displayCount}} ba.",
+      "maxFilesAllowed_other": "Ba za ka iya ƙara fiye da fayiloli {{displayCount}} ba.",
+      "onlyAddingFiles_one": "Ana ƙara fayiloli {{accepted}} kawai cikin {{total}} (iyaka {{max}})",
+      "onlyAddingFiles_other": "Ana ƙara fayiloli {{accepted}} kawai cikin {{total}} (iyaka {{max}})"
     },
     "composer": {
       "addAttachment": "Haɗa fayil",
@@ -2476,7 +2529,9 @@
       "discardAttachmentsMessage": "Za a share fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
       "discardAttachmentsTitle": "Watsar da haɗe-haɗe?",
       "charactersRemaining": "Haruffa {{count}} ne suka rage",
-      "insertNewline": "Saka sabon layi"
+      "insertNewline": "Saka sabon layi",
+      "charactersRemaining_one": "Haruffa {{count}} ne suka rage",
+      "charactersRemaining_other": "Haruffa {{count}} ne suka rage"
     },
     "chatLink": {
       "linkCopied": "An kwafi mahaɗin",
@@ -2548,7 +2603,9 @@
       "stepsCount_one": "mataki {{steps}}",
       "stepsCount": "matakai {{steps}}",
       "stepsCount_other": "matakai {{steps}}",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Samfur ({{displayCount}})",
+      "modelsCount_other": "Samfura ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Amincewa ta atomatik",
@@ -2588,7 +2645,9 @@
     },
     "toolRun": {
       "sheetTitle": "Kiran kayan aiki",
-      "condensedLabel": "{{itemCount}} abubuwa; {{last}}"
+      "condensedLabel": "{{itemCount}} abubuwa; {{last}}",
+      "condensedLabel_one": "{{itemCount}} abubuwa; {{last}}",
+      "condensedLabel_other": "{{itemCount}} abubuwa; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2782,9 @@
     "cliCantReceiveFilesTitle": "Wannan zaman ba zai iya karɓar fayiloli ba",
     "cliCantReceiveFilesMessage": "Kilo CLI da ke gudanar da wannan zaman ba zai iya karɓar fayiloli ba. Sabunta CLI a waccan na'urar ko raba zuwa sabon zama.",
     "contentlessMessage": "Babu abin da za a raba — ba a haɗa rubutu ko fayiloli ba.",
-    "couldNotReadContent": "Ba a iya karanta abin da aka raba ba."
+    "couldNotReadContent": "Ba a iya karanta abin da aka raba ba.",
+    "onlyFirstFilesAttached_one": "Fayiloli {{displayCount}} na farko kawai za a haɗa.",
+    "onlyFirstFilesAttached_other": "Fayiloli {{displayCount}} na farko kawai za a haɗa."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3154,9 @@
     "couldNotApprove": "Ba a iya amincewa ba",
     "couldNotStart": "Ba a iya farawa ba",
     "channelName": "Wakilai da ke aiki",
-    "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle."
+    "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle.",
+    "openSession": "Buɗe",
+    "approveFailed": "An kasa amincewa. Danna $t(common.approve) don sake gwadawa."
   },
   "transcriptionModel": {
     "title": "Samfurin mayar da magana zuwa rubutu",
@@ -3118,15 +3181,7 @@
     "remoteOptionTitle": "Kwamfutarka",
     "remoteOptionBody": "Gudanar da Kilo a na'urarka ta hanyar CLI na `kilo remote`.",
     "skip": "Tsallake kaita",
-    "tutorialLabel": "Koyarwa",
-    "remoteTitle": "Fara zaman nesa na farko",
-    "remoteBody": "Haɗa kwamfutarka, sai ka fara zaman daga nan.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Babu kwamfuta da aka haɗa tukuna",
-    "remoteEmptyBody": "Don haɗa shi, gudanar da `kilo remote` a kwamfutarka.",
-    "remoteFound": "An haɗa kwamfuta",
-    "checkAgain": "Sake dubawa",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Koyarwa"
   },
   "appActions": {
     "start": {
@@ -3134,5 +3189,8 @@
       "repositoryUnknown": "Kilo ba ya gane {{repository}} a matsayin ma'ajiyar GitHub ko GitLab. Zaɓi wata ma'ajiya a cikin Kilo.",
       "repositoryUnsupported": "{{repository}} ma'ajiyar Bitbucket ce — Fara wakili ba zai iya amfani da ita ba tukuna. Zaɓi wata ma'ajiya a cikin Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Buɗe zaman ƙarshe"
   }
 }

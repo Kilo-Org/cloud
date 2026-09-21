@@ -1,5 +1,5 @@
-import { type RefObject } from 'react';
-import { ScrollView, View } from 'react-native';
+import { type RefObject, useState } from 'react';
+import { type LayoutChangeEvent, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -194,16 +194,27 @@ export function NewSessionConfigureForm({
   // layout and never re-anchors, so the keyboard must be dismissed before
   // the sheet opens.)
   const { bottom } = useSafeAreaInsets();
+  // The scroll frame's own height, reported by the ScrollView below. It already
+  // shrinks with the keyboard because `AppAwareKeyboardPaddingView` pads this
+  // parent; the prompt yields its minimum height to it so the whole composer
+  // card renders above the bottom system bar.
+  const [frameHeight, setFrameHeight] = useState(0);
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
   const runOnNote =
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
 
+  function handleScrollFrameLayout(event: LayoutChangeEvent) {
+    const next = Math.max(Math.round(event.nativeEvent.layout.height), 0);
+    setFrameHeight(current => (current === next ? current : next));
+  }
+
   const body = (
     <ScrollView
       className="flex-1"
       contentContainerClassName="flex-grow px-4 pt-4"
+      onLayout={handleScrollFrameLayout}
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
       keyboardDismissMode="on-drag"
@@ -234,6 +245,7 @@ export function NewSessionConfigureForm({
         shareId={shareId}
         voiceInputSettlerRef={voiceInputSettlerRef}
         initialPrompt={initialPrompt}
+        frameHeight={frameHeight}
         onStartSession={isStartDisabled ? undefined : onStartSession}
         isCloneEntry={isCloneEntry}
       />

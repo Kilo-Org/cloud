@@ -20,6 +20,7 @@ export type ContextDisplayScope = { organizationId: string | null; isResolved: b
 /** The caller supplies its cached memberships; the picker does not fetch data. */
 export function useContextPicker(orgs: OrgListEntry[] | undefined) {
   const { showActionSheetWithOptions } = useActionSheet();
+  const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
   const { setOrganizationId } = useOrganization();
@@ -39,7 +40,9 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
         options,
         cancelButtonIndex,
         title: t('profile.selectAccount'),
-        containerStyle: { paddingBottom: bottom },
+        containerStyle: { paddingBottom: bottom, backgroundColor: colors.card },
+        textStyle: { color: colors.foreground },
+        titleTextStyle: { color: colors.mutedForeground },
       },
       index => {
         if (index === undefined || index === cancelButtonIndex) {

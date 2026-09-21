@@ -32,8 +32,11 @@ function base(overrides: Partial<ShareGateStateInput> = {}): ShareGateStateInput
     validation: okValidation,
     storedIsError: false,
     storedIsSuccess: true,
+    storedIsPaused: false,
     activeIsError: false,
-    storedRowCount: 3,
+    activeIsPaused: false,
+    liveRowCount: 3,
+    storedSessionCount: 3,
     isLoading: false,
     ...overrides,
   };
@@ -117,18 +120,18 @@ describe('selectShareGateState', () => {
 
   it('loading while destination queries are in flight', () => {
     const state = selectShareGateState(
-      base({ isLoading: true, storedIsSuccess: false, storedRowCount: 0 })
+      base({ isLoading: true, storedIsSuccess: false, liveRowCount: 0 })
     );
     expect(state.kind).toBe('loading');
     expect(state.showNewSession).toBe(true);
   });
 
-  it('retryable when storedIsError with zero stored rows', () => {
+  it('retryable when storedIsError with zero live rows', () => {
     const state = selectShareGateState(
       base({
         storedIsError: true,
         storedIsSuccess: false,
-        storedRowCount: 0,
+        liveRowCount: 0,
         isLoading: false,
       })
     );
@@ -141,36 +144,132 @@ describe('selectShareGateState', () => {
     }
   });
 
-  it('activeIsError alone is NOT retryable', () => {
+  it('activeIsError alone is NOT retryable while live rows are offered', () => {
     const state = selectShareGateState(
       base({
         activeIsError: true,
         storedIsError: false,
         storedIsSuccess: true,
-        storedRowCount: 2,
+        liveRowCount: 2,
       })
     );
     expect(state.kind).toBe('happy');
     expect(state.showRetry).toBe(false);
   });
 
-  it('activeIsError with empty stored success is empty, not retryable', () => {
+  it('retryable when the live lookup failed and stored sessions exist', () => {
     const state = selectShareGateState(
       base({
         activeIsError: true,
         storedIsError: false,
         storedIsSuccess: true,
-        storedRowCount: 0,
+        liveRowCount: 0,
+        storedSessionCount: 2,
       })
     );
-    expect(state.kind).toBe('empty');
-    expect(state.showRetry).toBe(false);
+    expect(state.kind).toBe('retryable');
+    if (state.kind === 'retryable') {
+      expect(state.message).toBe("Couldn't load your sessions.");
+      expect(state.showRetry).toBe(true);
+      expect(state.showNewSession).toBe(true);
+      expect(state.showList).toBe(false);
+    }
+  });
+
+  it('treats the live lookup failure as retryable whenever no live row is offered', () => {
+    const state = selectShareGateState(
+      base({
+        activeIsError: true,
+        storedIsError: false,
+        storedIsSuccess: true,
+        liveRowCount: 0,
+        storedSessionCount: 0,
+      })
+    );
+    expect(state.kind).toBe('retryable');
+    expect(state.showRetry).toBe(true);
     expect(state.showNewSession).toBe(true);
   });
 
-  it('empty when settled with zero destinations', () => {
+  it('retryable when the live lookup is paused with zero live rows', () => {
     const state = selectShareGateState(
-      base({ storedRowCount: 0, storedIsSuccess: true, storedIsError: false })
+      base({
+        activeIsPaused: true,
+        storedIsError: false,
+        storedIsSuccess: true,
+        liveRowCount: 0,
+        storedSessionCount: 2,
+      })
+    );
+    expect(state.kind).toBe('retryable');
+    if (state.kind === 'retryable') {
+      expect(state.message).toBe("Couldn't load your sessions.");
+      expect(state.showRetry).toBe(true);
+      expect(state.showNewSession).toBe(true);
+      expect(state.showList).toBe(false);
+    }
+  });
+
+  it('happy when the live lookup is paused but cached live rows are offered', () => {
+    const state = selectShareGateState(
+      base({
+        activeIsPaused: true,
+        storedIsError: false,
+        storedIsSuccess: true,
+        liveRowCount: 2,
+      })
+    );
+    expect(state.kind).toBe('happy');
+    expect(state.showRetry).toBe(false);
+  });
+
+  it('retryable when the stored page is paused with no cache (fresh offline open)', () => {
+    // Offline fresh open: the stored infinite query is paused with no cached
+    // page, so it is neither loading nor errored and offers no rows. It must
+    // not settle on the skeleton; the user needs a Retry.
+    const state = selectShareGateState(
+      base({
+        storedIsError: false,
+        storedIsSuccess: false,
+        storedIsPaused: true,
+        activeIsError: false,
+        activeIsPaused: true,
+        liveRowCount: 0,
+        storedSessionCount: 0,
+        isLoading: false,
+      })
+    );
+    expect(state.kind).toBe('retryable');
+    if (state.kind === 'retryable') {
+      expect(state.message).toBe("Couldn't load your sessions.");
+      expect(state.showRetry).toBe(true);
+      expect(state.showNewSession).toBe(true);
+      expect(state.showList).toBe(false);
+    }
+  });
+
+  it('loading while the stored page is unresolved but not paused', () => {
+    const state = selectShareGateState(
+      base({
+        storedIsError: false,
+        storedIsSuccess: false,
+        storedIsPaused: false,
+        liveRowCount: 0,
+        storedSessionCount: 0,
+        isLoading: false,
+      })
+    );
+    expect(state.kind).toBe('loading');
+  });
+
+  it('empty when settled with zero live rows and no stored sessions', () => {
+    const state = selectShareGateState(
+      base({
+        liveRowCount: 0,
+        storedSessionCount: 0,
+        storedIsSuccess: true,
+        storedIsError: false,
+      })
     );
     expect(state.kind).toBe('empty');
     if (state.kind === 'empty') {
@@ -181,8 +280,28 @@ describe('selectShareGateState', () => {
     }
   });
 
+  it('empty with live-aware copy when stored sessions exist but none are live', () => {
+    const state = selectShareGateState(
+      base({
+        liveRowCount: 0,
+        storedSessionCount: 4,
+        storedIsSuccess: true,
+        storedIsError: false,
+      })
+    );
+    expect(state.kind).toBe('empty');
+    if (state.kind === 'empty') {
+      // Reuses the app's live-empty copy (`home.noLiveSessions`), never
+      // `share.emptyMessage`, so offline sessions are not called "no sessions".
+      expect(state.message).toBe('Nothing running right now');
+      expect(state.showNewSession).toBe(true);
+      expect(state.showRetry).toBe(false);
+      expect(state.showList).toBe(false);
+    }
+  });
+
   it('happy when payload valid and queries settled with rows', () => {
-    const state = selectShareGateState(base({ storedRowCount: 5 }));
+    const state = selectShareGateState(base({ liveRowCount: 5 }));
     expect(state.kind).toBe('happy');
     if (state.kind === 'happy') {
       expect(state.showNewSession).toBe(true);

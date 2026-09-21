@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isKiloBrowserToolCallName,
   isRemoteMcpToolName,
   isWebMcpToolCallEvent,
   isWorkflowToolName,
+  toBrowserToolCallEvents,
   toDangerousToolCallEvents,
   toWebMcpToolCallEvents,
   toWorkflowToolCallEvent,
@@ -25,7 +27,7 @@ describe('workflow tool call events', () => {
   });
 
   it('does not recognize safe tool names as workflow names', () => {
-    expect(isWorkflowToolName('eval')).toBe(false);
+    expect(isWorkflowToolName('kilo_browser_click')).toBe(false);
     expect(isWorkflowToolName('get_page_snapshot')).toBe(false);
     expect(isWorkflowToolName('search_memories')).toBe(false);
     expect(isWorkflowToolName('mcp_test_tool')).toBe(false);
@@ -50,7 +52,7 @@ describe('workflow tool call events', () => {
     const request: KiloGatewayToolCallRequest = {
       arguments: {},
       id: 'call-1',
-      name: 'eval',
+      name: 'kilo_browser_snapshot',
     };
     const event = toWorkflowToolCallEvent(request, 7);
 
@@ -112,6 +114,94 @@ describe('workflow tool call events', () => {
     expect(isRemoteMcpToolName('search_workflows')).toBe(false);
     expect(isRemoteMcpToolName('run_workflow')).toBe(false);
     expect(isRemoteMcpToolName('mcp_test_search_workflows')).toBe(true);
+  });
+});
+
+describe('kilo browser tool call events', () => {
+  it('recognizes only kilo_browser_ names', () => {
+    expect(isKiloBrowserToolCallName('kilo_browser_click')).toBe(true);
+    expect(isKiloBrowserToolCallName('kilo_browser_snapshot')).toBe(true);
+    expect(isKiloBrowserToolCallName('browser_click')).toBe(false);
+    expect(isKiloBrowserToolCallName('get_page_snapshot')).toBe(false);
+    expect(isKiloBrowserToolCallName('mcp_test_tool')).toBe(false);
+  });
+
+  it('accepts a kilo_browser_ name in the gateway tool union', () => {
+    const request: KiloGatewayToolCallRequest = {
+      arguments: { element: 'Save', ref: 'e5' },
+      id: 'call-click',
+      name: 'kilo_browser_click',
+    };
+
+    expect(request.name).toBe('kilo_browser_click');
+  });
+
+  it('carries the upstream arguments verbatim in dangerous mode', () => {
+    const nestedArguments = {
+      element: 'Save',
+      nested: { deep: { value: [1, 2, 3] } },
+      ref: 'e5',
+    };
+
+    const events = toBrowserToolCallEvents(
+      [{ arguments: nestedArguments, id: 'call-click', name: 'kilo_browser_click' }],
+      7,
+      'dangerous'
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      arguments: nestedArguments,
+      name: 'kilo_browser_click',
+      providerToolCallId: 'call-click',
+      tabId: 7,
+      type: 'tool-call',
+    });
+  });
+
+  it('exposes a read-only browser tool in safe mode', () => {
+    const events = toBrowserToolCallEvents(
+      [{ arguments: {}, id: 'call-snapshot', name: 'kilo_browser_snapshot' }],
+      7,
+      'safe'
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      arguments: {},
+      name: 'kilo_browser_snapshot',
+      providerToolCallId: 'call-snapshot',
+      tabId: 7,
+      type: 'tool-call',
+    });
+  });
+
+  it('refuses a non-read-only browser tool in safe mode instead of dropping it', () => {
+    const events = toBrowserToolCallEvents(
+      [{ arguments: { element: 'Save', ref: 'e5' }, id: 'call-click', name: 'kilo_browser_click' }],
+      7,
+      'safe'
+    );
+
+    expect(events).toStrictEqual([
+      expect.objectContaining({
+        error:
+          'kilo_browser_click is not read-only: safe mode exposes only the Playwright MCP tools the upstream server marks with readOnlyHint, and this tool does not carry it. Switch to danger mode to run it.',
+        ok: false,
+        toolCallId: 'call-click',
+        type: 'tool-result',
+      }),
+    ]);
+  });
+
+  it('ignores names that are not browser tool calls', () => {
+    expect(
+      toBrowserToolCallEvents(
+        [{ arguments: {}, id: 'call-1', name: 'run_workflow' }],
+        7,
+        'dangerous'
+      )
+    ).toStrictEqual([]);
   });
 });
 

@@ -1744,7 +1744,8 @@
       "matchesBadge_one": "совпадение: {{displayCount}}",
       "matchesBadge_other": "совпадений: {{displayCount}}",
       "matchesBadge_few": "совпадения: {{displayCount}}",
-      "matchesBadge_many": "совпадений: {{displayCount}}"
+      "matchesBadge_many": "совпадений: {{displayCount}}",
+      "noOutput": "Нет вывода."
     },
     "readToolMarkdown": {
       "linesTruncated": "строки {{start}}–{{end}} (вывод сокращён)",
@@ -3239,7 +3240,9 @@
     "couldNotApprove": "Не удалось одобрить",
     "couldNotStart": "Не удалось запустить",
     "channelName": "Активные агенты",
-    "activityKitDisabledBody": "Включите «Эфир активности» в настройках, чтобы видеть активных агентов на экране блокировки."
+    "activityKitDisabledBody": "Включите «Эфир активности» в настройках, чтобы видеть активных агентов на экране блокировки.",
+    "openSession": "Открыть",
+    "approveFailed": "Не удалось одобрить. Нажмите $t(common.approve), чтобы повторить."
   },
   "transcriptionModel": {
     "title": "Модель распознавания речи",
@@ -3264,15 +3267,7 @@
     "remoteOptionTitle": "Ваш компьютер",
     "remoteOptionBody": "Запустите Kilo на своём компьютере через CLI `kilo remote`.",
     "skip": "Пропустить тур",
-    "tutorialLabel": "Обучение",
-    "remoteTitle": "Запустите свой первый удалённый сеанс",
-    "remoteBody": "Подключите свой компьютер, а затем запустите сеанс отсюда.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Компьютер ещё не подключён",
-    "remoteEmptyBody": "Чтобы подключить его, выполните `kilo remote` на своём компьютере.",
-    "remoteFound": "Компьютер подключён",
-    "checkAgain": "Проверить ещё раз",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Обучение"
   },
   "appActions": {
     "start": {

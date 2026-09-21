@@ -1712,7 +1712,8 @@
       "linesBadge_one": "{{displayCount}} dòng",
       "linesBadge_other": "{{displayCount}} dòng",
       "matchesBadge_one": "{{displayCount}} kết quả khớp",
-      "matchesBadge_other": "{{displayCount}} kết quả khớp"
+      "matchesBadge_other": "{{displayCount}} kết quả khớp",
+      "noOutput": "Không có đầu ra."
     },
     "readToolMarkdown": {
       "linesTruncated": "dòng {{start}}–{{end}} (đã cắt bớt)",
@@ -3153,7 +3154,9 @@
     "couldNotApprove": "Không thể phê duyệt",
     "couldNotStart": "Không thể bắt đầu",
     "channelName": "Tác nhân đang hoạt động",
-    "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
+    "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
+    "openSession": "Mở",
+    "approveFailed": "Không thể phê duyệt. Nhấn $t(common.approve) để thử lại."
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",
@@ -3178,15 +3181,7 @@
     "remoteOptionTitle": "Máy tính của bạn",
     "remoteOptionBody": "Chạy Kilo trên máy của bạn qua CLI `kilo remote`.",
     "skip": "Bỏ qua tour",
-    "tutorialLabel": "Hướng dẫn",
-    "remoteTitle": "Bắt đầu phiên từ xa đầu tiên của bạn",
-    "remoteBody": "Kết nối máy tính của bạn, sau đó bắt đầu phiên từ đây.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Chưa có máy tính nào được kết nối",
-    "remoteEmptyBody": "Để kết nối, hãy chạy `kilo remote` trên máy tính của bạn.",
-    "remoteFound": "Đã kết nối máy tính",
-    "checkAgain": "Kiểm tra lại",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Hướng dẫn"
   },
   "appActions": {
     "start": {

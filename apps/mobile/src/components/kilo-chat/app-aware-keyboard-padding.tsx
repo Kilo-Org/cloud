@@ -22,8 +22,14 @@ function keyboardPaddingFromEvent(event: KeyboardEvent): number {
  * The bottom padding an AppAwareKeyboardPaddingView applies: the strip the IME
  * hides from the screen bottom — its reported height plus the bottom system-bar
  * inset on Android, the screen overlap on iOS — plus the caller's offset while
- * the keyboard is open, else 0. Exported so a pinned footer inside the padding
- * view can measure its own clearance using the same calculation.
+ * the keyboard is open, else 0.
+ *
+ * This is the app's one keyboard read (`keyboardWillShow` on iOS,
+ * `keyboardDidShow` on Android, where the window never resizes for the IME
+ * under API 35+). Exported so a screen that must react to the keyboard beyond
+ * reserving its height — a pinned footer measuring its own clearance, a
+ * reveal-end scroll — reads the same lift the padding view applies instead of
+ * adding a second listener.
  */
 export function useAppAwareKeyboardPadding(keyboardOffset = 0): number {
   const { bottom } = useSafeAreaInsets();

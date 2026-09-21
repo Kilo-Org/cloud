@@ -2248,7 +2248,8 @@
       "linesBadge_many": "{{displayCount}} linhas",
       "matchesBadge_one": "{{displayCount}} correspondência",
       "matchesBadge_other": "{{displayCount}} correspondências",
-      "matchesBadge_many": "{{displayCount}} correspondências"
+      "matchesBadge_many": "{{displayCount}} correspondências",
+      "noOutput": "Sem saída."
     },
     "readToolMarkdown": {
       "linesTruncated": "linhas {{start}}–{{end}} (truncadas)",
@@ -3196,7 +3197,9 @@
     "couldNotApprove": "Não foi possível aprovar",
     "couldNotStart": "Não foi possível iniciar",
     "channelName": "Agentes ativos",
-    "activityKitDisabledBody": "Ativa as atividades em direto nas definições para ver os agentes ativos no ecrã bloqueado."
+    "activityKitDisabledBody": "Ativa as atividades em direto nas definições para ver os agentes ativos no ecrã bloqueado.",
+    "openSession": "Abrir",
+    "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente."
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",
@@ -3221,15 +3224,7 @@
     "remoteOptionTitle": "O seu computador",
     "remoteOptionBody": "Execute o Kilo na sua própria máquina através da CLI `kilo remote`.",
     "skip": "Saltar tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Inicie a sua primeira sessão remota",
-    "remoteBody": "Ligue o seu computador e depois inicie a sessão a partir daqui.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ainda sem computador ligado",
-    "remoteEmptyBody": "Para ligá-lo, execute `kilo remote` no seu computador.",
-    "remoteFound": "Computador ligado",
-    "checkAgain": "Verificar novamente",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

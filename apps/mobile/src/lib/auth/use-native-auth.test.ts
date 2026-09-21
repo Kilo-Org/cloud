@@ -403,6 +403,53 @@ describe('useNativeAuth SSO recovery', () => {
   });
 });
 
+// ── In-flight refusal ──────────────────────────────────────────────────
+
+type PostAuthResult = Awaited<ReturnType<typeof postAuth>>;
+
+describe('useNativeAuth in-flight refusal', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('surfaces the reason and does not post again when a second submit is refused', async () => {
+    let resolvePost: ((value: PostAuthResult) => void) | undefined = undefined;
+    mockPostAuth.mockImplementation(async () => {
+      const held = await new Promise<PostAuthResult>(resolve => {
+        resolvePost = resolve;
+      });
+      return held;
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    // Hold the first request pending so the busy guard stays set.
+    let firstSubmit: Promise<boolean> | undefined = undefined;
+    act(() => {
+      firstSubmit = result?.requestEmailCode('user@example.com');
+    });
+    expect(resultRef.current?.busy).toBe('otp-send');
+
+    let secondResult: boolean | undefined = undefined;
+    await act(async () => {
+      secondResult = await result?.requestEmailCode('user@example.com');
+    });
+
+    expect(secondResult).toBe(false);
+    expect(mockPostAuth).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith('Could not complete sign in. Please try again.');
+
+    await act(async () => {
+      resolvePost?.({ ok: true, data: { success: true } });
+      await firstSubmit;
+    });
+
+    expect(resultRef.current?.busy).toBeUndefined();
+  });
+});
+
 // ── Created-account announcement ────────────────────────────────────────
 
 describe('useNativeAuth created-account announcement', () => {

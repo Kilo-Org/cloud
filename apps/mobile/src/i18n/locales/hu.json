@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} sor",
       "linesBadge_other": "{{displayCount}} sor",
       "matchesBadge_one": "{{displayCount}} találat",
-      "matchesBadge_other": "{{displayCount}} találat"
+      "matchesBadge_other": "{{displayCount}} találat",
+      "noOutput": "Nincs kimenet."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}. sor (csonkolva)",
@@ -3153,7 +3154,9 @@
     "couldNotApprove": "Nem sikerült jóváhagyni",
     "couldNotStart": "Nem sikerült elindítani",
     "channelName": "Aktív ügynökök",
-    "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
+    "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn.",
+    "openSession": "Megnyitás",
+    "approveFailed": "Nem sikerült jóváhagyni. Az újrapróbáláshoz koppints a $t(common.approve) elemre."
   },
   "transcriptionModel": {
     "title": "Átírási modell",
@@ -3178,15 +3181,7 @@
     "remoteOptionTitle": "A számítógéped",
     "remoteOptionBody": "Futtasd a Kilót a saját gépeden a `kilo remote` CLI-n keresztül.",
     "skip": "Bemutató kihagyása",
-    "tutorialLabel": "Oktatóprogram",
-    "remoteTitle": "Indítsd el az első távoli munkameneted",
-    "remoteBody": "Csatlakoztasd a számítógéped, majd indítsd innen a munkamenetet.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Még nincs számítógép csatlakoztatva",
-    "remoteEmptyBody": "A csatlakoztatáshoz futtasd a `kilo remote` parancsot a számítógépeden.",
-    "remoteFound": "Számítógép csatlakoztatva",
-    "checkAgain": "Ellenőrzés újra",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Oktatóprogram"
   },
   "appActions": {
     "start": {

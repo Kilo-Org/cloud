@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} γραμμή",
       "linesBadge_other": "{{displayCount}} γραμμές",
       "matchesBadge_one": "{{displayCount}} αντιστοιχία",
-      "matchesBadge_other": "{{displayCount}} αντιστοιχίες"
+      "matchesBadge_other": "{{displayCount}} αντιστοιχίες",
+      "noOutput": "Δεν υπάρχει έξοδος."
     },
     "readToolMarkdown": {
       "linesTruncated": "γραμμές {{start}}–{{end}} (περικομμένες)",
@@ -3153,7 +3154,9 @@
     "couldNotApprove": "Η έγκριση απέτυχε",
     "couldNotStart": "Η εκκίνηση απέτυχε",
     "channelName": "Ενεργοί πράκτορες",
-    "activityKitDisabledBody": "Ενεργοποίησε τις ζωντανές δραστηριότητες στις ρυθμίσεις για να βλέπεις τους ενεργούς πράκτορες στην οθόνη κλειδώματος."
+    "activityKitDisabledBody": "Ενεργοποίησε τις ζωντανές δραστηριότητες στις ρυθμίσεις για να βλέπεις τους ενεργούς πράκτορες στην οθόνη κλειδώματος.",
+    "openSession": "Άνοιξε",
+    "approveFailed": "Δεν ήταν δυνατή η έγκριση. Πάτησε $t(common.approve) για να δοκιμάσεις ξανά."
   },
   "transcriptionModel": {
     "title": "Μοντέλο απομαγνητοφώνησης",
@@ -3178,15 +3181,7 @@
     "remoteOptionTitle": "Ο υπολογιστής σου",
     "remoteOptionBody": "Εκτέλεσε το Kilo στο δικό σου μηχάνημα μέσω του CLI `kilo remote`.",
     "skip": "Παράλειξη ξενάγησης",
-    "tutorialLabel": "Οδηγός",
-    "remoteTitle": "Ξεκίνα την πρώτη απομακρυσμένη συνεδρία σου",
-    "remoteBody": "Σύνδεσε τον υπολογιστή σου και μετά ξεκίνα τη συνεδρία από εδώ.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Δεν έχει συνδεθεί υπολογιστής ακόμα",
-    "remoteEmptyBody": "Για να τον συνδέσεις, εκτέλεσε `kilo remote` στον υπολογιστή σου.",
-    "remoteFound": "Ο υπολογιστής συνδέθηκε",
-    "checkAgain": "Έλεγχος ξανά",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Οδηγός"
   },
   "appActions": {
     "start": {

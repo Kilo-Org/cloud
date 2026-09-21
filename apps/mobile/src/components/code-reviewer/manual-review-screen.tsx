@@ -303,7 +303,14 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         </ScrollView>
 
         {/* The primary action is a pinned footer when the form is taller than
-            the viewport, so it is never clipped at the scroll fold. */}
+            the viewport, so it is never clipped at the scroll fold. The open
+            keyboard cannot cover it either: the footer is the padding view's
+            second child, which reserves the keyboard's height on both platforms
+            (Android is edge-to-edge and the window never resizes for the IME).
+            This screen revealed the scroll body's end while the keyboard was up
+            before that move; with the action out of the scroll body there is no
+            trailing control left to reveal, and scrolling the body to its end
+            would carry the focused URL field off screen. */}
         <ManualReviewActionFooter>
           <Button
             loading={createReview.isPending}

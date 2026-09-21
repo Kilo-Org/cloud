@@ -2223,10 +2223,6 @@
       "linesTruncated": "ບັນທັດ {{start}}–{{end}} (ຕັດບາງສ່ວນອອກ)",
       "linesOf": "ບັນທັດ {{start}}–{{end}} ຈາກທັງໝົດ {{total}} ບັນທັດ"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "{{action}} ຂອງ Cloud Agent ລົ້ມເຫຼວ ({{status}}).",
-      "failed": "{{action}} ຂອງ Cloud Agent ລົ້ມເຫຼວ."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ຂໍ້ມູນເຂົ້າທີ່ປ່ຽນເປັນຮູບແບບສຳລັບຈັດເກັບບໍ່ໄດ້]",
       "errorPrefix": "ຂໍ້ຜິດພາດ: {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "ຜູ້ໃຫ້ບໍລິການໄດ້ປະຕິເສດຄຳຂໍແລ້ວ.",
       "assistantStopped": "ການສ້າງຄຳຕອບຖືກຢຸດແລ້ວ.",
       "assistantContextOverflow": "ການສົນທະນາຍາວເກີນກວ່າທີ່ໂມເດວຈະຮອງຮັບໄດ້.",
-      "assistantFailed": "ສ້າງຄຳຕອບບໍ່ສຳເລັດ.",
-      "sendFailed": "ບໍ່ສາມາດສົ່ງຂໍ້ຄວາມໄດ້. ກະລຸນາລອງໃໝ່."
+      "assistantFailed": "ສ້າງຄຳຕອບບໍ່ສຳເລັດ."
     },
     "filePart": {
       "loadingImage": "ກຳລັງໂຫຼດຮູບພາບ",

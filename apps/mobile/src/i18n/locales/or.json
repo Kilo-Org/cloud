@@ -2223,10 +2223,6 @@
       "linesTruncated": "ଧାଡ଼ି {{start}}–{{end}} (କାଟି ଦିଆଯାଇଛି)",
       "linesOf": "ମୋଟ {{total}} ଧାଡ଼ି ମଧ୍ୟରୁ {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent ର {{action}} ବିଫଳ ହେଲା ({{status}})।",
-      "failed": "Cloud Agent ର {{action}} ବିଫଳ ହେଲା।"
-    },
     "collectCopyableText": {
       "unserializableInput": "[କ୍ରମିକ ରୂପରେ ରୂପାନ୍ତର କରିହେଉନଥିବା ଇନପୁଟ୍]",
       "errorPrefix": "ତ୍ରୁଟି: {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "ସେବା ପ୍ରଦାନକାରୀ ଅନୁରୋଧକୁ ଅସ୍ୱୀକାର କଲେ।",
       "assistantStopped": "ଉତ୍ତର ଲେଖିବା ବନ୍ଦ ହୋଇଗଲା।",
       "assistantContextOverflow": "ବାର୍ତ୍ତାଳାପ ମଡେଲ୍ ପାଇଁ ଅତ୍ୟଧିକ ଲମ୍ବା ହୋଇଗଲାଣି।",
-      "assistantFailed": "ଉତ୍ତର ଦେବାରେ ବିଫଳ ହେଲା।",
-      "sendFailed": "ବାର୍ତ୍ତା ପଠାଇ ହେଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+      "assistantFailed": "ଉତ୍ତର ଦେବାରେ ବିଫଳ ହେଲା।"
     },
     "filePart": {
       "loadingImage": "ଛବି ଲୋଡ୍ ହେଉଛି",

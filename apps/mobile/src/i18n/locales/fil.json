@@ -2223,10 +2223,6 @@
       "linesTruncated": "mga linyang {{start}}–{{end}} (pinaikli)",
       "linesOf": "mga linyang {{start}}–{{end}} sa {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Nabigo ang {{action}} ng Cloud Agent ({{status}}).",
-      "failed": "Nabigo ang {{action}} ng Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[input na hindi ma-serialize]",
       "errorPrefix": "Problema: {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "Tinanggihan ng tagapagbigay ng serbisyo ang kahilingan.",
       "assistantStopped": "Inihinto ang tugon.",
       "assistantContextOverflow": "Masyadong mahaba ang pag-uusap para sa modelo.",
-      "assistantFailed": "Nabigo ang pagtugon.",
-      "sendFailed": "Hindi maipadala ang mensahe. Subukang muli."
+      "assistantFailed": "Nabigo ang pagtugon."
     },
     "filePart": {
       "loadingImage": "Naglo-load ng larawan",

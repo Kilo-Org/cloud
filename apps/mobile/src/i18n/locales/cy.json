@@ -2351,10 +2351,6 @@
       "linesTruncated": "llinellau {{start}}–{{end}} (wedi'u cwtogi)",
       "linesOf": "llinellau {{start}}–{{end}} o {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Methodd y weithred {{action}} yn Cloud Agent ({{status}}).",
-      "failed": "Methodd y weithred {{action}} yn Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[mewnbwn na ellir ei gyfresoli]",
       "errorPrefix": "Gwall: {{error}}"
@@ -2450,8 +2446,7 @@
       "assistantProviderRejected": "Gwrthododd y darparwr y cais.",
       "assistantStopped": "Ataliwyd yr ymateb.",
       "assistantContextOverflow": "Mae'r sgwrs yn rhy hir i'r model.",
-      "assistantFailed": "Methodd yr ymateb.",
-      "sendFailed": "Methu anfon y neges. Ceisiwch eto."
+      "assistantFailed": "Methodd yr ymateb."
     },
     "filePart": {
       "loadingImage": "Yn llwytho delwedd",

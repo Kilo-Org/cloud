@@ -1719,10 +1719,6 @@
       "linesTruncated": "baris {{start}}–{{end}} (dipotong)",
       "linesOf": "baris {{start}}–{{end}} dari {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Tindakan {{action}} pada Cloud Agent gagal ({{status}}).",
-      "failed": "Tindakan {{action}} pada Cloud Agent gagal."
-    },
     "collectCopyableText": {
       "unserializableInput": "[masukan tidak dapat diserialisasi]",
       "errorPrefix": "Kesalahan: {{error}}"
@@ -1818,8 +1814,7 @@
       "assistantProviderRejected": "Penyedia menolak permintaan.",
       "assistantStopped": "Respons dihentikan.",
       "assistantContextOverflow": "Percakapan ini terlalu panjang untuk diproses oleh model.",
-      "assistantFailed": "Gagal menghasilkan respons.",
-      "sendFailed": "Gagal mengirim pesan. Coba lagi."
+      "assistantFailed": "Gagal menghasilkan respons."
     },
     "filePart": {
       "loadingImage": "Memuat gambar",

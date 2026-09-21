@@ -2223,10 +2223,6 @@
       "linesTruncated": "sararoota {{start}}–{{end}} (gabaabbate)",
       "linesOf": "sararoota {{total}} keessaa {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "{{action}} Cloud Agent irratti hin milkoofne ({{status}}).",
-      "failed": "{{action}} Cloud Agent irratti hin milkoofne."
-    },
     "collectCopyableText": {
       "unserializableInput": "[galtee gara bifa kuufamuutti jijjiiramuu hin dandeenye]",
       "errorPrefix": "Dogoggora: {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "Dhiyeessaan gaaffii dideera.",
       "assistantStopped": "Deebiin dhaabame.",
       "assistantContextOverflow": "Mariin kun moodelichaaf baay'ee dheeraadha.",
-      "assistantFailed": "Deebii kennuun hin milkoofne.",
-      "sendFailed": "Ergaa erguu hin danda'amne. Deebi'ii yaali."
+      "assistantFailed": "Deebii kennuun hin milkoofne."
     },
     "filePart": {
       "loadingImage": "Suuraa fe'aa jira",

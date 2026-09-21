@@ -2223,10 +2223,6 @@
       "linesTruncated": "read {{start}}–{{end}} (kärbitud)",
       "linesOf": "read {{start}}–{{end}} (kokku {{total}})"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agenti toiming „{{action}}“ ebaõnnestus ({{status}}).",
-      "failed": "Cloud Agenti toiming „{{action}}“ ebaõnnestus."
-    },
     "collectCopyableText": {
       "unserializableInput": "[serialiseerimatu sisend]",
       "errorPrefix": "Viga: {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "Pakkuja lükkas päringu tagasi.",
       "assistantStopped": "Vastuse koostamine peatati.",
       "assistantContextOverflow": "Vestlus on mudeli jaoks liiga pikk.",
-      "assistantFailed": "Vastuse koostamine ebaõnnestus.",
-      "sendFailed": "Sõnumi saatmine ebaõnnestus. Proovi uuesti."
+      "assistantFailed": "Vastuse koostamine ebaõnnestus."
     },
     "filePart": {
       "loadingImage": "Pildi laadimine",

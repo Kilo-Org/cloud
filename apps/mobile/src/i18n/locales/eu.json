@@ -2223,10 +2223,6 @@
       "linesTruncated": "{{start}}–{{end}} lerroak (moztuta)",
       "linesOf": "{{start}}–{{end}} lerroak, guztira {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent-en eragiketak huts egin du: {{action}} ({{status}}).",
-      "failed": "Cloud Agent-en eragiketak huts egin du: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[serializatu ezineko sarrera]",
       "errorPrefix": "Errorea: {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "Hornitzaileak eskaera baztertu du.",
       "assistantStopped": "Erantzuna sortzea gelditu da.",
       "assistantContextOverflow": "Elkarrizketa luzeegia da modeloarentzat.",
-      "assistantFailed": "Erantzunak huts egin du.",
-      "sendFailed": "Ezin izan da mezua bidali. Saiatu berriro."
+      "assistantFailed": "Erantzunak huts egin du."
     },
     "filePart": {
       "loadingImage": "Irudia kargatzen",

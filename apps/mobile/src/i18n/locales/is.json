@@ -2223,10 +2223,6 @@
       "linesTruncated": "línur {{start}}–{{end}} (stytt)",
       "linesOf": "línur {{start}}–{{end}} af {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Aðgerðin {{action}} í Cloud Agent mistókst ({{status}}).",
-      "failed": "Aðgerðin {{action}} í Cloud Agent mistókst."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ekki er hægt að raðgreina inntakið]",
       "errorPrefix": "Villa: {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "Veitandinn hafnaði beiðninni.",
       "assistantStopped": "Hætt var að mynda svarið.",
       "assistantContextOverflow": "Samtalið er of langt fyrir líkanið.",
-      "assistantFailed": "Ekki tókst að mynda svarið.",
-      "sendFailed": "Ekki tókst að senda skilaboð. Reyndu aftur."
+      "assistantFailed": "Ekki tókst að mynda svarið."
     },
     "filePart": {
       "loadingImage": "Hleður myndinni",

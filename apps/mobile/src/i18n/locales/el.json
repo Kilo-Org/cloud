@@ -2223,10 +2223,6 @@
       "linesTruncated": "γραμμές {{start}}–{{end}} (περικομμένες)",
       "linesOf": "γραμμές {{start}}–{{end}} από {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Η ενέργεια {{action}} του Cloud Agent απέτυχε ({{status}}).",
-      "failed": "Η ενέργεια {{action}} του Cloud Agent απέτυχε."
-    },
     "collectCopyableText": {
       "unserializableInput": "[μη σειριοποιήσιμη είσοδος]",
       "errorPrefix": "Σφάλμα: {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "Ο πάροχος απέρριψε το αίτημα.",
       "assistantStopped": "Η δημιουργία της απάντησης διακόπηκε.",
       "assistantContextOverflow": "Η συνομιλία είναι πολύ μεγάλη για το μοντέλο.",
-      "assistantFailed": "Η δημιουργία της απάντησης απέτυχε.",
-      "sendFailed": "Δεν ήταν δυνατή η αποστολή του μηνύματος. Δοκίμασε ξανά."
+      "assistantFailed": "Η δημιουργία της απάντησης απέτυχε."
     },
     "filePart": {
       "loadingImage": "Φόρτωση εικόνας",

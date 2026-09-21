@@ -1699,10 +1699,6 @@
       "linesTruncated": "righe {{start}}–{{end}} (troncate)",
       "linesOf": "righe {{start}}–{{end}} di {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Operazione {{action}} di Cloud Agent non riuscita ({{status}}).",
-      "failed": "Operazione {{action}} di Cloud Agent non riuscita."
-    },
     "collectCopyableText": {
       "unserializableInput": "[input non serializzabile]",
       "errorPrefix": "Errore: {{error}}"
@@ -1798,8 +1794,7 @@
       "assistantProviderRejected": "Il fornitore ha rifiutato la richiesta.",
       "assistantStopped": "La risposta è stata interrotta.",
       "assistantContextOverflow": "La conversazione è troppo lunga per il modello.",
-      "assistantFailed": "Non è stato possibile generare la risposta.",
-      "sendFailed": "Impossibile inviare il messaggio. Riprova."
+      "assistantFailed": "Non è stato possibile generare la risposta."
     },
     "filePart": {
       "loadingImage": "Caricamento dell'immagine",

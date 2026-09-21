@@ -2223,10 +2223,6 @@
       "linesTruncated": "{{start}}–{{end}} sətirləri (qısaldılıb)",
       "linesOf": "{{start}}–{{end}} sətirləri, cəmi {{total}} sətir"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent üçün {{action}} əməliyyatı uğursuz oldu ({{status}}).",
-      "failed": "Cloud Agent üçün {{action}} əməliyyatı uğursuz oldu."
-    },
     "collectCopyableText": {
       "unserializableInput": "[seriyalaşdırıla bilməyən giriş]",
       "errorPrefix": "Xəta: {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "Təminatçı sorğunu rədd etdi.",
       "assistantStopped": "Cavabın yaradılması dayandırıldı.",
       "assistantContextOverflow": "Söhbət model üçün çox uzundur.",
-      "assistantFailed": "Cavabı yaratmaq mümkün olmadı.",
-      "sendFailed": "Mesajı göndərmək mümkün olmadı. Yenidən cəhd et."
+      "assistantFailed": "Cavabı yaratmaq mümkün olmadı."
     },
     "filePart": {
       "loadingImage": "Şəkil yüklənir",

@@ -2223,10 +2223,6 @@
       "linesTruncated": "{{start}}–{{end}} տողերը (կրճատված)",
       "linesOf": "{{start}}–{{end}} տողերը՝ {{total}}-ից"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent-ի գործողությունը ձախողվեց՝ {{action}} ({{status}})։",
-      "failed": "Cloud Agent-ի գործողությունը ձախողվեց՝ {{action}}։"
-    },
     "collectCopyableText": {
       "unserializableInput": "[մուտքային տվյալները հնարավոր չէ սերիալացնել]",
       "errorPrefix": "Սխալ՝ {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "Մատակարարը մերժեց հարցումը։",
       "assistantStopped": "Պատասխանի ստեղծումը դադարեցվեց։",
       "assistantContextOverflow": "Զրույցը չափազանց երկար է մոդելի համար։",
-      "assistantFailed": "Չհաջողվեց ստեղծել պատասխանը։",
-      "sendFailed": "Չհաջողվեց ուղարկել հաղորդագրությունը։ Կրկին փորձեք։"
+      "assistantFailed": "Չհաջողվեց ստեղծել պատասխանը։"
     },
     "filePart": {
       "loadingImage": "Պատկերը բեռնվում է",

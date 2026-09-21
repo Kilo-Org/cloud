@@ -2223,10 +2223,6 @@
       "linesTruncated": "layuka {{start}}–{{end}} (an rage)",
       "linesOf": "layuka {{start}}–{{end}} cikin {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "An kasa yin {{action}} a Cloud Agent ({{status}}).",
-      "failed": "An kasa yin {{action}} a Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[bayanan shigarwa da ba za a iya juyawa zuwa tsarin adanawa ba]",
       "errorPrefix": "Kuskure: {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "Mai ba da sabis ya ƙi buƙatar.",
       "assistantStopped": "An dakatar da amsar.",
       "assistantContextOverflow": "Tattaunawar ta yi tsawo fiye da abin da samfurin zai iya karɓa.",
-      "assistantFailed": "An kasa samar da amsar.",
-      "sendFailed": "An kasa aika saƙon. Sake gwadawa."
+      "assistantFailed": "An kasa samar da amsar."
     },
     "filePart": {
       "loadingImage": "Ana loda hoto",

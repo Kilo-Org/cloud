@@ -2223,10 +2223,6 @@
       "linesTruncated": "خطوط {{start}}–{{end}} (نمایش ناقص)",
       "linesOf": "خطوط {{start}}–{{end}} از {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "عملیات {{action}} در Cloud Agent ناموفق بود ({{status}}).",
-      "failed": "عملیات {{action}} در Cloud Agent ناموفق بود."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ورودی غیرقابل سریال‌سازی]",
       "errorPrefix": "خطا: {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "ارائه‌دهنده درخواست را رد کرد.",
       "assistantStopped": "پاسخ متوقف شد.",
       "assistantContextOverflow": "گفت‌وگو برای این مدل بیش از حد طولانی است.",
-      "assistantFailed": "تولید پاسخ ناموفق بود.",
-      "sendFailed": "ارسال پیام ممکن نشد. لطفاً دوباره تلاش کنید."
+      "assistantFailed": "تولید پاسخ ناموفق بود."
     },
     "filePart": {
       "loadingImage": "در حال بارگذاری تصویر",

@@ -1693,10 +1693,6 @@
       "linesTruncated": "पंक्तियाँ {{start}}–{{end}} (कुछ हिस्सा हटाया गया है)",
       "linesOf": "{{total}} में से पंक्तियाँ {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent में {{action}} विफल रहा ({{status}})।",
-      "failed": "Cloud Agent में {{action}} विफल रहा।"
-    },
     "collectCopyableText": {
       "unserializableInput": "[इनपुट को सीरियलाइज़ नहीं किया जा सकता]",
       "errorPrefix": "त्रुटि: {{error}}"
@@ -1792,8 +1788,7 @@
       "assistantProviderRejected": "प्रदाता ने अनुरोध अस्वीकार कर दिया।",
       "assistantStopped": "उत्तर देना रोक दिया गया।",
       "assistantContextOverflow": "मॉडल के लिए बातचीत बहुत लंबी है।",
-      "assistantFailed": "उत्तर नहीं मिल सका।",
-      "sendFailed": "संदेश भेजा नहीं जा सका। कृपया फिर से कोशिश करें।"
+      "assistantFailed": "उत्तर नहीं मिल सका।"
     },
     "filePart": {
       "loadingImage": "छवि लोड हो रही है",

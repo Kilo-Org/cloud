@@ -2287,10 +2287,6 @@
       "linesTruncated": "vrstice {{start}}–{{end}} (skrajšano)",
       "linesOf": "vrstice {{start}}–{{end}} od {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Dejanje {{action}} v storitvi Cloud Agent ni uspelo ({{status}}).",
-      "failed": "Dejanje {{action}} v storitvi Cloud Agent ni uspelo."
-    },
     "collectCopyableText": {
       "unserializableInput": "[vnosa ni mogoče serializirati]",
       "errorPrefix": "Napaka: {{error}}"
@@ -2386,8 +2382,7 @@
       "assistantProviderRejected": "Ponudnik je zavrnil zahtevo.",
       "assistantStopped": "Ustvarjanje odgovora je bilo ustavljeno.",
       "assistantContextOverflow": "Pogovor je predolg za model.",
-      "assistantFailed": "Odgovora ni bilo mogoče ustvariti.",
-      "sendFailed": "Sporočila ni bilo mogoče poslati. Poskusi znova."
+      "assistantFailed": "Odgovora ni bilo mogoče ustvariti."
     },
     "filePart": {
       "loadingImage": "Nalaganje slike",

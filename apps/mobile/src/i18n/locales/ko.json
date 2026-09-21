@@ -1719,10 +1719,6 @@
       "linesTruncated": "{{start}}–{{end}}줄 (일부 생략)",
       "linesOf": "전체 {{total}}줄 중 {{start}}–{{end}}줄"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent 작업 실패: {{action}} ({{status}}).",
-      "failed": "Cloud Agent 작업 실패: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[직렬화할 수 없는 입력]",
       "errorPrefix": "오류: {{error}}"
@@ -1818,8 +1814,7 @@
       "assistantProviderRejected": "제공업체가 요청을 거부했습니다.",
       "assistantStopped": "응답 생성이 중지되었습니다.",
       "assistantContextOverflow": "대화가 너무 길어 모델이 처리할 수 없습니다.",
-      "assistantFailed": "응답을 생성하지 못했습니다.",
-      "sendFailed": "메시지를 보내지 못했습니다. 다시 시도하세요."
+      "assistantFailed": "응답을 생성하지 못했습니다."
     },
     "filePart": {
       "loadingImage": "이미지 불러오는 중",

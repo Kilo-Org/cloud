@@ -2223,10 +2223,6 @@
       "linesTruncated": "редове {{start}}–{{end}} (съкратено)",
       "linesOf": "редове {{start}}–{{end}} от {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Действието „{{action}}“ в Cloud Agent не успя ({{status}}).",
-      "failed": "Действието „{{action}}“ в Cloud Agent не успя."
-    },
     "collectCopyableText": {
       "unserializableInput": "[входни данни, които не могат да се сериализират]",
       "errorPrefix": "Грешка: {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "Доставчикът отхвърли заявката.",
       "assistantStopped": "Генерирането на отговора беше спряно.",
       "assistantContextOverflow": "Разговорът е твърде дълъг за модела.",
-      "assistantFailed": "Не успяхме да генерираме отговор.",
-      "sendFailed": "Не успяхме да изпратим съобщението. Опитай отново."
+      "assistantFailed": "Не успяхме да генерираме отговор."
     },
     "filePart": {
       "loadingImage": "Зареждане на изображението",

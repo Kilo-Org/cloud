@@ -2287,10 +2287,6 @@
       "linesTruncated": "радкі {{start}}–{{end}} (скарочана)",
       "linesOf": "радкі {{start}}–{{end}} з {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Памылка аперацыі «{{action}}» у Cloud Agent ({{status}}).",
-      "failed": "Памылка аперацыі «{{action}}» у Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[уваходныя даныя немагчыма серыялізаваць]",
       "errorPrefix": "Памылка: {{error}}"
@@ -2386,8 +2382,7 @@
       "assistantProviderRejected": "Пастаўшчык адхіліў запыт.",
       "assistantStopped": "Стварэнне адказу спынена.",
       "assistantContextOverflow": "Размова занадта доўгая для мадэлі.",
-      "assistantFailed": "Не ўдалося стварыць адказ.",
-      "sendFailed": "Не ўдалося адправіць паведамленне. Паспрабуйце яшчэ раз."
+      "assistantFailed": "Не ўдалося стварыць адказ."
     },
     "filePart": {
       "loadingImage": "Загрузка выявы",

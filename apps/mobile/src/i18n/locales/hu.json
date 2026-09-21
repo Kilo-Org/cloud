@@ -2223,10 +2223,6 @@
       "linesTruncated": "{{start}}–{{end}}. sor (csonkolva)",
       "linesOf": "{{start}}–{{end}}. sor, összesen {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "A Cloud Agent művelete nem sikerült: {{action}} ({{status}}).",
-      "failed": "A Cloud Agent művelete nem sikerült: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[nem szerializálható bemenet]",
       "errorPrefix": "Hiba: {{error}}"
@@ -2322,8 +2318,7 @@
       "assistantProviderRejected": "A szolgáltató elutasította a kérést.",
       "assistantStopped": "A válasz létrehozása leállt.",
       "assistantContextOverflow": "A beszélgetés túl hosszú a modell számára.",
-      "assistantFailed": "Nem sikerült létrehozni a választ.",
-      "sendFailed": "Nem sikerült elküldeni az üzenetet. Próbáld újra."
+      "assistantFailed": "Nem sikerült létrehozni a választ."
     },
     "filePart": {
       "loadingImage": "Kép betöltése",

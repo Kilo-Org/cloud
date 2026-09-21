@@ -1,6 +1,10 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import 'server-only';
-import { validateAuthorizationHeader, JWT_TOKEN_VERSION } from '@/lib/tokens';
+import {
+  validateAuthorizationHeader,
+  JWT_TOKEN_VERSION,
+  isRejectedCredentialReason,
+} from '@/lib/tokens';
 import {
   CloudAgentNextRuntimeAuthorizationClaimSchema,
   RuntimeProxyAttestationAudienceSchema,
@@ -1362,6 +1366,16 @@ type GetAuthResponse =
   | {
       user: null;
       authFailedResponse: NextResponse<FailureResult<string>>;
+      /**
+       * True when the request presented a credential that failed verification,
+       * rather than presenting none. Such a request must not be downgraded to
+       * an anonymous identity; see `isRejectedCredentialReason`.
+       *
+       * `authError` always sets this. It is optional only so existing callers
+       * that construct a failure result directly keep compiling; absent means
+       * false.
+       */
+      credentialsRejected?: boolean;
       isNewUser?: undefined;
       organizationId?: undefined;
       internalApiUse?: undefined;
@@ -1372,6 +1386,7 @@ type GetAuthResponse =
   | {
       user: User;
       authFailedResponse: null;
+      credentialsRejected?: undefined;
       isNewUser?: boolean;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
@@ -1493,7 +1508,7 @@ async function resolveUserFromAuth(
     try {
       decoded = bearer ? jwt.decode(bearer) : null;
     } catch {
-      return authError(401, 'Invalid API token', '?');
+      return authError(401, 'Invalid API token', '?', { credentialsRejected: true });
     }
     const decodedPayload = decoded !== null && typeof decoded !== 'string' ? decoded : null;
     const decodedRuntimeAuthorization = decodedPayload?.runtimeAuthorization;
@@ -1523,7 +1538,9 @@ async function resolveUserFromAuth(
       runtimeProxyAttestationVerified,
     });
     if (authorizationValidationResult.error != undefined) {
-      return authError(401, authorizationValidationResult.error, '?');
+      return authError(401, authorizationValidationResult.error, '?', {
+        credentialsRejected: isRejectedCredentialReason(authorizationValidationResult.reason),
+      });
     }
 
     const user = await findUserById(authorizationValidationResult.kiloUserId, readDb);
@@ -1532,7 +1549,7 @@ async function resolveUserFromAuth(
       user?.api_token_pepper &&
       user.api_token_pepper !== authorizationValidationResult.apiTokenPepper
     ) {
-      return authError(401, 'Invalid API token', user.id);
+      return authError(401, 'Invalid API token', user.id, { credentialsRejected: true });
     }
     // A token-bound organization is signed; the request header is mutable.
     // Legacy and personal tokens intentionally continue to use the header.
@@ -1635,11 +1652,17 @@ async function appendCallbackPath(url: string): Promise<string> {
   return url;
 }
 
-function authError(status: number, error: string, kiloUserId: string) {
+function authError(
+  status: number,
+  error: string,
+  kiloUserId: string,
+  options?: { credentialsRejected?: boolean }
+) {
   console.warn(`AUTH-FAIL ${status} (${kiloUserId}): ${error}`);
   return {
     user: null,
     authFailedResponse: NextResponse.json(failureResult(error), { status }),
+    credentialsRejected: options?.credentialsRejected ?? false,
   };
 }
 

@@ -40,6 +40,7 @@ import {
   invalidPathResponse,
   invalidRequestResponse,
   malformedJsonResponse,
+  invalidTokenResponse,
   makeErrorReadable,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
@@ -47,6 +48,7 @@ import {
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
+  temporarilyBlockedModelResponse,
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   unavailableModelResponse,
@@ -109,6 +111,8 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
+import { isFableModel, isOpus5Model } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { CLAUDE_OPUS_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
 
 export const maxDuration = 800;
 
@@ -455,6 +459,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const {
     user: maybeUser,
     authFailedResponse,
+    credentialsRejected,
     organizationId: authOrganizationId,
     botId: authBotId,
     tokenSource: authTokenSource,
@@ -467,6 +472,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
+    // A caller that presented a credential we could not verify is not the same
+    // as a caller that presented none. Answering for it as anonymous would
+    // silently drop its account, organization, BYOK keys and credits, and would
+    // hide from the client that its stored token is broken. Fail the request so
+    // the client re-authenticates.
+    if (credentialsRejected) {
+      return invalidTokenResponse();
+    }
+
     // No valid auth
     if (!(await isFreeModel(effectiveModelIdLowerCased))) {
       // Paid model requires authentication
@@ -732,6 +746,18 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       bodyText: requestBodyText,
     });
     return temporarilyUnavailableResponse();
+  }
+
+  if (
+    !autoModel &&
+    (isFableModel(effectiveModelIdLowerCased) ||
+      isOpus5Model(effectiveModelIdLowerCased) ||
+      effectiveModelIdLowerCased === CLAUDE_OPUS_LATEST_MODEL_ALIAS)
+  ) {
+    console.warn(
+      `User requested temporarily blocked model ${effectiveModelIdLowerCased}; rejecting.`
+    );
+    return temporarilyBlockedModelResponse();
   }
 
   if (

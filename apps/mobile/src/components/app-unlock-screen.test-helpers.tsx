@@ -205,11 +205,17 @@ vi.mock('@/components/share/share-payload-navigator', () => ({
 vi.mock('@/lib/active-sessions-live-sync-mount', () => ({
   ActiveSessionsLiveSyncMount: 'ActiveSessionsLiveSyncMount',
 }));
+vi.mock('@/lib/artifacts/artifact-mirror-sync-mount', () => ({
+  ArtifactMirrorSyncMount: 'ArtifactMirrorSyncMount',
+}));
 vi.mock('@/lib/persist/cache-persistence-mount', () => ({
   CachePersistenceMount: 'CachePersistenceMount',
 }));
 vi.mock('@/lib/system-search-index-mount', () => ({
   SystemSearchIndexMount: 'SystemSearchIndexMount',
+}));
+vi.mock('@/lib/tool-summary-translation/tool-summary-translation-retry-mount', () => ({
+  ToolSummaryTranslationRetryMount: 'ToolSummaryTranslationRetryMount',
 }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/pr-review/pr-review-connect-gate', () => ({

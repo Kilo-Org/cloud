@@ -18,7 +18,12 @@ import { createWrapperKiloClient, type WrapperKiloClient, type WrapperPty } from
 import { materializeMessageAttachments } from '../session-bootstrap';
 import { runProcess, withTimeoutAndAbort } from '../utils';
 import { applySessionAttach } from './apply-attach';
-import { updateSessionSnapshots, unfilteredKiloEvents, eventKiloSessionId, sessionEventIdentity } from './feed';
+import {
+  updateSessionSnapshots,
+  unfilteredKiloEvents,
+  eventKiloSessionId,
+  sessionEventIdentity,
+} from './feed';
 import {
   forgetAttachedRoot,
   rememberAttachedRoot,
@@ -5592,14 +5597,21 @@ describe('buildHeartbeatPayload', () => {
       expect(activity.consumeGateResult('root_1')).toBe('fail');
       expect(activity.consumeGateResult('root_1')).toBeUndefined();
 
-      rememberChildSession({ childId: 'child_1', parentId: 'root_1', directory: session.directory });
+      rememberChildSession({
+        childId: 'child_1',
+        parentId: 'root_1',
+        directory: session.directory,
+      });
       const childProperties = { sessionID: 'child_1', gateResult: 'pass' };
       const childIdentity = sessionEventIdentity({
         type: 'session.updated',
         properties: childProperties,
         sessionId: eventKiloSessionId(childProperties),
       });
-      expect(childIdentity).toMatchObject({ kiloSessionId: 'child_1', rootKiloSessionId: 'root_1' });
+      expect(childIdentity).toMatchObject({
+        kiloSessionId: 'child_1',
+        rootKiloSessionId: 'root_1',
+      });
       activity.observeEvent(
         'session.updated',
         childIdentity?.kiloSessionId,

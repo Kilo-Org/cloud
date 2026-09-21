@@ -4,6 +4,7 @@ import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/sch
 import { and, desc, eq, gte, isNotNull, lt, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
 import * as z from 'zod';
 import {
+  CLOUD_AGENT_FAILURE_RESPONSIBILITIES,
   CloudAgentFailureReasonSchema,
   CloudAgentFailureResponsibilitySchema,
   type CloudAgentFailureResponsibility,
@@ -12,7 +13,7 @@ import {
 const MAX_INTERVAL_MS = 90 * 24 * 60 * 60 * 1000;
 const HEALTH_ERROR_SESSION_LIMIT = 100;
 const healthErrorSourceSchema = z.enum(['setup', 'run']);
-const healthResponsibilityFilterSchema = z.enum(['all', 'platform', 'user', 'unknown']);
+const healthResponsibilityFilterSchema = z.enum(['all', ...CLOUD_AGENT_FAILURE_RESPONSIBILITIES]);
 const intervalShape = { startDate: z.string().datetime(), endDate: z.string().datetime() };
 
 function hasAscendingInterval(input: { startDate: string; endDate: string }) {
@@ -148,6 +149,7 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
           failed: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_session_runs.status} = 'failed')`,
           interrupted: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_session_runs.status} = 'interrupted')`,
           platformFailures: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_session_runs.status} = 'failed' AND ${runResponsibility} = 'platform')`,
+          providerFailures: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_session_runs.status} = 'failed' AND ${runResponsibility} = 'provider')`,
           userFailures: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_session_runs.status} = 'failed' AND ${runResponsibility} = 'user')`,
           unknownFailures: sql<number>`COUNT(*) FILTER (WHERE ${cloud_agent_session_runs.status} = 'failed' AND ${runResponsibility} = 'unknown')`,
         })
@@ -297,6 +299,7 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
       sessionsObserved: count(sessionCountRows[0]?.sessionsObserved),
       setupFailures: 0,
       platformFailures: count(row?.platformFailures),
+      providerFailures: count(row?.providerFailures),
       userFailures: count(row?.userFailures),
       unknownFailures: count(row?.unknownFailures),
       runFailureRate: null as number | null,
@@ -334,6 +337,7 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
       const occurrences = count(setupRow.count);
       summary.setupFailures += occurrences;
       if (setupRow.responsibility === 'platform') summary.platformFailures += occurrences;
+      else if (setupRow.responsibility === 'provider') summary.providerFailures += occurrences;
       else if (setupRow.responsibility === 'user') summary.userFailures += occurrences;
       else summary.unknownFailures += occurrences;
       if (input.responsibility !== 'all' && setupRow.responsibility !== input.responsibility) {

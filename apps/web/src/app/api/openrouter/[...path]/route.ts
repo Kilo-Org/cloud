@@ -40,6 +40,7 @@ import {
   invalidPathResponse,
   invalidRequestResponse,
   malformedJsonResponse,
+  invalidTokenResponse,
   makeErrorReadable,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
@@ -469,6 +470,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   const {
     user: maybeUser,
     authFailedResponse,
+    credentialsRejected,
     organizationId: authOrganizationId,
     botId: authBotId,
     tokenSource: authTokenSource,
@@ -481,6 +483,15 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   let tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
+    // A caller that presented a credential we could not verify is not the same
+    // as a caller that presented none. Answering for it as anonymous would
+    // silently drop its account, organization, BYOK keys and credits, and would
+    // hide from the client that its stored token is broken. Fail the request so
+    // the client re-authenticates.
+    if (credentialsRejected) {
+      return invalidTokenResponse();
+    }
+
     // No valid auth
     if (!(await isFreeModel(effectiveModelIdLowerCased))) {
       // Paid model requires authentication

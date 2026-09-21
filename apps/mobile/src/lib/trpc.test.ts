@@ -77,9 +77,11 @@ vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.example.com',
   E2E_LATENCY_MESSAGES_MS: 0,
   E2E_LATENCY_SESSION_MS: 0,
+  // The secure-store read path reads this fault window; keep it closed.
+  E2E_SECURE_STORE_FAULT_MS: 0,
   // A getter, not a snapshot: the mock factory object is cached, so a test
   // must be able to swap the optional endpoint without re-running it.
-  get LATENCY_INGEST_URL() {
+  get LATENCY_INGEST_URL(): string | undefined {
     return latencyIngestUrlMock.value;
   },
 }));

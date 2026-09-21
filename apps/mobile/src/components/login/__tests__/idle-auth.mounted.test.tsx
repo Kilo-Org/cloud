@@ -1,9 +1,10 @@
-/* eslint-disable max-lines -- the SSO-recovery, passkey, legal-link, and email-validation suites share one native-auth mock harness; splitting them would duplicate every mock in this file */
+/* eslint-disable max-lines -- the suite owns the sign-in hierarchy contract and the inline-link touch-target audit for one screen, and the SSO-recovery, passkey, legal-link, and email-validation suites share one native-auth mock harness; splitting them would duplicate every mock in this file */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { openBrowserAsync } from 'expo-web-browser';
+import { AppleAuthenticationButtonStyle } from 'expo-apple-authentication';
 import {
   INLINE_LINK_CONNECTOR_CLASS,
   MIN_TAP_TARGET_DP,
@@ -26,6 +27,10 @@ const ssoRecovery: { value: SsoRecoveryFixture } = vi.hoisted(() => ({
 // the one input the screen reads from the client module.
 const passkeySupport = vi.hoisted(() => ({ supported: true }));
 
+// Which provider controls the screen renders: Apple availability and the
+// Google client ID both come from outside the component.
+const providers = vi.hoisted(() => ({ appleAvailable: false, googleConfigured: false }));
+
 // What the screen reads from the hook: a fixed result object plus the one piece
 // of state the busy treatment depends on.
 const nativeAuth = vi.hoisted(() => ({
@@ -45,7 +50,7 @@ vi.mock('@/lib/auth/use-native-auth', () => ({
     busy: nativeAuth.busy,
     emailError: nativeAuth.emailError,
     clearEmailError: nativeAuth.clearEmailError,
-    googleConfigured: false,
+    googleConfigured: providers.googleConfigured,
     signInWithApple: vi.fn(),
     signInWithGoogle: vi.fn(),
     signInWithPasskey: nativeAuth.signInWithPasskey,
@@ -64,9 +69,12 @@ vi.mock('@/lib/login-draft', () => ({
 
 vi.mock('expo-apple-authentication', () => ({
   AppleAuthenticationButton: 'AppleAuthenticationButton',
-  AppleAuthenticationButtonStyle: { WHITE: 0, BLACK: 1 },
+  AppleAuthenticationButtonStyle: { WHITE: 0, WHITE_OUTLINE: 1, BLACK: 2 },
   AppleAuthenticationButtonType: { SIGN_IN: 0 },
-  isAvailableAsync: vi.fn().mockResolvedValue(false),
+  isAvailableAsync: vi.fn(async () => {
+    await Promise.resolve();
+    return providers.appleAvailable;
+  }),
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -187,6 +195,84 @@ function slopDp(hitSlop: unknown): number {
   }
   return 0;
 }
+
+function findAppleButton(root: I): I {
+  const nodes = root.findAll(
+    n => typeof n.type === 'string' && (n.type as string) === 'AppleAuthenticationButton'
+  );
+  const node = nodes[0];
+  if (!node) {
+    throw new Error('Apple sign-in button not found');
+  }
+  return node;
+}
+
+/** A Button that keeps the default (brand-filled) variant is a primary action. */
+function filledPrimaryLabels(root: I): (string | undefined)[] {
+  return root
+    .findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button')
+    .filter(b => b.props.variant === undefined)
+    .map(b => b.props.accessibilityLabel as string | undefined);
+}
+
+// Provider controls are opt-in per test; the file default is the plain
+// email-only form every other suite renders.
+beforeEach(() => {
+  providers.appleAvailable = false;
+  providers.googleConfigured = false;
+});
+
+describe('IdleAuth sign-in hierarchy', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    passkeySupport.supported = true;
+    providers.appleAvailable = true;
+    providers.googleConfigured = true;
+  });
+
+  it('leaves the email Continue as the only filled primary action', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    // Every provider control is a secondary: Apple wears the outlined native
+    // style, Google and the passkey are outline Buttons.
+    expect(findAppleButton(renderer.root).props.buttonStyle).toBe(
+      AppleAuthenticationButtonStyle.WHITE_OUTLINE
+    );
+    expect(findButton(renderer.root, 'Sign in with Google').props.variant).toBe('outline');
+    expect(findButton(renderer.root, 'Sign in with a passkey').props.variant).toBe('outline');
+
+    expect(filledPrimaryLabels(renderer.root)).toEqual(['Continue with email']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('never falls back to a solid Apple button style', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const style = findAppleButton(renderer.root).props.buttonStyle;
+    expect(style).not.toBe(AppleAuthenticationButtonStyle.BLACK);
+    expect(style).not.toBe(AppleAuthenticationButtonStyle.WHITE);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps one filled primary action without Apple sign-in', async () => {
+    providers.appleAvailable = false;
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    expect(() => findAppleButton(renderer.root)).toThrow('Apple sign-in button not found');
+    expect(filledPrimaryLabels(renderer.root)).toEqual(['Continue with email']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
 
 describe('IdleAuth SSO recovery', () => {
   beforeEach(() => {

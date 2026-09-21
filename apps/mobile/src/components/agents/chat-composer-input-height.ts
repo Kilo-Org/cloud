@@ -164,7 +164,7 @@ export function resolveComposerMaxHeight({
  * the pills need, and small enough that the input still takes the line back
  * when the IME withdraws.
  */
-export const COMPOSER_VIEWPORT_FLOOR_CLEARANCE = 12;
+const COMPOSER_VIEWPORT_FLOOR_CLEARANCE = 12;
 
 /**
  * Remaining-space floor measured against the viewport the composer actually

@@ -240,6 +240,7 @@ export function ScreenHeader({
           // A status line is one line: a narrow window truncates it rather than
           // stacking it into a column beside the title.
           numberOfLines={1}
+          ellipsizeMode="tail"
           accessible={Boolean(eyebrow)}
           accessibilityElementsHidden={!eyebrow}
           importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}

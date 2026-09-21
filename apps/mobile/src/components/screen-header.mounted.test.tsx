@@ -416,6 +416,64 @@ describe('ScreenHeader mounted', () => {
     expect(renderer.root.props.className).toContain('pt-3');
   });
 
+  it.each([false, true])('keeps repository eyebrows on one line with RTL=%s', isRTL => {
+    i18nManager.isRTL = isRTL;
+    platform.OS = 'android';
+    const repositories = ['KILO-ORG/CLOUD', 'organization-with-a-long-name/repository-name'];
+
+    for (const eyebrow of repositories) {
+      const renderer = renderHeader({ title: '#6054', eyebrow, headerRight: 'Submit review' });
+      const label = renderer.root.findByType('Eyebrow');
+      expect(label.props.numberOfLines).toBe(1);
+      expect(label.props.ellipsizeMode).toBe('tail');
+      expect(label.children).toEqual([eyebrow]);
+      expect(label.props.accessible).toBe(true);
+      expect(label.parent?.props.className).toContain('min-w-0 flex-1');
+
+      // Files and Discussion have fewer header actions than Overview. Keep the
+      // same line limit as their available width changes instead of reflowing.
+      act(() => {
+        renderer.update(createElement(ScreenHeader, { title: '#6054', eyebrow }));
+      });
+      expect(renderer.root.findByType('Eyebrow').props.numberOfLines).toBe(1);
+      expect(findBackPressable(renderer.root).props.className).toContain('h-11 w-11');
+      renderer.unmount();
+    }
+  });
+
+  it('keeps a reserved eyebrow hidden and on one line until its label arrives', () => {
+    const renderer = renderHeader({ title: '#6054', reserveEyebrow: true, centerTitle: true });
+    const placeholder = renderer.root.findByType('Eyebrow');
+    expect(placeholder.props.numberOfLines).toBe(1);
+    expect(placeholder.props.accessible).toBe(false);
+    expect(placeholder.props.accessibilityElementsHidden).toBe(true);
+    expect(placeholder.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(placeholder.props.className).toContain('opacity-0');
+
+    act(() => {
+      renderer.update(
+        createElement(ScreenHeader, {
+          title: '#6054',
+          reserveEyebrow: true,
+          centerTitle: true,
+          eyebrow: 'KILO-ORG/CLOUD',
+        })
+      );
+    });
+    const label = renderer.root.findByType('Eyebrow');
+    expect(label.props.numberOfLines).toBe(1);
+    expect(label.props.className).toContain('text-center');
+    expect(label.props.className).not.toContain('opacity-0');
+    expect(label.props.accessible).toBe(true);
+    renderer.unmount();
+  });
+
+  it('omits an absent eyebrow when no space is reserved', () => {
+    const renderer = renderHeader({ title: '#6054' });
+    expect(renderer.root.findAllByType('Eyebrow')).toHaveLength(0);
+    renderer.unmount();
+  });
+
   it('pads the sheet header by the landscape side insets even when it skips the safe-area top', () => {
     safeArea.left = 47;
     safeArea.right = 59;

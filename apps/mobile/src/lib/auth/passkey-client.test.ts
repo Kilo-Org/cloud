@@ -122,6 +122,17 @@ describe('classifyPasskeyError', () => {
     }
   );
 
+  it.each(['name', 'message', 'code'])(
+    'classifies ASCII protocol errors in %s independently of the locale',
+    field => {
+      expect(classifyPasskeyError({ [field]: 'USERCANCELLED' })).toBe('cancelled');
+      expect(classifyPasskeyError({ [field]: 'NOCREDENTIALS' })).toBe('no-passkey');
+      expect(classifyPasskeyError({ [field]: 'NOTALLOWEDERROR' })).toBe('no-passkey');
+      expect(classifyPasskeyError({ [field]: 'NOTSUPPORTEDEXCEPTION' })).toBe('unsupported');
+      expect(classifyPasskeyError({ [field]: 'NOTCONFIGUREDEXCEPTION' })).toBe('unsupported');
+    }
+  );
+
   it.each([
     [{ name: 'USERCANCELLEDEXCEPTION' }, 'login.passkeyCancelled'],
     [{ message: 'NOCREDENTIALS' }, 'login.passkeyNotFound'],

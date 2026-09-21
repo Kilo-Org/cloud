@@ -60,13 +60,13 @@ function cliCatalogOption(overrides: Partial<SessionModelOption> = {}): SessionM
   };
 }
 
-function renderRow(option: SessionModelOption): TestRenderer.ReactTestRenderer {
+function renderRow(option: SessionModelOption, selected = false): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   TestRenderer.act(() => {
     ref.current = TestRenderer.create(
       createElement(ModelPickerOptionRow, {
         option,
-        selected: false,
+        selected,
         selectedVariant: '',
         isFavorite: false,
         onSelectModel: vi.fn<(option: SessionModelOption) => void>(),
@@ -98,6 +98,24 @@ function countWithAccessibilityLabel(root: TestRenderer.ReactTestInstance, label
     .length;
 }
 
+function trailingSlots(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return renderer.root
+    .findAll(
+      node =>
+        typeof node.type === 'string' &&
+        ((node.type as string) === 'Star' || (node.type as string) === 'Check')
+    )
+    .map(node => `${String(node.type)}:${String(node.props.size)}`);
+}
+
+function checkAccessories(
+  renderer: TestRenderer.ReactTestRenderer
+): { color: unknown; size: unknown }[] {
+  return renderer.root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Check')
+    .map(node => ({ color: node.props.color, size: node.props.size }));
+}
+
 describe('ModelPickerOptionRow BYOK badge', () => {
   it('renders the BYOK badge for a CLI-catalog option with user BYOK available', () => {
     const renderer = renderRow(cliCatalogOption({ hasUserByokAvailable: true }));
@@ -113,5 +131,21 @@ describe('ModelPickerOptionRow BYOK badge', () => {
     const renderer = renderRow(cliCatalogOption({ isFree: true, mayTrainOnYourPrompts: true }));
     expect(textStrings(renderer.root)).not.toContain(freeModelFreeLabel());
     expect(countWithAccessibilityLabel(renderer.root, freeModelDataLabel())).toBe(0);
+  });
+});
+
+describe('ModelPickerOptionRow favorite star column', () => {
+  it('unselected rows reserve the same trailing accessory slot as selected rows', () => {
+    const option = cliCatalogOption();
+    expect(trailingSlots(renderRow(option, false))).toEqual(['Star:20', 'Check:18']);
+    expect(trailingSlots(renderRow(option, true))).toEqual(['Star:20', 'Check:18']);
+  });
+
+  it('hides the reserved check on unselected rows and shows it on selected rows', () => {
+    const option = cliCatalogOption();
+    expect(checkAccessories(renderRow(option, false))).toEqual([
+      { color: 'transparent', size: 18 },
+    ]);
+    expect(checkAccessories(renderRow(option, true))).toEqual([{ color: '#4F5A10', size: 18 }]);
   });
 });

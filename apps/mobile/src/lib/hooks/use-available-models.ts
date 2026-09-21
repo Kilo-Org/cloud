@@ -6,6 +6,7 @@ import { API_BASE_URL } from '@/lib/config';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { i18n } from '@/i18n';
 import { collator } from '@/lib/intl-cache';
+import { formatShortModelDisplayName } from '@/lib/model-display-name';
 
 const THINKING_EFFORT_KEYS = {
   none: 'models.thinkingEffort.none',
@@ -54,14 +55,6 @@ type ModelResponse = {
 
 // ── Pure model-option helpers ─────────────────────────────────────────
 
-function formatShortModelName(name: string): string {
-  if (!name) {
-    return name;
-  }
-  const colonIndex = name.indexOf(': ');
-  return colonIndex === -1 ? name : name.slice(colonIndex + 2);
-}
-
 export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
   if (!data?.data) {
     return [];
@@ -69,7 +62,7 @@ export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
 
   const items = data.data.map(model => ({
     id: model.id,
-    name: formatShortModelName(model.name),
+    name: formatShortModelDisplayName(model.name),
     isFree: model.isFree,
     mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
     hasUserByokAvailable: model.hasUserByokAvailable,

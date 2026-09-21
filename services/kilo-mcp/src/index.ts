@@ -941,7 +941,7 @@ const providerOptions: OAuthProviderOptions<Env> = {
   clientRegistrationEndpoint: '/register',
   scopesSupported: [MCP_SCOPE],
   accessTokenTTL: 3600,
-  // Session lifetime policy lives in ./oauth/session-lifetime: one year, with
+  // Session lifetime policy lives in ./oauth/session-lifetime: one month, with
   // the DCR record outliving the grant so a lapsed session re-authorizes.
   refreshTokenTTL: REFRESH_TOKEN_TTL_SECONDS,
   clientRegistrationTTL: CLIENT_REGISTRATION_TTL_SECONDS,

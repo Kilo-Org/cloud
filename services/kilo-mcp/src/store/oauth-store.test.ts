@@ -717,7 +717,7 @@ describe('production token routing (real provider + DO SQLite)', () => {
     }
   });
 
-  it('forgets a revoked grant’s history instead of keeping it for the one-year TTL', async () => {
+  it('forgets a revoked grant’s history instead of keeping it for the history TTL', async () => {
     const h = await harness();
     try {
       const [, grantId] = h.initial.refresh_token.split(':');
@@ -745,7 +745,7 @@ describe('production token routing (real provider + DO SQLite)', () => {
     }
   });
 
-  describe('session lifetime (one sign-in per year)', () => {
+  describe('session lifetime (one sign-in per month)', () => {
     /** Day 0: the instant the authorization code is exchanged for a grant. */
     const SESSION_START_MS = Date.UTC(2026, 0, 1, 12);
     const atDay = (day: number) => SESSION_START_MS + day * 24 * 60 * 60 * 1000;
@@ -760,10 +760,12 @@ describe('production token routing (real provider + DO SQLite)', () => {
       vi.unstubAllGlobals();
     });
 
-    it('continues a live session past the old 30-day cap', async () => {
+    it('continues a live session late in the month', async () => {
       const h = await harness();
       try {
-        vi.setSystemTime(atDay(31));
+        // Day 29 is the last full day inside the one-month bound and well past
+        // the two-week floor the request names.
+        vi.setSystemTime(atDay(29));
         const refreshed = await h.refresh(h.initial.refresh_token);
         expect(refreshed.status).toBe(200);
         const rotated = (await refreshed.json()) as {
@@ -781,31 +783,31 @@ describe('production token routing (real provider + DO SQLite)', () => {
       }
     });
 
-    it('keeps rotating a live session at day 100, past the old 90-day client record', async () => {
+    it('keeps the DCR record past the grant bound, so a lapsed session is invalid_grant not invalid_client', async () => {
       const h = await harness();
       try {
-        // The DCR record is looked up before the grant; if it were evicted
-        // inside the session the refresh would be `401 invalid_client`.
-        vi.setSystemTime(atDay(100));
-        const refreshed = await h.refresh(h.initial.refresh_token);
-        expect(refreshed.status).toBe(200);
-        const rotated = (await refreshed.json()) as { access_token: string };
-        expect((await h.mcp(rotated.access_token)).status).toBe(200);
+        // The DCR record is looked up before the grant. Were it to expire with
+        // the grant, day 31 would be `401 invalid_client`; the session+margin
+        // record keeps it a re-authorizable `invalid_grant`.
+        vi.setSystemTime(atDay(31));
+        const lapsed = await h.refresh(h.initial.refresh_token);
+        expect(lapsed.status).toBe(400);
+        expect(await lapsed.json()).toMatchObject({ error: 'invalid_grant' });
       } finally {
         h.db.close();
       }
     });
 
-    it('ends the session at the year bound instead of renewing it forever', async () => {
+    it('ends the session at the one-month bound instead of renewing it forever', async () => {
       const h = await harness();
       try {
-        vi.setSystemTime(atDay(364));
+        vi.setSystemTime(atDay(29));
         const refreshed = await h.refresh(h.initial.refresh_token);
         expect(refreshed.status).toBe(200);
         const rotated = (await refreshed.json()) as { access_token: string; refresh_token: string };
         expect((await h.mcp(rotated.access_token)).status).toBe(200);
 
-        vi.setSystemTime(atDay(366));
+        vi.setSystemTime(atDay(31));
         const lapsed = await h.refresh(rotated.refresh_token);
         expect(lapsed.status).toBe(400);
         // Only the OAuth error is contractual: the grant's KV expiration may
@@ -821,15 +823,16 @@ describe('production token routing (real provider + DO SQLite)', () => {
       }
     });
 
-    it('re-anchors the client record to a session that starts after registration, so it lasts its full year', async () => {
-      // The DCR record is written at registration (day 0); its lifetime cannot
-      // be anchored there, or a session that starts later outlives its own
-      // record and dies with `401 invalid_client` instead of `invalid_grant`.
+    it('re-anchors the client record to a session that starts after registration, so it lasts its full month', async () => {
+      // The DCR record is written at registration (day 0) with the
+      // session+margin TTL; its lifetime cannot be anchored there, or a session
+      // that starts later outlives its own record and dies with `401
+      // invalid_client` instead of `invalid_grant`.
       const h = await harness();
       try {
         // The user signs in through the real consent flow 40 days after the
-        // client registered. The grant minted now runs to day 405, while the
-        // day-0 record would expire at day 395.
+        // client registered. The grant minted now runs to day 70, while the
+        // day-0 record would expire at day 60.
         vi.setSystemTime(atDay(40));
         const exchanged = await h.exchange(await h.signIn());
         expect(exchanged.status).toBe(200);
@@ -838,28 +841,35 @@ describe('production token routing (real provider + DO SQLite)', () => {
           access_token: string;
         };
 
-        // Day 396 is past the day-0 record but inside the grant: the renewal
-        // at authorization is what keeps this a live session.
-        vi.setSystemTime(atDay(396));
+        // Day 65 is past the day-0 record but inside the grant: the renewal at
+        // authorization is what keeps this a live session.
+        vi.setSystemTime(atDay(65));
         const refreshed = await h.refresh(session.refresh_token);
         expect(refreshed.status).toBe(200);
         const rotated = (await refreshed.json()) as { access_token: string; refresh_token: string };
         expect((await h.mcp(rotated.access_token)).status).toBe(200);
 
         // The re-anchored record still lets the session end at its own bound.
-        vi.setSystemTime(atDay(406));
+        vi.setSystemTime(atDay(71));
         const lapsed = await h.refresh(rotated.refresh_token);
         expect(lapsed.status).toBe(400);
         expect(await lapsed.json()).toMatchObject({ error: 'invalid_grant' });
 
-        // The margin is anchored to this grant too: 15 days after the session
+        // The margin is anchored to this grant too: 20 days after the session
         // bound the record is still there, so the lapsed session reads as
         // `invalid_grant` (re-authorize) rather than `invalid_client`. A record
-        // left anchored at day 0 would have expired at day 395.
-        vi.setSystemTime(atDay(420));
+        // left anchored at day 0 would have expired at day 60.
+        vi.setSystemTime(atDay(90));
         const reauthorize = await h.refresh(rotated.refresh_token);
         expect(reauthorize.status).toBe(400);
         expect(await reauthorize.json()).toMatchObject({ error: 'invalid_grant' });
+
+        // Past the margin (day 100) the record is gone: only then does a
+        // re-authorization need a fresh client registration.
+        vi.setSystemTime(atDay(101));
+        const reregister = await h.refresh(rotated.refresh_token);
+        expect(reregister.status).toBe(401);
+        expect(await reregister.json()).toMatchObject({ error: 'invalid_client' });
       } finally {
         h.db.close();
       }
@@ -901,7 +911,7 @@ describe('production token routing (real provider + DO SQLite)', () => {
           )
           .all('user', grantId) as Array<{ token_hash: string; current: number }>;
         const hashes = await Promise.all(issued.map(token => hashRefreshToken(token)));
-        // (i) A year of rotations cannot grow the single global DO without bound.
+        // (i) A month of rotations cannot grow the single global DO without bound.
         expect(rows).toHaveLength(8);
         // (ii) Both tokens the provider still accepts survive with right flags.
         expect(rows[0]).toEqual({ token_hash: hashes[20], current: 1 });

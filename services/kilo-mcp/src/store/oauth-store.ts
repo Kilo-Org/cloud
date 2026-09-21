@@ -47,7 +47,7 @@ const PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000;
  * Newest refresh-token hashes kept per grant. The provider accepts the current
  * and the immediately previous refresh token, so eight rotations is the margin
  * that keeps both of them — and only a bounded number of older hashes — for
- * the whole session. Without the bound a year of rotations per client would
+ * the whole session. Without the bound a month of rotations per client would
  * grow this single global DO forever.
  */
 const REFRESH_HISTORY_KEEP_PER_GRANT = 8;
@@ -738,8 +738,8 @@ export class KiloMcpOAuthStore
   /**
    * Drop every hash recorded for a grant. The reuse guard calls this after it
    * revokes a grant: a dead grant can never authenticate another replay, so its
-   * rows must not sit in the single global DO until the one-year history TTL
-   * would have removed them.
+   * rows must not sit in the single global DO until the history TTL would have
+   * removed them.
    */
   async forgetRefreshTokens(parts: RefreshTokenParts): Promise<void> {
     this.db

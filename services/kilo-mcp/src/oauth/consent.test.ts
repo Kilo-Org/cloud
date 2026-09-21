@@ -788,7 +788,7 @@ describe('GET/POST /authorize/org', () => {
     expect(store.pending.get(id)?.status).toBe('completed');
   });
 
-  it('keeps a failed client-record renewal retryable instead of promising the year', async () => {
+  it('keeps a failed client-record renewal retryable instead of promising the session', async () => {
     const store = createFakeStore();
     const id = await seedPaired(store);
     const failing = fakeHelpers({ client: clientInfo(), updateError: new Error('kv down') });

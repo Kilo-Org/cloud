@@ -2259,7 +2259,7 @@
       "emptyTitle": "No folders inside",
       "emptyDescription": "Done uses this folder.",
       "retryableTitle": "Couldn't list folders",
-      "retryableDescription": "Check your connection and Retry. Done still confirms this folder.",
+      "retryableDescription": "Check your connection and try again. Done still confirms this folder.",
       "unsupportedTitle": "Can't list folders",
       "unsupportedDescription": "This CLI can't list folders. Done keeps the launch folder and Start session starts there."
     },

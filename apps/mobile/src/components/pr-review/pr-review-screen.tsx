@@ -297,10 +297,15 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
                 onPress={openReviewSubmit}
                 disabled={loadFailed}
                 accessibilityLabel={t('prReview.submit.submitReview')}
-                className={cn('px-3')}
+                // ScreenHeader caps a trailing action at half the row. A label
+                // that cannot shrink overflows that cap and is clipped by the
+                // screen edge at large font scales, so the button and its
+                // label shrink and wrap (as the Agents header action does)
+                // instead of drawing off-screen.
+                className={cn('min-w-0 shrink px-3')}
               >
                 <Check size={14} color={colors.primaryForeground} />
-                <Text>{t('prReview.submit.submitReview')}</Text>
+                <Text className="shrink text-center">{t('prReview.submit.submitReview')}</Text>
               </Button>
             ) : null}
           </View>

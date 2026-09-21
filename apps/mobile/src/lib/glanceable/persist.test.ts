@@ -7,10 +7,12 @@ import {
 
 import {
   _resetGlanceablePersistForTests,
+  _setGlanceableRestoreUnavailableForTests,
   _setLastGlanceableSnapshotForTests,
   _setSecureStoreForTests,
   getLastGlanceableSnapshot,
   getLocalScopeKey,
+  isGlanceableRestoreUnavailable,
   persistGlanceableSink,
   restorePersistedGlanceable,
 } from './persist';
@@ -137,5 +139,25 @@ describe('restorePersistedGlanceable', () => {
 
     expect(getLastGlanceableSnapshot()).toEqual(stored);
     expect(getLocalScopeKey()).toBe(stored.scopeKey);
+    expect(isGlanceableRestoreUnavailable()).toBe(false);
+  });
+
+  it('flags an unreadable mirror so a caller can tell it from an absent record', async () => {
+    // A locked keychain (expo-secure-store's default WHEN_UNLOCKED access): the
+    // record may exist but cannot be read.
+    secureStoreMock.getItemAsync.mockRejectedValueOnce(new Error('keychain locked'));
+
+    await restorePersistedGlanceable();
+
+    expect(getLastGlanceableSnapshot()).toBeNull();
+    expect(isGlanceableRestoreUnavailable()).toBe(true);
+  });
+
+  it('clears the unreadable flag after a read that succeeds', async () => {
+    _setGlanceableRestoreUnavailableForTests(true);
+
+    await restorePersistedGlanceable();
+
+    expect(isGlanceableRestoreUnavailable()).toBe(false);
   });
 });

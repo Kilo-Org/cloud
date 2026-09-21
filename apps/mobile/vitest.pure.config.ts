@@ -17,6 +17,9 @@ export default defineProject({
   test: {
     name: 'mobile-pure',
     environment: 'node',
+    // The app build's config module cannot load in this project; the setup
+    // file stubs the exports its importers read.
+    setupFiles: ['./vitest.setup.ts'],
     // Project configs do not inherit the root test options, and this suite
     // runs both projects in parallel: on a loaded host (dev stack, simulator,
     // Appium) workers starve and real-timer tests exceed the 5s default. One

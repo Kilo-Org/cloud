@@ -3267,15 +3267,7 @@
     "remoteOptionTitle": "Twój komputer",
     "remoteOptionBody": "Uruchom Kilo na własnej maszynie za pomocą CLI `kilo remote`.",
     "skip": "Pomiń przewodnik",
-    "tutorialLabel": "Samouczek",
-    "remoteTitle": "Rozpocznij swoją pierwszą sesję zdalną",
-    "remoteBody": "Połącz swój komputer, a następnie uruchom sesję stąd.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Brak podłączonego komputera",
-    "remoteEmptyBody": "Aby go połączyć, uruchom `kilo remote` na swoim komputerze.",
-    "remoteFound": "Komputer połączony",
-    "checkAgain": "Sprawdź ponownie",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Samouczek"
   },
   "appActions": {
     "start": {

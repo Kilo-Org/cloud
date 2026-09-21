@@ -3181,15 +3181,7 @@
     "remoteOptionTitle": "Kompüterin",
     "remoteOptionBody": "Kilo-nu `kilo remote` CLI vasitəsilə öz cihazında işə sal.",
     "skip": "Turu ötür",
-    "tutorialLabel": "Təlimat",
-    "remoteTitle": "İlk uzaq sessiyanı başlat",
-    "remoteBody": "Kompüterini qoş, sonra sessiyanı buradan başlat.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Hələ kompüter qoşulmayıb",
-    "remoteEmptyBody": "Onu qoşmaq üçün kompüterində `kilo remote` əmrini işə sal.",
-    "remoteFound": "Kompüter qoşuldu",
-    "checkAgain": "Yenidən yoxla",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Təlimat"
   },
   "appActions": {
     "start": {

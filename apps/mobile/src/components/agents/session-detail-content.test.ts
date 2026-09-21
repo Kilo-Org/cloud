@@ -2219,6 +2219,23 @@ describe('SessionDetailContent goal visibility', () => {
     expect(section[0]?.props.goal).toEqual(pausedGoal);
   });
 
+  it('sits the goal row a small margin under the header', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    // The screen shrinks the shared header padding for this screen only; the
+    // override replaces the ScreenHeader default `pb-3` through twMerge.
+    const header = view.renderer.root.findByType(ScreenHeader);
+    expect(header.props.className).toContain('pb-1');
+    expect(header.props.className).not.toContain('pb-3');
+
+    // The goal row still renders directly below the header.
+    const ordered = view.renderer.root.findAll(
+      node => Object.is(node.type, ScreenHeader) || Object.is(node.type, SessionGoalSection)
+    );
+    expect(ordered.map(node => node.type)).toEqual([ScreenHeader, SessionGoalSection]);
+  });
+
   it('hides the fixed goal row for a read-only session whose snapshot carries a goal', async () => {
     goalMountOptions = { goal: pausedGoal, resolvedType: 'read-only' };
     const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });

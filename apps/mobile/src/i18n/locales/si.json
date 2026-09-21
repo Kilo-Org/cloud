@@ -3181,15 +3181,7 @@
     "remoteOptionTitle": "ඔබේ පරිගණකය",
     "remoteOptionBody": "ඔබේම යන්ත්‍රයේ `kilo remote` CLI මගින් Kilo ධාවනය කරන්න.",
     "skip": "සංචාරය මඟහරින්න",
-    "tutorialLabel": "ඉගෙනුම් මාර්ගෝපදේශය",
-    "remoteTitle": "ඔබේ පළමු දුරස්ථ සැසිය අරඹන්න",
-    "remoteBody": "ඔබේ පරිගණකය සම්බන්ධ කර, පසුව සැසිය මෙතැනින් අරඹන්න.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "තවම පරිගණකයක් සම්බන්ධ වී නැත",
-    "remoteEmptyBody": "එය සම්බන්ධ කිරීමට ඔබේ පරිගණකයේ `kilo remote` ධාවනය කරන්න.",
-    "remoteFound": "පරිගණකය සම්බන්ධ විය",
-    "checkAgain": "නැවත පරීක්ෂා කරන්න",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ඉගෙනුම් මාර්ගෝපදේශය"
   },
   "appActions": {
     "start": {

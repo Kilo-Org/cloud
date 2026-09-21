@@ -3181,15 +3181,7 @@
     "remoteOptionTitle": "သင့်ကွန်ပျူတာ",
     "remoteOptionBody": "သင့်ကိုယ်ပိုင်စက်ပေါ်တွင် `kilo remote` CLI ဖြင့် Kilo ကို လုပ်ဆောင်ပါ။",
     "skip": "လမ်းညွှန်ကို ကျော်သွားပါ",
-    "tutorialLabel": "သင်ခန်းစာ",
-    "remoteTitle": "သင့်ပထမဆုံး ဝေးကွာဆက်ရှင်ကို စတင်ပါ",
-    "remoteBody": "သင့်ကွန်ပျူတာကို ချိတ်ဆက်ပြီး ဤနေရာမှ ဆက်ရှင်ကို စတင်ပါ။",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ကွန်ပျူတာ မချိတ်ဆက်ရသေးပါ",
-    "remoteEmptyBody": "၎င်းကို ချိတ်ဆက်ရန် သင့်ကွန်ပျူတာတွင် `kilo remote` ကို လုပ်ဆောင်ပါ။",
-    "remoteFound": "ကွန်ပျူတာ ချိတ်ဆက်ပြီး",
-    "checkAgain": "ထပ်စစ်ပါ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "သင်ခန်းစာ"
   },
   "appActions": {
     "start": {

@@ -3181,15 +3181,7 @@
     "remoteOptionTitle": "আপনার কম্পিউটার",
     "remoteOptionBody": "আপনার নিজের মেশিনে `kilo remote` CLI-এর মাধ্যমে Kilo চালান।",
     "skip": "ট্যুর বাদ দিন",
-    "tutorialLabel": "টিউটোরিয়াল",
-    "remoteTitle": "আপনার প্রথম রিমোট সেশন শুরু করুন",
-    "remoteBody": "আপনার কম্পিউটার সংযোগ করুন, তারপর এখান থেকে সেশন শুরু করুন।",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "এখনো কোনো কম্পিউটার সংযুক্ত হয়নি",
-    "remoteEmptyBody": "সংযোগ করতে আপনার কম্পিউটারে `kilo remote` চালান।",
-    "remoteFound": "কম্পিউটার সংযুক্ত",
-    "checkAgain": "আবার যাচাই করুন",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "টিউটোরিয়াল"
   },
   "appActions": {
     "start": {

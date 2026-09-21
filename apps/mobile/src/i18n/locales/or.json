@@ -3181,15 +3181,7 @@
     "remoteOptionTitle": "ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟର",
     "remoteOptionBody": "ଆପଣଙ୍କ ନିଜ ମେସିନରେ `kilo remote` CLI ମାଧ୍ୟମରେ Kilo ଚଲାନ୍ତୁ।",
     "skip": "ଭ୍ରମଣ ଛାଡ଼ନ୍ତୁ",
-    "tutorialLabel": "ଶିକ୍ଷା",
-    "remoteTitle": "ଆପଣଙ୍କ ପ୍ରଥମ ରିମୋଟ୍ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ",
-    "remoteBody": "ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରକୁ ସଂଯୋଗ କରନ୍ତୁ, ପରେ ଏଠାରୁ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ।",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି କମ୍ପ୍ୟୁଟର ସଂଯୋଗ ହୋଇନାହିଁ",
-    "remoteEmptyBody": "ଏହାକୁ ସଂଯୋଗ କରିବାକୁ ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରରେ `kilo remote` ଚଲାନ୍ତୁ।",
-    "remoteFound": "କମ୍ପ୍ୟୁଟର ସଂଯୋଗ ହୋଇଛି",
-    "checkAgain": "ପୁଣି ପରୀକ୍ଷା କରନ୍ତୁ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ଶିକ୍ଷା"
   },
   "appActions": {
     "start": {

@@ -3224,15 +3224,7 @@
     "remoteOptionTitle": "Tavs dators",
     "remoteOptionBody": "Palaid Kilo savā datorā, izmantojot `kilo remote` CLI.",
     "skip": "Izlaist apskati",
-    "tutorialLabel": "Apmācība",
-    "remoteTitle": "Sāc savu pirmo attālināto sesiju",
-    "remoteBody": "Pievieno datoru un tad sāc sesiju šeit.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Vēl nav pievienota datora",
-    "remoteEmptyBody": "Lai to pievienotu, palaid `kilo remote` savā datorā.",
-    "remoteFound": "Dators pievienots",
-    "checkAgain": "Pārbaudīt vēlreiz",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Apmācība"
   },
   "appActions": {
     "start": {

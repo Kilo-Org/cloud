@@ -3267,15 +3267,7 @@
     "remoteOptionTitle": "Váš počítač",
     "remoteOptionBody": "Spusťte Kilo na vlastním stroji prostřednictvím CLI `kilo remote`.",
     "skip": "Přeskočit prohlídku",
-    "tutorialLabel": "Návod",
-    "remoteTitle": "Spusťte svou první vzdálenou relaci",
-    "remoteBody": "Připojte svůj počítač a pak spusťte relaci odtud.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Zatím žádný připojený počítač",
-    "remoteEmptyBody": "Chcete-li ho připojit, spusťte na počítači `kilo remote`.",
-    "remoteFound": "Počítač připojen",
-    "checkAgain": "Zkontrolovat znovu",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Návod"
   },
   "appActions": {
     "start": {

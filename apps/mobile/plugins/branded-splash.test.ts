@@ -164,8 +164,15 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // Introspection reads the native project that is on disk, so a worktree with
+    // a prebuilt `android/` also carries that tree's other `colors.xml` entries
+    // (icon background, app background, notification icon). Assert the splash
+    // color is present instead of that it is the only entry, like the styles
+    // assertion below.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

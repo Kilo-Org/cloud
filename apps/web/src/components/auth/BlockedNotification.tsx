@@ -8,6 +8,7 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { INLINE_LINK_TOUCH_TARGET } from '@/components/auth/touch-targets';
 import Link from 'next/link';
 import { LANDING_URL } from '@/lib/constants';
 
@@ -26,7 +27,10 @@ export function BlockedNotification() {
             <AlertDescription>
               <p>
                 Our records indicate that your account has engaged in activities that violate our{' '}
-                <Link href={`${LANDING_URL}/terms`} className="underline">
+                <Link
+                  href={`${LANDING_URL}/terms`}
+                  className={`underline ${INLINE_LINK_TOUCH_TARGET}`}
+                >
                   terms
                 </Link>
                 . If you believe this is an error, please contact our support team.
@@ -35,8 +39,8 @@ export function BlockedNotification() {
           </Alert>
         </CardContent>
         <CardFooter>
-          <Link href={`${LANDING_URL}/support`} className="w-full">
-            <div className="border-input hover:bg-accent hover:text-accent-foreground w-full rounded-md border bg-transparent px-4 py-2 text-center">
+          <Link href={`${LANDING_URL}/support`} className="w-full pointer-coarse:min-h-11">
+            <div className="border-input hover:bg-accent hover:text-accent-foreground w-full rounded-md border bg-transparent px-4 py-2 text-center pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:items-center pointer-coarse:justify-center">
               Contact Support
             </div>
           </Link>

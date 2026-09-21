@@ -166,7 +166,14 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
           {item.title}
         </Text>
         <View className="flex-row items-center gap-2">
-          <Text variant="muted" className="text-xs">
+          {/*
+            The repo · time line yields width to the term chip: without min-w-0 shrink it
+            takes the whole row, pushing the chip past the right edge where the row clips it
+            (pr-review-home, font scale 2). A nested GitLab path or a long owner/repo
+            (#2 `discussion-conversation-only`) is wider than the row, so truncate the
+            metadata; the chip is the row's identity and must stay whole.
+          */}
+          <Text variant="muted" className="min-w-0 shrink text-xs" numberOfLines={1}>
             {rowLabel} · {updatedLabel}
           </Text>
           <InboxChip label={t(providerPrTermKey(item.ref.platform))} />
@@ -179,8 +186,9 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
 }
 
 function InboxChip({ label }: Readonly<{ label: string }>) {
+  // shrink-0 keeps the chip at its label width while the row's text truncates.
   return (
-    <View className="rounded-full bg-secondary px-2 py-0.5">
+    <View className="shrink-0 rounded-full bg-secondary px-2 py-0.5">
       <Text variant="muted" className="text-[10px] font-medium">
         {label}
       </Text>

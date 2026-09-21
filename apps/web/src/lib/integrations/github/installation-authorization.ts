@@ -164,9 +164,8 @@ export async function discoverAuthorizedGitHubInstallations(params: {
               account_id: target.account?.id ?? null,
               account_type: target.account?.type ?? null,
               account_login_present: Boolean(target.account?.login),
-              membership_visible: Boolean(membership),
+              active_membership_visible: Boolean(membership),
               membership_role: membership?.role ?? null,
-              membership_state: membership?.state ?? null,
               personal_account_matches_user: target.account?.id === user.id,
               authorized_candidate: candidates.some(
                 value => value.installationId === params.installationId

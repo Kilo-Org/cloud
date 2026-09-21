@@ -137,10 +137,11 @@ describe('discoverAuthorizedGitHubInstallations', () => {
     ).resolves.toMatchObject({ candidates: [] });
   });
 
-  test('logs the target proof without tokens, logins, or unrelated membership details', async () => {
+  test.each([false, true])('logs rejection safely with installation present: %s', async present => {
+    if (!present) listInstallations.mockResolvedValueOnce(installationPage([]));
     listMemberships.mockResolvedValueOnce(
       page([
-        { state: 'active', role: 'admin', organization: { id: 99, login: 'allowed' } },
+        { state: 'active', role: 'member', organization: { id: 99, login: 'allowed' } },
         { state: 'active', role: 'member', organization: { id: 101, login: 'unrelated-org' } },
       ])
     );
@@ -151,7 +152,7 @@ describe('discoverAuthorizedGitHubInstallations', () => {
         expectedAppId: '7',
         installationId: '44',
       })
-    ).resolves.toMatchObject({ candidate: { installationId: '44' } });
+    ).resolves.toBeNull();
 
     expect(console.log).toHaveBeenCalledWith(
       '[github_admin_proof:discovery]',
@@ -160,18 +161,19 @@ describe('discoverAuthorizedGitHubInstallations', () => {
         expected_app_id: 7,
         github_user_id: '12',
         installation_id: '44',
-        target: {
-          app_id: 7,
-          app_id_matches: true,
-          account_id: 99,
-          account_type: 'Organization',
-          account_login_present: true,
-          membership_visible: true,
-          membership_role: 'admin',
-          membership_state: 'active',
-          personal_account_matches_user: false,
-          authorized_candidate: true,
-        },
+        target: present
+          ? {
+              app_id: 7,
+              app_id_matches: true,
+              account_id: 99,
+              account_type: 'Organization',
+              account_login_present: true,
+              active_membership_visible: true,
+              membership_role: 'member',
+              personal_account_matches_user: false,
+              authorized_candidate: false,
+            }
+          : null,
       })
     );
     expect(console.log).toHaveBeenLastCalledWith(
@@ -181,7 +183,7 @@ describe('discoverAuthorizedGitHubInstallations', () => {
         installation_id: '44',
         expected_account_id: null,
         expected_account_type: null,
-        result: 'authorized',
+        result: 'installation_not_authorized',
       })
     );
     expect(console.log).toHaveBeenCalledTimes(2);

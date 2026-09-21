@@ -15,6 +15,7 @@ import type { CallbackTarget } from '../callbacks/index.js';
 import type { ExecutionMode, SessionMessageIntent } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { AttachmentsSchema } from '../persistence/schemas.js';
+import { resolveAssistantProviderOwnership } from '../shared/assistant-failure.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
 import {
   WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH,
@@ -765,10 +766,11 @@ function resolveTerminalProviderOwnership(
   params: Extract<TerminalizeParams, { kind: 'failed' }>,
   state: SessionMessageState
 ): CloudAgentProviderOwnership | undefined {
-  if (params.providerOwnership === 'byok' || params.assistantFailureReason === undefined) {
-    return params.providerOwnership;
-  }
-  return admittedAgentModel(state) === undefined ? params.providerOwnership : 'managed';
+  return resolveAssistantProviderOwnership(
+    params.providerOwnership,
+    params.assistantFailureReason,
+    admittedAgentModel(state)
+  );
 }
 
 export type TerminalizeParams =

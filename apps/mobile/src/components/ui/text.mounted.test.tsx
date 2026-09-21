@@ -42,12 +42,26 @@ afterEach(() => {
 
 describe('Text eyebrow letterspacing', () => {
   // Finding home-ar-loading: an Arabic section label carried the Latin
-  // uppercase letter-spacing and broke apart mid-word ('ال جلسا ت').
-  it.each([false, true])('keeps the eyebrow display treatment in LTR only (RTL=%s)', isRTL => {
+  // uppercase letter-spacing and broke apart mid-word ('ال جلسا ت'). The
+  // display treatment is dropped only for Arabic copy in an RTL interface.
+  it.each([false, true])('keeps the eyebrow display treatment for Latin copy (RTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     const classes = hostClasses(mount(createElement(Text, { variant: 'eyebrow' }, 'Live now')));
     expect(classes).toEqual(
-      expect.arrayContaining(['font-mono-medium', 'text-[10px]', 'text-muted-foreground'])
+      expect.arrayContaining([
+        'font-mono-medium',
+        'text-[10px]',
+        'text-muted-foreground',
+        'uppercase',
+        'tracking-[1.5px]',
+      ])
+    );
+  });
+
+  it.each([false, true])('drops the treatment from Arabic copy in RTL (RTL=%s)', isRTL => {
+    i18nManager.isRTL = isRTL;
+    const classes = hostClasses(
+      mount(createElement(Text, { variant: 'eyebrow' }, 'الجلسات الجارية الآن'))
     );
     if (isRTL) {
       expect(classes).not.toContain('uppercase');
@@ -69,12 +83,16 @@ describe('Text eyebrow letterspacing', () => {
     const classes = hostClasses(
       mount(createElement(Eyebrow, null, isRTL ? 'الجلسات الجارية الآن' : 'LIVE NOW'))
     );
-    expect(classes).toEqual(expect.arrayContaining(['font-mono-medium', 'text-[10px]']));
+    expect(classes).toEqual(expect.arrayContaining(['text-[10px]']));
     if (isRTL) {
+      // Arabic copy in an RTL interface also drops the mono family.
+      expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
       expect(classes).not.toContain('uppercase');
       expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
     } else {
-      expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
+      expect(classes).toEqual(
+        expect.arrayContaining(['font-mono-medium', 'uppercase', 'tracking-[1.5px]'])
+      );
     }
   });
 });

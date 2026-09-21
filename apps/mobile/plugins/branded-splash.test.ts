@@ -164,8 +164,13 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // A local prebuild leaves an `android/` directory under the project root,
+    // and its colors join the introspection result; assert the splash entry
+    // instead of the whole list so the check does not depend on that artifact.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

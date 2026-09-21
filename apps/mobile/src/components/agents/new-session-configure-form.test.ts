@@ -99,6 +99,11 @@ vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
+// The real Skeleton mounts Reanimated, which the pure Node project cannot load.
+vi.mock('@/components/ui/skeleton', () => ({
+  Skeleton: 'Skeleton',
+}));
+
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
 }));

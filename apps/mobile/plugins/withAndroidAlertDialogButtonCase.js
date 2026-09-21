@@ -46,12 +46,13 @@ const { withAndroidStyles } = require('expo/config-plugins');
  * borderless-colored text color) — only the case changes, so the row's layout
  * is byte-identical.
  *
- * Android is the only platform with this behaviour and the only
- * platform-specific piece on the path: iOS renders the same `Alert.alert()`
+ * One implementation for iOS and Android: both platforms render the same
+ * shared `Alert.alert()` call site. Android is the only platform with this
+ * behaviour and the only platform-specific piece on the path: iOS renders that
  * call as `UIAlertController`, which draws the app's copy as given and exposes
- * no casing override. There is deliberately no iOS half and no `Platform.OS`
- * branch anywhere on this path (apps/mobile/AGENTS.md: prefer native sheets and
- * alerts; confirm destructive actions with `Alert.alert()`).
+ * no casing override, so it needs no half. There is deliberately no iOS mod and
+ * no `Platform.OS` branch anywhere on this path (apps/mobile/AGENTS.md: prefer
+ * native sheets and alerts; confirm destructive actions with `Alert.alert()`).
  */
 
 const THEME_NAME = 'AppTheme';

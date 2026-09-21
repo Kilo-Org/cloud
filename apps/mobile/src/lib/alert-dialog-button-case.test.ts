@@ -175,15 +175,20 @@ describe('Android alert-dialog button case plugin', () => {
   it('is registered in the evaluated app config exactly once', () => {
     const occurrences = appConfigSource.split(`'${PLUGIN_PATH}'`).length - 1;
     expect(occurrences).toBe(1);
+    // One shared config for both platforms: a `Platform` branch around the
+    // registration would be the only way to fork it, and there is none.
+    expect(appConfigSource).not.toMatch(/\bPlatform\b/);
   });
 
   it('leaves the discard confirm as one shared Alert.alert call site', () => {
     // Parity guard: Android and iOS share the one call. The fix re-cases the
-    // Android render; it does not fork the call site by platform.
+    // Android render; it does not fork the call site by platform. Any
+    // `Platform` reference at all is rejected, so the guard also catches the
+    // shapes a later edit could reach for (`Platform.OS`, `Platform.select`, a
+    // platform-specific import) rather than only the two literal forms.
     expect(discardGuardSource.match(/Alert\.alert\(/g)).toHaveLength(1);
     expect(discardGuardSource).toContain("i18n.t('common.keepEditing')");
     expect(discardGuardSource).toContain("i18n.t('common.discard')");
-    expect(discardGuardSource).not.toContain('Platform.OS');
-    expect(discardGuardSource).not.toContain('Platform.select');
+    expect(discardGuardSource).not.toMatch(/\bPlatform\b/);
   });
 });

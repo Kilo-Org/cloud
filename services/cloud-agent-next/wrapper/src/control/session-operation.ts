@@ -113,6 +113,7 @@ export type SessionOperationDependencies = {
     options?: { retained?: true; nativeRuntimeId?: string }
   ) => unknown;
   sendOperationResult?: OperationResultSender;
+  consumeGateResult?: () => 'pass' | 'fail' | undefined;
   onLocalCompletion: (retain: boolean) => void;
   onCleanupConfirmed: () => void;
   onDiagnostic?: ControlDiagnosticReporter;
@@ -646,6 +647,7 @@ export class SessionOperation {
     const { runtime } = work;
     const { kiloClient, env } = runtime;
     this.captureRuntime(runtime);
+    this.deps.consumeGateResult?.();
     const assertCurrent = (submitting = false) => {
       signal.throwIfAborted();
       if (
@@ -866,6 +868,10 @@ export class SessionOperation {
             this.finalization.condensation.result === true))
       )
         outcome = { messageId, status: 'completed' };
+    }
+    const gateResult = this.deps.consumeGateResult?.();
+    if (outcome.status === 'completed' && gateResult !== undefined) {
+      outcome = { ...outcome, gateResult };
     }
     this.outcome = sessionMessageOutcomeSchema.parse(outcome);
     if (!this.authorization) {

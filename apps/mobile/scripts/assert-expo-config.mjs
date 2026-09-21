@@ -45,6 +45,7 @@ const BLOCKED_PERMISSIONS = [
 const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+const ALERT_DIALOG_BUTTON_CASE_PLUGIN = './plugins/withAndroidAlertDialogButtonCase';
 const ARTIFACT_FILE_PROVIDER_PLUGIN = './plugins/withArtifactFileProvider';
 // The one writer of the app target's `<tag>.lproj/Localizable.strings`: the App
 // Intent copy plus the appended Focus-filter catalog.
@@ -202,6 +203,13 @@ check(pluginNames.includes(SENTRY_PLUGIN), `plugins must include "${SENTRY_PLUGI
 check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
+);
+// Android alert-dialog actions must render in the app's sentence case: the
+// AppCompat button bar draws them ALL-CAPS, which contradicts the app's copy
+// (DESIGN.md:350). The plugin re-cases them from the activity theme.
+check(
+  pluginNames.includes(ALERT_DIALOG_BUTTON_CASE_PLUGIN),
+  `plugins must include "${ALERT_DIALOG_BUTTON_CASE_PLUGIN}"`
 );
 // The iOS File Provider extension target and the Pods integration behind it are
 // created by this plugin alone; without it the Files-app location has no

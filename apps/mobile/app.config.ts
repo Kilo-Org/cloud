@@ -364,6 +364,9 @@ const config: ExpoConfig = {
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
+    // Android alert-dialog actions must render in the app's sentence case, not
+    // AppCompat's stock ALL-CAPS button style.
+    './plugins/withAndroidAlertDialogButtonCase',
     './plugins/withAndroidExpoModuleRepos',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their

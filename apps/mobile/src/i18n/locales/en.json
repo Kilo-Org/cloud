@@ -2227,7 +2227,8 @@
       "filesBadge_other": "{{displayCount}} files",
       "matchesBadge_one": "{{displayCount}} match",
       "matchesBadge": "{{displayCount}} matches",
-      "matchesBadge_other": "{{displayCount}} matches"
+      "matchesBadge_other": "{{displayCount}} matches",
+      "noOutput": "No output."
     },
     "readToolMarkdown": {
       "linesTruncated": "lines {{start}}–{{end}} (truncated)",
@@ -2262,7 +2263,7 @@
       "emptyTitle": "No folders inside",
       "emptyDescription": "Done uses this folder.",
       "retryableTitle": "Couldn't list folders",
-      "retryableDescription": "Check your connection and Retry. Done still confirms this folder.",
+      "retryableDescription": "Check your connection and try again. Done still confirms this folder.",
       "unsupportedTitle": "Can't list folders",
       "unsupportedDescription": "This CLI can't list folders. Done keeps the launch folder and Start session starts there."
     },
@@ -3183,15 +3184,7 @@
     "remoteOptionTitle": "Your computer",
     "remoteOptionBody": "Run Kilo on your own machine through the `kilo remote` CLI.",
     "skip": "Skip tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Start your first remote session",
-    "remoteBody": "Connect your computer, then choose it below to start a new session.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "No computer connected yet",
-    "remoteEmptyBody": "Run `kilo remote` on your computer to connect it.",
-    "remoteFound": "Computer connected",
-    "checkAgain": "Check again",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {

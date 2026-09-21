@@ -131,4 +131,18 @@ describe('refreshGlanceableSessionsInputSchema', () => {
     expect(parsed).not.toHaveProperty('organizationId');
     expect(parsed).not.toHaveProperty('running');
   });
+
+  it('passes the approval hint through for the glanceable delivery window', () => {
+    const parsed = refreshGlanceableSessionsInputSchema.parse({
+      userId: 'usr_1',
+      cliSessionIds: ['ses_1', 'ses_2'],
+      approvalChangedSessionIds: ['ses_2'],
+    });
+    expect(parsed.approvalChangedSessionIds).toEqual(['ses_2']);
+    // A refresh with no hint is a normal counts change: no window exemption.
+    expect(
+      refreshGlanceableSessionsInputSchema.parse({ userId: 'usr_1', cliSessionIds: ['ses_1'] })
+        .approvalChangedSessionIds
+    ).toBeUndefined();
+  });
 });

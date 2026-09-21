@@ -2219,7 +2219,8 @@
       "linesBadge_one": "{{displayCount}} വരി",
       "linesBadge_other": "{{displayCount}} വരികൾ",
       "matchesBadge_one": "{{displayCount}} പൊരുത്തം",
-      "matchesBadge_other": "{{displayCount}} പൊരുത്തങ്ങൾ"
+      "matchesBadge_other": "{{displayCount}} പൊരുത്തങ്ങൾ",
+      "noOutput": "ഔട്ട്പുട്ട് ഇല്ല."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} വരികൾ (ഭാഗികം)",
@@ -3183,15 +3184,7 @@
     "remoteOptionTitle": "നിങ്ങളുടെ കമ്പ്യൂട്ടർ",
     "remoteOptionBody": "നിങ്ങളുടെ സ്വന്തം മെഷീനിൽ `kilo remote` CLI വഴി Kilo പ്രവർത്തിപ്പിക്കുക.",
     "skip": "ടൂർ ഒഴിവാക്കുക",
-    "tutorialLabel": "ട്യുടോറിയൽ",
-    "remoteTitle": "നിങ്ങളുടെ ആദ്യ റിമോട്ട് സെഷൻ ആരംഭിക്കുക",
-    "remoteBody": "നിങ്ങളുടെ കമ്പ്യൂട്ടർ കണക്റ്റ് ചെയ്ത് ഇവിടെ നിന്ന് സെഷൻ ആരംഭിക്കുക.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ഇതുവരെ കമ്പ്യൂട്ടർ കണക്റ്റ് ചെയ്തിട്ടില്ല",
-    "remoteEmptyBody": "അത് കണക്റ്റ് ചെയ്യാൻ നിങ്ങളുടെ കമ്പ്യൂട്ടറിൽ `kilo remote` പ്രവർത്തിപ്പിക്കുക.",
-    "remoteFound": "കമ്പ്യൂട്ടർ കണക്റ്റ് ചെയ്തു",
-    "checkAgain": "വീണ്ടും പരിശോധിക്കുക",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ട്യുടോറിയൽ"
   },
   "appActions": {
     "start": {

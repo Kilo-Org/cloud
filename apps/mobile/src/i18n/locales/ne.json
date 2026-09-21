@@ -2219,7 +2219,8 @@
       "linesBadge_one": "{{displayCount}} पङ्क्ति",
       "linesBadge_other": "{{displayCount}} पङ्क्ति",
       "matchesBadge_one": "{{displayCount}} नतिजा",
-      "matchesBadge_other": "{{displayCount}} नतिजा"
+      "matchesBadge_other": "{{displayCount}} नतिजा",
+      "noOutput": "कुनै आउटपुट छैन।"
     },
     "readToolMarkdown": {
       "linesTruncated": "पङ्क्ति {{start}}–{{end}} (केही अंश काटिएको)",
@@ -3183,15 +3184,7 @@
     "remoteOptionTitle": "तपाईंको कम्प्युटर",
     "remoteOptionBody": "आफ्नो मेसिनमा `kilo remote` CLI मार्फत Kilo चलाउनुहोस्।",
     "skip": "भ्रमण छोड्नुहोस्",
-    "tutorialLabel": "ट्युटोरियल",
-    "remoteTitle": "तपाईंको पहिलो रिमोट सत्र सुरु गर्नुहोस्",
-    "remoteBody": "तपाईंको कम्प्युटर जोड्नुहोस्, त्यसपछि यहाँबाट सत्र सुरु गर्नुहोस्।",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "अहिलेसम्म कुनै कम्प्युटर जडान भएको छैन",
-    "remoteEmptyBody": "यसलाई जोड्न तपाईंको कम्प्युटरमा `kilo remote` चलाउनुहोस्।",
-    "remoteFound": "कम्प्युटर जडान भयो",
-    "checkAgain": "फेरि जाँच गर्नुहोस्",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ट्युटोरियल"
   },
   "appActions": {
     "start": {

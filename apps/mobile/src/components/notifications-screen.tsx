@@ -205,7 +205,7 @@ function CategoryRow({
     : (preferences?.[meta.key] ?? readAgentPushPreference(queryClient, queryKey, meta.key));
   const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
   // An unavailable category is a terminal, non-retryable state: the switch is
-  // disabled and the server reason replaces the subtitle. A missing entry (the
+  // disabled and setup guidance replaces the subtitle. A missing entry (the
   // `noUncheckedIndexedAccess` widening) defaults to available.
   const unavailable = capability?.available === false;
   const isDisabled = disabled || !editable || unavailable;
@@ -214,9 +214,13 @@ function CategoryRow({
   // carries its own so the device scene can address it unambiguously.
   const accessibilityLabel =
     'accessibilityLabelKey' in meta ? t(meta.accessibilityLabelKey) : t(meta.titleKey);
-  const subtitle = unavailable
-    ? (capability.unavailableReason ?? t(meta.subtitleKey))
-    : t(meta.subtitleKey);
+  // Security unavailability means no scope has the agent enabled. Reuse its
+  // localized setup guidance instead of displaying the server's English prose.
+  const unavailableReason =
+    meta.key === 'securityFindings'
+      ? t('securityAgent.settingsOverview.disabledPrompt')
+      : capability?.unavailableReason;
+  const subtitle = unavailable ? (unavailableReason ?? t(meta.subtitleKey)) : t(meta.subtitleKey);
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />

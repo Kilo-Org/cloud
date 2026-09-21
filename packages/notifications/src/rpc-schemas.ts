@@ -176,6 +176,17 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
 export const refreshGlanceableSessionsInputSchema = z.object({
   userId: z.string().min(1),
   cliSessionIds: z.array(z.string().min(1)).min(1),
+  /**
+   * The subset of `cliSessionIds` whose change moved a session into or out of
+   * the `permission` status. `needsApproval` gates the Approve control on the
+   * locked/background surfaces, so the delivery window may not defer those
+   * scopes. The caller is the one that saw the previous status; the server
+   * cannot read a past status. Naming the sessions lets the server exempt only
+   * the scope that actually moved: one batch can span the personal scope and
+   * several organizations, and exempting all of them would wake devices that
+   * had no approval change.
+   */
+  approvalChangedSessionIds: z.array(z.string().min(1)).optional(),
 });
 export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSessionsInputSchema>;
 

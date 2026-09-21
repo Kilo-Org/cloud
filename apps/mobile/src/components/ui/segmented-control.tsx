@@ -42,15 +42,23 @@ export function SegmentedControl<T extends string>({
               onChange(option.value);
             }}
             className={cn(
-              'min-h-11 flex-1 items-center justify-center rounded-md px-3 active:opacity-70',
+              // px-2 (not px-3): equal-width segments are narrow on a phone, and
+              // the longest reference label ("Commit and push") otherwise wraps
+              // to two lines while its sibling stays on one. The tighter inset
+              // keeps every option label on a single line.
+              'min-h-11 flex-1 items-center justify-center rounded-md px-2 active:opacity-70',
               selected && 'bg-background'
             )}
           >
             <Text
               className={cn(
-                'text-sm',
+                'text-center text-sm',
                 selected ? 'font-medium text-foreground' : 'text-muted-foreground'
               )}
+              // One line per option: a wrapped label makes the two choices
+              // uneven. Longer locales ellipsize instead of growing a second
+              // line; the radio's accessibilityLabel still carries the full text.
+              numberOfLines={1}
             >
               {option.label}
             </Text>

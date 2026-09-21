@@ -2216,7 +2216,8 @@
       "linesBadge_one": "ahịrị {{displayCount}}",
       "linesBadge_other": "ahịrị {{displayCount}}",
       "matchesBadge_one": "ndakọrịta {{displayCount}}",
-      "matchesBadge_other": "ndakọrịta {{displayCount}}"
+      "matchesBadge_other": "ndakọrịta {{displayCount}}",
+      "noOutput": "Enweghị mpụta."
     },
     "readToolMarkdown": {
       "linesTruncated": "ahịrị {{start}}–{{end}} (ebipụrụ akụkụ)",
@@ -3153,7 +3154,9 @@
     "couldNotApprove": "Enweghị ike ịkwado",
     "couldNotStart": "Enweghị ike ịmalite",
     "channelName": "Ndị nnọchi anya na-arụ ọrụ",
-    "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi."
+    "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi.",
+    "openSession": "Meghe",
+    "approveFailed": "Enweghị ike ịkwado. Pịa $t(common.approve) ka ị nwaa ọzọ."
   },
   "transcriptionModel": {
     "title": "Ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",
@@ -3178,15 +3181,7 @@
     "remoteOptionTitle": "Kọmputa gị",
     "remoteOptionBody": "Gbaa Kilo na igwe gị site na CLI nke `kilo remote`.",
     "skip": "Kwụsị njem",
-    "tutorialLabel": "Ntuziaka",
-    "remoteTitle": "Malite nnọkọ remote mbụ gị",
-    "remoteBody": "Jikọta kọmputa gị, mesịa malitee nnọkọ ahụ site ebe a.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Onweghị kọmputa jikọrọ ruo ugbu a",
-    "remoteEmptyBody": "Iji jikọta ya, gbaa `kilo remote` na kọmputa gị.",
-    "remoteFound": "Ejikọrọ kọmputa",
-    "checkAgain": "Lelee ọzọ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Ntuziaka"
   },
   "appActions": {
     "start": {

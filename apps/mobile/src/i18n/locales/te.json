@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} పంక్తి",
       "linesBadge_other": "{{displayCount}} పంక్తులు",
       "matchesBadge_one": "{{displayCount}} సరిపోలిక",
-      "matchesBadge_other": "{{displayCount}} సరిపోలికలు"
+      "matchesBadge_other": "{{displayCount}} సరిపోలికలు",
+      "noOutput": "అవుట్పుట్ లేదు."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} పంక్తులు (కొంత భాగం మాత్రమే)",
@@ -3153,7 +3154,9 @@
     "couldNotApprove": "ఆమోదించలేకపోయింది",
     "couldNotStart": "ప్రారంభించలేకపోయింది",
     "channelName": "పనిచేస్తున్న ఏజెంట్లు",
-    "activityKitDisabledBody": "లాక్ స్క్రీన్‌పై పనిచేస్తున్న ఏజెంట్లను చూడటానికి సెట్టింగ్‌లలో లైవ్ యాక్టివిటీస్‌ను ఆన్ చేయండి."
+    "activityKitDisabledBody": "లాక్ స్క్రీన్‌పై పనిచేస్తున్న ఏజెంట్లను చూడటానికి సెట్టింగ్‌లలో లైవ్ యాక్టివిటీస్‌ను ఆన్ చేయండి.",
+    "openSession": "తెరవండి",
+    "approveFailed": "ఆమోదించలేకపోయాము. మళ్లీ ప్రయత్నించడానికి $t(common.approve) ని నొక్కండి."
   },
   "transcriptionModel": {
     "title": "వచనంగా మార్చే మోడల్",
@@ -3178,15 +3181,7 @@
     "remoteOptionTitle": "మీ కంప్యూటర్",
     "remoteOptionBody": "మీ సొంత యంత్రంలో `kilo remote` CLI ద్వారా Kilo ని అమలు చేయండి.",
     "skip": "పర్యటన వదిలేయండి",
-    "tutorialLabel": "ట్యుటోరియల్",
-    "remoteTitle": "మీ మొదటి రిమోట్ సెషన్‌ను ప్రారంభించండి",
-    "remoteBody": "మీ కంప్యూటర్‌ను కనెక్ట్ చేసి, ఆపై ఇక్కడి నుండి సెషన్ ప్రారంభించండి.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ఇంకా ఏ కంప్యూటర్ కూడా కనెక్ట్ కాలేదు",
-    "remoteEmptyBody": "దాన్ని కనెక్ట్ చేయడానికి మీ కంప్యూటర్‌లో `kilo remote` అమలు చేయండి.",
-    "remoteFound": "కంప్యూటర్ కనెక్ట్ అయింది",
-    "checkAgain": "మళ్లీ తనిఖీ చేయండి",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ట్యుటోరియల్"
   },
   "appActions": {
     "start": {

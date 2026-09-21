@@ -2216,7 +2216,8 @@
       "linesBadge_one": "{{displayCount}} വരി",
       "linesBadge_other": "{{displayCount}} വരികൾ",
       "matchesBadge_one": "{{displayCount}} പൊരുത്തം",
-      "matchesBadge_other": "{{displayCount}} പൊരുത്തങ്ങൾ"
+      "matchesBadge_other": "{{displayCount}} പൊരുത്തങ്ങൾ",
+      "noOutput": "ഔട്ട്പുട്ട് ഇല്ല."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} വരികൾ (ഭാഗികം)",
@@ -3153,7 +3154,9 @@
     "couldNotApprove": "അംഗീകരിക്കാനായില്ല",
     "couldNotStart": "ആരംഭിക്കാനായില്ല",
     "channelName": "സജീവ ഏജന്റുകൾ",
-    "activityKitDisabledBody": "ലോക്ക് സ്ക്രീനിൽ സജീവ ഏജന്റുകളെ കാണാൻ ക്രമീകരണങ്ങളിൽ തത്സമയ പ്രവർത്തനങ്ങൾ പ്രവർത്തനക്ഷമമാക്കുക."
+    "activityKitDisabledBody": "ലോക്ക് സ്ക്രീനിൽ സജീവ ഏജന്റുകളെ കാണാൻ ക്രമീകരണങ്ങളിൽ തത്സമയ പ്രവർത്തനങ്ങൾ പ്രവർത്തനക്ഷമമാക്കുക.",
+    "openSession": "തുറക്കുക",
+    "approveFailed": "അംഗീകരിക്കാനായില്ല. വീണ്ടും ശ്രമിക്കാൻ $t(common.approve) ടാപ്പ് ചെയ്യുക."
   },
   "transcriptionModel": {
     "title": "ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ",
@@ -3178,15 +3181,7 @@
     "remoteOptionTitle": "നിങ്ങളുടെ കമ്പ്യൂട്ടർ",
     "remoteOptionBody": "നിങ്ങളുടെ സ്വന്തം മെഷീനിൽ `kilo remote` CLI വഴി Kilo പ്രവർത്തിപ്പിക്കുക.",
     "skip": "ടൂർ ഒഴിവാക്കുക",
-    "tutorialLabel": "ട്യുടോറിയൽ",
-    "remoteTitle": "നിങ്ങളുടെ ആദ്യ റിമോട്ട് സെഷൻ ആരംഭിക്കുക",
-    "remoteBody": "നിങ്ങളുടെ കമ്പ്യൂട്ടർ കണക്റ്റ് ചെയ്ത് ഇവിടെ നിന്ന് സെഷൻ ആരംഭിക്കുക.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ഇതുവരെ കമ്പ്യൂട്ടർ കണക്റ്റ് ചെയ്തിട്ടില്ല",
-    "remoteEmptyBody": "അത് കണക്റ്റ് ചെയ്യാൻ നിങ്ങളുടെ കമ്പ്യൂട്ടറിൽ `kilo remote` പ്രവർത്തിപ്പിക്കുക.",
-    "remoteFound": "കമ്പ്യൂട്ടർ കണക്റ്റ് ചെയ്തു",
-    "checkAgain": "വീണ്ടും പരിശോധിക്കുക",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ട്യുടോറിയൽ"
   },
   "appActions": {
     "start": {

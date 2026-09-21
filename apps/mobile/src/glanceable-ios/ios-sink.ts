@@ -6,15 +6,16 @@ import {
   isEligibleGlanceableWork,
   isStartableGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
 import { i18n } from '@/i18n';
+import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import {
   getGlanceableDelivery,
   type GlanceableSink,
   type GlanceableSinkContext,
 } from '@/lib/glanceable/sink-registry';
 import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
+import { getWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 
 import { ActiveAgentsLiveActivity, OPEN_AGENTS_URL } from './active-agents-live-activity';
 import {
@@ -30,6 +31,7 @@ import { ActiveAgentsWidget } from './active-agents-widget';
 import {
   buildGlanceableLiveActivityContentState,
   buildGlanceableViewProps,
+  type GlanceableLiveActivityProps,
   toWidgetProps,
   widgetTimelineFrames,
 } from './view-props';
@@ -42,10 +44,68 @@ let activity: Activity | null = null;
 let revision = 0;
 /** In-flight native `update`; `end` awaits it so its contentDate is never older. */
 let inFlightUpdate: Promise<void> | null = null;
-let lastProps: Partial<GlanceableLiveActivityContentState> | null = null;
+let lastProps: GlanceableLiveActivityProps | null = null;
 
 function translate(key: string): string {
   return i18n.t(key);
+}
+
+/**
+ * True while the recorded ask is one Approve can answer. The count this
+ * content state carries includes questions and retried asks, which
+ * `runGlanceableApprove` resolves to `none`, so the layout needs this fact to
+ * avoid offering a control that cannot act. The read is synchronous and the
+ * publisher records the ask before it emits, so the flag matches the counts in
+ * the same state.
+ */
+function isApprovableAskRecorded(): boolean {
+  const ask = getWaitingAsk();
+  return ask?.status === 'permission' && ask.isCloudAgent;
+}
+
+/**
+ * The one-line notice the next Live Activity update carries: the in-app press
+ * sets it when Approve fails retryably. It never outlives its ask — a changed
+ * ask or a zero needs-input count clears it — so a failure message cannot
+ * describe a new session. Mirrors the Android sink's action notice.
+ */
+let actionNotice: string | null = null;
+let noticeAskKey: string | null = null;
+
+/** The recorded ask identity the notice describes; '' means "no ask". */
+function askKey(ask: WaitingAsk | null): string {
+  return ask === null ? '' : `${ask.kiloSessionId}|${ask.status}`;
+}
+
+/** Set (or clear) the notice for the next Live Activity update. */
+export function setGlanceableActionNotice(notice: string | null): void {
+  actionNotice = notice;
+  noticeAskKey = notice === null ? null : askKey(getWaitingAsk());
+}
+
+/** Drop the notice once nothing needs input or the recorded ask has changed. */
+function pruneActionNotice(snapshot: GlanceableAgentsSnapshot): void {
+  if (
+    actionNotice !== null &&
+    (snapshot.needsInput === 0 || askKey(getWaitingAsk()) !== noticeAskKey)
+  ) {
+    actionNotice = null;
+    noticeAskKey = null;
+  }
+}
+
+/**
+ * The content-state one update carries: the counts, the Approve gate, and the
+ * pending notice when there is one. Every Live Activity update goes through
+ * this, so the notice cannot be dropped by one path and kept by another.
+ */
+function liveActivityContentState(snapshot: GlanceableAgentsSnapshot): GlanceableLiveActivityProps {
+  pruneActionNotice(snapshot);
+  return buildGlanceableLiveActivityContentState(
+    snapshot,
+    isApprovableAskRecorded(),
+    actionNotice ?? undefined
+  );
 }
 
 /**
@@ -64,7 +124,7 @@ function isActivityKitUnavailable(error: unknown): boolean {
 let pendingStart: Promise<void> | null = null;
 /** What that deferred start will raise; a newer snapshot replaces it before it runs. */
 let pendingStartInput: {
-  contentState: Partial<GlanceableLiveActivityContentState>;
+  contentState: GlanceableLiveActivityProps;
   snapshot: GlanceableAgentsSnapshot;
   ctx: GlanceableSinkContext;
 } | null = null;
@@ -72,7 +132,7 @@ let pendingStartAt = 0;
 
 /** Raise the card. Shared by the immediate start and the one deferred behind a dismissal. */
 function startCard(
-  contentState: Partial<GlanceableLiveActivityContentState>,
+  contentState: GlanceableLiveActivityProps,
   snapshot: GlanceableAgentsSnapshot,
   ctx: GlanceableSinkContext
 ): void {
@@ -166,7 +226,7 @@ function refreshActivity(): boolean {
  */
 function endNow(
   dismissMs: number | null = null,
-  props: Partial<GlanceableLiveActivityContentState> | null = lastProps,
+  props: GlanceableLiveActivityProps | null = lastProps,
   reachEnded = dismissMs === null
 ): Promise<void> | null {
   const targets = new Map<string, Activity>();
@@ -284,6 +344,8 @@ export function _resetIosSinkForTests(): void {
   pendingStart = null;
   pendingStartInput = null;
   pendingStartAt = 0;
+  actionNotice = null;
+  noticeAskKey = null;
 }
 
 export const iosSink: GlanceableSink = {
@@ -306,7 +368,7 @@ export const iosSink: GlanceableSink = {
     if (frames !== null) {
       ActiveAgentsWidget.updateTimeline(frames);
     }
-    const contentState = buildGlanceableLiveActivityContentState(snapshot);
+    const contentState = liveActivityContentState(snapshot);
     if (!isEligibleGlanceableWork(snapshot)) {
       // ActivityKit owns removal after this call, even if JavaScript stops.
       // The after-date retains Lock Screen content, not the Dynamic Island.
@@ -336,14 +398,16 @@ export const iosSink: GlanceableSink = {
       return;
     }
 
-    const contentState = buildGlanceableLiveActivityContentState(snapshot);
+    // The content state is built only where it is applied: building it prunes
+    // the notice, and a snapshot this call discards (an older revision, or one
+    // that cannot start) must not clear the line a live card carries.
 
     if (pendingStart !== null) {
       // A start is already waiting on a dismissal. There is no card to update
       // yet, and raising a second one is the duplicate this sink exists to stop.
       // Hand the waiting start the newer counts so it does not open stale.
       if (isStartableGlanceableWork(snapshot) && snapshot.revision >= pendingStartAt) {
-        pendingStartInput = { contentState, snapshot, ctx };
+        pendingStartInput = { contentState: liveActivityContentState(snapshot), snapshot, ctx };
         pendingStartAt = snapshot.revision;
       }
       return;
@@ -359,6 +423,7 @@ export const iosSink: GlanceableSink = {
       if (!isStartableGlanceableWork(snapshot)) {
         return;
       }
+      const contentState = liveActivityContentState(snapshot);
       // Work resumed inside an idle window, so the card it replaces is already
       // `ended` and waiting out its dismissal date. Native discovery hides an
       // ended card, and only a second, immediate end removes it: dismiss it
@@ -394,6 +459,7 @@ export const iosSink: GlanceableSink = {
     if (snapshot.revision <= revision) {
       return;
     }
+    const contentState = liveActivityContentState(snapshot);
     lastProps = contentState;
     inFlightUpdate = activity.update(contentState, STALE_AFTER_SECONDS);
     revision = snapshot.revision;
@@ -403,3 +469,23 @@ export const iosSink: GlanceableSink = {
     void endNow();
   },
 };
+
+/**
+ * Re-render the surface the app last published, so a press that cannot reach
+ * the backend still shows its pending notice. The snapshot comes from the
+ * persisted mirror — a background press may have launched this process with no
+ * in-memory state — and it already carries the counts the card shows, so the
+ * update adds only the failure line. Reusing `publish` keeps the one render
+ * path: the adoption of a card this process did not start, the notice prune,
+ * and the content-state build.
+ */
+export async function renderStoredSnapshotWithNotice(): Promise<void> {
+  await restorePersistedGlanceable();
+  const snapshot = getLastGlanceableSnapshot();
+  if (snapshot === null) {
+    return;
+  }
+  iosSink.publish(snapshot);
+  // Keep the background press alive until ActivityKit has applied its notice.
+  await inFlightUpdate;
+}

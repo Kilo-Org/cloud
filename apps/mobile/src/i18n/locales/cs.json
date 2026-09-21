@@ -2280,7 +2280,8 @@
       "matchesBadge_one": "shoda: {{displayCount}}",
       "matchesBadge_other": "shody: {{displayCount}}",
       "matchesBadge_few": "shody: {{displayCount}}",
-      "matchesBadge_many": "shod: {{displayCount}}"
+      "matchesBadge_many": "shod: {{displayCount}}",
+      "noOutput": "Žádný výstup."
     },
     "readToolMarkdown": {
       "linesTruncated": "řádky {{start}}–{{end}} (zkráceno)",
@@ -3239,7 +3240,9 @@
     "couldNotApprove": "Schválení se nezdařilo",
     "couldNotStart": "Spuštění se nezdařilo",
     "channelName": "Aktivní agenti",
-    "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce."
+    "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce.",
+    "openSession": "Otevřít",
+    "approveFailed": "Schválení se nepodařilo. Klepnutím na $t(common.approve) to zkuste znovu."
   },
   "transcriptionModel": {
     "title": "Model přepisu",
@@ -3264,15 +3267,7 @@
     "remoteOptionTitle": "Váš počítač",
     "remoteOptionBody": "Spusťte Kilo na vlastním stroji prostřednictvím CLI `kilo remote`.",
     "skip": "Přeskočit prohlídku",
-    "tutorialLabel": "Návod",
-    "remoteTitle": "Spusťte svou první vzdálenou relaci",
-    "remoteBody": "Připojte svůj počítač a pak spusťte relaci odtud.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Zatím žádný připojený počítač",
-    "remoteEmptyBody": "Chcete-li ho připojit, spusťte na počítači `kilo remote`.",
-    "remoteFound": "Počítač připojen",
-    "checkAgain": "Zkontrolovat znovu",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Návod"
   },
   "appActions": {
     "start": {

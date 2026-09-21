@@ -2248,7 +2248,8 @@
       "linesBadge_zero": "{{displayCount}} rindu",
       "matchesBadge_one": "{{displayCount}} atbilstība",
       "matchesBadge_other": "{{displayCount}} atbilstības",
-      "matchesBadge_zero": "{{displayCount}} atbilstību"
+      "matchesBadge_zero": "{{displayCount}} atbilstību",
+      "noOutput": "Nav izvades."
     },
     "readToolMarkdown": {
       "linesTruncated": "rindas {{start}}–{{end}} (saturs saīsināts)",
@@ -3196,7 +3197,9 @@
     "couldNotApprove": "Neizdevās apstiprināt",
     "couldNotStart": "Neizdevās palaist",
     "channelName": "Aktīvie aģenti",
-    "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus."
+    "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus.",
+    "openSession": "Atvērt",
+    "approveFailed": "Neizdevās apstiprināt. Pieskaries $t(common.approve), lai mēģinātu vēlreiz."
   },
   "transcriptionModel": {
     "title": "Transkripcijas modelis",
@@ -3221,15 +3224,7 @@
     "remoteOptionTitle": "Tavs dators",
     "remoteOptionBody": "Palaid Kilo savā datorā, izmantojot `kilo remote` CLI.",
     "skip": "Izlaist apskati",
-    "tutorialLabel": "Apmācība",
-    "remoteTitle": "Sāc savu pirmo attālināto sesiju",
-    "remoteBody": "Pievieno datoru un tad sāc sesiju šeit.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Vēl nav pievienota datora",
-    "remoteEmptyBody": "Lai to pievienotu, palaid `kilo remote` savā datorā.",
-    "remoteFound": "Dators pievienots",
-    "checkAgain": "Pārbaudīt vēlreiz",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Apmācība"
   },
   "appActions": {
     "start": {

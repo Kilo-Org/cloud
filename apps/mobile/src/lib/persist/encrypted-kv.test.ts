@@ -185,6 +185,7 @@ vi.mock('@sentry/react-native', () => ({
 }));
 
 /* eslint-disable import/first */
+import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
 import { PERSIST_DB_KEY } from '@/lib/storage-keys';
 import {
@@ -366,6 +367,23 @@ describe('single-flight open contract', () => {
       sqlLog.some(sql => sql.includes('CREATE TABLE IF NOT EXISTS "__drizzle_migrations"'))
     ).toBe(true);
     expect(sqlLog.some(sql => sql.includes('INSERT INTO "__drizzle_migrations"'))).toBe(true);
+  });
+});
+
+describe('transient keychain read', () => {
+  it('retries a rejected key read instead of memoizing the open failure', async () => {
+    // The keychain read can reject transiently (device just rebooted, keystore
+    // still locked). The open must retry it: a memoized rejection here would
+    // reject every KV caller for the rest of the process.
+    const storedKey = 'a'.repeat(64);
+    store.set(PERSIST_DB_KEY, storedKey);
+    vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain unavailable'));
+
+    await expect(getItem('s', 'k')).resolves.toBeNull();
+
+    // The retry read the stored key and the store opened on it.
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(sqlLog).toContain(`PRAGMA key = "x'${storedKey}'"`);
   });
 });
 

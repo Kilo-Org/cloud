@@ -367,6 +367,63 @@ describe('SessionHistoryScreen', () => {
     }
   });
 
+  it('offers a filter row for every recent repository, not only the first three', async () => {
+    const gitUrls = [
+      'https://github.com/kilo/alpha.git',
+      'https://github.com/kilo/beta.git',
+      'https://github.com/kilo/gamma.git',
+      'https://github.com/kilo/delta.git',
+      'https://github.com/kilo/epsilon.git',
+    ];
+    listState.storedSessions = [
+      ...gitUrls.map((git_url, index) => ({
+        session_id: `s${index}`,
+        organization_id: null,
+        git_url,
+        created_on_platform: 'cloud-agent',
+      })),
+      // The same repository again: the sheet must not render a duplicate row.
+      {
+        session_id: 'alpha-again',
+        organization_id: null,
+        git_url: gitUrls[0],
+        created_on_platform: 'cli',
+      },
+    ];
+    const renderer = await renderScreen();
+    act(() => {
+      historyHeaderActions(renderer).onOpenFilters();
+    });
+
+    const modal = findNodeByType(renderer, 'SessionFilterModal');
+    const options = modal.props.projectOptions as { gitUrl: string }[];
+    expect(options.map(option => option.gitUrl)).toEqual(gitUrls);
+  });
+
+  it('keeps a selected project row that is no longer in the recent repositories', async () => {
+    const recent = 'https://github.com/kilo/alpha.git';
+    const stale = 'https://github.com/kilo/removed.git';
+    listState.storedSessions = [
+      {
+        session_id: 's0',
+        organization_id: null,
+        git_url: recent,
+        created_on_platform: 'cloud-agent',
+      },
+    ];
+    readFilterRecord.mockResolvedValue(
+      JSON.stringify({ projectFilter: [stale], platformFilter: [] })
+    );
+    const renderer = await renderScreen();
+    act(() => {
+      historyHeaderActions(renderer).onOpenFilters();
+    });
+
+    const modal = findNodeByType(renderer, 'SessionFilterModal');
+    const options = modal.props.projectOptions as { gitUrl: string }[];
+    expect(options.map(option => option.gitUrl)).toEqual([recent, stale]);
+  });
+
   it('keeps saved repository and platform selections after a successful history retry', async () => {
     readFilterRecord.mockImplementation(async storageKey => {
       await Promise.resolve();

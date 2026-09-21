@@ -287,4 +287,16 @@ describe('SessionFilterModal', () => {
       expect(props.onApply).not.toHaveBeenCalled();
     }
   );
+
+  // The sheet offers one row per recent repository (up to the server's LIMIT)
+  // plus one per selected project. A long list must not push the Apply/Cancel
+  // row off-screen: the sheet is bounded and its single list shrinks to scroll.
+  it('bounds the sheet and shrinks its single list so extra project rows stay reachable', async () => {
+    const { renderer } = await renderModal();
+    const scrollViews = renderer.root.findAllByType(ScrollView);
+    expect(scrollViews).toHaveLength(1);
+    const scrollView = renderer.root.findByType(ScrollView);
+    expect(scrollView.props.className).toContain('shrink');
+    expect(scrollView.parent?.props.className).toContain('max-h-[80%]');
+  });
 });

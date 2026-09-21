@@ -18,7 +18,12 @@ import { createWrapperKiloClient, type WrapperKiloClient, type WrapperPty } from
 import { materializeMessageAttachments } from '../session-bootstrap';
 import { runProcess, withTimeoutAndAbort } from '../utils';
 import { applySessionAttach } from './apply-attach';
-import { updateSessionSnapshots, unfilteredKiloEvents } from './feed';
+import {
+  updateSessionSnapshots,
+  unfilteredKiloEvents,
+  eventKiloSessionId,
+  sessionEventIdentity,
+} from './feed';
 import {
   forgetAttachedRoot,
   rememberAttachedRoot,
@@ -5570,6 +5575,67 @@ describe('buildHeartbeatPayload', () => {
       expect(activity.state()).toBe('active');
       activity.reconcile({ root_1: { type: 'idle' } });
       expect(activity.state()).toBe('idle');
+    });
+
+    it('createSessionActivityRegistry: stores an observed gate result under the resolved root', () => {
+      const activity = createSessionActivityRegistry(() => 100);
+      activity.attach('root_1');
+      rememberAttachedRoot('root_1', session.directory);
+
+      const rootProperties = { sessionID: 'root_1', gateResult: 'fail' };
+      const rootIdentity = sessionEventIdentity({
+        type: 'session.updated',
+        properties: rootProperties,
+        sessionId: eventKiloSessionId(rootProperties),
+      });
+      activity.observeEvent(
+        'session.updated',
+        rootIdentity?.kiloSessionId,
+        rootIdentity?.rootKiloSessionId,
+        rootProperties
+      );
+      expect(activity.consumeGateResult('root_1')).toBe('fail');
+      expect(activity.consumeGateResult('root_1')).toBeUndefined();
+
+      rememberChildSession({
+        childId: 'child_1',
+        parentId: 'root_1',
+        directory: session.directory,
+      });
+      const childProperties = { sessionID: 'child_1', gateResult: 'pass' };
+      const childIdentity = sessionEventIdentity({
+        type: 'session.updated',
+        properties: childProperties,
+        sessionId: eventKiloSessionId(childProperties),
+      });
+      expect(childIdentity).toMatchObject({
+        kiloSessionId: 'child_1',
+        rootKiloSessionId: 'root_1',
+      });
+      activity.observeEvent(
+        'session.updated',
+        childIdentity?.kiloSessionId,
+        childIdentity?.rootKiloSessionId,
+        childProperties
+      );
+      expect(activity.consumeGateResult('root_1')).toBe('pass');
+    });
+
+    it('createSessionActivityRegistry: detach clears the stored gate result', () => {
+      const activity = createSessionActivityRegistry(() => 100);
+      activity.attach('root_1');
+      activity.attach('root_2');
+      activity.observeEvent('session.updated', 'root_1', 'root_1', {
+        sessionID: 'root_1',
+        gateResult: 'fail',
+      });
+      activity.observeEvent('session.updated', 'root_2', 'root_2', {
+        sessionID: 'root_2',
+        gateResult: 'pass',
+      });
+      activity.detach('root_1');
+      expect(activity.consumeGateResult('root_2')).toBe('pass');
+      expect(activity.consumeGateResult('root_1')).toBeUndefined();
     });
   });
 });

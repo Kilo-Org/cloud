@@ -154,7 +154,11 @@ export function SessionFilterModal({
           // checkboxes/buttons inside stay individually navigable by VoiceOver
           // (a pressable defaults to accessible=true and would collapse them).
           accessible={false}
-          className="gap-4 rounded-2xl bg-popover p-5"
+          // Bounded so the row list can grow to the server's full recent-repository
+          // set without pushing the Apply/Cancel row off-screen: the ScrollView
+          // below shrinks into this cap and scrolls. The inline maxHeight tightens
+          // that bound to the visible window minus the safe-area insets.
+          className="max-h-[80%] gap-4 rounded-2xl bg-popover p-5"
           style={{ maxHeight: sheetMaxHeight }}
           onPress={e => {
             e.stopPropagation();

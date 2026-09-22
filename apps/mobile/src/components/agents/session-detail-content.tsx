@@ -189,6 +189,7 @@ import {
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
+import { normalizeSessionTitle } from '@/lib/session-title';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -1579,14 +1580,21 @@ export function SessionDetailContent({
   });
 
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
-  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
+  // The CLI lists an unrenamed session under a generated placeholder title
+  // (`New session - <ISO>`); it is a storage key, not a name, so treat it as
+  // absent and let the fallback name (or a live rename) show instead.
+  const serverTitle = isSessionLoaded
+    ? normalizeSessionTitle(fetchedData.title ?? undefined)
+    : undefined;
   const rename = useSessionDetailRename({
     sessionId,
     isLoaded: isSessionLoaded,
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
-    // title it opened with instead of blinking back to "Session".
-    fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
+    // title it opened with instead of blinking back to "Session". A
+    // generated placeholder title is not a name: fall back to the
+    // localized label rather than the raw ISO string.
+    fallbackTitle: normalizeSessionTitle(cachedTitle) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;

@@ -43,6 +43,33 @@ describe('getSessionDetailRenameState', () => {
     });
   });
 
+  it('falls back to the fallback name when the server title is a generated placeholder', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T02:05:22.778Z',
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+
+  it('keeps a real server title over the fallback name', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'Fix the session header',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe('Fix the session header');
+  });
+
   it('hides interactivity when fetched data belongs to a different session', () => {
     expect(
       getSessionDetailRenameState({
@@ -229,6 +256,21 @@ describe('titleFromSessionUpdatedEvent', () => {
     ).toBeUndefined();
     expect(
       titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ title: '  ' }))
+    ).toBeUndefined();
+  });
+
+  it('ignores a generated placeholder title', () => {
+    expect(
+      titleFromSessionUpdatedEvent(
+        'ses-1',
+        sessionUpdatedPayload({ title: 'New session - 2026-09-22T02:05:22.778Z' })
+      )
+    ).toBeUndefined();
+    expect(
+      titleFromSessionUpdatedEvent(
+        'ses-1',
+        sessionUpdatedPayload({ title: 'Child session - 2026-09-22T02:05:22.778Z' })
+      )
     ).toBeUndefined();
   });
 });

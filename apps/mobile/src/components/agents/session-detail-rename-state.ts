@@ -1,3 +1,5 @@
+import { normalizeSessionTitle } from '@/lib/session-title';
+
 export type RenameState = {
   isModalOpen: boolean;
   optimisticTitle: string | null;
@@ -53,7 +55,9 @@ type SessionDetailRenameState = {
 
 /**
  * Pure helper that derives the session-detail header display state from the
- * authoritative server title and the reducer state.
+ * authoritative server title and the reducer state. A generated placeholder
+ * title is normalised away, so the header shows the fallback name instead of
+ * the raw ISO string the CLI listed the session under.
  */
 export function getSessionDetailRenameState(input: {
   fallbackTitle: string;
@@ -61,9 +65,8 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
-  const baseTitle = input.isLoaded
-    ? (input.serverTitle ?? input.fallbackTitle)
-    : input.fallbackTitle;
+  const serverTitle = normalizeSessionTitle(input.serverTitle);
+  const baseTitle = input.isLoaded ? (serverTitle ?? input.fallbackTitle) : input.fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
     title,
@@ -75,7 +78,9 @@ export function getSessionDetailRenameState(input: {
 
 /**
  * Title from a v2 `session.updated` event for this session, or undefined
- * when the event is for another session or carries no usable title.
+ * when the event is for another session or carries no usable title. A
+ * generated placeholder title is not usable: returning it would both reach
+ * the header and clear an in-flight rename.
  */
 export function titleFromSessionUpdatedEvent(
   sessionId: string,
@@ -87,9 +92,5 @@ export function titleFromSessionUpdatedEvent(
   if (payload.source !== 'v2' || payload.session.sessionId !== sessionId) {
     return undefined;
   }
-  const title = payload.session.title;
-  if (title == null || title.trim().length === 0) {
-    return undefined;
-  }
-  return title;
+  return normalizeSessionTitle(payload.session.title);
 }

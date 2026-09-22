@@ -32,9 +32,21 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('react-native', () => ({
+  // The screen calls the keyboard-reveal hook before it picks a branch, and
+  // that hook subscribes to the platform's keyboard and app-state events.
+  AppState: { addEventListener: () => ({ remove: () => undefined }) },
+  Keyboard: { addListener: () => ({ remove: () => undefined }) },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
+}));
+// The screen imports the keyboard-padding view, which reads the safe-area
+// insets. The package is externalized by this project, so Node would load its
+// real entry and the Flow-typed `react-native` it requires; stub the one export
+// the view reads instead (same stub the other mounted suites use).
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0 }),
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));

@@ -129,6 +129,10 @@ export function mapModelIdToVercel(modelId: string) {
     return internalId;
   }
 
+  if (internalId.startsWith('x-ai/')) {
+    return `spacexai${internalId.slice(slashIndex)}`;
+  }
+
   const firstPartyProvider = inferVercelFirstPartyInferenceProviderForModel(internalId);
   return firstPartyProvider ? firstPartyProvider + internalId.slice(slashIndex) : internalId;
 }

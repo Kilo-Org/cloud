@@ -18,6 +18,8 @@ import {
   writePersistedPortOffset,
   resolveSessionNextAuthUrl,
   resolveDeletionMockSessionEnv,
+  resolveFakeLlmSessionEnv,
+  resolveE2eInternalSecretSessionEnv,
   services,
 } from './services';
 import { acquireProcessLock, withProcessLockAsync } from './process-lock';
@@ -64,6 +66,7 @@ import {
   buildFollowLogPipeCommand,
   buildLogPipeCommand,
   probePort,
+  waitForPort,
   restartServiceInTmux,
   buildStartCommand,
   shellQuote,
@@ -577,7 +580,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     for (const name of serviceNames) {
       const service = getService(name);
       if (service.type !== 'worker' || !findServicePane(sessionName, name)) continue;
-      const outcome = await restartServiceInTmux(sessionName, name);
+      const outcome = await restartServiceInTmux(sessionName, name, undefined, serviceNames);
       if (outcome === 'gave-up') throw new Error(`${name} did not restart with refreshed secrets`);
     }
     if (Object.keys(mobileEnv).length > 0) {
@@ -600,7 +603,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
       !findServicePane(sessionName, 'cloud-agent-public-tunnels')
     ) {
       const previous = snapshotCloudAgentPublicTunnelEnv(repoRoot);
-      startServiceInTmux(sessionName, 'cloud-agent-public-tunnels');
+      startServiceInTmux(sessionName, 'cloud-agent-public-tunnels', undefined, serviceNames);
       const captured = await waitForCloudAgentPublicTunnelCapture(
         repoRoot,
         previous,
@@ -738,18 +741,26 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
     mockPort: getService('deletion-mock').port,
   });
   if (deletionMockEnv) Object.assign(sessionEnv, deletionMockEnv);
+  const fakeLlmEnv = resolveFakeLlmSessionEnv({ serviceNames });
+  if (fakeLlmEnv) Object.assign(sessionEnv, fakeLlmEnv);
+  const e2eInternalSecretEnv = resolveE2eInternalSecretSessionEnv({ serviceNames });
+  if (e2eInternalSecretEnv) Object.assign(sessionEnv, e2eInternalSecretEnv);
   createSession(sessionName, sessionEnv);
 
   // --- Start each service in its own tmux window ---
   const SIDEBAR_WIDTH = 40;
 
   // --- Start capture services first (tunnel, stripe) and wait for output ---
+  // The fake-LLM Worker is a capture service too: the public-tunnel service
+  // probes it before publishing and exits if it is not answering, so it must be
+  // started and ready before the tunnel capture runs.
   const captureServiceSet = new Set([
     'kiloclaw-tunnel',
     'stripe',
     'app-builder-tunnel',
     'bitbucket-webhook-tunnel',
     'cloud-agent-public-tunnels',
+    'fake-llm-worker',
   ]);
   const captureServices = serviceNames.filter(n => captureServiceSet.has(n));
   const otherServices = serviceNames.filter(n => !captureServiceSet.has(n));
@@ -790,8 +801,18 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
       ? snapshotCloudAgentPublicTunnelEnv(repoRoot)
       : undefined;
 
+    // Start the fake-LLM Worker and wait for it to answer before any tunnel
+    // capture: the tunnels refuse to publish the fake when the guard probe
+    // cannot authenticate against it.
+    if (captureServices.includes('fake-llm-worker')) {
+      startServiceInTmux(sessionName, 'fake-llm-worker', sessionEnv, serviceNames);
+      startedServices.push('fake-llm-worker');
+      await waitForPort(getService('fake-llm-worker').port, 'fake-llm-worker', CAPTURE_TIMEOUT_MS);
+    }
+
     for (const name of captureServices) {
-      startServiceInTmux(sessionName, name, sessionEnv);
+      if (name === 'fake-llm-worker') continue;
+      startServiceInTmux(sessionName, name, sessionEnv, serviceNames);
       startedServices.push(name);
       await sleep(300);
     }
@@ -948,7 +969,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<string | undefin
       continue;
     }
 
-    startServiceInTmux(sessionName, name, sessionEnv);
+    startServiceInTmux(sessionName, name, sessionEnv, serviceNames);
     startedServices.push(name);
     await sleep(300);
   }

@@ -77,6 +77,10 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
+// The element tree finds the loading Skeleton by that name, and the real
+// component animates through Reanimated's worklets package (and the motion
+// policy's `expo-battery`), neither of which this node project can load.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
@@ -120,6 +124,10 @@ vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
+// The loading profile row renders the reanimated `Skeleton`; stub it so this
+// node suite neither loads reanimated nor loses the `findElementByType`
+// assertion for the loading placeholder.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 // The profile row and the environment row both render a loading `Skeleton`,
 // whose module imports `react-native-reanimated`: this pure suite does not set

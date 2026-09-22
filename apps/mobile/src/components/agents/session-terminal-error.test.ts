@@ -443,7 +443,9 @@ describe('sessionStatusErrorMessage', () => {
 function assistantFailure(detail: string | null): MessageFailure {
   return {
     kind: 'assistant',
+    titleKey: 'agentChat.messageFailure.assistantTitle',
     title: 'Response failed',
+    detailKey: null,
     detail,
     copyDetail: '',
     canRetry: true,
@@ -454,7 +456,9 @@ function assistantFailure(detail: string | null): MessageFailure {
 describe('statusIndicatorDuplicatesMessageFailure', () => {
   const deliveryFailure: MessageFailure = {
     kind: 'delivery',
+    titleKey: 'agentChat.messageFailure.deliveryTitle',
     title: 'Failed to deliver',
+    detailKey: 'agentChat.messageFailure.deliveryExhausted',
     detail: 'We could not deliver this message after several attempts.',
     copyDetail: 'Unauthorized: Unauthorized',
     canRetry: true,
@@ -485,7 +489,9 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
     // same failure stated a second time.
     const executionFailure: MessageFailure = {
       kind: 'delivery',
+      titleKey: 'agentChat.messageFailure.assistantTitle',
       title: 'Response failed',
+      detailKey: null,
       detail: null,
       copyDetail: 'simulated error',
       canRetry: true,
@@ -527,5 +533,24 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
         failure: assistantFailure(null),
       })
     ).toBe(false);
+  });
+
+  it('still suppresses the same failure after an in-place language switch', async () => {
+    // `failure` is built inside a memo keyed on the message arrays, so an
+    // in-place LTR-to-LTR language switch (apply-language.ts) re-renders the
+    // screen without rebuilding it. The check must compare catalog keys, not
+    // the memoized copy, or the footer line reappears in the new language.
+    const failure = assistantFailure(null);
+    await i18n.changeLanguage('it');
+    try {
+      expect(
+        statusIndicatorDuplicatesMessageFailure({
+          indicator: { type: 'error', message: 'simulated error' },
+          failure,
+        })
+      ).toBe(true);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

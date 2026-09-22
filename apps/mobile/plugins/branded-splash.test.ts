@@ -137,8 +137,9 @@ describe('shared branded splash', () => {
 
     // Introspect against a fresh project root: `compileModsAsync` seeds the
     // Android color/style mods from the resources already on disk, so pointing
-    // it at this package's root would read a local prebuild's `colors.xml`
-    // (absent in CI) and make the assertion depend on the developer's machine.
+    // it at this package's root would read a developer's prebuilt `android/`
+    // tree — its `colors.xml` is absent in CI — and merge colors this test does
+    // not own into the mod results, making the assertion machine-dependent.
     const { root } = createAndroidProject();
     const evaluated = await compileModsAsync(config, {
       projectRoot: root,
@@ -173,6 +174,8 @@ describe('shared branded splash', () => {
     // compile above inspects the fresh root `createAndroidProject()` created
     // (no prebuilt `colors.xml`), and `arrayContaining` leaves any other
     // entries in `resources.color` unpinned.
+    // `introspect` merges into the colors a local prebuild already generated, so
+    // assert the plugin's entry instead of the whole array.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),

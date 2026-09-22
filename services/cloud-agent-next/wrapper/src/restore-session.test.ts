@@ -7,10 +7,6 @@ import { buildWorktreeKiloEnvironment } from './control/worktree-runtime';
 
 const SESSION_ID = 'ses_test123';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 // Real session-ingest exports always carry a top-level `info` block with at
 // least `id`. The orchestrator's malformed-snapshot guardrail keys off that
 // field, so test fixtures must match real shape.
@@ -142,10 +138,6 @@ wait
   const kiloPath = path.join(binDir, 'kilo');
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
-
-// ---------------------------------------------------------------------------
-// Test suite
-// ---------------------------------------------------------------------------
 
 async function rejected(operation: Promise<void>): Promise<unknown> {
   try {
@@ -429,8 +421,6 @@ describe('restoreSession', () => {
     }
   });
 
-  // ---- Environment validation ----
-
   it('returns error when KILO_SESSION_INGEST_URL is missing', async () => {
     delete process.env.KILO_SESSION_INGEST_URL;
     const result = await restoreSession(SESSION_ID, workspace);
@@ -594,8 +584,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
       expect(result.error).toContain('KILOCODE_TOKEN');
     }
   });
-
-  // ---- Download failures ----
 
   it('returns 404 error when snapshot not found', async () => {
     mockFetchStatus(404);
@@ -859,8 +847,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     }
   });
 
-  // ---- Import failures ----
-
   it('returns import error when kilo import fails', async () => {
     const snapshot = makeSnapshot([{ file: 'src/index.ts', after: 'content', status: 'modified' }]);
     mockFetchOk(snapshot);
@@ -957,8 +943,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     expect(elapsedMs).toBeGreaterThanOrEqual(600);
     expect(fs.existsSync(descendantMarker)).toBe(false);
   });
-
-  // ---- Happy paths ----
 
   it('strips transient lifecycle parts from the snapshot before kilo import', async () => {
     const capturePath = path.join(tmpDir, 'import-input.json');
@@ -1133,8 +1117,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     });
   });
 
-  // ---- Path traversal protection ----
-
   it('skips diffs with path traversal', async () => {
     const snapshot = makeSnapshot([
       { file: '../escaped.txt', after: 'malicious', status: 'modified' },
@@ -1158,8 +1140,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     expect(fs.readFileSync(path.join(workspace, 'safe.txt'), 'utf-8')).toBe('safe content');
   });
 
-  // ---- Deduplication ----
-
   it('deduplicates diffs by file path with last-write-wins', async () => {
     const snapshot = makeMultiMessageSnapshot(
       [{ file: 'dup.txt', after: 'first version', status: 'modified' }],
@@ -1179,8 +1159,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     // Second message wins
     expect(fs.readFileSync(path.join(workspace, 'dup.txt'), 'utf-8')).toBe('second version');
   });
-
-  // ---- Empty after-content ----
 
   it('restores non-deleted diffs with empty after content', async () => {
     const snapshot = makeSnapshot([
@@ -1393,8 +1371,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     expect(new TextDecoder().decode(unmerged.stdout)).toBe('');
   });
 
-  // ---- Temp file cleanup ----
-
   it('cleans up temp file on success', async () => {
     mockFetchOk(makeSnapshot([{ file: 'a.txt', after: 'content', status: 'modified' }]));
 
@@ -1476,8 +1452,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     expect(snapshotDirectories()).toEqual([]);
   });
 
-  // ---- Fetch URL construction ----
-
   it('sends correct URL and auth header', async () => {
     let capturedUrl: string | undefined;
     let capturedHeaders: Headers | undefined;
@@ -1511,8 +1485,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     expect(capturedUrl).toContain(encodeURIComponent(specialId));
   });
 
-  // ---- Nested directory creation ----
-
   it('creates nested directories for diff file paths', async () => {
     const snapshot = makeSnapshot([
       { file: 'deep/nested/dir/file.ts', after: 'nested content', status: 'modified' },
@@ -1527,8 +1499,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     );
   });
 
-  // ---- Delete of already-absent file ----
-
   it('counts delete as applied even if file does not exist', async () => {
     const snapshot = makeSnapshot([{ file: 'nonexistent.txt', after: '', status: 'deleted' }]);
     mockFetchOk(snapshot);
@@ -1542,10 +1512,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     }
   });
 });
-
-// ---------------------------------------------------------------------------
-// extractDiffs (subprocess-based diff extraction)
-// ---------------------------------------------------------------------------
 
 describe('extractDiffs', () => {
   let tmpDir: string;

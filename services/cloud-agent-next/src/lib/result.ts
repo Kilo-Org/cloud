@@ -5,19 +5,11 @@
  * avoiding the need to rely on try/catch for control flow.
  */
 
-// ---------------------------------------------------------------------------
-// Result Type
-// ---------------------------------------------------------------------------
-
 /**
  * A Result represents either success (Ok) or failure (Err).
  * Use this instead of throwing exceptions for expected error cases.
  */
 export type Result<T, E = Error> = { ok: true; value: T } | { ok: false; error: E };
-
-// ---------------------------------------------------------------------------
-// Constructors
-// ---------------------------------------------------------------------------
 
 /** Create a successful Result containing a value */
 export const Ok = <T>(value: T): Result<T, never> => ({ ok: true, value });
@@ -25,19 +17,11 @@ export const Ok = <T>(value: T): Result<T, never> => ({ ok: true, value });
 /** Create a failed Result containing an error */
 export const Err = <E>(error: E): Result<never, E> => ({ ok: false, error });
 
-// ---------------------------------------------------------------------------
-// Type Guards
-// ---------------------------------------------------------------------------
-
 /** Check if a Result is Ok (successful) */
 export const isOk = <T, E>(r: Result<T, E>): r is { ok: true; value: T } => r.ok;
 
 /** Check if a Result is Err (failed) */
 export const isErr = <T, E>(r: Result<T, E>): r is { ok: false; error: E } => !r.ok;
-
-// ---------------------------------------------------------------------------
-// Combinators
-// ---------------------------------------------------------------------------
 
 /**
  * Transform the value inside a successful Result.

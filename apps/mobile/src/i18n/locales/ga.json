@@ -3248,6 +3248,14 @@
     "tooManySignInAttempts": "An iomarca iarrachtaí sínithe isteach. Fan agus bain triail as arís le do thoil."
   },
   "models": {
+    "auto": {
+      "frontier": "Uathoibríoch Ardleibhéil",
+      "balanced": "Uathoibríoch Cothrom",
+      "efficient": "Uathoibríoch Éifeachtúil",
+      "small": "Uathoibríoch Beag",
+      "free": "Uathoibríoch Saor in aisce",
+      "organization": "Uathoibríoch Eagraíochta"
+    },
     "dataCollected": "Sonraí bailithe",
     "free": "Saor in aisce",
     "couldNotUpdateFavorites": "Níorbh fhéidir na cinn is fearr leat a nuashonrú.",

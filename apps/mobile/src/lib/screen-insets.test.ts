@@ -77,10 +77,9 @@ describe('screen side insets: one implementation for both platforms', () => {
     const alignment = alignmentPath(profile);
     // `alignmentPath` starts at the `useScreenSideInsets` line, so this also
     // proves the path it scans is the screen's insets read, not an empty slice.
-    // The screen forks once on purpose: Android's native alert cannot show a
-    // red destructive button, so sign-out opens the in-app confirmation there.
-    // That fork is not on the insets path — every other line, and in
-    // particular the ones that carry the insets, stays one implementation.
+    // The screen carries no platform branch at all: sign-out confirms through
+    // one cross-platform in-app dialog, so the insets path — and every other
+    // line — stays a single implementation.
     expect(
       alignment,
       `${PROFILE_SCREEN} does not read its side insets from the entry point`

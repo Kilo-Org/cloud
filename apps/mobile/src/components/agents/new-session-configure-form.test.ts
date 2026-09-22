@@ -129,14 +129,6 @@ vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 // assertion for the loading placeholder.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
-// `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
-// import cannot resolve in the pure project; every sibling pure spec mocks it.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-
-vi.mock('@/components/ui/segmented-control', () => ({
-  SegmentedControl: 'SegmentedControl',
-}));
-
 // The profile row and the environment row both render a loading `Skeleton`,
 // whose module imports `react-native-reanimated`: this pure suite does not set
 // Reanimated up, and this project runs in plain Node, where the
@@ -145,6 +137,10 @@ vi.mock('@/components/ui/segmented-control', () => ({
 // pending-environment case asserts by name; its own rendering is not under test
 // here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
+vi.mock('@/components/ui/segmented-control', () => ({
+  SegmentedControl: 'SegmentedControl',
+}));
 
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,

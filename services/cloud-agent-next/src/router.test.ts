@@ -143,28 +143,21 @@ function mockWorktreeOwnershipRow(
 describe('router sessionId validation', () => {
   it('should reject invalid session ID formats', () => {
     const invalidIds = [
-      // Path traversal and command injection
       'agent_../../etc/passwd',
       'agent_abc123; rm -rf /',
       '../agent_12345678-1234-1234-1234-123456789abc',
-      // Missing or wrong prefix
       'session_12345678-1234-1234-1234-123456789abc',
       'agent2_12345678-1234-1234-1234-123456789abc',
       '12345678-1234-1234-1234-123456789abc',
-      // Incomplete formats
       'agent_',
       'agent_incomplete',
       '',
-      // Special characters
       'agent_test%00null',
       'agent_<script>alert(1)</script>',
-      // Non-hex characters in UUID
       'agent_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
       'agent_ZZZZZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZZZZZZZZZ',
-      // Wrong UUID length/format
       'agent_12345678-1234-1234-1234-123456789ab',
       'agent_123456781234123412341234567890abc',
-      // Whitespace/extra characters
       'agent_12345678-1234-1234-1234-123456789abc ',
       ' agent_12345678-1234-1234-1234-123456789abc',
     ];
@@ -357,7 +350,6 @@ describe('router sessionId validation', () => {
           const mockSession = { token: 'session' };
           getOrCreateSessionMock.mockResolvedValue(mockSession);
 
-          // Mock context
           mockContext = {
             userId: 'test-user-123',
             authToken: 'test-token',
@@ -405,7 +397,6 @@ describe('router sessionId validation', () => {
           };
           cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
 
-          // Mock sandbox with deleteSession method
           mockSandbox = {
             configureBilling: vi.fn().mockResolvedValue(undefined),
             deleteSession: vi.fn().mockResolvedValue(undefined),
@@ -413,7 +404,6 @@ describe('router sessionId validation', () => {
 
           vi.mocked(getSandbox).mockReturnValue(mockSandbox);
 
-          // Create caller with mocked context
           caller = appRouter.createCaller(mockContext);
         });
 
@@ -1021,7 +1011,6 @@ describe('router sessionId validation', () => {
         mockGetCurrentRuntimeExecution = vi.fn().mockResolvedValue(null);
         mockGetCurrentMessageWork = vi.fn().mockResolvedValue(null);
 
-        // Mock context
         mockContext = {
           userId: 'test-user-123',
           authToken: 'test-token',
@@ -1069,7 +1058,6 @@ describe('router sessionId validation', () => {
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
 
-        // Create caller with mocked context
         caller = appRouter.createCaller(mockContext);
       });
 
@@ -1109,7 +1097,6 @@ describe('router sessionId validation', () => {
 
           const result = await caller.getSession({ cloudAgentSessionId: sessionId });
 
-          // Verify the result contains safe fields
           expect(result.sessionId).toBe(sessionId);
           expect(result.kiloSessionId).toBe('a0000000-0000-4000-8000-000000000001');
           expect(result.userId).toBe('test-user-123');
@@ -1125,7 +1112,6 @@ describe('router sessionId validation', () => {
           expect(result.timestamp).toBe(123456789);
           expect(result.version).toBe(123456789);
 
-          // Verify secrets are NOT returned
           expect(result).not.toHaveProperty('githubToken');
           expect(result).not.toHaveProperty('gitToken');
           expect(result).not.toHaveProperty('envVars');
@@ -1137,7 +1123,6 @@ describe('router sessionId validation', () => {
           expect(result).not.toHaveProperty('callbackTarget');
           expect(result).not.toHaveProperty('providerRuntime');
 
-          // Verify DO was accessed with correct key
           expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
         });
 
@@ -1336,7 +1321,6 @@ describe('router sessionId validation', () => {
             'Session not found'
           );
 
-          // Verify the DO was keyed with the authenticated user's ID
           expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
         });
       });
@@ -1350,7 +1334,6 @@ describe('router sessionId validation', () => {
             userId: 'test-user-123',
             timestamp: 123456789,
             preparedAt: 1700000000000,
-            // initiatedAt is undefined - not yet initiated
           });
 
           mockGetMetadata.mockResolvedValue(metadata);

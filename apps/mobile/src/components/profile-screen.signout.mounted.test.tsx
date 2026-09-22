@@ -32,6 +32,10 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// The Profile screen reads its side insets through `@/lib/screen-insets`, which
+// imports `react-native-safe-area-context`; that package's React Native source
+// cannot be transformed in this project (its entry is Flow-typed), so the
+// mounted projects mock it.
 // The screen reads its side insets through `@/lib/screen-insets`; the native
 // module's source is not parseable by this project's transform, and the
 // sign-out confirmation does not depend on the values.

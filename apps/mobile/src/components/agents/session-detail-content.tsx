@@ -390,6 +390,10 @@ export function SessionDetailContent({
   }, []);
 
   const { bottom } = useSafeAreaInsets();
+  // The strip below the keyboard container reserves the device safe area so the
+  // composer's tail clears the navigation bar / home indicator. The container
+  // above does not add it again (`containerReservesBottomInset`), so the space
+  // is resolved once per screen instead of twice.
   const { showActionSheetWithOptions } = useActionSheet();
 
   // Durable composer draft. The composer renders immediately — typing must

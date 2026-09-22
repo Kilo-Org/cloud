@@ -50,12 +50,26 @@ catalog:
   ulid: 3.0.2
   vitest: 4.1.6
   workers-tagged-logger: 1.0.0
-  wrangler: 4.112.0
+  wrangler: 4.135.0
   zod: 4.4.3
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx
+  # Cloudflare's DO-managed container runtime (ctx.container, snapshotContainer).
+  # wrangler 4.134.0 is the first release with local development support for
+  # DO-managed Containers (named-image selection via ctx.container.images).
+  # 4.135.0 exact-pins its own workerd/miniflare runtime, so those exact versions
+  # are exempted with it. Approved early-access exception; remove all eight entries
+  # when 4.135.0 matures (workerd 2026-09-18, wrangler 2026-09-18).
+  - wrangler@4.135.0
+  - workerd@1.20260918.1
+  - miniflare@5.20260918.0-alpha
+  - '@cloudflare/workerd-darwin-64@1.20260918.1'
+  - '@cloudflare/workerd-darwin-arm64@1.20260918.1'
+  - '@cloudflare/workerd-linux-64@1.20260918.1'
+  - '@cloudflare/workerd-linux-arm64@1.20260918.1'
+  - '@cloudflare/workerd-windows-64@1.20260918.1'
   # Expo SDK 57 alignment: the 2026-09-08 patch releases `expo install --check`
   # expects, plus the exact transitive versions that aligned graph resolves to.
   # Each entry exempts exactly the listed package@version required by that

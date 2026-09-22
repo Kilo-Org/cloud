@@ -73,15 +73,13 @@ export function SessionContextMetrics({
   // Exactly 44pt via h-[44px]. rem-scaled h-11 measured ~38.7pt on device with
   // NativeWind 5 preview (rem ≈ 14px here), so an arbitrary px value is required
   // for the 44pt minimum touch target; height is identical in every pill state.
-  // `min-w-0 shrink` lets the pill give up width to the header's 50% slot cap
-  // instead of painting the cost past the gutter.
+  // `shrink min-w-0` lets the pill compress inside the header's capped trailing
+  // slot: RN's default flexShrink is 0, so without them the pill keeps its
+  // natural width and paints past the row's right edge, off-screen. The cost is
+  // the only unbounded text in the pill, so both text slots truncate to one
+  // line instead of painting past the pill.
   const pillClassName =
-    'h-[44px] min-w-0 shrink flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
-
-  // Without context usage the cost is the primary string; with usage the cost
-  // sits beside the percentage. Either way the cost is the only unbounded text
-  // in the pill, so the slot that carries it must be able to truncate.
-  const primaryIsCost = info == null;
+    'h-[44px] shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
 
   const body = (
     <>
@@ -94,19 +92,18 @@ export function SessionContextMetrics({
       {content.primary != null ? (
         <View className="min-w-0 shrink flex-row items-baseline gap-1">
           <Text
-            className={cn(
-              'text-xs font-semibold tabular-nums',
-              toneTextClass(content.tone),
-              primaryIsCost && 'min-w-0 shrink'
-            )}
             numberOfLines={1}
+            className={cn(
+              'min-w-0 shrink text-xs font-semibold tabular-nums',
+              toneTextClass(content.tone)
+            )}
           >
             {content.primary}
           </Text>
           {content.hasCost && content.secondary ? (
             <Text
-              className="min-w-0 shrink text-xs tabular-nums text-muted-foreground"
               numberOfLines={1}
+              className="min-w-0 shrink text-xs tabular-nums text-muted-foreground"
               accessibilityElementsHidden
               importantForAccessibility="no"
             >

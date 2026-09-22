@@ -99,6 +99,25 @@ describe('sandbox selection policy', () => {
       devcontainer: false,
       expected: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
     },
+    {
+      name: 'Cloudflare containers when the isolated owner is enrolled',
+      overrides: {
+        PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
+        VERCEL_SANDBOX_ORG_IDS: '',
+        CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
+      },
+      devcontainer: false,
+      expected: getSandboxAllocationRequest('cloudflare-containers-standard-4'),
+    },
+    {
+      name: 'unchanged shared Cloudflare when the owner is not isolated',
+      overrides: {
+        VERCEL_SANDBOX_ORG_IDS: '',
+        CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
+      },
+      devcontainer: false,
+      expected: getSandboxAllocationRequest('cloudflare-shared'),
+    },
   ])(
     'previews $name consistently with actual routing',
     async ({ overrides, devcontainer, expected }) => {
@@ -201,10 +220,11 @@ describe('sandbox selection policy', () => {
       ...configured,
       ...overrides,
       VERCEL_SANDBOX_ORG_IDS: '',
+      CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
     } as Env;
     const capabilities = getSandboxSelectionCapabilities(env, owner);
     expect(capabilities.enabled).toBe(true);
-    expect(capabilities.options).toHaveLength(4);
+    expect(capabilities.options).toHaveLength(6);
     expect(capabilities.options.every(option => !('available' in option))).toBe(true);
     expect(JSON.stringify(capabilities)).not.toContain('test-token');
     for (const preset of sandboxAllocationSchema.options) {
@@ -248,6 +268,71 @@ describe('sandbox selection policy', () => {
       );
     }
     expect(() => assertSandboxAllocationAvailable(env, owner, 'cloudflare-single')).not.toThrow();
+  });
+
+  it('offers every Cloudflare containers size only to enrolled owners', () => {
+    const enrolled = {
+      ...configured,
+      CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
+    } as Env;
+    const options = getSandboxSelectionCapabilities(enrolled, owner).options.map(
+      option => option.allocation
+    );
+    expect(options).toContainEqual(getSandboxAllocationRequest('cloudflare-containers-standard-3'));
+    expect(options).toContainEqual(getSandboxAllocationRequest('cloudflare-containers-standard-4'));
+    for (const allocation of [
+      'cloudflare-containers-standard-3',
+      'cloudflare-containers-standard-4',
+    ] as const) {
+      expect(() => assertSandboxAllocationAvailable(enrolled, owner, allocation)).not.toThrow();
+    }
+
+    const unenrolled = { ...configured, CLOUDFLARE_CONTAINERS_ORG_IDS: 'other-org' } as Env;
+    expect(
+      getSandboxSelectionCapabilities(unenrolled, owner).options.map(option => option.allocation)
+    ).not.toContainEqual(getSandboxAllocationRequest('cloudflare-containers-standard-3'));
+    expect(() =>
+      assertSandboxAllocationAvailable(unenrolled, owner, 'cloudflare-containers-standard-3')
+    ).toThrow('not enabled for this account');
+  });
+
+  it('admits personal Cloudflare containers enrollment only for the wildcard', () => {
+    const wildcard = {
+      ...configured,
+      SANDBOX_SELECTION_IDS: '*',
+      CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
+    } as Env;
+    expect(
+      getSandboxSelectionCapabilities(wildcard, { userId: owner.userId }).options.map(
+        option => option.allocation
+      )
+    ).toContainEqual(getSandboxAllocationRequest('cloudflare-containers-standard-4'));
+
+    const orgOnly = {
+      ...configured,
+      SANDBOX_SELECTION_IDS: '*',
+      CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
+    } as Env;
+    expect(
+      getSandboxSelectionCapabilities(orgOnly, { userId: owner.userId }).options.map(
+        option => option.allocation
+      )
+    ).not.toContainEqual(getSandboxAllocationRequest('cloudflare-containers-standard-4'));
+  });
+
+  it('fails Cloudflare containers closed for enforced organization billing', () => {
+    const env = {
+      ...configured,
+      CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
+      CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+      CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: owner.orgId,
+    } as Env;
+    expect(
+      getSandboxSelectionCapabilities(env, owner).options.map(option => option.allocation)
+    ).not.toContainEqual(getSandboxAllocationRequest('cloudflare-containers-standard-4'));
+    expect(() =>
+      assertSandboxAllocationAvailable(env, owner, 'cloudflare-containers-standard-4')
+    ).toThrow('enforced compute billing');
   });
 
   it('admits the trigger-only allocation without listing it', () => {

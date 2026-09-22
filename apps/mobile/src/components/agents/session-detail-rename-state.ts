@@ -52,6 +52,35 @@ type SessionDetailRenameState = {
 };
 
 /**
+ * The backend's "unnamed" session title is a raw ISO placeholder such as
+ * `New session - 2026-09-22T02:05:22.778Z`; web nulls it before display.
+ * Mirrors `isDefaultSessionTitle` in
+ * `packages/session-ingest-contracts/src/index.ts` and must stay in step with
+ * it. The pattern is mirrored rather than imported because mobile does not
+ * depend on that package (only `apps/web` consumes it) and
+ * `apps/mobile/AGENTS.md` requires `npx expo install` for dependencies, which
+ * cannot resolve a private workspace package.
+ */
+const PLACEHOLDER_SESSION_TITLE_PATTERN =
+  /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+/**
+ * A title a user should actually see, or undefined when the session has no
+ * name: null, blank, or the backend's ISO placeholder. Callers fall back to
+ * the localized unnamed-session name.
+ */
+export function namedSessionTitle(title: string | null | undefined): string | undefined {
+  if (title == null) {
+    return undefined;
+  }
+  const trimmed = title.trim();
+  if (trimmed.length === 0 || PLACEHOLDER_SESSION_TITLE_PATTERN.test(trimmed)) {
+    return undefined;
+  }
+  return trimmed;
+}
+
+/**
  * Pure helper that derives the session-detail header display state from the
  * authoritative server title and the reducer state.
  */
@@ -61,9 +90,8 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
-  const baseTitle = input.isLoaded
-    ? (input.serverTitle ?? input.fallbackTitle)
-    : input.fallbackTitle;
+  const serverTitle = namedSessionTitle(input.serverTitle);
+  const baseTitle = input.isLoaded ? (serverTitle ?? input.fallbackTitle) : input.fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
     title,
@@ -87,9 +115,5 @@ export function titleFromSessionUpdatedEvent(
   if (payload.source !== 'v2' || payload.session.sessionId !== sessionId) {
     return undefined;
   }
-  const title = payload.session.title;
-  if (title == null || title.trim().length === 0) {
-    return undefined;
-  }
-  return title;
+  return namedSessionTitle(payload.session.title);
 }

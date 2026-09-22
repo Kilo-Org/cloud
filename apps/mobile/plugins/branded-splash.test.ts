@@ -170,6 +170,10 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // This case introspects the real project root, so a worktree that carries a
+    // prebuilt `android/` tree contributes its own colors alongside the ones
+    // Expo generates. Assert the splash background this plugin owns is
+    // present, not that it is the only color.
     // `introspect` merges into the colors a local prebuild already generated, so
     // assert the plugin's entry instead of the whole array.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({

@@ -8,8 +8,8 @@ const FAB_BAND = FAB_SIZE + FAB_MARGIN;
 
 /**
  * The Agents screen's bottom bands: the band the centered states reserve through
- * `StateSurfaceInsets` (`surfaceBand`) and the band the rows list's frame
- * reserves (`listBand`).
+ * `StateSurfaceInsets` (`surfaceBand`) and the rows list's total band
+ * (`listBand`), from which the rows frame's own band is derived.
  *
  * `surfaceBand` is that centered band in both keyboard positions — the IME's
  * occlusion while the keyboard is up, the tab bar's own height while it is down
@@ -63,13 +63,16 @@ export function useAgentsBottomBands(
  * button's band had its right-aligned timestamp and chevron covered, and a
  * scroll view's padding is not part of its scrollable content on iOS, so padding
  * on the frame clipped the last rows under the bar with no way to scroll them
- * clear. The vertical value is the list's band (`listBand` from
- * `useAgentsBottomBands`): the band the centered states also reserve, floored at
- * the FAB's own overlay band. Android's edge-to-edge window does not resize for
- * the IME, so a keyboard-blind frame parked the last rows of a search behind the
- * keyboard with no way to scroll them clear (review finding,
- * session-list-chrome.ts). The landscape side insets keep row text clear of the
- * sensor housing; portrait insets are 0, keeping the geometry unchanged.
+ * clear. The band (`bottomBand`) is the caller's rows frame band
+ * (`rowsFrameBand` in `session-list-screen.tsx`): the part of the rows list's
+ * total band (`listBand` from `useAgentsBottomBands`, itself floored at the
+ * FAB's own overlay band) that the keyboard container does not already cover.
+ * The centered states reserve `surfaceBand` instead. Android's edge-to-edge
+ * window does not resize for the IME, so a keyboard-blind frame parked the last
+ * rows of a search behind the keyboard with no way to scroll them clear (review
+ * finding, session-list-chrome.ts). The landscape side insets keep row text
+ * clear of the sensor housing; portrait insets are 0, keeping the geometry
+ * unchanged.
  */
 export function useSessionListInsets({
   bottomBand,

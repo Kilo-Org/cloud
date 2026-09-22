@@ -3,7 +3,7 @@
 // limit. Receives the full set of state needed to switch on item kind
 // and dispatch to the right row component.
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 import { DiffLine } from '@/components/pr-review/diff/diff-line';
 import {
@@ -61,6 +61,9 @@ export type LineTapArgs = {
   hunk: ParsedHunk;
 };
 
+/** The one item the per-line tap map is keyed on. */
+type DiffLineItem = Extract<ListItem, { kind: 'diff-line' }>;
+
 export function useDiffRenderItem({
   viewed,
   onRetryPage,
@@ -70,6 +73,51 @@ export function useDiffRenderItem({
   onLineTap,
   selection,
 }: UseDiffRenderItemArgs) {
+  // Identity-stable per-line tap callbacks so `DiffLine`'s memo comparator —
+  // which compares `onTap` by reference — can hit. A fresh closure per line per
+  // render defeated it, so tapping one line re-rendered every mounted diff row
+  // instead of only the rows whose `isSelected` changed. Mirrors
+  // `pr-diff-file-navigator.tsx`'s `rowCallbacksRef`: the closures read the
+  // latest item and the latest `onLineTap` through refs, so they stay
+  // identity-stable (the memo keeps hitting) but never go stale when the item
+  // is rebuilt or `onLineTap` changes identity. The maps are bounded by the
+  // diff lines actually mounted — the same trade-off the navigator's per-row
+  // callback map accepts.
+  const onLineTapRef = useRef(onLineTap);
+  onLineTapRef.current = onLineTap;
+
+  const lineItemRef = useRef(new Map<string, DiffLineItem>());
+  const lineTapRef = useRef(new Map<string, () => void>());
+
+  const lineTapFor = useCallback((item: DiffLineItem) => {
+    lineItemRef.current.set(item.key, item);
+    let onTap = lineTapRef.current.get(item.key);
+    if (!onTap) {
+      onTap = () => {
+        const current = lineItemRef.current.get(item.key);
+        if (!current) {
+          return;
+        }
+        const side = sideForDiffLineType(current.line.type);
+        const lineNumber = side === 'LEFT' ? current.line.oldLine : current.line.newLine;
+        const hunk = current.parsed.hunks[current.hunkIndex];
+        if (lineNumber === undefined || !hunk) {
+          return;
+        }
+        onLineTapRef.current({
+          filePath: current.filePath,
+          hunkKey: `${current.filePath}:${current.hunkIndex}`,
+          side,
+          line: lineNumber,
+          text: current.line.text,
+          hunk,
+        });
+      };
+      lineTapRef.current.set(item.key, onTap);
+    }
+    return onTap;
+  }, []);
+
   return useCallback(
     ({ item }: { item: ListItem }) => {
       switch (item.kind) {
@@ -128,18 +176,7 @@ export function useDiffRenderItem({
               language={item.language}
               keyId={item.lineKeyId}
               onTap={
-                isSelectable && lineNumber !== undefined && hunk
-                  ? () => {
-                      onLineTap({
-                        filePath: item.filePath,
-                        hunkKey: `${item.filePath}:${item.hunkIndex}`,
-                        side,
-                        line: lineNumber,
-                        text: parsedLine.text,
-                        hunk,
-                      });
-                    }
-                  : undefined
+                isSelectable && lineNumber !== undefined && hunk ? lineTapFor(item) : undefined
               }
               isSelected={
                 selection !== null &&
@@ -178,6 +215,6 @@ export function useDiffRenderItem({
         }
       }
     },
-    [viewed, onRetryPage, onFetchAll, handleLoadContext, setExpanded, onLineTap, selection]
+    [viewed, onRetryPage, onFetchAll, handleLoadContext, setExpanded, lineTapFor, selection]
   );
 }

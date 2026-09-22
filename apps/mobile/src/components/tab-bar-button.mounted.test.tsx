@@ -8,6 +8,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { TabBarButton } from './tab-bar-button';
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
 }));
 
@@ -57,5 +58,12 @@ describe('TabBarButton mounted layout', () => {
   it('keeps the press ripple the bar passes', () => {
     const button = renderButton({ android_ripple: { borderless: true } });
     expect(button.props.android_ripple).toEqual({ borderless: true });
+  });
+
+  // The library's PlatformPressable cursors the entry on iOS pointer devices;
+  // React Native's Pressable does not, so the entry must set it itself.
+  it('keeps the pointer cursor the library applied on iOS', () => {
+    const button = renderButton({ style: { opacity: 1 } });
+    expect(button.props.style).toEqual(expect.arrayContaining([{ cursor: 'pointer' }]));
   });
 });

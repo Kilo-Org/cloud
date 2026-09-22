@@ -39,6 +39,9 @@ vi.mock('react-native-reanimated', () => ({
 // reads its landscape side insets from it, so the mock returns the hoisted
 // `safeArea`; the alignment guard in `screen-insets.test.ts` holds that read to
 // the shared entry point.
+// The screen reads its side insets through `@/lib/screen-insets`, whose real
+// `react-native-safe-area-context` entry is a Flow source this pipeline cannot
+// transform; the insets are irrelevant to the sign-out flow.
 // The screen reads its side insets through `@/lib/screen-insets`; the native
 // module's source is not parseable by this project's transform, and the
 // sign-out confirmation does not depend on the values.

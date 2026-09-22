@@ -1,3 +1,8 @@
+// Keep this file's name off the `_layout` prefix: Expo Router's typed-routes
+// generator reads every `.tsx` under `src/app`, and a `_layout.*.test.tsx` in a
+// directory is taken as that directory's layout, which drops every route below
+// `(tabs)` from `.expo/types/router.d.ts` and fails `pnpm typecheck`.
+//
 // The tab bar yields the bottom band to the IME: the shared `screenOptions`
 // must carry `tabBarHideOnKeyboard: true` so the absolutely-positioned bar
 // hides while the keyboard is up (its labels and the empty-state second line

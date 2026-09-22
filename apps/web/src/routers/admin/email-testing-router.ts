@@ -79,6 +79,21 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
         spend_url: `${NEXTAUTH_URL}/organizations/${orgId}/usage-details`,
         cta_label: 'Open spend view',
       };
+    case 'monthlySpendingAlert':
+      return {
+        organization_name: 'Acme Corp',
+        threshold_usd: '10,000.00',
+        spend_usd: '10,245.75',
+        period_label: 'September 2026',
+        alerts_url: `${organization_url}/alerts`,
+      };
+    case 'organizationLowBalanceAlert':
+      return {
+        organization_name: 'Acme Corp',
+        threshold_usd: '1,000.00',
+        balance_usd: '945.25',
+        alerts_url: `${organization_url}/alerts`,
+      };
     case 'autoTopUpFailed':
       return { reason: 'Card declined', credits_url: `${NEXTAUTH_URL}/credits?show-auto-top-up` };
     case 'codeReviewDisabled':

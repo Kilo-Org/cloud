@@ -83,14 +83,22 @@ export function NewSessionConfigureForm({
   onRetryCloudCreate,
 }: Readonly<NewSessionConfigureFormProps>) {
   const { t } = useTranslation();
-  // The screen root keeps the navigation-bar inset as paddingBottom, so the
-  // pinned footer can never render inside the bar. The window never resizes for
-  // the IME on either platform, so the keyboard-lift view below adds the
-  // reported IME height above that inset — the app's cross-platform IME
-  // primitive (keyboardDidShow/DidHide on Android, keyboardWillShow/WillHide on
-  // iOS), one implementation for both platforms. The footer is the lift view's
-  // second child, so no scroll position can carry the Start action under the
-  // bar or the keyboard.
+  // The form is edge-to-edge and the window never resizes for the IME on
+  // either platform, so the screen needs two floors. The first is the
+  // navigation-bar inset, which the screen root keeps as paddingBottom, so the
+  // pinned footer can never render inside the bar: the Start action sits in a
+  // footer below the scroll body, and without the inset the footer would render
+  // in the navigation bar's region (a formSheet over this screen no longer
+  // leaves that region exposed below itself: the sheet is fixed at its shared
+  // options, `sheetShouldOverflowTopInset`). The second is the keyboard height,
+  // because the composer auto-focuses on open and without the keyboard floor
+  // the Start control stays half-hidden behind the keyboard strip; the
+  // keyboard-lift view below adds the reported IME height above that inset.
+  // That lift view is the app's cross-platform IME primitive
+  // (keyboardDidShow/DidHide on Android, keyboardWillShow/WillHide on iOS), one
+  // implementation for both platforms; the footer is its second child, so the
+  // IME lifts the action too and no scroll position can carry the Start action
+  // under the bar or the keyboard.
   //
   // The composer reveal keeps the scroll CONTENT reachable; it does not keep
   // the composer card's own bottom row (the mode/model pills) above the IME —

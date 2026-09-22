@@ -323,7 +323,8 @@
       "chat": "Tin nhắn trò chuyện",
       "kiloclaw": "Hoạt động KiloClaw",
       "balance": "Cảnh báo số dư",
-      "security": "Vấn đề bảo mật"
+      "security": "Vấn đề bảo mật",
+      "spend": "Cảnh báo chi tiêu"
     },
     "category": {
       "chatMessagesSubtitle": "câu trả lời trong các cuộc trò chuyện của bạn",
@@ -338,7 +339,9 @@
       "balanceAlertsSubtitle": "cảnh báo số dư tổ chức thấp",
       "balanceAlertsUnavailable": "Tham gia một tổ chức để nhận cảnh báo số dư thấp.",
       "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA",
-      "securityFindingsUnavailable": "Bật Trợ lý bảo mật Kilo trên một phạm vi để nhận vấn đề bảo mật."
+      "securityFindingsUnavailable": "Bật Trợ lý bảo mật Kilo trên một phạm vi để nhận vấn đề bảo mật.",
+      "spendAlertsSubtitle": "vượt ngưỡng và tăng vọt theo giờ",
+      "spendAlertsToggle": "Danh mục cảnh báo chi tiêu"
     },
     "action": {
       "openSession": "Mở phiên"
@@ -3200,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Mở phiên gần nhất"
+  },
+  "spendAlerts": {
+    "subtitle": "Gửi cảnh báo qua email hoặc push tới các liên hệ thanh toán khi chi tiêu của phạm vi này vượt một giới hạn hoặc tăng vọt trên mức thường lệ theo giờ.",
+    "enable": "Bật cảnh báo chi tiêu",
+    "thresholdTitle": "Vượt ngưỡng",
+    "thresholdSubtitle": "Chi tiêu tích lũy vượt giới hạn của bạn",
+    "anomalyTitle": "Tăng vọt theo giờ",
+    "anomalySubtitle": "Một giờ cao hơn hẳn mức thường lệ của phạm vi này",
+    "limitLabel": "Giới hạn (USD)",
+    "windowLabel": "Khoảng thời gian",
+    "window24h": "24 giờ",
+    "window7d": "7 ngày",
+    "window30d": "30 ngày",
+    "multiplierLabel": "Hệ số tăng vọt",
+    "saved": "Đã lưu cài đặt cảnh báo chi tiêu",
+    "loadError": "Không thể tải cảnh báo chi tiêu.",
+    "saveError": "Không thể lưu cảnh báo chi tiêu.",
+    "empty": "Cảnh báo chi tiêu đang tắt. Bật chúng để thông báo cho các liên hệ thanh toán của phạm vi này.",
+    "noSpend": "Chưa ghi nhận chi tiêu nào",
+    "spend24h": "Chi tiêu trong 24 giờ qua",
+    "multiplierError": "Nhập hệ số từ 1 trở lên",
+    "permissionDenied": "Bạn không có quyền quản lý cảnh báo chi tiêu.",
+    "pushOffByCategory": "Đã tắt trong Thông báo"
   }
 }

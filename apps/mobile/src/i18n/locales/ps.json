@@ -827,7 +827,8 @@
       "chat": "د خبرو اترو پیغامونه",
       "kiloclaw": "د KiloClaw فعالیت",
       "balance": "د بیلانس خبرتیاوې",
-      "security": "امنیتي موندنې"
+      "security": "امنیتي موندنې",
+      "spend": "د لګښت خبرتیاوې"
     },
     "category": {
       "chatMessagesSubtitle": "ستاسو په خبرو اترو کې ځوابونه",
@@ -842,7 +843,9 @@
       "balanceAlertsSubtitle": "د سازمان د کم بیلانس خبرداري",
       "balanceAlertsUnavailable": "د بیلانس خبرتیاوې ترلاسه کولو لپاره یو سازمان ته وګډون وکړئ.",
       "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې",
-      "securityFindingsUnavailable": "امنیتي موندنې ترلاسه کولو لپاره په یوه ساحه کې د Kilo امنیتي اجنټ فعال کړئ."
+      "securityFindingsUnavailable": "امنیتي موندنې ترلاسه کولو لپاره په یوه ساحه کې د Kilo امنیتي اجنټ فعال کړئ.",
+      "spendAlertsSubtitle": "د حدونو تېرېدل او ساعتي زیاتوالی",
+      "spendAlertsToggle": "د لګښت خبرتیاوو کټګوري"
     },
     "action": {
       "openSession": "ناسته پرانیزئ"
@@ -3200,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "وروستۍ ناسته پرانیزئ"
+  },
+  "spendAlerts": {
+    "subtitle": "کله چې د دې ساحې لګښت له یو حد څخه تېر شي یا له خپل عادي ساعتي کچه پورته ووځي، د بلونو اړیکو ته د بریښنالیک یا push له لارې خبرتیا ولېږه.",
+    "enable": "د لګښت خبرتیاوې فعاله کړه",
+    "thresholdTitle": "د حد تېرېدل",
+    "thresholdSubtitle": "روان لګښت ستاسو حد تېروي",
+    "anomalyTitle": "ساعتي زیاتوالی",
+    "anomalySubtitle": "یوه ساعته د دې ساحې له عادي کچې ډېره لوړه ده",
+    "limitLabel": "حد (USD)",
+    "windowLabel": "کړکۍ",
+    "window24h": "24 ساعته",
+    "window7d": "7 ورځې",
+    "window30d": "30 ورځې",
+    "multiplierLabel": "د زیاتوالي ضریب",
+    "saved": "د لګښت خبرتیاوو تنظیمات خوندي شول",
+    "loadError": "د لګښت خبرتیاوې پورته نه شوې.",
+    "saveError": "د لګښت خبرتیاوې خوندي نه شوې.",
+    "empty": "د لګښت خبرتیاوې بندې دي. د دې ساحې د بلونو اړیکو ته د خبر ورکولو لپاره یې فعاله کړه.",
+    "noSpend": "تر دې دمه هیڅ لګښت ثبت شوی نه دی",
+    "spend24h": "د تېرو 24 ساعتونو لګښت",
+    "multiplierError": "د 1 یا ډېر ضریب ولیکه",
+    "permissionDenied": "تاسو د لګښت خبرتیاوو د اداره کولو اجازه نه لرئ.",
+    "pushOffByCategory": "په خبرتیاوو کې بند"
   }
 }

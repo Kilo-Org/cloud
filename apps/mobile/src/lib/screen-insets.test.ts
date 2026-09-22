@@ -39,12 +39,12 @@ const PROFILE_SCREEN = '../components/profile-screen.tsx';
  * The Profile screen's one deliberate platform fork: the sign-out confirmation
  * (#6393) shows the in-app destructive dialog on Android and the native alert
  * on iOS. It sits outside the alignment path the scan below reads, so this
- * assertion pins that the deliberate fork still exists in the screen. The
- * platform read moved into `destructive-confirm-platform.ts`, so the screen
- * delegates to `needsInAppDestructiveConfirm()` instead of branching itself.
+ * assertion pins that the screen still delegates that fork instead of losing
+ * it. The platform read itself moved into `destructive-confirm-platform.ts`,
+ * so the screen calls the shared `useSignOutConfirmation` hook rather than
+ * branching on the platform itself.
  */
-const SIGN_OUT_PLATFORM_FORK =
-  /if \(needsInAppDestructiveConfirm\(\)\) \{\n\s+setSignOutConfirmVisible\(true\);\n\s+return;\n\s+\}/;
+const SIGN_OUT_PLATFORM_FORK = /useSignOutConfirmation\(/;
 
 /**
  * The Profile screen's alignment path: from the line that reads
@@ -91,7 +91,7 @@ describe('screen side insets: one implementation for both platforms', () => {
     // particular the ones that carry the insets, stays one implementation.
     expect(
       profile,
-      `${PROFILE_SCREEN} no longer delegates its deliberate Android sign-out confirmation to needsInAppDestructiveConfirm`
+      `${PROFILE_SCREEN} no longer delegates its deliberate Android sign-out confirmation to useSignOutConfirmation`
     ).toMatch(SIGN_OUT_PLATFORM_FORK);
     expect(
       alignmentPath(profile),

@@ -241,6 +241,33 @@ describe('mcp-catalog catalog', () => {
       expect(rows[0]?.tags).toEqual(expect.arrayContaining(['organizationid', 'name', 'color']));
     });
 
+    it('keeps the tags of a union field merged into a top-level anyOf', () => {
+      // zod 4.6 emits `.and()` on a union as a top-level `anyOf` whose branches
+      // each carry the merged fields — the shape of
+      // `personalPrepareSessionNextSchema`. `sandboxAllocation` then lives in a
+      // branch's `properties`, not in a top-level one, so the tag walk must
+      // descend into `anyOf` or the field disappears from tags and searchBlob.
+      const { rows } = buildCatalogRows(
+        withMutation([
+          mutationLeaf('cloudAgentNext.prepareSession', [
+            z
+              .union([
+                z.object({ prompt: z.string() }),
+                z.object({ cloneFromKiloSessionId: z.string() }),
+              ])
+              .and(z.object({ sandboxAllocation: z.string().optional() })),
+          ]),
+        ]),
+        new Map([['cloudAgentNext.prepareSession', 'Prepares a session.']])
+      );
+      const row = rows[0];
+      expect(row?.inputSchema).toMatchObject({ anyOf: expect.any(Array) });
+      expect(row?.tags).toEqual(
+        expect.arrayContaining(['sandboxallocation', 'prompt', 'clonefromkilosessionid'])
+      );
+      expect(row?.searchBlob).toContain('sandboxAllocation');
+    });
+
     it('keeps committed summaries byte-for-byte, including whitespace', () => {
       const summary = '  Returns the user profile.  ';
       const { rows } = buildCatalogRows(

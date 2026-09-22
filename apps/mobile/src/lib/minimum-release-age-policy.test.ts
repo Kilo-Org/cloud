@@ -18,9 +18,6 @@ const BASE_EXCLUDE_ENTRIES = [
   'expo-dev-launcher',
   'expo-dev-menu',
   'expo-dev-menu-interface',
-  'expo-manifests',
-  'expo-updates-interface',
-  '@expo/schema-utils',
   '@typescript/native-preview',
   '@typescript/native-preview-darwin-arm64',
   '@typescript/native-preview-darwin-x64',
@@ -51,19 +48,34 @@ const CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES = [
 ] as const;
 
 // The exact versions the Expo SDK 57 aligned graph installs (verified against
-// pnpm-lock.yaml): the four 2026-09-08 patch releases `expo install --check`
+// pnpm-lock.yaml): the 2026-09-18 patch releases `expo install --check`
 // expects plus the transitive resolutions blocked by the 6842-minute gate.
 const SDK_57_EXACT_EXCLUDE_ENTRIES = [
-  'expo@57.0.21',
-  '@expo/ui@57.0.17',
-  'expo-router@57.0.20',
-  'expo-widgets@57.0.18',
-  'babel-preset-expo@57.0.11',
-  'expo-modules-core@57.0.17',
+  'expo@57.0.24',
+  '@expo/ui@57.0.19',
+  'expo-router@57.0.22',
+  'expo-widgets@57.0.20',
+  'expo-asset@57.0.18',
+  'expo-build-properties@57.0.21',
+  'expo-constants@57.0.19',
+  'expo-image-manipulator@57.0.19',
+  'expo-image-picker@57.0.19',
+  'expo-location@57.0.19',
+  'expo-notifications@57.0.20',
+  'expo-sharing@57.0.21',
+  'expo-task-manager@57.0.19',
+  'babel-preset-expo@57.0.12',
+  'expo-modules-core@57.0.18',
   'expo-modules-jsi@57.1.0',
-  '@expo/cli@57.0.23',
+  '@expo/cli@57.0.26',
+  '@expo/metro-runtime@57.0.16',
   '@expo/metro-file-map@57.0.3',
-  'expo-glass-effect@57.0.2',
+  'expo-glass-effect@57.0.3',
+  // These three were name-only base exemptions before the alignment; the
+  // aligned graph pins them, so they are scoped exactly like the rest.
+  'expo-manifests@57.0.2',
+  'expo-updates-interface@57.0.2',
+  '@expo/schema-utils@57.0.2',
 ] as const;
 
 // Exact pnpm syntax for one pinned package version: bare or @scoped name, then
@@ -110,7 +122,7 @@ describe('minimum release age policy contract', () => {
   });
 
   it('excludes exactly the base list plus the container-runtime and SDK 57 exact versions', () => {
-    // Order as written: tsx, the container-runtime exemptions, the ten
+    // Order as written: tsx, the container-runtime exemptions, the
     // aligned-version exemptions, then the remaining base entries — the base
     // list with nothing dropped or changed.
     const expected = [

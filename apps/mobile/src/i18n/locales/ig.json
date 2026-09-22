@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Ihe ị dere ga-efu.",
       "discardWithUploadsMessage": "A ga-ehichapụ ihe ị dere na faịlụ ọ bụla ebugotere nke a na-ejikọtaghị na ozi ezigara.",
       "discardFailed": "Enweghị ike ịtụfu ozi a na-ede. Biko nwaa ọzọ.",
-      "remoteHint": "Gbaa kilo remote n'ime otu ọrụ na kọmputa gị iji malite nnọkọ ebe ahụ.",
+      "remoteHint": "Gbaa `kilo remote` na kọmputa gị, ma ọ bụ `/remote` n'ime nnọkọ CLI na-arụ ọrụ, iji chịkwaa usoro kilo dị na kọmputa gị.",
       "continueFrom": "A na-aga n'ihu na {{title}}.",
       "importingSession": "Na-ebubata nnọkọ",
       "cliCannotContinue": "CLI a enweghị ike ịga n'ihu na nnọkọ. Họrọ Cloud Agent ma ọ bụ CLI ọzọ.",

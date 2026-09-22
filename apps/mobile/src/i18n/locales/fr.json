@@ -1599,7 +1599,7 @@
       "discardDraftMessage": "Votre consigne sera perdue.",
       "discardWithUploadsMessage": "Votre consigne et les fichiers transférés qui ne sont liés à aucun message envoyé seront supprimés.",
       "discardFailed": "Impossible de supprimer le brouillon. Réessayez.",
-      "remoteHint": "Exécutez kilo remote dans un projet sur votre ordinateur pour y démarrer des sessions.",
+      "remoteHint": "Exécutez `kilo remote` sur votre ordinateur, ou `/remote` dans une session CLI en cours, pour contrôler un processus kilo local.",
       "continueFrom": "La session {{title}} reprend.",
       "importingSession": "Importation de la session…",
       "cliCannotContinue": "Cette CLI ne permet pas de reprendre une session. Choisissez Cloud Agent ou une autre CLI.",

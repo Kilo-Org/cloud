@@ -2304,7 +2304,7 @@
       "discardDraftMessage": "Byddwch yn colli'ch anogiad.",
       "discardWithUploadsMessage": "Bydd eich anogiad ac unrhyw ffeiliau a uwchlwythwyd ond sydd heb eu defnyddio yn cael eu dileu.",
       "discardFailed": "Methu dileu'r drafft. Ceisiwch eto.",
-      "remoteHint": "Rhedwch kilo remote mewn prosiect ar eich cyfrifiadur i ddechrau sesiynau yno.",
+      "remoteHint": "Rhedwch `kilo remote` ar eich cyfrifiadur, neu `/remote` mewn sesiwn CLI sy'n rhedeg, i reoli proses kilo leol.",
       "continueFrom": "Yn parhau â {{title}}.",
       "importingSession": "Yn mewnforio sesiwn",
       "cliCannotContinue": "Ni all y CLI hwn barhau â sesiwn. Dewiswch Cloud Agent neu CLI arall.",

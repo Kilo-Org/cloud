@@ -1736,7 +1736,7 @@
       "discardDraftMessage": "ستفقد التعليمات التي كتبتها.",
       "discardWithUploadsMessage": "ستُحذف تعليماتك وأي ملفات مرفوعة لم تُرفق برسائل مرسلة.",
       "discardFailed": "تعذّر حذف المسودة. حاول مرة أخرى.",
-      "remoteHint": "شغّل kilo remote في مشروع على جهاز الكمبيوتر لبدء الجلسات هناك.",
+      "remoteHint": "شغّل `kilo remote` على جهاز الكمبيوتر، أو `/remote` في جلسة CLI قيد التشغيل، للتحكم في عملية kilo محلية.",
       "continueFrom": "تجري متابعة {{title}}.",
       "importingSession": "جارٍ استيراد الجلسة",
       "cliCannotContinue": "إصدار CLI هذا لا يدعم متابعة الجلسات. اختر Cloud Agent أو CLI آخر.",

@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Sinu viip läheb kaotsi.",
       "discardWithUploadsMessage": "Sinu viip ja üles laaditud failid, mida pole ühegi saadetud sõnumiga seotud, kustutatakse.",
       "discardFailed": "Mustandist loobumine ebaõnnestus. Proovi uuesti.",
-      "remoteHint": "Seansside alustamiseks seal käivita kilo remote arvutis olevas projektis.",
+      "remoteHint": "Kohaliku kilo protsessi juhtimiseks käivita arvutis `kilo remote` või töötavas CLI-seansis `/remote`.",
       "continueFrom": "Jätkub seanss „{{title}}“.",
       "importingSession": "Imporditakse seanssi",
       "cliCannotContinue": "See CLI ei saa seanssi jätkata. Vali Cloud Agent või mõni muu CLI.",

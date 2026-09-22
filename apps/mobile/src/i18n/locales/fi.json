@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Kehotteesi poistetaan.",
       "discardWithUploadsMessage": "Kehotteesi ja palvelimelle siirretyt tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
       "discardFailed": "Luonnosta ei voitu hylätä. Yritä uudelleen.",
-      "remoteHint": "Suorita kilo remote tietokoneesi projektissa aloittaaksesi istuntoja siellä.",
+      "remoteHint": "Voit hallita paikallista kilo-prosessia suorittamalla `kilo remote` tietokoneellasi tai `/remote` käynnissä olevassa CLI-istunnossa.",
       "continueFrom": "Jatketaan istuntoa: {{title}}.",
       "importingSession": "Tuodaan istuntoa",
       "cliCannotContinue": "Tämä CLI ei voi jatkaa istuntoa. Valitse Cloud Agent tai toinen CLI.",

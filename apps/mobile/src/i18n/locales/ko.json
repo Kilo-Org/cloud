@@ -1688,7 +1688,7 @@
       "discardDraftMessage": "프롬프트가 사라집니다.",
       "discardWithUploadsMessage": "프롬프트와 보낸 메시지에 첨부되지 않은 모든 업로드 파일이 삭제됩니다.",
       "discardFailed": "초안을 삭제할 수 없습니다. 다시 시도하세요.",
-      "remoteHint": "컴퓨터의 프로젝트에서 kilo remote를 실행하면 그곳에서 세션을 시작할 수 있습니다.",
+      "remoteHint": "컴퓨터에서 `kilo remote`를 실행하거나 실행 중인 CLI 세션에서 `/remote`를 사용하여 로컬 kilo 프로세스를 제어하세요.",
       "continueFrom": "{{title}} 세션을 이어서 진행합니다.",
       "importingSession": "세션 가져오는 중",
       "cliCannotContinue": "이 CLI에서는 세션을 이어서 진행할 수 없습니다. Cloud Agent 또는 다른 CLI를 선택하세요.",

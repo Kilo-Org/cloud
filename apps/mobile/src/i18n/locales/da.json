@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Din forespørgsel går tabt.",
       "discardWithUploadsMessage": "Din forespørgsel og eventuelle uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
       "discardFailed": "Kunne ikke kassere kladden. Prøv igen.",
-      "remoteHint": "Kør kilo remote i et projekt på din computer for at starte sessioner der.",
+      "remoteHint": "Kør `kilo remote` på din computer eller `/remote` i en aktiv CLI-session for at styre en lokal kilo-proces.",
       "continueFrom": "Sessionen {{title}} fortsættes.",
       "importingSession": "Importerer session",
       "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",

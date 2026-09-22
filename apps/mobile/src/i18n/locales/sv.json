@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Din prompt går förlorad.",
       "discardWithUploadsMessage": "Din prompt och uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
       "discardFailed": "Det gick inte att ta bort utkastet. Försök igen.",
-      "remoteHint": "Kör kilo remote i ett projekt på din dator för att starta sessioner där.",
+      "remoteHint": "Kör `kilo remote` på din dator, eller `/remote` i en aktiv CLI-session, för att styra en lokal kilo-process.",
       "continueFrom": "Sessionen {{title}} fortsätter.",
       "importingSession": "Importerar sessionen",
       "cliCannotContinue": "Den här CLI-versionen kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI-instans.",

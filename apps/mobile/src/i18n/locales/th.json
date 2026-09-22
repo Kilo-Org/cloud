@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "พรอมต์ที่คุณเขียนไว้จะหายไป",
       "discardWithUploadsMessage": "พรอมต์และไฟล์ที่อัปโหลดไว้แต่ยังไม่ได้ใช้จะถูกลบ",
       "discardFailed": "ไม่สามารถทิ้งฉบับร่างได้ กรุณาลองอีกครั้ง",
-      "remoteHint": "รัน kilo remote ในโปรเจกต์บนคอมพิวเตอร์ของคุณเพื่อเริ่มเซสชันที่นั่น",
+      "remoteHint": "รัน `kilo remote` บนคอมพิวเตอร์ หรือ `/remote` ในเซสชัน CLI ที่กำลังทำงาน เพื่อควบคุมโปรเซส kilo บนเครื่องนั้น",
       "continueFrom": "กำลังทำงานต่อจาก {{title}}",
       "importingSession": "กำลังนำเข้าเซสชัน",
       "cliCannotContinue": "CLI นี้ไม่สามารถทำงานต่อจากเซสชันเดิมได้ เลือก Cloud Agent หรือ CLI อื่น",

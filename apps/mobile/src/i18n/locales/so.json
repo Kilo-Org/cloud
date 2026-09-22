@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Tilmaantaadu way lumi doontaa.",
       "discardWithUploadsMessage": "Tilmaantaada iyo faylasha la gudbiyay ee aan weli la isticmaalin waa la tirtiri doonaa.",
       "discardFailed": "Qabyada lama tirtiri karin. Fadlan mar kale isku day.",
-      "remoteHint": "Ku socodsii kilo remote mashruuc ku yaalla kombiyuutarkaaga si aad halkaas uga bilowdo kalfadhiyada.",
+      "remoteHint": "Ku socodsii `kilo remote` kombiyuutarkaaga, ama `/remote` kalfadhi CLI oo socda, si aad u maamusho hawl kilo oo kombiyuutarkaaga ka socota.",
       "continueFrom": "Waxaa la sii wadaa {{title}}.",
       "importingSession": "Kalfadhiga waa la soo gelinayaa",
       "cliCannotContinue": "CLI-kan ma sii wadi karo kalfadhi. Dooro Cloud Agent ama CLI kale.",

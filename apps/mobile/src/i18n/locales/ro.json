@@ -2220,7 +2220,7 @@
       "discardDraftMessage": "Instrucțiunile tale se vor pierde.",
       "discardWithUploadsMessage": "Instrucțiunile tale și fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
       "discardFailed": "Nu s-a putut șterge ciorna. Încearcă din nou.",
-      "remoteHint": "Rulează kilo remote într-un proiect de pe computerul tău pentru a începe sesiuni acolo.",
+      "remoteHint": "Rulează `kilo remote` pe computerul tău sau `/remote` într-o sesiune CLI activă pentru a controla un proces kilo local.",
       "continueFrom": "Se continuă sesiunea {{title}}.",
       "importingSession": "Se importă sesiunea",
       "cliCannotContinue": "Acest CLI nu poate continua o sesiune. Alege Cloud Agent sau alt CLI.",

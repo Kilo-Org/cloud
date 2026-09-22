@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Gaaffiin kee ni bada.",
       "discardWithUploadsMessage": "Gaaffiin kee fi faayiloonni ol fe'aman kan ergaa ergametti hin qabachiifamne ni haqamu.",
       "discardFailed": "Wixinee haquu hin danda'amne. Deebi'ii yaali.",
-      "remoteHint": "Turtiiwwan achi jalqabuuf, pirojektiin kompiitara kee irratti kilo remote raawwadhu.",
+      "remoteHint": "Adeemsa kilo kompiitara kee irratti hojjechaa jiru to'achuuf, kompiitara kee irratti `kilo remote` yookaan turtii CLI hojjechaa jiru keessatti `/remote` raawwadhu.",
       "continueFrom": "{{title}} itti fufaa jira.",
       "importingSession": "Turtii galchaa jira",
       "cliCannotContinue": "CLI kun turtii itti fufuu hin danda'u. Cloud Agent yookaan CLI biraa filadhu.",

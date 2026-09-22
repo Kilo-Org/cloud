@@ -2248,7 +2248,7 @@
       "discardDraftMessage": "Tvoje zadanie sa stratí.",
       "discardWithUploadsMessage": "Tvoje zadanie a všetky nahrané súbory nepriložené k odoslaným správam sa odstránia.",
       "discardFailed": "Koncept sa nepodarilo zahodiť. Skús to znova.",
-      "remoteHint": "Spusti kilo remote v projekte na svojom počítači, aby si tam začal relácie.",
+      "remoteHint": "Ak chceš ovládať lokálny proces kilo, spusti `kilo remote` na počítači alebo `/remote` v spustenej relácii CLI.",
       "continueFrom": "Pokračuje sa v relácii {{title}}.",
       "importingSession": "Importuje sa relácia",
       "cliCannotContinue": "Táto verzia CLI nepodporuje pokračovanie v relácii. Vyber službu Cloud Agent alebo inú inštanciu CLI.",

@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Az utasításod elvész.",
       "discardWithUploadsMessage": "Az utasításod és az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",
       "discardFailed": "Nem sikerült elvetni a piszkozatot. Próbáld újra.",
-      "remoteHint": "A számítógépeden egy projektben futtasd a kilo remote parancsot, hogy ott munkameneteket indíts.",
+      "remoteHint": "A helyi kilo folyamat vezérléséhez futtasd a `kilo remote` parancsot a számítógépeden, vagy a `/remote` parancsot egy futó CLI-munkamenetben.",
       "continueFrom": "Ezt a munkamenetet folytatod: {{title}}.",
       "importingSession": "Munkamenet importálása…",
       "cliCannotContinue": "Ez a CLI nem támogatja a munkamenetek folytatását. Válaszd a Cloud Agentet vagy egy másik CLI-t.",

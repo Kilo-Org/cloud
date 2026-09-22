@@ -1664,7 +1664,7 @@
       "discardDraftMessage": "Il tuo prompt andrà perso.",
       "discardWithUploadsMessage": "Il tuo prompt e i file caricati non allegati a messaggi inviati verranno eliminati.",
       "discardFailed": "Impossibile eliminare la bozza. Riprova.",
-      "remoteHint": "Esegui kilo remote in un progetto sul tuo computer per avviare le sessioni lì.",
+      "remoteHint": "Esegui `kilo remote` sul tuo computer, oppure `/remote` in una sessione CLI attiva, per controllare un processo kilo locale.",
       "continueFrom": "Stai continuando la sessione {{title}}.",
       "importingSession": "Importazione in corso…",
       "cliCannotContinue": "Questa CLI non può continuare una sessione. Scegli Cloud Agent o un'altra CLI.",

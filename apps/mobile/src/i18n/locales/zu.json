@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Isicelo sakho sizolahleka.",
       "discardWithUploadsMessage": "Isicelo sakho namafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe kuzosuswa.",
       "discardFailed": "Asikwazanga ukulahla okusalungiswa. Sicela uzame futhi.",
-      "remoteHint": "Qalisa kilo remote kuphrojekthi kukhompyutha yakho ukuze uqale amaseshini lapho.",
+      "remoteHint": "Qalisa `kilo remote` kukhompyutha yakho, noma `/remote` eseshini ye-CLI esebenzayo, ukuze ulawule inqubo ye-kilo yasendaweni.",
       "continueFrom": "Kuqhutshekwa neseshini ethi {{title}}.",
       "importingSession": "Iseshini iyangeniswa",
       "cliCannotContinue": "Le CLI ayikwazi ukuqhubeka neseshini. Khetha i-Cloud Agent noma enye i-CLI.",

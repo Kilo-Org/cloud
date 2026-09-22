@@ -1688,7 +1688,7 @@
       "discardDraftMessage": "Nội dung yêu cầu của bạn sẽ bị mất.",
       "discardWithUploadsMessage": "Nội dung yêu cầu và các tệp đã tải lên nhưng chưa gắn với tin nhắn đã gửi sẽ bị xóa.",
       "discardFailed": "Không thể hủy bản nháp. Vui lòng thử lại.",
-      "remoteHint": "Chạy kilo remote trong một dự án trên máy tính của bạn để bắt đầu phiên tại đó.",
+      "remoteHint": "Chạy `kilo remote` trên máy tính hoặc `/remote` trong phiên CLI đang chạy để điều khiển tiến trình kilo trên máy.",
       "continueFrom": "Đang tiếp tục phiên {{title}}.",
       "importingSession": "Đang nhập phiên",
       "cliCannotContinue": "CLI này không hỗ trợ tiếp tục phiên. Hãy chọn Cloud Agent hoặc CLI khác.",

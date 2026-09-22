@@ -1688,7 +1688,7 @@
       "discardDraftMessage": "Instruksimu akan hilang.",
       "discardWithUploadsMessage": "Instruksimu dan unggahan yang belum dilampirkan ke pesan terkirim akan dihapus.",
       "discardFailed": "Tidak dapat membuang draf. Coba lagi.",
-      "remoteHint": "Jalankan kilo remote di sebuah proyek di komputermu untuk memulai sesi di sana.",
+      "remoteHint": "Jalankan `kilo remote` di komputermu, atau `/remote` dalam sesi CLI yang sedang berjalan, untuk mengendalikan proses kilo lokal.",
       "continueFrom": "Melanjutkan sesi {{title}}.",
       "importingSession": "Mengimpor sesi",
       "cliCannotContinue": "CLI ini tidak dapat melanjutkan sesi. Pilih Cloud Agent atau CLI lain.",

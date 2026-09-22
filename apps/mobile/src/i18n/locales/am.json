@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "ጥያቄዎ ይጠፋል።",
       "discardWithUploadsMessage": "ጥያቄዎና ከተላኩ መልእክቶች ጋር ያልተያያዙ የተሰቀሉ ፋይሎች ይሰረዛሉ።",
       "discardFailed": "ረቂቁን ማስወገድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
-      "remoteHint": "በኮምፒውተርዎ ላይ ባለ ፕሮጀክት ውስጥ kilo remote ን ያስኪዱ፣ እዚያ ክፍለ ጊዜዎችን ለመጀመር።",
+      "remoteHint": "በኮምፒውተርዎ ላይ ያለን የkilo ሂደት ለመቆጣጠር `kilo remote`ን በኮምፒውተርዎ ላይ ያስኪዱ፣ ወይም እየሠራ ባለ የCLI ክፍለ ጊዜ ውስጥ `/remote`ን ይጠቀሙ።",
       "continueFrom": "{{title}} እየቀጠለ ነው።",
       "importingSession": "ክፍለ ጊዜውን በማስመጣት ላይ",
       "cliCannotContinue": "ይህ CLI ክፍለ ጊዜን መቀጠል አይችልም። Cloud Agent ወይም ሌላ CLI ይምረጡ።",

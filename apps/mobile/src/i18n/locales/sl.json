@@ -2248,7 +2248,7 @@
       "discardDraftMessage": "Tvoj poziv se ne bo shranil.",
       "discardWithUploadsMessage": "Tvoj poziv in vse naložene datoteke, ki niso priložene poslanim sporočilom, bodo izbrisani.",
       "discardFailed": "Osnutka ni bilo mogoče zavreči. Poskusi znova.",
-      "remoteHint": "Zaženi kilo remote v projektu na svojem računalniku, da tam začneš seje.",
+      "remoteHint": "Za upravljanje lokalnega procesa kilo zaženi `kilo remote` na svojem računalniku ali `/remote` v aktivni seji CLI.",
       "continueFrom": "Nadaljuje se seja {{title}}.",
       "importingSession": "Uvažanje seje",
       "cliCannotContinue": "Ta CLI ne podpira nadaljevanja seje. Izberi Cloud Agent ali drug CLI.",

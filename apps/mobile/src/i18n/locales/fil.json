@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Mawawala ang iyong prompt.",
       "discardWithUploadsMessage": "Buburahin ang iyong prompt at mga na-upload na file na hindi pa nagagamit.",
       "discardFailed": "Hindi mabura ang burador. Subukang muli.",
-      "remoteHint": "Patakbuhin ang kilo remote sa isang proyekto sa iyong computer para makapagsimula ng mga session doon.",
+      "remoteHint": "Patakbuhin ang `kilo remote` sa iyong computer, o ang `/remote` sa isang tumatakbong sesyon ng CLI, para kontrolin ang isang lokal na proseso ng kilo.",
       "continueFrom": "Ipinagpapatuloy ang {{title}}.",
       "importingSession": "Ini-import ang sesyon",
       "cliCannotContinue": "Hindi kayang magpatuloy ng sesyon ang CLI na ito. Pumili ng Cloud Agent o ibang CLI.",

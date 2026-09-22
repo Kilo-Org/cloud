@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Yozgan so'rovingiz yo'qoladi.",
       "discardWithUploadsMessage": "So'rovingiz va hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi.",
       "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring.",
-      "remoteHint": "U yerda sessiyalarni boshlash uchun kompyuteringizdagi loyihada kilo remote buyrug'ini bajaring.",
+      "remoteHint": "Kompyuteringizdagi kilo jarayonini boshqarish uchun `kilo remote` buyrug'ini yoki ishlayotgan CLI sessiyasida `/remote` buyrug'ini bajaring.",
       "continueFrom": "{{title}} sessiyasi davom ettirilmoqda.",
       "importingSession": "Sessiya import qilinmoqda",
       "cliCannotContinue": "Bu CLI sessiyani davom ettira olmaydi. Cloud Agent xizmatini yoki boshqa CLI dasturini tanlang.",

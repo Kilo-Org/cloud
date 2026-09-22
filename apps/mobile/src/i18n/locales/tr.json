@@ -1688,7 +1688,7 @@
       "discardDraftMessage": "İstemin silinecek.",
       "discardWithUploadsMessage": "İstemin ve henüz bir mesaja eklenmemiş tüm yüklemeler silinecek.",
       "discardFailed": "Taslak silinemedi. Tekrar dene.",
-      "remoteHint": "Orada oturum başlatmak için bilgisayarındaki bir projede kilo remote komutunu çalıştır.",
+      "remoteHint": "Yerel bir kilo sürecini kontrol etmek için bilgisayarında `kilo remote` komutunu veya çalışan bir CLI oturumunda `/remote` komutunu çalıştır.",
       "continueFrom": "{{title}} oturumuna devam ediliyor.",
       "importingSession": "Oturum içe aktarılıyor",
       "cliCannotContinue": "Bu CLI bir oturuma devam etmeyi desteklemiyor. Cloud Agent veya başka bir CLI seç.",

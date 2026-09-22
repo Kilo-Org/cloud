@@ -1688,7 +1688,7 @@
       "discardDraftMessage": "你輸入的提示詞將不會保留。",
       "discardWithUploadsMessage": "你輸入的提示詞與尚未附加至已傳送訊息的上傳檔案都會刪除。",
       "discardFailed": "無法捨棄草稿。請再試一次。",
-      "remoteHint": "在電腦上的專案中執行 kilo remote，即可在該處啟動工作階段。",
+      "remoteHint": "在電腦上執行 `kilo remote`，或在執行中的 CLI 工作階段執行 `/remote`，即可控制本機的 kilo 程序。",
       "continueFrom": "正在接續 {{title}}。",
       "importingSession": "匯入工作階段中",
       "cliCannotContinue": "此 CLI 無法繼續工作階段。請選擇 Cloud Agent 或其他 CLI。",

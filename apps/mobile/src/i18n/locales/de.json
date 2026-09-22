@@ -1688,7 +1688,7 @@
       "discardDraftMessage": "Dein Prompt geht verloren.",
       "discardWithUploadsMessage": "Dein Prompt und alle hochgeladenen Dateien, die keiner gesendeten Nachricht angehängt sind, werden gelöscht.",
       "discardFailed": "Der Entwurf konnte nicht verworfen werden. Bitte versuche es erneut.",
-      "remoteHint": "Führe kilo remote in einem Projekt auf deinem Computer aus, um dort Sitzungen zu starten.",
+      "remoteHint": "Führe `kilo remote` auf deinem Computer aus oder `/remote` in einer laufenden CLI-Sitzung, um einen lokalen kilo-Prozess zu steuern.",
       "continueFrom": "Die Sitzung „{{title}}“ wird fortgesetzt.",
       "importingSession": "Sitzung wird importiert",
       "cliCannotContinue": "Diese CLI kann keine Sitzung fortsetzen. Wähle Cloud Agent oder eine andere CLI.",

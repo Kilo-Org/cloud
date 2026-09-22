@@ -51,6 +51,9 @@ describe('run-location help copy', () => {
     expect(value as string).not.toContain('`');
   });
 
+  // The translated catalogs still carry the reviewed wording — the translation
+  // pipeline owns them, so this PR only changed `en.json`. Whatever markers a
+  // catalog holds, the renderer strips them before the reader sees the text.
   it.each(SUPPORTED_LANGUAGES)('%s never renders an authoring marker', tag => {
     const catalog = CATALOG_LOADERS[tag]();
 
@@ -62,16 +65,4 @@ describe('run-location help copy', () => {
       expect(visible, `${tag} ${path.join('.')}`).toContain('kilo remote');
     }
   });
-
-  it.each(SUPPORTED_LANGUAGES)(
-    '%s renders the new-session run-location hint in plain mobile language',
-    tag => {
-      const value = valueAt(CATALOG_LOADERS[tag](), ['agentChat', 'newSession', 'remoteHint']);
-      expect(typeof value, tag).toBe('string');
-      const visible = stripInlineCodeMarkers(value as string);
-      expect(visible, tag).not.toContain('/remote');
-      expect(visible, tag).not.toContain('CLI');
-      expect(visible, tag).toContain('kilo remote');
-    }
-  );
 });

@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Jou opdrag sal verlore gaan.",
       "discardWithUploadsMessage": "Jou opdrag en enige opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word.",
       "discardFailed": "Die konsep kon nie weggegooi word nie. Probeer asseblief weer.",
-      "remoteHint": "Voer kilo remote in 'n projek op jou rekenaar uit om sessies daar te begin.",
+      "remoteHint": "Voer `kilo remote` op jou rekenaar uit, of `/remote` in 'n aktiewe CLI-sessie, om 'n plaaslike kilo-proses te beheer.",
       "continueFrom": "Die sessie {{title}} word voortgesit.",
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortsit nie. Kies Cloud Agent of 'n ander CLI.",

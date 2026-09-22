@@ -12,7 +12,12 @@ import { withDORetry } from './utils/do-retry.js';
 import type { GitTokenService } from './types.js';
 import { MeteredSandbox } from './container-usage.js';
 import type { SandboxClassName } from './container-usage-context.js';
-import { inspectGitHubRateLimitResponse } from './github-rate-limit-diagnostics.js';
+import {
+  GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS,
+  GITHUB_RATE_LIMIT_MAX_RETRY_TOTAL_WAIT_MS,
+  inspectGitHubRateLimitResponse,
+  resolveGitHubRateLimitRetryDelayMs,
+} from './github-rate-limit-diagnostics.js';
 import {
   cloudAgentSessionScopeHeaders,
   cloudAgentSessionScopeProtocolVersion,
@@ -25,6 +30,7 @@ const GITLAB_CAPABILITY_PREFIXES = ['kgl1.', 'kgl2.'];
 const KILO_CAPABILITY_PREFIXES = ['kka1.'];
 const BITBUCKET_CAPABILITY_PREFIXES = ['kbb1.'];
 const MAX_KILO_SESSION_BOOTSTRAP_BYTES = 16_000;
+const GITHUB_GIT_RETRY_MAX_BODY_BYTES = 1_048_576;
 const CONTROL_CREDENTIAL_CAPABILITY_PREFIXES = {
   kilo: 'kka1.',
   github: 'kgh2.',
@@ -169,6 +175,22 @@ function getCapabilityVersion(capability: string): string {
   return separator === -1 ? 'unknown' : capability.slice(0, separator);
 }
 
+/**
+ * Only GitHub git read/upload requests are retried. classifyScmRoute matches
+ * /info/refs by pathname alone, so the service query parameter must be checked
+ * to keep push (git-receive-pack) out of the retry path.
+ */
+function isGitHubGitUploadRetryableRequest(request: Request): boolean {
+  const url = new URL(request.url);
+  if (classifyScmTarget(url) !== 'github-git') return false;
+  const route = classifyScmRoute(url, 'github-git');
+  if (request.method === 'GET') {
+    return route === 'git-info-refs' && url.searchParams.get('service') === 'git-upload-pack';
+  }
+  if (request.method === 'POST') return route === 'git-upload-pack';
+  return false;
+}
+
 function isKiloSessionBootstrapRequest(request: Request): boolean {
   if (request.method.toUpperCase() !== 'POST') return false;
   try {
@@ -209,6 +231,39 @@ async function readBoundedRequestBody(
     offset += chunk.byteLength;
   }
   return new TextDecoder().decode(buffer);
+}
+
+/**
+ * Byte-exact sibling of readBoundedRequestBody for replay. It stops as soon as
+ * the body exceeds maxBytes and returns undefined instead of decoding anything.
+ */
+async function readBoundedRequestBodyBytes(
+  request: Request,
+  maxBytes: number
+): Promise<Uint8Array | undefined> {
+  const body: ReadableStream<Uint8Array> | null = request.clone().body;
+  if (!body) return undefined;
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) return undefined;
+      chunks.push(value);
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+  const buffer = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buffer.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return buffer;
 }
 
 async function getKiloSessionBootstrapId(request: Request): Promise<string | undefined> {
@@ -500,6 +555,52 @@ async function forwardCloudAgentSessionScopeRequest(
   );
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Forwards a GitHub git read/upload request and re-issues it while the upstream
+ * answers 429 with an observable reset. Waits the resolved (clamped) delay,
+ * bounded by a total scheduled-wait budget and an attempt cap. A response whose
+ * required wait exceeds the remaining budget is returned, never retried early.
+ * Forwarding failures throw to the caller, which owns the single 502 path.
+ */
+async function forwardGitHubGitWithRateLimitReset(
+  createRequest: () => Request,
+  headersToApply: Record<string, string | undefined>,
+  maxRetryAttempts: number
+): Promise<Response> {
+  let response = await forwardRedeemedRequest(createRequest(), headersToApply);
+  let attemptsUsed = 0;
+  let remainingTotalWaitMs = GITHUB_RATE_LIMIT_MAX_RETRY_TOTAL_WAIT_MS;
+
+  while (response.status === 429 && attemptsUsed < maxRetryAttempts) {
+    let diagnostic: Awaited<ReturnType<typeof inspectGitHubRateLimitResponse>>;
+    try {
+      diagnostic = await inspectGitHubRateLimitResponse(response);
+    } catch {
+      diagnostic = undefined;
+    }
+    if (!diagnostic) return response;
+
+    const delayMs = resolveGitHubRateLimitRetryDelayMs(diagnostic, Date.now());
+    if (delayMs === undefined || delayMs > remainingTotalWaitMs) return response;
+
+    void response.body?.cancel().catch(() => {});
+    await sleep(delayMs);
+    remainingTotalWaitMs -= delayMs;
+    attemptsUsed += 1;
+    logDiagnostic(
+      'info',
+      { retryDelayMs: delayMs, retryAttempt: attemptsUsed },
+      'Managed GitHub git request rate limited; retrying after observed reset'
+    );
+    response = await forwardRedeemedRequest(createRequest(), headersToApply);
+  }
+  return response;
+}
+
 async function handleManagedGitHubOutbound(
   request: Request,
   env: Cloudflare.Env,
@@ -554,9 +655,35 @@ async function handleManagedGitHubOutbound(
     return new Response('GitHub authorization unavailable', { status: 502 });
   }
 
+  const headersToApply = { authorization: result.authorization };
   let response: Response;
   try {
-    response = await forwardRedeemedRequest(request, { authorization: result.authorization });
+    if (!isGitHubGitUploadRetryableRequest(request)) {
+      response = await forwardRedeemedRequest(request, headersToApply);
+    } else if (request.method === 'POST') {
+      const bodyBytes = await readBoundedRequestBodyBytes(request, GITHUB_GIT_RETRY_MAX_BODY_BYTES);
+      if (bodyBytes === undefined) {
+        // Over the replay cap: forward once unchanged and return the real response.
+        response = await forwardRedeemedRequest(request, headersToApply);
+      } else {
+        response = await forwardGitHubGitWithRateLimitReset(
+          () =>
+            new Request(request.url, {
+              method: request.method,
+              headers: request.headers,
+              body: bodyBytes,
+            }),
+          headersToApply,
+          GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS
+        );
+      }
+    } else {
+      response = await forwardGitHubGitWithRateLimitReset(
+        () => request,
+        headersToApply,
+        GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS
+      );
+    }
   } catch (error) {
     logDiagnostic(
       'warn',

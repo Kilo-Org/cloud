@@ -1,4 +1,9 @@
+// eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
+import { createRequire } from 'node:module';
+import tailwindcss from '@tailwindcss/postcss';
+import postcss from 'postcss';
 import { type ComponentProps, createElement } from 'react';
+import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -6,7 +11,13 @@ import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 import { act, TestRenderer } from '@/test/renderer';
 import { EmailOtpForm } from '../email-otp-form';
 
-vi.mock('react-native', () => ({ TextInput: 'TextInput', View: 'View' }));
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+
+vi.mock('react-native', () => ({
+  I18nManager: i18nManager,
+  TextInput: 'TextInput',
+  View: 'View',
+}));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -47,9 +58,40 @@ function destination(root: TestRenderer.ReactTestInstance, email = reportedEmail
   );
 }
 
+const { compile } = createRequire(import.meta.url)(
+  'react-native-css/compiler'
+) as typeof NativeCSSCompiler;
+
+/**
+ * The native style one action label's className compiles to, through the app's
+ * own Tailwind and NativeWind pipeline — not a hand-written utility-to-property
+ * map. A label with no className compiles to no declarations, which is the
+ * pre-fix state this guards.
+ */
+async function compiledLabelStyles(className: string | undefined): Promise<unknown[]> {
+  const utilities = className?.split(' ').filter(Boolean).join(' ') ?? '';
+  if (!utilities) {
+    return [];
+  }
+  const { css } = await postcss([tailwindcss()]).process(
+    `@reference "../../../global.css"; .label { @apply ${utilities}; }`,
+    { from: import.meta.filename }
+  );
+  const rules = compile(css, { inlineVariables: false }).stylesheet().s;
+  return rules?.find(([name]) => name === 'label')?.[1].flatMap(rule => rule.d ?? []) ?? [];
+}
+
+/** The label text drawn inside the action button with this accessibility label. */
+function actionLabel(root: TestRenderer.ReactTestInstance, accessibilityLabel: string) {
+  return root
+    .findByProps({ accessibilityLabel })
+    .find(node => typeof node.type === 'string' && (node.type as string) === 'Text');
+}
+
 afterEach(async () => {
   act(() => renderer?.unmount());
   renderer = undefined;
+  i18nManager.isRTL = false;
   await i18n.changeLanguage('en');
 });
 
@@ -182,5 +224,57 @@ describe('EmailOtpForm controls', () => {
 
     expect(props.onVerify).toHaveBeenCalledWith('123456');
     expect(destination(mounted.root).props.children).toBe(initialDescription);
+  });
+});
+
+describe('EmailOtpForm action labels', () => {
+  it.each([
+    { language: 'en', isRTL: false },
+    { language: 'ar', isRTL: true },
+  ])(
+    'keeps both stacked action labels one line wide at matched heights in $language',
+    async ({ language, isRTL }) => {
+      i18nManager.isRTL = isRTL;
+      await i18n.changeLanguage(language);
+      const { mounted } = mount();
+
+      const verify = actionLabel(mounted.root, i18n.t('login.verifyCode'));
+      const resend = actionLabel(mounted.root, i18n.t('login.resendCode'));
+
+      // flex-1 gives each label the whole remaining row width instead of being
+      // measured short — the Arabic resend copy wrapped and orphaned "الرمز" on
+      // a second line, so it stood taller than the single-line verify action;
+      // text-center keeps the copy centred inside that box.
+      expect(await compiledLabelStyles(verify.props.className as string | undefined)).toEqual([
+        { flexBasis: '0%', flexGrow: 1, flexShrink: 1, textAlign: 'center' },
+      ]);
+      expect(await compiledLabelStyles(resend.props.className as string | undefined)).toEqual([
+        { flexBasis: '0%', flexGrow: 1, flexShrink: 1, textAlign: 'center' },
+      ]);
+      // The pair matches: neither stacked action can be taller than the other.
+      expect(resend.props.className).toBe(verify.props.className);
+    }
+  );
+
+  it('keeps the label box unchanged while a send or verify is in flight', () => {
+    const { mounted, props } = mount();
+    const idleClasses = [
+      actionLabel(mounted.root, i18n.t('login.verifyCode')).props.className,
+      actionLabel(mounted.root, i18n.t('login.resendCode')).props.className,
+    ];
+
+    act(() => {
+      mounted.update(createElement(EmailOtpForm, { ...props, busy: 'otp-send' }));
+    });
+
+    // The inline spinner joins the row; the label keeps its full-width box, so
+    // the row height stays the same between idle and busy.
+    expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(1);
+    expect(actionLabel(mounted.root, i18n.t('login.verifyCode')).props.className).toBe(
+      idleClasses[0]
+    );
+    expect(actionLabel(mounted.root, i18n.t('login.resendCode')).props.className).toBe(
+      idleClasses[1]
+    );
   });
 });

@@ -34,10 +34,6 @@ import { answerSessionPermission } from '@/lib/glanceable/approve-ask';
 import { cacheToolAttachment } from '@/components/agents/tool-card-image-cache';
 import { cacheFilePart } from '@/components/agents/file-part-cache';
 import {
-  readSessionTranscriptPage,
-  writeSessionTranscriptPage,
-} from '@/lib/persist/session-transcript-cache';
-import {
   persistResolvedDeliveryFailure,
   readResolvedDeliveryFailures,
 } from '@/lib/persist/resolved-delivery-failures';
@@ -177,11 +173,12 @@ type CreateMobileAgentSessionManagerOptions = {
   userWebConnection: UserWebConnection;
   organizationId?: string;
   /**
-   * The authenticated owner the cached transcript is scoped to. Empty means
-   * the owner is not confirmed yet, in which case the cache is skipped
-   * entirely rather than writing to a shared anonymous scope.
+   * The authenticated owner the resolved-delivery-failure memory is scoped to.
+   * The manager's own persisted transcript cache is gone, so this scope is only
+   * read by that memory; an absent owner skips it rather than writing to a
+   * shared anonymous scope.
    */
-  userId: string;
+  userId?: string;
 };
 
 const skipBatchOptions = { context: { skipBatch: true } };
@@ -209,27 +206,24 @@ export function createMobileAgentSessionManager({
     sessionId: KiloSessionId;
     cloudAgentSessionId: CloudAgentSessionId | null;
   } | null = null;
-  // The auth epoch this manager was created under. A transcript-cache write
-  // captured before a sign-out/sign-in must not land in the previous account's
-  // scope, so the write path re-checks this epoch (same fence as the read
-  // cache's persister).
-  const transcriptOwner = { userId, authEpoch: currentAuthEpoch() };
+  // The auth epoch this manager was created under. A resolved-delivery-failure
+  // write captured before a sign-out/sign-in must not land in the previous
+  // account's scope, so the write path re-checks this epoch. An empty owner
+  // skips the memory entirely.
+  const resolvedDeliveryOwner = { userId: userId ?? '', authEpoch: currentAuthEpoch() };
   return createSessionManager({
     store,
     websocketBaseUrl: CLOUD_AGENT_WS_URL,
     websocketHeaders: { Origin: WEB_BASE_URL },
     lifecycleHooks: createNativeUserWebConnectionLifecycleHooks(),
     userWebConnection,
-    // Thin cache passthrough: `readSessionTranscriptPage` already returns the
-    // promise and no-ops on an empty owner.
-    // eslint-disable-next-line @typescript-eslint/promise-function-async -- passthrough returns the promise directly
-    readCachedSnapshotPage: (id: KiloSessionId) => readSessionTranscriptPage(userId, id),
     // Durable memory of retried delivery failures, so the DO's stored-event
     // replay on the next open cannot restore a footer the retry cleared.
     // eslint-disable-next-line @typescript-eslint/promise-function-async -- passthrough returns the promise directly
-    readResolvedDeliveryFailures: (id: KiloSessionId) => readResolvedDeliveryFailures(userId, id),
+    readResolvedDeliveryFailures: (id: KiloSessionId) =>
+      readResolvedDeliveryFailures(resolvedDeliveryOwner.userId, id),
     persistResolvedDeliveryFailure: (id: KiloSessionId, messageId: string) => {
-      void persistResolvedDeliveryFailure(transcriptOwner, id, messageId);
+      void persistResolvedDeliveryFailure(resolvedDeliveryOwner, id, messageId);
     },
     // A tRPC call whose client control-plane deadline expired never got an
     // answer: the open is stalled, not failed. The manager keeps the skeleton
@@ -315,12 +309,6 @@ export function createMobileAgentSessionManager({
     },
     fetchSnapshotPage: async (id: KiloSessionId, options: { cursor?: string }) => {
       const outcome = await fetchMobileSessionSnapshotPage(id, options);
-      // Only the first page (no cursor) is cached: it holds the newest
-      // messages, which is what a warm open paints before the live refresh.
-      // Best effort — the write never affects the returned page.
-      if (outcome.kind === 'success' && options.cursor === undefined) {
-        void writeSessionTranscriptPage(transcriptOwner, id, outcome);
-      }
       return outcome;
     },
     api: {

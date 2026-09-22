@@ -231,7 +231,7 @@ describe('CloudAgentWorkspaceTabs', () => {
     expect(firstChatTrigger).toContain('data-state="inactive"');
     expect(findButtonMarkup(html, secondTitle)).toContain('aria-selected="true"');
     expect(findButtonMarkup(html, secondTitle)).toContain('data-state="active"');
-    expect(html).toContain('aria-label="open pull request #42"');
+    expect(html).not.toContain('aria-label="open pull request #42"');
     expect(html).not.toContain('animate-pulse');
     expect(firstChatTrigger).not.toContain('aria-label="open pull request #42"');
     expect(html).not.toMatch(/<button\b[^>]*>(?:(?!<\/button>)[\s\S])*<button\b/);

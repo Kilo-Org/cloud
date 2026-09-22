@@ -58,7 +58,7 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 18 }) }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
+vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown', Check: 'Check' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => theme.colors,
 }));
@@ -68,6 +68,8 @@ const Skeleton = 'Skeleton' as ElementType;
 const Pressable = 'Pressable' as ElementType;
 const name = 'An organization with a long name that must remain fully accessible';
 const orgs = [{ organizationId: 'org-a', organizationName: name, role: 'owner' }];
+// The mocked icon renders as a plain element, so the check paint lives on its props.
+type NativeIcon = { props: { size: number; color: string } };
 type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
 const mounted: Mounted[] = [];
 let persisted: string | null = null;
@@ -121,6 +123,9 @@ function nativePicker() {
           containerStyle: { paddingBottom: number; backgroundColor: string };
           textStyle: { color: string };
           titleTextStyle: { color: string };
+          showSeparators: boolean;
+          separatorStyle: { backgroundColor: string; height: number };
+          icons: (NativeIcon | null)[];
         },
         (index?: number) => void,
       ]
@@ -129,6 +134,12 @@ function nativePicker() {
     throw new Error('native picker did not open');
   }
   return { options: call[0], choose: call[1] };
+}
+
+// A row without a check keeps the gutter via a transparent check, so its paint
+// is the only thing distinguishing the current account.
+function checkPaints(native: ReturnType<typeof nativePicker>) {
+  return native.options.icons.map(icon => (icon === null ? null : icon.props.color));
 }
 
 beforeEach(() => {
@@ -201,6 +212,54 @@ describe('ContextControl', () => {
       expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe(expected);
     }
   );
+
+  it.each([
+    { stored: null, current: 0 },
+    { stored: 'org-a', current: 1 },
+    { stored: 'org-missing', current: null },
+  ])(
+    'separates the rows and checks the current account (stored=$stored)',
+    async ({ stored, current }) => {
+      storage.read.mockResolvedValue(stored);
+      const ui = await mount();
+      await waitFor(() => !picker(ui).props.disabled);
+      await press(picker(ui));
+      const native = nativePicker();
+      expect(native.options.options).toEqual(['Personal', name, 'Cancel']);
+      expect(native.options.showSeparators).toBe(true);
+      expect(native.options.separatorStyle).toEqual({
+        backgroundColor: DARK_COLORS.border,
+        height: 0.5,
+      });
+      // One check per choice; Cancel takes no gutter.
+      expect(native.options.icons).toHaveLength(3);
+      expect(native.options.icons[2]).toBeNull();
+      expect(native.options.icons.filter(icon => icon !== null)).toHaveLength(2);
+      expect(native.options.icons[0]?.props.size).toBe(18);
+      expect(checkPaints(native)).toEqual([
+        current === 0 ? DARK_COLORS.foreground : 'transparent',
+        current === 1 ? DARK_COLORS.foreground : 'transparent',
+        null,
+      ]);
+    }
+  );
+
+  it('checks Personal when the membership list is empty', async () => {
+    list.mockResolvedValue([]);
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await press(picker(ui));
+    const native = nativePicker();
+    expect(native.options.options).toEqual(['Personal', 'Cancel']);
+    expect(native.options.showSeparators).toBe(true);
+    expect(native.options.separatorStyle).toEqual({
+      backgroundColor: DARK_COLORS.border,
+      height: 0.5,
+    });
+    expect(native.options.icons).toHaveLength(2);
+    expect(native.options.icons[1]).toBeNull();
+    expect(checkPaints(native)).toEqual([DARK_COLORS.foreground, null]);
+  });
 
   it('themes the native picker with the active theme colors', async () => {
     const ui = await mount();

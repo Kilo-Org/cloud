@@ -88,6 +88,26 @@ describe('isStoreKiloPassProductsLoading', () => {
     ).toBe(true);
   });
 
+  it('waits for the store connection when the cached catalog is empty', () => {
+    expect(
+      isStoreKiloPassProductsLoading({
+        ...base,
+        data: [],
+        isStoreConnected: false,
+      })
+    ).toBe(true);
+  });
+
+  it('paints the empty catalog once the store connection has answered', () => {
+    expect(
+      isStoreKiloPassProductsLoading({
+        ...base,
+        data: [],
+        isStoreConnected: true,
+      })
+    ).toBe(false);
+  });
+
   it('shows the skeleton while the first load runs', () => {
     expect(
       isStoreKiloPassProductsLoading({

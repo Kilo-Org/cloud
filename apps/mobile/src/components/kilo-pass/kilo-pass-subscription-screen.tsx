@@ -183,6 +183,11 @@ function KiloPassNativeIapContent() {
     ownershipCheckFailed,
     retryOwnershipCheck,
   } = useKiloPassNativeIap();
+  // Registered here, not on the owner: the owner mounts for every presentation
+  // variant, but only this content renders `errorMessage` inline and only this
+  // content can start a purchase or a restore. The owner's recovery path, the
+  // only one that can run without this content, passes `notifyErrors: false`,
+  // so it never reaches the toast this suppresses.
   useInlinePurchaseErrorOwnership();
   const queryClient = useQueryClient();
   const preflightPurchase = useMutation(trpc.kiloPass.preflightPurchase.mutationOptions());

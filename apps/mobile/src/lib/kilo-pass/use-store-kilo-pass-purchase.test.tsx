@@ -1416,6 +1416,28 @@ describe('KiloPassNativeIapOwner', () => {
     expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledTimes(1);
   });
 
+  // The owner mounts for every presentation variant, including web_management
+  // and unavailable, where KiloPassNativeIapContent (the inline error surface)
+  // is not rendered. Recovery is the only error path that can run there, and it
+  // must stay silent rather than pop a bare toast behind a screen with no
+  // purchase UI.
+  it('keeps a recovery failure silent while no inline error surface is mounted', async () => {
+    mockedIap.availablePurchases = [createPurchase()];
+    mockedReactQuery.mobileStoreProductsData = {
+      products: [{ appleProductId: product.appleProductId }],
+    };
+    mockedReactQuery.completeAppStorePurchase.mockRejectedValue({
+      message: 'Server rejected the completion',
+    });
+    const owner = renderKiloPassNativeIapOwner();
+
+    owner.render();
+    await flushPromises();
+
+    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledTimes(1);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
   it('invalidates the full Kilo Pass state set including getPurchasePresentation after completion', async () => {
     mockedIap.availablePurchases = [createPurchase()];
     mockedReactQuery.mobileStoreProductsData = {

@@ -1542,7 +1542,6 @@ export function SessionDetailContent({
   const handleRenameClose = rename.closeModal;
   const headerRight = (
     <View className="flex-row items-center gap-2">
-      <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
       <SessionContextMetrics
         info={contextInfo}
         totalCostMicrodollars={totalMicrodollars}
@@ -1563,6 +1562,13 @@ export function SessionDetailContent({
       />
     </View>
   );
+  // The PR link shares the goal row so the header stays at two rows. While the
+  // fetch is in flight the badge's skeleton is the reserved box, so the row
+  // keeps its height when the fetch lands instead of moving the transcript.
+  const prBadge = (
+    <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
+  );
+  const hasPrRow = shouldShowLoading || (fetchedData?.associatedPr ?? null) !== null;
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   // A pending permission ask that the auto-reply is already answering is
   // suppressed: the card is gated out below (`suppressedRequestId`). Blocking
@@ -1940,7 +1946,7 @@ export function SessionDetailContent({
                 }
               : {})}
           />
-          {sessionGoal ? (
+          {sessionGoal !== null || hasPrRow ? (
             <Animated.View
               entering={FadeIn.duration(200)}
               exiting={FadeOut.duration(150)}
@@ -1949,6 +1955,7 @@ export function SessionDetailContent({
               <SessionGoalSection
                 goal={sessionGoal}
                 collapsed={goalCollapsed}
+                trailing={prBadge}
                 onToggleCollapsed={() => {
                   toggleSessionGoalCollapsed(sessionId);
                 }}

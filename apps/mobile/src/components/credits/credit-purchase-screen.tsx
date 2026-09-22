@@ -8,6 +8,7 @@ import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
 import { ScreenHeader } from '@/components/screen-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -132,9 +133,15 @@ export function CreditPurchaseScreen() {
             {renderBalanceValue()}
           </View>
 
-          {purchaseErrorMessageKey && (
-            <Text className="px-1 text-sm text-destructive">{t(purchaseErrorMessageKey)}</Text>
-          )}
+          {/* The purchase error is rendered inline (the store sheet has just
+              dismissed), so no toast accompanies it. AccessibleStatus is the
+              one announcement channel that survives that: a polite live
+              region on Android and an imperative announcement on iOS. A plain
+              Text left a screen-reader user with no failure feedback at all. */}
+          <AccessibleStatus
+            message={purchaseErrorMessageKey ? t(purchaseErrorMessageKey) : null}
+            className="px-1 text-sm"
+          />
 
           {storeUnavailable && (
             <View className="gap-3 rounded-xl border border-border bg-card p-5">

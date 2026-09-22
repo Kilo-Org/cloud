@@ -4,6 +4,7 @@ import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { CreditPurchaseScreen } from './credit-purchase-screen';
@@ -33,6 +34,11 @@ const balance = vi.hoisted(() => ({ balance: 1234 }));
 
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 
+// The iOS announcement channel behind AccessibleStatus. The screen renders the
+// purchase error inline and suppresses the error toast, so this hook (plus
+// Android's live region) is the only thing a screen reader can hear.
+const statusAnnouncement = vi.hoisted(() => ({ useStatusAnnouncement: vi.fn() }));
+
 // ── Mocks ───────────────────────────────────────────────────────────
 
 vi.mock('react-native', () => ({
@@ -52,6 +58,9 @@ vi.mock('@/components/detail-screen', () => ({
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/lib/a11y/status-announcement', () => ({
+  useStatusAnnouncement: statusAnnouncement.useStatusAnnouncement,
+}));
 
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.com' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
@@ -361,6 +370,29 @@ describe('CreditPurchaseScreen', () => {
     expect(
       packRows(renderer).every(row => (row.props as { disabled?: boolean }).disabled === false)
     ).toBe(true);
+    // The toast is suppressed for this screen, so the inline status is the only
+    // remaining channel: on iOS AccessibleStatus announces it imperatively.
+    expect(statusAnnouncement.useStatusAnnouncement).toHaveBeenCalledWith(
+      'The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.'
+    );
+    unmount();
+  });
+
+  it('announcement: the inline purchase error is a polite live region on Android', async () => {
+    // Android has no imperative announcement for this status: the persistent
+    // error text itself must be the live region TalkBack reads when it appears
+    // after the store sheet dismisses.
+    owner.errorMessageKey = 'credits.purchaseOwnedByAnotherAccount';
+    mockedPlatform.OS = 'android';
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const status = renderer.root.findByType(AccessibleStatus);
+    expect(status.props.message).toBe(
+      'The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.'
+    );
+    expect(status.findByType('Text').props.accessibilityLiveRegion).toBe('polite');
     unmount();
   });
 

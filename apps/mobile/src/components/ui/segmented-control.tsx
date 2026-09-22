@@ -63,9 +63,8 @@ export function SegmentedControl<T extends string>({
                 selected ? 'font-medium text-foreground' : 'text-muted-foreground'
               )}
               // One line per option: a wrapped label makes the two choices
-              // uneven. Longer locales ellipsize instead of growing a second
+              // uneven. Longer locales shrink to fit instead of growing a second
               // line; the radio's accessibilityLabel still carries the full text.
-              numberOfLines={1}
             >
               {option.label}
             </Text>

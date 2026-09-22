@@ -119,9 +119,9 @@ export function getTabBarHorizontalInset({
  * Whether the tab bar shows visible labels. Labels are dropped at and above
  * `TAB_ICON_FORWARD_FONT_SCALE` (the bar would balloon with the scaled label),
  * and when any label is too wide for its tab at the current window width (RN
- * would wrap it mid-word). With no `labels` the per-tab width is unknown, so
- * only the font-scale rule applies — the previous behaviour, unchanged for
- * callers that do not pass a tab width.
+ * would tail-ellipsize it, or wrap a `\n` line mid-word). With no `labels` the
+ * per-tab width is unknown, so only the font-scale rule applies — the previous
+ * behaviour, unchanged for callers that do not pass a tab width.
  */
 export function shouldShowTabLabel(
   fontScale = 1,
@@ -154,14 +154,16 @@ function isFullWidthCharacter(character: string): boolean {
 /**
  * Estimated rendered width (dp) of the widest line of a tab label. A label is
  * one line (`tabLabelNumberOfLines`), except copy that carries its own break
- * (`Kilo\nClaw`), whose wider line is the one that has to fit. The estimate is
- * deliberately conservative: it only decides whether the labels are dropped, so
- * over-estimating hides them slightly early and never leaves a broken word on
- * screen.
+ * (`Kilo\nClaw`), whose wider line is the one that has to fit. Only an explicit
+ * break starts a new line: an ordinary space stays on the same one line and
+ * counts toward its width (the renderer tail-ellipsizes, it does not wrap on a
+ * space). The estimate is deliberately conservative: it only decides whether
+ * the labels are dropped, so over-estimating hides them slightly early and
+ * never leaves a clipped label on screen.
  */
 export function tabLabelWidth(label: string, fontScale = 1): number {
   let widest = 0;
-  for (const line of label.split(/\s+/).filter(part => part.length > 0)) {
+  for (const line of label.split('\n')) {
     let lineWidth = 0;
     for (const character of line) {
       const advanceEm = isFullWidthCharacter(character) ? FULL_WIDTH_ADVANCE_EM : MONO_ADVANCE_EM;

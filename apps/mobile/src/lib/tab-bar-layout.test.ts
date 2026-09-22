@@ -171,9 +171,16 @@ describe('tabLabelWidth', () => {
     expect(tabLabelWidth('Profile')).toBeCloseTo(47.6, 5);
   });
 
-  it('measures the widest whitespace-separated line of a wrapped label', () => {
+  it('measures a wrapped label line by line, but a space-separated label as one line', () => {
+    // Only the explicit break splits the label into two lines; a plain space
+    // stays on the single line the renderer lays out.
     expect(tabLabelWidth('Kilo\nClaw')).toBeCloseTo(tabLabelWidth('Kilo'), 5);
-    expect(tabLabelWidth('Bogga shakhsiga')).toBeCloseTo(9 * (0.6 * 11 + 0.2), 5);
+    expect(tabLabelWidth('Bogga shakhsiga')).toBeCloseTo(15 * (0.6 * 11 + 0.2), 5);
+  });
+
+  it('counts a plain space as part of the single rendered line', () => {
+    // "Kilo Claw" is one line of 9 glyphs, not the 4-glyph widest word.
+    expect(tabLabelWidth('Kilo Claw')).toBeCloseTo(9 * (0.6 * 11 + 0.2), 5);
   });
 
   it('scales the glyph advance (not the tracking) with the system font scale', () => {
@@ -195,8 +202,10 @@ describe('tabLabelFits', () => {
     expect(tabLabelFits('Profile', 360 / 3)).toBe(true);
   });
 
-  it('uses the widest line, so a space-separated label can still fit', () => {
-    expect(tabLabelFits('Kilo Claw', 160 / 3)).toBe(true);
+  it('rejects a space-separated label that overflows its single rendered line', () => {
+    // "KILO CLAW" renders on one 9-glyph line (61.2dp), so it cannot fit the
+    // 43.3dp label box even though either word alone would.
+    expect(tabLabelFits('Kilo Claw', 160 / 3)).toBe(false);
     expect(tabLabelFits('Bogga shakhsiga', 160 / 3)).toBe(false);
   });
 });
@@ -224,6 +233,20 @@ describe('shouldShowTabLabel', () => {
     expect(shouldShowTabLabel(1, 360 / 5, ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'])).toBe(
       true
     );
+  });
+
+  it('drops the labels when a space-separated label overflows its single line', () => {
+    // `so` `common.profile` = "Bogga shakhsiga" (15 glyphs = 102dp) does not
+    // fit a 43.3dp label box at 160dp, so the bar goes icon-only instead of
+    // rendering a tail-ellipsized label.
+    expect(shouldShowTabLabel(1, 160 / 3, ['Home', 'Agents', 'Bogga shakhsiga'])).toBe(false);
+    // "Quick Chat" (10 glyphs = 68dp) overflows even though each word alone
+    // fits, so the widest-word measure would wrongly keep the labels.
+    expect(shouldShowTabLabel(1, 160 / 3, ['Home', 'Agents', 'Quick Chat'])).toBe(false);
+  });
+
+  it('keeps a space-separated label once its whole line fits the tab', () => {
+    expect(shouldShowTabLabel(1, 360 / 3, ['Home', 'Agents', 'Bogga shakhsiga'])).toBe(true);
   });
 
   it('keeps the width rule from overriding the font-scale rule', () => {

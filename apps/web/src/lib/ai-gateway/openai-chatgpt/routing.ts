@@ -227,6 +227,7 @@ export function buildOpenAiChatGptProvider(apiKey: string, accessToken: string):
     id: 'openai-chatgpt',
     apiUrl: OPENAI_CHATGPT_API_URL,
     apiUrlOverrides: {},
+    disableUrlSuffix: false,
     apiKey,
     apiKeyHeader: null,
     supportedChatApis: ['responses'],

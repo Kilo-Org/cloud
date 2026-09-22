@@ -56,11 +56,14 @@ vi.mock('react-native', () => ({
   View: 'View',
   useWindowDimensions: () => ({ fontScale: 1 }),
 }));
-// The footer and the keyboard-lift view both read the real
+// The screen wraps its form in the shared keyboard-lift view, whose real module
+// reads the platform and the safe-area insets (a react-native entry this node
+// project cannot load). Sibling mounted specs stub the view for the same
+// reason; here the footer and the lift view both read the real
 // `useAppAwareKeyboardPadding`, so the assertions below see the shared lift.
-// Stub the module's only native dependency instead of the module itself: its
-// `react-native-safe-area-context` import is not resolvable under this
-// project's Node environment.
+// Stub the module's only native dependency instead of the module itself:
+// `react-native-safe-area-context` is not resolvable under this project's Node
+// environment.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: BOTTOM_INSET, left: 0, right: 0 }),
 }));

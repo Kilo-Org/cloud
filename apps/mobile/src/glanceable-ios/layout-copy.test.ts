@@ -189,6 +189,7 @@ describe('withGlanceableCopy', () => {
       'locale',
       'needsInput',
       'newAgent',
+      'newestResult',
       'open',
       'openAgents',
       'privacy',

@@ -2145,7 +2145,11 @@ describe('createServiceState', () => {
       state.process({ type: 'stopped', reason: 'error' });
 
       expect(state.clearFailedMessage('m1')).toBe(false);
-      expect(state.getStatus()).toEqual({ type: 'error', message: 'Session terminated' });
+      expect(state.getStatus()).toEqual({
+        type: 'error',
+        message: 'Session terminated',
+        code: 'session-terminated',
+      });
     });
 
     it('terminal delivery failure resolves a stale preparing status', () => {

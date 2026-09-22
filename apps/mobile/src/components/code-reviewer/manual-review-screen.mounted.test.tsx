@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -61,13 +61,18 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: BOTTOM_INSET, left: 0, right: 0 }),
 }));
 
-vi.mock('expo-haptics', () => ({ notificationAsync: vi.fn(), selectionAsync: vi.fn() }));
+vi.mock('expo-haptics', () => ({
+  notificationAsync: vi.fn(),
+  selectionAsync: vi.fn(),
+  NotificationFeedbackType: { Success: 'success' },
+}));
 vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn(), push: status.push }) }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/form-field-a11y', () => ({ formFieldA11y: () => 'a11y' }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', GitPullRequest: 'GitPullRequest' }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: 'RadioGroup',
@@ -75,6 +80,15 @@ vi.mock('@/components/ui/radio-group', () => ({
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The real `@/components/tab-screen` and `@/lib/code-reviewer-status` are used
+// on purpose. The footer measures its clearance with the real
+// `useTabBarBottomPadding` (this screen no longer renders `TabScreenScrollView`,
+// so the old tab-screen mock does not apply), and the recovery cases below
+// depend on the real `classifyProviderErrorCode` to tell retryable from
+// permanent failures.
+vi.mock('@/lib/code-reviewer-config', () => ({
+  PLATFORM_CAPABILITIES: { github: { label: 'GitHub' }, gitlab: { label: 'GitLab' } },
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     foreground: '#ffffff',
@@ -142,16 +156,19 @@ function paddingBottomsAbove(node: TestRenderer.ReactTestInstance): number[] {
   return values;
 }
 
+beforeEach(() => {
+  keyboard.listeners.clear();
+  status.connected = true;
+  status.loading = false;
+  status.errorCode = null;
+  status.pending = false;
+  status.refetch.mockClear();
+  status.push.mockClear();
+});
+
 describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on %s', platform => {
   beforeEach(() => {
     keyboard.platform = platform;
-    keyboard.listeners.clear();
-    status.connected = true;
-    status.loading = false;
-    status.errorCode = null;
-    status.pending = false;
-    status.refetch.mockClear();
-    status.push.mockClear();
   });
 
   it('pins the start action outside the scroll viewport, clear of the tab bar', async () => {
@@ -319,6 +336,23 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
       '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github'
     );
     expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(0);
+    unmount();
+  });
+});
+
+describe('ManualReviewScreen connect provider CTA', () => {
+  it('renders the Connect GitHub action full-width like the PR-review connect gate', async () => {
+    status.connected = false;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ManualReviewScreen, { scope: 'personal' })
+    );
+
+    const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+    const { action } = empty.props as { action: ReactElement<{ className?: string }> };
+    const className = String(action.props.className);
+    expect(className).toContain('w-full');
+    expect(className).toContain('mt-3');
+
     unmount();
   });
 });

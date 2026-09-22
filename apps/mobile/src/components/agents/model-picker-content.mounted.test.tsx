@@ -344,9 +344,9 @@ describe('ModelPickerContent deferred search', () => {
 
     const emptyState = findByType(renderer.root, 'EmptyState');
     expect(emptyState).toHaveLength(1);
-    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
-    expect(emptyState[0]?.props.action).toBeUndefined();
-    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+    // The mock renders `action` as a child (as the real EmptyState does), so
+    // assert on the rendered children: no action node reaches the empty state.
+    expect(emptyState[0]?.children).toHaveLength(0);
     expect(findByType(renderer.root, 'Button')).toHaveLength(0);
 
     act(() => {

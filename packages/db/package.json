@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsgo --noEmit",
-    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/db/src"
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/db/src",
+    "test": "jest"
   },
   "exports": {
     ".": "./src/index.ts",
@@ -32,10 +33,12 @@
   },
   "devDependencies": {
     "@jest/globals": "30.3.0",
+    "@swc/jest": "0.2.39",
     "@types/pg": "8.18.0",
     "@typescript/native-preview": "catalog:",
     "dotenv": "17.3.1",
     "drizzle-kit": "catalog:",
+    "jest": "30.3.0",
     "typescript": "catalog:"
   }
 }

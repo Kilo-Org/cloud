@@ -95,7 +95,7 @@ async function applyConnectionRoleBackfill() {
   const migration = readFileSync(
     resolve(
       process.cwd(),
-      '../../packages/db/src/migrations/0255_github_connection_role_indexes.sql'
+      '../../packages/db/src/migrations/0256_github_connection_role_indexes.sql'
     ),
     'utf8'
   );
@@ -109,7 +109,6 @@ async function applyConnectionRoleBackfill() {
 
 describe('GitHub installation persistence', () => {
   beforeEach(async () => {
-    process.env.GITHUB_AGENT_ONLY_CONNECTIONS_ENABLED = 'true';
     process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = '';
     process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = '';
     await cleanupDbForTest();
@@ -477,31 +476,20 @@ describe('GitHub installation persistence', () => {
     await expect(
       assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationB.id })
     ).resolves.toBeUndefined();
-    const { getRepositoryCustomizations, updateInstallationSettings, updateRepositorySettings } =
-      await import('@/lib/integrations/github-apps-service');
+    const { updateModel } = await import('@/lib/integrations/github-apps-service');
     await expect(
-      getRepositoryCustomizations({ type: 'org', id: organizationB.id }, secondary.integrationId)
-    ).resolves.toMatchObject({ canEditReviews: false });
-    await expect(
-      updateInstallationSettings({ type: 'org', id: organizationB.id }, secondary.integrationId, {
-        prReviewMode: 'on',
-      })
-    ).resolves.toMatchObject({ success: false });
-    await expect(
-      updateRepositorySettings({ type: 'org', id: organizationB.id }, secondary.integrationId, 1, {
-        prReviewMode: 'off',
-      })
-    ).resolves.toMatchObject({ success: false });
-    await expect(
-      updateInstallationSettings({ type: 'org', id: organizationB.id }, secondary.integrationId, {
-        modelSlug: 'model-a',
-      })
+      updateModel({ type: 'org', id: organizationB.id }, 'model-a', secondary.integrationId)
     ).resolves.toMatchObject({ success: true });
     await expect(
-      updateRepositorySettings({ type: 'org', id: organizationB.id }, secondary.integrationId, 1, {
-        modelSlug: 'model-b',
+      db.query.platform_integrations.findFirst({
+        where: eq(platform_integrations.id, secondary.integrationId),
       })
-    ).resolves.toMatchObject({ success: true });
+    ).resolves.toMatchObject({ metadata: { model_slug: 'model-a' } });
+    await expect(
+      db.query.platform_integrations.findFirst({
+        where: eq(platform_integrations.id, workflow.integrationId),
+      })
+    ).resolves.toMatchObject({ metadata: null });
   });
 
   test.each([

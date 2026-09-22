@@ -14,7 +14,11 @@ import * as ReactI18next from 'react-i18next';
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
 const TEXT_DIRECTIONS = [
   { direction: 'LTR', isRTL: false, style: undefined },
-  { direction: 'RTL', isRTL: true, style: [{ writingDirection: 'rtl' }, undefined] },
+  {
+    direction: 'RTL',
+    isRTL: true,
+    style: [{ writingDirection: 'rtl' }, { letterSpacing: 0 }, undefined],
+  },
 ];
 
 vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
@@ -62,6 +66,10 @@ vi.mock('react', async () => {
 });
 
 // ── react-native ────────────────────────────────────────────────────
+const dimensions = vi.hoisted(() => ({
+  current: { fontScale: 1, height: 800, scale: 1, width: 400 },
+}));
+
 vi.mock('react-native', () => ({
   AccessibilityInfo: {
     announceForAccessibility: vi.fn(),
@@ -74,7 +82,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   Text: 'Text',
   TextInput: 'TextInput',
-  useWindowDimensions: () => ({ fontScale: 1, height: 800, scale: 1, width: 400 }),
+  useWindowDimensions: () => dimensions.current,
   View: 'View',
 }));
 
@@ -112,16 +120,24 @@ vi.mock('@/components/ui/accessible-status', () => ({
 }));
 
 vi.mock('@/components/agents/chat-toolbar', () => ({
-  ChatToolbar: () => null,
+  ChatToolbar: 'ChatToolbar',
+}));
+
+/** Captures the options the prompt hands the height-measuring hook. */
+const textHeightOptions = vi.hoisted(() => ({
+  current: null as Record<string, unknown> | null,
 }));
 
 vi.mock('@/components/agents/use-text-height', () => ({
-  useTextHeight: () => ({
-    height: 48,
-    measureElement: null,
-    reset: vi.fn(),
-    setText: vi.fn(),
-  }),
+  useTextHeight: (options: Record<string, unknown>) => {
+    textHeightOptions.current = options;
+    return {
+      height: 48,
+      measureElement: null,
+      reset: vi.fn(),
+      setText: vi.fn(),
+    };
+  },
 }));
 
 const voiceInputAvailable = vi.hoisted(() => ({ current: false }));
@@ -263,6 +279,8 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     voiceInputAvailable.current = false;
     returnSendsMessage.current = false;
     layoutDirection.isRTL = false;
+    dimensions.current = { fontScale: 1, height: 800, scale: 1, width: 400 };
+    textHeightOptions.current = null;
   });
 
   it.each(TEXT_DIRECTIONS)(
@@ -453,5 +471,89 @@ describe('NewSessionPrompt initialPrompt seed', () => {
 
     expect(findElementByType(element, 'TextInput')).toBeNull();
     expect(findElementByType(element, renderPromptControls)).toBeNull();
+  });
+
+  it('shrinks the input min height to two lines when the viewport above the keyboard is short', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    // 300 - 92 (header) - 125 (card chrome) = 83; floor((83 - 16) / 24) = 2 lines.
+    dimensions.current = { ...dimensions.current, height: 300 };
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt(defaultProps());
+
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 64 });
+    expect(textHeightOptions.current?.minHeight).not.toBe(88);
+  });
+
+  it('keeps the three-line floor at a large font scale when the viewport has room', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    // 500 - 92 (header, unscaled) - 145 (card chrome: 105 fixed + 20 text * 2)
+    // = 263; floor((263 - 16) / 48) = 5 -> clamped to the three-line default.
+    // Scaling the fixed rows (the shipped regression) gives 500 - 184 - 250 = 66
+    // -> one line -> 64.
+    dimensions.current = { ...dimensions.current, fontScale: 2, height: 500 };
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt(defaultProps());
+
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 160 });
+    expect(textHeightOptions.current?.minHeight).not.toBe(64);
+  });
+
+  it('lets the mode/model pills wrap and reports the toolbar height to the floor', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionPrompt(defaultProps()) as Node;
+
+    // The pills wrap onto a second row when the row runs out of width, so the
+    // toolbar is allowed to grow and is measured for the input's floor (the
+    // fallback-or-measured chrome decision itself is pinned in
+    // chat-composer-input-height.test.ts).
+    const toolbarProps = findElementByType(element, 'ChatToolbar');
+    expect(toolbarProps).toMatchObject({ wrap: true });
+    expect(toolbarProps?.onLayout).toEqual(expect.any(Function));
+  });
+
+  it('reserves the attachment strip so the toolbar clears the keyboard with an attachment staged', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    // The released density-560 frame: 203 - 125 (card chrome) - 12 = 66;
+    // floor((66 - 16) / 24) = two lines.
+    const promptViewportHeight = 203;
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt({ ...defaultProps(), promptViewportHeight });
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 64 });
+
+    // The strip's 72 leaves the frame room for one line, so the input gives the
+    // line up instead of pushing the mode/model pills under the IME.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt({
+      ...defaultProps(),
+      attachments: [{ id: 'a1', metadataStripFailed: false }] as never[],
+      promptViewportHeight,
+    });
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 40 });
+  });
+
+  it('reserves the counter and the metadata notice above the toolbar in the floor', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    const promptViewportHeight = 203;
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt({
+      ...defaultProps(),
+      initialPrompt: 'x'.repeat(100_000 - 5),
+      promptViewportHeight,
+    });
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 40 });
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt({
+      ...defaultProps(),
+      attachments: [{ id: 'a1', metadataStripFailed: true }] as never[],
+      promptViewportHeight,
+    });
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 40 });
   });
 });

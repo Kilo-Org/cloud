@@ -26,7 +26,12 @@ import { readProfileBundle } from '../session-profile.js';
 import { hasModernRuntimeAuthorization } from '../session/runtime-authorization-persistence.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
-import { parseCanonicalBitbucketCloneUrl, sessionIdSchema, type Env } from '../types.js';
+import {
+  agentSandboxProviderSchema,
+  parseCanonicalBitbucketCloneUrl,
+  sessionIdSchema,
+  type Env,
+} from '../types.js';
 import { createControlPlaneCredential, parseControlPlaneCredential } from './managed-credential.js';
 import {
   buildKiloCredentialInjectionRules,
@@ -181,7 +186,7 @@ export const sessionCredentialGrantSchema = z
       ),
     userId: z.string().min(1),
     orgId: organizationIdSchema.optional(),
-    provider: z.enum(['cloudflare', 'vercel']),
+    provider: agentSandboxProviderSchema,
     outboundContainerId: z.string().min(1).optional(),
     members: z.array(memberSchema).min(1),
     repository: repositorySchema.optional(),
@@ -210,7 +215,8 @@ export const sessionCredentialGrantSchema = z
       new Set(grant.members.map(member => member.kiloSessionId)).size !== grant.members.length ||
       (grant.containmentEnabled !== false &&
         grant.provider === 'cloudflare' &&
-        !grant.outboundContainerId)
+        !grant.outboundContainerId) ||
+      (grant.provider === 'cloudflare-containers' && grant.containmentEnabled !== false)
     ) {
       reject();
     }

@@ -14,7 +14,6 @@ export function canOrganizationUseMultipleGitHubInstallations(organizationId: st
 }
 
 export function canOrganizationCreateSharedGitHubConnection(organizationId: string): boolean {
-  if (getEnvVariable('GITHUB_AGENT_ONLY_CONNECTIONS_ENABLED') !== 'true') return false;
   return parseSharedGitHubInstallationOrganizationIds(
     getEnvVariable('GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS')
   ).has(organizationId);

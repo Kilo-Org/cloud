@@ -1,11 +1,5 @@
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import {
-  github_app_installations,
-  repository_customizations,
-  platform_integrations,
-  type NewRepositoryCustomization,
-  type RepositoryCustomization,
-} from '@kilocode/db/schema';
+import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
 import { eq, and, or, isNull, asc, desc, sql, ne } from 'drizzle-orm';
 import type {
   GitHubRequester,
@@ -1532,70 +1526,4 @@ export async function updateIntegrationMetadataForOwner(
   if (updated.length === 0) {
     throw new Error(`No ${platform} integration found for owner`);
   }
-}
-
-/**
- * Lists all per-repository overrides for an installation. Repositories
- * without a row here (or with a null field on their row) inherit the
- * installation's defaults.
- */
-export async function listRepositoryCustomizations(integrationId: string) {
-  return db
-    .select()
-    .from(repository_customizations)
-    .where(eq(repository_customizations.platform_integration_id, integrationId));
-}
-
-/**
- * Looks up a single repository's override row, or `null` if the repository
- * has no override (it fully inherits the installation's defaults).
- * `repositoryId` is the platform's repository identifier (GitHub's numeric
- * ID stringified, GitLab's project ID, etc.).
- */
-export async function getRepositoryCustomization(
-  integrationId: string,
-  repositoryId: string
-): Promise<RepositoryCustomization | null> {
-  const [row] = await db
-    .select()
-    .from(repository_customizations)
-    .where(
-      and(
-        eq(repository_customizations.platform_integration_id, integrationId),
-        eq(repository_customizations.repository_id, repositoryId)
-      )
-    );
-
-  return row ?? null;
-}
-
-/**
- * Upserts a per-repository override, changing only the fields present in
- * `updates`. Pass `null` for a field to explicitly clear it back to
- * "inherit the installation default"; omit a field to leave it untouched.
- * `repositoryId` is the platform's repository identifier (GitHub's numeric
- * ID stringified, GitLab's project ID, etc.).
- */
-export async function upsertRepositoryCustomization(
-  integrationId: string,
-  repositoryId: string,
-  updates: Pick<NewRepositoryCustomization, 'bot_mention_model_slug' | 'pr_review_mode'>
-) {
-  const [customization] = await db
-    .insert(repository_customizations)
-    .values({
-      platform_integration_id: integrationId,
-      repository_id: repositoryId,
-      ...updates,
-    })
-    .onConflictDoUpdate({
-      target: [
-        repository_customizations.platform_integration_id,
-        repository_customizations.repository_id,
-      ],
-      set: { ...updates, updated_at: new Date().toISOString() },
-    })
-    .returning();
-
-  return customization;
 }

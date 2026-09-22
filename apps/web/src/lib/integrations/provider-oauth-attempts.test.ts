@@ -13,9 +13,6 @@ import { anonymizeCloudUserData } from '@/lib/user';
 import { markOrganizationAsDeleted } from '@/lib/organizations/organizations';
 
 describe('provider OAuth attempts', () => {
-  beforeEach(() => {
-    process.env.GITHUB_AGENT_ONLY_CONNECTIONS_ENABLED = 'true';
-  });
   afterEach(cleanupDbForTest);
 
   it('is single-use and bound to actor, owner, provider, and expiry', async () => {

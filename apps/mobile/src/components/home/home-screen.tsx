@@ -18,10 +18,17 @@ import { NewTaskFromPictureButton } from '@/components/home/new-task-from-pictur
 import { ProductChoices } from '@/components/home/product-choices';
 import { ScreenHeader } from '@/components/screen-header';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 
 export function HomeScreen() {
   const { t } = useTranslation();
+  // The page body clears the landscape side safe areas (notch/Dynamic Island,
+  // Android cutout) with the same shared hook the header chrome uses
+  // (ScreenHeader), so the brand mark and the body below it always share one
+  // leading edge. One implementation for both platforms; zero insets collapse
+  // to a no-op and leave the portrait geometry unchanged.
+  const sideInsetStyle = useSideInsetStyle();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const [refreshing, setRefreshing] = useState(false);
   const context = useLiveSessionContext();
@@ -62,39 +69,44 @@ export function HomeScreen() {
         }
         size="large"
         showBackButton={false}
-        className="px-[22px] pb-1"
+        // The logo is the header's only visible child, so this is the brand
+        // mark's leading edge: it must be the page gutter the sections, cards
+        // and actions use (`mx-4`), not a wider header-only gutter.
+        className="px-4 pb-1"
       />
-      {centerFeedback ? (
-        <LiveSessionFeedback
-          context={context}
-          sessions={sessions}
-          failureLabel={t('home.couldNotLoadActiveSessions')}
-          centered
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        />
-      ) : (
-        <TabScreenScrollView
-          className="flex-1"
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        >
-          <Animated.View layout={LinearTransition} className="gap-2">
-            <AgentSessionsSection context={context} sessions={sessions} />
-            {context.isReady && (
-              <View className="gap-2 pt-4">
-                <NewTaskButton organizationId={context.organizationId} />
-                <NewTaskFromPictureButton organizationId={context.organizationId} />
-              </View>
-            )}
-            {context.accountReady && (
-              <ProductChoices
-                organizationId={context.organizationId}
-                contextReady={context.isReady}
-              />
-            )}
-          </Animated.View>
-        </TabScreenScrollView>
-      )}
+      <View className="flex-1" style={sideInsetStyle}>
+        {centerFeedback ? (
+          <LiveSessionFeedback
+            context={context}
+            sessions={sessions}
+            failureLabel={t('home.couldNotLoadActiveSessions')}
+            centered
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          />
+        ) : (
+          <TabScreenScrollView
+            className="flex-1"
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          >
+            <Animated.View layout={LinearTransition} className="gap-2">
+              <AgentSessionsSection context={context} sessions={sessions} />
+              {context.isReady && (
+                <View className="gap-2 pt-4">
+                  <NewTaskButton organizationId={context.organizationId} />
+                  <NewTaskFromPictureButton organizationId={context.organizationId} />
+                </View>
+              )}
+              {context.accountReady && (
+                <ProductChoices
+                  organizationId={context.organizationId}
+                  contextReady={context.isReady}
+                />
+              )}
+            </Animated.View>
+          </TabScreenScrollView>
+        )}
+      </View>
     </View>
   );
 }

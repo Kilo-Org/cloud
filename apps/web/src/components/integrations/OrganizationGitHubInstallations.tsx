@@ -24,13 +24,9 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { GitHubConnectionAttemptState } from './GitHubConnectionAttemptState';
-import { InstallationCustomizations } from './GitHubRepositoryCustomizationsPreview';
 
 type OrganizationGitHubInstallationsProps = {
   organizationId: string;
-  /** Reveals the Repository Customizations UI (default AI model / PR review
-   *  mode plus per-repository overrides) behind the PER_REPO_SETTINGS flag. */
-  perRepoSettingsEnabled?: boolean;
 };
 
 const statusLabel = {
@@ -43,7 +39,6 @@ const statusLabel = {
 
 export function OrganizationGitHubInstallations({
   organizationId,
-  perRepoSettingsEnabled,
 }: OrganizationGitHubInstallationsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -442,40 +437,32 @@ export function OrganizationGitHubInstallations({
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                    {installation.status === 'connected' &&
-                      (perRepoSettingsEnabled ? (
-                        <InstallationCustomizations
-                          integrationId={installation.id}
-                          organizationId={organizationId}
+                    {installation.status === 'connected' && (
+                      <div className="space-y-3 rounded-lg border p-4">
+                        <ModelCombobox
+                          id={`model-combobox-${installation.id}`}
+                          label="AI Model"
+                          helperText={
+                            installation.connectionRole === 'agent_only'
+                              ? 'Select the AI model for Slack agent sessions'
+                              : 'Select the AI model to use when responding to GitHub bot mentions'
+                          }
                           models={modelOptions}
-                          initiallyOpen={false}
+                          value={installation.modelSlug ?? undefined}
+                          onValueChange={modelSlug =>
+                            updateModel.mutate({
+                              organizationId,
+                              integrationId: installation.id,
+                              modelSlug,
+                            })
+                          }
+                          isLoading={isLoadingModels}
+                          disabled={!installation.canManageModel}
+                          placeholder="Select a model"
+                          triggerAriaLabel={`AI model for ${accountName}`}
                         />
-                      ) : (
-                        <div className="space-y-3 rounded-lg border p-4">
-                          <ModelCombobox
-                            id={`model-combobox-${installation.id}`}
-                            label="AI Model"
-                            helperText={
-                              installation.connectionRole === 'agent_only'
-                                ? 'Select the AI model for Slack agent sessions'
-                                : 'Select the AI model to use when responding to GitHub bot mentions'
-                            }
-                            models={modelOptions}
-                            value={installation.modelSlug ?? undefined}
-                            onValueChange={modelSlug =>
-                              updateModel.mutate({
-                                organizationId,
-                                integrationId: installation.id,
-                                modelSlug,
-                              })
-                            }
-                            isLoading={isLoadingModels}
-                            disabled={!installation.canManageModel}
-                            placeholder="Select a model"
-                            triggerAriaLabel={`AI model for ${accountName}`}
-                          />
-                        </div>
-                      ))}
+                      </div>
+                    )}
                   </div>
                   {installation.repositorySelection === 'selected' && (
                     <CollapsibleContent>

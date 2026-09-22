@@ -1,5 +1,5 @@
 {
-  "id": "8983dbb8-3b41-453a-b515-91cad58fa481",
+  "id": "680b9dae-f79b-471c-a110-40bacd3cc776",
   "prevId": "cbe64afa-e2db-4ad9-9527-f2e5ca3a9584",
   "version": "7",
   "dialect": "postgresql",
@@ -30608,12 +30608,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "github_connection_role": {
-          "name": "github_connection_role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "github_authorized_by_user_id": {
           "name": "github_authorized_by_user_id",
           "type": "text",
@@ -31116,10 +31110,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "platform_integrations_github_connection_role_check": {
-          "name": "platform_integrations_github_connection_role_check",
-          "value": "\"platform_integrations\".\"github_connection_role\" IS NULL OR (\n        \"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"integration_type\" = 'app'\n        AND \"platform_integrations\".\"platform_installation_id\" IS NOT NULL\n        AND \"platform_integrations\".\"github_connection_role\" IN ('workflow', 'agent_only')\n        AND (\"platform_integrations\".\"github_connection_role\" <> 'agent_only' OR \"platform_integrations\".\"github_installation_id\" IS NOT NULL)\n      )"
-        },
         "platform_integrations_owner_check": {
           "name": "platform_integrations_owner_check",
           "value": "(\n        (\"platform_integrations\".\"owned_by_user_id\" IS NOT NULL AND \"platform_integrations\".\"owned_by_organization_id\" IS NULL) OR\n        (\"platform_integrations\".\"owned_by_user_id\" IS NULL AND \"platform_integrations\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
@@ -36562,6 +36552,535 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.spend_alert_deliveries": {
+      "name": "spend_alert_deliveries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "dedupe_key": {
+          "name": "dedupe_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scope_key": {
+          "name": "scope_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rule_id": {
+          "name": "rule_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fired_at": {
+          "name": "fired_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "recipients": {
+          "name": "recipients",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_error_redacted": {
+          "name": "last_error_redacted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_spend_alert_deliveries_pending": {
+          "name": "IDX_spend_alert_deliveries_pending",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "attempt_count",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "spend_alert_deliveries_rule_id_spend_alert_rules_id_fk": {
+          "name": "spend_alert_deliveries_rule_id_spend_alert_rules_id_fk",
+          "tableFrom": "spend_alert_deliveries",
+          "tableTo": "spend_alert_rules",
+          "columnsFrom": [
+            "rule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_spend_alert_deliveries_dedupe_key": {
+          "name": "UQ_spend_alert_deliveries_dedupe_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "dedupe_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.spend_alert_hourly": {
+      "name": "spend_alert_hourly",
+      "schema": "",
+      "columns": {
+        "scope_key": {
+          "name": "scope_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hour_start": {
+          "name": "hour_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cost_microdollars": {
+          "name": "cost_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_spend_alert_hourly_scope_hour": {
+          "name": "uq_spend_alert_hourly_scope_hour",
+          "columns": [
+            {
+              "expression": "scope_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "hour_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_spend_alert_hourly_hour_start": {
+          "name": "IDX_spend_alert_hourly_hour_start",
+          "columns": [
+            {
+              "expression": "hour_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.spend_alert_rule_state": {
+      "name": "spend_alert_rule_state",
+      "schema": "",
+      "columns": {
+        "rule_id": {
+          "name": "rule_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "firing": {
+          "name": "firing",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "condition_started_at": {
+          "name": "condition_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_value_microdollars": {
+          "name": "last_value_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "spend_alert_rule_state_rule_id_spend_alert_rules_id_fk": {
+          "name": "spend_alert_rule_state_rule_id_spend_alert_rules_id_fk",
+          "tableFrom": "spend_alert_rule_state",
+          "tableTo": "spend_alert_rules",
+          "columnsFrom": [
+            "rule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.spend_alert_rules": {
+      "name": "spend_alert_rules",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "settings_id": {
+          "name": "settings_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "threshold_microdollars": {
+          "name": "threshold_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "window_hours": {
+          "name": "window_hours",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "multiplier_basis_points": {
+          "name": "multiplier_basis_points",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email_enabled": {
+          "name": "email_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "push_enabled": {
+          "name": "push_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_spend_alert_rules_kind": {
+          "name": "uq_spend_alert_rules_kind",
+          "columns": [
+            {
+              "expression": "settings_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "spend_alert_rules_settings_id_spend_alert_settings_id_fk": {
+          "name": "spend_alert_rules_settings_id_spend_alert_settings_id_fk",
+          "tableFrom": "spend_alert_rules",
+          "tableTo": "spend_alert_settings",
+          "columnsFrom": [
+            "settings_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.spend_alert_settings": {
+      "name": "spend_alert_settings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "scope_key": {
+          "name": "scope_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "uq_spend_alert_settings_scope": {
+          "name": "uq_spend_alert_settings_scope",
+          "columns": [
+            {
+              "expression": "scope_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "spend_alert_settings_kilo_user_id_kilocode_users_id_fk": {
+          "name": "spend_alert_settings_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "spend_alert_settings",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "spend_alert_settings_organization_id_organizations_id_fk": {
+          "name": "spend_alert_settings_organization_id_organizations_id_fk",
+          "tableFrom": "spend_alert_settings",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "spend_alert_settings_scope_check": {
+          "name": "spend_alert_settings_scope_check",
+          "value": "(\"spend_alert_settings\".\"kilo_user_id\" IS NOT NULL) <> (\"spend_alert_settings\".\"organization_id\" IS NOT NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.stripe_dispute_actions": {
       "name": "stripe_dispute_actions",
       "schema": "",
@@ -41292,6 +41811,13 @@
         },
         "balance_alerts_enabled": {
           "name": "balance_alerts_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "spend_alerts_enabled": {
+          "name": "spend_alerts_enabled",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,

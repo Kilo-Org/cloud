@@ -53,10 +53,10 @@ export const NEW_SESSION_PROMPT_CHROME_HEIGHT = 176;
  * New-session prompt card chrome the input must never squeeze out: the form's
  * `pt-4` (16), the card's `pt-2` (8), the control row (44), and the toolbar
  * (57). The mode and model pills are the last of these rows, so they are what
- * the keyboard clips first when the space above the IME is short. Kept apart
- * from `NEW_SESSION_PROMPT_CHROME_HEIGHT`, which is a soft cap that also
- * reserves the starter row; the min-height floor guards only the rows the input
- * must not push off screen.
+ * the keyboard clips first when the space above the IME is short. This budget
+ * is kept apart from the soft cap over the rest of the prompt chrome,
+ * `NEW_SESSION_PROMPT_CHROME_HEIGHT`, which reserves no starter row; the
+ * min-height floor guards only the rows the input must not push off screen.
  */
 export const NEW_SESSION_PROMPT_CARD_CHROME_HEIGHT = 125;
 

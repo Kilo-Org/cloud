@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Sparkles, X } from '@/components/ui/icons';
@@ -65,43 +65,18 @@ export function SuggestionCard({
     }
   }
 
-  function handleShowDetails() {
-    Alert.alert(
-      t('agentChat.suggestion.title'),
-      [
-        text,
-        ...actions.map(action =>
-          action.description ? `${action.label}\n${action.description}` : action.label
-        ),
-      ].join('\n\n'),
-      [{ text: t('common.done') }]
-    );
-  }
-
   const isPending = pending !== null;
 
   return (
-    <View className="px-3 py-2.5">
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerClassName="items-center gap-2"
-      >
-        <Pressable
-          onPress={handleShowDetails}
-          accessibilityRole="button"
-          accessibilityLabel={text}
-          accessibilityHint={t('agentChat.partDetail.showDetails')}
-          hitSlop={4}
-          className="max-w-[240px] flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 active:opacity-70"
-        >
-          <Sparkles size={15} color={colors.mutedForeground} />
-          <Text className="shrink text-sm text-foreground" numberOfLines={1}>
-            {text}
-          </Text>
-        </Pressable>
+    <View className="gap-2 px-3 py-2.5">
+      {/* The suggestion is context, not a control: it wraps in full so the
+          offered actions below stay the row's only affordances. */}
+      <View className="flex-row items-start gap-2">
+        <Sparkles size={15} color={colors.mutedForeground} />
+        <Text className="flex-1 text-sm text-foreground">{text}</Text>
+      </View>
 
+      <View className="flex-row flex-wrap items-center gap-2">
         {actions.map((action: SuggestionAction, index: number) => (
           <Button
             key={`${action.label}-${index}`}
@@ -136,7 +111,7 @@ export function SuggestionCard({
         >
           <X size={16} color={colors.mutedForeground} />
         </Button>
-      </ScrollView>
+      </View>
       {error ? <AccessibleStatus message={error} className="pt-1 text-xs" /> : null}
     </View>
   );

@@ -170,8 +170,16 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // The introspected colors mod starts from the native resources the platform
+    // project already holds, so a worktree that ran a prebuild (any device run
+    // does) reports the app's other colors beside the splash background. Assert
+    // the splash entry is generated from these options, not the array's length.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([
+          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+        ]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

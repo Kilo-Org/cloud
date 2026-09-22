@@ -77,6 +77,10 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
+// The element tree finds the loading Skeleton by that name, and the real
+// component animates through Reanimated's worklets package (and the motion
+// policy's `expo-battery`), neither of which this node project can load.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
@@ -133,8 +137,9 @@ vi.mock('@/components/ui/segmented-control', () => ({
 // whose module imports `react-native-reanimated`: this pure suite does not set
 // Reanimated up, and this project runs in plain Node, where the
 // Reanimated/worklets native entry cannot resolve (the published worklets
-// build uses bundler-style extensionless imports). The primitive is a stub like
-// every other UI element above; its own rendering is not under test here.
+// build uses bundler-style extensionless imports). The stub is the type the
+// pending-environment case asserts by name; its own rendering is not under test
+// here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({

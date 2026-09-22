@@ -9,9 +9,11 @@ import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/empty-state';
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
 import { DiscussionThread } from '@/components/pr-review/discussion/discussion-thread';
 import { Button } from '@/components/ui/button';
+import { MessageSquarePlus } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
   type DiscussionListItem,
@@ -19,6 +21,7 @@ import {
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { expandedForThread } from '@/lib/pr-review/discussion/thread-expansion';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
+import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 
@@ -74,7 +77,12 @@ export function PrReviewDiscussionList({
   onReplyInputFocus,
   onViewportLayout,
 }: Readonly<PrReviewDiscussionListProps>) {
+  const { t } = useTranslation();
   const trpc = useTRPC();
+  // Provider noun for the empty message below (GitLab calls it a merge
+  // request); the same scope the tab reads for its own copy.
+  const { ref } = useProviderPrScope({ owner, repo, number });
+  const isMergeRequest = ref.platform === 'gitlab';
   // Account-local hidden users (blocked + muted GitHub logins) filter rows.
   const hiddenUsers = useQuery(trpc.moderation.listHiddenUsers.queryOptions());
   // Viewer login for self-target gating on the comment overflow menu. The
@@ -190,6 +198,23 @@ export function PrReviewDiscussionList({
       onLayout={event => {
         onViewportLayout?.(event.nativeEvent.layout.height);
       }}
+      ListEmptyComponent={
+        // Every loaded row can be hidden (blocked/muted authors) while the
+        // tab still counts the discussion as content. Without this the list
+        // renders an empty body under the pinned Comment bar: no rows, no
+        // loading, no message (spot check e7). The copy is the discussion's
+        // existing empty copy — new copy belongs to the translation slice.
+        <EmptyState
+          placement="top"
+          icon={MessageSquarePlus}
+          title={t('prReview.discussion.noDiscussion')}
+          description={
+            isMergeRequest
+              ? t('prReview.terms.noDiscussionDescription')
+              : t('prReview.discussion.noDiscussionDescription')
+          }
+        />
+      }
       ListFooterComponent={
         <ListFooter
           hasNextPage={hasNextPage}

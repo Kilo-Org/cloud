@@ -164,8 +164,16 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // Introspection reads the existing Android project, so its colors.xml can
+    // hold unrelated entries (for example expo-notifications'
+    // notification_icon_color). Assert the splash color is present instead of
+    // pinning the whole array to the machine's prebuild state.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([
+          { $: { name: 'splashscreen_background' }, _: '#FAF74F' },
+        ]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

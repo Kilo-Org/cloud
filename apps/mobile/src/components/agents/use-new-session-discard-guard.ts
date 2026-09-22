@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Alert, Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
@@ -23,9 +22,8 @@ type PreventedLeaveAction = Parameters<Parameters<typeof usePreventRemove>[1]>[0
 
 type NewSessionDiscardGuard = {
   /**
-   * The Android discard confirm the screen mounts once (a Modal overlay, so the
-   * composer behind it keeps its layout); null on iOS and while the confirm is
-   * closed.
+   * The discard confirm the screen mounts once (a Modal overlay, so the
+   * composer behind it keeps its layout); null while the confirm is closed.
    */
   discardConfirm: ReactNode;
 };
@@ -52,12 +50,13 @@ const LEAVE_ACTION_TYPES: ReadonlySet<string> = new Set(['GO_BACK', 'POP', 'POP_
  * Forward navigation (any other action type) is replayed unconfirmed: the
  * durable draft survives the leave.
  *
- * Mirrors the `usePreventRemove` + `Alert.alert` pattern of
- * `useSettingsBackGuard` without any Security-specific helpers: when the
- * prompt is non-empty (`dirty`), the exit is intercepted and the user chooses
- * Keep editing (dismiss, draft intact) or Discard. On Discard the caller's
- * `onDiscard` runs first — clear the stored draft and reset the route-owned
- * prompt ref — and only then is the captured navigation action replayed.
+ * Follows the `usePreventRemove` interception of `useSettingsBackGuard` without
+ * any Security-specific helpers, but renders the in-app confirm instead of
+ * `Alert.alert`: when the prompt is non-empty (`dirty`), the exit is intercepted
+ * and the user chooses Keep editing (dismiss, draft intact) or Discard. On
+ * Discard the caller's `onDiscard` runs first — clear the stored draft and reset
+ * the route-owned prompt ref — and only then is the captured navigation action
+ * replayed.
  *
  * `skipNextGuardRef` is the caller's bypass: set it true right before a
  * successful Start/spawn navigation (`router.replace`) so the leave is not
@@ -67,13 +66,18 @@ const LEAVE_ACTION_TYPES: ReadonlySet<string> = new Set(['GO_BACK', 'POP', 'POP_
  * A Discard whose `onDiscard` rejects keeps the screen (no dispatch) and
  * toasts, so a failed draft clear never loses the prompt.
  *
- * Android's native `AlertDialog` paints every button with the theme accent, so
- * `Alert.alert`'s `style: 'destructive'` never reaches the screen there (iOS
- * honors it and keeps the native alert). The hook therefore forks on platform:
- * the iOS leave path is unchanged, while Android holds the captured action and
- * returns a `DestructiveConfirmDialog` node the caller renders — the same
- * #6393 affordance `profile-screen.tsx` uses for sign-out. The returned
- * `discardConfirm` is null on iOS and whenever the Android confirm is closed.
+ * The confirm is the in-app `DestructiveConfirmDialog` on both iOS and
+ * Android — one implementation, not the native `Alert.alert`. A platform fork
+ * would be needed only if a platform lacked the capability, and the reason we
+ * cannot use the native alert is a platform limitation on Android: its native
+ * `AlertDialog` paints every button with the theme accent, so `Alert.alert`'s
+ * `style: 'destructive'` never reaches the screen there and the discarding
+ * choice loses its red affordance. iOS honors `style: 'destructive'`, but one
+ * cross-platform dialog keeps the affordance identical on both. This is the
+ * same #6393 surface `profile-screen.tsx` uses for sign-out, rendered here with
+ * `common.keepEditing` as the safe choice. The hook holds the intercepted leave
+ * while the confirm is open and returns the `discardConfirm` node the caller
+ * mounts; it is null while the confirm is closed.
  */
 export function useNewSessionDiscardGuard({
   dirty,
@@ -95,7 +99,7 @@ export function useNewSessionDiscardGuard({
   const onDiscardRef = useRef(onDiscard);
   onDiscardRef.current = onDiscard;
 
-  // Android holds the intercepted leave here until the in-app confirm resolves.
+  // The intercepted leave is held here until the in-app confirm resolves.
   const [confirmVisible, setConfirmVisible] = useState(false);
   const pendingActionRef = useRef<PreventedLeaveAction | null>(null);
 
@@ -109,8 +113,8 @@ export function useNewSessionDiscardGuard({
     if (action === null) {
       return;
     }
-    // Close first, exactly as the native alert dismissed on press: the choice
-    // is made, and a second press must not clear or leave twice.
+    // Close first: the choice is made, and a second press must not clear or
+    // leave twice.
     closeConfirm();
     void (async () => {
       try {
@@ -137,55 +141,26 @@ export function useNewSessionDiscardGuard({
       navigation.dispatch(data.action);
       return;
     }
-    if (Platform.OS === 'android') {
-      pendingActionRef.current = action;
-      setConfirmVisible(true);
-      return;
-    }
-    Alert.alert(
-      i18n.t('agentChat.newSession.discardDraftTitle'),
-      i18n.t(
-        hasUnclaimedAttachments
-          ? 'agentChat.newSession.discardWithUploadsMessage'
-          : 'agentChat.newSession.discardDraftMessage'
-      ),
-      [
-        { text: i18n.t('common.keepEditing'), style: 'cancel' },
-        {
-          text: i18n.t('common.discard'),
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              try {
-                await onDiscardRef.current();
-                navigation.dispatch(action);
-              } catch {
-                // The clear failed: stay on the screen so the draft is kept
-                // and the user can retry or keep editing.
-                toast.error(i18n.t('agentChat.newSession.discardFailed'));
-              }
-            })();
-          },
-        },
-      ]
-    );
+    // Hold the intercepted leave and open the in-app confirm, on every
+    // platform: the confirm below is the one cross-platform implementation.
+    pendingActionRef.current = action;
+    setConfirmVisible(true);
   });
 
   return {
-    discardConfirm:
-      Platform.OS === 'android' && confirmVisible
-        ? createElement(DestructiveConfirmDialog, {
-            title: i18n.t('agentChat.newSession.discardDraftTitle'),
-            message: i18n.t(
-              hasUnclaimedAttachments
-                ? 'agentChat.newSession.discardWithUploadsMessage'
-                : 'agentChat.newSession.discardDraftMessage'
-            ),
-            confirmLabel: i18n.t('common.discard'),
-            cancelLabel: i18n.t('common.keepEditing'),
-            onConfirm: confirmDiscard,
-            onCancel: closeConfirm,
-          })
-        : null,
+    discardConfirm: confirmVisible
+      ? createElement(DestructiveConfirmDialog, {
+          title: i18n.t('agentChat.newSession.discardDraftTitle'),
+          message: i18n.t(
+            hasUnclaimedAttachments
+              ? 'agentChat.newSession.discardWithUploadsMessage'
+              : 'agentChat.newSession.discardDraftMessage'
+          ),
+          confirmLabel: i18n.t('common.discard'),
+          cancelLabel: i18n.t('common.keepEditing'),
+          onConfirm: confirmDiscard,
+          onCancel: closeConfirm,
+        })
+      : null,
   };
 }

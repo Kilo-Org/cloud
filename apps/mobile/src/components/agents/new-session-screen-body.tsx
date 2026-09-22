@@ -779,8 +779,8 @@ export function NewSessionScreenBody() {
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}
       />
-      {/* Android's discard confirm: a Modal overlay, so the composer behind it
-          keeps its layout while the destructive choice keeps its red fill. */}
+      {/* The discard confirm: a Modal overlay, so the composer behind it keeps
+          its layout while the destructive choice keeps its red fill. */}
       {discardConfirm}
     </View>
   );

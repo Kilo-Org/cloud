@@ -226,13 +226,16 @@ import {
   failWaitingMessages as applyFailWaitingMessages,
   failedMessageSnapshot,
   freezeLegacyQueuedMessages,
+  getSessionMessageTurn,
   hasAcceptedMessage,
   hasUnreleasedOperationProof,
   incrementDeliveryFailure,
   markSessionOperationRejection,
   matchesSessionMessageReplay,
   nextQueuedMessageId,
+  noOutputRecoveryAllowed,
   recordAcceptedMessageActivity,
+  redispatchAcceptedMessage,
   releaseCompletedRetryableAttach,
   releaseUnadmittedWaitingMessages,
   replacePreparationAttemptId,
@@ -3090,11 +3093,17 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   /**
-   * The inactivity fail path. Re-reads the accepted row and re-evaluates the
-   * bound synchronously before persisting, so real progress that landed during
-   * the preceding observe/sync keeps the turn alive. Message-only: no
-   * quarantine and no native-runtime retirement. The follow-up abort is
-   * best-effort and fenced with the captured wrapper instance.
+   * The inactivity path. Re-reads the accepted row and re-evaluates the bound
+   * synchronously before persisting, so real progress that landed during the
+   * preceding observe/sync keeps the turn alive.
+   *
+   * The first no-output detection is recoverable: the accepted turn is
+   * re-queued under its durable intent and the wedged runtime is retired, so
+   * the alarm re-dispatches it once on a replacement runtime. A second
+   * identical detection keeps the terminal path (message-only: no quarantine
+   * and no native-runtime retirement) and records the attempt count. The
+   * follow-up abort is best-effort and fenced with the captured wrapper
+   * instance.
    */
   private async failOverdueAcceptedMessage(
     accepted: MessageRecord,
@@ -3113,6 +3122,25 @@ export class SandboxSession extends DurableObject<Env> {
     diagnostic.stage = 'inactivity';
     diagnostic.reason = 'inactivity_due';
     diagnostic.lastActivityAt = activityAt;
+    const recoveryAttempts = current.recoveryAttempts ?? 0;
+    if (noOutputRecoveryAllowed(recoveryAttempts)) {
+      const next = redispatchAcceptedMessage(this.loadMessages(), current.messageId);
+      if (!next || !this.saveMessages(next, epoch)) return false;
+      diagnostic.recovery = 'redispatched';
+      logControlDiagnostic('accepted_no_output_recovery', {
+        ...diagnostic,
+        producer: 'accepted_inactivity',
+        recoveryAttempts: recoveryAttempts + 1,
+      });
+      const metadata = this.terminalLifecycle.getStoredMetadata();
+      if (metadata && current.wrapperInstanceId)
+        this.retainRuntimeCleanup(metadata, current.wrapperInstanceId, 'no_output_recovery');
+      const turn = getSessionMessageTurn(current);
+      this.broadcastQueuedMessage(current.messageId, turn ? renderExecutionTurnContent(turn) : '');
+      await this.armQueueRetry();
+      return true;
+    }
+    diagnostic.attempts = recoveryAttempts + 1;
     const wrapperInstanceId = current.wrapperInstanceId;
     const messages = failAcceptedMessage(
       this.loadMessages(),

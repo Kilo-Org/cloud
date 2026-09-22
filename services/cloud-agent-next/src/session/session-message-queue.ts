@@ -34,6 +34,7 @@ import {
   resolvePendingSessionMessageIntent,
   shouldSkipPendingFlush,
   storePendingSessionMessage,
+  type LegacyPendingSessionMessage,
   type PendingFlushFailureResult,
   type PendingFlushPolicy,
   type PendingSessionExecutionDefaults,
@@ -46,6 +47,7 @@ import {
   getSessionMessageState,
   listReconnectVisibleTerminalQueuedMessages,
   markMessageInterrupted,
+  markMessageQueuedForRecovery,
   putSessionMessageState,
   type SessionMessageFailureCode,
   type SessionMessageStorage,
@@ -1304,4 +1306,57 @@ export async function getQueuedMessageByMessageId(
   messageId: string
 ): Promise<PendingSessionMessage | undefined> {
   return findPendingSessionMessageByMessageId(storage, messageId);
+}
+
+/**
+ * Re-queue an accepted turn that an unhealthy wrapper left without output so the
+ * next pending drain re-dispatches it on a fresh runtime. The immutable
+ * `admissionSnapshot` (or the normalized `legacyAdmissionConstraints` predecessor
+ * shape) holds the user's typed turn across the recovery. Returns false when no
+ * intent can be resolved, leaving the caller to terminalize as today.
+ */
+export async function requeueAcceptedMessageForRecovery(
+  storage: SessionMessageQueueStorage,
+  state: SessionMessageState
+): Promise<boolean> {
+  const intent = resolveRecoveryIntent(state);
+  if (!intent) return false;
+
+  const queued = await markMessageQueuedForRecovery(storage, state.messageId);
+  if (!queued) return false;
+
+  const callbackSnapshot = state.callbackRequired
+    ? { required: true, target: state.callbackTarget }
+    : undefined;
+  await enqueuePendingSessionMessageIntent(storage, intent, Date.now(), callbackSnapshot);
+  return true;
+}
+
+function resolveRecoveryIntent(state: SessionMessageState): SessionMessageIntent | undefined {
+  if (state.admissionSnapshot) return state.admissionSnapshot;
+  const legacy = state.legacyAdmissionConstraints;
+  if (!legacy?.turn || !legacy.agent?.model) return undefined;
+  const legacyMessage: PendingSessionMessage & { legacy: LegacyPendingSessionMessage } = {
+    messageId: state.messageId,
+    content: state.prompt,
+    createdAt: state.createdAt,
+    legacy: {
+      messageId: state.messageId,
+      role: 'user',
+      content: state.prompt,
+      createdAt: state.createdAt,
+      turn:
+        legacy.turn.type === 'command'
+          ? { type: 'command', command: legacy.turn.command, arguments: legacy.turn.arguments }
+          : { type: 'prompt' },
+      executionOptions: {
+        mode: legacy.agent.mode,
+        model: legacy.agent.model,
+        variant: legacy.agent.variant,
+        autoCommit: legacy.finalization?.autoCommit,
+        condenseOnComplete: legacy.finalization?.condenseOnComplete,
+      },
+    },
+  };
+  return resolvePendingSessionMessageIntent(legacyMessage, {});
 }

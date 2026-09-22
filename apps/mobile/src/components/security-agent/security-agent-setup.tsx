@@ -1,13 +1,12 @@
 import { ShieldCheck } from '@/components/ui/icons';
 import { useState } from 'react';
-import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/empty-state';
 import { Text } from '@/components/ui/text';
-import { CenteredState } from '@/components/centered-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
 
@@ -44,13 +43,13 @@ export function SecurityAgentSetup<T>({
   };
 
   return (
-    <CenteredState>
-      <View className="items-center gap-3 px-6">
-        <ShieldCheck size={28} color={colors.mutedForeground} />
-        <Text className="text-center text-base font-semibold">{title}</Text>
-        <Text className="text-center text-sm text-muted-foreground">{description}</Text>
+    <EmptyState
+      icon={ShieldCheck}
+      title={title}
+      description={description}
+      action={
         <Button
-          className="mt-3 w-full flex-row gap-2"
+          className="w-full flex-row gap-2"
           disabled={connecting}
           onPress={() => {
             void connect();
@@ -59,7 +58,7 @@ export function SecurityAgentSetup<T>({
           {connecting ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
           <Text>{buttonLabel}</Text>
         </Button>
-      </View>
-    </CenteredState>
+      }
+    />
   );
 }

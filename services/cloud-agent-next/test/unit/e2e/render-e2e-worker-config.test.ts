@@ -35,6 +35,7 @@ const REMOVED_CONTAINER_CLASSES = [
   'SandboxContainment',
   'SandboxSmallContainment',
   'SandboxCodeReviewContainment',
+  'SandboxContainers',
 ];
 
 const KEPT_DO_CLASSES = [

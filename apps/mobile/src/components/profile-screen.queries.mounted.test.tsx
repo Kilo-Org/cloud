@@ -148,6 +148,38 @@ describe('ProfileScreen deferred queries', () => {
     unmount();
   });
 
+  it('paints the linked account row without an entering animation once the providers load', async () => {
+    providersQueryFn.mockResolvedValue({
+      providers: [{ provider: 'github', email: 'dev@kilo.ai' }],
+    });
+    organizationsQueryFn.mockResolvedValue([]);
+
+    const { renderer, unmount } = await mountProfile();
+
+    flushInteractions();
+    await waitFor(() => findConfigureRows(renderer.root, 'GitHub').length === 1);
+
+    const row = findConfigureRows(renderer.root, 'GitHub')[0];
+    if (!row) {
+      throw new Error('GitHub row was not rendered');
+    }
+
+    // A Reanimated entering animation does not run while the app is
+    // backgrounded: the row stays mounted at opacity 0, so the `Linked
+    // accounts` header sits alone above the tab bar and the Actions section is
+    // pushed out of the viewport. The row must be painted in the frame its data
+    // arrives, with no ancestor holding an entering animation.
+    const ancestorsWithEntering: string[] = [];
+    for (let node = row.parent; node; node = node.parent) {
+      if ('entering' in node.props) {
+        ancestorsWithEntering.push(node.type as string);
+      }
+    }
+    expect(ancestorsWithEntering).toEqual([]);
+
+    unmount();
+  });
+
   it('renders QueryError with retry after the deferred providers query fails', async () => {
     providersQueryFn.mockRejectedValue(new Error('boom'));
     organizationsQueryFn.mockResolvedValue([]);

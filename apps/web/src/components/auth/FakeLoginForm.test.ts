@@ -48,6 +48,11 @@ describe('FakeLoginForm development login panel placement', () => {
     // Any `fixed` at any breakpoint puts the panel back over the centered form.
     expect(classNames.filter(name => name === 'fixed' || name.endsWith(':fixed'))).toEqual([]);
 
+    // An out-of-flow panel (`absolute`/`sticky`) is what left the panel's own
+    // Sign In button behind the raised keyboard: the page scrolls its in-flow
+    // content into view, and nothing repositions an out-of-flow box.
+    expect(classNames.filter(name => /(^|:)(absolute|sticky)$/.test(name))).toEqual([]);
+
     for (const floatingClass of [
       'bottom-6',
       'left-6',

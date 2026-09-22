@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { compiledDimensions } from '@/test/native-dimensions';
 
 import '@/i18n';
 import { OrganizationMembersScreen } from './members-screen';
@@ -138,6 +139,7 @@ vi.mock('@/components/query-error', () => ({
 }));
 
 vi.mock('@/components/screen-header', () => ({
+  // Render headerRight so the invite control under test stays in the tree.
   ScreenHeader: (props: { headerRight?: ReactNode }) =>
     createElement('ScreenHeader', null, props.headerRight),
 }));
@@ -281,6 +283,30 @@ describe('OrganizationMembersScreen invite header control', () => {
     expect(width + 2 * slop).toBeGreaterThanOrEqual(MIN_REACH_DP);
 
     expect(control.props.accessibilityRole).toBe('button');
+    unmount();
+  });
+
+  it('compiles the invite control box to at least 28dp with a 44pt reach', async () => {
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(OrganizationMembersScreen)
+    );
+
+    const control = findInviteControl(renderer.root)[0];
+    if (!control) {
+      throw new Error('invite control not found');
+    }
+
+    const declarations = (await compiledDimensions(control.props.className as string)) as {
+      height?: number;
+      width?: number;
+    }[];
+    const box = Object.assign({}, ...declarations) as { height: number; width: number };
+    const slop = hitSlopPerSide(control.props.hitSlop);
+
+    expect(box.height).toBeGreaterThanOrEqual(MIN_BOX_DP);
+    expect(box.width).toBeGreaterThanOrEqual(MIN_BOX_DP);
+    expect(box.height + 2 * slop).toBeGreaterThanOrEqual(MIN_REACH_DP);
+    expect(box.width + 2 * slop).toBeGreaterThanOrEqual(MIN_REACH_DP);
     unmount();
   });
 

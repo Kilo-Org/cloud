@@ -110,7 +110,8 @@ export function StoredSessionRow({
   // ("New session - 2026-09-22T02:05:22.778Z"); it is not a name the user
   // should see, so the row falls back to the localized unnamed name the same
   // way the session header does.
-  const title = namedSessionTitle(session.title) ?? t('agents.sessionRow.untitled');
+  const title =
+    namedSessionTitle(session.title, session.session_id) ?? t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);

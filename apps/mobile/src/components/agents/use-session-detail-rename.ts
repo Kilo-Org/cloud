@@ -110,6 +110,7 @@ export function useSessionDetailRename({
       // what the user actually saw, not a stale server title that may lag
       // behind after a prior successful rename.
       const previousTitle = getSessionDetailRenameState({
+        sessionId,
         fallbackTitle,
         isLoaded,
         serverTitle: effectiveServerTitle,
@@ -135,6 +136,7 @@ export function useSessionDetailRename({
   );
 
   const state = getSessionDetailRenameState({
+    sessionId,
     fallbackTitle,
     isLoaded,
     serverTitle: effectiveServerTitle,

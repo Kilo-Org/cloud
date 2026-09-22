@@ -323,7 +323,8 @@
       "chat": "Sohbet mesajları",
       "kiloclaw": "KiloClaw etkinliği",
       "balance": "Bakiye uyarıları",
-      "security": "Güvenlik bulguları"
+      "security": "Güvenlik bulguları",
+      "spend": "Harcama uyarıları"
     },
     "category": {
       "chatMessagesSubtitle": "konuşmalarındaki yanıtlar",
@@ -334,8 +335,13 @@
       "sessionStatusTitle": "Oturum durumu",
       "sessionStatusSubtitle": "bitti / başarısız / kontrol edilmeye hazır",
       "kiloclawActivitySubtitle": "örnek hazır/başarısız, zamanlanmış eylemler",
+      "kiloclawActivityUnavailable": "KiloClaw etkinliği almak için bir KiloClaw örneği başlat.",
       "balanceAlertsSubtitle": "düşük kuruluş bakiyesi uyarıları",
-      "securityFindingsSubtitle": "yeni bulgular ve SLA hatırlatmaları"
+      "balanceAlertsUnavailable": "Düşük bakiye uyarıları almak için bir kuruluşa katıl.",
+      "securityFindingsSubtitle": "yeni bulgular ve SLA hatırlatmaları",
+      "securityFindingsUnavailable": "Güvenlik bulguları almak için bir kapsamda Kilo Güvenlik ajanını etkinleştir.",
+      "spendAlertsSubtitle": "eşik aşımları ve saatlik artışlar",
+      "spendAlertsToggle": "Harcama uyarıları kategorisi"
     },
     "action": {
       "openSession": "Oturumu aç"
@@ -1572,6 +1578,10 @@
       "couldNotLoad": "Oturum yüklenemedi.",
       "failedToLoadDetails": "Oturum ayrıntıları yüklenemedi.",
       "failedToStopExecution": "Çalışan işlem durdurulamadı.",
+      "stopped": "Oturum durduruldu",
+      "committing": "İşleniyor…",
+      "committed": "İşlendi",
+      "commitFailed": "İşleme başarısız oldu",
       "renameSession": "Oturumu yeniden adlandır",
       "renamePlaceholder": "Oturum adı",
       "transcriptAccessibility": "Oturum dökümü",
@@ -3156,7 +3166,8 @@
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
     "openSession": "Aç",
-    "approveFailed": "Onaylanamadı. Tekrar denemek için $t(common.approve) öğesine dokun."
+    "approveFailed": "Onaylanamadı. Tekrar denemek için $t(common.approve) öğesine dokun.",
+    "newestResult": "En yeni sonuç"
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",
@@ -3181,15 +3192,7 @@
     "remoteOptionTitle": "Bilgisayarın",
     "remoteOptionBody": "Kilo'yu kendi makinende `kilo remote` CLI'si üzerinden çalıştır.",
     "skip": "Turu atla",
-    "tutorialLabel": "Eğitim",
-    "remoteTitle": "İlk uzak oturumunu başlat",
-    "remoteBody": "Bilgisayarını bağla, ardından oturumu buradan başlat.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Henüz bağlı bir bilgisayar yok",
-    "remoteEmptyBody": "Bağlamak için bilgisayarında `kilo remote` komutunu çalıştır.",
-    "remoteFound": "Bilgisayar bağlandı",
-    "checkAgain": "Tekrar kontrol et",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Eğitim"
   },
   "appActions": {
     "start": {
@@ -3200,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Son oturumu aç"
+  },
+  "spendAlerts": {
+    "subtitle": "Bu kapsamın harcaması bir sınırı aştığında veya olağan saatlik hızının üzerine çıktığında faturalandırma kişilerine e-posta veya push ile uyarı gönder.",
+    "enable": "Harcama uyarılarını etkinleştir",
+    "thresholdTitle": "Eşik aşımı",
+    "thresholdSubtitle": "Cari harcama limitini aşıyor",
+    "anomalyTitle": "Saatlik artış",
+    "anomalySubtitle": "Bir saat bu kapsamın olağan hızının çok üzerinde",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Pencere",
+    "window24h": "24 saat",
+    "window7d": "7 gün",
+    "window30d": "30 gün",
+    "multiplierLabel": "Artış çarpanı",
+    "saved": "Harcama uyarısı ayarları kaydedildi",
+    "loadError": "Harcama uyarıları yüklenemedi.",
+    "saveError": "Harcama uyarıları kaydedilemedi.",
+    "empty": "Harcama uyarıları kapalı. Bu kapsamın faturalandırma kişilerini uyarmak için aç.",
+    "noSpend": "Henüz harcama kaydedilmedi",
+    "spend24h": "Son 24 saatteki harcama",
+    "multiplierError": "1 veya daha büyük bir çarpan gir",
+    "permissionDenied": "Harcama uyarılarını yönetme iznin yok.",
+    "pushOffByCategory": "Bildirimler'de kapalı"
   }
 }

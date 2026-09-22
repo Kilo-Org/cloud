@@ -101,6 +101,7 @@ async function checkDirectBYOK(
       id: 'direct-byok',
       apiUrl: directByok.base_url,
       apiUrlOverrides: directByok.base_url_overrides,
+      disableUrlSuffix: false,
       apiKey: userByok[0].decryptedAPIKey,
       apiKeyHeader: null,
       supportedChatApis: directByok.supported_chat_apis,

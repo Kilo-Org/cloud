@@ -259,7 +259,8 @@
       "chat": "Mensagens da conversa",
       "kiloclaw": "Atividade do KiloClaw",
       "balance": "Alertas de saldo",
-      "security": "Problemas de segurança"
+      "security": "Problemas de segurança",
+      "spend": "Alertas de gastos"
     },
     "liveActivities": "Atividades ao vivo",
     "liveActivitySubtitle": "Mostrar agentes ativos na tela de bloqueio",
@@ -298,8 +299,13 @@
       "sessionStatusTitle": "Status da sessão",
       "sessionStatusSubtitle": "sessão concluída, com falha ou pronta para você controlar",
       "kiloclawActivitySubtitle": "instância pronta ou com falha, ações agendadas",
+      "kiloclawActivityUnavailable": "Inicie uma instância do KiloClaw para receber a atividade do KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organização",
-      "securityFindingsSubtitle": "novos problemas de segurança e lembretes de SLA"
+      "balanceAlertsUnavailable": "Entre em uma organização para receber alertas de saldo baixo.",
+      "securityFindingsSubtitle": "novos problemas de segurança e lembretes de SLA",
+      "securityFindingsUnavailable": "Ative o agente de segurança do Kilo em um âmbito para receber problemas de segurança.",
+      "spendAlertsSubtitle": "ultrapassagens de limites e picos por hora",
+      "spendAlertsToggle": "Categoria de alertas de gastos"
     },
     "action": {
       "openSession": "Abrir sessão"
@@ -1548,6 +1554,10 @@
       "couldNotLoad": "Não foi possível carregar a sessão.",
       "failedToLoadDetails": "Não foi possível carregar os detalhes da sessão.",
       "failedToStopExecution": "Não foi possível interromper a execução.",
+      "stopped": "Sessão interrompida",
+      "committing": "Registrando…",
+      "committed": "Registrado",
+      "commitFailed": "Falha ao registrar",
       "renameSession": "Renomear sessão",
       "renamePlaceholder": "Nome da sessão",
       "transcriptAccessibility": "Transcrição da sessão",
@@ -3199,7 +3209,8 @@
     "channelName": "Agentes ativos",
     "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada.",
     "openSession": "Abrir",
-    "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente."
+    "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente.",
+    "newestResult": "Resultado mais recente"
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",
@@ -3224,15 +3235,7 @@
     "remoteOptionTitle": "Seu computador",
     "remoteOptionBody": "Execute o Kilo na sua própria máquina pela CLI `kilo remote`.",
     "skip": "Pular tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Inicie sua primeira sessão remota",
-    "remoteBody": "Conecte seu computador e depois inicie a sessão por aqui.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Nenhum computador conectado ainda",
-    "remoteEmptyBody": "Para conectá-lo, execute `kilo remote` no seu computador.",
-    "remoteFound": "Computador conectado",
-    "checkAgain": "Verificar novamente",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {
@@ -3243,5 +3246,28 @@
   },
   "launcher": {
     "openLastSession": "Abrir última sessão"
+  },
+  "spendAlerts": {
+    "subtitle": "Envie um alerta por e-mail ou notificação push aos contatos de cobrança quando os gastos deste escopo ultrapassarem um limite ou subirem acima do seu ritmo por hora habitual.",
+    "enable": "Ativar os alertas de gastos",
+    "thresholdTitle": "Ultrapassagem do limite",
+    "thresholdSubtitle": "Os gastos acumulados ultrapassam o seu limite",
+    "anomalyTitle": "Pico por hora",
+    "anomalySubtitle": "Uma hora está muito acima do ritmo habitual deste escopo",
+    "limitLabel": "Limite (USD)",
+    "windowLabel": "Janela",
+    "window24h": "24 horas",
+    "window7d": "7 dias",
+    "window30d": "30 dias",
+    "multiplierLabel": "Multiplicador do pico",
+    "saved": "Configurações dos alertas de gastos salvas",
+    "loadError": "Não foi possível carregar os alertas de gastos.",
+    "saveError": "Não foi possível salvar os alertas de gastos.",
+    "empty": "Os alertas de gastos estão desativados. Ative-os para avisar os contatos de cobrança deste escopo.",
+    "noSpend": "Nenhum gasto registrado ainda",
+    "spend24h": "Gastos nas últimas 24 horas",
+    "multiplierError": "Insira um multiplicador de 1 ou mais",
+    "permissionDenied": "Você não tem permissão para gerenciar os alertas de gastos.",
+    "pushOffByCategory": "Desativado em Notificações"
   }
 }

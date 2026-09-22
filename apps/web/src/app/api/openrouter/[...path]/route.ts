@@ -77,7 +77,6 @@ import {
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
@@ -113,8 +112,19 @@ import {
 } from '@/lib/organizations/effective-model-access.server';
 import { isFableModel, isOpus5Model } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { CLAUDE_OPUS_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 export const maxDuration = 800;
+
+/**
+ * The shared gateway/openrouter handler, wrapped so each call emits one
+ * `api_timing` line. The gateway catch-all imports this wrapped handler and
+ * wraps it again with the gateway pattern; the prefix check in
+ * `withRestTiming` keeps this inner line silent for a gateway pathname.
+ */
+export const POST = withRestTiming('/api/openrouter/[...path]', (request: Request) =>
+  openRouterPost(request as NextRequest)
+);
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -172,7 +182,7 @@ async function resolveRateLimit(
   };
 }
 
-export async function POST(request: NextRequest): Promise<NextResponseType<unknown>> {
+async function openRouterPost(request: NextRequest): Promise<NextResponseType<unknown>> {
   const requestStartedAt = performance.now();
 
   const url = new URL(request.url);
@@ -921,7 +931,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
   if (attempt.type === 'error') return attempt.response;
 
-  const { response, toolsAvailable, toolsUsed, experimentPromptCapture } = attempt;
+  const { response, experimentPromptCapture } = attempt;
   if (experimentPromptCapture) usageContext.experimentPromptCapture = experimentPromptCapture;
   const finalUpstreamModel = requestBodyParsed.body.model ?? effectiveModelIdLowerCased;
   logExceptInTest(
@@ -934,25 +944,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;
 
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: isAnonymousContext(user),
-      isStreaming: requestBodyParsed.body.stream === true,
-      userByok: !!effectiveProviderContext.userByok,
-      mode: modeHeader || undefined,
-      provider: effectiveProviderContext.provider.id,
-      requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(effectiveModelIdLowerCased),
-      toolsAvailable,
-      toolsUsed,
-      ttfbMs,
-      statusCode: response.status,
-    },
-    response.clone(),
-    requestStartedAt
-  );
   usageContext.status_code = response.status;
 
   // Handle OpenRouter 402 errors - don't pass them through to the client. We need to pay, not them.

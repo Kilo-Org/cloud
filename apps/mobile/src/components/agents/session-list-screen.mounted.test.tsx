@@ -321,6 +321,9 @@ function showKeyboard(height: number) {
 function descendantsOf(instance: TestRenderer.ReactTestInstance, type: string) {
   return instance.findAll(node => typeof node.type === 'string' && node.type === type);
 }
+function fab() {
+  return nodes('Pressable').find(node => node.props.testID === 'agents-new-session-fab');
+}
 type HeaderElement = {
   type: string;
   props: {
@@ -332,10 +335,10 @@ type HeaderElement = {
   };
 };
 function headerActions() {
-  const right = header().props.headerRight as {
+  const context = header().props.context as {
     props: { children: (HeaderElement | null)[] };
   };
-  return right.props.children.filter((child): child is HeaderElement => child !== null);
+  return context.props.children.filter((child): child is HeaderElement => child !== null);
 }
 function headerAction(testID = 'agents-view-history') {
   const button = headerActions().find(child => child.props.testID === testID);
@@ -494,9 +497,13 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(nodes('CenteredState')).toHaveLength(test.empty || (test.error && !test.rows) ? 1 : 0);
-    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(
-      state.tabBarHeight + (test.empty ? 0 : 64)
-    );
+    // The band a centered body lays out in ends at the tab bar, on every body.
+    // The FAB is a corner control: its band rides the rows list's own frame
+    // inset (`marginBottom`, asserted below) so no row sits under the button,
+    // and reserving it here as well shrank the band below the tab bar's top
+    // edge in a short landscape window, parking the no-match state's second
+    // line and action behind the bar (landscape spot defect e8).
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
@@ -519,7 +526,9 @@ describe('AgentSessionListScreen live presentation', () => {
 
     expect(header().parent?.children[0]).toBe(header());
     expect(header().props.className).toContain('px-[22px]');
-    expect(header().props.context).toBeUndefined();
+    // The list controls sit below the title (the header's context slot), so
+    // nothing shares the title's row and squeezes it on a narrow viewport.
+    expect(header().props.headerRight).toBeUndefined();
     expect(emptyState.props.placement).toBeUndefined();
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(60);
@@ -542,6 +551,18 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(label.props.numberOfLines).toBeUndefined();
     expect(label.props.allowFontScaling).not.toBe(false);
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
+  });
+
+  it('renders the empty-state New session action as the tab’s primary affordance', async () => {
+    await renderScreen();
+    const createAction = action('New session');
+    // One primary action per surface: the Agents empty state's only action is
+    // the same new-session flow Home surfaces as a filled brand-yellow button,
+    // so it must carry the primary variant rather than a low-emphasis outline.
+    expect(createAction.props.className).toContain('bg-primary');
+    expect(createAction.props.className).not.toContain('bg-card');
+    const icon = createAction.findByType('Plus');
+    expect(icon.props.color).toBe('#ffffff');
   });
 
   it('keeps cold-loading feedback stable until an accepted result', async () => {
@@ -981,8 +1002,6 @@ describe('AgentSessionListScreen live presentation', () => {
   it('offsets the FAB by the landscape right inset and keeps its vertical position', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
-    const fab = () =>
-      nodes('Pressable').find(node => node.props.testID === 'agents-new-session-fab');
     expect(fab()?.props.style).toEqual({
       bottom: state.tabBarHeight + 16,
       right: 20,
@@ -1071,19 +1090,27 @@ describe('AgentSessionListScreen header and admission', () => {
     await renderScreen();
     const history = action('Összes megtekintése');
     const label = history.findByType(Text);
-    const actions = history.parent;
-    const actionSlot = actions?.parent;
+    const actionsRow = history.parent;
     const title = header().findByProps({ accessibilityRole: 'header' });
-    expect(actionSlot?.props.className).toContain('max-w-[50%]');
-    expect(actionSlot?.props.className).not.toContain('shrink-0');
+    // The controls own a full-width row below the title (the header's
+    // `context` slot), so nothing shares the title's row: through the old
+    // `headerRight` half-row cap the two columns squeezed each other on a
+    // 480x1040 capture until "Agents" broke mid-word ("Age / nts") and this
+    // label stacked ("SEE / ALL").
+    expect(header().props.headerRight).toBeUndefined();
+    expect(actionsRow?.parent).toBe(title.parent);
+    expect(title.parent?.props.className).toContain('min-w-0 flex-1');
+    expect(title.parent?.parent?.props.className).toContain('flex-row');
+    expect(actionsRow?.props.className).toContain('justify-end');
+    expect(actionsRow?.props.className).toContain('min-h-11');
+    expect(actionsRow?.props.className).not.toContain('max-w-[50%]');
     expect(history.props.className).toContain('min-w-0');
     expect(history.props.className).toContain('shrink');
-    expect(actions?.props.className).toContain('items-center');
+    expect(actionsRow?.props.className).toContain('items-center');
     expect(label.props.className).toContain('text-center');
     expect(label.props.numberOfLines).toBeUndefined();
     expect(label.props.allowFontScaling).not.toBe(false);
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
-    expect(title.parent?.parent?.parent).toBe(actionSlot?.parent);
     expect(header().props.reserveEyebrow).toBe(true);
     expect(header().props.eyebrow).toBe(i18n.t('agents.liveCount', { count: 1 }));
     expect(text()).not.toContain(organizationName);
@@ -1114,10 +1141,16 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(header().props.eyebrow).toBe('1 LIVE');
   });
 
-  it('centers the header controls without a context control above search', async () => {
+  it('renders the list controls below the title with no account control above search', async () => {
     state.live.activeSessions = [{ ...row, gitUrl: 'https://github.com/kilo/cloud.git' }];
     await renderScreen();
-    expect(header().props.context).toBeUndefined();
+    // The controls own a full-width row under the title. Sharing the title's
+    // row squeezed both columns on a narrow viewport until the title broke
+    // mid-word and SEE ALL stacked (device capture at 480x1040).
+    const actions = header().props.context as { props: { className: string } };
+    expect(actions.props.className).toContain('justify-end');
+    expect(actions.props.className).toContain('min-h-11');
+    expect(header().props.headerRight).toBeUndefined();
     expect(
       nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
     ).toHaveLength(0);
@@ -1125,9 +1158,14 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(nodes('SessionListSearchHeader')).toHaveLength(1);
     const history = nodes('Pressable').find(node => node.props.testID === 'agents-view-history');
     const filters = nodes('Pressable').find(node => node.props.testID === 'agents-open-filters');
-    expect(history?.parent?.props.className).toContain('items-center');
-    expect(history?.parent?.props.className).toContain('min-h-11');
-    expect(filters?.parent?.parent).toBe(history?.parent);
+    const title = header().findByProps({ accessibilityRole: 'header' });
+    const actionsRow = history?.parent;
+    // The title column holds the title and the controls row only, stacked:
+    // the controls never sit beside the title and squeeze it.
+    expect(actionsRow?.parent).toBe(title.parent);
+    expect(actionsRow?.props.className).toContain('items-center');
+    expect(actionsRow?.props.className).toContain('min-h-11');
+    expect(filters?.parent?.parent).toBe(actionsRow);
     const updating = nodes('Text').find(node => node.children.includes('Updating'));
     expect(updating).toBeUndefined();
     state.live.isFetching = true;
@@ -1270,6 +1308,11 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(emptyState.props.description).toBe('Try a different search term.');
     expect(nodes('CenteredState')).toHaveLength(1);
     expect(nodes('FlatList')).toHaveLength(0);
+    // The no-match body owns the band the tab bar leaves (the FAB's band is no
+    // longer reserved in it, see `StateSurfaceInsets` above), so the creation
+    // FAB yields instead of floating over the state's description and Clear
+    // action.
+    expect(fab()).toBeUndefined();
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     act(() => {
       (emptyState.props.action as { props: { onPress: () => void } }).props.onPress();
@@ -1277,6 +1320,7 @@ describe('AgentSessionListScreen live filtering', () => {
 
     expect(nodes('FlatList')).toHaveLength(1);
     expect(nodes('CenteredState')).toHaveLength(0);
+    expect(fab()).toBeDefined();
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
   });

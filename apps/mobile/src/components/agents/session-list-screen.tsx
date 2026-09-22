@@ -67,7 +67,6 @@ export function AgentSessionListScreen() {
   const { activeSessions, refetch } = sessions;
   const content = liveSessionContent(context, sessions);
   const hasLiveRows = content === 'rows';
-  const showFab = context.isReady && content !== 'empty';
   // A failed foreground refresh keeps the cached rows on screen. That failure
   // must speak through the reserved status line (one inline "Couldn't refresh"
   // with Retry) instead of the load-failure block, which would push the kept
@@ -76,6 +75,17 @@ export function AgentSessionListScreen() {
 
   const query = useLiveSessionQuery(activeSessions);
   const { visibleSessions, isSearching } = query;
+  // The no-match body is the state the tab bar's band was reopened for, and its
+  // compact form fills that band down to the corner the FAB floats in. Since
+  // reserving the FAB's band here is what parked the state's second line and
+  // action behind the tab bar in a short landscape window (landscape spot
+  // defect e8), a state that fills the band owns it and the FAB yields: it
+  // must not sit over the description or the Clear action at a large text
+  // scale. The list bodies keep it — they clear it with their own frame inset —
+  // and so does the load-failure body, whose FAB is the only creation
+  // affordance while the list is failing.
+  const noMatchBody = hasLiveRows && visibleSessions.length === 0;
+  const showFab = context.isReady && content !== 'empty' && !noMatchBody;
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   const refetchRef = useRef(refetch);
@@ -171,13 +181,22 @@ export function AgentSessionListScreen() {
   const navigateToSession = useAgentSessionNavigator();
 
   const seeAllLabel = t('home.seeAll');
-  const headerRight = (
-    <View className="min-h-11 min-w-0 flex-row items-center gap-4">
+  // The list controls take the header's `context` slot, one line below the
+  // title, so the 30px title owns the whole title row (Quick Chat puts its
+  // account control in the same slot). Sharing that row through `headerRight`,
+  // the slot's half-row cap squeezed both columns on a narrow viewport until
+  // the title broke mid-word and this label stacked onto two lines (device
+  // capture at 480x1040: "Age / nts" beside "SEE / ALL"). On its own row the
+  // control keeps the header's full width at every display size, and the
+  // reserved row height keeps the header from moving when the filter button
+  // appears with the loaded sessions.
+  const headerActions = (
+    <View className="min-h-11 min-w-0 flex-row items-center justify-end gap-4">
       <Pressable
         onPress={() => {
           router.push('/(app)/(tabs)/(2_agents)/history' as Href);
         }}
-        // left slop capped against the large title, right slop reaches 44pt wide
+        // left slop capped against the gap, right slop reaches 44pt wide
         hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
         accessibilityRole="button"
         accessibilityLabel={seeAllLabel}
@@ -346,7 +365,14 @@ export function AgentSessionListScreen() {
   );
 
   return (
-    <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
+    // The band the no-match body is laid out in ends at the tab bar. The FAB is
+    // a corner control with its own frame inset on the rows list, and reserving
+    // its band here as well shrank the band to the FAB's top: in a short
+    // landscape window that is below the empty state's height, so the state fell
+    // to the scroll anchor and its second line and action were parked behind the
+    // tab bar (landscape spot defect e8). The no-match body therefore keeps the
+    // whole band and the FAB yields to it (`showFab`).
+    <StateSurfaceInsets bottomInset={tabBarHeight}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}
@@ -365,7 +391,7 @@ export function AgentSessionListScreen() {
           size="large"
           showBackButton={false}
           className="px-[22px] pb-1"
-          headerRight={headerRight}
+          context={headerActions}
         />
         {hasLiveRows || isSearching ? (
           <SessionListSearchHeader
@@ -383,7 +409,7 @@ export function AgentSessionListScreen() {
             {region}
           </KeyboardAvoidingView>
         )}
-        {/* Empty content owns its creation action; other admitted states keep the FAB. */}
+        {/* Empty content owns its creation action; the no-match body owns the band. */}
         {showFab && (
           <Pressable
             accessibilityRole="button"

@@ -843,7 +843,8 @@
       "chat": "Poruke u ćaskanju",
       "kiloclaw": "Aktivnosti u KiloClaw-u",
       "balance": "Upozorenja o stanju kredita",
-      "security": "Bezbednosni nalazi"
+      "security": "Bezbednosni nalazi",
+      "spend": "Obaveštenja o potrošnji"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",
@@ -854,8 +855,13 @@
       "sessionStatusTitle": "Status sesije",
       "sessionStatusSubtitle": "završeno / neuspešno / spremno za upravljanje",
       "kiloclawActivitySubtitle": "spremnost ili greška instance, zakazane radnje",
+      "kiloclawActivityUnavailable": "Pokreni KiloClaw instancu da dobiješ aktivnosti KiloClaw.",
       "balanceAlertsSubtitle": "upozorenja o niskom saldu organizacije",
-      "securityFindingsSubtitle": "novi nalazi i podsetnici za SLA"
+      "balanceAlertsUnavailable": "Pridruži se organizaciji da dobiješ upozorenja o niskom saldu.",
+      "securityFindingsSubtitle": "novi nalazi i podsetnici za SLA",
+      "securityFindingsUnavailable": "Uključi Kilo bezbednosnog agenta na opsegu da dobiješ bezbednosne nalaze.",
+      "spendAlertsSubtitle": "prekoračenja pragova i skokovi po satu",
+      "spendAlertsToggle": "Kategorija obaveštenja o potrošnji"
     },
     "action": {
       "openSession": "Otvori sesiju"
@@ -2104,6 +2110,10 @@
       "couldNotLoad": "Učitavanje sesije nije uspelo.",
       "failedToLoadDetails": "Učitavanje detalja sesije nije uspelo.",
       "failedToStopExecution": "Zaustavljanje izvršavanja nije uspelo.",
+      "stopped": "Sesija je zaustavljena",
+      "committing": "Komituje se…",
+      "committed": "Komitovano",
+      "commitFailed": "Komitovanje nije uspelo",
       "renameSession": "Preimenuj sesiju",
       "renamePlaceholder": "Naziv sesije",
       "transcriptAccessibility": "Transkript sesije",
@@ -3199,7 +3209,8 @@
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu.",
     "openSession": "Otvori",
-    "approveFailed": "Odobravanje nije uspelo. Dodirni $t(common.approve) da pokušaš ponovo."
+    "approveFailed": "Odobravanje nije uspelo. Dodirni $t(common.approve) da pokušaš ponovo.",
+    "newestResult": "Najnoviji rezultat"
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",
@@ -3224,15 +3235,7 @@
     "remoteOptionTitle": "Tvoj računar",
     "remoteOptionBody": "Pokreni Kilo na sopstvenoj mašini preko `kilo remote` CLI-ja.",
     "skip": "Preskoči turu",
-    "tutorialLabel": "Tutorijal",
-    "remoteTitle": "Pokreni svoju prvu udaljenu sesiju",
-    "remoteBody": "Poveži svoj računar, zatim pokreni sesiju odavde.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Još nema povezanog računara",
-    "remoteEmptyBody": "Da ga povežeš, pokreni `kilo remote` na računaru.",
-    "remoteFound": "Računar povezan",
-    "checkAgain": "Proveri ponovo",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorijal"
   },
   "appActions": {
     "start": {
@@ -3243,5 +3246,28 @@
   },
   "launcher": {
     "openLastSession": "Otvori poslednju sesiju"
+  },
+  "spendAlerts": {
+    "subtitle": "Pošalji obaveštenje e-poštom ili push porukom kontaktima za naplatu kada potrošnja ovog opsega pređe limit ili skoči iznad uobičajene satne stope.",
+    "enable": "Omogući obaveštenja o potrošnji",
+    "thresholdTitle": "Prekoračenje praga",
+    "thresholdSubtitle": "Tekuća potrošnja prelazi tvoj limit",
+    "anomalyTitle": "Satni skok",
+    "anomalySubtitle": "Jedan sat je daleko iznad uobičajene stope ovog opsega",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Prozor",
+    "window24h": "24 sata",
+    "window7d": "7 dana",
+    "window30d": "30 dana",
+    "multiplierLabel": "Množilac skoka",
+    "saved": "Podešavanja obaveštenja o potrošnji su sačuvana",
+    "loadError": "Obaveštenja o potrošnji nisu učitana.",
+    "saveError": "Obaveštenja o potrošnji nisu sačuvana.",
+    "empty": "Obaveštenja o potrošnji su isključena. Uključi ih da upozoriš kontakte za naplatu ovog opsega.",
+    "noSpend": "Još nema zabeležene potrošnje",
+    "spend24h": "Potrošnja u poslednja 24 sata",
+    "multiplierError": "Unesi množilac 1 ili veći",
+    "permissionDenied": "Nemaš dozvolu da upravljaš obaveštenjima o potrošnji.",
+    "pushOffByCategory": "Isključeno u Obaveštenjima"
   }
 }

@@ -827,7 +827,8 @@
       "chat": "Mesazhet e bisedës",
       "kiloclaw": "Aktiviteti i KiloClaw",
       "balance": "Njoftimet për gjendjen e llogarisë",
-      "security": "Gjetjet e sigurisë"
+      "security": "Gjetjet e sigurisë",
+      "spend": "Njoftime për shpenzimet"
     },
     "category": {
       "chatMessagesSubtitle": "përgjigje në bisedat e tua",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Statusi i seancës",
       "sessionStatusSubtitle": "e përfunduar / e dështuar / gati për kontroll",
       "kiloclawActivitySubtitle": "instancë gati / e dështuar, veprime të planifikuara",
+      "kiloclawActivityUnavailable": "Nis një instancë KiloClaw për të marrë aktivitetin e KiloClaw.",
       "balanceAlertsSubtitle": "paralajmërime për gjendje të ulët të organizatës",
-      "securityFindingsSubtitle": "gjetje të reja dhe kujtesa për SLA"
+      "balanceAlertsUnavailable": "Bashkohu me një organizatë për të marrë njoftime për gjendje të ulët.",
+      "securityFindingsSubtitle": "gjetje të reja dhe kujtesa për SLA",
+      "securityFindingsUnavailable": "Aktivizo agjentin e sigurisë Kilo në një fushëveprim për të marrë gjetjet e sigurisë.",
+      "spendAlertsSubtitle": "tejkalime pragjesh dhe rritje për orë",
+      "spendAlertsToggle": "Kategoria e njoftimeve për shpenzimet"
     },
     "action": {
       "openSession": "Hap seancën"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Nuk u ngarkua seanca.",
       "failedToLoadDetails": "Nuk u ngarkuan detajet e seancës.",
       "failedToStopExecution": "Nuk u ndal ekzekutimi.",
+      "stopped": "Seanca u ndal",
+      "committing": "Duke regjistruar…",
+      "committed": "U regjistrua",
+      "commitFailed": "Regjistrimi dështoi",
       "renameSession": "Riemërto seancën",
       "renamePlaceholder": "Emri i seancës",
       "transcriptAccessibility": "Transkripti i seancës",
@@ -3156,7 +3166,8 @@
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
     "openSession": "Hap",
-    "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri."
+    "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri.",
+    "newestResult": "Rezultati më i ri"
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",
@@ -3181,15 +3192,7 @@
     "remoteOptionTitle": "Kompjuteri yt",
     "remoteOptionBody": "Ekzekuto Kilo në makinën tënde përmes CLI-së `kilo remote`.",
     "skip": "Kapërce turin",
-    "tutorialLabel": "Tutoriali",
-    "remoteTitle": "Nis sesionin tënd të parë në distancë",
-    "remoteBody": "Lidh kompjuterin tënd, pastaj nis sesionin nga këtu.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ende pa kompjuter të lidhur",
-    "remoteEmptyBody": "Për ta lidhur, ekzekuto `kilo remote` në kompjuterin tënd.",
-    "remoteFound": "Kompjuteri u lidh",
-    "checkAgain": "Kontrollo përsëri",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutoriali"
   },
   "appActions": {
     "start": {
@@ -3200,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Hap sesionin e fundit"
+  },
+  "spendAlerts": {
+    "subtitle": "Dërgo një njoftim me email ose push te kontaktet e faturimit kur shpenzimet e këtij fushëveprimi kalojnë një kufi ose hidhen mbi ritmin e zakonshëm për orë.",
+    "enable": "Aktivizo njoftimet për shpenzimet",
+    "thresholdTitle": "Tejkalimi i pragut",
+    "thresholdSubtitle": "Shpenzimet rrjedhëse tejkalojnë kufirin tënd",
+    "anomalyTitle": "Rritje për orë",
+    "anomalySubtitle": "Një orë është shumë mbi ritmin e zakonshëm të këtij fushëveprimi",
+    "limitLabel": "Kufi (USD)",
+    "windowLabel": "Dritare",
+    "window24h": "24 orë",
+    "window7d": "7 ditë",
+    "window30d": "30 ditë",
+    "multiplierLabel": "Shumëzuesi i rritjes",
+    "saved": "Cilësimet e njoftimeve për shpenzimet u ruajtën",
+    "loadError": "Njoftimet për shpenzimet nuk u ngarkuan dot.",
+    "saveError": "Njoftimet për shpenzimet nuk u ruajtën dot.",
+    "empty": "Njoftimet për shpenzimet janë të fikura. Ndizni ato për të paralajmëruar kontaktet e faturimit të këtij fushëveprimi.",
+    "noSpend": "Nuk është regjistruar ende asnjë shpenzim",
+    "spend24h": "Shpenzimet në 24 orët e fundit",
+    "multiplierError": "Vendos një shumëzues 1 ose më shumë",
+    "permissionDenied": "Nuk ke leje për të menaxhuar njoftimet për shpenzimet.",
+    "pushOffByCategory": "Fikur në Njoftimet"
   }
 }

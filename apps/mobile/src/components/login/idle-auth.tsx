@@ -7,7 +7,7 @@ import {
 } from 'expo-apple-authentication';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, useColorScheme, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -39,9 +39,10 @@ export function IdleAuth({
   initialSsoRecovery?: SsoRecoveryDraft | null;
   onBusyChange?: (busy: boolean) => void;
 }>) {
-  const colorScheme = useColorScheme();
   const {
     busy,
+    emailError,
+    clearEmailError,
     googleConfigured,
     signInWithApple,
     signInWithGoogle,
@@ -58,11 +59,6 @@ export function IdleAuth({
   const [browserAuthStarting, setBrowserAuthStarting] = useState(false);
   const emailRef = useRef(initialEmail);
   const browserAuthStartingRef = useRef(false);
-  // Field-level validation message for the email input. Rendered under the
-  // field through FormField's `error` slot (AccessibleStatus announces it and
-  // keeps it on screen) instead of a toast, which is not part of the
-  // accessibility hierarchy.
-  const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,14 +83,13 @@ export function IdleAuth({
     };
   }, []);
 
-  // A verify-step SSO_ERROR sets ssoRecovery while the user is on the OTP view,
-  // which hides the recovery block. Return to the main view so the block (and
-  // its "Continue with SSO" control) becomes visible.
+  // Both SSO recovery and an address rejected during resend need controls on
+  // the main view, rather than leaving their feedback hidden behind OTP entry.
   useEffect(() => {
-    if (ssoRecovery) {
+    if (ssoRecovery || emailError) {
       setView('main');
     }
-  }, [ssoRecovery]);
+  }, [emailError, ssoRecovery]);
 
   // Restore an SSO-recovery banner that survived an RTL language reload.
   useEffect(() => {
@@ -120,13 +115,10 @@ export function IdleAuth({
   }, [ssoRecovery]);
 
   const handleSendCode = async () => {
-    if (!emailRef.current.trim()) {
-      // Empty input is a field-level error: show it under the field so the
-      // landing never looks dead, and never post an empty address.
-      setEmailError(t('login.pleaseEnterEmail'));
-      return;
-    }
-    setEmailError(null);
+    // Empty input is a field-level error: `useNativeAuth` sets the message and
+    // never posts an empty address, and FormField renders it under the field so
+    // the landing never looks dead. The same call clears a stale message and
+    // reports a rejected address (`INVALID_REQUEST` / `INVALID_EMAIL`).
     const ok = await requestEmailCode(emailRef.current);
     if (ok) {
       setView('otp');
@@ -233,11 +225,13 @@ export function IdleAuth({
         >
           <AppleAuthenticationButton
             buttonType={AppleAuthenticationButtonType.SIGN_IN}
-            buttonStyle={
-              colorScheme === 'dark'
-                ? AppleAuthenticationButtonStyle.WHITE
-                : AppleAuthenticationButtonStyle.BLACK
-            }
+            // WHITE_OUTLINE keeps Apple's control at the same secondary weight
+            // as the outlined Google and passkey buttons, so the brand-filled
+            // "Continue" is the surface's only filled primary action. Apple's
+            // solid BLACK/WHITE styles made a second full-width filled button,
+            // and Apple's own guidance picks the outlined style when the
+            // background does not contrast with a solid fill.
+            buttonStyle={AppleAuthenticationButtonStyle.WHITE_OUTLINE}
             cornerRadius={8}
             // eslint-disable-next-line react-native/no-inline-styles -- AppleAuthenticationButton isn't NativeWind-aware; height/width must be set via style, not className
             style={{ height: 44, width: '100%' }}
@@ -306,14 +300,24 @@ export function IdleAuth({
 
       <FormField
         label={t('login.emailAddress')}
+        error={emailError}
+        reserveErrorMessages={[
+          t('login.pleaseEnterEmail'),
+          t('authErrors.invalidRequest'),
+          t('authErrors.invalidEmail'),
+        ]}
         placeholder={t('login.emailPlaceholder')}
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
         autoComplete="email"
         textContentType="emailAddress"
-        defaultValue={initialEmail || undefined}
-        error={emailError ?? undefined}
+        // Seed from the live ref, not the mount-time draft: the field remounts
+        // when an address error (or SSO recovery) returns the view from OTP, and
+        // an uncontrolled field reads `defaultValue` only on mount. Using the
+        // ref keeps the rejected address visible under its own error instead of
+        // blanking the field while `emailRef` still holds it.
+        defaultValue={emailRef.current || undefined}
         // Small-phone IME (Defect B / QB-A1): the IME's Go key must submit
         // the same way the "Continue" button does, instead of only
         // dismissing the keyboard as `actionDone` previously did.
@@ -325,11 +329,9 @@ export function IdleAuth({
         }}
         onChangeText={value => {
           emailRef.current = value;
-          setLoginEmailDraft(value);
           // Clear the validation message as soon as the user starts fixing it.
-          if (emailError !== null) {
-            setEmailError(null);
-          }
+          clearEmailError();
+          setLoginEmailDraft(value);
         }}
       />
       <Button

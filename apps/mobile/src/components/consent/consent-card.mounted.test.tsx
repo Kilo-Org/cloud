@@ -2,7 +2,7 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConsentCard } from './consent-card';
+import { CONSENT_DISCLOSURE_MAX_FONT_SCALE, ConsentCard } from './consent-card';
 
 const mockedAcceptConsent = vi.hoisted(() => vi.fn());
 const mockedReadConsent = vi.hoisted(() => vi.fn());
@@ -123,6 +123,44 @@ function texts(root: I): string[] {
         typeof n.props.children === 'string'
     )
     .map(n => n.props.children as string);
+}
+
+function disclosureTexts(root: I): I[] {
+  return root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Text' &&
+      n.props.children === 'Kilo privacy policy'
+  );
+}
+
+function requireDisclosure(root: I): I {
+  const nodes = disclosureTexts(root);
+  if (nodes.length !== 1) {
+    throw new Error(`expected 1 privacy disclosure, got ${nodes.length}`);
+  }
+  const n = nodes[0];
+  if (!n) {
+    throw new Error('privacy disclosure not found');
+  }
+  return n;
+}
+
+function requireParent(node: I): I {
+  const parent = node.parent;
+  if (!parent) {
+    throw new Error('node has no parent');
+  }
+  return parent;
+}
+
+function hasAncestorOfType(node: I, type: string): boolean {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (parent.type === type) {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function flush() {
@@ -348,5 +386,55 @@ describe('ConsentCard', () => {
     expect(row).toBeDefined();
     expect(row?.props.title).toBe('Account & usage data');
     expect(row?.props.title).not.toContain('&amp;');
+  });
+
+  it('renders the privacy disclosure in the pinned footer, outside the scrolling body', () => {
+    for (const mode of ['onboarding', 'review'] as const) {
+      const renderer = mountCard(mode);
+      const root = renderer.root;
+      // One scroll region and one disclosure: the disclosure lives in the
+      // pinned footer, where the footer edge cannot cut it (the body tail
+      // rendered across the fold on a full-height screen).
+      expect(countByType(root, 'ScrollView')).toBe(1);
+      const disclosure = requireDisclosure(root);
+      expect(hasAncestorOfType(disclosure, 'ScrollView')).toBe(false);
+
+      const primary = mode === 'onboarding' ? 'Accept and continue' : 'Back';
+      const footer = requireParent(findButton(root, primary));
+      expect(disclosureTexts(footer).length).toBe(1);
+    }
+  });
+
+  it('keeps the privacy disclosure in the footer when an error occupies the footer slot', async () => {
+    mockedReadConsent.mockRejectedValue(new Error('keychain read failed'));
+    const renderer = mountCard('review');
+    await act(flush);
+    const root = renderer.root;
+    expect(texts(root)).toContain('Could not load your consent settings. Please try again.');
+    const footer = requireParent(findButton(root, 'Back'));
+    expect(disclosureTexts(footer).length).toBe(1);
+    expect(hasAncestorOfType(requireDisclosure(root), 'ScrollView')).toBe(false);
+  });
+
+  it('caps the pinned disclosure font scale so its footer height stays bounded', () => {
+    for (const mode of ['onboarding', 'review'] as const) {
+      const root = mountCard(mode).root;
+      // The sentence has no line cap: uncapped it grows to several lines at
+      // the largest system text size and the pinned footer's fixed height
+      // pushes the actions off the sheet.
+      const outer = root.findAll(
+        n =>
+          typeof n.type === 'string' &&
+          (n.type as string) === 'Text' &&
+          Array.isArray(n.props.children) &&
+          n.props.children.includes('Your data is handled per the')
+      );
+      expect(outer.length).toBe(1);
+      expect(outer[0]?.props.maxFontSizeMultiplier).toBe(CONSENT_DISCLOSURE_MAX_FONT_SCALE);
+      // The nested link is its own native text node, so it needs the cap too.
+      expect(requireDisclosure(root).props.maxFontSizeMultiplier).toBe(
+        CONSENT_DISCLOSURE_MAX_FONT_SCALE
+      );
+    }
   });
 });

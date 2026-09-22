@@ -827,7 +827,8 @@
       "chat": "Пораки во разговорите",
       "kiloclaw": "Активност на KiloClaw",
       "balance": "Предупредувања за салдо",
-      "security": "Безбедносни наоди"
+      "security": "Безбедносни наоди",
+      "spend": "Предупредувања за трошење"
     },
     "category": {
       "chatMessagesSubtitle": "одговори во твоите разговори",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Статус на сесија",
       "sessionStatusSubtitle": "завршено / неуспешно / подготвено за контрола",
       "kiloclawActivitySubtitle": "инстанца подготвена/неуспешна, закажани дејства",
+      "kiloclawActivityUnavailable": "Стартувај инстанца на KiloClaw за да добиеш активност од KiloClaw.",
       "balanceAlertsSubtitle": "предупредувања за ниска состојба на организацијата",
-      "securityFindingsSubtitle": "нови наоди и потсетници за SLA"
+      "balanceAlertsUnavailable": "Приклучи се кон организација за да добиеш предупредувања за ниска состојба.",
+      "securityFindingsSubtitle": "нови наоди и потсетници за SLA",
+      "securityFindingsUnavailable": "Вклучи го безбедносниот агент на Kilo во опсег за да добиеш безбедносни наоди.",
+      "spendAlertsSubtitle": "преминувања на прагови и часовни скокови",
+      "spendAlertsToggle": "Категорија предупредувања за трошење"
     },
     "action": {
       "openSession": "Отвори сесија"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Не успеа вчитувањето на сесијата.",
       "failedToLoadDetails": "Не успеа вчитувањето на деталите за сесијата.",
       "failedToStopExecution": "Не успеа запирањето на извршувањето.",
+      "stopped": "Сесијата е запрена",
+      "committing": "Се комитира…",
+      "committed": "Комитирано",
+      "commitFailed": "Комитирањето не успеа",
       "renameSession": "Преименување на сесијата",
       "renamePlaceholder": "Име на сесијата",
       "transcriptAccessibility": "Транскрипт на сесијата",
@@ -3156,7 +3166,8 @@
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран.",
     "openSession": "Отвори",
-    "approveFailed": "Одобрувањето не успеа. Допри $t(common.approve) за да се обидеш повторно."
+    "approveFailed": "Одобрувањето не успеа. Допри $t(common.approve) за да се обидеш повторно.",
+    "newestResult": "Најнов резултат"
   },
   "transcriptionModel": {
     "title": "Модел за транскрипција",
@@ -3181,15 +3192,7 @@
     "remoteOptionTitle": "Твојот компјутер",
     "remoteOptionBody": "Стартувај го Kilo на сопствената машина преку `kilo remote` CLI.",
     "skip": "Прескокни тура",
-    "tutorialLabel": "Водич",
-    "remoteTitle": "Започни ја твојата прва оддалечена сесија",
-    "remoteBody": "Поврзи го компјутерот, потоа стартувај ја сесијата оттука.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Сè уште нема поврзан компјутер",
-    "remoteEmptyBody": "За да го поврзеш, изврши `kilo remote` на компјутерот.",
-    "remoteFound": "Компјутерот е поврзан",
-    "checkAgain": "Провери повторно",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Водич"
   },
   "appActions": {
     "start": {
@@ -3200,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Отвори ја последната сесија"
+  },
+  "spendAlerts": {
+    "subtitle": "Испрати предупредување по е-пошта или push до контактите за наплата кога трошењето на овој опсег ќе премине лимит или ќе скокне над вообичаеното часовно темпо.",
+    "enable": "Овозможи предупредувања за трошење",
+    "thresholdTitle": "Преминување на праг",
+    "thresholdSubtitle": "Тековното трошење го надминува твојот лимит",
+    "anomalyTitle": "Часовен скок",
+    "anomalySubtitle": "Еден час е далеку над вообичаеното темпо на овој опсег",
+    "limitLabel": "Лимит (USD)",
+    "windowLabel": "Прозорец",
+    "window24h": "24 часа",
+    "window7d": "7 дена",
+    "window30d": "30 дена",
+    "multiplierLabel": "Множител на скокот",
+    "saved": "Поставките за предупредувања за трошење се зачувани",
+    "loadError": "Предупредувањата за трошење не можеа да се вчитаат.",
+    "saveError": "Предупредувањата за трошење не можеа да се зачуваат.",
+    "empty": "Предупредувањата за трошење се исклучени. Вклучи ги за да ги предупредиш контактите за наплата на овој опсег.",
+    "noSpend": "Сè уште нема евидентирано трошење",
+    "spend24h": "Трошење во последните 24 часа",
+    "multiplierError": "Внеси множител од 1 или повеќе",
+    "permissionDenied": "Немаш дозвола да управуваш со предупредувањата за трошење.",
+    "pushOffByCategory": "Исклучено во Известувања"
   }
 }

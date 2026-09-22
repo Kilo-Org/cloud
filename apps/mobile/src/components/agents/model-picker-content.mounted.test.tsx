@@ -1,4 +1,4 @@
-import { createElement, Fragment, type ReactNode } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,7 +14,7 @@ import { ModelPickerContent } from './model-picker-content';
 // rows look right.
 const buildSearchCalls = vi.hoisted(() => ({ values: [] as string[] }));
 
-// The data length of every FlatList commit, in order. A keystroke burst must
+// The data length of every FlashList commit, in order. A keystroke burst must
 // commit the held (pre-typing) list and then the settled list — never an
 // intermediate query's rows.
 const listCommitLengths = vi.hoisted(() => ({ values: [] as number[] }));
@@ -61,30 +61,36 @@ vi.mock('@/lib/hooks/use-model-preferences', () => ({
   }),
 }));
 
-// FlatList renders through a callback; this mock mirrors the real list (rows
-// via renderItem, key via keyExtractor) so row assertions see real content,
-// and records each commit's data length.
-const flatListMock = vi.hoisted(
-  () =>
-    (props: {
+// FlashList renders through a callback; this mock mirrors the real list (rows
+// via renderItem, key via keyExtractor, item type via getItemType) so row
+// assertions see real content, and records each commit's data length.
+vi.mock('@shopify/flash-list', async () => {
+  const React = await import('react');
+  return {
+    FlashList: (props: {
       data: readonly ModelPickerRow[];
       renderItem?: (info: { item: ModelPickerRow; index: number }) => ReactNode;
       keyExtractor?: (item: ModelPickerRow) => string;
+      getItemType?: (item: ModelPickerRow) => string;
     }) => {
       listCommitLengths.values.push(props.data.length);
       const rows = props.data.map((item, index) =>
-        createElement(
-          Fragment,
+        React.createElement(
+          React.Fragment,
           { key: props.keyExtractor ? props.keyExtractor(item) : String(index) },
           props.renderItem ? props.renderItem({ item, index }) : null
         )
       );
-      return createElement('FlatList', { data: props.data }, ...rows);
-    }
-);
+      return React.createElement(
+        'FlashList',
+        { data: props.data, getItemType: props.getItemType },
+        ...rows
+      );
+    },
+  };
+});
 
 vi.mock('react-native', () => ({
-  FlatList: flatListMock,
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
@@ -162,13 +168,24 @@ function findByType(
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
 }
 
-function listRows(renderer: TestRenderer.ReactTestRenderer): ModelPickerRow[] {
-  const list = findByType(renderer.root, 'FlatList')[0];
+function listHost(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  const list = findByType(renderer.root, 'FlashList')[0];
   if (!list) {
-    throw new Error('FlatList not found');
+    throw new Error('FlashList not found');
   }
+  return list;
+}
+
+function listRows(renderer: TestRenderer.ReactTestRenderer): ModelPickerRow[] {
   /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
-  return list.props.data as ModelPickerRow[];
+  return listHost(renderer).props.data as ModelPickerRow[];
+  /* eslint-enable typescript-eslint/no-unsafe-member-access */
+}
+
+/** The item-type selector FlashList uses to recycle headers apart from rows. */
+function getItemType(renderer: TestRenderer.ReactTestRenderer): (item: ModelPickerRow) => string {
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  return listHost(renderer).props.getItemType as (item: ModelPickerRow) => string;
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
 }
 
@@ -291,7 +308,7 @@ describe('ModelPickerContent deferred search', () => {
       await Promise.resolve();
     });
 
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
     const emptyState = findByType(renderer.root, 'EmptyState');
     expect(emptyState).toHaveLength(1);
     /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
@@ -328,6 +345,26 @@ describe('ModelPickerContent deferred search', () => {
     // Clearing drops the query the rows derive from and hides the affordance.
     expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
     expect(clearSearchButtons(renderer)).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('gives a group header and a model row different item types', async () => {
+    const renderer = await mount();
+
+    const rows = listRows(renderer);
+    const header = rows.find(row => row.type === 'header');
+    const model = rows.find(row => row.type === 'model');
+    if (!header || !model) {
+      throw new Error('expected both a header and a model row in the catalog');
+    }
+
+    // The two rows differ in height, so recycling them under one item type
+    // would measure one as the other. Pin the split.
+    expect(getItemType(renderer)(header)).toBe('header');
+    expect(getItemType(renderer)(model)).toBe('model');
 
     act(() => {
       renderer.unmount();

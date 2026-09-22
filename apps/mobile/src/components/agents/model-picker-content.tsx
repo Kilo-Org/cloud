@@ -1,8 +1,9 @@
+import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Info, Search, SearchX, X } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, TextInput, View } from 'react-native';
+import { Pressable, TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -21,6 +22,10 @@ import {
 import { commitModelPickerSelection, resolveModelPickerSelection } from '@/lib/picker-bridge';
 import { parseParam } from '@/lib/route-params';
 import { modelPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+
+// The picker sheet renders its own scroll container (`scrollable={false}`), so
+// the list fills the sheet's body.
+const listStyle = { flex: 1 } satisfies ViewStyle;
 
 export function ModelPickerContent() {
   const router = useRouter();
@@ -159,6 +164,37 @@ export function ModelPickerContent() {
     setSearch('');
   }, []);
 
+  // Hoisted out of the list body: the inline arrow gave the virtualized list a
+  // new renderer on every render, which re-rendered every mounted row. Height
+  // differs between the group header and a model row, so `getItemType` lets
+  // FlashList recycle the two apart.
+  const renderItem = useCallback(
+    ({ item }: { item: ModelPickerRow }) => {
+      if (item.type === 'header') {
+        return (
+          <View className="bg-secondary px-4 py-2">
+            <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {item.title}
+            </Text>
+          </View>
+        );
+      }
+
+      return (
+        <ModelPickerOptionRow
+          option={item.model}
+          selected={item.model.id === selectedModel}
+          selectedVariant={selectedVariant}
+          isFavorite={item.isFavorite}
+          onSelectModel={handleSelectModel}
+          onSelectVariant={handleSelectVariant}
+          onToggleFavorite={handleToggleFavorite}
+        />
+      );
+    },
+    [handleSelectModel, handleSelectVariant, handleToggleFavorite, selectedModel, selectedVariant]
+  );
+
   if (!bridge) {
     return (
       <PickerSheet
@@ -227,36 +263,18 @@ export function ModelPickerContent() {
           }
         />
       ) : (
-        <FlatList
-          className="flex-1 bg-background"
+        // No wrapping View: react-native-screens honors the formSheet header
+        // only when [header, scroll view] are the content's direct children,
+        // so the list itself carries the sheet background.
+        <FlashList<ModelPickerRow>
+          style={[listStyle, { backgroundColor: colors.background }]}
           data={rows}
           keyExtractor={item => item.key}
+          getItemType={item => item.type}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           contentContainerStyle={{ paddingBottom: bottom }}
-          renderItem={({ item }) => {
-            if (item.type === 'header') {
-              return (
-                <View className="bg-secondary px-4 py-2">
-                  <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {item.title}
-                  </Text>
-                </View>
-              );
-            }
-
-            return (
-              <ModelPickerOptionRow
-                option={item.model}
-                selected={item.model.id === selectedModel}
-                selectedVariant={selectedVariant}
-                isFavorite={item.isFavorite}
-                onSelectModel={handleSelectModel}
-                onSelectVariant={handleSelectVariant}
-                onToggleFavorite={handleToggleFavorite}
-              />
-            );
-          }}
+          renderItem={renderItem}
         />
       )}
     </PickerSheet>

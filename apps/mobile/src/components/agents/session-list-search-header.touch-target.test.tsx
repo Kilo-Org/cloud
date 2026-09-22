@@ -5,10 +5,34 @@
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
+import { compiledDimensions } from '@/test/native-dimensions';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SessionListSearchHeader } from './session-list-search-header';
-import { COMPACT_CONTROL_FRAME_DP, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
+import {
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  MIN_TAP_TARGET_DP,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
+
+type Insets = { top: number; right: number; bottom: number; left: number };
+
+/** The clear control's `hitSlop` as per-side insets, validating the shape. */
+function slopInsets(hitSlop: unknown): Insets {
+  if (typeof hitSlop !== 'object' || hitSlop === null) {
+    throw new TypeError(`no measurable hitSlop in ${JSON.stringify(hitSlop)}`);
+  }
+  const insets = hitSlop as Partial<Insets>;
+  if (
+    typeof insets.top !== 'number' ||
+    typeof insets.right !== 'number' ||
+    typeof insets.bottom !== 'number' ||
+    typeof insets.left !== 'number'
+  ) {
+    throw new TypeError(`no measurable hitSlop in ${JSON.stringify(hitSlop)}`);
+  }
+  return { top: insets.top, right: insets.right, bottom: insets.bottom, left: insets.left };
+}
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
@@ -52,12 +76,12 @@ function fieldOf(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTe
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'View' &&
-      String(node.props.className).includes('min-h-[44px]')
+      String(node.props.className).includes('min-h-[51px]')
   );
 }
 
 describe('SessionListSearchHeader clear button touch target', () => {
-  it('measures the clear button frame, not its 16pt glyph', () => {
+  it('measures the clear button frame, not its 16pt glyph', async () => {
     const renderer = mount(true);
     const clear = renderer.root.find(
       node =>
@@ -67,12 +91,31 @@ describe('SessionListSearchHeader clear button touch target', () => {
     );
 
     // The glyph is 16pt; sized to it the audit reported 16dp. The frame is
-    // what the audit measures and the slop on top of it is the 44pt target.
-    expect(clear.props.className).toContain('h-11 w-11');
+    // what the audit measures and the slop on top of it carries the reach past
+    // the 44pt target. One box width/height pair only: compiling the class is
+    // what proves the real box, so a second, conflicting pair cannot hide
+    // behind the order Tailwind emits its rules in.
+    expect(clear.props.className).toContain('h-[38px] w-[38px]');
     expect(clear.props.className).toContain('items-center');
-    const hitSlop = clear.props.hitSlop as number;
-    expect(hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
-    expect(COMPACT_CONTROL_FRAME_DP + 2 * hitSlop).toBeGreaterThanOrEqual(44);
+    const slop = slopInsets(clear.props.hitSlop);
+    expect(slop.top).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+    expect(slop.right).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+    expect(slop.bottom).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+    // The left side stops at the row's `gap-2` (7pt at the app's 14pt rem) so
+    // the control's touch region meets the input's instead of covering it.
+    expect(slop.left).toBe(7);
+
+    const declarations = (await compiledDimensions(clear.props.className as string)) as {
+      height?: number;
+      width?: number;
+    }[];
+    const box = Object.assign({}, ...declarations) as { height: number; width: number };
+    expect(box.height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    expect(box.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    // Past 44pt, not onto it: `@/lib/a11y/tap-target` records a 44dp target
+    // measuring 43.81dp at density 420.
+    expect(box.height + slop.top + slop.bottom).toBeGreaterThan(TOUCH_TARGET_DP);
+    expect(box.width + slop.left + slop.right).toBeGreaterThan(TOUCH_TARGET_DP);
 
     renderer.unmount();
   });
@@ -82,10 +125,14 @@ describe('SessionListSearchHeader clear button touch target', () => {
     const withoutText = mount(false);
 
     // Same field height in both states: the X appears on the first keystroke
-    // and must not move the list below it.
+    // and must not move the list below it. A single `min-h` class, so the
+    // effective floor cannot depend on Tailwind's emit order. The floor covers
+    // the 38pt control plus the row's padding and border; the compiled guard in
+    // `session-list-search-header.mounted.test.tsx` holds the arithmetic.
     const fieldWithText = fieldOf(withText);
     const fieldWithoutText = fieldOf(withoutText);
-    expect(fieldWithText.props.className).toContain('min-h-[44px]');
+    expect(fieldWithText.props.className).toContain('min-h-[51px]');
+    expect(fieldWithText.props.className).not.toContain('min-h-[44px]');
     expect(fieldWithoutText.props.className).toBe(fieldWithText.props.className);
 
     const clear = withText.root.find(

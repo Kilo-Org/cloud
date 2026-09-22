@@ -89,7 +89,7 @@ describe('sandbox selection policy', () => {
       expected: { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
     },
     {
-      name: 'unchanged default when explicit Vercel is unavailable for compute billing',
+      name: 'enforced default skips Vercel even when explicit Vercel is enrolled',
       overrides: {
         PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
         VERCEL_SANDBOX_ORG_IDS: owner.orgId,
@@ -97,7 +97,7 @@ describe('sandbox selection policy', () => {
         CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: owner.orgId,
       },
       devcontainer: false,
-      expected: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+      expected: getSandboxAllocationRequest('cloudflare-single'),
     },
     {
       name: 'Cloudflare containers when the isolated owner is enrolled',

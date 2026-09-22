@@ -11,6 +11,7 @@ import { parseVercelSandboxRuntimeConfig } from './agent-sandbox/vercel/vercel-r
 import { isCloudflareContainersEnrolled } from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
 import { isCloudAgentContainerBillingEnabled } from './container-billing-rollout.js';
 import { getDefaultSandboxDestination, isOrgInList } from './sandbox-id.js';
+import { providerSupportsEnforcedBilling } from './sandbox-provider-eligibility.js';
 import type { Env } from './types.js';
 
 type SelectionOwner = { userId: string; orgId?: string };
@@ -24,7 +25,10 @@ function sandboxAllocationUnavailableReason(
   if (provider === 'cloudflare') return undefined;
   if (provider === 'vercel') {
     if (!parseVercelSandboxRuntimeConfig(env)) return 'Vercel sandboxes are not configured';
-    if (isCloudAgentContainerBillingEnabled(env, owner)) {
+    if (
+      isCloudAgentContainerBillingEnabled(env, owner) &&
+      !providerSupportsEnforcedBilling(provider)
+    ) {
       return 'Vercel sandboxes do not support enforced compute billing';
     }
     return undefined;

@@ -19,7 +19,7 @@ import {
 
 import { renderActiveAgentsWidget } from './active-agents-widget';
 import { androidSink, getCurrentWidgetProps, handleAppStateActive } from './android-sink';
-import { formatGlanceableCount, isWidgetRtl } from './count-format';
+import { formatGlanceableAgo, formatGlanceableCount, isWidgetRtl } from './count-format';
 import { getStoredWidgetSnapshot, setWidgetSnapshot } from './live-update';
 import {
   type AndroidWidgetProps,
@@ -141,7 +141,7 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
   let props =
     stored === null
       ? getCurrentWidgetProps()
-      : buildCurrentWidgetProps(stored, translate, formatGlanceableCount);
+      : buildCurrentWidgetProps(stored, translate, formatGlanceableCount, formatGlanceableAgo);
   if (props === null) {
     // Migrate the existing mirror when this installation has no native snapshot yet.
     await restorePersistedGlanceable();
@@ -155,7 +155,12 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
       props =
         restored === null
           ? buildGenericWidgetProps(translate)
-          : buildCurrentWidgetProps(restored, translate, formatGlanceableCount);
+          : buildCurrentWidgetProps(
+              restored,
+              translate,
+              formatGlanceableCount,
+              formatGlanceableAgo
+            );
     } else {
       // A live publish during restoration owns the widget.
       snapshot = null;
@@ -171,11 +176,11 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
   const currentProps = (): AndroidWidgetProps => {
     const latest = getStoredWidgetSnapshot();
     if (latest !== null) {
-      return buildCurrentWidgetProps(latest, translate, formatGlanceableCount);
+      return buildCurrentWidgetProps(latest, translate, formatGlanceableCount, formatGlanceableAgo);
     }
     return snapshot === null
       ? props
-      : buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount);
+      : buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount, formatGlanceableAgo);
   };
   if (widgetAction === 'WIDGET_CLICK' && isWidgetAction(clickAction)) {
     await handleWidgetAction(clickAction, task, currentProps);

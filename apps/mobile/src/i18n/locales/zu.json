@@ -827,7 +827,8 @@
       "chat": "Imilayezo yengxoxo",
       "kiloclaw": "Umsebenzi we-KiloClaw",
       "balance": "Izexwayiso zebhalansi",
-      "security": "Okutholakele kwezokuphepha"
+      "security": "Okutholakele kwezokuphepha",
+      "spend": "Izexwayiso zokusebenzisa imali"
     },
     "category": {
       "chatMessagesSubtitle": "izimpendulo ezingxoxweni zakho",
@@ -838,11 +839,13 @@
       "sessionStatusTitle": "Isimo seseshini",
       "sessionStatusSubtitle": "kuqediwe / kwehlulekile / kulungele ukulawulwa",
       "kiloclawActivitySubtitle": "uhlelo selulungile/lwehlulekile, izenzo ezihleliwe",
-      "kiloclawActivityUnavailable": "Qala uhlelo lwe-KiloClaw ukuze uthole umsebenzi we-KiloClaw.",
+      "kiloclawActivityUnavailable": "Qala i-instance ye-KiloClaw ukuze uthole umsebenzi we-KiloClaw.",
       "balanceAlertsSubtitle": "izexwayiso zebhalansi ephansi yenhlangano",
-      "balanceAlertsUnavailable": "Joyina inhlangano ukuze uthole izexwayiso zebhalansi ephansi.",
+      "balanceAlertsUnavailable": "Joyina inhlangano ukuze uthole izexwayiso zebhalansi.",
       "securityFindingsSubtitle": "okutholakele okusha nezikhumbuzo ze-SLA",
-      "securityFindingsUnavailable": "Vula i-ejenti yezokuphepha ye-Kilo kububanzi ukuze uthole okutholakele kwezokuphepha."
+      "securityFindingsUnavailable": "Nika amandla i-ejenti yezokuphepha ye-Kilo kububanzi ukuze uthole okutholakele kwezokuphepha.",
+      "spendAlertsSubtitle": "ukweqa imingcele nokukhuphuka ngehora",
+      "spendAlertsToggle": "Isigaba sezexwayiso zokusebenzisa imali"
     },
     "action": {
       "openSession": "Vula iseshini"
@@ -3116,6 +3119,14 @@
     "tooManySignInAttempts": "Imizamo eminingi kakhulu yokungena. Sicela ulinde bese uzama futhi."
   },
   "models": {
+    "auto": {
+      "frontier": "Okuzenzakalelayo Ehamba phambili",
+      "balanced": "Okuzenzakalelayo Okulingene",
+      "efficient": "Okuzenzakalelayo Osebenza kahle",
+      "small": "Okuzenzakalelayo Okuncane",
+      "free": "Okuzenzakalelayo Mahhala",
+      "organization": "Okuzenzakalelayo Inhlangano"
+    },
     "dataCollected": "Idatha iyaqoqwa",
     "free": "Mahhala",
     "couldNotUpdateFavorites": "Asikwazanga ukubuyekeza okuthandwayo.",
@@ -3163,7 +3174,8 @@
     "channelName": "Ama-ejenti asebenzayo",
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe.",
     "openSession": "Vula",
-    "approveFailed": "Asikwazanga ukugunyaza. Thepha $t(common.approve) ukuze uzame futhi."
+    "approveFailed": "Asikwazanga ukugunyaza. Thepha $t(common.approve) ukuze uzame futhi.",
+    "newestResult": "Umphumela wakamuva"
   },
   "transcriptionModel": {
     "title": "Imodeli yokuguqula inkulumo",
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "Vula iseshini yokugcina"
+  },
+  "spendAlerts": {
+    "subtitle": "Thumela isexwayiso nge-imeyili noma nge-push kwabathintwayo bokukhokha lapho ukusetshenziswa kwemali kwalesi sikhathi kweqa umkhawulo noma kukhuphuka ngaphezu kwezinga elivamile lehora.",
+    "enable": "Vula izexwayiso zokusebenzisa imali",
+    "thresholdTitle": "Ukweqa umkhawulo",
+    "thresholdSubtitle": "Ukusetshenziswa kwemali okwamanje kweqa umkhawulo wakho",
+    "anomalyTitle": "Ukukhuphuka ngehora",
+    "anomalySubtitle": "Ihora elilodwa liphakeme kakhulu kunezinga elivamile lalesi sikhathi",
+    "limitLabel": "Umkhawulo (USD)",
+    "windowLabel": "Isikhathi",
+    "window24h": "Amahora angu-24",
+    "window7d": "Izinsuku ezingu-7",
+    "window30d": "Izinsuku ezingu-30",
+    "multiplierLabel": "Isiphindaphindi sokukhuphuka",
+    "saved": "Izilungiselelo zexwayiso lokusetshenziswa kwemali zilondoloziwe",
+    "loadError": "Ayikwazanga ukulayisha izexwayiso zokusetshenziswa kwemali.",
+    "saveError": "Ayikwazanga ukulondoloza izexwayiso zokusetshenziswa kwemali.",
+    "empty": "Izexwayiso zokusetshenziswa kwemali zivaliwe. Zivule ukuze uxwayise abathintwayo bokukhokha balesi sikhathi.",
+    "noSpend": "Akukho kusetshenziswa kwemali okurekhodiwe okwamanje",
+    "spend24h": "Ukusetshenziswa kwemali emahoreni angu-24 edlule",
+    "multiplierError": "Faka isiphindaphindi esingu-1 noma ngaphezulu",
+    "permissionDenied": "Awunayo imvume yokuphatha izexwayiso zokusetshenziswa kwemali.",
+    "pushOffByCategory": "Kucishiwe kuzaziso"
   }
 }

@@ -843,7 +843,8 @@
       "chat": "Poruke u razgovoru",
       "kiloclaw": "Aktivnost u KiloClawu",
       "balance": "Upozorenja o stanju računa",
-      "security": "Sigurnosni nalazi"
+      "security": "Sigurnosni nalazi",
+      "spend": "Upozorenja o potrošnji"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",
@@ -854,11 +855,13 @@
       "sessionStatusTitle": "Status sesije",
       "sessionStatusSubtitle": "dovršeno / neuspješno / spremno za upravljanje",
       "kiloclawActivitySubtitle": "spremnost ili pogreška instance, zakazane radnje",
-      "kiloclawActivityUnavailable": "Pokreni instancu KiloClaw da bi dobio aktivnost KiloClaw.",
+      "kiloclawActivityUnavailable": "Pokrenite KiloClaw instancu da biste dobili KiloClaw aktivnost.",
       "balanceAlertsSubtitle": "upozorenja o niskom saldu organizacije",
-      "balanceAlertsUnavailable": "Pridruži se organizaciji da bi dobio upozorenja o niskom saldu.",
+      "balanceAlertsUnavailable": "Pridružite se organizaciji da biste dobili upozorenja o saldu.",
       "securityFindingsSubtitle": "novi nalazi i podsjetnici na SLA",
-      "securityFindingsUnavailable": "Uključi Kilo sigurnosnog agenta na opsegu da bi dobio sigurnosne nalaze."
+      "securityFindingsUnavailable": "Omogućite Kilo sigurnosnog agenta na opsegu da biste dobili sigurnosne nalaze.",
+      "spendAlertsSubtitle": "prekoračenja pragova i skokovi po satu",
+      "spendAlertsToggle": "Kategorija upozorenja o potrošnji"
     },
     "action": {
       "openSession": "Otvori sesiju"
@@ -3159,6 +3162,14 @@
     "tooManySignInAttempts": "Previše pokušaja prijave. Pričekaj i pokušaj ponovno."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatski Napredni",
+      "balanced": "Automatski Uravnotežen",
+      "efficient": "Automatski Učinkovit",
+      "small": "Automatski Mali",
+      "free": "Automatski Besplatan",
+      "organization": "Automatski organizacije"
+    },
     "dataCollected": "Prikupljanje podataka",
     "free": "Besplatno",
     "couldNotUpdateFavorites": "Nije moguće ažurirati favorite.",
@@ -3206,7 +3217,8 @@
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama za prikaz aktivnih agenata na zaključanom zaslonu.",
     "openSession": "Otvori",
-    "approveFailed": "Odobravanje nije uspjelo. Dodirni $t(common.approve) da pokušaš ponovno."
+    "approveFailed": "Odobravanje nije uspjelo. Dodirni $t(common.approve) da pokušaš ponovno.",
+    "newestResult": "Najnoviji rezultat"
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",
@@ -3242,5 +3254,28 @@
   },
   "launcher": {
     "openLastSession": "Otvori posljednju sesiju"
+  },
+  "spendAlerts": {
+    "subtitle": "Pošalji upozorenje e-poštom ili push porukom kontaktima za naplatu kada potrošnja ovog opsega prijeđe limit ili skoči iznad uobičajene satne stope.",
+    "enable": "Omogući upozorenja o potrošnji",
+    "thresholdTitle": "Prekoračenje praga",
+    "thresholdSubtitle": "Tekuća potrošnja prelazi tvoj limit",
+    "anomalyTitle": "Satni skok",
+    "anomalySubtitle": "Jedan sat je daleko iznad uobičajene stope ovog opsega",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Prozor",
+    "window24h": "24 sata",
+    "window7d": "7 dana",
+    "window30d": "30 dana",
+    "multiplierLabel": "Množitelj skoka",
+    "saved": "Postavke upozorenja o potrošnji su spremljene",
+    "loadError": "Upozorenja o potrošnji nisu učitana.",
+    "saveError": "Upozorenja o potrošnji nisu spremljena.",
+    "empty": "Upozorenja o potrošnji su isključena. Uključi ih da upozoriš kontakte za naplatu ovog opsega.",
+    "noSpend": "Još nema zabilježene potrošnje",
+    "spend24h": "Potrošnja u posljednja 24 sata",
+    "multiplierError": "Unesi množitelj 1 ili veći",
+    "permissionDenied": "Nemaš dopuštenje za upravljanje upozorenjima o potrošnji.",
+    "pushOffByCategory": "Isključeno u Obavijestima"
   }
 }

@@ -1,9 +1,15 @@
-/* eslint-disable max-lines -- the SSO-recovery, passkey, legal-link, and email-validation suites share one native-auth mock harness; splitting them would duplicate every mock in this file */
+/* eslint-disable max-lines -- the suite owns the sign-in hierarchy contract and the inline-link touch-target audit for one screen, and the SSO-recovery, passkey, legal-link, and email-validation suites share one native-auth mock harness; splitting them would duplicate every mock in this file */
+// eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
+import { createRequire } from 'node:module';
+import tailwindcss from '@tailwindcss/postcss';
+import postcss from 'postcss';
 import { createElement } from 'react';
+import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { openBrowserAsync } from 'expo-web-browser';
+import { AppleAuthenticationButtonStyle } from 'expo-apple-authentication';
 import {
   INLINE_LINK_CONNECTOR_CLASS,
   MIN_TAP_TARGET_DP,
@@ -26,6 +32,10 @@ const ssoRecovery: { value: SsoRecoveryFixture } = vi.hoisted(() => ({
 // the one input the screen reads from the client module.
 const passkeySupport = vi.hoisted(() => ({ supported: true }));
 
+// Which provider controls the screen renders: Apple availability and the
+// Google client ID both come from outside the component.
+const providers = vi.hoisted(() => ({ appleAvailable: false, googleConfigured: false }));
+
 // What the screen reads from the hook: a fixed result object plus the one piece
 // of state the busy treatment depends on.
 const nativeAuth = vi.hoisted(() => ({
@@ -45,7 +55,7 @@ vi.mock('@/lib/auth/use-native-auth', () => ({
     busy: nativeAuth.busy,
     emailError: nativeAuth.emailError,
     clearEmailError: nativeAuth.clearEmailError,
-    googleConfigured: false,
+    googleConfigured: providers.googleConfigured,
     signInWithApple: vi.fn(),
     signInWithGoogle: vi.fn(),
     signInWithPasskey: nativeAuth.signInWithPasskey,
@@ -64,9 +74,12 @@ vi.mock('@/lib/login-draft', () => ({
 
 vi.mock('expo-apple-authentication', () => ({
   AppleAuthenticationButton: 'AppleAuthenticationButton',
-  AppleAuthenticationButtonStyle: { WHITE: 0, BLACK: 1 },
+  AppleAuthenticationButtonStyle: { WHITE: 0, WHITE_OUTLINE: 1, BLACK: 2 },
   AppleAuthenticationButtonType: { SIGN_IN: 0 },
-  isAvailableAsync: vi.fn().mockResolvedValue(false),
+  isAvailableAsync: vi.fn(async () => {
+    await Promise.resolve();
+    return providers.appleAvailable;
+  }),
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -96,6 +109,10 @@ vi.mock('@/lib/config', () => ({
   TERMS_URL: 'https://app.kilo.ai/terms-app',
   PRIVACY_URL: 'https://app.kilo.ai/privacy-app',
 }));
+
+const { compile } = createRequire(import.meta.url)(
+  'react-native-css/compiler'
+) as typeof NativeCSSCompiler;
 
 type R = TestRenderer.ReactTestRenderer;
 type I = TestRenderer.ReactTestInstance;
@@ -188,6 +205,115 @@ function slopDp(hitSlop: unknown): number {
   return 0;
 }
 
+/** The label Text inside a provider Button, whichever icon sits beside it. */
+function labelText(button: I): I {
+  return button.find(n => typeof n.type === 'string' && (n.type as string) === 'Text');
+}
+
+/**
+ * The compiled flex layout of a label's own className, through the app's own
+ * pipeline. Only the classes that decide the label's line allocation are
+ * compiled, so the assertion protects native sizing rather than utility names;
+ * pixel wrapping is verified on device.
+ */
+async function compiledLabelLayout(label: I) {
+  const classes = (label.props.className as string)
+    .split(' ')
+    .filter(className => /^(?:flex-|text-center$)/.test(className))
+    .join(' ');
+  if (!classes) {
+    return [];
+  }
+  const { css } = await postcss([tailwindcss()]).process(
+    `@reference "../../../global.css"; .target { @apply ${classes}; }`,
+    { from: import.meta.filename }
+  );
+  return (
+    compile(css, { inlineVariables: false })
+      .stylesheet()
+      .s?.find(([name]) => name === 'target')?.[1]
+      .flatMap(rule => rule.d ?? []) ?? []
+  );
+}
+
+function findAppleButton(root: I): I {
+  const nodes = root.findAll(
+    n => typeof n.type === 'string' && (n.type as string) === 'AppleAuthenticationButton'
+  );
+  const node = nodes[0];
+  if (!node) {
+    throw new Error('Apple sign-in button not found');
+  }
+  return node;
+}
+
+/** A Button that keeps the default (brand-filled) variant is a primary action. */
+function filledPrimaryLabels(root: I): (string | undefined)[] {
+  return root
+    .findAll(n => typeof n.type === 'string' && (n.type as string) === 'Button')
+    .filter(b => b.props.variant === undefined)
+    .map(b => b.props.accessibilityLabel as string | undefined);
+}
+
+// Provider controls are opt-in per test; the file default is the plain
+// email-only form every other suite renders.
+beforeEach(() => {
+  providers.appleAvailable = false;
+  providers.googleConfigured = false;
+});
+
+describe('IdleAuth sign-in hierarchy', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    passkeySupport.supported = true;
+    providers.appleAvailable = true;
+    providers.googleConfigured = true;
+  });
+
+  it('leaves the email Continue as the only filled primary action', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    // Every provider control is a secondary: Apple wears the outlined native
+    // style, Google and the passkey are outline Buttons.
+    expect(findAppleButton(renderer.root).props.buttonStyle).toBe(
+      AppleAuthenticationButtonStyle.WHITE_OUTLINE
+    );
+    expect(findButton(renderer.root, 'Sign in with Google').props.variant).toBe('outline');
+    expect(findButton(renderer.root, 'Sign in with a passkey').props.variant).toBe('outline');
+
+    expect(filledPrimaryLabels(renderer.root)).toEqual(['Continue with email']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('never falls back to a solid Apple button style', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const style = findAppleButton(renderer.root).props.buttonStyle;
+    expect(style).not.toBe(AppleAuthenticationButtonStyle.BLACK);
+    expect(style).not.toBe(AppleAuthenticationButtonStyle.WHITE);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps one filled primary action without Apple sign-in', async () => {
+    providers.appleAvailable = false;
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    expect(() => findAppleButton(renderer.root)).toThrow('Apple sign-in button not found');
+    expect(filledPrimaryLabels(renderer.root)).toEqual(['Continue with email']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
 describe('IdleAuth SSO recovery', () => {
   beforeEach(() => {
     ssoRecovery.value = { email: 'user@example.com', ssoOrganizationId: 'org_1' };
@@ -271,6 +397,69 @@ describe('IdleAuth passkey control', () => {
     expect(texts(renderer.root)).not.toContain('Sign in with a passkey');
     // The other ways in are untouched.
     expect(findButton(renderer.root, 'Continue with email')).toBeTruthy();
+  });
+});
+describe('IdleAuth provider label layout', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    passkeySupport.supported = true;
+    providers.appleAvailable = false;
+    providers.googleConfigured = true;
+  });
+
+  it('keeps the Google and passkey labels on one line at equal button heights', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const google = findButton(renderer.root, 'Sign in with Google');
+    const passkey = findButton(renderer.root, 'Sign in with a passkey');
+
+    for (const button of [google, passkey]) {
+      // A label must never be pushed onto its own flex line, so the icon stays
+      // on the label's line and the two stacked buttons keep one height.
+      expect(String(button.props.className).split(/\s+/)).not.toContain('flex-wrap');
+      // Keep the 44pt floor so Dynamic Type can still grow the control.
+      expect(String(button.props.className)).toContain('min-h-[44px]');
+
+      const label = labelText(button);
+      // Larger accessibility text may still wrap naturally; never hide part of
+      // the copy and never disable native font scaling.
+      expect(label.props.numberOfLines).toBeUndefined();
+      expect(label.props.adjustsFontSizeToFit).toBeUndefined();
+      expect(label.props.ellipsizeMode).toBeUndefined();
+      expect(label.props.allowFontScaling).not.toBe(false);
+    }
+
+    // flexBasis 0% + flexGrow 1 gives each label the whole remaining row width:
+    // the remedy the resend-code label already ships (PR #6384).
+    const oneLineLabel = { flexBasis: '0%', flexGrow: 1, flexShrink: 1, textAlign: 'center' };
+    expect(await compiledLabelLayout(labelText(google))).toEqual([oneLineLabel]);
+    expect(await compiledLabelLayout(labelText(passkey))).toEqual([oneLineLabel]);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('keeps the passkey row height while the ceremony runs', async () => {
+    nativeAuth.busy = 'passkey';
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const button = findButton(renderer.root, 'Sign in with a passkey');
+    expect(button.props.disabled).toBe(true);
+    expect(
+      button.findAll(n => typeof n.type === 'string' && (n.type as string) === 'ActivityIndicator')
+    ).toHaveLength(1);
+    // The inline indicator must not change the row's height: the label keeps its
+    // one-line layout and the button keeps the 44pt floor.
+    expect(String(button.props.className)).toContain('min-h-[44px]');
+    expect(await compiledLabelLayout(labelText(button))).toEqual([
+      { flexBasis: '0%', flexGrow: 1, flexShrink: 1, textAlign: 'center' },
+    ]);
+
+    act(() => {
+      renderer.unmount();
+    });
   });
 });
 describe('IdleAuth email continue copy', () => {

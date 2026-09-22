@@ -233,7 +233,17 @@ export function normalizePrThreadsPages(
 ): PrThreadsPageModel[] {
   const loaded = pages ?? [];
   if (platform === 'github') {
-    return [...loaded];
+    // A GitHub review thread can arrive with an empty comment list — the
+    // shape the provider arm below also drops. A thread with no comments is
+    // not discussion content: counted as content it keeps the tab out of its
+    // empty state, and the list's visible-comment filter then drops it, so
+    // the tab renders a blank body with no comments, no empty state and no
+    // error (spot check e7). Drop it here, where the shape is read, so the
+    // tab's empty check sees the truth.
+    return loaded.map(page => ({
+      ...page,
+      threads: page.threads.filter(thread => thread.comments.length > 0),
+    }));
   }
   return asGithubOptions<ProviderThreadsPage[]>(loaded).map(page =>
     normalizeProviderThreadsPage(page)

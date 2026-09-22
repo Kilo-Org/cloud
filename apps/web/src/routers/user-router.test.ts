@@ -54,18 +54,18 @@ const mockSendDeletionSupportNotification = jest.mocked(sendAccountDeletionSuppo
 const mockPerformGdprRemoval = jest.mocked(performGdprRemoval);
 const mockAssertUserCanBeSoftDeleted = jest.mocked(assertUserCanBeSoftDeleted);
 
-const AVAILABLE_CAPABILITY = { available: true, unavailableReason: null };
+const AVAILABLE_CAPABILITY = { available: true, unavailableReasonCode: null };
 const UNAVAILABLE_BALANCE_ALERTS = {
   available: false,
-  unavailableReason: 'Join an organization to get balance alerts.',
+  unavailableReasonCode: 'organizationRequired',
 };
 const UNAVAILABLE_SECURITY_FINDINGS = {
   available: false,
-  unavailableReason: 'Enable Kilo Security Agent on a scope to get security findings.',
+  unavailableReasonCode: 'securityAgentRequired',
 };
 const UNAVAILABLE_KILOCLAW_ACTIVITY = {
   available: false,
-  unavailableReason: 'Start a KiloClaw instance to get KiloClaw activity.',
+  unavailableReasonCode: 'kiloclawInstanceRequired',
 };
 
 /** Capabilities for a user with no org, no Security config, and no KiloClaw instance. */
@@ -76,6 +76,7 @@ const NO_GATES_CAPABILITIES = {
   sessionStatus: AVAILABLE_CAPABILITY,
   kiloclawActivity: UNAVAILABLE_KILOCLAW_ACTIVITY,
   balanceAlerts: UNAVAILABLE_BALANCE_ALERTS,
+  spendAlerts: AVAILABLE_CAPABILITY,
   securityFindings: UNAVAILABLE_SECURITY_FINDINGS,
 };
 
@@ -668,6 +669,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: true,
@@ -675,6 +677,9 @@ describe('user router - notification preferences', () => {
     });
     // Legacy compat: agentUpdates and agentPushEnabled always share the same value.
     expect(result.agentUpdates).toBe(result.agentPushEnabled);
+    // Spend alerts are default-ON with no row, exactly like the spend view's
+    // push channel reads the same column.
+    expect(result.spendAlerts).toBe(true);
   });
 
   it('returns the stored preferences when a row exists', async () => {
@@ -686,6 +691,7 @@ describe('user router - notification preferences', () => {
       session_status_enabled: true,
       kiloclaw_activity_enabled: false,
       balance_alerts_enabled: false,
+      spend_alerts_enabled: false,
       security_findings_enabled: true,
     });
 
@@ -699,6 +705,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: false,
       balanceAlerts: false,
+      spendAlerts: false,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: false,
@@ -718,6 +725,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: false,
@@ -734,6 +742,7 @@ describe('user router - notification preferences', () => {
     expect(row?.session_status_enabled).toBe(true);
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
 
     // Calling again with true must update, not insert
@@ -761,6 +770,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: true,
@@ -775,6 +785,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: false,
@@ -813,6 +824,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: false,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: true,
@@ -831,6 +843,7 @@ describe('user router - notification preferences', () => {
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.agent_push_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
   });
 
@@ -850,6 +863,7 @@ describe('user router - notification preferences', () => {
     expect(result.sessionStatus).toBe(true);
     expect(result.kiloclawActivity).toBe(true);
     expect(result.balanceAlerts).toBe(true);
+    expect(result.spendAlerts).toBe(true);
     expect(result.securityFindings).toBe(true);
     expect(result.agentPushEnabled).toBe(true);
 
@@ -863,8 +877,42 @@ describe('user router - notification preferences', () => {
     expect(row?.session_status_enabled).toBe(true);
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
     expect(row?.agent_push_enabled).toBe(true);
+  });
+
+  it('persists spendAlerts and echoes it, without touching the other columns', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    const result = await caller.user.setNotificationPreferences({ spendAlerts: false });
+    expect(result).toEqual({
+      chatMessages: true,
+      agentAttention: true,
+      agentUpdates: true,
+      sessionStatus: true,
+      kiloclawActivity: true,
+      balanceAlerts: true,
+      spendAlerts: false,
+      securityFindings: true,
+      notificationPreviews: 'generic',
+      agentPushEnabled: true,
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    expect(row?.spend_alerts_enabled).toBe(false);
+    // Unrelated category columns remain at their defaults: the partial upsert
+    // writes only the provided column, which is what keeps this screen and the
+    // spend view's push channel writing the same value.
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.security_findings_enabled).toBe(true);
+    expect(row?.agent_push_enabled).toBe(true);
+
+    const got = await caller.user.getNotificationPreferences();
+    expect(got.spendAlerts).toBe(false);
   });
 
   it('persists balanceAlerts and securityFindings independently via provided-only upsert', async () => {
@@ -878,6 +926,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: false,
+      spendAlerts: true,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: true,
@@ -900,6 +949,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: false,
+      spendAlerts: true,
       securityFindings: false,
       notificationPreviews: 'generic',
       agentPushEnabled: true,
@@ -907,6 +957,7 @@ describe('user router - notification preferences', () => {
 
     const got = await caller.user.getNotificationPreferences();
     expect(got.balanceAlerts).toBe(false);
+    expect(got.spendAlerts).toBe(true);
     expect(got.securityFindings).toBe(false);
 
     const [row] = await db
@@ -942,10 +993,11 @@ describe('user router - notification preferences', () => {
     expect(row?.session_status_enabled).toBe(true);
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
   });
 
-  it('one category toggle cannot delete unrelated subscriptions (six other categories + agent_push_enabled preserved)', async () => {
+  it('one category toggle cannot delete unrelated subscriptions (seven other categories + agent_push_enabled preserved)', async () => {
     const caller = await createCallerForUser(firstUser.id);
 
     // Seed every category OFF and the master gate OFF. A full-row overwrite
@@ -959,12 +1011,14 @@ describe('user router - notification preferences', () => {
       session_status_enabled: false,
       kiloclaw_activity_enabled: false,
       balance_alerts_enabled: false,
+      spend_alerts_enabled: false,
       security_findings_enabled: false,
     });
 
     // Flip exactly one category ON.
     const result = await caller.user.setNotificationPreferences({ balanceAlerts: true });
     expect(result.balanceAlerts).toBe(true);
+    expect(result.spendAlerts).toBe(false);
 
     const [row] = await db
       .select()
@@ -973,11 +1027,13 @@ describe('user router - notification preferences', () => {
 
     // The single flipped column changed; every other column is untouched.
     expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(false);
     expect(row?.agent_push_enabled).toBe(false);
     expect(row?.chat_messages_enabled).toBe(false);
     expect(row?.agent_attention_enabled).toBe(false);
     expect(row?.session_status_enabled).toBe(false);
     expect(row?.kiloclaw_activity_enabled).toBe(false);
+    expect(row?.spend_alerts_enabled).toBe(false);
     expect(row?.security_findings_enabled).toBe(false);
   });
 });
@@ -1016,11 +1072,13 @@ describe('user router - notification capabilities', () => {
     expect(result.capabilities.balanceAlerts).toEqual(UNAVAILABLE_BALANCE_ALERTS);
     expect(result.capabilities.kiloclawActivity).toEqual(UNAVAILABLE_KILOCLAW_ACTIVITY);
     expect(result.capabilities.securityFindings).toEqual(UNAVAILABLE_SECURITY_FINDINGS);
-    // The four always-on categories stay available for a signed-in user.
+    // The five always-on categories stay available for a signed-in user. Spend
+    // alerts are always available: every account has a personal scope.
     expect(result.capabilities.chatMessages).toEqual(AVAILABLE_CAPABILITY);
     expect(result.capabilities.agentAttention).toEqual(AVAILABLE_CAPABILITY);
     expect(result.capabilities.agentUpdates).toEqual(AVAILABLE_CAPABILITY);
     expect(result.capabilities.sessionStatus).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.spendAlerts).toEqual(AVAILABLE_CAPABILITY);
   });
 
   it('reports securityFindings unavailable when Security is disabled everywhere', async () => {
@@ -1104,6 +1162,7 @@ describe('user router - notification capabilities', () => {
       sessionStatus: AVAILABLE_CAPABILITY,
       kiloclawActivity: AVAILABLE_CAPABILITY,
       balanceAlerts: AVAILABLE_CAPABILITY,
+      spendAlerts: AVAILABLE_CAPABILITY,
       securityFindings: AVAILABLE_CAPABILITY,
     });
   });
@@ -1235,6 +1294,7 @@ describe('user router - register push token', () => {
       session_status_enabled: false,
       kiloclaw_activity_enabled: false,
       balance_alerts_enabled: false,
+      spend_alerts_enabled: false,
       security_findings_enabled: false,
       notification_previews: 'full',
     });
@@ -1253,6 +1313,7 @@ describe('user router - register push token', () => {
     expect(afterRegister?.session_status_enabled).toBe(false);
     expect(afterRegister?.kiloclaw_activity_enabled).toBe(false);
     expect(afterRegister?.balance_alerts_enabled).toBe(false);
+    expect(afterRegister?.spend_alerts_enabled).toBe(false);
     expect(afterRegister?.security_findings_enabled).toBe(false);
     expect(afterRegister?.notification_previews).toBe('full');
 
@@ -1276,6 +1337,7 @@ describe('user router - register push token', () => {
     expect(afterUnregister?.session_status_enabled).toBe(false);
     expect(afterUnregister?.kiloclaw_activity_enabled).toBe(false);
     expect(afterUnregister?.balance_alerts_enabled).toBe(false);
+    expect(afterUnregister?.spend_alerts_enabled).toBe(false);
     expect(afterUnregister?.security_findings_enabled).toBe(false);
     expect(afterUnregister?.notification_previews).toBe('full');
 

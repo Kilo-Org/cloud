@@ -21,7 +21,10 @@ import {
 } from '@kilocode/worker-utils/runtime-authorization';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
-import { getSandboxAllocationResources } from '@kilocode/worker-utils/sandbox-allocation';
+import {
+  getSandboxAllocationInstance,
+  getSandboxAllocationResources,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { resolveSecret } from '../auth.js';
 import {
   issuePersistedRuntimeProxyGrant,
@@ -3125,8 +3128,8 @@ export class SandboxSession extends DurableObject<Env> {
 
   /**
    * Schedule the next non-failing check from the freshly read clock:
-   * `min(now + acceptedAlarmCap, activityAt + idleStop)`. Never rearm at the
-   * already-past 90s threshold.
+   * `min(now + acceptedAlarmCap, activityAt + kiloInactivity)`. Never rearm at
+   * the already-past 90s threshold.
    */
   private async scheduleAcceptedRecheck(epoch: number, messageId: string): Promise<void> {
     const current = this.loadMessages().find(item => item.messageId === messageId);
@@ -3137,7 +3140,7 @@ export class SandboxSession extends DurableObject<Env> {
       return;
     }
     await this.armQueueRetry(
-      Math.min(Date.now() + DEADLINE_MS.acceptedAlarmCap, activityAt + DEADLINE_MS.idleStop)
+      Math.min(Date.now() + DEADLINE_MS.acceptedAlarmCap, activityAt + DEADLINE_MS.kiloInactivity)
     );
   }
 
@@ -3798,6 +3801,7 @@ export class SandboxSession extends DurableObject<Env> {
               sessionId,
               provider,
               resources: getSandboxAllocationResources(metadata.workspace?.sandboxAllocation),
+              instance: getSandboxAllocationInstance(metadata.workspace?.sandboxAllocation),
               ...(acquisition ? { acquisition } : { allowCreate }),
               ...(metadata.workspace?.worktreeId
                 ? { worktreeId: metadata.workspace.worktreeId }

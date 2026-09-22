@@ -14,6 +14,8 @@ import { NotificationsScreen } from './notifications-screen';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { i18n } from '@/i18n';
 import ar from '@/i18n/locales/ar.json';
+import en from '@/i18n/locales/en.json';
+import ur from '@/i18n/locales/ur.json';
 
 const prefsQueryFn = vi.hoisted(() => vi.fn());
 const pushTokensQueryFn = vi.hoisted(() => vi.fn());
@@ -144,13 +146,14 @@ type I = ReactTestInstance;
 
 function fullCapabilities(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    chatMessages: { available: true, unavailableReason: null },
-    agentAttention: { available: true, unavailableReason: null },
-    agentUpdates: { available: true, unavailableReason: null },
-    sessionStatus: { available: true, unavailableReason: null },
-    kiloclawActivity: { available: true, unavailableReason: null },
-    balanceAlerts: { available: true, unavailableReason: null },
-    securityFindings: { available: true, unavailableReason: null },
+    chatMessages: { available: true, unavailableReasonCode: null },
+    agentAttention: { available: true, unavailableReasonCode: null },
+    agentUpdates: { available: true, unavailableReasonCode: null },
+    sessionStatus: { available: true, unavailableReasonCode: null },
+    kiloclawActivity: { available: true, unavailableReasonCode: null },
+    balanceAlerts: { available: true, unavailableReasonCode: null },
+    spendAlerts: { available: true, unavailableReasonCode: null },
+    securityFindings: { available: true, unavailableReasonCode: null },
     ...overrides,
   };
 }
@@ -163,6 +166,7 @@ function fullPrefs(overrides: Record<string, unknown> = {}): Record<string, unkn
     sessionStatus: true,
     kiloclawActivity: true,
     balanceAlerts: true,
+    spendAlerts: true,
     securityFindings: true,
     agentPushEnabled: true,
     notificationPreviews: 'generic',
@@ -432,6 +436,89 @@ describe('NotificationsScreen mutation serialization (scope.id + generation guar
   });
 });
 
+describe('NotificationsScreen spend alerts row', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getNotificationPermissionStatus.mockResolvedValue('granted');
+    getDevicePushToken.mockResolvedValue('device-token');
+    pushTokensQueryFn.mockResolvedValue([{ token: 'device-token', platform: 'android' }]);
+    setPreferenceMutationFn.mockResolvedValue({});
+    registerTokenMutationFn.mockResolvedValue({ success: true });
+  });
+
+  it('happy: renders the row with its capability and flipping it sends exactly spendAlerts', async () => {
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Spend alerts category');
+
+    // The row renders beside balance alerts, enabled because the server
+    // reported the spend capability available.
+    expect(textWithChildren(renderer.root, 'Spend alerts').length).toBe(1);
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.value).toBe(true);
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(false);
+
+    // Exactly one category key per call: the payload is what the spend view's
+    // own column write must agree with.
+    prefsQueryFn.mockResolvedValue(fullPrefs({ spendAlerts: false }));
+    act(() => {
+      switchOnValueChange(renderer.root, 'Spend alerts category')?.(false);
+    });
+    await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
+    expect(setPreferenceMutationFn.mock.calls[0]?.[0]).toEqual({ spendAlerts: false });
+    await waitFor(
+      () => switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.value === false
+    );
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('non-retryable unhappy: an unavailable spend capability disables the row and shows the catalog subtitle', async () => {
+    // The spend row has no gated reason of its own (every signed-in account has
+    // a personal scope), but the screen must never render the server's English
+    // prose if one arrives: it falls back to the category subtitle.
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          spendAlerts: {
+            available: false,
+            unavailableReason: 'Spend alerts are unavailable.',
+          },
+        }),
+      })
+    );
+    const { renderer } = await renderScreen();
+
+    // Waiting on an available sibling proves the master gate settled, so the
+    // spend row's disabled state below is the server capability, not the gate.
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(true);
+    expect(
+      textWithChildren(renderer.root, en.notifications.category.spendAlertsSubtitle).length
+    ).toBe(1);
+    expect(textWithChildren(renderer.root, 'Spend alerts are unavailable.').length).toBe(0);
+  });
+
+  it('retryable unhappy: a spend toggle failure rolls back the optimistic flip', async () => {
+    prefsQueryFn.mockResolvedValue(fullPrefs());
+    setPreferenceMutationFn.mockRejectedValue({
+      data: { code: 'INTERNAL_SERVER_ERROR' },
+      message: 'boom',
+    });
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Spend alerts category');
+
+    act(() => {
+      switchOnValueChange(renderer.root, 'Spend alerts category')?.(false);
+    });
+    await waitFor(() => setPreferenceMutationFn.mock.calls.length === 1);
+    await waitFor(() => activityIndicators(renderer.root).length === 0);
+
+    // The switch returns to the unchanged server value and the error surfaces.
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.value).toBe(true);
+    expect(toastError).toHaveBeenCalledWith('boom');
+  });
+});
+
 describe('NotificationsScreen category availability', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -465,12 +552,17 @@ describe('NotificationsScreen category availability', () => {
   });
 
   it('non-retryable unhappy: an unavailable category disables the switch and shows the catalog reason', async () => {
-    // The server's `unavailableReason` is English prose; the row must render
-    // the catalog copy instead.
+    // The server names the reason with a machine-readable code. A response that
+    // still carries the old English `unavailableReason` prose must never render
+    // it: the row shows catalog copy instead.
     prefsQueryFn.mockResolvedValue(
       fullPrefs({
         capabilities: fullCapabilities({
-          balanceAlerts: { available: false, unavailableReason: 'SERVER PROSE SENTINEL' },
+          balanceAlerts: {
+            available: false,
+            unavailableReasonCode: 'organizationRequired',
+            unavailableReason: 'SERVER PROSE SENTINEL',
+          },
         }),
       })
     );
@@ -484,10 +576,37 @@ describe('NotificationsScreen category availability', () => {
 
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(true);
     expect(
-      textWithChildren(renderer.root, i18n.t('notifications.category.balanceAlertsUnavailable'))
-        .length
+      textWithChildren(renderer.root, en.notifications.category.balanceAlertsUnavailable).length
     ).toBe(1);
     expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
+  });
+
+  it('non-retryable unhappy: an unavailable category keeps its translated description, never the response sentence', async () => {
+    // The defect: the row rendered the response's `unavailableReason`, an
+    // English sentence, inside a localized screen. The description must come
+    // from the catalog, so a stale response string must never reach the screen.
+    // A server that predates the reason code sends no code at all.
+    const staleServerReason = 'stale server prose';
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          balanceAlerts: { available: false, unavailableReason: staleServerReason },
+        }),
+      })
+    );
+    const { renderer } = await renderScreen();
+
+    // Wait for an available sibling row to be enabled first: the master gate
+    // disables every row until the permission/device-token/push-token queries
+    // settle, so the unavailable row is disabled from the first render. Waiting
+    // on the sibling proves the gate settled and capabilities loaded.
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(true);
+    expect(
+      textWithChildren(renderer.root, en.notifications.category.balanceAlertsUnavailable).length
+    ).toBe(1);
+    expect(textWithChildren(renderer.root, staleServerReason).length).toBe(0);
   });
 
   it('repro: an unavailable Security findings row reads in the app language, never the server prose', async () => {
@@ -533,6 +652,79 @@ describe('NotificationsScreen category availability', () => {
     expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
   });
 
+  it('non-retryable unhappy: an unknown reason code falls back to the category subtitle', async () => {
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          securityFindings: { available: false, unavailableReasonCode: 'madeUpCode' },
+        }),
+      })
+    );
+    const { renderer } = await renderScreen();
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
+    expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
+    expect(textWithChildren(renderer.root, 'madeUpCode').length).toBe(0);
+  });
+
+  // A code naming an inherited Object.prototype member is still a code the
+  // catalog does not know: it must fall back to the subtitle, not render the
+  // prototype member. `in` matched these; an own-property guard must not.
+  it.each(['constructor', 'toString', 'hasOwnProperty', 'valueOf', '__proto__'])(
+    'non-retryable unhappy: the inherited prototype name %s falls back to the category subtitle',
+    async code => {
+      prefsQueryFn.mockResolvedValue(
+        fullPrefs({
+          capabilities: fullCapabilities({
+            securityFindings: { available: false, unavailableReasonCode: code },
+          }),
+        })
+      );
+      const { renderer } = await renderScreen();
+      await waitForEnabledSwitch(renderer, 'Chat messages');
+
+      expect(switchesByLabel(renderer.root, 'Security findings')[0]?.props.disabled).toBe(true);
+      expect(textWithChildren(renderer.root, 'new findings and SLA reminders').length).toBe(1);
+      expect(textWithChildren(renderer.root, code).length).toBe(0);
+    }
+  );
+
+  it('non-retryable unhappy: an unavailable category reads its description from the active catalog', async () => {
+    // The exact finding, on the screen that reported it: an Urdu Notifications
+    // screen showed the response's English sentence on the Security findings
+    // row. The row must read its copy from the catalog of the active language,
+    // so a localized screen never prints the response sentence.
+    // `securityFindingsUnavailable` is translated in ur.json, so this proves the
+    // Urdu screen, not an English fallback.
+    const serverReason = 'Enable Kilo Security Agent on a scope to get security findings.';
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          securityFindings: { available: false, unavailableReason: serverReason },
+        }),
+      })
+    );
+
+    await i18n.changeLanguage('ur');
+    const { renderer, unmount } = await renderScreen();
+    try {
+      await waitForEnabledSwitch(renderer, ur.notifications.channel.chat);
+
+      expect(
+        switchesByLabel(renderer.root, ur.notifications.channel.security)[0]?.props.disabled
+      ).toBe(true);
+      expect(
+        textWithChildren(renderer.root, ur.notifications.category.securityFindingsUnavailable)
+          .length
+      ).toBe(1);
+      expect(textWithChildren(renderer.root, serverReason).length).toBe(0);
+    } finally {
+      unmount();
+      await i18n.changeLanguage('en');
+    }
+  });
+
   it('retryable unhappy: a category save failure rolls back the optimistic flip', async () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());
     setPreferenceMutationFn.mockRejectedValue({
@@ -560,6 +752,7 @@ describe('NotificationsScreen category availability', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
       agentPushEnabled: true,
       notificationPreviews: 'generic',
@@ -569,6 +762,7 @@ describe('NotificationsScreen category availability', () => {
 
     expect(switchesByLabel(renderer.root, 'Chat messages')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(false);
+    expect(switchesByLabel(renderer.root, 'Spend alerts category')[0]?.props.disabled).toBe(false);
     expect(switchesByLabel(renderer.root, 'KiloClaw activity')[0]?.props.disabled).toBe(false);
   });
 

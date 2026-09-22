@@ -259,7 +259,8 @@
       "chat": "Messages de discussion",
       "kiloclaw": "Activité KiloClaw",
       "balance": "Alertes sur le solde",
-      "security": "Problèmes de sécurité"
+      "security": "Problèmes de sécurité",
+      "spend": "Alertes de dépenses"
     },
     "category": {
       "chatMessagesSubtitle": "réponses dans vos conversations",
@@ -272,9 +273,11 @@
       "kiloclawActivitySubtitle": "instance prête ou en échec, actions planifiées",
       "kiloclawActivityUnavailable": "Démarrez une instance KiloClaw pour recevoir l'activité KiloClaw.",
       "balanceAlertsSubtitle": "alertes de solde faible pour l'organisation",
-      "balanceAlertsUnavailable": "Rejoignez une organisation pour recevoir les alertes de solde faible.",
+      "balanceAlertsUnavailable": "Rejoignez une organisation pour recevoir les alertes de solde.",
       "securityFindingsSubtitle": "nouvelles vulnérabilités et rappels SLA",
-      "securityFindingsUnavailable": "Activez l'agent de sécurité Kilo sur un périmètre pour recevoir les problèmes de sécurité."
+      "securityFindingsUnavailable": "Activez l'Agent de sécurité Kilo sur un périmètre pour recevoir les signalements de sécurité.",
+      "spendAlertsSubtitle": "franchissements de seuils et pics horaires",
+      "spendAlertsToggle": "Catégorie « Alertes de dépenses »"
     },
     "liveActivities": "Activités en direct",
     "liveActivitySubtitle": "Afficher les agents actifs sur l’écran verrouillé",
@@ -3159,6 +3162,14 @@
     "tooManySignInAttempts": "Trop de tentatives de connexion. Veuillez patienter et réessayer."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Avancé",
+      "balanced": "Auto Équilibré",
+      "efficient": "Auto Efficace",
+      "small": "Auto Petit",
+      "free": "Auto Gratuit",
+      "organization": "Auto d'organisation"
+    },
     "dataCollected": "Données collectées",
     "free": "Gratuit",
     "couldNotUpdateFavorites": "Impossible de mettre à jour les favoris.",
@@ -3206,7 +3217,8 @@
     "channelName": "Agents actifs",
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé.",
     "openSession": "Ouvrir",
-    "approveFailed": "Impossible d'approuver. Touchez $t(common.approve) pour réessayer."
+    "approveFailed": "Impossible d'approuver. Touchez $t(common.approve) pour réessayer.",
+    "newestResult": "Dernier résultat"
   },
   "transcriptionModel": {
     "title": "Modèle de transcription",
@@ -3242,5 +3254,28 @@
   },
   "launcher": {
     "openLastSession": "Ouvrir la dernière session"
+  },
+  "spendAlerts": {
+    "subtitle": "Envoyez une alerte par e-mail ou notification push aux contacts de facturation lorsque les dépenses de ce périmètre dépassent une limite ou s'envolent au-dessus de leur rythme horaire habituel.",
+    "enable": "Activer les alertes de dépenses",
+    "thresholdTitle": "Franchissement du seuil",
+    "thresholdSubtitle": "Les dépenses cumulées dépassent votre limite",
+    "anomalyTitle": "Pic horaire",
+    "anomalySubtitle": "Une heure est bien au-dessus du rythme habituel de ce périmètre",
+    "limitLabel": "Limite (USD)",
+    "windowLabel": "Fenêtre",
+    "window24h": "24 heures",
+    "window7d": "7 jours",
+    "window30d": "30 jours",
+    "multiplierLabel": "Multiplicateur du pic",
+    "saved": "Paramètres des alertes de dépenses enregistrés",
+    "loadError": "Impossible de charger les alertes de dépenses.",
+    "saveError": "Impossible d'enregistrer les alertes de dépenses.",
+    "empty": "Les alertes de dépenses sont désactivées. Activez-les pour prévenir les contacts de facturation de ce périmètre.",
+    "noSpend": "Aucune dépense enregistrée pour l'instant",
+    "spend24h": "Dépenses des dernières 24 heures",
+    "multiplierError": "Saisissez un multiplicateur de 1 ou plus",
+    "permissionDenied": "Vous n'avez pas l'autorisation de gérer les alertes de dépenses.",
+    "pushOffByCategory": "Désactivé dans les notifications"
   }
 }

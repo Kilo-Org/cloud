@@ -74,6 +74,9 @@ describe('screen side insets: one implementation for both platforms', () => {
     expect(profile, `${PROFILE_SCREEN} imports the native safe-area module again`).not.toMatch(
       SAFE_AREA_MODULE
     );
+    // The screen carries no platform branch at all: sign-out confirms through
+    // one cross-platform in-app dialog, so the insets path — and every other
+    // line — stays a single implementation.
     expect(
       alignmentPath(profile),
       `${PROFILE_SCREEN}'s alignment path carries a per-platform branch`

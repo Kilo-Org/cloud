@@ -124,16 +124,20 @@ describe('shared branded splash', () => {
   });
 
   it('generates both native splash surfaces from the same options', async () => {
-    // Compile and introspect against a throwaway project root like the sibling
-    // cases: `compileModsAsync` seeds the Android color/style mods from the
-    // resources already on disk, so pointing it at this package's root would
-    // read a developer's prebuilt `android/` tree — its generated `colors.xml`
-    // is absent in CI — and merge colors this test does not own into the mod
-    // results, making the assertions depend on the developer's machine.
+    // Compile and introspect against the throwaway project root the sibling
+    // cases use: `compileModsAsync` seeds the Android color/style mods from the
+    // resources already on disk, so compiling against this package's root would
+    // fold a developer's generated, gitignored `android/` tree into the result —
+    // its `colors.xml` is absent in CI — and merge colors this test does not own
+    // into the mod results, making the exact assertion below machine-dependent.
     const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
-      { image: './assets/images/logo-mark.png', backgroundColor: '#FAF74F', imageWidth: 100 }
+      {
+        image: path.join(projectRoot, 'assets/images/logo-mark.png'),
+        backgroundColor: '#FAF74F',
+        imageWidth: 100,
+      }
     );
 
     expect(

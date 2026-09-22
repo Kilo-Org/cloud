@@ -323,7 +323,8 @@
       "chat": "הודעות צ׳אט",
       "kiloclaw": "פעילות KiloClaw",
       "balance": "התראות על היתרה",
-      "security": "ממצאי אבטחה"
+      "security": "ממצאי אבטחה",
+      "spend": "התראות הוצאות"
     },
     "category": {
       "chatMessagesSubtitle": "תשובות בשיחות שלך",
@@ -338,7 +339,9 @@
       "balanceAlertsSubtitle": "אזהרות על יתרה נמוכה בארגון",
       "balanceAlertsUnavailable": "הצטרף לארגון כדי לקבל התראות על יתרה נמוכה.",
       "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA",
-      "securityFindingsUnavailable": "הפעל את סוכן האבטחה של Kilo בהיקף כדי לקבל ממצאי אבטחה."
+      "securityFindingsUnavailable": "הפעל את סוכן האבטחה של Kilo בהיקף כדי לקבל ממצאי אבטחה.",
+      "spendAlertsSubtitle": "חציית ספים וזינוקים שעתיים",
+      "spendAlertsToggle": "קטגוריית התראות הוצאות"
     },
     "action": {
       "openSession": "פתיחת סשן"
@@ -3214,7 +3217,8 @@
     "channelName": "סוכנים פעילים",
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה.",
     "openSession": "פתח",
-    "approveFailed": "לא ניתן היה לאשר. הקש על $t(common.approve) כדי לנסות שוב."
+    "approveFailed": "לא ניתן היה לאשר. הקש על $t(common.approve) כדי לנסות שוב.",
+    "newestResult": "התוצאה החדשה ביותר"
   },
   "transcriptionModel": {
     "title": "מודל תמלול",
@@ -3250,5 +3254,28 @@
   },
   "launcher": {
     "openLastSession": "פתיחת הסשן האחרון"
+  },
+  "spendAlerts": {
+    "subtitle": "שלח התראה בדוא״ל או בהתראת push לאנשי הקשר לחיוב כאשר ההוצאות של תחום זה חוצות מגבלה או מזנקות מעל הקצב השעתי הרגיל.",
+    "enable": "הפעל התראות הוצאות",
+    "thresholdTitle": "חציית סף",
+    "thresholdSubtitle": "ההוצאה המצטברת חוצה את המגבלה שלך",
+    "anomalyTitle": "זינוק שעתי",
+    "anomalySubtitle": "שעה אחת גבוהה בהרבה מהקצב הרגיל של תחום זה",
+    "limitLabel": "מגבלה (USD)",
+    "windowLabel": "חלון",
+    "window24h": "24 שעות",
+    "window7d": "7 ימים",
+    "window30d": "30 ימים",
+    "multiplierLabel": "מכפיל הזינוק",
+    "saved": "הגדרות התראות ההוצאות נשמרו",
+    "loadError": "לא ניתן לטעון את התראות ההוצאות.",
+    "saveError": "לא ניתן לשמור את התראות ההוצאות.",
+    "empty": "התראות ההוצאות כבויות. הפעל אותן כדי ליידע את אנשי הקשר לחיוב של תחום זה.",
+    "noSpend": "עדיין לא נרשמה הוצאה",
+    "spend24h": "הוצאה ב־24 השעות האחרונות",
+    "multiplierError": "הזן מכפיל של 1 או יותר",
+    "permissionDenied": "אין לך הרשאה לנהל התראות הוצאות.",
+    "pushOffByCategory": "כבוי בהתראות"
   }
 }

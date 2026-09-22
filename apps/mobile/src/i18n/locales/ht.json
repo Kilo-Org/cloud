@@ -827,7 +827,8 @@
       "chat": "Mesaj diskisyon",
       "kiloclaw": "Aktivite KiloClaw",
       "balance": "Alèt balans",
-      "security": "Pwoblèm sekirite detekte"
+      "security": "Pwoblèm sekirite detekte",
+      "spend": "Alèt depans"
     },
     "category": {
       "chatMessagesSubtitle": "repons nan konvèsasyon ou yo",
@@ -842,7 +843,9 @@
       "balanceAlertsSubtitle": "avètisman lè balans òganizasyon an ba",
       "balanceAlertsUnavailable": "Antre nan yon òganizasyon pou jwenn alèt sou balans ki ba.",
       "securityFindingsSubtitle": "nouvo rezilta ak rapèl SLA",
-      "securityFindingsUnavailable": "Aktive ajan sekirite Kilo sou yon domèn pou jwenn pwoblèm sekirite detekte."
+      "securityFindingsUnavailable": "Aktive ajan sekirite Kilo sou yon domèn pou jwenn pwoblèm sekirite detekte.",
+      "spendAlertsSubtitle": "depasman papòt ak ogmantasyon chak èdtan",
+      "spendAlertsToggle": "Kategori alèt depans"
     },
     "action": {
       "openSession": "Louvri sesyon an"
@@ -3171,7 +3174,8 @@
     "channelName": "Ajan aktif",
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an.",
     "openSession": "Louvri",
-    "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò."
+    "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò.",
+    "newestResult": "Dènye rezilta"
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",
@@ -3207,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "Louvri dènye sesyon an"
+  },
+  "spendAlerts": {
+    "subtitle": "Voye yon alèt pa imèl oswa push bay kontak fakti yo lè depans sektè sa a depase yon limit oswa monte pi wo pase vitès èdtan abityèl li.",
+    "enable": "Aktive alèt depans yo",
+    "thresholdTitle": "Depasman papòt",
+    "thresholdSubtitle": "Depans aktyèl la depase limit ou",
+    "anomalyTitle": "Ogmantasyon chak èdtan",
+    "anomalySubtitle": "Yon èdtan byen pi wo pase vitès abityèl sektè sa a",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Fenèt",
+    "window24h": "24 èdtan",
+    "window7d": "7 jou",
+    "window30d": "30 jou",
+    "multiplierLabel": "Miltiplikatè ogmantasyon",
+    "saved": "Paramèt alèt depans yo anrejistre",
+    "loadError": "Pa t kapab chaje alèt depans yo.",
+    "saveError": "Pa t kapab anrejistre alèt depans yo.",
+    "empty": "Alèt depans yo fèmen. Limen yo pou avèti kontak fakti sektè sa a.",
+    "noSpend": "Poko gen depans ki anrejistre",
+    "spend24h": "Depans nan 24 èdtan ki sot pase yo",
+    "multiplierError": "Antre yon miltiplikatè 1 oswa plis",
+    "permissionDenied": "Ou pa gen pèmisyon pou jere alèt depans yo.",
+    "pushOffByCategory": "Fèmen nan Notifikasyon"
   }
 }

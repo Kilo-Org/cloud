@@ -891,7 +891,8 @@
       "chat": "Negeseuon sgwrs",
       "kiloclaw": "Gweithgaredd KiloClaw",
       "balance": "Rhybuddion balans",
-      "security": "Canfyddiadau diogelwch"
+      "security": "Canfyddiadau diogelwch",
+      "spend": "Rhybuddion gwariant"
     },
     "category": {
       "chatMessagesSubtitle": "atebion yn eich sgyrsiau",
@@ -906,7 +907,9 @@
       "balanceAlertsSubtitle": "rhybuddion am falans isel y sefydliad",
       "balanceAlertsUnavailable": "Ymunwch â sefydliad i gael rhybuddion balans isel.",
       "securityFindingsSubtitle": "canfyddiadau newydd a nodiadau atgoffa SLA",
-      "securityFindingsUnavailable": "Galluogwch asiant diogelwch Kilo ar gwmpas i gael canfyddiadau diogelwch."
+      "securityFindingsUnavailable": "Galluogwch asiant diogelwch Kilo ar gwmpas i gael canfyddiadau diogelwch.",
+      "spendAlertsSubtitle": "croesi trothwyon a sbigau bob awr",
+      "spendAlertsToggle": "Categori rhybuddion gwariant"
     },
     "action": {
       "openSession": "Agor y sesiwn"
@@ -3343,7 +3346,8 @@
     "channelName": "Asiantau gweithredol",
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo.",
     "openSession": "Agor",
-    "approveFailed": "Methu cymeradwyo. Tapiwch $t(common.approve) i geisio eto."
+    "approveFailed": "Methu cymeradwyo. Tapiwch $t(common.approve) i geisio eto.",
+    "newestResult": "Canlyniad diweddaraf"
   },
   "transcriptionModel": {
     "title": "Model trawsgrifio",
@@ -3379,5 +3383,28 @@
   },
   "launcher": {
     "openLastSession": "Agor y sesiwn ddiwethaf"
+  },
+  "spendAlerts": {
+    "subtitle": "Anfon rhybudd drwy e-bost neu wthiad at y cysylltiadau bilio pan fo gwariant y cwmpas hwn yn croesi terfyn neu'n codi uwchlaw ei gyfradd awr arferol.",
+    "enable": "Galluogi rhybuddion gwariant",
+    "thresholdTitle": "Croesi trothwy",
+    "thresholdSubtitle": "Mae gwariant crynodedig yn croesi dy derfyn",
+    "anomalyTitle": "Sbig awr",
+    "anomalySubtitle": "Mae awr ymhell uwchlaw cyfradd arferol y cwmpas hwn",
+    "limitLabel": "Terfyn (USD)",
+    "windowLabel": "Ffenestr",
+    "window24h": "24 awr",
+    "window7d": "7 diwrnod",
+    "window30d": "30 diwrnod",
+    "multiplierLabel": "Lluosydd y sbig",
+    "saved": "Wedi cadw gosodiadau rhybuddion gwariant",
+    "loadError": "Methwyd llwytho rhybuddion gwariant.",
+    "saveError": "Methwyd cadw rhybuddion gwariant.",
+    "empty": "Mae rhybuddion gwariant i ffwrdd. Tro nhw ymlaen i rybuddio cysylltiadau bilio'r cwmpas hwn.",
+    "noSpend": "Dim gwariant wedi'i gofnodi eto",
+    "spend24h": "Gwariant yn y 24 awr diwethaf",
+    "multiplierError": "Nodwch luosydd o 1 neu fwy",
+    "permissionDenied": "Nid oes gennyt ganiatâd i reoli rhybuddion gwariant.",
+    "pushOffByCategory": "I ffwrdd yn Hysbysiadau"
   }
 }

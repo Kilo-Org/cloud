@@ -843,7 +843,8 @@
       "chat": "Mesaje din conversații",
       "kiloclaw": "Activitate KiloClaw",
       "balance": "Alerte privind soldul",
-      "security": "Probleme de securitate detectate"
+      "security": "Probleme de securitate detectate",
+      "spend": "Alerte de cheltuieli"
     },
     "category": {
       "chatMessagesSubtitle": "răspunsuri în conversațiile tale",
@@ -858,7 +859,9 @@
       "balanceAlertsSubtitle": "avertismente de sold scăzut al organizației",
       "balanceAlertsUnavailable": "Alătură-te unei organizații pentru a primi alerte de sold scăzut.",
       "securityFindingsSubtitle": "constatări noi și mementouri SLA",
-      "securityFindingsUnavailable": "Activează agentul de securitate Kilo într-un domeniu pentru a primi probleme de securitate detectate."
+      "securityFindingsUnavailable": "Activează agentul de securitate Kilo într-un domeniu pentru a primi probleme de securitate detectate.",
+      "spendAlertsSubtitle": "depășiri de praguri și vârfuri orare",
+      "spendAlertsToggle": "Categoria alerte de cheltuieli"
     },
     "action": {
       "openSession": "Deschide sesiunea"
@@ -3214,7 +3217,8 @@
     "channelName": "Agenți activi",
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare.",
     "openSession": "Deschide",
-    "approveFailed": "Aprobarea nu a reușit. Atinge $t(common.approve) pentru a încerca din nou."
+    "approveFailed": "Aprobarea nu a reușit. Atinge $t(common.approve) pentru a încerca din nou.",
+    "newestResult": "Cel mai recent rezultat"
   },
   "transcriptionModel": {
     "title": "Model de transcriere",
@@ -3250,5 +3254,28 @@
   },
   "launcher": {
     "openLastSession": "Deschide ultima sesiune"
+  },
+  "spendAlerts": {
+    "subtitle": "Trimite o alertă prin e-mail sau push către contactele de facturare când cheltuielile acestui domeniu depășesc o limită sau sar peste ritmul orar obișnuit.",
+    "enable": "Activează alertele de cheltuieli",
+    "thresholdTitle": "Depășirea pragului",
+    "thresholdSubtitle": "Cheltuielile cumulate depășesc limita ta",
+    "anomalyTitle": "Vârf orar",
+    "anomalySubtitle": "O oră este mult peste ritmul obișnuit al acestui domeniu",
+    "limitLabel": "Limită (USD)",
+    "windowLabel": "Fereastră",
+    "window24h": "24 de ore",
+    "window7d": "7 zile",
+    "window30d": "30 de zile",
+    "multiplierLabel": "Multiplicatorul vârfului",
+    "saved": "Setările alertelor de cheltuieli au fost salvate",
+    "loadError": "Alertele de cheltuieli nu au putut fi încărcate.",
+    "saveError": "Alertele de cheltuieli nu au putut fi salvate.",
+    "empty": "Alertele de cheltuieli sunt oprite. Activează-le pentru a-i avertiza pe contactele de facturare ale acestui domeniu.",
+    "noSpend": "Încă nu s-a înregistrat nicio cheltuială",
+    "spend24h": "Cheltuieli din ultimele 24 de ore",
+    "multiplierError": "Introdu un multiplicator de 1 sau mai mare",
+    "permissionDenied": "Nu ai permisiunea de a gestiona alertele de cheltuieli.",
+    "pushOffByCategory": "Oprit în Notificări"
   }
 }

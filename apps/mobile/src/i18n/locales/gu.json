@@ -827,7 +827,8 @@
       "chat": "ચેટના સંદેશા",
       "kiloclaw": "KiloClawની પ્રવૃત્તિ",
       "balance": "બેલેન્સ અંગેની ચેતવણીઓ",
-      "security": "સુરક્ષા તપાસનાં તારણો"
+      "security": "સુરક્ષા તપાસનાં તારણો",
+      "spend": "ખર્ચની ચેતવણીઓ"
     },
     "category": {
       "chatMessagesSubtitle": "તમારી વાતચીતમાં જવાબો",
@@ -842,7 +843,9 @@
       "balanceAlertsSubtitle": "સંસ્થાનું બેલેન્સ ઓછું થવાની ચેતવણીઓ",
       "balanceAlertsUnavailable": "બેલેન્સ ચેતવણીઓ મેળવવા માટે સંસ્થામાં જોડાઓ.",
       "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર",
-      "securityFindingsUnavailable": "સુરક્ષા તારણો મેળવવા માટે વ્યાપમાં Kilo સુરક્ષા એજન્ટ ચાલુ કરો."
+      "securityFindingsUnavailable": "સુરક્ષા તારણો મેળવવા માટે વ્યાપમાં Kilo સુરક્ષા એજન્ટ ચાલુ કરો.",
+      "spendAlertsSubtitle": "મર્યાદા ઓળંગવી અને કલાકદીઠ ઉછાળા",
+      "spendAlertsToggle": "ખર્ચની ચેતવણીની શ્રેણી"
     },
     "action": {
       "openSession": "સેશન ખોલો"
@@ -3171,7 +3174,8 @@
     "channelName": "સક્રિય એજન્ટો",
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો.",
     "openSession": "ખોલો",
-    "approveFailed": "મંજૂર કરી શકાયું નહીં. ફરી પ્રયાસ કરવા $t(common.approve) પર ટૅપ કરો."
+    "approveFailed": "મંજૂર કરી શકાયું નહીં. ફરી પ્રયાસ કરવા $t(common.approve) પર ટૅપ કરો.",
+    "newestResult": "સૌથી નવું પરિણામ"
   },
   "transcriptionModel": {
     "title": "અવાજને લખાણમાં ફેરવવાનું મોડેલ",
@@ -3207,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "છેલ્લું સત્ર ખોલો"
+  },
+  "spendAlerts": {
+    "subtitle": "આ સ્કોપનો ખર્ચ મર્યાદા ઓળંગે ત્યારે અથવા તેના સામાન્ય કલાકદીઠ દરથી ઉપર ઉછાળે ત્યારે બિલિંગ સંપર્કોને ઇમેઇલ અથવા પુશ દ્વારા ચેતવણી મોકલો.",
+    "enable": "ખર્ચની ચેતવણીઓ ચાલુ કરો",
+    "thresholdTitle": "મર્યાદા ઓળંગવી",
+    "thresholdSubtitle": "ચાલુ ખર્ચ તમારી મર્યાદા ઓળંગે છે",
+    "anomalyTitle": "કલાકદીઠ ઉછાળો",
+    "anomalySubtitle": "એક કલાક આ સ્કોપના સામાન્ય દરથી ઘણો ઊંચો છે",
+    "limitLabel": "મર્યાદા (USD)",
+    "windowLabel": "સમયગાળો",
+    "window24h": "24 કલાક",
+    "window7d": "7 દિવસ",
+    "window30d": "30 દિવસ",
+    "multiplierLabel": "ઉછાળ ગુણક",
+    "saved": "ખર્ચની ચેતવણીની સેટિંગ્સ સાચવી",
+    "loadError": "ખર્ચની ચેતવણીઓ લોડ કરી શકાઈ નથી.",
+    "saveError": "ખર્ચની ચેતવણીઓ સાચવી શકાઈ નથી.",
+    "empty": "ખર્ચની ચેતવણીઓ બંધ છે. આ સ્કોપના બિલિંગ સંપર્કોને ચેતવવા માટે તેમને ચાલુ કરો.",
+    "noSpend": "હજી કોઈ ખર્ચ નોંધાયો નથી",
+    "spend24h": "છેલ્લા 24 કલાકનો ખર્ચ",
+    "multiplierError": "1 કે તેથી વધુ ગુણક દાખલ કરો",
+    "permissionDenied": "તમને ખર્ચની ચેતવણીઓનું સંચાલન કરવાની પરવાનગી નથી.",
+    "pushOffByCategory": "સૂચનાઓમાં બંધ"
   }
 }

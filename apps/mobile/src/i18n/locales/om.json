@@ -827,7 +827,8 @@
       "chat": "Ergaawwan marii",
       "kiloclaw": "Sochii KiloClaw",
       "balance": "Akeekkachiisa haftee maallaqaa",
-      "security": "Argannoowwan nageenyaa"
+      "security": "Argannoowwan nageenyaa",
+      "spend": "Akeekkachiisa baasii"
     },
     "category": {
       "chatMessagesSubtitle": "deebiiwwan mariiwwan kee keessatti",
@@ -842,7 +843,9 @@
       "balanceAlertsSubtitle": "akeekkachiisa haftee dhaabbataa xiqqaa",
       "balanceAlertsUnavailable": "Akeekkachiisa haftee xiqqaa argachuuf dhaabbata makami.",
       "securityFindingsSubtitle": "argannoowwan haaraa fi yaadachiisa SLA",
-      "securityFindingsUnavailable": "Argannoowwan nageenyaa argachuuf daangaa irratti eejentii nageenyaa Kilo bani."
+      "securityFindingsUnavailable": "Argannoowwan nageenyaa argachuuf daangaa irratti eejentii nageenyaa Kilo bani.",
+      "spendAlertsSubtitle": "daarbii daangaa fi olka'iinsa sa'aatii",
+      "spendAlertsToggle": "Ramaddii akeekkachiisa baasii"
     },
     "action": {
       "openSession": "Turtii bani"
@@ -3171,7 +3174,8 @@
     "channelName": "Eejentoota hojii irra jiran",
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi.",
     "openSession": "Bani",
-    "approveFailed": "Raggaasisuun hin danda'amne. Deebi'anii yaaluuf $t(common.approve) tuqi."
+    "approveFailed": "Raggaasisuun hin danda'amne. Deebi'anii yaaluuf $t(common.approve) tuqi.",
+    "newestResult": "Bu'aa haaraa"
   },
   "transcriptionModel": {
     "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",
@@ -3207,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "Turtii dhumaa bani"
+  },
+  "spendAlerts": {
+    "subtitle": "Yeroo baasiin naannoo kanaa daangaa darbu ykn sadarkaa sa'aatii baramaa isaa ol ka'u, qunnamtiiwwan kaffaltiitti imeelii ykn push ergaa.",
+    "enable": "Akeekkachiisa baasii dandeessisi",
+    "thresholdTitle": "Daangaa darbuu",
+    "thresholdSubtitle": "Baasiin yeroo ammaa daangaa kee darbaa jira",
+    "anomalyTitle": "Olka'iinsa sa'aatii",
+    "anomalySubtitle": "Sa'aanni tokko sadarkaa baramaa naannoo kanaa caalaa baay'ee ol jira",
+    "limitLabel": "Daangaa (USD)",
+    "windowLabel": "Yeroo",
+    "window24h": "Sa'aatii 24",
+    "window7d": "Guyyaa 7",
+    "window30d": "Guyyaa 30",
+    "multiplierLabel": "Baay'isaa olka'iinsaa",
+    "saved": "Qindaa'inni akeekkachiisa baasii olkaa'ame",
+    "loadError": "Akeekkachiisa baasii fiduun hin danda'amne.",
+    "saveError": "Akeekkachiisa baasii olkaa'uun hin danda'amne.",
+    "empty": "Akeekkachiisni baasii cufaa jira. Qunnamtiiwwan kaffaltii naannoo kanaa akeekkachiisuuf isa bansi.",
+    "noSpend": "Amma ammaatti baasiin galmeeffame hin jiru",
+    "spend24h": "Baasii sa'aatii 24 darban keessatti",
+    "multiplierError": "Baay'isaa 1 ykn isaa ol galchi",
+    "permissionDenied": "Akeekkachiisa baasii bulchuuf hayyamni sitti hin jiru.",
+    "pushOffByCategory": "Beeksisota keessatti cufaa"
   }
 }

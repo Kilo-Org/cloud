@@ -168,6 +168,9 @@ it('keeps the iOS keyboard height, which already reaches the screen bottom', asy
 
   const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
 
+  // The hook's occlusion is the keyboard's overlap with the screen bottom,
+  // which the iOS frame already reaches: the toast clears the reported height
+  // and keeps the standard gap above it.
   expect(toasters[0]?.props.offset).toBe(300 + TOAST_BOTTOM_GAP);
 });
 

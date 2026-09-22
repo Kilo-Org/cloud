@@ -3,7 +3,10 @@ import { TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import {
+  buildSessionModelOptions,
+  type SessionModelOption,
+} from '@/lib/hooks/use-session-model-options';
 
 import { ChatToolbar } from './chat-toolbar';
 
@@ -68,16 +71,61 @@ const MODEL_OPTIONS: SessionModelOption[] = [
   },
 ];
 
-function renderToolbar(): TestRenderer.ReactTestRenderer {
+// The remote CLI catalog repeats the vendor inside the display name
+// ("DeepSeek: DeepSeek V4 Flash 0731"), the string the explorer captured on the
+// composed chip.
+const CLI_PREFIXED_MODEL_NAME = 'DeepSeek: DeepSeek V4 Flash 0731';
+const CLI_STRIPPED_MODEL_NAME = 'DeepSeek V4 Flash 0731';
+
+function cliCatalogModelOptions(): SessionModelOption[] {
+  return buildSessionModelOptions({
+    activeSessionType: 'remote',
+    remoteModelState: {
+      ownerConnectionId: 'cli-owner',
+      protocol: 'v1',
+      refresh: 'idle',
+      catalog: {
+        protocolVersion: 1,
+        truncated: false,
+        providers: [
+          {
+            id: 'kilo',
+            name: 'Kilo',
+            models: [
+              {
+                id: 'deepseek/deepseek-v4-flash-0731',
+                name: CLI_PREFIXED_MODEL_NAME,
+                variants: [],
+                capabilities: { attachment: false, reasoning: true },
+                limits: { context: 200_000, output: 8192 },
+              },
+            ],
+          },
+        ],
+      },
+    },
+    observedModel: null,
+    remoteModelOverride: null,
+    gatewayModels: [],
+    gatewayModelsLoading: false,
+    organizationId: 'org-persisted',
+  }).options;
+}
+
+function renderToolbar(
+  model = 'deepseek/deepseek-v4.1-flash',
+  modelOptions: SessionModelOption[] = MODEL_OPTIONS,
+  variant = 'low'
+): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   TestRenderer.act(() => {
     ref.current = TestRenderer.create(
       createElement(ChatToolbar, {
         mode: 'code',
         onModeChange: vi.fn<(mode: string) => void>(),
-        model: 'deepseek/deepseek-v4.1-flash',
-        variant: 'low',
-        modelOptions: MODEL_OPTIONS,
+        model,
+        variant,
+        modelOptions,
         onModelSelect: vi.fn<(modelId: string, variant: string) => void>(),
         onPaste: vi.fn<() => void>(),
       })
@@ -163,5 +211,24 @@ describe('ChatToolbar long model name', () => {
 
     // The button still ends the chip's line at its trailing edge.
     expect(pasteButton?.props.className).toContain('ml-auto');
+  });
+
+  it('renders the vendor-stripped CLI model name in the chip, never the repeated prefix', () => {
+    const options = cliCatalogModelOptions();
+    const option = options[0];
+    if (!option) {
+      throw new Error('Expected one CLI catalog option');
+    }
+
+    const renderer = renderToolbar(option.id, options, '');
+
+    const labels = renderer.root
+      .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+      .map(node => node.props.children);
+
+    expect(labels).toContain(CLI_STRIPPED_MODEL_NAME);
+    expect(labels.some(label => typeof label === 'string' && label.includes('DeepSeek:'))).toBe(
+      false
+    );
   });
 });

@@ -35,29 +35,10 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
-// The native safe-area module cannot load in this node environment. The screen
-// reads its landscape side insets from it, so the mock returns the hoisted
-// `safeArea`; the alignment guard in `screen-insets.test.ts` holds that read to
-// the shared entry point.
-// ProfileScreen reads the landscape side insets, so the real native module
-// would load here. Its build requires `react-native` itself, whose Flow source
-// the vitest transform cannot parse (see `test/render-with-providers.tsx`), so
-// the harness mocks it exactly as `profile-screen.queries.mounted.test.tsx` does.
-// ProfileScreen reads the landscape side insets, so the real native module
-// would load here. Its build requires `react-native` itself, whose Flow source
-// the vitest transform cannot parse (see `test/render-with-providers.tsx`), so
-// the harness mocks it exactly as `profile-screen.queries.mounted.test.tsx` does.
-// The screen reads its side insets through `@/lib/screen-insets`, whose real
-// `react-native-safe-area-context` entry is a Flow source this pipeline cannot
-// transform; the insets are irrelevant to the sign-out flow.
-// The screen reads its side insets through `@/lib/screen-insets`; the native
-// module's source is not parseable by this project's transform, and the
-// sign-out confirmation does not depend on the values.
-// The Profile screen reads its landscape side insets through `@/lib/screen-insets`,
-// whose real module loads the native safe-area package. The node project cannot
-// load that native module, so the screen's own tests stub the hook.
-// The screen reads its side insets through `@/lib/screen-insets`, which imports
-// this native module; its untransformed source breaks the mounted project.
+// The Profile screen reads its side insets through `@/lib/screen-insets`, which
+// imports `react-native-safe-area-context`; that package's React Native source
+// is Flow-typed and the mounted project cannot transform it, so the module is
+// mocked here. The sign-out confirmation does not depend on the inset values.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));

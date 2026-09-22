@@ -110,4 +110,11 @@ describe('SessionListSearchHeader landscape sensor insets', () => {
     expect(classes).toContain('min-h-');
     expect(classes).not.toMatch(/(?:^|\s)py-/);
   });
+
+  it('keeps the placeholder on one line at any width', async () => {
+    // A narrow window with a large font scale made the placeholder wrap inside
+    // the field and the field grow with it (e1-list-bottom.png).
+    const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
+    expect(searchInput(renderer).props.numberOfLines).toBe(1);
+  });
 });

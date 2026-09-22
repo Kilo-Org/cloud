@@ -1,10 +1,5 @@
 /* eslint-disable max-lines -- the idle login screen owns every provider control, the SSO recovery block, and the email/OTP switch in one surface */
-import {
-  AppleAuthenticationButton,
-  AppleAuthenticationButtonStyle,
-  AppleAuthenticationButtonType,
-  isAvailableAsync as isAppleAuthAvailableAsync,
-} from 'expo-apple-authentication';
+import { isAvailableAsync as isAppleAuthAvailableAsync } from 'expo-apple-authentication';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, View } from 'react-native';
@@ -12,10 +7,12 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 import * as WebBrowser from 'expo-web-browser';
 
+import { AppleLogo } from '@/components/login/apple-logo';
 import { EmailOtpForm } from '@/components/login/email-otp-form';
 import { GoogleLogo } from '@/components/login/google-logo';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { KeyRound } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
   INLINE_LINK_BOX_CLASS,
@@ -25,6 +22,7 @@ import {
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { setLoginEmailDraft, setSsoRecoveryDraft, type SsoRecoveryDraft } from '@/lib/login-draft';
 import { cn } from '@/lib/utils';
 
@@ -54,6 +52,7 @@ export function IdleAuth({
     handleSsoError,
   } = useNativeAuth();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const [view, setView] = useState<'main' | 'otp'>('main');
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [browserAuthStarting, setBrowserAuthStarting] = useState(false);
@@ -219,30 +218,34 @@ export function IdleAuth({
       )}
 
       {showApple && (
-        <View
-          className={authBusy ? 'opacity-50' : undefined}
-          pointerEvents={authBusy ? 'none' : 'auto'}
+        // The provider row is ours, not Apple's native control: the native
+        // button titles itself in the device language, which left English
+        // "Sign in with Apple" next to the translated Google and passkey rows
+        // when the app language differed from the device language. The label
+        // comes from the catalog (`login.signInWithApple`), and the mark and
+        // outline chrome match the two rows below it.
+        <Button
+          variant="outline"
+          size="lg"
+          // Same chrome and no-flex-wrap row as the Google and passkey rows
+          // below: the label must stay on the icon's line at the shared 44pt
+          // floor, so all three provider rows keep one height.
+          className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
+          disabled={authBusy}
+          onPress={() => {
+            void signInWithApple();
+          }}
+          accessibilityLabel={t('login.signInWithApple')}
         >
-          <AppleAuthenticationButton
-            buttonType={AppleAuthenticationButtonType.SIGN_IN}
-            // WHITE_OUTLINE keeps Apple's control at the same secondary weight
-            // as the outlined Google and passkey buttons, so the brand-filled
-            // "Continue" is the surface's only filled primary action. Apple's
-            // solid BLACK/WHITE styles made a second full-width filled button,
-            // and Apple's own guidance picks the outlined style when the
-            // background does not contrast with a solid fill.
-            buttonStyle={AppleAuthenticationButtonStyle.WHITE_OUTLINE}
-            cornerRadius={8}
-            // eslint-disable-next-line react-native/no-inline-styles -- AppleAuthenticationButton isn't NativeWind-aware; height/width must be set via style, not className
-            style={{ height: 44, width: '100%' }}
-            onPress={() => {
-              if (!authBusy) {
-                void signInWithApple();
-              }
-            }}
-            accessibilityLabel={t('login.signInWithApple')}
-          />
-        </View>
+          {busy === 'apple' ? (
+            <ActivityIndicator size="small" />
+          ) : (
+            <AppleLogo size={18} color={colors.foreground} />
+          )}
+          <Text className="flex-1 text-center text-[17px] font-medium">
+            {t('login.signInWithApple')}
+          </Text>
+        </Button>
       )}
 
       {googleConfigured && (
@@ -282,7 +285,13 @@ export function IdleAuth({
             }}
             accessibilityLabel={t('login.signInWithPasskey')}
           >
-            {busy === 'passkey' ? <ActivityIndicator size="small" /> : null}
+            {busy === 'passkey' ? (
+              <ActivityIndicator size="small" />
+            ) : (
+              // Same leading-glyph slot as the Apple and Google rows, so the
+              // three provider options read as one group.
+              <KeyRound size={18} color={colors.foreground} />
+            )}
             <Text className="flex-1 text-center text-[17px] font-medium">
               {t('login.signInWithPasskey')}
             </Text>
@@ -378,14 +387,19 @@ export function IdleAuth({
         <Text className="text-xs text-muted-foreground">{t('login.termsSuffix')}</Text>
       </View>
       <Button
-        variant="ghost"
+        // A text action that opens the browser sign-in options. It wears the
+        // same underlined primary link treatment as the Terms and Privacy
+        // Policy links above, so it reads as tappable rather than as plain bold
+        // text with no affordance.
+        variant="link"
+        className="active:opacity-60"
         disabled={authBusy}
         onPress={() => {
           void startBrowserAuth();
         }}
         accessibilityLabel={t('login.moreSignInOptions')}
       >
-        <Text>{t('login.moreSignInOptions')}</Text>
+        <Text className="underline">{t('login.moreSignInOptions')}</Text>
       </Button>
     </View>
   );

@@ -34,10 +34,11 @@ const SAFE_AREA_MODULE = /react-native-safe-area-context/;
 
 /**
  * The lines that carry a screen's own inset handling: the entry-point import
- * and hook call, plus every line that consumes the values the hook returns. A
- * screen may legitimately fork on the platform elsewhere — the Profile screen
- * confirms sign-out with an in-app dialog on Android — so the platform check
- * covers the alignment path this entry point owns, not every line of the file.
+ * and hook call, plus every line that consumes the values the hook returns. The
+ * platform check covers the alignment path this entry point owns, not every
+ * line of the file: a screen may legitimately fork on the platform elsewhere,
+ * and the Profile screen keeps its sign-out confirmation on the shared
+ * `Alert.alert` for both platforms.
  *
  * The Profile screen applies its side insets as
  * `{ marginLeft: left, marginRight: right }` and hands that style on; keying on
@@ -60,8 +61,7 @@ const PROFILE_SCREEN = '../components/profile-screen.tsx';
  * The Profile screen's alignment path: from the line that reads
  * `useScreenSideInsets` through the line that first applies a side inset. Only
  * this path must stay free of per-platform branches. A fork elsewhere in the
- * screen — the Android sign-out confirmation, for example — is not on the
- * insets path and must not fail the guard.
+ * screen is not on the insets path and must not fail the guard.
  */
 function alignmentPath(profileSource: string): string {
   const lines = profileSource.split('\n');
@@ -95,10 +95,9 @@ describe('screen side insets: one implementation for both platforms', () => {
     expect(profile, `${PROFILE_SCREEN} imports the native safe-area module again`).not.toMatch(
       SAFE_AREA_MODULE
     );
-    // The screen forks once on purpose: Android's native alert cannot show a
-    // red destructive button, so sign-out opens the in-app confirmation there.
-    // That fork is not on the insets path — every other line, and in
-    // particular the ones that carry the insets, stays one implementation.
+    // Only the lines that carry the insets must stay one implementation for
+    // both platforms; a fork elsewhere in the screen is not on the insets path
+    // and must not fail this guard.
     expect(
       insetAlignmentLines(profile),
       `${PROFILE_SCREEN} carries a per-platform branch on its inset path`

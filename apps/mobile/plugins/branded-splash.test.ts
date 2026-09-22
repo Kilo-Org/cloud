@@ -172,12 +172,10 @@ describe('shared branded splash', () => {
       },
     });
     // Assert the color this plugin generates with containment, not by pinning
-    // the host's whole palette. The compile above inspects the fresh root
-    // `createAndroidProject()` created (no prebuilt `colors.xml`), and a
-    // worktree with a prebuilt `android/` directory merges that file's extra
-    // entries (iconBackground, colorPrimary, …) in, so pin `resources.color` to
-    // the generated entry the same way the styles assertion below pins its
-    // theme: not the whole array and not its exact length.
+    // the full `resources.color` array: containment matches the generated
+    // `splashscreen_background` entry regardless of what other entries the
+    // generated project contains, the same way the styles assertion below pins
+    // its theme — not the whole array and not its exact length.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([

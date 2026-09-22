@@ -21,11 +21,55 @@ import {
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 
+/** React compares hook dependencies one position at a time with `Object.is`. */
+function sameHookDeps(
+  a: readonly unknown[] | undefined,
+  b: readonly unknown[] | undefined
+): boolean {
+  if (a === undefined || b === undefined || a.length !== b.length) {
+    return false;
+  }
+  for (const [position, value] of a.entries()) {
+    if (!Object.is(value, b[position])) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // The harness invokes the memoized component directly (no React renderer), so
-// the identity `useCallback` mock keeps the stabilized handler callable there.
+// the identity `useCallback` mock keeps the stabilized handler callable there,
+// and `useMemo` replays React's contract from one slot per hook position: the
+// slot's value is reused while its dependencies are referentially equal.
+// `useCallback` is the component's last hook before its two `useMemo` calls, so
+// each call opens a render and points the next `useMemo` at slot 0.
+const hooks = vi.hoisted(() => {
+  const slots: { deps: readonly unknown[] | undefined; value: unknown }[] = [];
+  let index = 0;
+  return {
+    openRender: () => {
+      index = 0;
+    },
+    memo: <T>(factory: () => T, deps?: readonly unknown[]): T => {
+      const slot = slots[index];
+      index += 1;
+      if (slot && sameHookDeps(slot.deps, deps)) {
+        return slot.value as T;
+      }
+      const value = factory();
+      slots[index - 1] = { deps, value };
+      return value;
+    },
+  };
+});
+
 vi.mock('react', async importOriginal => ({
   ...(await importOriginal<typeof React>()),
-  useCallback: <T>(fn: T) => fn,
+  useCallback: <T>(fn: T) => {
+    hooks.openRender();
+    return fn;
+  },
+  useMemo: hooks.memo,
 }));
 
 vi.mock('react-i18next', async importOriginal => {
@@ -92,6 +136,9 @@ vi.mock('./part-types', async () => {
     ...actual,
     isFilePart: vi.fn(() => false),
     isTextPart: vi.fn(() => false),
+    // Wrapped, not replaced: the memoization test counts the scan, and every
+    // other test keeps the real first-human-part behaviour.
+    firstHumanText: vi.fn(actual.firstHumanText),
   };
 });
 vi.mock('./use-message-copy', () => ({
@@ -562,6 +609,28 @@ describe('MessageBubble copy-to-composer human text', () => {
     expect(
       findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Copy to composer')
     ).toBeNull();
+  });
+});
+
+describe('MessageBubble derived text memoization', () => {
+  it('derives the user text and copy text once per parts array', async () => {
+    const { firstHumanText } = await import('./part-types');
+    const firstHumanTextSpy = vi.mocked(firstHumanText);
+    firstHumanTextSpy.mockClear();
+
+    const message = userMessage('m-memo');
+    await renderBubble(message);
+    expect(firstHumanTextSpy).toHaveBeenCalledTimes(1);
+
+    // The same parts array is the memo key, so the second render reuses the
+    // slot and never re-scans the parts for the copy text or the join.
+    await renderBubble(message);
+    expect(firstHumanTextSpy).toHaveBeenCalledTimes(1);
+
+    // A fresh parts array misses the memo, so the derivation is keyed on the
+    // part list rather than skipped outright.
+    await renderBubble(userMessage('m-memo-next'));
+    expect(firstHumanTextSpy).toHaveBeenCalledTimes(2);
   });
 });
 

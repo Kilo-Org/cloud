@@ -98,13 +98,14 @@ export function NewSessionConfigureForm({
   // either platform, so the screen needs two floors: the navigation-bar inset
   // — the Start action sits in a footer below the scroll body, and without the
   // inset the footer would render in the navigation bar's region (a formSheet
-  // leaves that region exposed below itself; the picker's bottom strip showed
-  // its sliver) — and the keyboard height, because the composer auto-focuses
-  // on open and without the keyboard floor the Start control stays half-hidden
-  // behind the keyboard strip. The keyboard-lift view is the app's
-  // cross-platform IME primitive (keyboardDidShow/DidHide on Android,
-  // keyboardWillShow/WillHide on iOS), so the same implementation runs on both
-  // platforms; the footer is its second child, so the IME lifts the action too.
+  // over this screen no longer leaves that region exposed below itself: the
+  // sheet is fixed at its shared options, `sheetShouldOverflowTopInset`) — and
+  // the keyboard height, because the composer auto-focuses on open and without
+  // the keyboard floor the Start control stays half-hidden behind the keyboard
+  // strip. The keyboard-lift view is the app's cross-platform IME primitive
+  // (keyboardDidShow/DidHide on Android, keyboardWillShow/WillHide on iOS), so
+  // the same implementation runs on both platforms; the footer is its second
+  // child, so the IME lifts the action too.
   // The ScrollView's keyboard-inset adjustment stays on for focused-field
   // scroll-into-view; it sizes against the scroll view's own frame, which
   // already ends above the IME, so the two never stack into a double lift.

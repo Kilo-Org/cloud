@@ -89,6 +89,9 @@ import {
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  spend_alert_settings,
+  spend_alert_hourly,
+  spend_alert_deliveries,
   contributor_champion_events,
   contributor_champion_memberships,
   contributor_champion_contributors,
@@ -1087,6 +1090,10 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
  *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
  *   user_notification_preferences, quick_chat_threads, quick_chat_messages)
+ * - spend alert settings and their rules/state, the personal-scope hourly
+ *   counters, and the personal-scope deliveries (recipients contain billing
+ *   contact PII); organization-scoped alert rows are retained, with the deleted
+ *   member's id and address removed from their delivery recipients
  * - operation_ledgers (keyed by kilo_user_id)
  * - analytics_event_outbox (keyed by distinct_id: the user's email or, when the
  *   writer's email lookup failed, the user id)
@@ -1602,6 +1609,51 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(user_notification_preferences)
     .where(eq(user_notification_preferences.user_id, userId));
+  // Spend alerts are account-owned configuration, counters, and delivery
+  // payloads; delivery recipients carry billing contact PII. Personal scope
+  // keys use `user:<id>`, and deleting the settings row cascades to its rules
+  // and per-rule state. Organization-scoped alert rows belong to the
+  // organization, not the deleted member, but the member's own id and address
+  // are copied into those rows' recipients when they are a billing contact:
+  // strip both there so the deleted user's PII does not survive in the outbox.
+  const personalSpendAlertScopeKey = `user:${userId}`;
+  await tx.delete(spend_alert_settings).where(eq(spend_alert_settings.kilo_user_id, userId));
+  await tx
+    .delete(spend_alert_hourly)
+    .where(eq(spend_alert_hourly.scope_key, personalSpendAlertScopeKey));
+  await tx
+    .delete(spend_alert_deliveries)
+    .where(eq(spend_alert_deliveries.scope_key, personalSpendAlertScopeKey));
+  await tx.execute(sql`
+    UPDATE spend_alert_deliveries
+    SET
+      recipients = jsonb_build_object(
+        'userIds',
+        COALESCE(
+          (
+            SELECT jsonb_agg(entry.recipient)
+            FROM jsonb_array_elements_text(COALESCE(recipients->'userIds', '[]'::jsonb)) AS entry(recipient)
+            WHERE entry.recipient <> ${userId}::text
+          ),
+          '[]'::jsonb
+        ),
+        'emails',
+        COALESCE(
+          (
+            SELECT jsonb_agg(entry.recipient)
+            FROM jsonb_array_elements_text(COALESCE(recipients->'emails', '[]'::jsonb)) AS entry(recipient)
+            WHERE entry.recipient <> ${originalEmail}::text
+          ),
+          '[]'::jsonb
+        )
+      ),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE scope_key LIKE 'org:%'
+      AND (
+        recipients->'userIds' ? ${userId}::text
+        OR recipients->'emails' ? ${originalEmail}::text
+      )
+  `);
   await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
   await tx
     .delete(kilo_pass_scheduled_changes)

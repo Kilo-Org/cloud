@@ -1,3 +1,8 @@
+// Deliberately not named `_layout.mounted.test.tsx`: Expo Router treats every file
+// whose first dot segment is `_layout` as a layout, and the typed-routes generator
+// (`getRoutes` with `ignore: [/_layout\.[tj]sx?$/]`) then makes this test the layout of
+// `(tabs)` and drops the whole subtree under it from `.expo/types/router.d.ts`, which
+// breaks the typecheck for every `/(app)/(tabs)/...` href.
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

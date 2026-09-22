@@ -7,6 +7,7 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   getSandboxSelectionCapabilities,
+  isByocIncompatibleAllocation,
   isSandboxAllocationAvailable,
   type SandboxAllocationCapability,
   type SessionRepositoryType,
@@ -65,7 +66,11 @@ export async function resolveSavedSandboxAllocation(args: {
   for (const candidate of [candidates.repositoryAllocation, candidates.contextAllocation]) {
     if (candidate === undefined) continue;
     const allocation = candidate as SandboxAllocation;
-    if (!isSelectableSandboxAllocation(allocation)) continue;
+    if (
+      !isSelectableSandboxAllocation(allocation) ||
+      isByocIncompatibleAllocation(env, owner, allocation)
+    )
+      continue;
     // The same check as the picker, so a saved choice that the picker offered is
     // never skipped here.
     if (isSandboxAllocationAvailable(capabilities, allocation)) return allocation;

@@ -1,3 +1,4 @@
+import { byocVercelOwnerSchema } from './byoc/vercel-owner.js';
 import { Hono } from 'hono';
 import type { Context, Next } from 'hono';
 import { trpcServer } from '@hono/trpc-server';
@@ -79,8 +80,35 @@ import {
   widgetApprovalKeyRequestSchema,
   type WidgetApproval,
 } from './widget-approval-key.js';
+import { getVercelSnapshotBuildStub } from './byoc/vercel-snapshot-build-stub.js';
+import { getVercelRuntimeIdentity } from './byoc/vercel-runtime-identity.js';
+import { z } from 'zod';
+import { isOrgInList } from './sandbox-id.js';
 
 const app = new Hono<HonoContext>();
+
+const SnapshotBuildOwnerSchema = byocVercelOwnerSchema;
+const SnapshotBuildStartInputSchema = z
+  .object({
+    credentialId: z.uuid(),
+    buildGeneration: z.uuid(),
+  })
+  .and(SnapshotBuildOwnerSchema);
+const SnapshotBuildCleanupInputSchema = z
+  .object({
+    credentialId: z.uuid(),
+    buildGeneration: z.uuid(),
+    snapshotId: z.string().min(1).max(256).optional(),
+  })
+  .and(SnapshotBuildOwnerSchema);
+
+function snapshotBuildOwnerKey(input: z.infer<typeof SnapshotBuildOwnerSchema>): string {
+  return input.organizationId !== undefined ? input.organizationId : `user:${input.userId}`;
+}
+
+function snapshotBuildOwnerId(input: z.infer<typeof SnapshotBuildOwnerSchema>): string {
+  return input.organizationId !== undefined ? input.organizationId : input.userId;
+}
 
 function isAllowedWebSocketOrigin(env: Env, origin: string | undefined): boolean {
   const allowedOrigins = (env.WS_ALLOWED_ORIGINS || '')
@@ -296,6 +324,83 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 }
 
 registerControlLogRoutes(app);
+
+app.get('/internal/byoc/vercel-enrollment/:organizationId', (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const organizationId = z.uuid().safeParse(c.req.param('organizationId'));
+  if (!organizationId.success) return c.text('Invalid organization ID', 400);
+
+  return c.json({ enrolled: isOrgInList(c.env.BYOC_VERCEL_IDS, organizationId.data) }, 200, {
+    'Cache-Control': 'no-store',
+  });
+});
+
+app.get('/internal/byoc/vercel-enrollment/user/:userId', (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const userId = z.string().min(1).safeParse(c.req.param('userId'));
+  if (!userId.success) return c.text('Invalid user ID', 400);
+
+  return c.json({ enrolled: isOrgInList(c.env.BYOC_VERCEL_IDS, userId.data) }, 200, {
+    'Cache-Control': 'no-store',
+  });
+});
+
+app.get('/internal/byoc/vercel-runtime-identity', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  try {
+    return c.json(await getVercelRuntimeIdentity(), 200, { 'Cache-Control': 'no-store' });
+  } catch {
+    return c.text('Vercel runtime identity could not be resolved', 502);
+  }
+});
+
+app.post('/internal/byoc/vercel-snapshot-build/start', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const input = SnapshotBuildStartInputSchema.safeParse(await c.req.json().catch(() => null));
+  if (!input.success) return c.text('Invalid request', 400);
+  if (!isOrgInList(c.env.BYOC_VERCEL_IDS, snapshotBuildOwnerId(input.data))) {
+    return c.text('Owner is not enrolled in Vercel compute', 403);
+  }
+
+  try {
+    await withDORetry(
+      () => getVercelSnapshotBuildStub(c.env, snapshotBuildOwnerKey(input.data)),
+      stub => stub.start(input.data),
+      'startVercelSnapshotBuild'
+    );
+  } catch {
+    return c.text('Snapshot build could not be started', 502);
+  }
+  return c.json({ accepted: true }, 202);
+});
+
+app.post('/internal/byoc/vercel-snapshot-build/cleanup', async (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const input = SnapshotBuildCleanupInputSchema.safeParse(await c.req.json().catch(() => null));
+  if (!input.success) return c.text('Invalid request', 400);
+
+  try {
+    await withDORetry(
+      () => getVercelSnapshotBuildStub(c.env, snapshotBuildOwnerKey(input.data)),
+      stub => stub.cleanup(input.data),
+      'cleanupVercelSnapshotBuild'
+    );
+  } catch {
+    return c.text('Snapshot build resources could not be cleaned up', 502);
+  }
+
+  return c.body(null, 204);
+});
 
 app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
   return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');

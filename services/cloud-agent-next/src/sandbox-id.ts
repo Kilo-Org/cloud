@@ -1,3 +1,4 @@
+import { enrolledByocVercelOwner } from './byoc/vercel-owner.js';
 import {
   CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION,
   CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
@@ -17,12 +18,6 @@ import {
   type SessionPlane,
 } from './session-plane.js';
 import type { Sandbox } from '@cloudflare/sandbox';
-import {
-  parseVercelSandboxEnrollment,
-  parseVercelSandboxRuntimeConfig,
-  type VercelSandboxEnrollmentEnv,
-  type VercelSandboxRuntimeConfigEnv,
-} from './agent-sandbox/vercel/vercel-runtime-config.js';
 import {
   isCloudflareContainersEnrolled,
   type CloudflareContainersEnrollmentEnv,
@@ -71,6 +66,8 @@ export type SandboxRoutingOptions = {
    * allowlist and otherwise fall back to the owner-scoped shared identity.
    */
   legacyFallback?: boolean;
+  /** BYOC Vercel is intrinsically isolated and never uses a shared owner route. */
+  byoc?: boolean;
 };
 
 /**
@@ -241,9 +238,8 @@ export type SandboxSelection = {
 
 export type SandboxSelectionEnv = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
-} & VercelSandboxEnrollmentEnv &
-  VercelSandboxRuntimeConfigEnv &
-  CloudflareContainersEnrollmentEnv &
+  BYOC_VERCEL_IDS?: string;
+} & CloudflareContainersEnrollmentEnv &
   Pick<
     Env,
     | 'CLOUD_AGENT_CONTAINER_BILLING_ENABLED'
@@ -262,10 +258,8 @@ type SelectSandboxForNewSessionInput = {
 };
 
 /**
- * Resolves the sandbox provider for an already-computed sandbox ID. Vercel
- * is call-home only: isolated `workspace_` sessions whose owner is on
- * `VERCEL_SANDBOX_ORG_IDS` (`*` includes personal) with complete operational
- * configuration. Legacy `agent_` sessions and everything else stay on Cloudflare.
+ * Resolves the platform provider or an explicitly selected allocation.
+ * Vercel admission belongs to BYOC registration; platform defaults use Cloudflare.
  */
 export function selectSandboxProvider(input: {
   env: SandboxSelectionEnv;
@@ -310,22 +304,6 @@ export function selectDefaultSandboxProvider(input: {
   });
   const eligible = (provider: AgentSandboxProvider): boolean =>
     !enforced || providerSupportsEnforcedBilling(provider);
-
-  const enrollment = parseVercelSandboxEnrollment(input.env);
-  const runtimeConfig = parseVercelSandboxRuntimeConfig(input.env);
-  const enrolled =
-    input.orgId !== undefined
-      ? enrollment.orgIds.has('*') || enrollment.orgIds.has(input.orgId)
-      : enrollment.allowPersonal;
-  const useVercel =
-    eligible('vercel') &&
-    input.plane === 'control' &&
-    input.isolated &&
-    enrollment.enabled &&
-    enrolled &&
-    runtimeConfig !== undefined;
-
-  if (useVercel) return 'vercel';
 
   const useContainers =
     eligible('cloudflare-containers') &&
@@ -405,6 +383,9 @@ export function getDefaultSandboxDestination(
   env: SandboxSelectionEnv & ControlPlaneOwnerEnv,
   owner: { userId: string; orgId?: string }
 ): SandboxDestination {
+  if (enrolledByocVercelOwner(env, owner) !== undefined) {
+    return { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' };
+  }
   const provider = selectDefaultSandboxProvider({
     env,
     orgId: owner.orgId,
@@ -412,9 +393,6 @@ export function getDefaultSandboxDestination(
     plane: sessionPlaneForNewOwner(env, owner, { createdOnPlatform: 'cloud-agent-web' }),
     isolated: true,
   });
-  if (provider === 'vercel') {
-    return { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' };
-  }
   if (provider === 'cloudflare-containers') {
     return getSandboxAllocationRequest(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION);
   }
@@ -489,6 +467,9 @@ export async function generateSandboxRoutingTarget(
   }
   if (routingOptions.createdOnPlatform === 'code-review') {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'crv') };
+  }
+  if (routingOptions.byoc) {
+    return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };
   }
   if (allocation !== 'cloudflare-shared') {
     const preserveLegacySharedRouting =

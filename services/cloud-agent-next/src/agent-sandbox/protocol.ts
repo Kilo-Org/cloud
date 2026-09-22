@@ -17,6 +17,7 @@ import type { SandboxBillingAdmissionResult } from '../container-usage-context.j
 import type { SandboxClassName } from '../container-usage-context.js';
 import type { BillingContext } from '@kilocode/container-usage';
 import type { SandboxId } from '../types.js';
+import type { SandboxProviderBinding } from '../sandbox-provider-binding.js';
 
 export type SandboxDeleteReason = 'explicit' | 'retention-expired' | 'recovery' | 'late-create';
 
@@ -209,6 +210,7 @@ export type ProviderDeletionPlan =
 export type AgentSandboxLifecycleHost = {
   storage: DurableObjectStorage;
   runtimeContext: AgentSandboxRuntimeContext;
+  getProviderBinding(): Promise<SandboxProviderBinding | undefined>;
   scheduleAlarmAtOrBefore(deadline: number): Promise<void>;
   eraseDurableObjectState(): Promise<void>;
   purgeDeletedSessionPayload(): Promise<void>;

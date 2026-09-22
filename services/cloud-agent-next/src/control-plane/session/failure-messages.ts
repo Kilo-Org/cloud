@@ -22,6 +22,11 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   prompt_failed: 'Prompt delivery failed',
   sandbox_stopped: 'The sandbox stopped while waiting for an answer',
   execution_limit: 'The turn exceeded its time limit',
+  byoc_credential_missing: 'Vercel compute credentials are no longer available',
+  byoc_vercel_not_ready: 'Vercel compute setup is not ready',
+  byoc_vercel_forbidden: 'Vercel rejected access to your compute account',
+  byoc_vercel_capacity: 'Vercel compute capacity is unavailable',
+  byoc_vercel_snapshot_missing: 'The Vercel runtime snapshot is missing. Run setup again.',
 };
 
 export function isControlPlaneFailureReason(value: string): value is ControlPlaneFailureReason {

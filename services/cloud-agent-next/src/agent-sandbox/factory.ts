@@ -1,4 +1,9 @@
-import { getSandboxProvider, type SessionMetadata } from '../persistence/session-metadata.js';
+import { VERCEL_BYOC_REQUIRED_MESSAGE } from '../byoc/vercel-owner.js';
+import {
+  getSandboxProvider,
+  getSandboxProviderBinding,
+  type SessionMetadata,
+} from '../persistence/session-metadata.js';
 import type { Env } from '../types.js';
 import {
   AgentSandboxUnavailableError,
@@ -10,7 +15,7 @@ import {
 import { CloudflareAgentSandbox } from './cloudflare/cloudflare-agent-sandbox.js';
 import { VercelAgentSandbox } from './vercel/vercel-agent-sandbox.js';
 import { VercelSandboxLifecycle } from './vercel/vercel-lifecycle.js';
-import { resolveVercelSandboxRuntimeConfig } from './vercel/vercel-runtime-config.js';
+import { resolveByocVercelRuntimeConfig } from '../byoc/vercel-credential-resolver.js';
 
 export function createAgentSandbox(
   env: Env,
@@ -18,14 +23,14 @@ export function createAgentSandbox(
   runtimeContext?: AgentSandboxRuntimeContext
 ): AgentSandbox {
   if (getSandboxProvider(metadata) === 'vercel') {
-    const config = resolveVercelSandboxRuntimeConfig(env, metadata.workspace?.providerRuntime);
-    if (!config) {
-      throw new AgentSandboxUnavailableError(
-        'Vercel sandbox operational configuration is incomplete',
-        'provider_not_configured'
-      );
+    const binding = getSandboxProviderBinding(metadata);
+    const source = binding.kind === 'vercel' ? binding.source : undefined;
+    if (source?.kind === 'byoc') {
+      return new VercelAgentSandbox(metadata, undefined, runtimeContext, {
+        resolveConfig: () => resolveByocVercelRuntimeConfig(env, source),
+      });
     }
-    return new VercelAgentSandbox(metadata, config, runtimeContext);
+    throw new AgentSandboxUnavailableError(VERCEL_BYOC_REQUIRED_MESSAGE, 'provider_not_configured');
   }
   if (getSandboxProvider(metadata) === 'cloudflare-containers') {
     throw new AgentSandboxUnavailableError(

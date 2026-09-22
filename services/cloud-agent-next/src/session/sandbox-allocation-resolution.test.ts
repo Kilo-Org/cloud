@@ -21,7 +21,7 @@ const owner = { userId: 'oauth/user', orgId: 'org-id' };
 
 // Selection is enabled and Vercel is configured. Cloudflare containers are not
 // enrolled, and credential containment is on by default.
-const selectionEnv = {
+const selectionEnv = Object.assign({} as Env, {
   SANDBOX_SELECTION_IDS: 'org-id',
   VERCEL_TOKEN: 'test-token',
   VERCEL_TEAM_ID: 'team-id',
@@ -31,7 +31,7 @@ const selectionEnv = {
   VERCEL_SANDBOX_RUNTIME: 'node24',
   VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
   VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
-} satisfies Partial<Env>;
+});
 const env = selectionEnv as Env;
 const enrolledEnv = { ...selectionEnv, CLOUDFLARE_CONTAINERS_ORG_IDS: 'org-id' } as Env;
 const withoutVercelEnv = { SANDBOX_SELECTION_IDS: 'org-id' } as Env;
@@ -94,7 +94,7 @@ describe('resolveSavedSandboxAllocation', () => {
       contextAllocation: 'vercel-small',
     });
 
-    await expect(resolve()).resolves.toBe('vercel-small');
+    await expect(resolve()).resolves.toBeUndefined();
   });
 
   it('skips a saved Vercel choice for a GitLab repository', async () => {
@@ -120,10 +120,12 @@ describe('resolveSavedSandboxAllocation', () => {
     }
   );
 
-  it('keeps a saved Vercel choice when nothing restricts it', async () => {
+  it('keeps a saved Vercel choice only for a BYOC-enrolled owner', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({ contextAllocation: 'vercel-small' });
 
-    await expect(resolve()).resolves.toBe('vercel-small');
+    await expect(resolve({ env: { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env })).resolves.toBe(
+      'vercel-small'
+    );
   });
 
   it('returns nothing when no saved setting resolves', async () => {

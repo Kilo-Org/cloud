@@ -1,3 +1,4 @@
+import { byocVercelOwnerFields, VERCEL_BYOC_REQUIRED_MESSAGE } from '../byoc/vercel-owner.js';
 /**
  * Worker-side projections from the public grouped create/send inputs onto the
  * control-plane V2 Durable Object RPCs.
@@ -167,6 +168,21 @@ export function buildControlPlaneSandboxSelection(
   const provider = metadata.workspace?.sandboxProvider ?? 'cloudflare';
   const allocation = metadata.workspace?.sandboxAllocation;
   const sandboxKind = metadata.workspace?.sandboxKind;
+  const binding = metadata.workspace?.sandboxProviderBinding;
+  const byoc =
+    binding?.kind === 'vercel' && binding.source.kind === 'byoc'
+      ? { ...byocVercelOwnerFields(binding.source), credentialId: binding.source.credentialId }
+      : undefined;
+  if (provider === 'vercel') {
+    if (!byoc) throw new ControlPlaneRegistrationError(VERCEL_BYOC_REQUIRED_MESSAGE);
+    const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
+    return {
+      provider,
+      configuration: resources === undefined ? { provider } : { provider, resources },
+      byoc,
+      ...(sandboxKind ? { sandboxKind } : {}),
+    };
+  }
   const enforcementRequested = isCloudAgentContainerBillingEnabled(env, metadata.identity);
   const billing = {
     ...buildSandboxBillingInput(metadata, sandboxId, enforcementRequested),
@@ -183,14 +199,6 @@ export function buildControlPlaneSandboxSelection(
       : { egressAllowlist: metadata.workspace.egressAllowlist }),
   };
   switch (provider) {
-    case 'vercel': {
-      const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
-      return {
-        provider,
-        configuration: resources === undefined ? { provider } : { provider, resources },
-        ...pinned,
-      };
-    }
     case 'cloudflare-containers': {
       const instance = getSandboxAllocationInstance(allocation);
       return {

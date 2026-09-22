@@ -9,7 +9,7 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   sandboxSelectionCapabilitiesSchema,
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
@@ -83,7 +83,7 @@ function findOption(
   allocation: string
 ): SandboxSelectionCapabilities['options'][number] | undefined {
   return capabilities.options.find(
-    option => getKiloSandboxAllocation(option.allocation) === allocation
+    option => getSandboxAllocation(option.allocation) === allocation
   );
 }
 

@@ -21,6 +21,7 @@ import { renewRuntimeAuthorization } from '@kilocode/worker-utils/runtime-author
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
+  getSandboxProviderBinding,
   getSandboxProvider,
   parseSessionMetadata,
   serializeSessionMetadata,
@@ -32,6 +33,7 @@ import {
   sessionRuntimeLocator,
   type SessionRuntimeLocator,
 } from '../sandbox-control/worktree-ownership.js';
+import { sameSandboxProviderBinding } from '../sandbox-provider-binding.js';
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import { renderRecentActivity } from '../callbacks/recent-activity.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
@@ -795,6 +797,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       this.sandboxLifecycle = createAgentSandboxLifecycle(this.env, {
         storage: this.ctx.storage,
         runtimeContext: this.getAgentSandboxRuntimeContext(),
+        getProviderBinding: async () => {
+          const metadata = await this.getStoredMetadata();
+          return metadata ? getSandboxProviderBinding(metadata) : undefined;
+        },
         scheduleAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
         eraseDurableObjectState: () => this.eraseDurableObjectState(),
         purgeDeletedSessionPayload: () => this.purgeDeletedSessionPayload(),
@@ -2038,7 +2044,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       if (existingMetadata.clone?.reportingCreatedAt && existingMetadata.initialMessage?.id) {
         newMetadata.initialMessage = existingMetadata.initialMessage;
       }
-      if (getSandboxProvider(existingMetadata) !== getSandboxProvider(newMetadata)) {
+      if (
+        !sameSandboxProviderBinding(
+          getSandboxProviderBinding(existingMetadata),
+          getSandboxProviderBinding(newMetadata)
+        )
+      ) {
         throw new Error('Registered sandbox provider cannot be changed');
       }
       if (existingMetadata.workspace?.sandboxId !== newMetadata.workspace?.sandboxId) {

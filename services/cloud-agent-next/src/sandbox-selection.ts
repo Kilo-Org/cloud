@@ -1,16 +1,15 @@
+import { enrolledByocVercelOwner } from './byoc/vercel-owner.js';
 import { TRPCError } from '@trpc/server';
 import {
   CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   SELECTABLE_SANDBOX_ALLOCATIONS,
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   getSandboxAllocationProvider,
   getSandboxAllocationRequest,
   type SandboxAllocation,
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
-import { parseVercelSandboxRuntimeConfig } from './agent-sandbox/vercel/vercel-runtime-config.js';
 import { isCloudflareContainersEnrolled } from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
-import { isCloudAgentContainerBillingEnabled } from './container-billing-rollout.js';
 import {
   credentialContainmentEnabled,
   getDefaultSandboxDestination,
@@ -42,6 +41,17 @@ export function sandboxAllocationProviderCapabilityReason(
     : 'Vercel sandboxes do not include the security-remediation command-line tools';
 }
 
+export function isByocIncompatibleAllocation(
+  env: Env,
+  owner: { userId?: string; orgId?: string },
+  allocation: SandboxAllocation
+): boolean {
+  return (
+    enrolledByocVercelOwner(env, owner) !== undefined &&
+    getSandboxAllocationProvider(allocation) !== 'vercel'
+  );
+}
+
 export function sandboxAllocationUnavailableReason(
   env: Env,
   owner: SelectionOwner,
@@ -50,16 +60,15 @@ export function sandboxAllocationUnavailableReason(
 ): string | undefined {
   const capabilityReason = sandboxAllocationProviderCapabilityReason(allocation, capability);
   if (capabilityReason) return capabilityReason;
+  if (isByocIncompatibleAllocation(env, owner, allocation))
+    return 'BYOC Vercel accounts cannot select non-Vercel allocations';
   const provider = getSandboxAllocationProvider(allocation);
   switch (provider) {
     case 'cloudflare':
       return undefined;
     case 'vercel':
-      if (!parseVercelSandboxRuntimeConfig(env)) return 'Vercel sandboxes are not configured';
-      if (isCloudAgentContainerBillingEnabled(env, owner)) {
-        return 'Vercel sandboxes do not support enforced compute billing';
-      }
-      return undefined;
+      if (enrolledByocVercelOwner(env, owner) !== undefined) return undefined;
+      return 'Configure Vercel BYOC in Cloud Agent settings to use Vercel compute';
     case 'cloudflare-containers':
       if (!isCloudflareContainersEnrolled(env, { orgId: owner.orgId })) {
         return 'Cloudflare containers are not enabled for this account';
@@ -97,9 +106,9 @@ type SelectionOption = SandboxSelectionCapabilities['options'][number];
  */
 function nativeSmallInPlaceOfSingle(options: SelectionOption[]): SelectionOption[] {
   const isNative = (option: SelectionOption) =>
-    getKiloSandboxAllocation(option.allocation) === CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION;
+    getSandboxAllocation(option.allocation) === CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION;
   const single = options.find(
-    option => getKiloSandboxAllocation(option.allocation) === 'cloudflare-single'
+    option => getSandboxAllocation(option.allocation) === 'cloudflare-single'
   );
   const nativeAvailable = options.some(
     option => isNative(option) && option.unavailableReason === undefined
@@ -177,7 +186,7 @@ export function isSandboxAllocationAvailable(
       allocation === 'cloudflare-single' ||
       capabilities.options.some(
         option =>
-          getKiloSandboxAllocation(option.allocation) === allocation &&
+          getSandboxAllocation(option.allocation) === allocation &&
           option.unavailableReason === undefined &&
           option.repositoryUnavailableReason === undefined
       ))
@@ -201,15 +210,19 @@ export function assertSandboxAllocationAvailable(
       message: 'Sandbox selection is not enabled for this owner',
     });
   }
-  if (!isSandboxAllocationAvailable(capabilities, allocation)) {
+  const unavailableReason = isByocIncompatibleAllocation(env, owner, allocation)
+    ? sandboxAllocationUnavailableReason(env, owner, allocation, capability)
+    : undefined;
+  if (unavailableReason !== undefined || !isSandboxAllocationAvailable(capabilities, allocation)) {
     const option = capabilities.options.find(
-      candidate => getKiloSandboxAllocation(candidate.allocation) === allocation
+      candidate => getSandboxAllocation(candidate.allocation) === allocation
     );
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message:
         option?.unavailableReason ??
         option?.repositoryUnavailableReason ??
+        unavailableReason ??
         sandboxAllocationUnavailableReason(env, owner, allocation, capability) ??
         'Sandbox allocation is unavailable',
     });

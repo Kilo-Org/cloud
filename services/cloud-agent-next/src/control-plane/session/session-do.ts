@@ -20,6 +20,8 @@ import { z } from 'zod';
 import { resolveSecret } from '../../auth.js';
 import type { CallbackTarget } from '../../callbacks/index.js';
 import type { DurableAdmissionAck } from '../../execution/types.js';
+import { getSandboxProviderBinding } from '../../persistence/session-metadata.js';
+import { sameSandboxProviderBinding } from '../../sandbox-provider-binding.js';
 import { logger } from '../../logger.js';
 import type { WrapperPty } from '../../kilo/wrapper-client.js';
 import type { OperationResult } from '../../persistence/types.js';
@@ -937,6 +939,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       existing.identity.userId === metadata.identity.userId &&
       (existing.identity.orgId ?? null) === (metadata.identity.orgId ?? null) &&
       sameRepository(existing.repository, metadata.repository) &&
+      sameSandboxProviderBinding(
+        getSandboxProviderBinding(existing),
+        getSandboxProviderBinding(metadata)
+      ) &&
       this.registration.sandboxId === metadata.workspace?.sandboxId &&
       (existing.workspace?.egressMode ?? 'unrestricted') ===
         (metadata.workspace?.egressMode ?? 'unrestricted') &&

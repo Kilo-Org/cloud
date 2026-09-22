@@ -65,8 +65,8 @@ describe('formatSandboxDestination', () => {
       getSandboxAllocationRequest('isolated-standard'),
       'Kilo · Cloudflare · 4 vCPU / 12 GiB · Large',
     ],
-    [getSandboxAllocationRequest('vercel-small'), 'Kilo · Vercel · 2 vCPU / 4 GiB · Small'],
-    [vercelLarge, 'Kilo · Vercel · 4 vCPU / 8 GiB · Medium'],
+    [getSandboxAllocationRequest('vercel-small'), 'BYOC · Vercel · 2 vCPU / 4 GiB · Small'],
+    [vercelLarge, 'BYOC · Vercel · 4 vCPU / 8 GiB · Medium'],
     [byocLarge, 'BYOC · Vercel · 4 vCPU / 8 GiB · Medium'],
     [{ ...byocLarge, instanceType: 'small' }, 'BYOC · Vercel · 2 vCPU / 4 GiB · Small'],
     [
@@ -74,8 +74,8 @@ describe('formatSandboxDestination', () => {
       'Kilo · Cloudflare · 2 vCPU / 6 GiB · Retired devcontainer',
     ],
     [
-      { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
-      'Kilo · Vercel · Provider default',
+      { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
+      'BYOC · Vercel · Provider default',
     ],
   ] satisfies Array<[SandboxDestination | undefined, string]>)(
     'formats %j as %s',
@@ -102,11 +102,11 @@ describe('formatSandboxDestinationWithoutTier', () => {
       { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
       'Kilo · Cloudflare · 2 vCPU / 6 GiB',
     ],
-    [getSandboxAllocationRequest('vercel-small'), 'Kilo · Vercel · 2 vCPU / 4 GiB'],
+    [getSandboxAllocationRequest('vercel-small'), 'BYOC · Vercel · 2 vCPU / 4 GiB'],
     [byocLarge, 'BYOC · Vercel · 4 vCPU / 8 GiB'],
     [
-      { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
-      'Kilo · Vercel · Provider default',
+      { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
+      'BYOC · Vercel · Provider default',
     ],
   ] satisfies Array<[SandboxDestination | undefined, string]>)(
     'states the account, provider and capacity without the tenancy tier: %j',
@@ -139,7 +139,7 @@ describe('formatSandboxCapacity', () => {
     [getSandboxAllocationRequest('isolated-standard'), '4 vCPU / 12 GiB'],
     [getSandboxAllocationRequest('vercel-small'), '2 vCPU / 4 GiB'],
     [byocLarge, '4 vCPU / 8 GiB'],
-    [{ provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' }, 'Provider default'],
+    [{ provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' }, 'Provider default'],
   ] satisfies Array<[SandboxDestination, string]>)(
     'reports the vCPU and memory a destination runs with: %j',
     (destination, label) => {
@@ -156,7 +156,7 @@ describe('formatSandboxInstance', () => {
     [getSandboxAllocationRequest('cloudflare-containers-standard-4'), '4 vCPU / 12 GiB · Large'],
     [getSandboxAllocationRequest('vercel-small'), '2 vCPU / 4 GiB · Small'],
     [byocLarge, '4 vCPU / 8 GiB · Medium'],
-    [{ provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' }, 'Provider default'],
+    [{ provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' }, 'Provider default'],
   ] satisfies Array<[SandboxDestination, string]>)(
     'formats an instance without repeating its account/provider heading: %j',
     (destination, label) => {
@@ -189,23 +189,22 @@ describe('getSandboxSelectionGroups', () => {
       {
         key: 'byoc:vercel',
         label: 'BYOC · Vercel',
-        options: [options[1], options[4]],
+        options: [options[0], options[1], options[4]],
       },
       {
         key: 'kilo:cloudflare',
         label: 'Kilo · Cloudflare',
         options: [options[2], options[3]],
       },
-      { key: 'kilo:vercel', label: 'Kilo · Vercel', options: [options[0]] },
     ]);
-    expect(groups[0].options[0]).toBe(options[1]);
+    expect(groups[0].options[0]).toBe(options[0]);
     expect(options).toEqual(original);
   });
 
   it('does not render empty provider groups', () => {
     expect(getSandboxSelectionGroups([])).toEqual([]);
     expect(getSandboxSelectionGroups(getSandboxSelectionOptions(capabilities))).toEqual([
-      { key: 'kilo:vercel', label: 'Kilo · Vercel', options: capabilities.options },
+      { key: 'byoc:vercel', label: 'BYOC · Vercel', options: capabilities.options },
     ]);
   });
 });
@@ -222,17 +221,17 @@ describe('getSandboxSelectionOptions', () => {
     ];
     const originalOrder = [...options];
     expect(getSandboxSelectionOptions({ enabled: true, options })).toEqual([
+      options[0],
       options[1],
       options[3],
+      options[4],
       options[2],
       options[5],
-      options[0],
-      options[4],
     ]);
     expect(options).toEqual(originalOrder);
   });
 
-  it('does not invent BYOC options when the Worker only offers Kilo', () => {
+  it('uses only the options offered by the Worker', () => {
     expect(getSandboxSelectionOptions(capabilities)).toEqual(capabilities.options);
     expect(getSandboxSelectionOptions(undefined)).toEqual([]);
     expect(getSandboxSelectionOptions({ enabled: false, options: [] })).toEqual([]);
@@ -274,7 +273,7 @@ describe('resolveSandboxSelection', () => {
   it.each([
     getSandboxAllocationRequest('cloudflare-shared'),
     getSandboxAllocationRequest('vercel-large'),
-    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
     {
       provider: { id: 'cloudflare', account: 'kilo' },
       instanceType: 'devcontainer',
@@ -292,11 +291,15 @@ describe('resolveSandboxSelection', () => {
     }
   );
 
-  it('does not substitute a Kilo destination for an unavailable BYOC draft', () => {
+  it('does not substitute a different instance for an unavailable BYOC draft', () => {
     expect(
       resolveSandboxSelection({
         ...input,
         draft: { ...draft, allocation: byocLarge },
+        capabilities: {
+          ...capabilities,
+          options: [{ allocation: getSandboxAllocationRequest('vercel-small') }],
+        },
       })
     ).toEqual({
       sandboxAllocation: byocLarge,
@@ -464,7 +467,7 @@ describe('resolveSandboxSelectionSubmissionError', () => {
     {
       sandboxAllocation: getSandboxAllocationKey(getSandboxAllocationRequest('cloudflare-single')),
     },
-    { sandboxAllocation: getSandboxAllocationKey(byocLarge) },
+    { sandboxAllocation: 'vercel:byoc:small' },
     { sandboxAllocation: undefined },
     { attachments: { path: 'upload', files: ['other-notes.md'] } },
   ])('does not bypass validation for a changed creation intent: %j', change => {
@@ -590,7 +593,7 @@ describe('resolveSandboxPicker', () => {
 
   it('lists the default separately when no option matches it', () => {
     const providerDefault = {
-      provider: { id: 'vercel', account: 'kilo' },
+      provider: { id: 'vercel', account: 'byoc' },
       instanceType: 'default',
     } satisfies SandboxDestination;
     const picker = resolveSandboxPicker({

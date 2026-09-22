@@ -118,6 +118,11 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'prompt_failed',
   'sandbox_stopped',
   'execution_limit',
+  'byoc_credential_missing',
+  'byoc_vercel_not_ready',
+  'byoc_vercel_forbidden',
+  'byoc_vercel_capacity',
+  'byoc_vercel_snapshot_missing',
 ] as const;
 export type ControlPlaneFailureReason = (typeof CONTROL_PLANE_FAILURE_REASON_VALUES)[number];
 

@@ -29,66 +29,27 @@ describe('AgentSandbox provider factory', () => {
     }
   );
 
-  it('resolves configured Vercel metadata to the exact-session adapter without Cloudflare bindings', () => {
-    const sandbox = createAgentSandbox(
-      {
-        VERCEL_TOKEN: 'token',
-        VERCEL_TEAM_ID: 'team',
-        VERCEL_PROJECT_ID: 'project',
-        VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot',
-        VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build',
-        VERCEL_SANDBOX_RUNTIME: 'node24',
-        VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
-        VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
-      } as Env,
-      metadata('vercel')
-    );
-
-    expect(sandbox).toBeInstanceOf(VercelAgentSandbox);
+  it('creates a Vercel adapter only with a persisted customer credential binding', () => {
+    const pinned = metadata('vercel');
+    pinned.workspace!.sandboxProviderBinding = {
+      kind: 'vercel',
+      source: { kind: 'byoc', userId: 'oauth/customer', credentialId: 'credential' },
+    };
+    expect(createAgentSandbox({} as Env, pinned)).toBeInstanceOf(VercelAgentSandbox);
     expect(getSandbox).not.toHaveBeenCalled();
   });
-
-  it('uses persisted runtime identity instead of mutable enrollment snapshot values', () => {
-    const pinned = metadata('vercel');
-    pinned.workspace = {
-      ...pinned.workspace,
-      providerRuntime: {
-        provider: 'vercel',
-        sessionId: 'session-1',
-        projectId: 'project-pinned',
-        snapshotId: 'snapshot-pinned',
-        runtimeBuildId: 'build-pinned',
-        runtime: 'node24',
-      },
-    };
-    const sandbox = createAgentSandbox(
-      {
-        VERCEL_TOKEN: 'token',
-        VERCEL_TEAM_ID: 'team',
-        VERCEL_PROJECT_ID: 'project-current',
-        VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot-current',
-        VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build-current',
-        VERCEL_SANDBOX_RUNTIME: 'node24',
-        VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
-        VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
-      } as Env,
-      pinned
-    );
-
-    expect((sandbox as any).config).toMatchObject({
-      projectId: 'project-pinned',
-      snapshotId: 'snapshot-pinned',
-      runtimeBuildId: 'build-pinned',
+  it('rejects retired platform Vercel sessions even if old platform credentials remain configured', () => {
+    const env = Object.assign({} as Env, {
+      WORKER_URL: 'http://worker.test',
+      VERCEL_TOKEN: 'retired-token',
+      VERCEL_TEAM_ID: 'retired-team',
+      VERCEL_PROJECT_ID: 'retired-project',
+      VERCEL_SANDBOX_SNAPSHOT_ID: 'retired-snapshot',
     });
-  });
-
-  it('requires operational configuration only for Vercel metadata', () => {
-    expect(() => createAgentSandbox({} as Env, metadata('vercel'))).toThrow(
-      'Vercel sandbox operational configuration is incomplete'
+    expect(() => createAgentSandbox(env, metadata('vercel'))).toThrow(
+      'Kilo-paid Vercel compute is retired'
     );
-    expect(createAgentSandbox({} as Env, metadata('cloudflare'))).toBeInstanceOf(
-      CloudflareAgentSandbox
-    );
+    expect(createAgentSandbox(env, metadata('cloudflare'))).toBeInstanceOf(CloudflareAgentSandbox);
   });
 
   it('fails closed for cloudflare-containers metadata on the legacy agent plane', () => {

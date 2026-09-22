@@ -356,15 +356,15 @@ describe('sandbox preset input boundaries', () => {
   );
 
   it.each(['small', 'large'] as const)(
-    'rejects unsupported BYOC %s rather than allocating Kilo compute',
+    'rejects retired Kilo-paid Vercel %s requests',
     instanceType => {
-      const sandboxAllocation = { provider: { id: 'vercel', account: 'byoc' }, instanceType };
+      const sandboxAllocation = { provider: { id: 'vercel', account: 'kilo' }, instanceType };
       for (const result of [
         PrepareSessionInput.safeParse({ ...prepare, sandboxAllocation }),
         StartSessionInput.safeParse({ ...baseStartInput, runtime: { sandboxAllocation } }),
       ]) {
         expect(result.success).toBe(false);
-        if (!result.success) expect(result.error.message).toContain('BYOC');
+        if (!result.success) expect(result.error.message).toContain('byoc');
       }
     }
   );

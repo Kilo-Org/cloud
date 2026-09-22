@@ -56,7 +56,9 @@ import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
+import { personalVercelComputeRouter } from '@/routers/organizations/organization-vercel-compute-router';
 export const rootRouter = createTRPCRouter({
+  vercelCompute: personalVercelComputeRouter,
   test: testRouter,
   organizations: organizationsRouter,
   debug: debugRouter,

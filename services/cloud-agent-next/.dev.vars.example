@@ -64,23 +64,14 @@ CREDENTIAL_CONTAINMENT_ENABLED=false
 # binding and only applies to the constant isolated workspace path.
 CONTAINER_REPO_SNAPSHOT_IDS=
 
-# Vercel Sandbox operational configuration (optional)
-# Snapshot/build values must come from a successful `pnpm --filter cloud-agent-next snapshot:vercel`
-# acceptance run. Partial configuration never enables Vercel.
-VERCEL_PROJECT_ID=
-VERCEL_TEAM_ID=
-VERCEL_SANDBOX_SNAPSHOT_ID=
-VERCEL_SANDBOX_RUNTIME_BUILD_ID=
+# Vercel BYOC runtime defaults. Customer credentials and snapshots come from Compute settings.
 VERCEL_SANDBOX_RUNTIME=node24
 VERCEL_SANDBOX_INITIAL_TIMEOUT_MS=300000
 VERCEL_SANDBOX_EXTEND_DURATION_MS=600000
-# Keep `VERCEL_TOKEN` in local secrets/.dev.vars only; never commit a token value.
-# VERCEL_TOKEN=
 
-# Vercel enrollment is the allowlist itself. Empty is off. Comma-separated org
-# IDs, or `*` for every organization and personal accounts. Organizations must
-# also be isolated by PER_SESSION_SANDBOX_ORG_IDS.
-VERCEL_SANDBOX_ORG_IDS=
+# Customer-paid Vercel enrollment. Comma-separated user or organization IDs; empty is off.
+# `*` enrolls both personal accounts and organizations. BYOC sessions use isolated sandboxes.
+BYOC_VERCEL_IDS=
 
 # Cloudflare containers enrollment (optional). Comma-separated organization IDs, or `*` for
 # every organization and personal accounts. Empty is off.

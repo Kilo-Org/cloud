@@ -1,5 +1,5 @@
 import {
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   getSandboxAllocationKey,
   getSandboxAllocationResources,
   type SelectableSandboxAllocationRequest,
@@ -45,8 +45,7 @@ const instanceLabels: Record<SandboxDestination['instanceType'], string> = {
 };
 
 /**
- * Names the account whose cloud runs the sandbox alongside the provider. Both
- * halves stay visible because a BYOC account can offer the same provider as Kilo.
+ * Names the compute account and provider. Vercel is customer-paid only.
  */
 export function formatSandboxProvider(provider: SandboxDestination['provider']): string {
   return `${accountLabels[provider.account]} · ${formatSandboxProviderName(provider)}`;
@@ -57,13 +56,11 @@ export function formatSandboxProviderName(provider: SandboxDestination['provider
 }
 
 /**
- * Formats the fixed Vercel instance resources. Both accounts run the same
- * hardware, so the Kilo allocation is the existing mapping to the single
- * resource table in worker-utils.
+ * Formats the Vercel BYOC resources from the shared allocation mapping.
  */
 function formatVercelCapacity(instanceType: 'small' | 'large'): string | null {
   const resources = getSandboxAllocationResources(
-    getKiloSandboxAllocation({ provider: { id: 'vercel', account: 'kilo' }, instanceType })
+    getSandboxAllocation({ provider: { id: 'vercel', account: 'byoc' }, instanceType })
   );
   return resources
     ? formatContainerCapacity({

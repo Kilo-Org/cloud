@@ -60,6 +60,27 @@ describe('Vercel durable runtime state', () => {
     expect(() => parseVercelStopTombstone({ ...stopTombstone, userId: 'user-1' })).toThrow();
   });
 
+  it('persists the BYOC binding without accepting provider credentials', () => {
+    const byocTombstone = {
+      ...stopTombstone,
+      sandboxProviderBinding: {
+        kind: 'vercel' as const,
+        source: {
+          kind: 'byoc' as const,
+          organizationId: 'org-1',
+          credentialId: 'credential-1',
+        },
+      },
+    };
+    expect(parseVercelStopTombstone(byocTombstone)).toEqual(byocTombstone);
+    expect(() =>
+      parseVercelStopTombstone({
+        ...byocTombstone,
+        accessToken: 'must-not-be-persisted',
+      })
+    ).toThrow();
+  });
+
   it('claims one due stop attempt and retries only its matching claim', () => {
     const claimed = claimVercelStopAttempt(stopTombstone, 'attempt-1', 100, 150);
     expect(claimed).toEqual({

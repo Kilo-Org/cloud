@@ -27,6 +27,11 @@ import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import { agentSandboxProviderSchema, type AgentSandboxProvider, type SandboxId } from '../types.js';
 import {
+  bindingFromLegacyProvider,
+  SandboxProviderBindingSchema,
+  type SandboxProviderBinding,
+} from '../sandbox-provider-binding.js';
+import {
   AttachmentsSchema,
   branchNameSchema,
   CallbackTargetSchema,
@@ -298,6 +303,7 @@ const MetadataWorkspaceSchema = egressPolicySchema
     sandboxKind: sandboxKindSchema.optional(),
     sandboxProvider: SandboxProviderSchema.optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
+    sandboxProviderBinding: SandboxProviderBindingSchema.optional(),
     providerRuntime: ProviderRuntimeSchema.optional(),
     worktreeId: cloudAgentWorktreeIdSchema.optional(),
     workspacePath: z.string().optional(),
@@ -395,6 +401,13 @@ const MetadataWorkspaceSchema = egressPolicySchema
       workspace.providerRuntime === undefined ||
       workspace.providerRuntime.provider === workspace.sandboxProvider,
     'Provider runtime must match the workspace sandbox provider'
+  )
+  .refine(
+    workspace =>
+      workspace.sandboxProviderBinding === undefined ||
+      workspace.sandboxProvider === undefined ||
+      workspace.sandboxProviderBinding.kind === workspace.sandboxProvider,
+    'Provider binding must match the workspace sandbox provider'
   );
 
 const MetadataDevContainerSchema = z
@@ -473,6 +486,7 @@ export const CurrentSessionMetadataSchema = z
 
 export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;
 export type CredentialContainment = z.infer<typeof CredentialContainmentSchema>;
+export type { SandboxProviderBinding };
 
 export function getControlPlaneCredentialContainment(
   sessionId: string,
@@ -528,7 +542,14 @@ export function requiresContainmentSandbox(metadata: SessionMetadata): boolean {
 }
 
 export function getSandboxProvider(metadata: SessionMetadata): AgentSandboxProvider {
-  return metadata.workspace?.sandboxProvider ?? 'cloudflare';
+  return getSandboxProviderBinding(metadata).kind;
+}
+
+export function getSandboxProviderBinding(metadata: SessionMetadata): SandboxProviderBinding {
+  return (
+    metadata.workspace?.sandboxProviderBinding ??
+    bindingFromLegacyProvider(metadata.workspace?.sandboxProvider ?? 'cloudflare')
+  );
 }
 
 type LegacySessionMetadata = z.output<typeof LegacySessionMetadataSchema>;

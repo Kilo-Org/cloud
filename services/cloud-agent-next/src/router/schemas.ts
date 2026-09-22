@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   sandboxAllocationInputSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
@@ -59,9 +59,9 @@ export {
 export const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
 
 const ManagedSandboxAllocationInput = sandboxAllocationInputSchema.transform((request, ctx) => {
-  const allocation = getKiloSandboxAllocation(request);
+  const allocation = getSandboxAllocation(request);
   if (allocation === undefined) {
-    ctx.addIssue({ code: 'custom', message: 'BYOC sandbox allocation is not available' });
+    ctx.addIssue({ code: 'custom', message: 'Sandbox allocation is not available' });
     return z.NEVER;
   }
   return allocation;

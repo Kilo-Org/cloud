@@ -1,6 +1,7 @@
 import * as z from 'zod';
 
 import type { SandboxId } from '../../types.js';
+import { SandboxProviderBindingSchema } from '../../sandbox-provider-binding.js';
 
 /**
  * Durable-storage keys for Vercel runtime state owned by the session DO.
@@ -80,6 +81,7 @@ export const VercelStopTombstoneSchema = z
   .object({
     version: z.literal(2),
     provider: z.literal('vercel'),
+    sandboxProviderBinding: SandboxProviderBindingSchema.optional(),
     sandboxName: SandboxIdSchema,
     sessionId: z.string().min(1).optional(),
     unresolvedCreate: VercelUnresolvedCreateSchema.optional(),
@@ -94,7 +96,12 @@ export const VercelStopTombstoneSchema = z
   .strict()
   .refine(value => value.sessionId !== undefined || value.unresolvedCreate !== undefined, {
     message: 'Vercel stop tombstone requires an exact session or unresolved create',
-  });
+  })
+  .refine(
+    value =>
+      value.sandboxProviderBinding === undefined || value.sandboxProviderBinding.kind === 'vercel',
+    'Vercel stop tombstone requires a Vercel provider binding'
+  );
 
 const LegacyVercelStopTombstoneSchema = z.object({
   version: z.literal(1),

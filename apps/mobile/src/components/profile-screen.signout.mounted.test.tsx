@@ -36,9 +36,9 @@ vi.mock('react-native-reanimated', () => ({
 }));
 
 // The screen reads its landscape side insets through `@/lib/screen-insets`,
-// which imports `react-native-safe-area-context`. That native module's source
-// is not parseable by this project's transform, so stub the hook with the
-// hoisted `insets` above; the sign-out confirmation does not depend on them.
+// whose real `react-native-safe-area-context` entry is a Flow source this
+// transform cannot parse; the insets are irrelevant to the sign-out flow, so
+// stub the hook with the hoisted `insets` above.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));

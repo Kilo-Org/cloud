@@ -95,9 +95,11 @@ describe('screen side insets: one implementation for both platforms', () => {
     expect(profile, `${PROFILE_SCREEN} imports the native safe-area module again`).not.toMatch(
       SAFE_AREA_MODULE
     );
-    // Only the lines that carry the insets must stay one implementation for
-    // both platforms; a fork elsewhere in the screen is not on the insets path
-    // and must not fail this guard.
+    // The screen carries no platform branch at all: sign-out confirms through
+    // the one shared alert on both platforms, so the insets path — and every
+    // other line — stays a single implementation. Only the lines that carry the
+    // insets are read below as the alignment path; a fork elsewhere in the
+    // screen is not on the insets path and must not fail this guard.
     expect(
       insetAlignmentLines(profile),
       `${PROFILE_SCREEN} carries a per-platform branch on its inset path`

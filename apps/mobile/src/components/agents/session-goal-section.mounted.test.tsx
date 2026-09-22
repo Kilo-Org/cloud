@@ -218,6 +218,9 @@ describe('SessionGoalSection disclosure', () => {
     expect(String(slot?.props.className)).toContain('shrink-0');
     expect(String(slot?.props.className)).toContain('self-start');
     expect(String(slot?.props.className)).toContain('pt-0.5');
+    // `ml-auto` keeps the PR link at the row's trailing edge here too, so the
+    // control does not move between a goal session and a PR-only one.
+    expect(String(slot?.props.className)).toContain('ml-auto');
     // The goal pressable still owns the tap target for the whole row.
     expect(
       String(renderer.root.findByProps({ accessibilityLabel: ROW_LABEL }).props.className)
@@ -240,6 +243,11 @@ describe('SessionGoalSection disclosure', () => {
     expect(row.props.className).toContain('min-h-12');
     expect(row.props.className).toContain('pt-0.5');
     expect(row.props.className).toContain('pb-2');
+
+    // The lone PR link takes the same trailing edge it has beside a goal, so
+    // the control does not jump to the row's leading edge on a PR-only session.
+    const slot = hostAncestor(renderer.root.findByProps({ accessibilityLabel: TRAILING_LABEL }));
+    expect(String(slot?.props.className)).toContain('ml-auto');
   });
 
   it('calls onToggleCollapsed from the disclosure pressable', () => {

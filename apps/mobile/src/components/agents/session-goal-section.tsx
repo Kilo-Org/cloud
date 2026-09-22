@@ -68,7 +68,7 @@ export function SessionGoalSection({
   const { t } = useTranslation();
 
   const trailingSlot = trailing ? (
-    <View className="shrink-0 self-start pt-0.5">{trailing}</View>
+    <View className="ml-auto shrink-0 self-start pt-0.5">{trailing}</View>
   ) : null;
 
   if (!goal) {

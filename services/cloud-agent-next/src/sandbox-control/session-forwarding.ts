@@ -8,7 +8,13 @@ const MAX_SESSION_FORWARD_BYTES = 4 * MAX_SANDBOX_CONTROL_FRAME_BYTES;
 export class SessionForwardingError extends Error {
   constructor(
     message: string,
-    readonly retryable: boolean
+    readonly retryable: boolean,
+    /**
+     * True when the frame was reported as delivered before the fence check
+     * failed. A delivered frame must not be retained and replayed: a
+     * non-receipted frame has no dedupe guard at the session DO.
+     */
+    readonly forwarded = false
   ) {
     super(message);
     this.name = 'SessionForwardingError';
@@ -28,6 +34,21 @@ export type FencedSessionForward<T> = {
   deadlineAt: number;
   fence: () => Promise<boolean>;
   forward: () => Promise<T>;
+  /**
+   * Whether a resolved `forward()` reached its destination. A fence rejection
+   * after `forward()` resolved is only marked delivered when this reports true,
+   * so a forward that never attempted its send stays retainable for replay.
+   * Defaults to true for callers that never inspect `forwarded`.
+   */
+  delivered?: (result: T) => boolean;
+  /**
+   * Whether the frame consumes the shared forwarding admission budget. A
+   * replayed frame is already bounded by the retained-event queue, so charging
+   * it to the live budget would reject new live frames for every session while a
+   * backlog drains. An exempt frame still joins its session's chain, so a
+   * replayed prefix stays ahead of the live frames for that session.
+   */
+  admissionExempt?: boolean;
 };
 
 export type SessionForwarding = {
@@ -87,19 +108,23 @@ export function createSessionForwarding(): SessionForwarding {
     enqueueFenced<T>(input: FencedSessionForward<T>): Promise<T> {
       if (input.bytes > MAX_SANDBOX_CONTROL_FRAME_BYTES)
         return Promise.reject(new SessionForwardingError('Forwarded frame is too large', false));
+      const metered = input.admissionExempt !== true;
       if (
-        stats.waiting + stats.inFlight >= SANDBOX_CONTROL_FORWARD_OPERATION_LIMIT ||
-        stats.bufferedBytes + input.bytes > MAX_SESSION_FORWARD_BYTES
+        metered &&
+        (stats.waiting + stats.inFlight >= SANDBOX_CONTROL_FORWARD_OPERATION_LIMIT ||
+          stats.bufferedBytes + input.bytes > MAX_SESSION_FORWARD_BYTES)
       )
         return Promise.reject(
           new SessionForwardingError('Forwarding capacity is unavailable', true)
         );
-      stats.waiting++;
-      stats.bufferedBytes += input.bytes;
-      stats.highWater = Math.max(stats.highWater, stats.waiting + stats.inFlight);
+      if (metered) {
+        stats.waiting++;
+        stats.bufferedBytes += input.bytes;
+        stats.highWater = Math.max(stats.highWater, stats.waiting + stats.inFlight);
+      }
       return enqueue(input.sessionId, async () => {
-        stats.waiting--;
-        stats.inFlight++;
+        if (metered) stats.waiting--;
+        if (metered) stats.inFlight++;
         try {
           if (
             Date.now() >= input.deadlineAt ||
@@ -113,11 +138,17 @@ export function createSessionForwarding(): SessionForwarding {
             !(await input.fence()) ||
             Date.now() >= input.deadlineAt
           )
-            throw new SessionForwardingError('Forwarding fence changed', false);
+            throw new SessionForwardingError(
+              'Forwarding fence changed',
+              false,
+              input.delivered?.(result) ?? true
+            );
           return result;
         } finally {
-          stats.inFlight--;
-          stats.bufferedBytes -= input.bytes;
+          if (metered) {
+            stats.inFlight--;
+            stats.bufferedBytes -= input.bytes;
+          }
         }
       });
     },

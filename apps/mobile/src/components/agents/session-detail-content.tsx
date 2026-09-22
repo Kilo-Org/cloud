@@ -129,7 +129,10 @@ import {
   type SessionTranscriptItem,
 } from '@/components/agents/session-transcript';
 import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
-import { displaySessionTitle } from '@/components/agents/session-detail-rename-state';
+import {
+  displaySessionTitle,
+  SESSION_TITLE_MAX_LENGTH,
+} from '@/components/agents/session-detail-rename-state';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
@@ -2074,6 +2077,10 @@ export function SessionDetailContent({
               title={t('agentChat.session.renameSession')}
               placeholder={t('agentChat.session.renamePlaceholder')}
               initialValue={rename.modalInitialValue}
+              // The server accepts a title this long; the modal's 50-character
+              // default would cut a longer title mid-word and the header would
+              // then show the fragment.
+              maxLength={SESSION_TITLE_MAX_LENGTH}
               onSave={handleRenameSave}
               onClose={handleRenameClose}
             />

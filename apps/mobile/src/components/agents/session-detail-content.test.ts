@@ -46,6 +46,7 @@ import {
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
@@ -340,6 +341,9 @@ vi.mock('@/components/agents/use-session-config-sync', () => ({
   useSessionConfigSync: () => ({ currentMode: 'code', currentModel: '', currentVariant: '' }),
 }));
 const openRenameModal = vi.hoisted(() => vi.fn());
+// Mirrors the real hook's modal fields; a test opens the dialog by flipping
+// `isOpen` so it can inspect the RenameModal the screen renders.
+const renameModalState = vi.hoisted(() => ({ isOpen: false, initialValue: '' }));
 vi.mock('@/components/agents/use-session-detail-rename', () => ({
   useSessionDetailRename: ({
     serverTitle,
@@ -350,7 +354,11 @@ vi.mock('@/components/agents/use-session-detail-rename', () => ({
   }) => ({
     title: serverTitle ?? fallbackTitle,
     isTitleInteractive: serverTitle !== undefined,
+    isModalOpen: renameModalState.isOpen,
+    modalInitialValue: renameModalState.initialValue,
     openModal: openRenameModal,
+    closeModal: vi.fn(),
+    submit: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 vi.mock('@/lib/analytics/posthog', () => ({
@@ -581,6 +589,8 @@ function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   openRenameModal.mockClear();
+  renameModalState.isOpen = false;
+  renameModalState.initialValue = '';
   showActionSheetWithOptions.mockClear();
   hideThinking.current = false;
   hideThinking.loaded = true;
@@ -887,6 +897,23 @@ describe('SessionDetailContent header title', () => {
     const title = header.findByProps({ accessibilityRole: 'header' });
     expect(title.props.numberOfLines).toBe(2);
     expect(title.props.ellipsizeMode).toBe('tail');
+  });
+
+  // The rename dialog inherited RenameModal's 50-character default, below the
+  // 200-character cap the rename endpoint accepts. A longer title was dropped
+  // after character 50, and the header then rendered the leftover fragment
+  // ("Moving-average empty window rollup verification pa") as if it were the
+  // whole title.
+  it('lets the rename dialog hold a title as long as the server accepts', async () => {
+    renameModalState.isOpen = true;
+    renameModalState.initialValue = 'Moving-average rage empty baseline';
+    const { renderer } = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const modal = renderer.root.findAllByType('RenameModal')[0];
+    expect(modal?.props).toMatchObject({
+      maxLength: SESSION_TITLE_MAX_LENGTH,
+      initialValue: renameModalState.initialValue,
+    });
+    expect(SESSION_TITLE_MAX_LENGTH).toBe(200);
   });
 });
 

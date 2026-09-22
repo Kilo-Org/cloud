@@ -54,6 +54,16 @@ type SessionDetailRenameState = {
 };
 
 /**
+ * The longest session title the rename endpoint accepts, in characters. It
+ * mirrors the server's `RenameSessionInputSchema` (`title: z.string().max(200)`
+ * in apps/web/src/routers/cli-sessions-v2-router.ts). Every rename surface must
+ * allow this many characters: a lower field cap silently drops the rest of the
+ * title, and the header then renders a mid-word fragment such as
+ * "…verification pa" instead of the title the user typed.
+ */
+export const SESSION_TITLE_MAX_LENGTH = 200;
+
+/**
  * The title as it may be shown on screen, or undefined when the session has
  * no real title yet. A freshly created session carries a
  * `New session - <ISO timestamp>` placeholder until auto-titling replaces it;

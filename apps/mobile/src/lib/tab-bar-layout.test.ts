@@ -1,3 +1,8 @@
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
+import { readFileSync } from 'node:fs';
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -18,6 +23,15 @@ import {
   tabLabelWidth,
   visibleTabCount,
 } from '@/lib/tab-bar-layout';
+
+const LAYOUT_SOURCE = readFileSync(
+  fileURLToPath(new URL('tab-bar-layout.ts', import.meta.url)),
+  'utf8'
+);
+const LABEL_SOURCE = readFileSync(
+  fileURLToPath(new URL('../components/tab-bar-label.tsx', import.meta.url)),
+  'utf8'
+);
 
 describe('getTabBarOverlayHeight', () => {
   it('includes the bottom safe area on iOS', () => {
@@ -229,6 +243,27 @@ describe('tabLabelNumberOfLines', () => {
   it('keeps the two lines for copy that carries its own break', () => {
     expect(tabLabelNumberOfLines(i18n.t('tabs.kiloclawWrapped'))).toBe(2);
     expect(tabLabelNumberOfLines('Kilo\nClaw')).toBe(2);
+  });
+});
+
+describe('mirrored tab label metrics', () => {
+  // The metrics at the top of this module are copied from the label
+  // component's style, so the "keep these in step" pointer must name the file
+  // that actually owns that style, and the copied tokens must still match it.
+  it('points at the component that owns the tab label style', () => {
+    expect(LAYOUT_SOURCE).toContain('apps/mobile/src/components/tab-bar-label.tsx');
+    expect(LABEL_SOURCE).toContain('export function TabBarLabel');
+  });
+
+  it('mirrors the component font size and tracking in the width estimate', () => {
+    // JetBrains Mono advances 0.6em per glyph; the label adds 0.2px tracking.
+    // `tabLabelWidth` must use the same 11px/0.2px the component's class sets,
+    // and the component must render one line via `tabLabelNumberOfLines`.
+    expect(LABEL_SOURCE).toContain(
+      'font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px]'
+    );
+    expect(LABEL_SOURCE).toContain('numberOfLines={tabLabelNumberOfLines(label)}');
+    expect(tabLabelWidth('A')).toBeCloseTo(0.6 * 11 + 0.2);
   });
 });
 

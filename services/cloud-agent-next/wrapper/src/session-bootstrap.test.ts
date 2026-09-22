@@ -22,6 +22,7 @@ import type {
 import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-environment.js';
 import { isWrapperSessionReadyRequest } from '../../src/shared/wrapper-bootstrap.js';
+import { runProcess, type ExecResult } from './utils';
 
 function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyRequest> = {}) {
   const request: WrapperSessionReadyRequest = {
@@ -992,6 +993,76 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(progress.mock.calls.flat().join(' ')).not.toContain('gh-token');
   });
 
+  it('bounds a progressing clone with its own hard timeout below the preparation deadline', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    let cloneResult: ExecResult | undefined;
+    const progressScript =
+      'for i in $(seq 1 50); do printf \'Receiving objects: %s%%\\n\' "$i"; sleep 0.05; done';
+
+    const preparation = prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async (args, opts) => {
+        if (args[0] === 'clone') {
+          expect(opts?.hardTimeoutMs).toBe(300_000);
+          cloneResult = await runProcess('sh', ['-c', progressScript], {
+            ...opts,
+            inactivityTimeoutMs: 400,
+            hardTimeoutMs: 400,
+          });
+          return cloneResult;
+        }
+        if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => {
+        throw new Error('restore should not run after clone timeout');
+      },
+    });
+    const preparationError = await preparation.catch(caught => caught);
+
+    // A progressing clone is still bounded by the clone's own wall clock, so it
+    // is attributed as git_clone_timeout rather than the preparation deadline.
+    expect(preparationError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'git_clone_timeout',
+      retryable: true,
+    });
+    expect(cloneResult?.terminationReason).toBe('hard_timeout');
+  });
+
+  it('fails a silent clone with the inactivity bound', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    let cloneResult: ExecResult | undefined;
+
+    const preparation = prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async (args, opts) => {
+        if (args[0] === 'clone') {
+          expect(opts?.hardTimeoutMs).toBe(300_000);
+          cloneResult = await runProcess('sh', ['-c', 'sleep 3'], {
+            ...opts,
+            inactivityTimeoutMs: 400,
+          });
+          return cloneResult;
+        }
+        if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => {
+        throw new Error('restore should not run after clone timeout');
+      },
+    });
+    const preparationError = await preparation.catch(caught => caught);
+    expect(preparationError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'git_clone_timeout',
+      retryable: true,
+    });
+
+    expect(cloneResult?.exitCode).toBe(124);
+    expect(cloneResult?.terminationReason).toBe('inactivity_timeout');
+  });
+
   it('fails and cleans up when a repository fetch reaches its hard limit', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.setupCommands = [];
@@ -1647,6 +1718,17 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       name: 'clone timeout',
       stage: 'clone',
       result: { stdout: '', stderr: '', exitCode: 124, terminationReason: 'timeout' as const },
+      subtype: 'git_clone_timeout',
+    },
+    {
+      name: 'clone inactivity timeout',
+      stage: 'clone',
+      result: {
+        stdout: '',
+        stderr: '',
+        exitCode: 124,
+        terminationReason: 'inactivity_timeout' as const,
+      },
       subtype: 'git_clone_timeout',
     },
     {
@@ -3143,7 +3225,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       { type: 'text', text: 'Process this file' },
       {
         type: 'text',
-        text: 'attachment interrupted.bin could not be retrieved (stream reset)',
+        text: 'attachment interrupted.bin could not be retrieved (download failed after 3 attempts)',
       },
     ]);
     expect(fs.existsSync(localPath)).toBe(false);
@@ -3207,7 +3289,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(await fsp.readFile(okPath, 'utf8')).toBe('png-bytes');
   });
 
-  it('converts a network/timeout failure into an explanatory text part and continues', async () => {
+  it('converts an exhausted retry into an explanatory text part and continues', async () => {
     const okPath = path.join(tmpDir, 'ok.json');
     const failPath = path.join(tmpDir, 'bad.json');
     const prompt: WrapperPromptRequest = {
@@ -3238,21 +3320,24 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
     };
 
+    let badRequests = 0;
     const result = await materializePromptAttachments(prompt, {
       fetch: asFetch(async input => {
         const url = typeof input === 'string' ? input : (input as Request).url;
         if (url === 'https://r2.example.com/bad.json') {
+          badRequests += 1;
           throw new Error('socket hang up');
         }
         return new Response('{"ok":true}', { status: 200 });
       }),
     });
 
+    expect(badRequests).toBe(3);
     expect(result.message.parts).toEqual([
       { type: 'text', text: 'Read both' },
       {
         type: 'text',
-        text: 'attachment bad.json could not be retrieved (socket hang up)',
+        text: 'attachment bad.json could not be retrieved (download failed after 3 attempts)',
       },
       {
         type: 'file',
@@ -3263,6 +3348,283 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     ]);
     expect(fs.existsSync(failPath)).toBe(false);
     expect(await fsp.readFile(okPath, 'utf8')).toBe('{"ok":true}');
+  });
+
+  it('retries a transient fetch failure and materializes the attachment on the retry', async () => {
+    const localPath = path.join(tmpDir, 'retry.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_retry',
+        prompt: 'Look at this image',
+        attachments: [
+          {
+            filename: 'retry.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/retry.png',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    let attempts = 0;
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error('socket hang up');
+        }
+        return new Response('png-bytes', {
+          status: 200,
+          headers: { 'content-length': '9' },
+        });
+      }),
+    });
+
+    expect(attempts).toBe(2);
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Look at this image' },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: `file://${localPath}`,
+        filename: 'retry.png',
+      },
+    ]);
+    expect(await fsp.readFile(localPath, 'utf8')).toBe('png-bytes');
+  });
+
+  it('falls back to a buffered read when the streaming read fails mid-transfer', async () => {
+    const localPath = path.join(tmpDir, 'fallback.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_fallback',
+        prompt: 'Look at this image',
+        attachments: [
+          {
+            filename: 'fallback.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/fallback.png',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    let attempts = 0;
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          const chunk = new Uint8Array(64 * 1024);
+          const body = new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.enqueue(chunk);
+              controller.error(new Error('stream reset'));
+            },
+          });
+          return new Response(body, { status: 200 });
+        }
+        return new Response('png-bytes', {
+          status: 200,
+          headers: { 'content-length': '9' },
+        });
+      }),
+    });
+
+    expect(attempts).toBe(2);
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Look at this image' },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: `file://${localPath}`,
+        filename: 'fallback.png',
+      },
+    ]);
+    expect(await fsp.readFile(localPath, 'utf8')).toBe('png-bytes');
+  });
+
+  it('falls back to the bounded streaming read when a buffered retry has no content-length', async () => {
+    const localPath = path.join(tmpDir, 'no-content-length.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_no_content_length',
+        prompt: 'Look at this image',
+        attachments: [
+          {
+            filename: 'no-content-length.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/no-content-length.png',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    let attempts = 0;
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error('socket hang up');
+        }
+        const response = new Response('png-bytes', { status: 200 });
+        response.headers.delete('content-length');
+        return response;
+      }),
+    });
+
+    expect(attempts).toBe(2);
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Look at this image' },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: `file://${localPath}`,
+        filename: 'no-content-length.png',
+      },
+    ]);
+    expect(await fsp.readFile(localPath, 'utf8')).toBe('png-bytes');
+  });
+
+  it('retries a 500 then succeeds, and reports a 400 without retrying', async () => {
+    const retryPath = path.join(tmpDir, 'flaky.png');
+    const badPath = path.join(tmpDir, 'bad.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_status_retry',
+        prompt: 'Show both',
+        attachments: [
+          {
+            filename: 'flaky.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/flaky.png',
+            localPath: retryPath,
+          },
+          {
+            filename: 'bad.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/bad.png',
+            localPath: badPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    let flakyRequests = 0;
+    let badRequests = 0;
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async input => {
+        const url = typeof input === 'string' ? input : (input as Request).url;
+        if (url === 'https://r2.example.com/flaky.png') {
+          flakyRequests += 1;
+          if (flakyRequests === 1) {
+            return new Response('busy', { status: 500 });
+          }
+          return new Response('png-bytes', { status: 200 });
+        }
+        badRequests += 1;
+        return new Response('bad request', { status: 400 });
+      }),
+    });
+
+    expect(flakyRequests).toBe(2);
+    expect(badRequests).toBe(1);
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Show both' },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: `file://${retryPath}`,
+        filename: 'flaky.png',
+      },
+      {
+        type: 'text',
+        text: 'attachment bad.png could not be retrieved (HTTP 400)',
+      },
+    ]);
+    expect(await fsp.readFile(retryPath, 'utf8')).toBe('png-bytes');
+    expect(fs.existsSync(badPath)).toBe(false);
+  });
+
+  it('propagates a caller abort instead of retrying or masking it as an exhausted attachment', async () => {
+    const localPath = path.join(tmpDir, 'aborted.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_aborted',
+        prompt: 'Look at this image',
+        attachments: [
+          {
+            filename: 'aborted.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/aborted.png',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const controller = new AbortController();
+    let attempts = 0;
+    let abortError: unknown;
+    try {
+      await materializePromptAttachments(prompt, {
+        fetch: asFetch(async () => {
+          attempts += 1;
+          if (attempts < 3) {
+            throw new Error('socket hang up');
+          }
+          controller.abort();
+          return new Response('png-bytes', {
+            status: 200,
+            headers: { 'content-length': '9' },
+          });
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      abortError = error;
+    }
+
+    expect(abortError).toBeInstanceOf(Error);
+    expect(attempts).toBe(3);
+    expect(fs.existsSync(localPath)).toBe(false);
   });
 
   it('materializes a generic binary attachment as a text part describing the saved file', async () => {

@@ -1,6 +1,10 @@
 import { Buffer } from 'node:buffer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cloudAgentSessionScopeHeaders } from '@kilocode/session-ingest-contracts';
+import {
+  GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS,
+  GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS,
+} from './github-rate-limit-diagnostics.js';
 
 const sdk = vi.hoisted(() => {
   class StockSandbox {}
@@ -1985,5 +1989,338 @@ describe('handleManagedScmOutbound control-plane aliases', () => {
     expect(resolveCredential).toHaveBeenCalledOnce();
     expect(redemptions.kilo).toHaveBeenCalledOnce();
     expect(forward).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleManagedScmOutbound bounded GitHub git rate-limit retry', () => {
+  const FAKE_NOW = Date.parse('2026-01-01T00:00:00.000Z');
+  const GITHUB_GIT_GET_URL = 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack';
+  const GITHUB_GIT_POST_URL = 'https://github.com/acme/repo.git/git-upload-pack';
+
+  function githubRedeem() {
+    return vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_GIT_AUTHORIZATION,
+    });
+  }
+
+  function githubGitGetRequest(): Request {
+    return new Request(GITHUB_GIT_GET_URL, {
+      headers: { Authorization: basicCredential(CAPABILITY) },
+    });
+  }
+
+  function githubGitPostRequest(body: BodyInit): Request {
+    return new Request(GITHUB_GIT_POST_URL, {
+      method: 'POST',
+      headers: { Authorization: basicCredential(CAPABILITY) },
+      body,
+    });
+  }
+
+  function resetHeader(delaySeconds: number): Record<string, string> {
+    return { 'x-ratelimit-reset': String(Math.floor(Date.now() / 1000) + delaySeconds) };
+  }
+
+  function stubResponseSequence(factories: ReadonlyArray<() => Response>) {
+    let index = 0;
+    const fetchMock = vi.fn(async (_request: Request): Promise<Response> => {
+      const factory = factories[Math.min(index, factories.length - 1)];
+      index += 1;
+      return factory ? factory() : new Response(null, { status: 500 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  async function settle<T>(pending: Promise<T>): Promise<T> {
+    await vi.runAllTimersAsync();
+    return pending;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllGlobals();
+    vi.useFakeTimers();
+    vi.setSystemTime(FAKE_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('waits the retry-after delta-seconds delay before re-issuing', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: { 'retry-after': '30' } }),
+      () => new Response('ok', { status: 200 }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS - 1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await expect(pending).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('waits the retry-after HTTP-date delay before re-issuing', async () => {
+    const retryAfter = new Date(FAKE_NOW + 30_000).toUTCString();
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: { 'retry-after': retryAfter } }),
+      () => new Response('ok', { status: 200 }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS - 1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await expect(pending).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('clamps an oversized retry-after to the per-wait maximum', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: { 'retry-after': '999999' } }),
+      () => new Response('ok', { status: 200 }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS - 1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await expect(pending).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('waits the observed retry-after value rather than the per-wait maximum', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: { 'retry-after': '7' } }),
+      () => new Response('ok', { status: 200 }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(6_999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await expect(pending).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('re-issues repeatedly while the observed resets fit the total-wait budget', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: resetHeader(5) }),
+      () => new Response('rate limited', { status: 429, headers: resetHeader(5) }),
+      () => new Response('ok', { status: 200 }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    await expect(pending).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('returns the 429 when the next observed wait exceeds the remaining budget', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: resetHeader(25) }),
+      () => new Response('rate limited', { status: 429, headers: resetHeader(25) }),
+      () => new Response('rate limited', { status: 429, headers: resetHeader(20) }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    await expect(pending).resolves.toMatchObject({ status: 429 });
+
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('stops at the attempt cap and returns the final 429', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: { 'retry-after': '0' } }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await expect(settle(pending)).resolves.toMatchObject({ status: 429 });
+    expect(fetchMock).toHaveBeenCalledTimes(1 + GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS);
+  });
+
+  it('retries immediately when the observed delay is zero', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('rate limited', { status: 429, headers: { 'retry-after': '0' } }),
+      () => new Response('ok', { status: 200 }),
+    ]);
+    const pending = handleOutbound(githubGitGetRequest(), createEnv(githubRedeem()));
+
+    await expect(settle(pending)).resolves.toMatchObject({ status: 200 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('replays an eligible POST body byte-for-byte on retry', async () => {
+    const binaryBody = new Uint8Array([0x00, 0xff, 0x50, 0x41, 0x43, 0x4b, 0x0a, 0x80, 0x7f]);
+    const seen: Uint8Array[] = [];
+    const fetchMock = vi.fn(async (request: Request): Promise<Response> => {
+      seen.push(new Uint8Array(await request.arrayBuffer()));
+      if (seen.length === 1) {
+        return new Response('rate limited', { status: 429, headers: resetHeader(5) });
+      }
+      return new Response('ok', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const pending = handleOutbound(githubGitPostRequest(binaryBody), createEnv(githubRedeem()));
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(pending).resolves.toMatchObject({ status: 200 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(Array.from(seen[0] ?? [])).toEqual(Array.from(binaryBody));
+    expect(Array.from(seen[1] ?? [])).toEqual(Array.from(binaryBody));
+  });
+
+  it('forwards an over-cap eligible POST once and returns its response', async () => {
+    const overCapBody = new Uint8Array(1_048_577);
+    const fetchMock = vi.fn(async (request: Request): Promise<Response> => {
+      await request.arrayBuffer();
+      return new Response('ok', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await settle(
+      handleOutbound(githubGitPostRequest(overCapBody), createEnv(githubRedeem()))
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry an over-cap eligible POST that receives a 429', async () => {
+    const overCapBody = new Uint8Array(1_048_577);
+    const fetchMock = vi.fn(async (request: Request): Promise<Response> => {
+      await request.arrayBuffer();
+      return new Response('rate limited', { status: 429, headers: { 'retry-after': '7' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await settle(
+      handleOutbound(githubGitPostRequest(overCapBody), createEnv(githubRedeem()))
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('7');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  const excludedRequests: ReadonlyArray<[string, () => Request]> = [
+    [
+      'POST git-receive-pack',
+      () =>
+        new Request('https://github.com/acme/repo.git/git-receive-pack', {
+          method: 'POST',
+          headers: { Authorization: basicCredential(CAPABILITY) },
+          body: 'pack-body',
+        }),
+    ],
+    [
+      'GET info/refs for git-receive-pack',
+      () =>
+        new Request('https://github.com/acme/repo.git/info/refs?service=git-receive-pack', {
+          headers: { Authorization: basicCredential(CAPABILITY) },
+        }),
+    ],
+    [
+      'GitHub API route',
+      () =>
+        new Request('https://api.github.com/repos/acme/repo', {
+          headers: { Authorization: `Bearer ${CAPABILITY}` },
+        }),
+    ],
+  ];
+
+  it.each(excludedRequests)(
+    'does not retry %s even with an observable reset',
+    async (_label, makeRequest) => {
+      const fetchMock = stubResponseSequence([
+        () => new Response('rate limited', { status: 429, headers: { 'retry-after': '30' } }),
+      ]);
+
+      const response = await settle(handleOutbound(makeRequest(), createEnv(githubRedeem())));
+
+      expect(response.status).toBe(429);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('does not retry an eligible read route without an observable reset', async () => {
+    const fetchMock = stubResponseSequence([() => new Response('rate limited', { status: 429 })]);
+
+    const response = await settle(handleOutbound(githubGitGetRequest(), createEnv(githubRedeem())));
+
+    expect(response.status).toBe(429);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry an initial 403', async () => {
+    const fetchMock = stubResponseSequence([
+      () => new Response('forbidden', { status: 403, headers: { 'retry-after': '30' } }),
+    ]);
+
+    const response = await settle(handleOutbound(githubGitGetRequest(), createEnv(githubRedeem())));
+
+    expect(response.status).toBe(403);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces the existing 502 when a retry forward fails', async () => {
+    let calls = 0;
+    const fetchMock = vi.fn(async (_request: Request): Promise<Response> => {
+      calls += 1;
+      if (calls === 1) {
+        return new Response('rate limited', { status: 429, headers: { 'retry-after': '0' } });
+      }
+      throw new Error('network unavailable');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await settle(handleOutbound(githubGitGetRequest(), createEnv(githubRedeem())));
+
+    expect(response.status).toBe(502);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

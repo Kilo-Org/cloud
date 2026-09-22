@@ -25,6 +25,10 @@ type CenteredStateProps = {
   className?: string;
   testID?: string;
   refreshControl?: ScrollViewProps['refreshControl'];
+  /** Frame clearance the caller owns (e.g. the fixed tab-bar band). It shrinks
+   *  the measured viewport, so the centered body clears the overlay before any
+   *  surface geometry lands; a ready layout can only tighten the same value. */
+  frameStyle?: ScrollViewProps['style'];
 };
 
 type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
@@ -41,6 +45,7 @@ export function CenteredState({
   className,
   testID = 'centered-state',
   refreshControl,
+  frameStyle,
 }: CenteredStateProps) {
   const surface = useStateSurface();
   const frame = surface?.frame;
@@ -115,12 +120,22 @@ export function CenteredState({
     [surface, viewport, contentHeight]
   );
   const ready = layout !== undefined;
+  // While the measured layout is pending, the fallback must still keep the band
+  // the surface reserved (the fixed tab bar) free: without it the body centers
+  // in the full viewport, which runs under the bar, and the bar clips the
+  // body's lower lines and its action.
+  const bottomReservation = surface?.bottomReservation ?? 0;
   const contentStyle = useMemo(
     () =>
       ready
         ? { flexGrow: 1, ...layout }
-        : { flexGrow: 1, justifyContent: 'center' as const, paddingVertical: 16 },
-    [layout, ready]
+        : {
+            flexGrow: 1,
+            justifyContent: 'center' as const,
+            paddingTop: 16,
+            paddingBottom: 16 + bottomReservation,
+          },
+    [bottomReservation, layout, ready]
   );
   const [fallbackElapsed, setFallbackElapsed] = useState(false);
   useEffect(() => {
@@ -145,6 +160,7 @@ export function CenteredState({
     <ScrollView
       ref={capture}
       className={cn('flex-1', className)}
+      style={frameStyle}
       testID={testID}
       onLayout={measure}
       contentContainerStyle={contentStyle}

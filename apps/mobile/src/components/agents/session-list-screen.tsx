@@ -265,11 +265,15 @@ export function AgentSessionListScreen() {
     // over it (device defect uxs1). That body is centered, so it draws the
     // pull's own progress while reduced motion is on, and the band then
     // yields its spinner to it (`progressInBody` on the reserved line).
+    // The body's frame carries the same band clearance as the rows list, so
+    // the centered copy and its CTA clear the fixed tab bar even before the
+    // surface geometry lands (a measured layout can only tighten it).
     body = (
       <EmptyState
         icon={Bot}
         title={t('agents.sessionList.noMatches')}
         refreshControl={rowsControl}
+        frameStyle={listInsets.frame}
         description={
           isSearching
             ? t('agents.sessionList.tryDifferentSearch')

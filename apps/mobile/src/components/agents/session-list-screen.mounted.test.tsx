@@ -1282,6 +1282,25 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
   });
 
+  it('clears the tab bar for the no-match body without waiting on a surface measurement', async () => {
+    state.live.activeSessions = [row];
+    const renderer = await renderScreen();
+    const searchHeader = requireNode('SessionListSearchHeader');
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+    expect(nodes('CenteredState')).toHaveLength(1);
+    expect(nodes('FlatList')).toHaveLength(0);
+    // The no-match body owns the same frame clearance as the rows list, so the
+    // fixed tab bar clips neither its secondary line nor its CTA even while the
+    // measured surface layout is still pending.
+    const body = nodes('CenteredState')[0];
+    expect(body?.props.frameStyle).toEqual({ marginBottom: state.tabBarHeight + 64 });
+    expect(renderer.root.findByType(EmptyState).props.description).toBe(
+      'Try a different search term.'
+    );
+  });
+
   it('narrows the live list to the search text', async () => {
     state.live.activeSessions = [
       { ...row, id: 'a1', organizationId: null, title: 'Fix the login redirect' },

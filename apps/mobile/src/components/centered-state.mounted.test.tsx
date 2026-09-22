@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Placement, measurement, and fallback contracts share one mounted fixture. */
 import {
   act,
   type ComponentPropsWithRef,
@@ -321,5 +322,22 @@ describe('CenteredState measurement fallback', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('reserves the surface bottom band while the layout measurement is pending', async () => {
+    // The tab bar is an absolute overlay: its band is known from the surface
+    // reservation before any geometry lands. The fallback placement must keep
+    // the content clear of it instead of centering the body under the bar.
+    native.surface.bottomInset = 96;
+    native.surface.bottomReservation = 96;
+    const mounted = await mount();
+    expect(mounted.content().accessibilityElementsHidden).toBe(true);
+    const style = mounted.scroll().contentContainerStyle as {
+      paddingVertical?: number;
+      paddingBottom?: number;
+    };
+    const bottomPadding = style.paddingBottom ?? style.paddingVertical ?? 0;
+    expect(bottomPadding).toBeGreaterThanOrEqual(96);
+    mounted.unmount();
   });
 });

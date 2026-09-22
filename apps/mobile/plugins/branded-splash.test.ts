@@ -164,8 +164,14 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // Introspection reads the project root's real `colors.xml`, so the array
+    // also carries the colors every other Android plugin contributes. This
+    // suite owns only the splash color: assert it is present, as the styles
+    // assertion below does, rather than pinning the whole file.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

@@ -19,6 +19,7 @@ import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
+import { useAgentsBottomBand, useSessionListInsets } from '@/components/agents/session-list-chrome';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -53,6 +54,10 @@ export function AgentSessionListScreen() {
   const content = liveSessionContent(context, sessions);
   const hasLiveRows = content === 'rows';
   const showFab = context.isReady && content !== 'empty';
+  // Android's edge-to-edge window does not resize for the IME, so the centered
+  // empty states reserve the keyboard's own height or their copy and Clear
+  // search action draw behind it (explorer finding, agents-list).
+  const bottomReservation = useAgentsBottomBand(tabBarHeight, showFab);
   // A failed foreground refresh keeps the cached rows on screen. That failure
   // must speak through the reserved status line (one inline "Couldn't refresh"
   // with Retry) instead of the load-failure block, which would push the kept
@@ -207,24 +212,11 @@ export function AgentSessionListScreen() {
   );
 
   // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
-  // content must clear them. The inset rides on the list's frame as a
-  // `marginBottom` (the viewport ends above the band) — the same viewport inset
-  // `TabScreenScrollView` uses — never on the list's content and never as
-  // `style` padding: a content inset only cleared the end of the list, so every
-  // row the user scrolled into the button's band had its right-aligned
-  // timestamp and chevron covered, and a scroll view's padding is not part of
-  // its scrollable content on iOS, so padding on the frame clipped the last
-  // rows under the bar with no way to scroll them clear. The vertical value
-  // matches the screen's `StateSurfaceInsets`. The landscape side insets keep
-  // row text clear of the sensor housing; portrait insets are 0, keeping the
-  // geometry unchanged.
-  const listInsets = useMemo(
-    () => ({
-      frame: { marginBottom: showFab ? tabBarHeight + FAB_SIZE + FAB_MARGIN : tabBarHeight },
-      content: { paddingTop: 0, paddingBottom: 0, paddingLeft: left, paddingRight: right },
-    }),
-    [showFab, tabBarHeight, left, right]
-  );
+  // content must clear them: the band rides on the list's frame as a
+  // `marginBottom` (the viewport ends above it), never on the content and never
+  // as `style` padding, which only cleared the end of the list. The landscape
+  // side insets keep row text clear of the sensor housing.
+  const listInsets = useSessionListInsets({ tabBarHeight, showFab, left, right });
 
   // The fixed 20pt margin gains the landscape right inset so the FAB clears the
   // sensor area; portrait insets are 0, keeping the geometry unchanged.
@@ -309,7 +301,7 @@ export function AgentSessionListScreen() {
   }
 
   return (
-    <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
+    <StateSurfaceInsets bottomInset={bottomReservation}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}

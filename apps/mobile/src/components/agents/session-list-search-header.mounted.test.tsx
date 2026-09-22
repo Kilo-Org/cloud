@@ -104,6 +104,17 @@ describe('SessionListSearchHeader landscape sensor insets', () => {
     expect(fieldRow(renderer).props.style).toEqual({ marginLeft: 69, marginRight: 81 });
   });
 
+  it('asks the IME for no full-screen editor so the screen keeps the keyboard', async () => {
+    // e9-land-ime-up.png: with little room left in a landscape window the IME
+    // swapped the app for its own full-screen editor — the capture shows the
+    // query, a SEARCH action button and the keyboard where the screen's own
+    // no-match body belongs. `disableFullscreenUI` maps to
+    // `EditorInfo.IME_FLAG_NO_FULLSCREEN` in ReactEditText.updateImeOptions,
+    // the flag the IME's fullscreen decision reads.
+    const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
+    expect(searchInput(renderer).props.disableFullscreenUI).toBe(true);
+  });
+
   it('sizes the single-line input with min-height, never vertical padding', async () => {
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
     const classes = searchInput(renderer).props.className as string;

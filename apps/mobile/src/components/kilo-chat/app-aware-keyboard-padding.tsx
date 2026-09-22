@@ -69,6 +69,34 @@ export function useAppAwareKeyboardPadding(): number {
   return keyboardPadding;
 }
 
+/**
+ * The keyboard's raw height and the occlusion it reserves at the screen bottom,
+ * `0` while the keyboard is down.
+ *
+ * The two platforms measure the IME from different origins: Android's stops at
+ * the navigation bar (`ReactRootView` reports `imeInsets.bottom −
+ * barInsets.bottom`) while iOS's frame reaches the screen bottom. The reserved
+ * space is anchored to the screen bottom, so resolve the occlusion with the same
+ * rule the login screen and the Toaster use (`resolveKeyboardBottomPadding`);
+ * padding by the raw Android height left the manual review form's Start button
+ * behind the IME's navigation row (2026-09-20). A caller that reserves the
+ * keyboard's height in its own layout (a surface inset) reads the occlusion from
+ * here; the padded view below also needs the raw metric.
+ */
+export function useKeyboardOcclusion() {
+  const keyboardHeight = useAppAwareKeyboardPadding();
+  const { bottom } = useSafeAreaInsets();
+  const keyboardOcclusion =
+    keyboardHeight > 0
+      ? resolveKeyboardBottomPadding({
+          keyboardHeight,
+          bottomInset: bottom,
+          platform: Platform.OS,
+        })
+      : 0;
+  return { keyboardHeight, keyboardOcclusion };
+}
+
 export function AppAwareKeyboardPaddingView({
   style,
   keyboardOffset = 0,
@@ -102,24 +130,8 @@ export function AppAwareKeyboardPaddingView({
    */
   contentReservesBottomInset?: boolean;
 }) {
-  const keyboardHeight = useAppAwareKeyboardPadding();
+  const { keyboardHeight, keyboardOcclusion } = useKeyboardOcclusion();
   const { bottom } = useSafeAreaInsets();
-  // The hook reports the platform's own keyboard metric, and the two platforms
-  // measure it from different origins: Android's stops at the navigation bar
-  // (`ReactRootView` reports `imeInsets.bottom − barInsets.bottom`) while iOS's
-  // frame reaches the screen bottom. The reserved space is anchored to the
-  // screen bottom, so resolve it with the same rule the login screen and the
-  // Toaster use; padding by the raw Android height left the bottom
-  // `bottomInset` of the content — the manual review form's Start button —
-  // behind the IME's navigation row (2026-09-20).
-  const keyboardOcclusion =
-    keyboardHeight > 0
-      ? resolveKeyboardBottomPadding({
-          keyboardHeight,
-          bottomInset: bottom,
-          platform: Platform.OS,
-        })
-      : 0;
   // One inset per screen: where a container outside this view (a trailing
   // spacer, a parent `paddingBottom`) or the wrapped content's own bottom
   // padding already reserved the bottom inset, the screen-bottom-anchored

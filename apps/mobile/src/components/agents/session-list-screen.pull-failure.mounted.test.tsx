@@ -88,6 +88,7 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   useWindowDimensions: () => ({ fontScale: 1 }),
   AppState: appState,
+  Keyboard: { addListener: () => ({ remove: () => undefined }) },
   FlatList: (props: {
     data: { id: string }[];
     renderItem: (entry: { item: { id: string } }) => ReactNode;

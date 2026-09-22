@@ -8,6 +8,7 @@ import type * as MotionContextModule from '@/lib/a11y/motion-context';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { AgentSessionListScreen } from './session-list-screen';
 import { RowsRefreshControl } from './rows-refresh-control';
+import { FAB_MARGIN, FAB_SIZE } from './session-list-content';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
@@ -33,6 +34,9 @@ const state = vi.hoisted(() => ({
   tabBarHeight: 60,
   focusCallbacks: new Set<() => void>(),
   listeners: new Set<(state: string) => void>(),
+  // Keyboard listeners, keyed by the event the platform reports (the screen's
+  // empty state reserves the IME's height, so a case must be able to raise it).
+  keyboard: new Map<string, Set<(event: { endCoordinates: { height: number } }) => void>>(),
   auth: { token: 'account' as string | undefined, isLoading: false, isSigningOut: false },
   organization: { organizationId: null as string | null, isLoaded: true },
   boundary: { orgs: [] as Org[] | undefined, isResolving: false, isError: false },
@@ -90,6 +94,21 @@ vi.mock('react-native', () => ({
       return {
         remove: () => {
           state.listeners.delete(listener);
+        },
+      };
+    },
+  },
+  Keyboard: {
+    addListener: (
+      event: string,
+      listener: (event: { endCoordinates: { height: number } }) => void
+    ) => {
+      const listeners = state.keyboard.get(event) ?? new Set();
+      listeners.add(listener);
+      state.keyboard.set(event, listeners);
+      return {
+        remove: () => {
+          listeners.delete(listener);
         },
       };
     },
@@ -353,6 +372,17 @@ function foreground() {
     listener('active');
   }
 }
+function keyboardListeners(event: string) {
+  return state.keyboard.get(event) ?? new Set();
+}
+function showKeyboard(height: number) {
+  for (const listener of keyboardListeners('keyboardDidShow')) {
+    listener({ endCoordinates: { height } });
+  }
+}
+function surfaceBottomInset() {
+  return root().findByType(StateSurfaceInsets).props.bottomInset as number;
+}
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   state.focused = true;
@@ -364,6 +394,7 @@ beforeEach(() => {
   state.rightInset = 0;
   state.tabBarHeight = 60;
   state.focusCallbacks.clear();
+  state.keyboard.clear();
   state.destination = '';
   state.sessionId = '';
   state.announcements = [];
@@ -392,6 +423,7 @@ afterEach(async () => {
   act(() => mountedRenderer?.unmount());
   mountedRenderer = undefined;
   state.listeners.clear();
+  state.keyboard.clear();
   await i18n.changeLanguage('en');
 });
 
@@ -1280,6 +1312,60 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(nodes('CenteredState')).toHaveLength(0);
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
+  });
+
+  it('reserves the keyboard height for the no-match body so its second line stays readable', async () => {
+    // agents-list: the empty state's second line and its Clear search action
+    // drew behind the raised IME, because Android's edge-to-edge window does
+    // not resize for the keyboard.
+    state.platform.OS = 'android';
+    state.live.activeSessions = [{ ...row, id: 'a1', organizationId: null, title: 'Ship it' }];
+    const renderer = await renderScreen();
+
+    const searchHeader = requireNode('SessionListSearchHeader');
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+    expect(renderer.root.findByType(EmptyState).props.description).toBe(
+      'Try a different search term.'
+    );
+    // Keyboard down: the surface reserves only the tab-bar / FAB band.
+    expect(surfaceBottomInset()).toBe(state.tabBarHeight + FAB_SIZE + FAB_MARGIN);
+
+    act(() => {
+      showKeyboard(320);
+    });
+    // The raised IME becomes the reserved band, so the centered copy and its
+    // action stay above the keyboard. Android reports the IME above the
+    // navigation bar and the harness's bottom inset is zero, so the reserve is
+    // the reported height alone.
+    expect(surfaceBottomInset()).toBe(320);
+
+    act(() => {
+      for (const listener of keyboardListeners('keyboardDidHide')) {
+        listener({ endCoordinates: { height: 0 } });
+      }
+    });
+    expect(surfaceBottomInset()).toBe(state.tabBarHeight + FAB_SIZE + FAB_MARGIN);
+  });
+
+  it('replaces the tab-bar band with the IME band while the keyboard is up', async () => {
+    // The raised keyboard hides the tab bar (`tabBarHideOnKeyboard`), so the
+    // bar's own height is not on screen and reserving its band on top of the
+    // IME's occlusion pushed the no-match copy's second line behind the
+    // keyboard on a short landscape window (explorer finding,
+    // agents-search-empty).
+    state.platform.OS = 'android';
+    state.live.activeSessions = [{ ...row, id: 'a1', organizationId: null, title: 'Ship it' }];
+    await renderScreen();
+    expect(surfaceBottomInset()).toBe(state.tabBarHeight + FAB_SIZE + FAB_MARGIN);
+
+    act(() => {
+      showKeyboard(40);
+    });
+    // A band shorter than the tab bar's own still wins: the bar is not on
+    // screen, so its height is not a band the body must clear.
+    expect(surfaceBottomInset()).toBe(40);
   });
 
   it('narrows the live list to the search text', async () => {

@@ -7611,19 +7611,51 @@ describe('SandboxSession orchestration', () => {
     );
   });
 
-  it.each([{ autoCommit: true }, { condenseOnComplete: true }])(
-    'preserves supported follow-up finalization %j through prompt handoff',
-    async finalization => {
+  it('gives a non-worktree control session the default auto-commit path', async () => {
+    const fixture = sessionFixture();
+    expect(fixture.metadata.workspace?.worktreeId).toBeUndefined();
+    await expect(fixture.admit('a')).resolves.toMatchObject({ success: true });
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({
+      state: { kind: 'accepted', intent: { finalization: { autoCommit: true } } },
+    });
+    expect(fixture.control.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'session.prompt',
+        payload: expect.objectContaining({ finalization: { autoCommit: true } }),
+      })
+    );
+  });
+
+  it('honors a non-worktree control session stored auto-commit override', async () => {
+    const fixture = sessionFixture({ finalization: { autoCommit: false } });
+    await expect(fixture.admit('a')).resolves.toMatchObject({ success: true });
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({
+      state: { kind: 'accepted', intent: { finalization: { autoCommit: false } } },
+    });
+  });
+
+  it.each([
+    [{ autoCommit: true }, { autoCommit: true }],
+    [{ condenseOnComplete: true }, { autoCommit: true, condenseOnComplete: true }],
+  ])(
+    'defaults auto-commit for non-worktree follow-up %j through prompt handoff',
+    async (submitted, effective) => {
       const fixture = sessionFixture();
-      await expect(fixture.admit('a', { finalization })).resolves.toMatchObject({ success: true });
-      await fixture.flush();
-      expect(fixture.record('a')).toMatchObject({
-        state: { kind: 'accepted', intent: { finalization } },
+      await expect(fixture.admit('a', { finalization: submitted })).resolves.toMatchObject({
+        success: true,
       });
+      await fixture.flush();
+      const record = fixture.record('a');
+      if (record?.state.kind !== 'accepted' || !record.state.intent) {
+        throw new Error('expected accepted record');
+      }
+      expect(record.state.intent.finalization).toEqual(effective);
       expect(fixture.control.request).toHaveBeenCalledWith(
         expect.objectContaining({
           operation: 'session.prompt',
-          payload: expect.objectContaining({ finalization }),
+          payload: expect.objectContaining({ finalization: effective }),
         })
       );
     }

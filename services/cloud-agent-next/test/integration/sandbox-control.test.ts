@@ -11067,7 +11067,7 @@ describe('SandboxSession control-plane regressions', () => {
     }
   }, 30_000);
 
-  it('normalizes initial and command models once without preflight or leaking session finalization', async () => {
+  it('normalizes initial and command models once without preflight and inherits session finalization', async () => {
     const { fixture, session } = messageFixture();
     const { socket } = await initializeTerminalRuntime(fixture);
     const finalization = {
@@ -11120,6 +11120,7 @@ describe('SandboxSession control-plane regressions', () => {
           messageId: 'msg_command_model',
           turn: { type: 'command', command: 'review', arguments: '--all' },
           agent: { mode: 'reviewer', model: 'kilo/example', variant: 'low' },
+          finalization: { autoCommit: true, condenseOnComplete: true },
         },
       ]);
       expect((await admissionState(session)).metadata?.finalization).toEqual(finalization);
@@ -11225,16 +11226,19 @@ describe('SandboxSession control-plane regressions', () => {
           messageId: INITIAL_MESSAGE_ID,
           turn: { type: 'prompt', prompt: 'A' },
           agent: { ...agentA, model: 'anthropic/claude-sonnet-4' },
+          finalization: { autoCommit: true },
         },
         {
           messageId: 'msg_b',
           turn: { type: 'prompt', prompt: 'B' },
           agent: { mode: 'reviewer', model: 'openai/gpt-4.1' },
+          finalization: { autoCommit: true },
         },
         {
           messageId: 'msg_c',
           turn: { type: 'prompt', prompt: 'inherits B' },
           agent: { mode: 'code', model: 'openai/gpt-4.1' },
+          finalization: { autoCommit: true },
         },
       ]);
       const terminal = await admissionState(session);
@@ -11271,6 +11275,7 @@ describe('SandboxSession control-plane regressions', () => {
     expect(state.messages[1]?.state.intent).toEqual({
       turn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'initial' },
       agent: { mode: 'reviewer', model: agentA.model },
+      finalization: { autoCommit: true },
     });
     expect(state.metadata?.agent).toEqual({ mode: 'architect', model: agentA.model });
     expect(globalThis.fetch).not.toHaveBeenCalled();
@@ -11353,6 +11358,7 @@ describe('SandboxSession control-plane regressions', () => {
           messageId: 'msg_model_less',
           turn: { type: 'command', command: 'status', arguments: '--all' },
           agent: { mode: 'reviewer' },
+          finalization: { autoCommit: true },
         },
       ]);
       await runInDurableObject(session, (_instance, state) => {
@@ -11696,6 +11702,7 @@ describe('SandboxSession control-plane regressions', () => {
       {
         turn: { type: 'prompt', messageId: 'msg_new_b', prompt: 'new B' },
         agent: { mode: 'code', model: modelB },
+        finalization: { autoCommit: true },
       },
     ]);
     expect(frozen.messages[2]).toMatchObject({
@@ -11857,6 +11864,7 @@ describe('SandboxSession control-plane regressions', () => {
         messageId: INITIAL_MESSAGE_ID,
         turn: { type: 'prompt', prompt: 'retry A' },
         agent: { ...agentA, model: 'anthropic/claude-sonnet-4' },
+        finalization: { autoCommit: true },
       });
       const accepted = await admissionState(session);
       expect(accepted.messages).toMatchObject([
@@ -12128,6 +12136,7 @@ describe('SandboxSession control-plane regressions', () => {
       const initialRecord = createSessionMessageRecord({
         turn: initialTurn,
         agent: { mode: 'code', model: 'test' },
+        finalization: { autoCommit: true },
       });
       const followUpRecord = createSessionMessageRecord({
         turn: {
@@ -12137,6 +12146,7 @@ describe('SandboxSession control-plane regressions', () => {
           arguments: followUpTurn.arguments,
         },
         agent: { mode: 'code', model: 'test' },
+        finalization: { autoCommit: true },
       });
       expect(
         ((await readSessionValue(state.storage)) as { messages?: SessionMessage[] } | undefined)

@@ -827,7 +827,8 @@
       "chat": "Spjallskilaboð",
       "kiloclaw": "Virkni í KiloClaw",
       "balance": "Inneignarviðvaranir",
-      "security": "Öryggisniðurstöður"
+      "security": "Öryggisniðurstöður",
+      "spend": "Útgjaldaviðvaranir"
     },
     "category": {
       "chatMessagesSubtitle": "svör í samtölunum þínum",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Staða lotu",
       "sessionStatusSubtitle": "lokið / mistókst / tilbúin til stýringar",
       "kiloclawActivitySubtitle": "tilvik tilbúið eða bilað, tímasettar aðgerðir",
+      "kiloclawActivityUnavailable": "Ræstu KiloClaw-tilvik til að fá KiloClaw-virkni.",
       "balanceAlertsSubtitle": "viðvaranir um lága inneign félagsins",
-      "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar"
+      "balanceAlertsUnavailable": "Skráðu þig í fyrirtæki til að fá viðvaranir um lága inneign.",
+      "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar",
+      "securityFindingsUnavailable": "Virkjaðu Kilo öryggiserindreka á sviði til að fá öryggisniðurstöður.",
+      "spendAlertsSubtitle": "yfirferðir þröskulda og uppsveiflur á klukkustund",
+      "spendAlertsToggle": "Flokkur útgjaldaviðvarana"
     },
     "action": {
       "openSession": "Opna lotu"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Ekki tókst að hlaða lotunni.",
       "failedToLoadDetails": "Ekki tókst að hlaða upplýsingum um lotuna.",
       "failedToStopExecution": "Ekki tókst að stöðva keyrsluna.",
+      "stopped": "Lotan var stöðvuð",
+      "committing": "Skrái…",
+      "committed": "Skráð",
+      "commitFailed": "Skráning mistókst",
       "renameSession": "Endurnefna lotu",
       "renamePlaceholder": "Lotunafn",
       "transcriptAccessibility": "Samtalsferill lotunnar",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} lína",
       "linesBadge_other": "{{displayCount}} línur",
       "matchesBadge_one": "{{displayCount}} samsvörun",
-      "matchesBadge_other": "{{displayCount}} samsvaranir"
+      "matchesBadge_other": "{{displayCount}} samsvaranir",
+      "noOutput": "Ekkert úttak."
     },
     "readToolMarkdown": {
       "linesTruncated": "línur {{start}}–{{end}} (stytt)",
@@ -3153,7 +3164,10 @@
     "couldNotApprove": "Gat ekki samþykkt",
     "couldNotStart": "Gat ekki ræst",
     "channelName": "Virkir fulltrúar",
-    "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum."
+    "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum.",
+    "openSession": "Opna",
+    "approveFailed": "Ekki tókst að samþykkja. Ýttu á $t(common.approve) til að reyna aftur.",
+    "newestResult": "Nýjasta niðurstaðan"
   },
   "transcriptionModel": {
     "title": "Umritunarlíkan",
@@ -3178,15 +3192,7 @@
     "remoteOptionTitle": "Tölvan þín",
     "remoteOptionBody": "Keyrðu Kilo á eigin tölvu í gegnum `kilo remote` CLI-ið.",
     "skip": "Sleppa kynningu",
-    "tutorialLabel": "Leiðbeiningar",
-    "remoteTitle": "Hafðu uppi fyrstu fjarlotu þína",
-    "remoteBody": "Tengdu tölvuna þína og vertu svo að byrja lotuna héðan.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Engin tölva tengd ennþá",
-    "remoteEmptyBody": "Til að tengja hana skaltu keyra `kilo remote` á tölvunni þinni.",
-    "remoteFound": "Tölva tengd",
-    "checkAgain": "Athuga aftur",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Leiðbeiningar"
   },
   "appActions": {
     "start": {
@@ -3197,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Opna síðustu lotu"
+  },
+  "spendAlerts": {
+    "subtitle": "Sendu viðvörun í tölvupósti eða push til innheimtutengiliða þegar útgjöld þessa svæðis fara yfir mörk eða stökkva yfir venjulegan klukkustundarhraða þess.",
+    "enable": "Virkja útgjaldaviðvaranir",
+    "thresholdTitle": "Yfirferð þröskulds",
+    "thresholdSubtitle": "Safnað útgjöld fara yfir mörkin þín",
+    "anomalyTitle": "Uppsveifla á klukkustund",
+    "anomalySubtitle": "Klukkustund er langt yfir venjulegum hraða þessa svæðis",
+    "limitLabel": "Mörk (USD)",
+    "windowLabel": "Gluggi",
+    "window24h": "24 klukkustundir",
+    "window7d": "7 dagar",
+    "window30d": "30 dagar",
+    "multiplierLabel": "Margfaldari uppsveiflunnar",
+    "saved": "Stillingar útgjaldaviðvarana vistaðar",
+    "loadError": "Ekki tókst að hlaða útgjaldaviðvörunum.",
+    "saveError": "Ekki tókst að vista útgjaldaviðvaranir.",
+    "empty": "Útgjaldaviðvaranir eru af. Kveiktu á þeim til að vara innheimtutengiliði þessa svæðis við.",
+    "noSpend": "Engin útgjöld skráð ennþá",
+    "spend24h": "Útgjöld síðustu 24 klukkustundir",
+    "multiplierError": "Sláðu inn margfaldara sem er 1 eða meira",
+    "permissionDenied": "Þú hefur ekki heimild til að stjórna útgjaldaviðvörunum.",
+    "pushOffByCategory": "Af í Tilkynningum"
   }
 }

@@ -827,7 +827,8 @@
       "chat": "សារជជែក",
       "kiloclaw": "សកម្មភាព KiloClaw",
       "balance": "ការជូនដំណឹងអំពីសមតុល្យ",
-      "security": "បញ្ហាសុវត្ថិភាពដែលរកឃើញ"
+      "security": "បញ្ហាសុវត្ថិភាពដែលរកឃើញ",
+      "spend": "ការជូនដំណឹងអំពីការចំណាយ"
     },
     "category": {
       "chatMessagesSubtitle": "ការឆ្លើយតបនៅក្នុងការសន្ទនារបស់អ្នក",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "ស្ថានភាពវគ្គ",
       "sessionStatusSubtitle": "បានបញ្ចប់ / បានបរាជ័យ / រួចរាល់សម្រាប់ឱ្យអ្នកគ្រប់គ្រង",
       "kiloclawActivitySubtitle": "ម៉ាស៊ីនរួចរាល់/បរាជ័យ សកម្មភាពតាមកាលវិភាគ",
+      "kiloclawActivityUnavailable": "ចាប់ផ្ដើមម៉ាស៊ីន KiloClaw ដើម្បីទទួលបានសកម្មភាព KiloClaw។",
       "balanceAlertsSubtitle": "ការព្រមានពេលសមតុល្យរបស់អង្គការទាប",
-      "securityFindingsSubtitle": "ការរកឃើញថ្មី និងការរំលឹក SLA"
+      "balanceAlertsUnavailable": "ចូលរួមស្ថាប័នដើម្បីទទួលបានការជូនដំណឹងពេលសមតុល្យទាប។",
+      "securityFindingsSubtitle": "ការរកឃើញថ្មី និងការរំលឹក SLA",
+      "securityFindingsUnavailable": "បើកភ្នាក់ងារសុវត្ថិភាព Kilo នៅក្នុងវិសាលភាពដើម្បីទទួលបានបញ្ហាសុវត្ថិភាពដែលរកឃើញ។",
+      "spendAlertsSubtitle": "ការឆ្លងកាត់កម្រិត និងការកើនឡើងប្រចាំម៉ោង",
+      "spendAlertsToggle": "ប្រភេទនៃការជូនដំណឹងអំពីការចំណាយ"
     },
     "action": {
       "openSession": "បើកវគ្គ"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "មិនអាចផ្ទុកវគ្គបានទេ។",
       "failedToLoadDetails": "មិនអាចផ្ទុកព័ត៌មានលម្អិតនៃវគ្គបានទេ។",
       "failedToStopExecution": "មិនអាចបញ្ឈប់ការដំណើរការបានទេ។",
+      "stopped": "វគ្គត្រូវបានបញ្ឈប់",
+      "committing": "កំពុងកត់ត្រា…",
+      "committed": "កត់ត្រារួចរាល់",
+      "commitFailed": "ការកត់ត្រាបានបរាជ័យ",
       "renameSession": "ប្តូរឈ្មោះវគ្គ",
       "renamePlaceholder": "ឈ្មោះវគ្គ",
       "transcriptAccessibility": "កំណត់ត្រាសន្ទនារបស់វគ្គ",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} បន្ទាត់",
       "linesBadge_other": "{{displayCount}} បន្ទាត់",
       "matchesBadge_one": "ត្រូវគ្នា {{displayCount}}",
-      "matchesBadge_other": "ត្រូវគ្នា {{displayCount}}"
+      "matchesBadge_other": "ត្រូវគ្នា {{displayCount}}",
+      "noOutput": "គ្មានលទ្ធផលទេ។"
     },
     "readToolMarkdown": {
       "linesTruncated": "បន្ទាត់ {{start}}–{{end}} (បានកាត់ឱ្យខ្លី)",
@@ -3153,7 +3164,10 @@
     "couldNotApprove": "មិនអាចយល់ព្រមបានទេ",
     "couldNotStart": "មិនអាចចាប់ផ្ដើមបានទេ",
     "channelName": "ភ្នាក់ងារសកម្ម",
-    "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។"
+    "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។",
+    "openSession": "បើក",
+    "approveFailed": "មិនអាចយល់ព្រមបានទេ។ ប៉ះ $t(common.approve) ដើម្បីព្យាយាមម្តងទៀត។",
+    "newestResult": "លទ្ធផលថ្មីបំផុត"
   },
   "transcriptionModel": {
     "title": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទ",
@@ -3178,15 +3192,7 @@
     "remoteOptionTitle": "កុំព្យូទ័ររបស់អ្នក",
     "remoteOptionBody": "ដំណើរការ Kilo លើម៉ាស៊ីនរបស់អ្នកតាមរយៈ CLI `kilo remote`។",
     "skip": "រំលងដំណើរ",
-    "tutorialLabel": "ការណែនាំ",
-    "remoteTitle": "ចាប់ផ្តើមវគ្គចម្ងាយដំបូងរបស់អ្នក",
-    "remoteBody": "ភ្ជាប់កុំព្យូទ័ររបស់អ្នក បន្ទាប់មកចាប់ផ្តើមវគ្គពីទីនេះ។",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "មិនទាន់មានកុំព្យូទ័របានភ្ជាប់ទេ",
-    "remoteEmptyBody": "ដើម្បីភ្ជាប់វា ចូលដំណើរការ `kilo remote` លើកុំព្យូទ័ររបស់អ្នក។",
-    "remoteFound": "បានភ្ជាប់កុំព្យូទ័រ",
-    "checkAgain": "ពិនិត្យម្តងទៀត",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ការណែនាំ"
   },
   "appActions": {
     "start": {
@@ -3197,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "បើកវគ្គចុងក្រោយ"
+  },
+  "spendAlerts": {
+    "subtitle": "ផ្ញើការជូនដំណឹងតាមអ៊ីមែល ឬ push ទៅអ្នកទំនាក់ទំនងវិក្កយបត្រ នៅពេលការចំណាយរបស់វិសាលភាពនេះឆ្លងកាត់កម្រិត ឬកើនឡើងលើសពីអត្រាប្រចាំម៉ោងធម្មតា។",
+    "enable": "បើកការជូនដំណឹងអំពីការចំណាយ",
+    "thresholdTitle": "ការឆ្លងកាត់កម្រិត",
+    "thresholdSubtitle": "ការចំណាយបច្ចុប្បន្នឆ្លងកាត់កម្រិតរបស់អ្នក",
+    "anomalyTitle": "ការកើនឡើងប្រចាំម៉ោង",
+    "anomalySubtitle": "មួយម៉ោងខ្ពស់ជាងអត្រាធម្មតារបស់វិសាលភាពនេះច្រើន",
+    "limitLabel": "កម្រិត (USD)",
+    "windowLabel": "រយៈពេល",
+    "window24h": "24 ម៉ោង",
+    "window7d": "7 ថ្ងៃ",
+    "window30d": "30 ថ្ងៃ",
+    "multiplierLabel": "តម្លៃគុណនៃការកើនឡើង",
+    "saved": "បានរក្សាទុកការកំណត់នៃការជូនដំណឹងអំពីការចំណាយ",
+    "loadError": "មិនអាចផ្ទុកការជូនដំណឹងអំពីការចំណាយបានទេ។",
+    "saveError": "មិនអាចរក្សាទុកការជូនដំណឹងអំពីការចំណាយបានទេ។",
+    "empty": "ការជូនដំណឹងអំពីការចំណាយបិទ។ បើកវាដើម្បីជូនដំណឹងអ្នកទំនាក់ទំនងវិក្កយបត្ររបស់វិសាលភាពនេះ។",
+    "noSpend": "មិនទាន់មានការចំណាយត្រូវបានកត់ត្រាទេ",
+    "spend24h": "ការចំណាយក្នុងរយៈពេល 24 ម៉ោងចុងក្រោយ",
+    "multiplierError": "បញ្ចូលតម្លៃគុណ 1 ឬច្រើនជាងនេះ",
+    "permissionDenied": "អ្នកមិនមានសិទ្ធិគ្រប់គ្រងការជូនដំណឹងអំពីការចំណាយទេ។",
+    "pushOffByCategory": "បិទក្នុងការជូនដំណឹង"
   }
 }

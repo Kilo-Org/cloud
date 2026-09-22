@@ -723,6 +723,8 @@ function glanceableSnapshot(
     needsInput: 0,
     idle: 0,
     needsInputSince: '2026-01-01T00:00:00.000Z',
+    newestResultKind: 'running',
+    newestResultAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -804,6 +806,10 @@ const secureStoreMock = {
   getItemAsync: vi.fn(async (key: string) => {
     await Promise.resolve();
     return secureStore.get(key) ?? null;
+  }),
+  deleteItemAsync: vi.fn(async (key: string) => {
+    secureStore.delete(key);
+    await Promise.resolve();
   }),
 };
 
@@ -1920,15 +1926,19 @@ describe('cold iOS background delivery', () => {
   async function loadColdBackground() {
     vi.resetModules();
     await import('@/lib/glanceable/delivery-registration');
-    const [notifications, registry, persist, sink, cleanup, blank] = await Promise.all([
+    const [notifications, registry, persist, sink, cleanup, blank, waitingAsk] = await Promise.all([
       import('./notifications'),
       import('@/lib/glanceable/sink-registry'),
       import('@/lib/glanceable/persist'),
       import('@/glanceable-ios/ios-sink'),
       import('@/lib/auth/logout-cleanup'),
       import('@/lib/glanceable/cleanup'),
+      import('@/lib/glanceable/waiting-ask'),
     ]);
     persist._setSecureStoreForTests(secureStoreMock);
+    // The ask mirror lazy-`require`s the native store too, so the headless
+    // hydration reads the same injected map the snapshot restore does.
+    waitingAsk._setSecureStoreForTests(secureStoreMock);
     for (const listener of mocks.startTokenListeners) {
       listener({ activityPushToStartToken: 'scope-token' });
     }
@@ -2280,8 +2290,71 @@ describe('cold iOS background delivery', () => {
       needsApproval: 0,
       idle: 0,
       needsInputSince: null,
+      // No ask is recorded for this cold push, so the app-built state says so
+      // explicitly; the layout gates Approve on this flag.
+      canApprove: false,
     });
     expect(rows.has('scope-token')).toBe(true);
+  });
+
+  it('hydrates the mirrored ask so a waiting push keeps Approve', async () => {
+    // The app is not running, so the only copy of the ask is the SecureStore
+    // mirror. The headless apply must read it before the sink stamps
+    // `canApprove`, or the card hides an Approve that the tap still answers.
+    secureStore.set(
+      'glanceable-waiting-ask',
+      JSON.stringify({
+        kiloSessionId: 'session-1',
+        status: 'permission',
+        isCloudAgent: true,
+        scopeKey: SCOPE_KEY,
+        organizationId: 'org-9',
+        userId: 'u1',
+        recordedAt: Date.parse('2026-01-01T00:00:00.000Z'),
+      })
+    );
+    const background = await loadColdBackground();
+    expect(
+      await background.deliver({
+        status: 'happy',
+        running: 0,
+        needsInput: 1,
+        idle: 0,
+        needsInputSince: '2026-01-01T00:00:00.000Z',
+      })
+    ).toBe(0);
+
+    expect(JSON.parse(native.props ?? '{}')).toMatchObject({ needsInput: 1, canApprove: true });
+  });
+
+  it('does not revive a mirrored ask recorded for another scope', async () => {
+    // The mirror outlives a sign-out or an org switch, and the ask names the
+    // session and organization an action would answer: a restored record from
+    // another scope must never put Approve on the card.
+    secureStore.set(
+      'glanceable-waiting-ask',
+      JSON.stringify({
+        kiloSessionId: 'session-1',
+        status: 'permission',
+        isCloudAgent: true,
+        scopeKey: buildOpaqueScopeKey({ userId: 'u1', organizationId: 'org-other' }),
+        organizationId: 'org-other',
+        userId: 'u1',
+        recordedAt: Date.parse('2026-01-01T00:00:00.000Z'),
+      })
+    );
+    const background = await loadColdBackground();
+    expect(
+      await background.deliver({
+        status: 'happy',
+        running: 0,
+        needsInput: 1,
+        idle: 0,
+        needsInputSince: '2026-01-01T00:00:00.000Z',
+      })
+    ).toBe(0);
+
+    expect(JSON.parse(native.props ?? '{}')).toMatchObject({ needsInput: 1, canApprove: false });
   });
 
   it('keeps the adopted card when an idle-only push arrives in the background', async () => {

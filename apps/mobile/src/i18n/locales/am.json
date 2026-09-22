@@ -827,7 +827,8 @@
       "chat": "የውይይት መልእክቶች",
       "kiloclaw": "የKiloClaw እንቅስቃሴ",
       "balance": "የቀሪ ሂሳብ ማስጠንቀቂያዎች",
-      "security": "የደህንነት ግኝቶች"
+      "security": "የደህንነት ግኝቶች",
+      "spend": "የወጪ ማስጠንቀቂያዎች"
     },
     "category": {
       "chatMessagesSubtitle": "በውይይቶችዎ ውስጥ የሚሰጡ ምላሾች",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "የክፍለ ጊዜ ሁኔታ",
       "sessionStatusSubtitle": "የተጠናቀቀ / ያልተሳካ / ለመቆጣጠር ዝግጁ",
       "kiloclawActivitySubtitle": "ዝግጁ የሆነ/ያልተሳካ ሂደት፣ መርሐግብር የተያዘላቸው ተግባሮች",
+      "kiloclawActivityUnavailable": "የKiloClaw እንቅስቃሴ ለማግኘት የKiloClaw ሂደት ይጀምሩ።",
       "balanceAlertsSubtitle": "ዝቅተኛ የድርጅት ቀሪ ሂሳብ ማስጠንቀቂያዎች",
-      "securityFindingsSubtitle": "አዳዲስ ግኝቶችና የSLA ማስታወሻዎች"
+      "balanceAlertsUnavailable": "የቀሪ ሂሳብ ማስጠንቀቂያዎችን ለማግኘት ድርጅት ይቀላቀሉ።",
+      "securityFindingsSubtitle": "አዳዲስ ግኝቶችና የSLA ማስታወሻዎች",
+      "securityFindingsUnavailable": "የደህንነት ግኝቶችን ለማግኘት የKilo የደህንነት ወኪልን በአንድ ወሰን ያንቁ።",
+      "spendAlertsSubtitle": "የገደብ መሻገሪያዎች እና የሰዓት ጭማሪዎች",
+      "spendAlertsToggle": "የወጪ ማስጠንቀቂያ ምድብ"
     },
     "action": {
       "openSession": "ክፍለ ጊዜውን ክፈት"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "ክፍለ ጊዜውን መጫን አልተቻለም።",
       "failedToLoadDetails": "የክፍለ ጊዜውን ዝርዝሮች መጫን አልተሳካም።",
       "failedToStopExecution": "ሂደቱን ማቆም አልተሳካም።",
+      "stopped": "ክፍለ ጊዜው ቆሟል",
+      "committing": "በመመዝገብ ላይ…",
+      "committed": "ተመዝግቧል",
+      "commitFailed": "መመዝገብ አልተሳካም",
       "renameSession": "የክፍለ ጊዜ ስም መቀየር",
       "renamePlaceholder": "የክፍለ ጊዜ ስም",
       "transcriptAccessibility": "የክፍለ ጊዜው የውይይት ግልባጭ",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} መስመር",
       "linesBadge_other": "{{displayCount}} መስመሮች",
       "matchesBadge_one": "{{displayCount}} ተዛማጅ",
-      "matchesBadge_other": "{{displayCount}} ተዛማጆች"
+      "matchesBadge_other": "{{displayCount}} ተዛማጆች",
+      "noOutput": "ምንም ውጤት የለም።"
     },
     "readToolMarkdown": {
       "linesTruncated": "መስመሮች {{start}}–{{end}} (በከፊል የታዩ)",
@@ -3153,7 +3164,10 @@
     "couldNotApprove": "ማጽደቅ አልተቻለም",
     "couldNotStart": "መጀመር አልተቻለም",
     "channelName": "ንቁ ወኪሎች",
-    "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።"
+    "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።",
+    "openSession": "ክፈት",
+    "approveFailed": "ማጽደቅ አልተቻለም። እንደገና ለመሞከር $t(common.approve) ይንኩ።",
+    "newestResult": "አዲሱ ውጤት"
   },
   "transcriptionModel": {
     "title": "የድምጽ ወደ ጽሑፍ ሞዴል",
@@ -3178,15 +3192,7 @@
     "remoteOptionTitle": "የእርስዎ ኮምፒውተር",
     "remoteOptionBody": "`kilo remote` በሚባለው CLI በመጠቀም Kiloን በራስዎ ማሽን ላይ ያስኪዱ።",
     "skip": "ጉዞውን ዕለጥ",
-    "tutorialLabel": "መመሪያ",
-    "remoteTitle": "የመጀመሪያውን ሩቅ ክፍለ ጊዜ ይጀምሩ",
-    "remoteBody": "ኮምፒውተርዎን ያገናኙ፣ ከዚያ ክፍለ ጊዜውን ከዚህ ይጀምሩ።",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "እስካሁን የተገናኘ ኮምፒውተር የለም",
-    "remoteEmptyBody": "ለማገናኘት በኮምፒውተርዎ ላይ `kilo remote`ን ያስኪዱ።",
-    "remoteFound": "ኮምፒውተር ተገናኝቷል",
-    "checkAgain": "እንደገና ይፈትሹ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "መመሪያ"
   },
   "appActions": {
     "start": {
@@ -3197,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "የመጨረሻውን ክፍለ ጊዜ ክፈት"
+  },
+  "spendAlerts": {
+    "subtitle": "የዚህ አካባቢ ወጪ ገደብ ሲያልፍ ወይም ከተለመደው የሰዓት መጠኑ በላይ ሲጨምር ለሂሳብ ተጠሪዎች በኢሜይል ወይም በግፋ ማስጠንቀቂያ ላክ።",
+    "enable": "የወጪ ማስጠንቀቂያዎችን አንቃ",
+    "thresholdTitle": "የገደብ መሻገር",
+    "thresholdSubtitle": "ተንቀሳቃሽ ወጪ ገደብህን ያልፋል",
+    "anomalyTitle": "የሰዓት ጭማሪ",
+    "anomalySubtitle": "አንድ ሰዓት ከዚህ አካባቢ የተለመደው መጠን በጣም ከፍ ይላል",
+    "limitLabel": "ገደብ (USD)",
+    "windowLabel": "የጊዜ መስኮት",
+    "window24h": "24 ሰዓታት",
+    "window7d": "7 ቀናት",
+    "window30d": "30 ቀናት",
+    "multiplierLabel": "የጭማሪ ብዜት",
+    "saved": "የወጪ ማስጠንቀቂያ ቅንብሮች ተቀምጠዋል",
+    "loadError": "የወጪ ማስጠንቀቂያዎችን መጫን አልተቻለም።",
+    "saveError": "የወጪ ማስጠንቀቂያዎችን ማስቀመጥ አልተቻለም።",
+    "empty": "የወጪ ማስጠንቀቂያዎች ጠፍተዋል። የዚህን አካባቢ የሂሳብ ተጠሪዎች ለማስጠንቀቅ ያብራቸው።",
+    "noSpend": "እስካሁን ምንም ወጪ አልተመዘገበም",
+    "spend24h": "ባለፉት 24 ሰዓታት የወጣ ወጪ",
+    "multiplierError": "ከ1 ወይም ከዚያ በላይ የሆነ ብዜት ያስገቡ",
+    "permissionDenied": "የወጪ ማስጠንቀቂያዎችን ለማስተዳደር ፈቃድ የለዎትም።",
+    "pushOffByCategory": "በማሳወቂያዎች ውስጥ ተሰናክሏል"
   }
 }

@@ -323,7 +323,8 @@
       "chat": "Wiadomości na czacie",
       "kiloclaw": "Aktywność KiloClaw",
       "balance": "Powiadomienia o saldzie",
-      "security": "Wykryte problemy z bezpieczeństwem"
+      "security": "Wykryte problemy z bezpieczeństwem",
+      "spend": "Alerty o wydatkach"
     },
     "category": {
       "chatMessagesSubtitle": "odpowiedzi w twoich rozmowach",
@@ -334,8 +335,13 @@
       "sessionStatusTitle": "Status sesji",
       "sessionStatusSubtitle": "zakończona / nieudana / gotowa do sterowania",
       "kiloclawActivitySubtitle": "gotowość lub błąd instancji, zaplanowane działania",
+      "kiloclawActivityUnavailable": "Uruchom instancję KiloClaw, aby otrzymywać aktywność KiloClaw.",
       "balanceAlertsSubtitle": "ostrzeżenia o niskim saldzie organizacji",
-      "securityFindingsSubtitle": "nowe wykryte problemy i przypomnienia o terminach SLA"
+      "balanceAlertsUnavailable": "Dołącz do organizacji, aby otrzymywać powiadomienia o niskim saldzie.",
+      "securityFindingsSubtitle": "nowe wykryte problemy i przypomnienia o terminach SLA",
+      "securityFindingsUnavailable": "Włącz agenta bezpieczeństwa Kilo w zakresie, aby otrzymywać wykryte problemy z bezpieczeństwem.",
+      "spendAlertsSubtitle": "przekroczenia progów i skoki godzinowe",
+      "spendAlertsToggle": "Kategoria alertów o wydatkach"
     },
     "action": {
       "openSession": "Otwórz sesję"
@@ -1596,6 +1602,10 @@
       "couldNotLoad": "Nie udało się wczytać sesji.",
       "failedToLoadDetails": "Nie udało się wczytać szczegółów sesji.",
       "failedToStopExecution": "Nie udało się zatrzymać wykonywania zadania.",
+      "stopped": "Sesja zatrzymana",
+      "committing": "Zatwierdzanie…",
+      "committed": "Zatwierdzono",
+      "commitFailed": "Zatwierdzanie nie powiodło się",
       "renameSession": "Zmień nazwę sesji",
       "renamePlaceholder": "Nazwa sesji",
       "transcriptAccessibility": "Zapis sesji",
@@ -1744,7 +1754,8 @@
       "matchesBadge_one": "dopasowanie: {{displayCount}}",
       "matchesBadge_other": "dopasowania: {{displayCount}}",
       "matchesBadge_few": "dopasowania: {{displayCount}}",
-      "matchesBadge_many": "dopasowań: {{displayCount}}"
+      "matchesBadge_many": "dopasowań: {{displayCount}}",
+      "noOutput": "Brak wyjścia."
     },
     "readToolMarkdown": {
       "linesTruncated": "wiersze {{start}}–{{end}} (skrócono)",
@@ -3239,7 +3250,10 @@
     "couldNotApprove": "Nie udało się zatwierdzić",
     "couldNotStart": "Nie udało się uruchomić",
     "channelName": "Aktywni agenci",
-    "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
+    "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady.",
+    "openSession": "Otwórz",
+    "approveFailed": "Nie udało się zatwierdzić. Dotknij $t(common.approve), aby spróbować ponownie.",
+    "newestResult": "Najnowszy wynik"
   },
   "transcriptionModel": {
     "title": "Model transkrypcji",
@@ -3264,15 +3278,7 @@
     "remoteOptionTitle": "Twój komputer",
     "remoteOptionBody": "Uruchom Kilo na własnej maszynie za pomocą CLI `kilo remote`.",
     "skip": "Pomiń przewodnik",
-    "tutorialLabel": "Samouczek",
-    "remoteTitle": "Rozpocznij swoją pierwszą sesję zdalną",
-    "remoteBody": "Połącz swój komputer, a następnie uruchom sesję stąd.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Brak podłączonego komputera",
-    "remoteEmptyBody": "Aby go połączyć, uruchom `kilo remote` na swoim komputerze.",
-    "remoteFound": "Komputer połączony",
-    "checkAgain": "Sprawdź ponownie",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Samouczek"
   },
   "appActions": {
     "start": {
@@ -3283,5 +3289,28 @@
   },
   "launcher": {
     "openLastSession": "Otwórz ostatnią sesję"
+  },
+  "spendAlerts": {
+    "subtitle": "Wyślij alert e-mailem lub powiadomieniem push do kontaktów rozliczeniowych, gdy wydatki tego zakresu przekroczą limit lub wzrosną powyżej zwykłego tempa godzinowego.",
+    "enable": "Włącz alerty o wydatkach",
+    "thresholdTitle": "Przekroczenie progu",
+    "thresholdSubtitle": "Bieżące wydatki przekraczają twój limit",
+    "anomalyTitle": "Skok godzinowy",
+    "anomalySubtitle": "Godzina jest znacznie powyżej zwykłego tempa tego zakresu",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Okno",
+    "window24h": "24 godziny",
+    "window7d": "7 dni",
+    "window30d": "30 dni",
+    "multiplierLabel": "Mnożnik skoku",
+    "saved": "Zapisano ustawienia alertów o wydatkach",
+    "loadError": "Nie udało się wczytać alertów o wydatkach.",
+    "saveError": "Nie udało się zapisać alertów o wydatkach.",
+    "empty": "Alerty o wydatkach są wyłączone. Włącz je, aby ostrzegać kontakty rozliczeniowe tego zakresu.",
+    "noSpend": "Nie zarejestrowano jeszcze żadnych wydatków",
+    "spend24h": "Wydatki z ostatnich 24 godzin",
+    "multiplierError": "Podaj mnożnik równy 1 lub większy",
+    "permissionDenied": "Nie masz uprawnień do zarządzania alertami o wydatkach.",
+    "pushOffByCategory": "Wyłączone w Powiadomieniach"
   }
 }

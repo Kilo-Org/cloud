@@ -259,7 +259,8 @@
       "chat": "Messages de discussion",
       "kiloclaw": "Activité KiloClaw",
       "balance": "Alertes sur le solde",
-      "security": "Problèmes de sécurité"
+      "security": "Problèmes de sécurité",
+      "spend": "Alertes de dépenses"
     },
     "category": {
       "chatMessagesSubtitle": "réponses dans vos conversations",
@@ -270,8 +271,13 @@
       "sessionStatusTitle": "Statut de la session",
       "sessionStatusSubtitle": "terminée / en échec / prête à être contrôlée",
       "kiloclawActivitySubtitle": "instance prête ou en échec, actions planifiées",
+      "kiloclawActivityUnavailable": "Démarrez une instance KiloClaw pour recevoir l'activité KiloClaw.",
       "balanceAlertsSubtitle": "alertes de solde faible pour l'organisation",
-      "securityFindingsSubtitle": "nouvelles vulnérabilités et rappels SLA"
+      "balanceAlertsUnavailable": "Rejoignez une organisation pour recevoir les alertes de solde faible.",
+      "securityFindingsSubtitle": "nouvelles vulnérabilités et rappels SLA",
+      "securityFindingsUnavailable": "Activez l'agent de sécurité Kilo sur un périmètre pour recevoir les problèmes de sécurité.",
+      "spendAlertsSubtitle": "franchissements de seuils et pics horaires",
+      "spendAlertsToggle": "Catégorie « Alertes de dépenses »"
     },
     "liveActivities": "Activités en direct",
     "liveActivitySubtitle": "Afficher les agents actifs sur l’écran verrouillé",
@@ -1483,6 +1489,10 @@
       "couldNotLoad": "Impossible de charger la session.",
       "failedToLoadDetails": "Impossible de charger les détails de la session.",
       "failedToStopExecution": "Impossible d'arrêter l'exécution.",
+      "stopped": "Session arrêtée",
+      "committing": "Validation…",
+      "committed": "Validé",
+      "commitFailed": "Échec de la validation",
       "renameSession": "Renommer la session",
       "renamePlaceholder": "Nom de la session",
       "transcriptAccessibility": "Transcription de la session",
@@ -1627,7 +1637,8 @@
       "linesBadge_many": "{{displayCount}} lignes",
       "matchesBadge_one": "{{displayCount}} résultat",
       "matchesBadge_other": "{{displayCount}} résultats",
-      "matchesBadge_many": "{{displayCount}} résultats"
+      "matchesBadge_many": "{{displayCount}} résultats",
+      "noOutput": "Aucune sortie."
     },
     "readToolMarkdown": {
       "linesTruncated": "lignes {{start}}–{{end}} (tronquées)",
@@ -3196,7 +3207,10 @@
     "couldNotApprove": "Échec de l'approbation",
     "couldNotStart": "Échec du démarrage",
     "channelName": "Agents actifs",
-    "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé."
+    "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé.",
+    "openSession": "Ouvrir",
+    "approveFailed": "Impossible d'approuver. Touchez $t(common.approve) pour réessayer.",
+    "newestResult": "Dernier résultat"
   },
   "transcriptionModel": {
     "title": "Modèle de transcription",
@@ -3221,15 +3235,7 @@
     "remoteOptionTitle": "Votre ordinateur",
     "remoteOptionBody": "Exécutez Kilo sur votre propre machine via le CLI `kilo remote`.",
     "skip": "Passer la visite",
-    "tutorialLabel": "Tutoriel",
-    "remoteTitle": "Démarrez votre première session à distance",
-    "remoteBody": "Connectez votre ordinateur, puis démarrez la session depuis ici.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Aucun ordinateur connecté pour le moment",
-    "remoteEmptyBody": "Pour le connecter, exécutez `kilo remote` sur votre ordinateur.",
-    "remoteFound": "Ordinateur connecté",
-    "checkAgain": "Vérifier à nouveau",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutoriel"
   },
   "appActions": {
     "start": {
@@ -3240,5 +3246,28 @@
   },
   "launcher": {
     "openLastSession": "Ouvrir la dernière session"
+  },
+  "spendAlerts": {
+    "subtitle": "Envoyez une alerte par e-mail ou notification push aux contacts de facturation lorsque les dépenses de ce périmètre dépassent une limite ou s'envolent au-dessus de leur rythme horaire habituel.",
+    "enable": "Activer les alertes de dépenses",
+    "thresholdTitle": "Franchissement du seuil",
+    "thresholdSubtitle": "Les dépenses cumulées dépassent votre limite",
+    "anomalyTitle": "Pic horaire",
+    "anomalySubtitle": "Une heure est bien au-dessus du rythme habituel de ce périmètre",
+    "limitLabel": "Limite (USD)",
+    "windowLabel": "Fenêtre",
+    "window24h": "24 heures",
+    "window7d": "7 jours",
+    "window30d": "30 jours",
+    "multiplierLabel": "Multiplicateur du pic",
+    "saved": "Paramètres des alertes de dépenses enregistrés",
+    "loadError": "Impossible de charger les alertes de dépenses.",
+    "saveError": "Impossible d'enregistrer les alertes de dépenses.",
+    "empty": "Les alertes de dépenses sont désactivées. Activez-les pour prévenir les contacts de facturation de ce périmètre.",
+    "noSpend": "Aucune dépense enregistrée pour l'instant",
+    "spend24h": "Dépenses des dernières 24 heures",
+    "multiplierError": "Saisissez un multiplicateur de 1 ou plus",
+    "permissionDenied": "Vous n'avez pas l'autorisation de gérer les alertes de dépenses.",
+    "pushOffByCategory": "Désactivé dans les notifications"
   }
 }

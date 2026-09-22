@@ -323,7 +323,8 @@
       "chat": "聊天訊息",
       "kiloclaw": "KiloClaw 活動",
       "balance": "餘額提醒",
-      "security": "資安問題"
+      "security": "資安問題",
+      "spend": "支出提醒"
     },
     "category": {
       "chatMessagesSubtitle": "對話中的回覆",
@@ -334,8 +335,13 @@
       "sessionStatusTitle": "工作階段狀態",
       "sessionStatusSubtitle": "已完成／失敗／可開始控制",
       "kiloclawActivitySubtitle": "執行個體就緒或失敗、排程動作",
+      "kiloclawActivityUnavailable": "啟動 KiloClaw 執行個體即可取得 KiloClaw 活動。",
       "balanceAlertsSubtitle": "組織餘額不足警告",
-      "securityFindingsSubtitle": "新發現的安全問題與 SLA 提醒"
+      "balanceAlertsUnavailable": "加入組織即可取得餘額不足提醒。",
+      "securityFindingsSubtitle": "新發現的安全問題與 SLA 提醒",
+      "securityFindingsUnavailable": "在範圍內啟用 Kilo 資安代理程式即可取得資安問題。",
+      "spendAlertsSubtitle": "門檻突破與每小時激增",
+      "spendAlertsToggle": "支出提醒類別"
     },
     "action": {
       "openSession": "開啟工作階段"
@@ -1572,6 +1578,10 @@
       "couldNotLoad": "無法載入工作階段。",
       "failedToLoadDetails": "無法載入工作階段詳細資料。",
       "failedToStopExecution": "無法停止執行。",
+      "stopped": "工作階段已停止",
+      "committing": "正在提交…",
+      "committed": "已提交",
+      "commitFailed": "提交失敗",
       "renameSession": "重新命名工作階段",
       "renamePlaceholder": "工作階段名稱",
       "transcriptAccessibility": "工作階段對話記錄",
@@ -1712,7 +1722,8 @@
       "linesBadge_one": "{{displayCount}} 行",
       "linesBadge_other": "{{displayCount}} 行",
       "matchesBadge_one": "{{displayCount}} 筆相符結果",
-      "matchesBadge_other": "{{displayCount}} 筆相符結果"
+      "matchesBadge_other": "{{displayCount}} 筆相符結果",
+      "noOutput": "沒有輸出。"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截斷）",
@@ -3153,7 +3164,10 @@
     "couldNotApprove": "無法核准",
     "couldNotStart": "無法開始",
     "channelName": "執行中的代理程式",
-    "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。"
+    "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。",
+    "openSession": "開啟",
+    "approveFailed": "無法核准。點一下$t(common.approve)再試一次。",
+    "newestResult": "最新結果"
   },
   "transcriptionModel": {
     "title": "轉錄模型",
@@ -3178,15 +3192,7 @@
     "remoteOptionTitle": "你的電腦",
     "remoteOptionBody": "透過 `kilo remote` CLI 在你自己的電腦上執行 Kilo。",
     "skip": "跳過導覽",
-    "tutorialLabel": "教學",
-    "remoteTitle": "開始你的第一個遠端工作階段",
-    "remoteBody": "連線你的電腦，然後從這裡啟動工作階段。",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "尚未連線任何電腦",
-    "remoteEmptyBody": "請在你的電腦上執行 `kilo remote` 以完成連線。",
-    "remoteFound": "電腦已連線",
-    "checkAgain": "重新檢查",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "教學"
   },
   "appActions": {
     "start": {
@@ -3197,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "開啟上次工作階段"
+  },
+  "spendAlerts": {
+    "subtitle": "當此範圍的支出超過限額或高於其平時每小時速率時，透過電子郵件或推播向帳單聯絡人發送提醒。",
+    "enable": "啟用支出提醒",
+    "thresholdTitle": "門檻突破",
+    "thresholdSubtitle": "累計支出超過你的限額",
+    "anomalyTitle": "每小時激增",
+    "anomalySubtitle": "某一小時的支出遠高於此範圍的平時速率",
+    "limitLabel": "限額 (USD)",
+    "windowLabel": "時間視窗",
+    "window24h": "24 小時",
+    "window7d": "7 天",
+    "window30d": "30 天",
+    "multiplierLabel": "激增倍數",
+    "saved": "支出提醒設定已儲存",
+    "loadError": "無法載入支出提醒。",
+    "saveError": "無法儲存支出提醒。",
+    "empty": "支出提醒已關閉。開啟後會通知此範圍的帳單聯絡人。",
+    "noSpend": "尚無支出記錄",
+    "spend24h": "過去 24 小時的支出",
+    "multiplierError": "請輸入 1 或更大的倍數",
+    "permissionDenied": "你沒有管理支出提醒的權限。",
+    "pushOffByCategory": "已在通知中關閉"
   }
 }

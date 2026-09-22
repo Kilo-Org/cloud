@@ -243,6 +243,8 @@ describe('cleanup', () => {
       needsInput: 1,
       idle: 1,
       needsInputSince: '2026-08-26T23:00:00.000Z',
+      newestResultKind: 'running',
+      newestResultAt: '2026-08-26T23:30:00.000Z',
     };
     _setLastGlanceableSnapshotForTests(seeded);
 
@@ -294,6 +296,8 @@ describe('cleanup', () => {
         needsInput: 0,
         idle: 0,
         needsInputSince: null,
+        newestResultKind: null,
+        newestResultAt: null,
       };
       _setLastGlanceableSnapshotForTests(terminal);
 

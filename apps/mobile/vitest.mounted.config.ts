@@ -12,12 +12,15 @@ export default defineProject({
   plugins: [inlineSqlPlugin()],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@': fileURLToPath(new URL('src', import.meta.url)),
     },
   },
   test: {
     name: 'mobile-mounted',
     environment: 'node',
+    // The app build's config module cannot load in this project; the setup
+    // file stubs the exports its importers read.
+    setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.mounted.test.tsx'],
     // Project configs do not inherit the root test options, and this suite
     // runs both projects in parallel: on a loaded host (dev stack, simulator,

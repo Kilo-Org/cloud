@@ -4,6 +4,7 @@ import type { OperationLedgerRow } from '@kilocode/db/schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
+  getSandboxAllocationProvider,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 
@@ -171,7 +172,7 @@ function sourceMetadataWithPreset(sandboxAllocation: SandboxAllocation): Session
     sandboxAllocation === 'cloudflare-shared'
       ? 'org-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
       : 'ses-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-  const sandboxProvider = sandboxAllocation.startsWith('vercel-') ? 'vercel' : 'cloudflare';
+  const sandboxProvider = getSandboxAllocationProvider(sandboxAllocation);
   return {
     ...metadata,
     workspace: {

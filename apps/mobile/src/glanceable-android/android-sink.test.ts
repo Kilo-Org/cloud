@@ -7,6 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
 import { setGlanceableDelivery } from '@/lib/glanceable/sink-registry';
+import {
+  _resetWaitingAskForTests,
+  recordWaitingAsk,
+  type WaitingAsk,
+} from '@/lib/glanceable/waiting-ask';
 import { i18n } from '@/i18n';
 
 import {
@@ -14,6 +19,8 @@ import {
   androidSink,
   getCurrentWidgetProps,
   handleAppStateActive,
+  renderStoredSnapshotWithNotice,
+  setGlanceableActionNotice,
 } from './android-sink';
 import { _setPermissionReaderForTests, type NotificationPermissionStatus } from './permission';
 import { _resetAndroidPermissionAlertForTests } from './permission-alert';
@@ -22,6 +29,8 @@ const mocks = vi.hoisted(() => {
   let notification: {
     title: string;
     text: string;
+    openLabel: string;
+    openUrl: string;
     approveLabel: string | null;
     compactText: string | null;
     channelId: string;
@@ -41,7 +50,7 @@ const mocks = vi.hoisted(() => {
   function post(
     title: string,
     text: string,
-    _openAgentsLabel: string,
+    openAction: { label: string; url: string },
     approveLabel: string | null,
     compactText: string | null,
     channelId: string,
@@ -49,7 +58,17 @@ const mocks = vi.hoisted(() => {
     promotion: boolean,
     timeoutMs = 0
   ): void {
-    notification = { title, text, approveLabel, compactText, channelId, alerting, promotion };
+    notification = {
+      title,
+      text,
+      openLabel: openAction.label,
+      openUrl: openAction.url,
+      approveLabel,
+      compactText,
+      channelId,
+      alerting,
+      promotion,
+    };
     notificationDeadline = timeoutMs > 0 ? Date.now() + timeoutMs : null;
     postedChannel = channelId;
   }
@@ -63,7 +82,7 @@ const mocks = vi.hoisted(() => {
   function postUpdate(
     title: string,
     text: string,
-    openAgentsLabel: string,
+    openAction: { label: string; url: string },
     approveLabel: string | null,
     compactText: string | null,
     channelId: string,
@@ -73,7 +92,7 @@ const mocks = vi.hoisted(() => {
     post(
       title,
       text,
-      openAgentsLabel,
+      openAction,
       approveLabel,
       compactText,
       channelId,
@@ -97,7 +116,7 @@ const mocks = vi.hoisted(() => {
         widgetSnapshot = snapshot;
         widgetDeadline = deadline;
       }),
-      getWidgetSnapshot: () => widgetSnapshot,
+      getWidgetSnapshot: vi.fn(() => widgetSnapshot),
       getPostedChannel: () => postedChannel,
     },
     // Test control for the durable native marker a previous process left behind.
@@ -183,6 +202,33 @@ const MIXED = {
   running: 4,
 };
 
+/** The two notification actions when no ask is recorded. */
+function noAskActions(): {
+  openLabel: string;
+  openUrl: string;
+  approveLabel: string | null;
+} {
+  return {
+    openLabel: i18n.t('glanceable.openSession'),
+    openUrl: 'kiloapp:///cloud/sessions',
+    approveLabel: null,
+  };
+}
+
+/** A recorded waiting ask; overrides carry the case under test. */
+function waitingAsk(overrides: Partial<WaitingAsk> = {}): WaitingAsk {
+  return {
+    kiloSessionId: 'ses_waiting',
+    status: 'permission',
+    isCloudAgent: true,
+    scopeKey: 'scope-u1',
+    organizationId: null,
+    userId: 'u1',
+    recordedAt: NOW,
+    ...overrides,
+  };
+}
+
 async function flushAsync(): Promise<void> {
   // The channel ensurer resolves `@/lib/notifications` through a dynamic
   // import, so a start settles over more turns than a direct call: advance the
@@ -215,6 +261,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   mocks.native.setWidgetSnapshot('', 0);
   _resetAndroidSinkForTests();
+  _resetWaitingAskForTests();
   _resetAndroidPermissionAlertForTests();
   // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
   _setPermissionReaderForTests(() => Promise.resolve('granted'));
@@ -265,7 +312,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '2 Needs input, 4 Working, 3 Idle',
-      approveLabel: null,
+      ...noAskActions(),
       compactText: '2',
       channelId: 'needs-input',
       alerting: true,
@@ -277,7 +324,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '4 Working, 3 Idle',
-      approveLabel: null,
+      ...noAskActions(),
       compactText: '4',
       channelId: 'agent-progress',
       alerting: false,
@@ -289,7 +336,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '4 Working',
-      approveLabel: null,
+      ...noAskActions(),
       compactText: '4',
       channelId: 'agent-progress',
       alerting: false,
@@ -300,7 +347,7 @@ describe('androidSink start and update', () => {
     expect(mocks.native.start).toHaveBeenCalledWith(
       'Active agents',
       '2 Needs input, 4 Working, 3 Idle',
-      'Open agents',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
       null,
       '2',
       'needs-input',
@@ -310,7 +357,7 @@ describe('androidSink start and update', () => {
     expect(mocks.native.update).toHaveBeenLastCalledWith(
       'Active agents',
       '4 Working',
-      'Open agents',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
       null,
       '4',
       'agent-progress',
@@ -330,7 +377,7 @@ describe('androidSink start and update', () => {
     expect(mocks.native.update).toHaveBeenLastCalledWith(
       'Active agents',
       expect.any(String),
-      'Open agents',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
       null,
       expect.any(String),
       'needs-input',
@@ -347,7 +394,7 @@ describe('androidSink start and update', () => {
     expect(mocks.native.start).toHaveBeenCalledWith(
       'Active agents',
       expect.any(String),
-      'Open agents',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
       null,
       expect.any(String),
       'agent-progress',
@@ -380,7 +427,7 @@ describe('androidSink start and update', () => {
     expect(mocks.native.update).toHaveBeenLastCalledWith(
       'Active agents',
       expect.any(String),
-      'Open agents',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
       null,
       expect.any(String),
       'needs-input',
@@ -405,7 +452,7 @@ describe('androidSink start and update', () => {
     expect(mocks.native.start).toHaveBeenCalledWith(
       'Active agents',
       expect.any(String),
-      'Open agents',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
       null,
       expect.any(String),
       'needs-input',
@@ -428,7 +475,7 @@ describe('androidSink start and update', () => {
     expect(mocks.native.start).toHaveBeenCalledWith(
       'Active agents',
       expect.any(String),
-      'Open agents',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
       null,
       expect.any(String),
       'needs-input',
@@ -459,7 +506,7 @@ describe('androidSink start and update', () => {
     expect(mocks.native.start).toHaveBeenCalledWith(
       'Active agents',
       expect.any(String),
-      'Open agents',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
       null,
       expect.any(String),
       'needs-input',
@@ -485,7 +532,7 @@ describe('androidSink start and update', () => {
     expect(mocks.native.start).toHaveBeenCalledWith(
       'Active agents',
       expect.any(String),
-      'Open agents',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
       null,
       expect.any(String),
       'needs-input',
@@ -504,6 +551,31 @@ describe('androidSink start and update', () => {
     );
   });
 
+  it('waits for channel creation before concurrent starts can post', async () => {
+    const channels = Promise.withResolvers<undefined>();
+    mocks.ensureAndroidNotificationChannels
+      .mockReturnValueOnce(channels.promise)
+      .mockReturnValueOnce(channels.promise);
+    androidSink.startOrUpdate(MIXED, CTX);
+    androidSink.startOrUpdate({ ...MIXED, revision: 2, needsInput: 0 }, CTX);
+    await flushAsync();
+
+    expect(mocks.ensureAndroidNotificationChannels).toHaveBeenCalledTimes(2);
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(mocks.native.update).not.toHaveBeenCalled();
+
+    channels.resolve(undefined);
+    await flushAsync();
+
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    expect(mocks.native.update).toHaveBeenCalledTimes(1);
+    expect(mocks.getNotification()).toMatchObject({
+      text: '4 Working, 3 Idle',
+      channelId: 'agent-progress',
+      alerting: false,
+    });
+  });
+
   it('keeps the full summary when the device cannot promote', async () => {
     mocks.native.isPromotionCapable.mockReturnValue(false);
     androidSink.startOrUpdate(MIXED, CTX);
@@ -512,7 +584,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '2 Needs input, 4 Working, 3 Idle',
-      approveLabel: null,
+      ...noAskActions(),
       compactText: '2',
       channelId: 'needs-input',
       alerting: true,
@@ -532,7 +604,7 @@ describe('androidSink start and update', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '4 Working, 3 Idle',
-      approveLabel: null,
+      ...noAskActions(),
       compactText: '4',
       channelId: 'agent-progress',
       alerting: false,
@@ -626,31 +698,40 @@ describe('androidSink start and update', () => {
   });
 });
 
+/**
+ * The Approve control while a permission waits, and its removal. The merged
+ * sink takes the action from the recorded waiting ask — the same record the
+ * headless answer reads — so these cases record one, and the Open deep link
+ * rides beside the label.
+ */
 describe('androidSink approve action', () => {
   const PERMISSION = snapshotFor([{ status: 'permission' }], 0);
 
   it('passes the Approve label while a permission waits and drops it once answered', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_approve' }));
     androidSink.startOrUpdate(PERMISSION, CTX);
     await flushAsync();
-    expect(mocks.getNotification()?.approveLabel).toBe('Approve');
+    expect(mocks.getNotification()?.approveLabel).toBe(i18n.t('common.approve'));
     expect(mocks.native.start).toHaveBeenCalledWith(
       'Active agents',
       '1 Needs input',
-      'Open agents',
-      'Approve',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions/ses_approve' },
+      i18n.t('common.approve'),
       '1',
       'needs-input',
       true,
       true
     );
 
+    // Answered elsewhere: the record is gone, so the next publish drops Approve.
+    recordWaitingAsk(null);
     androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 1), CTX);
     await flushAsync();
     expect(mocks.getNotification()?.approveLabel).toBeNull();
     expect(mocks.native.update).toHaveBeenLastCalledWith(
       'Active agents',
       '1 Working',
-      'Open agents',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
       null,
       '1',
       'agent-progress',
@@ -660,6 +741,7 @@ describe('androidSink approve action', () => {
   });
 
   it('passes the Approve label when the pending start is retried at foreground', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_retry' }));
     // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
     _setPermissionReaderForTests(() => Promise.resolve('denied'));
     androidSink.startOrUpdate(PERMISSION, CTX);
@@ -673,8 +755,8 @@ describe('androidSink approve action', () => {
     expect(mocks.native.start).toHaveBeenCalledWith(
       'Active agents',
       '1 Needs input',
-      'Open agents',
-      'Approve',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions/ses_retry' },
+      i18n.t('common.approve'),
       '1',
       'needs-input',
       true,
@@ -683,13 +765,14 @@ describe('androidSink approve action', () => {
   });
 
   it('passes no Approve label for a question-only wait or no wait', async () => {
+    recordWaitingAsk(waitingAsk({ status: 'question', kiloSessionId: 'ses_question' }));
     androidSink.startOrUpdate(snapshotFor([{ status: 'question' }], 0), CTX);
     await flushAsync();
     expect(mocks.getNotification()?.approveLabel).toBeNull();
     expect(mocks.native.start).toHaveBeenCalledWith(
       'Active agents',
       '1 Needs input',
-      'Open agents',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions/ses_question' },
       null,
       '1',
       'needs-input',
@@ -697,6 +780,7 @@ describe('androidSink approve action', () => {
       true
     );
 
+    recordWaitingAsk(null);
     androidSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 1), CTX);
     await flushAsync();
     expect(mocks.getNotification()?.approveLabel).toBeNull();
@@ -707,17 +791,43 @@ describe('androidSink approve action', () => {
     await flushAsync();
     expect(mocks.getNotification()?.approveLabel).toBeNull();
 
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_late' }));
     androidSink.publish(snapshotFor([{ status: 'permission' }], 1));
-    expect(mocks.getNotification()?.approveLabel).toBe('Approve');
+    expect(mocks.getNotification()?.approveLabel).toBe(i18n.t('common.approve'));
     expect(mocks.native.update).toHaveBeenLastCalledWith(
       'Active agents',
       '1 Needs input',
-      'Open agents',
-      'Approve',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions/ses_late' },
+      i18n.t('common.approve'),
       '1',
       'needs-input',
       true,
       0
+    );
+  });
+
+  it('drops the label when a terminal republish has no eligible work', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_done' }));
+    androidSink.startOrUpdate(PERMISSION, CTX);
+    await flushAsync();
+    expect(mocks.getNotification()?.approveLabel).toBe(i18n.t('common.approve'));
+
+    // Work stopped being eligible while the ask record was still there (the
+    // background delivery path publishes without reselecting the ask). The
+    // surface is terminal now, so it must not offer an action it no longer
+    // reports; Open stays, because the deep link is still the only route back.
+    androidSink.publish(snapshotFor([], 1, 'empty'));
+
+    expect(mocks.getNotification()?.approveLabel).toBeNull();
+    expect(mocks.native.update).toHaveBeenLastCalledWith(
+      'Active agents',
+      'No agents waiting',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions/ses_done' },
+      null,
+      null,
+      'agent-progress',
+      false,
+      expect.any(Number)
     );
   });
 });
@@ -756,6 +866,211 @@ describe('androidSink app-state retry', () => {
 function runningCount(): string | undefined {
   return getCurrentWidgetProps()?.countLines.find(line => line.kind === 'running')?.count;
 }
+
+describe('androidSink notification actions', () => {
+  it('passes Approve and Open with the recorded session deep link for a cloud-agent permission', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_approve' }));
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()).toMatchObject({
+      openLabel: i18n.t('glanceable.openSession'),
+      openUrl: 'kiloapp:///cloud/sessions/ses_approve',
+      approveLabel: i18n.t('common.approve'),
+    });
+  });
+
+  it('passes Open only for a question', async () => {
+    recordWaitingAsk(waitingAsk({ status: 'question', kiloSessionId: 'ses_question' }));
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()).toMatchObject({
+      openUrl: 'kiloapp:///cloud/sessions/ses_question',
+      approveLabel: null,
+    });
+  });
+
+  it('passes Open only when the recorded permission is not a cloud-agent row', async () => {
+    recordWaitingAsk(waitingAsk({ isCloudAgent: false, kiloSessionId: 'ses_local' }));
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()).toMatchObject({
+      openUrl: 'kiloapp:///cloud/sessions/ses_local',
+      approveLabel: null,
+    });
+  });
+
+  it('passes Open only when no ask is recorded', async () => {
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()).toMatchObject(noAskActions());
+  });
+
+  it('carries the recorded session id only in the Open intent', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_secret' }));
+    androidSink.publish(MIXED);
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    const notification = mocks.getNotification();
+    expect(notification?.openUrl).toBe('kiloapp:///cloud/sessions/ses_secret');
+    expect(
+      JSON.stringify({
+        title: notification?.title,
+        text: notification?.text,
+        openLabel: notification?.openLabel,
+        approveLabel: notification?.approveLabel,
+        compactText: notification?.compactText,
+      })
+    ).not.toContain('ses_secret');
+    expect(getCurrentWidgetProps()?.accessibilityLabel).not.toContain('ses_secret');
+  });
+});
+
+describe('androidSink action notice', () => {
+  it('prefixes the notice to the next notification republish', async () => {
+    recordWaitingAsk(waitingAsk());
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    setGlanceableActionNotice('Approval failed');
+    androidSink.startOrUpdate({ ...MIXED, revision: 2, running: 5 }, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()?.text).toBe('Approval failed 2 Needs input, 5 Working, 3 Idle');
+  });
+
+  it('drops the notice once the counts reach zero', async () => {
+    recordWaitingAsk(waitingAsk());
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    setGlanceableActionNotice('Approval failed');
+
+    androidSink.publish({ ...MIXED, revision: 2, needsInput: 0 });
+    expect(mocks.getNotification()?.text).toBe('4 Working, 3 Idle');
+
+    androidSink.publish({ ...MIXED, revision: 3, needsInput: 3 });
+    expect(mocks.getNotification()?.text).toBe('3 Needs input, 4 Working, 3 Idle');
+  });
+
+  it('drops the notice when the recorded ask changes', async () => {
+    recordWaitingAsk(waitingAsk());
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    setGlanceableActionNotice('Approval failed');
+
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_other' }));
+    androidSink.startOrUpdate({ ...MIXED, revision: 2, running: 5 }, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()?.text).toBe('2 Needs input, 5 Working, 3 Idle');
+  });
+
+  it('prefixes the notice only after it is set', async () => {
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    expect(mocks.getNotification()?.text).toBe('2 Needs input, 4 Working, 3 Idle');
+  });
+});
+
+describe('renderStoredSnapshotWithNotice', () => {
+  it('renders the stored snapshot with the failure line and Approve, with no fresh publish', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_retry' }));
+    // The app persisted this on its last publish; a headless process reads the
+    // counts back from Android's own storage instead of fetching them again.
+    mocks.native.setWidgetSnapshot(JSON.stringify(MIXED), 0);
+    setGlanceableActionNotice('Approval failed');
+
+    // The headless task finishes when this resolves, so the render must be on
+    // the notification by then: no flush, no fire-and-forget.
+    await renderStoredSnapshotWithNotice(CTX);
+
+    expect(mocks.native.getWidgetSnapshot).toHaveBeenCalled();
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    expect(mocks.native.start).toHaveBeenCalledWith(
+      'Active agents',
+      'Approval failed 2 Needs input, 4 Working, 3 Idle',
+      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions/ses_retry' },
+      i18n.t('common.approve'),
+      '2',
+      'needs-input',
+      true,
+      true
+    );
+    expect(mocks.native.update).not.toHaveBeenCalled();
+  });
+
+  it('renders the failure line after the stored snapshot expired, while the card stays', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_expired' }));
+    mocks.native.setWidgetSnapshot(JSON.stringify(MIXED), 0);
+    setGlanceableActionNotice('Approval failed');
+    // An eligible card is posted ongoing with no native deadline, so it is still
+    // in the shade with its Approve action after the snapshot's `expiresAt`. The
+    // failure line that tap draws must still reach it.
+    vi.setSystemTime(NOW + 28_800_001);
+
+    await renderStoredSnapshotWithNotice(CTX);
+
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    expect(mocks.getNotification()).toMatchObject({
+      text: 'Approval failed 2 Needs input, 4 Working, 3 Idle',
+      approveLabel: i18n.t('common.approve'),
+    });
+  });
+
+  it('updates an active notification when the revision did not change', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_live' }));
+    androidSink.publish(MIXED);
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    mocks.native.start.mockClear();
+
+    setGlanceableActionNotice('Approval failed');
+    await renderStoredSnapshotWithNotice(CTX);
+
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(mocks.native.update).toHaveBeenCalledTimes(1);
+    expect(mocks.getNotification()).toMatchObject({
+      text: 'Approval failed 2 Needs input, 4 Working, 3 Idle',
+      approveLabel: i18n.t('common.approve'),
+    });
+  });
+
+  it('updates an active notification after the stored snapshot expired', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_live' }));
+    androidSink.publish(MIXED);
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    mocks.native.start.mockClear();
+
+    setGlanceableActionNotice('Approval failed');
+    vi.setSystemTime(NOW + 28_800_001);
+    await renderStoredSnapshotWithNotice(CTX);
+
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(mocks.native.update).toHaveBeenCalledTimes(1);
+    expect(mocks.getNotification()).toMatchObject({
+      text: 'Approval failed 2 Needs input, 4 Working, 3 Idle',
+      approveLabel: i18n.t('common.approve'),
+    });
+  });
+
+  it('makes no native call when nothing is stored', async () => {
+    setGlanceableActionNotice('Approval failed');
+
+    await renderStoredSnapshotWithNotice(CTX);
+
+    expect(mocks.native.getWidgetSnapshot).toHaveBeenCalled();
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(mocks.native.update).not.toHaveBeenCalled();
+  });
+});
 
 describe('androidSink widget publish and end', () => {
   it('publishes the widget snapshot on every publish', () => {
@@ -1040,7 +1355,7 @@ describe('handleAppStateActive permission alert', () => {
     expect(mocks.getNotification()).toEqual({
       title: 'Active agents',
       text: '2 Needs input, 4 Working, 3 Idle',
-      approveLabel: null,
+      ...noAskActions(),
       compactText: '2',
       channelId: 'needs-input',
       alerting: true,

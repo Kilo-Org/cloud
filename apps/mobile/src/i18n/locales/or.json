@@ -827,7 +827,8 @@
       "chat": "ଚାଟ୍ ସନ୍ଦେଶ",
       "kiloclaw": "KiloClaw କାର୍ଯ୍ୟକଳାପ",
       "balance": "ଅବଶିଷ୍ଟ ରାଶି ସମ୍ବନ୍ଧୀୟ ସତର୍କ ସୂଚନା",
-      "security": "ଚିହ୍ନଟ ସୁରକ୍ଷା ସମସ୍ୟା"
+      "security": "ଚିହ୍ନଟ ସୁରକ୍ଷା ସମସ୍ୟା",
+      "spend": "ଖର୍ଚ୍ଚ ସତର୍କତା"
     },
     "category": {
       "chatMessagesSubtitle": "ଆପଣଙ୍କ ବାର୍ତ୍ତାଳାପର ଉତ୍ତର",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "ସେସନ୍ ସ୍ଥିତି",
       "sessionStatusSubtitle": "ସମାପ୍ତ / ବିଫଳ / ନିୟନ୍ତ୍ରଣ ପାଇଁ ପ୍ରସ୍ତୁତ",
       "kiloclawActivitySubtitle": "ଇନଷ୍ଟାନ୍ସ ପ୍ରସ୍ତୁତ/ବିଫଳ, ନିର୍ଦ୍ଧାରିତ କାର୍ଯ୍ୟ",
+      "kiloclawActivityUnavailable": "KiloClaw କାର୍ଯ୍ୟକଳାପ ପାଇବାକୁ ଏକ KiloClaw ଇନଷ୍ଟାନ୍ସ ଆରମ୍ଭ କରନ୍ତୁ।",
       "balanceAlertsSubtitle": "ସଂଗଠନର କମ୍ ବ୍ୟାଲାନ୍ସ ସତର୍କତା",
-      "securityFindingsSubtitle": "ନୂଆ ସୁରକ୍ଷା ସମସ୍ୟା ଓ SLA ସ୍ମାରକ"
+      "balanceAlertsUnavailable": "ବ୍ୟାଲାନ୍ସ ସତର୍କତା ପାଇବାକୁ ଏକ ସଂଗଠନରେ ଯୋଗ ଦିଅନ୍ତୁ।",
+      "securityFindingsSubtitle": "ନୂଆ ସୁରକ୍ଷା ସମସ୍ୟା ଓ SLA ସ୍ମାରକ",
+      "securityFindingsUnavailable": "ସୁରକ୍ଷା ସମସ୍ୟା ପାଇବାକୁ ଏକ ପରିସରରେ Kilo ସୁରକ୍ଷା ଏଜେଣ୍ଟ ଚାଲୁ କରନ୍ତୁ।",
+      "spendAlertsSubtitle": "ସୀମା ଅତିକ୍ରମ ଏବଂ ଘଣ୍ଟାପ୍ରତି ବୃଦ୍ଧି",
+      "spendAlertsToggle": "ଖର୍ଚ୍ଚ ସତର୍କତା ବର୍ଗ"
     },
     "action": {
       "openSession": "ସେସନ ଖୋଲନ୍ତୁ"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "failedToLoadDetails": "ସେସନ୍ ବିବରଣୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "failedToStopExecution": "ଚାଲୁଥିବା କାମ ବନ୍ଦ ହୋଇପାରିଲା ନାହିଁ।",
+      "stopped": "ସେସନ୍ ବନ୍ଦ ହୋଇଛି",
+      "committing": "କମିଟ୍ କରାଯାଉଛି…",
+      "committed": "କମିଟ୍ ହୋଇଛି",
+      "commitFailed": "କମିଟ୍ ବିଫଳ ହେଲା",
       "renameSession": "ସେସନ୍ ନାମ ବଦଳାନ୍ତୁ",
       "renamePlaceholder": "ସେସନ୍ ନାମ",
       "transcriptAccessibility": "ସେସନର ବାର୍ତ୍ତାଳାପ ବିବରଣୀ",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}}ଟି ଧାଡ଼ି",
       "linesBadge_other": "{{displayCount}}ଟି ଧାଡ଼ି",
       "matchesBadge_one": "{{displayCount}}ଟି ମେଳ",
-      "matchesBadge_other": "{{displayCount}}ଟି ମେଳ"
+      "matchesBadge_other": "{{displayCount}}ଟି ମେଳ",
+      "noOutput": "କୌଣସି ଆଉଟପୁଟ୍ ନାହିଁ।"
     },
     "readToolMarkdown": {
       "linesTruncated": "ଧାଡ଼ି {{start}}–{{end}} (କାଟି ଦିଆଯାଇଛି)",
@@ -3153,7 +3164,10 @@
     "couldNotApprove": "ଅନୁମୋଦନ କରାଯାଇପାରିଲା ନାହିଁ",
     "couldNotStart": "ଆରମ୍ଭ କରାଯାଇପାରିଲା ନାହିଁ",
     "channelName": "ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ",
-    "activityKitDisabledBody": "ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ ଦେଖିବାକୁ ସେଟିଂସ୍‌ରେ ଲାଇଭ୍ କାର୍ଯ୍ୟକଳାପ ଚାଲୁ କରନ୍ତୁ।"
+    "activityKitDisabledBody": "ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ ଦେଖିବାକୁ ସେଟିଂସ୍‌ରେ ଲାଇଭ୍ କାର୍ଯ୍ୟକଳାପ ଚାଲୁ କରନ୍ତୁ।",
+    "openSession": "ଖୋଲନ୍ତୁ",
+    "approveFailed": "ଅନୁମୋଦନ କରିହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ $t(common.approve) ଟାପ୍ କରନ୍ତୁ।",
+    "newestResult": "ନୂତନତମ ଫଳାଫଳ"
   },
   "transcriptionModel": {
     "title": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର ମଡେଲ୍",
@@ -3178,15 +3192,7 @@
     "remoteOptionTitle": "ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟର",
     "remoteOptionBody": "ଆପଣଙ୍କ ନିଜ ମେସିନରେ `kilo remote` CLI ମାଧ୍ୟମରେ Kilo ଚଲାନ୍ତୁ।",
     "skip": "ଭ୍ରମଣ ଛାଡ଼ନ୍ତୁ",
-    "tutorialLabel": "ଶିକ୍ଷା",
-    "remoteTitle": "ଆପଣଙ୍କ ପ୍ରଥମ ରିମୋଟ୍ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ",
-    "remoteBody": "ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରକୁ ସଂଯୋଗ କରନ୍ତୁ, ପରେ ଏଠାରୁ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ।",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି କମ୍ପ୍ୟୁଟର ସଂଯୋଗ ହୋଇନାହିଁ",
-    "remoteEmptyBody": "ଏହାକୁ ସଂଯୋଗ କରିବାକୁ ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରରେ `kilo remote` ଚଲାନ୍ତୁ।",
-    "remoteFound": "କମ୍ପ୍ୟୁଟର ସଂଯୋଗ ହୋଇଛି",
-    "checkAgain": "ପୁଣି ପରୀକ୍ଷା କରନ୍ତୁ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ଶିକ୍ଷା"
   },
   "appActions": {
     "start": {
@@ -3197,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "ଶେଷ ସେସନ୍ ଖୋଲନ୍ତୁ"
+  },
+  "spendAlerts": {
+    "subtitle": "ଏହି ସ୍କୋପର ଖର୍ଚ୍ଚ ଏକ ସୀମା ଅତିକ୍ରମ କଲେ କିମ୍ବା ଏହାର ସାଧାରଣ ଘଣ୍ଟାପ୍ରତି ହାରଠାରୁ ଉପରକୁ ଗଲେ ବିଲିଂ ସମ୍ପର୍କମାନଙ୍କୁ ଇମେଲ କିମ୍ବା ପୁଶ୍ ମାଧ୍ୟମରେ ସତର୍କତା ପଠାନ୍ତୁ।",
+    "enable": "ଖର୍ଚ୍ଚ ସତର୍କତା ଚାଲୁ କରନ୍ତୁ",
+    "thresholdTitle": "ସୀମା ଅତିକ୍ରମ",
+    "thresholdSubtitle": "ଚାଲୁ ଖର୍ଚ୍ଚ ଆପଣଙ୍କ ସୀମା ଅତିକ୍ରମ କରୁଛି",
+    "anomalyTitle": "ଘଣ୍ଟାପ୍ରତି ବୃଦ୍ଧି",
+    "anomalySubtitle": "ଏକ ଘଣ୍ଟା ଏହି ସ୍କୋପର ସାଧାରଣ ହାରଠାରୁ ବହୁତ ଉପରେ",
+    "limitLabel": "ସୀମା (USD)",
+    "windowLabel": "ଅବଧି",
+    "window24h": "24 ଘଣ୍ଟା",
+    "window7d": "7 ଦିନ",
+    "window30d": "30 ଦିନ",
+    "multiplierLabel": "ବୃଦ୍ଧି ଗୁଣକ",
+    "saved": "ଖର୍ଚ୍ଚ ସତର୍କତା ସେଟିଂସ୍ ସଞ୍ଚିତ ହେଲା",
+    "loadError": "ଖର୍ଚ୍ଚ ସତର୍କତା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "saveError": "ଖର୍ଚ୍ଚ ସତର୍କତା ସଞ୍ଚିତ ହୋଇପାରିଲା ନାହିଁ।",
+    "empty": "ଖର୍ଚ୍ଚ ସତର୍କତା ବନ୍ଦ ଅଛି। ଏହି ସ୍କୋପର ବିଲିଂ ସମ୍ପର୍କମାନଙ୍କୁ ସୂଚିତ କରିବାକୁ ସେଗୁଡ଼ିକୁ ଚାଲୁ କରନ୍ତୁ।",
+    "noSpend": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଖର୍ଚ୍ଚ ରେକର୍ଡ ହୋଇନାହିଁ",
+    "spend24h": "ଗତ 24 ଘଣ୍ଟାର ଖର୍ଚ୍ଚ",
+    "multiplierError": "1 କିମ୍ବା ତାହାଠାରୁ ଅଧିକ ଗୁଣକ ଦିଅନ୍ତୁ",
+    "permissionDenied": "ଖର୍ଚ୍ଚ ସତର୍କତା ପରିଚାଳନା କରିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
+    "pushOffByCategory": "ବିଜ୍ଞପ୍ତିରେ ବନ୍ଦ"
   }
 }

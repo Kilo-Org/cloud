@@ -323,7 +323,8 @@
       "chat": "Tin nhắn trò chuyện",
       "kiloclaw": "Hoạt động KiloClaw",
       "balance": "Cảnh báo số dư",
-      "security": "Vấn đề bảo mật"
+      "security": "Vấn đề bảo mật",
+      "spend": "Cảnh báo chi tiêu"
     },
     "category": {
       "chatMessagesSubtitle": "câu trả lời trong các cuộc trò chuyện của bạn",
@@ -334,8 +335,13 @@
       "sessionStatusTitle": "Trạng thái phiên",
       "sessionStatusSubtitle": "hoàn tất / thất bại / sẵn sàng điều khiển",
       "kiloclawActivitySubtitle": "máy sẵn sàng hoặc gặp lỗi, thao tác đã lên lịch",
+      "kiloclawActivityUnavailable": "Khởi động một máy KiloClaw để nhận hoạt động KiloClaw.",
       "balanceAlertsSubtitle": "cảnh báo số dư tổ chức thấp",
-      "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA"
+      "balanceAlertsUnavailable": "Tham gia một tổ chức để nhận cảnh báo số dư thấp.",
+      "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA",
+      "securityFindingsUnavailable": "Bật Trợ lý bảo mật Kilo trên một phạm vi để nhận vấn đề bảo mật.",
+      "spendAlertsSubtitle": "vượt ngưỡng và tăng vọt theo giờ",
+      "spendAlertsToggle": "Danh mục cảnh báo chi tiêu"
     },
     "action": {
       "openSession": "Mở phiên"
@@ -1572,6 +1578,10 @@
       "couldNotLoad": "Không thể tải phiên.",
       "failedToLoadDetails": "Không thể tải thông tin phiên.",
       "failedToStopExecution": "Không thể dừng tác vụ đang chạy.",
+      "stopped": "Đã dừng phiên",
+      "committing": "Đang ghi nhận…",
+      "committed": "Đã ghi nhận",
+      "commitFailed": "Ghi nhận thất bại",
       "renameSession": "Đổi tên phiên",
       "renamePlaceholder": "Tên phiên",
       "transcriptAccessibility": "Bản ghi phiên",
@@ -1712,7 +1722,8 @@
       "linesBadge_one": "{{displayCount}} dòng",
       "linesBadge_other": "{{displayCount}} dòng",
       "matchesBadge_one": "{{displayCount}} kết quả khớp",
-      "matchesBadge_other": "{{displayCount}} kết quả khớp"
+      "matchesBadge_other": "{{displayCount}} kết quả khớp",
+      "noOutput": "Không có đầu ra."
     },
     "readToolMarkdown": {
       "linesTruncated": "dòng {{start}}–{{end}} (đã cắt bớt)",
@@ -3153,7 +3164,10 @@
     "couldNotApprove": "Không thể phê duyệt",
     "couldNotStart": "Không thể bắt đầu",
     "channelName": "Tác nhân đang hoạt động",
-    "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
+    "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
+    "openSession": "Mở",
+    "approveFailed": "Không thể phê duyệt. Nhấn $t(common.approve) để thử lại.",
+    "newestResult": "Kết quả mới nhất"
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",
@@ -3178,15 +3192,7 @@
     "remoteOptionTitle": "Máy tính của bạn",
     "remoteOptionBody": "Chạy Kilo trên máy của bạn qua CLI `kilo remote`.",
     "skip": "Bỏ qua tour",
-    "tutorialLabel": "Hướng dẫn",
-    "remoteTitle": "Bắt đầu phiên từ xa đầu tiên của bạn",
-    "remoteBody": "Kết nối máy tính của bạn, sau đó bắt đầu phiên từ đây.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Chưa có máy tính nào được kết nối",
-    "remoteEmptyBody": "Để kết nối, hãy chạy `kilo remote` trên máy tính của bạn.",
-    "remoteFound": "Đã kết nối máy tính",
-    "checkAgain": "Kiểm tra lại",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Hướng dẫn"
   },
   "appActions": {
     "start": {
@@ -3197,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Mở phiên gần nhất"
+  },
+  "spendAlerts": {
+    "subtitle": "Gửi cảnh báo qua email hoặc push tới các liên hệ thanh toán khi chi tiêu của phạm vi này vượt một giới hạn hoặc tăng vọt trên mức thường lệ theo giờ.",
+    "enable": "Bật cảnh báo chi tiêu",
+    "thresholdTitle": "Vượt ngưỡng",
+    "thresholdSubtitle": "Chi tiêu tích lũy vượt giới hạn của bạn",
+    "anomalyTitle": "Tăng vọt theo giờ",
+    "anomalySubtitle": "Một giờ cao hơn hẳn mức thường lệ của phạm vi này",
+    "limitLabel": "Giới hạn (USD)",
+    "windowLabel": "Khoảng thời gian",
+    "window24h": "24 giờ",
+    "window7d": "7 ngày",
+    "window30d": "30 ngày",
+    "multiplierLabel": "Hệ số tăng vọt",
+    "saved": "Đã lưu cài đặt cảnh báo chi tiêu",
+    "loadError": "Không thể tải cảnh báo chi tiêu.",
+    "saveError": "Không thể lưu cảnh báo chi tiêu.",
+    "empty": "Cảnh báo chi tiêu đang tắt. Bật chúng để thông báo cho các liên hệ thanh toán của phạm vi này.",
+    "noSpend": "Chưa ghi nhận chi tiêu nào",
+    "spend24h": "Chi tiêu trong 24 giờ qua",
+    "multiplierError": "Nhập hệ số từ 1 trở lên",
+    "permissionDenied": "Bạn không có quyền quản lý cảnh báo chi tiêu.",
+    "pushOffByCategory": "Đã tắt trong Thông báo"
   }
 }

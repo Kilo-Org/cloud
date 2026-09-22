@@ -827,7 +827,8 @@
       "chat": "Ujumbe wa mazungumzo",
       "kiloclaw": "Shughuli za KiloClaw",
       "balance": "Tahadhari za salio",
-      "security": "Matokeo ya ukaguzi wa usalama"
+      "security": "Matokeo ya ukaguzi wa usalama",
+      "spend": "Tahadhari za matumizi"
     },
     "category": {
       "chatMessagesSubtitle": "majibu kwenye mazungumzo yako",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Hali ya kikao",
       "sessionStatusSubtitle": "kimekamilika / kimeshindikana / kiko tayari kudhibitiwa",
       "kiloclawActivitySubtitle": "nakala iko tayari au imeshindikana, vitendo vilivyoratibiwa",
+      "kiloclawActivityUnavailable": "Anzisha nakala ya KiloClaw ili kupata shughuli za KiloClaw.",
       "balanceAlertsSubtitle": "maonyo ya salio la chini la shirika",
-      "securityFindingsSubtitle": "matokeo mapya na vikumbusho vya SLA"
+      "balanceAlertsUnavailable": "Jiunge na shirika ili kupata maonyo ya salio la chini.",
+      "securityFindingsSubtitle": "matokeo mapya na vikumbusho vya SLA",
+      "securityFindingsUnavailable": "Washa wakala wa usalama wa Kilo kwenye wigo ili kupata matokeo ya ukaguzi wa usalama.",
+      "spendAlertsSubtitle": "kuvuka vizingiti na kuongezeka kwa saa",
+      "spendAlertsToggle": "Aina ya tahadhari za matumizi"
     },
     "action": {
       "openSession": "Fungua kikao"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Imeshindikana kupakia kikao.",
       "failedToLoadDetails": "Imeshindikana kupakia maelezo ya kikao.",
       "failedToStopExecution": "Imeshindikana kusimamisha utekelezaji.",
+      "stopped": "Kikao kimesimamishwa",
+      "committing": "Inahifadhi…",
+      "committed": "Imehifadhiwa",
+      "commitFailed": "Uhifadhi umeshindikana",
       "renameSession": "Badilisha jina la kikao",
       "renamePlaceholder": "Jina la kikao",
       "transcriptAccessibility": "Nakala ya mazungumzo ya kikao",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "Mstari {{displayCount}}",
       "linesBadge_other": "Mistari {{displayCount}}",
       "matchesBadge_one": "Tokeo {{displayCount}}",
-      "matchesBadge_other": "Matokeo {{displayCount}}"
+      "matchesBadge_other": "Matokeo {{displayCount}}",
+      "noOutput": "Hakuna matokeo."
     },
     "readToolMarkdown": {
       "linesTruncated": "mistari {{start}}–{{end}} (imekatwa)",
@@ -3153,7 +3164,10 @@
     "couldNotApprove": "Imeshindwa kuidhinisha",
     "couldNotStart": "Imeshindwa kuanza",
     "channelName": "Mawakala wanaofanya kazi",
-    "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa."
+    "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa.",
+    "openSession": "Fungua",
+    "approveFailed": "Imeshindikana kuidhinisha. Gusa $t(common.approve) ili ujaribu tena.",
+    "newestResult": "Matokeo mapya zaidi"
   },
   "transcriptionModel": {
     "title": "Modeli ya unukuzi",
@@ -3178,15 +3192,7 @@
     "remoteOptionTitle": "Kompyuta yako",
     "remoteOptionBody": "Endesha Kilo kwenye kompyuta yako mwenyewe kupitia CLI ya `kilo remote`.",
     "skip": "Ruka ziara",
-    "tutorialLabel": "Mafunzo",
-    "remoteTitle": "Anza kikao chako cha kwanza cha mbali",
-    "remoteBody": "Unganisha kompyuta yako, kisha anza kikao hapa.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Hakuna kompyuta iliyounganishwa bado",
-    "remoteEmptyBody": "Ili kuiunganisha, endesha `kilo remote` kwenye kompyuta yako.",
-    "remoteFound": "Kompyuta imeunganishwa",
-    "checkAgain": "Angalia tena",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Mafunzo"
   },
   "appActions": {
     "start": {
@@ -3197,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Fungua kikao cha mwisho"
+  },
+  "spendAlerts": {
+    "subtitle": "Tuma tahadhari kwa barua pepe au push kwa anwani za bili wakati matumizi ya wigo huu yanapita kikomo au yanapanda juu ya kiwango chake cha kawaida cha saa.",
+    "enable": "Washa tahadhari za matumizi",
+    "thresholdTitle": "Kuvuka kizingiti",
+    "thresholdSubtitle": "Matumizi yanayoendelea yanapita kikomo chako",
+    "anomalyTitle": "Kuongezeka kwa saa",
+    "anomalySubtitle": "Saa moja iko juu sana kuliko kiwango cha kawaida cha wigo huu",
+    "limitLabel": "Kikomo (USD)",
+    "windowLabel": "Kipindi",
+    "window24h": "Saa 24",
+    "window7d": "Siku 7",
+    "window30d": "Siku 30",
+    "multiplierLabel": "Kizidishi cha kuongezeka",
+    "saved": "Mipangilio ya tahadhari za matumizi imehifadhiwa",
+    "loadError": "Tahadhari za matumizi hazikuweza kupakiwa.",
+    "saveError": "Tahadhari za matumizi hazikuweza kuhifadhiwa.",
+    "empty": "Tahadhari za matumizi zimezimwa. Ziwasha ili kuwatahadharisha anwani za bili za wigo huu.",
+    "noSpend": "Hakuna matumizi yaliyorekodiwa bado",
+    "spend24h": "Matumizi katika saa 24 zilizopita",
+    "multiplierError": "Weka kizidishi cha 1 au zaidi",
+    "permissionDenied": "Huna ruhusa ya kusimamia tahadhari za matumizi.",
+    "pushOffByCategory": "Imezimwa katika Arifa"
   }
 }

@@ -827,7 +827,8 @@
       "chat": "Samtalemeldinger",
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarsler",
-      "security": "Sikkerhetsfunn"
+      "security": "Sikkerhetsfunn",
+      "spend": "Forbruksvarsler"
     },
     "category": {
       "chatMessagesSubtitle": "svar i samtalene dine",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Øktstatus",
       "sessionStatusSubtitle": "fullført / mislykket / klar for fjernstyring",
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
+      "kiloclawActivityUnavailable": "Start en KiloClaw-instans for å få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "advarsler om lav organisasjonssaldo",
-      "securityFindingsSubtitle": "nye funn og SLA-påminnelser"
+      "balanceAlertsUnavailable": "Bli med i en organisasjon for å få varsler om lav saldo.",
+      "securityFindingsSubtitle": "nye funn og SLA-påminnelser",
+      "securityFindingsUnavailable": "Aktiver Kilo-sikkerhetsagenten i et omfang for å få sikkerhetsfunn.",
+      "spendAlertsSubtitle": "grenseoverskridelser og topper per time",
+      "spendAlertsToggle": "Kategorien forbruksvarsler"
     },
     "action": {
       "openSession": "Åpne økt"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Kunne ikke laste inn økten.",
       "failedToLoadDetails": "Kunne ikke laste inn øktdetaljene.",
       "failedToStopExecution": "Kunne ikke stoppe kjøringen.",
+      "stopped": "Økten er stoppet",
+      "committing": "Lagrer…",
+      "committed": "Lagret",
+      "commitFailed": "Lagringen mislyktes",
       "renameSession": "Gi økten nytt navn",
       "renamePlaceholder": "Øktnavn",
       "transcriptAccessibility": "Samtalelogg for økten",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} linje",
       "linesBadge_other": "{{displayCount}} linjer",
       "matchesBadge_one": "{{displayCount}} treff",
-      "matchesBadge_other": "{{displayCount}} treff"
+      "matchesBadge_other": "{{displayCount}} treff",
+      "noOutput": "Ingen utdata."
     },
     "readToolMarkdown": {
       "linesTruncated": "linje {{start}}–{{end}} (avkortet)",
@@ -3153,7 +3164,10 @@
     "couldNotApprove": "Kunne ikke godkjenne",
     "couldNotStart": "Kunne ikke starte",
     "channelName": "Aktive agenter",
-    "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
+    "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen.",
+    "openSession": "Åpne",
+    "approveFailed": "Kunne ikke godkjenne. Trykk på $t(common.approve) for å prøve igjen.",
+    "newestResult": "Nyeste resultat"
   },
   "transcriptionModel": {
     "title": "Transkripsjonsmodell",
@@ -3178,15 +3192,7 @@
     "remoteOptionTitle": "Datamaskinen din",
     "remoteOptionBody": "Kjør Kilo på din egen maskin via `kilo remote`-CLI-en.",
     "skip": "Hopp over omvisning",
-    "tutorialLabel": "Opplæring",
-    "remoteTitle": "Start din første remote-økt",
-    "remoteBody": "Koble til datamaskinen din, og start økten herfra.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ingen datamaskin er koblet til ennå",
-    "remoteEmptyBody": "For å koble den til, kjør `kilo remote` på datamaskinen din.",
-    "remoteFound": "Datamaskin tilkoblet",
-    "checkAgain": "Sjekk igjen",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Opplæring"
   },
   "appActions": {
     "start": {
@@ -3197,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Åpne siste økt"
+  },
+  "spendAlerts": {
+    "subtitle": "Send et varsel på e-post eller push til faktureringskontaktene når forbruket i dette området overskrider en grense eller stiger over den vanlige timesraten.",
+    "enable": "Aktiver forbruksvarsler",
+    "thresholdTitle": "Grenseoverskridelse",
+    "thresholdSubtitle": "Løpende forbruk overskrider grensen din",
+    "anomalyTitle": "Topp per time",
+    "anomalySubtitle": "Én time er langt over dette områdets vanlige rate",
+    "limitLabel": "Grense (USD)",
+    "windowLabel": "Vindu",
+    "window24h": "24 timer",
+    "window7d": "7 dager",
+    "window30d": "30 dager",
+    "multiplierLabel": "Topp-multiplikator",
+    "saved": "Innstillingene for forbruksvarsler er lagret",
+    "loadError": "Forbruksvarslene kunne ikke lastes.",
+    "saveError": "Forbruksvarslene kunne ikke lagres.",
+    "empty": "Forbruksvarsler er av. Slå dem på for å varsle faktureringskontaktene i dette området.",
+    "noSpend": "Ingen forbruk registrert ennå",
+    "spend24h": "Forbruk de siste 24 timene",
+    "multiplierError": "Angi en multiplikator på 1 eller mer",
+    "permissionDenied": "Du har ikke tillatelse til å administrere forbruksvarsler.",
+    "pushOffByCategory": "Av i Varsler"
   }
 }

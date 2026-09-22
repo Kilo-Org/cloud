@@ -827,7 +827,8 @@
       "chat": "Kletsboodskappe",
       "kiloclaw": "KiloClaw-aktiwiteit",
       "balance": "Saldowaarskuwings",
-      "security": "Sekuriteitsbevindings"
+      "security": "Sekuriteitsbevindings",
+      "spend": "Bestedingswaarskuwings"
     },
     "category": {
       "chatMessagesSubtitle": "antwoorde in jou gesprekke",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Sessiestatus",
       "sessionStatusSubtitle": "klaar / misluk / gereed om te beheer",
       "kiloclawActivitySubtitle": "instansie gereed/misluk, geskeduleerde aksies",
+      "kiloclawActivityUnavailable": "Begin 'n KiloClaw-instansie om KiloClaw-aktiwiteit te kry.",
       "balanceAlertsSubtitle": "waarskuwings oor die organisasie se lae saldo",
-      "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe"
+      "balanceAlertsUnavailable": "Sluit by 'n organisasie aan om waarskuwings oor lae saldo te kry.",
+      "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe",
+      "securityFindingsUnavailable": "Aktiveer Kilo-sekuriteitsagent op 'n bestek om sekuriteitsbevindings te kry.",
+      "spendAlertsSubtitle": "oorskryding van drempels en uurlikse pieke",
+      "spendAlertsToggle": "Kategorie vir bestedingswaarskuwings"
     },
     "action": {
       "openSession": "Maak sessie oop"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Die sessie kon nie gelaai word nie.",
       "failedToLoadDetails": "Die sessiebesonderhede kon nie gelaai word nie.",
       "failedToStopExecution": "Die uitvoering kon nie gestop word nie.",
+      "stopped": "Sessie gestop",
+      "committing": "Besig om te vaslê…",
+      "committed": "Vasgelê",
+      "commitFailed": "Vaslê het misluk",
       "renameSession": "Hernoem sessie",
       "renamePlaceholder": "Sessienaam",
       "transcriptAccessibility": "Sessietranskripsie",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} reël",
       "linesBadge_other": "{{displayCount}} reëls",
       "matchesBadge_one": "{{displayCount}} treffer",
-      "matchesBadge_other": "{{displayCount}} treffers"
+      "matchesBadge_other": "{{displayCount}} treffers",
+      "noOutput": "Geen uitset nie."
     },
     "readToolMarkdown": {
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",
@@ -3153,7 +3164,10 @@
     "couldNotApprove": "Kon nie goedkeur nie",
     "couldNotStart": "Kon nie begin nie",
     "channelName": "Aktiewe agente",
-    "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien."
+    "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
+    "openSession": "Oop",
+    "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer.",
+    "newestResult": "Nuutste resultaat"
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",
@@ -3178,15 +3192,7 @@
     "remoteOptionTitle": "Jou rekenaar",
     "remoteOptionBody": "Voer Kilo op jou eie masjien uit deur die `kilo remote`-CLI.",
     "skip": "Slaan toer oor",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Begin jou eerste afstandsessie",
-    "remoteBody": "Koppel jou rekenaar en begin dan die sessie van hier af.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Nog geen rekenaar gekoppel nie",
-    "remoteEmptyBody": "Voer `kilo remote` op jou rekenaar uit om dit te koppel.",
-    "remoteFound": "Rekenaar gekoppel",
-    "checkAgain": "Kontroleer weer",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {
@@ -3197,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Maak laaste sessie oop"
+  },
+  "spendAlerts": {
+    "subtitle": "E-pos of stoot 'n waarskuwing na die faktuurkontakte wanneer hierdie omvang se besteding 'n limiet oorskry of bo sy gewone uurlikse tempo styg.",
+    "enable": "Aktiveer bestedingswaarskuwings",
+    "thresholdTitle": "Oorskryding van drempel",
+    "thresholdSubtitle": "Lopende besteding oorskry jou limiet",
+    "anomalyTitle": "Uurlikse piek",
+    "anomalySubtitle": "'n Uur is ver bo hierdie omvang se gewone tempo",
+    "limitLabel": "Limiet (USD)",
+    "windowLabel": "Venster",
+    "window24h": "24 uur",
+    "window7d": "7 dae",
+    "window30d": "30 dae",
+    "multiplierLabel": "Piekvermenigvuldiger",
+    "saved": "Instellings vir bestedingswaarskuwings gestoor",
+    "loadError": "Kon nie bestedingswaarskuwings laai nie.",
+    "saveError": "Kon nie bestedingswaarskuwings stoor nie.",
+    "empty": "Bestedingswaarskuwings is af. Skakel dit aan om hierdie omvang se faktuurkontakte te waarsku.",
+    "noSpend": "Nog geen besteding aangeteken nie",
+    "spend24h": "Besteding in die afgelope 24 uur",
+    "multiplierError": "Voer 'n vermenigvuldiger van 1 of meer in",
+    "permissionDenied": "Jy het nie toestemming om bestedingswaarskuwings te bestuur nie.",
+    "pushOffByCategory": "Af in Kennisgewings"
   }
 }

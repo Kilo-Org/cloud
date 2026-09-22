@@ -39,6 +39,14 @@ export function SettingsSaveButton({
   return (
     <Button
       size="sm"
+      // ScreenHeader's trailing cluster is content-sized and never shrinks
+      // (`screen-header.tsx`), so a label whose width grows with the font
+      // scale has nothing squeezing it from outside: uncapped, it consumes the
+      // row, collapses the `flex-1 min-w-0` title to zero and then paints past
+      // the screen edge. Bound it here, exactly as pr-review's Submit review
+      // does (140 dp leaves the title ~104 dp on the narrowest 320 dp
+      // viewport, and the label wraps in place instead of clipping).
+      className="min-w-0 max-w-[140px] shrink px-3"
       disabled={!dirty || !valid || pending}
       onPress={() => {
         void (async () => {
@@ -53,7 +61,7 @@ export function SettingsSaveButton({
       }}
     >
       {pending ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
-      <Text>{t('securityAgent.settingsSave.saveChanges')}</Text>
+      <Text className="shrink text-center">{t('securityAgent.settingsSave.saveChanges')}</Text>
     </Button>
   );
 }

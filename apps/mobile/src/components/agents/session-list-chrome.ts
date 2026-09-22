@@ -6,15 +6,17 @@ import { useKeyboardOcclusion } from '@/components/kilo-chat/app-aware-keyboard-
 /** The FAB's own height plus its fixed margin above the tab bar. */
 const FAB_BAND = FAB_SIZE + FAB_MARGIN;
 
-/** The tab bar's own height, plus the FAB band when the button is admitted. */
-function tabBarBand(tabBarHeight: number, showFab: boolean): number {
-  return tabBarHeight + (showFab ? FAB_BAND : 0);
-}
-
 /**
  * The Agents screen's bottom bands: the band the centered states reserve through
  * `StateSurfaceInsets` (`surfaceBand`) and the band the rows list's frame
  * reserves (`listBand`).
+ *
+ * `surfaceBand` is that centered band in both keyboard positions — the IME's
+ * occlusion while the keyboard is up, the tab bar's own height while it is down
+ * — and never the FAB-inclusive band: the button's band rides the rows list's
+ * own frame inset, and reserving it here as well shrank the centered band below
+ * the tab bar's top edge on a short landscape window (landscape spot defect e8).
+ * The screen passes the returned band to `StateSurfaceInsets` unchanged.
  *
  * Android's edge-to-edge window does not resize for the IME, so an empty state
  * that mounts while the search field's keyboard is already up draws its lower
@@ -44,8 +46,7 @@ export function useAgentsBottomBands(
 ): { surfaceBand: number; listBand: number } {
   const { keyboardOcclusion } = useKeyboardOcclusion();
   return useMemo(() => {
-    const surfaceBand =
-      keyboardOcclusion > 0 ? keyboardOcclusion : tabBarBand(tabBarHeight, showFab);
+    const surfaceBand = keyboardOcclusion > 0 ? keyboardOcclusion : tabBarHeight;
     // The band the button's overlay covers from the screen bottom, `0` while the
     // button is not admitted.
     const fabBand = showFab ? tabBarHeight + FAB_BAND : 0;

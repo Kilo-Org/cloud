@@ -1462,6 +1462,31 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(composedSurfaceBottomInset()).toBe(100);
   });
 
+  it('keeps the centered band at the tab bar while the keyboard is down with the FAB admitted', async () => {
+    // Review finding (session-list-chrome.ts:48): `surfaceBand` is documented as
+    // the band the centered states reserve through `StateSurfaceInsets`, so it
+    // must be that band in both keyboard positions — the tab bar's own height
+    // while the keyboard is down — and never the FAB-inclusive band the
+    // keyboard-down rule keeps out of the centered surface (landscape spot
+    // defect e8). The screen passes the hook's band unchanged.
+    state.platform.OS = 'android';
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const fabBand = state.tabBarHeight + FAB_SIZE + FAB_MARGIN;
+    expect(fab()).toBeDefined();
+    expect(surfaceBottomInset()).toBe(state.tabBarHeight);
+    // The button's band rides the rows list's frame, where the FAB is the rows
+    // list's own overlay.
+    expect(nodes('FlatList')[0]?.props.style).toEqual({ marginBottom: fabBand });
+
+    act(() => {
+      showKeyboard(100);
+    });
+    // A raised IME shorter than the FAB band still replaces the tab-bar band for
+    // the centered states.
+    expect(surfaceBottomInset()).toBe(100);
+  });
+
   it('insets the rows viewport by the IME band so a search never parks rows behind the keyboard', async () => {
     // Android's edge-to-edge window does not resize for the IME, so a
     // keyboard-blind frame left the last rows of a search behind the keyboard

@@ -110,7 +110,9 @@ export function AgentSessionListScreen() {
   // (`rowsFrameBand`).
   const { surfaceBand, listBand } = useAgentsBottomBands(tabBarHeight, showFab);
   const { keyboardOcclusion } = useKeyboardOcclusion();
-  const centeredBand = keyboardOcclusion > 0 ? surfaceBand : tabBarHeight;
+  // The centered states reserve the hook's own band in both keyboard positions,
+  // so the keyboard-down rule lives in `useAgentsBottomBands` alone rather than
+  // being re-resolved here (review finding, session-list-chrome.ts:48).
   // The keyboard container below already pads the region by the IME's occlusion,
   // so the rows frame adds only the part of `listBand` that container does not
   // cover: `listBand` is the band the viewport must clear from the screen
@@ -394,9 +396,10 @@ export function AgentSessionListScreen() {
     // body, so the band ends at the tab bar while the keyboard is down (a band
     // shrank to the FAB's top pushed the empty state's second line and action
     // behind the bar in a short landscape window, landscape spot defect e8);
-    // while the keyboard is up the band is the IME's occlusion instead
-    // (`centeredBand`).
-    <StateSurfaceInsets bottomInset={centeredBand}>
+    // while the keyboard is up the band is the IME's occlusion instead. Both
+    // positions are the hook's `surfaceBand` (review finding,
+    // session-list-chrome.ts:48).
+    <StateSurfaceInsets bottomInset={surfaceBand}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}

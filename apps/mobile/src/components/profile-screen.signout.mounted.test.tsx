@@ -34,6 +34,9 @@ vi.mock('react-native-reanimated', () => ({
 
 // The screen reads its side insets through `@/lib/screen-insets`, whose native
 // module cannot load in this project.
+// The Profile screen reads its landscape side insets through `@/lib/screen-insets`,
+// whose real module loads the native safe-area package. The node project cannot
+// load that native module, so the screen's own tests stub the hook.
 // The screen reads its side insets through `@/lib/screen-insets`, which imports
 // this native module; its untransformed source breaks the mounted project.
 vi.mock('react-native-safe-area-context', () => ({

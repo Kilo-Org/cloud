@@ -173,13 +173,10 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    // Introspection reads the project's own native resources, so the colors
-    // modResults carry whatever the worktree's generated `android/` project
-    // declares (adaptive-icon, notification, app background) next to the
-    // splash color. Assert the splash color the plugin owns, not the array.
-    // `introspect` merges into the colors a local prebuild already generated, so
-    // a worktree with a prebuilt `android/` directory carries that file's extra
-    // entries. Assert the generated entry among them, not as the only one.
+    // Assert the color this plugin generates, not the host's palette: the
+    // compile above inspects the fresh root `createAndroidProject()` created
+    // (no prebuilt `colors.xml`), so `resources.color` holds only the generated
+    // entry; `arrayContaining` pins the assertion on that entry, not the array.
     expect(evaluated._internal?.modResults?.android?.colors?.resources.color).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),

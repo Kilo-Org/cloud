@@ -841,9 +841,9 @@
       "kiloclawActivitySubtitle": "ອິນສະແຕນພ້ອມໃຊ້ງານ/ຂັດຂ້ອງ, ວຽກທີ່ຕັ້ງເວລາໄວ້",
       "kiloclawActivityUnavailable": "ເລີ່ມອິນສະແຕນ KiloClaw ເພື່ອຮັບກິດຈະກຳ KiloClaw.",
       "balanceAlertsSubtitle": "ຄຳເຕືອນເມື່ອຍອດເງິນຂອງອົງກອນຕໍ່າ",
-      "balanceAlertsUnavailable": "ເຂົ້າຮ່ວມອົງກອນ ເພື່ອຮັບຄຳເຕືອນເມື່ອຍອດເງິນຕໍ່າ.",
+      "balanceAlertsUnavailable": "ເຂົ້າຮ່ວມອົງກອນ ເພື່ອຮັບການແຈ້ງເຕືອນຍອດເງິນ.",
       "securityFindingsSubtitle": "ບັນຫາທີ່ພົບໃໝ່ ແລະ ການແຈ້ງເຕືອນກ່ຽວກັບ SLA",
-      "securityFindingsUnavailable": "ເປີດເອເຈນດ້ານຄວາມປອດໄພ Kilo ໃນຂອບເຂດ ເພື່ອຮັບບັນຫາດ້ານຄວາມປອດໄພທີ່ກວດພົບ.",
+      "securityFindingsUnavailable": "ເປີດເອເຈນດ້ານຄວາມປອດໄພ Kilo ໃນຂອບເຂດ ເພື່ອຮັບບັນຫາຄວາມປອດໄພ.",
       "spendAlertsSubtitle": "ການຂ້າມຂີດຈຳກັດ ແລະ ການເພີ່ມຂຶ້ນຕໍ່ຊົ່ວໂມງ",
       "spendAlertsToggle": "ໝວດການແຈ້ງເຕືອນການໃຊ້ຈ່າຍ"
     },

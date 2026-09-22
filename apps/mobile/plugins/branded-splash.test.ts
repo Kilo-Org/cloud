@@ -127,7 +127,9 @@ describe('shared branded splash', () => {
     // Compile against a clean project root. The introspection base mods merge
     // the resources already on disk, so compiling against the real project root
     // would fold a developer's generated, gitignored `android/` tree into the
-    // result and its extra colors would break the exact assertion below.
+    // result — its `colors.xml` is absent in CI — and merge colors this test
+    // does not own into the mod results, making the exact assertion below
+    // machine-dependent.
     const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },

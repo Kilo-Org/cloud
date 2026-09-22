@@ -367,6 +367,14 @@ const config: ExpoConfig = {
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
+    // One implementation for iOS and Android: the discard confirm is the same
+    // shared `Alert.alert` call on both platforms, and iOS's `UIAlertController`
+    // already draws that copy as given (it exposes no casing transform to
+    // override). Android is the one platform that lacks the capability —
+    // AppCompat's stock button-bar text appearance forces ALL-CAPS — so the
+    // plugin's single platform piece is the AppTheme override it writes, and it
+    // is registered once here for both prebuilds.
+    './plugins/withAndroidAlertDialogButtonCase',
     './plugins/withAndroidExpoModuleRepos',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their

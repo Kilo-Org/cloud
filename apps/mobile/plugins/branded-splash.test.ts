@@ -171,6 +171,9 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // The shared app config carries the other `colors.xml` entries (icon and
+    // notification colors, the app background) through the same mod chain, so
+    // assert this plugin's surface is present rather than the array length.
     // Introspection reads the project's own native resources, so the colors
     // modResults carry whatever the worktree's generated `android/` project
     // declares (adaptive-icon, notification, app background) next to the

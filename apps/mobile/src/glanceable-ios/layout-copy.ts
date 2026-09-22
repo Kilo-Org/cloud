@@ -57,6 +57,7 @@ export function glanceableLayoutCopy() {
     running: i18n.t('common.working'),
     idle: i18n.t('common.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
+    newestResult: i18n.t('glanceable.newestResult'),
     // The Live Activity's two buttons and the widget's in-place actions all read
     // `common.approve`: the permission card, the wrist control, and the widget
     // button name the same action, and `check:i18n` forbids a second key with the

@@ -80,14 +80,18 @@ describe('Text mounted letter spacing', () => {
     expect(text.props.style).toContainEqual({ letterSpacing: 0 });
   });
 
-  it('keeps the RTL paragraph direction for Latin children', () => {
+  // The interface direction owns the reset outside joined script: an RTL
+  // interface draws every run unspaced (`RTL_NO_LETTER_SPACING`), so a Latin
+  // label keeps the paragraph direction and loses the tracking its class asks
+  // for. The joined-script rule only adds the override in an LTR interface.
+  it('keeps the RTL paragraph direction and the reset for Latin children', () => {
     i18nManager.isRTL = true;
     const text = hostText(
       mount(createElement(Text, { className: 'tracking-[1.5px]' }, 'Live now'))
     );
 
     expect(text.props.style).toContainEqual({ writingDirection: 'rtl' });
-    expect(text.props.style).not.toContainEqual({ letterSpacing: 0 });
+    expect(text.props.style).toContainEqual({ letterSpacing: 0 });
   });
 });
 

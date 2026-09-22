@@ -551,6 +551,31 @@ describe('androidSink start and update', () => {
     );
   });
 
+  it('waits for channel creation before concurrent starts can post', async () => {
+    const channels = Promise.withResolvers<undefined>();
+    mocks.ensureAndroidNotificationChannels
+      .mockReturnValueOnce(channels.promise)
+      .mockReturnValueOnce(channels.promise);
+    androidSink.startOrUpdate(MIXED, CTX);
+    androidSink.startOrUpdate({ ...MIXED, revision: 2, needsInput: 0 }, CTX);
+    await flushAsync();
+
+    expect(mocks.ensureAndroidNotificationChannels).toHaveBeenCalledTimes(2);
+    expect(mocks.native.start).not.toHaveBeenCalled();
+    expect(mocks.native.update).not.toHaveBeenCalled();
+
+    channels.resolve(undefined);
+    await flushAsync();
+
+    expect(mocks.native.start).toHaveBeenCalledTimes(1);
+    expect(mocks.native.update).toHaveBeenCalledTimes(1);
+    expect(mocks.getNotification()).toMatchObject({
+      text: '4 Working, 3 Idle',
+      channelId: 'agent-progress',
+      alerting: false,
+    });
+  });
+
   it('keeps the full summary when the device cannot promote', async () => {
     mocks.native.isPromotionCapable.mockReturnValue(false);
     androidSink.startOrUpdate(MIXED, CTX);

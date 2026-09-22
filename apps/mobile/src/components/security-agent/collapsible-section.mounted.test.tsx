@@ -252,6 +252,42 @@ describe('CollapsibleSection controlled expanded state and class overrides', () 
   });
 });
 
+describe('CollapsibleSection animateLayout opt-out', () => {
+  // A section whose siblings above it mount or resize asynchronously must not
+  // carry the layout transition: the transition paints the box at its
+  // pre-change position and covers the sibling that moved (the new-session
+  // branch row above the connect card). The opt-out drops only the transition.
+  beforeEach(() => {
+    policy.reducedMotion = false;
+    reanimated.sharedValues = [];
+    reanimated.withTiming.mockClear();
+  });
+
+  afterEach(() => {
+    act(() => mounted?.unmount());
+    mounted = undefined;
+  });
+
+  it('drops the layout transition while keeping the title, body, and controlled toggle', () => {
+    const onToggle = vi.fn<() => void>();
+    const renderer = mountSection({ expanded: true, onToggle, animateLayout: false });
+
+    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toBeUndefined();
+    expect(title(renderer).props.children).toBe('Source');
+    expect(animatedViewCount(renderer, BODY_CLASSES)).toBe(1);
+
+    const pressable = toggle(renderer);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(pressable.props.accessibilityState).toEqual({ expanded: true });
+  });
+
+  it('keeps the layout transition by default', () => {
+    const renderer = mountSection();
+
+    expect(animatedView(renderer, OUTER_CLASSES).props.layout).toEqual({ __linearTransition: 200 });
+  });
+});
+
 /** The goal row's carat pressable, mounted on its own. */
 function mountChevron(
   props: Partial<ComponentProps<typeof DisclosureChevron>> = {}

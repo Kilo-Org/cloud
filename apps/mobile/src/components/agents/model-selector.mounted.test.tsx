@@ -8,8 +8,9 @@ import {
   freeModelFreeLabel,
 } from '@/lib/free-model-data-disclosure';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { i18n } from '@/i18n';
 
-import { ModelPickerOptionRow } from './model-selector';
+import { ModelPickerOptionRow, ModelSelector } from './model-selector';
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -101,6 +102,25 @@ function countWithAccessibilityLabel(root: TestRenderer.ReactTestInstance, label
     .length;
 }
 
+function renderSelector(option: SessionModelOption): TestRenderer.ReactTestRenderer {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  TestRenderer.act(() => {
+    ref.current = TestRenderer.create(
+      createElement(ModelSelector, {
+        value: option.id,
+        variant: '',
+        options: [option],
+        onSelect: vi.fn<(modelId: string, variant: string) => void>(),
+      })
+    );
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
 function trailingSlots(renderer: TestRenderer.ReactTestRenderer): string[] {
   return renderer.root
     .findAll(
@@ -154,6 +174,31 @@ describe('ModelPickerOptionRow BYOK badge', () => {
     const renderer = renderRow(cliCatalogOption({ isFree: true, mayTrainOnYourPrompts: true }));
     expect(textStrings(renderer.root)).not.toContain(freeModelFreeLabel());
     expect(countWithAccessibilityLabel(renderer.root, freeModelDataLabel())).toBe(0);
+  });
+});
+
+describe('Auto model labels', () => {
+  // The backend names Kilo's own Auto models in English ("Auto Efficient"),
+  // which no catalog translates; the chip and the picker row must show the
+  // catalog's label instead so the Arabic composer is not half translated.
+  const autoOption = cliCatalogOption({
+    id: 'kilo-auto/efficient',
+    displayId: 'kilo-auto/efficient',
+    name: 'backend name',
+  });
+
+  it('renders the catalog label, not the backend name, on the chip', () => {
+    const renderer = renderSelector(autoOption);
+    const texts = textStrings(renderer.root);
+    expect(texts).toContain(i18n.t('models.auto.efficient'));
+    expect(texts).not.toContain('backend name');
+  });
+
+  it('renders the catalog label, not the backend name, in the picker row', () => {
+    const renderer = renderRow(autoOption);
+    const texts = textStrings(renderer.root);
+    expect(texts).toContain(i18n.t('models.auto.efficient'));
+    expect(texts).not.toContain('backend name');
   });
 });
 

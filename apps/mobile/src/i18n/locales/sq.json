@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Ke bërë shumë përpjekje për të hyrë. Prit pak dhe provo përsëri."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatik i avancuar",
+      "balanced": "Automatik i ekuilibruar",
+      "efficient": "Automatik efikas",
+      "small": "Automatik i vogël",
+      "free": "Automatik falas",
+      "organization": "Automatik i organizatës"
+    },
     "dataCollected": "Mblidhen të dhëna",
     "free": "Falas",
     "couldNotUpdateFavorites": "Nuk u përditësuan të preferuarat.",

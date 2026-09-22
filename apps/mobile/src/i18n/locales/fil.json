@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Masyadong maraming pagtatangkang mag-sign in. Pakihintay at subukan muli."
   },
   "models": {
+    "auto": {
+      "frontier": "Awtomatikong Pinakamaunlad",
+      "balanced": "Awtomatikong Balanse",
+      "efficient": "Awtomatikong Mabisa",
+      "small": "Awtomatikong Maliit",
+      "free": "Awtomatikong Libre",
+      "organization": "Awtomatikong Organisasyon"
+    },
     "dataCollected": "Kinokolekta ang datos",
     "free": "Libre",
     "couldNotUpdateFavorites": "Hindi ma-update ang mga paborito.",

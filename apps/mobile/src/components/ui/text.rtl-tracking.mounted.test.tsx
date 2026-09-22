@@ -115,6 +115,7 @@ describe('Text tracked labels in RTL', () => {
     const classes = className.split(' ');
     expect(classes).not.toContain('uppercase');
     expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+    expect(hostText(root).props.className as string).not.toContain('tracking-');
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
   });
 });

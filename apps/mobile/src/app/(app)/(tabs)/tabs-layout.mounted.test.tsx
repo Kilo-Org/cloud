@@ -1,3 +1,8 @@
+// Named `tabs-layout`, never `_layout.*`: expo-router's route parser reads the
+// first dot-separated part of a filename, so `_layout.mounted.test.tsx` counts
+// as the layout for this directory. The typed-routes generator walks the
+// filesystem directly (not Metro's test blocklist), so that stray layout
+// swallowed the whole `(tabs)` subtree and every tab route vanished from `Href`.
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

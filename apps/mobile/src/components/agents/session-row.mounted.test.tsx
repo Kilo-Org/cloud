@@ -327,6 +327,44 @@ describe('StoredSessionRow live speech', () => {
   );
 });
 
+describe('StoredSessionRow placeholder title', () => {
+  const placeholder = 'New session - 2026-09-22T04:17:22.503Z';
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    __resetSessionAttentionForTests();
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-28T12:00:00.000Z'));
+  });
+  afterEach(async () => {
+    act(() => {
+      for (const renderer of mounted) {
+        renderer.unmount();
+      }
+    });
+    mounted.length = 0;
+    vi.restoreAllMocks();
+    await i18n.changeLanguage('en');
+  });
+
+  it.each(['list', 'card'] as const)(
+    'paints the friendly label and never the machine title for variant=%s',
+    variant => {
+      const renderer = mount(row({ session: { ...session, title: placeholder }, variant }));
+      expect(texts(renderer)).toContain('Untitled session');
+      expect(texts(renderer)).not.toContain(placeholder);
+      const label = hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel as string;
+      expect(label).toContain('Untitled session');
+      expect(label).not.toContain(placeholder);
+    }
+  );
+
+  it('leaves a real title unchanged', () => {
+    const renderer = mount(row({ session: { ...session, title: 'Fix login bug' } }));
+    expect(texts(renderer)).toContain('Fix login bug');
+    expect(texts(renderer)).not.toContain('Untitled session');
+  });
+});
+
 describe('RemoteSessionRow live speech', () => {
   let client: QueryClient = createKiloAppQueryClient();
 
@@ -431,4 +469,34 @@ describe('RemoteSessionRow live speech', () => {
       'Live work, Idle, feature/live, LIVE-REPO, and 5 minutes ago'
     );
   });
+
+  it.each(['list', 'card'] as const)(
+    'paints the friendly label and never the machine title for a placeholder title (variant=%s)',
+    variant => {
+      const placeholder = 'New session - 2026-09-22T04:17:22.503Z';
+      const renderer = mount(
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(RemoteSessionRow, {
+            session: makeCached({
+              id: 'remote-1',
+              status: 'busy',
+              title: placeholder,
+              createdOnPlatform: 'cli',
+              gitBranch: 'feature/live',
+              updatedAt: '2026-08-28T11:55:00.000Z',
+            }),
+            variant,
+            onPress: () => undefined,
+          })
+        )
+      );
+      expect(texts(renderer)).toContain('Untitled session');
+      expect(texts(renderer)).not.toContain(placeholder);
+      const label = hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel as string;
+      expect(label).toContain('Untitled session');
+      expect(label).not.toContain(placeholder);
+    }
+  );
 });

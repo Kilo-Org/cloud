@@ -148,6 +148,32 @@ describe('planNeedsInputNotifications', () => {
     expect(plan.dismiss).toEqual([]);
   });
 
+  it('publishes the friendly label for a placeholder-titled raise', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [],
+      next: [
+        makeCached({
+          id: 'ses_1',
+          title: 'New session - 2026-09-22T04:17:22.503Z',
+          status: 'question',
+        }),
+      ],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+    expect(plan.publish).toEqual([
+      {
+        sessionId: 'ses_1',
+        title: 'Untitled session',
+        kind: 'question',
+        prUrl: null,
+        organizationId: null,
+      },
+    ]);
+    expect(plan.dismiss).toEqual([]);
+  });
+
   it('does not re-publish a raise it already notified', () => {
     const plan = planNeedsInputNotifications({
       previous: [notifiedRow()],

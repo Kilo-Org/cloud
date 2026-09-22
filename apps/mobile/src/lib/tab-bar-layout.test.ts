@@ -1,3 +1,8 @@
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
+import { readFileSync } from 'node:fs';
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -13,9 +18,20 @@ import {
   TAB_LABEL_WRAP_FONT_SCALE,
   tabAccessibilityLabel,
   tabBarPosition,
+  tabLabelFits,
   tabLabelNumberOfLines,
+  tabLabelWidth,
   visibleTabCount,
 } from '@/lib/tab-bar-layout';
+
+const LAYOUT_SOURCE = readFileSync(
+  fileURLToPath(new URL('tab-bar-layout.ts', import.meta.url)),
+  'utf8'
+);
+const LABEL_SOURCE = readFileSync(
+  fileURLToPath(new URL('../components/tab-bar-label.tsx', import.meta.url)),
+  'utf8'
+);
 
 describe('getTabBarOverlayHeight', () => {
   it('includes the bottom safe area on iOS', () => {
@@ -83,6 +99,17 @@ describe('getEffectiveTabBarHeight', () => {
       70
     );
   });
+
+  it('honours a caller-supplied label decision at the default font scale', () => {
+    expect(
+      getEffectiveTabBarHeight({
+        bottomInset: 16,
+        platform: 'android',
+        fontScale: 1,
+        showLabel: false,
+      })
+    ).toBe(getTabBarIconForwardHeight(16, 'android'));
+  });
 });
 describe('getTabBarIconForwardHeight', () => {
   it('collapses to the base height when labels are hidden at large font scale', () => {
@@ -138,6 +165,42 @@ describe('getTabBarHorizontalInset', () => {
   });
 });
 
+describe('tabLabelWidth', () => {
+  it('measures a single unbroken word at the tab label size', () => {
+    // "Profile" is 7 glyphs at (0.6em x 11) + 0.2 tracking = 47.6
+    expect(tabLabelWidth('Profile')).toBeCloseTo(47.6, 5);
+  });
+
+  it('measures the widest whitespace-separated line of a wrapped label', () => {
+    expect(tabLabelWidth('Kilo\nClaw')).toBeCloseTo(tabLabelWidth('Kilo'), 5);
+    expect(tabLabelWidth('Bogga shakhsiga')).toBeCloseTo(9 * (0.6 * 11 + 0.2), 5);
+  });
+
+  it('scales the glyph advance (not the tracking) with the system font scale', () => {
+    expect(tabLabelWidth('Profile', 2)).toBeCloseTo(7 * (0.6 * 11 * 2 + 0.2), 5);
+  });
+
+  it('counts CJK/Kana/Hangul glyphs as one em wide', () => {
+    expect(tabLabelWidth('設定')).toBeCloseTo(2 * (11 + 0.2), 5);
+  });
+});
+
+describe('tabLabelFits', () => {
+  it('rejects a label wider than its tab minus the item padding', () => {
+    // 160dp / 3 tabs = 53.3dp box, less 10dp padding = 43.3dp for a 47.6dp word
+    expect(tabLabelFits('Profile', 160 / 3)).toBe(false);
+  });
+
+  it('accepts the same label on a normal phone width', () => {
+    expect(tabLabelFits('Profile', 360 / 3)).toBe(true);
+  });
+
+  it('uses the widest line, so a space-separated label can still fit', () => {
+    expect(tabLabelFits('Kilo Claw', 160 / 3)).toBe(true);
+    expect(tabLabelFits('Bogga shakhsiga', 160 / 3)).toBe(false);
+  });
+});
+
 describe('shouldShowTabLabel', () => {
   it('keeps the label below the icon-forward threshold', () => {
     expect(shouldShowTabLabel(1)).toBe(true);
@@ -148,6 +211,23 @@ describe('shouldShowTabLabel', () => {
     expect(shouldShowTabLabel(TAB_ICON_FORWARD_FONT_SCALE)).toBe(false);
     expect(shouldShowTabLabel(2.5)).toBe(false);
     expect(shouldShowTabLabel(3)).toBe(false);
+  });
+
+  it('drops the labels when any label is too wide for its tab', () => {
+    // Reported geometry: 160dp / 5 tabs = 32dp per tab, 22dp for the label
+    expect(shouldShowTabLabel(1, 160 / 5, ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'])).toBe(
+      false
+    );
+  });
+
+  it('keeps the labels when every label fits its tab', () => {
+    expect(shouldShowTabLabel(1, 360 / 5, ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'])).toBe(
+      true
+    );
+  });
+
+  it('keeps the width rule from overriding the font-scale rule', () => {
+    expect(shouldShowTabLabel(2, 160 / 5, ['Home'])).toBe(false);
   });
 });
 
@@ -163,6 +243,27 @@ describe('tabLabelNumberOfLines', () => {
   it('keeps the two lines for copy that carries its own break', () => {
     expect(tabLabelNumberOfLines(i18n.t('tabs.kiloclawWrapped'))).toBe(2);
     expect(tabLabelNumberOfLines('Kilo\nClaw')).toBe(2);
+  });
+});
+
+describe('mirrored tab label metrics', () => {
+  // The metrics at the top of this module are copied from the label
+  // component's style, so the "keep these in step" pointer must name the file
+  // that actually owns that style, and the copied tokens must still match it.
+  it('points at the component that owns the tab label style', () => {
+    expect(LAYOUT_SOURCE).toContain('apps/mobile/src/components/tab-bar-label.tsx');
+    expect(LABEL_SOURCE).toContain('export function TabBarLabel');
+  });
+
+  it('mirrors the component font size and tracking in the width estimate', () => {
+    // JetBrains Mono advances 0.6em per glyph; the label adds 0.2px tracking.
+    // `tabLabelWidth` must use the same 11px/0.2px the component's class sets,
+    // and the component must render one line via `tabLabelNumberOfLines`.
+    expect(LABEL_SOURCE).toContain(
+      'font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px]'
+    );
+    expect(LABEL_SOURCE).toContain('numberOfLines={tabLabelNumberOfLines(label)}');
+    expect(tabLabelWidth('A')).toBeCloseTo(0.6 * 11 + 0.2);
   });
 });
 

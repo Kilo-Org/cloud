@@ -32,9 +32,19 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('react-native', () => ({
+  AppState: { addEventListener: () => ({ remove: vi.fn() }) },
+  Keyboard: { addListener: () => ({ remove: vi.fn() }) },
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
+}));
+// The keyboard-padding leaf the screen renders reads the native side insets
+// through `react-native-safe-area-context`, whose module resolves to its
+// untransformed `react-native` entry (`src/index.tsx`) and breaks the mounted
+// project; every mounted suite mocks it.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 // The screen wraps its form in the shared keyboard-lift view, whose real module
 // reads the platform and the safe-area insets (a react-native entry this node

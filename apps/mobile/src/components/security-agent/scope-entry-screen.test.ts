@@ -12,7 +12,9 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { ScopeEntryScreen } from './scope-entry-screen';
 import { SettingsOverviewScreen } from './settings-overview-screen';
 
-const transport = vi.hoisted(() => vi.fn<typeof fetch>());
+const transport = vi.hoisted(() =>
+  vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+);
 let permissionData = {
   hasIntegration: true,
   hasPermissions: true,
@@ -83,7 +85,7 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 function host(root: TestRenderer.ReactTestInstance, type: string) {
   return root.findAll(node => node.type === type);
 }
-function procedureFor(input: Parameters<typeof fetch>[0]) {
+function procedureFor(input: RequestInfo | URL) {
   return new URL(input instanceof Request ? input.url : input).pathname.split('.').at(-1) ?? '';
 }
 async function advanceBy() {
@@ -268,7 +270,13 @@ describe.each([
       organizationId: 'org_123',
     });
     const other = trpc.securityAgent.getConfig.queryOptions();
-    void queryClient.prefetchQuery(other);
+    void (async () => {
+      try {
+        await queryClient.query(other);
+      } catch {
+        // Best-effort seed of a paused query; it never settles while offline.
+      }
+    })();
     queryClient.setQueryData(configKey, configData);
     const root = await mount('org_123', Screen);
     const error = host(root, 'PlatformErrorScreen')[0];

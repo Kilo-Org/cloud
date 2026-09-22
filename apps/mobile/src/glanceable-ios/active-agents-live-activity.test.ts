@@ -163,7 +163,7 @@ describe('Active Agents Live Activity actions', () => {
     // the foreground. The two sides are literals in different languages, so the
     // patch is read here to hold them equal — a rename on one side alone would
     // put Open back in the background with no other test to catch it.
-    const patch = read('../../../../patches/expo-widgets@57.0.18.patch');
+    const patch = read('../../../../patches/expo-widgets@57.0.20.patch');
     expect(patch).toContain('@Field var openAppWhenRun: Bool?');
     expect(patch).toContain('static var openAppWhenRun: Bool = true');
     expect(patch).toContain('intent: LiveActivityOpenInteraction(');

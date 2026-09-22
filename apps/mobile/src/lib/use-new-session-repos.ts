@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- One hook wires the GitHub, GitLab, and Bitbucket provider queries, recents resolution, and connect/refresh flows end-to-end. */
 import { useCallback, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
@@ -22,7 +21,6 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
 import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
-import { useExternalAuthReturn } from '@/lib/external-auth/use-external-auth-return';
 import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -282,36 +280,18 @@ export function useNewSessionRepos({
   }, [refreshGitHubForceFresh, forceFreshGitLab, forceFreshBitbucket]);
 
   // ── Per-provider connect ──────────────────────────────────────────
-  // Android: `openAuthorizationAndWaitForReturn` returns `'app-foreground'`
-  // (the browser launch is fire-and-forget), so each provider's refresh runs
-  // from a shared foreground listener when the app returns.
-  const { markLaunched: markGitLabLaunched, clearLaunch: clearGitLabLaunch } =
-    useExternalAuthReturn(() => {
-      void forceFreshGitLab();
-    });
-  const { markLaunched: markBitbucketLaunched, clearLaunch: clearBitbucketLaunch } =
-    useExternalAuthReturn(() => {
-      void forceFreshBitbucket();
-    });
-
   const openGitLabIntegration = useCallback(() => {
     void (async () => {
       try {
-        markGitLabLaunched();
-        const trigger = await openAuthorizationAndWaitForReturn(
-          Platform.OS,
+        await openAuthorizationAndWaitForReturn(
           getGitLabIntegrationUrl(WEB_BASE_URL, organizationId)
         );
-        if (trigger === 'sheet-close') {
-          clearGitLabLaunch();
-          await forceFreshGitLab();
-        }
+        await forceFreshGitLab();
       } catch {
-        clearGitLabLaunch();
         toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));
       }
     })();
-  }, [organizationId, forceFreshGitLab, markGitLabLaunched, clearGitLabLaunch]);
+  }, [organizationId, forceFreshGitLab]);
 
   const openBitbucketIntegration = useCallback(() => {
     if (!organizationId) {
@@ -319,21 +299,15 @@ export function useNewSessionRepos({
     }
     void (async () => {
       try {
-        markBitbucketLaunched();
-        const trigger = await openAuthorizationAndWaitForReturn(
-          Platform.OS,
+        await openAuthorizationAndWaitForReturn(
           getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId)
         );
-        if (trigger === 'sheet-close') {
-          clearBitbucketLaunch();
-          await forceFreshBitbucket();
-        }
+        await forceFreshBitbucket();
       } catch {
-        clearBitbucketLaunch();
         toast.error(i18n.t('codeReviewer.providerConnect.bitbucketError'));
       }
     })();
-  }, [organizationId, forceFreshBitbucket, markBitbucketLaunched, clearBitbucketLaunch]);
+  }, [organizationId, forceFreshBitbucket]);
 
   const openIntegration = useCallback(
     (platform: RepositoryPlatform) => {

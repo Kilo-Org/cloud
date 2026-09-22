@@ -25,6 +25,7 @@ export function ThreadDiffSnippet({ snippet }: Readonly<ThreadDiffSnippetProps>)
     >
       {truncatedCount > 0 ? (
         <View className="border-b border-hair-soft px-3 py-1">
+          {/* i18n-dup-ok: 'prReview.discussion.moreLinesAbove_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
           <Text className="text-xs text-muted-foreground">
             {t('prReview.discussion.moreLinesAbove', {
               count: truncatedCount,

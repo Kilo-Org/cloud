@@ -6,20 +6,34 @@ const { withDangerousMod, withInfoPlist, withXcodeProject } = require('expo/conf
 const { assertIntentCopy, renderLocalizableStrings } = require('./app-intent-copy.js');
 const { mergeIntoResourcesPhase } = require('./app-intent-resources.js');
 
-// Localizes the App Intents on the main app target.
+// Writes the main app target's `Localizable.strings`, one `<tag>.lproj` file
+// per language.
 //
 // An App Intent's `title`, its parameter names and its `AppShortcutsProvider`
 // phrases are `LocalizedStringResource`s that iOS resolves against
 // `Localizable.strings` in the app bundle. Expo's prebuild writes the app's
-// `Info.plist` and the widget extension's copy, but nothing writes the app
+// `Info.plist` and the widget extension's copy, but nothing else writes the app
 // target's own `Localizable.strings`, so the Shortcuts app would list every
 // action in English on a localized device.
 //
-// This is the app-target twin of `withWidgetLocalizations`: the copy lives in
-// `app-intent-copy.json` beside this file (bundle metadata, never i18next), and
-// one `<tag>.lproj/Localizable.strings` is written per language and attached to
-// the app target's Resources build phase. It throws for a language with no copy,
-// so a prebuild fails loudly instead of shipping an English label.
+// This fork follows the capability, not a scope: App Intents and their `.lproj`
+// `Localizable.strings` metadata are iOS-only, so no Android prebuild calls
+// this plugin. Android has no App Intents to localize — its action surface is
+// the exported entry points plus `res/xml/shortcuts.xml`, which
+// `platform-parity.test.ts` compares against the iOS tree.
+//
+// This is the app-target twin of `withWidgetLocalizations`: the App Intent copy
+// lives in `app-intent-copy.json` beside this file (bundle metadata, never
+// i18next), and pre-rendered `additionalStrings` — the Focus filter's catalog,
+// which the same bundle's `Localizable.strings` resolves — are appended to each
+// language's file. The two are one bundle resource, so one writer must emit
+// them: feeding the Focus-filter key to Expo's built-in `withLocales` instead
+// made the app target carry two `Localizable.strings` (this one and
+// `Supporting/<tag>.lproj/Localizable.strings`) and Xcode failed the build with
+// "Multiple commands produce …/Localizable.strings".
+//
+// It throws for a language with no copy — or no appended strings — so a
+// prebuild fails loudly instead of shipping an English label.
 //
 // The main app target is not addressable by name the way the extension is:
 // `pbxTargetByName` returns the target body, which carries no uuid, and
@@ -54,7 +68,10 @@ function appTargetUuid(project) {
   return uuid;
 }
 
-module.exports = function withAppIntentLocalizations(config, { languages, copy } = {}) {
+module.exports = function withAppIntentLocalizations(
+  config,
+  { languages, copy, additionalStrings } = {}
+) {
   if (!Array.isArray(languages) || languages.length === 0) {
     throw new Error('withAppIntentLocalizations needs a non-empty `languages` array');
   }
@@ -64,6 +81,12 @@ module.exports = function withAppIntentLocalizations(config, { languages, copy }
   }
   if (!copy.en) {
     throw new Error('withAppIntentLocalizations: the app-intent copy needs an `en` entry');
+  }
+  const withoutAdditional = languages.filter(tag => typeof additionalStrings?.[tag] !== 'string');
+  if (withoutAdditional.length > 0) {
+    throw new Error(
+      `withAppIntentLocalizations: no additional Localizable.strings content for ${withoutAdditional.join(', ')}`
+    );
   }
   for (const tag of languages) {
     assertIntentCopy(copy, tag);
@@ -116,9 +139,12 @@ module.exports = function withAppIntentLocalizations(config, { languages, copy }
           for (const tag of languages) {
             const dir = path.join(targetRoot, `${tag}.lproj`);
             fs.mkdirSync(dir, { recursive: true });
+            // Both catalogs are already rendered `.strings` bodies that end in
+            // a newline: the App Intent entries first, the Focus-filter copy
+            // appended after them, so the one bundle file carries both.
             fs.writeFileSync(
               path.join(dir, STRINGS_FILE),
-              renderLocalizableStrings(copy, tag),
+              `${renderLocalizableStrings(copy, tag)}${additionalStrings[tag]}`,
               'utf8'
             );
           }

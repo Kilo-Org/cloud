@@ -24,7 +24,13 @@ import type {
 } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import { createChatProcessor } from './chat-processor';
-import type { AssistantMessage, UserMessage, TextPart, Part } from '@kilocode/app-shared/opencode';
+import type {
+  AssistantMessage,
+  UserMessage,
+  TextPart,
+  Part,
+  ToolPart,
+} from '@kilocode/app-shared/opencode';
 import { kiloId, cloudAgentId, stubUserMessage, stubTextPart, makeSnapshot } from './test-helpers';
 import type {
   CloudStatus,
@@ -1243,6 +1249,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Connection lost. Please retry in a moment.',
+          code: 'connection-lost',
         })
       );
       expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
@@ -1361,6 +1368,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'progress',
           message: 'Setting up environment…',
+          code: 'setting-up-environment',
         })
       );
     });
@@ -2896,6 +2904,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Connection lost. Please retry in a moment.',
+          code: 'connection-lost',
         })
       );
     });
@@ -3042,6 +3051,7 @@ describe('createSessionManager', () => {
           type: 'error',
           message:
             'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
+          code: 'selected-model-unavailable',
         })
       );
     });
@@ -3083,6 +3093,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Agent connection lost',
+          code: 'agent-connection-lost',
         })
       );
 
@@ -3101,6 +3112,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Agent connection lost',
+          code: 'agent-connection-lost',
         })
       );
     });
@@ -3131,6 +3143,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Agent connection lost',
+          code: 'agent-connection-lost',
         })
       );
 
@@ -3349,6 +3362,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Connection failed. Please retry in a moment.',
+          code: 'connection-failed',
         })
       );
     });
@@ -4695,7 +4709,11 @@ describe('createSessionManager', () => {
         mgr.atoms.statusIndicator
       );
       expect(indicator).toEqual(
-        expect.objectContaining({ type: 'info', message: 'Session stopped' })
+        expect.objectContaining({
+          type: 'info',
+          message: 'Session stopped',
+          code: 'session-stopped',
+        })
       );
     });
 
@@ -4713,7 +4731,11 @@ describe('createSessionManager', () => {
         mgr.atoms.statusIndicator
       );
       expect(indicator).toEqual(
-        expect.objectContaining({ type: 'error', message: 'Failed to stop execution' })
+        expect.objectContaining({
+          type: 'error',
+          message: 'Failed to stop execution',
+          code: 'failed-to-stop-execution',
+        })
       );
     });
 
@@ -4973,7 +4995,11 @@ describe('createSessionManager', () => {
         mgr.atoms.statusIndicator
       );
       expect(indicator).toEqual(
-        expect.objectContaining({ type: 'info', message: 'Session stopped' })
+        expect.objectContaining({
+          type: 'info',
+          message: 'Session stopped',
+          code: 'session-stopped',
+        })
       );
     });
 
@@ -5128,7 +5154,11 @@ describe('createSessionManager', () => {
         mgr.atoms.statusIndicator
       );
       expect(indicator).toEqual(
-        expect.objectContaining({ type: 'info', message: 'Session stopped' })
+        expect.objectContaining({
+          type: 'info',
+          message: 'Session stopped',
+          code: 'session-stopped',
+        })
       );
     });
 
@@ -5256,6 +5286,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+          code: 'insufficient-credits',
         })
       );
       expect(config.initiate).not.toHaveBeenCalled();
@@ -5829,6 +5860,162 @@ describe('createSessionManager', () => {
       expect(pending.has('m1')).toBe(false);
       expect(pending.get('m2')).toEqual({ status: 'failed', error: 'y', reason: 'execution' });
       expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m1');
+    });
+  });
+
+  describe('resolved delivery failures', () => {
+    function lastSessionConfig() {
+      return jest.mocked(createCloudAgentSession).mock.calls.at(-1)?.[0];
+    }
+
+    it('seeds the resolved ids from the durable reader and persists a retry', async () => {
+      const persistResolvedDeliveryFailure = jest.fn();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn().mockResolvedValue(['m-original']),
+        persistResolvedDeliveryFailure,
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      // The durable read is not awaited on the open path: let its microtask land.
+      await Promise.resolve();
+
+      const sessionConfig = lastSessionConfig();
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-original')).toBe(true);
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-other')).toBe(false);
+
+      mgr.clearFailedMessage('m-other');
+
+      expect(persistResolvedDeliveryFailure).toHaveBeenCalledWith(kiloId('ses-1'), 'm-other');
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-other')).toBe(true);
+    });
+
+    it('persists a retry under the session that owns the row, not the switched-to one', async () => {
+      const persistResolvedDeliveryFailure = jest.fn();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn().mockResolvedValue([]),
+        persistResolvedDeliveryFailure,
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.switchSession(kiloId('ses-2'));
+
+      // The re-send was accepted on `ses-1` while the user switched to `ses-2`,
+      // so the caller passes the session that owned the retried row.
+      mgr.clearFailedMessage('m-other', kiloId('ses-1'));
+
+      expect(persistResolvedDeliveryFailure).toHaveBeenCalledWith(kiloId('ses-1'), 'm-other');
+      // The switched-to session keeps its own transcript: another session's
+      // failure id must not clear an entry in its state.
+      expect(mockSession.state.clearFailedMessage).not.toHaveBeenCalled();
+    });
+
+    it('suppresses the replay when the user switches back before the durable write lands', async () => {
+      // The durable store never sees the retry: the fire-and-forget write has
+      // not landed yet, so both reads return the pre-write list.
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn().mockResolvedValue([]),
+        persistResolvedDeliveryFailure: jest.fn(),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.switchSession(kiloId('ses-2'));
+
+      // The re-send was accepted on `ses-1` while the user was on `ses-2`.
+      mgr.clearFailedMessage('m-other', kiloId('ses-1'));
+
+      // The user switches straight back. The durable read returns [], but the
+      // in-memory record for `ses-1` keeps the resolution, so the session's
+      // predicate suppresses the DO's replayed failure.
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.('m-other')).toBe(true);
+    });
+
+    it('undoes the terminal error a failure pruned by the durable read had set', async () => {
+      const read = deferred<readonly string[]>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // The DO's stored-event replay applied the failure and it became the
+      // active turn's terminal error before the durable read resolved.
+      mockSessionCallbacks.onMessageFailed?.('m-original', {
+        status: 'failed',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+      mockSessionCallbacks.onError?.('The message could not be delivered');
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
+        'The message could not be delivered'
+      );
+
+      mockSession.state.clearFailedMessage.mockReturnValueOnce(true);
+      read.resolve(['m-original']);
+      await read.promise;
+      await Promise.resolve();
+
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-original');
+      // The predicate path never reaches `onError`; pruning afterwards must
+      // leave the same state, so the error the failure set goes too.
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+    });
+
+    it('reads the durable memory for the session being opened', async () => {
+      const readResolvedDeliveryFailures = jest.fn().mockResolvedValue([]);
+      const config = createMockConfig({ readResolvedDeliveryFailures });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(readResolvedDeliveryFailures).toHaveBeenCalledWith(kiloId('ses-1'));
+    });
+
+    it('prunes a replayed failure that landed before the durable read resolved', async () => {
+      const read = deferred<readonly string[]>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = lastSessionConfig();
+      // The DO's stored-event replay delivered the failure first.
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-original')).toBe(false);
+
+      read.resolve(['m-original']);
+      await read.promise;
+      await Promise.resolve();
+
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-original');
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-original')).toBe(true);
+    });
+
+    it('ignores a durable read that resolves after the session switched', async () => {
+      const read = deferred<readonly string[]>();
+      const readResolvedDeliveryFailures = jest
+        .fn()
+        .mockReturnValueOnce(read.promise)
+        .mockResolvedValue([]);
+      const config = createMockConfig({ readResolvedDeliveryFailures });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.switchSession(kiloId('ses-2'));
+      const secondConfig = lastSessionConfig();
+
+      read.resolve(['m-original']);
+      await read.promise;
+      await Promise.resolve();
+
+      expect(secondConfig?.isDeliveryFailureResolved?.('m-original')).toBe(false);
+      expect(mockSession.state.clearFailedMessage).not.toHaveBeenCalledWith('m-original');
     });
   });
 
@@ -7582,6 +7769,182 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
     expect(
       atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList).map(m => m.info.id)
     ).toEqual(['msg-current']);
+  });
+
+  // -------------------------------------------------------------------------
+  // applyPage tool lifecycle ordering
+  // -------------------------------------------------------------------------
+
+  describe('page replay tool lifecycle ordering', () => {
+    const taskMessageId = 'msg-task';
+    const taskPartId = 'part-task';
+
+    function taskPartBase(): Omit<ToolPart, 'state'> {
+      return {
+        id: taskPartId,
+        sessionID: 'ses-1',
+        messageID: taskMessageId,
+        type: 'tool',
+        callID: 'call-task',
+        tool: 'task',
+      };
+    }
+
+    function runningTaskPart(start = 1): ToolPart {
+      return {
+        ...taskPartBase(),
+        state: { status: 'running', input: {}, time: { start } },
+      };
+    }
+
+    function completedTaskPart(end: number): ToolPart {
+      return {
+        ...taskPartBase(),
+        state: {
+          status: 'completed',
+          input: {},
+          output: 'done',
+          title: 'task',
+          metadata: {},
+          time: { start: 1, end },
+        },
+      };
+    }
+
+    function erroredTaskPart(end: number): ToolPart {
+      return {
+        ...taskPartBase(),
+        state: { status: 'error', input: {}, error: 'boom', time: { start: 1, end } },
+      };
+    }
+
+    function taskMessage(part: Part): SessionSnapshotPage['messages'][number] {
+      return { info: stubUserMessage({ id: taskMessageId, sessionID: 'ses-1' }), parts: [part] };
+    }
+
+    function cachedTaskPage(part: Part): SessionSnapshotPage {
+      return {
+        info: { id: 'ses-1' },
+        messages: [taskMessage(part)],
+        nextCursor: null,
+        omittedItemCount: 0,
+      };
+    }
+
+    function storedTaskPart(
+      config: SessionManagerConfig,
+      mgr: ReturnType<typeof createSessionManager>
+    ): ToolPart {
+      const messages = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      const message = messages.find(m => m.info.id === taskMessageId);
+      if (!message) throw new Error('task message missing');
+      const part = message.parts.find(p => p.id === taskPartId);
+      if (!part || part.type !== 'tool') throw new Error('task part missing');
+      return part;
+    }
+
+    it('applies a replayed terminal task part over the cached running part', async () => {
+      const readCachedSnapshotPage = jest.fn().mockResolvedValue(cachedTaskPage(runningTaskPart()));
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({ kiloSessionId: 'ses-1', messages: [taskMessage(completedTaskPart(250))] })
+      );
+      const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await new Promise<void>(resolve => setImmediate(resolve));
+
+      expect(storedTaskPart(config, mgr).state.status).toBe('completed');
+    });
+
+    it('keeps a live running task when a replayed terminal predates the live update', async () => {
+      const livePage = deferred<SessionSnapshotPageOutcome>();
+      const readCachedSnapshotPage = jest.fn().mockResolvedValue(cachedTaskPage(runningTaskPart()));
+      const fetchSnapshotPage = createPageFetchMock(() => livePage.promise);
+      const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      if (!latestStorage) throw new Error('expected session storage');
+      const livePart = runningTaskPart();
+      latestStorage.upsertPart(taskMessageId, livePart, 200);
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.part.updated',
+        part: livePart,
+        time: 200,
+      });
+
+      livePage.resolve(
+        makePage({ kiloSessionId: 'ses-1', messages: [taskMessage(completedTaskPart(150))] })
+      );
+      await new Promise<void>(resolve => setImmediate(resolve));
+
+      expect(storedTaskPart(config, mgr).state.status).toBe('running');
+    });
+
+    it('keeps a snapshotted running task when the replayed terminal settled before the live run', async () => {
+      // Reopen replay: the cached transcript holds the live run's running part
+      // (start = 2026), and the freshly fetched page delivers the stale stored
+      // terminal whose settle time is 2023-11-16 — older than the live run. The
+      // page replay must not flip the snapshotted running task to completed.
+      const readCachedSnapshotPage = jest
+        .fn()
+        .mockResolvedValue(cachedTaskPage(runningTaskPart(1_789_655_865_076)));
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({
+          kiloSessionId: 'ses-1',
+          messages: [taskMessage(completedTaskPart(1_700_100_006_000))],
+        })
+      );
+      const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await new Promise<void>(resolve => setImmediate(resolve));
+
+      expect(storedTaskPart(config, mgr).state.status).toBe('running');
+    });
+
+    it('keeps a live running task when the cached terminal is stale (reverse replay order)', async () => {
+      // Reverse reopen order: the cached transcript holds a stored terminal
+      // that settled in 2023, while the freshly fetched page delivers the live
+      // run (start = 2026) of the same part. The newer run replaces the stale
+      // cached terminal instead of being dropped as a backwards step.
+      const readCachedSnapshotPage = jest
+        .fn()
+        .mockResolvedValue(cachedTaskPage(completedTaskPart(1_700_100_006_000)));
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({
+          kiloSessionId: 'ses-1',
+          messages: [taskMessage(runningTaskPart(1_789_655_865_076))],
+        })
+      );
+      const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await new Promise<void>(resolve => setImmediate(resolve));
+
+      expect(storedTaskPart(config, mgr).state.status).toBe('running');
+    });
+
+    it('applies a replayed error task part over the cached running part', async () => {
+      const readCachedSnapshotPage = jest.fn().mockResolvedValue(cachedTaskPage(runningTaskPart()));
+      const fetchSnapshotPage = createPageFetchMock(async () =>
+        makePage({ kiloSessionId: 'ses-1', messages: [taskMessage(erroredTaskPart(250))] })
+      );
+      const config = createMockConfig({ readCachedSnapshotPage, fetchSnapshotPage });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await new Promise<void>(resolve => setImmediate(resolve));
+
+      const part = storedTaskPart(config, mgr);
+      expect(part.state.status).toBe('error');
+      expect(part.state.status).not.toBe('completed');
+      if (part.state.status !== 'error') throw new Error('expected error part');
+      expect(part.state.error).toBe('boom');
+    });
   });
 
   // -------------------------------------------------------------------------

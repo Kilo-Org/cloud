@@ -7790,6 +7790,41 @@
                         "instanceType"
                       ],
                       "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "const": "cloudflare-containers"
+                            },
+                            "account": {
+                              "type": "string",
+                              "const": "kilo"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "account"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "instanceType": {
+                          "type": "string",
+                          "enum": [
+                            "standard-3",
+                            "standard-4"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "instanceType"
+                      ],
+                      "additionalProperties": false
                     }
                   ]
                 },
@@ -7798,6 +7833,8 @@
                   "enum": [
                     "cloudflare-single",
                     "cloudflare-shared",
+                    "cloudflare-containers-standard-3",
+                    "cloudflare-containers-standard-4",
                     "vercel-small",
                     "vercel-large"
                   ]
@@ -20360,6 +20397,41 @@
                             "instanceType"
                           ],
                           "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "const": "cloudflare-containers"
+                                },
+                                "account": {
+                                  "type": "string",
+                                  "const": "kilo"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "account"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "instanceType": {
+                              "type": "string",
+                              "enum": [
+                                "standard-3",
+                                "standard-4"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "instanceType"
+                          ],
+                          "additionalProperties": false
                         }
                       ]
                     },
@@ -20368,6 +20440,8 @@
                       "enum": [
                         "cloudflare-single",
                         "cloudflare-shared",
+                        "cloudflare-containers-standard-3",
+                        "cloudflare-containers-standard-4",
                         "vercel-small",
                         "vercel-large"
                       ]
@@ -35227,6 +35301,136 @@
     ],
     "searchBlob": "slack.updateModel Change the AI model that the Slack integration uses for a specified organization. slack updatemodel organizationid modelslug organizationId modelSlug"
   },
+  "spendAlerts.get": {
+    "path": "spendAlerts.get",
+    "kind": "query",
+    "summary": "View the current spend alert configuration and notification settings for your personal account or an organization you belong to, including whether you have permission to change them.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "spendalerts",
+      "get",
+      "organizationid"
+    ],
+    "searchBlob": "spendAlerts.get View the current spend alert configuration and notification settings for your personal account or an organization you belong to, including whether you have permission to change them. spendalerts get organizationid organizationId"
+  },
+  "spendAlerts.save": {
+    "path": "spendAlerts.save",
+    "kind": "mutation",
+    "summary": "Update spend alert settings and rules for your personal account or an organization, controlling when and how you get notified about spending thresholds.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "threshold",
+                  "anomaly"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "threshold": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0.000001,
+                    "maximum": 1000000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "windowHours": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "const": 24
+                      },
+                      {
+                        "type": "number",
+                        "const": 168
+                      },
+                      {
+                        "type": "number",
+                        "const": 720
+                      }
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "multiplierBasisPoints": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 5000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "emailEnabled": {
+                "type": "boolean"
+              },
+              "pushEnabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "enabled",
+              "emailEnabled",
+              "pushEnabled"
+            ]
+          }
+        }
+      },
+      "required": [
+        "enabled",
+        "rules"
+      ]
+    },
+    "tags": [
+      "spendalerts",
+      "save",
+      "organizationid",
+      "enabled",
+      "rules"
+    ],
+    "searchBlob": "spendAlerts.save Update spend alert settings and rules for your personal account or an organization, controlling when and how you get notified about spending thresholds. spendalerts save organizationid enabled rules organizationId enabled rules"
+  },
   "unifiedSessions.list": {
     "path": "unifiedSessions.list",
     "kind": "query",
@@ -36300,6 +36504,31 @@
     ],
     "searchBlob": "user.changeAutoTopUpPaymentMethod Change the saved payment method used for automatic credit top-up. user changeautotopuppaymentmethod amountcents amountCents"
   },
+  "user.deletePasskey": {
+    "path": "user.deletePasskey",
+    "kind": "mutation",
+    "summary": "Remove one of the signed-in user's registered passkeys, revoking that device or security key for future sign-in.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "tags": [
+      "user",
+      "deletepasskey",
+      "id"
+    ],
+    "searchBlob": "user.deletePasskey Remove one of the signed-in user's registered passkeys, revoking that device or security key for future sign-in. user deletepasskey id id"
+  },
   "user.getAuthProviders": {
     "path": "user.getAuthProviders",
     "kind": "query",
@@ -36533,6 +36762,17 @@
     ],
     "searchBlob": "user.getNotificationPreferences Get the current user's notification preferences for push notifications, chat messages, balance alerts, security findings, and more. user getnotificationpreferences"
   },
+  "user.getPasskeys": {
+    "path": "user.getPasskeys",
+    "kind": "query",
+    "summary": "List all passkeys (WebAuthn security keys, Face ID, Touch ID) registered to the signed-in user's account, including device type and last used time.",
+    "inputSchema": {},
+    "tags": [
+      "user",
+      "getpasskeys"
+    ],
+    "searchBlob": "user.getPasskeys List all passkeys (WebAuthn security keys, Face ID, Touch ID) registered to the signed-in user's account, including device type and last used time. user getpasskeys"
+  },
   "user.linkAuthProvider": {
     "path": "user.linkAuthProvider",
     "kind": "mutation",
@@ -36554,7 +36794,8 @@
             "discord",
             "openai",
             "fake-login",
-            "workos"
+            "workos",
+            "passkey"
           ]
         },
         "organizationId": {
@@ -36708,6 +36949,38 @@
     ],
     "searchBlob": "user.removeAutoTopUpPaymentMethod Remove the saved payment method for auto top-up and turn auto top-up off. user removeautotopuppaymentmethod"
   },
+  "user.renamePasskey": {
+    "path": "user.renamePasskey",
+    "kind": "mutation",
+    "summary": "Rename a saved passkey to a custom label so the user can identify which device or security key it belongs to.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "tags": [
+      "user",
+      "renamepasskey",
+      "id",
+      "name"
+    ],
+    "searchBlob": "user.renamePasskey Rename a saved passkey to a custom label so the user can identify which device or security key it belongs to. user renamepasskey id name id name"
+  },
   "user.requestAccountDeletion": {
     "path": "user.requestAccountDeletion",
     "kind": "mutation",
@@ -36823,6 +37096,9 @@
         "balanceAlerts": {
           "type": "boolean"
         },
+        "spendAlerts": {
+          "type": "boolean"
+        },
         "securityFindings": {
           "type": "boolean"
         },
@@ -36847,11 +37123,12 @@
       "sessionstatus",
       "kiloclawactivity",
       "balancealerts",
+      "spendalerts",
       "securityfindings",
       "notificationpreviews",
       "agentpushenabled"
     ],
-    "searchBlob": "user.setNotificationPreferences Update notification settings for chat messages, agent updates, balance alerts, and security findings. user setnotificationpreferences chatmessages agentattention agentupdates sessionstatus kiloclawactivity balancealerts securityfindings notificationpreviews agentpushenabled chatMessages agentAttention agentUpdates sessionStatus kiloclawActivity balanceAlerts securityFindings notificationPreviews agentPushEnabled"
+    "searchBlob": "user.setNotificationPreferences Update notification settings for chat messages, agent updates, balance alerts, and security findings. user setnotificationpreferences chatmessages agentattention agentupdates sessionstatus kiloclawactivity balancealerts spendalerts securityfindings notificationpreviews agentpushenabled chatMessages agentAttention agentUpdates sessionStatus kiloclawActivity balanceAlerts spendAlerts securityFindings notificationPreviews agentPushEnabled"
   },
   "user.signOutBrowserSessions": {
     "path": "user.signOutBrowserSessions",
@@ -36961,7 +37238,8 @@
             "discord",
             "openai",
             "fake-login",
-            "workos"
+            "workos",
+            "passkey"
           ]
         }
       },

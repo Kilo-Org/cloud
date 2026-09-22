@@ -26,6 +26,36 @@ export function assistantFailureMessage(reason: CloudAgentAssistantFailureReason
   return ASSISTANT_FAILURE_MESSAGES[reason];
 }
 
+/**
+ * The single owner of the assistant-reason-to-terminal-code rule shared by the
+ * safe-failure projection and the control-plane run classifier.
+ */
+export function assistantTerminalCode(
+  reason: CloudAgentAssistantFailureReason
+): 'payment_required' | 'model_missing' | undefined {
+  return reason === 'insufficient_credits'
+    ? 'payment_required'
+    : reason === 'model_unavailable'
+      ? 'model_missing'
+      : undefined;
+}
+
+/**
+ * Resolves assistant-failure ownership: a `[BYOK]` marker is preserved, an
+ * admitted run fills `managed` from its admitted model, and otherwise the
+ * supplied ownership is returned unchanged. Mirrors the legacy terminalization
+ * rule exactly.
+ */
+export function resolveAssistantProviderOwnership(
+  providerOwnership: CloudAgentProviderOwnership | undefined,
+  assistantFailureReason: CloudAgentAssistantFailureReason | undefined,
+  admittedModel: string | undefined
+): CloudAgentProviderOwnership | undefined {
+  if (providerOwnership === 'byok' || assistantFailureReason === undefined)
+    return providerOwnership;
+  return admittedModel === undefined ? providerOwnership : 'managed';
+}
+
 export type AssistantFailureClassification = {
   reason: CloudAgentAssistantFailureReason;
   safeMessage: string;
@@ -65,12 +95,7 @@ export function classifyAssistantFailure(
     : (classifySdkErrorName(source) ??
       (messageReason !== 'unknown' ? messageReason : classifySdkStatus(source)) ??
       'unknown');
-  const terminalCode =
-    reason === 'insufficient_credits'
-      ? 'payment_required'
-      : reason === 'model_unavailable'
-        ? 'model_missing'
-        : undefined;
+  const terminalCode = assistantTerminalCode(reason);
 
   return {
     reason,
@@ -139,11 +164,35 @@ function classifyAssistantFailureText(message: string): CloudAgentAssistantFailu
   if (/\btool calls (?:cutoff|cut off) by max_tokens\b/.test(message)) {
     return 'output_limit';
   }
+  // A provider rejects an over-long request with a 4xx that would otherwise
+  // fall through to the APIError status mapping and be reported as an invalid
+  // request. Match the wording providers use (Kilo/Nex AGI "exceeds this
+  // model's context length", OpenAI "maximum context length", Anthropic
+  // "prompt is too long") plus the provider_code token, so the transcript
+  // names the real cause instead of "Assistant request was invalid". Every
+  // branch requires an over-limit qualifier: a field-name validation error like
+  // "Invalid value for 'context_length'" or a payload-size 413 ("Request Entity
+  // Too Large") must stay an invalid request, not claim the context window.
+  if (
+    /\bcontext[_ ]?(?:length|window|limit|size)[_ ]?(?:exceeds?|exceeded|overflow(?:ed)?|too (?:long|large)|max(?:imum)?)\b/.test(
+      message
+    ) ||
+    /\b(?:exceeds?|exceeded|overflow(?:ed)?|max(?:imum)?)\b[^.]{0,40}\bcontext\b/.test(message) ||
+    /\b(?:prompt|request|input|messages?)\b[^.]{0,40}\btoo long\b/.test(message)
+  ) {
+    return 'context_limit';
+  }
   if (
     /\b(rate limit|rate_limit|usage[_ -]?limit[_ -]?exceeded|too many requests|429)\b/.test(message)
   ) {
     return 'rate_limited';
   }
+  // "too many tokens" on its own is ambiguous: a provider uses it both for an
+  // over-long request and for a per-minute rate limit ("Rate limit reached: too
+  // many tokens per minute"). An explicit rate-limit wording is the stronger
+  // signal and is checked first, so the unqualified pattern is only consulted
+  // here, after it.
+  if (/\btoo many tokens\b/.test(message)) return 'context_limit';
   if (/\b(timed? out|timeout|deadline exceeded)\b/.test(message)) return 'timeout';
   if (/\b(unauthorized|forbidden|authorization|authentication|401|403)\b/.test(message)) {
     return 'provider_authentication';

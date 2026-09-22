@@ -43,6 +43,9 @@ import {
   organization_audit_logs,
   organization_recommendation_dismissals,
   magic_link_tokens,
+  passkey_credentials,
+  passkey_challenges,
+  passkey_sign_in_tickets,
   device_auth_requests,
   device_sessions,
   native_attested_keys,
@@ -86,6 +89,9 @@ import {
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  spend_alert_settings,
+  spend_alert_hourly,
+  spend_alert_deliveries,
   contributor_champion_events,
   contributor_champion_memberships,
   contributor_champion_contributors,
@@ -324,6 +330,16 @@ export type DeferredSignInEvent = {
 
 export async function findAndSyncExistingUser(args: CreateOrUpdateUserArgs) {
   const timer = createTimer();
+
+  // A passkey never owns a `user_auth_provider` row: the credential is bound to
+  // the Kilo user id in `passkey_credentials`, and the redeemed sign-in ticket
+  // already proved that id, so the provider account id *is* the user id.
+  // Resolve it directly and leave the account's hosted domain and display name
+  // untouched — the passkey path settles no user-account changes.
+  if (args.provider === 'passkey') {
+    return (await findUserById(args.provider_account_id)) ?? null;
+  }
+
   const existing_kilo_user_id = await findUserIdByAuthProvider(
     args.provider,
     args.provider_account_id
@@ -1074,6 +1090,10 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
  *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
  *   user_notification_preferences, quick_chat_threads, quick_chat_messages)
+ * - spend alert settings and their rules/state, the personal-scope hourly
+ *   counters, and the personal-scope deliveries (recipients contain billing
+ *   contact PII); organization-scoped alert rows are retained, with the deleted
+ *   member's id and address removed from their delivery recipients
  * - operation_ledgers (keyed by kilo_user_id)
  * - analytics_event_outbox (keyed by distinct_id: the user's email or, when the
  *   writer's email lookup failed, the user id)
@@ -1259,6 +1279,23 @@ export async function anonymizeCloudUserData(
     );
   await tx.delete(referral_codes).where(eq(referral_codes.kilo_user_id, userId));
   await tx.delete(magic_link_tokens).where(eq(magic_link_tokens.email, originalEmail));
+  // Passkey credentials are PII: the credential id, public key and user-facing
+  // label identify the user's device. Drop any challenge still open for a
+  // ceremony so a deleted account cannot complete a pending registration or
+  // authentication. Usernameless challenges (kilo_user_id IS NULL) are not
+  // attributable to this user; the device-auth cleanup cron removes them once
+  // they expire.
+  await tx.delete(passkey_credentials).where(eq(passkey_credentials.kilo_user_id, userId));
+  await tx
+    .delete(passkey_challenges)
+    .where(
+      and(eq(passkey_challenges.kilo_user_id, userId), isNull(passkey_challenges.consumed_at))
+    );
+  // A sign-in ticket is a live proof that a passkey assertion verified, so it
+  // is deleted with the credentials it was minted for rather than left to
+  // expire. Consumed tickets are removed too: their `kilo_user_id` still names
+  // the deleted account.
+  await tx.delete(passkey_sign_in_tickets).where(eq(passkey_sign_in_tickets.kilo_user_id, userId));
 
   // Remove from organizations
   await tx
@@ -1572,6 +1609,51 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(user_notification_preferences)
     .where(eq(user_notification_preferences.user_id, userId));
+  // Spend alerts are account-owned configuration, counters, and delivery
+  // payloads; delivery recipients carry billing contact PII. Personal scope
+  // keys use `user:<id>`, and deleting the settings row cascades to its rules
+  // and per-rule state. Organization-scoped alert rows belong to the
+  // organization, not the deleted member, but the member's own id and address
+  // are copied into those rows' recipients when they are a billing contact:
+  // strip both there so the deleted user's PII does not survive in the outbox.
+  const personalSpendAlertScopeKey = `user:${userId}`;
+  await tx.delete(spend_alert_settings).where(eq(spend_alert_settings.kilo_user_id, userId));
+  await tx
+    .delete(spend_alert_hourly)
+    .where(eq(spend_alert_hourly.scope_key, personalSpendAlertScopeKey));
+  await tx
+    .delete(spend_alert_deliveries)
+    .where(eq(spend_alert_deliveries.scope_key, personalSpendAlertScopeKey));
+  await tx.execute(sql`
+    UPDATE spend_alert_deliveries
+    SET
+      recipients = jsonb_build_object(
+        'userIds',
+        COALESCE(
+          (
+            SELECT jsonb_agg(entry.recipient)
+            FROM jsonb_array_elements_text(COALESCE(recipients->'userIds', '[]'::jsonb)) AS entry(recipient)
+            WHERE entry.recipient <> ${userId}::text
+          ),
+          '[]'::jsonb
+        ),
+        'emails',
+        COALESCE(
+          (
+            SELECT jsonb_agg(entry.recipient)
+            FROM jsonb_array_elements_text(COALESCE(recipients->'emails', '[]'::jsonb)) AS entry(recipient)
+            WHERE entry.recipient <> ${originalEmail}::text
+          ),
+          '[]'::jsonb
+        )
+      ),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE scope_key LIKE 'org:%'
+      AND (
+        recipients->'userIds' ? ${userId}::text
+        OR recipients->'emails' ? ${originalEmail}::text
+      )
+  `);
   await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
   await tx
     .delete(kilo_pass_scheduled_changes)

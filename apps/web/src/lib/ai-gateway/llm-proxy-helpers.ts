@@ -88,6 +88,39 @@ export function malformedJsonResponse(parseError: unknown) {
   );
 }
 
+/**
+ * Error code a client matches on to detect a credential it has to replace.
+ *
+ * It is carried in `error.code` rather than inferred from the status, because
+ * the same status also carries the sign-in prompts served to anonymous callers.
+ */
+export const INVALID_TOKEN_CODE = 'INVALID_TOKEN';
+
+/**
+ * Response for a request that presented a credential which failed verification.
+ *
+ * Such a request must not be answered as an anonymous caller. The caller
+ * believes it is authenticated, so downgrading it silently drops the account,
+ * its organization, its BYOK keys and its credits, and hides the broken
+ * credential from the client that sent it. Fail loudly so the client can
+ * re-authenticate.
+ */
+export function invalidTokenResponse() {
+  return NextResponse.json(
+    {
+      error: {
+        code: INVALID_TOKEN_CODE,
+        message: 'Your authentication token is invalid. Please sign in again.',
+      },
+      error_type: ProxyErrorType.authentication_required,
+    },
+    {
+      status: 401,
+      headers: { 'WWW-Authenticate': 'Bearer error="invalid_token"' },
+    }
+  );
+}
+
 export function temporarilyUnavailableResponse() {
   return NextResponse.json(
     {
@@ -403,6 +436,14 @@ export function efficientPoolBlockedResponse() {
 
 export function unavailableModelResponse() {
   const error = 'The requested model is currently unavailable. Please choose a different model.';
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.unavailable_model, message: error },
+    { status: 404 }
+  );
+}
+
+export function temporarilyBlockedModelResponse() {
+  const error = 'This model is temporarily unavailable. Try a different model.';
   return NextResponse.json(
     { error, error_type: ProxyErrorType.unavailable_model, message: error },
     { status: 404 }

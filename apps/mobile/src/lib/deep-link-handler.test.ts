@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the mapping, pass-through, and stash suites share one owned test file */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as UniversalLinks from '@kilocode/app-shared/universal-links';
@@ -10,6 +11,7 @@ import {
   captureLaunchDeepLink,
   getPendingDeepLink,
   getPendingDeepLinkSnapshot,
+  setCurrentDeepLinkUserId,
 } from './deep-link-launch';
 import { setGitHubInstallReturnOutcome } from './github-install-return';
 import { resolvePendingNavigation } from './pending-navigation';
@@ -166,6 +168,34 @@ describe('redirectSystemPath', () => {
       expect(!result).toBe(true);
       expect(getPendingDeepLink()).toBe('/(app)/(tabs)/(3_profile)');
       expect(mocks.navigate).not.toHaveBeenCalled();
+    });
+
+    it('drops an app-scheme search-family link captured while signed out', () => {
+      // The app scheme is how Android delivers a tap on an indexed result, so
+      // the identifier is bound to the account that indexed it: a signed-out
+      // capture must not reach the next account's shell.
+      setCurrentDeepLinkUserId(null);
+      const result = redirectSystemPath({
+        path: 'kiloapp://pr-review/Kilo-Org/cloud/6234',
+        initial: false,
+      });
+
+      expect(result).toBeNull();
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+
+      setCurrentDeepLinkUserId('user-b');
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+
+    it('keeps an https link to the same family for the next account', () => {
+      setCurrentDeepLinkUserId(null);
+      redirectSystemPath({
+        path: 'https://app.kilo.ai/pr-review/Kilo-Org/cloud/6234',
+        initial: false,
+      });
+
+      setCurrentDeepLinkUserId('user-b');
+      expect(getPendingDeepLinkSnapshot()).toBe('/(app)/pr-review/Kilo-Org/cloud/6234');
     });
   });
 

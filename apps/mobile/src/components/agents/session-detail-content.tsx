@@ -78,7 +78,6 @@ import {
   useSessionAutoApproveEnabled,
 } from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
-import { SessionCopyLinkAction } from '@/components/agents/session-copy-link-action';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
@@ -99,6 +98,7 @@ import {
 } from '@/components/agents/session-working-state';
 import {
   countInFlightMessages,
+  lastVisibleMessageFailure,
   resolveRetryPrompt,
   retryFailedMessage,
 } from '@/components/agents/session-detail-content-helpers';
@@ -116,6 +116,7 @@ import { useInteractionHandlers } from '@/components/agents/use-interaction-hand
 import { useSessionAutoApprove } from '@/components/agents/use-session-auto-approve';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
   SESSION_SLOW_LOAD_MS,
   useSessionSlowLoadPhase,
@@ -146,6 +147,7 @@ import { ToolRunSheetHost } from '@/components/agents/tool-run-sheet-host';
 import {
   buildTerminalErrorCopyText,
   resolveSessionTerminalError,
+  statusIndicatorDuplicatesMessageFailure,
 } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
@@ -184,6 +186,7 @@ import {
   buildContinueHref,
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
+import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -619,13 +622,26 @@ export function SessionDetailContent({
   );
 
   const viewTrackedRef = useRef<string | null>(null);
+  const recordedLastOpenedRef = useRef<{ sessionId: string; userId: string } | null>(null);
   useEffect(() => {
-    if (fetchedData?.kiloSessionId !== sessionId || viewTrackedRef.current === sessionId) {
+    if (fetchedData?.kiloSessionId !== sessionId) {
       return;
     }
-    viewTrackedRef.current = sessionId;
-    captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
-  }, [fetchedData, sessionId, analyticsSurface, openedVia]);
+    if (viewTrackedRef.current !== sessionId) {
+      viewTrackedRef.current = sessionId;
+      captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
+    }
+    // Record the session the person actually viewed (not one merely fetched) so
+    // the launcher's 'Open last session' reopens it. Its latch is separate from
+    // the analytics one above: `userId` resolves after the first render, so the
+    // analytics event still fires once per session while the record waits for
+    // the identity and lands on the render that has it.
+    const recorded = recordedLastOpenedRef.current;
+    if (userId !== undefined && (recorded?.sessionId !== sessionId || recorded.userId !== userId)) {
+      recordedLastOpenedRef.current = { sessionId, userId };
+      recordLastOpenedSession(sessionId, userId);
+    }
+  }, [fetchedData, sessionId, analyticsSurface, openedVia, userId]);
 
   useEffect(
     () => () => {
@@ -1108,11 +1124,24 @@ export function SessionDetailContent({
         void handleSend(prompt);
         return;
       }
-      void retryFailedMessage(async () => {
-        await handleSend(prompt);
+      // The re-send is a new submission; `retryFailedMessage` clears the
+      // original delivery failure once it is accepted so the row stops showing
+      // as failed. It is cleared against this screen's session — the one that
+      // owns the row and that the manager opened — because the await above can
+      // outlive it: switching sessions while the re-send is in flight must not
+      // record this resolution under the session the user switched to.
+      const ownerSessionId = sessionId;
+      void retryFailedMessage({
+        message,
+        send: async () => {
+          await handleSend(prompt);
+        },
+        clearFailedMessage: messageId => {
+          manager.clearFailedMessage(messageId, ownerSessionId);
+        },
       });
     },
-    [messages, requiresModel, pinned.model, currentModel, handleSend]
+    [messages, requiresModel, pinned.model, currentModel, handleSend, manager, sessionId]
   );
 
   const handleCancelQueued = useCallback(
@@ -1455,8 +1484,30 @@ export function SessionDetailContent({
     isStreaming,
     pendingMessageCount: inFlightMessageCount,
   });
+  // A failed last row states its own failure and carries the action. The fixed
+  // footer's error line must not state the same failure a second time (explorer
+  // finding: the same failure stated three times), so a status error the row
+  // already carries is dropped — a classified one the row does not carry stays.
+  const footerMessageFailure = useMemo(
+    () =>
+      lastVisibleMessageFailure({
+        displayedMessages,
+        messages,
+        pendingMessages,
+        canceledQueuedMessages,
+      }),
+    [displayedMessages, messages, pendingMessages, canceledQueuedMessages]
+  );
+  const footerStatusIndicator =
+    statusIndicator !== null &&
+    !statusIndicatorDuplicatesMessageFailure({
+      indicator: statusIndicator,
+      failure: footerMessageFailure,
+    })
+      ? statusIndicator
+      : null;
   const hasFooterStatusIndicator =
-    (!cachedMetadataRefresh && statusIndicator !== null) ||
+    (!cachedMetadataRefresh && footerStatusIndicator !== null) ||
     (cloudStatus !== null && cloudStatus.type !== 'ready');
   const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
     isAgentWorking: shouldShowWorkingIndicator,
@@ -1473,7 +1524,7 @@ export function SessionDetailContent({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
-    hasStatusIndicator: !cachedMetadataRefresh && statusIndicator !== null,
+    hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
     messageCount: messages.length,
   });
 
@@ -1510,7 +1561,6 @@ export function SessionDetailContent({
           });
         }}
       />
-      <SessionCopyLinkAction sessionId={sessionId} anchorMessageId={anchor ?? resumeAnchor} />
     </View>
   );
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
@@ -1877,8 +1927,10 @@ export function SessionDetailContent({
           <ScreenHeader
             title={rename.title}
             reserveTitleSpace
+            titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
             backFallback="/(app)/(tabs)/(2_agents)"
             headerRight={headerRight}
+            className="pb-1"
             {...(rename.isTitleInteractive
               ? {
                   onTitlePress: rename.openModal,
@@ -1907,7 +1959,9 @@ export function SessionDetailContent({
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
           {keyboardContainerKind === 'app-aware-padding' ? (
-            <AppAwareKeyboardPaddingView className="flex-1">
+            // The trailing bottom-chrome spacer below reserves the navigation-
+            // bar inset outside this view, so the view must not add it again.
+            <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
               {renderKeyboardBody()}
             </AppAwareKeyboardPaddingView>
           ) : (
@@ -1929,6 +1983,7 @@ export function SessionDetailContent({
               visible={sheetMountState.visible}
               info={sheetMountState.info}
               sessionId={sessionId}
+              anchorMessageId={anchor ?? resumeAnchor}
               sessionTitle={rename.title}
               activeSessionType={activeSessionType}
               ownerConnectionId={remoteModelState.ownerConnectionId}
@@ -2063,15 +2118,20 @@ export function SessionDetailContent({
 
         {/* Fixed indicator row — lives outside the FlashList so per-token
             content-size changes during streaming cannot reposition it.
-            Gated on has-messages so the empty/connecting path (which
-            renders the centered status indicator inside `renderContent`)
-            does not double-render. While preparing, suppressed when the
-            transcript already shows PreparationGroup (no duplicate). */}
+            It carries no position layout transition: while the list resizes it
+            would animate this row's position lag and paint it over the
+            transcript rows it passes (profile-screen.tsx:275-277). It snaps in
+            the same frame and stays opaque via `bg-background`, so a future
+            layout change covers a transcript row instead of overprinting it.
+            Gated on has-messages so the empty/connecting path (which renders
+            the centered status indicator inside `renderContent`) does not
+            double-render. While preparing, suppressed when the transcript
+            already shows PreparationGroup (no duplicate). */}
         {showSessionFooterRow ? (
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
-            layout={LinearTransition.duration(150)}
+            className="bg-background"
           >
             {/* Raw list on purpose: working-indicator.tsx:50-59 derives the
                 label from the last assistant part, and compute-status.ts:33-35
@@ -2079,7 +2139,9 @@ export function SessionDetailContent({
                 spinner reads Thinking during a reasoning stream in both modes.
                 Feeding it displayedMessages would drop that label. */}
             <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
-            {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
+            {footerStatusIndicator ? (
+              <SessionStatusIndicator indicator={footerStatusIndicator} />
+            ) : null}
           </Animated.View>
         ) : null}
 
@@ -2333,9 +2395,10 @@ export function SessionDetailContent({
       );
     }
     return (
-      // Fades in as the skeleton fades out, so the transcript resolves in
-      // place instead of replacing the placeholder in one frame.
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+      // No entrance animation: the transcript body must paint on its own, not
+      // after a `FadeIn` (which starts at `opacity: 0`) completes. The
+      // skeleton's `exiting` crossfade still carries the swap visually.
+      <View className="flex-1">
         <SessionMessageList
           sessionId={sessionId}
           items={transcript}
@@ -2356,7 +2419,7 @@ export function SessionDetailContent({
           resumeAt={resumeAnchor}
           followTailNonce={followTailNonce}
         />
-      </Animated.View>
+      </View>
     );
   }
 }

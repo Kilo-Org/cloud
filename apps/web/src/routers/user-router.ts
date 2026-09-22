@@ -17,6 +17,11 @@ import {
   releaseSignInCode,
   reserveSignInCode,
 } from '@/lib/auth/magic-link-tokens';
+import {
+  deletePasskey as deleteOwnedPasskey,
+  listPasskeysForUser,
+  renamePasskey as renameOwnedPasskey,
+} from '@/lib/auth/passkey';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { TRPCError } from '@trpc/server';
@@ -38,6 +43,7 @@ import {
   user_push_tokens,
   user_activity_tokens,
   agent_configs,
+  passkey_credentials,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -62,6 +68,32 @@ import { revokeWebSessions } from '@/lib/web-session-revocation';
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
 const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', 'Auto top-up via stripe'];
+
+/**
+ * Resolve one of the user's passkey credential ids from the opaque row id the
+ * management UI holds.
+ *
+ * The client is never told the public key or the WebAuthn credential id: it
+ * names a row by its database id and the server resolves the credential, always
+ * scoped to the caller, before touching the credential.
+ */
+async function findOwnedPasskeyCredentialId(
+  kiloUserId: string,
+  passkeyRowId: string
+): Promise<string | null> {
+  const [row] = await db
+    .select({ credential_id: passkey_credentials.credential_id })
+    .from(passkey_credentials)
+    .where(
+      and(
+        eq(passkey_credentials.id, passkeyRowId),
+        eq(passkey_credentials.kilo_user_id, kiloUserId)
+      )
+    )
+    .limit(1);
+
+  return row?.credential_id ?? null;
+}
 
 async function assertSelfServiceAccountDeletionAllowed(userId: string): Promise<void> {
   const [user] = await db
@@ -395,7 +427,7 @@ async function enrichDeductionsWithInstanceNames(
   });
 }
 
-// The seven notification category keys are owned by the mobile app:
+// The eight notification category keys are owned by the mobile app:
 // `NOTIFICATION_CATEGORY_KEYS` / `NotificationCategoryKey` in
 // `apps/mobile/src/lib/hooks/agent-push-preference.ts`. The server hard-codes
 // the same string literals; do not define a duplicate server category-key type.
@@ -406,6 +438,7 @@ const NOTIFICATION_CATEGORY_KEYS = [
   'sessionStatus',
   'kiloclawActivity',
   'balanceAlerts',
+  'spendAlerts',
   'securityFindings',
 ] as const;
 
@@ -425,7 +458,7 @@ function unavailableCapability(reason: string): NotificationCapability {
 }
 
 /**
- * Compute the per-category availability map for the signed-in user. The four
+ * Compute the per-category availability map for the signed-in user. The five
  * always-on categories need no data; the three gated categories each run one
  * read-only existence check.
  */
@@ -467,6 +500,9 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
     balanceAlerts: hasOrganization
       ? ALWAYS_AVAILABLE_CAPABILITY
       : unavailableCapability('Join an organization to get balance alerts.'),
+    // Every signed-in account has a personal scope, so spend alerts are always
+    // available; the spend view offers the same switch for that scope.
+    spendAlerts: ALWAYS_AVAILABLE_CAPABILITY,
     securityFindings: hasSecurityConfig
       ? ALWAYS_AVAILABLE_CAPABILITY
       : unavailableCapability('Enable Kilo Security Agent on a scope to get security findings.'),
@@ -499,6 +535,53 @@ export const userRouter = createTRPCRouter({
       })),
     });
   }),
+
+  // ─── Passkeys ───────────────────────────────────────────────────────
+
+  getPasskeys: baseProcedure.query(async ({ ctx }) => {
+    const passkeys = await listPasskeysForUser(ctx.user.id);
+
+    return successResult({
+      passkeys: passkeys.map(passkey => ({
+        id: passkey.id,
+        name: passkey.name,
+        created_at: passkey.created_at,
+        last_used_at: passkey.last_used_at,
+        device_type: passkey.device_type,
+        backed_up: passkey.backed_up,
+      })),
+    });
+  }),
+
+  renamePasskey: baseProcedure
+    .input(z.object({ id: z.uuid(), name: z.string().trim().min(1).max(64) }))
+    .mutation(async ({ ctx, input }) => {
+      const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
+      if (!credentialId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+      }
+
+      const renamed = await renameOwnedPasskey(ctx.user.id, credentialId, input.name);
+      if (!renamed) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+      }
+      return successResult();
+    }),
+
+  deletePasskey: baseProcedure
+    .input(z.object({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const credentialId = await findOwnedPasskeyCredentialId(ctx.user.id, input.id);
+      if (!credentialId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+      }
+
+      const deleted = await deleteOwnedPasskey(ctx.user.id, credentialId);
+      if (!deleted) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Passkey not found' });
+      }
+      return successResult();
+    }),
 
   linkAuthProvider: baseProcedure
     .input(LinkAuthProviderInputSchema)
@@ -1279,6 +1362,11 @@ export const userRouter = createTRPCRouter({
         // server row, not a client-side cache, decides whether a re-register
         // is needed. Null means English.
         locale: user_push_tokens.locale,
+        // The client compares this against the running app version so an
+        // upgrade re-registers the row. Without that the push route would keep
+        // classifying an upgraded device by the version it first registered
+        // under, and never address the named Android channel.
+        appVersion: user_push_tokens.app_version,
       })
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, ctx.user.id));
@@ -1295,6 +1383,7 @@ export const userRouter = createTRPCRouter({
         session_status_enabled: user_notification_preferences.session_status_enabled,
         kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
         balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
+        spend_alerts_enabled: user_notification_preferences.spend_alerts_enabled,
         security_findings_enabled: user_notification_preferences.security_findings_enabled,
         notification_previews: user_notification_preferences.notification_previews,
       })
@@ -1312,6 +1401,7 @@ export const userRouter = createTRPCRouter({
       sessionStatus: row?.session_status_enabled ?? true,
       kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
       balanceAlerts: row?.balance_alerts_enabled ?? true,
+      spendAlerts: row?.spend_alerts_enabled ?? true,
       securityFindings: row?.security_findings_enabled ?? true,
       notificationPreviews: row?.notification_previews ?? 'generic',
       agentPushEnabled,
@@ -1328,6 +1418,7 @@ export const userRouter = createTRPCRouter({
         sessionStatus: z.boolean().optional(),
         kiloclawActivity: z.boolean().optional(),
         balanceAlerts: z.boolean().optional(),
+        spendAlerts: z.boolean().optional(),
         securityFindings: z.boolean().optional(),
         notificationPreviews: z.enum(['generic', 'full']).optional(),
         // Legacy shipped-client input: still accepted and writes the same column as `agentUpdates`.
@@ -1365,6 +1456,10 @@ export const userRouter = createTRPCRouter({
         set.balance_alerts_enabled = input.balanceAlerts;
         values.balance_alerts_enabled = input.balanceAlerts;
       }
+      if (input.spendAlerts !== undefined) {
+        set.spend_alerts_enabled = input.spendAlerts;
+        values.spend_alerts_enabled = input.spendAlerts;
+      }
       if (input.securityFindings !== undefined) {
         set.security_findings_enabled = input.securityFindings;
         values.security_findings_enabled = input.securityFindings;
@@ -1398,6 +1493,7 @@ export const userRouter = createTRPCRouter({
           session_status_enabled: user_notification_preferences.session_status_enabled,
           kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
           balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
+          spend_alerts_enabled: user_notification_preferences.spend_alerts_enabled,
           security_findings_enabled: user_notification_preferences.security_findings_enabled,
           notification_previews: user_notification_preferences.notification_previews,
         })
@@ -1412,6 +1508,7 @@ export const userRouter = createTRPCRouter({
         sessionStatus: row?.session_status_enabled ?? true,
         kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
         balanceAlerts: row?.balance_alerts_enabled ?? true,
+        spendAlerts: row?.spend_alerts_enabled ?? true,
         securityFindings: row?.security_findings_enabled ?? true,
         notificationPreviews: row?.notification_previews ?? 'generic',
         agentPushEnabled: effectiveAgentPush,

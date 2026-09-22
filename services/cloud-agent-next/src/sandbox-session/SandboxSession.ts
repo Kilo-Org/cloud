@@ -238,6 +238,7 @@ import {
   replacePreparationAttemptId,
   rotateLostPreparationAttempt,
   resolveSessionMessageIntent,
+  RUNTIME_REPLACEMENT_WAIT_LIMIT,
   streamCloudStatus,
   streamQueuedSnapshots,
   type ControlSessionMessageInput,
@@ -4396,10 +4397,18 @@ export class SandboxSession extends DurableObject<Env> {
    * A preparation deadline that lands while the control plane reports a
    * runtime replacement in flight does not terminalize the head. It re-arms the
    * head's existing durable delivery deadline and the existing 5 s queue-retry
-   * alarm, so the delivery resumes once the replacement rebinds. The bound is
-   * the control plane's own retirement lifecycle: once the allocation stops the
-   * retirement receipts are pruned, the probe reports false, and the next
-   * deadline check fails the head exactly as before.
+   * alarm, so the delivery resumes once the replacement rebinds.
+   *
+   * The deferral is re-validated after the probe: `runtimeReplacementInFlight`
+   * is a cross-DO RPC, so another event may deliver the head while it is
+   * outstanding, and `commitSavedMessages` treats an accepted row as mutable.
+   * Only a still-queued head is rewritten.
+   *
+   * The wait is bounded: each deferral spends one unit of
+   * `RUNTIME_REPLACEMENT_WAIT_LIMIT`. A retirement fence that never clears
+   * exhausts the budget and the existing terminal path fails the head exactly
+   * as before, so a runtime that never returns still reaches
+   * `preparation_timeout`.
    *
    * Every re-arm mints a fresh preparation attempt. A preparation attempt is
    * the acquisition request identity, and `SandboxControl` binds it to its
@@ -4419,6 +4428,19 @@ export class SandboxSession extends DurableObject<Env> {
     if (input.sandboxId !== undefined && (await this.runtimeReplacementInFlight(input.sandboxId))) {
       const epoch = this.terminalLifecycle.captureEpoch();
       if (epoch === null) return;
+      const current = this.loadMessages().find(message => message.messageId === input.messageId);
+      if (!current || current.state !== 'queued') return;
+      const waits = current.replacementWaits ?? 0;
+      if (waits >= RUNTIME_REPLACEMENT_WAIT_LIMIT) {
+        await this.failDelivery(
+          input.messageId,
+          'preparation_timeout',
+          input.wrapperInstanceId,
+          input.scope,
+          input.detail
+        );
+        return;
+      }
       const now = Date.now();
       const extended = this.loadMessages().map(message => {
         if (message.messageId !== input.messageId) return message;
@@ -4432,6 +4454,7 @@ export class SandboxSession extends DurableObject<Env> {
           preparationAttemptId: crypto.randomUUID(),
           preparationWait: undefined,
           deliveryDeadlineAt: now + SESSION_DELIVERY_TIMEOUT_MS,
+          replacementWaits: waits + 1,
           ...(operations ? { operations } : {}),
         };
       });

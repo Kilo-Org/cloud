@@ -2,9 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   NEXT_RUNTIME_ID,
   RUNTIME_ID,
+  controlFailure,
   createSessionFixture,
+  delegateRequest,
 } from '../session-fixture.test-helpers.js';
-import type { SessionMessageRecord } from '../session-message-queue.js';
+import {
+  RUNTIME_REPLACEMENT_WAIT_LIMIT,
+  type SessionMessageRecord,
+} from '../session-message-queue.js';
 
 const orchestrationMocks = vi.hoisted(() => ({
   eventQueries: vi.fn(),
@@ -175,5 +180,148 @@ describe('runtime replacement in flight', () => {
     await fixture.fireAlarm();
     await fixture.flush();
     expect(fixture.record('a')).toMatchObject({ state: 'accepted' });
+  });
+
+  it('retires a bound attach proof into retiredAttach while deferring', async () => {
+    const fixture = createSessionFixture(fixtureDeps);
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    // The first drain dispatches the attach. The control plane rejects it
+    // retryably, so the head stays queued with the live attach proof bound,
+    // exactly as the production head did before the runtime retired.
+    delegateRequest(fixture, 'session.attach', async () => controlFailure(true, 'not_ready'));
+    await fixture.admit('a');
+    await fixture.flush();
+
+    const attach = fixture.record('a')?.operations?.attach;
+    if (!attach?.dispatched) throw new Error('Missing dispatched attach proof');
+
+    // The runtime retires while that proof is still bound to the head.
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      runtimeReplacementInFlight: true,
+    });
+    const deadlineAt = Date.now() + 20_000;
+    const stored = fixture.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+    fixture.storage.kv.put(
+      'session_messages',
+      stored.map(message =>
+        message.messageId === 'a' ? { ...message, deliveryDeadlineAt: deadlineAt } : message
+      )
+    );
+
+    vi.setSystemTime(deadlineAt);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    const record = fixture.record('a');
+    expect(record?.state).toBe('queued');
+    expect(record?.operations?.attach).toBeUndefined();
+    expect(record?.operations?.retiredAttach).toEqual(attach);
+  });
+
+  it('does not rewrite a head another event delivered during the probe', async () => {
+    const fixture = createSessionFixture(fixtureDeps);
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'connected',
+      wrapperInstanceId: RUNTIME_ID,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+
+    const deadlineAt = Date.now() + 20_000;
+    const attemptId = fixture.record('a')?.preparationAttemptId;
+    if (!attemptId) throw new Error('Missing preparation attempt');
+    const stored = fixture.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+    fixture.storage.kv.put(
+      'session_messages',
+      stored.map(message =>
+        message.messageId === 'a' ? { ...message, deliveryDeadlineAt: deadlineAt } : message
+      )
+    );
+
+    // The fence probe is a cross-DO RPC. While it is outstanding another event
+    // can deliver the head; emulate that by accepting the row inside the probe.
+    fixture.control.getStatus.mockImplementation(async () => {
+      const current = fixture.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+      fixture.storage.kv.put(
+        'session_messages',
+        current.map(message =>
+          message.messageId === 'a'
+            ? { ...message, state: 'accepted' as const, acceptedAt: Date.now() }
+            : message
+        )
+      );
+      return {
+        physical: 'running',
+        connection: 'connected',
+        wrapperInstanceId: RUNTIME_ID,
+        runtimeReplacementInFlight: true,
+      };
+    });
+
+    vi.setSystemTime(deadlineAt);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    // The delivered head keeps its own attempt and deadline: the deferral must
+    // not re-target a row it no longer owns.
+    expect(fixture.record('a')).toMatchObject({
+      state: 'accepted',
+      preparationAttemptId: attemptId,
+      deliveryDeadlineAt: deadlineAt,
+    });
+  });
+
+  it('fails the head once the deferral budget is exhausted', async () => {
+    const fixture = createSessionFixture(fixtureDeps);
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'connected',
+      wrapperInstanceId: RUNTIME_ID,
+      runtimeReplacementInFlight: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+
+    const stored = fixture.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+    fixture.storage.kv.put(
+      'session_messages',
+      stored.map(message =>
+        message.messageId === 'a'
+          ? { ...message, deliveryDeadlineAt: Date.now() + 20_000 }
+          : message
+      )
+    );
+
+    // Each deadline pass defers and mints a fresh window. The finite budget is
+    // what keeps a fence that never clears from deferring forever.
+    let deadlineAt = fixture.record('a')?.deliveryDeadlineAt;
+    for (let pass = 0; pass < RUNTIME_REPLACEMENT_WAIT_LIMIT; pass++) {
+      if (deadlineAt === undefined) throw new Error('Missing delivery deadline');
+      vi.setSystemTime(deadlineAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+      expect(fixture.record('a')?.state).toBe('queued');
+      deadlineAt = fixture.record('a')?.deliveryDeadlineAt;
+      if (deadlineAt === undefined || deadlineAt <= Date.now())
+        throw new Error('Deferral did not extend the deadline');
+    }
+
+    if (deadlineAt === undefined) throw new Error('Missing delivery deadline');
+    vi.setSystemTime(deadlineAt);
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      failedReason: 'preparation_timeout',
+    });
   });
 });

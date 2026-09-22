@@ -402,7 +402,7 @@ export function NewSessionPrompt({
           onChangeText={handlePromptChange}
           onSelectionChange={handlePromptSelectionChange}
           onLayout={handlePromptInputLayout}
-          scrollEnabled={promptMeasure.height >= promptMaxHeight}
+          scrollEnabled={promptMeasure.height >= promptMeasure.maxHeight}
           editable={control.inputEditable}
           maxLength={PROMPT_INPUT_MAX_CHARS}
           accessibilityState={{ disabled: control.inputAccessibilityDisabled }}

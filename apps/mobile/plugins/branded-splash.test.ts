@@ -164,8 +164,14 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // The mod pipeline reads the project's existing colors.xml as its baseline,
+    // so a checkout with a prebuilt android platform (gitignored) already holds
+    // theme colors here. Assert the splash entry the mod owns is present, like
+    // the styles assertion below, instead of that the file holds nothing else.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

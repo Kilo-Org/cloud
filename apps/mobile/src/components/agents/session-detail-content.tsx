@@ -1541,7 +1541,7 @@ export function SessionDetailContent({
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
   const headerRight = (
-    <View className="flex-row items-center gap-2">
+    <View className="flex-row min-w-0 shrink items-center gap-2">
       <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
       <SessionContextMetrics
         info={contextInfo}

@@ -389,7 +389,7 @@ export function ChatComposer({
   const fontSize = TEXT_INPUT_FONT_SIZE * fontScale;
   const lineHeight = TEXT_INPUT_LINE_HEIGHT * fontScale;
   const inputMinHeight = lineHeight + TEXT_INPUT_VERTICAL_PADDING;
-  const inputMaxHeight = resolveComposerMaxHeight({
+  const rawInputMaxHeight = resolveComposerMaxHeight({
     windowHeight,
     safeAreaInsetTop: insets.top,
     safeAreaInsetBottom: insets.bottom,
@@ -416,15 +416,26 @@ export function ChatComposer({
     };
   }, []);
 
+  // The row reports the real input's content height (dp, padding included) on
+  // every content change. `useTextHeight` reads the line pitch that input
+  // lays out at from it, so the capped height it publishes lands on a whole
+  // rendered line.
+  const [inputContentHeight, setInputContentHeight] = useState<number | null>(null);
   const measure = useTextHeight({
     minHeight: inputMinHeight,
-    maxHeight: inputMaxHeight,
+    maxHeight: rawInputMaxHeight,
     verticalPadding: TEXT_INPUT_VERTICAL_PADDING,
     textContentWidth: resolveComposerTextContentWidth(inputWidth),
     fontSize: TEXT_INPUT_FONT_SIZE,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
     fontScale,
+    nativeContentHeight: inputContentHeight,
   });
+  // The cap snapped to the input's own rendered line pitch (see
+  // `useTextHeight`). A capped multiline input must be a whole number of that
+  // pitch: Android's `TextInput` scrolls to the caret by a partial line
+  // otherwise, which cuts the first visible line against the input's top edge.
+  const inputMaxHeight = measure.maxHeight;
   // useTextHeight() returns a new object every render.  Hold the latest
   // measure in a ref so the draft-restore effect only runs after an
   // inputEpoch bump (remount), never on a stray measure identity change.
@@ -1174,9 +1185,9 @@ export function ChatComposer({
   const textInputStyle: TextStyle = {
     color: colors.foreground,
     fontSize,
-    height: measure.height,
     includeFontPadding: false,
     lineHeight,
+    height: measure.height,
     paddingHorizontal: COMPOSER_INPUT_PADDING_HORIZONTAL,
     paddingVertical: 12,
     textAlignVertical: 'top',
@@ -1336,6 +1347,7 @@ export function ChatComposer({
                 setIsFocused(true);
               }}
               onInputLayout={handleInputLayout}
+              onInputContentSizeChange={setInputContentHeight}
               onInsertNewline={handleInsertNewline}
               onSelectionChange={handleSelectionChange}
               onStop={handleStop}

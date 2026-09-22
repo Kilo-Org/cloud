@@ -122,6 +122,7 @@ vi.mock('@/components/agents/chat-toolbar', () => ({
 vi.mock('@/components/agents/use-text-height', () => ({
   useTextHeight: () => ({
     height: 48,
+    maxHeight: 160,
     measureElement: null,
     reset: vi.fn(),
     setText: vi.fn(),

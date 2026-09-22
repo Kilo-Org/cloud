@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  alignComposerInputHeightToLines,
   COMPOSER_CHROME_HEIGHT,
   COMPOSER_INPUT_MAX_HEIGHT,
   COMPOSER_INPUT_PADDING_HORIZONTAL,
@@ -150,5 +151,102 @@ describe('resolveComposerMaxHeight', () => {
         keyboardHeight: 400,
       })
     ).toBe(MIN);
+  });
+});
+
+describe('alignComposerInputHeightToLines', () => {
+  // The composer input's own geometry: 20pt lines and 24pt of vertical padding.
+  // `TEXT_INPUT_VERTICAL_PADDING` is not font-scaled (see `chat-composer.tsx`),
+  // so the aligned cap is a whole number of scaled lines plus a flat 24.
+  const LINE_HEIGHT = 20;
+  const VERTICAL_PADDING = 24;
+
+  const capArgsFor = (windowHeight: number, fontScale: number) =>
+    ({
+      windowHeight,
+      safeAreaInsetTop: 0,
+      safeAreaInsetBottom: 0,
+      keyboardHeight: 0,
+      sessionHeaderHeight: 0,
+      composerChromeHeight: 0,
+      minHeight: LINE_HEIGHT * fontScale + VERTICAL_PADDING,
+      absoluteMaxHeight: 1000,
+    }) as const;
+
+  const align = (height: number, fontScale: number) => {
+    const lineHeight = LINE_HEIGHT * fontScale;
+    return alignComposerInputHeightToLines({
+      height,
+      lineHeight,
+      verticalPadding: VERTICAL_PADDING,
+      minHeight: lineHeight + VERTICAL_PADDING,
+    });
+  };
+
+  // Window heights whose remaining space leaves a raw cap of 62, 98, and 117
+  // points at fontScale 1: the capped composer in the report measured 117dp,
+  // not a whole number of lines, so Android scrolled to the caret by a partial
+  // line and the draft's first line was cut by the input's top edge.
+  it.each([62, 98, 117])(
+    'snaps a %ipt cap to a whole number of lines at fontScale 1',
+    windowHeight => {
+      const cap = resolveComposerMaxHeight(capArgsFor(windowHeight, 1));
+      // Precondition: the raw remaining-space cap is not line-aligned.
+      expect((cap - VERTICAL_PADDING) % LINE_HEIGHT).not.toBe(0);
+
+      const aligned = align(cap, 1);
+
+      expect((aligned - VERTICAL_PADDING) % LINE_HEIGHT).toBe(0);
+      expect(aligned).toBeLessThanOrEqual(cap);
+      expect(aligned).toBeGreaterThanOrEqual(LINE_HEIGHT + VERTICAL_PADDING);
+    }
+  );
+
+  it.each([1.5, 2])(
+    'snaps a 117pt cap to a whole number of scaled lines at fontScale %s',
+    fontScale => {
+      const cap = resolveComposerMaxHeight(capArgsFor(117, fontScale));
+
+      const aligned = align(cap, fontScale);
+
+      expect((aligned - VERTICAL_PADDING) % (LINE_HEIGHT * fontScale)).toBe(0);
+      expect(aligned).toBeLessThanOrEqual(cap);
+      expect(aligned).toBeGreaterThanOrEqual(LINE_HEIGHT * fontScale + VERTICAL_PADDING);
+    }
+  );
+
+  it('keeps the largest line-aligned height at or below the raw cap', () => {
+    // 117 -> 4 lines + padding = 104, the largest whole-line height under 117.
+    expect(align(117, 1)).toBe(104);
+    expect(align(98, 1)).toBe(84);
+    expect(align(62, 1)).toBe(44);
+  });
+
+  it('never falls below the minimum height', () => {
+    expect(align(30, 1)).toBe(LINE_HEIGHT + VERTICAL_PADDING);
+    expect(align(LINE_HEIGHT + VERTICAL_PADDING, 1)).toBe(LINE_HEIGHT + VERTICAL_PADDING);
+  });
+
+  it('leaves an already line-aligned cap unchanged', () => {
+    expect(align(124, 1)).toBe(124);
+  });
+
+  it('returns the height unchanged when the geometry is degenerate', () => {
+    expect(
+      alignComposerInputHeightToLines({
+        height: 117,
+        lineHeight: 0,
+        verticalPadding: VERTICAL_PADDING,
+        minHeight: 44,
+      })
+    ).toBe(117);
+    expect(
+      alignComposerInputHeightToLines({
+        height: 117,
+        lineHeight: LINE_HEIGHT,
+        verticalPadding: 0,
+        minHeight: 44,
+      })
+    ).toBe(117);
   });
 });

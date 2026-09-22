@@ -827,7 +827,8 @@
       "chat": "Ujumbe wa mazungumzo",
       "kiloclaw": "Shughuli za KiloClaw",
       "balance": "Tahadhari za salio",
-      "security": "Matokeo ya ukaguzi wa usalama"
+      "security": "Matokeo ya ukaguzi wa usalama",
+      "spend": "Tahadhari za matumizi"
     },
     "category": {
       "chatMessagesSubtitle": "majibu kwenye mazungumzo yako",
@@ -838,11 +839,13 @@
       "sessionStatusTitle": "Hali ya kikao",
       "sessionStatusSubtitle": "kimekamilika / kimeshindikana / kiko tayari kudhibitiwa",
       "kiloclawActivitySubtitle": "nakala iko tayari au imeshindikana, vitendo vilivyoratibiwa",
-      "kiloclawActivityUnavailable": "Anzisha nakala ya KiloClaw ili kupata shughuli za KiloClaw.",
+      "kiloclawActivityUnavailable": "Anzisha instance ya KiloClaw ili kupata shughuli za KiloClaw.",
       "balanceAlertsSubtitle": "maonyo ya salio la chini la shirika",
-      "balanceAlertsUnavailable": "Jiunge na shirika ili kupata maonyo ya salio la chini.",
+      "balanceAlertsUnavailable": "Jiunge na shirika ili kupata maonyo ya salio.",
       "securityFindingsSubtitle": "matokeo mapya na vikumbusho vya SLA",
-      "securityFindingsUnavailable": "Washa wakala wa usalama wa Kilo kwenye wigo ili kupata matokeo ya ukaguzi wa usalama."
+      "securityFindingsUnavailable": "Washa Wakala wa usalama wa Kilo kwenye wigo ili kupata matokeo ya usalama.",
+      "spendAlertsSubtitle": "kuvuka vizingiti na kuongezeka kwa saa",
+      "spendAlertsToggle": "Aina ya tahadhari za matumizi"
     },
     "action": {
       "openSession": "Fungua kikao"
@@ -3116,6 +3119,14 @@
     "tooManySignInAttempts": "Majaribio ya kuingia ni mengi mno. Tafadhali subiri kisha ujaribu tena."
   },
   "models": {
+    "auto": {
+      "frontier": "Kiotomatiki Ya hali ya juu",
+      "balanced": "Kiotomatiki Wastani",
+      "efficient": "Kiotomatiki Ufanisi",
+      "small": "Kiotomatiki Ndogo",
+      "free": "Kiotomatiki Bure",
+      "organization": "Kiotomatiki ya Shirika"
+    },
     "dataCollected": "Data hukusanywa",
     "free": "Bure",
     "couldNotUpdateFavorites": "Imeshindikana kusasisha vipendwa.",
@@ -3200,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "Fungua kikao cha mwisho"
+  },
+  "spendAlerts": {
+    "subtitle": "Tuma tahadhari kwa barua pepe au push kwa anwani za bili wakati matumizi ya wigo huu yanapita kikomo au yanapanda juu ya kiwango chake cha kawaida cha saa.",
+    "enable": "Washa tahadhari za matumizi",
+    "thresholdTitle": "Kuvuka kizingiti",
+    "thresholdSubtitle": "Matumizi yanayoendelea yanapita kikomo chako",
+    "anomalyTitle": "Kuongezeka kwa saa",
+    "anomalySubtitle": "Saa moja iko juu sana kuliko kiwango cha kawaida cha wigo huu",
+    "limitLabel": "Kikomo (USD)",
+    "windowLabel": "Kipindi",
+    "window24h": "Saa 24",
+    "window7d": "Siku 7",
+    "window30d": "Siku 30",
+    "multiplierLabel": "Kizidishi cha kuongezeka",
+    "saved": "Mipangilio ya tahadhari za matumizi imehifadhiwa",
+    "loadError": "Tahadhari za matumizi hazikuweza kupakiwa.",
+    "saveError": "Tahadhari za matumizi hazikuweza kuhifadhiwa.",
+    "empty": "Tahadhari za matumizi zimezimwa. Ziwasha ili kuwatahadharisha anwani za bili za wigo huu.",
+    "noSpend": "Hakuna matumizi yaliyorekodiwa bado",
+    "spend24h": "Matumizi katika saa 24 zilizopita",
+    "multiplierError": "Weka kizidishi cha 1 au zaidi",
+    "permissionDenied": "Huna ruhusa ya kusimamia tahadhari za matumizi.",
+    "pushOffByCategory": "Imezimwa katika Arifa"
   }
 }

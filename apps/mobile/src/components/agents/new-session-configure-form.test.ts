@@ -51,6 +51,7 @@ const keyboardSubscribers = vi.hoisted(() => ({
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Keyboard: {
@@ -76,6 +77,10 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
+// The element tree finds the loading Skeleton by that name, and the real
+// component animates through Reanimated's worklets package (and the motion
+// policy's `expo-battery`), neither of which this node project can load.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
@@ -119,22 +124,27 @@ vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
+// The environment row and the loading profile row both render the reanimated
+// `Skeleton`; the real Skeleton pulls in react-native-reanimated (and
+// react-native-worklets), whose extensionless ESM imports do not load in this
+// node-only project. Stub it so this node suite neither loads reanimated nor
+// loses the `findElementByType` assertion for the loading placeholder; the pure
+// test only needs the element type, as new-session-profile-row.mounted.test.tsx does.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
-// `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
-// import cannot resolve in the pure project; every sibling pure spec mocks it.
+// The profile row and the environment row both render a loading `Skeleton`,
+// whose module imports `react-native-reanimated`: Reanimated's worklets entry
+// is unavailable in the pure project, so the skeleton leaf that reaches it is
+// stubbed as the other pure suites do. This suite does not set Reanimated up,
+// and this project runs in plain Node, where the Reanimated/worklets native
+// entry cannot resolve (the published worklets build uses bundler-style
+// extensionless imports). The stub is the type the pending-environment case
+// asserts by name; its own rendering is not under test here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
-
-// The profile row and the environment row both render a loading `Skeleton`,
-// whose module imports `react-native-reanimated`: this pure suite does not set
-// Reanimated up, and this project runs in plain Node, where the
-// Reanimated/worklets native entry cannot resolve (the published worklets
-// build uses bundler-style extensionless imports). The primitive is a stub like
-// every other UI element above; its own rendering is not under test here.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,

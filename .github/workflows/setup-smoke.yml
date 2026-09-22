@@ -107,6 +107,15 @@ jobs:
           echo "Web app did not become ready in time"
           exit 1
 
+      - name: Warm up profile route
+        # /profile isn't hit by the readiness check above, so its first request is
+        # a cold Next.js dev-server compile. That compile pushed a real run of the
+        # setup smoke test past its 30s timeout (see run 35127808857, which timed
+        # out at 30217ms then passed in 7941ms on retry once the route was
+        # compiled). Compile it here, outside of the test's timeout budget, so the
+        # test only measures the actual sign-in and render flow.
+        run: curl -fsSL -o /dev/null http://localhost:3000/profile || true
+
       - name: Run setup smoke tests
         run: pnpm test:setup-smoke
 

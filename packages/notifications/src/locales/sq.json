@@ -7,6 +7,7 @@
       "instanceLifecycle": "Instanca juaj ka një përditësim",
       "scheduledAction": "Një veprim i planifikuar ka një përditësim",
       "lowBalance": "Bilanci juaj ka nevojë për vëmendje",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Një gjetje sigurie ka nevojë për vëmendje",
       "activeAgentsGlanceable": "Agjentët aktivë kanë një përditësim"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Alarmi i bilancit të ulët",
       "body": "Bilanci i {{organizationName}} ra nën ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Gjetje e re sigurie ({{severity}})",

@@ -827,7 +827,8 @@
       "chat": "Ozi nkata",
       "kiloclaw": "Ihe omume KiloClaw",
       "balance": "Ọkwa gbasara ego fọdụrụ",
-      "security": "Ihe achọpụtara gbasara nchebe"
+      "security": "Ihe achọpụtara gbasara nchebe",
+      "spend": "Ọkwa gbasara mmefu"
     },
     "category": {
       "chatMessagesSubtitle": "azịza na mkparịta ụka gị",
@@ -838,11 +839,13 @@
       "sessionStatusTitle": "Ọnọdụ nnọkọ",
       "sessionStatusSubtitle": "agwụla / agaghị nke ọma / dị njikere ka ị chịkwaa ya",
       "kiloclawActivitySubtitle": "usoro dị njikere ma ọ bụ agaghị nke ọma, omume a haziri oge ha",
-      "kiloclawActivityUnavailable": "Malite usoro KiloClaw iji nweta ihe omume KiloClaw.",
+      "kiloclawActivityUnavailable": "Malite usoro KiloClaw iji nweta ọrụ KiloClaw.",
       "balanceAlertsSubtitle": "ịdọ aka na ntị mgbe ego ụlọ ọrụ fọdụrụ dị ntakịrị",
-      "balanceAlertsUnavailable": "Sonye n'òtù iji nweta ịdọ aka na ntị maka ego fọdụrụ.",
+      "balanceAlertsUnavailable": "Sonye na ụlọ ọrụ iji nweta ịdọ aka na ntị ego.",
       "securityFindingsSubtitle": "nchọpụta ọhụrụ na ncheta SLA",
-      "securityFindingsUnavailable": "Gbanye onye enyemaka nchebe Kilo na mpaghara iji nweta ihe achọpụtara gbasara nchebe."
+      "securityFindingsUnavailable": "Gbanye Onye enyemaka nchebe Kilo n'oke iji nweta nchọpụta nchebe.",
+      "spendAlertsSubtitle": "ịgafe oke na mmụba kwa awa",
+      "spendAlertsToggle": "Otu ọkwa gbasara mmefu"
     },
     "action": {
       "openSession": "Mepee nnọkọ"
@@ -3116,6 +3119,14 @@
     "tooManySignInAttempts": "Mgbalị nbanye karịrị akarị. Biko chere ma nwaa ọzọ."
   },
   "models": {
+    "auto": {
+      "frontier": "Akpaaka Kachasị elu",
+      "balanced": "Akpaaka Nhatanha",
+      "efficient": "Akpaaka Na-arụ ọrụ nke ọma",
+      "small": "Akpaaka Nta",
+      "free": "Akpaaka N'efu",
+      "organization": "Akpaaka Òtù"
+    },
     "dataCollected": "Data anakọtara",
     "free": "N'efu",
     "couldNotUpdateFavorites": "Enweghị ike imelite ihe kacha amasị gị.",
@@ -3200,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "Mepee nnọkọ ikpeazụ"
+  },
+  "spendAlerts": {
+    "subtitle": "Zipu ọkwa site na ozi-e ma ọ bụ push nye ndị kọntaktị ịgba ụgwọ mgbe mmefu nke mpaghara a gafere oke ma ọ bụ rịgoro karịa ọnụ ọgụgụ awa ya.",
+    "enable": "Gbanye ọkwa gbasara mmefu",
+    "thresholdTitle": "Ịgafe oke",
+    "thresholdSubtitle": "Mmefu na-aga n'ihu na-agafe oke gị",
+    "anomalyTitle": "Mmụba kwa awa",
+    "anomalySubtitle": "Otu awa dị nnọọ elu karịa ọnụ ọgụgụ mpaghara a",
+    "limitLabel": "Oke (USD)",
+    "windowLabel": "Oge",
+    "window24h": "Awa 24",
+    "window7d": "Ụbọchị 7",
+    "window30d": "Ụbọchị 30",
+    "multiplierLabel": "Ọnụọgụ mmụba",
+    "saved": "Echekwara ntọala ọkwa gbasara mmefu",
+    "loadError": "Enweghị ike ibudata ọkwa gbasara mmefu.",
+    "saveError": "Enweghị ike ichekwa ọkwa gbasara mmefu.",
+    "empty": "Ọkwa gbasara mmefu gbanyụrụ. Gbanye ya iji kwaa ndị kọntaktị ịgba ụgwọ nke mpaghara a aka na ntị.",
+    "noSpend": "Edebebeghị mmefu ọ bụla",
+    "spend24h": "Mmefu n'ime awa 24 gara aga",
+    "multiplierError": "Tinye ọnụọgụ mmụba nke 1 ma ọ bụ karịa",
+    "permissionDenied": "Ị nweghị ikike ijikwa ọkwa gbasara mmefu.",
+    "pushOffByCategory": "Gbanyụrụ n'ime Ọkwa"
   }
 }

@@ -368,8 +368,9 @@ export function PrReviewDiscussionTab({
     );
   }
 
-  // ── Empty (neither threads nor conversation comments) ──────────────
-  if (view.kind === 'empty') {
+  // An empty normalized page can still have more discussion to load. Keep
+  // the list's empty message and pagination footer reachable in that case.
+  if (view.kind === 'empty' && !query.hasNextPage && !query.isFetchingNextPage && !laterPageError) {
     return withCommentCta(
       <EmptyState
         icon={MessageSquarePlus}

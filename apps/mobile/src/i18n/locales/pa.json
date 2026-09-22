@@ -827,7 +827,8 @@
       "chat": "ਚੈਟ ਦੇ ਸੁਨੇਹੇ",
       "kiloclaw": "KiloClaw ਦੀ ਗਤੀਵਿਧੀ",
       "balance": "ਬਚੀ ਰਕਮ ਬਾਰੇ ਚੇਤਾਵਨੀਆਂ",
-      "security": "ਸੁਰੱਖਿਆ ਜਾਂਚ ਦੇ ਨਤੀਜੇ"
+      "security": "ਸੁਰੱਖਿਆ ਜਾਂਚ ਦੇ ਨਤੀਜੇ",
+      "spend": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ"
     },
     "category": {
       "chatMessagesSubtitle": "ਤੁਹਾਡੀਆਂ ਗੱਲਬਾਤਾਂ ਵਿੱਚ ਜਵਾਬ",
@@ -838,11 +839,13 @@
       "sessionStatusTitle": "ਸੈਸ਼ਨ ਦੀ ਸਥਿਤੀ",
       "sessionStatusSubtitle": "ਪੂਰਾ ਹੋਇਆ / ਅਸਫਲ / ਕੰਟਰੋਲ ਕਰਨ ਲਈ ਤਿਆਰ",
       "kiloclawActivitySubtitle": "ਇੰਸਟੈਂਸ ਤਿਆਰ/ਅਸਫਲ, ਨਿਰਧਾਰਤ ਕਾਰਵਾਈਆਂ",
-      "kiloclawActivityUnavailable": "KiloClaw ਗਤੀਵਿਧੀ ਪਾਉਣ ਲਈ ਇੱਕ KiloClaw ਇੰਸਟੈਂਸ ਸ਼ੁਰੂ ਕਰੋ।",
+      "kiloclawActivityUnavailable": "KiloClaw ਗਤੀਵਿਧੀ ਲੈਣ ਲਈ KiloClaw ਇੰਸਟੈਂਸ ਸ਼ੁਰੂ ਕਰੋ।",
       "balanceAlertsSubtitle": "ਸੰਸਥਾ ਦਾ ਬੈਲੰਸ ਘੱਟ ਹੋਣ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ",
-      "balanceAlertsUnavailable": "ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਪਾਉਣ ਲਈ ਇੱਕ ਸੰਸਥਾ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ।",
+      "balanceAlertsUnavailable": "ਬੈਲੰਸ ਚੇਤਾਵਨੀਆਂ ਲੈਣ ਲਈ ਇੱਕ ਸੰਸਥਾ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਵੋ।",
       "securityFindingsSubtitle": "ਨਵੀਆਂ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਅਤੇ SLA ਲਈ ਯਾਦ-ਦਹਾਨੀਆਂ",
-      "securityFindingsUnavailable": "ਸੁਰੱਖਿਆ ਨਤੀਜੇ ਪਾਉਣ ਲਈ ਇੱਕ ਦਾਇਰੇ ਵਿੱਚ Kilo ਸੁਰੱਖਿਆ ਏਜੰਟ ਚਾਲੂ ਕਰੋ।"
+      "securityFindingsUnavailable": "ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਲੈਣ ਲਈ ਇੱਕ ਦਾਇਰੇ 'ਤੇ Kilo ਸੁਰੱਖਿਆ ਏਜੰਟ ਚਾਲੂ ਕਰੋ।",
+      "spendAlertsSubtitle": "ਸੀਮਾ ਟੱਪਣਾ ਅਤੇ ਹਰ ਘੰਟੇ ਵਾਧਾ",
+      "spendAlertsToggle": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਦੀ ਸ਼੍ਰੇਣੀ"
     },
     "action": {
       "openSession": "ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ"
@@ -3116,6 +3119,14 @@
     "tooManySignInAttempts": "ਸਾਈਨ-ਇਨ ਦੀਆਂ ਬਹੁਤ ਜ਼ਿਆਦਾ ਕੋਸ਼ਿਸ਼ਾਂ ਹੋ ਚੁੱਕੀਆਂ ਹਨ। ਕਿਰਪਾ ਕਰਕੇ ਉਡੀਕ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
   },
   "models": {
+    "auto": {
+      "frontier": "ਆਟੋ ਫਰੰਟੀਅਰ",
+      "balanced": "ਆਟੋ ਸੰਤੁਲਿਤ",
+      "efficient": "ਆਟੋ ਕੁਸ਼ਲ",
+      "small": "ਆਟੋ ਛੋਟਾ",
+      "free": "ਆਟੋ ਮੁਫ਼ਤ",
+      "organization": "ਸੰਸਥਾ ਆਟੋ"
+    },
     "dataCollected": "ਡੇਟਾ ਇਕੱਠਾ ਹੁੰਦਾ ਹੈ",
     "free": "ਮੁਫ਼ਤ",
     "couldNotUpdateFavorites": "ਪਸੰਦੀਦਾ ਸੂਚੀ ਅੱਪਡੇਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
@@ -3200,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "ਆਖਰੀ ਸੈਸ਼ਨ ਖੋਲ੍ਹੋ"
+  },
+  "spendAlerts": {
+    "subtitle": "ਜਦੋਂ ਇਸ ਸਕੋਪ ਦਾ ਖਰਚਾ ਕੋਈ ਸੀਮਾ ਟੱਪ ਜਾਵੇ ਜਾਂ ਆਪਣੀ ਆਮ ਪ੍ਰਤੀ ਘੰਟਾ ਦਰ ਤੋਂ ਉੱਪਰ ਚੜ੍ਹ ਜਾਵੇ, ਤਾਂ ਬਿਲਿੰਗ ਸੰਪਰਕਾਂ ਨੂੰ ਈਮੇਲ ਜਾਂ ਪੁਸ਼ ਰਾਹੀਂ ਚੇਤਾਵਨੀ ਭੇਜੋ।",
+    "enable": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਚਾਲੂ ਕਰੋ",
+    "thresholdTitle": "ਸੀਮਾ ਟੱਪਣਾ",
+    "thresholdSubtitle": "ਚਾਲੂ ਖਰਚਾ ਤੁਹਾਡੀ ਸੀਮਾ ਟੱਪ ਰਿਹਾ ਹੈ",
+    "anomalyTitle": "ਪ੍ਰਤੀ ਘੰਟਾ ਵਾਧਾ",
+    "anomalySubtitle": "ਇੱਕ ਘੰਟਾ ਇਸ ਸਕੋਪ ਦੀ ਆਮ ਦਰ ਤੋਂ ਬਹੁਤ ਉੱਪਰ ਹੈ",
+    "limitLabel": "ਸੀਮਾ (USD)",
+    "windowLabel": "ਸਮਾਂ",
+    "window24h": "24 ਘੰਟੇ",
+    "window7d": "7 ਦਿਨ",
+    "window30d": "30 ਦਿਨ",
+    "multiplierLabel": "ਵਾਧੇ ਦਾ ਗੁਣਕ",
+    "saved": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀ ਸੈਟਿੰਗਾਂ ਸੰਭਾਲੀਆਂ ਗਈਆਂ",
+    "loadError": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
+    "saveError": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਸੰਭਾਲੀਆਂ ਨਹੀਂ ਜਾ ਸਕੀਆਂ।",
+    "empty": "ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਬੰਦ ਹਨ। ਇਸ ਸਕੋਪ ਦੇ ਬਿਲਿੰਗ ਸੰਪਰਕਾਂ ਨੂੰ ਸੂਚਿਤ ਕਰਨ ਲਈ ਇਨ੍ਹਾਂ ਨੂੰ ਚਾਲੂ ਕਰੋ।",
+    "noSpend": "ਹਾਲੇ ਕੋਈ ਖਰਚਾ ਦਰਜ ਨਹੀਂ ਹੋਇਆ",
+    "spend24h": "ਪਿਛਲੇ 24 ਘੰਟਿਆਂ ਦਾ ਖਰਚਾ",
+    "multiplierError": "1 ਜਾਂ ਵੱਧ ਦਾ ਗੁਣਕ ਦਾਖਲ ਕਰੋ",
+    "permissionDenied": "ਤੁਹਾਨੂੰ ਖਰਚੇ ਦੀਆਂ ਚੇਤਾਵਨੀਆਂ ਪ੍ਰਬੰਧਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+    "pushOffByCategory": "ਸੂਚਨਾਵਾਂ ਵਿੱਚ ਬੰਦ"
   }
 }

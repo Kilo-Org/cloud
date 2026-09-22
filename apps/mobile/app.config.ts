@@ -1,5 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
+import { DEV_CLIENT_PLUGIN_OPTIONS } from './src/lib/dev-client-plugin';
 import { SUPPORTED_LANGUAGES } from './src/i18n/languages.ts';
 import { buildFocusFilterStringsFiles } from './src/i18n/focus-filter-locales.ts';
 import { buildPermissionPromptLocales } from './src/i18n/permission-prompt-locales.ts';
@@ -226,7 +227,7 @@ const config: ExpoConfig = {
     ],
   },
   plugins: [
-    ['expo-dev-client', { toolsButton: false }],
+    ['expo-dev-client', DEV_CLIENT_PLUGIN_OPTIONS],
     [
       'expo-build-properties',
       {
@@ -367,6 +368,11 @@ const config: ExpoConfig = {
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
+    // Alert dialogs (Alert.alert) follow the app theme too: AppCompat's
+    // DayNight defaults are #424242 / teal, not the app's surfaces. Android-only
+    // by capability — iOS's UIAlertController already follows the system
+    // appearance and takes no app-token override (see the plugin's doc comment).
+    './plugins/withAndroidAlertDialogTheme',
     './plugins/withAndroidExpoModuleRepos',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their

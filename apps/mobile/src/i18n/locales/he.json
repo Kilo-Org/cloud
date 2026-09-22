@@ -323,7 +323,8 @@
       "chat": "הודעות צ׳אט",
       "kiloclaw": "פעילות KiloClaw",
       "balance": "התראות על היתרה",
-      "security": "ממצאי אבטחה"
+      "security": "ממצאי אבטחה",
+      "spend": "התראות הוצאות"
     },
     "category": {
       "chatMessagesSubtitle": "תשובות בשיחות שלך",
@@ -334,11 +335,13 @@
       "sessionStatusTitle": "מצב הסשן",
       "sessionStatusSubtitle": "הסתיים / נכשל / מוכן לשליטה",
       "kiloclawActivitySubtitle": "מופע מוכן או שנכשל, פעולות מתוזמנות",
-      "kiloclawActivityUnavailable": "הפעל מופע של KiloClaw כדי לקבל פעילות KiloClaw.",
+      "kiloclawActivityUnavailable": "הפעל מופע KiloClaw כדי לקבל פעילות KiloClaw.",
       "balanceAlertsSubtitle": "אזהרות על יתרה נמוכה בארגון",
-      "balanceAlertsUnavailable": "הצטרף לארגון כדי לקבל התראות על יתרה נמוכה.",
+      "balanceAlertsUnavailable": "הצטרף לארגון כדי לקבל התראות יתרה.",
       "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA",
-      "securityFindingsUnavailable": "הפעל את סוכן האבטחה של Kilo בהיקף כדי לקבל ממצאי אבטחה."
+      "securityFindingsUnavailable": "הפעל את סוכן האבטחה של Kilo בהיקף כדי לקבל ממצאי אבטחה.",
+      "spendAlertsSubtitle": "חציית ספים וזינוקים שעתיים",
+      "spendAlertsToggle": "קטגוריית התראות הוצאות"
     },
     "action": {
       "openSession": "פתיחת סשן"
@@ -3159,6 +3162,14 @@
     "tooManySignInAttempts": "יותר מדי ניסיונות התחברות. המתן ונסה שוב."
   },
   "models": {
+    "auto": {
+      "frontier": "אוטומטי מתקדם",
+      "balanced": "אוטומטי מאוזן",
+      "efficient": "אוטומטי יעיל",
+      "small": "אוטומטי קטן",
+      "free": "אוטומטי חינם",
+      "organization": "אוטומטי של הארגון"
+    },
     "dataCollected": "אוסף נתונים",
     "free": "חינם",
     "couldNotUpdateFavorites": "לא ניתן היה לעדכן את המועדפים.",
@@ -3243,5 +3254,28 @@
   },
   "launcher": {
     "openLastSession": "פתיחת הסשן האחרון"
+  },
+  "spendAlerts": {
+    "subtitle": "שלח התראה בדוא״ל או בהתראת push לאנשי הקשר לחיוב כאשר ההוצאות של תחום זה חוצות מגבלה או מזנקות מעל הקצב השעתי הרגיל.",
+    "enable": "הפעל התראות הוצאות",
+    "thresholdTitle": "חציית סף",
+    "thresholdSubtitle": "ההוצאה המצטברת חוצה את המגבלה שלך",
+    "anomalyTitle": "זינוק שעתי",
+    "anomalySubtitle": "שעה אחת גבוהה בהרבה מהקצב הרגיל של תחום זה",
+    "limitLabel": "מגבלה (USD)",
+    "windowLabel": "חלון",
+    "window24h": "24 שעות",
+    "window7d": "7 ימים",
+    "window30d": "30 ימים",
+    "multiplierLabel": "מכפיל הזינוק",
+    "saved": "הגדרות התראות ההוצאות נשמרו",
+    "loadError": "לא ניתן לטעון את התראות ההוצאות.",
+    "saveError": "לא ניתן לשמור את התראות ההוצאות.",
+    "empty": "התראות ההוצאות כבויות. הפעל אותן כדי ליידע את אנשי הקשר לחיוב של תחום זה.",
+    "noSpend": "עדיין לא נרשמה הוצאה",
+    "spend24h": "הוצאה ב־24 השעות האחרונות",
+    "multiplierError": "הזן מכפיל של 1 או יותר",
+    "permissionDenied": "אין לך הרשאה לנהל התראות הוצאות.",
+    "pushOffByCategory": "כבוי בהתראות"
   }
 }

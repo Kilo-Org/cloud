@@ -859,7 +859,8 @@
       "chat": "Správy v čete",
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornenia na zostatok",
-      "security": "Bezpečnostné zistenia"
+      "security": "Bezpečnostné zistenia",
+      "spend": "Upozornenia na výdavky"
     },
     "category": {
       "chatMessagesSubtitle": "odpovede v tvojich konverzáciách",
@@ -872,9 +873,11 @@
       "kiloclawActivitySubtitle": "pripravená inštancia, zlyhanie inštancie, naplánované akcie",
       "kiloclawActivityUnavailable": "Spustite inštanciu KiloClaw, aby ste získali aktivitu KiloClaw.",
       "balanceAlertsSubtitle": "upozornenia na nízky zostatok organizácie",
-      "balanceAlertsUnavailable": "Pripojte sa k organizácii, aby ste dostávali upozornenia na nízky zostatok.",
+      "balanceAlertsUnavailable": "Pripojte sa k organizácii, aby ste získali upozornenia na zostatok.",
       "securityFindingsSubtitle": "nové zistenia a pripomienky SLA",
-      "securityFindingsUnavailable": "Zapnite bezpečnostného agenta Kilo v rozsahu, aby ste dostávali bezpečnostné zistenia."
+      "securityFindingsUnavailable": "Zapnite Bezpečnostného agenta Kilo v rozsahu, aby ste získali bezpečnostné zistenia.",
+      "spendAlertsSubtitle": "prekročenia prahov a hodinové špičky",
+      "spendAlertsToggle": "Kategória upozornení na výdavky"
     },
     "action": {
       "openSession": "Otvoriť reláciu"
@@ -3202,6 +3205,14 @@
     "tooManySignInAttempts": "Príliš veľa pokusov o prihlásenie. Chvíľu počkaj a skús to znova."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatický Špičkový",
+      "balanced": "Automatický Vyvážený",
+      "efficient": "Automatický Efektívny",
+      "small": "Automatický Malý",
+      "free": "Automatický Zadarmo",
+      "organization": "Automatický organizácie"
+    },
     "dataCollected": "Zber údajov",
     "free": "Zadarmo",
     "couldNotUpdateFavorites": "Obľúbené sa nepodarilo aktualizovať.",
@@ -3286,5 +3297,28 @@
   },
   "launcher": {
     "openLastSession": "Otvoriť poslednú reláciu"
+  },
+  "spendAlerts": {
+    "subtitle": "Pošli e-mailom alebo push oznámením upozornenie fakturačným kontaktom, keď výdavky tohto rozsahu prekročia limit alebo vyskočia nad obvyklú hodinovú sadzbu.",
+    "enable": "Povoliť upozornenia na výdavky",
+    "thresholdTitle": "Prekročenie prahu",
+    "thresholdSubtitle": "Priebežné výdavky prekračujú tvoj limit",
+    "anomalyTitle": "Hodinová špička",
+    "anomalySubtitle": "Hodina je výrazne nad obvyklou sadzbou tohto rozsahu",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Okno",
+    "window24h": "24 hodín",
+    "window7d": "7 dní",
+    "window30d": "30 dní",
+    "multiplierLabel": "Násobiteľ špičky",
+    "saved": "Nastavenia upozornení na výdavky boli uložené",
+    "loadError": "Upozornenia na výdavky sa nepodarilo načítať.",
+    "saveError": "Upozornenia na výdavky sa nepodarilo uložiť.",
+    "empty": "Upozornenia na výdavky sú vypnuté. Zapni ich, aby si upozornil fakturačné kontakty tohto rozsahu.",
+    "noSpend": "Zatiaľ nie sú zaznamenané žiadne výdavky",
+    "spend24h": "Výdavky za posledných 24 hodín",
+    "multiplierError": "Zadaj násobiteľ 1 alebo väčší",
+    "permissionDenied": "Nemáš povolenie spravovať upozornenia na výdavky.",
+    "pushOffByCategory": "Vypnuté v Upozorneniach"
   }
 }

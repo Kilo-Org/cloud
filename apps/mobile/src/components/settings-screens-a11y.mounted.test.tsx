@@ -75,6 +75,7 @@ vi.mock('@/components/ui/icons', () => ({
   Shield: 'Shield',
   SlidersHorizontal: 'SlidersHorizontal',
   Smartphone: 'Smartphone',
+  Wallet: 'Wallet',
   WandSparkles: 'WandSparkles',
 }));
 vi.mock('@/components/ui/directional-icons', () => ({

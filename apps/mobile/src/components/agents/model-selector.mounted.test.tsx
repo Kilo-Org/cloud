@@ -8,8 +8,9 @@ import {
   freeModelFreeLabel,
 } from '@/lib/free-model-data-disclosure';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { i18n } from '@/i18n';
 
-import { ModelPickerOptionRow } from './model-selector';
+import { ModelPickerOptionRow, ModelSelector } from './model-selector';
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -101,6 +102,43 @@ function countWithAccessibilityLabel(root: TestRenderer.ReactTestInstance, label
     .length;
 }
 
+function renderSelector(option: SessionModelOption): TestRenderer.ReactTestRenderer {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  TestRenderer.act(() => {
+    ref.current = TestRenderer.create(
+      createElement(ModelSelector, {
+        value: option.id,
+        variant: '',
+        options: [option],
+        onSelect: vi.fn<(modelId: string, variant: string) => void>(),
+      })
+    );
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+function trailingSlots(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return renderer.root
+    .findAll(
+      node =>
+        typeof node.type === 'string' &&
+        ((node.type as string) === 'Star' || (node.type as string) === 'Check')
+    )
+    .map(node => `${String(node.type)}:${String(node.props.size)}`);
+}
+
+function checkAccessories(
+  renderer: TestRenderer.ReactTestRenderer
+): { color: unknown; size: unknown }[] {
+  return renderer.root
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Check')
+    .map(node => ({ color: node.props.color, size: node.props.size }));
+}
+
 function isInstance(
   node: TestRenderer.ReactTestInstance | string
 ): node is TestRenderer.ReactTestInstance {
@@ -139,7 +177,32 @@ describe('ModelPickerOptionRow BYOK badge', () => {
   });
 });
 
-describe('ModelPickerOptionRow trailing check column', () => {
+describe('Auto model labels', () => {
+  // The backend names Kilo's own Auto models in English ("Auto Efficient"),
+  // which no catalog translates; the chip and the picker row must show the
+  // catalog's label instead so the Arabic composer is not half translated.
+  const autoOption = cliCatalogOption({
+    id: 'kilo-auto/efficient',
+    displayId: 'kilo-auto/efficient',
+    name: 'backend name',
+  });
+
+  it('renders the catalog label, not the backend name, on the chip', () => {
+    const renderer = renderSelector(autoOption);
+    const texts = textStrings(renderer.root);
+    expect(texts).toContain(i18n.t('models.auto.efficient'));
+    expect(texts).not.toContain('backend name');
+  });
+
+  it('renders the catalog label, not the backend name, in the picker row', () => {
+    const renderer = renderRow(autoOption);
+    const texts = textStrings(renderer.root);
+    expect(texts).toContain(i18n.t('models.auto.efficient'));
+    expect(texts).not.toContain('backend name');
+  });
+});
+
+describe('ModelPickerOptionRow trailing accessory slot', () => {
   it('reserves the same trailing column whether or not the row is selected', () => {
     const selectedRow = rowContainer(renderRow(cliCatalogOption(), { selected: true }));
     const unselectedRow = rowContainer(renderRow(cliCatalogOption(), { selected: false }));
@@ -160,9 +223,21 @@ describe('ModelPickerOptionRow trailing check column', () => {
     expect(unselectedSlot?.type).toBe('View');
     expect(selectedSlot?.props.className).toBe(unselectedSlot?.props.className);
     expect(String(selectedSlot?.props.className)).toContain('w-[18px]');
+  });
 
-    // Only the contents differ: the check marks the selected row.
-    expect(selectedSlot?.findAllByType('Check')).toHaveLength(1);
-    expect(unselectedSlot?.findAllByType('Check')).toHaveLength(0);
+  it('keeps the star then the reserved check in one order on every row', () => {
+    const option = cliCatalogOption();
+    expect(trailingSlots(renderRow(option, { selected: false }))).toEqual(['Star:20', 'Check:18']);
+    expect(trailingSlots(renderRow(option, { selected: true }))).toEqual(['Star:20', 'Check:18']);
+  });
+
+  it('hides the reserved check on unselected rows and shows it on selected rows', () => {
+    const option = cliCatalogOption();
+    expect(checkAccessories(renderRow(option, { selected: false }))).toEqual([
+      { color: 'transparent', size: 18 },
+    ]);
+    expect(checkAccessories(renderRow(option, { selected: true }))).toEqual([
+      { color: '#4F5A10', size: 18 },
+    ]);
   });
 });

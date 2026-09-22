@@ -5,13 +5,12 @@ import { getCalendars } from 'expo-localization';
 import { type Href, useRouter } from 'expo-router';
 import { Plus, Settings2 } from '@/components/ui/icons';
 import { useCallback, useMemo } from 'react';
-import { Platform, Pressable, useWindowDimensions, View, type ViewStyle } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QueryError } from '@/components/query-error';
 import { captureEvent, CONVERSATION_CREATED_EVENT } from '@/lib/analytics/posthog';
@@ -21,7 +20,7 @@ import { Text } from '@/components/ui/text';
 import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { chatConversationPath } from '@/lib/kilo-chat-routes';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
 import { EmptyConversationList } from './empty-conversation-list';
 import { groupConversationsByActivity } from './conversation-list-groups';
@@ -101,8 +100,9 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
+  // The tabs layout's width-aware label decision rides along, so the list and
+  // FAB clearance track the bar height the layout actually renders.
+  const tabBarHeight = useEffectiveTabBarHeight();
   const client = useKiloChatClient();
   const eventClient = useEventServiceClient();
   const activeAndFocused = useAppActiveAndFocused();
@@ -120,11 +120,6 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
   const isFetchingNextPage = listQuery.isFetchingNextPage;
   const fetchNextPage = listQuery.fetchNextPage;
   const refetchConversations = listQuery.refetch;
-  const tabBarHeight = getEffectiveTabBarHeight({
-    bottomInset: bottom,
-    platform: Platform.OS,
-    fontScale,
-  });
   const listContentContainerStyle = useMemo(
     () =>
       ({

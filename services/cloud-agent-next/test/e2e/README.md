@@ -270,10 +270,10 @@ deploy reference.
 
 Two Workers, in deploy order:
 
-1. `fake-llm-e2e-test` — Worker + `FakeLlmState` Durable Object running the
+1. `fake-llm` — Worker + `FakeLlmState` Durable Object running the
    shared `fake-llm-core.ts`; deploy first with
    `test/e2e/deploy/deploy-fake-llm.sh deploy`.
-2. `cloud-agent-next-e2e-test` — private render of this package's Worker;
+2. `cloud-agent-e2e-test` — private render of this package's Worker;
    deploy second with
    `E2E_USER_ID=<id> FAKE_LLM_BASE_URL=<base> test/e2e/deploy/deploy-e2e-worker.sh deploy`.
    Add `E2E_INTERNAL_API_SECRET=<secret>` on the first deploy or to rotate it; a
@@ -526,7 +526,7 @@ Troubleshooting:
   bypass balance admission.
 - **Container cold-start timeout** — `cold-hot` defaults to 240s per
   turn; a first real container boot can exceed two minutes.
-- **Fake Worker `/health`** — `curl https://fake-llm-e2e-test.<sub>.workers.dev/health`
+- **Fake Worker `/health`** — `curl https://fake-llm.engineering-e11.workers.dev/health`
   confirms the container Worker is up.
 
 ## Gateway contract

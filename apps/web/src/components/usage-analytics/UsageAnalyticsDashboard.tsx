@@ -67,6 +67,7 @@ import { AIAdoptionSummaryCard } from './AIAdoptionSummaryCard';
 import { FeatureAdoptionView } from './FeatureAdoptionView';
 import { RecommendationsView } from './RecommendationsView';
 import { UsageViewNavigation } from './UsageViewNavigation';
+import { SpendAlertsPanel } from '@/components/spend-alerts/SpendAlertsPanel';
 
 /**
  * Personal usage never targets a single organization, so org-only props
@@ -836,6 +837,18 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
             ) : (
               <>
                 <UsageWarning />
+
+                {/* Spend-alert settings belong to this spend view's owner and
+                    are independent of the usage queries below: they render
+                    above the summary and stay put when a query fails. */}
+                {org ? (
+                  <SpendAlertsPanel
+                    organizationId={org.organizationId}
+                    callerRole={org.callerRole}
+                  />
+                ) : (
+                  <SpendAlertsPanel />
+                )}
 
                 {usageDashboardState === 'error' ? (
                   <UsageDataErrorState onRetry={retryUsageQueries} />

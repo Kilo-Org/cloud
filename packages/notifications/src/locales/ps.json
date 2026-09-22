@@ -7,6 +7,7 @@
       "instanceLifecycle": "ستاسو نمونه تازه شوې ده",
       "scheduledAction": "یو ټاکلی عمل تازه شوی دی",
       "lowBalance": "ستاسو توازن ته پاملرنه اړینه ده",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "یو امنیتي موندنې ته پاملرنه اړینه ده",
       "activeAgentsGlanceable": "فعال اجنټان تازه معلومات لري"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "د ټیټ توازن خبرتیا",
       "body": "د {{organizationName}} توازن له ${{minimumBalanceUsd}} لاندې راښکته شو"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "نوې امنیتي موندنه ({{severity}})",

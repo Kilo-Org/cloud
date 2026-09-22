@@ -2,7 +2,6 @@
 import { useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BookOpenCheck,
@@ -17,7 +16,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from '@/components/ui/icons';
-import { Alert, Platform, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
@@ -32,10 +31,12 @@ import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
+import { useSignOutConfirmation } from '@/components/use-sign-out-confirmation';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { showFeedbackPrompt } from '@/lib/feedback';
+import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganization } from '@/lib/organization-context';
 import {
@@ -78,26 +79,30 @@ export function ProfileScreen() {
   const trpc = useTRPC();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
+  // The account queries wait for the tab transition to settle, but the hook
+  // bounds that wait: an interaction queue that never reports idle (an
+  // automated UI session holds one open) must not hide the Linked accounts row,
+  // the only place the signed-in address renders.
+  const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
-  // Both sections fetch at mount, in parallel with the Credits card, so the
-  // screen settles in one wave. They used to wait for
-  // `InteractionManager.runAfterInteractions`, which is unbounded: a delayed
-  // interaction frame left the linked-accounts skeleton and the disabled agent
-  // rows on screen long after the rest of the profile had loaded (explorer:
-  // "profile: 7.5s to settle, 1.5s is its normal").
   // Android's native alert paints every button with the theme accent, so
   // `Alert.alert`'s destructive style never shows the red affordance there.
   // Android opens the in-app confirmation instead; iOS keeps the native alert,
   // which already renders the destructive sign-out choice in red.
-  const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
+  // The confirmation's platform split lives in the hook, keeping this screen's
+  // shared layout path free of platform forks (`screen-insets.test.ts`).
+  const { confirmVisible, requestSignOut, dismissConfirm, confirmSignOut } = useSignOutConfirmation(
+    () => void signOut()
+  );
   const {
     data,
+    isLoading,
     isError: providersError,
     isFetching: providersFetching,
     refetch: refetchProviders,
   } = useQuery({
     ...trpc.user.getAuthProviders.queryOptions(),
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && afterInteractions,
   });
   const {
     data: orgs,
@@ -106,10 +111,10 @@ export function ProfileScreen() {
     refetch: refetchOrganizations,
   } = useQuery({
     ...trpc.organizations.list.queryOptions(),
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && afterInteractions,
   });
   const agentScope = organizationContextLoaded
-    ? getProfileAgentScope(organizationId, orgs, organizationsFetching)
+    ? getProfileAgentScope(organizationId, orgs, organizationsFetching || !afterInteractions)
     : undefined;
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
@@ -135,21 +140,6 @@ export function ProfileScreen() {
         text: t('profile.deleteAccountConfirm'),
         style: 'destructive',
         onPress: beginDelete,
-      },
-    ]);
-  };
-
-  const confirmSignOut = () => {
-    if (Platform.OS === 'android') {
-      setSignOutConfirmVisible(true);
-      return;
-    }
-    Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.signOut'),
-        style: 'destructive',
-        onPress: () => void signOut(),
       },
     ]);
   };
@@ -291,13 +281,14 @@ export function ProfileScreen() {
             position lag as a visible header overlap. Opacity fades are safe. */}
         {(providersError ||
           (data?.providers.length ?? 0) > 0 ||
-          (isAuthenticated && data === undefined)) && (
+          isLoading ||
+          (!afterInteractions && !data)) && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('profile.linkedAccounts')}
             </Text>
 
-            {isAuthenticated && data === undefined && !providersError && (
+            {(isLoading || !afterInteractions) && !data && !providersError && (
               <Animated.View exiting={FadeOut.duration(150)}>
                 {/* Content-shaped skeleton (icon tile + two text bars in the
                     row's own bg-secondary card): a plain block read as an
@@ -356,7 +347,7 @@ export function ProfileScreen() {
             label={t('profile.privacyChoices')}
             onPress={showPrivacyChoices}
           />
-          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={confirmSignOut} />
+          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={requestSignOut} />
           <ActionTile
             icon={Trash2}
             label={t('profile.deleteAccount')}
@@ -392,18 +383,13 @@ export function ProfileScreen() {
         </View>
       </TabScreenScrollView>
 
-      {signOutConfirmVisible && (
+      {confirmVisible && (
         <DestructiveConfirmDialog
           title={t('profile.signOutTitle')}
           message={t('profile.signOutMessage')}
           confirmLabel={t('common.signOut')}
-          onCancel={() => {
-            setSignOutConfirmVisible(false);
-          }}
-          onConfirm={() => {
-            setSignOutConfirmVisible(false);
-            void signOut();
-          }}
+          onCancel={dismissConfirm}
+          onConfirm={confirmSignOut}
         />
       )}
     </View>

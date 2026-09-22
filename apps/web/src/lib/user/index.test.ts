@@ -65,6 +65,11 @@ import {
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  spend_alert_settings,
+  spend_alert_rules,
+  spend_alert_rule_state,
+  spend_alert_hourly,
+  spend_alert_deliveries,
   user_data_export_object_deletions,
   security_advisor_scans,
   credit_campaigns,
@@ -5057,6 +5062,90 @@ describe('User', () => {
         .from(user_notification_preferences)
         .where(eq(user_notification_preferences.user_id, user.id));
       expect(rows).toHaveLength(0);
+    });
+
+    it('should delete personal spend alert settings, rules, counters, and deliveries', async () => {
+      const user = await insertTestUser();
+      const scopeKey = `user:${user.id}`;
+      const [settings] = await db
+        .insert(spend_alert_settings)
+        .values({ scope_key: scopeKey, kilo_user_id: user.id, enabled: true })
+        .returning();
+      const [rule] = await db
+        .insert(spend_alert_rules)
+        .values({
+          settings_id: settings.id,
+          kind: 'threshold',
+          threshold_microdollars: 5_000_000,
+        })
+        .returning();
+      await db.insert(spend_alert_rule_state).values({ rule_id: rule.id, firing: true });
+      await db.insert(spend_alert_hourly).values({
+        scope_key: scopeKey,
+        hour_start: new Date().toISOString(),
+        cost_microdollars: 4_200_000,
+      });
+      await db.insert(spend_alert_deliveries).values({
+        dedupe_key: `spend-alert-test-${crypto.randomUUID()}`,
+        scope_key: scopeKey,
+        channel: 'email',
+        recipients: [{ email: 'billing-contact@example.com' }],
+      });
+
+      await softDeleteUser(user.id);
+
+      const settingsRows = await db
+        .select()
+        .from(spend_alert_settings)
+        .where(eq(spend_alert_settings.kilo_user_id, user.id));
+      expect(settingsRows).toHaveLength(0);
+      // Deleting the settings row cascades to its rules and per-rule state.
+      const ruleRows = await db
+        .select()
+        .from(spend_alert_rules)
+        .where(eq(spend_alert_rules.settings_id, settings.id));
+      expect(ruleRows).toHaveLength(0);
+      const ruleStateRows = await db
+        .select()
+        .from(spend_alert_rule_state)
+        .where(eq(spend_alert_rule_state.rule_id, rule.id));
+      expect(ruleStateRows).toHaveLength(0);
+      const hourlyRows = await db
+        .select()
+        .from(spend_alert_hourly)
+        .where(eq(spend_alert_hourly.scope_key, scopeKey));
+      expect(hourlyRows).toHaveLength(0);
+      const deliveryRows = await db
+        .select()
+        .from(spend_alert_deliveries)
+        .where(eq(spend_alert_deliveries.scope_key, scopeKey));
+      expect(deliveryRows).toHaveLength(0);
+    });
+
+    it('should strip a deleted billing contact from organization scope delivery recipients', async () => {
+      const user = await insertTestUser();
+      const otherUserId = `test-other-${crypto.randomUUID()}`;
+      const otherEmail = 'other-billing@example.com';
+      const dedupeKey = `spend-alert-org-test-${crypto.randomUUID()}`;
+      await db.insert(spend_alert_deliveries).values({
+        dedupe_key: dedupeKey,
+        scope_key: `org:${crypto.randomUUID()}`,
+        channel: 'email',
+        recipients: {
+          userIds: [user.id, otherUserId],
+          emails: [user.google_user_email, otherEmail],
+        },
+      });
+
+      await softDeleteUser(user.id);
+
+      // Organization-scoped rows belong to the organization and stay, but the
+      // deleted member's id and address are their PII and must be removed.
+      const [row] = await db
+        .select()
+        .from(spend_alert_deliveries)
+        .where(eq(spend_alert_deliveries.dedupe_key, dedupeKey));
+      expect(row?.recipients).toEqual({ userIds: [otherUserId], emails: [otherEmail] });
     });
 
     it('should delete Coding Plan availability notification intents', async () => {

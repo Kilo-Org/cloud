@@ -14,6 +14,7 @@ import { useComposerRevealScroll } from '@/components/agents/use-composer-reveal
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
 /**
@@ -97,13 +98,14 @@ export function NewSessionConfigureForm({
   // either platform, so the screen needs two floors: the navigation-bar inset
   // — the Start action sits in a footer below the scroll body, and without the
   // inset the footer would render in the navigation bar's region (a formSheet
-  // leaves that region exposed below itself; the picker's bottom strip showed
-  // its sliver) — and the keyboard height, because the composer auto-focuses
-  // on open and without the keyboard floor the Start control stays half-hidden
-  // behind the keyboard strip. The keyboard-lift view is the app's
-  // cross-platform IME primitive (keyboardDidShow/DidHide on Android,
-  // keyboardWillShow/WillHide on iOS), so the same implementation runs on both
-  // platforms; the footer is its second child, so the IME lifts the action too.
+  // over this screen no longer leaves that region exposed below itself: the
+  // sheet is fixed at its shared options, `sheetShouldOverflowTopInset`) — and
+  // the keyboard height, because the composer auto-focuses on open and without
+  // the keyboard floor the Start control stays half-hidden behind the keyboard
+  // strip. The keyboard-lift view is the app's cross-platform IME primitive
+  // (keyboardDidShow/DidHide on Android, keyboardWillShow/WillHide on iOS), so
+  // the same implementation runs on both platforms; the footer is its second
+  // child, so the IME lifts the action too.
   // The ScrollView's keyboard-inset adjustment stays on for focused-field
   // scroll-into-view; it sizes against the scroll view's own frame, which
   // already ends above the IME, so the two never stack into a double lift.
@@ -197,7 +199,7 @@ export function NewSessionConfigureForm({
       ) : null}
 
       <Text className="mt-2 text-xs text-muted-foreground">
-        {t('agentChat.newSession.remoteHint')}
+        {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
       </Text>
 
       {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
@@ -244,8 +246,10 @@ export function NewSessionConfigureForm({
   );
 
   return (
+    // The root reserves the navigation-bar inset, so the keyboard-lift view
+    // pads from its own bottom edge and must not add the inset again.
     <View className="flex-1 bg-background" style={{ paddingBottom: bottom }}>
-      <AppAwareKeyboardPaddingView className="flex-1">
+      <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
         {body}
         {/*
           The primary action is pinned below the scroll body, never part of it.

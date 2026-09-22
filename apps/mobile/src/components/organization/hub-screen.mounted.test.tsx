@@ -116,6 +116,7 @@ vi.mock('@/components/ui/icons', () => ({
   Pencil: 'Pencil',
   Receipt: 'Receipt',
   Users: 'Users',
+  Wallet: 'Wallet',
 }));
 
 vi.mock('@/components/ui/kv-row', () => ({ KvRow: 'KvRow' }));

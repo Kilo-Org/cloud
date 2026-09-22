@@ -1,6 +1,8 @@
 import { type ComponentProps, useEffect, useState } from 'react';
 import { AppState, Keyboard, type KeyboardEvent, Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { resolveKeyboardBottomPadding } from '@/components/login-screen-state';
 import {
   resolveAppAwareKeyboardPadding,
   resolveKeyboardPaddingEventsForPlatform,
@@ -70,9 +72,64 @@ export function useAppAwareKeyboardPadding(): number {
 export function AppAwareKeyboardPaddingView({
   style,
   keyboardOffset = 0,
+  containerReservesBottomInset = false,
+  contentReservesBottomInset = false,
   ...props
-}: ComponentProps<typeof View> & { keyboardOffset?: number }) {
-  const keyboardPadding = useAppAwareKeyboardPadding();
+}: ComponentProps<typeof View> & {
+  keyboardOffset?: number;
+  /**
+   * The caller's own container reserves the platform's bottom inset above this
+   * view (a trailing spacer, or a `paddingBottom` on the parent), so the
+   * view's bottom edge sits `bottomInset` above the screen bottom. The
+   * resolved occlusion is anchored to the screen bottom, so the inset the
+   * container already reserved is subtracted here — on Android that reduces to
+   * the platform's raw metric, whose origin stops at the navigation bar.
+   * Counting the inset twice floated the session composer and the new-session
+   * Start button a nav-bar height above the keyboard (2026-09-20).
+   */
+  containerReservesBottomInset?: boolean;
+  /**
+   * The wrapped content pads the platform's bottom inset itself: the session
+   * composer adds `MESSAGE_INPUT_BOTTOM_CLEARANCE + bottomInset` and the
+   * discussion CTA bar adds `useDetailScreenBottomPadding()`. The occlusion
+   * resolved above is anchored to the screen bottom, so it counts that inset on
+   * top of the content's own padding and floats the composer / CTA a
+   * navigation-bar height above the keyboard. Such a caller adds the platform's
+   * raw keyboard metric instead: on Android the content's inset padding
+   * completes it, and on iOS the metric already reaches the screen bottom, so
+   * the lift those callers shipped with is unchanged (2026-09-21 review
+   * finding).
+   */
+  contentReservesBottomInset?: boolean;
+}) {
+  const keyboardHeight = useAppAwareKeyboardPadding();
+  const { bottom } = useSafeAreaInsets();
+  // The hook reports the platform's own keyboard metric, and the two platforms
+  // measure it from different origins: Android's stops at the navigation bar
+  // (`ReactRootView` reports `imeInsets.bottom − barInsets.bottom`) while iOS's
+  // frame reaches the screen bottom. The reserved space is anchored to the
+  // screen bottom, so resolve it with the same rule the login screen and the
+  // Toaster use; padding by the raw Android height left the bottom
+  // `bottomInset` of the content — the manual review form's Start button —
+  // behind the IME's navigation row (2026-09-20).
+  const keyboardOcclusion =
+    keyboardHeight > 0
+      ? resolveKeyboardBottomPadding({
+          keyboardHeight,
+          bottomInset: bottom,
+          platform: Platform.OS,
+        })
+      : 0;
+  // One inset per screen: where a container outside this view (a trailing
+  // spacer, a parent `paddingBottom`) or the wrapped content's own bottom
+  // padding already reserved the bottom inset, the screen-bottom-anchored
+  // occlusion must not count it a second time.
+  let keyboardPadding = keyboardOcclusion;
+  if (containerReservesBottomInset) {
+    keyboardPadding = Math.max(keyboardOcclusion - bottom, 0);
+  } else if (contentReservesBottomInset) {
+    keyboardPadding = keyboardHeight;
+  }
 
   const resolvedKeyboardPadding = keyboardPadding > 0 ? keyboardPadding + keyboardOffset : 0;
 

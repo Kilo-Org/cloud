@@ -124,9 +124,12 @@ describe('shared branded splash', () => {
   });
 
   it('generates both native splash surfaces from the same options', async () => {
-    // Compile against a throwaway project root like the sibling cases: reading
-    // the developer's generated `android/` would fold its existing colors into
-    // the introspection result and make this assertion depend on local state.
+    // Compile and introspect against a throwaway project root like the sibling
+    // cases: `compileModsAsync` seeds the Android color/style mods from the
+    // resources already on disk, so pointing it at this package's root would
+    // read a developer's prebuilt `android/` tree — its generated `colors.xml`
+    // is absent in CI — and merge colors this test does not own into the mod
+    // results, making the assertions depend on the developer's machine.
     const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
@@ -143,11 +146,6 @@ describe('shared branded splash', () => {
     ).toBeTypeOf('function');
     expect(config.mods?.android?.styles).toBeTypeOf('function');
 
-    // Introspect against a fresh project root: `compileModsAsync` seeds the
-    // Android color/style mods from the resources already on disk, so pointing
-    // it at this package's root would read a developer's prebuilt `android/`
-    // tree — its `colors.xml` is absent in CI — and merge colors this test does
-    // not own into the mod results, making the assertion machine-dependent.
     const evaluated = await compileModsAsync(config, {
       projectRoot: root,
       platforms: ['ios', 'android'],

@@ -41,19 +41,26 @@ export function getInitialSessionListAutoScrollVisibility({
 /**
  * Decide whether a programmatic scroll-to-latest should be scheduled.
  *
- * Mirrors the four guards inside `useSessionAutoScroll`'s `scheduleScrollToLatestMessage`:
+ * Mirrors the guards inside `useSessionAutoScroll`'s `scheduleScrollToLatestMessage`:
  *  - `isAutoScrolling`     – a programmatic scroll is in flight, skip the retry.
  *  - `isUserScrolling`     – user is dragging or in momentum, never yank.
  *  - `shouldAutoScroll`    – the user has scrolled away from the bottom.
+ *  - `newestKeyChanged`    – the newest item actually changed. Prepending an
+ *    older page grows the list without moving the tail, so scheduling a
+ *    scroll there would yank the viewport back to the newest message while
+ *    the user is reading history. Callers that do not track item identity
+ *    (layout/keyboard triggers) omit it and keep the previous behavior.
  */
 export function shouldScheduleSessionAutoScroll({
   isAutoScrolling,
   isUserScrolling,
   shouldAutoScroll,
+  newestKeyChanged = true,
 }: {
   isAutoScrolling: boolean;
   isUserScrolling: boolean;
   shouldAutoScroll: boolean;
+  newestKeyChanged?: boolean;
 }): boolean {
   if (!shouldAutoScroll) {
     return false;
@@ -62,6 +69,9 @@ export function shouldScheduleSessionAutoScroll({
     return false;
   }
   if (isAutoScrolling) {
+    return false;
+  }
+  if (!newestKeyChanged) {
     return false;
   }
   return true;

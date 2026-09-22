@@ -263,6 +263,41 @@ export function holdsNativeRuntimeRetirementFence(
   );
 }
 
+/**
+ * True while a directory-native retirement for `sessionId` still fences the
+ * current physical allocation and wrapper lifetime.
+ *
+ * A retirement keeps the physical allocation running so a healthy wrapper can
+ * create a new native in place. The session must not bind that allocation
+ * until the receipt is delivered (or released): a completed+delivered receipt
+ * releases the session route fence and must be reused rather than refused,
+ * and a pruned receipt leaves no fence at all. Pending, unconfirmed, and
+ * completed-but-undelivered receipts mean notifications have not reached the
+ * recipients yet, so the containment fence still holds.
+ *
+ * Matching the active wrapper lifetime keeps a receipt from an older wrapper
+ * incarnation from fencing a new wrapper on the same allocation.
+ */
+export function holdsNativeRetirementFenceForSession(
+  receipts: readonly NativeRuntimeRetirementReceipt[],
+  physical: PhysicalRecord,
+  connection: { providerInstanceId: string; wrapperInstanceId?: string } | null | undefined,
+  sessionId: string
+): boolean {
+  return receipts.some(receipt => {
+    if (!receipt.recipients.some(recipient => recipient.sessionId === sessionId)) return false;
+    if (!matchesNativeRuntimeRetirementAllocation(receipt, physical)) return false;
+    if (
+      connection?.wrapperInstanceId !== undefined &&
+      (connection.wrapperInstanceId !== receipt.connection.wrapperInstanceId ||
+        connection.providerInstanceId !== receipt.connection.providerInstanceId)
+    ) {
+      return false;
+    }
+    return holdsNativeRuntimeRetirementFence(receipt);
+  });
+}
+
 function hasOtherNativeRuntimeRetirementFence(
   receipts: readonly NativeRuntimeRetirementReceipt[],
   receipt: NativeRuntimeRetirementReceipt

@@ -34,28 +34,28 @@ vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('react-native', () => ({
   // The screen calls the keyboard-reveal hook before it picks a branch, and
   // that hook subscribes to the platform's keyboard and app-state events.
-  AppState: { addEventListener: () => ({ remove: () => undefined }) },
-  Keyboard: { addListener: () => ({ remove: () => undefined }) },
-  Platform: { OS: 'ios' },
+  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
 }));
-// The screen imports the keyboard-padding view, which reads the safe-area
-// insets. The package is externalized by this project, so Node would load its
-// real entry and the Flow-typed `react-native` it requires; stub the one export
-// the view reads instead (same stub the other mounted suites use). The shared
-// keyboard-lift view is stubbed for the same reason (this node project cannot
-// load its react-native entry), and the reveal hook stays inert with no
-// keyboard padding.
+// The screen wraps its form in the shared keyboard-lift view, whose real module
+// reads the platform and the safe-area insets (a react-native entry this node
+// project cannot load). Sibling mounted specs stub the view for the same
+// reason; the reveal hook stays inert with no keyboard padding.
+// The screen reserves the keyboard's height and reveals its submit button via
+// `useRevealEndOnKeyboard`, so those hooks run on every render. Mock the native
+// safe-area context like the sibling app-aware-keyboard-padding.mounted.test.tsx
+// so the real package's TS source is never resolved by the test transform.
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-// The screen reads `useRevealEndOnKeyboard()` on every render, before the
-// provider-status branches, and that hook reaches the keyboard-padding module
-// (whose safe-area import is not resolvable under this project's Node
-// environment). Sibling mounted tests of a screen that reserves keyboard
-// height mock the module the same way.
+// The keyboard-lift view reads the device insets through
+// `react-native-safe-area-context`, whose CommonJS entry requires a Flow
+// react-native subpath this node project cannot load. Stub the two kilo-chat
+// modules the way the sibling node-only screen tests do.
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
   useAppAwareKeyboardPadding: () => 0,

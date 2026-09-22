@@ -36,6 +36,15 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   View: 'View',
 }));
+// The screen reads `useRevealEndOnKeyboard()` on every render, before the
+// provider-status branches, and that hook reaches the keyboard-padding module
+// (whose safe-area import is not resolvable under this project's Node
+// environment). Sibling mounted tests of a screen that reserves keyboard
+// height mock the module the same way.
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
+  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
+  useAppAwareKeyboardPadding: () => 0,
+}));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 // The screen wraps its body in the keyboard-padding view, which reads the

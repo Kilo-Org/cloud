@@ -226,13 +226,16 @@ import {
   failWaitingMessages as applyFailWaitingMessages,
   failedMessageSnapshot,
   freezeLegacyQueuedMessages,
+  getSessionMessageTurn,
   hasAcceptedMessage,
   hasUnreleasedOperationProof,
   incrementDeliveryFailure,
   markSessionOperationRejection,
   matchesSessionMessageReplay,
   nextQueuedMessageId,
+  noOutputRecoveryAllowed,
   recordAcceptedMessageActivity,
+  redispatchAcceptedMessage,
   releaseCompletedRetryableAttach,
   releaseUnadmittedWaitingMessages,
   replacePreparationAttemptId,
@@ -244,6 +247,11 @@ import {
   type SessionMessageRecord,
 } from './session-message-queue.js';
 import { createMessageCallbacks, type MessageCallbacks } from './message-callbacks.js';
+import {
+  applyStoredAssistantSettlement,
+  projectStoredAssistantSettlement,
+  type AcceptedStoredSettlement,
+} from './accepted-stored-settlement.js';
 import {
   createReportOutbox,
   readReportAnchor,
@@ -3027,6 +3035,11 @@ export class SandboxSession extends DurableObject<Env> {
               report('inactivity');
               return;
             }
+            if (!this.acceptedTurnIsDrivable(accepted.messageId)) {
+              diagnostic.reason = 'accepted_message_changed';
+              report('superseded');
+              return;
+            }
             diagnostic.healthy = true;
             report('healthy');
             await this.scheduleAcceptedRecheck(epoch, accepted.messageId);
@@ -3059,6 +3072,11 @@ export class SandboxSession extends DurableObject<Env> {
           report('inactivity');
           return;
         }
+        if (!this.acceptedTurnIsDrivable(accepted.messageId)) {
+          diagnostic.reason = 'accepted_message_changed';
+          report('superseded');
+          return;
+        }
         if (!waiting) {
           diagnostic.reason = 'inactive_snapshot';
           throw new Error('Accepted execution is no longer active');
@@ -3066,7 +3084,10 @@ export class SandboxSession extends DurableObject<Env> {
         report('healthy');
         await this.scheduleAcceptedRecheck(epoch, accepted.messageId);
       } catch {
-        if (this.isCurrentAcceptedMessage(accepted, epoch)) {
+        if (
+          this.isCurrentAcceptedMessage(accepted, epoch) &&
+          this.acceptedTurnIsDrivable(accepted.messageId)
+        ) {
           diagnostic.reason ??= 'sync_failed';
           report('runtime_unhealthy');
           await this.failDelivery(
@@ -3090,11 +3111,37 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   /**
-   * The inactivity fail path. Re-reads the accepted row and re-evaluates the
-   * bound synchronously before persisting, so real progress that landed during
-   * the preceding observe/sync keeps the turn alive. Message-only: no
-   * quarantine and no native-runtime retirement. The follow-up abort is
-   * best-effort and fenced with the captured wrapper instance.
+   * Positive terminal evidence for an accepted turn that already answered over
+   * the ingest channel, read from the DO's stored kilocode events. The record
+   * stays `accepted` because settlement here comes from the prompt operation
+   * result, so recovery must settle (not re-run) a turn whose answer already
+   * arrived. Mirrors the legacy wrapper-death reconciliation.
+   */
+  private storedAssistantSettlement(current: MessageRecord): AcceptedStoredSettlement | undefined {
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    if (!metadata || !kiloSessionId) return undefined;
+    return projectStoredAssistantSettlement(
+      this.eventQueries.getAssistantMessageForUserMessage(
+        metadata.identity.sessionId,
+        kiloSessionId,
+        current.messageId
+      )
+    );
+  }
+
+  /**
+   * The inactivity path. Re-reads the accepted row and re-evaluates the bound
+   * synchronously before persisting, so real progress that landed during the
+   * preceding observe/sync keeps the turn alive.
+   *
+   * The first no-output detection is recoverable: the accepted turn is
+   * re-queued under its durable intent and the wedged runtime is retired, so
+   * the alarm re-dispatches it once on a replacement runtime. A second
+   * identical detection keeps the terminal path (message-only: no quarantine
+   * and no native-runtime retirement) and records the attempt count. The
+   * follow-up abort is best-effort and fenced with the captured wrapper
+   * instance.
    */
   private async failOverdueAcceptedMessage(
     accepted: MessageRecord,
@@ -3106,6 +3153,10 @@ export class SandboxSession extends DurableObject<Env> {
     if (
       !current ||
       current.state !== 'accepted' ||
+      // A Stop admitted while this alarm awaited its observation keeps the
+      // record `accepted` and only adds `cancellation`. Recovering it would
+      // re-queue the turn the user just stopped.
+      current.cancellation !== undefined ||
       activityAt === undefined ||
       !acceptedInactivityDue(activityAt, Date.now())
     )
@@ -3113,6 +3164,46 @@ export class SandboxSession extends DurableObject<Env> {
     diagnostic.stage = 'inactivity';
     diagnostic.reason = 'inactivity_due';
     diagnostic.lastActivityAt = activityAt;
+    // Reconcile before recovering: settlement here normally comes from the
+    // prompt operation result, so a runtime that went silent after streaming
+    // its answer still leaves the record `accepted`. Re-dispatching it would run
+    // the turn and its side effects a second time.
+    const settlement = this.storedAssistantSettlement(current);
+    if (settlement) {
+      const settled = applyStoredAssistantSettlement(
+        this.loadMessages(),
+        current.messageId,
+        settlement,
+        Date.now()
+      );
+      if (!settled || !this.saveMessages(settled, epoch)) return false;
+      diagnostic.recovery = 'reconciled';
+      logControlDiagnostic('accepted_no_output_reconciled', {
+        ...diagnostic,
+        producer: 'accepted_inactivity',
+        result: settlement.state,
+      });
+      return true;
+    }
+    const recoveryAttempts = current.recoveryAttempts ?? 0;
+    if (noOutputRecoveryAllowed(recoveryAttempts)) {
+      const next = redispatchAcceptedMessage(this.loadMessages(), current.messageId);
+      if (!next || !this.saveMessages(next, epoch)) return false;
+      diagnostic.recovery = 'redispatched';
+      logControlDiagnostic('accepted_no_output_recovery', {
+        ...diagnostic,
+        producer: 'accepted_inactivity',
+        recoveryAttempts: recoveryAttempts + 1,
+      });
+      const metadata = this.terminalLifecycle.getStoredMetadata();
+      if (metadata && current.wrapperInstanceId)
+        this.retainRuntimeCleanup(metadata, current.wrapperInstanceId, 'no_output_recovery');
+      const turn = getSessionMessageTurn(current);
+      this.broadcastQueuedMessage(current.messageId, turn ? renderExecutionTurnContent(turn) : '');
+      await this.armQueueRetry();
+      return true;
+    }
+    diagnostic.attempts = recoveryAttempts + 1;
     const wrapperInstanceId = current.wrapperInstanceId;
     const messages = failAcceptedMessage(
       this.loadMessages(),
@@ -3124,6 +3215,20 @@ export class SandboxSession extends DurableObject<Env> {
     if (nextQueuedMessageId(messages)) await this.armQueueRetry();
     await this.abortOverdueAcceptedMessage(current.messageId, wrapperInstanceId);
     return true;
+  }
+
+  /**
+   * Whether the accepted turn is still the watchdog's to drive. A Stop admitted
+   * during an awaited observation keeps the record `accepted` and only adds
+   * `cancellation`; the stop lifecycle settles the turn from there, so the
+   * watchdog must release it instead of re-arming it or failing it as a runtime
+   * failure. `failOverdueAcceptedMessage` already refuses to recover such a
+   * record, which is why the callers re-check here before treating "not overdue"
+   * as healthy.
+   */
+  private acceptedTurnIsDrivable(messageId: string): boolean {
+    const current = this.loadMessages().find(item => item.messageId === messageId);
+    return current?.state === 'accepted' && current.cancellation === undefined;
   }
 
   /**
@@ -3158,6 +3263,7 @@ export class SandboxSession extends DurableObject<Env> {
     if (!this.terminalLifecycle.isCurrent(epoch)) return;
     if (this.isCurrentAcceptedMessage(accepted, epoch)) {
       if (await this.failOverdueAcceptedMessage(accepted, epoch, diagnostic)) return;
+      if (!this.acceptedTurnIsDrivable(accepted.messageId)) return;
       await this.scheduleAcceptedRecheck(epoch, accepted.messageId);
       return;
     }

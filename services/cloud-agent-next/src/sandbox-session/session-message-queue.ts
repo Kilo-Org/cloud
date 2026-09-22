@@ -71,6 +71,12 @@ type SessionMessageLifecycle = {
   providerOwnership?: CloudAgentProviderOwnership;
   attachFailures?: number;
   promptFailures?: number;
+  /**
+   * No-output recoveries already spent on this turn. Bumped by
+   * `redispatchAcceptedMessage`, so a second identical no-output detection
+   * terminalizes instead of recovering again.
+   */
+  recoveryAttempts?: number;
   preparationAttemptId?: string;
   /**
    * Durable wait reason for a head whose preparation attempt is finalized but
@@ -116,6 +122,21 @@ export type SessionMessageRecord = SessionMessageRecordV2 | LegacySessionMessage
 
 export const ATTACH_FAILURE_LIMIT = 2;
 export const PROMPT_FAILURE_LIMIT = 5;
+const NO_OUTPUT_RECOVERY_LIMIT = 1;
+
+/**
+ * Whether one more no-output recovery may be spent on an accepted turn.
+ *
+ * Both producers of `wrapper_no_output` share this bound: the accepted-message
+ * inactivity timeout in `SandboxSession.failOverdueAcceptedMessage` here, and
+ * the wrapper no-output watchdog in `src/session/wrapper-supervisor.ts`. Each
+ * plane owns its recovery lifecycle, so the same bound is duplicated on purpose:
+ * a turn gets at most one automatic re-dispatch before a second identical
+ * detection terminalizes with the attempt count recorded.
+ */
+export function noOutputRecoveryAllowed(recoveryAttempts: number): boolean {
+  return recoveryAttempts < NO_OUTPUT_RECOVERY_LIMIT;
+}
 
 export function resolveSessionMessageIntent(
   input: ControlSessionMessageInput,
@@ -381,6 +402,52 @@ export function releaseUnadmittedWaitingMessages(
     }),
     releasedIds,
   };
+}
+
+/**
+ * Re-queue an accepted turn whose runtime produced no output, so the alarm can
+ * re-dispatch the same durable turn on a fresh runtime. The immutable `intent`
+ * (the user's typed message) is preserved, which is what makes the recovery
+ * lossless. Every ambiguous dispatch proof is dropped: a late operation result
+ * for the retired authorization must not revive it, and the cleared prompt
+ * proof is what lets the delivery start a new acquisition instead of
+ * reconciling the old one. Only the matching record changes; every other record
+ * is returned untouched. Returns `undefined` when no accepted record matches.
+ *
+ * `deliveryDeadlineAt` and `executionDeadlineAt` are cleared with the other
+ * dispatch state: both were measured against the runtime that just went silent,
+ * so keeping either would fail the replacement delivery immediately or hand the
+ * fresh prompt a bound that belongs to the retired authorization.
+ */
+export function redispatchAcceptedMessage(
+  messages: readonly SessionMessageRecord[],
+  messageId: string
+): SessionMessageRecord[] | undefined {
+  const message = messages.find(item => item.messageId === messageId);
+  if (!message || message.state !== 'accepted') return undefined;
+  return messages.map(item =>
+    item.messageId !== messageId
+      ? item
+      : {
+          ...item,
+          state: 'queued',
+          acceptedAt: undefined,
+          lastActivityAt: undefined,
+          deliveryDeadlineAt: undefined,
+          executionDeadlineAt: undefined,
+          terminalAt: undefined,
+          terminalSource: undefined,
+          failedReason: undefined,
+          failedDetail: undefined,
+          wrapperInstanceId: undefined,
+          preparationAttemptId: undefined,
+          preparationWait: undefined,
+          unresolvedDispatch: undefined,
+          retryNotBefore: undefined,
+          operations: undefined,
+          recoveryAttempts: (item.recoveryAttempts ?? 0) + 1,
+        }
+  );
 }
 
 /**
@@ -667,6 +734,10 @@ export function failedMessageSnapshot(
     delivery: accepted ? 'sent' : 'queued',
     accepted,
     reason: cancelled ? 'interrupted' : message.failedReason,
+    // Record the attempt count only once a no-output recovery was spent on this
+    // turn: a first-attempt failure has no recovery to account for, and emitting
+    // `attempts: 1` there would change every other terminal failure payload.
+    ...(message.recoveryAttempts !== undefined ? { attempts: message.recoveryAttempts + 1 } : {}),
     ...(cancelled
       ? { error: 'The message was interrupted' }
       : message.failedDetail || message.failedReason

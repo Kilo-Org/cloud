@@ -50,15 +50,20 @@ export function SegmentedControl<T extends string>({
               selected && 'bg-background'
             )}
           >
+            {/* `numberOfLines` + `adjustsFontSizeToFit` keeps a longer label
+                ("Commit and push") on one line at every width and font scale.
+                One line per option: a wrapped label made the equal-width
+                segments render at unequal height and weight, and the platform
+                shrinks the font to fit rather than truncating. Longer locales
+                ellipsize instead of growing a second line; the radio's
+                accessibilityLabel still carries the full text. */}
             <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
               className={cn(
                 'text-center text-sm',
                 selected ? 'font-medium text-foreground' : 'text-muted-foreground'
               )}
-              // One line per option: a wrapped label makes the two choices
-              // uneven. Longer locales ellipsize instead of growing a second
-              // line; the radio's accessibilityLabel still carries the full text.
-              numberOfLines={1}
             >
               {option.label}
             </Text>

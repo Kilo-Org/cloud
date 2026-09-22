@@ -339,7 +339,7 @@
       "balanceAlertsSubtitle": "संगठन का बैलेंस कम होने की चेतावनियाँ",
       "balanceAlertsUnavailable": "बैलेंस अलर्ट पाने के लिए किसी संगठन से जुड़ें।",
       "securityFindingsSubtitle": "नई सुरक्षा समस्याएँ और SLA के रिमाइंडर",
-      "securityFindingsUnavailable": "सुरक्षा समस्याएँ पाने के लिए किसी दायरे में Kilo सुरक्षा एजेंट चालू करें।",
+      "securityFindingsUnavailable": "सुरक्षा समस्याएँ पाने के लिए किसी स्कोप पर Kilo सुरक्षा एजेंट चालू करें।",
       "spendAlertsSubtitle": "सीमा पार होना और हर घंटे की बढ़त",
       "spendAlertsToggle": "खर्च की चेतावनी श्रेणी"
     },

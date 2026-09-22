@@ -841,9 +841,9 @@
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
       "kiloclawActivityUnavailable": "Start en KiloClaw-instans for at få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "advarsler om lav saldo i organisationen",
-      "balanceAlertsUnavailable": "Tilmeld dig en organisation for at få advarsler om lav saldo.",
+      "balanceAlertsUnavailable": "Tilmeld dig en organisation for at få saldoadvarsler.",
       "securityFindingsSubtitle": "nye fund og SLA-påmindelser",
-      "securityFindingsUnavailable": "Aktivér Kilo-sikkerhedsagenten i et område for at få sikkerhedsfund.",
+      "securityFindingsUnavailable": "Aktivér Kilo-sikkerhedsagenten på et område for at få sikkerhedsfund.",
       "spendAlertsSubtitle": "grænseoverskridelser og spikes pr. time",
       "spendAlertsToggle": "Kategorien forbrugsadvarsler"
     },

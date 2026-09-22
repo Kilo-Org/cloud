@@ -841,9 +841,9 @@
       "kiloclawActivitySubtitle": "kwafin shirin ya shirya ko ya gaza, ayyukan da aka tsara",
       "kiloclawActivityUnavailable": "Fara kwafin KiloClaw don samun ayyukan KiloClaw.",
       "balanceAlertsSubtitle": "gargaɗin ƙarancin kuɗin ƙungiya",
-      "balanceAlertsUnavailable": "Shiga ƙungiya don samun gargaɗin ƙarancin kuɗi.",
+      "balanceAlertsUnavailable": "Shiga ƙungiya don samun gargaɗin kuɗi.",
       "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA",
-      "securityFindingsUnavailable": "Kunna wakilin tsaro na Kilo a wani yanki don samun sakamakon binciken tsaro.",
+      "securityFindingsUnavailable": "Kunna Wakilin tsaro na Kilo a kan wani iyaka don samun sakamakon binciken tsaro.",
       "spendAlertsSubtitle": "wucewar iyaka da hauhawar sa'a",
       "spendAlertsToggle": "Rukunin faɗakarwar kashe kuɗi"
     },

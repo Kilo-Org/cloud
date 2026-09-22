@@ -337,9 +337,9 @@
       "kiloclawActivitySubtitle": "instans siap/gagal, tindakan terjadwal",
       "kiloclawActivityUnavailable": "Mulai instans KiloClaw untuk mendapatkan aktivitas KiloClaw.",
       "balanceAlertsSubtitle": "peringatan saat saldo organisasi rendah",
-      "balanceAlertsUnavailable": "Gabung ke organisasi untuk mendapatkan peringatan saldo rendah.",
+      "balanceAlertsUnavailable": "Bergabunglah dengan organisasi untuk mendapatkan peringatan saldo.",
       "securityFindingsSubtitle": "temuan baru dan pengingat SLA",
-      "securityFindingsUnavailable": "Aktifkan agen keamanan Kilo pada cakupan untuk mendapatkan temuan keamanan.",
+      "securityFindingsUnavailable": "Aktifkan Agen keamanan Kilo pada cakupan untuk mendapatkan temuan keamanan.",
       "spendAlertsSubtitle": "melewati ambang batas dan lonjakan per jam",
       "spendAlertsToggle": "Kategori peringatan pengeluaran"
     },

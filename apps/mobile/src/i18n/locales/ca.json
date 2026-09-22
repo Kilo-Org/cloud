@@ -857,9 +857,9 @@
       "kiloclawActivitySubtitle": "instància a punt/fallida, accions programades",
       "kiloclawActivityUnavailable": "Inicia una instància de KiloClaw per rebre activitat de KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo baix de l'organització",
-      "balanceAlertsUnavailable": "Uneix-te a una organització per rebre avisos de saldo baix.",
+      "balanceAlertsUnavailable": "Uneix-te a una organització per rebre avisos de saldo.",
       "securityFindingsSubtitle": "noves deteccions i recordatoris d'SLA",
-      "securityFindingsUnavailable": "Activa l'agent de seguretat de Kilo en un àmbit per rebre problemes de seguretat.",
+      "securityFindingsUnavailable": "Activa l'Agent de seguretat de Kilo en un àmbit per rebre deteccions de seguretat.",
       "spendAlertsSubtitle": "superacions de llindars i pics horaris",
       "spendAlertsToggle": "Categoria d'alertes de despesa"
     },

@@ -309,9 +309,9 @@
       "kiloclawActivitySubtitle": "instancia lista/fallida, acciones programadas",
       "kiloclawActivityUnavailable": "Inicia una instancia de KiloClaw para recibir actividad de KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo bajo de la organización",
-      "balanceAlertsUnavailable": "Únete a una organización para recibir alertas de saldo bajo.",
+      "balanceAlertsUnavailable": "Únete a una organización para recibir avisos de saldo.",
       "securityFindingsSubtitle": "nuevos hallazgos y recordatorios de SLA",
-      "securityFindingsUnavailable": "Activa el agente de seguridad de Kilo en un ámbito para recibir hallazgos de seguridad.",
+      "securityFindingsUnavailable": "Activa el Agente de seguridad de Kilo en un ámbito para recibir hallazgos de seguridad.",
       "spendAlertsSubtitle": "superaciones de umbrales y picos por hora",
       "spendAlertsToggle": "Categoría de alertas de gasto"
     },

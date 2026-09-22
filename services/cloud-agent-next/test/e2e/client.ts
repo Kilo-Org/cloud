@@ -13,6 +13,7 @@ import WebSocket from 'ws';
 import { z } from 'zod';
 import { mintApiToken, mintStreamTicket } from './auth.js';
 import { resolveFakeAdminToken } from './fake-llm-admin.js';
+import { FAKE_SCOPE_MARKER_PREFIX, isFakeScopeToken } from './fake-llm-core.js';
 import type { FakeScenarioStatus } from './fake-llm-server.js';
 
 /**
@@ -100,10 +101,6 @@ export const DEFAULT_CONFIG: Omit<DriverConfig, 'user' | 'nextAuthSecret'> = {
   model: 'kilo/fake-deterministic',
   fakeLlmUrl: process.env.FAKE_LLM_URL ?? 'http://localhost:8811',
 };
-
-// ---------------------------------------------------------------------------
-// tRPC helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Minimal tRPC HTTP-link client. The cloud-agent-next server mounts tRPC
@@ -196,10 +193,6 @@ export async function trpcCall<T>(
   const envelope = z.object({ result: z.object({ data: z.unknown() }) }).parse(parsed);
   return envelope.result.data as T;
 }
-
-// ---------------------------------------------------------------------------
-// High-level session operations
-// ---------------------------------------------------------------------------
 
 export type StartSessionResult = {
   cloudAgentSessionId: string;
@@ -520,10 +513,6 @@ export async function sendMessage(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Control-plane helpers
-// ---------------------------------------------------------------------------
-
 const messageResultSchema = z.object({
   cloudAgentSessionId: z.string(),
   messageId: z.string(),
@@ -600,10 +589,6 @@ export async function deleteSession(
   return trpcCall<{ success: boolean }>(config, 'deleteSession', { sessionId }, { signal });
 }
 
-// ---------------------------------------------------------------------------
-// Fake-LLM gate helpers
-// ---------------------------------------------------------------------------
-
 /**
  * Headers for the fake LLM `/test/*` side channel.
  *
@@ -652,13 +637,17 @@ export async function fetchFakeWaiters(fakeLlmUrl: string): Promise<FakeWaitersS
 
 export type FakeRequestSnapshot = {
   chatCompletions: number;
+  /** Present when the query was scoped; echoes the requested scope. */
+  scope?: string;
 };
 
 export async function fetchFakeRequests(
   fakeLlmUrl: string,
   signal?: AbortSignal
 ): Promise<FakeRequestSnapshot> {
-  const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/requests`;
+  const scope = resolveFakeScope();
+  const query = scope === undefined ? '' : `?scope=${encodeURIComponent(scope)}`;
+  const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/requests${query}`;
   const res = await fetch(url, { headers: fakeControlHeaders(), signal });
   if (!res.ok) {
     throw new Error(`fetchFakeRequests failed: ${res.status} ${res.statusText}`);
@@ -748,10 +737,6 @@ export async function waitForGateEngaged(
   }
   return false;
 }
-
-// ---------------------------------------------------------------------------
-// WebSocket stream
-// ---------------------------------------------------------------------------
 
 export const streamEventSchema = z.object({
   eventId: z.number(),
@@ -1142,12 +1127,24 @@ export async function openConnectedStream(
   return requireConnected(stream, sessionId);
 }
 
-// ---------------------------------------------------------------------------
-// Scenario helpers
-// ---------------------------------------------------------------------------
-
 export function fakeDirective(conversation: string): string {
-  return `__fake__:${conversation}`;
+  const scope = resolveFakeScope();
+  const directive = `__fake__:${conversation}`;
+  return scope === undefined ? directive : `${FAKE_SCOPE_MARKER_PREFIX}${scope}\n${directive}`;
+}
+
+/**
+ * Parallel matrix shards set `E2E_FAKE_SCOPE` to a unique token so the shared
+ * fake attributes that shard's completions to it. Absent means the global
+ * counters, which is what a single focused run uses.
+ */
+export function resolveFakeScope(): string | undefined {
+  const raw = process.env.E2E_FAKE_SCOPE;
+  if (raw === undefined || raw === '') return undefined;
+  if (!isFakeScopeToken(raw)) {
+    throw new Error(`E2E_FAKE_SCOPE must match [A-Za-z0-9_-]{1,64}; got ${JSON.stringify(raw)}`);
+  }
+  return raw;
 }
 
 export function hasPreparationForMessage(events: StreamEvent[], messageId: string): boolean {
@@ -1180,10 +1177,6 @@ export function waitForOpen(ws: WebSocket, timeoutMs = 5_000): Promise<void> {
     });
   });
 }
-
-// ---------------------------------------------------------------------------
-// Assertions
-// ---------------------------------------------------------------------------
 
 export type AssertionResult = { ok: boolean; message: string };
 

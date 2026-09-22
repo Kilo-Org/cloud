@@ -48,19 +48,11 @@ import {
   RestoredWorkspaceReconciliationError,
 } from './session-bootstrap.js';
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 /** Grace period before force exit during shutdown (110 seconds) */
 const SHUTDOWN_TIMEOUT_MS = 110_000;
 
 /** Timeout for createKilo() server startup */
 const KILO_STARTUP_TIMEOUT_MS = 30_000;
-
-// ---------------------------------------------------------------------------
-// Environment Variable Parsing
-// ---------------------------------------------------------------------------
 
 function getOptionalEnvInt(name: string, defaultValue: number): number {
   const value = process.env[name];
@@ -165,10 +157,6 @@ function parseStartupArgs(argv: string[]): StartupArgs {
   return { agentSessionId, userId, sessionId, wrapperInstanceId, wrapperInstanceGeneration };
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
 async function main() {
   logToFile(`wrapper starting (long-running mode) bun=${Bun.version}`);
 
@@ -217,7 +205,6 @@ async function main() {
     failStartup(`Invalid agent session ID: ${agentSessionId}`);
   }
 
-  // Set log path if not already set
   if (!process.env.WRAPPER_LOG_PATH) {
     process.env.WRAPPER_LOG_PATH = `/tmp/kilocode-wrapper-${Date.now()}.log`;
   }
@@ -234,9 +221,6 @@ async function main() {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Wire up components
-  // ---------------------------------------------------------------------------
   // Confine tool subprocesses to a memory-capped cgroup (best-effort; null
   // when the cgroup fs is unavailable, e.g. in devcontainers).
   const toolCgroup = startToolCgroup(process.env);
@@ -862,7 +846,6 @@ async function main() {
     }
   }
 
-  // Create HTTP server
   if (initialWorkspacePath) {
     await runtime.start({
       workspacePath: initialWorkspacePath,
@@ -883,10 +866,6 @@ async function main() {
   );
   console.log(`Wrapper listening on port ${wrapperPort}`);
 
-  // ---------------------------------------------------------------------------
-  // Graceful shutdown
-  // ---------------------------------------------------------------------------
-
   async function handleShutdown(signal: string): Promise<void> {
     if (isShuttingDown) return;
     isShuttingDown = true;
@@ -896,7 +875,6 @@ async function main() {
     logToFile(`shutdown signal: ${signal}`);
     console.error(`Received ${signal}, shutting down...`);
 
-    // Force exit after timeout
     setTimeout(() => {
       logToFile('force exit after timeout');
       process.exit(1);
@@ -938,10 +916,8 @@ async function main() {
       await uploader.finalize();
     }
 
-    // Close connections
     void connectionManager?.close();
 
-    // Close kilo server (real or fake)
     try {
       if (runtime.closeServer()) {
         logToFile('kilo server closed');
@@ -950,10 +926,8 @@ async function main() {
       logToFile('kilo server close failed');
     }
 
-    // Stop HTTP server
     await server.stop();
 
-    // Try graceful exit
     setTimeout(() => {
       logToFile('graceful exit');
       process.exit(0);
@@ -963,9 +937,6 @@ async function main() {
   process.on('SIGTERM', () => void handleShutdown('SIGTERM'));
   process.on('SIGINT', () => void handleShutdown('SIGINT'));
 
-  // ---------------------------------------------------------------------------
-  // Crash handlers — best-effort log upload on unexpected crashes
-  // ---------------------------------------------------------------------------
   function handleCrash(label: string): void {
     if (isShuttingDown) return;
 

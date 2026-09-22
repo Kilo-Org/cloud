@@ -135,10 +135,12 @@ describe('shared branded splash', () => {
     ).toBeTypeOf('function');
     expect(config.mods?.android?.styles).toBeTypeOf('function');
 
-    // Compile against a throwaway project: `compileModsAsync` seeds the Android
-    // color/style mods from the resources already on disk, so pointing it at this
-    // package's root would read a local prebuild's generated `colors.xml`
-    // (absent in CI) and make the assertions depend on the developer's machine.
+    // Compile and introspect against a throwaway project: `compileModsAsync`
+    // seeds the Android color/style mods from the resources already on disk, so
+    // pointing it at this package's root would read a developer's prebuilt
+    // `android/` tree — its generated `colors.xml` is absent in CI — and merge
+    // colors this test does not own into the mod results, making the assertions
+    // depend on the developer's machine.
     const { root } = createAndroidProject();
     const evaluated = await compileModsAsync(config, {
       projectRoot: root,
@@ -169,8 +171,12 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // `introspect` merges into the colors a local prebuild already generated, so
+    // assert the plugin's entry instead of the whole array.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

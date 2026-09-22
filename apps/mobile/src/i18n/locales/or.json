@@ -843,7 +843,7 @@
       "balanceAlertsSubtitle": "ସଂଗଠନର କମ୍ ବ୍ୟାଲାନ୍ସ ସତର୍କତା",
       "balanceAlertsUnavailable": "ବ୍ୟାଲାନ୍ସ ସତର୍କତା ପାଇବାକୁ ଏକ ସଂଗଠନରେ ଯୋଗ ଦିଅନ୍ତୁ।",
       "securityFindingsSubtitle": "ନୂଆ ସୁରକ୍ଷା ସମସ୍ୟା ଓ SLA ସ୍ମାରକ",
-      "securityFindingsUnavailable": "ସୁରକ୍ଷା ସମସ୍ୟା ପାଇବାକୁ ଏକ ପରିସରରେ Kilo ସୁରକ୍ଷା ଏଜେଣ୍ଟ ଚାଲୁ କରନ୍ତୁ।",
+      "securityFindingsUnavailable": "ସୁରକ୍ଷା ସମସ୍ୟା ପାଇବାକୁ ଏକ ପରିସରରେ Kilo ସୁରକ୍ଷା ଏଜେଣ୍ଟ ସକ୍ଷମ କରନ୍ତୁ।",
       "spendAlertsSubtitle": "ସୀମା ଅତିକ୍ରମ ଏବଂ ଘଣ୍ଟାପ୍ରତି ବୃଦ୍ଧି",
       "spendAlertsToggle": "ଖର୍ଚ୍ଚ ସତର୍କତା ବର୍ଗ"
     },

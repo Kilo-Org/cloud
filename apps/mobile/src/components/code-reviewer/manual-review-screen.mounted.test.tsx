@@ -36,15 +36,21 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   View: 'View',
 }));
-vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-// The keyboard-lift view reads the device insets through
-// `react-native-safe-area-context`, whose CommonJS entry requires a Flow
-// react-native subpath this node project cannot load. Stub the two kilo-chat
-// modules the way the sibling node-only screen tests do.
+// The screen wraps its form in the shared keyboard-lift view, whose real module
+// reads the platform and the safe-area insets (a react-native entry this node
+// project cannot load). Sibling mounted specs stub the view for the same
+// reason; the reveal hook stays inert with no keyboard padding.
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
+  useAppAwareKeyboardPadding: () => 0,
 }));
+vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+// The screen reads `useRevealEndOnKeyboard()` on every render, before the
+// provider-status branches, and that hook reaches the keyboard-padding module
+// (whose safe-area import is not resolvable under this project's Node
+// environment). Sibling mounted tests of a screen that reserves keyboard
+// height mock the module the same way.
 vi.mock('@/components/kilo-chat/use-reveal-end-on-keyboard', () => ({
   useRevealEndOnKeyboard: () => ({ current: null }),
 }));

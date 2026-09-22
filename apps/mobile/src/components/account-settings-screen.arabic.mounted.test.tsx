@@ -89,7 +89,9 @@ describe('AccountSettingsScreen in Arabic', () => {
     expect(renderer.root.findByType('ScreenHeader').props.title).toBe('الحساب');
     expect(findConfigureRow(renderer, 'اللغة').props).toMatchObject({ subtitle: 'العربية' });
     expect(findConfigureRow(renderer, 'المضيفون الموثوقون')).toBeDefined();
-    expect(findConfigureRow(renderer, 'مفاتيح المرور')).toBeDefined();
+    expect(findConfigureRow(renderer, 'مفاتيح المرور').props).toMatchObject({
+      subtitle: 'سجّل الدخول بدون كلمة مرور',
+    });
     expect(findConfigureRow(renderer, 'جلسات الأجهزة')).toBeDefined();
   });
 

@@ -55,6 +55,8 @@ vi.mock('@/lib/utils', () => ({
 
 // The model name from the explorer capture: 19 characters, wider than the
 // space one nowrap row leaves after the shrink-0 mode chip and the effort badge.
+// It only wraps because the packed model row is itself shrink-0, so the outer
+// row overflows and `flex-wrap` fires instead of squeezing the label.
 const LONG_MODEL_NAME = 'DeepSeek V4.1 Flash';
 
 const MODEL_OPTIONS: SessionModelOption[] = [
@@ -94,8 +96,9 @@ describe('ChatToolbar long model name', () => {
   it('lets the control row reflow instead of squeezing the model name to a few characters', () => {
     const renderer = renderToolbar();
     // A nowrap row gives the model chip only what the shrink-0 mode chip leaves,
-    // and the chip then sheds that from the label. Wrapping moves the model chip
-    // to its own line, where it keeps the full name.
+    // and the chip then sheds that from the label. The pack row is shrink-0 too,
+    // so it cannot absorb the deficit itself: the outer row overflows and wraps
+    // the pack to its own line, where the chip keeps the full name.
     const rows = renderer.root.findAll(
       node =>
         typeof node.type === 'string' &&
@@ -160,6 +163,9 @@ describe('ChatToolbar long model name', () => {
     expect(shared).toBeDefined();
     expect(shared?.props.className).toContain('flex-row');
     expect(shared?.props.className).not.toContain('flex-wrap');
+    // shrink-0 is what makes the outer `flex-wrap` fire: the pack cannot absorb
+    // the row's deficit, so it overflows and wraps whole.
+    expect(shared?.props.className).toContain('shrink-0');
 
     // The button still ends the chip's line at its trailing edge.
     expect(pasteButton?.props.className).toContain('ml-auto');

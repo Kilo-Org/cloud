@@ -193,6 +193,36 @@ describe('ChatToolbar', () => {
     expect(pasteButtonProps.className).toContain('ml-auto');
   });
 
+  it('is content-sized with wrap on so the pack row can wrap intact', () => {
+    const onPaste = vi.fn(() => undefined);
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({ ...defaultProps(), onPaste, wrap: true }) as Node;
+
+    // A shrinkable pack row absorbs the row's deficit itself: the outer row fits,
+    // `flex-wrap` never fires and the chip label ellipsizes. `shrink-0` keeps the
+    // pack at its content width so the outer row overflows and wraps it;
+    // `max-w-full` stops the pack from pushing past the narrowest viewport.
+    const wrapRow = findRowHolding(element, ['ModelSelector', 'ComposerPasteButton']);
+    expect(wrapRow).not.toBeNull();
+    const wrapClassName = typeof wrapRow?.className === 'string' ? wrapRow.className : '';
+    expect(wrapClassName).toContain('shrink-0');
+    expect(wrapClassName).toContain('max-w-full');
+  });
+
+  it('keeps the pack row shrinkable when the host pins one row', () => {
+    const onPaste = vi.fn(() => undefined);
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({ ...defaultProps(), onPaste, wrap: false }) as Node;
+
+    // With one row pinned the pack must give width back, so the label ellipsizes
+    // inside it instead of overflowing the row.
+    const pinnedRow = findRowHolding(element, ['ModelSelector', 'ComposerPasteButton']);
+    expect(pinnedRow).not.toBeNull();
+    const pinnedClassName = typeof pinnedRow?.className === 'string' ? pinnedRow.className : '';
+    expect(pinnedClassName).toContain('shrink');
+    expect(pinnedClassName).not.toContain('shrink-0');
+  });
+
   it('locks only the model picker when modelLocked is true', () => {
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const element = ChatToolbar({

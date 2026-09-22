@@ -88,11 +88,19 @@ export function ChatToolbar({
   // row to its left. Packed, the chip and the button move to the next line
   // together and the button stays at the end of the chip's line.
   const modelSelectorWithPaste = (
-    // Content-sized for the wrap decision (grow leaves the basis at auto), so
-    // the outer row still sees the chip's real width and wraps the unit instead
-    // of squeezing the chip; on its line the unit fills the row and the paste
-    // keeps the trailing edge.
-    <View className="min-w-0 grow flex-row items-center gap-2">
+    // `shrink-0` keeps the pack at its content width so the outer row has
+    // something to overflow and wrap. While the pack could shrink it absorbed
+    // the row's deficit itself, the outer row fit, `flex-wrap` never fired and
+    // the chip label ellipsized instead. `max-w-full` caps the pack at the row's
+    // width, so a label wider than the viewport is elided inside the chip rather
+    // than pushed off the screen edge. With one row pinned (`wrap={false}`) the
+    // pack stays shrinkable so the label can still ellipsize inside that row.
+    <View
+      className={cn(
+        'min-w-0 grow flex-row items-center gap-2',
+        wrap ? 'shrink-0 max-w-full' : 'shrink'
+      )}
+    >
       {modelSelector}
       {onPaste ? (
         <ComposerPasteButton
@@ -106,11 +114,12 @@ export function ChatToolbar({
   );
 
   return (
-    // The chips reflow instead of shrinking each other: the mode chip is
-    // `shrink-0`, so in a nowrap row the only flexible part is the model chip,
-    // and a long model name ("DeepSeek V4.1 Flash") collapses to "Dee..." next
-    // to the effort badge. Wrapping moves the model chip to its own line, where
-    // it has the full row width to show the selected model.
+    // The chips reflow instead of shrinking each other: the mode chip and the
+    // packed model row are both `shrink-0`, so in a nowrap row the only flexible
+    // part is the model chip, and a long model name ("DeepSeek V4.1 Flash")
+    // collapses to "Dee..." next to the effort badge. With `flex-wrap` on, the
+    // pack overflows the row and wraps whole onto its own line, where it has the
+    // full row width to show the selected model.
     <View
       onLayout={onLayout}
       className={cn(

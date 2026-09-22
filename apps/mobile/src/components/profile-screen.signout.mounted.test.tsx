@@ -36,6 +36,9 @@ vi.mock('react-native-reanimated', () => ({
 // imports `react-native/Libraries/Utilities/codegenNativeComponent` — a path
 // this pipeline cannot parse, so the entry point is stubbed like the screens'
 // other native reads.
+// The screen reads its side insets through `@/lib/screen-insets`; the native
+// module's source is not parseable by this project's transform, and the
+// sign-out confirmation does not depend on the values.
 // The Profile screen reads its landscape side insets through `@/lib/screen-insets`,
 // whose real module loads the native safe-area package. The node project cannot
 // load that native module, so the screen's own tests stub the hook.

@@ -19,6 +19,7 @@ import {
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { modelPickerCostLabel } from '@/lib/model-cost';
+import { autoModelNameKey } from '@/lib/model-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ModelPickerSelection, type ModelPickerSelectionScope } from '@/lib/picker-bridge';
 import { modelPickerSlot } from '@/lib/route-registry';
@@ -83,6 +84,21 @@ function toSessionModelOption(option: ModelOption | SessionModelOption): Session
   return { ...option, displayId: option.id, showGatewayMetadata: true };
 }
 
+/**
+ * The name to render for a model. Kilo's own auto models arrive from the
+ * gateway with an English product name (`Auto Efficient`), which was the one
+ * English word left on the Arabic new-session screen; their names live in the
+ * catalogs. Every other name is the vendor's own and stays as the gateway
+ * spells it.
+ */
+function localizedModelName(
+  option: Pick<SessionModelOption, 'id' | 'name' | 'modelRef'>,
+  t: (key: string) => string
+): string {
+  const key = autoModelNameKey(option.modelRef?.modelID ?? option.id);
+  return key ? t(key) : option.name;
+}
+
 export function openModelPicker(
   router: ImperativeRouter,
   params: {
@@ -138,7 +154,8 @@ export function ModelSelector({
   const providerAware = pickerOptions.some(
     option => option.modelRef !== undefined || !option.showGatewayMetadata
   );
-  const label = selectedModel?.name ?? (!providerAware && value ? value : t('common.model'));
+  const selectedModelName = selectedModel ? localizedModelName(selectedModel, t) : undefined;
+  const label = selectedModelName ?? (!providerAware && value ? value : t('common.model'));
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
@@ -228,10 +245,11 @@ export function ModelPickerOptionRow({
   const { t } = useTranslation();
   const { free, byok, collectsData } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
+  const displayName = localizedModelName(option, t);
   const accessibilityLabel = formatList(
     [
       option.provider?.name,
-      option.name,
+      displayName,
       option.displayId,
       byok ? BYOK_MODEL_LABEL : undefined,
       free && !byok ? freeModelFreeLabel() : undefined,
@@ -264,7 +282,7 @@ export function ModelPickerOptionRow({
           accessibilityState={{ disabled: option.unavailable, selected }}
         >
           <View className="flex-1">
-            <Text className="text-base text-foreground">{option.name}</Text>
+            <Text className="text-base text-foreground">{displayName}</Text>
             {option.modelRef ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
                 {t('agentChat.modelSelector.provider', { id: option.modelRef.providerID })}
@@ -320,8 +338,8 @@ export function ModelPickerOptionRow({
           accessibilityRole="button"
           accessibilityLabel={
             isFavorite
-              ? t('agentChat.modelSelector.removeFromFavorites', { name: option.name })
-              : t('agentChat.modelSelector.addToFavorites', { name: option.name })
+              ? t('agentChat.modelSelector.removeFromFavorites', { name: displayName })
+              : t('agentChat.modelSelector.addToFavorites', { name: displayName })
           }
           accessibilityState={{ selected: isFavorite }}
         >

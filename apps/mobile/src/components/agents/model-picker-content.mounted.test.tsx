@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The picker's search, empty-state and bottom-inset contracts share one mount harness. */
 import { createElement, Fragment, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -24,6 +25,10 @@ const listCommitLengths = vi.hoisted(() => ({ values: [] as number[] }));
 const preferences = vi.hoisted(() => ({ favorites: [] as string[] }));
 
 const slotState = vi.hoisted(() => ({ bridge: undefined as unknown }));
+
+// The device's safe-area insets. Configurable so a test can prove the list's
+// viewport ends above the bottom system bar instead of under it.
+const safeAreaInsets = vi.hoisted(() => ({ bottom: 0 }));
 
 const routerBack = vi.hoisted(() => vi.fn());
 
@@ -70,6 +75,8 @@ const flatListMock = vi.hoisted(
       data: readonly ModelPickerRow[];
       renderItem?: (info: { item: ModelPickerRow; index: number }) => ReactNode;
       keyExtractor?: (item: ModelPickerRow) => string;
+      style?: unknown;
+      contentContainerStyle?: unknown;
     }) => {
       listCommitLengths.values.push(props.data.length);
       const rows = props.data.map((item, index) =>
@@ -79,7 +86,15 @@ const flatListMock = vi.hoisted(
           props.renderItem ? props.renderItem({ item, index }) : null
         )
       );
-      return createElement('FlatList', { data: props.data }, ...rows);
+      return createElement(
+        'FlatList',
+        {
+          data: props.data,
+          style: props.style,
+          contentContainerStyle: props.contentContainerStyle,
+        },
+        ...rows
+      );
     }
 );
 
@@ -96,13 +111,14 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: safeAreaInsets.bottom, left: 0, right: 0 }),
 }));
 vi.mock('@/components/picker-sheet', () => ({
   PickerSheet: (props: { children?: ReactNode; headerContent?: ReactNode }) =>
     createElement('PickerSheet', null, props.headerContent, props.children),
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
@@ -224,6 +240,7 @@ describe('ModelPickerContent deferred search', () => {
     buildSearchCalls.values.length = 0;
     listCommitLengths.values.length = 0;
     slotState.bridge = makeBridge();
+    safeAreaInsets.bottom = 0;
     routerBack.mockClear();
   });
 
@@ -303,6 +320,45 @@ describe('ModelPickerContent deferred search', () => {
     });
   });
 
+  it('offers a Clear search action in the no-matches state that restores the catalog', async () => {
+    const renderer = await mount();
+
+    await act(async () => {
+      typeSearch(renderer, 'no-such-model-xyz');
+      await Promise.resolve();
+    });
+
+    const [emptyState] = findByType(renderer.root, 'EmptyState');
+    if (!emptyState) {
+      throw new Error('empty state not found');
+    }
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    const action = emptyState.props.action as
+      | { props: { onPress?: () => void; children?: { props: { children?: string } } } }
+      | undefined;
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+    expect(action).toBeTruthy();
+    // The same label and copy the Agents search empty state offers, so both
+    // searches recover the same way.
+    expect(action?.props.children?.props.children).toBe('Clear search');
+
+    await act(async () => {
+      action?.props.onPress?.();
+      await Promise.resolve();
+    });
+
+    // Clearing drops the query the rows derive from and the whole catalog
+    // returns, so the empty state (and its action) is gone.
+    expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('offers an in-field clear affordance that resets the query', async () => {
     const renderer = await mount();
 
@@ -328,6 +384,29 @@ describe('ModelPickerContent deferred search', () => {
     // Clearing drops the query the rows derive from and hides the affordance.
     expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
     expect(clearSearchButtons(renderer)).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('ends the list viewport above the bottom system bar', async () => {
+    // A device with a navigation bar: the viewport must end above it, or the
+    // last row is drawn under the opaque bar (a content inset only cleared the
+    // end of the list, so a row at the viewport bottom stayed covered).
+    safeAreaInsets.bottom = 24;
+    const renderer = await mount();
+
+    const [list] = findByType(renderer.root, 'FlatList');
+    if (!list) {
+      throw new Error('FlatList not found');
+    }
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    expect((list.props.style as { marginBottom?: number }).marginBottom).toBe(24);
+    // The inset lives on the frame alone; leaving it on the content as well
+    // would double the reserved space.
+    expect(list.props.contentContainerStyle).toBeUndefined();
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
 
     act(() => {
       renderer.unmount();

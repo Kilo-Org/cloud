@@ -82,6 +82,12 @@ vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus'
 vi.mock('@/components/pr-review/discussion/pr-review-discussion-list', () => ({
   PrReviewDiscussionList: 'PrReviewDiscussionList',
 }));
+// The tab mounts the shared moderation provider around the list; here it is a
+// plain host node so the tab suite can assert the nesting (the provider's own
+// behaviour is covered by comment-row.test.tsx, which mounts the real one).
+vi.mock('@/components/pr-review/discussion/comment-moderation', () => ({
+  CommentModerationProvider: 'CommentModerationProvider',
+}));
 vi.mock('@/components/pr-review/discussion/pr-comment-cta', () => ({
   PrCommentCta: 'PrCommentCta',
 }));
@@ -112,6 +118,14 @@ export function mountTab(scopeRef?: ProviderPrRef): TestRenderer.ReactTestRender
     throw new Error('renderer was not created');
   }
   return renderer;
+}
+
+/** Re-renders the mounted tab in place with the same props, so a test can
+ * compare a prop's identity across two renders of one component instance. */
+export function rerenderTab(renderer: TestRenderer.ReactTestRenderer): void {
+  act(() => {
+    renderer.update(createElement(PrReviewDiscussionTab, BASE_PROPS));
+  });
 }
 
 export function bottomPaddedViews(

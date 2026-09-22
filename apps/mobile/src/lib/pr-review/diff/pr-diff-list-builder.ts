@@ -19,6 +19,24 @@ import { buildSideBySideRows } from '@/lib/pr-review/diff/side-by-side';
 type ParsedFile = ReturnType<typeof parsePatch>;
 type ParsedHunk = ParsedFile['hunks'][number];
 
+// Parsed patches keyed by file-object identity. `buildFileItems` re-runs on
+// every `viewed` / `expanded` change, and the file DTOs come straight from the
+// query pages and are immutable for their lifetime, so a WeakMap cannot go
+// stale and is released with the pages when a refetch replaces them. Returning
+// the same `ParsedFile` object across rebuilds also keeps `item.parsed` /
+// `item.line` reference-stable so `DiffLine`'s memo comparator can hit.
+const parsedPatchCache = new WeakMap<object, ParsedFile>();
+
+function parsedPatchFor(file: BuildItemsArgs['files'][number]): ParsedFile {
+  const cached = parsedPatchCache.get(file);
+  if (cached) {
+    return cached;
+  }
+  const parsed: ParsedFile = file.patch ? parsePatch(file.patch) : { isRename: false, hunks: [] };
+  parsedPatchCache.set(file, parsed);
+  return parsed;
+}
+
 function pushSideBySideHunk(args: {
   items: ListItem[];
   file: BuildItemsArgs['files'][number];
@@ -115,7 +133,7 @@ function pushExpandedFileItems(
     number: args.number,
     path: file.path,
   });
-  const parsed: ParsedFile = file.patch ? parsePatch(file.patch) : { isRename: false, hunks: [] };
+  const parsed: ParsedFile = parsedPatchFor(file);
   const hunks = parsed.hunks;
 
   if (file.patchMissing || hunks.length === 0) {

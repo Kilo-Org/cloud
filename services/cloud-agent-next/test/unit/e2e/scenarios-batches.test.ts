@@ -51,10 +51,7 @@ describe('validateScenarioBatches', () => {
   });
 
   it('reports a scenario listed in more than one batch', () => {
-    const errors = validateScenarioBatches(
-      { b1: batch(['a']), b2: batch(['a']) },
-      ['a']
-    );
+    const errors = validateScenarioBatches({ b1: batch(['a']), b2: batch(['a']) }, ['a']);
     expect(errors).toContainEqual(expect.stringContaining('"a" is listed in more than one batch'));
   });
 
@@ -95,8 +92,7 @@ describe('resolveBatch', () => {
     // error, and its text comes from the same rule the exhaustive validator
     // uses — resolveBatch does not restate it.
     const registry = ['unknown-model', 'auth-reject'];
-    const diagnostic =
-      'batch "long-question-idle" lists unknown scenario "question-idle-resume"';
+    const diagnostic = 'batch "long-question-idle" lists unknown scenario "question-idle-resume"';
 
     const resolution = resolveBatch('long-question-idle', registry);
     if (resolution === null || resolution.ok) throw new Error('expected a rejection');

@@ -22,8 +22,7 @@ vi.mock('ws', () => ({
       this.observed = {
         url,
         message: data => this.handlers.get('message')?.(Buffer.from(data)),
-        closeFromServer: (code = 1006, reason = '') =>
-          this.handlers.get('close')?.(code, reason),
+        closeFromServer: (code = 1006, reason = '') => this.handlers.get('close')?.(code, reason),
         errorFromServer: error => this.handlers.get('error')?.(error ?? new Error('ws error')),
         closeCalls: 0,
       };

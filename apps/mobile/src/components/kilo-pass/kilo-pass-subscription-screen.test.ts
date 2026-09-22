@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   nativeIap: {
     clearError: vi.fn(),
     errorMessage: null as string | null,
+    storeConnectionError: false,
     isPending: false,
     products: [] as unknown[],
     productsError: null as string | null,
@@ -279,6 +280,7 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.ownerMount.mockReset();
     mocks.nativeIap.clearError.mockReset();
     mocks.nativeIap.errorMessage = null;
+    mocks.nativeIap.storeConnectionError = false;
     mocks.nativeIap.isPending = false;
     mocks.nativeIap.products = [];
     mocks.nativeIap.productsError = null;
@@ -551,6 +553,33 @@ describe('KiloPassSubscriptionScreen', () => {
     renderer.unmount();
   });
 
+  it('e7: the products-unavailable retry shows a busy state and keeps the card mounted while retrying', async () => {
+    setAndroidNativeIapPresentation();
+    mocks.nativeIap.products = [];
+    mocks.nativeIap.productsIsRefetching = true;
+
+    const renderer = await renderScreen();
+
+    // The card stays the one error surface, with the retry's busy label.
+    expect(allText(renderer)).toContain('Google Play products unavailable');
+    expect(allText(renderer)).toContain('Trying again...');
+
+    const retry = renderer.root.find(
+      node =>
+        String(node.type) === 'Button' &&
+        (node.props as Record<string, unknown>).accessibilityLabel ===
+          'Try loading Kilo Pass products again'
+    );
+    expect((retry.props as { disabled?: boolean }).disabled).toBe(true);
+    expect((retry.props as { loading?: boolean }).loading).toBe(true);
+    expect(
+      (retry.props as { accessibilityState?: { busy?: boolean; disabled?: boolean } })
+        .accessibilityState
+    ).toEqual({ busy: true, disabled: true });
+
+    renderer.unmount();
+  });
+
   it('does not mount the IAP owner (single useIAP call site) on Android', async () => {
     mockedPlatform.OS = 'android';
     mocks.presentation.data = { kind: 'unavailable', webUrl: null };
@@ -705,6 +734,135 @@ describe('KiloPassSubscriptionScreen', () => {
       (first(tiles).props as { accessibilityState?: { disabled?: boolean } }).accessibilityState
         ?.disabled
     ).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('shows one error surface and one retry when Play is unavailable and the ownership lookup failed', async () => {
+    setAndroidNativeIapPresentation();
+    mocks.nativeIap.products = [];
+    mocks.nativeIap.errorMessage =
+      'Could not connect to Google Play. Check your connection and try again.';
+    mocks.nativeIap.storeConnectionError = true;
+    mocks.nativeIap.ownershipCheckFailed = true;
+
+    const renderer = await renderScreen();
+
+    expect(allText(renderer)).toContain('Google Play products unavailable');
+    expect(allText(renderer)).not.toContain('Could not connect to Google Play');
+
+    const buttons = renderer.root.findAll(node => String(node.type) === 'Button');
+    expect(buttons).toHaveLength(1);
+
+    await press(first(buttons));
+
+    expect(mocks.nativeIap.productsRefetch).toHaveBeenCalledTimes(1);
+    expect(mocks.nativeIap.retryOwnershipCheck).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('hides the store-connection line by identity, not by comparing the translated copy', async () => {
+    setAndroidNativeIapPresentation();
+    mocks.nativeIap.products = [];
+    mocks.nativeIap.ownershipCheckFailed = true;
+    // The owner stored that message before the app language changed, so the copy
+    // it holds is no longer the copy this render resolves. A copy comparison
+    // fails then and puts the failure the card already states back inline.
+    mocks.nativeIap.errorMessage =
+      'Could not connect to the App Store. Check your connection and try again.';
+    mocks.nativeIap.storeConnectionError = true;
+
+    const renderer = await renderScreen();
+
+    expect(allText(renderer)).toContain('Google Play products unavailable');
+    expect(allText(renderer)).not.toContain('Could not connect to the App Store');
+
+    const buttons = renderer.root.findAll(node => String(node.type) === 'Button');
+    expect(buttons).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('keeps the ownership error inline when the products are available', async () => {
+    setNativeIapPresentation();
+    mocks.nativeIap.products = [product];
+    mocks.nativeIap.errorMessage =
+      'Could not connect to the App Store. Check your connection and try again.';
+    mocks.nativeIap.ownershipCheckFailed = true;
+
+    const renderer = await renderScreen();
+
+    expect(allText(renderer)).toContain(
+      'Could not connect to the App Store. Check your connection and try again.'
+    );
+
+    renderer.unmount();
+  });
+
+  it('keeps the Play ownership error inline with one retry when the products are available', async () => {
+    setAndroidNativeIapPresentation();
+    mocks.nativeIap.products = [product];
+    mocks.nativeIap.errorMessage =
+      'Could not connect to Google Play. Check your connection and try again.';
+    mocks.nativeIap.ownershipCheckFailed = true;
+
+    const renderer = await renderScreen();
+
+    // The card is absent, so nothing suppresses the still-true ownership
+    // failure: the store error stays inline and the retry stays reachable.
+    expect(allText(renderer)).toContain(
+      'Could not connect to Google Play. Check your connection and try again.'
+    );
+    expect(allText(renderer)).not.toContain('Google Play products unavailable');
+
+    const retry = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Button' &&
+        (node.props as { accessibilityLabel?: string }).accessibilityLabel ===
+          'Retry loading Kilo Pass'
+    );
+    expect(retry).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('keeps the Play store error beside its retry after the message was cleared', async () => {
+    setAndroidNativeIapPresentation();
+    mocks.nativeIap.products = [product];
+    mocks.nativeIap.errorMessage = null;
+    mocks.nativeIap.ownershipCheckFailed = true;
+
+    const renderer = await renderScreen();
+
+    // The retry renders from `ownershipCheckFailed`; the error must come from
+    // the same flag, so a cleared message can never leave the retry on its own.
+    expect(allText(renderer)).toContain(
+      'Could not connect to Google Play. Check your connection and try again.'
+    );
+    expect(allText(renderer)).not.toContain('Google Play products unavailable');
+
+    const retry = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Button' &&
+        (node.props as { accessibilityLabel?: string }).accessibilityLabel ===
+          'Retry loading Kilo Pass'
+    );
+    expect(retry).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('keeps a failed restore visible while the products-unavailable card is shown', async () => {
+    setAndroidNativeIapPresentation();
+    mocks.nativeIap.products = [];
+    mocks.nativeIap.errorMessage = 'Failed to restore purchases. Try again.';
+    mocks.nativeIap.ownershipCheckFailed = true;
+
+    const renderer = await renderScreen();
+
+    expect(allText(renderer)).toContain('Google Play products unavailable');
+    expect(allText(renderer)).toContain('Failed to restore purchases. Try again.');
 
     renderer.unmount();
   });

@@ -33,7 +33,7 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 
 - `services/cloud-agent-next/test/e2e/README.md` is the source of truth for setup, fake-LLM routing, lifecycle directives, and troubleshooting.
 - The deterministic fake has one runtime-neutral core (`test/e2e/fake-llm-core.ts`) with two adapters: the local Node server (`test/e2e/fake-llm-server.ts`) and the deployed Worker + `FakeLlmState` Durable Object (`test/e2e/fake-llm-worker.ts`, `test/e2e/wrangler.fake-llm.jsonc`). Change the core, not one adapter.
-- Every `/test/*` route needs the admin bearer from `FAKE_LLM_ADMIN_TOKEN` (`test/e2e/fake-llm-admin.ts`). A zero-config local stack falls back to an insecure development default; the public tunnel refuses to publish it and the deploy script rejects it.
+- Every `/test/*` route needs the admin bearer from `FAKE_LLM_ADMIN_TOKEN` (`test/e2e/fake-llm-admin.ts`). A zero-config local stack falls back to an insecure development default; the public tunnel refuses to publish it and the deploy script rejects it. The deployed profile resolves the bearer env-first and then from the auth file's `fakeLlmAdminToken`, exports the resolved value into `FAKE_LLM_ADMIN_TOKEN` for the run, and never prints it.
 - The deployed Worker additionally authenticates its model routes with a Kilo JWT against the `NEXTAUTH_SECRET` Secrets Store binding. The local Node adapter keeps those routes open for the Next.js gateway.
 - Driven and deployed by `test/e2e/deploy/README.md`; deployment is operator-driven. Do not deploy.
 - Prefer focused scenario debugging first: `pnpm exec tsx services/cloud-agent-next/test/e2e/run.ts <lifecycle> <conversation>`.

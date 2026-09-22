@@ -7,6 +7,7 @@ import {
   getSessionSnapshot,
   interruptSession,
   isMessageCompleted,
+  openConnectedStream,
   prepareBrowserSession,
   releaseGate,
   sendMessage,
@@ -32,7 +33,6 @@ import {
   type SandboxContainer,
 } from './sandbox-control.js';
 import {
-  openConnectedStream,
   readWorktreeOwnership,
   requireWorktreeSessionIdentity,
   requireWorktreeGate,
@@ -1079,7 +1079,7 @@ export async function lifecycleMultiSessionCollab(args: LifecycleArgs): Promise<
     if (initialFile.unavailable) throw new Error(initialFile.reason);
     const initialHead = initialFile.head;
     const ownership = await resources.within('planner worktree ownership', () =>
-      readWorktreeOwnership(args.config, [planner.kiloSessionId])
+      readWorktreeOwnership(args.config, [planner.cloudAgentSessionId])
     );
     const plannerOwnership = ownership[0];
     if (!plannerOwnership?.worktreeId)
@@ -1195,9 +1195,9 @@ export async function lifecycleMultiSessionCollab(args: LifecycleArgs): Promise<
     }
     const rows = await resources.within('all worktree ownership', () =>
       readWorktreeOwnership(args.config, [
-        planner.kiloSessionId,
-        implementer.kiloSessionId,
-        reviewer.kiloSessionId,
+        planner.cloudAgentSessionId,
+        implementer.cloudAgentSessionId,
+        reviewer.cloudAgentSessionId,
       ])
     );
     if (rows.length !== 3 || rows.some(row => row.worktreeId !== plannerOwnership.worktreeId)) {

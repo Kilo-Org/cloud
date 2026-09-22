@@ -121,7 +121,6 @@ describe('mapModelIdToVercel', () => {
       ['anthropic/claude-sonnet-4-5', 'anthropic/claude-sonnet-4.5'],
       ['anthropic/claude-sonnet-4-6', 'anthropic/claude-sonnet-4.6'],
       ['anthropic/claude-sonnet-5-20260630', 'anthropic/claude-sonnet-5'],
-      ['claude-opus-5', 'anthropic/claude-opus-5'],
       ['claude-sonnet-4', 'anthropic/claude-sonnet-4'],
       ['claude-sonnet-4.5', 'anthropic/claude-sonnet-4.5'],
       ['claude-sonnet-5', 'anthropic/claude-sonnet-5'],

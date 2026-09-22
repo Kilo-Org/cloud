@@ -43,11 +43,15 @@ export function SessionListSearchHeader({
   );
   return (
     <View>
+      {/* One `min-height` floor, not two: `min-h-[50px]` is the height the row
+          must already hold for the clear control's 38pt box plus the field's
+          own 12pt vertical padding (`py-1.5`), so the first keystroke cannot
+          grow the row and shift the list below. A second `min-h-*` class would
+          set the same property, leaving which floor wins to the order Tailwind
+          emits its rules rather than to this intent. */}
       <View
         style={fieldMargins}
-        // `min-h-[44px]`: the field reserves the X's target height, so the
-        // field never grows when the first keystroke reveals that button.
-        className="my-2 min-h-[44px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4"
+        className="my-2 min-h-[50px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
       >
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
         <View className="h-[18px] w-[18px] items-center justify-center">
@@ -81,12 +85,16 @@ export function SessionListSearchHeader({
             onPress={onClearSearch}
             accessibilityLabel={t('common.clearSearch')}
             accessibilityRole="button"
-            // The frame, not the 16pt glyph, is what the size audit measures:
-            // `h-11 w-11` is 38.5pt on device and the 3pt slop carries it to
-            // the 44pt minimum. `-mr-2` keeps the glyph near its old inset and
-            // the frame's left edge inside the field's right padding.
+            // The frame, not the 16pt glyph, is what the size audit measures.
+            // One size, spelled as whole pixels the mounted test compiles: the
+            // 38pt box clears the 28dp floor, and the 3pt slop carries it to
+            // 38 + 2 * 3 = 44pt. The row's `min-h-[50px]` already holds this
+            // box plus the field's 12pt padding. A second `h-*`/`w-*` pair here
+            // would set the same properties and leave the real size to
+            // Tailwind's emit order. `-mr-2` keeps the glyph near its old inset
+            // and the frame's left edge inside the field's right padding.
             hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
-            className="-mr-2 h-11 w-11 items-center justify-center active:opacity-70"
+            className="-mr-2 h-[38px] w-[38px] items-center justify-center active:opacity-70"
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>

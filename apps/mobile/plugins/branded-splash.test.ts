@@ -126,7 +126,11 @@ describe('shared branded splash', () => {
   it('generates both native splash surfaces from the same options', async () => {
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
-      { image: './assets/images/logo-mark.png', backgroundColor: '#FAF74F', imageWidth: 100 }
+      {
+        image: path.join(projectRoot, 'assets/images/logo-mark.png'),
+        backgroundColor: '#FAF74F',
+        imageWidth: 100,
+      }
     );
 
     expect(

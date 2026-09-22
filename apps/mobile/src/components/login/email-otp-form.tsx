@@ -86,6 +86,7 @@ export function EmailOtpForm({
         size="lg"
         className="flex-row gap-2"
         disabled={!hasCompleteCode || authBusy}
+        loading={busy === 'otp-verify'}
         onPress={() => {
           if (canSubmitEmailCode(codeRef.current, busy)) {
             onVerify(codeRef.current);
@@ -93,7 +94,6 @@ export function EmailOtpForm({
         }}
         accessibilityLabel={t('login.verifyCode')}
       >
-        {busy === 'otp-verify' ? <ActivityIndicator size="small" /> : null}
         <Text>{t('login.verifyCode')}</Text>
       </Button>
       <Button

@@ -108,9 +108,25 @@ describe('EmailOtpForm destination layout', () => {
       });
 
       expect(destination(mounted.root).props.children).toBe(initialDescription);
-      expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(1);
       for (const button of mounted.root.findAllByType('Button')) {
         expect(button.props.disabled).toBe(true);
+      }
+
+      const verify = mounted.root.findByProps({ accessibilityLabel: 'Verify code' });
+      const resend = mounted.root.findByProps({ accessibilityLabel: 'Resend code' });
+      if (busy === 'otp-verify') {
+        // Verify owns the busy state: the spinner lives inside Button
+        // (`loading`), so the form renders no child indicator of its own.
+        expect(verify.props.loading).toBe(true);
+        expect(verify.findAllByType('ActivityIndicator')).toHaveLength(0);
+        expect(resend.findAllByType('ActivityIndicator')).toHaveLength(0);
+        expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+      } else {
+        // Resend keeps its inline spinner; Verify is disabled but not busy, so
+        // it must not take the busy treatment (the muted disabled fill).
+        expect(verify.props.loading).not.toBe(true);
+        expect(resend.findAllByType('ActivityIndicator')).toHaveLength(1);
+        expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(1);
       }
 
       act(() => {
@@ -119,10 +135,10 @@ describe('EmailOtpForm destination layout', () => {
 
       expect(destination(mounted.root).props.children).toBe(initialDescription);
       expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(0);
-      const resend = mounted.root.findByProps({ accessibilityLabel: 'Resend code' });
-      expect(resend.props.disabled).toBe(false);
+      const idleResend = mounted.root.findByProps({ accessibilityLabel: 'Resend code' });
+      expect(idleResend.props.disabled).toBe(false);
       act(() => {
-        (resend.props.onPress as () => void)();
+        (idleResend.props.onPress as () => void)();
       });
       expect(props.onResend).toHaveBeenCalledOnce();
     }
@@ -135,6 +151,9 @@ describe('EmailOtpForm controls', () => {
 
     const verify = mounted.root.findByProps({ accessibilityLabel: 'Verify code' });
     expect(verify.props.disabled).toBe(true);
+    // Disabled but not busy: no loading flag, so Button keeps the muted
+    // disabled fill instead of the brand-filled busy treatment.
+    expect(verify.props.loading).not.toBe(true);
     act(() => {
       (verify.props.onPress as () => void)();
     });

@@ -199,10 +199,10 @@ export function IdleAuth({
             size="lg"
             className="flex-row gap-2"
             disabled={authBusy}
+            loading={browserAuthStarting}
             onPress={() => void startSsoAuth(ssoRecovery.email)}
             accessibilityLabel={t('login.continueWithSso')}
           >
-            {browserAuthStarting ? <ActivityIndicator size="small" /> : null}
             <Text>{t('login.continueWithSso')}</Text>
           </Button>
           <Button
@@ -338,10 +338,10 @@ export function IdleAuth({
         size="lg"
         className="flex-row gap-2"
         disabled={authBusy}
+        loading={busy === 'otp-send'}
         onPress={() => void handleSendCode()}
         accessibilityLabel={t('login.continueWithEmail')}
       >
-        {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
         <Text>{t('common.continue')}</Text>
       </Button>
       <View className="flex-row flex-wrap items-center justify-center">

@@ -104,16 +104,16 @@ describe('Text joined-script letter spacing', () => {
   it('adds the RTL paragraph direction beside the reset on an Arabic run', () => {
     i18nManager.isRTL = true;
     expect(ownStyles(mount('أعلام المميزات'))).toEqual([
-      { letterSpacing: 0 },
       { writingDirection: 'rtl' },
+      { letterSpacing: 0 },
     ]);
   });
 
-  it('keeps Latin tracking in a right-to-left interface', () => {
+  it('resets the tracking in a right-to-left interface whatever the script', () => {
     i18nManager.isRTL = true;
     const styles = ownStyles(mount('Preferences'));
     expect(styles).toContainEqual({ writingDirection: 'rtl' });
-    expect(styles.some(style => 'letterSpacing' in style)).toBe(false);
+    expect(styles).toContainEqual({ letterSpacing: 0 });
   });
 
   it('lets an explicit caller letterSpacing win over the reset', () => {

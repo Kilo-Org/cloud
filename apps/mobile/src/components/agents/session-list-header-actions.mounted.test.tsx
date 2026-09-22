@@ -259,7 +259,9 @@ describe('SessionListHeaderActions new-session control', () => {
       // The gap has to fit the pair's two facing slops in either direction;
       // more than the gap means the two touch regions overlap, and the later
       // sibling (the filter) claims the taps inside the overlap. Either control
-      // may express hitSlop as one number or as per-side insets.
+      // may express hitSlop as one number or as per-side insets: the filter
+      // writes its slop as one number for every side, the new-session control
+      // as a per-side object.
       const facingDp = isRTL
         ? slopSideDp(newSessionSlop, 'left') + slopSideDp(filterSlop, 'right')
         : slopSideDp(newSessionSlop, 'right') + slopSideDp(filterSlop, 'left');

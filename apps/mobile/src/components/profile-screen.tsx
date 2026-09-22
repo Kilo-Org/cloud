@@ -2,7 +2,6 @@
 import { useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BookOpenCheck,
@@ -32,6 +31,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
+import { useSignOutConfirmation } from '@/components/use-sign-out-confirmation';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -85,6 +85,13 @@ export function ProfileScreen() {
   // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
+  // One destructive confirm for both platforms: the in-app dialog carries the
+  // destructive (red) affordance on iOS and Android alike, so the sign-out
+  // path never branches on the platform. The confirmation itself, and its
+  // rationale, live in `useSignOutConfirmation`.
+  const { confirmVisible, requestSignOut, dismissConfirm, confirmSignOut } = useSignOutConfirmation(
+    () => void signOut()
+  );
   const {
     data,
     isLoading,
@@ -133,17 +140,6 @@ export function ProfileScreen() {
         onPress: beginDelete,
       },
     ]);
-  };
-
-  // One destructive confirm for both platforms: the in-app dialog carries the
-  // destructive (red) affordance on iOS and Android alike. The native alert
-  // cannot be the shared implementation — Android's `AlertDialog` paints every
-  // button with the theme accent, so `Alert.alert`'s `style: 'destructive'`
-  // never reaches the screen there.
-  const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
-
-  const confirmSignOut = () => {
-    setSignOutConfirmVisible(true);
   };
 
   const showPrivacyChoices = () => {
@@ -349,7 +345,7 @@ export function ProfileScreen() {
             label={t('profile.privacyChoices')}
             onPress={showPrivacyChoices}
           />
-          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={confirmSignOut} />
+          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={requestSignOut} />
           <ActionTile
             icon={Trash2}
             label={t('profile.deleteAccount')}
@@ -385,18 +381,13 @@ export function ProfileScreen() {
         </View>
       </TabScreenScrollView>
 
-      {signOutConfirmVisible && (
+      {confirmVisible && (
         <DestructiveConfirmDialog
           title={t('profile.signOutTitle')}
           message={t('profile.signOutMessage')}
           confirmLabel={t('common.signOut')}
-          onCancel={() => {
-            setSignOutConfirmVisible(false);
-          }}
-          onConfirm={() => {
-            setSignOutConfirmVisible(false);
-            void signOut();
-          }}
+          onCancel={dismissConfirm}
+          onConfirm={confirmSignOut}
         />
       )}
     </View>

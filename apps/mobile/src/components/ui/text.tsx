@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { I18nManager, Text as RNText, type Role, type TextStyle } from 'react-native';
 
-import { RTL_WRITING_DIRECTION, textLetterSpacing } from '@/lib/rtl-text';
+import { RTL_NO_LETTER_SPACING, RTL_WRITING_DIRECTION, textLetterSpacing } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 const textVariants = cva('text-foreground text-base font-medium', {
@@ -74,14 +74,17 @@ function Text({
   }) {
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot.Text : RNText;
-  // A joined-script run (Arabic, Farsi, Urdu, Kurdish, Pashto) renders with
-  // natural letter spacing whatever the interface language is: any tracking
-  // class on it would pull apart letters the script joins. Latin runs keep the
-  // style's tracking. The caller's own style stays last, so an explicit
-  // `letterSpacing` still wins.
+  // Letter spacing — Tailwind's `tracking-*` — is a Latin typographic device:
+  // it opens every glyph from its neighbour. A joined-script run (Arabic,
+  // Farsi, Urdu, Kurdish, Pashto) is one connected shape, so any tracking class
+  // on it would pull apart letters the script joins; the app's RTL catalogs do
+  // not take tracking either. The reset therefore follows the script whatever
+  // the interface direction is, and an RTL interface whatever the script is.
+  // Latin runs in LTR keep the style's tracking. The caller's own style stays
+  // last, so an explicit `letterSpacing` still wins.
   const ownStyles = [
-    textLetterSpacing(props.children),
     I18nManager.isRTL ? RTL_WRITING_DIRECTION : undefined,
+    textLetterSpacing(props.children) ?? (I18nManager.isRTL ? RTL_NO_LETTER_SPACING : undefined),
   ].filter((style): style is TextStyle => style !== undefined);
   return (
     <Component

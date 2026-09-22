@@ -9,7 +9,30 @@ import { compiledDimensions } from '@/test/native-dimensions';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SessionListSearchHeader } from './session-list-search-header';
-import { COMPACT_CONTROL_HIT_SLOP_DP, MIN_AUDITED_CONTROL_FRAME_DP } from '@/lib/a11y/touch-target';
+import {
+  COMPACT_CONTROL_HIT_SLOP_DP,
+  MIN_TAP_TARGET_DP,
+  TOUCH_TARGET_DP,
+} from '@/lib/a11y/tap-target';
+
+type Insets = { top: number; right: number; bottom: number; left: number };
+
+/** The clear control's `hitSlop` as per-side insets, validating the shape. */
+function slopInsets(hitSlop: unknown): Insets {
+  if (typeof hitSlop !== 'object' || hitSlop === null) {
+    throw new TypeError(`no measurable hitSlop in ${JSON.stringify(hitSlop)}`);
+  }
+  const insets = hitSlop as Partial<Insets>;
+  if (
+    typeof insets.top !== 'number' ||
+    typeof insets.right !== 'number' ||
+    typeof insets.bottom !== 'number' ||
+    typeof insets.left !== 'number'
+  ) {
+    throw new TypeError(`no measurable hitSlop in ${JSON.stringify(hitSlop)}`);
+  }
+  return { top: insets.top, right: insets.right, bottom: insets.bottom, left: insets.left };
+}
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -67,24 +90,31 @@ describe('SessionListSearchHeader clear button touch target', () => {
     );
 
     // The glyph is 16pt; sized to it the audit reported 16dp. The frame is
-    // what the audit measures and the slop on top of it is the 44pt target.
-    // One box width/height pair only: compiling the class is what proves the
-    // real box, so a second, conflicting pair cannot hide behind the order
-    // Tailwind emits its rules in.
+    // what the audit measures and the slop on top of it carries the reach past
+    // the 44pt target. One box width/height pair only: compiling the class is
+    // what proves the real box, so a second, conflicting pair cannot hide
+    // behind the order Tailwind emits its rules in.
     expect(clear.props.className).toContain('h-[38px] w-[38px]');
     expect(clear.props.className).toContain('items-center');
-    const hitSlop = clear.props.hitSlop as number;
-    expect(hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+    const slop = slopInsets(clear.props.hitSlop);
+    expect(slop.top).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+    expect(slop.right).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+    expect(slop.bottom).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+    // The left side stops at the row's `gap-2` (7pt at the app's 14pt rem) so
+    // the control's touch region meets the input's instead of covering it.
+    expect(slop.left).toBe(7);
 
     const declarations = (await compiledDimensions(clear.props.className as string)) as {
       height?: number;
       width?: number;
     }[];
     const box = Object.assign({}, ...declarations) as { height: number; width: number };
-    expect(box.height).toBeGreaterThanOrEqual(MIN_AUDITED_CONTROL_FRAME_DP);
-    expect(box.width).toBeGreaterThanOrEqual(MIN_AUDITED_CONTROL_FRAME_DP);
-    expect(box.height + 2 * hitSlop).toBeGreaterThanOrEqual(44);
-    expect(box.width + 2 * hitSlop).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    expect(box.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    // Past 44pt, not onto it: `@/lib/a11y/tap-target` records a 44dp target
+    // measuring 43.81dp at density 420.
+    expect(box.height + slop.top + slop.bottom).toBeGreaterThan(TOUCH_TARGET_DP);
+    expect(box.width + slop.left + slop.right).toBeGreaterThan(TOUCH_TARGET_DP);
 
     renderer.unmount();
   });

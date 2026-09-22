@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type TextInput } from 'react-native';
 
 import '@/i18n';
+import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
 import { SessionListSearchHeader } from './session-list-search-header';
 
 const state = vi.hoisted(() => ({
@@ -149,20 +150,29 @@ describe('SessionListSearchHeader clear control', () => {
     return {
       renderer,
       box: Object.assign({}, ...declarations) as { height: number; width: number },
-      slop: clear.props.hitSlop as number,
+      slop: clear.props.hitSlop as { top: number; right: number; bottom: number; left: number },
+      rowClassName: fieldRow(renderer).props.className as string,
     };
   }
 
   it('lays out a box at least 28dp on a side', async () => {
     const { box } = await mountWithClear();
-    expect(box.height).toBeGreaterThanOrEqual(28);
-    expect(box.width).toBeGreaterThanOrEqual(28);
+    expect(box.height).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    expect(box.width).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
   });
 
-  it('reaches the 44pt minimum target with its slop', async () => {
+  it('carries the reach past the 44pt minimum target, not onto it', async () => {
     const { box, slop } = await mountWithClear();
-    expect(box.height + 2 * slop).toBeGreaterThanOrEqual(44);
-    expect(box.width + 2 * slop).toBeGreaterThanOrEqual(44);
+    expect(box.height + slop.top + slop.bottom).toBeGreaterThan(TOUCH_TARGET_DP);
+    expect(box.width + slop.left + slop.right).toBeGreaterThan(TOUCH_TARGET_DP);
+  });
+
+  it('stops the clear control left of the row gap, so it cannot cover the input', async () => {
+    const { slop, rowClassName } = await mountWithClear();
+    // The row's `gap-2` compiles to 7pt at the app's 14pt rem; the control's
+    // left slop meets the input at that gap instead of reaching into it.
+    expect(await compiledLengthDp(rowClassName, 'gap')).toBe(7);
+    expect(slop.left).toBeLessThanOrEqual(7);
   });
 
   it('reserves the box height on the field, so typing cannot shift the list', async () => {

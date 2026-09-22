@@ -42,21 +42,14 @@ vi.mock('react-native', () => ({
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 // The screen wraps its form in the shared keyboard-lift view and reads
 // `useRevealEndOnKeyboard()` on every render, before the provider-status
-// branches. Both kilo-chat modules reach `react-native-safe-area-context`,
-// whose native source this project's transform cannot parse (see the mounted
-// project's config); the connect CTA under test depends on neither, so stub
-// them the way the sibling node-only screen tests do.
-// The screen reserves the keyboard's height and reveals its submit button via
-// `useRevealEndOnKeyboard`, so those hooks run on every render. Mock the native
-// safe-area context like the sibling app-aware-keyboard-padding.mounted.test.tsx
-// so the real package's TS source is never resolved by the test transform.
+// branches, so the real tree pulls in both kilo-chat views and the
+// `react-native-safe-area-context` they read. That package will not load in
+// this node-only project (`SyntaxError: Unexpected token 'typeof'`), and the
+// connect CTA under test needs none of it, so stub the three modules the way
+// the sibling node-only screen tests do.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-// The keyboard-lift view reads the device insets through
-// `react-native-safe-area-context`, whose CommonJS entry requires a Flow
-// react-native subpath this node project cannot load. Stub the two kilo-chat
-// modules the way the sibling node-only screen tests do.
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
   useAppAwareKeyboardPadding: () => 0,

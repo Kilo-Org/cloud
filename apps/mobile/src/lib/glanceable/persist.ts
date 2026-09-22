@@ -46,8 +46,24 @@ let localScopeKey: string | null = null;
 // the read can never be clobbered by a stale persisted record.
 let persistEpoch = 0;
 
+// True when the last restore could not read the persisted mirror. A null
+// in-memory snapshot then means "unknown", not "nothing persisted": the record
+// may exist and name a card owner, so a caller that retires cards on a null
+// snapshot has to check this first.
+let restoreUnavailable = false;
+
 export function getLastGlanceableSnapshot(): GlanceableAgentsSnapshot | null {
   return lastSnapshot;
+}
+
+/**
+ * True when the last `restorePersistedGlanceable` could not read the durable
+ * mirror. Distinct from an absent record: the keychain may still hold a
+ * snapshot that names an owner, so a null in-memory state is not proof that
+ * nothing owns the surface.
+ */
+export function isGlanceableRestoreUnavailable(): boolean {
+  return restoreUnavailable;
 }
 
 export function getLocalScopeKey(): string | null {
@@ -83,6 +99,7 @@ function parseStoredSnapshot(raw: string): GlanceableAgentsSnapshot | null {
  */
 export async function restorePersistedGlanceable(): Promise<void> {
   const startEpoch = persistEpoch;
+  restoreUnavailable = false;
   try {
     const [rawSnapshot, rawScope] = await Promise.all([
       getSecureStore().getItemAsync(GLANCEABLE_SNAPSHOT_KEY),
@@ -106,6 +123,9 @@ export async function restorePersistedGlanceable(): Promise<void> {
     }
   } catch {
     // A malformed mirror is treated as absent; the publisher repopulates it.
+    // A read failure is different: the record may be there and own a card, so
+    // record the uncertainty for callers that act on a null snapshot.
+    restoreUnavailable = true;
   }
 }
 
@@ -136,9 +156,14 @@ export function _setLastGlanceableSnapshotForTests(
   localScopeKey = snapshot?.scopeKey ?? null;
 }
 
+export function _setGlanceableRestoreUnavailableForTests(unavailable: boolean): void {
+  restoreUnavailable = unavailable;
+}
+
 export function _resetGlanceablePersistForTests(): void {
   persistEpoch = 0;
   lastSnapshot = null;
   localScopeKey = null;
+  restoreUnavailable = false;
   secureStoreForTests = null;
 }

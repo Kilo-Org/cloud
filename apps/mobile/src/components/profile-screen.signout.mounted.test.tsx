@@ -32,6 +32,9 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// The screen reads its side insets from `@/lib/screen-insets`; the native
+// module is mocked so the suite does not load `react-native-safe-area-context`,
+// whose Flow-typed `react-native` source the vitest transform cannot parse.
 // The screen reads its side insets through `@/lib/screen-insets`, which imports
 // this native module; its untransformed source breaks the mounted project.
 vi.mock('react-native-safe-area-context', () => ({

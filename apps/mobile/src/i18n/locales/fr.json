@@ -273,9 +273,9 @@
       "kiloclawActivitySubtitle": "instance prête ou en échec, actions planifiées",
       "kiloclawActivityUnavailable": "Démarrez une instance KiloClaw pour recevoir l'activité KiloClaw.",
       "balanceAlertsSubtitle": "alertes de solde faible pour l'organisation",
-      "balanceAlertsUnavailable": "Rejoignez une organisation pour recevoir les alertes de solde faible.",
+      "balanceAlertsUnavailable": "Rejoignez une organisation pour recevoir les alertes de solde.",
       "securityFindingsSubtitle": "nouvelles vulnérabilités et rappels SLA",
-      "securityFindingsUnavailable": "Activez l'agent de sécurité Kilo sur un périmètre pour recevoir les problèmes de sécurité.",
+      "securityFindingsUnavailable": "Activez l'Agent de sécurité Kilo sur un périmètre pour recevoir les signalements de sécurité.",
       "spendAlertsSubtitle": "franchissements de seuils et pics horaires",
       "spendAlertsToggle": "Catégorie « Alertes de dépenses »"
     },

@@ -164,8 +164,13 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // The shared app config carries the other `colors.xml` entries (icon and
+    // notification colors, the app background) through the same mod chain, so
+    // assert this plugin's surface is present rather than the array length.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

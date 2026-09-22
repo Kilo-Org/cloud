@@ -208,10 +208,10 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
       for (const listener of keyboardShow) {
         listener({
           endCoordinates: {
-            // The iOS height deliberately differs from screenHeight - screenY
-            // (900 - 576 = 324), so this fixture fails if the iOS branch
-            // regresses to endCoordinates.height (250).
-            height: platform === 'android' ? 300 : 250,
+            // A docked keyboard: iOS's frame top (576) plus its height (324)
+            // reaches the screen bottom (900), so the footer lifts by the same
+            // 324 as Android's height plus inset.
+            height: platform === 'android' ? 300 : 324,
             screenY: platform === 'android' ? 876 : 576,
           },
         });
@@ -220,8 +220,8 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
 
     const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     // Nearest first: the footer drops its tab-bar clearance. Android restores
-    // the system-bar inset excluded from height; iOS uses the keyboard top
-    // (900 - 576 = 324), not the reported height.
+    // the system-bar inset excluded from height; iOS's frame reaches the screen
+    // bottom, so its height is the lift.
     expect(paddingBottomsAbove(action)).toEqual([0, 324]);
 
     const hide = platform === 'android' ? 'keyboardDidHide' : 'keyboardWillHide';
@@ -252,9 +252,9 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
       for (const listener of keyboardShow) {
         listener({
           endCoordinates: {
-            // iOS height again differs from screenHeight - screenY
-            // (900 - 852 = 48), so a regression to height (32) fails.
-            height: platform === 'android' ? 24 : 32,
+            // A docked short keyboard: iOS's top (852) plus its height (48)
+            // reaches the screen bottom (900), one nav bar tall.
+            height: platform === 'android' ? 24 : 48,
             screenY: platform === 'android' ? 876 : 852,
           },
         });

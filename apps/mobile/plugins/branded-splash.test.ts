@@ -124,9 +124,18 @@ describe('shared branded splash', () => {
   });
 
   it('generates both native splash surfaces from the same options', async () => {
+    // Compile against a clean project root. The introspection base mods merge
+    // the resources already on disk, so compiling against the real project root
+    // would fold a developer's generated, gitignored `android/` tree into the
+    // result and its extra colors would break the exact assertion below.
+    const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
-      { image: './assets/images/logo-mark.png', backgroundColor: '#FAF74F', imageWidth: 100 }
+      {
+        image: path.join(projectRoot, 'assets/images/logo-mark.png'),
+        backgroundColor: '#FAF74F',
+        imageWidth: 100,
+      }
     );
 
     expect(
@@ -136,7 +145,7 @@ describe('shared branded splash', () => {
     expect(config.mods?.android?.styles).toBeTypeOf('function');
 
     const evaluated = await compileModsAsync(config, {
-      projectRoot,
+      projectRoot: root,
       platforms: ['ios', 'android'],
       introspect: true,
     });

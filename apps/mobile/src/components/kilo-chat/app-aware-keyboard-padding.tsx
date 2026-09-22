@@ -12,10 +12,16 @@ import {
  * it in. Android edge-to-edge reports the visible-frame height with the bottom
  * system-bar inset already subtracted (`ReactRootView` reports
  * `imeInsets.bottom − barInsets.bottom`), so the metric stops at the navigation
- * bar; iOS reports the keyboard top in screen coordinates, which reaches the
- * screen bottom, so the overlap is the distance from that top to the screen
- * bottom. An event that carries no screen position falls back to the reported
- * height, which already reaches the screen bottom there.
+ * bar; iOS reports the keyboard frame in screen coordinates.
+ *
+ * A keyboard docked to the screen bottom reaches it, so the distance from the
+ * keyboard top to the screen bottom is its own height. An undocked (floating or
+ * split) iPad keyboard sits above the bottom, where that distance counts the
+ * uncovered screen below it — hundreds of points — and overstates the lift the
+ * shared keyboard view applies. Clamping the overlap to the reported frame
+ * height keeps the docked metric and caps a floating keyboard at the strip it
+ * actually hides (2026-09-22 review finding). An event that carries no screen
+ * position falls back to the reported height too.
  */
 function keyboardPaddingFromEvent(event: KeyboardEvent): number {
   if (Platform.OS === 'android') {
@@ -25,7 +31,7 @@ function keyboardPaddingFromEvent(event: KeyboardEvent): number {
   if (!Number.isFinite(keyboardTop)) {
     return event.endCoordinates.height;
   }
-  return Dimensions.get('screen').height - keyboardTop;
+  return Math.min(Dimensions.get('screen').height - keyboardTop, event.endCoordinates.height);
 }
 
 /**
@@ -36,9 +42,9 @@ function keyboardPaddingFromEvent(event: KeyboardEvent): number {
  * This is the app's one keyboard read (`keyboardWillShow` on iOS,
  * `keyboardDidShow` on Android, where the window never resizes for the IME
  * under API 35+). Exported so a screen that must react to the keyboard beyond
- * reserving its height — a pinned footer measuring its own clearance, a
- * reveal-end scroll — reads the same lift `AppAwareKeyboardPaddingView` applies
- * instead of adding a second listener.
+ * reserving its height — a pinned footer measuring its own clearance — reads the
+ * same lift `AppAwareKeyboardPaddingView` applies instead of adding a second
+ * listener.
  */
 export function useAppAwareKeyboardPadding(): number {
   const { bottom } = useSafeAreaInsets();

@@ -144,23 +144,39 @@ describe('AppAwareKeyboardPaddingView', () => {
     const renderer = mount();
     expect(paddingBottom(renderer)).toBe(0);
     // Android edge-to-edge reports the nav-bar-excluded height, not the IME
-    // top; iOS reports the keyboard top at screen coordinates.
-    showKeyboard(height, platform.OS === 'android' ? 876 : 576);
+    // top; iOS reports the keyboard top, which on a docked keyboard sits its
+    // own height above the screen bottom.
+    showKeyboard(height, platform.OS === 'android' ? 876 : screen.height - height);
     expect(paddingBottom(renderer)).toBe(
-      platform.OS === 'android' ? height + insets.bottom : screen.height - 576
+      platform.OS === 'android' ? height + insets.bottom : height
     );
     renderer.unmount();
   });
 
   it('tracks a short keyboard and a changed screen size', () => {
     const renderer = mount();
-    showKeyboard(24, platform.OS === 'android' ? 876 : 852);
-    expect(paddingBottom(renderer)).toBe(
-      platform.OS === 'android' ? 24 + insets.bottom : screen.height - 852
-    );
+    showKeyboard(24, 876);
+    expect(paddingBottom(renderer)).toBe(platform.OS === 'android' ? 24 + insets.bottom : 24);
     screen.height = 600;
     showKeyboard(200, platform.OS === 'android' ? 576 : 400);
     expect(paddingBottom(renderer)).toBe(platform.OS === 'android' ? 200 + insets.bottom : 200);
+    renderer.unmount();
+  });
+
+  it('caps an undocked iOS keyboard at its frame height, not the screen below it', () => {
+    // An iPad floating/split keyboard reports its top at the floating position,
+    // so the distance to the screen bottom counts the uncovered screen under it
+    // (hundreds of points), not the strip it hides. The frame height is the
+    // occlusion there (2026-09-22 review finding).
+    platform.OS = 'ios';
+    insets.bottom = 34;
+    screen.height = 1024;
+    const renderer = mount();
+
+    // Docked at height 264 the top would be 760; floating it sits at 500.
+    showKeyboard(264, 500);
+    expect(paddingBottom(renderer)).toBe(264);
+
     renderer.unmount();
   });
 

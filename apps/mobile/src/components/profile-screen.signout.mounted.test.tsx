@@ -34,10 +34,8 @@ vi.mock('react-native-reanimated', () => ({
 
 // The screen reads its landscape side insets through `useScreenSideInsets`;
 // without this mock the real module pulls React Native's Flow-typed source,
-// which the vitest (rolldown) transform cannot parse. The `safeArea` value
+// which the vitest (rolldown) transform cannot parse. The `insets` value
 // above stands in for the device's insets.
-// The screen reads its side insets through `@/lib/screen-insets`, which imports
-// this native module; its untransformed source breaks the mounted project.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));

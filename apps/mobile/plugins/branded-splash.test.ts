@@ -164,9 +164,11 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
-    });
+    // Introspection merges the colors of an existing `android/` prebuild when one
+    // is present, so assert the splash color is added rather than the whole list.
+    expect(evaluated._internal?.modResults?.android?.colors?.resources?.color).toEqual(
+      expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }])
+    );
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {
         style: expect.arrayContaining([

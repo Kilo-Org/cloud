@@ -85,6 +85,7 @@ const flatListMock = vi.hoisted(
 
 vi.mock('react-native', () => ({
   FlatList: flatListMock,
+  Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
 }));
@@ -108,6 +109,7 @@ vi.mock('@/components/ui/icons', () => ({
   Info: 'Info',
   Search: 'Search',
   SearchX: 'SearchX',
+  X: 'X',
 }));
 vi.mock('@/components/agents/model-selector', () => ({
   ModelPickerOptionRow: 'ModelPickerOptionRow',
@@ -182,6 +184,17 @@ function searchInput(renderer: TestRenderer.ReactTestRenderer): TestRenderer.Rea
     throw new Error('search input not found');
   }
   return input;
+}
+
+/**
+ * The in-field clear affordance, found by the label the Agents search field
+ * also uses. It must exist on both platforms: `clearButtonMode` is iOS-only,
+ * so Android previously rendered the query with no way to clear it.
+ */
+function clearSearchButtons(
+  renderer: TestRenderer.ReactTestRenderer
+): TestRenderer.ReactTestInstance[] {
+  return renderer.root.findAll(node => node.props.accessibilityLabel === 'Clear search');
 }
 
 /** Drive the uncontrolled TextInput's handler the way a keystroke would. */
@@ -284,6 +297,37 @@ describe('ModelPickerContent deferred search', () => {
     /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
     expect(emptyState[0]?.props.title).toBe('No matches');
     /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('offers an in-field clear affordance that resets the query', async () => {
+    const renderer = await mount();
+
+    // Nothing typed: no clear affordance, matching the Agents search field.
+    expect(clearSearchButtons(renderer)).toHaveLength(0);
+
+    await act(async () => {
+      typeSearch(renderer, FINAL_QUERY);
+      await Promise.resolve();
+    });
+
+    expect(listedDisplayIds(renderer)).toHaveLength(FINAL_MATCH_COUNT);
+    const [clear] = clearSearchButtons(renderer);
+    if (!clear) {
+      throw new Error('clear affordance not found');
+    }
+
+    await act(async () => {
+      (clear.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    // Clearing drops the query the rows derive from and hides the affordance.
+    expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
+    expect(clearSearchButtons(renderer)).toHaveLength(0);
 
     act(() => {
       renderer.unmount();

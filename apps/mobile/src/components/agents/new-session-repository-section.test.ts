@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one module-mock scaffold and the shared test-helpers harness serve the branch-row, connect-card collapse, and connect-card layout-stability suites */
 /* oxlint-disable max-lines -- one suite for the repository section: the branch row, Bitbucket restriction, connect-card collapse, one-line connect label, and post-selection compact actions all mount the same section through one hoisted preference mock */
 /* eslint-disable max-lines -- the provider connect-card states (branch row, organizations-only note, collapse, post-selection actions) and the open-label line pinning share one module-mock set */
 import { act, type TestRenderer } from '@/test/renderer';
@@ -275,6 +276,29 @@ describe('NewSessionRepositorySection connect card collapse', () => {
 
     expect(renderedText(renderer)).not.toContain(i18n.t('common.connectGithub'));
     expect(pressables(renderer)).toHaveLength(0);
+  });
+});
+
+describe('NewSessionRepositorySection connect card layout stability', () => {
+  // The branch row mounts above the connect card's slot as soon as a repository
+  // is chosen, so the card must not carry a layout transition: Reanimated would
+  // paint it at its pre-change position, covering the row and leaving an empty
+  // gap below. Its content still fades in.
+  it('leaves the layout transition off the connect card and keeps the content fade', () => {
+    const renderer = mountSection({
+      groups: [group('github', 'repos'), group('gitlab', 'connect')],
+    });
+
+    const card = renderer.root.find(
+      node =>
+        node.type === ('Animated.View' as never) && String(node.props.className).includes('bg-card')
+    );
+    expect(card.props.layout).toBeUndefined();
+
+    const content = renderer.root.find(
+      node => node.type === ('Animated.View' as never) && node.props.entering !== undefined
+    );
+    expect(content.props.entering).toEqual({ __fadeIn: 150 });
   });
 });
 

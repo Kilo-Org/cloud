@@ -82,8 +82,10 @@ describe('Text tracked labels in RTL', () => {
   it('keeps the caller style after the RTL defaults', () => {
     i18nManager.isRTL = true;
     const callerStyle = { color: '#ff0000' };
+    // Arabic-script copy, the only copy the merged rule resets (text.rtl-labels:
+    // Latin labels keep their tracking); the caller style still lands last.
     const root = mount(
-      createElement(Text, { className: 'tracking-[1.5px]', style: callerStyle }, '…')
+      createElement(Text, { className: 'tracking-[1.5px]', style: callerStyle }, 'استكشف')
     );
 
     expect(hostStyle(root)).toContainEqual(callerStyle);
@@ -102,7 +104,10 @@ describe('Text tracked labels in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
-    expect(hostText(root).props.className as string).toContain('tracking-[1.5px]');
+    // Arabic-script copy drops the tracked class and the mono family in an RTL
+    // interface (`withoutMonoFamily`): a zero letter spacing alone does not
+    // keep a cursive script's joins (text.rtl-labels, text.mounted).
+    expect(hostText(root).props.className as string).not.toContain('tracking-[1.5px]');
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
   });
 });

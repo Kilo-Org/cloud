@@ -173,6 +173,10 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // arrayContaining, not an exact array: introspection seeds android.colors
+    // from the checked-out prebuild, which also carries the app's other colors
+    // (colorPrimary, app_background, notification_icon_color). Asserting the
+    // exact length made this pass only on a tree with no prebuilt android/.
     // Introspection reads the project's own native resources, so the colors
     // modResults carry whatever the worktree's generated `android/` project
     // declares (adaptive-icon, notification, app background) next to the

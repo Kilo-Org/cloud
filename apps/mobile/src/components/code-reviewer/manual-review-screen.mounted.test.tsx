@@ -32,6 +32,8 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('react-native', () => ({
+  // The screen calls the keyboard-reveal hook before it picks a branch, and
+  // that hook subscribes to the platform's keyboard and app-state events.
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: 'android' },

@@ -493,7 +493,6 @@ vi.mock('@/components/empty-state', () => ({
 }));
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
-  useAppAwareKeyboardPadding: () => 0,
 }));
 vi.mock('@/components/query-error', () => ({
   QueryError: 'QueryError',

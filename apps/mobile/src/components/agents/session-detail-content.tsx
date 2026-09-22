@@ -107,10 +107,7 @@ import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch'
 import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
-import {
-  AppAwareKeyboardPaddingView,
-  useAppAwareKeyboardPadding,
-} from '@/components/kilo-chat/app-aware-keyboard-padding';
+import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import {
   resolveLoadedCliSessionPresenceId,
   useCliSessionPresence,
@@ -393,13 +390,10 @@ export function SessionDetailContent({
   }, []);
 
   const { bottom } = useSafeAreaInsets();
-  // The strip below the keyboard container reserves the device safe area so
-  // the composer's tail clears the navigation bar / home indicator. The
-  // container above already covers that strip once the keyboard is open, so
-  // the reservation has to yield to the lift; keeping both leaves the inset as
-  // a blank band between the composer and the keyboard.
-  const keyboardLift = useAppAwareKeyboardPadding();
-  const bottomStripHeight = Math.max(0, bottom - keyboardLift);
+  // The strip below the keyboard container reserves the device safe area so the
+  // composer's tail clears the navigation bar / home indicator. The container
+  // above does not add it again (`containerReservesBottomInset`), so the space
+  // is resolved once per screen instead of twice.
   const { showActionSheetWithOptions } = useActionSheet();
 
   // Durable composer draft. The composer renders immediately — typing must
@@ -1969,7 +1963,9 @@ export function SessionDetailContent({
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
           {keyboardContainerKind === 'app-aware-padding' ? (
-            <AppAwareKeyboardPaddingView className="flex-1">
+            // The trailing bottom-chrome spacer below reserves the navigation-
+            // bar inset outside this view, so the view must not add it again.
+            <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
               {renderKeyboardBody()}
             </AppAwareKeyboardPaddingView>
           ) : (
@@ -1980,10 +1976,10 @@ export function SessionDetailContent({
 
           {isComposerVisible ? (
             <BlurBar className="border-t-0">
-              <View style={{ height: bottomStripHeight }} />
+              <View style={{ height: bottom }} />
             </BlurBar>
           ) : (
-            <View style={{ height: bottomStripHeight }} className="bg-background" />
+            <View style={{ height: bottom }} className="bg-background" />
           )}
 
           {sheetMountState.mounted ? (

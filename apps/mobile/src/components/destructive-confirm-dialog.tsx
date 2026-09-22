@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Modal, Platform, Pressable, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
@@ -11,21 +11,6 @@ type DestructiveConfirmDialogProps = {
   onConfirm: () => void;
   onCancel: () => void;
 };
-
-/**
- * Whether the running platform needs this in-app surface instead of the native
- * `Alert.alert` confirmation.
- *
- * Android's native `AlertDialog` paints every button with the theme accent, so
- * `Alert.alert`'s `style: 'destructive'` never reaches the screen there; iOS
- * honors it and keeps the native alert. Callers outside this module ask through
- * this function rather than testing `Platform.OS` themselves: `profile-screen.tsx`
- * sits on the safe-area alignment path that `src/lib/screen-insets.test.ts`
- * holds platform-free.
- */
-export function shouldUseInAppDestructiveConfirm(): boolean {
-  return Platform.OS === 'android';
-}
 
 /**
  * In-app confirmation for a destructive action, rendered with the destructive

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { type LayoutChangeEvent, Platform, type TextInput, View } from 'react-native';
 import { type AttachmentBlock, MESSAGE_TEXT_MAX_CHARS } from '@kilocode/kilo-chat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAppAwareKeyboardPadding } from './app-aware-keyboard-padding';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { useMessageInputClipboardImageHint } from './use-message-input-clipboard-image-hint';
 import { useMessageInputAppStateFocus } from './use-message-input-app-state-focus';
@@ -69,7 +68,6 @@ export function MessageInputContent({
   onSendContentBlocks?: MessageInputContentBlocksOnSend;
 }) {
   const { bottom } = useSafeAreaInsets();
-  const keyboardLift = useAppAwareKeyboardPadding();
   const valueRef = useRef(initialText);
   const [canSend, setCanSend] = useState(() =>
     canSubmitMessageInputContent({ text: initialText, readyAttachmentBlocks: editableAttachments })
@@ -241,7 +239,6 @@ export function MessageInputContent({
       style={{
         paddingBottom: resolveMessageInputBottomPadding({
           bottomSafeAreaInset: bottom,
-          keyboardLift,
           platform: Platform.OS,
         }),
       }}

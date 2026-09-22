@@ -11,12 +11,10 @@ import { NewSessionRepositorySection } from '@/components/agents/new-session-rep
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { useComposerRevealScroll } from '@/components/agents/use-composer-reveal-scroll';
-import {
-  AppAwareKeyboardPaddingView,
-  useAppAwareKeyboardPadding,
-} from '@/components/kilo-chat/app-aware-keyboard-padding';
+import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
 /**
@@ -115,12 +113,6 @@ export function NewSessionConfigureForm({
   // layout and never re-anchors, so the keyboard must be dismissed before
   // the sheet opens.)
   const { bottom } = useSafeAreaInsets();
-  // The keyboard-lift view below already covers the strip the IME hides,
-  // system bars included, so the navigation-bar padding the form keeps while
-  // the keyboard is closed has to yield to that lift; keeping both shows the
-  // inset as a blank band between the content and the keyboard.
-  const keyboardLift = useAppAwareKeyboardPadding();
-  const formBottomPadding = Math.max(0, bottom - keyboardLift);
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
   const runOnNote =
@@ -206,7 +198,7 @@ export function NewSessionConfigureForm({
       ) : null}
 
       <Text className="mt-2 text-xs text-muted-foreground">
-        {t('agentChat.newSession.remoteHint')}
+        {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
       </Text>
 
       {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
@@ -253,8 +245,10 @@ export function NewSessionConfigureForm({
   );
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingBottom: formBottomPadding }}>
-      <AppAwareKeyboardPaddingView className="flex-1">
+    // The root reserves the navigation-bar inset, so the keyboard-lift view
+    // pads from its own bottom edge and must not add the inset again.
+    <View className="flex-1 bg-background" style={{ paddingBottom: bottom }}>
+      <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
         {body}
         {/*
           The primary action is pinned below the scroll body, never part of it.

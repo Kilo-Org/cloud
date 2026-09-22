@@ -74,7 +74,6 @@ const connectionHealth = vi.hoisted(() => ({
   retryConnection: vi.fn(),
 }));
 const hideThinking = vi.hoisted(() => ({ current: false, loaded: true }));
-const keyboardLiftState = vi.hoisted(() => ({ current: 0 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/agents/session-provider', () => ({
@@ -294,7 +293,6 @@ vi.mock('@/components/agents/session-message-list', () => ({
 }));
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
-  useAppAwareKeyboardPadding: () => keyboardLiftState.current,
 }));
 vi.mock('@/components/kilo-chat/hooks/use-cli-session-presence', () => ({
   resolveLoadedCliSessionPresenceId: vi.fn(),
@@ -1270,38 +1268,6 @@ describe('session detail bottom strip', () => {
     const spacerStyle = spacer?.props.style as { height: number } | undefined;
     expect(spacerStyle).toEqual({ height: 16 });
     expect(Object.keys(spacerStyle ?? {})).toEqual(['height']);
-  });
-
-  it('yields the home-indicator strip to the keyboard lift that already covers it', async () => {
-    keyboardLiftState.current = 300;
-    try {
-      const { renderer } = await mountDetails([]);
-      const strips = renderer.root.findAll(node => Object.is(node.type, 'BlurBar'));
-      expect(strips).toHaveLength(1);
-      const spacer = strips[0]?.findAll(node => Object.is(node.type, 'View'))[0];
-      expect(spacer).toBeDefined();
-      const spacerStyle = spacer?.props.style as { height: number } | undefined;
-      // The lift already covers the strip the navigation bar sits in, so
-      // holding the inset open would show it as a band above the keyboard.
-      expect(spacerStyle?.height).toBe(0);
-    } finally {
-      keyboardLiftState.current = 0;
-    }
-  });
-
-  it('keeps the leftover strip while the lift is shorter than the inset', async () => {
-    keyboardLiftState.current = 10;
-    try {
-      const { renderer } = await mountDetails([]);
-      const strips = renderer.root.findAll(node => Object.is(node.type, 'BlurBar'));
-      expect(strips).toHaveLength(1);
-      const spacer = strips[0]?.findAll(node => Object.is(node.type, 'View'))[0];
-      expect(spacer).toBeDefined();
-      const spacerStyle = spacer?.props.style as { height: number } | undefined;
-      expect(spacerStyle?.height).toBe(6);
-    } finally {
-      keyboardLiftState.current = 0;
-    }
   });
 });
 

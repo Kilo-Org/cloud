@@ -62,36 +62,6 @@ describe('message input layout', () => {
     ).toBe(8);
   });
 
-  it('yields the Android safe-area clearance to the keyboard lift that covers it', () => {
-    expect(
-      resolveMessageInputBottomPadding({
-        bottomSafeAreaInset: 24,
-        keyboardLift: 300,
-        platform: 'android',
-      })
-    ).toBe(8);
-  });
-
-  it('keeps the inset the lift does not reach', () => {
-    expect(
-      resolveMessageInputBottomPadding({
-        bottomSafeAreaInset: 24,
-        keyboardLift: 10,
-        platform: 'android',
-      })
-    ).toBe(22);
-  });
-
-  it('keeps only the minimum clearance once the lift covers the iOS inset', () => {
-    expect(
-      resolveMessageInputBottomPadding({
-        bottomSafeAreaInset: 34,
-        keyboardLift: 336,
-        platform: 'ios',
-      })
-    ).toBe(8);
-  });
-
   it('caps the visible composer text area at five lines', () => {
     const expectedMaxHeight =
       MESSAGE_INPUT_LINE_HEIGHT * MESSAGE_INPUT_MAX_VISIBLE_LINES + MESSAGE_INPUT_VERTICAL_INSET;

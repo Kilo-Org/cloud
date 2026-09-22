@@ -130,22 +130,82 @@ it('reads the keyboard height through the shared app-aware hook', async () => {
   expect(sharedKeyboardHook.calls).toBeGreaterThan(0);
 });
 
-it('keeps the toast above the software keyboard while it is up', async () => {
+/**
+ * Android's `endCoordinates.height` stops at the navigation bar
+ * (`ReactRootView` sends `imeInsets.bottom − barInsets.bottom`), so the raw
+ * height sits below the IME's true top edge by the bar inset. The toast is
+ * anchored to the screen bottom, so the Toaster resolves the occlusion through
+ * the same rule the screens reserve padding with (`resolveKeyboardBottomPadding`)
+ * — a raw height left the toast's last line behind the IME's navigation row
+ * (2026-09-20 review finding). The mocked bottom inset is 12.
+ */
+it('clears the Android IME navigation row by adding the bottom inset', async () => {
   platform.OS = 'android';
   await mount();
 
   act(() => {
-    keyboard.show?.({ endCoordinates: { height: 300 } });
+    keyboard.show({ endCoordinates: { height: 300 } });
   });
 
   const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
 
-  // Android reports the IME height with the bottom system bars already
-  // subtracted (ReactRootView: imeInsets.bottom − barInsets.bottom), so
-  // `useAppAwareKeyboardPadding` adds the mocked 12pt inset back to cover the
-  // whole strip the keyboard hides: the toast clears 300 + 12 and keeps the
-  // standard gap above that.
   expect(toasters[0]?.props.offset).toBe(300 + 12 + TOAST_BOTTOM_GAP);
+});
+
+/**
+ * iOS reports the keyboard window frame, which reaches the screen bottom and
+ * so already includes the home-indicator inset. Adding the bottom inset there
+ * would float the toast above the keyboard, so the iOS height passes through
+ * unchanged — the platform-parity half of the keyboard rule.
+ */
+it('keeps the iOS keyboard height, which already reaches the screen bottom', async () => {
+  platform.OS = 'ios';
+  await mount();
+
+  act(() => {
+    keyboard.show({ endCoordinates: { height: 300 } });
+  });
+
+  const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
+
+  // The hook's occlusion is the keyboard's overlap with the screen bottom,
+  // which the iOS frame already reaches: the toast clears the reported height
+  // and keeps the standard gap above it.
+  expect(toasters[0]?.props.offset).toBe(300 + TOAST_BOTTOM_GAP);
+});
+
+/**
+ * The harness keeps every keyboard subscriber, one set per direction (see the
+ * Keyboard mock in the test helpers). A second consumer — here an extra
+ * listener standing in for a screen on top of the Toaster — must not shadow the
+ * Toaster's listener, and disposing it must not detach the Toaster's. A single
+ * slot per direction failed both halves.
+ */
+it('delivers a keyboard event to every subscriber and detaches only the disposed one', async () => {
+  platform.OS = 'android';
+  await mount();
+
+  const extra = vi.fn((_event: { endCoordinates: { height: number } }) => undefined);
+  const subscription = keyboard.addListener('keyboardDidShow', extra);
+
+  act(() => {
+    keyboard.show({ endCoordinates: { height: 300 } });
+  });
+  // Both the Toaster's hook and the extra subscriber received the height.
+  expect(extra).toHaveBeenCalledWith({ endCoordinates: { height: 300 } });
+  expect(unlockRoot().findAllByType('Toaster' as ElementType)[0]?.props.offset).toBe(
+    300 + 12 + TOAST_BOTTOM_GAP
+  );
+
+  subscription.remove();
+  act(() => {
+    keyboard.show({ endCoordinates: { height: 240 } });
+  });
+  // The disposed subscriber is gone; the Toaster's listener is still attached.
+  expect(extra).toHaveBeenCalledTimes(1);
+  expect(unlockRoot().findAllByType('Toaster' as ElementType)[0]?.props.offset).toBe(
+    240 + 12 + TOAST_BOTTOM_GAP
+  );
 });
 
 /**

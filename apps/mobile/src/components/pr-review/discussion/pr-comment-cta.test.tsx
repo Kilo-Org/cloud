@@ -23,27 +23,24 @@ vi.mock('react-i18next', async importOriginal => {
 });
 
 const insetsState = vi.hoisted(() => ({ bottom: 0 }));
-// Every mounted listener for one event, in registration order: the lift view
-// and the bar inside it each measure the same keyboard, so a test fires them
-// together the way the platform does.
+const platformState = vi.hoisted(() => ({ OS: 'ios' }));
 const keyboardSubscribers = vi.hoisted(() => ({
-  show: [] as ((event: { endCoordinates: { height: number; screenY: number } }) => void)[],
-  hide: [] as (() => void)[],
+  show: null as ((event: { endCoordinates: { height: number } }) => void) | null,
+  hide: null as (() => void) | null,
 }));
 
 vi.mock('react-native', () => ({
   View: 'View',
-  Platform: { OS: 'ios' },
-  Dimensions: { get: () => ({ height: 900 }) },
+  Platform: platformState,
   Keyboard: {
     addListener: vi.fn((event: string, listener: (event?: unknown) => void) => {
-      if (event === 'keyboardWillShow') {
-        keyboardSubscribers.show.push(
-          listener as (event: { endCoordinates: { height: number; screenY: number } }) => void
-        );
+      if (event === 'keyboardWillShow' || event === 'keyboardDidShow') {
+        keyboardSubscribers.show = listener as (event: {
+          endCoordinates: { height: number };
+        }) => void;
       }
-      if (event === 'keyboardWillHide') {
-        keyboardSubscribers.hide.push(listener as () => void);
+      if (event === 'keyboardWillHide' || event === 'keyboardDidHide') {
+        keyboardSubscribers.hide = listener as () => void;
       }
       return { remove: vi.fn() };
     }),
@@ -80,15 +77,6 @@ function mountCta(props: Partial<typeof BASE_PROPS> = {}): TestRenderer.ReactTes
   return renderer;
 }
 
-function showKeyboard(height: number, screenY: number) {
-  expect(keyboardSubscribers.show.length).toBeGreaterThan(0);
-  act(() => {
-    for (const listener of keyboardSubscribers.show) {
-      listener({ endCoordinates: { height, screenY } });
-    }
-  });
-}
-
 function paddedViews(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
   return renderer.root.findAll(
     node =>
@@ -123,9 +111,10 @@ function paddingValues(renderer: TestRenderer.ReactTestRenderer): number[] {
 
 describe('PrCommentCta', () => {
   beforeEach(() => {
+    platformState.OS = 'ios';
     insetsState.bottom = 0;
-    keyboardSubscribers.show = [];
-    keyboardSubscribers.hide = [];
+    keyboardSubscribers.show = null;
+    keyboardSubscribers.hide = null;
     BASE_PROPS.onPress.mockClear();
   });
 
@@ -160,19 +149,31 @@ describe('PrCommentCta', () => {
 
   it('lifts above the keyboard while it is open', () => {
     const renderer = mountCta();
-    showKeyboard(336, 564);
+    if (!keyboardSubscribers.show) {
+      throw new Error('keyboard show listener was not registered');
+    }
+    act(() => {
+      keyboardSubscribers.show?.({ endCoordinates: { height: 336 } });
+    });
     expect(paddingValues(renderer)).toContain(336);
   });
 
-  it('yields the safe-area padding to the lift while the keyboard is open', () => {
-    insetsState.bottom = 34;
+  it("lifts by the raw Android metric, which the bar's own inset padding completes", () => {
+    // The bar's inner padding already includes the platform's bottom inset
+    // (`useDetailScreenBottomPadding`), so the lift must not add it a second
+    // time and float the button a navigation-bar height above the keyboard
+    // (2026-09-21 review finding).
+    platformState.OS = 'android';
+    insetsState.bottom = 63;
     const renderer = mountCta();
-    // While closed the bar clears the device safe area by itself.
-    expect(paddingValues(renderer)).toContain(50);
-    showKeyboard(336, 564);
-    // The lift already covers the safe-area strip, so the bar keeps no
-    // inset-tall blank band between itself and the keyboard.
-    expect(paddingValues(renderer)).toEqual([336, 0]);
+    if (!keyboardSubscribers.show) {
+      throw new Error('keyboard show listener was not registered');
+    }
+    act(() => {
+      keyboardSubscribers.show?.({ endCoordinates: { height: 704 } });
+    });
+    expect(paddingValues(renderer)).toContain(704);
+    expect(paddingValues(renderer)).not.toContain(767);
   });
 
   it('does not react to keyboard events at all while the lift is gated off', () => {
@@ -182,8 +183,8 @@ describe('PrCommentCta', () => {
     // list viewport behind the sheet and parks the last thread's reply field
     // under the bar (uxs3 spot check, e4-confirm-discard).
     const renderer = mountCta({ keyboardLift: false });
-    expect(keyboardSubscribers.show).toEqual([]);
-    expect(keyboardSubscribers.hide).toEqual([]);
+    expect(keyboardSubscribers.show).toBeNull();
+    expect(keyboardSubscribers.hide).toBeNull();
     // The bar itself still renders; only the lift wrapper is gone.
     expect(renderer.root.find(node => String(node.type) === 'Button')).toBeDefined();
     expect(paddingValues(renderer)).not.toContain(0);

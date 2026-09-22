@@ -76,10 +76,8 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
-const keyboardLiftState = vi.hoisted(() => ({ current: 0 }));
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
-  useAppAwareKeyboardPadding: () => keyboardLiftState.current,
 }));
 
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
@@ -122,26 +120,25 @@ vi.mock('@/components/ui/button', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
+// `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
+// import cannot resolve in the pure project; every sibling pure spec mocks it.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
-// The profile row renders a loading skeleton, and `@/components/ui/skeleton`
-// pulls `react-native-reanimated`, which this pure suite does not set up.
+// The profile row and the environment row both render a loading `Skeleton`,
+// whose module imports `react-native-reanimated`: this pure suite does not set
+// Reanimated up, and this project runs in plain Node, where the
+// Reanimated/worklets native entry cannot resolve (the published worklets
+// build uses bundler-style extensionless imports). The primitive is a stub like
+// every other UI element above; its own rendering is not under test here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
 }));
-
-// The environment row's loading state renders `Skeleton`, whose module imports
-// react-native-reanimated: this project runs in plain Node, where the
-// Reanimated/worklets native entry cannot resolve (the published worklets
-// build uses bundler-style extensionless imports). The primitive is a stub like
-// every other UI element above; its own rendering is not under test here.
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 // ── hooks ──────────────────────────────────────────────────────────
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -836,6 +833,9 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    // The help draws the commands as prose: the authoring markers must not
+    // reach the screen.
+    expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const remote = NewSessionConfigureForm({
@@ -846,6 +846,7 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 
   // ── Case 14: reorder wiring lock ──
@@ -867,41 +868,6 @@ describe('NewSessionConfigureForm', () => {
     expect(prompt!.onMoveAttachment).toBe(onMoveAttachment);
     // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
     expect(prompt!.onReorderAttachments).toBe(onReorderAttachments);
-  });
-
-  // ── Case 15: the safe-area reservation yields to the keyboard lift ──
-  it('drops the safe-area reservation while the keyboard lift covers it', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    insetsState.bottom = 42;
-    keyboardLiftState.current = 300;
-    try {
-      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-      const element = NewSessionConfigureForm({ ...defaultProps() }) as Node;
-
-      // The lift already covers the navigation bar the inset reserved, so the
-      // outer View must not hold it open as a band above the keyboard.
-      expect(findElementByType(element, 'View')?.style).toEqual({ paddingBottom: 0 });
-    } finally {
-      keyboardLiftState.current = 0;
-      insetsState.bottom = 0;
-    }
-  });
-
-  it('keeps the leftover safe-area reservation while the lift is shorter than the inset', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    insetsState.bottom = 42;
-    keyboardLiftState.current = 10;
-    try {
-      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-      const element = NewSessionConfigureForm({ ...defaultProps() }) as Node;
-
-      expect(findElementByType(element, 'View')?.style).toEqual({ paddingBottom: 32 });
-    } finally {
-      keyboardLiftState.current = 0;
-      insetsState.bottom = 0;
-    }
   });
 
   // ── Case 14: a cloud-create failure belongs to the cloud target only ──

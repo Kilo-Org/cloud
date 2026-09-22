@@ -50,6 +50,14 @@ vi.mock('@/components/ui/radio-group', () => ({
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+// The keyboard padding module pulls in `react-native-safe-area-context`, whose
+// externalized CJS build then requires the real Flow-typed react-native entry
+// and cannot be parsed under the suite's react-native mock. The screen only
+// needs the padding host and the hook's value, both stubbed here.
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
+  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
+  useAppAwareKeyboardPadding: () => 0,
+}));
 vi.mock('@/lib/code-reviewer-config', () => ({
   PLATFORM_CAPABILITIES: { github: { label: 'GitHub' }, gitlab: { label: 'GitLab' } },
 }));

@@ -102,7 +102,9 @@ describe('Text tracked labels in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
-    expect(hostText(root).props.className as string).toContain('tracking-[1.5px]');
+    // The eyebrow variant drops the LTR-only display classes in RTL, so there
+    // is no tracked class left to beat; the reset still reaches the run.
+    expect(hostText(root).props.className as string).not.toContain('tracking-[1.5px]');
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
   });
 });

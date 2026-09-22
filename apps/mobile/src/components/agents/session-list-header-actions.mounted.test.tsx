@@ -250,10 +250,13 @@ describe('SessionListHeaderActions new-session control', () => {
     expect(gapDp).toBe(14);
 
     // `hitSlopInsets` (inside `slopSideDp`) validates and normalizes either
-    // shape of React Native's `number | Rect` hitSlop: the filter spells out
-    // four equal per-side insets, while the new-session control caps its right
-    // side. The new-session control sits left of the filter, so the gap has to
-    // fit both facing slops; more than the gap means the two regions overlap.
+    // shape of React Native's `number | Rect` hitSlop: a control may express one
+    // dp value for every side or spell out per-side insets. Both header controls
+    // spell out insets today — the filter writes four equal sides, while the
+    // new-session control caps its facing (right) side — so the helper has to
+    // accept either shape rather than assume one. The new-session control sits
+    // left of the filter, so the gap has to fit both facing slops; more than the
+    // gap means the two regions overlap.
     expect(
       slopSideDp(newSession.props.hitSlop, 'right') + slopSideDp(filter.props.hitSlop, 'left')
     ).toBeLessThanOrEqual(gapDp);

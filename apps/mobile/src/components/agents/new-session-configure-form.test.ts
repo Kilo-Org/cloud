@@ -124,10 +124,12 @@ vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
-// The environment row renders Skeleton while the profile query is loading. The
-// real Skeleton pulls in react-native-reanimated (and react-native-worklets),
-// whose extensionless ESM imports do not load in this node-only project; the
-// pure test only needs the element type, as new-session-profile-row.mounted.test.tsx does.
+// The environment row and the loading profile row both render the reanimated
+// `Skeleton`; the real Skeleton pulls in react-native-reanimated (and
+// react-native-worklets), whose extensionless ESM imports do not load in this
+// node-only project. Stub it so this node suite neither loads reanimated nor
+// loses the `findElementByType` assertion for the loading placeholder; the pure
+// test only needs the element type, as new-session-profile-row.mounted.test.tsx does.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 // `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated

@@ -1,0 +1,50 @@
+name: E2E Deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-deploy
+  cancel-in-progress: false
+
+jobs:
+  e2e-deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      FAKE_LLM_ADMIN_TOKEN: ${{ secrets.FAKE_LLM_ADMIN_TOKEN }}
+      E2E_INTERNAL_API_SECRET: ${{ secrets.E2E_INTERNAL_API_SECRET }}
+      FAKE_LLM_WORKER_URL: https://fake-llm.engineering-e11.workers.dev
+      # '*' enrols every authenticated Kilo user in control-plane and
+      # worktree-session creation. The e2e Worker also writes to production
+      # Postgres and R2, so this is a deliberate opt-in, not an isolation boundary.
+      E2E_USER_ID: '*'
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy fake-LLM Worker
+        working-directory: services/cloud-agent-next
+        run: test/e2e/deploy/deploy-fake-llm.sh deploy
+
+      - name: Deploy Cloud Agent e2e Worker
+        working-directory: services/cloud-agent-next
+        env:
+          FAKE_LLM_BASE_URL: ${{ env.FAKE_LLM_WORKER_URL }}/api/openrouter
+        run: test/e2e/deploy/deploy-e2e-worker.sh deploy

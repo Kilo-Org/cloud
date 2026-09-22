@@ -1,3 +1,10 @@
+// Tests the `(tabs)` layout's screen options, so it lives outside the route
+// directory instead of next to the layout. A file in
+// `src/app/(app)/(tabs)/` whose name starts with `_layout` is parsed by
+// expo-router as the layout for that directory: it then collides with the real
+// `_layout.tsx` (a route-tree error) and drops every `(tabs)` route from the
+// generated typed routes.
+//
 // The tab bar yields the bottom band to the IME: the shared `screenOptions`
 // must carry `tabBarHideOnKeyboard: true` so the absolutely-positioned bar
 // hides while the keyboard is up (its labels and the empty-state second line

@@ -170,6 +170,10 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // Assert the color this plugin generates, not the host's palette: the
+    // compile above inspects the fresh root `createAndroidProject()` created
+    // (no prebuilt `colors.xml`), and `arrayContaining` leaves any other
+    // entries in `resources.color` unpinned.
     // `introspect` merges into the colors a local prebuild already generated, so
     // a worktree with a prebuilt `android/` directory carries that file's extra
     // entries. Assert the generated entry among them, not as the only one.

@@ -70,17 +70,16 @@ export function ChatToolbar({
       lockLabel={modelLocked ? modelLockLabel : undefined}
     />
   );
-  // The paste button rides with the model chip as one wrap unit. As a sibling
-  // of the chips it is the item that overflows the full first line, so it wraps
-  // alone onto the next line and strands itself at the far edge with an empty
-  // row to its left. Packed, the chip and the button move to the next line
-  // together and the button stays at the end of the chip's line.
+  // The paste button shares the model chip's line. The wrapper grows to fill the
+  // width the shrink-0 mode chip leaves; inside it the model chip is the only
+  // part that gives up width, so the paste button keeps `shrink-0` and stays on
+  // the same line at the row's trailing edge.
   const modelSelectorWithPaste = (
-    // Content-sized for the wrap decision (grow leaves the basis at auto), so
-    // the outer row still sees the chip's real width and wraps the unit instead
-    // of squeezing the chip; on its line the unit fills the row and the paste
-    // keeps the trailing edge.
-    <View className="min-w-0 grow flex-row items-center gap-2">
+    // `min-w-0` lets the chip shrink below its content width, `shrink` makes the
+    // wrapper give up that width (React Native defaults `flexShrink` to 0) and
+    // `grow` takes the remaining row width, so the chip truncates and the paste
+    // button never needs a line of its own.
+    <View className="min-w-0 shrink grow flex-row items-center gap-2">
       {modelSelector}
       {onPaste ? (
         <ComposerPasteButton
@@ -94,17 +93,13 @@ export function ChatToolbar({
   );
 
   return (
-    // The chips reflow instead of shrinking each other: the mode chip is
-    // `shrink-0`, so in a nowrap row the only flexible part is the model chip,
-    // and a long model name ("DeepSeek V4.1 Flash") collapses to "Dee..." next
-    // to the effort badge. Wrapping moves the model chip to its own line, where
-    // it has the full row width to show the selected model.
+    // The row never wraps: it stays one line on both the session and the
+    // new-session composer at every width and locale. The mode chip is
+    // `shrink-0`, so the model chip takes the remaining width and truncates a
+    // long model name ("DeepSeek V4.1 Flash") with its own `numberOfLines={1}`,
+    // while the paste button keeps the trailing edge of the same line.
     <View
-      className={cn(
-        'flex-row flex-wrap items-center gap-2 px-3 py-2.5',
-        disabled && 'opacity-50',
-        className
-      )}
+      className={cn('flex-row items-center gap-2 px-3 py-2.5', disabled && 'opacity-50', className)}
     >
       {order === 'model-first' ? modelSelectorWithPaste : modeSelector}
       {order === 'model-first' ? modeSelector : modelSelectorWithPaste}

@@ -164,9 +164,13 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
-    });
+    // The introspection base mod reads the real project's generated
+    // `values/colors.xml`, so other plugins' colors (icon, notification,
+    // rotation surface) are present too. Assert the splash color the plugin
+    // owns, not the whole file.
+    expect(evaluated._internal?.modResults?.android?.colors?.resources?.color).toEqual(
+      expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }])
+    );
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {
         style: expect.arrayContaining([

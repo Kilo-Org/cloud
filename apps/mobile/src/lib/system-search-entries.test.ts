@@ -73,6 +73,16 @@ describe('session documents', () => {
     expect(storedSessionSearchDocument({ session_id: 'c', title: null })).toBeNull();
   });
 
+  it('skips a session whose title is the backend creation placeholder', () => {
+    // `New session - <ISO>` is machine copy, not a name the user could search
+    // for, so it is indexed exactly like a title-less row: not at all.
+    const placeholder = 'New session - 2026-09-22T04:17:22.503Z';
+    expect(storedSessionSearchDocument({ session_id: 'x', title: placeholder })).toBeNull();
+    expect(
+      activeSessionSearchDocument({ id: 'live-x', title: placeholder, organizationId: null })
+    ).toBeNull();
+  });
+
   it('builds the live-session document from the camelCase active row', () => {
     const document = activeSessionSearchDocument({
       id: 'live-1',

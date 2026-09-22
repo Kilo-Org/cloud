@@ -57,4 +57,31 @@ describe('newestSessionTitle', () => {
     // that were never enriched, and the line then shows nothing.
     expect(newestSessionTitle([{ status: 'question' }])).toBeNull();
   });
+
+  it('returns null when the newest row carries only the backend creation placeholder', () => {
+    // `New session - <ISO>` is machine copy written at creation
+    // (`services/cloud-agent-next/src/session/session-registration.ts:764`),
+    // never the user's name for the session.
+    const rows = [
+      { title: 'Named row', status: 'busy', updatedAt: '2026-01-01T00:00:00.000Z' },
+      {
+        title: 'New session - 2026-09-22T04:17:22.503Z',
+        status: 'busy',
+        updatedAt: '2026-01-06T00:00:00.000Z',
+      },
+    ];
+    expect(newestSessionTitle(rows)).toBeNull();
+  });
+
+  it('keeps a real newest title above an older placeholder row', () => {
+    const rows = [
+      {
+        title: 'New session - 2026-09-22T04:17:22.503Z',
+        status: 'busy',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+      { title: 'Real newest', status: 'busy', updatedAt: '2026-01-06T00:00:00.000Z' },
+    ];
+    expect(newestSessionTitle(rows)).toBe('Real newest');
+  });
 });

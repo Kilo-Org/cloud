@@ -325,6 +325,28 @@ describe('StoredSessionRow live speech', () => {
       expect(selectedId).toBe(destinationsDisabled ? null : 'stored-1');
     }
   );
+
+  it.each(['list', 'card'] as const)(
+    'paints the friendly label, never the backend creation placeholder (%s)',
+    variant => {
+      // `New session - <ISO>` is machine copy written at creation
+      // (`services/cloud-agent-next/src/session/session-registration.ts:764`),
+      // never a name to paint in the row or speak.
+      const placeholder = 'New session - 2026-09-22T04:17:22.503Z';
+      const renderer = mount(row({ session: { ...session, title: placeholder }, variant }));
+      expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+        'Untitled session, feature/live, CLI, and cost 12 cents, 5 minutes ago'
+      );
+      expect(texts(renderer)).toContain('Untitled session');
+      expect(texts(renderer)).not.toContain(placeholder);
+    }
+  );
+
+  it.each(['list', 'card'] as const)('keeps a real title unchanged (%s)', variant => {
+    const renderer = mount(row({ session: { ...session, title: 'Fix login bug' }, variant }));
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toContain('Fix login bug');
+    expect(texts(renderer)).toContain('Fix login bug');
+  });
 });
 
 describe('RemoteSessionRow live speech', () => {

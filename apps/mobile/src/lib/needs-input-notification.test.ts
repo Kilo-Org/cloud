@@ -89,6 +89,32 @@ describe('shouldPublishForSession', () => {
 });
 
 describe('planNeedsInputNotifications', () => {
+  it('publishes the friendly label for a backend creation-placeholder title', () => {
+    const plan = planNeedsInputNotifications({
+      previous: [],
+      next: [
+        makeCached({
+          id: 'ses_1',
+          title: 'New session - 2026-09-22T04:17:22.503Z',
+          status: 'question',
+        }),
+      ],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+    expect(plan.publish).toEqual([
+      {
+        sessionId: 'ses_1',
+        title: 'Untitled session',
+        kind: 'question',
+        prUrl: null,
+        organizationId: null,
+      },
+    ]);
+    expect(plan.dismiss).toEqual([]);
+  });
+
   it('publishes a row transporting into a question', () => {
     const plan = planNeedsInputNotifications({
       previous: [],

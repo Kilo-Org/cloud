@@ -97,12 +97,12 @@ const otherKey = [
 ];
 const session: ActiveSession = makeCached({ createdOnPlatform: 'cli' });
 
-async function render() {
+async function render(next: ActiveSession = session, variant?: 'list' | 'card') {
   await act(async () => {
     const tree = createElement(
       QueryClientProvider,
       { client },
-      createElement(RemoteSessionRow, { session, onPress: vi.fn<() => void>() })
+      createElement(RemoteSessionRow, { session: next, onPress: vi.fn<() => void>(), variant })
     );
     if (renderer) {
       renderer.update(tree);
@@ -111,6 +111,9 @@ async function render() {
     }
     await flush();
   });
+}
+function isHost(node: TestRenderer.ReactTestInstance, type: string) {
+  return node.type === type;
 }
 function attach(queryKey: readonly unknown[] = QUERY_KEY) {
   owner = new ActiveSessionsLiveSync({
@@ -262,5 +265,41 @@ describe('row exit refresh caller', () => {
     });
     expect(client.getQueryData(QUERY_KEY)).toEqual(current);
     expect(state.request.mock.calls).toHaveLength(0);
+  });
+});
+
+describe('RemoteSessionRow creation-placeholder title', () => {
+  it.each(['list', 'card'] as const)(
+    'paints the friendly label, never the backend creation placeholder (%s)',
+    async variant => {
+      // The live tray and the Home cards share this row; the backend's
+      // creation placeholder (`session-registration.ts:764`) must never reach
+      // either the drawn title or the spoken label.
+      const placeholder = 'New session - 2026-09-22T04:17:22.503Z';
+      await render(
+        makeCached({ id: 'remote-1', title: placeholder, createdOnPlatform: 'cli' }),
+        variant
+      );
+      if (!renderer) {
+        throw new Error('Missing row');
+      }
+      const button = renderer.root.findByType(Pressable);
+      expect(button.props.accessibilityLabel).toContain('Untitled session');
+      expect(button.props.accessibilityLabel).not.toContain(placeholder);
+      const row = renderer.root.findAll(node => isHost(node, 'SessionRow'))[0];
+      expect(row?.props.title).toBe('Untitled session');
+      expect(row?.props.title).not.toBe(placeholder);
+    }
+  );
+
+  it('keeps a real title unchanged', async () => {
+    await render(makeCached({ id: 'remote-1', title: 'Live work', createdOnPlatform: 'cli' }));
+    if (!renderer) {
+      throw new Error('Missing row');
+    }
+    expect(renderer.root.findByType(Pressable).props.accessibilityLabel).toContain('Live work');
+    expect(renderer.root.findAll(node => isHost(node, 'SessionRow'))[0]?.props.title).toBe(
+      'Live work'
+    );
   });
 });

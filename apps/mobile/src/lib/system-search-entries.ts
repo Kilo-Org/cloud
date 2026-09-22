@@ -27,6 +27,7 @@ import {
 } from '@/lib/pr-review/provider-pr-ref';
 import { providerRefFromRecentPr, type RecentPrRef } from '@/lib/pr-review/recent-prs';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { isPlaceholderSessionTitle } from '@/lib/session-display-title';
 
 import {
   APP_SCHEME,
@@ -193,7 +194,7 @@ function sessionSearchDocument(input: {
   gitBranch?: string | null;
 }): SystemSearchDocument | null {
   const title = (input.title ?? '').trim();
-  if (title.length === 0) {
+  if (isPlaceholderSessionTitle(title)) {
     return null;
   }
   return buildDocument({

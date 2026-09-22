@@ -39,6 +39,7 @@ import {
 
 import { type CachedActiveSession, isAttentionStatus } from '@/lib/active-sessions-live';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { resolveSessionDisplayTitle } from '@/lib/session-display-title';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { i18n } from '@/i18n';
 
@@ -185,7 +186,7 @@ function toNotificationRow(
 ): NeedsInputNotificationRow {
   return {
     sessionId: row.id,
-    title: row.title,
+    title: resolveSessionDisplayTitle(row.title, i18n.t('agents.sessionRow.untitled')),
     kind,
     prUrl: row.associatedPr?.url ?? null,
     organizationId: row.organizationId ?? null,

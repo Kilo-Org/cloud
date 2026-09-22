@@ -1,5 +1,6 @@
 import { type GlanceableSessionRow } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { isPlaceholderSessionTitle } from '@/lib/session-display-title';
 import { parseTimestamp } from '@/lib/utils';
 
 /**
@@ -45,9 +46,10 @@ function titleOf(row: NewestSessionRow | null): string | null {
     return null;
   }
   const title = row.title;
-  // A blank title would draw an empty newest line; the surface shows nothing
-  // rather than a label with no name after it.
-  if (title === null || title === undefined || title.trim().length === 0) {
+  // A blank title, or the backend's creation placeholder, would draw an empty
+  // or machine-string newest line; the surface shows nothing rather than a
+  // label with no name after it.
+  if (title === null || title === undefined || isPlaceholderSessionTitle(title)) {
     return null;
   }
   return title;

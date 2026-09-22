@@ -98,10 +98,11 @@ type SharedSandboxRouteMetadata = NonNullable<
 >;
 
 /**
- * The plane a new session will be created on. Vercel sandboxes exist only on the
- * control plane, so those allocations force it; every other request — including a
- * Cloudflare allocation — defers to `sessionPlaneForNewOwner`. Single source of
- * truth: the allocation checks and the session-ID generation must agree.
+ * The plane a new session will be created on. Vercel and DO-managed Cloudflare
+ * containers exist only on the control plane, so those allocations force it;
+ * every other request — including a Cloudflare allocation — defers to
+ * `sessionPlaneForNewOwner`. Single source of truth: the allocation checks and
+ * the session-ID generation must agree.
  */
 function sessionPlaneForCreate(
   input: SessionRegistrationInput,

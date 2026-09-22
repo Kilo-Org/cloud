@@ -1,14 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
 import { parseSandboxBillingInput } from '../container-usage-context.js';
 import type {
   ContainerInstanceSize,
   ContainersObservation,
   SandboxContainers,
 } from '../sandbox-containers/SandboxContainers.js';
-import {
-  CONTAINERS_MVP_INSTANCE,
-  createCloudflareContainersProviderAdapter,
-} from './cloudflare-containers-provider.js';
+import { createCloudflareContainersProviderAdapter } from './cloudflare-containers-provider.js';
 import { decodeCloudflareProviderRef, encodeCloudflareProviderRef } from './cloudflare-provider.js';
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { DEADLINE_MS } from './deadlines.js';
@@ -89,7 +87,7 @@ function setup(
   const adapter = createCloudflareContainersProviderAdapter({
     logicalSandboxId: options.logicalSandboxId ?? LOGICAL_ID,
     allocationName: options.allocationName ?? ALLOCATION_A,
-    instance: options.instance ?? CONTAINERS_MVP_INSTANCE,
+    ...(options.instance === undefined ? {} : { instance: options.instance }),
     getContainer,
   });
   return { adapter, stub, getContainer };
@@ -170,13 +168,23 @@ describe('cloudflare containers provider launch', () => {
     expect(getContainer).toHaveBeenCalledWith(LOGICAL_ID);
     expect(stub.launchWrapper).toHaveBeenCalledWith({
       allocationRef: REF_A,
-      instance: CONTAINERS_MVP_INSTANCE,
+      instance: CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
       env: {
         FOO: 'bar',
         PROVIDER_INSTANCE_ID: REF_A,
         WRAPPER_LOG_PATH: '/tmp/kilocode-control-wrapper.log',
       },
     });
+  });
+
+  it('launches the selected container instance when one is configured', async () => {
+    const { adapter, stub } = setup({ instance: 'standard-3' });
+
+    await adapter.launch(REF_A, {});
+
+    expect(stub.launchWrapper).toHaveBeenCalledWith(
+      expect.objectContaining({ instance: 'standard-3' })
+    );
   });
 
   it('rejects a reference for an allocation that is not the current one', async () => {
@@ -219,13 +227,13 @@ describe('cloudflare containers provider container resolution', () => {
     const first = createCloudflareContainersProviderAdapter({
       logicalSandboxId: LOGICAL_ID,
       allocationName: ALLOCATION_A,
-      instance: CONTAINERS_MVP_INSTANCE,
+      instance: CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
       getContainer,
     });
     const second = createCloudflareContainersProviderAdapter({
       logicalSandboxId: LOGICAL_ID,
       allocationName: ALLOCATION_B,
-      instance: CONTAINERS_MVP_INSTANCE,
+      instance: CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
       getContainer,
     });
 

@@ -17,6 +17,7 @@ import { assertKiloModelAvailable } from '../model-validation.js';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
+  getSandboxAllocationProvider,
   getSandboxAllocationRequest,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
@@ -391,6 +392,7 @@ describe('explicit sandbox session creation', () => {
       SANDBOX_SELECTION_IDS: orgId,
       PER_SESSION_SANDBOX_ORG_IDS: '*',
       VERCEL_SANDBOX_ORG_IDS: '*',
+      CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
     });
     return ctx;
   }
@@ -457,9 +459,7 @@ describe('explicit sandbox session creation', () => {
         lifecycle: { version: 1, timestamp: 1 },
       });
       expect(metadata.workspace?.sandboxAllocation).toBe(preset);
-      expect(metadata.workspace?.sandboxProvider).toBe(
-        preset.startsWith('vercel-') ? 'vercel' : 'cloudflare'
-      );
+      expect(metadata.workspace?.sandboxProvider).toBe(getSandboxAllocationProvider(preset));
       expect(metadata.workspace).not.toHaveProperty('resources');
       if (preset === 'cloudflare-shared') {
         expect(resolveSharedSandboxAssignment).toHaveBeenCalledOnce();

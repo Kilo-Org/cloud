@@ -1,3 +1,4 @@
+import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
 import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import type {
   ContainerInstanceSize,
@@ -15,8 +16,6 @@ import { DEADLINE_MS, leaseAtLeastMs } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
 import type { CreateIntent, ObserveResult } from './physical-lifecycle.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
-
-export const CONTAINERS_MVP_INSTANCE: ContainerInstanceSize = 'standard-2';
 
 const LOG_MAX_BYTES = 1024 * 1024;
 
@@ -40,9 +39,10 @@ function mapObservation(
 export function createCloudflareContainersProviderAdapter(deps: {
   logicalSandboxId: string;
   allocationName: string;
-  instance: ContainerInstanceSize;
+  instance?: ContainerInstanceSize;
   getContainer: (logicalSandboxId: string) => DurableObjectStub<SandboxContainers>;
 }): ProviderAdapter {
+  const instance = deps.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
   const encodeIntentProviderRef = (intent: CreateIntent): string =>
     encodeCloudflareProviderRef({
       sandboxId: intent.allocationName ?? deps.logicalSandboxId,
@@ -92,7 +92,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       const container = deps.getContainer(deps.logicalSandboxId);
       await container.launchWrapper({
         allocationRef: ref,
-        instance: deps.instance,
+        instance,
         env: {
           ...env,
           PROVIDER_INSTANCE_ID: ref,

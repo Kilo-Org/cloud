@@ -151,7 +151,16 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
 
   const { connected, finishTransaction, requestPurchase } = useIAP({
     onPurchaseError: error => {
+      // A store error with no purchase in flight is the store failing to answer,
+      // not a purchase the user started: the screen's store-unavailable banner
+      // already reports that state, so a second "purchase failed" affordance
+      // beside it would contradict the banner. Only a request this owner started
+      // may surface as a purchase failure.
+      const purchaseWasInFlight = activePurchaseRequestRef.current !== null;
       releasePurchaseRequest();
+      if (!purchaseWasInFlight) {
+        return;
+      }
       // A null key means the user cancelled — not a failure.
       const key = getStoreCreditPurchaseErrorMessageKey(error, isAndroid ? 'play' : 'app_store');
       if (key) {

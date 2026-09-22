@@ -258,4 +258,39 @@ describe('CreditNativeIapOwner', () => {
     expect(handle.value?.errorMessageKey).toBeNull();
     expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
   });
+
+  it('a store error with no purchase in flight adds no purchase-failure affordance', async () => {
+    const { handle } = await mountOwner();
+
+    // The store emits a connection error on its own; the user started no
+    // purchase. The store-unavailable banner reports it, so the owner must not
+    // also claim a purchase failed.
+    mockedIap.handlers?.onPurchaseError({
+      code: 'billing-unavailable',
+      message: 'Play Store service is not connected',
+    });
+    await flushPromises();
+
+    expect(handle.value?.errorMessageKey).toBeNull();
+  });
+
+  it('a store error during a purchase reports the purchase failure', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const { handle } = await mountOwner();
+
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    await flushPromises();
+
+    mockedIap.handlers?.onPurchaseError({
+      code: 'billing-unavailable',
+      message: 'Play Store service is not connected',
+    });
+    await flushPromises();
+
+    expect(handle.value?.errorMessageKey).toBe('kiloPass.purchaseFailed');
+    expect(handle.value?.completingProductId).toBeNull();
+  });
 });

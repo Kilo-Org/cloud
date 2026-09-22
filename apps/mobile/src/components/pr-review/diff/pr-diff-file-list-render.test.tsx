@@ -55,11 +55,13 @@ type HarnessProps = {
   item: DiffLineItem;
   onLineTap: (args: LineTapArgs) => void;
   selection: SelectionView;
+  /** When false the row is unmounted while the hook stays mounted. */
+  show?: boolean;
 };
 
 // A minimal host for the hook: mount it, then `renderer.update` with a new
 // `selection` / item to force the re-render the memo has to survive.
-function Harness({ item, onLineTap, selection }: Readonly<HarnessProps>) {
+function Harness({ item, onLineTap, selection, show = true }: Readonly<HarnessProps>) {
   const renderItem = useDiffRenderItem({
     viewed: { isViewed: () => false, toggle: vi.fn() },
     onRetryPage: () => undefined,
@@ -69,7 +71,7 @@ function Harness({ item, onLineTap, selection }: Readonly<HarnessProps>) {
     onLineTap,
     selection,
   });
-  return <>{renderItem({ item })}</>;
+  return <>{show ? renderItem({ item }) : null}</>;
 }
 
 // One builder for the whole line, so a rebuilt item keeps the same `key` (the
@@ -180,5 +182,86 @@ describe('useDiffRenderItem per-line onTap identity', () => {
     );
 
     expect(diffLineProps(renderer).onTap).toBeUndefined();
+  });
+});
+
+// The cached callback + item are released when FlashList unmounts the row as it
+// scrolls out of the render window. Before that release existed, the two maps
+// kept one entry per line ever rendered — and each retained item holds its
+// file's whole parsed patch, so a collapsed or refetched file's lines were
+// never collected.
+describe('useDiffRenderItem releases per-line state when a row unmounts', () => {
+  it('drops the cached tap callback so a remount builds a fresh one', () => {
+    const onLineTap = vi.fn<(args: LineTapArgs) => void>();
+    const item = buildItem('beta', 2);
+    const renderer = mount(createElement(Harness, { item, onLineTap, selection: null }));
+    const before = diffLineProps(renderer).onTap;
+    expect(typeof before).toBe('function');
+
+    act(() => {
+      renderer.update(createElement(Harness, { item, onLineTap, selection: null, show: false }));
+    });
+    expect(renderer.root.findAll(node => String(node.type) === 'DiffLine')).toHaveLength(0);
+
+    act(() => {
+      renderer.update(createElement(Harness, { item, onLineTap, selection: null }));
+    });
+    const after = diffLineProps(renderer).onTap;
+    expect(typeof after).toBe('function');
+    // A retained entry would hand back the released callback.
+    expect(after).not.toBe(before);
+  });
+
+  it('drops both map entries for the unmounted line key', () => {
+    const deleteSpy = vi.spyOn(Map.prototype, 'delete');
+    try {
+      const onLineTap = vi.fn<(args: LineTapArgs) => void>();
+      const item = buildItem('beta', 2);
+      const renderer = mount(createElement(Harness, { item, onLineTap, selection: null }));
+
+      act(() => {
+        renderer.update(createElement(Harness, { item, onLineTap, selection: null, show: false }));
+      });
+
+      // The item map and the callback map both key on the line key.
+      expect(deleteSpy.mock.calls.filter(([key]) => key === 'line:src/a.ts:0:0')).toHaveLength(2);
+    } finally {
+      deleteSpy.mockRestore();
+    }
+  });
+
+  it('taps with the current item after the row remounts', () => {
+    const onLineTap = vi.fn<(args: LineTapArgs) => void>();
+    const renderer = mount(
+      createElement(Harness, { item: buildItem('beta', 2), onLineTap, selection: null })
+    );
+
+    act(() => {
+      renderer.update(
+        createElement(Harness, {
+          item: buildItem('beta', 2),
+          onLineTap,
+          selection: null,
+          show: false,
+        })
+      );
+    });
+    const rebuilt = buildItem('beta again', 4);
+    act(() => {
+      renderer.update(createElement(Harness, { item: rebuilt, onLineTap, selection: null }));
+    });
+
+    const tap = diffLineProps(renderer).onTap as () => void;
+    act(() => {
+      tap();
+    });
+    expect(onLineTap).toHaveBeenCalledWith({
+      filePath: 'src/a.ts',
+      hunkKey: 'src/a.ts:0',
+      side: 'RIGHT',
+      line: 4,
+      text: 'beta again',
+      hunk: rebuilt.parsed.hunks[0],
+    });
   });
 });

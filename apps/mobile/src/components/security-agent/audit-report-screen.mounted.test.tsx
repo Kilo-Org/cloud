@@ -246,7 +246,7 @@ describe('AuditReportScreen states', () => {
     expect(empty).toHaveLength(1);
     expect(empty[0]?.props.title).toBe('Audit report unavailable');
     expect(findByType(root.root, 'QueryError')).toHaveLength(0);
-    expect(empty[0]?.props.className ?? '').not.toMatch(/\bflex-1\b/);
+    expect(empty[0]?.props.placement).toBe('static');
   });
 
   it('treats a personal UNAUTHORIZED as a retryable session error', () => {
@@ -260,10 +260,10 @@ describe('AuditReportScreen states', () => {
     expect(findByType(root.root, 'EmptyState')).toHaveLength(0);
   });
 
-  // Explorer audit-report-empty: see the Yoga note in audit-report-screen.tsx.
-  // A `flex-1` child (flexBasis 0%) collapses to zero height inside
-  // CenteredState's auto-height wrapper, which blanks the title/description, so
-  // the centered states must reach EmptyState with no flex basis.
+  // Explorer finding 3 of 3 (security-audit): the empty body painted a lone
+  // icon bubble with no copy, because CenteredState's measured path collapsed
+  // the copy's height. The screen owns its layout now: a centred
+  // TabScreenScrollView holding EmptyState with placement="static".
   it('renders EmptyState for an empty period', () => {
     setQueryState({
       data: {
@@ -274,11 +274,9 @@ describe('AuditReportScreen states', () => {
     const root = renderScreen('personal');
 
     const empty = findByType(root.root, 'EmptyState');
-    expect(empty).toHaveLength(1);
     expect(empty[0]?.props.title).toBe('No recorded activity');
-    expect(empty[0]?.props.placement).not.toBe('top');
-    expect(findByType(root.root, 'TabScreenScrollView')).toHaveLength(0);
-    expect(empty[0]?.props.className ?? '').not.toMatch(/\bflex-1\b/);
+    expect(empty[0]?.props.placement).toBe('static');
+    expect(findByType(root.root, 'TabScreenScrollView')).toHaveLength(1);
   });
 
   it('retains a cached report with an inline retry after a transient failure', () => {
@@ -312,8 +310,9 @@ describe('AuditReportScreen states', () => {
       data: { status: 'ok', report: makeReport() },
     });
     const tree = renderScreen('org-123');
-    expect(findByType(tree.root, 'TabScreenScrollView')).toHaveLength(0);
-    expect(findByType(tree.root, 'EmptyState')).toHaveLength(1);
+    expect(findByType(tree.root, 'CollapsibleSection')).toHaveLength(0);
+    const empty = findByType(tree.root, 'EmptyState');
+    expect(empty[0]?.props.placement).toBe('static');
   });
 
   it('renders one section per finding group for a non-empty report', () => {

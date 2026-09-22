@@ -165,17 +165,21 @@ function AuditReportView({
     const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language, {
       timeZone: 'UTC',
     });
-    // No `flex-1` here: CenteredState centers its child by measuring the
-    // child's intrinsic height, and a `flex-1` (flexBasis 0%) child inside its
-    // auto-height wrapper collapses to zero, which zeroes the height Yoga lets
-    // the title and description measure into. The screenshot then shows the
-    // icon bubble with no readable copy (explorer audit-report-empty).
+    // Explorer finding 3 of 3 (security-audit): the empty body painted a lone
+    // icon bubble with no copy. CenteredState's measured path collapses the
+    // copy's height while the fixed-size bubble still paints, so this screen
+    // owns its layout: a centred, still-scrollable scroller holding EmptyState
+    // with placement="static" (the documented body for a caller that owns its
+    // own layout).
     return (
-      <EmptyState
-        icon={FileText}
-        title={t('securityAgent.auditReport.noActivity')}
-        description={t('securityAgent.auditReport.noActivityDescription', { start, end })}
-      />
+      <TabScreenScrollView className="flex-1" contentContainerClassName="grow justify-center">
+        <EmptyState
+          placement="static"
+          icon={FileText}
+          title={t('securityAgent.auditReport.noActivity')}
+          description={t('securityAgent.auditReport.noActivityDescription', { start, end })}
+        />
+      </TabScreenScrollView>
     );
   }
 
@@ -217,11 +221,16 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
       {query.isLoading && <AuditReportSkeleton />}
 
       {forbidden && (
-        <EmptyState
-          icon={ShieldOff}
-          title={t('securityAgent.auditReport.unavailable')}
-          description={t('securityAgent.auditReport.unavailableDescription')}
-        />
+        // Explorer finding 3 of 3: an icon-only body is the same defect for a
+        // denied viewer, so this screen owns the layout here too.
+        <TabScreenScrollView className="flex-1" contentContainerClassName="grow justify-center">
+          <EmptyState
+            placement="static"
+            icon={ShieldOff}
+            title={t('securityAgent.auditReport.unavailable')}
+            description={t('securityAgent.auditReport.unavailableDescription')}
+          />
+        </TabScreenScrollView>
       )}
 
       {!query.isLoading && query.isError && !forbidden && !hasReport && (

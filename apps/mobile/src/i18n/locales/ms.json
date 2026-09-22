@@ -839,11 +839,11 @@
       "sessionStatusTitle": "Status sesi",
       "sessionStatusSubtitle": "selesai / gagal / sedia untuk dikawal",
       "kiloclawActivitySubtitle": "instans sedia/gagal, tindakan berjadual",
-      "kiloclawActivityUnavailable": "Mulakan instans KiloClaw untuk mendapat aktiviti KiloClaw.",
+      "kiloclawActivityUnavailable": "Mulakan instans KiloClaw untuk mendapatkan aktiviti KiloClaw.",
       "balanceAlertsSubtitle": "amaran baki rendah untuk organisasi",
-      "balanceAlertsUnavailable": "Sertai organisasi untuk mendapat amaran baki rendah.",
+      "balanceAlertsUnavailable": "Sertai organisasi untuk mendapatkan amaran baki.",
       "securityFindingsSubtitle": "penemuan baharu dan peringatan SLA",
-      "securityFindingsUnavailable": "Dayakan ejen keselamatan Kilo pada skop untuk mendapat dapatan keselamatan.",
+      "securityFindingsUnavailable": "Dayakan Ejen keselamatan Kilo pada skop untuk mendapatkan penemuan keselamatan.",
       "spendAlertsSubtitle": "melepasi ambang dan lonjakan setiap jam",
       "spendAlertsToggle": "Kategori amaran perbelanjaan"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Terlalu banyak percubaan log masuk. Sila tunggu dan cuba lagi."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatik Tercanggih",
+      "balanced": "Automatik Seimbang",
+      "efficient": "Automatik Cekap",
+      "small": "Automatik Kecil",
+      "free": "Automatik Percuma",
+      "organization": "Automatik Organisasi"
+    },
     "dataCollected": "Data dikumpul",
     "free": "Percuma",
     "couldNotUpdateFavorites": "Tidak dapat mengemas kini kegemaran.",

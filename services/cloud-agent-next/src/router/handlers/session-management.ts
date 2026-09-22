@@ -370,7 +370,6 @@ export function createSessionManagementHandlers() {
             CloudAgentSessionState | null
           >(getStub, s => s.getMetadata(), 'getMetadata');
 
-          // Handle not found
           if (!metadata) {
             logger.info('Session not found');
             throw new TRPCError({
@@ -404,7 +403,6 @@ export function createSessionManagementHandlers() {
               .warn('Failed to fetch latest event ID for getSession');
           }
 
-          // Compute sandboxId for log correlation
           const sessionMetadata = metadata;
           const metadataProfile = readProfileBundle(sessionMetadata);
 

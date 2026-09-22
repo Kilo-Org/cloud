@@ -839,11 +839,11 @@
       "sessionStatusTitle": "Ọnọdụ nnọkọ",
       "sessionStatusSubtitle": "agwụla / agaghị nke ọma / dị njikere ka ị chịkwaa ya",
       "kiloclawActivitySubtitle": "usoro dị njikere ma ọ bụ agaghị nke ọma, omume a haziri oge ha",
-      "kiloclawActivityUnavailable": "Malite usoro KiloClaw iji nweta ihe omume KiloClaw.",
+      "kiloclawActivityUnavailable": "Malite usoro KiloClaw iji nweta ọrụ KiloClaw.",
       "balanceAlertsSubtitle": "ịdọ aka na ntị mgbe ego ụlọ ọrụ fọdụrụ dị ntakịrị",
-      "balanceAlertsUnavailable": "Sonye n'òtù iji nweta ịdọ aka na ntị maka ego fọdụrụ.",
+      "balanceAlertsUnavailable": "Sonye na ụlọ ọrụ iji nweta ịdọ aka na ntị ego.",
       "securityFindingsSubtitle": "nchọpụta ọhụrụ na ncheta SLA",
-      "securityFindingsUnavailable": "Gbanye onye enyemaka nchebe Kilo na mpaghara iji nweta ihe achọpụtara gbasara nchebe.",
+      "securityFindingsUnavailable": "Gbanye Onye enyemaka nchebe Kilo n'oke iji nweta nchọpụta nchebe.",
       "spendAlertsSubtitle": "ịgafe oke na mmụba kwa awa",
       "spendAlertsToggle": "Otu ọkwa gbasara mmefu"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Mgbalị nbanye karịrị akarị. Biko chere ma nwaa ọzọ."
   },
   "models": {
+    "auto": {
+      "frontier": "Akpaaka Kachasị elu",
+      "balanced": "Akpaaka Nhatanha",
+      "efficient": "Akpaaka Na-arụ ọrụ nke ọma",
+      "small": "Akpaaka Nta",
+      "free": "Akpaaka N'efu",
+      "organization": "Akpaaka Òtù"
+    },
     "dataCollected": "Data anakọtara",
     "free": "N'efu",
     "couldNotUpdateFavorites": "Enweghị ike imelite ihe kacha amasị gị.",

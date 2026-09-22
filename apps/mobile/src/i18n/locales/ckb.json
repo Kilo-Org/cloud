@@ -839,11 +839,11 @@
       "sessionStatusTitle": "دۆخی سێشن",
       "sessionStatusSubtitle": "تەواوبوو / سەرنەکەوتوو / ئامادە بۆ کۆنترۆڵکردن",
       "kiloclawActivitySubtitle": "نموونەی ئامادە یان سەرنەکەوتوو، کردارە کاتدیاریکراوەکان",
-      "kiloclawActivityUnavailable": "نموونەیەکی KiloClaw دەستپێبکە بۆ وەرگرتنی چالاکیی KiloClaw.",
+      "kiloclawActivityUnavailable": "دەستپێکردنی نموونەیەکی KiloClaw بۆ وەرگرتنی چالاکی KiloClaw.",
       "balanceAlertsSubtitle": "ئاگادارکردنەوەکانی کەمی باڵانسی ڕێکخراوە",
-      "balanceAlertsUnavailable": "بەشداری ڕێکخراوێک بکە بۆ وەرگرتنی ئاگادارکردنەوەکانی باڵانس.",
+      "balanceAlertsUnavailable": "بەشداریکردن لە ڕێکخراوێک بۆ وەرگرتنی ئاگادارکردنەوەکانی باڵانس.",
       "securityFindingsSubtitle": "دۆزینەوە نوێکان و بیرخستنەوەکانی SLA",
-      "securityFindingsUnavailable": "بریکاری ئاسایشی Kilo لە مەودایەکدا چالاک بکە بۆ وەرگرتنی دۆزینەوەکانی ئاسایش.",
+      "securityFindingsUnavailable": "چالاککردنی بریکاری ئاسایشی Kilo لە مەودایەکدا بۆ وەرگرتنی دۆزینەوە ئەمنییەکان.",
       "spendAlertsSubtitle": "تێپەڕینی سنوورەکان و بەرزبوونەوەکانی کاتژمێری",
       "spendAlertsToggle": "پۆلی ئاگادارکردنەوەکانی خەرجی"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "زۆر جار هەوڵی چوونەژوورەوەت داوە. تکایە کەمێک چاوەڕێ بکە و دووبارە هەوڵ بدەوە."
   },
   "models": {
+    "auto": {
+      "frontier": "خۆکاری پێشکەوتوو",
+      "balanced": "خۆکاری هاوسەنگ",
+      "efficient": "خۆکاری کارا",
+      "small": "خۆکاری بچووک",
+      "free": "خۆکاری خۆڕایی",
+      "organization": "خۆکاری ڕێکخراو"
+    },
     "dataCollected": "زانیاری کۆ دەکرێتەوە",
     "free": "خۆڕایی",
     "couldNotUpdateFavorites": "نەتوانرا دڵخوازەکان نوێ بکرێنەوە.",

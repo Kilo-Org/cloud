@@ -17,7 +17,6 @@ import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { Owner } from '@/lib/integrations/core/types';
-import { resolveModelForGitHubRepository } from '@/lib/integrations/github-repository-settings';
 import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
@@ -184,7 +183,7 @@ export default async function spawnCloudAgentSession(
   } else {
     if (!args.githubRepo) {
       // Unreachable given the guard above (one of githubRepo/gitlabProject
-      // is always set here), but keeps the repo-model lookup below type-safe.
+      // is always set here), but keeps the repository lookup below type-safe.
       return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
     }
 
@@ -202,26 +201,12 @@ export default async function spawnCloudAgentSession(
         response: 'Error: That GitHub connection is no longer available to this Kilo organization.',
       };
     }
-    const effectiveModel = await resolveModelForGitHubRepository(
-      githubIntegration,
-      args.githubRepo
-    ).catch(error => {
-      console.error(
-        '[KiloBot] Failed to resolve per-repository model override, falling back to installation model:',
-        error
-      );
-      captureException(error, {
-        tags: { component: 'kilo-bot', op: 'resolve-model-for-github-repository' },
-        extra: { botRequestId, githubRepo: args.githubRepo },
-      });
-      return model;
-    });
 
     prepareInput = {
       githubRepo: args.githubRepo,
       prompt,
       mode,
-      model: effectiveModel,
+      model,
       githubIntegrationId: repository.githubIntegrationId,
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,

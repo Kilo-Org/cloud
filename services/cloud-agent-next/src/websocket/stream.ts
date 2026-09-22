@@ -41,10 +41,6 @@ import type { CloudMessageFailedPayload } from '../session/message-settlement-ou
  */
 const REPLAY_BATCH_BYTES = 1_048_576; // 1 MiB
 
-// ---------------------------------------------------------------------------
-// Event Formatting
-// ---------------------------------------------------------------------------
-
 /**
  * Format a stored event for sending to client.
  *
@@ -75,10 +71,6 @@ export function formatStreamEvent(event: StoredEvent, sessionId: SessionId): Str
 export function createErrorMessage(code: StreamErrorCode, message: string): StreamError {
   return { type: 'error', code, message };
 }
-
-// ---------------------------------------------------------------------------
-// Stream Handler Factory
-// ---------------------------------------------------------------------------
 
 /**
  * A currently-queued user message that should be resurfaced on WebSocket
@@ -155,7 +147,6 @@ export function createStreamHandler(
      * @returns HTTP response (101 on success, error status otherwise)
      */
     async handleStreamRequest(request: Request): Promise<Response> {
-      // Verify it's a WebSocket upgrade
       const upgradeHeader = request.headers.get('Upgrade');
       if (upgradeHeader !== 'websocket') {
         return new Response('Expected WebSocket upgrade', { status: 426 });
@@ -164,7 +155,6 @@ export function createStreamHandler(
       const url = new URL(request.url);
       const filters = parseStreamFilters(url, sessionId);
       const skipReplay = url.searchParams.get('replay') === 'false';
-      // Create WebSocket pair
       const pair = new WebSocketPair();
       const client = pair[0];
       const server = pair[1];
@@ -183,7 +173,6 @@ export function createStreamHandler(
         .withFields({ sessionId, connectedClientCount: state.getWebSockets('stream').length })
         .info('Client stream WebSocket registered');
 
-      // Replay historical events unless client opted out
       if (!skipReplay) {
         await this.replayEvents(server, filters);
       }
@@ -450,17 +439,14 @@ export function createStreamHandler(
 
       for (const ws of allWs) {
         try {
-          // Get filters from attachment
           const attachment = ws.deserializeAttachment() as StreamAttachment | null;
 
           if (!attachment) continue;
 
           const { filters } = attachment;
 
-          // Check if event matches this client's filters
           if (!matchesFilters(event, filters)) continue;
 
-          // Send formatted event
           const formatted = formatStreamEvent(event, sessionId);
           ws.send(JSON.stringify(formatted));
         } catch (error) {

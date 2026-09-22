@@ -855,11 +855,11 @@
       "sessionStatusTitle": "Starea sesiunii",
       "sessionStatusSubtitle": "finalizată / eșuată / pregătită pentru control",
       "kiloclawActivitySubtitle": "instanță pregătită sau eșuată, acțiuni programate",
-      "kiloclawActivityUnavailable": "Pornește o instanță KiloClaw pentru a primi activitatea KiloClaw.",
+      "kiloclawActivityUnavailable": "Pornește o instanță KiloClaw pentru a primi activitate KiloClaw.",
       "balanceAlertsSubtitle": "avertismente de sold scăzut al organizației",
-      "balanceAlertsUnavailable": "Alătură-te unei organizații pentru a primi alerte de sold scăzut.",
+      "balanceAlertsUnavailable": "Alătură-te unei organizații pentru a primi alerte de sold.",
       "securityFindingsSubtitle": "constatări noi și mementouri SLA",
-      "securityFindingsUnavailable": "Activează agentul de securitate Kilo într-un domeniu pentru a primi probleme de securitate detectate.",
+      "securityFindingsUnavailable": "Activează Agentul de securitate Kilo într-un domeniu pentru a primi constatări de securitate.",
       "spendAlertsSubtitle": "depășiri de praguri și vârfuri orare",
       "spendAlertsToggle": "Categoria alerte de cheltuieli"
     },
@@ -3162,6 +3162,14 @@
     "tooManySignInAttempts": "Prea multe încercări de autentificare. Așteaptă și încearcă din nou."
   },
   "models": {
+    "auto": {
+      "frontier": "Automat Avansat",
+      "balanced": "Automat Echilibrat",
+      "efficient": "Automat Eficient",
+      "small": "Automat Mic",
+      "free": "Automat Gratuit",
+      "organization": "Automat de organizație"
+    },
     "dataCollected": "Date colectate",
     "free": "Gratuit",
     "couldNotUpdateFavorites": "Nu s-au putut actualiza favoritele.",

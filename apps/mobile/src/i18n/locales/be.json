@@ -873,9 +873,9 @@
       "kiloclawActivitySubtitle": "экзэмпляр гатовы або завяршыўся з памылкай, запланаваныя дзеянні",
       "kiloclawActivityUnavailable": "Запусціце экзэмпляр KiloClaw, каб атрымліваць актыўнасць KiloClaw.",
       "balanceAlertsSubtitle": "папярэджанні аб нізкім балансе арганізацыі",
-      "balanceAlertsUnavailable": "Далучыцеся да арганізацыі, каб атрымліваць папярэджанні аб нізкім балансе.",
+      "balanceAlertsUnavailable": "Далучыцеся да арганізацыі, каб атрымліваць папярэджанні аб балансе.",
       "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA",
-      "securityFindingsUnavailable": "Уключыце агента бяспекі Kilo у пэўным абсягу, каб атрымліваць выяўленыя праблемы бяспекі.",
+      "securityFindingsUnavailable": "Уключыце Агента бяспекі Kilo у пэўным абсягу, каб атрымліваць праблемы бяспекі.",
       "spendAlertsSubtitle": "перасячэнні парогаў і гадзінныя ўсплёскі",
       "spendAlertsToggle": "Катэгорыя апавяшчэнняў аб выдатаках"
     },
@@ -3205,6 +3205,14 @@
     "tooManySignInAttempts": "Занадта шмат спроб уваходу. Пачакай і паспрабуй яшчэ раз."
   },
   "models": {
+    "auto": {
+      "frontier": "Аўта Перадавы",
+      "balanced": "Аўта Збалансаваны",
+      "efficient": "Аўта Эфектыўны",
+      "small": "Аўта Малы",
+      "free": "Аўта Бясплатны",
+      "organization": "Аўта арганізацыі"
+    },
     "dataCollected": "Збор даных",
     "free": "Бясплатна",
     "couldNotUpdateFavorites": "Не ўдалося абнавіць абранае.",

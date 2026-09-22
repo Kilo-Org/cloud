@@ -124,6 +124,10 @@ describe('shared branded splash', () => {
   });
 
   it('generates both native splash surfaces from the same options', async () => {
+    // Compile against a throwaway project root like the sibling cases: reading
+    // the developer's generated `android/` would fold its existing colors into
+    // the introspection result and make this assertion depend on local state.
+    const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
       { image: './assets/images/logo-mark.png', backgroundColor: '#FAF74F', imageWidth: 100 }
@@ -135,8 +139,13 @@ describe('shared branded splash', () => {
     ).toBeTypeOf('function');
     expect(config.mods?.android?.styles).toBeTypeOf('function');
 
+    // Introspect against a fresh project root: `compileModsAsync` seeds the
+    // Android color/style mods from the resources already on disk, so pointing
+    // it at this package's root would read a developer's prebuilt `android/`
+    // tree — its `colors.xml` is absent in CI — and merge colors this test does
+    // not own into the mod results, making the assertion machine-dependent.
     const evaluated = await compileModsAsync(config, {
-      projectRoot,
+      projectRoot: root,
       platforms: ['ios', 'android'],
       introspect: true,
     });
@@ -164,14 +173,18 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    // The compiled result also carries the app's other Android color resources
-    // (iconBackground, colorPrimary, app_background, notification_icon_color);
-    // pin the splash background this plugin contributes without requiring the
-    // list to hold only it.
+    // Introspection reads the project's own native resources, so the colors
+    // modResults carry whatever the generated `android/` project declares
+    // (iconBackground, colorPrimary, app_background, notification_icon_color)
+    // next to the splash color this plugin contributes. `introspect` merges into
+    // the colors a local prebuild already generated, so pin the splash entry
+    // among them without requiring the list to hold only it.
     expect(evaluated._internal?.modResults?.android?.colors).toEqual(
       expect.objectContaining({
         resources: expect.objectContaining({
-          color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+          color: expect.arrayContaining([
+            expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+          ]),
         }),
       })
     );

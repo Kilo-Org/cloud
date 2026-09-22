@@ -839,11 +839,11 @@
       "sessionStatusTitle": "სესიის სტატუსი",
       "sessionStatusSubtitle": "დასრულდა / ჩაიშალა / სამართავად მზადაა",
       "kiloclawActivitySubtitle": "ინსტანცია მზადაა / ჩაიშალა, დაგეგმილი მოქმედებები",
-      "kiloclawActivityUnavailable": "გაუშვი KiloClaw-ის ინსტანცია, რომ მიიღო KiloClaw-ის აქტივობა.",
+      "kiloclawActivityUnavailable": "გაუშვით KiloClaw ინსტანცია KiloClaw აქტივობის მისაღებად.",
       "balanceAlertsSubtitle": "ორგანიზაციის დაბალი ბალანსის გაფრთხილებები",
-      "balanceAlertsUnavailable": "შეუერთდი ორგანიზაციას, რომ მიიღო დაბალი ბალანსის გაფრთხილებები.",
+      "balanceAlertsUnavailable": "შეუერთდით ორგანიზაციას ბალანსის გაფრთხილებების მისაღებად.",
       "securityFindingsSubtitle": "ახლად აღმოჩენილი პრობლემები და SLA-ის შეხსენებები",
-      "securityFindingsUnavailable": "ჩართე Kilo-ს უსაფრთხოების აგენტი სფეროში, რომ მიიღო უსაფრთხოების პრობლემები.",
+      "securityFindingsUnavailable": "ჩართეთ Kilo უსაფრთხოების აგენტი სფეროზე უსაფრთხოების პრობლემების მისაღებად.",
       "spendAlertsSubtitle": "ზღვრების გადაცილება და საათობრივი ნახტომები",
       "spendAlertsToggle": "ხარჯვის შეტყობინებების კატეგორია"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "შესვლის მცდელობების რაოდენობა გადაჭარბებულია. ცოტა მოიცადე და ხელახლა სცადე."
   },
   "models": {
+    "auto": {
+      "frontier": "ავტომატური მოწინავე",
+      "balanced": "ავტომატური დაბალანსებული",
+      "efficient": "ავტომატური ეფექტური",
+      "small": "ავტომატური პატარა",
+      "free": "ავტომატური უფასო",
+      "organization": "ორგანიზაციის ავტომატური"
+    },
     "dataCollected": "მონაცემები გროვდება",
     "free": "უფასო",
     "couldNotUpdateFavorites": "რჩეულების განახლება ვერ მოხერხდა.",

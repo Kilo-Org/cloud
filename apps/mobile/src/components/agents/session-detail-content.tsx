@@ -188,6 +188,7 @@ import {
 } from '@/components/agents/new-session-prefill';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
+import { resolveSessionDisplayTitle } from '@/lib/session-display-title';
 import {
   areModelPickerSelectionScopesEqual,
   type ModelPickerSelection,
@@ -1536,7 +1537,7 @@ export function SessionDetailContent({
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
     // title it opened with instead of blinking back to "Session".
-    fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
+    fallbackTitle: resolveSessionDisplayTitle(cachedTitle, t('agentChat.session.title')),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;

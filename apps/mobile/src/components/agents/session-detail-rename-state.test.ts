@@ -109,6 +109,48 @@ describe('getSessionDetailRenameState', () => {
       }).modalInitialValue
     ).toBe('Pending');
   });
+
+  it('paints the fallback for the backend creation-placeholder title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T04:17:22.503Z',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe(fallbackTitle);
+
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'Child session - 2026-09-22T04:17:22.503Z',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe(fallbackTitle);
+  });
+
+  it('seeds the rename modal with the fallback while a placeholder title is loaded', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T04:17:22.503Z',
+        renameState: { ...initialRenameState(), isModalOpen: true },
+      }).modalInitialValue
+    ).toBe(fallbackTitle);
+  });
+
+  it('passes a real title that merely starts like a placeholder verbatim', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - my plan',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe('New session - my plan');
+  });
 });
 
 describe('renameStateReducer', () => {
@@ -229,6 +271,21 @@ describe('titleFromSessionUpdatedEvent', () => {
     ).toBeUndefined();
     expect(
       titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ title: '  ' }))
+    ).toBeUndefined();
+  });
+
+  it('ignores a creation-placeholder title from a live update', () => {
+    expect(
+      titleFromSessionUpdatedEvent(
+        'ses-1',
+        sessionUpdatedPayload({ title: 'New session - 2026-09-22T04:17:22.503Z' })
+      )
+    ).toBeUndefined();
+    expect(
+      titleFromSessionUpdatedEvent(
+        'ses-1',
+        sessionUpdatedPayload({ title: 'Child session - 2026-09-22T04:17:22.503Z' })
+      )
     ).toBeUndefined();
   });
 });

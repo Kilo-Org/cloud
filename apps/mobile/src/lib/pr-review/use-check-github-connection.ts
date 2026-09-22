@@ -9,7 +9,7 @@ export function useCheckGitHubConnection() {
 
   return useMutation({
     mutationFn: async () => {
-      const authorization = await queryClient.fetchQuery({
+      const authorization = await queryClient.query({
         ...trpc.githubApps.getUserAuthorization.queryOptions(),
         staleTime: 0,
       });

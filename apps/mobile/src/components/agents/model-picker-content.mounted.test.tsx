@@ -102,7 +102,14 @@ vi.mock('@/components/picker-sheet', () => ({
   PickerSheet: (props: { children?: ReactNode; headerContent?: ReactNode }) =>
     createElement('PickerSheet', null, props.headerContent, props.children),
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+// EmptyState renders its `action` node (as the real component does) so the
+// empty state's clear CTA is reachable from the tree; `title` stays a prop for
+// the existing assertions.
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { title: string; action?: ReactNode }) =>
+    createElement('EmptyState', { title: props.title }, props.action),
+}));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
@@ -297,6 +304,50 @@ describe('ModelPickerContent deferred search', () => {
     /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
     expect(emptyState[0]?.props.title).toBe('No matches');
     /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('offers a Clear search action in the No matches empty state that returns the full list', async () => {
+    const renderer = await mount();
+
+    await act(async () => {
+      typeSearch(renderer, 'no-such-model-xyz');
+      await Promise.resolve();
+    });
+
+    // The "No matches" body offers exactly one clear CTA.
+    const clearActions = findByType(renderer.root, 'Button');
+    expect(clearActions).toHaveLength(1);
+
+    await act(async () => {
+      /* eslint-disable typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+      clearActions[0]?.props.onPress();
+      /* eslint-enable typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access */
+      await Promise.resolve();
+    });
+
+    // The empty state is gone and the unfiltered catalog is listed again.
+    expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
+    expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('does not offer a clear action when the catalog itself is empty', async () => {
+    slotState.bridge = { ...makeBridge(), options: [] };
+    const renderer = await mount();
+
+    const emptyState = findByType(renderer.root, 'EmptyState');
+    expect(emptyState).toHaveLength(1);
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    expect(emptyState[0]?.props.action).toBeUndefined();
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+    expect(findByType(renderer.root, 'Button')).toHaveLength(0);
 
     act(() => {
       renderer.unmount();

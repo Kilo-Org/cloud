@@ -32,9 +32,19 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('react-native', () => ({
+  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
+}));
+// The screen reserves the keyboard's height and reveals its submit button via
+// `useRevealEndOnKeyboard`, so those hooks run on every render. Mock the native
+// safe-area context like the sibling app-aware-keyboard-padding.mounted.test.tsx
+// so the real package's TS source is never resolved by the test transform.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));

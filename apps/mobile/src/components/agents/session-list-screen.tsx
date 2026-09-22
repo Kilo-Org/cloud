@@ -19,7 +19,10 @@ import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
-import { useAgentsBottomBand, useSessionListInsets } from '@/components/agents/session-list-chrome';
+import {
+  useAgentsBottomBands,
+  useSessionListInsets,
+} from '@/components/agents/session-list-chrome';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -56,8 +59,10 @@ export function AgentSessionListScreen() {
   const showFab = context.isReady && content !== 'empty';
   // Android's edge-to-edge window does not resize for the IME, so the centered
   // empty states reserve the keyboard's own height or their copy and Clear
-  // search action draw behind it (explorer finding, agents-list).
-  const bottomReservation = useAgentsBottomBand(tabBarHeight, showFab);
+  // search action draw behind it (explorer finding, agents-list). The rows list
+  // reserves the larger of that band and the FAB's own band, because the button
+  // does not move with the keyboard (device defect uxs1).
+  const { surfaceBand, listBand } = useAgentsBottomBands(tabBarHeight, showFab);
   // A failed foreground refresh keeps the cached rows on screen. That failure
   // must speak through the reserved status line (one inline "Couldn't refresh"
   // with Retry) instead of the load-failure block, which would push the kept
@@ -215,10 +220,9 @@ export function AgentSessionListScreen() {
   // content must clear them: the band rides on the list's frame as a
   // `marginBottom` (the viewport ends above it), never on the content and never
   // as `style` padding, which only cleared the end of the list. The band is the
-  // same one the centered states reserve (`bottomReservation`), so while the
-  // keyboard is up the rows also end above the IME instead of behind it. The
-  // landscape side insets keep row text clear of the sensor housing.
-  const listInsets = useSessionListInsets({ bottomBand: bottomReservation, left, right });
+  // rows list's own (`listBand`), so no row parks behind the keyboard or the
+  // button. The landscape side insets keep row text clear of the sensor housing.
+  const listInsets = useSessionListInsets({ bottomBand: listBand, left, right });
 
   // The fixed 20pt margin gains the landscape right inset so the FAB clears the
   // sensor area; portrait insets are 0, keeping the geometry unchanged.
@@ -303,7 +307,7 @@ export function AgentSessionListScreen() {
   }
 
   return (
-    <StateSurfaceInsets bottomInset={bottomReservation}>
+    <StateSurfaceInsets bottomInset={surfaceBand}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}

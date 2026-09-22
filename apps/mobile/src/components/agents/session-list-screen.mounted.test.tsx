@@ -1400,15 +1400,42 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       showKeyboard(320);
     });
-    // The frame band follows the surface's reservation: the IME's occlusion
-    // replaces the tab-bar/FAB band, whose bar is hidden while the keyboard is
-    // up.
+    // The frame band follows the surface's reservation — the IME's occlusion
+    // replaces the tab-bar band, whose bar is hidden while the keyboard is up —
+    // floored at the FAB's own overlay band.
     expect(listStyle()).toEqual({ marginBottom: 320 });
 
     act(() => {
       hideKeyboard();
     });
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight + FAB_SIZE + FAB_MARGIN });
+  });
+
+  it('keeps the rows viewport clear of the FAB when a raised IME is shorter than the button', async () => {
+    // The FAB keeps its screen-bottom-anchored position while the keyboard is up
+    // (it is not part of the tab bar `tabBarHideOnKeyboard` hides), so a band
+    // that followed the IME's occlusion alone parked the last rows' timestamps
+    // behind the button on Android, where the IME's occlusion stops at the
+    // navigation bar (device defect uxs1, e1-kbup.png).
+    state.platform.OS = 'android';
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const listStyle = () => nodes('FlatList')[0]?.props.style as Record<string, number>;
+    const fabBand = state.tabBarHeight + FAB_SIZE + FAB_MARGIN;
+
+    act(() => {
+      showKeyboard(100);
+    });
+    // The centered states still take the shorter IME band, so their copy clears
+    // the keyboard rather than a phantom tab-bar band.
+    expect(surfaceBottomInset()).toBe(100);
+    // The rows list cannot: a shorter frame parks rows under the button.
+    expect(listStyle()).toEqual({ marginBottom: fabBand });
+
+    act(() => {
+      hideKeyboard();
+    });
+    expect(listStyle()).toEqual({ marginBottom: fabBand });
   });
 
   it('narrows the live list to the search text', async () => {

@@ -82,7 +82,7 @@ export function SessionListSearchHeader({
           // the flag the IME's fullscreen decision reads, so the input is
           // edited in place and the screen's own body and the tab bar stay on
           // screen. The screen's insets then reserve the IME's occlusion (see
-          // `useAgentsBottomBand`).
+          // `useAgentsBottomBands`).
           disableFullscreenUI
           autoCapitalize="none"
           autoCorrect={false}

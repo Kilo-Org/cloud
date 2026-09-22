@@ -264,6 +264,7 @@ export function androidChannelIdForPushData(data: PushData): AndroidNotification
     case 'scheduled-action':
       return 'kiloclaw';
     case 'low_balance':
+    case 'spend_alert':
       return 'balance';
     case 'security_finding':
     case 'security_lifecycle':
@@ -335,6 +336,16 @@ export function genericPushContentForPushData(
           'generic.body.lowBalance',
           undefined,
           'Your balance needs attention'
+        ),
+      };
+    case 'spend_alert':
+      return {
+        title: translatePush(locale, 'generic.title', undefined, 'Kilo'),
+        body: translatePush(
+          locale,
+          'generic.body.spendAlert',
+          undefined,
+          'Your spend needs attention'
         ),
       };
     case 'security_finding':

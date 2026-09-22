@@ -2006,7 +2006,9 @@ export function SessionDetailContent({
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
           {keyboardContainerKind === 'app-aware-padding' ? (
-            <AppAwareKeyboardPaddingView className="flex-1">
+            // The trailing bottom-chrome spacer below reserves the navigation-
+            // bar inset outside this view, so the view must not add it again.
+            <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
               {renderKeyboardBody()}
             </AppAwareKeyboardPaddingView>
           ) : (

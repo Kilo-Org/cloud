@@ -843,7 +843,8 @@
       "chat": "Tērzēšanas ziņojumi",
       "kiloclaw": "KiloClaw darbība",
       "balance": "Brīdinājumi par atlikumu",
-      "security": "Drošības konstatējumi"
+      "security": "Drošības konstatējumi",
+      "spend": "Izdevumu brīdinājumi"
     },
     "category": {
       "chatMessagesSubtitle": "atbildes tavās sarunās",
@@ -858,7 +859,9 @@
       "balanceAlertsSubtitle": "brīdinājumi par mazu organizācijas kredītu atlikumu",
       "balanceAlertsUnavailable": "Pievienojies organizācijai, lai saņemtu brīdinājumus par mazu atlikumu.",
       "securityFindingsSubtitle": "jaunas konstatētās problēmas un SLA atgādinājumi",
-      "securityFindingsUnavailable": "Iespējo Kilo drošības aģentu tvērumā, lai saņemtu drošības konstatējumus."
+      "securityFindingsUnavailable": "Iespējo Kilo drošības aģentu tvērumā, lai saņemtu drošības konstatējumus.",
+      "spendAlertsSubtitle": "sliekšņu pārsniegumi un stundas lēcieni",
+      "spendAlertsToggle": "Izdevumu brīdinājumu kategorija"
     },
     "action": {
       "openSession": "Atvērt sesiju"
@@ -3232,7 +3235,8 @@
     "channelName": "Aktīvie aģenti",
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus.",
     "openSession": "Atvērt",
-    "approveFailed": "Neizdevās apstiprināt. Pieskaries $t(common.approve), lai mēģinātu vēlreiz."
+    "approveFailed": "Neizdevās apstiprināt. Pieskaries $t(common.approve), lai mēģinātu vēlreiz.",
+    "newestResult": "Jaunākais rezultāts"
   },
   "transcriptionModel": {
     "title": "Transkripcijas modelis",
@@ -3268,6 +3272,29 @@
   },
   "launcher": {
     "openLastSession": "Atvērt pēdējo sesiju"
+  },
+  "spendAlerts": {
+    "subtitle": "Sūti brīdinājumu pa e-pastu vai push ziņojumu norēķinu kontaktpersonām, kad šīs jomas izdevumi pārsniedz limitu vai pārlec virs ierastā stundas tempa.",
+    "enable": "Iespējot izdevumu brīdinājumus",
+    "thresholdTitle": "Sliekšņa pārsniegums",
+    "thresholdSubtitle": "Tekošie izdevumi pārsniedz tavu limitu",
+    "anomalyTitle": "Stundas lēciens",
+    "anomalySubtitle": "Viena stunda ir krietni virs šīs jomas ierastā tempa",
+    "limitLabel": "Limits (USD)",
+    "windowLabel": "Logs",
+    "window24h": "24 stundas",
+    "window7d": "7 dienas",
+    "window30d": "30 dienas",
+    "multiplierLabel": "Lēciena reizinātājs",
+    "saved": "Izdevumu brīdinājumu iestatījumi saglabāti",
+    "loadError": "Neizdevās ielādēt izdevumu brīdinājumus.",
+    "saveError": "Neizdevās saglabāt izdevumu brīdinājumus.",
+    "empty": "Izdevumu brīdinājumi ir izslēgti. Ieslēdz tos, lai brīdinātu šīs jomas norēķinu kontaktpersonas.",
+    "noSpend": "Izdevumi vēl nav reģistrēti",
+    "spend24h": "Izdevumi pēdējo 24 stundu laikā",
+    "multiplierError": "Ievadi reizinātāju, kas ir 1 vai lielāks",
+    "permissionDenied": "Tev nav atļaujas pārvaldīt izdevumu brīdinājumus.",
+    "pushOffByCategory": "Izslēgts paziņojumos"
   },
   "profiles": {
     "title": "Profili",

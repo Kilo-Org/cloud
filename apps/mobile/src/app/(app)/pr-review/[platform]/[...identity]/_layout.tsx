@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { PrReviewConnectGate } from '@/components/pr-review/pr-review-connect-gate';
-import { useFormSheetDetents } from '@/lib/form-sheet';
+import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrganization } from '@/lib/organization-context';
@@ -59,7 +59,7 @@ export default function ProviderPrReviewLayout() {
     : (parseParam(params.identity) ?? '');
   const instance = parseParam(params.instance) ?? '';
   const { organizationId } = useOrganization();
-  const { fullSheetDetent } = useFormSheetDetents();
+  const sheetOptions = { ...useFormSheetScreenOptions(), sheetInitialDetentIndex: 'last' as const };
   const { userId } = useCurrentUserId();
   useRouteForegroundRefresh([[['providerReview']]]);
 
@@ -88,14 +88,6 @@ export default function ProviderPrReviewLayout() {
   // GitLab instances — never share a queue.
   const triple = providerPrTriple(ref);
   const draftEntityKey = `${pendingReviewDraftKey(triple.owner, triple.repo, triple.number)}@${providerPrRefKey(ref)}`;
-
-  const sheetOptions = {
-    presentation: 'formSheet' as const,
-    sheetAllowedDetents: [0.5, fullSheetDetent] as [number, number],
-    sheetInitialDetentIndex: 'last' as const,
-    sheetGrabberVisible: true,
-    headerShown: false,
-  };
 
   return (
     <ProviderPrScopeProvider value={scope}>

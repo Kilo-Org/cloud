@@ -254,7 +254,16 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({ useCurrentUserId: () => ({ userId: null }) }));
-vi.mock('@/lib/form-sheet', () => ({ useFormSheetDetents: () => ({ fullSheetDetent: 1 }) }));
+vi.mock('@/lib/form-sheet', () => ({
+  useFormSheetDetents: () => ({ fullSheetDetent: 1 }),
+  useFormSheetScreenOptions: () => ({
+    presentation: 'formSheet',
+    sheetAllowedDetents: [0.5, 1],
+    sheetGrabberVisible: true,
+    headerShown: false,
+    sheetShouldOverflowTopInset: true,
+  }),
+}));
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 vi.mock('@/lib/hooks/use-security-lifecycle-invalidation', () => ({
   useSecurityLifecycleInvalidation: vi.fn(),

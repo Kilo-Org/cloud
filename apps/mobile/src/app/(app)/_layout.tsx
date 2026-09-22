@@ -18,7 +18,7 @@ import {
   attemptPushRegistrationReconciliation,
   subscribeToPushTokenRotation,
 } from '@/lib/auth/push-registration-reconciliation';
-import { useFormSheetDetents } from '@/lib/form-sheet';
+import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -113,7 +113,7 @@ function AppWideFreshnessMount() {
 
 export default function AppLayout() {
   const colors = useThemeColors();
-  const { fullSheetDetent } = useFormSheetDetents();
+  const sheetOptions = useFormSheetScreenOptions();
   useSecurityLifecycleInvalidation();
   useGlanceableOrgFence();
 
@@ -150,96 +150,19 @@ export default function AppLayout() {
             />
             <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
             <Stack.Screen name="agent-chat/[session-id]" />
-            <Stack.Screen
-              name="agent-chat/model-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="agent-chat/repo-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="agent-chat/branch-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
+            <Stack.Screen name="agent-chat/model-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/repo-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/branch-picker" options={sheetOptions} />
             <Stack.Screen
               name="agent-chat/mode-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
+              options={{ ...sheetOptions, sheetAllowedDetents: [0.5] }}
             />
-            <Stack.Screen
-              name="agent-chat/instance-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="agent-chat/folder-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="share-gate"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="language-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="transcription-model-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="voice-language-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
+            <Stack.Screen name="agent-chat/instance-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/folder-picker" options={sheetOptions} />
+            <Stack.Screen name="share-gate" options={sheetOptions} />
+            <Stack.Screen name="language-picker" options={sheetOptions} />
+            <Stack.Screen name="transcription-model-picker" options={sheetOptions} />
+            <Stack.Screen name="voice-language-picker" options={sheetOptions} />
             <Stack.Screen
               name="kilo-pass"
               options={{

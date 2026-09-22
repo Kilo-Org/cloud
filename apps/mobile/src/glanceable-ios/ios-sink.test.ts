@@ -936,6 +936,37 @@ describe('iosSink widget publish', () => {
       expect(props.primaryKind === undefined).toBe(!hasPrimary);
     }
   });
+
+  it('writes the newest-result fields for the large card and drops them on locked frames', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const newestAt = new Date(NOW - 180_000).toISOString();
+    iosSink.publish(snapshotFor([{ status: 'question', statusUpdatedAt: newestAt }]));
+
+    // Every publish replaces the snapshot and the timeline, so a state change
+    // repaints the card at once; no timer carries the newest result.
+    const happy = mockState.snapshots.at(-1) as Partial<GlanceableViewProps>;
+    expect(happy).toMatchObject({
+      newestResultKind: 'needsInput',
+      newestResultLabel: 'Needs input',
+      newestResultAt: newestAt,
+    });
+
+    // The stale frame keeps the counts and the delayed copy; the layout prefers
+    // that copy over a relative time claiming freshness the snapshot lost.
+    const stale = mockState.timeline[1]?.props as Partial<GlanceableViewProps>;
+    expect(stale).toMatchObject({
+      statusLine: "Can't update now",
+      newestResultKind: 'needsInput',
+      newestResultAt: newestAt,
+    });
+
+    iosSink.publish(snapshotFor([], 1, 'empty'));
+    const empty = mockState.snapshots.at(-1) as Partial<GlanceableViewProps>;
+    expect(empty.newestResultKind).toBeUndefined();
+    expect(empty.newestResultLabel).toBeUndefined();
+    expect(empty.newestResultAt).toBeUndefined();
+  });
 });
 
 describe('iosSink Live Activity content-state', () => {
@@ -1306,6 +1337,9 @@ describe('buildGlanceableViewProps', () => {
       'actions',
       'countLines',
       'needsInputSince',
+      'newestResultAt',
+      'newestResultKind',
+      'newestResultLabel',
       'newestTitle',
       'primaryCount',
       'primaryKind',
@@ -1477,6 +1511,59 @@ describe('buildGlanceableViewProps', () => {
     );
     expect(buildExpiredWidgetProps(happy, key => key).newestTitle).toBeUndefined();
   });
+
+  it('carries the newest-result fact and the label of its count row', () => {
+    const newestAt = new Date(NOW - 120_000).toISOString();
+    const props = buildGlanceableViewProps(
+      snapshotFor([
+        { status: 'busy', statusUpdatedAt: new Date(NOW - 600_000).toISOString() },
+        { status: 'question', statusUpdatedAt: newestAt },
+      ]),
+      {},
+      key => key
+    );
+
+    expect(props.newestResultKind).toBe('needsInput');
+    expect(props.newestResultAt).toBe(newestAt);
+    // The label is the mapped row's own, not a second translation of the word.
+    expect(props.newestResultLabel).toBe('glanceable.needsInput');
+    expect(props.newestResultLabel).toBe(
+      props.countLines.find(line => line.kind === 'needsInput')?.label
+    );
+  });
+
+  it('keeps the newest-result fact on the stale frame beside the counts', () => {
+    const newestAt = new Date(NOW - 120_000).toISOString();
+    const props = buildGlanceableViewProps(
+      snapshotFor([{ status: 'question', statusUpdatedAt: newestAt }], 1, 'stale'),
+      {},
+      key => key
+    );
+
+    expect(props.countLines).toHaveLength(3);
+    expect(props.statusLine).toBe('glanceable.stale');
+    // The layout's footer prefers `statusLine`, but the props still carry the
+    // fact so a later fresh publish needs no second build.
+    expect(props.newestResultKind).toBe('needsInput');
+    expect(props.newestResultAt).toBe(newestAt);
+  });
+
+  it('reports no newest result while counts show but no row has a timestamp', () => {
+    const props = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
+    expect(props.countLines).toHaveLength(3);
+    expect(props.newestResultKind).toBeNull();
+    expect(props.newestResultLabel).toBeNull();
+    expect(props.newestResultAt).toBeNull();
+  });
+
+  it('reports no newest result on any locked or waiting frame', () => {
+    for (const status of ['waiting', 'empty', 'expired', 'signed_out', 'privacy'] as const) {
+      const props = buildGlanceableViewProps(snapshotFor([], 0, status), {}, key => key);
+      expect(props.newestResultKind).toBeNull();
+      expect(props.newestResultLabel).toBeNull();
+      expect(props.newestResultAt).toBeNull();
+    }
+  });
 });
 
 const COPY: Record<string, string> = {
@@ -1497,8 +1584,28 @@ describe('toWidgetProps', () => {
     expect('primaryLabel' in props).toBe(false);
     expect('primaryKind' in props).toBe(false);
     expect('needsInputSince' in props).toBe(false);
+    expect('newestResultKind' in props).toBe(false);
+    expect('newestResultLabel' in props).toBe(false);
+    expect('newestResultAt' in props).toBe(false);
     expect('newestTitle' in props).toBe(false);
     expect(props.statusLine).toBe('glanceable.noneWaiting');
+  });
+
+  it('keeps the newest-result fields the large card draws', () => {
+    const newestAt = new Date(NOW - 60_000).toISOString();
+    const props = toWidgetProps(
+      buildGlanceableViewProps(
+        snapshotFor([{ status: 'question', statusUpdatedAt: newestAt }], 0),
+        {},
+        key => key
+      )
+    );
+
+    expect(props).toMatchObject({
+      newestResultKind: 'needsInput',
+      newestResultLabel: 'glanceable.needsInput',
+      newestResultAt: newestAt,
+    });
   });
 
   it('keeps every non-null field', () => {

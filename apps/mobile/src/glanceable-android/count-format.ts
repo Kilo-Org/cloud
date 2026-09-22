@@ -1,6 +1,7 @@
 import { i18n } from '@/i18n';
 import { RTL_LANGUAGES, type SupportedLanguage } from '@/i18n/languages';
 import { numberFormat } from '@/lib/intl-cache';
+import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 /**
  * Draw a count in the active language's own digits.
@@ -23,4 +24,16 @@ export function formatGlanceableCount(value: number): string {
  */
 export function isWidgetRtl(): boolean {
   return RTL_LANGUAGES.has(i18n.language as SupportedLanguage);
+}
+
+/**
+ * The relative time the large cell's newest-result footer shows.
+ *
+ * `timeAgo` already localizes through `Intl.RelativeTimeFormat` and falls back
+ * to `common.justNow` for sub-minute ages, so the widget bakes no timer and no
+ * second wording. `parseTimestamp` accepts both the ISO strings this app writes
+ * and the PostgreSQL form Hermes cannot parse with `new Date`.
+ */
+export function formatGlanceableAgo(at: string): string {
+  return timeAgo(parseTimestamp(at));
 }

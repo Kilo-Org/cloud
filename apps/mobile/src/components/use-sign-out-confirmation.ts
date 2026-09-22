@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
+
+import { needsInAppDestructiveConfirm } from '@/lib/destructive-confirm-platform';
 
 /**
  * Sign-out confirmation, including its platform split.
@@ -13,14 +15,16 @@ import { useTranslation } from 'react-i18next';
  * Android's native `AlertDialog` paints every button with the theme accent, so
  * `Alert.alert`'s `style: 'destructive'` never reaches the screen there.
  * Android opens the in-app `DestructiveConfirmDialog` instead; iOS keeps the
- * native alert, whose destructive choice already renders red.
+ * native alert, whose destructive choice already renders red. The platform read
+ * itself lives in `needsInAppDestructiveConfirm`, shared with the other
+ * destructive confirmations.
  */
 export function useSignOutConfirmation(onSignOut: () => void) {
   const { t } = useTranslation();
   const [confirmVisible, setConfirmVisible] = useState(false);
 
   const requestSignOut = useCallback(() => {
-    if (Platform.OS === 'android') {
+    if (needsInAppDestructiveConfirm()) {
       setConfirmVisible(true);
       return;
     }

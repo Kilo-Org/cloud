@@ -65,12 +65,8 @@ function slopDp(hitSlop: unknown): number {
   return 0;
 }
 
-/**
- * One side's reach from a hitSlop that is either a uniform number or a per-side
- * object. React Native applies a numeric slop to every side, which is how the
- * filter control spells its target.
- */
-function sideSlopDp(hitSlop: unknown, side: keyof Insets): number {
+/** One side's reach, from a hitSlop that is one number for every side or per-side insets. */
+function slopSideDp(hitSlop: unknown, side: keyof Insets): number {
   if (typeof hitSlop === 'number') {
     return hitSlop;
   }
@@ -247,17 +243,22 @@ describe('SessionListHeaderActions new-session control', () => {
     // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
     expect(gapDp).toBe(14);
 
-    const newSessionSlop = (side: keyof Insets): number =>
-      sideSlopDp(newSession.props.hitSlop, side);
+    // `hitSlopInsets` validates and normalizes either shape; `slopSideDp` then
+    // reads the facing side, because the filter expresses its slop as one dp
+    // value for every side while the new-session control caps its right side.
+    const newSessionSlop = hitSlopInsets(newSession.props.hitSlop);
     const filterSlop = hitSlopInsets(filter.props.hitSlop);
     // The new-session control sits left of the filter, so the gap has to fit
-    // both facing slops; more than the gap means the two regions overlap.
-    expect(newSessionSlop('right') + filterSlop.left).toBeLessThanOrEqual(gapDp);
+    // both facing slops; more than the gap means the two regions overlap. Either
+    // control may express hitSlop as one number or as per-side insets.
+    expect(
+      slopSideDp(newSessionSlop, 'right') + slopSideDp(filterSlop, 'left')
+    ).toBeLessThanOrEqual(gapDp);
     // Capping the right side must not drop the control below the design target.
     const box = boxDp(newSession.props.className as string);
-    expect(box.width + newSessionSlop('left') + newSessionSlop('right')).toBeGreaterThanOrEqual(
-      TOUCH_TARGET_DP
-    );
+    expect(
+      box.width + slopSideDp(newSessionSlop, 'left') + slopSideDp(newSessionSlop, 'right')
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
 
     act(() => {
       renderer.unmount();

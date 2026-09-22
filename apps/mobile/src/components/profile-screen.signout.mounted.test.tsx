@@ -11,6 +11,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 const signOutFn = vi.hoisted(() => vi.fn());
 const alertFn = vi.hoisted(() => vi.fn());
 const platform = vi.hoisted(() => ({ os: 'android' as 'android' | 'ios' }));
+const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
   Alert: { alert: alertFn },
@@ -31,13 +32,10 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
-// The screen reads the landscape side insets from the shared entry point, whose
-// native module (`react-native-safe-area-context`) the pure node project cannot
-// load. The sibling profile query harness mocks it the same way.
-const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
-
+// The screen reads its side insets through `@/lib/screen-insets`, which imports
+// this native module; its untransformed source breaks the mounted project.
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => insetsState,
+  useSafeAreaInsets: () => insets,
 }));
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));

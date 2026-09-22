@@ -31,6 +31,7 @@ import { isResourceTokenIssuanceEnabled, NEXTAUTH_SECRET } from '@/lib/config.se
 import { db } from '@/lib/drizzle';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { getUserFromSessionForCredentialIssuance } from '@/lib/user/server';
+import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 
 const ONE_HOUR_SECONDS = 60 * 60;
 const LEGACY_DEVICE_SESSION_SECONDS = ONE_HOUR_SECONDS;
@@ -117,8 +118,34 @@ export function isDelegableResource(value: unknown): value is DelegableResource 
   );
 }
 
-export function canIssueLegacyOrganizationToken(requestHeaders: Headers): boolean {
-  return !requestHeaders.has('authorization');
+export async function canIssueLegacyOrganizationToken(
+  requestHeaders: Headers,
+  user: Pick<User, 'id' | 'api_token_pepper'>
+): Promise<boolean> {
+  // Organization authorization has already authenticated the session or bearer.
+  if (!requestHeaders.get('authorization')) return true;
+  const bearer = tokenFromHeaders(requestHeaders);
+  if (!bearer) return false;
+  try {
+    const verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
+      audience: KILO_API_AUDIENCE,
+      mode: 'allow-legacy',
+    });
+    if (
+      verified.userId !== user.id ||
+      verified.claims.env !== process.env.NODE_ENV ||
+      verified.claims.apiTokenPepper !== user.api_token_pepper ||
+      hasUnsafeLegacyClaims(verified.claimNames)
+    ) {
+      return false;
+    }
+    if (verified.claims.deviceSessionId !== undefined) {
+      await assertActiveDeviceSession(verified.claims.deviceSessionId, user.id);
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function hasUnsafeLegacyClaims(claimNames: readonly string[]): boolean {
@@ -413,7 +440,25 @@ export async function createDelegatedResourceToken(
   resource: DelegableResource,
   options?: CreateDelegatedResourceTokenOptions
 ): Promise<{ token: string; expiresAt: string; user: User; tokenSource?: string }> {
-  const authority = await getResourceDelegationAuthority(user, options);
+  const authority = await getResourceDelegationAuthority(user, { headers: options?.headers });
+  let organizationRole = options?.organizationRole;
+  if (options?.organizationId) {
+    // Explicit delegation follows REST organization access, including inherited and global-admin access.
+    // Control-token callers retain the direct-membership check in getResourceDelegationAuthority.
+    const context = await getAuthorizedOrgContext(options.organizationId);
+    if (!context.success || context.data.user.id !== authority.user.id) {
+      forbidden('Unauthorized organization resource delegation request');
+    }
+    const role = context.data.user.role;
+    if (
+      role === 'billing_manager' ||
+      (resource === 'attribution' && role === 'admin') ||
+      (organizationRole !== undefined && organizationRole !== role)
+    ) {
+      forbidden('Organization role cannot issue this resource token');
+    }
+    organizationRole = role;
+  }
   if (authority.organizationId && authority.organizationId !== options?.organizationId) {
     forbidden('Scoped credentials cannot mint tokens for another organization');
   }
@@ -446,7 +491,7 @@ export async function createDelegatedResourceToken(
     credentialExchange: false,
     extra: {
       organizationId: options?.organizationId ?? authority.organizationId,
-      organizationRole: options?.organizationRole,
+      organizationRole,
       tokenSource: options?.tokenSource ?? authority.tokenSource,
     },
   });

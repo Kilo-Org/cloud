@@ -1,4 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
+import { OpenAILogo } from '@/components/auth/OpenAILogo';
 import {
   AllAuthMethodIds,
   AuthProviderIdSchema,
@@ -19,5 +20,23 @@ describe('Anaconda provider metadata', () => {
     expect(OAuthProviderIds[0]).toBe('anaconda');
     expect(ProdNonSSOAuthProviders[0]).toBe('anaconda');
     expect(AllAuthMethodIds).toContain('anaconda');
+  });
+});
+
+describe('OpenAI provider metadata', () => {
+  test('defines ChatGPT as a linkable OAuth sign-in method', () => {
+    expect(AuthProviderIdSchema.parse('openai')).toBe('openai');
+    expect(getProviderById('openai')).toMatchObject({
+      id: 'openai',
+      name: 'ChatGPT',
+      signInLabel: 'Continue with ChatGPT',
+    });
+    expect(OAuthProviderIds).toContain('openai');
+    expect(ProdNonSSOAuthProviders).toContain('openai');
+    expect(AllAuthMethodIds).toContain('openai');
+  });
+
+  test('uses the OpenAI logo for the ChatGPT sign-in icon', () => {
+    expect((getProviderById('openai').icon as { type?: unknown }).type).toBe(OpenAILogo);
   });
 });

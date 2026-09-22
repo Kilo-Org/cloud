@@ -72,6 +72,12 @@ import {
   type KiloPassAffiliateSaleContext,
 } from '@/lib/kilo-pass/affiliate-sale';
 import { processPersonalKiloPassStripePaidConversion } from '@/lib/impact/kilo-pass-referrals';
+import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
+import {
+  settleKiloPassInvoiceServiceFee,
+  type KiloPassServiceFeeSettlementResult,
+} from '@/lib/service-fees/settlement';
+import { isServiceFeeInvoiceLine } from '@/lib/service-fees/stripe-lines';
 import {
   runAfterResponse,
   trackKiloPassPurchaseCompleted,
@@ -422,6 +428,28 @@ async function hasHandledKiloPassInvoicePaid(
   return existing !== undefined;
 }
 
+function invoiceHasServiceFeeLine(invoice: Stripe.Invoice): boolean {
+  return (invoice.lines?.data ?? []).some(line => isServiceFeeInvoiceLine(line));
+}
+
+function productOnlyKiloPassAnalyticsAmount(invoice: Stripe.Invoice): number {
+  if (invoiceHasServiceFeeLine(invoice)) return 0;
+  return invoice.amount_paid;
+}
+
+function productAmountFromServiceFeeSettlement(
+  invoice: Stripe.Invoice,
+  settlement: KiloPassServiceFeeSettlementResult
+): number {
+  if (settlement.status === 'settled' || settlement.assessment) {
+    return settlement.settledProductMinor;
+  }
+  if (invoiceHasServiceFeeLine(invoice)) {
+    return settlement.settledProductMinor;
+  }
+  return invoice.amount_paid;
+}
+
 function purchaseKindFromBillingReason(
   billingReason: Stripe.Invoice['billing_reason']
 ): KiloPassPurchaseKind {
@@ -452,6 +480,7 @@ export async function handleKiloPassInvoicePaid(params: {
   // invoice handling when Stripe did not surface the matching price line.
   if (!invoiceLooksLikeKiloPassByPriceId(invoice) && !metadataFromInvoice) return;
 
+  let settledProductMinor = productOnlyKiloPassAnalyticsAmount(invoice);
   let didMutateBalance = false;
   let kiloUserIdForCache: string | null = null;
   const affiliateSaleState: {
@@ -502,6 +531,25 @@ export async function handleKiloPassInvoicePaid(params: {
       }
 
       const priceMetadata = getKiloPassPriceMetadataFromInvoice(invoice);
+      try {
+        const serviceFeeSettlement = await settleKiloPassInvoiceServiceFee({
+          invoice,
+          stripe,
+          store: createServiceFeeStores(tx).assessments,
+          subscription,
+        });
+        settledProductMinor = productAmountFromServiceFeeSettlement(invoice, serviceFeeSettlement);
+      } catch (error) {
+        captureException(error, {
+          tags: { source: 'kilo_pass_service_fee_settlement' },
+          extra: {
+            stripeEventId: eventId,
+            stripeInvoiceId: invoice.id,
+            stripeSubscriptionId: subscription.id,
+          },
+        });
+        settledProductMinor = productOnlyKiloPassAnalyticsAmount(invoice);
+      }
 
       const kiloUserId = metadata.kiloUserId;
       const tier = priceMetadata?.tier ?? metadata.tier;
@@ -919,7 +967,7 @@ export async function handleKiloPassInvoicePaid(params: {
         cadence: referralConversionState.cadence,
         purchaseKind: purchaseKindFromBillingReason(invoice.billing_reason),
         stripeInvoiceId: invoice.id,
-        amountPaidUsd: invoice.amount_paid / 100,
+        amountPaidUsd: settledProductMinor / 100,
         currency: (invoice.currency ?? 'usd').toLowerCase(),
         livemode: invoice.livemode,
       });
@@ -956,7 +1004,7 @@ export async function handleKiloPassInvoicePaid(params: {
       kiloPassSubscriptionId: referralConversionState.kiloPassSubscriptionId,
       sourcePaymentId: invoice.id,
       orderId: invoice.id,
-      amount: invoice.amount_paid / 100,
+      amount: settledProductMinor / 100,
       currencyCode: invoice.currency ?? 'usd',
       itemCategory: reportingFields.itemCategory,
       itemName: reportingFields.itemName,
@@ -977,6 +1025,7 @@ export async function handleKiloPassInvoicePaid(params: {
       invoice,
       stripe,
       context: affiliateSaleState.context,
+      productAmountMinor: settledProductMinor,
     });
   }
 

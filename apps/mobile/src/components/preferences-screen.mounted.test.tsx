@@ -1,8 +1,7 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as account-settings-screen.mounted.test.tsx) */
-import { act, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { PreferencesScreen } from '@/components/preferences-screen';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -26,6 +25,8 @@ vi.mock('@/components/ui/icons', () => ({
   Globe: 'Globe',
   Mic: 'Mic',
   SlidersHorizontal: 'SlidersHorizontal',
+  Wallet: 'Wallet',
+  WandSparkles: 'WandSparkles',
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
@@ -72,13 +73,19 @@ describe('PreferencesScreen hub', () => {
   it('renders one navigation row per settings group with its title and subtitle', async () => {
     const renderer = await mountPreferences();
 
-    expect(hubRows(renderer)).toHaveLength(4);
+    expect(hubRows(renderer)).toHaveLength(6);
     expect(row(renderer, 'General').props).toMatchObject({ icon: 'SlidersHorizontal', last: true });
     expect(row(renderer, 'Voice input').props).toMatchObject({
       icon: 'Mic',
       last: true,
       subtitle:
         "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway.",
+    });
+    expect(row(renderer, 'Translate tool summaries').props).toMatchObject({
+      icon: 'WandSparkles',
+      last: true,
+      subtitle:
+        'Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.',
     });
     expect(row(renderer, 'Account').props).toMatchObject({
       icon: 'Globe',
@@ -90,13 +97,19 @@ describe('PreferencesScreen hub', () => {
       subtitle: 'Push preferences',
       last: true,
     });
+    expect(row(renderer, i18n.t('notifications.channel.spend')).props).toMatchObject({
+      icon: 'Wallet',
+      last: true,
+    });
   });
 
   it.each([
     ['General', '/(app)/(tabs)/(3_profile)/general'],
     ['Voice input', '/(app)/(tabs)/(3_profile)/voice-input'],
+    ['Translate tool summaries', '/(app)/(tabs)/(3_profile)/tool-summary-translation'],
     ['Account', '/(app)/(tabs)/(3_profile)/account'],
     ['Notifications', '/(app)/(tabs)/(3_profile)/notifications'],
+    [i18n.t('notifications.channel.spend'), '/(app)/(tabs)/(3_profile)/spend-alerts'],
   ])('pushes the %s subpage from its row', async (title, route) => {
     const renderer = await mountPreferences();
 

@@ -24,28 +24,30 @@ export type AutoSelectInput = {
 };
 
 /**
- * Pick the new-session model. In dev builds, `kilo-auto/efficient` wins over every
- * override when the catalog holds it. Otherwise the priority is server lastSelected,
- * then local persisted preference, then org default, then the first catalog entry.
+ * Pick the new-session model. A persisted choice is always restored first so
+ * the user's last picked model/effort combo comes back: the server
+ * `lastSelected`, then the local persisted preference. When neither is
+ * available in the catalog, dev builds fall back to `kilo-auto/efficient`,
+ * then the org default, then the first catalog entry.
  */
 export function pickAutoSelectedModel(
   input: AutoSelectInput
 ): { model: string; variant: string } | null {
   const { models, lastSelected, stored, organizationId, orgDefaultModel, isDev } = input;
+  const serverMatch = lastSelected ? models.find(m => m.id === lastSelected.model) : undefined;
+  if (serverMatch) {
+    return { model: serverMatch.id, variant: pickVariant(serverMatch, lastSelected?.variant) };
+  }
+  const localEntry = resolveModelForContext(stored, contextKey(organizationId), models);
+  if (localEntry) {
+    return localEntry;
+  }
   const devDefaultMatch = isDev ? models.find(m => m.id === DEV_DEFAULT_MODEL_ID) : undefined;
   if (devDefaultMatch) {
     return { model: devDefaultMatch.id, variant: pickVariant(devDefaultMatch, undefined) };
   }
-  const serverMatch = lastSelected ? models.find(m => m.id === lastSelected.model) : undefined;
-  const localEntry = resolveModelForContext(stored, contextKey(organizationId), models);
   const orgDefaultMatch = orgDefaultModel ? models.find(m => m.id === orgDefaultModel) : undefined;
   const fallback = orgDefaultMatch ?? models[0];
-  if (serverMatch) {
-    return { model: serverMatch.id, variant: pickVariant(serverMatch, lastSelected?.variant) };
-  }
-  if (localEntry) {
-    return localEntry;
-  }
   if (fallback) {
     return { model: fallback.id, variant: pickVariant(fallback, undefined) };
   }

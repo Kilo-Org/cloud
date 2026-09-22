@@ -99,7 +99,6 @@ export function registerAgent(sql: SqlStorage, input: RegisterAgentInput): Agent
   const id = generateId();
   const timestamp = now();
 
-  // Create the agent bead
   query(
     sql,
     /* sql */ `
@@ -131,7 +130,6 @@ export function registerAgent(sql: SqlStorage, input: RegisterAgentInput): Agent
     ]
   );
 
-  // Create the agent_metadata satellite row
   query(
     sql,
     /* sql */ `
@@ -242,8 +240,6 @@ export function deleteAgent(sql: SqlStorage, agentId: string): void {
   // deleteBead cascades to agent_metadata, bead_events, bead_dependencies, etc.
   deleteBead(sql, agentId);
 }
-
-// ── Hooks (GUPP) ────────────────────────────────────────────────────
 
 /** Bead types that are system-managed and should never be hooked to an agent. */
 const UNHOOKABLE_BEAD_TYPES = new Set(['escalation', 'convoy', 'agent', 'message']);
@@ -376,8 +372,6 @@ export function getHookedBead(sql: SqlStorage, agentId: string): Bead | null {
   return getBead(sql, agent.current_hook_bead_id);
 }
 
-// ── Name Allocation ─────────────────────────────────────────────────
-
 /**
  * Allocate a unique polecat name from the pool.
  * Names are town-global (agents belong to the town, not rigs) so we
@@ -466,14 +460,11 @@ export function getOrCreateAgent(
     if (idle.length > 0) return toAgent(AgentBeadRecord.parse(idle[0]));
   }
 
-  // Create a new agent
   const name = role === 'polecat' ? allocatePolecatName(sql) : role;
   const identity = `${name}-${role}-${rigId.slice(0, 8)}@${townId.slice(0, 8)}`;
 
   return registerAgent(sql, { role, name, identity, rig_id: rigId });
 }
-
-// ── Prime Context ───────────────────────────────────────────────────
 
 export function prime(sql: SqlStorage, agentId: string): PrimeContext {
   const agent = getAgent(sql, agentId);
@@ -501,7 +492,6 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
   ];
   const openBeads = BeadRecord.array().parse(openBeadRows);
 
-  // Build rework context if the hooked bead is a rework request
   let rework_context: PrimeContext['rework_context'] = null;
   if (hookedBead?.labels.includes('gt:rework') && hookedBead.metadata) {
     const meta = hookedBead.metadata as Record<string, unknown>;
@@ -517,7 +507,6 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
     };
   }
 
-  // Build PR fixup context if the hooked bead is a PR fixup request
   let pr_fixup_context: PrimeContext['pr_fixup_context'] = null;
   if (hookedBead?.labels.includes('gt:pr-fixup') && hookedBead.metadata) {
     const meta = hookedBead.metadata as Record<string, unknown>;
@@ -566,8 +555,6 @@ export function prime(sql: SqlStorage, agentId: string): PrimeContext {
   };
 }
 
-// ── Checkpoint ──────────────────────────────────────────────────────
-
 export function writeCheckpoint(sql: SqlStorage, agentId: string, data: unknown): void {
   const serialized = data === null || data === undefined ? null : JSON.stringify(data);
   query(
@@ -586,8 +573,6 @@ export function readCheckpoint(sql: SqlStorage, agentId: string): unknown {
   return agent?.checkpoint ?? null;
 }
 
-// ── Status Message ───────────────────────────────────────
-
 export function updateAgentStatusMessage(sql: SqlStorage, agentId: string, message: string): void {
   query(
     sql,
@@ -600,8 +585,6 @@ export function updateAgentStatusMessage(sql: SqlStorage, agentId: string, messa
     [message, now(), agentId]
   );
 }
-
-// ── Touch (heartbeat helper) ────────────────────────────────────────
 
 export function touchAgent(
   sql: SqlStorage,

@@ -1,7 +1,12 @@
 /* eslint-disable max-lines -- Queued-badge, delivery, and a11y seams share the direct-invocation MessageBubble harness. */
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import {
+  type MessageDeliveryState,
+  type StoredMessage,
+  type ToolPart,
+} from '@kilocode/cloud-agent-sdk';
+import type * as React from 'react';
 
 import type * as PartTypes from './part-types';
 import {
@@ -15,6 +20,13 @@ import {
 
 import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
+
+// The harness invokes the memoized component directly (no React renderer), so
+// the identity `useCallback` mock keeps the stabilized handler callable there.
+vi.mock('react', async importOriginal => ({
+  ...(await importOriginal<typeof React>()),
+  useCallback: <T>(fn: T) => fn,
+}));
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -69,6 +81,10 @@ vi.mock('./file-part-renderer', () => ({
 }));
 vi.mock('./part-renderer', () => ({
   PartRenderer: () => null,
+}));
+vi.mock('./tool-run-rows', () => ({
+  CondensedToolRunRow: 'CondensedToolRunRow',
+  ToolOneLineRow: 'ToolOneLineRow',
 }));
 vi.mock('./part-types', async () => {
   const actual = await vi.importActual<typeof PartTypes>('./part-types');
@@ -188,6 +204,8 @@ async function renderBubbleWithHandlers(
     onCopyToComposer?: (text: string) => void;
     onRestoreQueued?: (m: StoredMessage) => void;
     onLongPressDetails?: (m: StoredMessage) => void;
+    condenseToolCalls?: boolean;
+    partsOverride?: readonly StoredMessage['parts'][number][];
   }
 ): Promise<unknown> {
   const { MessageBubble } = await import('./message-bubble');
@@ -242,11 +260,11 @@ describe('MessageBubble failure footer', () => {
     vi.mocked(isTextPart).mockImplementation(actual.isTextPart);
     const { Bubble: MockBubble } = await import('@/components/ui/bubble');
     const message = userMessage('m-sanitized');
-    const textPart = message.parts[0];
-    if (textPart?.type !== 'text') {
+    const firstPart = message.parts[0];
+    if (firstPart?.type !== 'text') {
       throw new Error('expected text part');
     }
-    textPart.text = '<script>hidden</script>';
+    firstPart.text = '<script>hidden</script>';
 
     try {
       const tree = await renderBubbleWithHandlers(message, {
@@ -283,6 +301,26 @@ describe('MessageBubble failure footer', () => {
     );
     expect(findText(tree, t => t === 'Response failed')).toBe(true);
     expect(findElementByType(tree, 'Button', p => p.accessibilityLabel === 'Retry')).toBeNull();
+  });
+
+  it('states a generic assistant failure once, without a detail line repeating the title', async () => {
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-laconic', 'APIError'),
+      {
+        onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+      }
+    );
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findText(tree, t => t === 'The response failed.')).toBe(false);
+  });
+
+  it('keeps the classified detail line for a known assistant error', async () => {
+    const tree = await renderBubbleWithHandlers(
+      assistantMessageWithError('m-asst-known', 'ProviderAuthError'),
+      { onRetryMessage: vi.fn<(message: StoredMessage) => void>() }
+    );
+    expect(findText(tree, t => t === 'Response failed')).toBe(true);
+    expect(findText(tree, t => t === 'The provider rejected the request.')).toBe(true);
   });
 
   it('does not render the footer when no handler is supplied', async () => {
@@ -586,6 +624,60 @@ describe('MessageBubble user text join', () => {
   );
 });
 
+describe('MessageBubble assistant treatment', () => {
+  // The user treatment (Bubble side="user": right-aligned accent tile) is
+  // reserved for a user-role info. An assistant message at any point of its
+  // life — before the first token, mid-stream, completed — and a message whose
+  // role is missing or unknown must never take it.
+  async function findUserBubble(tree: unknown): Promise<{ side: unknown } | null> {
+    const { Bubble: MockBubble } = await import('@/components/ui/bubble');
+    const element = findElementByTypeFn(tree, MockBubble);
+    return element ? { side: element.props.side } : null;
+  }
+
+  it('renders streaming assistant text through the part renderer, never the user bubble', async () => {
+    const { PartRenderer: MockPartRenderer } = await import('./part-renderer');
+    const message = assistantMessage('m-treatment-streaming');
+    message.parts = [
+      {
+        id: 'm-treatment-streaming-text',
+        sessionID: 'ses_1',
+        messageID: 'm-treatment-streaming',
+        type: 'text',
+        text: 'AI Gateway abuse classification is an external, fail-mostly-open integration',
+      },
+    ] as typeof message.parts;
+
+    const tree = await renderBubble(message);
+    expect(await findUserBubble(tree)).toBeNull();
+    expect(findElementByTypeFn(tree, MockPartRenderer)).not.toBeNull();
+  });
+
+  it('renders an assistant message with no content yet without the user bubble', async () => {
+    // Before the first token the assistant row has no visible parts; the
+    // transcript drops it, and the bubble itself must not render user ink.
+    const tree = await renderBubble(assistantMessage('m-treatment-empty'));
+    expect(await findUserBubble(tree)).toBeNull();
+  });
+
+  it('renders a message with an undefined role without the user bubble', async () => {
+    // A payload quirk must never fall back to the user treatment: the missing
+    // role renders the assistant path (no bubble), never Bubble side="user".
+    const message = assistantMessage('m-treatment-unknown-role');
+    (message.info as { role?: string }).role = undefined;
+
+    const tree = await renderBubble(message);
+    expect(await findUserBubble(tree)).toBeNull();
+  });
+
+  it('reserves Bubble side="user" for a user-role message', async () => {
+    const tree = await renderBubble(userMessage('m-treatment-user'));
+    const userBubble = await findUserBubble(tree);
+    expect(userBubble).not.toBeNull();
+    expect(userBubble?.side).toBe('user');
+  });
+});
+
 describe('MessageBubble in-bubble text selection context', () => {
   it('wraps the assistant parts view in InMessageBubbleContext.Provider with value true', async () => {
     const { InMessageBubbleContext } = await import('./bubble-text-selection-context');
@@ -603,6 +695,93 @@ describe('MessageBubble in-bubble text selection context', () => {
     const provider = findProvider(tree, InMessageBubbleContext.Provider);
     expect(provider).not.toBeNull();
     expect(provider?.props.value).toBe(true);
+  });
+});
+
+describe('MessageBubble part-row long-press context', () => {
+  it('mounts the message long-press provider on the assistant parts when the details sheet is wired', async () => {
+    const onLongPressDetails = vi.fn<(m: StoredMessage) => void>();
+    const message = assistantMessage('m-long-press');
+    const tree = await renderBubbleWithHandlers(message, { onLongPressDetails });
+
+    const { MessageLongPressProvider } = await import('./message-long-press-context');
+    const provider = findElementByTypeFn(tree, MessageLongPressProvider);
+    expect(provider).not.toBeNull();
+    expect(provider?.props.message).toBe(message);
+    expect(provider?.props.onLongPressDetails).toBe(onLongPressDetails);
+  });
+
+  it('keeps assistant part rows tap-only when no details sheet is wired', async () => {
+    const tree = await renderBubble(assistantMessage('m-long-press-plain'));
+
+    const { MessageLongPressProvider } = await import('./message-long-press-context');
+    const provider = findElementByTypeFn(tree, MessageLongPressProvider);
+    expect(provider).not.toBeNull();
+    expect(provider?.props.onLongPressDetails).toBeUndefined();
+  });
+});
+
+describe('MessageBubble code-copy long-press forwarding', () => {
+  it('forwards the details long-press into user markdown code fences', async () => {
+    const { isTextPart } = await import('./part-types');
+    vi.mocked(isTextPart).mockReturnValue(true);
+    try {
+      const { ChatMarkdownText: MockChatMarkdownText } = await import('./chat-markdown-text');
+      const message = userMessage('m-code-copy');
+      const onLongPressDetails = vi.fn<(value: StoredMessage) => void>();
+      const tree = await renderBubbleWithHandlers(message, { onLongPressDetails });
+
+      const element = findElementByTypeFn(tree, MockChatMarkdownText);
+      expect(element).not.toBeNull();
+      const handler = element?.props.onLongPressCode as (() => void) | undefined;
+      expect(typeof handler).toBe('function');
+      handler?.();
+      expect(onLongPressDetails).toHaveBeenCalledWith(message);
+    } finally {
+      vi.mocked(isTextPart).mockReturnValue(false);
+    }
+  });
+
+  it('forwards the details long-press into assistant part renderers', async () => {
+    const { PartRenderer: MockPartRenderer } = await import('./part-renderer');
+    const message = assistantMessage('m-code-copy-assistant');
+    message.parts = [
+      {
+        id: 'm-code-copy-assistant-text',
+        sessionID: 'ses_1',
+        messageID: 'm-code-copy-assistant',
+        type: 'text',
+        text: 'hi',
+      },
+    ] as typeof message.parts;
+    const onLongPressDetails = vi.fn<(value: StoredMessage) => void>();
+    const tree = await renderBubbleWithHandlers(message, { onLongPressDetails });
+
+    const element = findElementByTypeFn(tree, MockPartRenderer);
+    expect(element).not.toBeNull();
+    const handler = element?.props.onLongPressCode as (() => void) | undefined;
+    expect(typeof handler).toBe('function');
+    handler?.();
+    expect(onLongPressDetails).toHaveBeenCalledWith(message);
+  });
+
+  it('omits the long-press handler when the bubble has no details action', async () => {
+    const { PartRenderer: MockPartRenderer } = await import('./part-renderer');
+    const message = assistantMessage('m-code-copy-none');
+    message.parts = [
+      {
+        id: 'm-code-copy-none-text',
+        sessionID: 'ses_1',
+        messageID: 'm-code-copy-none',
+        type: 'text',
+        text: 'hi',
+      },
+    ] as typeof message.parts;
+    const tree = await renderBubbleWithHandlers(message, {});
+
+    const element = findElementByTypeFn(tree, MockPartRenderer);
+    expect(element).not.toBeNull();
+    expect(element?.props.onLongPressCode).toBeUndefined();
   });
 });
 
@@ -624,6 +803,169 @@ describe('MessageBubble row rhythm', () => {
     expect(userPressable?.className).toBe('px-4 py-1');
   });
 });
+
+function toolPart(id: string, tool = 'read'): ToolPart {
+  return {
+    id,
+    sessionID: 'ses_1',
+    messageID: 'm-tool',
+    type: 'tool',
+    callID: `call-${id}`,
+    tool,
+    state: {
+      status: 'completed',
+      input: { filePath: `/${id}.ts` },
+      output: '',
+      title: tool,
+      metadata: {},
+      time: { start: 0, end: 1 },
+    },
+  };
+}
+
+function textPart(id: string): StoredMessage['parts'][number] {
+  return {
+    id,
+    sessionID: 'ses_1',
+    messageID: 'm-tool',
+    type: 'text',
+    text: 'between',
+    time: { start: 0, end: 1 },
+  };
+}
+
+describe('MessageBubble condensed tool runs', () => {
+  beforeEach(async () => {
+    const { isTextPart } = await import('./part-types');
+    vi.mocked(isTextPart).mockReturnValue(false);
+  });
+
+  it('condenses three consecutive tool parts into one run row when enabled', async () => {
+    const { PartRenderer } = await import('./part-renderer');
+    const message = assistantMessage('m-condense-on');
+    message.parts = [toolPart('t1'), toolPart('t2'), toolPart('t3')];
+
+    const tree = await renderBubbleWithHandlers(message, { condenseToolCalls: true });
+
+    expect(countElementsByType(tree, PartRenderer)).toBe(0);
+    expect(countElementsByType(tree, 'CondensedToolRunRow')).toBe(1);
+    const run = findElementByType(tree, 'CondensedToolRunRow');
+    expect(run).not.toBeNull();
+    if (!run) {
+      throw new Error('expected run row');
+    }
+    expect((run.props.parts as ToolPart[]).map(part => part.id)).toEqual(['t1', 't2', 't3']);
+  });
+
+  it.each([false, undefined] as const)(
+    'keeps one PartRenderer per tool part when condense is %s',
+    async condenseToolCalls => {
+      const { PartRenderer } = await import('./part-renderer');
+      const message = assistantMessage(`m-condense-off-${String(condenseToolCalls)}`);
+      message.parts = [toolPart('t1'), toolPart('t2'), toolPart('t3')];
+
+      const tree = await renderBubbleWithHandlers(
+        message,
+        condenseToolCalls === undefined ? {} : { condenseToolCalls }
+      );
+
+      expect(countElementsByType(tree, PartRenderer)).toBe(3);
+      expect(countElementsByType(tree, 'CondensedToolRunRow')).toBe(0);
+    }
+  );
+
+  it('renders run, text, run in order when a text part sits between tool pairs', async () => {
+    const actual = await vi.importActual<typeof PartTypes>('./part-types');
+    const { isTextPart } = await import('./part-types');
+    vi.mocked(isTextPart).mockImplementation(actual.isTextPart);
+    try {
+      const { PartRenderer } = await import('./part-renderer');
+      const message = assistantMessage('m-condense-split');
+      message.parts = [
+        toolPart('t1'),
+        toolPart('t2'),
+        textPart('x'),
+        toolPart('t3'),
+        toolPart('t4'),
+      ];
+
+      const tree = await renderBubbleWithHandlers(message, { condenseToolCalls: true });
+
+      const gapView = findElementByType(tree, 'View', props => props.className === 'gap-2');
+      expect(gapView).not.toBeNull();
+      const sequence = collectTypeSequence(gapView?.props.children).filter(
+        type => type === 'CondensedToolRunRow' || type === PartRenderer
+      );
+      expect(sequence).toEqual(['CondensedToolRunRow', PartRenderer, 'CondensedToolRunRow']);
+    } finally {
+      vi.mocked(isTextPart).mockReturnValue(false);
+    }
+  });
+
+  it('renders a lone tool part as one PartRenderer and no run row', async () => {
+    const { PartRenderer } = await import('./part-renderer');
+    const message = assistantMessage('m-condense-lone');
+    message.parts = [toolPart('t1')];
+
+    const tree = await renderBubbleWithHandlers(message, { condenseToolCalls: true });
+
+    expect(countElementsByType(tree, PartRenderer)).toBe(1);
+    expect(countElementsByType(tree, 'CondensedToolRunRow')).toBe(0);
+  });
+
+  it('renders only the overridden parts when a condensed run split the message', async () => {
+    const { PartRenderer } = await import('./part-renderer');
+    const message = assistantMessage('m-condense-fragment');
+    const first = toolPart('t1');
+    const second = toolPart('t2');
+    message.parts = [first, second];
+
+    // The transcript moved t1 into a run and re-emitted the message's remaining
+    // parts; the bubble must render exactly the parts it was handed, so the part
+    // already shown in the run row never renders a second time.
+    const tree = await renderBubbleWithHandlers(message, {
+      condenseToolCalls: true,
+      partsOverride: [second],
+    });
+
+    expect(countElementsByType(tree, PartRenderer)).toBe(1);
+    expect(countElementsByType(tree, 'CondensedToolRunRow')).toBe(0);
+    const rendered = findElementByTypeFn(tree, PartRenderer);
+    expect((rendered?.props.part as ToolPart | undefined)?.id).toBe('t2');
+  });
+});
+
+function countElementsByType(node: unknown, target: unknown): number {
+  if (Array.isArray(node)) {
+    let total = 0;
+    for (const child of node) {
+      total += countElementsByType(child, target);
+    }
+    return total;
+  }
+  if (node == null || typeof node !== 'object') {
+    return 0;
+  }
+  const element = node as { type?: unknown; props?: { children?: unknown } };
+  let total = element.type === target ? 1 : 0;
+  total += countElementsByType(element.props?.children, target);
+  return total;
+}
+
+function collectTypeSequence(node: unknown): unknown[] {
+  if (Array.isArray(node)) {
+    const out: unknown[] = [];
+    for (const child of node) {
+      out.push(...collectTypeSequence(child));
+    }
+    return out;
+  }
+  if (node == null || typeof node !== 'object') {
+    return [];
+  }
+  const element = node as { type?: unknown; props?: { children?: unknown } };
+  return [element.type, ...collectTypeSequence(element.props?.children)];
+}
 
 function findElementByTypeFn(
   node: unknown,

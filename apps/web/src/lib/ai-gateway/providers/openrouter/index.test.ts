@@ -205,6 +205,15 @@ describe('auto models', () => {
     expect(models.data.some(model => model.id === KILO_AUTO_EFFICIENT_MODEL.id)).toBe(true);
   });
 
+  it('explicitly caches authenticated catalog requests', async () => {
+    await getEnhancedOpenRouterModels();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/models',
+      expect.objectContaining({ cache: 'force-cache', next: { revalidate: 60 } })
+    );
+  });
+
   it('excludes OpenRouter batch variants from the public model list', async () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(

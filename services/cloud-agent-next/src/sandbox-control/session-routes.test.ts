@@ -8,6 +8,8 @@ import {
   getRouteByKiloSessionId,
   getRouteBySessionId,
   hasActiveWork,
+  hasEnvironmentPinningWork,
+  pinsEnvironment,
   resolveSessionEventRoute,
   type AttachRouteInput,
 } from './session-routes.js';
@@ -407,6 +409,104 @@ describe('session routes', () => {
     expect(hasActiveWork(table)).toBe(true);
     applyReportedSessionState(table, 'kilo_1', { state: 'idle', idleForMs: 0 }, 3000);
     expect(hasActiveWork(table)).toBe(false);
+  });
+
+  it('pins finalizing and non-input work, but not an input-only park', () => {
+    expect(pinsEnvironment('finalizing', 'input')).toBe(true);
+    expect(pinsEnvironment('finalizing', null)).toBe(true);
+    expect(pinsEnvironment('active', 'input')).toBe(false);
+    expect(pinsEnvironment('active', 'tool')).toBe(true);
+    expect(pinsEnvironment('active', 'model')).toBe(true);
+    expect(pinsEnvironment('active', 'preparation')).toBe(true);
+    expect(pinsEnvironment('active', null)).toBe(true);
+    expect(pinsEnvironment('idle', null)).toBe(false);
+    expect(pinsEnvironment(null, null)).toBe(false);
+  });
+
+  it('stops pinning on the capture-shaped input heartbeat', () => {
+    const { table } = attachedTable();
+    applyReportedSessionState(
+      table,
+      'kilo_1',
+      { state: 'active', idleForMs: 600_000, waitingOn: 'input' },
+      1000
+    );
+    expect(
+      hasEnvironmentPinningWork(table, {
+        state: 'active',
+        pendingMessages: 1,
+        sessions: [{ state: 'active', waitingOn: 'input' }],
+      })
+    ).toBe(false);
+  });
+
+  it('pins when an input wait shares the environment with a running sibling', () => {
+    const first = attachedTable();
+    applyReportedSessionState(
+      first.table,
+      'kilo_1',
+      { state: 'active', idleForMs: 600_000, waitingOn: 'input' },
+      1000
+    );
+    const second = attachRoute(
+      first.table,
+      { ...attachInput, sessionId: 'ses_2', kiloSessionId: 'kilo_2', directory: '/workspace/b' },
+      OWNER
+    );
+    applyReportedSessionState(
+      second.table,
+      'kilo_2',
+      { state: 'active', idleForMs: 0, waitingOn: 'tool' },
+      1000
+    );
+    expect(
+      hasEnvironmentPinningWork(second.table, {
+        state: 'active',
+        pendingMessages: 1,
+        sessions: [{ state: 'active', waitingOn: 'input' }],
+      })
+    ).toBe(true);
+  });
+
+  it('pins a finalizing session even while it reports an input wait', () => {
+    const { table } = attachedTable();
+    applyReportedSessionState(
+      table,
+      'kilo_1',
+      { state: 'finalizing', idleForMs: 600_000, waitingOn: 'input' },
+      1000
+    );
+    expect(
+      hasEnvironmentPinningWork(table, {
+        state: 'finalizing',
+        sessions: [{ state: 'finalizing', waitingOn: 'input' }],
+      })
+    ).toBe(true);
+  });
+
+  it('pins empty-session aggregate active or pending work by default', () => {
+    const { table } = attachedTable();
+    expect(
+      hasEnvironmentPinningWork(table, {
+        state: 'active',
+        pendingMessages: 0,
+        sessions: [],
+      })
+    ).toBe(true);
+    expect(
+      hasEnvironmentPinningWork(table, {
+        state: 'idle',
+        pendingMessages: 1,
+        sessions: [],
+      })
+    ).toBe(true);
+    expect(
+      hasEnvironmentPinningWork(table, {
+        state: 'idle',
+        pendingMessages: 0,
+        sessions: [],
+      })
+    ).toBe(false);
   });
 });
 

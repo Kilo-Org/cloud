@@ -36,6 +36,7 @@
     "cost": "Արժեք",
     "discard": "Հրաժարվել",
     "findings": "Հայտնաբերված խնդիրներ",
+    "mergeRequest": "միաձուլման հարցում",
     "notConnected": "Միացված չէ",
     "notifications": "Ծանուցումներ",
     "pullRequest": "միավորման հարցում",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Օգտագործել այլ էլ. փոստի հասցե",
     "signInWithApple": "Մուտք գործել Apple-ով",
     "signInWithGoogle": "Մուտք գործել Google-ով",
+    "signInWithPasskey": "Մուտք գործել մուտքի բանալիով",
     "emailAddress": "Էլ. փոստի հասցե",
     "emailPlaceholder": "անուն@example.com",
     "continueWithEmail": "Շարունակել էլ. փոստով",
@@ -174,6 +176,10 @@
     "termsConnector": " և ",
     "termsSuffix": "։",
     "moreSignInOptions": "Մուտքի այլ տարբերակներ",
+    "passkeyCancelled": "Մուտքը մուտքի բանալիով չեղարկվել է։ Փորձեք կրկին։",
+    "passkeyNotFound": "Այս սարքի համար մուտքի բանալի պահված չէ։ Փոխարենը մուտք գործեք Apple-ով, Google-ով կամ ձեր էլ. փոստով։",
+    "passkeyUnsupported": "Մուտքի բանալիները հասանելի չեն այս սարքում։ Փոխարենը մուտք գործեք Apple-ով, Google-ով կամ ձեր էլ. փոստով։",
+    "passkeyFailed": "Չհաջողվեց մուտք գործել մուտքի բանալիով։ Փորձեք կրկին։",
     "couldNotCompleteSignIn": "Չհաջողվեց ավարտել մուտքը։ Կրկին փորձիր։",
     "sessionEnded": "Քո նիստն ավարտվել է։ Նորից մուտք գործիր։",
     "signInCodeExpired": "Մուտքի կոդիդ ժամկետը լրացել է։ Կրկին փորձիր։",
@@ -224,13 +230,36 @@
     "providerTestAccount": "Թեստային հաշիվ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Կորպորատիվ SSO"
+    "providerEnterpriseSso": "Կորպորատիվ SSO",
+    "passkeysTitle": "Մուտքի բանալիներ",
+    "passkeysSubtitle": "Մուտք գործել առանց գաղտնաբառի",
+    "passkeysEmpty": "Դեռ մուտքի բանալիներ չկան",
+    "passkeysEmptyHint": "$t(profile.addPasskey)՝ առանց գաղտնաբառի մուտք գործելու համար։",
+    "passkeysCouldNotLoad": "Չհաջողվեց բեռնել մուտքի բանալիները",
+    "passkeysLoadFailed": "Մուտքի բանալիները հասանելի չեն, քանի դեռ սա չի բեռնվել։",
+    "addPasskey": "Ավելացնել մուտքի բանալի",
+    "passkeyDefaultName": "Մուտքի բանալի",
+    "passkeyAddedOn": "Ավելացվել է {{date}}",
+    "passkeyAdded": "Մուտքի բանալին ավելացվել է։",
+    "passkeyAddFailed": "Չհաջողվեց ավելացնել մուտքի բանալի։ Փորձեք կրկին։",
+    "passkeyAddUnsupported": "Այս սարքը չի կարող ստեղծել մուտքի բանալիներ։",
+    "passkeyAddCancelled": "Մուտքի բանալու ստեղծումը չեղարկվել է։",
+    "passkeyRemoved": "Մուտքի բանալին հեռացվել է։",
+    "passkeyRemoveFailed": "Չհաջողվեց հեռացնել այդ մուտքի բանալին։ Փորձեք կրկին։",
+    "passkeyRenamed": "Մուտքի բանալին վերանվանվել է։",
+    "passkeyName": "Մուտքի բանալու անունը",
+    "renamePasskey": "Վերանվանել մուտքի բանալին",
+    "removePasskey": "Հեռացնել մուտքի բանալին",
+    "removePasskeyTitle": "Հեռացնե՞լ մուտքի բանալին։",
+    "removePasskeyMessage": "Այլևս չեք կարողանա մուտք գործել այս մուտքի բանալիով։"
   },
   "preferences": {
     "general": "Ընդհանուր",
     "voiceInput": "Ձայնային մուտք",
     "autoExpandThinking": "Ինքնաշխատ բացել մտածման բաժինը",
     "autoExpandThinkingSubtitle": "Մտածումն ավարտվելուց հետո բացել գործակալի մտածման բաժինը։",
+    "hideThinking": "Թաքցնել մտածման մանրամասները",
+    "hideThinkingSubtitle": "Չցուցադրել գործակալի մտածումը նիստի էջում։",
     "keepScreenOn": "Նիստի էջում էկրանը միացված պահել",
     "keepScreenOnSubtitle": "Էկրանը միացված պահել, քանի դեռ նիստն աշխատում է։",
     "appearance": "Արտաքին տեսք",
@@ -253,7 +282,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Խոսքի տեքստի վերածում Kilo Gateway-ով",
     "gatewayTranscriptionSubtitle": "Ձայնային մուտքագրումը տեքստի վերածեք Kilo Gateway-ի մոդելով՝ սարքի խոսքի ճանաչման փոխարեն։ Ձեր ձայնագրությունը ուղարկվում է Kilo Gateway։",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Խտացնել գործիքների կանչերը",
+    "condenseToolCallsSubtitle": "Խմբավորեք հաջորդական գործիքների կանչերը մեկ տողում, որը կարող եք բացել։",
+    "toolSummaryTranslation": "Թարգմանել գործիքների ամփոփումները",
+    "toolSummaryTranslationSubtitle": "Ուղարկեք յուրաքանչյուր գործիքի ամփոփում մոդելին՝ այն ձեր հավելվածի լեզվով թարգմանելու համար։ Թարգմանության ձախողման դեպքում ցուցադրվում է բնօրինակը։",
+    "toolSummaryTranslationModelUnavailableNotice": "Այս մոդելը այլևս չի առաջարկվում։ Մեկ այլ ընտրելու համար հպեք $t(common.model)։"
   },
   "prReview": {
     "pullRequestUnavailable": "Միավորման հարցումը հասանելի չէ",
@@ -335,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "Բեռնված է {{total}} ֆայլից {{displayCount}}-ը",
       "filesStillLoading": "Ֆայլերը դեռ բեռնվում են։ Քաշիր ներքև՝ թարմացնելու համար։",
       "goToOverview": "Անցնել ակնարկին",
-      "goToOverviewTab": "Անցնել ակնարկի ներդիրին"
+      "goToOverviewTab": "Անցնել ակնարկի ներդիրին",
+      "expandAllLines_one": "Ցույց տալ բոլոր {{displayCount}} տողերը",
+      "expandAllLines_other": "Ցույց տալ բոլոր {{displayCount}} տողերը",
+      "expandLines_one": "Ցույց տալ {{displayCount}} տող ({{start}}–{{end}})",
+      "expandLines_other": "Ցույց տալ {{displayCount}} տող ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Ցույց տալ համատեքստի {{displayCount}} տող",
+      "expandLinesOfContext_other": "Ցույց տալ համատեքստի {{displayCount}} տող",
+      "expandMoreLines_one": "Ցույց տալ ևս {{displayCount}} տող ({{start}}–{{end}})",
+      "expandMoreLines_other": "Ցույց տալ ևս {{displayCount}} տող ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "բեռնված է {{total}} ֆայլից {{loaded}}-ը",
+      "loadedOfTotalFiles_other": "բեռնված է {{total}} ֆայլից {{loaded}}-ը"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ֆայլի վերջում նոր տողի նշան չկա։",
@@ -350,6 +394,7 @@
       "merge": "Միավորում",
       "mergeNow": "Միավորել հիմա",
       "mergePullRequest": "Միավորման հարցման միավորում",
+      "mergeTermTitle": "Միավորել {{term}}-ը",
       "enableAutoMerge": "Միացնել ավտոմատ միավորումը",
       "disableAutoMerge": "Անջատել ավտոմատ միավորումը",
       "autoMergeOn": "Ավտոմատ միավորումը միացված է",
@@ -368,9 +413,12 @@
       "deleteBranchAfterMerge": "Ջնջել ճյուղը միավորումից հետո",
       "noEnabledMethods": "Այս պահոցում միավորման ոչ մի մեթոդ միացված չէ։ Խնդրիր պահոցի ադմինիստրատորին միացնել սովորական միավորումը, կոմիտների համախմբումը կամ վերաբազավորումը։",
       "confirmTitle": "Միավորե՞լ միավորման հարցումը",
+      "confirmTitleTerm": "Միավորե՞լ {{term}}ը",
       "confirmMessage": "Քո փոփոխությունները կմիավորվեն բազային ճյուղին։",
       "enableAutoMergeConfirmTitle": "Միացնե՞լ ավտոմատ միավորումը",
       "enableAutoMergeConfirmMessage": "GitHub-ն ավտոմատ կմիավորի այս միավորման հարցումը, երբ բոլոր պարտադիր ստուգումները հաջողությամբ ավարտվեն։",
+      "enableAutoMergeConfirmMessageTerm": "{{term}}-ը կմիավորվի ավտոմատ, երբ դրա կոնվեյերը հաջողությամբ ավարտվի։",
+      "enableAutoMergeDescriptionTerm": "GitLab-ը ավտոմատ կմիավորի այս {{term}}-ը, երբ դրա կոնվեյերը հաջողությամբ ավարտվի։",
       "forbidden": "Այս միավորման հարցումը միավորելու թույլտվություն չունես։",
       "cannotMerge": "Այս միավորման հարցումը հնարավոր չէ միավորել ներկայիս տեսքով։",
       "couldNotMerge": "Չհաջողվեց միավորել միավորման հարցումը։",
@@ -381,7 +429,8 @@
       },
       "terminal": {
         "alreadyMerged": "Արդեն միավորված է",
-        "closed": "Այս միավորման հարցումը փակ է"
+        "closed": "Այս միավորման հարցումը փակ է",
+        "closedMergeRequest": "Այս միաձուլման հարցումը փակ է"
       },
       "partialSuccessBanner": {
         "body": "Չհաջողվեց ջնջել ճյուղը՝ {{reason}}։",
@@ -406,6 +455,18 @@
         "behindDetail": "Աղբյուրի ճյուղը հետ է մնում բազային ճյուղից։ Միավորելուց առաջ վերաբազավորիր կամ թարմացրու այն։",
         "notMergeableTitle": "Այս միավորման հարցումը դեռ հնարավոր չէ միավորել",
         "notMergeableDetail": "GitHub-ը հայտնել է միավորման հետևյալ կարգավիճակը՝ {{state}}։"
+      },
+      "restrictions": {
+        "title": "Միավորման սահմանափակումներ",
+        "approvalsRequired_one": "Պահանջվում է {{displayCount}} հավանություն",
+        "approvalsRequired_other": "Պահանջվում է {{displayCount}} հավանություն",
+        "pipelineMustSucceed": "Միավորելուց առաջ կոնվեյերը պետք է հաջողությամբ ավարտվի։"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Կոնվեյերը ձախողվում է վերջին կոմիտում։",
+        "pendingPipeline": "Կոնվեյերը դեռ աշխատում է վերջին կոմիտում։",
+        "permission": "Այս {{term}}ը միավորելու թույլտվություն չունես։",
+        "draft": "Միավորելուց առաջ նշիր {{term}}ը որպես վերանայման պատրաստ։"
       },
       "methodLabels": {
         "merge": "Ստեղծել միավորման կոմիտ",
@@ -455,6 +516,8 @@
       "replyBadRequest": "Այս պատասխանը հնարավոր չէ հրապարակել։ Հնարավոր է՝ քննարկման շղթան փոխվել է։",
       "replyForbidden": "Այս միավորման հարցմանը պատասխանելու թույլտվություն չունես։",
       "addCommentCta": "Մեկնաբանել այս միավորման հարցումը",
+      "fixWithKilo": "Շտկել Kilo-ով",
+      "fixWithKiloPrompt": "Խնդրում ենք անդրադառնալ այս միավորման հարցման հետևյալ մեկնաբանությանը՝ {{link}}",
       "commentBadRequest": "Այս մեկնաբանությունը հնարավոր չէ հրապարակել։ Հնարավոր է՝ միավորման հարցումը փոխվել է։",
       "commentForbidden": "Այս միավորման հարցման վրա մեկնաբանություն գրելու թույլտվություն չունես։",
       "moderation": {
@@ -505,7 +568,10 @@
         "outdatedOnLines": "Հնացած՝ {{lines}}",
         "outdatedOnPath": "Հնացած՝ {{path}}"
       },
-      "deletedUser": "ջնջված օգտատեր"
+      "deletedUser": "ջնջված օգտատեր",
+      "replyForbiddenTerm": "Այս {{term}}-ին պատասխանելու թույլտվություն չունես։",
+      "moreLinesAbove_one": "… վերևում կա ևս {{displayCount}} տող։",
+      "moreLinesAbove_other": "… վերևում կա ևս {{displayCount}} տող։"
     },
     "couldNotOpenGitHubAppSettings": "Չհաջողվեց բացել GitHub հավելվածի կարգավորումները։",
     "installKiloGitHubApp": "Տեղադրել Kilo GitHub հավելվածը",
@@ -517,17 +583,19 @@
     "reviewPullRequest": "Վերանայել միավորման հարցումը",
     "headLine": "{{counts}} · վերջին կոմիտ՝ {{sha}}",
     "entry": {
-      "eyebrow": "Բացիր միավորման հարցումը URL-ով։",
-      "pastePrLink": "Տեղադրել PR-ի հղումը",
-      "noRecentPrs": "Վերջերս բացված PR-եր չկան",
-      "noRecentPrsDescription": "Վերևում տեղադրիր PR-ի հղումը՝ վերանայում սկսելու համար։ Հաջորդ անգամ այն կհայտնվի այստեղ։",
+      "eyebrow": "Բացեք միավորման կամ միաձուլման հարցում URL-ով",
+      "pastePrLink": "Տեղադրեք միավորման կամ միաձուլման հարցման հղում",
+      "noRecentPrs": "Վերջերս վերանայումներ չկան",
+      "noRecentPrsDescription": "Վերանայում սկսելու համար վերևում տեղադրեք հղում — հաջորդ անգամ այն կհայտնվի այստեղ։",
       "couldNotLoad": "Չհաջողվեց բեռնել։",
       "removeFromRecentsTitle": "Հեռացնե՞լ վերջերս բացվածների ցանկից",
-      "removeFromRecentsMessage": "Այս միավորման հարցումը կհեռացվի վերջերս բացվածների քո ցանկից։",
+      "removeFromRecentsMessage": "Այս վերանայումը կհեռացվի Ձեր վերջերսի ցանկից։",
       "removeRecentAccessibility": "Հեռացնել {{repo}}-ն վերջերս բացվածների ցանկից",
-      "urlAccessibility": "GitHub-ի միավորման հարցման URL",
-      "clearLink": "Մաքրել միավորման հարցման հղումը",
-      "pasteLink": "Տեղադրել միավորման հարցման հղումը",
+      "urlAccessibility": "Մուտքագրեք միավորման կամ միաձուլման հարցման URL",
+      "urlPlaceholder": "Միավորման կամ միաձուլման հարցման URL",
+      "openAccessibility": "Բացել միավորման կամ միաձուլման հարցումը",
+      "clearLink": "Մաքրել հղումը",
+      "pasteLink": "Տեղադրեք միավորման կամ միաձուլման հարցման հղում",
       "open": "Բաց"
     },
     "checks": {
@@ -544,6 +612,8 @@
       "pending": "{{displayCount}} սպասման մեջ",
       "skipped": "{{displayCount}} բաց թողնված",
       "checksCount": "{{displayCount}} ստուգում",
+      "checksCount_one": "{{displayCount}} ստուգում",
+      "checksCount_other": "{{displayCount}} ստուգում",
       "checkDetails": "ստուգման մանրամասներ"
     },
     "inbox": {
@@ -576,9 +646,15 @@
     "connect": {
       "checkFailedTitle": "Չհաջողվեց ստուգել GitHub-ի հետ կապը։",
       "checkFailedMessage": "Մուտքի կարգավիճակը հասանելի կլինի բեռնումն ավարտվելուց հետո։",
+      "checkFailedTitleGitLab": "Չհաջողվեց ստուգել GitLab-ի հետ կապը։",
+      "checkFailedTitleBitbucket": "Չհաջողվեց ստուգել Bitbucket-ի հետ կապը։",
+      "providerCheckFailedMessage": "Միացման կարգավիճակը հասանելի չէ մինչև բեռնվելը։",
       "reconnectTitle": "Կրկին միացում GitHub-ին",
       "reconnectDescription": "GitHub-ի հետ կապիդ թույլտվությունը չեղարկվել է։ Կրկին միացիր՝ հեռախոսով միավորման հարցումների վերանայումը շարունակելու համար։",
-      "description": "Միացրու GitHub-ի քո հաշիվը՝ հեռախոսով միավորման հարցումներ վերանայելու համար։"
+      "description": "Միացրու GitHub-ի քո հաշիվը՝ հեռախոսով միավորման հարցումներ վերանայելու համար։",
+      "gitlabDescription": "Միացրեք Ձեր GitLab հաշիվը՝ միաձուլման հարցումները բջջայինում վերանայելու համար։",
+      "bitbucketDescription": "Միացրեք Bitbucket-ը այս կազմակերպությանը՝ միավորման հարցումները բջջայինում վերանայելու համար։",
+      "bitbucketOrgOnlyDescription": "Ընտրեք կազմակերպություն Ձեր պրոֆիլում՝ դրա Bitbucket միավորման հարցումները վերանայելու համար։"
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +676,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub-ի հետ կապի ժամկետը լրացել է։",
-      "message": "GitHub-ի հետ կապդ այլևս վավեր չէ։ Կրկին ստուգիր կապը։ Անհրաժեշտության դեպքում քեզ կառաջարկվի նորից միանալ։"
+      "message": "GitHub-ի հետ կապդ այլևս վավեր չէ։ Կրկին ստուգիր կապը։ Անհրաժեշտության դեպքում քեզ կառաջարկվի նորից միանալ։",
+      "gitlabTitle": "GitLab-ի հետ կապի ժամկետը լրացել է։",
+      "bitbucketTitle": "Bitbucket-ի հետ կապի ժամկետը լրացել է։",
+      "providerMessage": "{{provider}}-ի հետ կապդ այլևս վավեր չէ։ Կրկին ստուգիր կապը։ Անհրաժեշտության դեպքում քեզ կառաջարկվի նորից միանալ։"
     },
     "eventChips": {
       "comment": "Մեկնաբանություն",
@@ -665,10 +744,12 @@
       "statusContext": "Համատեքստ",
       "lineLabel": "{{status}} տող {{line}}՝ {{text}}",
       "lineLabelNoNumber": "{{status}}՝ {{text}}",
-      "emptyLine": "(դատարկ)"
+      "emptyLine": "(դատարկ)",
+      "truncationBanner_one": "Ցուցադրվում են փոփոխված {{total}} ֆայլից առաջին {{limit}}-ը՝ GitHub API-ի սահմանափակման պատճառով։",
+      "truncationBanner_other": "Ցուցադրվում են փոփոխված {{total}} ֆայլից առաջին {{limit}}-ը՝ GitHub API-ի սահմանափակման պատճառով։"
     },
     "linkPasteClipboardEmpty": "Սեղմատախտակը դատարկ է։",
-    "linkPasteNotAPullRequest": "Սա GitHub-ի միավորման հարցման հղում չէ։",
+    "linkPasteNotAPullRequest": "Սա միավորման կամ միաձուլման հարցման հղում չէ",
     "announce": {
       "commentPosted": "Մեկնաբանությունը հրապարակվել է",
       "reviewSubmitted": "Վերանայումն ուղարկվել է",
@@ -677,6 +758,7 @@
     "mutationError": {
       "commentNotPosted": "Այս մեկնաբանությունը հնարավոր չէ հրապարակել։ Հնարավոր է՝ ընտրված տողը փոխվել է, կամ PR-ը թարմացվել է։",
       "reviewNotSubmitted": "Այս վերանայումը հնարավոր չէ ուղարկել ներկայիս տեսքով։ Հնարավոր է՝ PR-ը փոխվել է, կամ փորձում ես վերանայել սեփական միավորման հարցումդ։",
+      "reviewNotSubmittedTerm": "Այս վերանայումը հնարավոր չէ ուղարկել ինչպես կա։ Հնարավոր է՝ {{term}}-ը փոխվել է, կամ դուք չեք կարող վերանայել Ձեր սեփական {{term}}-ը։",
       "couldNotPostComment": "Չհաջողվեց հրապարակել մեկնաբանությունը։",
       "couldNotSubmitReview": "Չհաջողվեց ուղարկել վերանայումը։ Ստուգիր կապդ և կրկին փորձիր։"
     },
@@ -684,9 +766,31 @@
       "couldNotReply": "Չհաջողվեց պատասխանել։",
       "couldNotCompleteAction": "Չհաջողվեց կատարել այս գործողությունը։",
       "mergeResultDefaultError": "GitHub-ը չավարտեց միավորումը։",
+      "mergeResultNotCompleted": "{{term}}-ը չմիավորվեց։ Ստուգեք դրա վիճակը և փորձեք կրկին։",
       "ambiguous": "Չհաջողվեց հաստատել արդյունքը։ Կրկին փորձելուց առաջ ստուգիր PR-ը։",
       "persistenceFailed": "Չհաջողվեց գրանցել այս գործողությունը։ Կրկին փորձիր ավելի ուշ։",
       "forbidden": "Այս գործողությունն արգելված է։"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Հասանելի չէ այս մատակարարի մոտ",
+        "accessibility": "Հասանելի չէ այս մատակարարի մոտ՝ {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Միավորման հարցում",
+      "mergeRequest": "Միաձուլման հարցում",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Կիսվել միաձուլման հարցմամբ",
+      "viewOnProvider": "Դիտել {{provider}}-ում",
+      "mergeRequestUnavailable": "Միաձուլման հարցումը հասանելի չէ",
+      "unavailableDescription": "Հնարավոր է՝ այն ջնջվել է, կամ դուք հասանելիություն չունեք դրան։",
+      "accessDeniedMergeRequest": "Այս միաձուլման հարցումը դիտելու թույլտվություն չունես։",
+      "couldNotLoadMergeRequest": "Չհաջողվեց բեռնել միաձուլման հարցումը։",
+      "discussionAccessDenied": "Այս միաձուլման հարցման քննարկումը դիտելու թույլտվություն չունես։",
+      "discussionUnavailableMessage": "Հնարավոր է՝ այս միաձուլման հարցումը հեռացվել է։",
+      "noDiscussionDescription": "Այս միաձուլման հարցման մեջ դեռ չկան վերանայման քննարկումներ կամ ընդհանուր մեկնաբանություններ։",
+      "noFilesChangedDescription": "Այս միաձուլման հարցման մեջ ֆայլերի փոփոխություններ չկան։"
     }
   },
   "notifications": {
@@ -719,11 +823,12 @@
     "previewFullDescription": "Ծանուցումները հաղորդագրության տեքստը ցուցադրում են կողպված էկրանին։",
     "previewGenericDescription": "Ծանուցումները հայտնում են միայն նոր իրադարձության մասին։ Բացեք Kilo-ն՝ հաղորդագրությունը կարդալու համար։",
     "channel": {
-      "agent": "Գործակալի նիստեր",
+      "agentProgress": "Գործակալի ընթացքը",
       "chat": "Զրույցի հաղորդագրություններ",
       "kiloclaw": "KiloClaw-ի ակտիվություն",
       "balance": "Մնացորդի մասին զգուշացումներ",
-      "security": "Հայտնաբերված անվտանգության խնդիրներ"
+      "security": "Հայտնաբերված անվտանգության խնդիրներ",
+      "spend": "Ծախսերի ծանուցումներ"
     },
     "category": {
       "chatMessagesSubtitle": "պատասխաններ ձեր զրույցներում",
@@ -734,8 +839,22 @@
       "sessionStatusTitle": "Նիստի կարգավիճակ",
       "sessionStatusSubtitle": "ավարտված / ձախողված / պատրաստ է կառավարման",
       "kiloclawActivitySubtitle": "միջավայրը պատրաստ է կամ ձախողվել է, պլանավորված գործողություններ",
+      "kiloclawActivityUnavailable": "Սկսեք KiloClaw միջավայր՝ KiloClaw ակտիվություն ստանալու համար։",
       "balanceAlertsSubtitle": "կազմակերպության ցածր մնացորդի նախազգուշացումներ",
-      "securityFindingsSubtitle": "հայտնաբերված նոր խնդիրներ և SLA հիշեցումներ"
+      "balanceAlertsUnavailable": "Միացեք կազմակերպությանը՝ մնացորդի նախազգուշացումներ ստանալու համար։",
+      "securityFindingsSubtitle": "հայտնաբերված նոր խնդիրներ և SLA հիշեցումներ",
+      "securityFindingsUnavailable": "Միացրեք Kilo անվտանգության գործակալը շրջանակում՝ անվտանգության խնդիրներ ստանալու համար։",
+      "spendAlertsSubtitle": "շեմերի հատումներ և ժամային ցատկեր",
+      "spendAlertsToggle": "Ծախսերի ծանուցումների կատեգորիա"
+    },
+    "action": {
+      "openSession": "Բացել նիստը"
+    },
+    "needsInputAction": {
+      "approved": "Հարցումը հաստատվեց",
+      "replied": "Պատասխանն ուղարկվեց",
+      "failed": "Չհաջողվեց պատասխանել: Կրկին փորձելու համար նորից հպեք:",
+      "unavailable": "Այս հարցումն այլևս չի սպասում:"
     }
   },
   "tabs": {
@@ -816,7 +935,9 @@
       "uploadFailed": "Վերբեռնումը ձախողվեց։",
       "failedToUploadFile": "Չհաջողվեց վերբեռնել ֆայլը՝ {{reason}}։",
       "nothingToPaste": "Տեղադրելու բան չկա։",
-      "metadataStripFailed": "Չհաջողվեց հեռացնել լուսանկարի մետատվյալները։"
+      "metadataStripFailed": "Չհաջողվեց հեռացնել լուսանկարի մետատվյալները։",
+      "limit_one": "Կարող ես կցել մինչև {{displayCount}} ֆայլ։",
+      "limit_other": "Կարող ես կցել մինչև {{displayCount}} ֆայլ։"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}՝ {{status}}",
@@ -1560,7 +1681,11 @@
       "syncFindings": "Համաժամեցնել խնդիրները",
       "syncNow": "Համաժամեցնել հիմա",
       "syncQueued": "Համաժամեցումը հերթագրված է",
-      "syncStatusUnavailable": "Համաժամեցման կարգավիճակն անհասանելի է։"
+      "syncStatusUnavailable": "Համաժամեցման կարգավիճակն անհասանելի է։",
+      "daysOverdue_one": "{{displayCount}} օրով ժամկետանց",
+      "daysOverdue_other": "{{displayCount}} օրով ժամկետանց",
+      "findingsCount_one": "{{displayCount}} խնդիր",
+      "findingsCount_other": "{{displayCount}} խնդիր"
     },
     "dashboardMetrics": {
       "openFindings": "Բաց խնդիրներ",
@@ -1957,6 +2082,10 @@
       "couldNotLoad": "Չհաջողվեց բեռնել նիստը։",
       "failedToLoadDetails": "Չհաջողվեց բեռնել նիստի մանրամասները։",
       "failedToStopExecution": "Չհաջողվեց դադարեցնել կատարումը։",
+      "stopped": "Նիստը դադարեցվեց",
+      "committing": "Ամրագրվում է…",
+      "committed": "Ամրագրված է",
+      "commitFailed": "Ամրագրումը ձախողվեց",
       "renameSession": "Վերանվանել նիստը",
       "renamePlaceholder": "Նիստի անուն",
       "transcriptAccessibility": "Նիստի սղագրություն",
@@ -1991,17 +2120,56 @@
       "exitNeedsNewerCli": "Հեռակա / հրամանների համար անհրաժեշտ է Kilo CLI-ի ավելի նոր տարբերակ։ Թարմացրեք Kilo CLI-ն և կրկին միացեք։"
     },
     "sessionConnection": {
+      "label": "Կապ",
       "connecting": "Միանում է…",
       "reconnecting": "Կրկին միանում է…",
       "connectionLost": "Կապը կորել է",
       "retryConnection": "Կրկին փորձել միանալ"
     },
+    "goal": {
+      "title": "Նպատակ",
+      "statusActive": "Ակտիվ նպատակ",
+      "statusPaused": "Դադարեցված նպատակ",
+      "statusComplete": "Նպատակն ավարտված է",
+      "statusBlocked": "Նպատակն արգելափակված է",
+      "edit": "Խմբագրել նպատակը",
+      "remove": "Հեռացնել նպատակը",
+      "pause": "Դադարեցնել նպատակը",
+      "resume": "Շարունակել նպատակը",
+      "editPlaceholder": "Նկարագրեք նպատակը",
+      "removeConfirmTitle": "Հեռացնե՞լ նպատակը",
+      "removeConfirmMessage": "CLI-ն մաքրում է այս նստաշրջանի նպատակը։",
+      "updateFailed": "Չհաջողվեց թարմացնել նպատակը։",
+      "sectionAccessibility": "{{status}}։ Նպատակ՝ {{text}}",
+      "collapse": "Ծալել նպատակը",
+      "expand": "Բացել նպատակը"
+    },
     "newSession": {
+      "recentlyUsed": "Վերջերս օգտագործված",
+      "couldNotLoadGithubRepositories": "Չհաջողվեց բեռնել GitHub-ի պահոցները։",
+      "couldNotLoadGitlabRepositories": "Չհաջողվեց բեռնել GitLab-ի պահոցները։",
+      "couldNotLoadBitbucketRepositories": "Չհաջողվեց բեռնել Bitbucket-ի պահոցները։",
       "connectGithubDescription": "Միացրեք GitHub-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
+      "connectGitlabDescription": "Միացրեք GitLab-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
+      "connectBitbucketDescription": "Միացրեք Bitbucket-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
       "openGithub": "Բացել GitHub-ը",
+      "openGitlab": "Բացել GitLab-ը",
+      "openBitbucket": "Բացել Bitbucket-ը",
       "refreshRepositories": "Թարմացնել պահոցները",
       "githubConnected": "GitHub-ը միացված է",
+      "gitlabConnected": "GitLab-ը միացված է",
       "noRepositoriesVisible": "Պահոցներ չեն երևում։ Ստուգեք Kilo-ի GitHub հավելվածի՝ պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
+      "noRepositoriesVisibleGitlab": "Պահոցներ չեն երևում։ Ստուգեք GitLab-ի պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
+      "noRepositoriesVisibleBitbucket": "Պահոցներ չեն երևում։ Ստուգեք Bitbucket-ի պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
+      "bitbucketOrganizationsOnly": "Bitbucket-ը հասանելի է միայն կազմակերպությունների համար։",
+      "branchPickerTitle": "Ընտրել ճյուղը",
+      "branchDefault": "Կանխադրված",
+      "branchAccessibility": "Ճյուղ՝ {{label}}",
+      "branchLoading": "Բեռնվում են ճյուղերը",
+      "branchLoadError": "Չհաջողվեց բեռնել ճյուղերը",
+      "branchUnavailable": "Այս պահոցի համար ճյուղեր հասանելի չեն։ Ստուգեք Ձեր հասանելիությունը մատակարարի մոտ, ապա ընտրեք այլ պահոց։",
+      "branchEmpty": "Ճյուղեր հասանելի չեն",
+      "branchPlaceholder": "Ընտրեք ճյուղ",
       "runOnWithTarget": "Գործարկման միջավայր՝ {{target}}",
       "environment": "Միջավայր",
       "couldNotLoadEnvironment": "Չհաջողվեց բեռնել ձեր միջավայրը։",
@@ -2022,24 +2190,13 @@
       "couldNotRefreshRepositories": "Չհաջողվեց թարմացնել պահոցները։ Կրկին փորձեք։",
       "discardDraftTitle": "Ջնջե՞լ սևագիրը",
       "discardDraftMessage": "Ձեր հուշումը կկորչի։",
+      "discardWithUploadsMessage": "Ձեր հուշումը և ուղարկված հաղորդագրություններին չկցված վերբեռնված բոլոր ֆայլերը կջնջվեն։",
       "discardFailed": "Չհաջողվեց ջնջել սևագիրը։ Կրկին փորձեք։",
       "remoteHint": "Տեղական kilo գործընթացը կառավարելու համար ձեր համակարգչում գործարկեք `kilo remote` կամ գործող CLI նիստում՝ `/remote`։",
-      "connectBitbucketDescription": "Միացրեք Bitbucket-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
-      "connectGitlabDescription": "Միացրեք GitLab-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
-      "couldNotLoadBitbucketRepositories": "Չհաջողվեց բեռնել Bitbucket-ի պահոցները։",
-      "couldNotLoadGithubRepositories": "Չհաջողվեց բեռնել GitHub-ի պահոցները։",
-      "couldNotLoadGitlabRepositories": "Չհաջողվեց բեռնել GitLab-ի պահոցները։",
-      "gitlabConnected": "GitLab-ը միացված է",
-      "noRepositoriesVisibleBitbucket": "Պահոցներ չեն երևում։ Ստուգեք Bitbucket-ի պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
-      "noRepositoriesVisibleGitlab": "Պահոցներ չեն երևում։ Ստուգեք GitLab-ի պահոցների մուտքի թույլտվությունները, ապա թարմացրեք ցանկը։",
-      "openBitbucket": "Բացել Bitbucket-ը",
-      "openGitlab": "Բացել GitLab-ը",
-      "recentlyUsed": "Վերջերս օգտագործված",
       "continueFrom": "Շարունակվում է «{{title}}» նիստը։",
       "importingSession": "Նիստը ներմուծվում է",
       "cliCannotContinue": "Այս CLI-ն չի կարող շարունակել նիստը։ Ընտրեք Cloud Agent-ը կամ մեկ այլ CLI։",
-      "importFailed": "Չհաջողվեց ներմուծել այս նիստը։",
-      "discardWithUploadsMessage": "Ձեր հուշումը և ուղարկված հաղորդագրություններին չկցված վերբեռնված բոլոր ֆայլերը կջնջվեն։"
+      "importFailed": "Չհաջողվեց ներմուծել այս նիստը։"
     },
     "partRenderer": {
       "updatedFileCount_one": "Թարմացվել է {{displayCount}} ֆայլ։",
@@ -2063,7 +2220,14 @@
       "updateTodos": "Թարմացնել անելիքները",
       "linesBadge": "{{displayCount}} տող",
       "filesBadge": "{{displayCount}} ֆայլ",
-      "matchesBadge": "{{displayCount}} համընկնում"
+      "matchesBadge": "{{displayCount}} համընկնում",
+      "filesBadge_one": "{{displayCount}} ֆայլ",
+      "filesBadge_other": "{{displayCount}} ֆայլ",
+      "linesBadge_one": "{{displayCount}} տող",
+      "linesBadge_other": "{{displayCount}} տող",
+      "matchesBadge_one": "{{displayCount}} համընկնում",
+      "matchesBadge_other": "{{displayCount}} համընկնում",
+      "noOutput": "Ելք չկա։"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} տողերը (կրճատված)",
@@ -2353,7 +2517,11 @@
       "files": "Ֆայլեր",
       "couldNotOpenPhotoPicker": "Չհաջողվեց բացել լուսանկարների ընտրիչը։ Վերագործարկեք Kilo-ն և կրկին փորձեք։",
       "maxFilesAllowed": "Կարող եք ավելացնել առավելագույնը {{displayCount}} ֆայլ։",
-      "onlyAddingFiles": "{{total}} ֆայլից ավելացվում է միայն {{accepted}}-ը (առավելագույնը՝ {{max}})"
+      "onlyAddingFiles": "{{total}} ֆայլից ավելացվում է միայն {{accepted}}-ը (առավելագույնը՝ {{max}})",
+      "maxFilesAllowed_one": "Կարող եք ավելացնել առավելագույնը {{displayCount}} ֆայլ։",
+      "maxFilesAllowed_other": "Կարող եք ավելացնել առավելագույնը {{displayCount}} ֆայլ։",
+      "onlyAddingFiles_one": "{{total}} ֆայլից ավելացվում է միայն {{accepted}}-ը (առավելագույնը՝ {{max}})",
+      "onlyAddingFiles_other": "{{total}} ֆայլից ավելացվում է միայն {{accepted}}-ը (առավելագույնը՝ {{max}})"
     },
     "composer": {
       "addAttachment": "Կցել ֆայլ",
@@ -2371,7 +2539,9 @@
       "discardAttachmentsMessage": "Ուղարկված հաղորդագրություններին չկցված վերբեռնված ֆայլերը կջնջվեն։",
       "discardAttachmentsTitle": "Ջնջե՞լ կցումները",
       "charactersRemaining": "Մնացել է {{count}} նիշ",
-      "insertNewline": "Տեղադրել նոր տող"
+      "insertNewline": "Տեղադրել նոր տող",
+      "charactersRemaining_one": "Մնացել է {{count}} նիշ",
+      "charactersRemaining_other": "Մնացել է {{count}} նիշ"
     },
     "chatLink": {
       "linkCopied": "Հղումը պատճենված է",
@@ -2405,6 +2575,12 @@
       "startNewSession": "Սկսել նոր նիստ",
       "exitSession": "Դուրս գալ նիստից",
       "clearSession": "Ավարտել այս նիստը և սկսել նորը",
+      "compactDescription": "սեղմիր ընթացիկ աշխատաշրջանի համատեքստը",
+      "goalDescription": "Շարունակիր աշխատել աշխատաշրջանի նպատակի ուղղությամբ։ /goal <objective> կամ pause, resume, clear",
+      "initDescription": "ուղղորդված AGENTS.md կարգավորում",
+      "resumeClaudeDescription": "ներմուծիր Claude Code աշխատաշրջանի արտագրությունը",
+      "resumeCodexDescription": "ներմուծիր OpenAI Codex աշխատաշրջանի արտագրությունը",
+      "reviewDescription": "վերանայիր փոփոխությունները [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Օգտագործել /{{command}}",
       "insert": "Տեղադրել",
       "upgradeRequiredFallback": "Այս հրամանն օգտագործելու համար թարմացրեք ձեր CLI-ն։",
@@ -2437,7 +2613,14 @@
       "stepsCount_one": "{{steps}} քայլ",
       "stepsCount": "{{steps}} քայլ",
       "stepsCount_other": "{{steps}} քայլ",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Մոդել ({{displayCount}})",
+      "modelsCount_other": "Մոդելներ ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "Ավտոմատ հաստատում",
+      "description": "Ավտոմատ կերպով հաստատեք այս նստաշրջանի թույլտվության հարցումները։ Գործիքներն այնուհետև աշխատում են առանց հարցման։",
+      "unavailable": "Այս նստաշրջանը չի կարող ստանալ թույլտվության հարցումներ։"
     },
     "prBadge": {
       "open": "բաց միավորման հարցում",
@@ -2469,6 +2652,12 @@
       "tapToListHint": "Հպեք թղթապանակին՝ դրա պարունակությունը տեսնելու համար։",
       "unsupportedDescription": "Այս CLI-ն չի կարող ցուցադրել թղթապանակները։ «Պատրաստ է» կոճակը պահպանում է գործարկման թղթապանակը, իսկ «Սկսել նիստը» կոճակը նիստը սկսում է այդտեղ։",
       "unsupportedTitle": "Հնարավոր չէ ցուցադրել թղթապանակները"
+    },
+    "toolRun": {
+      "sheetTitle": "Գործիքների կանչեր",
+      "condensedLabel": "{{itemCount}} տարր; {{last}}",
+      "condensedLabel_one": "{{itemCount}} տարր; {{last}}",
+      "condensedLabel_other": "{{itemCount}} տարր; {{last}}"
     }
   },
   "bootstrap": {
@@ -2513,6 +2702,7 @@
     "couldNotLoadActiveSessions": "Չհաջողվեց բեռնել ակտիվ նիստերը։",
     "agentSessions": "Այժմ ընթացքի մեջ",
     "newCodingTask": "Նոր ծրագրավորման առաջադրանք",
+    "newTaskFromPicture": "Նոր առաջադրանք նկարից",
     "explore": "Բացահայտում",
     "seeAll": "Դիտել բոլորը",
     "noLiveSessions": "Այս պահին ոչինչ չի աշխատում"
@@ -2581,7 +2771,10 @@
     "gatewayModelUnavailable": "Այս տեքստի վերածման մոդելը հասանելի չէ։ Ընտրեք մեկ այլ՝ Նախապատվություններում։",
     "gatewayModelUnavailableNotice": "Այս մոդելը այլևս չի առաջարկվում։ Մեկ այլ ընտրելու համար հպեք $t(transcriptionModel.title)։",
     "gatewaySignInRequired": "Մուտք գործեք՝ Kilo Gateway-ի վերածումն օգտագործելու համար։",
-    "gatewayNoModel": "Նախ ընտրեք տեքստի վերածման մոդել՝ Նախապատվություններում։"
+    "gatewayNoModel": "Նախ ընտրեք տեքստի վերածման մոդել՝ Նախապատվություններում։",
+    "testTitle": "Փորձարկել ձայնային մուտքագրումը",
+    "testPlaceholder": "Հպեք խոսափողին և սկսեք խոսել:",
+    "testClear": "Մաքրել տեքստը"
   },
   "share": {
     "title": "Ուղարկում Kilo-ին",
@@ -2599,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "Այս նիստը չի կարող ստանալ ֆայլեր",
     "cliCantReceiveFilesMessage": "Այս նիստը գործարկող Kilo CLI-ն չի կարող ստանալ ֆայլեր։ Թարմացրու CLI-ն այդ համակարգչում կամ բովանդակությունն ուղարկիր նոր նիստի։",
     "contentlessMessage": "Ուղարկելու բան չկա․ տեքստ կամ ֆայլեր չկան։",
-    "couldNotReadContent": "Չհաջողվեց կարդալ ուղարկվող բովանդակությունը։"
+    "couldNotReadContent": "Չհաջողվեց կարդալ ուղարկվող բովանդակությունը։",
+    "onlyFirstFilesAttached_one": "Կկցվեն միայն առաջին {{displayCount}} ֆայլերը։",
+    "onlyFirstFilesAttached_other": "Կկցվեն միայն առաջին {{displayCount}} ֆայլերը։"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2731,7 +2926,8 @@
     "aiProvidersWhat": "Ձեր հուշումները, զրույցի պատմությունն ու ձեր կցած բոլոր ֆայլերը։",
     "aiProvidersWhy": "AI պատասխաններ ստեղծելու համար։",
     "aiProvidersWho": "Anthropic, OpenAI, Google և այլ մատակարարներ, որոնց ընտրում եք յուրաքանչյուր հարցման համար։",
-    "gatewayWhat": "Հաշվի ID-ն, հարցումների մետատվյալները, տոկենների օգտագործումը։",
+    "gatewayWhat": "Հաշվի ID-ն, հարցումների մետատվյալները, տոկենների օգտագործումը, ինչպես նաև հավելվածի կողմից դրա միջոցով ուղարկվող հուշումները և ձայնագրությունները։",
+    "viaGateway": "Kilo Gateway-ի միջոցով",
     "gatewayWhy": "Նույնականացման, հարցումների ուղղորդման և վճարումների հաշվառման տվյալների համադրման համար։",
     "gatewayWho": "Kilo (kilo.ai)։",
     "crashReportingWhat": "Խափանումների և սխալների հաշվետվություններ, որոնցից հեռացվել է հավելվածի բովանդակությունը։",
@@ -2751,7 +2947,7 @@
     "installAttributionWho": "AppsFlyer։",
     "voiceTranscriptionWhat": "Թելադրման ընթացքում արված ձեր ձայնագրությունը։",
     "voiceTranscriptionWhy": "Խոսքը տեքստի վերածելու համար։",
-    "voiceTranscriptionWho": "Մշակվում է միայն սարքում։ Եթե սարքը չի կարող խոսքը տեքստի վերածել առանց համացանցի, ձայնագրությունը փոխանցվում է Apple-ին կամ Google-ին։",
+    "voiceTranscriptionWho": "Ձեր սարքը, ձեր ընտրած տեքստի վերածման մոդելով Kilo Gateway-ը, կամ Apple-ը կամ Google-ը՝ առցանց ճանաչման համար։",
     "installAttributionPromptTitle": "Թույլատրե՞լ որոշել տեղադրման աղբյուրը",
     "installAttributionPromptMessage": "Kilo-ն Apple-ի հետագծման թույլտվությունն օգտագործում է միայն պարզելու համար, թե որ աղբյուրից եք եկել։ Ձեր հուշումներն ու զրույցները երբեք չեն օգտագործվում այդ նպատակով։",
     "what": "Ի՞նչ",
@@ -2923,6 +3119,14 @@
     "tooManySignInAttempts": "Մուտք գործելու չափազանց շատ փորձեր են կատարվել։ Մի քիչ սպասիր և կրկին փորձիր։"
   },
   "models": {
+    "auto": {
+      "frontier": "Ավտոմատ Առաջատար",
+      "balanced": "Ավտոմատ Հավասարակշռված",
+      "efficient": "Ավտոմատ Արդյունավետ",
+      "small": "Ավտոմատ Փոքր",
+      "free": "Ավտոմատ Անվճար",
+      "organization": "Կազմակերպության ավտոմատ"
+    },
     "dataCollected": "Տվյալներ է հավաքում",
     "free": "Անվճար",
     "couldNotUpdateFavorites": "Չհաջողվեց թարմացնել նախընտրածները։",
@@ -2961,8 +3165,17 @@
     "privacy": "Բացիր Kilo-ն՝ գործակալներին տեսնելու համար",
     "openAgents": "Բացել գործակալները",
     "needsInput": "Սպասում է պատասխանի",
+    "newestSession": "Ամենանոր: {{title}}",
+    "noneWaiting": "Սպասող գործակալ չկա",
+    "newAgent": "Նոր գործակալ",
+    "approving": "Հաստատվում է...",
+    "couldNotApprove": "Չհաջողվեց հաստատել",
+    "couldNotStart": "Չհաջողվեց սկսել",
     "channelName": "Ակտիվ գործակալներ",
-    "activityKitDisabledBody": "Կարգավորումներում միացրու ընթացիկ գործողությունների ցուցադրումը՝ ակտիվ գործակալներին կողպման էկրանին տեսնելու համար։"
+    "activityKitDisabledBody": "Կարգավորումներում միացրու ընթացիկ գործողությունների ցուցադրումը՝ ակտիվ գործակալներին կողպման էկրանին տեսնելու համար։",
+    "openSession": "Բացիր",
+    "approveFailed": "Չհաջողվեց հաստատել։ Կրկին փորձելու համար հպեք $t(common.approve)-ին։",
+    "newestResult": "Նորագույն արդյունքը"
   },
   "transcriptionModel": {
     "title": "Տեքստի վերածման մոդել",
@@ -2970,5 +3183,56 @@
     "emptyTitle": "Տեքստի վերածման մոդելներ չկան",
     "emptyDescription": "Kilo Gateway-ը հիմա տեքստի վերածման մոդելներ չի առաջարկում։",
     "loadFailed": "Չհաջողվեց բեռնել տեքստի վերածման մոդելները։"
+  },
+  "voiceLanguage": {
+    "title": "Ձայնային մուտքագրման լեզու",
+    "automatic": "Ավտոմատ",
+    "loadFailed": "Չհաջողվեց բեռնել այս սարքի աջակցվող լեզուները:",
+    "emptyTitle": "Աջակցվող լեզուներ չկան",
+    "emptyDescription": "Այս սարքի խոսքի ճանաչումը ոչ մի աջակցվող լեզու չի հաղորդում:"
+  },
+  "tour": {
+    "eyebrow": "Արագ ուղեցույց",
+    "forkTitle": "Որտե՞ղ ես ուզում գործարկել Kilo-ն։",
+    "forkSubtitle": "Ընտրիր, թե որտեղ գործարկել Kilo-ն քո առաջին աշխատաշրջանի համար։",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Գործարկիր Kilo-ն մեկուսացված ամպային միջավայրում՝ առանց որևէ բան տեղադրելու։",
+    "remoteOptionTitle": "Քո համակարգիչը",
+    "remoteOptionBody": "Գործարկիր Kilo-ն քո սեփական համակարգչում՝ `kilo remote` CLI-ի միջոցով։",
+    "skip": "Բաց թողնել ուղեցույցը",
+    "tutorialLabel": "Ուղեցույց"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Գործակալը մեկնարկելու համար հուշում է պետք։ Ավելացրու հուշում և նորից գործարկիր այն։",
+      "repositoryUnknown": "Kilo-ն {{repository}}-ը չի ճանաչում որպես GitHub կամ GitLab պահոց։ Ընտրիր մեկ այլ պահոց Kilo-ում։",
+      "repositoryUnsupported": "{{repository}}-ը Bitbucket պահոց է — Մեկնարկիր գործակալը դեռ չի կարող օգտագործել այն։ Ընտրիր մեկ այլ պահոց Kilo-ում։"
+    }
+  },
+  "launcher": {
+    "openLastSession": "Բացել վերջին աշխատաշրջանը"
+  },
+  "spendAlerts": {
+    "subtitle": "Ուղարկիր ծանուցում էլ. փոստով կամ push-ով վճարումների կոնտակտներին, երբ այս տիրույթի ծախսը հատի սահմանը կամ բարձրանա սովորական ժամային տեմպից։",
+    "enable": "Միացնել ծախսերի ծանուցումները",
+    "thresholdTitle": "Շեմի հատում",
+    "thresholdSubtitle": "Ընթացիկ ծախսը հատում է քո սահմանը",
+    "anomalyTitle": "Ժամային ցատկ",
+    "anomalySubtitle": "Մեկ ժամը շատ ավելի բարձր է այս տիրույթի սովորական տեմպից",
+    "limitLabel": "Սահման (USD)",
+    "windowLabel": "Պատուհան",
+    "window24h": "24 ժամ",
+    "window7d": "7 օր",
+    "window30d": "30 օր",
+    "multiplierLabel": "Ցատկի բազմապատկիչ",
+    "saved": "Ծախսերի ծանուցման կարգավորումները պահպանվեցին",
+    "loadError": "Ծախսերի ծանուցումները չհաջողվեց բեռնել։",
+    "saveError": "Ծախսերի ծանուցումները չհաջողվեց պահպանել։",
+    "empty": "Ծախսերի ծանուցումներն անջատված են։ Միացրու դրանք այս տիրույթի վճարումների կոնտակտներին զգուշացնելու համար։",
+    "noSpend": "Ծախս դեռ չի գրանցվել",
+    "spend24h": "Ծախսը վերջին 24 ժամում",
+    "multiplierError": "Մուտքագրիր 1 կամ ավելի բազմապատկիչ",
+    "permissionDenied": "Դուք ծախսերի ծանուցումները կառավարելու թույլտվություն չունեք։",
+    "pushOffByCategory": "Անջատված է Ծանուցումներում"
   }
 }

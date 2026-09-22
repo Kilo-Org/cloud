@@ -90,7 +90,7 @@ export function useComposerInlineError(error: unknown, isEdit: boolean) {
       })();
       return;
     }
-    const display = mutationErrorDisplay('composer', classification, error);
+    const display = mutationErrorDisplay('composer', classification, { rawError: error });
     setInlineError(display.message);
     setInlineErrorKind(display.kind);
     setInlineErrorIsLocal(false);

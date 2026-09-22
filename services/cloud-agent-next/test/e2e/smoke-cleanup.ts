@@ -5,6 +5,24 @@ type CleanupDependencies = {
   stopOwnedSandboxes: (sessionId: string) => Promise<void>;
 };
 
+/**
+ * `success: false` outcomes that mean the session already reached its desired
+ * end state, so the backstop must not treat them as a cleanup failure.
+ *
+ * `Session not found` is the concrete outcome of interrupting a session the
+ * scenario's `finally` already deleted: `deleteSession` destroys the Durable
+ * Object metadata but keeps the `cli_sessions_v2` access row, so the handler
+ * passes `requireCurrentSessionAccess` and then returns this from the
+ * `fetchSessionMetadata` null branch. Sandbox teardown still runs for it,
+ * because the backstop cannot assume the earlier delete removed every
+ * container family.
+ */
+const SETTLED_INTERRUPT_MESSAGES: ReadonlySet<string> = new Set([
+  'No accepted wrapper messages or pending queued messages',
+  'No session work to interrupt',
+  'Session not found',
+]);
+
 /** Settle durable demand before killing containers that alarms could recreate. */
 export async function cleanupOwnedSessions(
   sessionIds: ReadonlySet<string>,
@@ -17,8 +35,7 @@ export async function cleanupOwnedSessions(
       const result = await deps.interrupt(sessionId);
       if (
         !result.success &&
-        result.message !== 'No accepted wrapper messages or pending queued messages' &&
-        result.message !== 'No session work to interrupt'
+        (result.message === undefined || !SETTLED_INTERRUPT_MESSAGES.has(result.message))
       ) {
         throw new Error(`Interruption was not confirmed for ${sessionId}`);
       }

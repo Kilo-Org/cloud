@@ -28,9 +28,11 @@ import {
   completeSessionOperationAttachment,
   recordSessionOperationDispatch,
   recordSessionOperationExecutionDeadline,
+  releaseUnconfirmedAttach,
   type SessionMessageRecord,
 } from './session-message-queue.js';
 import { applyControlPlanePreparingEvent } from './control-plane-preparing.js';
+import { logControlDiagnostic } from '../sandbox-control/diagnostics.js';
 import { persistSandboxControlSessionEvent } from './sandbox-control-event.js';
 import {
   ControlRequestError,
@@ -130,23 +132,35 @@ export async function reconcileSessionOperation(
     effects.assertScope();
     if (Date.now() >= operationDeadlineAt) throw new Error('Operation observation expired');
     const lookup = sessionOperationLookupResultSchema.parse(controlRequestResult(response));
-    if (lookup.state === 'missing') return { state: 'uncertain', reason: 'missing' };
+    const unconfirmed = (reason: 'missing' | 'unverified'): UncertainOperation => {
+      logControlDiagnostic('session_operation_reconcile', {
+        sessionId: authorization.session.sessionId,
+        messageId: authorization.messageId,
+        operation: authorization.operation,
+        operationId: authorization.operationId,
+        reason,
+        lookupState: lookup.state,
+      });
+      return { state: 'uncertain', reason };
+    };
+    if (lookup.state === 'missing') return unconfirmed('missing');
     const observed =
       lookup.state === 'completed' ? lookup.delivery.authorization : lookup.authorization;
     if (!sameSessionOperation(observed, authorization))
       throw new Error('Operation observation identity changed');
     if (
+      authorization.operation === 'session.prompt' &&
       lookup.state === 'running' &&
       lookup.executionDeadlineAt !== undefined &&
       effects.recordExecutionDeadline?.(authorization, lookup.executionDeadlineAt) === false
     )
-      return { state: 'uncertain', reason: 'unverified' };
+      return unconfirmed('unverified');
     if (lookup.state === 'completed') {
       if (
         (await persistSessionOperationDelivery(lookup.delivery, operationDeadlineAt, effects)) ===
         'unverified'
       )
-        return { state: 'uncertain', reason: 'unverified' };
+        return unconfirmed('unverified');
     }
     return lookup;
   } catch (error) {
@@ -202,19 +216,28 @@ export async function dispatchSessionOperation(
           },
         }
       );
-      if (lookup.state !== 'completed') return lookup;
-      if (!lookup.delivery.result.ok)
-        return {
-          state: 'rejected',
-          error: lookup.delivery.result.error,
-          rejectionReceived: true,
-        };
-      if (kind === 'attach') {
-        const completed = completeSessionOperationAttachment(messages.read(), authorization);
-        if (!completed || !messages.commit(completed))
-          return { state: 'uncertain', reason: 'unverified' };
+      if (lookup.state === 'completed') {
+        if (!lookup.delivery.result.ok)
+          return {
+            state: 'rejected',
+            error: lookup.delivery.result.error,
+            rejectionReceived: true,
+          };
+        if (kind === 'attach') {
+          const completed = completeSessionOperationAttachment(messages.read(), authorization);
+          if (!completed || !messages.commit(completed))
+            return { state: 'uncertain', reason: 'unverified' };
+        }
+        return { state: 'completed', result: lookup.delivery.result.result };
       }
-      return { state: 'completed', result: lookup.delivery.result.result };
+      // A dispatched attach the current runtime has no record of never executed
+      // there. Retire that unconfirmed proof and fall through to dispatch a fresh
+      // attach rather than failing preparation on an outcome it cannot confirm.
+      // A dispatched prompt is never recovered this way: it may already have run.
+      if (kind !== 'attach' || lookup.state !== 'uncertain' || lookup.reason !== 'missing')
+        return lookup;
+      const released = releaseUnconfirmedAttach(messages.read(), authorization);
+      if (released === undefined || !messages.commit(released)) return lookup;
     }
     assertAdmissionCurrent();
     const payload = structuredClone(

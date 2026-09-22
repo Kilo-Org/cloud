@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 /* eslint-disable max-lines -- the spectator describe adds a transcript-state suite on top of the existing outcome-first contract; they share one mock harness */
 
 // Outcome-first detail-screen contract: the screen leads with the conclusion
@@ -7,7 +6,7 @@
 // (NOT_FOUND/FORBIDDEN/UNAUTHORIZED) shows no Retry; a transient error does.
 
 import { createElement, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ReviewDetailScreen } from './review-detail-screen';
@@ -78,6 +77,9 @@ vi.mock('react-native', () => ({
   },
   Pressable: 'Pressable',
   Platform: nativePlatform,
+  // SheetHeader reads the synchronous Android status-bar height the same way
+  // the form-sheet detents do (src/lib/form-sheet.ts).
+  StatusBar: { currentHeight: 24 },
   AppState: { addEventListener: () => ({ remove: vi.fn() }) },
   Alert: { alert: vi.fn() },
 }));
@@ -143,7 +145,7 @@ vi.mock('@/lib/analytics/posthog', () => ({
   useFeatureFlag: () => true,
 }));
 vi.mock('@/lib/code-reviewer-open-pr-destination', () => ({
-  resolveCodeReviewerOpenPrDestination: () => ({ kind: 'external' }),
+  resolveCodeReviewerOpenPrDestination: () => ({ kind: 'browser' }),
 }));
 vi.mock('@/lib/code-reviewer-config', () => ({
   reviewerPlatformLabel: () => 'GitHub',
@@ -154,7 +156,6 @@ vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useCancelReview: () => ({ isPending: false, mutate: vi.fn() }),
   useRetriggerReview: () => ({ isPending: false, mutate: vi.fn() }),
 }));
-vi.mock('@/lib/profile-agent-navigation', () => ({ getPrReviewPath: vi.fn() }));
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
   parseTimestamp: (value: unknown) => value,
@@ -394,6 +395,39 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(errorNode).toBeDefined();
     expect(typeof errorNode?.props.numberOfLines).toBe('number');
     expect(errorNode?.props.numberOfLines).toBeLessThanOrEqual(4);
+  });
+});
+
+describe('ReviewDetailScreen details metadata', () => {
+  it('labels the completion-timestamp row in the Details list', () => {
+    // The Details key-value list pairs every label with its value. The
+    // completion row must render the "Completed" label ahead of its timestamp
+    // value; a value-only row there would collapse the two-column alignment.
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'completed',
+        started_at: null,
+        completed_at: '2024-01-01T00:05:00.000Z',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+
+    // `timeAgo` is mocked to "now" in this suite, so the Details completion row
+    // is the only "Completed" immediately followed by "now": the status
+    // conclusion is followed by "Findings" and the Gate status value by its
+    // "Threshold" row.
+    const completionRowIndex = texts.findIndex(
+      (text, index) => text === 'Completed' && texts[index + 1] === 'now'
+    );
+    const detailsHeaderIndex = texts.indexOf('Details');
+    // Assert the header was found before comparing: `indexOf` returns -1 on a
+    // copy change, and `completionRowIndex >= 0` would then satisfy the
+    // placement check without proving the row sits inside the Details list.
+    expect(detailsHeaderIndex).toBeGreaterThanOrEqual(0);
+    expect(completionRowIndex).toBeGreaterThan(detailsHeaderIndex);
   });
 });
 

@@ -1,4 +1,3 @@
-import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
@@ -9,10 +8,12 @@ import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-by
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
+import { tagOpenAiChatGptByokModels } from '@/lib/ai-gateway/openai-chatgpt/routing';
 import { readDb } from '@/lib/drizzle';
 import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
 import { appendLocalFakeDeterministicCatalogModels } from '@/lib/ai-gateway/local-fake-llm';
 import { getEnkryptBenchmarks, publishEnkryptModels } from '@/lib/model-stats/enkrypt';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 async function modelResponse(response: OpenRouterModelsResponse) {
   const snapshot = await getEnkryptBenchmarks();
@@ -38,8 +39,8 @@ async function tryGetUserFromAuth() {
  * Test using:
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
  */
-export async function GET(
-  _request: NextRequest
+async function getModels(
+  _request: Request
 ): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
   const auth = await tryGetUserFromAuth();
   try {
@@ -74,9 +75,9 @@ export async function GET(
       listAvailableExperimentModels(),
       getUserByokProviderIds(readDb, auth.user.id),
     ]);
-    const modelsWithByokAvailability = await addUserByokAvailability(
-      models,
-      enabledByokProviderIds
+    const modelsWithByokAvailability = await tagOpenAiChatGptByokModels(
+      { kiloUserId: auth.user.id, organizationId: null },
+      await addUserByokAvailability(models, enabledByokProviderIds)
     );
     return await modelResponse({
       data: appendLocalFakeDeterministicCatalogModels(
@@ -98,3 +99,5 @@ export async function GET(
     );
   }
 }
+
+export const GET = withRestTiming('/api/openrouter/models', getModels);

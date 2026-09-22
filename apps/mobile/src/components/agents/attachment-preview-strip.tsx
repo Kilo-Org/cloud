@@ -383,7 +383,7 @@ function AttachmentChip({
               'overflow-hidden rounded-md border border-border bg-card',
               isImage ? 'h-16 w-20' : 'h-12 w-48',
               description.showRetry && 'border-destructive',
-              isErrored && !description.showRetry && 'border-destructive/60'
+              isErrored && !description.showRetry && 'border-danger-tile-border'
             )}
           >
             {description.showRetry ? (
@@ -482,6 +482,7 @@ function AttachmentChip({
               setTextPreview(null);
             }}
             doneLabel={t('common.done')}
+            topInset="ios-page-sheet"
           />
           {textPreview.text === '' ? (
             <CenteredState>
@@ -533,7 +534,10 @@ export function AttachmentPreviewStrip({
       horizontal
       showsHorizontalScrollIndicator={false}
       className="mb-2"
-      contentContainerClassName="items-center"
+      // pl-3 matches the composer toolbar's px-3 so the first thumbnail's
+      // left edge lines up with the mode/model chips. No right padding: each
+      // chip carries its own mr-2 and the scroll container clips at the edge.
+      contentContainerClassName="items-center pl-3"
       keyboardShouldPersistTaps="handled"
     >
       {attachments.map((attachment, index) => (

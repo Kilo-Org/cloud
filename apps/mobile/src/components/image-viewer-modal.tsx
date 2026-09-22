@@ -179,7 +179,7 @@ export function ImageViewerModal({
           >
             <Pressable
               onPress={onClose}
-              className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70"
+              className="min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md bg-secondary active:opacity-70"
               accessibilityRole="button"
               accessibilityLabel={t('imageViewer.close', { filename })}
             >
@@ -190,7 +190,7 @@ export function ImageViewerModal({
                 onPress={onShare}
                 disabled={sharing || uri === null}
                 accessibilityState={{ disabled: uri === null, busy: sharing }}
-                className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70 disabled:opacity-50"
+                className="min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md bg-secondary active:opacity-70 disabled:opacity-50"
                 accessibilityRole="button"
                 accessibilityLabel={t('imageViewer.share', { filename })}
               >

@@ -1,7 +1,7 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- one cohesive mounted suite: stored row, share list, and remote row share the mock harness; react-test-renderer mounts the real rows and their native presentation without a DOM. */
+/* eslint-disable max-lines -- one cohesive mounted suite: stored row, share list, and remote row share the mock harness; test-renderer mounts the real rows and their native presentation without a DOM. */
 import { createElement, type ReactElement } from 'react';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeCached } from '@/lib/active-sessions-live-sync.test-helpers';

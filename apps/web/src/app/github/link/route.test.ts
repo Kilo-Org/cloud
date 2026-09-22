@@ -132,7 +132,8 @@ describe('GET /github/link', () => {
       USER_ID,
       INSTALLATION_ID,
       '/github/link',
-      'standard'
+      'standard',
+      PLATFORM_INTEGRATION_ID
     );
     expect(mockedGetGitHubAppCredentials).toHaveBeenCalledWith('standard');
   });

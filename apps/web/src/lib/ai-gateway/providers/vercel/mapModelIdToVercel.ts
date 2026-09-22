@@ -5,6 +5,7 @@ import {
   CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
 import {
   GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID,
   GEMINI_PRO_CURRENT_VERCEL_MODEL_ID,
@@ -25,6 +26,8 @@ import {
   CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
   CLAUDE_OPUS_LATEST_MODEL_ALIAS,
   CLAUDE_SONNET_LATEST_MODEL_ALIAS,
+  DEEPSEEK_FLASH_LATEST_MODEL_ALIAS,
+  DEEPSEEK_PRO_LATEST_MODEL_ALIAS,
   DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
   GEMINI_FLASH_LATEST_MODEL_ALIAS,
   GEMINI_PRO_LATEST_MODEL_ALIAS,
@@ -57,6 +60,8 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   [GROK_LATEST_MODEL_ALIAS]: GROK_CURRENT_VERCEL_MODEL_ID,
   [GLM_LATEST_MODEL_ALIAS]: GLM_CURRENT_VERCEL_MODEL_ID,
   [GLM_FLASH_LATEST_MODEL_ALIAS]: GLM_FLASH_CURRENT_VERCEL_MODEL_ID,
+  [DEEPSEEK_PRO_LATEST_MODEL_ALIAS]: 'deepseek/deepseek-v4-pro-0813',
+  [DEEPSEEK_FLASH_LATEST_MODEL_ALIAS]: DEEPSEEK_V4_1_FLASH_MODEL_ID,
   [DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS]: 'deepseek/deepseek-v4-flash-0731',
   'mistralai/codestral-2508': 'mistral/codestral',
   'mistralai/devstral-2512': 'mistral/devstral-2',
@@ -76,7 +81,6 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'anthropic/claude-sonnet-4-5': 'anthropic/claude-sonnet-4.5',
   'anthropic/claude-sonnet-4-6': 'anthropic/claude-sonnet-4.6',
   'anthropic/claude-sonnet-5-20260630': 'anthropic/claude-sonnet-5',
-  'claude-opus-5': 'anthropic/claude-opus-5',
   'claude-sonnet-4': 'anthropic/claude-sonnet-4',
   'claude-sonnet-4.5': 'anthropic/claude-sonnet-4.5',
   'claude-sonnet-5': 'anthropic/claude-sonnet-5',
@@ -122,6 +126,10 @@ export function mapModelIdToVercel(modelId: string) {
   const slashIndex = internalId.indexOf('/');
   if (slashIndex < 0) {
     return internalId;
+  }
+
+  if (internalId.startsWith('x-ai/')) {
+    return `spacexai${internalId.slice(slashIndex)}`;
   }
 
   const firstPartyProvider = inferVercelFirstPartyInferenceProviderForModel(internalId);

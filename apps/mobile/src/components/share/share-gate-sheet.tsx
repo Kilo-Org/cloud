@@ -23,7 +23,7 @@ import { useRemoteInstanceSpawn } from '@/lib/hooks/use-remote-instance-spawn';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useHoistedOperationKey } from '@/lib/operation-key';
-import { getPrReviewPath } from '@/lib/profile-agent-navigation';
+import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import { resolveRemoteSubmitOutcome } from '@/lib/remote-submit-outcome';
 import { appendShareParams, setPendingShareNavigation } from '@/lib/share-navigation';
 import {
@@ -50,7 +50,7 @@ import { ShareDestinationList } from './share-destination-list';
 import { isShareCommitEnabled, selectShareGateState } from './share-gate-state';
 import { SharePayloadPreview } from './share-payload-preview';
 import { type SharePayloadValidation, validateSharePayload } from './share-payload-validation';
-import { selectShareReviewPr } from './share-review-pr';
+import { selectShareReviewPr, selectShareReviewPrSubtitle } from './share-review-pr';
 
 type ShareGateSheetProps = {
   shareId: string | undefined;
@@ -62,8 +62,10 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const trpc = useTRPC();
   const { t } = useTranslation();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
-  // Org-scoped stored page only (cloud-agent + cli). Active list is an
-  // id/capability lookup — never a row source.
+  // Org-scoped stored page (cloud-agent + cli) narrowed to live sessions:
+  // a session that is not live cannot receive the share, so it is never
+  // offered. The active list supplies the liveness filter and the
+  // attachments capability — never a row source.
   const sessions = useAgentSessions({
     createdOnPlatform: expandPlatformFilter(['cloud-agent', 'cli']),
     organizationId,
@@ -158,8 +160,11 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         validation,
         storedIsError: sessions.storedIsError,
         storedIsSuccess: sessions.storedIsSuccess,
+        storedIsPaused: sessions.storedIsPaused,
         activeIsError: sessions.activeIsError,
-        storedRowCount: destinations.length,
+        activeIsPaused: sessions.activeIsPaused,
+        liveRowCount: destinations.length,
+        storedSessionCount: sessions.storedSessions.length,
         isLoading: sessions.isLoading || !orgLoaded,
       }),
     [
@@ -168,8 +173,11 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       validation,
       sessions.storedIsError,
       sessions.storedIsSuccess,
+      sessions.storedIsPaused,
       sessions.activeIsError,
+      sessions.activeIsPaused,
       sessions.isLoading,
+      sessions.storedSessions.length,
       destinations.length,
       orgLoaded,
     ]
@@ -218,7 +226,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     }
     void Haptics.selectionAsync();
     setPendingShareNavigation({
-      href: getPrReviewPath(reviewPr.owner, reviewPr.repo, reviewPr.number) as string,
+      href: providerPrRoutePath(reviewPr) as string,
       shareId: null,
     });
     dismiss();
@@ -409,11 +417,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         <DestinationOptionRow
           icon={GitPullRequest}
           title={t('common.reviewPr')}
-          subtitle={t('share.reviewPrSubtitle', {
-            owner: reviewPr.owner,
-            repo: reviewPr.repo,
-            number: reviewPr.number,
-          })}
+          subtitle={selectShareReviewPrSubtitle(reviewPr)}
           accessibilityLabel={t('common.reviewPr')}
           onPress={handleReviewPr}
         />

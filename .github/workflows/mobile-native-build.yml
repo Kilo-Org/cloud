@@ -4,9 +4,11 @@
 # machine with the same native inputs computes the same name and can install
 # the artifact instead of compiling (dev/local/mobile-remote-native.ts).
 #
-# Runs on pushes to main that can change native inputs, and on demand for
-# any pushed branch via workflow_dispatch. The gate job skips platforms
-# whose artifact already exists.
+# Runs on pushes to main that can change native inputs, on pull requests that
+# change a native input, and on demand for any pushed branch via
+# workflow_dispatch. The gate job skips platforms whose artifact already
+# exists, so a PR whose nativeHash is already published costs one ubuntu gate
+# job and no macOS runner.
 name: mobile-native-build
 
 on:
@@ -25,11 +27,18 @@ on:
       - 'pnpm-workspace.yaml'
       - 'patches/**'
       - '.github/workflows/mobile-native-build.yml'
-  # Self-validation: a PR that edits this workflow builds it once, under a
-  # pr<N>-<workflow hash>- artifact prefix so hosts never install it.
-  # (workflow_dispatch only works after the file exists on main.)
+  # Native inputs: any of these can break the native build, so a pull request
+  # that changes one builds it before merge (PR 6115 merged an iOS app that
+  # did not compile with only the workflow-file path here). A PR whose hash is
+  # already published skips both platforms in the gate job. Editing this
+  # workflow file itself also runs it, under a pr<N>-<workflow hash>- prefix
+  # hosts never install.
   pull_request:
     paths:
+      - 'apps/mobile/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'patches/**'
       - '.github/workflows/mobile-native-build.yml'
 
 concurrency:
@@ -42,6 +51,10 @@ concurrency:
 permissions:
   contents: read
   actions: read
+  # The gate lists the pull request's changed files to decide whether the run
+  # validates this workflow file (out-of-namespace prefix) or a native input
+  # (plain, installable name).
+  pull-requests: read
 
 jobs:
   gate:
@@ -70,7 +83,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Compute hashes and check existing artifacts
+      - name: Compute hashes and gate the build
         id: decide
         env:
           GH_TOKEN: ${{ github.token }}
@@ -82,35 +95,14 @@ jobs:
           android_hash=$(pnpm exec tsx dev/local/mobile-native-hash.ts android)
           echo "ios_hash=$ios_hash" >> "$GITHUB_OUTPUT"
           echo "android_hash=$android_hash" >> "$GITHUB_OUTPUT"
-          # A pull_request run validates this workflow. Its artifacts stay out
-          # of the namespace hosts install from (dev/local/mobile-remote-native.ts)
-          # and are keyed on the workflow file as well, so each edit of it
-          # builds exactly once and a re-push of the same file skips.
-          prefix=''
-          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
-            workflow_hash=$(sha256sum .github/workflows/mobile-native-build.yml | cut -c1-8)
-            prefix="pr$PR_NUMBER-$workflow_hash-"
-          fi
-          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
-          exists() {
-            count=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=$1&per_page=10" \
-              --jq '[.artifacts[] | select(.expired | not)] | length')
-            [ "$count" -gt 0 ]
-          }
-          need() {
-            platform=$1 hash=$2
-            if [ "$PLATFORM" != all ] && [ "$PLATFORM" != "$platform" ]; then
-              echo false; return
-            fi
-            if exists "${prefix}mobile-native-$platform-$hash"; then
-              echo "artifact ${prefix}mobile-native-$platform-$hash already exists" >&2
-              echo false
-            else
-              echo true
-            fi
-          }
-          echo "need_ios=$(need ios "$ios_hash")" >> "$GITHUB_OUTPUT"
-          echo "need_android=$(need android "$android_hash")" >> "$GITHUB_OUTPUT"
+          # dev/local/mobile-native-gate.ts decides the prefix and which
+          # platforms still need building. A pull_request run that edits this
+          # workflow is validating that edit, so it publishes under
+          # pr<N>-<workflow hash>- and hosts never install it; a pull_request
+          # run whose native input changed publishes the plain
+          # mobile-native-<platform>-<nativeHash> name a host installs, and
+          # skips a platform whose artifact already exists.
+          pnpm exec tsx dev/local/mobile-native-gate.ts "$ios_hash" "$android_hash"
 
   ios:
     needs: gate

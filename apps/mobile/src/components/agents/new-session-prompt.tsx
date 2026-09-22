@@ -30,8 +30,15 @@ import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import {
   NEW_SESSION_PROMPT_CHROME_HEIGHT,
+  NEW_SESSION_PROMPT_DEFAULT_LINES,
   NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT,
+  NEW_SESSION_PROMPT_LINE_HEIGHT,
+  NEW_SESSION_PROMPT_VERTICAL_PADDING,
   resolveComposerMaxHeight,
+  resolveComposerMinHeight,
+  resolveComposerMinHeightForViewport,
+  resolveNewSessionPromptCardChrome,
+  resolveNewSessionPromptCardChromeRowsAboveToolbar,
   SESSION_HEADER_HEIGHT,
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
@@ -59,12 +66,10 @@ import {
   useClipboardPaste,
 } from '@/lib/agent-attachments/use-clipboard-paste';
 
-const PROMPT_INPUT_DEFAULT_LINES = 3;
-const PROMPT_INPUT_LINE_HEIGHT = 24;
+// Mirrors the input's `text-base`.
 const PROMPT_INPUT_FONT_SIZE = 16;
-// Must mirror the TextInput's actual padding: py-2 (16 total) and px-2 on
-// iOS (16 total) / the 24pt-per-side Android inset (48 total).
-const PROMPT_INPUT_VERTICAL_PADDING = 16;
+// Must mirror the TextInput's actual horizontal padding: px-2 on iOS (16
+// total) / the 24pt-per-side Android inset (48 total).
 const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
 const PROMPT_INPUT_MAX_CHARS = CLOUD_AGENT_PROMPT_MAX_LENGTH;
@@ -118,6 +123,7 @@ export function NewSessionPrompt({
   shareId,
   voiceInputSettlerRef,
   initialPrompt,
+  promptViewportHeight = 0,
   onStartSession,
   isCloneEntry = false,
 }: Readonly<NewSessionPromptComponentProps>) {
@@ -147,9 +153,66 @@ export function NewSessionPrompt({
   const isComposingRef = useRef(false);
   const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
-  const promptLineHeight = PROMPT_INPUT_LINE_HEIGHT * fontScale;
+  // Measured mode/model toolbar height. The pills wrap onto a second row on
+  // narrow viewports, so the chrome the input must not squeeze out is not a
+  // constant; the static budget covers the first frame, before the toolbar
+  // has laid out.
+  const [toolbarHeight, setToolbarHeight] = useState<number | null>(null);
+  const promptLineHeight = NEW_SESSION_PROMPT_LINE_HEIGHT * fontScale;
+  // The card rows above the toolbar that render only in some states. The floor
+  // below reserves each one under the same condition the render uses.
+  const hasAttachments = attachments.length > 0;
+  const showsAttachmentStatus = attachments.some(
+    attachment => attachment.metadataStripFailed === true
+  );
+  const showsCounter =
+    PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING;
+  // The models-error block renders in the toolbar's place.
+  const showsModelsError = isModelsError && modelOptions.length === 0;
+  // The input's floor gives up lines on a short viewport (landscape at a high
+  // density) so the card's control row and mode/model toolbar stay above the
+  // keyboard. With room it is still the three-line default. The floor scales
+  // only the rows that grow with `fontScale` (the pill's text line); the header
+  // row is pinned by its own `min-h-14` and does not. The host's measured frame
+  // is the floor's yardstick once it exists; the window-based floor covers the
+  // first frame, before the host has laid out. The max cap below stays
+  // deliberately conservative — only the floor hands lines back.
+  const promptCardChromeHeight = resolveNewSessionPromptCardChrome({
+    fontScale,
+    toolbarHeight,
+    // The card renders three more rows above the toolbar in some states; the
+    // floor reserves each with the same condition the render uses. A row it
+    // does not reserve is a line the input keeps while the pills drop under
+    // the keyboard.
+    rowsAboveToolbarHeight: resolveNewSessionPromptCardChromeRowsAboveToolbar({
+      hasAttachments,
+      showsAttachmentStatus,
+      showsCounter,
+    }),
+    // The models-error block renders in the toolbar's place, so the toolbar's
+    // measured height must not stand in for a row that is not there.
+    toolbarRendered: !showsModelsError,
+  });
   const promptMinHeight =
-    promptLineHeight * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING;
+    promptViewportHeight > 0
+      ? resolveComposerMinHeightForViewport({
+          viewportHeight: promptViewportHeight,
+          composerChromeHeight: promptCardChromeHeight,
+          lineHeight: promptLineHeight,
+          verticalPadding: NEW_SESSION_PROMPT_VERTICAL_PADDING,
+          defaultLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+        })
+      : resolveComposerMinHeight({
+          windowHeight,
+          safeAreaInsetTop: insets.top,
+          safeAreaInsetBottom: insets.bottom,
+          keyboardHeight,
+          sessionHeaderHeight: SESSION_HEADER_HEIGHT,
+          composerChromeHeight: promptCardChromeHeight,
+          lineHeight: promptLineHeight,
+          verticalPadding: NEW_SESSION_PROMPT_VERTICAL_PADDING,
+          defaultLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
+        });
   const promptMaxHeight = resolveComposerMaxHeight({
     windowHeight,
     safeAreaInsetTop: insets.top,
@@ -187,10 +250,10 @@ export function NewSessionPrompt({
   const promptMeasure = useTextHeight({
     minHeight: promptMinHeight,
     maxHeight: promptMaxHeight,
-    verticalPadding: PROMPT_INPUT_VERTICAL_PADDING,
+    verticalPadding: NEW_SESSION_PROMPT_VERTICAL_PADDING,
     textContentWidth: promptInputWidth - PROMPT_INPUT_HORIZONTAL_PADDING,
     fontSize: PROMPT_INPUT_FONT_SIZE,
-    lineHeight: PROMPT_INPUT_LINE_HEIGHT,
+    lineHeight: NEW_SESSION_PROMPT_LINE_HEIGHT,
     fontScale,
   });
 
@@ -300,6 +363,16 @@ export function NewSessionPrompt({
     setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
+  function handleToolbarLayout(event: LayoutChangeEvent) {
+    const nextHeight = Math.round(event.nativeEvent.layout.height);
+    // A zero-height layout is not a measurement — the row is collapsed or has
+    // not laid out — so keep the last measured height (or the `null` that makes
+    // the floor use the static budget). Reserving the rows above the toolbar
+    // alone (68) would sit below the static estimate (125) and let the input
+    // keep lines the card cannot fit.
+    setToolbarHeight(current => (nextHeight <= 0 ? current : nextHeight));
+  }
+
   function handlePromptSelectionChange(event: TextInputSelectionChangeEvent) {
     promptSelectionRef.current = event.nativeEvent.selection;
   }
@@ -369,7 +442,7 @@ export function NewSessionPrompt({
         onMove={onMoveAttachment}
         onReorder={onReorderAttachments}
       />
-      {attachments.some(attachment => attachment.metadataStripFailed === true) ? (
+      {showsAttachmentStatus ? (
         <AccessibleStatus
           tone="error"
           message={t('agentChat.composer.photoMetadataNotRemoved')}
@@ -410,8 +483,9 @@ export function NewSessionPrompt({
           // arrival hides the attachment strip and the Start button.
           autoFocus={shareId === undefined || shareId === ''}
         />
-        {PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING ? (
+        {showsCounter ? (
           <View className="flex-row justify-end px-1 pb-1">
+            {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
             <Text
               className="text-xs font-normal text-muted-foreground"
               accessibilityLabel={t('agentChat.composer.charactersRemaining', {
@@ -449,7 +523,7 @@ export function NewSessionPrompt({
           ) : null}
         </NewSessionPromptControls>
       </View>
-      {isModelsError && modelOptions.length === 0 ? (
+      {showsModelsError ? (
         <QueryError
           placement="top"
           variant="server"
@@ -473,6 +547,8 @@ export function NewSessionPrompt({
           customOptions={customOptions}
           modelLocked={modelLocked}
           modelLockLabel={modelLockLabel}
+          onLayout={handleToolbarLayout}
+          wrap
           className="border-t border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
         />
       )}

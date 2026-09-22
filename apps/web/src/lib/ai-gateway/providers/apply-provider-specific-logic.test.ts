@@ -9,13 +9,12 @@ import {
   removeUnsupportedRequestServiceTier,
 } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
 import {
   ReasoningDetailsTransform,
   type Provider,
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
-import { QWEN37_MAX_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
 import {
   gpt_5_6_sol_discounted_model,
   gpt_6_astra_flex_model,
@@ -38,9 +37,10 @@ function makeRequest(
 
 function makeProvider(responseTransforms: Provider['responseTransforms']): Provider {
   return {
-    id: 'perplexity',
+    id: 'openrouter',
     apiUrl: 'https://example.com/v1',
     apiUrlOverrides: {},
+    disableUrlSuffix: false,
     apiKey: 'test-key',
     apiKeyHeader: null,
     supportedChatApis: ['chat_completions'],
@@ -67,16 +67,13 @@ function makeMessagesRequest(
 }
 
 describe('applyAnthropicThinkingDefault', () => {
-  it.each(['z-ai/glm-5.2', PERPLEXITY_KIMI_PUBLIC_ID, 'minimax/minimax-m3'])(
-    'disables implicit thinking for %s',
-    model => {
-      const request = makeMessagesRequest(model);
+  it.each(['z-ai/glm-5.2', 'minimax/minimax-m3'])('disables implicit thinking for %s', model => {
+    const request = makeMessagesRequest(model);
 
-      applyAnthropicThinkingDefault(model, request);
+    applyAnthropicThinkingDefault(model, request);
 
-      expect(request.body.thinking).toEqual({ type: 'disabled' });
-    }
-  );
+    expect(request.body.thinking).toEqual({ type: 'disabled' });
+  });
 
   it.each([{ type: 'enabled' as const, budget_tokens: 1_024 }, { type: 'adaptive' as const }])(
     'preserves explicitly enabled thinking %p',
@@ -97,8 +94,8 @@ describe('applyAnthropicThinkingDefault', () => {
     expect(request.body.thinking).toBeUndefined();
   });
 
-  it.each(['z-ai/glm-5.1', 'moonshotai/kimi-k3-fast'])(
-    'does not apply the partner thinking default to %s',
+  it.each(['z-ai/glm-5.1', 'moonshotai/kimi-k3', 'moonshotai/kimi-k3-fast'])(
+    'does not add thinking to %s',
     model => {
       const request = makeMessagesRequest(model);
 
@@ -112,7 +109,7 @@ describe('applyAnthropicThinkingDefault', () => {
 describe('removeUnsupportedRequestServiceTier', () => {
   it.each([
     {
-      model: QWEN37_MAX_MODEL_ID,
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
       kiloExclusiveModel: null,
       reason: 'non-fallback custom pricing',
     },
@@ -145,7 +142,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
   );
 
   it.each([
-    [PERPLEXITY_KIMI_PUBLIC_ID, null],
+    ['moonshotai/kimi-k3', null],
     [gpt_6_astra_flex_model.public_id, gpt_6_astra_flex_model],
     ['vendor/standard-model', null],
   ] as const)('preserves the request-level tier for %s', (model, kiloExclusiveModel) => {

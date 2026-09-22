@@ -36,6 +36,7 @@
     "cost": "ఖర్చు",
     "discard": "విస్మరించండి",
     "findings": "గుర్తించిన సమస్యలు",
+    "mergeRequest": "మెర్జ్ రిక్వెస్ట్",
     "notConnected": "కనెక్ట్ కాలేదు",
     "notifications": "నోటిఫికేషన్లు",
     "pullRequest": "పుల్ రిక్వెస్ట్",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "వేరే ఇమెయిల్ చిరునామాను ఉపయోగించండి",
     "signInWithApple": "Appleతో సైన్ ఇన్ చేయండి",
     "signInWithGoogle": "Googleతో సైన్ ఇన్ చేయండి",
+    "signInWithPasskey": "పాస్‌కీతో సైన్ ఇన్ చేయండి",
     "emailAddress": "ఇమెయిల్ చిరునామా",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "ఇమెయిల్‌తో కొనసాగించండి",
@@ -174,6 +176,10 @@
     "termsConnector": " మరియు ",
     "termsSuffix": ".",
     "moreSignInOptions": "మరిన్ని సైన్ ఇన్ ఎంపికలు",
+    "passkeyCancelled": "పాస్‌కీతో సైన్ ఇన్ రద్దు చేయబడింది. దయచేసి మళ్లీ ప్రయత్నించండి.",
+    "passkeyNotFound": "ఈ పరికరం కోసం ఏ పాస్‌కీ సేవ్ చేయబడలేదు. దానికి బదులుగా Apple, Google లేదా మీ ఇమెయిల్‌తో సైన్ ఇన్ చేయండి.",
+    "passkeyUnsupported": "ఈ పరికరంలో పాస్‌కీలు అందుబాటులో లేవు. దానికి బదులుగా Apple, Google లేదా మీ ఇమెయిల్‌తో సైన్ ఇన్ చేయండి.",
+    "passkeyFailed": "పాస్‌కీతో సైన్ ఇన్ చేయలేకపోయాం. దయచేసి మళ్లీ ప్రయత్నించండి.",
     "couldNotCompleteSignIn": "సైన్ ఇన్ పూర్తి చేయలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి.",
     "sessionEnded": "మీ సెషన్ ముగిసింది. దయచేసి మళ్లీ సైన్ ఇన్ చేయండి.",
     "signInCodeExpired": "మీ సైన్ ఇన్ కోడ్ గడువు ముగిసింది. దయచేసి మళ్లీ ప్రయత్నించండి.",
@@ -224,13 +230,36 @@
     "providerTestAccount": "పరీక్ష ఖాతా",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "ఎంటర్‌ప్రైజ్ SSO"
+    "providerEnterpriseSso": "ఎంటర్‌ప్రైజ్ SSO",
+    "passkeysTitle": "పాస్‌కీలు",
+    "passkeysSubtitle": "పాస్‌వర్డ్ లేకుండా సైన్ ఇన్ చేయండి",
+    "passkeysEmpty": "ఇంకా పాస్‌కీలు లేవు",
+    "passkeysEmptyHint": "$t(profile.addPasskey) చేసి పాస్‌వర్డ్ లేకుండా సైన్ ఇన్ చేయండి.",
+    "passkeysCouldNotLoad": "పాస్‌కీలు లోడ్ కాలేదు",
+    "passkeysLoadFailed": "ఇది లోడ్ అయ్యే వరకు పాస్‌కీలు అందుబాటులో ఉండవు.",
+    "addPasskey": "పాస్‌కీ జోడించండి",
+    "passkeyDefaultName": "పాస్‌కీ",
+    "passkeyAddedOn": "{{date}}న జోడించబడింది",
+    "passkeyAdded": "పాస్‌కీ జోడించబడింది.",
+    "passkeyAddFailed": "పాస్‌కీ జోడించలేకపోయాం. మళ్లీ ప్రయత్నించండి.",
+    "passkeyAddUnsupported": "ఈ పరికరం పాస్‌కీలు సృష్టించలేదు.",
+    "passkeyAddCancelled": "పాస్‌కీ సృష్టించడం రద్దు చేయబడింది.",
+    "passkeyRemoved": "పాస్‌కీ తీసివేయబడింది.",
+    "passkeyRemoveFailed": "ఆ పాస్‌కీని తీసివేయలేకపోయాం. మళ్లీ ప్రయత్నించండి.",
+    "passkeyRenamed": "పాస్‌కీ పేరు మార్చబడింది.",
+    "passkeyName": "పాస్‌కీ పేరు",
+    "renamePasskey": "పాస్‌కీ పేరు మార్చండి",
+    "removePasskey": "పాస్‌కీ తీసివేయండి",
+    "removePasskeyTitle": "పాస్‌కీ తీసివేయాలా?",
+    "removePasskeyMessage": "ఇప్పుడు మీరు ఈ పాస్‌కీతో సైన్ ఇన్ చేయలేరు."
   },
   "preferences": {
     "general": "సాధారణం",
     "voiceInput": "వాయిస్ ఇన్‌పుట్",
     "autoExpandThinking": "ఆలోచనను స్వయంచాలకంగా విస్తరించండి",
     "autoExpandThinkingSubtitle": "ఏజెంట్ ఆలోచించడం పూర్తయినప్పుడు ఆ వివరాలను విస్తరించి చూపించండి.",
+    "hideThinking": "ఆలోచన వివరాలను దాచండి",
+    "hideThinkingSubtitle": "సెషన్ పేజీలో ఏజెంట్ ఆలోచనను చూపించవద్దు.",
     "keepScreenOn": "సెషన్ పేజీలో ఉన్నంతసేపు స్క్రీన్ ఆన్‌లో ఉంచండి",
     "keepScreenOnSubtitle": "సెషన్ పని చేస్తున్నప్పుడు స్క్రీన్ ఆఫ్ కాకుండా ఉంచండి.",
     "appearance": "రూపం",
@@ -253,7 +282,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ద్వారా మాటలను వచనంగా మార్చడం",
     "gatewayTranscriptionSubtitle": "పరికరం యొక్క మాటల గుర్తింపుకు బదులు Kilo Gateway మోడల్‌తో వాయిస్ ఇన్‌పుట్‌ను వచనంగా మార్చండి. మీ రికార్డింగ్ Kilo Gatewayకు పంపబడుతుంది.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "టూల్ కాల్స్‌ను కుదించండి",
+    "condenseToolCallsSubtitle": "వరుసగా వచ్చే టూల్ కాల్స్‌ను మీరు తెరవగల ఒక వరుసలో సమూహపరచండి.",
+    "toolSummaryTranslation": "టూల్ సారాంశాలను అనువదించండి",
+    "toolSummaryTranslationSubtitle": "ప్రతి టూల్ సారాంశాన్ని మీ యాప్ భాషలోకి అనువదించడానికి మోడల్‌కు పంపండి. అనువాదం విఫలమైతే అసలైనది చూపబడుతుంది.",
+    "toolSummaryTranslationModelUnavailableNotice": "ఈ మోడల్ ఇకపై అందించబడదు. మరొకదాన్ని ఎంచుకోవడానికి $t(common.model) ని నొక్కండి."
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
@@ -335,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "మొత్తం {{total}}లో {{displayCount}} ఫైళ్లు లోడ్ అయ్యాయి",
       "filesStillLoading": "ఫైళ్లు ఇంకా లోడ్ అవుతున్నాయి. రిఫ్రెష్ చేయడానికి కిందికి లాగండి.",
       "goToOverview": "అవలోకనానికి వెళ్లండి",
-      "goToOverviewTab": "అవలోకనం ట్యాబ్‌కు వెళ్లండి"
+      "goToOverviewTab": "అవలోకనం ట్యాబ్‌కు వెళ్లండి",
+      "expandAllLines_one": "మొత్తం {{displayCount}} పంక్తి చూపండి",
+      "expandAllLines_other": "మొత్తం {{displayCount}} పంక్తులను చూపండి",
+      "expandLines_one": "{{displayCount}} పంక్తి చూపండి ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} పంక్తులను చూపండి ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "చుట్టుపక్కల కోడ్‌లోని {{displayCount}} పంక్తి చూపండి",
+      "expandLinesOfContext_other": "చుట్టుపక్కల కోడ్‌లోని {{displayCount}} పంక్తులను చూపండి",
+      "expandMoreLines_one": "మరో {{displayCount}} పంక్తి చూపండి ({{start}}–{{end}})",
+      "expandMoreLines_other": "మరో {{displayCount}} పంక్తులను చూపండి ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}} ఫైళ్లలో {{loaded}} లోడ్ అయ్యాయి",
+      "loadedOfTotalFiles_other": "{{total}} ఫైళ్లలో {{loaded}} లోడ్ అయ్యాయి"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "ఫైల్ చివర కొత్త పంక్తి లేదు.",
@@ -350,6 +394,7 @@
       "merge": "మెర్జ్",
       "mergeNow": "ఇప్పుడు మెర్జ్ చేయండి",
       "mergePullRequest": "పుల్ రిక్వెస్ట్ మెర్జ్",
+      "mergeTermTitle": "{{term}} మెర్జ్",
       "enableAutoMerge": "ఆటో-మెర్జ్‌ను ప్రారంభించండి",
       "disableAutoMerge": "ఆటో-మెర్జ్‌ను నిలిపివేయండి",
       "autoMergeOn": "ఆటో-మెర్జ్ ఆన్‌లో ఉంది",
@@ -368,9 +413,12 @@
       "deleteBranchAfterMerge": "మెర్జ్ తర్వాత బ్రాంచ్‌ను తొలగించండి",
       "noEnabledMethods": "ఈ రిపోజిటరీలో ఏ మెర్జ్ పద్ధతినీ ప్రారంభించలేదు. మెర్జ్, స్క్వాష్ లేదా రీబేస్ పద్ధతిని ప్రారంభించమని రిపోజిటరీ నిర్వాహకుడిని అడగండి.",
       "confirmTitle": "పుల్ రిక్వెస్ట్‌ను మెర్జ్ చేయాలా?",
+      "confirmTitleTerm": "{{term}}‌ను మెర్జ్ చేయాలా?",
       "confirmMessage": "దీనితో మీ మార్పులు బేస్ బ్రాంచ్‌లో మెర్జ్ అవుతాయి.",
       "enableAutoMergeConfirmTitle": "ఆటో-మెర్జ్‌ను ప్రారంభించాలా?",
       "enableAutoMergeConfirmMessage": "అవసరమైన తనిఖీలన్నీ విజయవంతమయ్యాక GitHub ఈ పుల్ రిక్వెస్ట్‌ను స్వయంచాలకంగా మెర్జ్ చేస్తుంది.",
+      "enableAutoMergeConfirmMessageTerm": "పైప్‌లైన్ విజయవంతమైన తర్వాత {{term}} ఆటోమేటిక్‌గా మెర్జ్ అవుతుంది.",
+      "enableAutoMergeDescriptionTerm": "పైప్‌లైన్ విజయవంతమైన తర్వాత GitLab ఈ {{term}}ను ఆటోమేటిక్‌గా మెర్జ్ చేస్తుంది.",
       "forbidden": "ఈ పుల్ రిక్వెస్ట్‌ను మెర్జ్ చేయడానికి మీకు అనుమతి లేదు.",
       "cannotMerge": "ఈ పుల్ రిక్వెస్ట్‌ను ప్రస్తుత స్థితిలో మెర్జ్ చేయలేము.",
       "couldNotMerge": "పుల్ రిక్వెస్ట్‌ను మెర్జ్ చేయలేకపోయాము.",
@@ -381,7 +429,8 @@
       },
       "terminal": {
         "alreadyMerged": "ఇప్పటికే మెర్జ్ అయింది",
-        "closed": "ఈ పుల్ రిక్వెస్ట్ మూసివేయబడింది"
+        "closed": "ఈ పుల్ రిక్వెస్ట్ మూసివేయబడింది",
+        "closedMergeRequest": "ఈ మెర్జ్ రిక్వెస్ట్ మూసివేయబడింది"
       },
       "partialSuccessBanner": {
         "body": "బ్రాంచ్‌ను తొలగించలేకపోయాము: {{reason}}.",
@@ -406,6 +455,18 @@
         "behindDetail": "హెడ్ బ్రాంచ్‌లో బేస్ బ్రాంచ్‌లోని తాజా మార్పులు లేవు. మెర్జ్ చేయడానికి ముందు బ్రాంచ్‌ను రీబేస్ చేయండి లేదా నవీకరించండి.",
         "notMergeableTitle": "ఈ పుల్ రిక్వెస్ట్‌ను ఇంకా మెర్జ్ చేయలేము",
         "notMergeableDetail": "మెర్జ్ చేయగల స్థితిని GitHub {{state}}గా తెలిపింది."
+      },
+      "restrictions": {
+        "title": "మెర్జ్ పరిమితులు",
+        "approvalsRequired_one": "{{displayCount}} ఆమోదం అవసరం",
+        "approvalsRequired_other": "{{displayCount}} ఆమోదాలు అవసరం",
+        "pipelineMustSucceed": "మెర్జ్ చేసే ముందు పైప్‌లైన్ విజయవంతం కావాలి."
+      },
+      "providerBlocked": {
+        "failingPipeline": "చివరి కమిట్‌పై పైప్‌లైన్ విఫలమవుతోంది.",
+        "pendingPipeline": "చివరి కమిట్‌పై పైప్‌లైన్ ఇంకా నడుస్తోంది.",
+        "permission": "ఈ {{term}}‌ను మెర్జ్ చేయడానికి మీకు అనుమతి లేదు.",
+        "draft": "మెర్జ్ చేయడానికి ముందు {{term}}‌ను సమీక్షకు సిద్ధంగా ఉన్నట్లు గుర్తించండి."
       },
       "methodLabels": {
         "merge": "మెర్జ్ కమిట్‌ను సృష్టించండి",
@@ -455,6 +516,8 @@
       "replyBadRequest": "ఈ ప్రత్యుత్తరాన్ని పోస్ట్ చేయలేము. చర్చలో మార్పులు జరిగి ఉండవచ్చు.",
       "replyForbidden": "ఈ పుల్ రిక్వెస్ట్‌కు ప్రత్యుత్తరం ఇవ్వడానికి మీకు అనుమతి లేదు.",
       "addCommentCta": "ఈ పుల్ రిక్వెస్ట్‌పై వ్యాఖ్యానించండి",
+      "fixWithKilo": "Kilo తో పరిష్కరించండి",
+      "fixWithKiloPrompt": "దయచేసి కింది పుల్ రిక్వెస్ట్ వ్యాఖ్యను పరిష్కరించండి: {{link}}",
       "commentBadRequest": "ఈ వ్యాఖ్యను పోస్ట్ చేయలేము. పుల్ రిక్వెస్ట్ మారి ఉండవచ్చు.",
       "commentForbidden": "ఈ పుల్ రిక్వెస్ట్‌పై వ్యాఖ్యానించడానికి మీకు అనుమతి లేదు.",
       "moderation": {
@@ -505,7 +568,10 @@
         "outdatedOnLines": "{{lines}}పై పాత వ్యాఖ్య",
         "outdatedOnPath": "{{path}}పై పాత వ్యాఖ్య"
       },
-      "deletedUser": "తొలగించబడిన వినియోగదారు"
+      "deletedUser": "తొలగించబడిన వినియోగదారు",
+      "replyForbiddenTerm": "ఈ {{term}}‌కు ప్రత్యుత్తరం ఇవ్వడానికి మీకు అనుమతి లేదు.",
+      "moreLinesAbove_one": "… పైన మరో {{displayCount}} పంక్తి ఉంది.",
+      "moreLinesAbove_other": "… పైన మరో {{displayCount}} పంక్తులు ఉన్నాయి."
     },
     "couldNotOpenGitHubAppSettings": "GitHub యాప్ సెట్టింగ్‌లను తెరవలేకపోయాం.",
     "installKiloGitHubApp": "Kilo GitHub యాప్‌ను ఇన్‌స్టాల్ చేయండి",
@@ -517,17 +583,19 @@
     "reviewPullRequest": "పుల్ రిక్వెస్ట్‌ను సమీక్షించండి",
     "headLine": "{{counts}} · హెడ్ {{sha}}",
     "entry": {
-      "eyebrow": "URL ద్వారా పుల్ రిక్వెస్ట్‌ను తెరవండి.",
-      "pastePrLink": "PR లింక్‌ను పేస్ట్ చేయండి",
-      "noRecentPrs": "ఇటీవలి PRలు లేవు",
-      "noRecentPrsDescription": "సమీక్ష ప్రారంభించడానికి పైన PR లింక్‌ను పేస్ట్ చేయండి — ఆ PR తదుపరిసారి ఇక్కడ కనిపిస్తుంది.",
+      "eyebrow": "URL ద్వారా పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్‌ను తెరవండి",
+      "pastePrLink": "పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ లింక్‌ను పేస్ట్ చేయండి",
+      "noRecentPrs": "ఇటీవలి సమీక్షలు లేవు",
+      "noRecentPrsDescription": "సమీక్ష ప్రారంభించడానికి పైన లింక్‌ను పేస్ట్ చేయండి — తదుపరి సారి అది ఇక్కడ కనిపిస్తుంది.",
       "couldNotLoad": "లోడ్ చేయలేకపోయాము.",
       "removeFromRecentsTitle": "ఇటీవలి జాబితా నుంచి తీసివేయాలా?",
-      "removeFromRecentsMessage": "ఈ పుల్ రిక్వెస్ట్‌ను మీ ఇటీవలి జాబితా నుంచి తీసివేస్తాము.",
+      "removeFromRecentsMessage": "ఈ సమీక్ష మీ ఇటీవలి జాబితా నుండి తొలగించబడుతుంది.",
       "removeRecentAccessibility": "{{repo}}ను ఇటీవలి జాబితా నుంచి తీసివేయండి",
-      "urlAccessibility": "GitHub పుల్ రిక్వెస్ట్ URL",
-      "clearLink": "పుల్ రిక్వెస్ట్ లింక్‌ను తీసివేయండి",
-      "pasteLink": "పుల్ రిక్వెస్ట్ లింక్‌ను పేస్ట్ చేయండి",
+      "urlAccessibility": "పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ URLను నమోదు చేయండి",
+      "urlPlaceholder": "పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ URL",
+      "openAccessibility": "పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్‌ను తెరవండి",
+      "clearLink": "లింక్‌ను తొలగించండి",
+      "pasteLink": "పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ లింక్‌ను పేస్ట్ చేయండి",
       "open": "ఓపెన్"
     },
     "checks": {
@@ -544,6 +612,8 @@
       "pending": "{{displayCount}} ఇంకా పూర్తి కాలేదు",
       "skipped": "{{displayCount}} దాటవేయబడ్డాయి",
       "checksCount": "{{displayCount}} తనిఖీలు",
+      "checksCount_one": "{{displayCount}} తనిఖీ",
+      "checksCount_other": "{{displayCount}} తనిఖీలు",
       "checkDetails": "తనిఖీ వివరాలు"
     },
     "inbox": {
@@ -576,9 +646,15 @@
     "connect": {
       "checkFailedTitle": "GitHub కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
       "checkFailedMessage": "ఇది లోడ్ అయ్యే వరకు సైన్ ఇన్ స్థితిని తెలుసుకోలేము.",
+      "checkFailedTitleGitLab": "GitLab కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
+      "checkFailedTitleBitbucket": "Bitbucket కనెక్షన్‌ను తనిఖీ చేయలేకపోయాము.",
+      "providerCheckFailedMessage": "ఇది లోడ్ అయ్యే వరకు కనెక్షన్ స్థితి అందుబాటులో ఉండదు.",
       "reconnectTitle": "GitHubకు మళ్లీ కనెక్షన్",
       "reconnectDescription": "మీ GitHub కనెక్షన్ అనుమతిని రద్దు చేశారు. మొబైల్‌లో పుల్ రిక్వెస్ట్‌లను సమీక్షించడం కొనసాగించడానికి మళ్లీ కనెక్ట్ చేయండి.",
-      "description": "మొబైల్‌లో పుల్ రిక్వెస్ట్‌లను సమీక్షించడానికి మీ GitHub ఖాతాను కనెక్ట్ చేయండి."
+      "description": "మొబైల్‌లో పుల్ రిక్వెస్ట్‌లను సమీక్షించడానికి మీ GitHub ఖాతాను కనెక్ట్ చేయండి.",
+      "gitlabDescription": "మొబైల్‌లో మెర్జ్ రిక్వెస్ట్‌లను సమీక్షించడానికి మీ GitLab ఖాతాను కనెక్ట్ చేయండి.",
+      "bitbucketDescription": "మొబైల్‌లో పుల్ రిక్వెస్ట్‌లను సమీక్షించడానికి ఈ సంస్థను Bitbucketకు కనెక్ట్ చేయండి.",
+      "bitbucketOrgOnlyDescription": "దాని Bitbucket పుల్ రిక్వెస్ట్‌లను సమీక్షించడానికి మీ ప్రొఫైల్‌లో సంస్థను ఎంచుకోండి."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +676,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub కనెక్షన్ గడువు ముగిసింది.",
-      "message": "మీ GitHub కనెక్షన్ ఇక చెల్లదు. కనెక్షన్‌ను మళ్లీ తనిఖీ చేయండి — అవసరమైతే మళ్లీ కనెక్ట్ చేయమని అడుగుతాము."
+      "message": "మీ GitHub కనెక్షన్ ఇక చెల్లదు. కనెక్షన్‌ను మళ్లీ తనిఖీ చేయండి — అవసరమైతే మళ్లీ కనెక్ట్ చేయమని అడుగుతాము.",
+      "gitlabTitle": "GitLab కనెక్షన్ గడువు ముగిసింది.",
+      "bitbucketTitle": "Bitbucket కనెక్షన్ గడువు ముగిసింది.",
+      "providerMessage": "మీ {{provider}} కనెక్షన్ ఇక చెల్లదు. కనెక్షన్‌ను మళ్లీ తనిఖీ చేయండి — అవసరమైతే మళ్లీ కనెక్ట్ చేయమని అడుగుతాము."
     },
     "eventChips": {
       "comment": "వ్యాఖ్య",
@@ -665,10 +744,12 @@
       "statusContext": "మార్పు చేయని కోడ్",
       "lineLabel": "{{status}} పంక్తి {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(ఖాళీ)"
+      "emptyLine": "(ఖాళీ)",
+      "truncationBanner_one": "GitHub API పరిమితి కారణంగా మారిన {{total}} ఫైళ్లలో మొదటి {{limit}} ఫైళ్లను మాత్రమే చూపిస్తున్నాము.",
+      "truncationBanner_other": "GitHub API పరిమితి కారణంగా మారిన {{total}} ఫైళ్లలో మొదటి {{limit}} ఫైళ్లను మాత్రమే చూపిస్తున్నాము."
     },
     "linkPasteClipboardEmpty": "క్లిప్‌బోర్డ్ ఖాళీగా ఉంది.",
-    "linkPasteNotAPullRequest": "ఇది GitHub పుల్ రిక్వెస్ట్ లింక్ కాదు.",
+    "linkPasteNotAPullRequest": "ఇది పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ లింక్ కాదు",
     "announce": {
       "commentPosted": "వ్యాఖ్య పోస్ట్ చేయబడింది",
       "reviewSubmitted": "సమీక్ష సమర్పించబడింది",
@@ -677,6 +758,7 @@
     "mutationError": {
       "commentNotPosted": "ఈ వ్యాఖ్యను పోస్ట్ చేయలేము. ఎంచుకున్న పంక్తి మారి ఉండవచ్చు లేదా PRను నవీకరించి ఉండవచ్చు.",
       "reviewNotSubmitted": "ఈ సమీక్షను ప్రస్తుత స్థితిలో సమర్పించలేము. PRలో మార్పులు జరిగి ఉండవచ్చు లేదా ఇది మీ స్వంత పుల్ రిక్వెస్ట్ కావచ్చు, దాన్ని మీరే సమీక్షించలేరు.",
+      "reviewNotSubmittedTerm": "ఈ సమీక్షను అలాగే సమర్పించలేము. {{term}} మారి ఉండవచ్చు, లేదా మీ స్వంత {{term}}ను మీరు సమీక్షించలేరు.",
       "couldNotPostComment": "వ్యాఖ్యను పోస్ట్ చేయలేకపోయాము.",
       "couldNotSubmitReview": "సమీక్షను సమర్పించలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి."
     },
@@ -684,9 +766,31 @@
       "couldNotReply": "బదులు పంపలేకపోయాం.",
       "couldNotCompleteAction": "ఈ చర్యను పూర్తి చేయలేకపోయాము.",
       "mergeResultDefaultError": "GitHub మెర్జ్‌ను పూర్తి చేయలేదు.",
+      "mergeResultNotCompleted": "{{term}} మెర్జ్ కాలేదు. దాని స్థితిని తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
       "ambiguous": "నిర్ధారించలేకపోయాము — మళ్లీ ప్రయత్నించే ముందు PRని తనిఖీ చేయండి.",
       "persistenceFailed": "ఈ చర్యను నమోదు చేయలేకపోయాము. తర్వాత మళ్లీ ప్రయత్నించండి.",
       "forbidden": "ఈ చర్యకు అనుమతి లేదు."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "ఈ ప్రొవైడర్‌లో అందుబాటులో లేదు",
+        "accessibility": "ఈ ప్రొవైడర్‌లో అందుబాటులో లేదు: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "పుల్ రిక్వెస్ట్",
+      "mergeRequest": "మెర్జ్ రిక్వెస్ట్",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "మెర్జ్ రిక్వెస్ట్‌ను పంచుకోండి",
+      "viewOnProvider": "{{provider}}పై చూడండి",
+      "mergeRequestUnavailable": "మెర్జ్ రిక్వెస్ట్ అందుబాటులో లేదు",
+      "unavailableDescription": "అది తొలగించబడి ఉండవచ్చు, లేదా మీకు దానికి యాక్సెస్ ఉండకపోవచ్చు.",
+      "accessDeniedMergeRequest": "ఈ మెర్జ్ రిక్వెస్ట్‌ను చూడటానికి మీకు అనుమతి లేదు.",
+      "couldNotLoadMergeRequest": "మెర్జ్ రిక్వెస్ట్‌ను లోడ్ చేయలేకపోయాము.",
+      "discussionAccessDenied": "ఈ మెర్జ్ రిక్వెస్ట్ చర్చను చూడటానికి మీకు అనుమతి లేదు.",
+      "discussionUnavailableMessage": "ఈ మెర్జ్ రిక్వెస్ట్ తీసివేయబడి ఉండవచ్చు.",
+      "noDiscussionDescription": "ఈ మెర్జ్ రిక్వెస్ట్‌పై సమీక్ష చర్చలు లేదా సంభాషణలో వ్యాఖ్యలు లేవు.",
+      "noFilesChangedDescription": "ఈ మెర్జ్ రిక్వెస్ట్‌లో ఏ ఫైల్‌లోనూ మార్పులు లేవు."
     }
   },
   "notifications": {
@@ -719,11 +823,12 @@
     "previewFullDescription": "నోటిఫికేషన్‌లు మీ లాక్ స్క్రీన్‌పై సందేశంలోని వచనాన్ని చూపిస్తాయి.",
     "previewGenericDescription": "నోటిఫికేషన్‌లు ఏదైనా జరిగిందని మాత్రమే తెలియజేస్తాయి. సందేశాన్ని చదవడానికి Kilo తెరవండి.",
     "channel": {
-      "agent": "ఏజెంట్ సెషన్‌లు",
+      "agentProgress": "ఏజెంట్ పురోగతి",
       "chat": "చాట్ సందేశాలు",
       "kiloclaw": "KiloClaw కార్యకలాపాలు",
       "balance": "బ్యాలెన్స్ హెచ్చరికలు",
-      "security": "గుర్తించిన భద్రతా సమస్యలు"
+      "security": "గుర్తించిన భద్రతా సమస్యలు",
+      "spend": "ఖర్చు హెచ్చరికలు"
     },
     "category": {
       "chatMessagesSubtitle": "మీ సంభాషణలలో ప్రత్యుత్తరాలు",
@@ -734,8 +839,22 @@
       "sessionStatusTitle": "సెషన్ స్థితి",
       "sessionStatusSubtitle": "పూర్తయింది / విఫలమైంది / నియంత్రించడానికి సిద్ధం",
       "kiloclawActivitySubtitle": "ఇన్‌స్టాన్స్ సిద్ధం/విఫలం, నిర్ణీత సమయాల్లో జరిగే చర్యలు",
+      "kiloclawActivityUnavailable": "KiloClaw కార్యకలాపాన్ని పొందడానికి KiloClaw ఇన్‌స్టాన్స్‌ను ప్రారంభించండి.",
       "balanceAlertsSubtitle": "సంస్థ బ్యాలెన్స్ తగ్గినప్పుడు హెచ్చరికలు",
-      "securityFindingsSubtitle": "కొత్త భద్రతా సమస్యలు, SLA రిమైండర్లు"
+      "balanceAlertsUnavailable": "బ్యాలెన్స్ హెచ్చరికలను పొందడానికి సంస్థలో చేరండి.",
+      "securityFindingsSubtitle": "కొత్త భద్రతా సమస్యలు, SLA రిమైండర్లు",
+      "securityFindingsUnavailable": "భద్రతా సమస్యలను పొందడానికి ఒక పరిధిలో Kilo భద్రతా ఏజెంట్‌ను ప్రారంభించండి.",
+      "spendAlertsSubtitle": "పరిమితి దాటడం మరియు గంటకు పెరుగుదల",
+      "spendAlertsToggle": "ఖర్చు హెచ్చరికల వర్గం"
+    },
+    "action": {
+      "openSession": "సెషన్‌ను తెరవండి"
+    },
+    "needsInputAction": {
+      "approved": "అభ్యర్థన ఆమోదించబడింది",
+      "replied": "ప్రత్యుత్తరం పంపబడింది",
+      "failed": "సమాధానం ఇవ్వడం సాధ్యం కాలేదు. మళ్లీ ప్రయత్నించడానికి మళ్లీ నొక్కండి.",
+      "unavailable": "ఈ అభ్యర్థన ఇకపై వేచి ఉండదు."
     }
   },
   "tabs": {
@@ -816,7 +935,9 @@
       "uploadFailed": "అప్‌లోడ్ విఫలమైంది.",
       "failedToUploadFile": "ఫైల్‌ను అప్‌లోడ్ చేయలేకపోయాము: {{reason}}",
       "nothingToPaste": "అతికించడానికి ఏమీ లేదు.",
-      "metadataStripFailed": "ఫోటో మెటాడేటాను తొలగించలేకపోయాము."
+      "metadataStripFailed": "ఫోటో మెటాడేటాను తొలగించలేకపోయాము.",
+      "limit_one": "మీరు గరిష్టంగా {{displayCount}} ఫైల్ జత చేయవచ్చు.",
+      "limit_other": "మీరు గరిష్టంగా {{displayCount}} ఫైళ్లను జత చేయవచ్చు."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1560,7 +1681,11 @@
       "syncFindings": "సమస్యలను సింక్ చేయండి",
       "syncNow": "ఇప్పుడే సింక్ చేయండి",
       "syncQueued": "సింక్‌ను క్యూలో చేర్చాము",
-      "syncStatusUnavailable": "సింక్ స్థితి అందుబాటులో లేదు."
+      "syncStatusUnavailable": "సింక్ స్థితి అందుబాటులో లేదు.",
+      "daysOverdue_one": "గడువు దాటి {{displayCount}} రోజు",
+      "daysOverdue_other": "గడువు దాటి {{displayCount}} రోజులు",
+      "findingsCount_one": "{{displayCount}} సమస్య",
+      "findingsCount_other": "{{displayCount}} సమస్యలు"
     },
     "dashboardMetrics": {
       "openFindings": "పెండింగ్ సమస్యలు",
@@ -1957,6 +2082,10 @@
       "couldNotLoad": "సెషన్‌ను లోడ్ చేయలేకపోయాము.",
       "failedToLoadDetails": "సెషన్ వివరాలను లోడ్ చేయలేకపోయాము.",
       "failedToStopExecution": "అమలును ఆపలేకపోయాము.",
+      "stopped": "సెషన్ ఆపబడింది",
+      "committing": "కమిట్ చేస్తోంది…",
+      "committed": "కమిట్ పూర్తయింది",
+      "commitFailed": "కమిట్ విఫలమైంది",
       "renameSession": "సెషన్ పేరు మార్చండి",
       "renamePlaceholder": "సెషన్ పేరు",
       "transcriptAccessibility": "సెషన్ సంభాషణ పాఠ్యం",
@@ -1991,17 +2120,56 @@
       "exitNeedsNewerCli": "రిమోట్ స్లాష్ కమాండ్‌లకు కొత్త Kilo CLI సంస్కరణ అవసరం. Kilo CLIను నవీకరించి మళ్లీ కనెక్ట్ చేయండి."
     },
     "sessionConnection": {
+      "label": "కనెక్షన్",
       "connecting": "కనెక్ట్ అవుతోంది…",
       "reconnecting": "మళ్లీ కనెక్ట్ అవుతోంది…",
       "connectionLost": "కనెక్షన్ తెగిపోయింది",
       "retryConnection": "కనెక్ట్ చేయడానికి మళ్లీ ప్రయత్నించండి"
     },
+    "goal": {
+      "title": "లక్ష్యం",
+      "statusActive": "క్రియాశీల లక్ష్యం",
+      "statusPaused": "నిలిపివేసిన లక్ష్యం",
+      "statusComplete": "లక్ష్యం పూర్తయింది",
+      "statusBlocked": "లక్ష్యం నిరోధించబడింది",
+      "edit": "లక్ష్యాన్ని సవరించండి",
+      "remove": "లక్ష్యాన్ని తీసివేయండి",
+      "pause": "లక్ష్యాన్ని నిలిపివేయండి",
+      "resume": "లక్ష్యాన్ని కొనసాగించండి",
+      "editPlaceholder": "లక్ష్యాన్ని వివరించండి",
+      "removeConfirmTitle": "లక్ష్యాన్ని తీసివేయాలా?",
+      "removeConfirmMessage": "ఈ సెషన్ లక్ష్యాన్ని CLI క్లియర్ చేస్తుంది.",
+      "updateFailed": "లక్ష్యాన్ని నవీకరించలేకపోయాము.",
+      "sectionAccessibility": "{{status}}. లక్ష్యం: {{text}}",
+      "collapse": "లక్ష్యాన్ని కుదించండి",
+      "expand": "లక్ష్యాన్ని విస్తరించండి"
+    },
     "newSession": {
+      "recentlyUsed": "ఇటీవల ఉపయోగించినవి",
+      "couldNotLoadGithubRepositories": "GitHub రిపోజిటరీలను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoadGitlabRepositories": "GitLab రిపోజిటరీలను లోడ్ చేయలేకపోయాము.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket రిపోజిటరీలను లోడ్ చేయలేకపోయాము.",
       "connectGithubDescription": "మీ బ్రౌజర్‌లో GitHubను కనెక్ట్ చేయండి. తర్వాత రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడికి తిరిగి రండి.",
+      "connectGitlabDescription": "మీ బ్రౌజర్‌లో GitLabను కనెక్ట్ చేయండి. తర్వాత రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడికి తిరిగి రండి.",
+      "connectBitbucketDescription": "మీ బ్రౌజర్‌లో Bitbucketను కనెక్ట్ చేయండి. తర్వాత రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడికి తిరిగి రండి.",
       "openGithub": "GitHub తెరవండి",
+      "openGitlab": "GitLab తెరవండి",
+      "openBitbucket": "Bitbucket తెరవండి",
       "refreshRepositories": "రిపోజిటరీలను రిఫ్రెష్ చేయండి",
       "githubConnected": "GitHub కనెక్ట్ అయింది",
+      "gitlabConnected": "GitLab కనెక్ట్ అయింది",
       "noRepositoriesVisible": "రిపోజిటరీలు కనిపించడం లేదు. Kilo GitHub యాప్‌కు రిపోజిటరీలను యాక్సెస్ చేసే అనుమతి ఉందో తనిఖీ చేసి, రిఫ్రెష్ చేయండి.",
+      "noRepositoriesVisibleGitlab": "రిపోజిటరీలు కనిపించడం లేదు. GitLabలో రిపోజిటరీలను యాక్సెస్ చేసే అనుమతులను తనిఖీ చేసి, రిఫ్రెష్ చేయండి.",
+      "noRepositoriesVisibleBitbucket": "రిపోజిటరీలు కనిపించడం లేదు. Bitbucketలో రిపోజిటరీలను యాక్సెస్ చేసే అనుమతులను తనిఖీ చేసి, రిఫ్రెష్ చేయండి.",
+      "bitbucketOrganizationsOnly": "Bitbucket సంస్థలకు మాత్రమే అందుబాటులో ఉంటుంది.",
+      "branchPickerTitle": "బ్రాంచ్‌ను ఎంచుకోండి",
+      "branchDefault": "డిఫాల్ట్",
+      "branchAccessibility": "బ్రాంచ్: {{label}}",
+      "branchLoading": "బ్రాంచ్‌లు లోడ్ అవుతున్నాయి",
+      "branchLoadError": "బ్రాంచ్‌లను లోడ్ చేయలేకపోయాము",
+      "branchUnavailable": "ఈ రిపొజిటరీ కోసం బ్రాంచ్‌లు అందుబాటులో లేవు. ప్రొవైడర్ వద్ద మీ యాక్సెస్‌ను తనిఖీ చేసి, వేరే రిపొజిటరీని ఎంచుకోండి.",
+      "branchEmpty": "బ్రాంచ్‌లు అందుబాటులో లేవు",
+      "branchPlaceholder": "బ్రాంచ్‌ను ఎంచుకోండి",
       "runOnWithTarget": "అమలు చేసే చోటు: {{target}}",
       "environment": "పని వాతావరణం",
       "couldNotLoadEnvironment": "మీ పని వాతావరణాన్ని లోడ్ చేయలేకపోయాము.",
@@ -2022,24 +2190,13 @@
       "couldNotRefreshRepositories": "రిపోజిటరీలను రిఫ్రెష్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించండి.",
       "discardDraftTitle": "చిత్తుప్రతిని తొలగించాలా?",
       "discardDraftMessage": "మీ ప్రాంప్ట్ తొలగిపోతుంది.",
+      "discardWithUploadsMessage": "మీ ప్రాంప్ట్‌తో పాటు, అప్‌లోడ్ చేసి ఇంకా ఉపయోగించని ఫైళ్లు కూడా తొలగిపోతాయి.",
       "discardFailed": "చిత్తుప్రతిని తొలగించలేకపోయాము. మళ్లీ ప్రయత్నించండి.",
       "remoteHint": "స్థానిక kilo ప్రాసెస్‌ను నియంత్రించడానికి మీ కంప్యూటర్‌లో `kilo remote` అమలు చేయండి లేదా నడుస్తున్న CLI సెషన్‌లో `/remote` అమలు చేయండి.",
-      "connectBitbucketDescription": "మీ బ్రౌజర్‌లో Bitbucketను కనెక్ట్ చేయండి. తర్వాత రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడికి తిరిగి రండి.",
-      "connectGitlabDescription": "మీ బ్రౌజర్‌లో GitLabను కనెక్ట్ చేయండి. తర్వాత రిపోజిటరీని ఎంచుకోవడానికి ఇక్కడికి తిరిగి రండి.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket రిపోజిటరీలను లోడ్ చేయలేకపోయాము.",
-      "couldNotLoadGithubRepositories": "GitHub రిపోజిటరీలను లోడ్ చేయలేకపోయాము.",
-      "couldNotLoadGitlabRepositories": "GitLab రిపోజిటరీలను లోడ్ చేయలేకపోయాము.",
-      "gitlabConnected": "GitLab కనెక్ట్ అయింది",
-      "noRepositoriesVisibleBitbucket": "రిపోజిటరీలు కనిపించడం లేదు. Bitbucketలో రిపోజిటరీలను యాక్సెస్ చేసే అనుమతులను తనిఖీ చేసి, రిఫ్రెష్ చేయండి.",
-      "noRepositoriesVisibleGitlab": "రిపోజిటరీలు కనిపించడం లేదు. GitLabలో రిపోజిటరీలను యాక్సెస్ చేసే అనుమతులను తనిఖీ చేసి, రిఫ్రెష్ చేయండి.",
-      "openBitbucket": "Bitbucket తెరవండి",
-      "openGitlab": "GitLab తెరవండి",
-      "recentlyUsed": "ఇటీవల ఉపయోగించినవి",
       "continueFrom": "{{title}}ను కొనసాగిస్తోంది.",
       "importingSession": "సెషన్‌ను దిగుమతి చేస్తోంది",
       "cliCannotContinue": "ఈ CLIతో సెషన్‌ను కొనసాగించడం సాధ్యం కాదు. Cloud Agent లేదా మరో CLIను ఎంచుకోండి.",
-      "importFailed": "ఈ సెషన్‌ను దిగుమతి చేయలేకపోయాము.",
-      "discardWithUploadsMessage": "మీ ప్రాంప్ట్‌తో పాటు, అప్‌లోడ్ చేసి ఇంకా ఉపయోగించని ఫైళ్లు కూడా తొలగిపోతాయి."
+      "importFailed": "ఈ సెషన్‌ను దిగుమతి చేయలేకపోయాము."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ఫైల్‌ను నవీకరించాము.",
@@ -2063,7 +2220,14 @@
       "updateTodos": "పనుల జాబితాను నవీకరించండి",
       "linesBadge": "{{displayCount}} పంక్తులు",
       "filesBadge": "{{displayCount}} ఫైళ్లు",
-      "matchesBadge": "{{displayCount}} సరిపోలికలు"
+      "matchesBadge": "{{displayCount}} సరిపోలికలు",
+      "filesBadge_one": "{{displayCount}} ఫైల్",
+      "filesBadge_other": "{{displayCount}} ఫైళ్లు",
+      "linesBadge_one": "{{displayCount}} పంక్తి",
+      "linesBadge_other": "{{displayCount}} పంక్తులు",
+      "matchesBadge_one": "{{displayCount}} సరిపోలిక",
+      "matchesBadge_other": "{{displayCount}} సరిపోలికలు",
+      "noOutput": "అవుట్పుట్ లేదు."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} పంక్తులు (కొంత భాగం మాత్రమే)",
@@ -2353,7 +2517,11 @@
       "files": "ఫైళ్లు",
       "couldNotOpenPhotoPicker": "ఫోటోలను ఎంచుకునే తెరను తెరవలేకపోయాము. Kiloను మళ్లీ ప్రారంభించి ప్రయత్నించండి.",
       "maxFilesAllowed": "గరిష్టంగా {{displayCount}} ఫైళ్లను జోడించవచ్చు.",
-      "onlyAddingFiles": "{{total}} ఫైళ్లలో {{accepted}} మాత్రమే జోడిస్తోంది (గరిష్టం {{max}})"
+      "onlyAddingFiles": "{{total}} ఫైళ్లలో {{accepted}} మాత్రమే జోడిస్తోంది (గరిష్టం {{max}})",
+      "maxFilesAllowed_one": "గరిష్టంగా {{displayCount}} ఫైల్ జోడించవచ్చు.",
+      "maxFilesAllowed_other": "గరిష్టంగా {{displayCount}} ఫైళ్లను జోడించవచ్చు.",
+      "onlyAddingFiles_one": "{{total}} ఫైళ్లలో {{accepted}} మాత్రమే జోడిస్తోంది (గరిష్టం {{max}})",
+      "onlyAddingFiles_other": "{{total}} ఫైళ్లలో {{accepted}} మాత్రమే జోడిస్తోంది (గరిష్టం {{max}})"
     },
     "composer": {
       "addAttachment": "ఫైల్‌ను జోడించండి",
@@ -2371,7 +2539,9 @@
       "discardAttachmentsMessage": "అప్‌లోడ్ చేసి ఇంకా ఉపయోగించని ఫైళ్లు తొలగిపోతాయి.",
       "discardAttachmentsTitle": "జోడింపులను తొలగించాలా?",
       "charactersRemaining": "{{count}} అక్షరాలు మిగిలి ఉన్నాయి",
-      "insertNewline": "కొత్త పంక్తిని చేర్చండి"
+      "insertNewline": "కొత్త పంక్తిని చేర్చండి",
+      "charactersRemaining_one": "{{count}} అక్షరం మిగిలి ఉంది",
+      "charactersRemaining_other": "{{count}} అక్షరాలు మిగిలి ఉన్నాయి"
     },
     "chatLink": {
       "linkCopied": "లింక్ కాపీ చేయబడింది",
@@ -2405,6 +2575,12 @@
       "startNewSession": "కొత్త సెషన్‌ను ప్రారంభించండి",
       "exitSession": "సెషన్ నుండి నిష్క్రమించండి",
       "clearSession": "ఈ సెషన్‌ను ముగించి కొత్తదాన్ని ప్రారంభించండి",
+      "compactDescription": "ప్రస్తుత సెషన్ సందర్భాన్ని కుదించండి",
+      "goalDescription": "సెషన్ లక్ష్యం వైపు పని కొనసాగించండి. /goal <objective> లేదా pause, resume, clear",
+      "initDescription": "మార్గదర్శిత AGENTS.md సెటప్",
+      "resumeClaudeDescription": "Claude Code సెషన్ ట్రాన్స్క్రిప్ట్ను దిగుమతి చేయండి",
+      "resumeCodexDescription": "OpenAI Codex సెషన్ ట్రాన్స్క్రిప్ట్ను దిగుమతి చేయండి",
+      "reviewDescription": "మార్పులను సమీక్షించండి [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ఉపయోగించండి",
       "insert": "చేర్చండి",
       "upgradeRequiredFallback": "ఈ కమాండ్‌ను ఉపయోగించడానికి మీ CLIను నవీకరించండి.",
@@ -2437,7 +2613,14 @@
       "stepsCount_one": "{{steps}} దశ",
       "stepsCount": "{{steps}} దశలు",
       "stepsCount_other": "{{steps}} దశలు",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "మోడల్ ({{displayCount}})",
+      "modelsCount_other": "మోడళ్లు ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "స్వయంచాలక ఆమోదం",
+      "description": "ఈ సెషన్ కోసం అనుమతి అభ్యర్థనలను స్వయంచాలకంగా ఆమోదించండి. ఆ తర్వాత సాధనాలు ఎటువంటి ప్రాంప్ట్ లేకుండా నడుస్తాయి.",
+      "unavailable": "ఈ సెషన్ అనుమతి అభ్యర్థనలను స్వీకరించజాలదు."
     },
     "prBadge": {
       "open": "ఓపెన్ పుల్ రిక్వెస్ట్",
@@ -2469,6 +2652,12 @@
       "tapToListHint": "ఫోల్డర్‌లో ఏముందో చూడటానికి దాన్ని నొక్కండి.",
       "unsupportedDescription": "ఈ CLI ఫోల్డర్‌ల జాబితాను చూపలేదు. ‘పూర్తయింది’ నొక్కితే ప్రారంభ ఫోల్డర్ అలాగే ఉంటుంది. ‘సెషన్ ప్రారంభించండి’ నొక్కితే సెషన్ అక్కడే మొదలవుతుంది.",
       "unsupportedTitle": "ఫోల్డర్‌ల జాబితాను చూపడం సాధ్యం కాదు"
+    },
+    "toolRun": {
+      "sheetTitle": "టూల్ కాల్స్",
+      "condensedLabel": "{{itemCount}} అంశాలు; {{last}}",
+      "condensedLabel_one": "{{itemCount}} అంశం; {{last}}",
+      "condensedLabel_other": "{{itemCount}} అంశాలు; {{last}}"
     }
   },
   "bootstrap": {
@@ -2513,6 +2702,7 @@
     "couldNotLoadActiveSessions": "ప్రస్తుతం నడుస్తున్న సెషన్‌లను లోడ్ చేయలేకపోయాము.",
     "agentSessions": "ప్రస్తుతం నడుస్తున్నవి",
     "newCodingTask": "కొత్త కోడింగ్ పని",
+    "newTaskFromPicture": "చిత్రం నుండి కొత్త పని",
     "explore": "మరిన్ని ఫీచర్‌లు",
     "seeAll": "అన్నీ చూడండి",
     "noLiveSessions": "ప్రస్తుతం ఏదీ అమలులో లేదు"
@@ -2581,7 +2771,10 @@
     "gatewayModelUnavailable": "ఈ వచన మార్పిడి మోడల్ అందుబాటులో లేదు. ప్రాధాన్యతలలో మరొకదాన్ని ఎంచుకోండి.",
     "gatewayModelUnavailableNotice": "ఈ మోడల్ ఇకపై అందించబడదు. మరొకదాన్ని ఎంచుకోవడానికి $t(transcriptionModel.title) ని నొక్కండి.",
     "gatewaySignInRequired": "Kilo Gateway మార్పిడిని ఉపయోగించడానికి సైన్ ఇన్ చేయండి.",
-    "gatewayNoModel": "ముందుగా ప్రాధాన్యతలలో వచనంగా మార్చే మోడల్‌ను ఎంచుకోండి."
+    "gatewayNoModel": "ముందుగా ప్రాధాన్యతలలో వచనంగా మార్చే మోడల్‌ను ఎంచుకోండి.",
+    "testTitle": "వాయిస్ ఇన్‌పుట్‌ను పరీక్షించండి",
+    "testPlaceholder": "మైక్రోఫోన్‌ను నొక్కి మాట్లాడటం ప్రారంభించండి.",
+    "testClear": "వచనాన్ని తీసివేయండి"
   },
   "share": {
     "title": "Kiloలో పంచుకోవడం",
@@ -2599,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "ఈ సెషన్ ఫైళ్లను స్వీకరించలేదు",
     "cliCantReceiveFilesMessage": "ఈ సెషన్‌ను నడుపుతున్న Kilo CLI ఫైళ్లను స్వీకరించలేదు. ఆ కంప్యూటర్‌లో CLIని నవీకరించండి లేదా బదులుగా కొత్త సెషన్‌లో పంచుకోండి.",
     "contentlessMessage": "పంచుకోవడానికి ఏమీ లేదు — వచనం లేదా ఫైళ్లు ఏవీ జత చేయలేదు.",
-    "couldNotReadContent": "పంచుకున్న కంటెంట్‌ను చదవలేకపోయాము."
+    "couldNotReadContent": "పంచుకున్న కంటెంట్‌ను చదవలేకపోయాము.",
+    "onlyFirstFilesAttached_one": "మొదటి {{displayCount}} ఫైల్ మాత్రమే జత చేస్తాము.",
+    "onlyFirstFilesAttached_other": "మొదటి {{displayCount}} ఫైళ్లను మాత్రమే జత చేస్తాము."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2731,7 +2926,8 @@
     "aiProvidersWhat": "మీ ప్రాంప్ట్‌లు, సంభాషణ చరిత్ర, మీరు జోడించే ఫైళ్లు.",
     "aiProvidersWhy": "AI ప్రతిస్పందనలను రూపొందించడానికి.",
     "aiProvidersWho": "Anthropic, OpenAI, Google మరియు మీరు ప్రతి అభ్యర్థనకు ఎంచుకునే ఇతర ప్రొవైడర్లు.",
-    "gatewayWhat": "ఖాతా ID, అభ్యర్థన మెటాడేటా, టోకెన్ వినియోగం.",
+    "gatewayWhat": "ఖాతా ID, అభ్యర్థన మెటాడేటా, టోకెన్ వినియోగం, అలాగే యాప్ దీని ద్వారా పంపే ప్రాంప్ట్‌లు మరియు వాయిస్ రికార్డింగ్‌లు.",
+    "viaGateway": "Kilo Gateway ద్వారా",
     "gatewayWhy": "గుర్తింపు ధృవీకరణ, అభ్యర్థనలను సంబంధిత ప్రొవైడర్లకు పంపడం, బిల్లింగ్ లెక్కలను సరిపోల్చడం.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "యాప్ కంటెంట్‌ను తీసివేసిన క్రాష్, లోప నివేదికలు.",
@@ -2751,7 +2947,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "మీరు చెప్పిన మాటల రికార్డింగ్.",
     "voiceTranscriptionWhy": "మాటలను వచనంగా మార్చడానికి.",
-    "voiceTranscriptionWho": "మీ పరికరంలోనే ప్రాసెస్ చేస్తుంది. ఆఫ్‌లైన్‌లో మాటలను వచనంగా మార్చడం సాధ్యం కాకపోతే Apple లేదా Google ప్రాసెస్ చేస్తుంది.",
+    "voiceTranscriptionWho": "మీ పరికరం, మీరు ఎంచుకున్న ట్రాన్స్క్రిప్షన్ మోడల్‌తో Kilo Gateway, లేదా ఆన్‌లైన్ గుర్తింపు కోసం Apple లేదా Google.",
     "installAttributionPromptTitle": "ఇన్‌స్టాల్ మూలాన్ని గుర్తించడానికి అనుమతించాలా?",
     "installAttributionPromptMessage": "మీరు ఏ మార్గం ద్వారా వచ్చారో తెలుసుకోవడానికి మాత్రమే Kilo, Apple ట్రాకింగ్ అనుమతిని ఉపయోగిస్తుంది. మీ ప్రాంప్ట్‌లను, సంభాషణలను ఇందుకు ఎప్పుడూ ఉపయోగించదు.",
     "what": "ఏమి",
@@ -2923,6 +3119,14 @@
     "tooManySignInAttempts": "సైన్ ఇన్ చేయడానికి చాలా సార్లు ప్రయత్నించారు. కాసేపు ఆగి మళ్లీ ప్రయత్నించండి."
   },
   "models": {
+    "auto": {
+      "frontier": "ఆటో అత్యాధునికం",
+      "balanced": "ఆటో సమతుల్యం",
+      "efficient": "ఆటో సమర్థవంతమైన",
+      "small": "ఆటో చిన్న",
+      "free": "ఆటో ఉచితం",
+      "organization": "సంస్థ ఆటో"
+    },
     "dataCollected": "డేటా సేకరణ ఉంది",
     "free": "ఉచితం",
     "couldNotUpdateFavorites": "ఇష్టమైనవాటిని నవీకరించలేకపోయాము.",
@@ -2961,8 +3165,17 @@
     "privacy": "ఏజెంట్లను చూడటానికి Kilo తెరవండి",
     "openAgents": "ఏజెంట్లను తెరవండి",
     "needsInput": "మీ స్పందన అవసరం",
+    "newestSession": "సరికొత్త: {{title}}",
+    "noneWaiting": "వేచి ఉన్న ఏజెంట్ లేదు",
+    "newAgent": "కొత్త ఏజెంట్",
+    "approving": "ఆమోదిస్తోంది...",
+    "couldNotApprove": "ఆమోదించలేకపోయింది",
+    "couldNotStart": "ప్రారంభించలేకపోయింది",
     "channelName": "పనిచేస్తున్న ఏజెంట్లు",
-    "activityKitDisabledBody": "లాక్ స్క్రీన్‌పై పనిచేస్తున్న ఏజెంట్లను చూడటానికి సెట్టింగ్‌లలో లైవ్ యాక్టివిటీస్‌ను ఆన్ చేయండి."
+    "activityKitDisabledBody": "లాక్ స్క్రీన్‌పై పనిచేస్తున్న ఏజెంట్లను చూడటానికి సెట్టింగ్‌లలో లైవ్ యాక్టివిటీస్‌ను ఆన్ చేయండి.",
+    "openSession": "తెరవండి",
+    "approveFailed": "ఆమోదించలేకపోయాము. మళ్లీ ప్రయత్నించడానికి $t(common.approve) ని నొక్కండి.",
+    "newestResult": "సరికొత్త ఫలితం"
   },
   "transcriptionModel": {
     "title": "వచనంగా మార్చే మోడల్",
@@ -2970,5 +3183,56 @@
     "emptyTitle": "వచనంగా మార్చే మోడల్లు లేవు",
     "emptyDescription": "Kilo Gateway ప్రస్తుతం వచనంగా మార్చే మోడల్లను అందించడం లేదు.",
     "loadFailed": "వచనంగా మార్చే మోడల్లను లోడ్ చేయలేకపోయాం."
+  },
+  "voiceLanguage": {
+    "title": "వాయిస్ ఇన్‌పుట్ భాష",
+    "automatic": "ఆటో",
+    "loadFailed": "ఈ పరికరం మద్దతిచ్చే భాషలను లోడ్ చేయలేకపోయాము.",
+    "emptyTitle": "మద్దతిచ్చే భాషలు లేవు",
+    "emptyDescription": "ఈ పరికరం యొక్క ప్రసంగ గుర్తింపు మద్దతిచ్చే భాషలను నివేదించదు."
+  },
+  "tour": {
+    "eyebrow": "త్వరిత పర్యటన",
+    "forkTitle": "Kilo ని ఎక్కడ అమలు చేయాలనుకుంటున్నారు?",
+    "forkSubtitle": "మీ మొదటి సెషన్ కోసం Kilo ఎక్కడ నడుస్తుందో ఎంచుకోండి.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "ఏదీ ఇన్‌స్టాల్ చేయకుండా, వేరు చేయబడిన క్లౌడ్ వాతావరణంలో Kilo ని అమలు చేయండి.",
+    "remoteOptionTitle": "మీ కంప్యూటర్",
+    "remoteOptionBody": "మీ సొంత యంత్రంలో `kilo remote` CLI ద్వారా Kilo ని అమలు చేయండి.",
+    "skip": "పర్యటన వదిలేయండి",
+    "tutorialLabel": "ట్యుటోరియల్"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "ఏజెంట్‌ను ప్రారంభించడానికి ప్రాంప్ట్ అవసరం. ప్రాంప్ట్‌ను జోడించి మళ్లీ అమలు చేయండి.",
+      "repositoryUnknown": "Kilo, {{repository}}ను GitHub లేదా GitLab రిపోజిటరీగా గుర్తించదు. Kiloలో మరో రిపోజిటరీని ఎంచుకోండి.",
+      "repositoryUnsupported": "{{repository}} ఒక Bitbucket రిపోజిటరీ — ఏజెంట్‌ను ప్రారంభించండి ఇంకా దీన్ని ఉపయోగించడం సాధ్యం కాదు. Kiloలో మరో రిపోజిటరీని ఎంచుకోండి."
+    }
+  },
+  "launcher": {
+    "openLastSession": "చివరి సెషన్ను తెరవండి"
+  },
+  "spendAlerts": {
+    "subtitle": "ఈ పరిధి ఖర్చు పరిమితిని దాటినప్పుడు లేదా దాని సాధారణ గంటవారీ రేటు కంటే పైకి ఎగిసినప్పుడు బిల్లింగ్ పరిచయాలకు ఇమెయిల్ లేదా పుష్ ద్వారా హెచ్చరిక పంపండి.",
+    "enable": "ఖర్చు హెచ్చరికలను ప్రారంభించండి",
+    "thresholdTitle": "పరిమితి దాటడం",
+    "thresholdSubtitle": "ప్రస్తుత ఖర్చు మీ పరిమితిని దాటుతోంది",
+    "anomalyTitle": "గంటవారీ పెరుగుదల",
+    "anomalySubtitle": "ఒక గంట ఈ పరిధి సాధారణ రేటు కంటే చాలా ఎక్కువ",
+    "limitLabel": "పరిమితి (USD)",
+    "windowLabel": "కాలవ్యవధి",
+    "window24h": "24 గంటలు",
+    "window7d": "7 రోజులు",
+    "window30d": "30 రోజులు",
+    "multiplierLabel": "పెరుగుదల గుణకం",
+    "saved": "ఖర్చు హెచ్చరిక సెట్టింగ్‌లు సేవ్ చేయబడ్డాయి",
+    "loadError": "ఖర్చు హెచ్చరికలు లోడ్ కాలేదు.",
+    "saveError": "ఖర్చు హెచ్చరికలు సేవ్ కాలేదు.",
+    "empty": "ఖర్చు హెచ్చరికలు ఆఫ్‌లో ఉన్నాయి. ఈ పరిధి బిల్లింగ్ పరిచయాలను హెచ్చరించడానికి వాటిని ఆన్ చేయండి.",
+    "noSpend": "ఇంకా ఖర్చు నమోదు కాలేదు",
+    "spend24h": "గత 24 గంటల ఖర్చు",
+    "multiplierError": "1 లేదా అంతకంటే ఎక్కువ గుణకాన్ని నమోదు చేయండి",
+    "permissionDenied": "ఖర్చు హెచ్చరికలను నిర్వహించడానికి మీకు అనుమతి లేదు.",
+    "pushOffByCategory": "నోటిఫికేషన్లలో ఆఫ్"
   }
 }

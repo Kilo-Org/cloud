@@ -107,6 +107,14 @@ export async function consumeCloudAgentReportBatch(
         message.retry();
         continue;
       }
+      if (result.outcome === 'conflict') {
+        console.error('Dropping Cloud Agent run report with conflicting session parent identity', {
+          cloudAgentSessionId: parsed.data.session.cloudAgentSessionId,
+          messageId: parsed.data.run.messageId,
+        });
+        message.ack();
+        continue;
+      }
       message.ack();
     } catch {
       console.error('Saving Cloud Agent report failed; message will retry', {

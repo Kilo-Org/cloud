@@ -16,17 +16,21 @@ export const URL_SCHEMES = {
   // The event-service client accepts both https: and wss:
   // (packages/event-service/src/client.ts:38-49).
   eventServiceUrl: ['https:', 'wss:'],
+  // Optional: client-observed latency ingest. The committed production default
+  // is LATENCY_INGEST_URL_DEFAULT below; an explicit value overrides it.
+  latencyIngestUrl: ['https:'],
 };
 
-/** Production host allowlist, seeded from the committed apps/mobile/.env
- *  production defaults. The .env URL values include api.kilo.ai, app.kilo.ai,
+/** Production host allowlist, seeded from the committed mobile production
+ *  defaults: the apps/mobile/.env URL values (api.kilo.ai, app.kilo.ai,
  *  cloud-agent-next.kilosessions.ai, ingest.kilosessions.ai, chat.kiloapps.io,
- *  events.kiloapps.io, and notifications.kiloapps.io. url-contract.test.ts
- *  asserts every committed .env URL value against this list, so a missing
- *  host fails the test before any build. Preflight is the runtime safety net:
- *  the release preflight runs assertProductionHost against the real production
- *  values, so an incomplete allowlist fails preflight before any build, never
- *  at runtime in a store build. */
+ *  events.kiloapps.io, notifications.kiloapps.io) and the latency ingest
+ *  default committed in LATENCY_INGEST_URL_DEFAULT below. url-contract.test.ts
+ *  asserts every committed default against this list, so a missing host fails
+ *  the test before any build. Preflight is the runtime safety net: the release
+ *  preflight runs assertProductionHost against the real production values, so
+ *  an incomplete allowlist fails preflight before any build, never at runtime
+ *  in a store build. */
 export const PRODUCTION_HOSTS = [
   'api.kilo.ai',
   'app.kilo.ai',
@@ -34,8 +38,16 @@ export const PRODUCTION_HOSTS = [
   'cloud-agent-next.kilosessions.ai',
   'events.kiloapps.io',
   'ingest.kilosessions.ai',
+  'latency.kiloapps.io',
   'notifications.kiloapps.io',
 ];
+
+/** Committed production default for the optional latency ingest endpoint. It
+ *  is a public host, so it lives in code like the Sentry DSN (sentry-dsn.js),
+ *  never in the gitignored apps/mobile/.env: a committed .env path is
+ *  credential-shaped to the release gate. The optional LATENCY_INGEST_URL
+ *  key overrides it; config.ts is the only consumer. */
+export const LATENCY_INGEST_URL_DEFAULT = 'https://latency.kiloapps.io';
 
 /** Parse a URL value, throwing a clear error for a missing or malformed URL.
  *  @param {string} name

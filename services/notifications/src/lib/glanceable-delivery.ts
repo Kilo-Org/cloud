@@ -10,6 +10,8 @@
 import {
   type GlanceableLiveActivityContentState,
   type PushData,
+  agentNotificationKindForGlanceableSnapshot,
+  androidChannelIdForAgentKind,
   translatePush,
 } from '@kilocode/notifications';
 
@@ -66,6 +68,7 @@ export function toGlanceableContentState(
     status: snapshot.status,
     running: snapshot.running,
     needsInput: snapshot.needsInput,
+    needsApproval: snapshot.needsApproval ?? 0,
     idle: snapshot.idle,
     needsInputSince: snapshot.needsInputSince,
   };
@@ -77,8 +80,10 @@ export function toGlanceableContentState(
 
 export function buildGlanceableExpoMessages(
   tokens: readonly ExpoPushToken[],
-  snapshot: ActiveAgentsGlanceable
+  snapshot: ActiveAgentsGlanceable,
+  priority: 'default' | 'high'
 ): ExpoPushMessage[] {
+  const kind = agentNotificationKindForGlanceableSnapshot(snapshot);
   return tokens.map(
     ({ token }) =>
       ({
@@ -91,8 +96,16 @@ export function buildGlanceableExpoMessages(
         // `applyGlanceablePushData` path, so the push never rings or interrupts.
         _contentAvailable: true,
         sound: null,
-        priority: 'default',
-        channelId: 'active-agents',
+        // FCM defers normal-priority data messages while Android is
+        // backgrounded/Doze, so the Android wake must be `high` to reach the
+        // ongoing notification and widget without waiting for the app to open.
+        // iOS stays `default`: APNs background `content-available` pushes use
+        // priority 5, and Live Activity freshness rides the direct APNs path.
+        priority,
+        // The wake names the kind's channel because the ongoing card is posted
+        // locally on that same channel; the legacy `active-agents` id is deleted
+        // on startup and no client creates it, so posting to it would be dropped.
+        channelId: androidChannelIdForAgentKind(kind),
         // Android collapse key = the opaque scope key, so every aggregate update
         // for one user+org collapses into the same ongoing notification.
         tag: snapshot.scopeKey,
@@ -194,14 +207,20 @@ export async function deliverGlanceableSnapshot(
   // timeline through the background task while the app is not foregrounded.
   if (deps.isCurrent && !(await deps.isCurrent())) return;
   if (iosExpoTokens.length > 0) {
-    await deps.sendExpoPush(buildGlanceableExpoMessages(iosExpoTokens, snapshot), deps.isCurrent);
+    await deps.sendExpoPush(
+      buildGlanceableExpoMessages(iosExpoTokens, snapshot, 'default'),
+      deps.isCurrent
+    );
   }
 
   if (await deps.hasAndroidOngoingToken(params.userId, params.organizationId)) {
     const expoTokens = await deps.listAndroidExpoTokens(params.userId, params.organizationId);
     if (deps.isCurrent && !(await deps.isCurrent())) return;
     if (expoTokens.length > 0) {
-      await deps.sendExpoPush(buildGlanceableExpoMessages(expoTokens, snapshot), deps.isCurrent);
+      await deps.sendExpoPush(
+        buildGlanceableExpoMessages(expoTokens, snapshot, 'high'),
+        deps.isCurrent
+      );
     }
   }
 }

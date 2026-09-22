@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { classifySandboxId } from '../sandbox-id.js';
 import {
+  MAX_REFERENCE_BYTES,
+  MAX_REFERENCE_ENTRIES,
+  emptySessionReferenceState,
+  serializedReferenceBytes,
+  type SessionReferenceState,
+} from './session-references.js';
+import {
   SandboxRuntimeMetadataSchema,
   type SandboxRuntimeMetadata,
 } from '../shared/sandbox-status.js';
@@ -17,6 +24,7 @@ import { sandboxRecoveryDecisionSchema, type SandboxRecoveryDecision } from './c
 
 export const PHYSICAL_KEY = 'physical_record';
 const ROUTES_KEY = 'session_routes';
+export const SESSION_REFERENCES_KEY = 'session_references';
 const DEADLINES_KEY = 'deadlines';
 const LOG_KEY = 'transition_log';
 const CREDENTIAL_GRANTS_KEY = 'worktree_credential_grants';
@@ -59,6 +67,22 @@ const sessionRouteSchema = z.object({
   retiringNativeRuntimeId: z.string().uuid().optional(),
 });
 const routeTableSchema = z.array(sessionRouteSchema);
+const sessionReferenceSchema = z
+  .object({
+    sessionId: z.string().min(1).max(128),
+    kiloSessionId: z.string().min(1).max(128),
+    directory: z.string().min(1).max(512),
+    worktreeId: z.string().min(1).max(128).optional(),
+  })
+  .strict();
+export const sessionReferenceStateSchema = z.object({
+  reconciled: z.boolean(),
+  overflowed: z.boolean(),
+  entries: z
+    .array(sessionReferenceSchema)
+    .max(MAX_REFERENCE_ENTRIES)
+    .refine(entries => serializedReferenceBytes(entries) <= MAX_REFERENCE_BYTES),
+});
 const nativeRuntimeRetirementRecipientSchema = sessionRouteSchema.pick({
   sessionId: true,
   kiloSessionId: true,
@@ -167,11 +191,35 @@ export async function loadRouteTable(storage: ControlStorage): Promise<Map<strin
   return new Map(rows.map(route => [route.sessionId, route]));
 }
 
+export function loadRouteTableSync(storage: {
+  get<T = unknown>(key: string): T | undefined;
+}): Map<string, SessionRoute> {
+  const rows = storage.get<SessionRoute[]>(ROUTES_KEY) ?? [];
+  return new Map(rows.map(route => [route.sessionId, route]));
+}
+
 export async function saveRouteTable(
   storage: ControlStorage,
   table: Map<string, SessionRoute>
 ): Promise<void> {
   await storage.put(ROUTES_KEY, [...table.values()]);
+}
+
+export async function loadSessionReferences(
+  storage: ControlStorage
+): Promise<SessionReferenceState> {
+  const stored = await storage.get(SESSION_REFERENCES_KEY);
+  if (stored === undefined) return emptySessionReferenceState();
+  const parsed = sessionReferenceStateSchema.safeParse(stored);
+  if (!parsed.success) throw new Error('Invalid stored session references');
+  return parsed.data;
+}
+
+export async function saveSessionReferences(
+  storage: ControlStorage,
+  state: SessionReferenceState
+): Promise<void> {
+  await storage.put(SESSION_REFERENCES_KEY, sessionReferenceStateSchema.parse(state));
 }
 
 export async function loadNativeRuntimeRetirements(
@@ -247,6 +295,7 @@ export async function eraseSandboxRecord(storage: ControlStorage): Promise<void>
   await storage.delete([
     PHYSICAL_KEY,
     ROUTES_KEY,
+    SESSION_REFERENCES_KEY,
     DEADLINES_KEY,
     LOG_KEY,
     CREDENTIAL_GRANTS_KEY,

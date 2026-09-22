@@ -102,6 +102,10 @@ export type AutocommitCompletedData = {
   skipped?: boolean;
   commitHash?: string;
   commitMessage?: string;
+  userMessageId?: string;
+  committedAt?: string;
+  pushStatus?: 'pushed' | 'failed' | 'not_attempted' | 'unknown';
+  commitMessageTruncated?: true;
 };
 
 /**

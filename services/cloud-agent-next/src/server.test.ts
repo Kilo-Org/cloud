@@ -1,3 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+import { parse } from 'jsonc-parser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { VERCEL_SANDBOX_UNAVAILABLE_MESSAGE } from './agent-sandbox/vercel/vercel-agent-sandbox.js';
@@ -17,21 +21,27 @@ const {
   getRunningTerminalClientMock,
   consumeCloudAgentReportBatchMock,
   removeExpiredCloudAgentReportDataMock,
+  runCloudAgentOutcomeCollectionMock,
+  runCloudAgentOpenStockCollectionMock,
   requireCurrentSessionAccessMock,
   getPgDbMock,
+  loggerWarnMock,
 } = vi.hoisted(() => ({
   getRunningTerminalClientMock: vi.fn(),
   consumeCloudAgentReportBatchMock: vi.fn().mockResolvedValue(undefined),
   removeExpiredCloudAgentReportDataMock: vi.fn().mockResolvedValue(undefined),
+  runCloudAgentOutcomeCollectionMock: vi.fn().mockResolvedValue(undefined),
+  runCloudAgentOpenStockCollectionMock: vi.fn().mockResolvedValue(undefined),
   requireCurrentSessionAccessMock: vi.fn(),
   getPgDbMock: vi.fn(),
+  loggerWarnMock: vi.fn(),
 }));
 
 vi.mock('./logger.js', () => {
   const logger = {
     setTags: vi.fn(),
     info: vi.fn(),
-    warn: vi.fn(),
+    warn: loggerWarnMock,
     error: vi.fn(),
     withFields: vi.fn(),
   };
@@ -78,6 +88,14 @@ vi.mock('./telemetry/report-consumer.js', () => ({
   ]),
   consumeCloudAgentReportBatch: consumeCloudAgentReportBatchMock,
   removeExpiredCloudAgentReportData: removeExpiredCloudAgentReportDataMock,
+}));
+
+vi.mock('./telemetry/outcome-aggregate.js', () => ({
+  runCloudAgentOutcomeCollection: runCloudAgentOutcomeCollectionMock,
+}));
+
+vi.mock('./telemetry/open-stock.js', () => ({
+  runCloudAgentOpenStockCollection: runCloudAgentOpenStockCollectionMock,
 }));
 
 vi.mock('./middleware/auth.js', () => ({
@@ -129,7 +147,11 @@ vi.mock('@kilocode/db/client', () => ({
   }),
 }));
 
-const { default: worker } = await import('./server.js');
+const {
+  default: worker,
+  REPORT_RETENTION_CRON,
+  OUTCOME_AGGREGATE_CRON,
+} = await import('./server.js');
 
 const secret = 'test-secret';
 
@@ -265,6 +287,9 @@ beforeEach(() => {
   getRunningTerminalClientMock.mockReset();
   consumeCloudAgentReportBatchMock.mockClear();
   removeExpiredCloudAgentReportDataMock.mockClear();
+  runCloudAgentOutcomeCollectionMock.mockClear();
+  runCloudAgentOpenStockCollectionMock.mockClear();
+  loggerWarnMock.mockClear();
   getPgDbMock.mockReset();
   requireCurrentSessionAccessMock.mockReset().mockResolvedValue({
     kiloSessionId: 'ses_12345678901234567890123456',
@@ -365,12 +390,74 @@ describe('server background reporting', () => {
     expect(consumeCloudAgentReportBatchMock).toHaveBeenCalledWith(batch, env);
   });
 
-  it('runs reporting retention cleanup from the scheduled handler', async () => {
+  it('runs only reporting retention cleanup on the daily cron', async () => {
     const env = createEnv();
 
-    await worker.scheduled({} as ScheduledController, env as unknown as Env);
+    await worker.scheduled(
+      { cron: REPORT_RETENTION_CRON } as ScheduledController,
+      env as unknown as Env
+    );
 
+    expect(removeExpiredCloudAgentReportDataMock).toHaveBeenCalledTimes(1);
     expect(removeExpiredCloudAgentReportDataMock).toHaveBeenCalledWith(env);
+    expect(runCloudAgentOutcomeCollectionMock).not.toHaveBeenCalled();
+    expect(runCloudAgentOpenStockCollectionMock).not.toHaveBeenCalled();
+  });
+
+  it('runs the outcome and open-stock collections on the 3-minute cron', async () => {
+    const env = createEnv();
+
+    await worker.scheduled(
+      { cron: OUTCOME_AGGREGATE_CRON } as ScheduledController,
+      env as unknown as Env
+    );
+
+    expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledTimes(1);
+    expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledWith(env);
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledTimes(1);
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledWith(env);
+    expect(removeExpiredCloudAgentReportDataMock).not.toHaveBeenCalled();
+  });
+
+  it('still runs the open-stock collection and preserves the outcome error when outcome collection rejects', async () => {
+    const env = createEnv();
+    const outcomeError = new Error('outcome collection failed');
+    runCloudAgentOutcomeCollectionMock.mockRejectedValueOnce(outcomeError);
+
+    await expect(
+      worker.scheduled(
+        { cron: OUTCOME_AGGREGATE_CRON } as ScheduledController,
+        env as unknown as Env
+      )
+    ).rejects.toBe(outcomeError);
+
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledTimes(1);
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledWith(env);
+  });
+
+  it('runs neither branch for an unrecognized cron and warns', async () => {
+    const env = createEnv();
+
+    await worker.scheduled({ cron: '0 0 * * 0' } as ScheduledController, env as unknown as Env);
+
+    expect(removeExpiredCloudAgentReportDataMock).not.toHaveBeenCalled();
+    expect(runCloudAgentOutcomeCollectionMock).not.toHaveBeenCalled();
+    expect(runCloudAgentOpenStockCollectionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      'Cloud Agent scheduled handler received an unrecognized cron',
+      { cron: '0 0 * * 0' }
+    );
+  });
+
+  it('keeps the deployed cron triggers in sync with the dispatcher constants', () => {
+    const config = parse(fs.readFileSync(path.join(process.cwd(), 'wrangler.jsonc'), 'utf8')) as {
+      triggers?: { crons?: string[] };
+      env?: { dev?: { triggers?: { crons?: string[] } } };
+    };
+    const expected = [REPORT_RETENTION_CRON, OUTCOME_AGGREGATE_CRON].sort();
+
+    expect((config.triggers?.crons ?? []).slice().sort()).toEqual(expected);
+    expect((config.env?.dev?.triggers?.crons ?? []).slice().sort()).toEqual(expected);
   });
 });
 
@@ -779,10 +866,8 @@ describe('server runtime credential proxy', () => {
         userId: 'usr_proxy',
         orgId: 'org_proxy',
         mode: 'contained',
-        generation: 1,
         allocationId: 'allocation_proxy',
-        wrapperRunId: 'run_proxy',
-        wrapperConnectionId: 'connection_proxy',
+        instanceGeneration: 1,
         leaseExpiresAt: Date.now() + 60_000,
         state: 'active',
       })

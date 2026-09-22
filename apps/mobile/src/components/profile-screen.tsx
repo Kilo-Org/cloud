@@ -4,6 +4,7 @@ import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import {
+  BookOpenCheck,
   Building2,
   GitMerge,
   GitPullRequest,
@@ -35,13 +36,13 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import {
   getCodeReviewerProfilePath,
   getProfileAgentScope,
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
+import { useScreenSideInsets } from '@/lib/screen-insets';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -69,12 +70,17 @@ function providerLabel(provider: string) {
 }
 
 export function ProfileScreen() {
+  const { left, right } = useScreenSideInsets();
+  const scrollStyle = { marginLeft: left, marginRight: right };
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
-  const colors = useThemeColors();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
+  // The account queries wait for the tab transition to settle, but the hook
+  // bounds that wait: an interaction queue that never reports idle (an
+  // automated UI session holds one open) must not hide the Linked accounts row,
+  // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const {
@@ -127,15 +133,18 @@ export function ProfileScreen() {
     ]);
   };
 
+  // The sign-out confirmation is the shared native alert on both platforms:
+  // Android's AppCompat dialog takes its panel and action accent from the
+  // activity theme, which plugins/withAndroidAlertDialogTheme points at the app
+  // tokens, and iOS renders the same call as a `UIAlertController` that already
+  // follows the device appearance.
   const confirmSignOut = () => {
     Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.signOut'),
         style: 'destructive',
-        onPress: () => {
-          void signOut();
-        },
+        onPress: () => void signOut(),
       },
     ]);
   };
@@ -149,7 +158,8 @@ export function ProfileScreen() {
       <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 pt-4"
+        style={scrollStyle}
+        contentContainerClassName="px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {/* Credits */}
@@ -251,9 +261,20 @@ export function ProfileScreen() {
             title={t('common.preferences')}
             subtitle={t('profile.preferencesSubtitle')}
             className="rounded-lg bg-secondary px-3"
-            last
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+            }}
+          />
+          {/* Permanent replay entry: opens the tour at any time, including
+              after the account finished or skipped it. Opening it is an
+              explicit user action, never a re-arm of the auto-open. */}
+          <ConfigureRow
+            icon={BookOpenCheck}
+            title={t('tour.tutorialLabel')}
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/tour' as Href);
             }}
           />
         </View>
@@ -308,6 +329,7 @@ export function ProfileScreen() {
                   icon={KeyRound}
                   title={providerLabel(p.provider)}
                   subtitle={p.email}
+                  subtitleNumberOfLines={1}
                   className="rounded-lg bg-secondary px-3"
                   last={index === data.providers.length - 1}
                 />
@@ -321,7 +343,6 @@ export function ProfileScreen() {
           <ActionTile
             icon={MessageSquare}
             label={t('profile.feedback')}
-            color={colors.mutedForeground}
             onPress={() => {
               showFeedbackPrompt(userId);
             }}
@@ -329,19 +350,12 @@ export function ProfileScreen() {
           <ActionTile
             icon={Lock}
             label={t('profile.privacyChoices')}
-            color={colors.mutedForeground}
             onPress={showPrivacyChoices}
           />
-          <ActionTile
-            icon={LogOut}
-            label={t('common.signOut')}
-            color={colors.mutedForeground}
-            onPress={confirmSignOut}
-          />
+          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={confirmSignOut} />
           <ActionTile
             icon={Trash2}
             label={t('profile.deleteAccount')}
-            color={colors.destructive}
             destructive
             disabled={deletePending}
             onPress={confirmDeleteAccount}

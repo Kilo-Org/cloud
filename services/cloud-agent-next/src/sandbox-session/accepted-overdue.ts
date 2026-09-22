@@ -11,3 +11,12 @@ export function acceptedAlarmDecision(
   if (now >= checkAt) return { action: 'check' };
   return { action: 'rearm', at: Math.min(checkAt, now + DEADLINE_MS.acceptedAlarmCap) };
 }
+
+/**
+ * The inactivity bound. `activityAt` is `lastActivityAt ?? acceptedAt`; callers
+ * must not substitute `0` for a missing accepted-at, because that would fail a
+ * turn that was never accepted.
+ */
+export function acceptedInactivityDue(activityAt: number, now: number): boolean {
+  return now >= activityAt + DEADLINE_MS.kiloInactivity;
+}

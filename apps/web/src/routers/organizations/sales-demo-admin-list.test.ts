@@ -15,6 +15,11 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createSalesDemoOrganization, salesDemoMemberId } from '@/lib/organizations/sales-demo';
 import type { User } from '@kilocode/db/schema';
 
+// `createSalesDemoOrganization` seeds 30 days of usage for 26 members inside the
+// test body, so a single case needs more than the default 5s budget once CI is
+// under contention (the same reason the sales-demo-reset route test raises it).
+jest.setTimeout(30_000);
+
 async function deleteAllSalesDemoOrgs() {
   const rows = await db
     .select({ id: organizations.id })

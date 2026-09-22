@@ -18,10 +18,11 @@ import {
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   invalidRequestResponse,
+  invalidTokenResponse,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
   temporarilyUnavailableResponse,
-  usageLimitExceededResponse,
+  creditsBlockedResponse,
   wrapInSafeNextResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -32,8 +33,6 @@ import {
   isAnonymousContext,
   type AnonymousUserContext,
 } from '@/lib/anonymous';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
   type EmbeddingProxyRequest,
@@ -124,6 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const {
     user: maybeUser,
     authFailedResponse,
+    credentialsRejected,
     organizationId: authOrganizationId,
     botId: authBotId,
     tokenSource: authTokenSource,
@@ -139,6 +139,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
+    // A credential we could not verify is not the absence of one. Fail the
+    // request rather than answering as anonymous; see `invalidTokenResponse`.
+    if (credentialsRejected) {
+      return invalidTokenResponse();
+    }
+
     if (!(await isFreeModel(requestedModelLowerCased))) {
       return NextResponse.json(
         {
@@ -204,10 +210,16 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
-    const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
+    const { balance, settings, plan, balanceLimitedByUserAllowance } =
+      await getBalanceAndOrgSettings(organizationId, user);
 
     if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
-      return await usageLimitExceededResponse(user, balance);
+      return await creditsBlockedResponse({
+        user,
+        balance,
+        organizationId,
+        balanceLimitedByUserAllowance,
+      });
     }
 
     const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
@@ -298,25 +310,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;
-
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: isAnonymousContext(user),
-      isStreaming: false,
-      userByok: !!userByok,
-      provider: provider.id,
-      requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(requestedModelLowerCased),
-      toolsAvailable: [],
-      toolsUsed: [],
-      ttfbMs,
-      statusCode: response.status,
-    },
-    response.clone(),
-    requestStartedAt
-  );
 
   usageContext.status_code = response.status;
 

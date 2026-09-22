@@ -1,4 +1,4 @@
-import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, View } from 'react-native';
@@ -14,10 +14,10 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
-import { formatExactTokens } from './context-usage-display';
 import { handleMessageDetailsCopy } from './message-details-copy';
 import { getMessageDetailsContent } from './message-details-content';
 import { MessageTextSelectSheet } from './message-text-select-sheet';
+import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
 import {
   buildReportAiResponseErrorToast,
@@ -31,6 +31,8 @@ type MessageDetailsSheetProps = {
   visible: boolean;
   message: StoredMessage | null;
   modelOptions: SessionModelOption[];
+  /** The selected message's delivery state; a failed one adds the transport detail to Copy. */
+  deliveryState?: MessageDeliveryState;
   onClose: () => void;
   canCancelQueued?: boolean;
   isCancelingQueued?: boolean;
@@ -43,6 +45,7 @@ export function MessageDetailsSheet({
   visible,
   message,
   modelOptions,
+  deliveryState,
   onClose,
   canCancelQueued = false,
   isCancelingQueued = false,
@@ -57,8 +60,8 @@ export function MessageDetailsSheet({
   const [reportedMessageId, setReportedMessageId] = useState<string | null>(null);
   const [selectVisible, setSelectVisible] = useState(false);
   const content = useMemo(
-    () => (message ? getMessageDetailsContent(message, modelOptions) : null),
-    [message, modelOptions]
+    () => (message ? getMessageDetailsContent(message, modelOptions, deliveryState) : null),
+    [message, modelOptions, deliveryState]
   );
 
   const reportMutation = useMutation(
@@ -92,7 +95,7 @@ export function MessageDetailsSheet({
   }, [visible]);
 
   const handleCopy = () => {
-    handleMessageDetailsCopy(content?.copyableText);
+    handleMessageDetailsCopy(content?.copyText);
   };
 
   const handleReport = () => {
@@ -156,23 +159,31 @@ export function MessageDetailsSheet({
             title={t('agentChat.messageDetails.title')}
             onDone={onClose}
             doneLabel={t('common.done')}
+            topInset="ios-page-sheet"
           />
 
           {content ? (
             <ScrollView className="flex-1" contentContainerClassName="px-6 pb-6 pt-2">
-              {content.copyableText ? (
+              {/* The two actions are independent: Copy is scoped to the message
+                  text, while Select text also offers the thinking block and tool
+                  output, so a message with only those parts still renders the
+                  select affordance. Gate the block on either and each action on
+                  its own payload. */}
+              {content.copyText || content.canSelectText ? (
                 <View className="mb-6 gap-2">
-                  <Pressable
-                    onPress={handleCopy}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('agentChat.messageDetails.copyMessage')}
-                    className="rounded-md border border-border px-4 py-3 active:opacity-70"
-                    testID="message-details-copy"
-                  >
-                    <Text className="text-center text-base font-medium text-foreground">
-                      {t('agentChat.messageDetails.copyMessage')}
-                    </Text>
-                  </Pressable>
+                  {content.copyText ? (
+                    <Pressable
+                      onPress={handleCopy}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('agentChat.messageDetails.copyMessage')}
+                      className="rounded-md border border-border px-4 py-3 active:opacity-70"
+                      testID="message-details-copy"
+                    >
+                      <Text className="text-center text-base font-medium text-foreground">
+                        {t('agentChat.messageDetails.copyMessage')}
+                      </Text>
+                    </Pressable>
+                  ) : null}
 
                   {content.canSelectText ? (
                     <Pressable
@@ -278,25 +289,5 @@ export function MessageDetailsSheet({
         </>
       )}
     </SessionPageSheet>
-  );
-}
-
-function Row({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
-  return (
-    <View className="gap-1">
-      <Text className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Text>
-      {children}
-    </View>
-  );
-}
-
-function TokenRow({ label, value }: Readonly<{ label: string; value: number }>) {
-  return (
-    <View className="flex-row items-center justify-between">
-      <Text className="text-sm text-muted-foreground">{label}</Text>
-      <Text className="text-sm font-medium text-foreground tabular-nums">
-        {formatExactTokens(value)}
-      </Text>
-    </View>
   );
 }

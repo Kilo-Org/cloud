@@ -371,11 +371,27 @@ jobs:
     if: needs.changes.outputs.cloud_agent_next == 'true'
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 15
+
+    env:
+      POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           lfs: true
-          ref: ${{ github.head_ref }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -400,6 +416,9 @@ jobs:
 
       - name: Run cloud-agent-next tests
         run: pnpm --filter cloud-agent-next test:all
+
+      - name: Run Cloud Agent Postgres aggregate tests
+        run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloud-agent-next test:postgres
 
   workspace-tests:
     needs: [changes, typecheck, lint, format-check, drizzle-check]

@@ -1,30 +1,31 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { db, pool } from '@/lib/drizzle';
+import { cleanupDbForTest, db, pool } from '@/lib/drizzle';
 import {
-  repository_customizations,
   platform_integrations,
   kilocode_users,
   organizations,
+  github_app_installations,
 } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import {
   deleteIntegration,
   deleteGitHubInstallationRecords,
   deleteIntegrationForOwner,
+  autoCompleteInstallation,
   createPendingIntegration,
   findIntegrationByInstallationId,
-  getRepositoryCustomization,
-  listRepositoryCustomizations,
+  findGitHubBotLinkIntegrations,
   suspendIntegration,
   suspendIntegrationForOwner,
   unsuspendIntegration,
   unsuspendIntegrationForOwner,
   updateIntegrationMetadataForOwner,
   updateIntegrationRepositories,
-  upsertRepositoryCustomization,
   upsertPlatformIntegrationForOwner,
 } from './platform-integrations';
 import type { Owner } from '../core/types';
+import { insertTestUser } from '@/tests/helpers/user.helper';
+import { disconnectGitHubInstallation } from './github-installations';
 
 const INSTALLATION_ID = `test-github-install-${Date.now()}`;
 
@@ -111,6 +112,55 @@ describe('upsertPlatformIntegrationForOwner', () => {
     expect(row.platform).toBe('github');
   });
 
+  test('records authorization provenance when a verified GitHub identity is supplied', async () => {
+    const owner: Owner = { type: 'user', id: userId };
+    const result = await upsertPlatformIntegrationForOwner(owner, {
+      ...baseInstallData(INSTALLATION_ID),
+      kiloUserId: userId,
+      githubUserId: '999888',
+    });
+    expect(result).toEqual({ ok: true });
+
+    const [inserted] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, INSTALLATION_ID));
+    expect(inserted).toMatchObject({
+      github_authorized_by_user_id: userId,
+      github_authorized_user_id: '999888',
+      github_authorized_at: expect.any(String),
+    });
+
+    // A later update from a different verified identity refreshes provenance.
+    const updateResult = await upsertPlatformIntegrationForOwner(owner, {
+      ...baseInstallData(INSTALLATION_ID),
+      kiloUserId: userId,
+      githubUserId: '111222',
+    });
+    expect(updateResult).toEqual({ ok: true });
+    const [updated] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, INSTALLATION_ID));
+    expect(updated).toMatchObject({ github_authorized_user_id: '111222' });
+  });
+
+  test('leaves authorization provenance null when no verified identity is supplied', async () => {
+    const owner: Owner = { type: 'user', id: userId };
+    const result = await upsertPlatformIntegrationForOwner(owner, baseInstallData(INSTALLATION_ID));
+    expect(result).toEqual({ ok: true });
+
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, INSTALLATION_ID));
+    expect(row).toMatchObject({
+      github_authorized_by_user_id: null,
+      github_authorized_user_id: null,
+      github_authorized_at: null,
+    });
+  });
+
   test('inserts a new GitHub installation for an org owner', async () => {
     const owner: Owner = { type: 'org', id: orgId };
     const result = await upsertPlatformIntegrationForOwner(owner, baseInstallData(INSTALLATION_ID));
@@ -143,6 +193,43 @@ describe('upsertPlatformIntegrationForOwner', () => {
       .where(eq(platform_integrations.owned_by_organization_id, orgId));
     expect(rows).toHaveLength(1);
     expect(rows[0]?.platform_installation_id).toBe(INSTALLATION_ID);
+  });
+
+  test('legacy writer: local disconnect frees a non-allowlisted organization to connect a fresh installation', async () => {
+    const owner: Owner = { type: 'org', id: orgId };
+    const first = await upsertPlatformIntegrationForOwner(owner, baseInstallData(INSTALLATION_ID));
+    expect(first).toEqual({ ok: true });
+    const [firstRow] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, INSTALLATION_ID));
+
+    // Blocked while the first installation is still connected.
+    const blocked = await upsertPlatformIntegrationForOwner(
+      owner,
+      baseInstallData(`${INSTALLATION_ID}-fresh`)
+    );
+    expect(blocked).toEqual({ ok: false, reason: 'multiple_installations_disabled' });
+
+    await disconnectGitHubInstallation(owner, firstRow.id);
+
+    // The disconnected legacy row must not keep occupying the org's slot.
+    const afterDisconnect = await upsertPlatformIntegrationForOwner(
+      owner,
+      baseInstallData(`${INSTALLATION_ID}-fresh`)
+    );
+    expect(afterDisconnect).toEqual({ ok: true });
+
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, orgId));
+    expect(rows.find(row => row.platform_installation_id === INSTALLATION_ID)).toMatchObject({
+      github_disconnected_at: expect.any(String),
+    });
+    expect(
+      rows.find(row => row.platform_installation_id === `${INSTALLATION_ID}-fresh`)
+    ).toMatchObject({ github_disconnected_at: null, integration_status: 'active' });
   });
 
   test('serializes concurrent different installations for a non-allowlisted organization', async () => {
@@ -379,7 +466,7 @@ describe('upsertPlatformIntegrationForOwner', () => {
     expect(rows).toHaveLength(2);
   });
 
-  test('concurrent callbacks create one pending row for a GitHub app target', async () => {
+  test('pending GitHub app targets are idempotent per owner without suppressing another owner', async () => {
     const accountId = `pending-target-${Date.now()}`;
     const request = {
       requester: {
@@ -402,12 +489,58 @@ describe('upsertPlatformIntegrationForOwner', () => {
       createPendingIntegration({ ...request, userId: otherUserId }),
     ]);
 
-    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(results.filter(Boolean)).toHaveLength(2);
     const rows = await db
       .select()
       .from(platform_integrations)
       .where(eq(platform_integrations.platform_account_id, accountId));
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(2);
+  });
+
+  test('autoCompleteInstallation records the original requester as authorization provenance', async () => {
+    const accountId = `autocomplete-provenance-${Date.now()}`;
+    const pending = await createPendingIntegration({
+      userId,
+      requester: {
+        kilo_user_id: userId,
+        kilo_user_email: 'requester@example.com',
+        kilo_user_name: 'Requester',
+        requested_at: new Date().toISOString(),
+      },
+      githubRequester: { id: 'github-requester-42', login: 'requester' },
+      githubRequest: {
+        id: 'github-request-1',
+        accountId,
+        accountLogin: 'target-org',
+      },
+      githubAppType: 'standard',
+    });
+    if (!pending) throw new Error('Expected a pending row to be created');
+
+    await autoCompleteInstallation({
+      integrationId: pending.id,
+      installationData: {
+        installation_id: INSTALLATION_ID,
+        account_id: accountId,
+        account_login: 'target-org',
+        repository_selection: 'all',
+        permissions: {},
+        events: [],
+        created_at: new Date().toISOString(),
+      },
+      existingMetadata: pending.metadata as Record<string, unknown>,
+    });
+
+    const [completed] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, pending.id));
+    expect(completed).toMatchObject({
+      integration_status: 'active',
+      github_authorized_by_user_id: userId,
+      github_authorized_user_id: 'github-requester-42',
+      github_authorized_at: expect.any(String),
+    });
   });
 
   test('same-owner refresh with app type is not confused by another owner other-app-type row', async () => {
@@ -985,6 +1118,154 @@ describe('upsertPlatformIntegrationForOwner', () => {
   });
 });
 
+describe('findGitHubBotLinkIntegrations', () => {
+  afterEach(cleanupDbForTest);
+
+  test('resolves exact shared associations and rejects ambiguous, wrong, or disconnected choices', async () => {
+    const userA = (await insertTestUser()).id;
+    const userB = (await insertTestUser()).id;
+    const [canonical] = await db
+      .insert(github_app_installations)
+      .values({
+        github_app_type: 'standard',
+        installation_id: '881122',
+        lifecycle_state: 'active',
+        sharing_mode: 'web_cloud_agent',
+      })
+      .returning();
+    const associations = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_user_id: userA,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: '881122',
+          github_app_type: 'standard',
+          github_installation_id: canonical.id,
+          integration_status: 'active',
+        },
+        {
+          owned_by_user_id: userB,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: '881122',
+          github_app_type: 'standard',
+          github_installation_id: canonical.id,
+          integration_status: 'active',
+        },
+      ])
+      .returning();
+
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([expect.objectContaining({ id: associations[0]!.id })]);
+    await expect(
+      findGitHubBotLinkIntegrations({ installationId: '881122', appType: 'standard' })
+    ).resolves.toEqual([]);
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: 'different-installation',
+        appType: 'standard',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([]);
+
+    await db
+      .update(github_app_installations)
+      .set({ suspended_at: new Date().toISOString() })
+      .where(eq(github_app_installations.id, canonical.id));
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([]);
+    await db
+      .update(github_app_installations)
+      .set({ suspended_at: null, lifecycle_state: 'deleted' })
+      .where(eq(github_app_installations.id, canonical.id));
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([]);
+    await db
+      .update(github_app_installations)
+      .set({ lifecycle_state: 'active', auth_invalid_at: new Date().toISOString() })
+      .where(eq(github_app_installations.id, canonical.id));
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([]);
+    await db
+      .update(github_app_installations)
+      .set({ auth_invalid_at: null })
+      .where(eq(github_app_installations.id, canonical.id));
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: crypto.randomUUID(),
+      })
+    ).resolves.toEqual([]);
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'lite',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([]);
+
+    await db
+      .update(platform_integrations)
+      .set({ github_disconnected_at: new Date().toISOString() })
+      .where(eq(platform_integrations.id, associations[0]!.id));
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([]);
+  });
+
+  test('accepts one true legacy Standard/null association', async () => {
+    const userId = (await insertTestUser()).id;
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: userId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '881123',
+        github_app_type: null,
+        integration_status: 'active',
+      })
+      .returning();
+    await expect(
+      findGitHubBotLinkIntegrations({ installationId: '881123', appType: 'standard' })
+    ).resolves.toEqual([expect.objectContaining({ id: legacy.id })]);
+    await db
+      .update(platform_integrations)
+      .set({ github_app_type: 'standard' })
+      .where(eq(platform_integrations.id, legacy.id));
+    await expect(
+      findGitHubBotLinkIntegrations({ installationId: '881123', appType: 'standard' })
+    ).resolves.toEqual([]);
+  });
+});
+
 describe('updateIntegrationMetadataForOwner', () => {
   const orgId = crypto.randomUUID();
   const otherOrgId = crypto.randomUUID();
@@ -1087,144 +1368,5 @@ describe('updateIntegrationMetadataForOwner', () => {
         integrationId
       )
     ).rejects.toThrow('No github integration found for owner');
-  });
-});
-
-describe('repository_customizations accessors', () => {
-  const orgId = crypto.randomUUID();
-  const installationId = `test-repo-custom-${Date.now()}`;
-  let integrationId: string;
-
-  beforeEach(async () => {
-    await db.insert(organizations).values({ id: orgId, name: `Repo custom org ${Date.now()}` });
-    const [integration] = await db
-      .insert(platform_integrations)
-      .values({
-        owned_by_organization_id: orgId,
-        platform: 'github',
-        integration_type: 'app',
-        platform_installation_id: installationId,
-        integration_status: 'active',
-        repository_access: 'all',
-      })
-      .returning();
-    integrationId = integration.id;
-  });
-
-  afterEach(async () => {
-    await db.delete(organizations).where(eq(organizations.id, orgId));
-  });
-
-  test('upsertRepositoryCustomization inserts, then updates only the supplied fields', async () => {
-    await upsertRepositoryCustomization(integrationId, '1', {
-      bot_mention_model_slug: 'model-a',
-      pr_review_mode: 'on',
-    });
-
-    await upsertRepositoryCustomization(integrationId, '1', {
-      pr_review_mode: 'off',
-    });
-
-    const [row] = await listRepositoryCustomizations(integrationId);
-
-    expect(row).toMatchObject({
-      repository_id: '1',
-      bot_mention_model_slug: 'model-a',
-      pr_review_mode: 'off',
-    });
-  });
-
-  test('upsertRepositoryCustomization clears a field back to inherited with null', async () => {
-    await upsertRepositoryCustomization(integrationId, '1', {
-      bot_mention_model_slug: 'model-a',
-      pr_review_mode: 'on',
-    });
-
-    await upsertRepositoryCustomization(integrationId, '1', {
-      bot_mention_model_slug: null,
-    });
-
-    const [row] = await listRepositoryCustomizations(integrationId);
-
-    expect(row).toMatchObject({ bot_mention_model_slug: null, pr_review_mode: 'on' });
-  });
-
-  test('listRepositoryCustomizations only returns rows for the given integration', async () => {
-    const [otherIntegration] = await db
-      .insert(platform_integrations)
-      .values({
-        owned_by_organization_id: orgId,
-        platform: 'github',
-        integration_type: 'app',
-        platform_installation_id: `${installationId}-other`,
-        integration_status: 'active',
-        repository_access: 'all',
-      })
-      .returning();
-
-    await upsertRepositoryCustomization(integrationId, '1', { pr_review_mode: 'on' });
-    await upsertRepositoryCustomization(otherIntegration.id, '1', { pr_review_mode: 'off' });
-
-    const rows = await listRepositoryCustomizations(integrationId);
-
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ platform_integration_id: integrationId, pr_review_mode: 'on' });
-  });
-
-  test('deleting the parent integration cascades to its customizations', async () => {
-    await upsertRepositoryCustomization(integrationId, '1', { pr_review_mode: 'on' });
-
-    await db.delete(platform_integrations).where(eq(platform_integrations.id, integrationId));
-
-    const remaining = await db
-      .select()
-      .from(repository_customizations)
-      .where(eq(repository_customizations.platform_integration_id, integrationId));
-
-    expect(remaining).toHaveLength(0);
-  });
-
-  test('getRepositoryCustomization returns null when the repository has no override', async () => {
-    const customization = await getRepositoryCustomization(integrationId, '1');
-
-    expect(customization).toBeNull();
-  });
-
-  test('getRepositoryCustomization returns the matching row', async () => {
-    await upsertRepositoryCustomization(integrationId, '1', {
-      bot_mention_model_slug: 'model-a',
-      pr_review_mode: 'on',
-    });
-
-    const customization = await getRepositoryCustomization(integrationId, '1');
-
-    expect(customization).toMatchObject({
-      platform_integration_id: integrationId,
-      repository_id: '1',
-      bot_mention_model_slug: 'model-a',
-      pr_review_mode: 'on',
-    });
-  });
-
-  test("getRepositoryCustomization does not leak another integration's row for the same repository_id", async () => {
-    const [otherIntegration] = await db
-      .insert(platform_integrations)
-      .values({
-        owned_by_organization_id: orgId,
-        platform: 'github',
-        integration_type: 'app',
-        platform_installation_id: `${installationId}-other-lookup`,
-        integration_status: 'active',
-        repository_access: 'all',
-      })
-      .returning();
-
-    await upsertRepositoryCustomization(otherIntegration.id, '1', {
-      bot_mention_model_slug: 'other-integration-model',
-    });
-
-    const customization = await getRepositoryCustomization(integrationId, '1');
-
-    expect(customization).toBeNull();
   });
 });

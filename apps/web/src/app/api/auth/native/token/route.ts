@@ -1,4 +1,3 @@
-import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
 import {
@@ -15,6 +14,7 @@ import {
   consumeSignInCode,
 } from '@/lib/auth/magic-link-tokens';
 import { hosted_domain_specials } from '@/lib/auth/constants';
+import { consumeSignInTicket } from '@/lib/auth/passkey';
 import {
   createOrUpdateUser,
   findUserById,
@@ -42,6 +42,7 @@ import {
 import { captureMessage } from '@sentry/nextjs';
 import PostHogClient from '@/lib/posthog';
 import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 const posthogClient = PostHogClient();
 
@@ -109,11 +110,19 @@ const requestSchema = z.discriminatedUnion('provider', [
     supportsRefresh: z.boolean().optional(),
     admission: z.unknown().optional(),
   }),
+  z.object({
+    // A passkey ticket is minted by the passkey authenticate route after the
+    // WebAuthn assertion verified server-side; it is redeemed exactly once.
+    provider: z.literal('passkey'),
+    ticket: z.string(),
+    supportsRefresh: z.boolean().optional(),
+  }),
 ]);
 
 /**
- * Native (mobile) sign-in token exchange. Verifies an Apple/Google ID token or an
- * email sign-in code, creates or updates the user, and mints an API token.
+ * Native (mobile) sign-in token exchange. Verifies an Apple/Google ID token, an
+ * email sign-in code, or a passkey sign-in ticket, creates or updates the user,
+ * and mints an API token.
  *
  * Verification order per plan:
  *   1. Sync admission gate (checkNativeAdmission).
@@ -123,10 +132,15 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   5. Verified-domain membership admission.
  *   6. Key persistence (after settlement, binds key to user id).
  *
+ * A passkey ticket skips steps 3, 4 and 6: the ticket is a live proof that a
+ * WebAuthn assertion verified server-side, so the user exists already and no
+ * account settlement or attested-key binding applies.
+ *
  * Response contract (frozen — mobile client is built against it):
  *   200 { token, refreshToken?, expiresIn?, created? }
  *   401 { error: 'INVALID_TOKEN' }
  *   401 { error: 'INVALID_CODE' }
+ *   401 { error: 'INVALID_TICKET' }
  *   425 { error: 'CODE_IN_PROGRESS' }
  *   429 { error: 'TOO_MANY_ATTEMPTS' }
  *   403/503 { error: 'BLOCKED' | 'SSO_ERROR', ssoOrganizationId? }
@@ -135,7 +149,7 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   400 invalid request body
  *   500 provider infrastructure error
  */
-export async function POST(request: NextRequest) {
+export const POST = withRestTiming('/api/auth/native/token', async (request: Request) => {
   const body = await request.json().catch(() => undefined);
   const validation = requestSchema.safeParse(body);
 
@@ -161,6 +175,54 @@ export async function POST(request: NextRequest) {
   // ── Step 3: Provider identity verification ───────────────────────────────
   let args: CreateOrUpdateUserArgs;
   let autoLinkToExistingUser: boolean;
+
+  if (data.provider === 'passkey') {
+    // The ticket is single-use and short-lived, and was minted only after a
+    // WebAuthn assertion verified against a server-stored challenge, so
+    // redeeming it is the identity proof. A replay consumes no row.
+    const ticket = await consumeSignInTicket(data.ticket);
+    if (!ticket) {
+      return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
+    }
+
+    const user = await findUserById(ticket.kilo_user_id);
+    if (!user) {
+      return NextResponse.json({ error: 'INVALID_TICKET' }, { status: 401 });
+    }
+
+    if (user.blocked_reason) {
+      return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
+    }
+
+    // Same forced-SSO and blacklist gate every other native provider passes.
+    const eligibility = await checkDomainSignInEligibility(user.google_user_email);
+    if (!eligibility.ok) {
+      return eligibilityResponse(eligibility);
+    }
+
+    // Fall into the same device-session issuance the other providers use.
+    // `created` is always false: a passkey belongs to an existing user.
+    if (data.supportsRefresh) {
+      const sid = await createDeviceSession({
+        userId: user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+      });
+      const pair = await issueSessionCredentials(user, sid);
+      return NextResponse.json(
+        {
+          token: pair.token,
+          refreshToken: pair.refreshToken,
+          expiresIn: pair.expiresIn,
+          created: false,
+        },
+        { status: 200 }
+      );
+    }
+
+    captureMessage('native_token_legacy_long_lived_count: 1');
+    const token = generateApiToken(user);
+    return NextResponse.json({ token, created: false }, { status: 200 });
+  }
 
   if (data.provider === 'apple') {
     let verified;
@@ -611,4 +673,4 @@ export async function POST(request: NextRequest) {
   captureMessage('native_token_legacy_long_lived_count: 1');
   const token = generateApiToken(result.user);
   return NextResponse.json({ token, created: result.isNew }, { status: 200 });
-}
+});

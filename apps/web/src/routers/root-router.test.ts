@@ -36,6 +36,12 @@ describe('trpc tests', () => {
   });
 
   describe('router composition', () => {
+    it('registers providerReview on the server root so mobile calls resolve', () => {
+      expect(rootRouter._def.record).toHaveProperty('providerReview');
+      expect(rootRouter._def.record).toHaveProperty('providerReview.getPullRequest');
+      expect(rootRouter._def.record).toHaveProperty('providerReview.addComment');
+    });
+
     it('registers Bitbucket only under organizations', () => {
       expect(rootRouter._def.record).not.toHaveProperty('bitbucket');
       expect(rootRouter._def.record).toHaveProperty('organizations.bitbucket');

@@ -23,7 +23,6 @@ describe('GatewayRoutingConfigSchema', () => {
       vercel_routing_percentage: 25,
       vercel_routing_percentage_free: null,
       vercel_routing_opt_out_models: [],
-      perplexity_routing_percentage: null,
     });
   });
 
@@ -32,7 +31,6 @@ describe('GatewayRoutingConfigSchema', () => {
       vercel_routing_percentage: null,
       vercel_routing_percentage_free: null,
       vercel_routing_opt_out_models: [],
-      perplexity_routing_percentage: null,
     });
   });
 
@@ -41,7 +39,6 @@ describe('GatewayRoutingConfigSchema', () => {
       vercel_routing_percentage: 25,
       vercel_routing_percentage_free: null,
       vercel_routing_opt_out_models: [],
-      perplexity_routing_percentage: null,
     });
   });
 
@@ -55,7 +52,6 @@ describe('GatewayRoutingConfigSchema', () => {
       vercel_routing_percentage: 25,
       vercel_routing_percentage_free: 80,
       vercel_routing_opt_out_models: [],
-      perplexity_routing_percentage: null,
     });
   });
 
@@ -69,21 +65,6 @@ describe('GatewayRoutingConfigSchema', () => {
       vercel_routing_percentage: 25,
       vercel_routing_percentage_free: null,
       vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
-      perplexity_routing_percentage: null,
-    });
-  });
-
-  test('accepts a Perplexity percentage', () => {
-    expect(
-      GatewayRoutingConfigSchema.parse({
-        vercel_routing_percentage: 25,
-        perplexity_routing_percentage: 20,
-      })
-    ).toEqual({
-      vercel_routing_percentage: 25,
-      vercel_routing_percentage_free: null,
-      vercel_routing_opt_out_models: [],
-      perplexity_routing_percentage: 20,
     });
   });
 
@@ -109,7 +90,6 @@ describe('GatewayConfigSchema', () => {
     });
     expect(parsed.note).toBeNull();
     expect(parsed.vercel_routing_opt_out_models).toEqual([]);
-    expect(parsed.perplexity_routing_percentage).toBeNull();
   });
 
   test('round-trips a note', () => {
@@ -128,32 +108,29 @@ describe('saved gateway configuration compatibility', () => {
   test.each([
     { name: 'runtime routing', schema: GatewayRoutingConfigSchema },
     { name: 'admin configuration', schema: GatewayConfigSchema },
-  ])(
-    '$name preserves Perplexity when saved JSON includes an obsolete Friendli percentage',
-    ({ schema }) => {
-      const savedJson = JSON.stringify({
-        vercel_routing_percentage: 25,
-        vercel_routing_percentage_free: 80,
-        vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
-        friendli_routing_percentage: 10,
-        perplexity_routing_percentage: 12.345,
-        updated_at: '2026-01-01T00:00:00.000Z',
-        updated_by: 'u1',
-        updated_by_email: 'a@example.com',
-        note: 'Existing routing overrides',
-      });
+  ])('$name drops obsolete partner percentages from saved JSON', ({ schema }) => {
+    const savedJson = JSON.stringify({
+      vercel_routing_percentage: 25,
+      vercel_routing_percentage_free: 80,
+      vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
+      friendli_routing_percentage: 10,
+      perplexity_routing_percentage: 12.345,
+      updated_at: '2026-01-01T00:00:00.000Z',
+      updated_by: 'u1',
+      updated_by_email: 'a@example.com',
+      note: 'Existing routing overrides',
+    });
 
-      const parsed = schema.parse(JSON.parse(savedJson));
+    const parsed = schema.parse(JSON.parse(savedJson));
 
-      expect(parsed).toMatchObject({
-        vercel_routing_percentage: 25,
-        vercel_routing_percentage_free: 80,
-        vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
-        perplexity_routing_percentage: 12.345,
-      });
-      expect(parsed).not.toHaveProperty('friendli_routing_percentage');
-    }
-  );
+    expect(parsed).toMatchObject({
+      vercel_routing_percentage: 25,
+      vercel_routing_percentage_free: 80,
+      vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
+    });
+    expect(parsed).not.toHaveProperty('friendli_routing_percentage');
+    expect(parsed).not.toHaveProperty('perplexity_routing_percentage');
+  });
 });
 
 describe('GatewayConfigInputSchema', () => {
@@ -163,14 +140,12 @@ describe('GatewayConfigInputSchema', () => {
         vercel_routing_percentage: 75,
         vercel_routing_percentage_free: 60,
         vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
-        perplexity_routing_percentage: 20,
         note: 'Rollout stable',
       })
     ).toEqual({
       vercel_routing_percentage: 75,
       vercel_routing_percentage_free: 60,
       vercel_routing_opt_out_models: ['moonshotai/kimi-k3'],
-      perplexity_routing_percentage: 20,
       note: 'Rollout stable',
     });
   });
@@ -181,14 +156,12 @@ describe('GatewayConfigInputSchema', () => {
         vercel_routing_percentage: null,
         vercel_routing_percentage_free: null,
         vercel_routing_opt_out_models: [],
-        perplexity_routing_percentage: null,
         note: null,
       })
     ).toEqual({
       vercel_routing_percentage: null,
       vercel_routing_percentage_free: null,
       vercel_routing_opt_out_models: [],
-      perplexity_routing_percentage: null,
       note: null,
     });
   });
@@ -199,7 +172,6 @@ describe('GatewayConfigInputSchema', () => {
         vercel_routing_percentage: 50,
         vercel_routing_percentage_free: 50,
         vercel_routing_opt_out_models: [],
-        perplexity_routing_percentage: 0,
         note: 'x'.repeat(NOTE_MAX_LENGTH + 1),
       })
     ).toThrow();

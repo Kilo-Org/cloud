@@ -166,7 +166,7 @@ describe('operation admission and lookup', () => {
     }
   });
 
-  it('retains an unconfirmed root/incarnation failure and gates only fresh A work', async () => {
+  it('retains an unconfirmed root/incarnation failure while admitting fresh work', async () => {
     const handlerDeps = deps({
       sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
     });
@@ -196,18 +196,7 @@ describe('operation admission and lookup', () => {
         handlerDeps,
         authorizationA
       )
-    ).toMatchObject({ ok: false, error: { code: 'not_ready', retryable: true } });
-    expect(
-      await handleControlRequest(
-        'session.prompt',
-        sessionA,
-        { ...promptPayload, messageId: 'message_b' },
-        handlerDeps
-      )
-    ).toMatchObject({ ok: false, error: { code: 'not_ready', retryable: true } });
-    expect(
-      await handleControlRequest('session.operation.get', sessionA, authorizationA, handlerDeps)
-    ).toMatchObject({ ok: true, result: { state: 'missing' } });
+    ).toMatchObject({ ok: true, result: { status: 'accepted' } });
     expect(
       await handleControlRequest('session.operation.ack', sessionA, {}, handlerDeps)
     ).toMatchObject({ ok: false, error: { code: 'unauthorized' } });
@@ -285,7 +274,7 @@ describe('operation admission and lookup', () => {
     }
   });
 
-  it('retains terminal unconfirmed state across routing loss until explicit root notification', async () => {
+  it('keeps unconfirmed retirement state across routing loss without gating fresh work', async () => {
     const handlerDeps = deps();
     const sessionA = { ...session, sessionId: 'ses_a', kiloSessionId: 'kilo_a' };
     rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
@@ -310,7 +299,7 @@ describe('operation admission and lookup', () => {
     rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
     expect(await handlerDeps.operations.retireRootPublication(input)).toBe('unconfirmed');
     expect(handlerDeps.operations.admission('session.prompt', sessionA, undefined).kind).toBe(
-      'reply'
+      'continue'
     );
 
     handlerDeps.operations.notifyRootDisappeared({
@@ -323,7 +312,7 @@ describe('operation admission and lookup', () => {
     );
   });
 
-  it('retains an unconfirmed record after physical unregistration and later no-op failures', async () => {
+  it('retains an unconfirmed record after physical unregistration without gating fresh work', async () => {
     const fixture = deps();
     const runtime = fixture.kiloRuntimes?.get(session.directory);
     if (!runtime) throw new Error('Missing native runtime');
@@ -367,7 +356,7 @@ describe('operation admission and lookup', () => {
     operations.prune();
     rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
     expect(await operations.retireRootPublication(input)).toBe('unconfirmed');
-    expect(operations.admission('session.prompt', sessionA, undefined).kind).toBe('reply');
+    expect(operations.admission('session.prompt', sessionA, undefined).kind).toBe('continue');
 
     operations.notifyRootDisappeared({
       directory: sessionA.directory,
@@ -696,7 +685,7 @@ describe('operation admission and lookup', () => {
       expect(a2.publicationScope()?.claim).toBeDefined();
       expect(a2.signal.aborted).toBe(true);
       expect(integratedDeps.operations.admission('session.prompt', sessionA, undefined).kind).toBe(
-        'reply'
+        'continue'
       );
       expect(await supersededWithoutClaim.physical).toMatchObject({
         scope: 'root',
@@ -1016,7 +1005,7 @@ describe('operation admission and lookup', () => {
       const secondPublication = integratedDeps.operations.escalateRootPublication(input);
       expect(second.operation.publicationScope()?.claim).toBeDefined();
       expect(integratedDeps.operations.admission('session.prompt', sessionA, undefined).kind).toBe(
-        'reply'
+        'continue'
       );
       expect(integratedDeps.operations.admission('session.prompt', sessionB, undefined).kind).toBe(
         'continue'

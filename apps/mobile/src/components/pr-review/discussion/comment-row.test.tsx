@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to test React/RN structure under vitest */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CommentRow, moderationFailure } from './comment-row';
@@ -22,7 +21,6 @@ function makeComment(overrides: Partial<ReviewComment> = {}): ReviewComment {
 }
 
 // ── Mocks ────────────────────────────────────────────────────────────
-
 type AlertButton = { text?: string; onPress?: () => void };
 type MutationOptions = {
   onSuccess?: (result: unknown, input?: unknown) => void;
@@ -68,6 +66,9 @@ vi.mock('@/components/agents/markdown-text', () => ({ MarkdownText: 'MarkdownTex
 vi.mock('@/components/ui/icons', () => ({ MoreHorizontal: 'MoreHorizontal' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/pr-review/discussion/pr-comment-fix-with-kilo', () => ({
+  PrCommentFixWithKilo: 'PrCommentFixWithKilo',
+}));
 vi.mock('@/components/pr-review/discussion/reactions-row', () => ({
   ReactionsRow: 'ReactionsRow',
 }));
@@ -106,7 +107,8 @@ vi.mock('@/lib/utils', () => ({
 
 async function render(
   comment: ReviewComment,
-  viewerLogin: string | null = 'bob'
+  viewerLogin: string | null = 'bob',
+  extra: { readOnly?: boolean; reactionsSupported?: boolean } = {}
 ): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | null = null;
   await act(async () => {
@@ -114,8 +116,13 @@ async function render(
     renderer = TestRenderer.create(
       createElement(CommentRow, {
         comment,
+        owner: 'octocat',
+        repo: 'hello',
+        number: 7,
+        commentKind: 'review',
         onToggleReaction: vi.fn<() => void>(),
         viewerLogin,
+        ...extra,
       })
     );
   });
@@ -298,6 +305,60 @@ describe('CommentRow overflow actions', () => {
     openOverflow(renderer);
 
     expect(disabledButtonIndices()).toEqual([1, 2, 3]);
+
+    renderer.unmount();
+  });
+});
+
+describe('CommentRow reactions capability gate (s6)', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // eslint-disable-next-line typescript-eslint/promise-function-async -- thin wrapper around the shared renderer
+  function renderWithCapabilities(
+    reactionsSupported: boolean
+  ): Promise<TestRenderer.ReactTestRenderer> {
+    return render(makeComment(), null, { readOnly: true, reactionsSupported });
+  }
+
+  it('supported (default): renders the reactions row', async () => {
+    const renderer = await renderWithCapabilities(true);
+    expect(renderer.root.findAll(node => (node.type as string) === 'ReactionsRow')).toHaveLength(1);
+    renderer.unmount();
+  });
+
+  it('unsupported: renders no reactions row at all — never an empty or failing one', async () => {
+    const renderer = await renderWithCapabilities(false);
+    expect(renderer.root.findAll(node => (node.type as string) === 'ReactionsRow')).toHaveLength(0);
+    renderer.unmount();
+  });
+});
+
+describe('CommentRow Fix with Kilo CTA (s2)', () => {
+  it('passes the provider triple, the comment id and the kind to the row CTA', async () => {
+    const renderer = await render(makeComment({ commentId: 42 }));
+
+    const cta = renderer.root.find(node => String(node.type) === 'PrCommentFixWithKilo');
+    expect(cta.props).toMatchObject({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 7,
+      commentId: 42,
+      kind: 'review',
+    });
+  });
+});
+
+describe('CommentRow avatar recycling', () => {
+  it('sets recyclingKey to the author avatar URL so a recycled row clears the previous image', async () => {
+    const avatarUrl = 'https://example.com/alice.png';
+    const renderer = await render(makeComment({ author: { login: 'alice', avatarUrl } }));
+
+    const image = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'Image'
+    );
+    expect((image.props as Record<string, unknown>).recyclingKey).toBe(avatarUrl);
 
     renderer.unmount();
   });

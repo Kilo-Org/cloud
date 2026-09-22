@@ -99,6 +99,230 @@ describe('deep-link-launch', () => {
     });
   });
 
+  describe('system-search source precedence', () => {
+    // A system-search destination is session-bound, so these cases run with the
+    // account already settled (the signed-in case).
+    beforeEach(() => {
+      setCurrentDeepLinkUserId('user-1');
+    });
+
+    it('beats a pending notification', () => {
+      setPendingDeepLink('/from-notification', 'notification');
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
+    });
+
+    it('loses to a universal link', () => {
+      setPendingDeepLink('/from-link', 'universal-link');
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      expect(getPendingDeepLink()).toBe('/from-link');
+    });
+
+    it('replaces an app-scheme launch link with the exact route for the same tap', () => {
+      // Android delivers a system-search tap as the document's `kiloapp://`
+      // route; the launch capture maps it through the lossy web table (which
+      // strips the query), and the search capture must then win with the exact
+      // route. An `https://` launch link is not flagged and keeps priority.
+      setPendingDeepLink('/(app)/pr-review/gitlab/group/sub/repo/12', 'universal-link', {
+        fromLaunchAppScheme: true,
+      });
+      setPendingDeepLink(
+        '/(app)/pr-review/gitlab/group/sub/repo/12?instance=https%3A%2F%2Fgitlab.example.com',
+        'system-search'
+      );
+      expect(getPendingDeepLink()).toBe(
+        '/(app)/pr-review/gitlab/group/sub/repo/12?instance=https%3A%2F%2Fgitlab.example.com'
+      );
+    });
+
+    it('is not overwritten by a later notification', () => {
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      setPendingDeepLink('/from-notification', 'notification');
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
+    });
+
+    it('round-trips through the persisted record', async () => {
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
+      });
+      const record = JSON.parse(store.get(PENDING_DEEP_LINK_KEY) ?? '') as {
+        source: string;
+        userId: string | null;
+      };
+      expect(record.source).toBe('system-search');
+      // The durable record is bound to the account that captured it.
+      expect(record.userId).toBe('user-1');
+
+      _resetDeepLinkLaunchForTests();
+
+      setCurrentDeepLinkUserId('user-1');
+      await restorePersistedPendingDeepLink();
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
+    });
+
+    it('is dropped when the destination was captured while signed out', () => {
+      setCurrentDeepLinkUserId(null);
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+    });
+
+    it('binds a destination captured before the account settled', () => {
+      // A cold-launch tap is captured at module scope, before auth restores;
+      // it must survive the settle of the account it belongs to.
+      _resetDeepLinkLaunchForTests();
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+
+      setCurrentDeepLinkUserId('user-1');
+
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/session-1');
+    });
+
+    it('drops a destination captured before a signed-out settle', () => {
+      _resetDeepLinkLaunchForTests();
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+
+      setCurrentDeepLinkUserId(null);
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+    });
+
+    it('does not restore a persisted destination with no account identity', async () => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: '/(app)/agent-chat/session-1',
+          source: 'system-search',
+          storedAt: Date.now(),
+          userId: null,
+        })
+      );
+
+      setCurrentDeepLinkUserId('user-2');
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+      });
+    });
+
+    it('does not restore for a different account', async () => {
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
+      });
+
+      _resetDeepLinkLaunchForTests();
+
+      setCurrentDeepLinkUserId('user-2');
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+  });
+
+  describe('session-bound launch captures', () => {
+    // Android delivers a tap on an indexed result as the entry's `kiloapp://`
+    // link, so an app-scheme launch URL that names an indexed family is a
+    // system-search identifier and must not survive the account boundary.
+    const PR_LAUNCH = 'kiloapp://pr-review/Kilo-Org/cloud/6234';
+    const PR_HREF = '/(app)/pr-review/Kilo-Org/cloud/6234';
+
+    it('drops an app-scheme search-family launch captured while signed out', () => {
+      setCurrentDeepLinkUserId(null);
+      _setGetLinkingURLForTests(() => PR_LAUNCH);
+      captureLaunchDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+    });
+
+    it('keeps an app-scheme search-family launch captured before a signed-in settle', () => {
+      // A cold launch is captured before auth restores: the destination binds to
+      // the account it turns out to belong to.
+      _setGetLinkingURLForTests(() => PR_LAUNCH);
+      captureLaunchDeepLink();
+      expect(getPendingDeepLinkSnapshot()).toBe(PR_HREF);
+
+      setCurrentDeepLinkUserId('user-a');
+      expect(getPendingDeepLink()).toBe(PR_HREF);
+    });
+
+    it('drops an app-scheme search-family launch captured before a signed-out settle', () => {
+      _setGetLinkingURLForTests(() => PR_LAUNCH);
+      captureLaunchDeepLink();
+      expect(getPendingDeepLinkSnapshot()).toBe(PR_HREF);
+
+      setCurrentDeepLinkUserId(null);
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+
+    it('drops an app-scheme search-family launch at sign-out', () => {
+      setCurrentDeepLinkUserId('user-a');
+      _setGetLinkingURLForTests(() => PR_LAUNCH);
+      captureLaunchDeepLink();
+      expect(getPendingDeepLinkSnapshot()).toBe(PR_HREF);
+
+      clearAccountBoundPendingDeepLink();
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+
+    it('keeps an https launch link that names the same family', () => {
+      // The public universal link stays account-independent: a signed-out
+      // reader may still sign in and land on the page they opened.
+      setCurrentDeepLinkUserId(null);
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/pr-review/Kilo-Org/cloud/6234');
+      captureLaunchDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBe(PR_HREF);
+    });
+
+    it('does not restore a persisted session-bound record with no account identity', async () => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: PR_HREF,
+          source: 'universal-link',
+          storedAt: Date.now(),
+          userId: null,
+          sessionBound: true,
+        })
+      );
+
+      setCurrentDeepLinkUserId('user-b');
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+      });
+    });
+
+    it('restores a persisted session-bound record for the account that captured it', async () => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: PR_HREF,
+          source: 'universal-link',
+          storedAt: Date.now(),
+          userId: 'user-a',
+          sessionBound: true,
+        })
+      );
+
+      setCurrentDeepLinkUserId('user-a');
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLink()).toBe(PR_HREF);
+    });
+  });
+
   describe('consume exactly once', () => {
     it('lets exactly one of two consumers read a single href', () => {
       setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
@@ -413,6 +637,19 @@ describe('deep-link-launch', () => {
       );
     });
 
+    it('carries the resume anchor of a cold launch URL into the stash', () => {
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/ses_1?at=msg%2042');
+      captureLaunchDeepLink();
+      // Assert immediately — no await. The point of the test is synchronicity.
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1?at=msg%2042');
+    });
+
+    it('keeps an anchor-less session launch href byte-identical', () => {
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/cloud/sessions/ses_1');
+      captureLaunchDeepLink();
+      expect(getPendingDeepLink()).toBe('/(app)/agent-chat/ses_1');
+    });
+
     it('is a no-op when the latch is already set (slot not overwritten)', () => {
       _setGetLinkingURLForTests(() => 'https://app.kilo.ai/profile');
       captureLaunchDeepLink();
@@ -429,6 +666,47 @@ describe('deep-link-launch', () => {
       _setGetLinkingURLForTests(() => null);
       captureLaunchDeepLink();
       expect(getPendingDeepLink()).toBeNull();
+    });
+
+    it('flags an app-scheme launch URL so the exact search route can replace it', () => {
+      setCurrentDeepLinkUserId('user-1');
+      _setGetLinkingURLForTests(
+        () =>
+          'kiloapp://pr-review/gitlab/group/sub/repo/12?instance=https%3A%2F%2Fgitlab.example.com'
+      );
+      captureLaunchDeepLink();
+      // The web table drops the instance query, so the search capture's exact
+      // route for the same tap must replace this mapping.
+      expect(getPendingDeepLinkSnapshot()).toBe('/(app)/pr-review/gitlab/group/sub/repo/12');
+
+      setPendingDeepLink(
+        '/(app)/pr-review/gitlab/group/sub/repo/12?instance=https%3A%2F%2Fgitlab.example.com',
+        'system-search'
+      );
+      expect(getPendingDeepLink()).toBe(
+        '/(app)/pr-review/gitlab/group/sub/repo/12?instance=https%3A%2F%2Fgitlab.example.com'
+      );
+    });
+
+    it('does not let a stale search slot replace an unrelated app-scheme launch link', () => {
+      setCurrentDeepLinkUserId('user-1');
+      _setGetLinkingURLForTests(() => 'kiloapp://pr-review/octocat/hello-world/42');
+      captureLaunchDeepLink();
+
+      // A slot left over from an earlier, unconsumed search tap names a
+      // different destination: the link the launch actually opened wins.
+      setPendingDeepLink('/(app)/agent-chat/session-1', 'system-search');
+
+      expect(getPendingDeepLink()).toBe('/(app)/pr-review/octocat/hello-world/42');
+    });
+
+    it('leaves an https launch link unflaggeable by the search route', () => {
+      setCurrentDeepLinkUserId('user-1');
+      _setGetLinkingURLForTests(() => 'https://app.kilo.ai/pr-review/octocat/hello-world/42');
+      captureLaunchDeepLink();
+
+      setPendingDeepLink('/(app)/agent-chat/other', 'system-search');
+      expect(getPendingDeepLinkSnapshot()).toBe('/(app)/pr-review/octocat/hello-world/42');
     });
 
     it('is a no-op for an unmapped/garbage URL', () => {

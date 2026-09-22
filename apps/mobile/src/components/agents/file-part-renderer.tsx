@@ -514,6 +514,7 @@ function FilePreviewModal({
         doneLabel={t('common.done')}
         onShare={onShare}
         sharing={sharing}
+        topInset="ios-page-sheet"
       />
       <AccessibleStatus message={shareError} className="px-6 pt-2 text-sm" />
       {status === 'error' || (status === 'ready' && text === '') ? (

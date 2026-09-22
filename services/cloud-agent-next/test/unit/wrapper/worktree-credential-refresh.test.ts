@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import { createWrapperKiloClient, type WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
 import { formatGitResultFailure } from '../../../wrapper/src/git-errors.js';
 import { applySessionAttach } from '../../../wrapper/src/control/apply-attach.js';
@@ -21,7 +22,12 @@ import {
   type ControlHandlerResult,
   type HandlerDeps,
 } from '../../../wrapper/src/control/sandbox-control-handlers.js';
-import { startSandboxControlEventFeed } from '../../../wrapper/src/control/sandbox-control-runtime.js';
+import {
+  startSandboxControlEventFeed,
+  type KiloFeedConnection,
+} from '../../../wrapper/src/control/sandbox-control-runtime.js';
+import { logToFile } from '../../../wrapper/src/utils.js';
+import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type * as ControlRuntimeModule from '../../../wrapper/src/control/sandbox-control-runtime.js';
 import type * as KiloApiModule from '../../../wrapper/src/kilo-api.js';
 import type * as UtilsModule from '../../../wrapper/src/utils.js';
@@ -38,6 +44,7 @@ vi.mock('../../../wrapper/src/control/sandbox-control-runtime.js', async importO
   ...(await importOriginal<typeof ControlRuntimeModule>()),
   startSandboxControlEventFeed: vi.fn(async () => ({
     isFresh: () => true,
+    isRecovering: () => false,
     usable: Promise.resolve(true),
     close: () => {},
     settled: Promise.resolve(),
@@ -75,6 +82,36 @@ const auth: WorktreeKiloAuth = {
 const originalEnv = { GH_TOKEN: 'github-original', CUSTOM_VALUE: 'profile-value' };
 const registries: WorktreeKiloRuntimes[] = [];
 
+function createFeedConnection(sseMaxRetryAttempts: number): {
+  connection: KiloFeedConnection;
+  errors: unknown[];
+  getsStarted: number;
+} {
+  const state = { errors: [] as unknown[], getsStarted: 0 };
+  return {
+    connection: {
+      hooks: {
+        beginAttempt: () => new AbortController().signal,
+        abortAttempt: () => {},
+        onGetStart: () => {
+          state.getsStarted += 1;
+        },
+        onSseError: error => {
+          state.errors.push(error);
+        },
+        onSleepWake: () => {},
+      },
+      sseMaxRetryAttempts,
+    },
+    get errors() {
+      return state.errors;
+    },
+    get getsStarted() {
+      return state.getsStarted;
+    },
+  };
+}
+
 function fixture() {
   const statuses = vi.fn<WrapperKiloClient['getSessionStatuses']>(async () => ({}));
   const createPty = vi.fn<WrapperKiloClient['createPty']>();
@@ -111,11 +148,13 @@ function fixture() {
     };
   });
   const onUnexpectedClose = vi.fn();
+  const diagnostics: ControlDiagnosticFields[] = [];
   const registry = createWorktreeKiloRuntimes({
     homeRoot: '/test-homes',
     inheritedEnv: {},
     startServer,
     onUnexpectedClose,
+    onDiagnostic: (_event, fields) => diagnostics.push(fields),
   });
   registries.push(registry);
   async function attach(
@@ -133,7 +172,17 @@ function fixture() {
       attachment.release();
     }
   }
-  return { registry, attach, startServer, close, statuses, createPty, clients, onUnexpectedClose };
+  return {
+    registry,
+    attach,
+    startServer,
+    close,
+    statuses,
+    createPty,
+    clients,
+    onUnexpectedClose,
+    diagnostics,
+  };
 }
 
 beforeEach(() => {
@@ -185,6 +234,21 @@ describe('direct worktree credential refresh', () => {
     expect(directoryForSession(sibling.kiloSessionId)).toBe(identity.directory);
     expect(f.registry.get(identity.directory)).toBe(refreshed);
     expect(f.onUnexpectedClose).not.toHaveBeenCalled();
+
+    // Shared existing-root renewal: the sibling is still committed when the
+    // existing root re-attaches with changed env, so the reason must not claim
+    // it was the sole root.
+    const renewal = f.diagnostics.find(
+      fields => fields.reason === 'refresh:existing_root_env_changed'
+    );
+    expect(renewal).toMatchObject({
+      reason: 'refresh:existing_root_env_changed',
+      kiloSessionId: identity.kiloSessionId,
+      sessionCount: 2,
+    });
+    expect(renewal?.detail).toContain('newRoot=0');
+    expect(renewal?.detail).toContain('tc=1');
+
     await f.attach(rotated, env, sibling);
     expect(f.startServer).toHaveBeenCalledTimes(2);
   });
@@ -224,9 +288,7 @@ describe('direct worktree credential refresh', () => {
       }
     };
     await expect(attempt()).rejects.toMatchObject({
-      code: ['status-error', 'pty-error', 'pty-invalid'].includes(blocker)
-        ? 'not_ready'
-        : 'session_busy',
+      code: 'session_busy',
       retryable: true,
     });
     expect(f.close).not.toHaveBeenCalled();
@@ -236,6 +298,116 @@ describe('direct worktree credential refresh', () => {
     expect(f.registry.get(identity.directory)).toBe(runtime);
     expect(f.registry.isHealthy()).toBe(true);
     expect(f.onUnexpectedClose).not.toHaveBeenCalled();
+  });
+
+  it('retries a later attach after an idle-probe transport failure without rotating on the failed attempt', async () => {
+    const f = fixture();
+    const runtime = await f.attach();
+    await f.attach(auth, originalEnv, sibling);
+
+    vi.mocked(f.statuses).mockRejectedValueOnce(
+      new Error(`Session status failed: HTTP 503 ${'x'.repeat(200)}`, {
+        cause: new Error('upstream fetch failed'),
+      })
+    );
+
+    const failed = await f
+      .attach(auth, { ...originalEnv, GH_TOKEN: 'github-renewed' })
+      .catch(error => error);
+    expect(failed).toMatchObject({
+      code: 'session_busy',
+      retryable: true,
+      message: expect.stringContaining('Worktree idle probe failed'),
+    });
+    expect(f.startServer).toHaveBeenCalledTimes(1);
+    expect(runtime.signal.aborted).toBe(false);
+    expect(f.close).not.toHaveBeenCalled();
+
+    const logOutput = vi
+      .mocked(logToFile)
+      .mock.calls.map(([message]) => message)
+      .join('\n');
+    expect(logOutput).toContain('session_status');
+    expect(logOutput).toContain('Session status failed: HTTP 503');
+    expect(logOutput).toContain('upstream fetch failed');
+    expect(logOutput).toContain('attempt=1');
+    expect(logOutput).toContain('elapsedMs=');
+    expect(logOutput).toContain(path.basename(identity.directory));
+    for (const secret of [
+      'real-kilo-original',
+      'real-kilo-renewed',
+      'github-original',
+      'github-renewed',
+      'profile-value',
+    ]) {
+      expect(logOutput).not.toContain(secret);
+    }
+
+    const failure = f.diagnostics.find(
+      fields =>
+        fields.phase === 'failed' &&
+        fields.stage === 'runtime_attach' &&
+        fields.errorCode === 'session_busy'
+    );
+    expect(failure).toMatchObject({
+      phase: 'failed',
+      stage: 'runtime_attach',
+      errorCode: 'session_busy',
+      attempt: 1,
+    });
+    expect(failure?.detail).toContain('session_status');
+    expect(failure?.detail?.length).toBeLessThanOrEqual(128);
+    expect(failure?.detail?.length).toBe(128);
+
+    const refreshed = await f.attach(auth, { ...originalEnv, GH_TOKEN: 'github-renewed' });
+    expect(refreshed).toBe(runtime);
+    expect(f.startServer).toHaveBeenCalledTimes(2);
+    expect(runtime.env.GH_TOKEN).toBe('github-renewed');
+  });
+
+  it('does not log the PTY response body when the idle probe payload is malformed', async () => {
+    const f = fixture();
+    const runtime = await f.attach();
+    await f.attach(auth, originalEnv, sibling);
+
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('not-json-SECRETBODY', { status: 200 }));
+
+    const failed = await f
+      .attach(auth, { ...originalEnv, GH_TOKEN: 'github-renewed' })
+      .catch(error => error);
+    expect(failed).toMatchObject({
+      code: 'session_busy',
+      retryable: true,
+      message: expect.stringContaining('Worktree idle probe failed'),
+    });
+    expect(f.startServer).toHaveBeenCalledTimes(1);
+    expect(runtime.signal.aborted).toBe(false);
+    expect(f.close).not.toHaveBeenCalled();
+
+    const logOutput = vi
+      .mocked(logToFile)
+      .mock.calls.map(([message]) => message)
+      .join('\n');
+    expect(logOutput).toContain('pty_body');
+    expect(logOutput).toContain('invalid payload');
+    expect(logOutput).not.toContain('SECRETBODY');
+
+    const failure = f.diagnostics.find(
+      fields =>
+        fields.phase === 'failed' &&
+        fields.stage === 'runtime_attach' &&
+        fields.errorCode === 'session_busy'
+    );
+    expect(failure).toMatchObject({
+      phase: 'failed',
+      stage: 'runtime_attach',
+      errorCode: 'session_busy',
+      attempt: 1,
+    });
+    expect(failure?.detail).toContain('pty_body');
+    expect(failure?.detail).toContain('invalid payload');
+    expect(failure?.detail).not.toContain('SECRETBODY');
+    expect(failure?.detail?.length).toBeLessThanOrEqual(128);
   });
 
   it('fences lookups during refresh and rechecks wrapper activity after the idle probe', async () => {
@@ -345,6 +517,7 @@ describe('direct worktree credential refresh', () => {
       let fresh = true;
       vi.mocked(startSandboxControlEventFeed).mockResolvedValueOnce({
         isFresh: () => fresh,
+        isRecovering: () => false,
         usable: Promise.resolve(true),
         close: () => {},
         settled: Promise.resolve(),
@@ -436,7 +609,7 @@ describe('direct worktree credential refresh', () => {
     }
   );
 
-  it('waits for confirmed old process exit before launching the refreshed process', async () => {
+  it('refreshes without waiting for the old process close', async () => {
     const f = fixture();
     const stopped = Promise.withResolvers<void>();
     f.startServer.mockImplementationOnce(async options => {
@@ -450,14 +623,12 @@ describe('direct worktree credential refresh', () => {
       { ...originalEnv, GH_TOKEN: 'github-renewed' },
       () => true
     );
-    await vi.waitFor(() => expect(f.close).toHaveBeenCalledTimes(1));
-    expect(f.startServer).toHaveBeenCalledTimes(1);
-    expect(f.registry.get(identity.directory)).toBeUndefined();
-    stopped.resolve();
     expect(await attachment.ready).toBe(runtime);
     attachment.commit();
     attachment.release();
     expect(f.startServer).toHaveBeenCalledTimes(2);
+    expect(f.close).toHaveBeenCalledTimes(1);
+    stopped.resolve();
   });
 
   it.each(['server-start', 'feed-start', 'feed-timeout', 'process-stop-timeout'] as const)(
@@ -491,7 +662,7 @@ describe('direct worktree credential refresh', () => {
       expect(runtime.signal.aborted).toBe(true);
       expect(f.registry.get(identity.directory)).toBeUndefined();
       await vi.waitFor(() => expect(f.onUnexpectedClose).toHaveBeenCalledTimes(1));
-      expect(f.registry.isHealthy()).toBe(failure !== 'process-stop-timeout');
+      expect(f.registry.isHealthy()).toBe(true);
       expect(f.onUnexpectedClose.mock.calls[0]?.[0]).toMatchObject({
         directory: identity.directory,
         reason: 'credential_refresh_failed',
@@ -508,21 +679,26 @@ describe('direct worktree credential refresh', () => {
     }
   );
 
-  it('does not report intentional shutdown during a pending destructive refresh as unexpected', async () => {
+  it('does not report intentional shutdown while a destructive refresh is pending', async () => {
     const f = fixture();
-    const stopped = Promise.withResolvers<void>();
+    const stopResult = Promise.withResolvers<boolean>();
     f.startServer.mockImplementationOnce(async options => {
-      options.onProcessScope?.({ stop: async () => true, verify: async () => true } as never);
-      return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+      options.onProcessScope?.({ stop: async () => stopResult.promise } as never);
+      return {
+        url: 'http://127.0.0.1:10000',
+        close: f.close,
+        stopped: new Promise<void>(() => {}),
+      };
     });
-    await f.attach();
+    const runtime = await f.attach();
     const outcome = f
       .attach(auth, { ...originalEnv, GH_TOKEN: 'github-renewed' })
       .catch(error => error);
     await vi.waitFor(() => expect(f.close).toHaveBeenCalledTimes(1));
     f.registry.shutdown();
-    expect(await outcome).toMatchObject({ code: 'runtime_unhealthy' });
-    stopped.resolve();
+    stopResult.resolve(true);
+    expect(await outcome).toMatchObject({ code: 'runtime_unhealthy', retryable: true });
+    expect(runtime.signal.aborted).toBe(true);
     expect(f.startServer).toHaveBeenCalledTimes(1);
     expect(f.onUnexpectedClose).not.toHaveBeenCalled();
   });
@@ -559,7 +735,7 @@ describe('direct worktree credential refresh', () => {
   });
 
   it.each(['connection', 'http'] as const)(
-    'recovers from real SDK SSE startup %s errors without retaining private data',
+    'reports real SDK SSE startup %s errors to the connection hooks without retaining private data',
     async failure => {
       vi.mocked(fetch).mockImplementation(async request => {
         const url = request instanceof Request ? request.url : String(request);
@@ -573,35 +749,41 @@ describe('direct worktree credential refresh', () => {
       const runtime = await f.attach();
       const feed = vi.mocked(startSandboxControlEventFeed).mock.calls[0]?.[0];
       if (!feed) throw new Error('Missing worktree event feed');
-      const { stream } = await feed.open(feed.signal);
+      // One admission proves the SDK snapshot is threaded from the connection:
+      // without sseMaxRetryAttempts the SDK generator would never stop retrying.
+      const harness = createFeedConnection(1);
+      const { stream } = await feed.open(
+        feed.signal,
+        () => {},
+        () => {},
+        harness.connection
+      );
       if (!stream) throw new Error('Missing SDK SSE stream');
-      const error = await stream[Symbol.asyncIterator]()
-        .next()
-        .catch(error => error);
-      expect(error).toMatchObject({
-        reason: 'feed_failed',
-        message: 'Kilo global event feed failed',
-      });
-      expect(error).not.toHaveProperty('cause');
-      expect(String(error)).not.toContain('private-');
-      expect(JSON.stringify(error)).not.toContain('private-');
+      expect(await stream[Symbol.asyncIterator]().next()).toMatchObject({ done: true });
+      expect(harness.getsStarted).toBe(1);
+      expect(harness.errors).toHaveLength(1);
+      expect(String(harness.errors[0])).toContain('private-');
       expect(
         vi.mocked(fetch).mock.calls.filter(([request]) => {
           const url = request instanceof Request ? request.url : String(request);
           return new URL(url).pathname === '/global/event';
         })
       ).toHaveLength(1);
+      const logOutput = vi
+        .mocked(logToFile)
+        .mock.calls.map(([message]) => message)
+        .join('\n');
+      expect(logOutput).not.toContain('private-');
       expect(runtime.signal.aborted).toBe(false);
-      feed.onUnexpectedClose(error);
-      await vi.waitFor(() =>
-        expect(vi.mocked(startSandboxControlEventFeed)).toHaveBeenCalledTimes(2)
-      );
+      // A connection-layer error is recovered inside one feed episode; it never
+      // retires the runtime or spawns another feed episode.
+      expect(vi.mocked(startSandboxControlEventFeed)).toHaveBeenCalledTimes(1);
       expect(f.onUnexpectedClose).not.toHaveBeenCalled();
       expect(runtime.signal.aborted).toBe(false);
     }
   );
 
-  it('ignores retired process feed failures and recovers current feed errors', async () => {
+  it('ignores retired process feed failures and retires the current runtime on a terminal feed failure', async () => {
     const f = fixture();
     const runtime = await f.attach();
     const oldFeed = vi.mocked(startSandboxControlEventFeed).mock.calls[0]?.[0];
@@ -613,13 +795,18 @@ describe('direct worktree credential refresh', () => {
     expect(f.onUnexpectedClose).not.toHaveBeenCalled();
     const currentFeed = vi.mocked(startSandboxControlEventFeed).mock.calls[1]?.[0];
     expect(currentFeed).toBeDefined();
+    // The episode owner only reports terminal feed failures here; intra-episode
+    // recovery never reaches onUnexpectedClose, so a duplicate terminal report is
+    // deduplicated and never spawns another startSandboxControlEventFeed episode.
     currentFeed?.onUnexpectedClose(new Error('private-current-feed-credential'));
     currentFeed?.onUnexpectedClose(new Error('private-duplicate-feed-credential'));
-    await vi.waitFor(() =>
-      expect(vi.mocked(startSandboxControlEventFeed)).toHaveBeenCalledTimes(3)
-    );
-    expect(f.onUnexpectedClose).not.toHaveBeenCalled();
-    expect(runtime.signal.aborted).toBe(false);
+    await vi.waitFor(() => expect(f.onUnexpectedClose).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(startSandboxControlEventFeed)).toHaveBeenCalledTimes(2);
+    expect(f.onUnexpectedClose.mock.calls[0]?.[0]).toMatchObject({
+      directory: identity.directory,
+      reason: 'feed_failed',
+    });
+    expect(runtime.signal.aborted).toBe(true);
   });
 
   it('keeps a stale runtime while its feed recovery begins', async () => {
@@ -627,6 +814,7 @@ describe('direct worktree credential refresh', () => {
     let fresh = true;
     vi.mocked(startSandboxControlEventFeed).mockResolvedValueOnce({
       isFresh: () => fresh,
+      isRecovering: () => !fresh,
       usable: Promise.resolve(true),
       close: () => {},
       settled: Promise.resolve(),

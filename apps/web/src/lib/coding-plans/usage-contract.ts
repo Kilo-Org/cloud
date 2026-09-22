@@ -50,7 +50,8 @@ export type CodingPlanUsageErrorCode =
   | 'timeout'
   | 'http'
   | 'invalid_response'
-  | 'application';
+  | 'application'
+  | 'provider_plan_inactive';
 
 // Thrown by provider usage adapters. The message is a safe generic user-facing
 // string; `code` is a non-secret failure category for logging.

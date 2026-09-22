@@ -65,8 +65,19 @@ export function FakeLoginForm({ searchParams }: FakeSignInButtonProps) {
     return null;
   }
 
+  // The panel stays in the page flow at every viewport width. As a fixed
+  // overlay it landed on top of the sign-in form's own "Continue with Email"
+  // label on phone-sized viewports — the device-link flow opens this page in a
+  // phone browser — and the page text showed through the panel, so two labels
+  // occupied the same space. Raising the overlay breakpoint does not help: the
+  // form is `max-w-sm` (384px) centered, so its left edge stays left of the
+  // panel's right edge (24px + 320px = 344px) until the viewport is roughly
+  // 1787px wide, and the marketing column only appears at `xl`, which narrows
+  // the form's column further. In flow the panel cannot overlap the form at any
+  // width, and the keyboard cannot reposition it. `relative` keeps the close
+  // button anchored to the panel.
   return (
-    <div className="fixed bottom-6 left-6 w-80 overflow-visible rounded-lg border border-amber-600/50 bg-gray-900 p-4 shadow-lg">
+    <div className="relative mb-6 w-full max-w-sm overflow-visible rounded-lg border border-amber-600/50 bg-gray-900 p-4 shadow-lg">
       {/* Close button */}
       <button
         onClick={() => setIsVisible(false)}

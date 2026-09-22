@@ -1,26 +1,113 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEADLINE_MS } from '../../sandbox-control/deadlines.js';
-import { controlDispatchDisposition } from '../control-dispatch.js';
-import { failWaitingMessages, nextQueuedMessageId } from '../session-message-queue.js';
+import { createSessionFixture, RUNTIME_ID } from '../session-fixture.test-helpers.js';
+import type { SessionMessageRecord } from '../session-message-queue.js';
+
+const orchestrationMocks = vi.hoisted(() => ({
+  eventQueries: vi.fn(),
+  signedAttachments: vi.fn(),
+  broadcast: vi.fn(),
+}));
+
+vi.mock('cloudflare:workers', () => ({
+  DurableObject: class {
+    constructor(
+      protected ctx: unknown,
+      protected env: unknown
+    ) {}
+  },
+}));
+vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
+vi.mock('drizzle-orm/durable-sqlite', () => ({ drizzle: vi.fn() }));
+vi.mock('drizzle-orm/durable-sqlite/migrator', () => ({ migrate: vi.fn(async () => undefined) }));
+vi.mock('../../../drizzle/migrations', () => ({ default: {} }));
+vi.mock('../../session/queries/index.js', () => ({
+  createEventQueries: orchestrationMocks.eventQueries,
+}));
+vi.mock('../../model-validation.js', () => ({
+  assertKiloModelAvailable: vi.fn(async () => undefined),
+}));
+vi.mock('../../execution/attachment-prompt-parts.js', () => ({
+  buildSignedPromptAttachments: orchestrationMocks.signedAttachments,
+}));
+vi.mock('../../websocket/stream.js', () => ({
+  createStreamHandler: (
+    _state: unknown,
+    _queries: unknown,
+    _sessionId: string,
+    options?: {
+      deriveCloudStatus?: () => Promise<unknown>;
+      deriveQueuedMessages?: () => Promise<unknown>;
+      readPendingInteractions?: () => unknown;
+      deriveSessionStatus?: () => Promise<unknown>;
+      getPreparationSnapshots?: () => Promise<unknown>;
+    }
+  ) => ({
+    broadcastEvent: orchestrationMocks.broadcast,
+    handleStreamRequest: async () =>
+      Response.json({
+        cloudStatus: await options?.deriveCloudStatus?.(),
+        queuedMessages: await options?.deriveQueuedMessages?.(),
+        pendingInteractions: options?.readPendingInteractions?.(),
+        sessionStatus: await options?.deriveSessionStatus?.(),
+        preparationSnapshots: await options?.getPreparationSnapshots?.(),
+      }),
+  }),
+}));
+
+const fixtureDeps = {
+  eventQueries: orchestrationMocks.eventQueries,
+  signedAttachments: orchestrationMocks.signedAttachments,
+};
 
 describe('startup timeout', () => {
-  it('fails the waiting queue after the two-minute startup deadline', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    orchestrationMocks.broadcast.mockClear();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('fails the head at its delivery deadline while the environment is unavailable', async () => {
+    // The two-minute startup budget is the named preparation bound.
     expect(DEADLINE_MS.startup).toBe(2 * 60_000);
-    const disposition = controlDispatchDisposition({
-      physical: 'failed',
+
+    const fixture = createSessionFixture(fixtureDeps);
+    fixture.setStatus({
+      physical: 'stopped',
       connection: 'disconnected',
+      wrapperInstanceId: RUNTIME_ID,
     });
-    if (disposition.action !== 'fail') throw new Error('Expected a terminal disposition');
-    const { reason } = disposition;
-    const { messages, failedIds } = failWaitingMessages(
-      [
-        { messageId: 'a', state: 'queued' },
-        { messageId: 'b', state: 'queued' },
-      ],
-      reason
+    await fixture.admit('a');
+    await fixture.flush();
+
+    const deadlineAt = Date.now() + 20_000;
+    const stored = fixture.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+    fixture.storage.kv.put(
+      'session_messages',
+      stored.map(message =>
+        message.messageId === 'a' ? { ...message, deliveryDeadlineAt: deadlineAt } : message
+      )
     );
-    expect(failedIds).toEqual(['a', 'b']);
-    expect(messages.every(message => message.state === 'failed')).toBe(true);
-    expect(nextQueuedMessageId(messages)).toBeUndefined();
+
+    // Before the deadline the unavailable environment parks the head: the real
+    // `deliveryDeadlineAt` path must not terminalize yet.
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('a')?.state).toBe('queued');
+    expect(fixture.alarmAt()).not.toBeNull();
+
+    // At the head deadline the real drain check fails the head with the
+    // preparation reason.
+    vi.setSystemTime(deadlineAt);
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      failedReason: 'preparation_timeout',
+      terminalAt: deadlineAt,
+    });
   });
 });

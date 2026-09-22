@@ -104,12 +104,13 @@ This is a concrete, selective map from the shared Kilo token entry points. It do
 | User-data export | `apps/web/src/lib/user-data-export-worker-client.ts` | `services/user-data-export/src/index.ts` | `user-data-export` | Preserve `user-data-export` | Requires its additional internal API key and five-minute assertion limit. |
 | Organization and attribution | `apps/web/src/app/api/organizations/[id]/user-tokens/route.ts` | `services/ai-attribution/src/util/auth.ts` | None | `ai-attribution` | Organization-bearing tokens have other valid uses; attribution consumer transport was not fully traced. |
 | Auto-routing benchmark | `apps/web/src/app/api/internal/auto-routing-benchmark/token/route.ts` | `services/auto-routing-benchmark/src/run.ts` decider CLI | None | `kilo-api` / `kilo-gateway` based on actual downstream call | `tokenSource: 'auto-routing-benchmark'` identifies issuance, not an authorization audience; full CLI call graph is unresolved. |
+| MCP catalog dump | `apps/web/src/app/api/internal/mcp-catalog/token/route.ts` | `.github/workflows/kilo-mcp-catalog.yml` `kilo run` (benchmarking service account) | None | `kilo-api` / `kilo-gateway` based on actual downstream call | `tokenSource: 'mcp-catalog'` identifies issuance; the `MCP_CATALOG_TOKEN_SECRET` shared secret only authenticates the mint and is never a Kilo credential. |
 
 ## Existing markers and excluded families
 
 Core optional markers accepted by the shared schema are documented in `packages/worker-utils/src/kilo-token.ts`: `tokenSource`, `botId`, `internalApiUse`, `createdOnPlatform`, `deviceAuthRequestCode`, `deviceSessionId`, admin/Gastown flags, and organization claims.
 
-- Confirmed `tokenSource` values: `cloud-agent`, `kilo-chat`, `auto-routing-benchmark`.
+- Confirmed `tokenSource` values: `cloud-agent`, `kilo-chat`, `auto-routing-benchmark`, `mcp-catalog`.
 - Confirmed `botId` values: `reviewer`, `auto-fix`, `auto-triage`, `discord-bot`, `webhook-bot`.
 - `internalApiUse` and `createdOnPlatform` are additional automation markers; `services/security-auto-analysis/src/token.ts` emits `internalApiUse: true` and `createdOnPlatform: 'security-agent'`.
 - No universal signed system marker or reliable system-user-ID convention was confirmed.
@@ -131,7 +132,8 @@ The earlier sections describe the Phase 1 contracts. The web/deployment reader i
 
 - General web/API bearer authentication expects `kilo-api` by default. `validateAuthorizationHeader` checks the audience after signature verification; `getUserFromAuth` passes an optional, server-owned `expectedAudience` override. Cookie-session authentication and existing account/pepper checks are unchanged. A rejected bearer does not fall back to a browser session.
 - Model gateway operations explicitly expect `kilo-gateway`: chat/completions, Responses, Messages, embeddings, transcription, FIM, edit completions, model catalogs/validation, and the billed Exa proxy. Re-exported gateway/v1 handlers inherit the implementation's expectation; request headers and URL paths do not select the audience policy.
-- Existing public catalogs and anonymous/free-model behavior remain available after authentication rejection where already supported. Such requests must remain anonymous, without the rejected token's user, organization, BYOK, bot, source, or billing identity.
+- Anonymous access survives only the absence of a credential. A request that sends no bearer, or the `anonymous` sentinel a Kilo client sends when nobody is signed in (`ANONYMOUS_API_KEY` in `packages/kilo-gateway/src/api/constants.ts` of the kilocode repository), keeps the public catalogs and the free-model tier, and carries no user, organization, BYOK, bot, source, or billing identity.
+- A rejected bearer fails with `401 INVALID_TOKEN` instead of continuing anonymously. The caller presented a credential and believes it is authenticated, so answering it as anonymous would drop its account, organization, BYOK, bot, source, and billing identity, and would hide the refused credential from the client. This covers an unverifiable, expired, outdated, or revoked token, and an operation-scoped `kilo-api` token sent to a `kilo-gateway` operation; mint that token with `resource: 'gateway'` from `/api/auth/resource-token` or `/api/organizations/[id]/user-tokens`.
 - HTML deployment expects the dedicated `deploy-builder:html-deploy` audience before rate limiting or deployment work. This does not change the builder's separate backend-secret `/deploy` interface.
 
 All three resource boundaries retain supported audience-less legacy tokens. Explicit audiences require exact matching, or membership in a valid audience array; null, empty, malformed, duplicate, and mismatched audiences are rejected. These changes do not add an environment check to ordinary web authentication, alter its historical timestamp handling, or migrate any signers.

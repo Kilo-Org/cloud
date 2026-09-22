@@ -1248,11 +1248,13 @@ export type AuthProviderId =
   | 'apple'
   | 'email'
   | 'google'
+  | 'passkey'
   | 'anaconda'
   | 'github'
   | 'gitlab'
   | 'linkedin'
   | 'discord'
+  | 'openai'
   | 'fake-login'
   | 'workos';
 
@@ -2199,8 +2201,9 @@ export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform)
 export type ReasoningDetailsTransform = z.infer<typeof ReasoningDetailsTransformSchema>;
 
 export const CustomLlmApiConfigSchema = z.object({
-  internal_id: z.string().min(1),
+  internal_id: z.string().min(1).optional(),
   base_url: z.url(),
+  disable_url_suffix: z.boolean().optional(),
   add_cache_breakpoints: z.boolean().optional(),
   sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),

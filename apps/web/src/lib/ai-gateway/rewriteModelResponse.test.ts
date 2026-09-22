@@ -10,7 +10,7 @@ import {
   type RequestLoggingParams,
 } from './rewriteModelResponse';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
-import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/custom-pricing';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import { ReasoningDetailsTransform } from '@/lib/ai-gateway/providers/types';
@@ -1352,10 +1352,10 @@ describe('rewriteModelResponse', () => {
   test('strips cost for models with custom pricing', async () => {
     const result = await rewriteModelResponse({
       response: jsonResponse({
-        model: QWEN37_PLUS_MODEL_ID,
+        model: GEMINI_FLASH_CURRENT_MODEL_ID,
         usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
       }),
-      model: QWEN37_PLUS_MODEL_ID,
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
       providerId: 'openrouter',
       kind: 'chat_completions',
       logging: makeLogging(),
@@ -1365,27 +1365,8 @@ describe('rewriteModelResponse', () => {
     // The upstream-reported cost does not reflect the custom pricing, so it
     // must be removed just like for free models.
     expect(await result.json()).toEqual({
-      model: QWEN37_PLUS_MODEL_ID,
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
       usage: {},
-    });
-  });
-
-  test('preserves cost for models with fallback-only custom pricing', async () => {
-    const result = await rewriteModelResponse({
-      response: jsonResponse({
-        model: 'moonshotai/kimi-k3',
-        usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
-      }),
-      model: 'moonshotai/kimi-k3',
-      providerId: 'openrouter',
-      kind: 'chat_completions',
-      logging: makeLogging(),
-      responseTransforms: null,
-    });
-
-    expect(await result.json()).toEqual({
-      model: 'moonshotai/kimi-k3',
-      usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
     });
   });
 

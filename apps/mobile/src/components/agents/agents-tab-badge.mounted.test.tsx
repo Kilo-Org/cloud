@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts the React Native tree without a DOM. */
 import { createElement } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { act, type ReactTestInstance } from 'react-test-renderer';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -109,8 +108,12 @@ describe('Agents needs-input badge and shared live count', () => {
         { id: 'unenriched', connectionId: 'cli', title: 'Unknown owner', status: 'question' },
       ]);
       expectCounts(result.renderer, count, count);
+      // A socket write that empties the live set keeps the last confirmed
+      // snapshot for the reconnect window, so the count cannot flash "0 LIVE"
+      // and back while the rows are still on screen. The window's release is
+      // locked in use-live-sessions-hold.mounted.test.tsx.
       await updateSessions(result, []);
-      expectCounts(result.renderer, undefined, 0);
+      expectCounts(result.renderer, count, count);
     }
   );
 

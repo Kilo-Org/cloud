@@ -125,6 +125,28 @@ describe('createMessageCallbacks', () => {
     });
   });
 
+  it('carries a gate result into the callback payload when the record has one', () => {
+    const harness = createHarness();
+
+    expect(
+      harness.callbacks.persistTerminalCallback(message('completed', { gateResult: 'pass' }))
+    ).toBe(true);
+
+    const stored = harness.kv.get<unknown>(callbackOutboxKey(MESSAGE_ID));
+    expect(parseCallbackOutboxValue(stored)?.job.payload).toMatchObject({ gateResult: 'pass' });
+  });
+
+  it('omits the gate result key from the callback payload when the record has none', () => {
+    const harness = createHarness();
+
+    expect(harness.callbacks.persistTerminalCallback(message('completed'))).toBe(true);
+
+    const stored = harness.kv.get<unknown>(callbackOutboxKey(MESSAGE_ID));
+    const payload = parseCallbackOutboxValue(stored)?.job.payload;
+    expect(payload).toBeDefined();
+    expect(payload && 'gateResult' in payload).toBe(false);
+  });
+
   it.each([
     ['failed', 'provider rejected the request', 'provider rejected the request'],
     ['cancelled', undefined, 'The message was interrupted'],
@@ -225,5 +247,171 @@ describe('createMessageCallbacks', () => {
 
     expect(send).toHaveBeenCalledOnce();
     expect(harness.callbacks.pendingCallbackCount()).toBe(0);
+  });
+
+  describe('persistDrainedBatchCallback', () => {
+    it('persists one job for the last admitted terminal message of a drained batch', async () => {
+      const send = vi.fn(async (_job: CallbackJob) => ({}) as QueueSendResponse);
+      const harness = createHarness({ queue: { send } });
+      const messages = [
+        message('completed', { messageId: 'a' }),
+        message('completed', { messageId: 'b' }),
+        message('completed', { messageId: 'c' }),
+      ];
+
+      expect(
+        harness.callbacks.persistDrainedBatchCallback(messages, new Set(['a', 'b', 'c']))
+      ).toBe(true);
+
+      expect(harness.callbacks.pendingCallbackCount()).toBe(1);
+      expect(
+        parseCallbackOutboxValue(harness.kv.get(callbackOutboxKey('c')))?.job.payload
+      ).toMatchObject({
+        messageId: 'c',
+        executionId: 'c',
+        idempotencyKey: 'c',
+        status: 'completed',
+        lastAssistantMessageText: 'the final answer',
+      });
+      expect(harness.kv.get(callbackOutboxKey('a'))).toBeUndefined();
+      expect(harness.kv.get(callbackOutboxKey('b'))).toBeUndefined();
+
+      await harness.callbacks.repair(Date.now());
+      expect(send).toHaveBeenCalledOnce();
+      expect(send.mock.calls[0]?.[0].payload.messageId).toBe('c');
+    });
+
+    it('persists nothing while the post-write batch still has queued work', () => {
+      const harness = createHarness();
+      const messages = [
+        message('completed', { messageId: 'a' }),
+        message('completed', { messageId: 'b' }),
+        message('queued', { messageId: 'c' }),
+      ];
+
+      expect(harness.callbacks.persistDrainedBatchCallback(messages, new Set(['a', 'b']))).toBe(
+        false
+      );
+      expect(harness.callbacks.pendingCallbackCount()).toBe(0);
+    });
+
+    it('coalesces sequential drain checks to the last admitted terminal message', () => {
+      const harness = createHarness();
+
+      expect(
+        harness.callbacks.persistDrainedBatchCallback(
+          [
+            message('completed', { messageId: 'a' }),
+            message('queued', { messageId: 'b' }),
+            message('queued', { messageId: 'c' }),
+          ],
+          new Set(['a'])
+        )
+      ).toBe(false);
+      expect(
+        harness.callbacks.persistDrainedBatchCallback(
+          [
+            message('completed', { messageId: 'a' }),
+            message('completed', { messageId: 'b' }),
+            message('queued', { messageId: 'c' }),
+          ],
+          new Set(['b'])
+        )
+      ).toBe(false);
+      expect(
+        harness.callbacks.persistDrainedBatchCallback(
+          [
+            message('completed', { messageId: 'a' }),
+            message('completed', { messageId: 'b' }),
+            message('completed', { messageId: 'c' }),
+          ],
+          new Set(['c'])
+        )
+      ).toBe(true);
+
+      expect(harness.callbacks.pendingCallbackCount()).toBe(1);
+      expect(
+        parseCallbackOutboxValue(harness.kv.get(callbackOutboxKey('c')))?.job.payload.messageId
+      ).toBe('c');
+    });
+
+    it('does not persist for a drained write that terminalized nothing', () => {
+      const harness = createHarness();
+
+      expect(
+        harness.callbacks.persistDrainedBatchCallback(
+          [message('completed', { messageId: 'a' })],
+          new Set()
+        )
+      ).toBe(false);
+      expect(harness.callbacks.pendingCallbackCount()).toBe(0);
+    });
+
+    it('persists the last admitted payload when a mixed batch drains on a failure', () => {
+      const harness = createHarness();
+
+      expect(
+        harness.callbacks.persistDrainedBatchCallback(
+          [
+            message('completed', { messageId: 'a' }),
+            message('failed', { messageId: 'b', failedDetail: 'provider rejected the request' }),
+          ],
+          new Set(['a', 'b'])
+        )
+      ).toBe(true);
+
+      expect(
+        parseCallbackOutboxValue(harness.kv.get(callbackOutboxKey('b')))?.job.payload
+      ).toMatchObject({
+        messageId: 'b',
+        status: 'failed',
+        errorMessage: 'provider rejected the request',
+      });
+    });
+
+    it('projects a single drained cancellation as an interrupted callback', () => {
+      const harness = createHarness();
+
+      expect(
+        harness.callbacks.persistDrainedBatchCallback(
+          [message('cancelled', { messageId: 'a' })],
+          new Set(['a'])
+        )
+      ).toBe(true);
+
+      expect(
+        parseCallbackOutboxValue(harness.kv.get(callbackOutboxKey('a')))?.job.payload.status
+      ).toBe('interrupted');
+    });
+
+    it('persists a second drained batch after the first job was sent', async () => {
+      const send = vi.fn(async (_job: CallbackJob) => ({}) as QueueSendResponse);
+      const harness = createHarness({ queue: { send } });
+
+      expect(
+        harness.callbacks.persistDrainedBatchCallback(
+          [message('completed', { messageId: 'a' }), message('completed', { messageId: 'b' })],
+          new Set(['a', 'b'])
+        )
+      ).toBe(true);
+      await harness.callbacks.repair(Date.now());
+      expect(send).toHaveBeenCalledOnce();
+      expect(harness.callbacks.pendingCallbackCount()).toBe(0);
+
+      expect(
+        harness.callbacks.persistDrainedBatchCallback(
+          [
+            message('completed', { messageId: 'a' }),
+            message('completed', { messageId: 'b' }),
+            message('completed', { messageId: 'c' }),
+            message('completed', { messageId: 'd' }),
+          ],
+          new Set(['c', 'd'])
+        )
+      ).toBe(true);
+      await harness.callbacks.repair(Date.now());
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(send.mock.calls[1]?.[0].payload.messageId).toBe('d');
+    });
   });
 });

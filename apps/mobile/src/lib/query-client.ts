@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 import { handleTrpcQueryError } from '@/lib/auth/trpc-unauthorized';
 import { reportTrpcError } from '@/lib/force-update-signal';
+import { reportAppError } from '@/lib/telemetry/app-error-reporting';
 import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 
 export type ActiveSessionsQueryMetadata = Readonly<{
@@ -136,6 +137,7 @@ const PERMANENT_CODES = new Set([
   'FORBIDDEN',
   'NOT_FOUND',
   'CONFLICT',
+  'UNPROCESSABLE_CONTENT',
 ]);
 
 type TrpcErrorData = {
@@ -238,6 +240,7 @@ export function createKiloAppQueryClient(): QueryClient {
       onError: (error, query) => {
         void handleTrpcQueryError(error);
         reportTrpcError(error);
+        reportAppError(error, { source: 'query', queryKey: query.queryKey });
         // Removing a still-observed query rebuilds it on the next render and
         // refetches, which fails FORBIDDEN again and loops for as long as the
         // error screen stays mounted. Only drop queries nothing is observing.
@@ -250,6 +253,7 @@ export function createKiloAppQueryClient(): QueryClient {
       onError: error => {
         void handleTrpcQueryError(error);
         reportTrpcError(error);
+        reportAppError(error, { source: 'mutation' });
       },
     }),
   });

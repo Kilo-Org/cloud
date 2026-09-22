@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to test React/RN structure under vitest */
 /* eslint-disable max-lines -- the test file covers all four feature states plus owner-mount assertions */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
@@ -126,10 +125,6 @@ vi.mock('@/lib/kilo-pass/legal-links', () => ({
 
 vi.mock('@/lib/kilo-pass/navigation', () => ({
   ensureProfileAfterKiloPassPurchase: vi.fn(),
-}));
-
-vi.mock('@/lib/kilo-pass/subscription-page-copy', () => ({
-  formatKiloPassTierDescription: () => 'description',
 }));
 
 vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({

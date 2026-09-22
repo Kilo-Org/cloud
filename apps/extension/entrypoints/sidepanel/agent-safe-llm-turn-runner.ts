@@ -1,6 +1,7 @@
-/* eslint-disable import/max-dependencies -- The safe turn runner wires every safe-mode tool family: page tools, workflows, remote MCP, and web search. */
+/* eslint-disable import/max-dependencies -- The safe turn runner wires every safe-mode tool family: browser tools, workflows, remote MCP, and web search. */
 import type {
   AgentConversationEvent,
+  KiloBrowserToolCallEvent,
   RemoteMcpToolCallEvent,
   WebMcpToolCallEvent,
   WorkflowToolCallEvent,
@@ -19,16 +20,20 @@ import { buildWebMcpToolDefinitions } from '@/src/shared/web-mcp-tools';
 import type { WebMcpToolRoute } from '@/src/shared/web-mcp-tools';
 import { createSafeToolExecutor } from './agent-safe-tool-runtime';
 import {
+  isKiloBrowserToolCallEvent,
+  isKiloBrowserToolCallName,
   isRemoteMcpToolCallEvent,
   isRemoteMcpToolName,
   isWebMcpToolCallEvent,
   isWorkflowToolCallEvent,
   isWorkflowToolName,
+  toBrowserToolTurnEvents,
   toSafeToolCallEvents,
   toWebMcpToolCallEvents,
   toWorkflowToolCallEvents,
 } from './agent-tool-call-events';
 import { discoverWebMcpTools, executeWebMcpToolCall } from './agent-web-mcp-tool-runtime';
+import { executeKiloBrowserToolCall } from './browser-tool-runtime';
 import { createWebSearchExecutor } from './agent-web-search-tool-runtime';
 import { executeWorkflowToolCall } from './agent-workflow-tool-runtime';
 import type { WorkflowToolContext } from './agent-workflow-tool-runtime';
@@ -61,8 +66,11 @@ interface RunSafeLlmTurnOptions {
   readonly workflowToolContext?: WorkflowToolContext | undefined;
 }
 
+type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
+
 type SafeRunToolCallEvent =
   | ReturnType<typeof toSafeToolCallEvents>[number]
+  | KiloBrowserToolCallEvent
   | WorkflowToolCallEvent
   | RemoteMcpToolCallEvent
   | WebMcpToolCallEvent;
@@ -90,11 +98,7 @@ export const runSafeLlmTurn = ({
   });
 
   // The fixed tool set never changes within a turn; WebMCP page tools are appended per-request by prepareTools.
-  const fixedTools = [
-    ...createSafeToolDefinitions({ supportsImages }),
-    ...workflowTools,
-    ...remoteMcpTools,
-  ];
+  const fixedTools = [...createSafeToolDefinitions('safe'), ...workflowTools, ...remoteMcpTools];
   // Rebuilt on every discovery so a stale route can never resolve a later call.
   let webMcpRoutes: ReadonlyMap<string, WebMcpToolRoute> = new Map();
 
@@ -102,6 +106,10 @@ export const runSafeLlmTurn = ({
     ...options,
     // eslint-disable-next-line require-await -- async normalizes the sync no-executor error branch into the Promise<EvalTabResult> the runner expects.
     executeToolCall: async (toolCall): Promise<EvalTabResult> => {
+      if (isKiloBrowserToolCallEvent(toolCall)) {
+        return executeKiloBrowserToolCall(toolCall);
+      }
+
       if (isWebMcpToolCallEvent(toolCall)) {
         return executeWebMcpToolCall(toolCall);
       }
@@ -163,7 +171,11 @@ export const runSafeLlmTurn = ({
     },
     supportsImages,
     toToolCallEvents: toolCalls =>
-      toolCalls.flatMap<SafeRunToolCallEvent>(toolCall => {
+      toolCalls.flatMap<SafeRunToolCallEvent | ToolResultEvent>(toolCall => {
+        if (isKiloBrowserToolCallName(toolCall.name)) {
+          return toBrowserToolTurnEvents([toolCall], selectedTabId, 'safe');
+        }
+
         const webMcpEvents = toWebMcpToolCallEvents([toolCall], webMcpRoutes);
 
         if (webMcpEvents.length > 0) {

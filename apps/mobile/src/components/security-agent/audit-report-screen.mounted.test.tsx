@@ -1,5 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree. */
-
 // Audit-report screen state contract: loading shows a skeleton; a network
 // error and a `query_failed` response are retryable (inline error + Retry);
 // the org billing-gate denial (FORBIDDEN/UNAUTHORIZED) is non-retryable with
@@ -8,7 +6,7 @@
 // use-security-agent.ts.
 
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -248,6 +246,7 @@ describe('AuditReportScreen states', () => {
     expect(empty).toHaveLength(1);
     expect(empty[0]?.props.title).toBe('Audit report unavailable');
     expect(findByType(root.root, 'QueryError')).toHaveLength(0);
+    expect(empty[0]?.props.className ?? '').not.toMatch(/\bflex-1\b/);
   });
 
   it('treats a personal UNAUTHORIZED as a retryable session error', () => {
@@ -261,6 +260,10 @@ describe('AuditReportScreen states', () => {
     expect(findByType(root.root, 'EmptyState')).toHaveLength(0);
   });
 
+  // Explorer audit-report-empty: see the Yoga note in audit-report-screen.tsx.
+  // A `flex-1` child (flexBasis 0%) collapses to zero height inside
+  // CenteredState's auto-height wrapper, which blanks the title/description, so
+  // the centered states must reach EmptyState with no flex basis.
   it('renders EmptyState for an empty period', () => {
     setQueryState({
       data: {
@@ -275,6 +278,7 @@ describe('AuditReportScreen states', () => {
     expect(empty[0]?.props.title).toBe('No recorded activity');
     expect(empty[0]?.props.placement).not.toBe('top');
     expect(findByType(root.root, 'TabScreenScrollView')).toHaveLength(0);
+    expect(empty[0]?.props.className ?? '').not.toMatch(/\bflex-1\b/);
   });
 
   it('retains a cached report with an inline retry after a transient failure', () => {

@@ -14,6 +14,19 @@ import { I18nManager, type TextStyle } from 'react-native';
  */
 export const RTL_WRITING_DIRECTION: TextStyle = { writingDirection: 'rtl' };
 
+/**
+ * Letter-spacing — Tailwind's `tracking-*` — is a Latin typographic device:
+ * it opens every glyph from its neighbour. The RTL scripts the app ships do
+ * not take it. An Arabic-script word is one connected shape, so a tracked
+ * label breaks its joins and renders the letters as isolated forms
+ * ('استكشف'); a letter-spacing of 0 keeps the paragraph's natural spacing.
+ *
+ * `@/components/ui/text` applies this to everything that goes through it, in
+ * the same RTL style array as `RTL_WRITING_DIRECTION`, so a tracked class the
+ * LTR design owns stays in the className and simply has no effect in RTL.
+ */
+export const RTL_NO_LETTER_SPACING: TextStyle = { letterSpacing: 0 };
+
 /** The caller's style with the RTL paragraph direction behind it, in RTL only. */
 export function withRtlWritingDirection(style: TextStyle | undefined): TextStyle | undefined {
   if (!I18nManager.isRTL) {
@@ -21,3 +34,18 @@ export function withRtlWritingDirection(style: TextStyle | undefined): TextStyle
   }
   return style ? { ...RTL_WRITING_DIRECTION, ...style } : RTL_WRITING_DIRECTION;
 }
+
+/**
+ * Base direction for code content (a diff line, a hunk header): code is written
+ * left to right whatever the interface language. Inheriting the interface's
+ * direction instead leaves Android resolving the paragraph's `auto` alignment
+ * against RTL, which right-aligns LTR script — the continuation of a wrapped
+ * diff line starts mid-row instead of under the first line's start — and
+ * reorders a hunk header's runs (`@@ -0,0 +1,82 @@` draws as `@@ 1,82+ 0,0- @@`).
+ *
+ * `direction` names the base direction Android's paragraph layout reads, and
+ * `writingDirection` the same for iOS (see `RTL_WRITING_DIRECTION`). Apply it to
+ * the code `Text` itself: `direction` on a wrapping `View` would mirror that
+ * view's children too (it would move the diff gutter to the left).
+ */
+export const LTR_TEXT_DIRECTION: TextStyle = { direction: 'ltr', writingDirection: 'ltr' };

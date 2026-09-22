@@ -15,6 +15,7 @@ import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
 
 import {
   type ChildSessionCardState,
@@ -56,10 +57,9 @@ export function ChildSessionSection({
   const colors = useThemeColors();
   const { t } = useTranslation();
 
-  const { agentName, taskName, latestActivity }: ChildSessionCardState = getChildSessionCardState(
-    part,
-    childMessages
-  );
+  const { agentName, taskName, translatable, latestActivity }: ChildSessionCardState =
+    getChildSessionCardState(part, childMessages);
+  const shownTaskName = useTranslatedToolSummary(taskName, translatable, part.id);
   const latestActivityLabel = getChildSessionActivityLabel(latestActivity);
   const modelLabel = getChildSessionModelLabel(childMessages, modelOptions ?? []);
 
@@ -80,14 +80,14 @@ export function ChildSessionSection({
         className="flex-row items-center gap-2 px-3 py-2 active:bg-secondary"
         onPress={() => {
           if (sessionId) {
-            onOpenChildSession(sessionId, taskName);
+            onOpenChildSession(sessionId, shownTaskName);
           }
         }}
         disabled={!sessionId}
         accessibilityRole="button"
         accessibilityLabel={t('agentChat.childSession.accessibilityLabel', {
           agentName,
-          taskName,
+          taskName: shownTaskName,
           modelLabel: modelLabel ? `, ${modelLabel}` : '',
           latestActivityLabel,
           status,
@@ -108,7 +108,7 @@ export function ChildSessionSection({
             {agentName}
           </Text>
           <Text className="text-sm leading-5 text-foreground" numberOfLines={1}>
-            {taskName}
+            {shownTaskName}
           </Text>
           {modelLabel ? <ChildSessionModelLabel modelLabel={modelLabel} /> : null}
           {latestActivity ? (

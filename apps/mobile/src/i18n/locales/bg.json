@@ -36,6 +36,7 @@
     "cost": "Разход",
     "discard": "Отхвърли",
     "findings": "Открити проблеми",
+    "mergeRequest": "merge заявка",
     "notConnected": "Не е свързан",
     "notifications": "Известия",
     "pullRequest": "заявка за сливане",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Използвай друг имейл",
     "signInWithApple": "Влез с Apple",
     "signInWithGoogle": "Влез с Google",
+    "signInWithPasskey": "Влез с ключ за достъп",
     "emailAddress": "Имейл адрес",
     "emailPlaceholder": "потребител@example.com",
     "continueWithEmail": "Продължи с имейл",
@@ -174,6 +176,10 @@
     "termsConnector": " и ",
     "termsSuffix": ".",
     "moreSignInOptions": "Още опции за влизане",
+    "passkeyCancelled": "Влизането с ключ за достъп беше отменено. Опитайте отново.",
+    "passkeyNotFound": "За това устройство не е запазен ключ за достъп. Влезте вместо това с Apple, Google или имейла си.",
+    "passkeyUnsupported": "Ключовете за достъп не са налични на това устройство. Влезте вместо това с Apple, Google или имейла си.",
+    "passkeyFailed": "Неуспешно влизане с ключ за достъп. Опитайте отново.",
     "couldNotCompleteSignIn": "Не можахме да завършим влизането. Моля, опитай отново.",
     "sessionEnded": "Сесията ти приключи. Влез отново.",
     "signInCodeExpired": "Кодът ти за влизане е изтекъл. Опитай отново.",
@@ -224,13 +230,36 @@
     "providerTestAccount": "Тестов акаунт",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Корпоративно SSO"
+    "providerEnterpriseSso": "Корпоративно SSO",
+    "passkeysTitle": "Ключове за достъп",
+    "passkeysSubtitle": "Влезте без парола",
+    "passkeysEmpty": "Още няма ключове за достъп",
+    "passkeysEmptyHint": "$t(profile.addPasskey), за да влезете без парола.",
+    "passkeysCouldNotLoad": "Ключовете за достъп не можаха да се заредят",
+    "passkeysLoadFailed": "Ключовете за достъп са недостъпни, докато това не се зареди.",
+    "addPasskey": "Добавяне на ключ за достъп",
+    "passkeyDefaultName": "Ключ за достъп",
+    "passkeyAddedOn": "Добавен {{date}}",
+    "passkeyAdded": "Ключът за достъп е добавен.",
+    "passkeyAddFailed": "Неуспешно добавяне на ключ за достъп. Опитайте отново.",
+    "passkeyAddUnsupported": "Това устройство не може да създава ключове за достъп.",
+    "passkeyAddCancelled": "Създаването на ключа за достъп беше отменено.",
+    "passkeyRemoved": "Ключът за достъп е премахнат.",
+    "passkeyRemoveFailed": "Този ключ за достъп не можа да се премахне. Опитайте отново.",
+    "passkeyRenamed": "Ключът за достъп е преименуван.",
+    "passkeyName": "Име на ключа за достъп",
+    "renamePasskey": "Преименуване на ключа за достъп",
+    "removePasskey": "Премахване на ключа за достъп",
+    "removePasskeyTitle": "Да се премахне ли ключът за достъп?",
+    "removePasskeyMessage": "Вече няма да можете да влезете с този ключ за достъп."
   },
   "preferences": {
     "general": "Общи",
     "voiceInput": "Гласово въвеждане",
     "autoExpandThinking": "Автоматично разгъване на разсъжденията",
     "autoExpandThinkingSubtitle": "Показвай разсъжденията на агента разгънати, след като приключат.",
+    "hideThinking": "Скриване на подробностите за разсъжденията",
+    "hideThinkingSubtitle": "Да не се показват разсъжденията на агента на страницата на сесията.",
     "keepScreenOn": "Дръж екрана включен при отворена сесия",
     "keepScreenOnSubtitle": "Дръж екрана включен, докато сесията работи.",
     "appearance": "Изглед",
@@ -253,7 +282,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Транскрипция през Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Преобразувай гласовото въвеждане с модел на Kilo Gateway вместо разпознаването на реч на устройството. Записът ти се изпраща до Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Свиване на извиквания на инструменти",
+    "condenseToolCallsSubtitle": "Групирайте последователни извиквания на инструменти в един ред, който можете да отворите.",
+    "toolSummaryTranslation": "Преведи обобщенията на инструментите",
+    "toolSummaryTranslationSubtitle": "Изпращай всяко обобщение на инструмент към модел, за да го преведе на езика на приложението ти. Ако преводът се провали, се показва оригиналът.",
+    "toolSummaryTranslationModelUnavailableNotice": "Този модел вече не се предлага. Докосни $t(common.model), за да избереш друг."
   },
   "prReview": {
     "pullRequestUnavailable": "Недостъпна заявка за обединяване",
@@ -318,7 +352,7 @@
       "expandMoreLines": "Покажи още {{displayCount}} реда ({{start}}–{{end}})",
       "expandLinesOfContext": "Покажи {{displayCount}} реда от контекста",
       "expandAll": "Разгъни всичко",
-      "expandAllLines": "Разгъни всички {{displayCount}} реда",
+      "expandAllLines": "Разгъни всички редове ({{displayCount}})",
       "loadingMoreFiles": "Зареждане на още файлове…",
       "retryLoadingNextPage": "Опитай отново да заредиш следващата страница",
       "failedToLoadMoreFiles": "Не можахме да заредим още файлове — докосни, за да опиташ отново",
@@ -335,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "Заредени {{displayCount}} от {{total}} файла",
       "filesStillLoading": "Файловете все още се зареждат. Плъзни надолу, за да опресниш.",
       "goToOverview": "Отвори обзора",
-      "goToOverviewTab": "Отвори раздела „Обзор“"
+      "goToOverviewTab": "Отвори раздела „Обзор“",
+      "expandAllLines_one": "Разгъни всички редове ({{displayCount}})",
+      "expandAllLines_other": "Разгъни всички редове ({{displayCount}})",
+      "expandLines_one": "Покажи {{displayCount}} ред ({{start}}–{{end}})",
+      "expandLines_other": "Покажи {{displayCount}} реда ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Покажи {{displayCount}} ред от контекста",
+      "expandLinesOfContext_other": "Покажи {{displayCount}} реда от контекста",
+      "expandMoreLines_one": "Покажи още {{displayCount}} ред ({{start}}–{{end}})",
+      "expandMoreLines_other": "Покажи още {{displayCount}} реда ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "заредени {{loaded}} от {{total}} файла",
+      "loadedOfTotalFiles_other": "заредени {{loaded}} от {{total}} файла"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ няма нов ред в края на файла",
@@ -350,6 +394,7 @@
       "merge": "Сливане",
       "mergeNow": "Обедини сега",
       "mergePullRequest": "Обединяване на заявката",
+      "mergeTermTitle": "Обедини {{term}}",
       "enableAutoMerge": "Активирай автоматично обединяване",
       "disableAutoMerge": "Деактивирай автоматичното обединяване",
       "autoMergeOn": "Автоматичното обединяване е включено",
@@ -368,9 +413,12 @@
       "deleteBranchAfterMerge": "Изтрий клона след обединяването",
       "noEnabledMethods": "В това хранилище няма активирани методи за обединяване. Помоли администратор на хранилището да активира обединяване с комит, свиване или пребазиране.",
       "confirmTitle": "Да се обедини ли заявката?",
+      "confirmTitleTerm": "Да се обедини ли {{term}}?",
       "confirmMessage": "Това ще обедини промените ти в основния клон.",
       "enableAutoMergeConfirmTitle": "Да се активира ли автоматичното обединяване?",
       "enableAutoMergeConfirmMessage": "GitHub ще обедини тази заявка автоматично, когато всички задължителни проверки завършат успешно.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} ще бъде обединен автоматично, след като конвейерът завърши успешно.",
+      "enableAutoMergeDescriptionTerm": "GitLab обединява тази {{term}} автоматично, след като конвейерът завърши успешно.",
       "forbidden": "Нямаш права да обединяваш тази заявка.",
       "cannotMerge": "Тази заявка не може да се обедини в сегашния си вид.",
       "couldNotMerge": "Не можахме да обединим заявката.",
@@ -381,7 +429,8 @@
       },
       "terminal": {
         "alreadyMerged": "Вече обединена",
-        "closed": "Заявката е затворена"
+        "closed": "Заявката е затворена",
+        "closedMergeRequest": "Тази merge заявка е затворена"
       },
       "partialSuccessBanner": {
         "body": "Не можахме да изтрием клона: {{reason}}.",
@@ -406,6 +455,18 @@
         "behindDetail": "Изходният клон изостава от основния. Пребазирай или обнови клона преди обединяването.",
         "notMergeableTitle": "Тази заявка все още не може да се обедини",
         "notMergeableDetail": "GitHub съобщи следното състояние за възможността за обединяване: {{state}}."
+      },
+      "restrictions": {
+        "title": "Ограничения при обединяване",
+        "approvalsRequired_one": "Необходимо е {{displayCount}} одобрение",
+        "approvalsRequired_other": "Необходими са {{displayCount}} одобрения",
+        "pipelineMustSucceed": "Конвейерът трябва да завърши успешно преди обединяването."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Конвейерът се проваля при последния комит.",
+        "pendingPipeline": "Конвейерът все още работи при последния комит.",
+        "permission": "Нямате разрешение да обединявате {{term}}.",
+        "draft": "Маркирайте {{term}} като готов за преглед преди обединяване."
       },
       "methodLabels": {
         "merge": "Създай комит за обединяване",
@@ -455,6 +516,8 @@
       "replyBadRequest": "Този отговор не може да бъде публикуван. Нишката може да се е променила.",
       "replyForbidden": "Нямаш права да отговаряш в тази заявка за обединяване.",
       "addCommentCta": "Коментирай тази заявка за обединяване",
+      "fixWithKilo": "Отстрани с Kilo",
+      "fixWithKiloPrompt": "Моля, разгледай следния коментар към заявката за обединяване: {{link}}",
       "commentBadRequest": "Този коментар не може да бъде публикуван. Заявката за обединяване може да се е променила.",
       "commentForbidden": "Нямаш права да коментираш в тази заявка за обединяване.",
       "moderation": {
@@ -505,7 +568,10 @@
         "outdatedOnLines": "Неактуален коментар: {{lines}}",
         "outdatedOnPath": "Неактуален коментар: {{path}}"
       },
-      "deletedUser": "изтрит потребител"
+      "deletedUser": "изтрит потребител",
+      "replyForbiddenTerm": "Нямате разрешение да отговаряте в {{term}}.",
+      "moreLinesAbove_one": "… още {{displayCount}} ред по-горе",
+      "moreLinesAbove_other": "… още {{displayCount}} реда по-горе"
     },
     "couldNotOpenGitHubAppSettings": "Настройките на приложението в GitHub не се отвориха.",
     "installKiloGitHubApp": "Инсталирай приложението Kilo за GitHub",
@@ -517,17 +583,19 @@
     "reviewPullRequest": "Прегледай заявката за обединяване",
     "headLine": "{{counts}} · последен комит {{sha}}",
     "entry": {
-      "eyebrow": "Отвори заявка за обединяване чрез URL.",
-      "pastePrLink": "Постави връзка към PR",
-      "noRecentPrs": "Няма скорошни PR",
-      "noRecentPrsDescription": "Постави връзка към PR по-горе, за да започнеш преглед. Следващия път този PR ще се покаже тук.",
+      "eyebrow": "Отворете заявка за сливане или merge заявка чрез URL",
+      "pastePrLink": "Поставете връзка към заявка за сливане или merge заявка",
+      "noRecentPrs": "Няма скорошни прегледи",
+      "noRecentPrsDescription": "Поставете връзка по-горе, за да започнете преглед — следващия път ще се появи тук.",
       "couldNotLoad": "Не можахме да заредим данните.",
       "removeFromRecentsTitle": "Да се премахне ли от последно отваряните?",
-      "removeFromRecentsMessage": "Тази заявка за обединяване ще бъде премахната от списъка ти с последно отваряни заявки.",
+      "removeFromRecentsMessage": "Този преглед ще бъде премахнат от скорошните ви.",
       "removeRecentAccessibility": "Премахни {{repo}} от последно отваряните",
-      "urlAccessibility": "URL на заявка за обединяване в GitHub",
-      "clearLink": "Изчисти връзката към заявката за обединяване",
-      "pasteLink": "Постави връзка към заявка за обединяване",
+      "urlAccessibility": "Въведете URL на заявка за сливане или merge заявка",
+      "urlPlaceholder": "URL на заявка за сливане или merge заявка",
+      "openAccessibility": "Отвори заявка за сливане или merge заявка",
+      "clearLink": "Изчисти връзката",
+      "pasteLink": "Поставете връзка към заявка за сливане или merge заявка",
       "open": "Отваряне"
     },
     "checks": {
@@ -544,6 +612,8 @@
       "pending": "изчакващи: {{displayCount}}",
       "skipped": "пропуснати: {{displayCount}}",
       "checksCount": "{{displayCount}} проверки",
+      "checksCount_one": "{{displayCount}} проверка",
+      "checksCount_other": "{{displayCount}} проверки",
       "checkDetails": "подробности за проверката"
     },
     "inbox": {
@@ -576,9 +646,15 @@
     "connect": {
       "checkFailedTitle": "Не можахме да проверим връзката с GitHub.",
       "checkFailedMessage": "Не можем да проверим дали си влязъл, докато данните не се заредят.",
+      "checkFailedTitleGitLab": "Не можа да се провери връзката с GitLab",
+      "checkFailedTitleBitbucket": "Не можа да се провери връзката с Bitbucket",
+      "providerCheckFailedMessage": "Състоянието на връзката е недостъпно, докато това се зареди.",
       "reconnectTitle": "Повторно свързване с GitHub",
       "reconnectDescription": "Достъпът ти до GitHub е отнет. Свържи се отново, за да продължиш да преглеждаш заявки за обединяване от телефона си.",
-      "description": "Свържи акаунта си в GitHub, за да преглеждаш заявки за обединяване от телефона си."
+      "description": "Свържи акаунта си в GitHub, за да преглеждаш заявки за обединяване от телефона си.",
+      "gitlabDescription": "Свържете акаунта си в GitLab, за да преглеждате merge заявки на мобилно устройство.",
+      "bitbucketDescription": "Свържете Bitbucket с тази организация, за да преглеждате заявки за сливане на мобилно устройство.",
+      "bitbucketOrgOnlyDescription": "Изберете организация в профила си, за да преглеждате нейните Bitbucket заявки за сливане."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +676,10 @@
     },
     "reconnectNotice": {
       "title": "Срокът на връзката с GitHub изтече.",
-      "message": "Връзката ти с GitHub вече не е валидна. Провери я отново — при нужда ще получиш подкана да се свържеш отново."
+      "message": "Връзката ти с GitHub вече не е валидна. Провери я отново — при нужда ще получиш подкана да се свържеш отново.",
+      "gitlabTitle": "Връзката с GitLab изтече",
+      "bitbucketTitle": "Връзката с Bitbucket изтече",
+      "providerMessage": "Връзката ви с {{provider}} вече не е валидна. Проверете връзката отново — при необходимост ще бъдете подканени да се свържете повторно."
     },
     "eventChips": {
       "comment": "Коментар",
@@ -665,10 +744,12 @@
       "statusContext": "Контекст",
       "lineLabel": "Ред {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(празно)"
+      "emptyLine": "(празно)",
+      "truncationBanner_one": "Показват се първите {{limit}} от {{total}} променени файла поради ограничение на API на GitHub.",
+      "truncationBanner_other": "Показват се първите {{limit}} от {{total}} променени файла поради ограничение на API на GitHub."
     },
     "linkPasteClipboardEmpty": "Клипбордът е празен.",
-    "linkPasteNotAPullRequest": "Това не е връзка към заявка за обединяване в GitHub.",
+    "linkPasteNotAPullRequest": "Това не е връзка към заявка за сливане или merge заявка",
     "announce": {
       "commentPosted": "Коментарът е публикуван",
       "reviewSubmitted": "Прегледът е изпратен",
@@ -677,6 +758,7 @@
     "mutationError": {
       "commentNotPosted": "Този коментар не може да се публикува. Избраният ред може да се е променил или този PR да е обновен.",
       "reviewNotSubmitted": "Този преглед не може да се изпрати в сегашния си вид. Възможно е този PR да е променен или да се опитваш да прегледаш собствената си заявка за обединяване.",
+      "reviewNotSubmittedTerm": "Този преглед не може да бъде изпратен такъв. {{term}} може да се е променил или не можете да преглеждате собствения си {{term}}.",
       "couldNotPostComment": "Не можахме да публикуваме коментара.",
       "couldNotSubmitReview": "Не можахме да изпратим прегледа. Провери връзката си и опитай отново."
     },
@@ -684,9 +766,31 @@
       "couldNotReply": "Отговорът не беше изпратен.",
       "couldNotCompleteAction": "Не можахме да завършим това действие.",
       "mergeResultDefaultError": "GitHub не завърши обединяването.",
+      "mergeResultNotCompleted": "{{term}} не беше обединен. Проверете състоянието му и опитайте отново.",
       "ambiguous": "Не можахме да потвърдим резултата. Провери този PR, преди да опиташ отново.",
       "persistenceFailed": "Не можахме да запишем това действие. Опитай отново по-късно.",
       "forbidden": "Действието не е разрешено."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Не е налично при този доставчик",
+        "accessibility": "Не е налично при този доставчик: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Заявка за сливане",
+      "mergeRequest": "Merge заявка",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Сподели merge заявка",
+      "viewOnProvider": "Преглед в {{provider}}",
+      "mergeRequestUnavailable": "Merge заявката е недостъпна",
+      "unavailableDescription": "Може би е изтрита или нямате достъп до нея.",
+      "accessDeniedMergeRequest": "Нямате разрешение да прегледате тази merge заявка.",
+      "couldNotLoadMergeRequest": "Merge заявката не можа да се зареди",
+      "discussionAccessDenied": "Нямате разрешение да прегледате дискусиата по тази merge заявка.",
+      "discussionUnavailableMessage": "Тази merge заявка може би е премахната.",
+      "noDiscussionDescription": "Няма нишки за преглед или коментари по тази merge заявка.",
+      "noFilesChangedDescription": "Тази merge заявка няма промени по файлове."
     }
   },
   "notifications": {
@@ -719,11 +823,12 @@
     "previewFullDescription": "Известията показват текста на съобщението на заключения ти екран.",
     "previewGenericDescription": "Известията само съобщават за нова активност. Отвори Kilo, за да прочетеш съобщението.",
     "channel": {
-      "agent": "Сесии с агенти",
+      "agentProgress": "Напредък на агентите",
       "chat": "Съобщения в чата",
       "kiloclaw": "Активност на KiloClaw",
       "balance": "Известия за салдото",
-      "security": "Проблеми със сигурността"
+      "security": "Проблеми със сигурността",
+      "spend": "Известия за разходи"
     },
     "category": {
       "chatMessagesSubtitle": "отговори в разговорите ти",
@@ -734,8 +839,22 @@
       "sessionStatusTitle": "Статус на сесията",
       "sessionStatusSubtitle": "завършена / неуспешна / готова за управление",
       "kiloclawActivitySubtitle": "готова инстанция или грешка, планирани действия",
+      "kiloclawActivityUnavailable": "Стартирайте инстанция KiloClaw, за да получавате активност на KiloClaw.",
       "balanceAlertsSubtitle": "предупреждения за ниска наличност на организацията",
-      "securityFindingsSubtitle": "нови открити проблеми и напомняния за SLA"
+      "balanceAlertsUnavailable": "Присъединете се към организация, за да получавате предупреждения за баланса.",
+      "securityFindingsSubtitle": "нови открити проблеми и напомняния за SLA",
+      "securityFindingsUnavailable": "Активирайте Агента по сигурността на Kilo в обхват, за да получавате открити проблеми със сигурността.",
+      "spendAlertsSubtitle": "преминаване на прагове и часови скокове",
+      "spendAlertsToggle": "Категория известия за разходи"
+    },
+    "action": {
+      "openSession": "Отваряне на сесия"
+    },
+    "needsInputAction": {
+      "approved": "Заявката е одобрена",
+      "replied": "Отговорът е изпратен",
+      "failed": "Не можа да се отговори. Докоснете отново, за да опитате пак.",
+      "unavailable": "Тази заявка вече не чака."
     }
   },
   "tabs": {
@@ -816,7 +935,9 @@
       "uploadFailed": "Качването завърши неуспешно.",
       "failedToUploadFile": "Не успяхме да качим файла: {{reason}}.",
       "nothingToPaste": "Няма какво да поставиш.",
-      "metadataStripFailed": "Метаданните на снимката не можаха да бъдат премахнати."
+      "metadataStripFailed": "Метаданните на снимката не можаха да бъдат премахнати.",
+      "limit_one": "Можеш да прикачиш до {{displayCount}} файл.",
+      "limit_other": "Можеш да прикачиш до {{displayCount}} файла."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1560,7 +1681,11 @@
       "syncFindings": "Синхронизирай проблемите",
       "syncNow": "Синхронизирай сега",
       "syncQueued": "Синхронизацията е добавена в опашката",
-      "syncStatusUnavailable": "Състоянието на синхронизацията не е достъпно."
+      "syncStatusUnavailable": "Състоянието на синхронизацията не е достъпно.",
+      "daysOverdue_one": "Просрочие от {{displayCount}} ден",
+      "daysOverdue_other": "Просрочие от {{displayCount}} дни",
+      "findingsCount_one": "{{displayCount}} проблем",
+      "findingsCount_other": "{{displayCount}} проблема"
     },
     "dashboardMetrics": {
       "openFindings": "Отворени проблеми",
@@ -1957,6 +2082,10 @@
       "couldNotLoad": "Не успяхме да заредим сесията.",
       "failedToLoadDetails": "Не успяхме да заредим подробностите за сесията.",
       "failedToStopExecution": "Не успяхме да спрем изпълнението.",
+      "stopped": "Сесията е спряна",
+      "committing": "Създава се комит…",
+      "committed": "Комитът е създаден",
+      "commitFailed": "Неуспешно създаване на комит",
       "renameSession": "Преименуване на сесията",
       "renamePlaceholder": "Име на сесията",
       "transcriptAccessibility": "Запис на разговора",
@@ -1991,17 +2120,56 @@
       "exitNeedsNewerCli": "Отдалечените команди с наклонена черта изискват по-нова версия на Kilo CLI. Актуализирай Kilo CLI и се свържи отново."
     },
     "sessionConnection": {
+      "label": "Връзка",
       "connecting": "Свързване…",
       "reconnecting": "Повторно свързване…",
       "connectionLost": "Прекъсната връзка",
       "retryConnection": "Опитай да се свържеш отново"
     },
+    "goal": {
+      "title": "Цел",
+      "statusActive": "Активна цел",
+      "statusPaused": "Цел на пауза",
+      "statusComplete": "Целта е изпълнена",
+      "statusBlocked": "Целта е блокирана",
+      "edit": "Редактиране на целта",
+      "remove": "Премахване на целта",
+      "pause": "Пауза на целта",
+      "resume": "Продължаване на целта",
+      "editPlaceholder": "Опишете целта",
+      "removeConfirmTitle": "Премахване на целта?",
+      "removeConfirmMessage": "CLI изчиства целта на тази сесия.",
+      "updateFailed": "Целта не можа да се обнови.",
+      "sectionAccessibility": "{{status}}. Цел: {{text}}",
+      "collapse": "Свий целта",
+      "expand": "Разгъни целта"
+    },
     "newSession": {
+      "recentlyUsed": "Наскоро използвани",
+      "couldNotLoadGithubRepositories": "Не успяхме да заредим хранилищата в GitHub.",
+      "couldNotLoadGitlabRepositories": "Не успяхме да заредим хранилищата в GitLab.",
+      "couldNotLoadBitbucketRepositories": "Не успяхме да заредим хранилищата в Bitbucket.",
       "connectGithubDescription": "Свържи GitHub в браузъра си, след което се върни тук, за да избереш хранилище.",
+      "connectGitlabDescription": "Свържи GitLab в браузъра си, след което се върни тук, за да избереш хранилище.",
+      "connectBitbucketDescription": "Свържи Bitbucket в браузъра си, след което се върни тук, за да избереш хранилище.",
       "openGithub": "Отвори GitHub",
+      "openGitlab": "Отвори GitLab",
+      "openBitbucket": "Отвори Bitbucket",
       "refreshRepositories": "Опресни хранилищата",
       "githubConnected": "Връзка с GitHub",
+      "gitlabConnected": "Връзка с GitLab",
       "noRepositoriesVisible": "Няма видими хранилища. Провери достъпа на приложението Kilo за GitHub до хранилищата, след което опресни списъка.",
+      "noRepositoriesVisibleGitlab": "Няма видими хранилища. Провери достъпа до хранилищата в GitLab, след което опресни списъка.",
+      "noRepositoriesVisibleBitbucket": "Няма видими хранилища. Провери достъпа до хранилищата в Bitbucket, след което опресни списъка.",
+      "bitbucketOrganizationsOnly": "Bitbucket е наличен само за организации.",
+      "branchPickerTitle": "Избери клон",
+      "branchDefault": "По подразбиране",
+      "branchAccessibility": "Клон: {{label}}",
+      "branchLoading": "Клоновете се зареждат",
+      "branchLoadError": "Клоновете не можаха да се заредят",
+      "branchUnavailable": "Клоновете не са налични за това хранилище. Проверете достъпа си при доставчика и изберете друго хранилище.",
+      "branchEmpty": "Няма налични клонове",
+      "branchPlaceholder": "Изберете клон",
       "runOnWithTarget": "Изпълнение в: {{target}}",
       "environment": "Среда",
       "couldNotLoadEnvironment": "Не успяхме да заредим средата ти.",
@@ -2022,24 +2190,13 @@
       "couldNotRefreshRepositories": "Не успяхме да опресним хранилищата. Опитай отново.",
       "discardDraftTitle": "Да се изтрие ли черновата?",
       "discardDraftMessage": "Подканата ти ще се загуби.",
+      "discardWithUploadsMessage": "Подканата ти и всички качени файлове, които не са прикачени към изпратени съобщения, ще бъдат изтрити.",
       "discardFailed": "Не успяхме да изтрием черновата. Опитай отново.",
       "remoteHint": "Изпълни `kilo remote` на компютъра си или `/remote` в работеща CLI сесия, за да управляваш локален процес на kilo.",
-      "connectBitbucketDescription": "Свържи Bitbucket в браузъра си, след което се върни тук, за да избереш хранилище.",
-      "connectGitlabDescription": "Свържи GitLab в браузъра си, след което се върни тук, за да избереш хранилище.",
-      "couldNotLoadBitbucketRepositories": "Не успяхме да заредим хранилищата в Bitbucket.",
-      "couldNotLoadGithubRepositories": "Не успяхме да заредим хранилищата в GitHub.",
-      "couldNotLoadGitlabRepositories": "Не успяхме да заредим хранилищата в GitLab.",
-      "gitlabConnected": "Връзка с GitLab",
-      "noRepositoriesVisibleBitbucket": "Няма видими хранилища. Провери достъпа до хранилищата в Bitbucket, след което опресни списъка.",
-      "noRepositoriesVisibleGitlab": "Няма видими хранилища. Провери достъпа до хранилищата в GitLab, след което опресни списъка.",
-      "openBitbucket": "Отвори Bitbucket",
-      "openGitlab": "Отвори GitLab",
-      "recentlyUsed": "Наскоро използвани",
       "continueFrom": "Продължаваш сесията {{title}}.",
       "importingSession": "Импортиране на сесията",
       "cliCannotContinue": "Този CLI не може да продължи сесия. Избери Cloud Agent или друг CLI.",
-      "importFailed": "Тази сесия не можа да бъде импортирана.",
-      "discardWithUploadsMessage": "Подканата ти и всички качени файлове, които не са прикачени към изпратени съобщения, ще бъдат изтрити."
+      "importFailed": "Тази сесия не можа да бъде импортирана."
     },
     "partRenderer": {
       "updatedFileCount_one": "Актуализиран е {{displayCount}} файл.",
@@ -2063,7 +2220,14 @@
       "updateTodos": "Актуализирай задачите",
       "linesBadge": "{{displayCount}} реда",
       "filesBadge": "{{displayCount}} файла",
-      "matchesBadge": "{{displayCount}} съвпадения"
+      "matchesBadge": "{{displayCount}} съвпадения",
+      "filesBadge_one": "{{displayCount}} файл",
+      "filesBadge_other": "{{displayCount}} файла",
+      "linesBadge_one": "{{displayCount}} ред",
+      "linesBadge_other": "{{displayCount}} реда",
+      "matchesBadge_one": "{{displayCount}} съвпадение",
+      "matchesBadge_other": "{{displayCount}} съвпадения",
+      "noOutput": "Няма изход."
     },
     "readToolMarkdown": {
       "linesTruncated": "редове {{start}}–{{end}} (съкратено)",
@@ -2353,7 +2517,11 @@
       "files": "Файлове",
       "couldNotOpenPhotoPicker": "Не успяхме да отворим прозореца за избор на снимки. Рестартирай Kilo и опитай отново.",
       "maxFilesAllowed": "Можеш да прикачиш най-много {{displayCount}} файла.",
-      "onlyAddingFiles": "Добавят се само {{accepted}} от {{total}} файла (макс. {{max}})"
+      "onlyAddingFiles": "Добавят се само {{accepted}} от {{total}} файла (макс. {{max}})",
+      "maxFilesAllowed_one": "Можеш да прикачиш най-много {{displayCount}} файл.",
+      "maxFilesAllowed_other": "Можеш да прикачиш най-много {{displayCount}} файла.",
+      "onlyAddingFiles_one": "Добавят се само {{accepted}} от {{total}} файла (макс. {{max}})",
+      "onlyAddingFiles_other": "Добавят се само {{accepted}} от {{total}} файла (макс. {{max}})"
     },
     "composer": {
       "addAttachment": "Прикачи файл",
@@ -2371,7 +2539,9 @@
       "discardAttachmentsMessage": "Качените файлове, които не са прикачени към изпратени съобщения, ще бъдат изтрити.",
       "discardAttachmentsTitle": "Да се премахнат ли прикачените файлове?",
       "charactersRemaining": "Остават {{count}} знака",
-      "insertNewline": "Вмъкни нов ред"
+      "insertNewline": "Вмъкни нов ред",
+      "charactersRemaining_one": "Остава {{count}} знак",
+      "charactersRemaining_other": "Остават {{count}} знака"
     },
     "chatLink": {
       "linkCopied": "Връзката е копирана",
@@ -2405,6 +2575,12 @@
       "startNewSession": "Започни нова сесия",
       "exitSession": "Прекрати сесията",
       "clearSession": "Приключи тази сесия и започни нова",
+      "compactDescription": "компактирай контекста на текущата сесия",
+      "goalDescription": "Продължи да работиш към целта на сесията. /goal <objective> или pause, resume, clear",
+      "initDescription": "направлявано настройване на AGENTS.md",
+      "resumeClaudeDescription": "импортирай транскрипт от сесия на Claude Code",
+      "resumeCodexDescription": "импортирай транскрипт от сесия на OpenAI Codex",
+      "reviewDescription": "прегледай промените [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Използвай /{{command}}",
       "insert": "Вмъкни",
       "upgradeRequiredFallback": "Актуализирай CLI, за да използваш тази команда.",
@@ -2437,7 +2613,14 @@
       "stepsCount_one": "{{steps}} стъпка",
       "stepsCount": "{{steps}} стъпки",
       "stepsCount_other": "{{steps}} стъпки",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Модел ({{displayCount}})",
+      "modelsCount_other": "Модели ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "Автоматично одобряване",
+      "description": "Автоматично одобряване на заявките за разрешение за тази сесия. След това инструментите работят без подкана.",
+      "unavailable": "Тази сесия не може да получава заявки за разрешение."
     },
     "prBadge": {
       "open": "отваряне на заявка за сливане",
@@ -2469,6 +2652,12 @@
       "tapToListHint": "Докосни папка, за да видиш съдържанието ѝ.",
       "unsupportedDescription": "Този CLI не може да показва списък с папки. С „Готово“ запазваш началната папка, а със „Започни сесия“ стартираш сесията в нея.",
       "unsupportedTitle": "Списъкът с папки е недостъпен"
+    },
+    "toolRun": {
+      "sheetTitle": "Извиквания на инструменти",
+      "condensedLabel": "{{itemCount}} елемента; {{last}}",
+      "condensedLabel_one": "{{itemCount}} елемент; {{last}}",
+      "condensedLabel_other": "{{itemCount}} елемента; {{last}}"
     }
   },
   "bootstrap": {
@@ -2513,6 +2702,7 @@
     "couldNotLoadActiveSessions": "Не успяхме да заредим активните сесии.",
     "agentSessions": "Активни сега",
     "newCodingTask": "Нова задача за програмиране",
+    "newTaskFromPicture": "Нова задача от снимка",
     "explore": "Още възможности",
     "seeAll": "Виж всички",
     "noLiveSessions": "В момента нищо не се изпълнява"
@@ -2581,7 +2771,10 @@
     "gatewayModelUnavailable": "Този модел за транскрипция не е наличен. Избери друг в Предпочитания.",
     "gatewayModelUnavailableNotice": "Този модел вече не се предлага. Докосни $t(transcriptionModel.title), за да избереш друг.",
     "gatewaySignInRequired": "Влез, за да използваш транскрипция през Kilo Gateway.",
-    "gatewayNoModel": "Първо избери модел за транскрипция в Предпочитания."
+    "gatewayNoModel": "Първо избери модел за транскрипция в Предпочитания.",
+    "testTitle": "Тестване на гласовото въвеждане",
+    "testPlaceholder": "Докоснете микрофона и започнете да говорите.",
+    "testClear": "Изчистване на текста"
   },
   "share": {
     "title": "Споделяне в Kilo",
@@ -2599,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "Тази сесия не може да получава файлове",
     "cliCantReceiveFilesMessage": "Kilo CLI, в който се изпълнява тази сесия, не може да получава файлове. Актуализирай CLI на тази машина или сподели съдържанието в нова сесия.",
     "contentlessMessage": "Няма какво да се сподели — не бяха включени текст или файлове.",
-    "couldNotReadContent": "Не можахме да прочетем споделеното съдържание."
+    "couldNotReadContent": "Не можахме да прочетем споделеното съдържание.",
+    "onlyFirstFilesAttached_one": "Ще бъдат прикачени само първите {{displayCount}} файл.",
+    "onlyFirstFilesAttached_other": "Ще бъдат прикачени само първите {{displayCount}} файла."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2731,7 +2926,8 @@
     "aiProvidersWhat": "Твоите подкани, историята на разговорите и всички файлове, които прикачваш.",
     "aiProvidersWhy": "За генериране на отговори от AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google и други доставчици, които избираш за всяка заявка.",
-    "gatewayWhat": "Идентификатор на акаунта, метаданни на заявките, потребление на токени.",
+    "gatewayWhat": "Идентификатор на акаунта, метаданни на заявките, потребление на токени, както и промптовете и гласовите записи, които приложението изпраща чрез него.",
+    "viaGateway": "Чрез Kilo Gateway",
     "gatewayWhy": "За удостоверяване, маршрутизиране на заявките и сверяване на начислените суми.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Доклади за сривове и грешки, от които е премахнато съдържанието на приложението.",
@@ -2751,7 +2947,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Аудиозаписът ти по време на диктуване.",
     "voiceTranscriptionWhy": "За превръщане на речта в текст.",
-    "voiceTranscriptionWho": "Само на устройството или чрез Apple или Google, когато устройството не може да транскрибира офлайн.",
+    "voiceTranscriptionWho": "Твоето устройство, Kilo Gateway с избрания от теб модел за транскрипция или Apple или Google за онлайн разпознаване.",
     "installAttributionPromptTitle": "Да се разреши ли отчитането на източника на инсталацията?",
     "installAttributionPromptMessage": "Kilo използва разрешението за проследяване на Apple само за да разбере чрез кой канал си открил приложението. Подканите и разговорите ти никога не се използват за това.",
     "what": "Какво",
@@ -2923,6 +3119,14 @@
     "tooManySignInAttempts": "Твърде много опити за влизане. Изчакай и опитай отново."
   },
   "models": {
+    "auto": {
+      "frontier": "Автоматичен Водещ",
+      "balanced": "Автоматичен Балансиран",
+      "efficient": "Автоматичен Ефективен",
+      "small": "Автоматичен Малък",
+      "free": "Автоматичен Безплатен",
+      "organization": "Автоматичен на организацията"
+    },
     "dataCollected": "Събира данни",
     "free": "Безплатно",
     "couldNotUpdateFavorites": "Не успяхме да актуализираме любимите модели.",
@@ -2961,8 +3165,17 @@
     "privacy": "Отвори Kilo, за да видиш агентите",
     "openAgents": "Отвори агентите",
     "needsInput": "Нужен е отговор",
+    "newestSession": "Най-новата: {{title}}",
+    "noneWaiting": "Няма чакащи агенти",
+    "newAgent": "Нов агент",
+    "approving": "Одобрява се...",
+    "couldNotApprove": "Одобряването не бе успешно",
+    "couldNotStart": "Стартирането не бе успешно",
     "channelName": "Активни агенти",
-    "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран."
+    "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран.",
+    "openSession": "Отвори",
+    "approveFailed": "Не успяхме да одобрим. Докосни $t(common.approve), за да опиташ отново.",
+    "newestResult": "Най-нов резултат"
   },
   "transcriptionModel": {
     "title": "Модел за транскрипция",
@@ -2970,5 +3183,56 @@
     "emptyTitle": "Няма модели за транскрипция",
     "emptyDescription": "Kilo Gateway в момента не предлага модели за транскрипция.",
     "loadFailed": "Моделите за транскрипция не се заредиха."
+  },
+  "voiceLanguage": {
+    "title": "Език на гласовото въвеждане",
+    "automatic": "Автоматично",
+    "loadFailed": "Езиците, поддържани от това устройство, не можаха да се заредят.",
+    "emptyTitle": "Няма поддържани езици",
+    "emptyDescription": "Разпознаването на реч на това устройство не отчита поддържани езици."
+  },
+  "tour": {
+    "eyebrow": "Бърз тур",
+    "forkTitle": "Къде искаш да стартираш Kilo?",
+    "forkSubtitle": "Избери къде да работи Kilo за първата ти сесия.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Стартирай Kilo в изолирана облачна среда, без нищо за инсталиране.",
+    "remoteOptionTitle": "Компютърът ти",
+    "remoteOptionBody": "Стартирай Kilo на собствената си машина през `kilo remote` CLI.",
+    "skip": "Пропусни тура",
+    "tutorialLabel": "Ръководство"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "За да стартираш агент, е нужна подкана. Добави подкана и го стартирай отново.",
+      "repositoryUnknown": "Kilo не разпознава {{repository}} като хранилище в GitHub или GitLab. Избери друго хранилище в Kilo.",
+      "repositoryUnsupported": "{{repository}} е хранилище в Bitbucket — Стартирай агент още не може да го използва. Избери друго хранилище в Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Отвори последната сесия"
+  },
+  "spendAlerts": {
+    "subtitle": "Изпращай известие по имейл или push до контактите за фактуриране, когато разходите на този обхват надхвърлят лимит или скочат над обичайната си часова норма.",
+    "enable": "Включи известията за разходи",
+    "thresholdTitle": "Преминаване на праг",
+    "thresholdSubtitle": "Текущите разходи надхвърлят лимита ти",
+    "anomalyTitle": "Часов скок",
+    "anomalySubtitle": "Един час е далеч над обичайната норма за този обхват",
+    "limitLabel": "Лимит (USD)",
+    "windowLabel": "Прозорец",
+    "window24h": "24 часа",
+    "window7d": "7 дни",
+    "window30d": "30 дни",
+    "multiplierLabel": "Множител на скока",
+    "saved": "Настройките за известия за разходи са запазени",
+    "loadError": "Известията за разходи не можаха да се заредят.",
+    "saveError": "Известията за разходи не можаха да се запазят.",
+    "empty": "Известията за разходи са изключени. Включи ги, за да предупреждаваш контактите за фактуриране на този обхват.",
+    "noSpend": "Още няма записани разходи",
+    "spend24h": "Разходи през последните 24 часа",
+    "multiplierError": "Въведи множител 1 или повече",
+    "permissionDenied": "Нямаш разрешение да управляваш известията за разходи.",
+    "pushOffByCategory": "Изключено в „Известия“"
   }
 }

@@ -1,7 +1,54 @@
 import { describe, expect, it } from 'vitest';
-import { pushDataSchema } from '@kilocode/notifications';
 
-import { notificationPathForData } from './notification-path';
+import { notificationPathForData, prPathForData } from './notification-path';
+
+describe('prPathForData', () => {
+  it('routes a GitHub PR payload to the PR review route with via=push', () => {
+    expect(
+      prPathForData({
+        type: 'cloud_agent_session',
+        cliSessionId: 'ses_1',
+        prUrl: 'https://github.com/org/repo/pull/7',
+      })
+    ).toBe('/(app)/pr-review/org/repo/7?via=push');
+  });
+
+  it('routes a GitLab MR payload to the provider route with its instance hint', () => {
+    expect(
+      prPathForData({
+        type: 'cloud_agent_session',
+        cliSessionId: 'ses_1',
+        prUrl: 'https://gitlab.example.com/group/project/-/merge_requests/9',
+      })
+    ).toBe(
+      '/(app)/pr-review/gitlab/group/project/9?instance=https%3A%2F%2Fgitlab.example.com&via=push'
+    );
+  });
+
+  it('routes a Bitbucket PR payload to the provider route', () => {
+    expect(
+      prPathForData({
+        type: 'cloud_agent_session',
+        cliSessionId: 'ses_1',
+        prUrl: 'https://bitbucket.org/workspace/repo/pull-requests/3',
+      })
+    ).toBe('/(app)/pr-review/bitbucket/workspace/repo/3?via=push');
+  });
+
+  it('returns null for a payload without a PR', () => {
+    expect(prPathForData({ type: 'cloud_agent_session', cliSessionId: 'ses_1' })).toBeNull();
+  });
+
+  it('returns null for a PR URL the provider resolver cannot parse', () => {
+    expect(
+      prPathForData({
+        type: 'cloud_agent_session',
+        cliSessionId: 'ses_1',
+        prUrl: 'https://docs.example.com/pull/1',
+      })
+    ).toBeNull();
+  });
+});
 
 describe('notificationPathForData', () => {
   it('routes chat message notifications to the conversation screen', () => {
@@ -70,6 +117,8 @@ describe('notificationPathForData', () => {
         updatedAt: '2026-01-01T00:00:00.000Z',
         expiresAt: '2026-01-01T08:00:00.000Z',
         needsInputSince: '2026-01-01T00:00:00.000Z',
+        newestResultKind: 'running',
+        newestResultAt: '2026-01-01T00:00:00.000Z',
       })
     ).toBe('/(app)/(tabs)/(2_agents)');
   });
@@ -81,6 +130,25 @@ describe('notificationPathForData', () => {
         organizationId: 'org-abc',
       })
     ).toBe('/(app)/(tabs)/(3_profile)/organization/credit-activity?org=org-abc&via=push');
+  });
+
+  it('routes spend_alert notifications for the personal scope to the spend view with via=push', () => {
+    expect(
+      notificationPathForData({
+        type: 'spend_alert',
+        scope: 'personal',
+      })
+    ).toBe('/(app)/(tabs)/(3_profile)/spend-alerts?via=push');
+  });
+
+  it('routes spend_alert notifications for an organization scope to its spend view', () => {
+    expect(
+      notificationPathForData({
+        type: 'spend_alert',
+        scope: 'organization',
+        organizationId: 'org-spend',
+      })
+    ).toBe('/(app)/(tabs)/(3_profile)/spend-alerts?org=org-spend&via=push');
   });
 
   it('routes security_finding notifications for personal scope', () => {
@@ -136,129 +204,5 @@ describe('notificationPathForData', () => {
         scope: 'org-xyz',
       })
     ).toBe('/(app)/(tabs)/(3_profile)/security-agent/org-xyz/findings/finding-4?via=push');
-  });
-});
-
-describe('pushDataSchema', () => {
-  it('rejects empty chat notification IDs', () => {
-    expect(
-      pushDataSchema.safeParse({
-        type: 'chat.message',
-        sandboxId: '',
-        conversationId: 'conversation-1',
-        messageId: 'message-1',
-      }).success
-    ).toBe(false);
-    expect(
-      pushDataSchema.safeParse({
-        type: 'chat.message',
-        sandboxId: 'sandbox-1',
-        conversationId: '',
-        messageId: 'message-1',
-      }).success
-    ).toBe(false);
-    expect(
-      pushDataSchema.safeParse({
-        type: 'chat.message',
-        sandboxId: 'sandbox-1',
-        conversationId: 'conversation-1',
-        messageId: '',
-      }).success
-    ).toBe(false);
-  });
-
-  it('accepts valid chat, lifecycle, and cloud agent notification data', () => {
-    expect(
-      pushDataSchema.safeParse({
-        type: 'chat.message',
-        sandboxId: 'sandbox-1',
-        conversationId: 'conversation-1',
-        messageId: 'message-1',
-      }).success
-    ).toBe(true);
-    expect(
-      pushDataSchema.safeParse({
-        type: 'instance-lifecycle',
-        event: 'ready',
-        sandboxId: 'sandbox-1',
-      }).success
-    ).toBe(true);
-    expect(
-      pushDataSchema.safeParse({
-        type: 'cloud_agent_session',
-        cliSessionId: 'ses_1',
-      }).success
-    ).toBe(true);
-  });
-
-  it('accepts valid low_balance and security_finding notification data', () => {
-    expect(
-      pushDataSchema.safeParse({
-        type: 'low_balance',
-        organizationId: 'org-abc',
-      }).success
-    ).toBe(true);
-    expect(
-      pushDataSchema.safeParse({
-        type: 'security_finding',
-        findingId: 'finding-1',
-        scope: 'personal',
-      }).success
-    ).toBe(true);
-    expect(
-      pushDataSchema.safeParse({
-        type: 'security_finding',
-        findingId: 'finding-2',
-        scope: 'org-xyz',
-      }).success
-    ).toBe(true);
-  });
-
-  it('parses low_balance and security_finding through the schema into notification paths', () => {
-    const lowBalance = pushDataSchema.parse({
-      type: 'low_balance',
-      organizationId: 'org-parsed',
-    });
-    expect(notificationPathForData(lowBalance)).toBe(
-      '/(app)/(tabs)/(3_profile)/organization/credit-activity?org=org-parsed&via=push'
-    );
-
-    const personalFinding = pushDataSchema.parse({
-      type: 'security_finding',
-      findingId: 'f-parsed',
-      scope: 'personal',
-    });
-    expect(notificationPathForData(personalFinding)).toBe(
-      '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/f-parsed?via=push'
-    );
-
-    const orgFinding = pushDataSchema.parse({
-      type: 'security_finding',
-      findingId: 'f-org',
-      scope: 'org-99',
-    });
-    expect(notificationPathForData(orgFinding)).toBe(
-      '/(app)/(tabs)/(3_profile)/security-agent/org-99/findings/f-org?via=push'
-    );
-  });
-
-  it('rejects empty cloud agent session IDs', () => {
-    expect(
-      pushDataSchema.safeParse({
-        type: 'cloud_agent_session',
-        cliSessionId: '',
-      }).success
-    ).toBe(false);
-  });
-
-  it('rejects a security_lifecycle payload with an unknown event value', () => {
-    expect(
-      pushDataSchema.safeParse({
-        type: 'security_lifecycle',
-        event: 'sla_warning',
-        findingId: 'finding-1',
-        scope: 'org-xyz',
-      }).success
-    ).toBe(false);
   });
 });

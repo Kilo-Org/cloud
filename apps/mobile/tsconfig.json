@@ -8,7 +8,11 @@
     "noUncheckedIndexedAccess": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@/assets/*": ["./assets/*"]
+      "@/assets/*": ["./assets/*"],
+      // react-test-renderer is removed; the test harness renders with the
+      // maintained `test-renderer` through src/test/renderer. A test that still
+      // names the old package for its DOM-free instance type resolves here.
+      "react-test-renderer": ["./src/test/renderer"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"]

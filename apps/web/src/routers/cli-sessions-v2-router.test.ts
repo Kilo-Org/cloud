@@ -6,6 +6,7 @@ import {
   cli_sessions_v2,
   github_branch_pull_requests,
   agent_environment_profiles,
+  kilocode_users,
   organizations,
   organization_memberships,
   platform_integrations,
@@ -738,6 +739,29 @@ describe('cli-sessions-v2-router', () => {
       });
     });
 
+    it('projects the session goal from the snapshot metadata and never leaks the raw metadata', async () => {
+      const goal = { text: 'Ship p7 objective', status: 'paused' as const };
+      fetchSessionMessagesPage.mockResolvedValueOnce({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        sessionMetadata: { 'kilo.goal': goal, 'kilo.somethingPrivate': '/srv/secret' },
+      });
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getSessionMessagesPage({
+        session_id: sessionId,
+        limit: 50,
+      });
+
+      expect(result).toEqual({
+        kiloSessionId: sessionId,
+        history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+        watermarkEventId: null,
+        sessionGoal: goal,
+      });
+      expect(result).not.toHaveProperty('sessionMetadata');
+    });
+
     it('preserves retryable_failure so the UI can offer Retry', async () => {
       const history = {
         kind: 'retryable_failure' as const,
@@ -1086,25 +1110,19 @@ describe('cli-sessions-v2-router', () => {
         expect(result.watermarkEventId).toBeNull();
       });
 
-      it('resolves getSession before fetchSessionMessagesPage starts (deferred-promise order proof)', async () => {
-        // Deferred promise proves the router awaits getSession before calling
-        // fetchSessionMessagesPage. Without this ordering, the watermark
-        // read could race with the page fetch.
-        let getSessionResolved = false;
+      it('starts fetchSessionMessagesPage while getSession is still unresolved (concurrency proof)', async () => {
+        // A deferred getSession proves the router starts the worker page fetch
+        // concurrently with the watermark read instead of awaiting the
+        // watermark round trip first.
         let resolveGetSession!: (value: { latestEventId: number }) => void;
-
         const getSessionPromise = new Promise<{ latestEventId: number }>(resolve => {
           resolveGetSession = resolve;
         });
         mockGetSession.mockReturnValue(getSessionPromise);
 
         let fetchPageCalled = false;
-        let pageResolved = false;
         fetchSessionMessagesPage.mockImplementationOnce(async () => {
           fetchPageCalled = true;
-          // If getSession hasn't resolved yet, the ordering is broken.
-          expect(getSessionResolved).toBe(true);
-          pageResolved = true;
           return {
             kiloSessionId: watermarkSessionId,
             history: { messages: [], nextCursor: null, omittedItemCount: 0 },
@@ -1117,20 +1135,57 @@ describe('cli-sessions-v2-router', () => {
           limit: 50,
         });
 
-        // Let the router reach the getSession call.
-        await new Promise(r => setTimeout(r, 0));
+        // Wait until both operations have started. The watermark read stays
+        // pending (its deferred promise is unresolved), so a serial
+        // implementation would never call fetchSessionMessagesPage here.
+        const deadline = Date.now() + 2000;
+        while (
+          (!fetchPageCalled || mockGetSession.mock.calls.length === 0) &&
+          Date.now() < deadline
+        ) {
+          await new Promise(r => setTimeout(r, 5));
+        }
 
-        // Neither getSession nor fetchPage has resolved yet.
-        expect(getSessionResolved).toBe(false);
-        expect(fetchPageCalled).toBe(false);
+        expect(mockGetSession).toHaveBeenCalledWith(cloudAgentSessionId);
+        expect(fetchPageCalled).toBe(true);
 
-        // Resolve getSession — the router must then call fetchSessionMessagesPage.
-        getSessionResolved = true;
+        // Resolve the watermark read and confirm it is still merged into the
+        // page response.
         resolveGetSession({ latestEventId: 99 });
-
         const result = await resultPromise;
-        expect(result.watermarkEventId).toBe(99);
-        expect(pageResolved).toBe(true);
+        expect(result).toEqual({
+          kiloSessionId: watermarkSessionId,
+          history: { messages: [], nextCursor: null, omittedItemCount: 0 },
+          watermarkEventId: 99,
+        });
+      });
+
+      it('maps a page failure to INTERNAL_SERVER_ERROR while the watermark read is still pending', async () => {
+        // The page fetch rejects while the concurrent watermark read is still
+        // in flight. The error contract must be unchanged, and the pending
+        // watermark read must settle without becoming an unhandled rejection.
+        let resolveGetSession!: (value: { latestEventId: number }) => void;
+        mockGetSession.mockReturnValue(
+          new Promise<{ latestEventId: number }>(resolve => {
+            resolveGetSession = resolve;
+          })
+        );
+        fetchSessionMessagesPage.mockRejectedValueOnce(new Error('worker down'));
+
+        const caller = await createCallerForUser(regularUser.id);
+        const rejection = await caller.cliSessionsV2
+          .getSessionMessagesPage({ session_id: watermarkSessionId, limit: 50 })
+          .catch(err => err);
+
+        expect(rejection).toBeInstanceOf(TRPCError);
+        expect(rejection).toMatchObject({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch session messages page',
+        });
+
+        // Let the still-pending watermark read settle cleanly.
+        resolveGetSession({ latestEventId: 7 });
+        await new Promise(r => setTimeout(r, 0));
       });
     });
   });
@@ -1688,6 +1743,66 @@ describe('cli-sessions-v2-router', () => {
       await expect(
         caller.cliSessionsV2.get({ session_id: organizationSessionId })
       ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    it('get distinguishes a session owned by another account from one that does not exist', async () => {
+      // The session exists (created for regularUser in beforeEach) but the
+      // caller is a different signed-in account: an access denial, not a
+      // missing row. The session-resume gate and the mobile session route
+      // render these two denials with different copy, so the lookup must say
+      // which one happened.
+      const caller = await createCallerForUser(otherUser.id);
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: organizationSessionId })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: 'ses_never_ingested_unknown_id' })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
+    it('get returns the owner row when the same session_id exists for two accounts', async () => {
+      // `cli_sessions_v2`'s primary key is `(session_id, kilo_user_id)`, so a
+      // lookup on `session_id` alone can match more than one row. The owner's
+      // row must win even when the other account's row is the one the lookup
+      // reads first — a first-row lookup denied the owner their own session.
+      // The colliding account's id sorts before every other test user's, so it
+      // is the row a plain `limit(1)` returns, whichever plan the database
+      // picks.
+      const collidingUserId = '0000-cli-sessions-v2-collision';
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, collidingUserId));
+      await insertTestUser({
+        id: collidingUserId,
+        google_user_email: 'cli-sessions-v2-collision@example.com',
+        google_user_name: 'CLI Sessions V2 Collision User',
+      });
+      await db.insert(cli_sessions_v2).values([
+        {
+          session_id: organizationSessionId,
+          kilo_user_id: collidingUserId,
+          created_on_platform: 'cloud-agent',
+        },
+        {
+          session_id: organizationSessionId,
+          kilo_user_id: regularUser.id,
+          organization_id: testOrganization.id,
+          created_on_platform: 'cloud-agent',
+        },
+      ]);
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const session = await caller.cliSessionsV2.get({ session_id: organizationSessionId });
+
+        expect(session.kilo_user_id).toBe(regularUser.id);
+      } finally {
+        await db
+          .delete(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+        await db.delete(kilocode_users).where(eq(kilocode_users.id, collidingUserId));
+      }
     });
 
     it('getByCloudAgentSessionId rejects an organization session after its creator loses membership', async () => {

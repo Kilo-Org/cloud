@@ -13,6 +13,8 @@ export const GOOGLE_CLIENT_ID = getEnvVariable('GOOGLE_CLIENT_ID');
 export const GOOGLE_CLIENT_SECRET = getEnvVariable('GOOGLE_CLIENT_SECRET');
 export const ANACONDA_CLIENT_ID = getEnvVariable('ANACONDA_CLIENT_ID');
 export const ANACONDA_CLIENT_SECRET = getEnvVariable('ANACONDA_CLIENT_SECRET');
+export const OPENAI_CLIENT_ID = getEnvVariable('OPENAI_CLIENT_ID');
+export const OPENAI_CLIENT_SECRET = getEnvVariable('OPENAI_CLIENT_SECRET');
 export const GOOGLE_WORKSPACE_OAUTH_CLIENT_ID = getEnvVariable('GOOGLE_WORKSPACE_OAUTH_CLIENT_ID');
 export const GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET = getEnvVariable(
   'GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET'
@@ -60,6 +62,10 @@ export const MISTRAL_API_KEY = getEnvVariable('MISTRAL_API_KEY');
 export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
+// Shared secret with the MCP catalog CI job
+// (.github/workflows/kilo-mcp-catalog.yml). It authenticates only the mint in
+// app/api/internal/mcp-catalog/token; it is never accepted as a Kilo credential.
+export const MCP_CATALOG_TOKEN_SECRET = getEnvVariable('MCP_CATALOG_TOKEN_SECRET');
 export function isBoundedInternalServiceTokenIssuanceEnabled(): boolean {
   return getEnvVariable('BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED') === 'true';
 }
@@ -110,13 +116,6 @@ export const IMPACT_ADVOCATE_API_BASE_URL =
   getEnvVariable('IMPACT_ADVOCATE_API_BASE_URL') || 'https://app.referralsaasquatch.com';
 export const IMPACT_ADVOCATE_DEBUG_LOGGING =
   getEnvVariable('IMPACT_ADVOCATE_DEBUG_LOGGING') === 'true';
-
-// Gates the "Repository Customizations" GitHub UI (per-installation default AI
-// model / PR review mode, plus per-repository overrides) on the GitHub
-// integration settings pages for both personal accounts and organizations.
-// Hidden by default so the feature can ship dark; set PER_REPO_SETTINGS=true
-// to reveal it.
-export const PER_REPO_SETTINGS_ENABLED = getEnvVariable('PER_REPO_SETTINGS') === 'true';
 
 // Gates the Coding Plans UI on the /subscriptions route. Hidden by default so
 // the feature can ship dark; set CODING_PLANS_PURCHASE_ENABLED=true to reveal it.
@@ -500,6 +499,9 @@ export const SECURITY_AUTO_ANALYSIS_WORKER_URL =
 export const GOOGLE_WEB_RISK_API_KEY = getEnvVariable('GOOGLE_WEB_RISK_API_KEY');
 
 export const CREDIT_CATEGORIES_ENCRYPTION_KEY = getEnvVariable('CREDIT_CATEGORIES_ENCRYPTION_KEY');
+export const CREDIT_CATEGORIES_ENCRYPTION_KEY_V2 = getEnvVariable(
+  'CREDIT_CATEGORIES_ENCRYPTION_KEY_V2'
+);
 
 // Agent observability ingest service
 export const O11Y_SERVICE_URL = getEnvVariable('O11Y_SERVICE_URL') || '';

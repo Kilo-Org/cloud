@@ -66,6 +66,5 @@ describe('tryGetProviderById', () => {
 
   test('does not claim dynamically constructed providers', () => {
     expect(tryGetProviderById('direct-byok')).toBeUndefined();
-    expect(tryGetProviderById('perplexity')).toBeUndefined();
   });
 });

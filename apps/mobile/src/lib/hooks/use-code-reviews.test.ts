@@ -1,9 +1,12 @@
+/* eslint-disable max-lines -- one file for the review-list pagination builder and the mutation wiring suites */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  buildReviewListQueryOptions,
   cancelReviewMutationFn,
   createManualReviewMutationFn,
   retriggerReviewMutationFn,
+  REVIEW_PAGE_SIZE,
   useCancelReview,
   useCreateManualReview,
   useRetriggerReview,
@@ -19,6 +22,8 @@ const cancelMutateMock = vi.fn();
 const retriggerMutateMock = vi.fn();
 const personalCreateMutateMock = vi.fn();
 const orgCreateMutateMock = vi.fn();
+const listForUserQueryMock = vi.fn();
+const listForOrganizationQueryMock = vi.fn();
 const invalidateQueriesMock = vi.fn();
 const cancelQueriesMock = vi.fn();
 const getQueryDataMock = vi.fn();
@@ -33,6 +38,7 @@ vi.mock('@tanstack/react-query', () => ({
     return { mutate: vi.fn() };
   },
   useQuery: () => ({ data: undefined }),
+  useInfiniteQuery: () => ({ data: undefined }),
   useQueryClient: () => ({
     cancelQueries: cancelQueriesMock,
     getQueryData: getQueryDataMock,
@@ -51,6 +57,10 @@ vi.mock('@/lib/trpc', () => ({
   }),
   trpcClient: {
     codeReviews: {
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      listForUser: { query: (vars: unknown) => listForUserQueryMock(vars) },
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      listForOrganization: { query: (vars: unknown) => listForOrganizationQueryMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       cancel: { mutate: (vars: unknown) => cancelMutateMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -78,7 +88,8 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 }));
 
 vi.mock('@kilocode/app-shared/code-review', () => ({
-  hasInFlightReview: () => false,
+  hasInFlightReview: (reviews: { status: string }[]) =>
+    reviews.some(review => review.status === 'running'),
   isInFlightReviewStatus: () => false,
 }));
 
@@ -117,6 +128,8 @@ beforeEach(() => {
   retriggerMutateMock.mockReset();
   personalCreateMutateMock.mockReset();
   orgCreateMutateMock.mockReset();
+  listForUserQueryMock.mockReset();
+  listForOrganizationQueryMock.mockReset();
   invalidateQueriesMock.mockReset();
   cancelQueriesMock.mockReset();
   getQueryDataMock.mockReset();
@@ -289,5 +302,199 @@ describe('useCreateManualReview wiring', () => {
 
     expect(invalidateQueriesMock).toHaveBeenCalledTimes(1);
     expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildReviewListQueryOptions: offset pagination behind useReviewList
+// ---------------------------------------------------------------------------
+
+type ReviewPage = {
+  success: boolean;
+  reviews: { id: string; status: string }[];
+  total?: number;
+  hasMore?: boolean;
+  error?: string;
+};
+
+type ReviewListOptions = ReturnType<typeof buildReviewListQueryOptions>;
+
+function createReviewTrpcStub() {
+  const stub = {
+    codeReviews: {
+      listForUser: { queryKey: () => ['codeReviews', 'listForUser'] },
+      listForOrganization: {
+        queryKey: (input: { organizationId: string }) => [
+          'codeReviews',
+          'listForOrganization',
+          input,
+        ],
+      },
+    },
+  };
+  return stub as never;
+}
+
+function makePage(count: number, hasMore = false, status = 'completed'): ReviewPage {
+  return {
+    success: true,
+    reviews: Array.from({ length: count }, (_, index) => ({
+      id: `review-${index}`,
+      status,
+    })),
+    total: count,
+    hasMore,
+  };
+}
+
+// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+function callQueryFn(options: ReviewListOptions, pageParam: number): Promise<ReviewPage> {
+  const queryFn = options.queryFn as unknown as (context: {
+    pageParam: number;
+  }) => Promise<ReviewPage>;
+  return queryFn({ pageParam });
+}
+
+function readGetNextPageParam(
+  options: ReviewListOptions
+): (lastPage: ReviewPage, pages: ReviewPage[], lastPageParam: number) => number | undefined {
+  return options.getNextPageParam as unknown as (
+    lastPage: ReviewPage,
+    pages: ReviewPage[],
+    lastPageParam: number
+  ) => number | undefined;
+}
+
+function readRefetchInterval(
+  options: ReviewListOptions
+): (query: { state: { data?: { pages: ReviewPage[] } } }) => number | false {
+  return options.refetchInterval as unknown as (query: {
+    state: { data?: { pages: ReviewPage[] } };
+  }) => number | false;
+}
+
+describe('buildReviewListQueryOptions (offset pagination)', () => {
+  it('uses the listForUser key, starts at offset 0, and requests the first page', async () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    listForUserQueryMock.mockResolvedValueOnce(makePage(1));
+
+    expect(options.queryKey).toEqual(['codeReviews', 'listForUser']);
+    expect(options.initialPageParam).toBe(0);
+    expect(REVIEW_PAGE_SIZE).toBe(50);
+
+    await callQueryFn(options, 0);
+
+    expect(listForUserQueryMock).toHaveBeenCalledWith({ limit: 50, offset: 0 });
+  });
+
+  it('uses the listForOrganization key and passes the requested offset through', async () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'org_42');
+    listForOrganizationQueryMock.mockResolvedValueOnce(makePage(50));
+
+    expect(options.queryKey).toEqual([
+      'codeReviews',
+      'listForOrganization',
+      { organizationId: 'org_42' },
+    ]);
+
+    await callQueryFn(options, 50);
+
+    expect(listForOrganizationQueryMock).toHaveBeenCalledWith({
+      organizationId: 'org_42',
+      limit: 50,
+      offset: 50,
+    });
+  });
+
+  it('advances the offset by the loaded row count while hasMore is true', () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    const getNextPageParam = readGetNextPageParam(options);
+    const page = makePage(50, true);
+
+    expect(getNextPageParam(page, [page], 0)).toBe(50);
+    expect(getNextPageParam(page, [page], 50)).toBe(100);
+  });
+
+  it('stops pagination when hasMore is false or the page failed', () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    const getNextPageParam = readGetNextPageParam(options);
+
+    expect(getNextPageParam(makePage(50, false), [], 0)).toBeUndefined();
+    expect(getNextPageParam({ success: false, reviews: [], error: 'boom' }, [], 0)).toBeUndefined();
+  });
+
+  it('rejects a resolved failure page instead of treating it as an ordinary page', async () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    listForUserQueryMock.mockResolvedValueOnce({ success: false, reviews: [], error: 'boom' });
+
+    await expect(callQueryFn(options, 0)).rejects.toThrow('boom');
+  });
+
+  it('rejects a resolved failure next page and retries the same offset', async () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    const getNextPageParam = readGetNextPageParam(options);
+
+    const page1 = makePage(50, true);
+    listForUserQueryMock.mockResolvedValueOnce(page1);
+    const loaded = await callQueryFn(options, 0);
+    expect(loaded.reviews).toHaveLength(50);
+
+    // A resolved `{ success: false }` payload must reject like a thrown error
+    // so `isFetchNextPageError` fires; the already-loaded rows stay held.
+    listForUserQueryMock.mockResolvedValueOnce({ success: false, reviews: [], error: 'boom' });
+    await expect(callQueryFn(options, 50)).rejects.toThrow('boom');
+    expect(loaded.reviews).toHaveLength(50);
+    expect(getNextPageParam(page1, [page1], 0)).toBe(50);
+
+    // No page was appended, so retrying asks for the same offset again.
+    const page2 = makePage(10, false);
+    listForUserQueryMock.mockResolvedValueOnce(page2);
+    await expect(callQueryFn(options, 50)).resolves.toEqual(page2);
+    expect(listForUserQueryMock).toHaveBeenLastCalledWith({ limit: 50, offset: 50 });
+  });
+
+  it('keeps the loaded rows and retries the same offset after a failed next page', async () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    const getNextPageParam = readGetNextPageParam(options);
+
+    const page1 = makePage(50, true);
+    listForUserQueryMock.mockResolvedValueOnce(page1);
+    const loaded = await callQueryFn(options, 0);
+
+    expect(loaded.reviews).toHaveLength(50);
+    expect(getNextPageParam(page1, [page1], 0)).toBe(50);
+
+    // The next page fails: the rows already loaded stay held and the retry
+    // policy asks for the same offset again instead of dropping or skipping.
+    listForUserQueryMock.mockRejectedValueOnce(new Error('network down'));
+    await expect(callQueryFn(options, 50)).rejects.toThrow('network down');
+    expect(loaded.reviews).toHaveLength(50);
+    expect(getNextPageParam(page1, [page1], 0)).toBe(50);
+
+    // Retrying the same offset resolves, and the terminal page stops paging.
+    const page2 = makePage(10, false);
+    listForUserQueryMock.mockResolvedValueOnce(page2);
+    await callQueryFn(options, 50);
+
+    expect(listForUserQueryMock).toHaveBeenLastCalledWith({ limit: 50, offset: 50 });
+    expect(getNextPageParam(page2, [page1, page2], 50)).toBeUndefined();
+  });
+
+  it('polls every 5s while the first page holds a running review', () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    const refetchInterval = readRefetchInterval(options);
+
+    expect(refetchInterval({ state: { data: { pages: [makePage(50, true, 'running')] } } })).toBe(
+      5000
+    );
+  });
+
+  it('does not poll for a terminal first page or when no page is loaded', () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    const refetchInterval = readRefetchInterval(options);
+
+    expect(refetchInterval({ state: { data: { pages: [makePage(50, false)] } } })).toBe(false);
+    expect(refetchInterval({ state: { data: { pages: [] } } })).toBe(false);
+    expect(refetchInterval({ state: {} })).toBe(false);
   });
 });

@@ -10,6 +10,10 @@ jest.mock('@/lib/firstTopupBonus', () => ({
   processFirstTopupBonus: jest.fn(),
 }));
 
+jest.mock('@/lib/email', () => ({
+  sendCreditsTopUpEmail: jest.fn(async () => ({ sent: true })),
+}));
+
 describe('processTopUp', () => {
   beforeEach(() => {
     jest.clearAllMocks();

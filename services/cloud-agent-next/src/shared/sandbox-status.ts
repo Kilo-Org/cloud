@@ -28,6 +28,8 @@ export function getSandboxProviderLabel(provider: unknown): SandboxProviderLabel
       return 'Cloudflare';
     case 'vercel':
       return 'Vercel';
+    case 'cloudflare-containers':
+      return 'Cloudflare';
     default:
       return 'Unknown';
   }

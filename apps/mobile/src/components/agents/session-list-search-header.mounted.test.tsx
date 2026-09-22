@@ -1,5 +1,6 @@
 import { createRef, type ElementType, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
+import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type TextInput } from 'react-native';
@@ -116,5 +117,72 @@ describe('SessionListSearchHeader landscape sensor insets', () => {
     // the field and the field grow with it (e1-list-bottom.png).
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
     expect(searchInput(renderer).props.numberOfLines).toBe(1);
+  });
+});
+
+describe('SessionListSearchHeader clear control', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  });
+  afterEach(() => {
+    act(() => {
+      for (const renderer of renderers.splice(0)) {
+        renderer.unmount();
+      }
+    });
+  });
+
+  // The on-device accessibility explorer measures a control's laid-out bounds and
+  // `hitSlop` never widens them: the clear X with no box of its own reads as its
+  // 16pt glyph and is reported too small to tap. Pin the compiled box.
+  async function mountWithClear() {
+    const renderer = await mount(<SessionListSearchHeader {...baseProps} hasText />);
+    const clear = renderer.root.find(
+      node =>
+        node.type === ('Pressable' as ElementType) &&
+        node.props.accessibilityLabel === 'Clear search'
+    );
+    const declarations = (await compiledDimensions(clear.props.className as string)) as {
+      height?: number;
+      width?: number;
+    }[];
+    return {
+      renderer,
+      box: Object.assign({}, ...declarations) as { height: number; width: number },
+      slop: clear.props.hitSlop as number,
+    };
+  }
+
+  it('lays out a box at least 28dp on a side', async () => {
+    const { box } = await mountWithClear();
+    expect(box.height).toBeGreaterThanOrEqual(28);
+    expect(box.width).toBeGreaterThanOrEqual(28);
+  });
+
+  it('reaches the 44pt minimum target with its slop', async () => {
+    const { box, slop } = await mountWithClear();
+    expect(box.height + 2 * slop).toBeGreaterThanOrEqual(44);
+    expect(box.width + 2 * slop).toBeGreaterThanOrEqual(44);
+  });
+
+  it('reserves the box height on the field, so typing cannot shift the list', async () => {
+    const { renderer, box } = await mountWithClear();
+    const rowClassName = fieldRow(renderer).props.className as string;
+    const declarations = (await compiledDimensions(rowClassName)) as { minHeight?: number }[];
+    const field = Object.assign({}, ...declarations) as { minHeight?: number };
+
+    // The row's `py-1.5` compiles to a 5.25pt `paddingBlock` per side at the
+    // app's 14pt rem — 10.5pt, not the 12pt a 16pt rem would give — and its
+    // `border` adds 1pt per side, 2pt vertically. React Native lays the row out
+    // as a border box, so the field's floor must already hold the control's box
+    // plus both. Read the padding and the border from the compiled row rather
+    // than a hand-written rem figure.
+    const rowVerticalPaddingDp = 2 * (await compiledLengthDp(rowClassName, 'paddingBlock'));
+    const rowVerticalBorderDp = 2 * (await compiledLengthDp(rowClassName, 'borderWidth'));
+    expect(rowVerticalPaddingDp).toBe(10.5);
+    expect(rowVerticalBorderDp).toBe(2);
+    expect(field.minHeight).toBeGreaterThanOrEqual(
+      box.height + rowVerticalPaddingDp + rowVerticalBorderDp
+    );
   });
 });

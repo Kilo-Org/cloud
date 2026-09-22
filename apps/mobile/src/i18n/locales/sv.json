@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "För många inloggningsförsök. Vänta ett tag och försök igen."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatisk Avancerad",
+      "balanced": "Automatisk Balanserad",
+      "efficient": "Automatisk Effektiv",
+      "small": "Automatisk Liten",
+      "free": "Automatisk Gratis",
+      "organization": "Organisations-Auto"
+    },
     "dataCollected": "Data samlas in",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Det gick inte att uppdatera favoriterna.",

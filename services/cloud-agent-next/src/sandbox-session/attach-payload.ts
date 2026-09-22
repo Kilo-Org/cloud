@@ -67,6 +67,7 @@ export function buildSessionAttachPayload(
   validateControlSessionOptions(metadata);
   const env = {
     ...(profile.envVars ?? {}),
+    KILOCODE_FEATURE: metadata.identity.createdOnPlatform ?? 'cloud-agent',
     ...(metadata.auth.kilocodeToken ? { KILOCODE_TOKEN: metadata.auth.kilocodeToken } : {}),
   };
   rejectReservedControlRuntimeEnvironment(env);

@@ -42,7 +42,12 @@ function authorization(state: 'active' | 'revoked' = 'active'): RuntimeAuthoriza
 function metadata(kiloSessionId = 'kilo_1'): SessionMetadata {
   return {
     metadataSchemaVersion: 2,
-    identity: { sessionId: 'agent_1', userId: 'user_1', orgId: 'org_1' },
+    identity: {
+      sessionId: 'agent_1',
+      userId: 'user_1',
+      orgId: 'org_1',
+      createdOnPlatform: 'cloud-agent-web',
+    },
     auth: { kiloSessionId },
     lifecycle: { version: 1, timestamp: 0 },
   };
@@ -167,6 +172,7 @@ describe('persisted runtime credential proxy RPC', () => {
     await expect(resolveWith(controlFence('connection_2'))).resolves.toEqual({
       token,
       organizationId: 'org_1',
+      feature: 'cloud-agent-web',
       runtimeAuthorization: {
         userId: 'user_1',
         authorizationId,
@@ -287,6 +293,7 @@ describe('persisted runtime credential proxy RPC', () => {
     ).resolves.toEqual({
       token,
       organizationId: 'org_1',
+      feature: 'cloud-agent-web',
       runtimeAuthorization: {
         userId: 'user_1',
         authorizationId,
@@ -448,6 +455,7 @@ describe('persisted runtime credential proxy RPC', () => {
     await expect(resolveWith(handleB!)).resolves.toEqual({
       token,
       organizationId: 'org_1',
+      feature: 'cloud-agent-web',
       runtimeAuthorization: {
         userId: 'user_1',
         authorizationId,

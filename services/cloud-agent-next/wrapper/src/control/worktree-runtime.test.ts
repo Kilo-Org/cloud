@@ -649,6 +649,7 @@ describe('worktree Kilo environments', () => {
       XDG_CONFIG_HOME: '/home/worktree-a/.config',
       XDG_CACHE_HOME: '/home/worktree-a/.cache',
       KILOCODE_TOKEN: auth.token,
+      KILOCODE_FEATURE: 'cloud-agent',
       KILO_API_URL: auth.targets.backendBaseUrl,
       KILOCODE_BACKEND_BASE_URL: auth.targets.backendBaseUrl,
       KILO_OPENROUTER_BASE: auth.targets.providerBaseUrl,
@@ -680,6 +681,18 @@ describe('worktree Kilo environments', () => {
     expect(JSON.stringify(env)).not.toContain('actual-');
     expect(inherited.KILOCODE_TOKEN).toBe('actual-managed-kilo-token');
     expect(environment.KILOCODE_TOKEN).toBe('actual-attachment-token');
+  });
+
+  it('uses trusted session feature attribution instead of inherited attribution', () => {
+    const env = buildWorktreeKiloEnvironment(
+      '/workspace/a',
+      '/home/worktree-a',
+      auth,
+      { KILOCODE_FEATURE: 'cloud-agent-web' },
+      { KILOCODE_FEATURE: 'cli' }
+    );
+
+    expect(env.KILOCODE_FEATURE).toBe('cloud-agent-web');
   });
 });
 

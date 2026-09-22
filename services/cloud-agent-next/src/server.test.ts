@@ -1163,6 +1163,7 @@ describe('server runtime credential proxy', () => {
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
         token: 'https://provider.example.test/api/openrouter:backing-token',
         organizationId: 'org_proxy',
+        feature: 'cloud-agent-web',
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
@@ -1196,6 +1197,7 @@ describe('server runtime credential proxy', () => {
               ...Object.fromEntries(prohibited.map(name => [name, 'untrusted'])),
               Authorization: `Bearer ${await handle()}`,
               'X-Kilocode-OrganizationId': 'attacker-org',
+              'X-Kilocode-Feature': 'cli',
               'X-Client-Request-Id': 'request_proxy',
             },
           }
@@ -1210,6 +1212,7 @@ describe('server runtime credential proxy', () => {
         'Bearer https://provider.example.test/api/openrouter:backing-token'
       );
       expect(forwarded.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
+      expect(forwarded.headers.get('x-kilocode-feature')).toBe('cloud-agent-web');
       expect(forwarded.headers.get('x-client-request-id')).toBe('request_proxy');
     } finally {
       vi.unstubAllGlobals();

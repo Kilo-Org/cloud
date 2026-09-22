@@ -155,6 +155,7 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
 }): Promise<{
   token: string;
   organizationId?: string;
+  feature: string;
   runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
 } | null> {
   const now = input.now ?? Date.now();
@@ -215,6 +216,7 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
   return {
     token: resolved.token,
     ...(latest.orgId ? { organizationId: latest.orgId } : {}),
+    feature: latestMetadata?.identity.createdOnPlatform ?? 'cloud-agent',
     runtimeAuthorization: {
       userId: latestAuthorization.userId,
       authorizationId: latestAuthorization.id,

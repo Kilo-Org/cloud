@@ -31,7 +31,7 @@ describe('buildSessionAttachPayload', () => {
         platform: 'github',
         token: 'gh_token',
       },
-      env: { KILOCODE_TOKEN: 'cap_1' },
+      env: { KILOCODE_FEATURE: 'cloud-agent', KILOCODE_TOKEN: 'cap_1' },
     });
   });
 
@@ -53,7 +53,7 @@ describe('buildSessionAttachPayload', () => {
     ).toEqual({
       snapshotIdentity: 'kilo_1',
       directory: '/workspace/a',
-      env: { KILOCODE_TOKEN: 'cap_1' },
+      env: { KILOCODE_FEATURE: 'cloud-agent', KILOCODE_TOKEN: 'cap_1' },
       setupCommands: ['pnpm install'],
       preparation: { attemptId: 'att_1', triggerMessageId: 'msg_1' },
     });
@@ -77,6 +77,21 @@ describe('buildSessionAttachPayload', () => {
       branch: 'kilo/quiet-forest-abc',
       branchMode: 'working',
     });
+  });
+
+  it('passes the session origin to the Kilo runtime', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        userId: 'user-1',
+        createdOnPlatform: 'cloud-agent-web',
+      },
+      auth: { kiloSessionId: 'kilo_1' },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(buildSessionAttachPayload(metadata).env?.KILOCODE_FEATURE).toBe('cloud-agent-web');
   });
 
   it('drops working-branch fields for a legacy wrapper', () => {

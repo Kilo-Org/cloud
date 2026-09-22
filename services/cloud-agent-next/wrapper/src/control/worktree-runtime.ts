@@ -337,6 +337,7 @@ export function buildWorktreeKiloEnvironment(
     KILO_DISABLE_AUTOUPDATE: 'true',
     KILO_DEBUG_SESSION_INGEST: '1',
     KILOCODE_TOKEN: kilo.token,
+    KILOCODE_FEATURE: environment.KILOCODE_FEATURE ?? 'cloud-agent',
     ...(kilo.organizationId ? { KILOCODE_ORGANIZATION_ID: kilo.organizationId } : {}),
     KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: kilo.token } }),
     KILOCODE_BACKEND_BASE_URL: kilo.targets.backendBaseUrl,

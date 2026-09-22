@@ -372,7 +372,12 @@ function runtimeProxyAuthorization(request: Request): string | null {
   return match?.[1] ?? null;
 }
 
-function runtimeProxyHeaders(request: Request, token: string, organizationId?: string): Headers {
+function runtimeProxyHeaders(
+  request: Request,
+  token: string,
+  organizationId?: string,
+  feature?: string
+): Headers {
   const headers = new Headers(request.headers);
   for (const name of [
     'Authorization',
@@ -410,6 +415,7 @@ function runtimeProxyHeaders(request: Request, token: string, organizationId?: s
   }
   headers.set('Authorization', `Bearer ${token}`);
   if (organizationId) headers.set('X-Kilocode-OrganizationId', organizationId);
+  if (feature) headers.set('X-Kilocode-Feature', feature);
   return headers;
 }
 
@@ -491,6 +497,7 @@ async function forwardRuntimeCredentialProxy(
   let credential: {
     token: string;
     organizationId?: string;
+    feature: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
   } | null;
   try {
@@ -530,7 +537,12 @@ async function forwardRuntimeCredentialProxy(
       bearer: credential.token,
       ...credential.runtimeAuthorization,
     });
-    const headers = runtimeProxyHeaders(c.req.raw, credential.token, credential.organizationId);
+    const headers = runtimeProxyHeaders(
+      c.req.raw,
+      credential.token,
+      credential.organizationId,
+      route === 'provider' ? credential.feature : undefined
+    );
     headers.set(RUNTIME_PROXY_ATTESTATION_HEADER, proof);
     const response = await fetch(
       createSanitizedForwardRequest(c.req.raw, upstream, headers, bodyText),

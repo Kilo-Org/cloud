@@ -1504,6 +1504,7 @@ export class SandboxSession extends DurableObject<Env> {
   async resolveRuntimeCredentialProxyGrant(_handle: string): Promise<{
     token: string;
     organizationId?: string;
+    feature: string;
     runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
   } | null> {
     return resolvePersistedRuntimeProxyCredential({

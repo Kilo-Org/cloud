@@ -21,7 +21,7 @@ export function prefetchCurrentUser(): void {
     try {
       const token = await preloadedAuthToken;
       if (token != null) {
-        await queryClient.prefetchQuery(trpcOptions.user.getMe.queryOptions());
+        await queryClient.query(trpcOptions.user.getMe.queryOptions());
       }
     } catch {
       // A rejected preload (keychain unavailable at process start) must not

@@ -244,10 +244,17 @@ function topSchemaKeys(inputSchema: Record<string, unknown>): string[] {
   if (isRecord(properties)) {
     for (const key of Object.keys(properties)) if (!keys.includes(key)) keys.push(key);
   }
-  // A chain that falls back to a top-level `allOf` keeps its field keys in the
-  // subschemas; surface them so tags and the search blob stay complete.
-  if (Array.isArray(inputSchema.allOf)) {
-    for (const sub of inputSchema.allOf) {
+  // Composition keywords keep their field keys in the subschemas: a chain that
+  // falls back to a top-level `allOf`, and zod 4.6's top-level `anyOf` for
+  // `.and()` on a union (see `personalPrepareSessionNextSchema`), whose
+  // branches each carry the merged fields. Surface every subschema key so tags
+  // and the search blob stay complete — `sandboxAllocation` exists only inside
+  // those `anyOf` branches and otherwise drops out of the search terms while
+  // staying in `inputSchema`.
+  for (const keyword of ['allOf', 'anyOf'] as const) {
+    const subschemas = inputSchema[keyword];
+    if (!Array.isArray(subschemas)) continue;
+    for (const sub of subschemas) {
       if (isRecord(sub)) {
         for (const key of topSchemaKeys(sub)) if (!keys.includes(key)) keys.push(key);
       }

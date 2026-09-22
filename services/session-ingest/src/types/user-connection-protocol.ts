@@ -6,19 +6,29 @@ import { z } from 'zod';
 
 // -- CLI → DO (CLIOutbound) ---------------------------------------------------
 
+// zod 4.6 measures a string's `.max()` in Unicode code points, but the
+// UserConnectionDO WebSocket attachment budget counts escaped UTF-16 units
+// (see the "WS attachment size" tests): one astral code point is two UTF-16
+// units and up to twelve escaped JSON bytes. Bound the instance metadata by
+// UTF-16 units so the budget still holds.
+const utf16UnitsAtMost = (schema: z.ZodString, maxUnits: number) =>
+  schema.refine(value => value.length <= maxUnits, {
+    error: `Must contain at most ${maxUnits} UTF-16 code units`,
+  });
+
 // Identity of the CLI process (terminal or kilo remote) attached to this WebSocket.
 // Newer CLIs include this on every heartbeat; legacy CLIs that predate the
 // `kilo remote` spawner omit it entirely. The DO persists the latest value
 // in the WebSocket attachment and uses it for `getConnectedInstances()`.
 const instanceSchema = z.object({
-  name: z.string().min(1).max(64),
-  projectName: z.string().min(1).max(64),
-  version: z.string().max(32).optional(),
+  name: utf16UnitsAtMost(z.string().min(1), 64),
+  projectName: utf16UnitsAtMost(z.string().min(1), 64),
+  version: utf16UnitsAtMost(z.string(), 32).optional(),
   // Old producers and hibernated attachments omit this metadata. Keep it optional
   // until all supported metadata-free producers and attachments have retired.
   kind: z.enum(['cli', 'remote']).optional(),
   startedAt: z.string().datetime({ precision: 3 }).length(24).optional(),
-  gitBranch: z.string().max(24).optional(),
+  gitBranch: utf16UnitsAtMost(z.string(), 24).optional(),
 });
 
 export type Instance = z.infer<typeof instanceSchema>;

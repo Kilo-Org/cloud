@@ -32,6 +32,10 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// ProfileScreen reads the landscape side insets, so the real native module
+// would load here. Its build requires `react-native` itself, whose Flow source
+// the vitest transform cannot parse (see `test/render-with-providers.tsx`), so
+// the harness mocks it exactly as `profile-screen.queries.mounted.test.tsx` does.
 // The screen reads its side insets through `@/lib/screen-insets`; the native
 // module's source is not parseable by this project's transform, and the
 // sign-out confirmation does not depend on the values.

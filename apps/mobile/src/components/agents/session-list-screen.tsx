@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, FlatList, Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { AppState, FlatList, Pressable, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -26,7 +26,7 @@ import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
@@ -38,13 +38,10 @@ export function AgentSessionListScreen() {
   const navigation = useNavigation();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom, left, right } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
-
-  const tabBarHeight = useMemo(
-    () => getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }),
-    [bottom, fontScale]
-  );
+  const { left, right } = useSafeAreaInsets();
+  // The tabs layout's width-aware label decision rides along, so this screen's
+  // clearance (list frame, FAB and state-surface insets) tracks the bar height.
+  const tabBarHeight = useEffectiveTabBarHeight();
 
   const context = useLiveSessionContext();
   const { organizationId, isError: isContextError, refetch: refetchContext } = context;

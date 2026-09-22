@@ -56,7 +56,6 @@ export function SegmentedControl<T extends string>({
                 height and weight. The platform shrinks the font to fit rather
                 than truncating, so the label stays readable. */}
             <Text
-              numberOfLines={1}
               adjustsFontSizeToFit
               className={cn(
                 'text-center text-sm',

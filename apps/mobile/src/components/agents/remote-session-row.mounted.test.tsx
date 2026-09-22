@@ -5,6 +5,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RemoteSessionRow } from './remote-session-row';
+import { showRenamePrompt } from './session-row-actions';
 import {
   buildActiveSessionsTrayInput,
   type CachedActiveSessionsData,
@@ -25,6 +26,7 @@ import { createKiloAppQueryClient, getActiveSessionsQueryMetadata } from '@/lib/
 const state = vi.hoisted(() => ({
   organizationId: null as string | null,
   exit: undefined as (() => void) | undefined,
+  rename: undefined as (() => void) | undefined,
   request: vi.fn<() => Promise<CachedActiveSessionsData>>(),
   send: vi.fn(),
 }));
@@ -64,8 +66,9 @@ vi.mock('@/components/agents/session-platform-icon', () => ({
   SessionPlatformIcon: () => null,
 }));
 vi.mock('@/components/agents/session-row-actions', () => ({
-  showSessionActionMenu: (options: { onExit?: () => void }) => {
+  showSessionActionMenu: (options: { onExit?: () => void; onRename?: () => void }) => {
     state.exit = options.onExit;
+    state.rename = options.onRename;
   },
   copySessionId: vi.fn(),
   showRenamePrompt: vi.fn(),
@@ -140,6 +143,7 @@ beforeEach(() => {
   setSignOutActive(false);
   state.organizationId = null;
   state.exit = undefined;
+  state.rename = undefined;
   state.request.mockReset().mockResolvedValue({ sessions: [] });
   state.send.mockReset().mockResolvedValue(undefined);
   client = createKiloAppQueryClient();
@@ -262,5 +266,35 @@ describe('row exit refresh caller', () => {
     });
     expect(client.getQueryData(QUERY_KEY)).toEqual(current);
     expect(state.request.mock.calls).toHaveLength(0);
+  });
+});
+
+describe('RemoteSessionRow rename prefill', () => {
+  it('seeds the rename prompt with the raw backend title, not the untitled fallback', async () => {
+    const rawTitle = 'New session - 2026-09-20T08:10:35.172Z';
+    await act(async () => {
+      renderer = TestRenderer.create(
+        createElement(
+          QueryClientProvider,
+          { client },
+          createElement(RemoteSessionRow, {
+            session: makeCached({ id: 'remote-rename', createdOnPlatform: 'cli', title: rawTitle }),
+            onPress: vi.fn<() => void>(),
+          })
+        )
+      );
+      await flush();
+    });
+    act(() => {
+      if (!renderer) {
+        throw new Error('Missing row');
+      }
+      const props = renderer.root.findByType(Pressable).props as { onLongPress: () => void };
+      props.onLongPress();
+    });
+    act(() => {
+      state.rename?.();
+    });
+    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith(rawTitle, expect.any(Function));
   });
 });

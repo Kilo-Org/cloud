@@ -25,6 +25,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { displaySessionTitle } from '@/lib/session-title';
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
@@ -90,7 +91,12 @@ export function RemoteSessionRow({
     };
   }, [refreshScope]);
   const exitingRef = useRef(false);
-  const title = session.title.length > 0 ? session.title : t('agents.sessionRow.untitled');
+  const title = displaySessionTitle(session.title) ?? t('agents.sessionRow.untitled');
+  // The rename field seeds the session's own title, never the display fallback:
+  // `showRenamePrompt` saves whatever the field holds, so prefilling the
+  // untitled copy would persist that localized string as a real title on a
+  // no-edit tap (the raw backend default is a harmless no-op).
+  const renameInitialValue = session.title;
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
   const agentLabel = remoteSessionEyebrowLabel(session);
@@ -202,7 +208,7 @@ export function RemoteSessionRow({
       },
       onRename: () => {
         if (Platform.OS === 'ios') {
-          showRenamePrompt(title, newTitle => {
+          showRenamePrompt(renameInitialValue, newTitle => {
             renameSession(session.id, newTitle);
           });
         } else {
@@ -257,7 +263,7 @@ export function RemoteSessionRow({
         <RenameModal
           title={t('agentChat.session.renameSession')}
           placeholder={t('agentChat.session.renamePlaceholder')}
-          initialValue={title}
+          initialValue={renameInitialValue}
           onClose={() => {
             setRenameVisible(false);
           }}

@@ -27,6 +27,7 @@ import {
 } from '@/lib/pr-review/provider-pr-ref';
 import { providerRefFromRecentPr, type RecentPrRef } from '@/lib/pr-review/recent-prs';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { displaySessionTitle } from '@/lib/session-title';
 
 import {
   APP_SCHEME,
@@ -192,8 +193,12 @@ function sessionSearchDocument(input: {
   organizationId?: string | null;
   gitBranch?: string | null;
 }): SystemSearchDocument | null {
-  const title = (input.title ?? '').trim();
-  if (title.length === 0) {
+  // A backend default title (`New session - <ISO>`) is machine output, so the
+  // entry is treated like a title-less row and stays out of the index. The
+  // title is trimmed so a padded one indexes and fingerprints identically to
+  // the unpadded value.
+  const title = displaySessionTitle(input.title)?.trim();
+  if (title === undefined || title.length === 0) {
     return null;
   }
   return buildDocument({

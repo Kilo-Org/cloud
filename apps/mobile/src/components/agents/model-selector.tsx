@@ -26,6 +26,7 @@ import { modelPickerSlot } from '@/lib/route-registry';
 import { cn } from '@/lib/utils';
 
 import { modelSelectorBadges } from './model-selector-badges';
+import { resolveModelSelectorLabel } from './model-selector-label';
 
 type ModelSelectorProps = {
   value: string;
@@ -139,10 +140,18 @@ export function ModelSelector({
   const providerAware = pickerOptions.some(
     option => option.modelRef !== undefined || !option.showGatewayMetadata
   );
-  const fallbackLabel = !providerAware && value ? value : t('common.model');
-  const label = selectedModel
-    ? autoModelLabel(selectedModel.displayId, selectedModel.name)
-    : fallbackLabel;
+  // A matched option can be one of Kilo's own Auto models, whose backend name no
+  // catalog translates, so resolve its label first and let the helper fall back
+  // to the short name (or the generic label) for a stored reference the catalog
+  // does not carry.
+  const label = resolveModelSelectorLabel({
+    selectedName: selectedModel
+      ? autoModelLabel(selectedModel.displayId, selectedModel.name)
+      : undefined,
+    value,
+    providerAware,
+    fallbackLabel: t('common.model'),
+  });
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';

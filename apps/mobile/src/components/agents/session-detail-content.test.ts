@@ -2803,6 +2803,32 @@ describe('SessionDetailContent fixed indicator row', () => {
   });
 });
 
+describe('session detail composer placeholder (explorer session-detail)', () => {
+  // The explorer's `session-detail.png` shows the composer field rendering the
+  // literal developer string 'undefined'. Every placeholder the detail screen
+  // can pass is catalog copy, so the proof is that the mounted composer always
+  // receives a non-empty catalog string — never 'undefined' and never a raw key.
+  it('passes catalog copy to the composer, never the literal undefined', async () => {
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer.props.placeholder).toBe(i18n.t('common.message'));
+    expect(typeof composer.props.placeholder).toBe('string');
+    expect(composer.props.placeholder).not.toBe('undefined');
+  });
+
+  it('resolves the preparing and finalizing placeholders to catalog copy too', () => {
+    for (const key of [
+      'agentChat.composer.preparingPlaceholder',
+      'agentChat.composer.finalizingPlaceholder',
+    ]) {
+      const copy = i18n.t(key);
+      expect(copy).not.toBe(key);
+      expect(copy).not.toBe('undefined');
+      expect(copy.length).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe('session detail duplicate failure state', () => {
   // Stored messages are ordered by id, which is time-sortable ascending, so the
   // user row must sort before the assistant row for the Retry prompt to resolve.
@@ -2892,6 +2918,23 @@ describe('session detail duplicate failure state', () => {
     expect(nodes[0]?.props).toMatchObject({
       indicator: { message: 'simulated error' },
     });
+  });
+
+  it('draws the fixed footer on an opaque, non-absolute surface above the transcript', async () => {
+    // Explorer `session-working` showed the fixed footer line printed over the
+    // scrolling transcript row it covers. The footer must be an opaque
+    // `bg-background` sibling in the column flow, never an `absolute` overlay.
+    const view = await mountFailedTurn({
+      type: 'error',
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      timestamp: 0,
+    });
+    const nodes = indicatorNodes(view);
+    expect(nodes).toHaveLength(1);
+    const footer = nodes[0]?.parent;
+    const className = String(footer?.props.className ?? '');
+    expect(className).toContain('bg-background');
+    expect(className).not.toContain('absolute');
   });
 });
 

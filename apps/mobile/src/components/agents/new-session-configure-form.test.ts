@@ -127,6 +127,10 @@ vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
+// The loading profile row renders the reanimated `Skeleton`; stub it so this
+// node suite neither loads reanimated nor loses the `findElementByType`
+// assertion for the loading placeholder.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 // `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
 // import cannot resolve in the pure project; every sibling pure spec mocks it.

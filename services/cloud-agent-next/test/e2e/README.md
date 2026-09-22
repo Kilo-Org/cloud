@@ -490,8 +490,10 @@ Docker-only flow (`sandboxFaults`/`gates`) `unsupported` rather than skipping it
 assertions. Long `gate`/`hang` directives remain outside the supported deployed
 profile (short streams only).
 
-The deployed profile does **not** send `x-skip-balance-check`: the enrolled user
-must have positive balance, and a 403 at `start` means fund the user.
+The deployed profile sends `x-skip-balance-check`, so the enrolled user needs no
+funding: the deterministic fake LLM performs no billable inference, and the e2e
+render disables container billing. Balance admission is not part of the deployed
+e2e contract.
 
 Honest caveat: `cold-hot` proves the warm dispatch path, not physical
 container identity. The absence of hot-turn preparation events is not proof that
@@ -522,8 +524,6 @@ Troubleshooting:
   mode-600 JSON file with a `token` field; the failure names both.
 - **`WORKER_URL`/`FAKE_LLM_URL`/`E2E_BACKEND_URL` must be `https://`** — the
   deployed profile refuses plain HTTP.
-- **403 at `start`** — fund the enrolled user; the deployed profile does not
-  bypass balance admission.
 - **Container cold-start timeout** — `cold-hot` defaults to 240s per
   turn; a first real container boot can exceed two minutes.
 - **Fake Worker `/health`** — `curl https://fake-llm-e2e-test.<sub>.workers.dev/health`

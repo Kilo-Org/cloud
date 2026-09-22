@@ -14,7 +14,7 @@ import {
 import { type LayoutChangeEvent, Platform, View, type ViewProps } from 'react-native';
 import { type Stack } from 'expo-router';
 
-import { getStateSurfaceInsets, resolveBottomReservation } from '@/lib/centered-state-layout';
+import { getBottomReservation, getStateSurfaceInsets } from '@/lib/centered-state-layout';
 import {
   type SurfaceMeasurement,
   useStateSurfaceMeasurement,
@@ -225,17 +225,13 @@ export function NativeStateSurface({ children, navigation, options }: ScreenLayo
 export function StateSurfaceInsets({
   children,
   bottomInset,
-  replaceBottomReservation = false,
 }: {
   children: ReactNode;
+  /** Raised onto the inherited bottom reservation: a nested surface can only
+   *  add clearance, never shrink it. The tabs layout reserves the tab bar alone
+   *  (its content gap is content-only), so the Agents screen's `tabBarHeight +
+   *  fabBand` is the whole reserve its centered states resolve. */
   bottomInset: number;
-  /** Set `bottomInset` as the surface's own bottom reserve instead of only
-   *  raising the inherited one. A nested surface whose centered state must use
-   *  the whole room above a hard overlay passes this, so the inherited content
-   *  gap does not shrink the state's clear region (the Agents no-match state,
-   *  device capture `agents-search-empty`). Defaults to raising, so a nested
-   *  reservation can never shrink a surface's clearance. */
-  replaceBottomReservation?: boolean;
 }) {
   const surface = useStateSurface();
   const geometry = useMemo(
@@ -243,16 +239,15 @@ export function StateSurfaceInsets({
       surface
         ? resolveSurfaceGeometry(surface, {
             top: surface.topReservation,
-            bottom: resolveBottomReservation({
+            bottom: getBottomReservation({
               inherited: surface.bottomReservation,
               bottomInset,
-              replace: replaceBottomReservation,
             }),
             nativeViewportFillsSurface: surface.nativeViewportFillsSurface,
             register: surface.register,
           })
         : null,
-    [surface, bottomInset, replaceBottomReservation]
+    [surface, bottomInset]
   );
   return <StateSurfaceContext value={geometry}>{children}</StateSurfaceContext>;
 }

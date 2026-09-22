@@ -2,6 +2,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { type LayoutChangeEvent } from 'react-native';
 
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
+import { REFRESH_PROGRESS_REDUCED_MOTION_HEIGHT } from '@/components/ui/refresh-progress';
+import { useProvidedMotionPolicy } from '@/lib/a11y/motion-context';
 import { getAgentsListBottomInset, getEmptyStatePresentation } from '@/lib/agents-bottom-chrome';
 
 /**
@@ -38,10 +40,18 @@ export function useAgentsListChrome({
   // `getAgentsListBottomInset`); the centered states keep all of it.
   const fabBand = showFab ? FAB_SIZE + FAB_MARGIN : 0;
   const centeredBottomInset = tabBarHeight + fabBand;
+  // `CenteredState` publishes the band above the pull-to-refresh line it renders
+  // above the children, and under reduced motion that line reserves its `h-9`
+  // box whether or not a pull is in flight (`RefreshProgress`). The decision
+  // must read the same band, or a reduced-motion user keeps the full form in a
+  // band that cannot hold it.
+  const reducedMotion = useProvidedMotionPolicy()?.reducedMotion ?? false;
+  const refreshReserve = reducedMotion ? REFRESH_PROGRESS_REDUCED_MOTION_HEIGHT : 0;
   const compactEmptyState =
     getEmptyStatePresentation({
       available: bodyHeight,
       bottomInset: centeredBottomInset,
+      reservedHeight: refreshReserve,
       fontScale,
     }) === 'compact';
 

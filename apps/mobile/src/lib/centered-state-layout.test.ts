@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getBottomReservation,
   getCenteredStateBand,
   getCenteredStateLayout,
   getStateSurfaceInsets,
   intersectStateFrames,
-  resolveBottomReservation,
 } from './centered-state-layout';
 
 describe('getCenteredStateLayout', () => {
@@ -282,16 +282,10 @@ describe('getStateSurfaceInsets', () => {
   });
 });
 
-describe('resolveBottomReservation', () => {
-  it('raises an inherited reserve with the passed inset', () => {
-    expect(resolveBottomReservation({ inherited: 97, bottomInset: 81, replace: false })).toBe(97);
-    expect(resolveBottomReservation({ inherited: 60, bottomInset: 81, replace: false })).toBe(81);
-  });
-
-  it('replaces the inherited reserve when asked', () => {
-    // The Agents screen keeps the tab bar alone: the tab layout's inherited
-    // content gap must not shrink its centered states' clear region.
-    expect(resolveBottomReservation({ inherited: 97, bottomInset: 81, replace: true })).toBe(81);
+describe('getBottomReservation', () => {
+  it('raises an inherited reserve with the passed inset, never shrinking it', () => {
+    expect(getBottomReservation({ inherited: 97, bottomInset: 81 })).toBe(97);
+    expect(getBottomReservation({ inherited: 60, bottomInset: 81 })).toBe(81);
   });
 });
 

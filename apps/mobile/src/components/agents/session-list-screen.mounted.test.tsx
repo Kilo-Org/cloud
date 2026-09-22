@@ -514,14 +514,13 @@ describe('AgentSessionListScreen live presentation', () => {
     // (the mocked 48dp button + its 16dp margin) joins it, because a centered
     // state's full-width action (the load failure's Retry, the boundary's
     // back-to-profile) must not reach into the corner overlay (see
-    // `useAgentsListChrome`). The reserve replaces the tab layout's inherited
-    // bar-plus-content-gap reservation, so the centered states keep the bar
-    // alone above them. The no-match body owns the whole band and hides the FAB
-    // instead (`showFab`), so its reserve is the bar alone.
+    // `useAgentsListChrome`). The tabs layout reserves the bar alone (its 16dp
+    // content gap is content-only), so the raised reserve is the bar plus the
+    // FAB band. The no-match body owns the whole band and hides the FAB instead
+    // (`showFab`), so its reserve is the bar alone.
     const surface = root().findByType(StateSurfaceInsets);
     const expectedInset = test.empty ? state.tabBarHeight : state.tabBarHeight + 64;
     expect(surface.props.bottomInset).toBe(expectedInset);
-    expect(surface.props.replaceBottomReservation).toBe(true);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
@@ -1674,10 +1673,9 @@ describe('AgentSessionListScreen live filtering', () => {
     );
     const surface = root().findByType(StateSurfaceInsets);
     expect(surface.props.bottomInset).toBe(state.tabBarHeight);
-    // The state's surface replaces the tabs layout's inherited bar-plus-gap
-    // reservation, so its clear region is the body minus the bar the state's
+    // The tabs layout reserves the bar alone (its 16dp content gap is
+    // content-only), so the state's clear region is the body minus the bar its
     // own full-width action must clear.
-    expect(surface.props.replaceBottomReservation).toBe(true);
 
     // A body that exactly clears the bar holds the whole full state; one dp less
     // is compact.
@@ -1749,6 +1747,36 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(compact()).toBe(false);
     expect(root().findByType(EmptyState).props.compact).toBe(false);
+  });
+
+  it('compacts the no-match state for the reserve reduced motion adds to the band', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const compact = () => root().findByType(EmptyState).props.compact as boolean;
+    const search = () => {
+      (requireNode('SessionListSearchHeader').props.onChangeText as (text: string) => void)(
+        'nothing matches this'
+      );
+    };
+    act(search);
+
+    // A body that holds the whole full state while no reserve sits above it...
+    const holdsFullState = getEmptyStateFullHeight() + state.tabBarHeight;
+    act(() => {
+      layoutBody(holdsFullState);
+    });
+    expect(compact()).toBe(false);
+
+    // ...no longer holds it once reduced motion reserves RefreshProgress's h-9
+    // box (31.5dp) inside the band, so the state must go compact instead of
+    // running its hint and Clear action under the bar.
+    state.reducedMotion = true;
+    await renderScreen();
+    act(search);
+    act(() => {
+      layoutBody(holdsFullState);
+    });
+    expect(compact()).toBe(true);
   });
 });
 

@@ -357,9 +357,11 @@ export function AgentSessionListScreen() {
     // Retry, the boundary's back-to-profile) cannot reach under the corner
     // overlay (device defect e3, see `useAgentsListChrome`). The no-match body
     // owns the whole band and hides the FAB (`showFab`), so its reserve is the
-    // bar alone; the replace flag keeps the tabs layout's inherited content gap
-    // from shrinking the state's clear region (landscape spot defect e8).
-    <StateSurfaceInsets bottomInset={centeredBottomInset} replaceBottomReservation>
+    // bar alone. The tabs layout reserves the bar alone too — its 16dp
+    // scroll-content gap is content-only (`_layout.tsx`) — so raising the
+    // inherited reserve is exactly the bar plus the FAB band and nothing
+    // shrinks the state's clear region.
+    <StateSurfaceInsets bottomInset={centeredBottomInset}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}

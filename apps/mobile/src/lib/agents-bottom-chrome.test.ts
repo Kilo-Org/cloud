@@ -14,10 +14,9 @@ const SHORT_AVAILABLE = 180;
 const TAB_BAR = 81;
 const FAB_BAND = 72;
 const FULL_BAND = TAB_BAR + FAB_BAND;
-// The gap the tabs layout reserves below the bar for scrolled content. The
-// screen's surface replaces that inherited reservation, so its centered states
-// keep the bar and the FAB band it resolves instead (see
-// `getEmptyStatePresentation`).
+// The gap a scrolled-content surface reserves below the bar. The tabs layout
+// keeps it content-only, but a surface that did reserve it must be measured
+// against that larger inset (see `getEmptyStatePresentation`).
 const TAB_GAP = 16;
 
 describe('getAgentsListBottomInset', () => {
@@ -55,24 +54,34 @@ describe('getAgentsListBottomInset', () => {
 });
 
 describe('getEmptyStateFullHeight', () => {
-  it('reproduces the one-line state height the old fixed constant held at scale 1', () => {
-    // The 184dp the constant used to be: bubble 56 + gaps 16/4/16 + a 28dp
-    // title line + a 20dp description line + the 44dp action.
-    expect(getEmptyStateFullHeight({ descriptionLines: 1 })).toBe(184);
+  it('builds the state from the app’s 14pt rem, not a 16pt one', () => {
+    // bubble h-14 (49) + gap-4 (14) + text-lg line (24.5) + gap-1 (3.5) + a
+    // text-sm description line (17.5) + gap-4 (14) + the 44px action.
+    expect(getEmptyStateFullHeight({ descriptionLines: 1 })).toBe(167);
   });
 
   it('reserves the two-line description the live empty state actually renders', () => {
     // `agents.sessionList.noSessionsYetDescription` is longer than one phone
-    // line, so the state on screen is one text line taller than the old 184dp.
-    expect(getEmptyStateFullHeight()).toBe(204);
+    // line, so the state on screen is one text line taller.
+    expect(getEmptyStateFullHeight()).toBe(184);
     expect(getEmptyStateFullHeight({ descriptionLines: 2 })).toBeGreaterThan(
       getEmptyStateFullHeight({ descriptionLines: 1 })
     );
   });
 
-  it('grows the state with Dynamic Type', () => {
-    // The title, the description and the action all scale; the icon bubble and
-    // the block gaps do not.
+  it('counts a title line as well as the description lines', () => {
+    expect(getEmptyStateFullHeight({ titleLines: 2 })).toBe(209);
+    expect(getEmptyStateFullHeight({ titleLines: 2 })).toBeGreaterThan(
+      getEmptyStateFullHeight({ titleLines: 1 })
+    );
+  });
+
+  it('grows the state with Dynamic Type, counting the copy re-wrapping', () => {
+    // The title wraps to two lines and the two-line description to four at
+    // scale 2, so the text blocks grow with the square of the scale. A
+    // scale-only estimate that held the line counts fixed was 249dp here and
+    // under-estimated the rendered state by a whole text line.
+    expect(getEmptyStateFullHeight({ fontScale: 2 })).toBe(368);
     expect(getEmptyStateFullHeight({ fontScale: 2 })).toBeGreaterThan(
       getEmptyStateFullHeight({ fontScale: 1 })
     );
@@ -144,6 +153,31 @@ describe('getEmptyStatePresentation', () => {
         available: atScale2 + TAB_BAR,
         bottomInset: TAB_BAR,
         fontScale: 2,
+      })
+    ).toBe('full');
+  });
+
+  it('subtracts the reserved refresh line the band publishes', () => {
+    // Reduced motion reserves `RefreshProgress`'s h-9 box (31.5dp) above the
+    // children, so a body that holds the full state with no reserve no longer
+    // holds it: ignoring the reserve kept the full form in a band that could
+    // not fit it (reduced-motion users only).
+    const holdsFullState = getEmptyStateFullHeight() + TAB_BAR;
+    expect(getEmptyStatePresentation({ available: holdsFullState, bottomInset: TAB_BAR })).toBe(
+      'full'
+    );
+    expect(
+      getEmptyStatePresentation({
+        available: holdsFullState + 31.5 - 1,
+        bottomInset: TAB_BAR,
+        reservedHeight: 31.5,
+      })
+    ).toBe('compact');
+    expect(
+      getEmptyStatePresentation({
+        available: holdsFullState + 31.5,
+        bottomInset: TAB_BAR,
+        reservedHeight: 31.5,
       })
     ).toBe('full');
   });

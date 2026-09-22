@@ -266,13 +266,14 @@ async function attemptRefresh(
     const accessToken = readStringField(body, 'access_token');
     const expiresIn = readExpiresIn(body);
     if (accessToken && expiresIn) {
-      const earliestRefreshAt = readEarliestRefreshAt(body);
       const updated: OpenAiChatGptConnection = {
         ...connection,
         access_token: accessToken,
         refresh_token: readStringField(body, 'refresh_token') ?? refreshToken,
         expires_at: nowSeconds() + expiresIn,
-        ...(earliestRefreshAt !== undefined ? { earliest_refresh_at: earliestRefreshAt } : {}),
+        // Always overwrite: a response that omits the field lifts the previous
+        // token's restriction instead of carrying it onto the rotated token.
+        earliest_refresh_at: readEarliestRefreshAt(body),
         scope: readStringField(body, 'scope') ?? connection.scope,
         token_type: readStringField(body, 'token_type') ?? connection.token_type,
         status: 'connected',

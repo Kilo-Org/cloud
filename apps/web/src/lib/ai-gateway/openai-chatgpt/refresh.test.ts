@@ -198,8 +198,8 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('refreshes an expired token even when earliest_refresh_at is in the past', async () => {
-    storedRow = encryptedRow(buildConnection({ earliest_refresh_at: nowSeconds() - 1 }));
+  it('refreshes an expired token even when earliest_refresh_at is still ahead', async () => {
+    storedRow = encryptedRow(buildConnection({ earliest_refresh_at: nowSeconds() + 300 }));
     fetchMock.mockResolvedValue(
       jsonResponse({ access_token: 'new-access-token', expires_in: 3600 })
     );
@@ -225,6 +225,17 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     await resolveOpenAiChatGptAccessToken(USER_OWNER);
 
     expect(decodeStored(txUpdateSetCalls[0]).earliest_refresh_at).toBe(earliestRefreshAt);
+  });
+
+  it('clears a stored earliest_refresh_at when the refresh response omits it', async () => {
+    storedRow = encryptedRow(buildConnection({ earliest_refresh_at: nowSeconds() - 1 }));
+    fetchMock.mockResolvedValue(
+      jsonResponse({ access_token: 'new-access-token', expires_in: 3600 })
+    );
+
+    await resolveOpenAiChatGptAccessToken(USER_OWNER);
+
+    expect(decodeStored(txUpdateSetCalls[0]).earliest_refresh_at).toBeUndefined();
   });
 
   it('reports no connection when no row is stored', async () => {

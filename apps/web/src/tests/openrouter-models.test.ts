@@ -139,6 +139,10 @@ jest.mock('@/lib/ai-gateway/experiments/list-available-experiment-models', () =>
   listAvailableExperimentModels: jest.fn(async () => []),
 }));
 
+jest.mock('@/lib/ai-gateway/openai-chatgpt/routing', () => ({
+  tagOpenAiChatGptByokModels: jest.fn(async (_userId: string, models: unknown[]) => models),
+}));
+
 jest.mock('@/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getBenchmarkRoutingTable: jest.fn(async () => ({ status: 200, body: { table: null } })),
 }));
@@ -283,14 +287,18 @@ describe('GET /api/openrouter/models', () => {
     expect(Array.isArray(responseData.data)).toBe(true);
   });
 
-  test('excludes unavailable free Gemma models advertised upstream while retaining paid Gemma', async () => {
+  test('excludes unavailable free models advertised upstream while retaining paid Gemma', async () => {
     const original = mockOpenRouterModels.data.find(model => model.id === 'some-other-model');
     if (!original) throw new Error('Expected catalog fixture');
     const upstream = {
       data: [
         ...mockOpenRouterModels.data,
         { ...original, id: 'google/gemma-4-31b-it', name: 'Google: Gemma 4 31B IT' },
-        ...['google/gemma-4-26b-a4b-it:free', 'google/gemma-4-31b-it:free'].map(id => ({
+        ...[
+          'google/gemma-4-26b-a4b-it:free',
+          'google/gemma-4-31b-it:free',
+          'thinkingmachines/inkling:free',
+        ].map(id => ({
           ...original,
           id,
           name: id,
@@ -310,6 +318,7 @@ describe('GET /api/openrouter/models', () => {
     expect(response.status).toBe(200);
     expect(modelIds).not.toContain('google/gemma-4-26b-a4b-it:free');
     expect(modelIds).not.toContain('google/gemma-4-31b-it:free');
+    expect(modelIds).not.toContain('thinkingmachines/inkling:free');
     expect(modelIds).toContain('google/gemma-4-31b-it');
   });
 
@@ -420,8 +429,12 @@ describe('GET /api/openrouter/models', () => {
 });
 
 describe('GET /api/gateway/v1/models', () => {
-  test('uses the OpenRouter models handler', () => {
-    expect(gatewayV1ModelsGET).toBe(GET);
+  test('re-wraps the OpenRouter models handler with its own timing pattern', () => {
+    // The alias wraps the already timed handler so a gateway pathname logs the
+    // gateway pattern; the inner `/api/openrouter/models` wrapper stays silent
+    // by prefix. A bare re-export would emit no `api_timing` line at all.
+    expect(typeof gatewayV1ModelsGET).toBe('function');
+    expect(gatewayV1ModelsGET).not.toBe(GET);
   });
 
   test('retains Enkrypt and Terminal Bench in the gateway catalog response', async () => {
@@ -494,7 +507,9 @@ describe('Enkrypt catalog publication boundaries', () => {
 
       const raw = await getRawOpenRouterModels();
       const catalog = await GET(createTestRequest('/api/openrouter/models'));
-      const transcription = await transcriptionModelsGET();
+      const transcription = await transcriptionModelsGET(
+        createTestRequest('/api/gateway/transcription-models')
+      );
       expect(catalog.status).toBe(200);
       expect(transcription.status).toBe(200);
       for (const response of [raw, await catalog.json(), await transcription.json()]) {
@@ -516,7 +531,9 @@ describe('Enkrypt catalog publication boundaries', () => {
     expect(await getRawOpenRouterModels()).toEqual({
       data: [{ id: 'provider/invalid', unrelated: 'retained' }],
     });
-    const transcription = await transcriptionModelsGET();
+    const transcription = await transcriptionModelsGET(
+      createTestRequest('/api/gateway/transcription-models')
+    );
     expect(transcription.status).toBe(200);
     expect(await transcription.json()).toEqual({
       data: [{ id: 'provider/invalid', unrelated: 'retained' }],

@@ -12,7 +12,7 @@ import { Readable } from 'node:stream';
 // extract it ("Error 79 - Inappropriate file type or format").
 export const maxDuration = 800;
 
-const BATCH_SIZE = 25;
+const BATCH_SIZE = 10;
 
 function formatTimestamp(isoString: string): string {
   return isoString.replaceAll(':', '-').replaceAll(' ', '_');

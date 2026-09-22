@@ -4,6 +4,8 @@
     "done": "Xong",
     "retry": "Thử lại",
     "tryAgain": "Thử lại",
+    "continue": "Tiếp tục",
+    "notNow": "Để sau",
     "language": "Ngôn ngữ",
     "device": "Thiết bị",
     "share": "Chia sẻ {{title}}",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "Không thể sao chép vào bộ nhớ tạm.",
     "required": "bắt buộc",
     "error": "lỗi: {{error}}",
-    "notNow": "Để sau",
-    "continue": "Tiếp tục",
     "back": "Quay lại",
     "somethingWentWrong": "Đã xảy ra lỗi.",
     "couldNotOpen": "Không thể mở {{label}}.",
@@ -36,6 +36,7 @@
     "cost": "Chi phí",
     "discard": "Hủy bỏ",
     "findings": "Vấn đề",
+    "mergeRequest": "merge request",
     "notConnected": "Chưa kết nối",
     "notifications": "Thông báo",
     "pullRequest": "yêu cầu hợp nhất",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Sử dụng email khác",
     "signInWithApple": "Đăng nhập bằng Apple",
     "signInWithGoogle": "Đăng nhập bằng Google",
+    "signInWithPasskey": "Đăng nhập bằng khóa truy cập",
     "emailAddress": "Địa chỉ email",
     "emailPlaceholder": "ban@example.com",
     "continueWithEmail": "Tiếp tục với email",
@@ -174,6 +176,10 @@
     "termsConnector": " và ",
     "termsSuffix": ".",
     "moreSignInOptions": "Thêm tùy chọn đăng nhập",
+    "passkeyCancelled": "Đăng nhập bằng khóa truy cập đã bị hủy. Vui lòng thử lại.",
+    "passkeyNotFound": "Không có khóa truy cập nào được lưu cho thiết bị này. Hãy đăng nhập bằng Apple, Google hoặc email của bạn.",
+    "passkeyUnsupported": "Khóa truy cập không khả dụng trên thiết bị này. Hãy đăng nhập bằng Apple, Google hoặc email của bạn.",
+    "passkeyFailed": "Không thể đăng nhập bằng khóa truy cập. Vui lòng thử lại.",
     "couldNotCompleteSignIn": "Không thể hoàn tất đăng nhập. Vui lòng thử lại.",
     "sessionEnded": "Phiên của bạn đã kết thúc. Vui lòng đăng nhập lại.",
     "signInCodeExpired": "Mã đăng nhập của bạn đã hết hạn. Vui lòng thử lại.",
@@ -224,11 +230,36 @@
     "providerTestAccount": "Tài khoản thử nghiệm",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO doanh nghiệp"
+    "providerEnterpriseSso": "SSO doanh nghiệp",
+    "passkeysTitle": "Khóa truy cập",
+    "passkeysSubtitle": "Đăng nhập không cần mật khẩu",
+    "passkeysEmpty": "Chưa có khóa truy cập nào",
+    "passkeysEmptyHint": "$t(profile.addPasskey) để đăng nhập không cần mật khẩu.",
+    "passkeysCouldNotLoad": "Không thể tải khóa truy cập",
+    "passkeysLoadFailed": "Khóa truy cập không khả dụng cho đến khi nội dung này tải xong.",
+    "addPasskey": "Thêm khóa truy cập",
+    "passkeyDefaultName": "Khóa truy cập",
+    "passkeyAddedOn": "Đã thêm {{date}}",
+    "passkeyAdded": "Đã thêm khóa truy cập.",
+    "passkeyAddFailed": "Không thể thêm khóa truy cập. Hãy thử lại.",
+    "passkeyAddUnsupported": "Thiết bị này không thể tạo khóa truy cập.",
+    "passkeyAddCancelled": "Việc tạo khóa truy cập đã bị hủy.",
+    "passkeyRemoved": "Đã xóa khóa truy cập.",
+    "passkeyRemoveFailed": "Không thể xóa khóa truy cập đó. Hãy thử lại.",
+    "passkeyRenamed": "Đã đổi tên khóa truy cập.",
+    "passkeyName": "Tên khóa truy cập",
+    "renamePasskey": "Đổi tên khóa truy cập",
+    "removePasskey": "Xóa khóa truy cập",
+    "removePasskeyTitle": "Xóa khóa truy cập?",
+    "removePasskeyMessage": "Bạn sẽ không thể đăng nhập bằng khóa truy cập này nữa."
   },
   "preferences": {
+    "general": "Chung",
+    "voiceInput": "Nhập bằng giọng nói",
     "autoExpandThinking": "Tự động mở phần suy luận",
     "autoExpandThinkingSubtitle": "Hiển thị toàn bộ nội dung suy luận của tác nhân sau khi suy luận xong.",
+    "hideThinking": "Ẩn chi tiết suy luận",
+    "hideThinkingSubtitle": "Không hiển thị suy luận của tác nhân trên trang phiên.",
     "keepScreenOn": "Giữ màn hình sáng khi xem phiên",
     "keepScreenOnSubtitle": "Giữ màn hình sáng khi phiên đang chạy.",
     "appearance": "Giao diện",
@@ -237,6 +268,7 @@
     "appearanceLight": "Sáng",
     "appearanceDark": "Tối",
     "account": "Tài khoản",
+    "accountSubtitle": "Ngôn ngữ, máy chủ được tin cậy và phiên đăng nhập trên thiết bị",
     "prReviewAttribution": "Ghi tên ứng dụng trong bản rà soát PR",
     "prReviewAttributionSubtitle": "Thêm dòng Đã rà soát qua Kilo ở cuối mỗi bản rà soát bạn gửi.",
     "returnSendsMessage": "Phím xuống dòng gửi tin nhắn",
@@ -250,7 +282,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Chuyển giọng nói thành văn bản qua Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Sử dụng mô hình Kilo Gateway để chuyển nội dung nhập bằng giọng nói thành văn bản thay vì nhận dạng giọng nói của thiết bị. Bản ghi của bạn được gửi tới Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Nén các lệnh gọi công cụ",
+    "condenseToolCallsSubtitle": "Nhóm các lệnh gọi công cụ liên tiếp vào một hàng mà bạn có thể mở.",
+    "toolSummaryTranslation": "Dịch tóm tắt công cụ",
+    "toolSummaryTranslationSubtitle": "Gửi từng tóm tắt công cụ đến một mô hình để dịch sang ngôn ngữ ứng dụng của bạn. Bản gốc sẽ hiển thị nếu dịch thất bại.",
+    "toolSummaryTranslationModelUnavailableNotice": "Mô hình này không còn được cung cấp nữa. Nhấn $t(common.model) để chọn mô hình khác."
   },
   "notifications": {
     "liveActivities": "Hoạt động trực tiếp",
@@ -282,11 +319,12 @@
     "previewFullDescription": "Thông báo hiển thị nội dung tin nhắn trên màn hình khóa của bạn.",
     "previewGenericDescription": "Thông báo chỉ cho biết có hoạt động mới. Mở Kilo để xem nội dung.",
     "channel": {
-      "agent": "Phiên tác nhân",
+      "agentProgress": "Tiến độ tác nhân",
       "chat": "Tin nhắn trò chuyện",
       "kiloclaw": "Hoạt động KiloClaw",
       "balance": "Cảnh báo số dư",
-      "security": "Vấn đề bảo mật"
+      "security": "Vấn đề bảo mật",
+      "spend": "Cảnh báo chi tiêu"
     },
     "category": {
       "chatMessagesSubtitle": "câu trả lời trong các cuộc trò chuyện của bạn",
@@ -297,8 +335,22 @@
       "sessionStatusTitle": "Trạng thái phiên",
       "sessionStatusSubtitle": "hoàn tất / thất bại / sẵn sàng điều khiển",
       "kiloclawActivitySubtitle": "máy sẵn sàng hoặc gặp lỗi, thao tác đã lên lịch",
+      "kiloclawActivityUnavailable": "Khởi chạy một instance KiloClaw để nhận hoạt động KiloClaw.",
       "balanceAlertsSubtitle": "cảnh báo số dư tổ chức thấp",
-      "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA"
+      "balanceAlertsUnavailable": "Tham gia một tổ chức để nhận cảnh báo số dư.",
+      "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA",
+      "securityFindingsUnavailable": "Bật Trợ lý bảo mật Kilo trên một phạm vi để nhận các vấn đề bảo mật.",
+      "spendAlertsSubtitle": "vượt ngưỡng và tăng vọt theo giờ",
+      "spendAlertsToggle": "Danh mục cảnh báo chi tiêu"
+    },
+    "action": {
+      "openSession": "Mở phiên"
+    },
+    "needsInputAction": {
+      "approved": "Yêu cầu đã được phê duyệt",
+      "replied": "Phản hồi đã được gửi",
+      "failed": "Không thể trả lời. Nhấn lại để thử lại.",
+      "unavailable": "Yêu cầu này không còn chờ đợi nữa."
     }
   },
   "tabs": {
@@ -379,7 +431,9 @@
       "uploadFailed": "Không thể tải lên.",
       "failedToUploadFile": "Không thể tải tệp lên: {{reason}}.",
       "nothingToPaste": "Không có nội dung để dán.",
-      "metadataStripFailed": "Không thể xóa siêu dữ liệu ảnh."
+      "metadataStripFailed": "Không thể xóa siêu dữ liệu ảnh.",
+      "limit_one": "Bạn có thể đính kèm tối đa {{displayCount}} tệp.",
+      "limit_other": "Bạn có thể đính kèm tối đa {{displayCount}} tệp."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1148,7 +1202,11 @@
       "syncNow": "Đồng bộ ngay",
       "syncQueued": "Đã đưa yêu cầu đồng bộ vào hàng đợi",
       "syncStatusUnavailable": "Không thể lấy trạng thái đồng bộ.",
-      "withinDeadline": "Trong hạn"
+      "withinDeadline": "Trong hạn",
+      "daysOverdue_one": "Quá hạn {{displayCount}} ngày",
+      "daysOverdue_other": "Quá hạn {{displayCount}} ngày",
+      "findingsCount_one": "{{displayCount}} vấn đề",
+      "findingsCount_other": "{{displayCount}} vấn đề"
     },
     "dashboardMetrics": {
       "openFindings": "Vấn đề chưa xử lý",
@@ -1520,6 +1578,10 @@
       "couldNotLoad": "Không thể tải phiên.",
       "failedToLoadDetails": "Không thể tải thông tin phiên.",
       "failedToStopExecution": "Không thể dừng tác vụ đang chạy.",
+      "stopped": "Đã dừng phiên",
+      "committing": "Đang ghi nhận…",
+      "committed": "Đã ghi nhận",
+      "commitFailed": "Ghi nhận thất bại",
       "renameSession": "Đổi tên phiên",
       "renamePlaceholder": "Tên phiên",
       "transcriptAccessibility": "Bản ghi phiên",
@@ -1554,17 +1616,56 @@
       "exitNeedsNewerCli": "Bạn cần phiên bản Kilo CLI mới hơn để dùng lệnh dấu gạch chéo từ xa. Hãy cập nhật Kilo CLI và kết nối lại."
     },
     "sessionConnection": {
+      "label": "Kết nối",
       "connecting": "Đang kết nối…",
       "reconnecting": "Đang kết nối lại…",
       "connectionLost": "Mất kết nối",
       "retryConnection": "Thử kết nối lại"
     },
+    "goal": {
+      "title": "Mục tiêu",
+      "statusActive": "Mục tiêu đang hoạt động",
+      "statusPaused": "Mục tiêu tạm dừng",
+      "statusComplete": "Mục tiêu đã hoàn thành",
+      "statusBlocked": "Mục tiêu bị chặn",
+      "edit": "Chỉnh sửa mục tiêu",
+      "remove": "Xóa mục tiêu",
+      "pause": "Tạm dừng mục tiêu",
+      "resume": "Tiếp tục mục tiêu",
+      "editPlaceholder": "Mô tả mục tiêu",
+      "removeConfirmTitle": "Xóa mục tiêu?",
+      "removeConfirmMessage": "CLI xóa mục tiêu của phiên này.",
+      "updateFailed": "Không thể cập nhật mục tiêu.",
+      "sectionAccessibility": "{{status}}. Mục tiêu: {{text}}",
+      "collapse": "Thu gọn mục tiêu",
+      "expand": "Mở rộng mục tiêu"
+    },
     "newSession": {
+      "recentlyUsed": "Đã dùng gần đây",
+      "couldNotLoadGithubRepositories": "Không thể tải danh sách kho mã GitHub.",
+      "couldNotLoadGitlabRepositories": "Không thể tải danh sách kho mã GitLab.",
+      "couldNotLoadBitbucketRepositories": "Không thể tải danh sách kho mã Bitbucket.",
       "connectGithubDescription": "Kết nối GitHub trong trình duyệt, rồi quay lại đây để chọn kho mã.",
+      "connectGitlabDescription": "Kết nối GitLab trong trình duyệt, rồi quay lại đây để chọn kho mã.",
+      "connectBitbucketDescription": "Kết nối Bitbucket trong trình duyệt, rồi quay lại đây để chọn kho mã.",
       "openGithub": "Mở GitHub",
+      "openGitlab": "Mở GitLab",
+      "openBitbucket": "Mở Bitbucket",
       "refreshRepositories": "Làm mới danh sách kho mã",
       "githubConnected": "Đã kết nối GitHub",
+      "gitlabConnected": "Đã kết nối GitLab",
       "noRepositoriesVisible": "Không thấy kho mã nào. Hãy kiểm tra quyền truy cập kho mã của ứng dụng Kilo trên GitHub, rồi làm mới danh sách.",
+      "noRepositoriesVisibleGitlab": "Không thấy kho mã nào. Hãy kiểm tra quyền truy cập kho mã trên GitLab, rồi làm mới danh sách.",
+      "noRepositoriesVisibleBitbucket": "Không thấy kho mã nào. Hãy kiểm tra quyền truy cập kho mã trên Bitbucket, rồi làm mới danh sách.",
+      "bitbucketOrganizationsOnly": "Bitbucket chỉ khả dụng cho các tổ chức.",
+      "branchPickerTitle": "Chọn nhánh",
+      "branchDefault": "Mặc định",
+      "branchAccessibility": "Nhánh: {{label}}",
+      "branchLoading": "Đang tải các nhánh",
+      "branchLoadError": "Không tải được các nhánh",
+      "branchUnavailable": "Không có nhánh khả dụng cho kho mã nguồn này. Kiểm tra quyền truy cập của bạn với nhà cung cấp, rồi chọn kho mã nguồn khác.",
+      "branchEmpty": "Không có nhánh khả dụng",
+      "branchPlaceholder": "Chọn một nhánh",
       "runOnWithTarget": "Chạy trên: {{target}}",
       "environment": "Môi trường",
       "couldNotLoadEnvironment": "Không thể tải môi trường của bạn.",
@@ -1583,26 +1684,15 @@
       "couldNotReadPendingSessions": "Không thể đọc danh sách phiên đang chờ. Vui lòng thử lại.",
       "failedToCreate": "Không thể tạo phiên.",
       "couldNotRefreshRepositories": "Không thể làm mới danh sách kho mã. Vui lòng thử lại.",
-      "discardDraftMessage": "Nội dung yêu cầu của bạn sẽ bị mất.",
       "discardDraftTitle": "Hủy bản nháp?",
+      "discardDraftMessage": "Nội dung yêu cầu của bạn sẽ bị mất.",
+      "discardWithUploadsMessage": "Nội dung yêu cầu và các tệp đã tải lên nhưng chưa gắn với tin nhắn đã gửi sẽ bị xóa.",
       "discardFailed": "Không thể hủy bản nháp. Vui lòng thử lại.",
       "remoteHint": "Chạy `kilo remote` trên máy tính hoặc `/remote` trong phiên CLI đang chạy để điều khiển tiến trình kilo trên máy.",
-      "connectBitbucketDescription": "Kết nối Bitbucket trong trình duyệt, rồi quay lại đây để chọn kho mã.",
-      "connectGitlabDescription": "Kết nối GitLab trong trình duyệt, rồi quay lại đây để chọn kho mã.",
-      "couldNotLoadBitbucketRepositories": "Không thể tải danh sách kho mã Bitbucket.",
-      "couldNotLoadGithubRepositories": "Không thể tải danh sách kho mã GitHub.",
-      "couldNotLoadGitlabRepositories": "Không thể tải danh sách kho mã GitLab.",
-      "gitlabConnected": "Đã kết nối GitLab",
-      "noRepositoriesVisibleBitbucket": "Không thấy kho mã nào. Hãy kiểm tra quyền truy cập kho mã trên Bitbucket, rồi làm mới danh sách.",
-      "noRepositoriesVisibleGitlab": "Không thấy kho mã nào. Hãy kiểm tra quyền truy cập kho mã trên GitLab, rồi làm mới danh sách.",
-      "openBitbucket": "Mở Bitbucket",
-      "openGitlab": "Mở GitLab",
-      "recentlyUsed": "Đã dùng gần đây",
       "continueFrom": "Đang tiếp tục phiên {{title}}.",
       "importingSession": "Đang nhập phiên",
       "cliCannotContinue": "CLI này không hỗ trợ tiếp tục phiên. Hãy chọn Cloud Agent hoặc CLI khác.",
-      "importFailed": "Không thể nhập phiên này.",
-      "discardWithUploadsMessage": "Nội dung yêu cầu và các tệp đã tải lên nhưng chưa gắn với tin nhắn đã gửi sẽ bị xóa."
+      "importFailed": "Không thể nhập phiên này."
     },
     "partRenderer": {
       "updatedFileCount_one": "Đã cập nhật {{displayCount}} tệp.",
@@ -1626,7 +1716,14 @@
       "updateTodos": "Cập nhật danh sách việc cần làm",
       "linesBadge": "{{displayCount}} dòng",
       "filesBadge": "{{displayCount}} tệp",
-      "matchesBadge": "{{displayCount}} kết quả khớp"
+      "matchesBadge": "{{displayCount}} kết quả khớp",
+      "filesBadge_one": "{{displayCount}} tệp",
+      "filesBadge_other": "{{displayCount}} tệp",
+      "linesBadge_one": "{{displayCount}} dòng",
+      "linesBadge_other": "{{displayCount}} dòng",
+      "matchesBadge_one": "{{displayCount}} kết quả khớp",
+      "matchesBadge_other": "{{displayCount}} kết quả khớp",
+      "noOutput": "Không có đầu ra."
     },
     "readToolMarkdown": {
       "linesTruncated": "dòng {{start}}–{{end}} (đã cắt bớt)",
@@ -1916,7 +2013,11 @@
       "files": "Tệp",
       "couldNotOpenPhotoPicker": "Không thể mở trình chọn ảnh. Khởi động lại Kilo và thử lại.",
       "maxFilesAllowed": "Chỉ được thêm tối đa {{displayCount}} tệp.",
-      "onlyAddingFiles": "Chỉ thêm {{accepted}} trong {{total}} tệp (tối đa {{max}})"
+      "onlyAddingFiles": "Chỉ thêm {{accepted}} trong {{total}} tệp (tối đa {{max}})",
+      "maxFilesAllowed_one": "Chỉ được thêm tối đa {{displayCount}} tệp.",
+      "maxFilesAllowed_other": "Chỉ được thêm tối đa {{displayCount}} tệp.",
+      "onlyAddingFiles_one": "Chỉ thêm {{accepted}} trong {{total}} tệp (tối đa {{max}})",
+      "onlyAddingFiles_other": "Chỉ thêm {{accepted}} trong {{total}} tệp (tối đa {{max}})"
     },
     "composer": {
       "addAttachment": "Thêm tệp đính kèm",
@@ -1934,7 +2035,9 @@
       "discardAttachmentsMessage": "Các tệp đã tải lên nhưng chưa gắn với tin nhắn đã gửi sẽ bị xóa.",
       "discardAttachmentsTitle": "Hủy tệp đính kèm?",
       "charactersRemaining": "Còn {{count}} ký tự",
-      "insertNewline": "Chèn dòng mới"
+      "insertNewline": "Chèn dòng mới",
+      "charactersRemaining_one": "Còn {{count}} ký tự",
+      "charactersRemaining_other": "Còn {{count}} ký tự"
     },
     "chatLink": {
       "linkCopied": "Đã sao chép liên kết",
@@ -1968,6 +2071,12 @@
       "startNewSession": "Bắt đầu phiên mới",
       "exitSession": "Thoát phiên",
       "clearSession": "Kết thúc phiên này và bắt đầu phiên mới",
+      "compactDescription": "nén ngữ cảnh của phiên hiện tại",
+      "goalDescription": "Tiếp tục làm việc hướng tới mục tiêu của phiên. /goal <objective> hoặc pause, resume, clear",
+      "initDescription": "thiết lập AGENTS.md có hướng dẫn",
+      "resumeClaudeDescription": "nhập bản ghi phiên Claude Code",
+      "resumeCodexDescription": "nhập bản ghi phiên OpenAI Codex",
+      "reviewDescription": "xem lại các thay đổi [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Dùng /{{command}}",
       "insert": "Chèn",
       "upgradeRequiredFallback": "Vui lòng nâng cấp CLI của bạn để sử dụng lệnh này.",
@@ -2000,7 +2109,14 @@
       "stepsCount_one": "{{steps}} bước",
       "stepsCount": "{{steps}} bước",
       "stepsCount_other": "{{steps}} bước",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Mô hình ({{displayCount}})",
+      "modelsCount_other": "Mô hình ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "Tự động phê duyệt",
+      "description": "Tự động phê duyệt các yêu cầu cấp quyền cho phiên này. Sau đó, các công cụ chạy mà không cần nhắc.",
+      "unavailable": "Phiên này không thể nhận yêu cầu cấp quyền."
     },
     "prBadge": {
       "open": "mở yêu cầu hợp nhất",
@@ -2032,6 +2148,12 @@
       "tapToListHint": "Chạm vào thư mục để xem nội dung bên trong.",
       "unsupportedDescription": "CLI này không hỗ trợ liệt kê thư mục. Chạm vào Xong để giữ thư mục khởi chạy, rồi chạm vào Bắt đầu phiên để chạy phiên tại đó.",
       "unsupportedTitle": "Không hỗ trợ liệt kê thư mục"
+    },
+    "toolRun": {
+      "sheetTitle": "Lệnh gọi công cụ",
+      "condensedLabel": "{{itemCount}} mục; {{last}}",
+      "condensedLabel_one": "{{itemCount}} mục; {{last}}",
+      "condensedLabel_other": "{{itemCount}} mục; {{last}}"
     }
   },
   "bootstrap": {
@@ -2076,6 +2198,7 @@
     "couldNotLoadActiveSessions": "Không thể tải các phiên đang hoạt động.",
     "agentSessions": "Đang hoạt động",
     "newCodingTask": "Tác vụ lập trình mới",
+    "newTaskFromPicture": "Tác vụ mới từ hình ảnh",
     "explore": "Khám phá",
     "seeAll": "Xem tất cả",
     "noLiveSessions": "Hiện không có phiên nào đang chạy"
@@ -2142,8 +2265,12 @@
     "gatewayUnreachable": "Không thể kết nối tới Kilo Gateway. Hãy kiểm tra kết nối và thử lại.",
     "gatewayTimeout": "Việc chuyển giọng nói thành văn bản mất quá nhiều thời gian. Hãy thử lại.",
     "gatewayModelUnavailable": "Mô hình này hiện không khả dụng. Hãy chọn mô hình khác trong Tùy chọn.",
+    "gatewayModelUnavailableNotice": "Mô hình này không còn được cung cấp nữa. Nhấn $t(transcriptionModel.title) để chọn mô hình khác.",
     "gatewaySignInRequired": "Đăng nhập để dùng tính năng chuyển giọng nói qua Kilo Gateway.",
-    "gatewayNoModel": "Trước tiên, hãy chọn một mô hình chuyển giọng nói trong Tùy chọn."
+    "gatewayNoModel": "Trước tiên, hãy chọn một mô hình chuyển giọng nói trong Tùy chọn.",
+    "testTitle": "Kiểm tra nhập bằng giọng nói",
+    "testPlaceholder": "Chạm vào micrô và bắt đầu nói.",
+    "testClear": "Xóa văn bản"
   },
   "share": {
     "title": "Chia sẻ đến Kilo",
@@ -2161,7 +2288,9 @@
     "cliCantReceiveFilesTitle": "Phiên này không thể nhận tệp",
     "cliCantReceiveFilesMessage": "Kilo CLI đang chạy phiên này không thể nhận tệp. Cập nhật CLI trên máy đó hoặc chia sẻ đến phiên mới.",
     "contentlessMessage": "Không có gì để chia sẻ — không có văn bản hoặc tệp nào được đính kèm.",
-    "couldNotReadContent": "Không thể đọc nội dung được chia sẻ."
+    "couldNotReadContent": "Không thể đọc nội dung được chia sẻ.",
+    "onlyFirstFilesAttached_one": "Chỉ {{displayCount}} tệp đầu tiên sẽ được đính kèm.",
+    "onlyFirstFilesAttached_other": "Chỉ {{displayCount}} tệp đầu tiên sẽ được đính kèm."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2293,7 +2422,8 @@
     "aiProvidersWhat": "Yêu cầu, lịch sử trò chuyện và mọi tệp bạn đính kèm.",
     "aiProvidersWhy": "Để tạo phản hồi AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google và các nhà cung cấp khác mà bạn chọn cho từng yêu cầu.",
-    "gatewayWhat": "ID tài khoản, siêu dữ liệu yêu cầu, mức sử dụng token.",
+    "gatewayWhat": "ID tài khoản, siêu dữ liệu yêu cầu, mức sử dụng token, cùng các câu lệnh và bản ghi âm mà ứng dụng gửi qua đó.",
+    "viaGateway": "Qua Kilo Gateway",
     "gatewayWhy": "Xác thực, định tuyến yêu cầu, đối soát thanh toán.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Báo cáo sự cố và lỗi, đã loại bỏ nội dung ứng dụng.",
@@ -2313,7 +2443,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Bản ghi âm khi bạn nhập bằng giọng nói.",
     "voiceTranscriptionWhy": "Để chuyển giọng nói thành văn bản.",
-    "voiceTranscriptionWho": "Chỉ xử lý trên thiết bị; nếu thiết bị không thể chuyển giọng nói thành văn bản ngoại tuyến, dữ liệu sẽ được gửi đến Apple hoặc Google.",
+    "voiceTranscriptionWho": "Thiết bị của bạn, Kilo Gateway với mô hình phiên âm bạn chọn, hoặc Apple hoặc Google để nhận dạng trực tuyến.",
     "what": "Dữ liệu chia sẻ",
     "why": "Mục đích",
     "who": "Bên nhận dữ liệu",
@@ -2325,6 +2455,8 @@
     "checkConnection": "Kiểm tra kết nối",
     "checks": {
       "checksCount": "{{displayCount}} bước kiểm tra",
+      "checksCount_one": "{{displayCount}} bước kiểm tra",
+      "checksCount_other": "{{displayCount}} bước kiểm tra",
       "couldNotLoad": "Không thể tải các bước kiểm tra.",
       "failed": "{{displayCount}} không đạt",
       "noAccess": "Bạn không có quyền xem các bước kiểm tra của kho lưu trữ này.",
@@ -2360,11 +2492,17 @@
       "tapDiffLineToSuggest": "Chạm vào một dòng trong bản so sánh để bật đề xuất."
     },
     "connect": {
-      "checkFailedMessage": "Chưa thể xác định trạng thái đăng nhập cho đến khi tải xong dữ liệu.",
       "checkFailedTitle": "Không thể kiểm tra kết nối GitHub.",
-      "description": "Kết nối tài khoản GitHub của bạn để đánh giá PR trên thiết bị di động.",
+      "checkFailedMessage": "Chưa thể xác định trạng thái đăng nhập cho đến khi tải xong dữ liệu.",
+      "checkFailedTitleGitLab": "Không thể kiểm tra kết nối GitLab.",
+      "checkFailedTitleBitbucket": "Không thể kiểm tra kết nối Bitbucket.",
+      "providerCheckFailedMessage": "Trạng thái kết nối chưa khả dụng cho đến khi tải xong.",
+      "reconnectTitle": "Kết nối lại GitHub",
       "reconnectDescription": "Quyền kết nối với GitHub của bạn đã bị thu hồi. Kết nối lại để tiếp tục đánh giá PR trên thiết bị di động.",
-      "reconnectTitle": "Kết nối lại GitHub"
+      "description": "Kết nối tài khoản GitHub của bạn để đánh giá PR trên thiết bị di động.",
+      "gitlabDescription": "Kết nối tài khoản GitLab để xem merge request trên thiết bị di động.",
+      "bitbucketDescription": "Kết nối Bitbucket với tổ chức này để xem PR trên thiết bị di động.",
+      "bitbucketOrgOnlyDescription": "Chọn một tổ chức trong hồ sơ của bạn để xem các PR Bitbucket của tổ chức đó."
     },
     "connectionExpired": "Kết nối GitHub đã hết hạn.",
     "couldNotLoadPullRequest": "Không thể tải PR.",
@@ -2418,6 +2556,8 @@
       "replyBody": "Nội dung trả lời",
       "replyForbidden": "Bạn không có quyền trả lời trong PR này.",
       "addCommentCta": "Bình luận trong PR này",
+      "fixWithKilo": "Sửa bằng Kilo",
+      "fixWithKiloPrompt": "Vui lòng xử lý bình luận PR sau: {{link}}",
       "commentBadRequest": "Không thể đăng bình luận này. PR có thể đã thay đổi.",
       "commentForbidden": "Bạn không có quyền bình luận trong PR này.",
       "replyPlaceholder": "Trả lời…",
@@ -2457,21 +2597,26 @@
         "outdatedOnLines": "Không còn cập nhật tại {{lines}}",
         "outdatedOnPath": "Không còn cập nhật tại {{path}}"
       },
-      "deletedUser": "người dùng đã bị xóa"
+      "deletedUser": "người dùng đã bị xóa",
+      "replyForbiddenTerm": "Bạn không có quyền trả lời trong {{term}} này.",
+      "moreLinesAbove_one": "… Còn {{displayCount}} dòng ở trên.",
+      "moreLinesAbove_other": "… Còn {{displayCount}} dòng ở trên."
     },
     "entry": {
-      "clearLink": "Xóa liên kết PR",
+      "eyebrow": "Mở PR hoặc merge request bằng URL",
+      "pastePrLink": "Dán liên kết PR hoặc merge request",
+      "noRecentPrs": "Chưa có đánh giá gần đây",
+      "noRecentPrsDescription": "Dán liên kết ở trên để bắt đầu đánh giá — lần sau nó sẽ xuất hiện ở đây.",
       "couldNotLoad": "Không thể tải dữ liệu.",
-      "eyebrow": "Mở PR bằng URL.",
-      "noRecentPrs": "Chưa có PR gần đây",
-      "noRecentPrsDescription": "Dán liên kết PR ở trên để bắt đầu đánh giá. PR sẽ xuất hiện ở đây vào lần sau.",
-      "open": "Mở",
-      "pasteLink": "Dán liên kết PR",
-      "pastePrLink": "Dán liên kết PR",
-      "removeFromRecentsMessage": "PR này sẽ được xóa khỏi danh sách gần đây của bạn.",
       "removeFromRecentsTitle": "Xóa khỏi mục gần đây?",
+      "removeFromRecentsMessage": "Đánh giá này sẽ được xóa khỏi danh sách gần đây của bạn.",
       "removeRecentAccessibility": "Xóa {{repo}} khỏi mục gần đây",
-      "urlAccessibility": "URL của PR trên GitHub"
+      "urlAccessibility": "Nhập URL của PR hoặc merge request",
+      "urlPlaceholder": "URL của PR hoặc merge request",
+      "openAccessibility": "Mở PR hoặc merge request",
+      "clearLink": "Xóa liên kết",
+      "pasteLink": "Dán liên kết PR hoặc merge request",
+      "open": "Mở"
     },
     "eventChips": {
       "comment": "Bình luận",
@@ -2553,7 +2698,17 @@
       "loadingLines": "Đang tải {{loaded}}/{{total}} dòng…",
       "loadingMoreFiles": "Đang tải thêm tệp…",
       "retryLoadingContext": "Thử tải lại các dòng ngữ cảnh",
-      "retryLoadingNextPage": "Thử tải lại trang tiếp theo"
+      "retryLoadingNextPage": "Thử tải lại trang tiếp theo",
+      "expandAllLines_one": "Hiện tất cả {{displayCount}} dòng",
+      "expandAllLines_other": "Hiện tất cả {{displayCount}} dòng",
+      "expandLines_one": "Hiện {{displayCount}} dòng ({{start}}–{{end}})",
+      "expandLines_other": "Hiện {{displayCount}} dòng ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Hiện {{displayCount}} dòng ngữ cảnh",
+      "expandLinesOfContext_other": "Hiện {{displayCount}} dòng ngữ cảnh",
+      "expandMoreLines_one": "Hiện thêm {{displayCount}} dòng ({{start}}–{{end}})",
+      "expandMoreLines_other": "Hiện thêm {{displayCount}} dòng ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "Đã tải {{loaded}}/{{total}} tệp",
+      "loadedOfTotalFiles_other": "Đã tải {{loaded}}/{{total}} tệp"
     },
     "inbox": {
       "couldNotLoad": "Không thể tải hộp thư đến.",
@@ -2564,47 +2719,52 @@
     },
     "installKiloGitHubApp": "Cài đặt ứng dụng Kilo trên GitHub",
     "merge": {
-      "autoMergeDescription": "GitHub sẽ tự động hợp nhất PR này khi tất cả các bước kiểm tra bắt buộc đều đạt yêu cầu (phương thức: {{method}}).",
-      "autoMergeOn": "Đã bật tự động hợp nhất",
-      "blockedTitle": "Lý do chưa thể hợp nhất",
-      "cannotMerge": "Không thể hợp nhất PR này ở trạng thái hiện tại.",
-      "checking": "Đang kiểm tra khả năng hợp nhất…",
-      "commitMessage": "Thông điệp bản ghi",
-      "commitMessagePlaceholder": "Mô tả bản ghi hợp nhất (không bắt buộc)",
-      "commitTitle": "Tiêu đề bản ghi",
-      "confirmMessage": "Thao tác này sẽ hợp nhất các thay đổi của bạn vào nhánh đích.",
-      "confirmTitle": "Hợp nhất PR?",
-      "couldNotDetermine": "Không thể xác định khả năng hợp nhất.",
-      "couldNotMerge": "Không thể hợp nhất PR.",
-      "deleteBranch": "Xóa nhánh",
-      "deleteBranchAfterMerge": "Xóa nhánh sau khi hợp nhất",
-      "disableAutoMerge": "Tắt tự động hợp nhất",
-      "enableAutoMerge": "Bật tự động hợp nhất",
-      "enableAutoMergeConfirmMessage": "GitHub sẽ tự động hợp nhất PR này khi tất cả các bước kiểm tra bắt buộc đều đạt yêu cầu.",
-      "enableAutoMergeConfirmTitle": "Bật tự động hợp nhất?",
-      "forbidden": "Bạn không có quyền hợp nhất PR này.",
-      "loadFailedTitle": "Không thể tải các tùy chọn hợp nhất.",
       "merge": "Hợp nhất",
       "mergeNow": "Hợp nhất ngay",
       "mergePullRequest": "Hợp nhất PR",
+      "mergeTermTitle": "Hợp nhất {{term}}",
+      "enableAutoMerge": "Bật tự động hợp nhất",
+      "disableAutoMerge": "Tắt tự động hợp nhất",
+      "autoMergeOn": "Đã bật tự động hợp nhất",
+      "autoMergeDescription": "GitHub sẽ tự động hợp nhất PR này khi tất cả các bước kiểm tra bắt buộc đều đạt yêu cầu (phương thức: {{method}}).",
+      "checking": "Đang kiểm tra khả năng hợp nhất…",
+      "couldNotDetermine": "Không thể xác định khả năng hợp nhất.",
+      "refreshMergeability": "Kiểm tra lại khả năng hợp nhất",
+      "blockedTitle": "Lý do chưa thể hợp nhất",
+      "updateBranch": "Cập nhật nhánh",
+      "updateBranchFromBase": "Cập nhật nhánh từ nhánh đích",
       "methodLabel": "Phương thức",
+      "commitTitle": "Tiêu đề bản ghi",
+      "commitMessage": "Thông điệp bản ghi",
+      "commitMessagePlaceholder": "Mô tả bản ghi hợp nhất (không bắt buộc)",
+      "deleteBranch": "Xóa nhánh",
+      "deleteBranchAfterMerge": "Xóa nhánh sau khi hợp nhất",
+      "noEnabledMethods": "Kho lưu trữ này chưa bật phương thức hợp nhất nào. Hãy nhờ quản trị viên bật phương thức tạo bản ghi hợp nhất, gộp bản ghi hoặc chuyển gốc.",
+      "confirmTitle": "Hợp nhất PR?",
+      "confirmTitleTerm": "Hợp nhất {{term}}?",
+      "confirmMessage": "Thao tác này sẽ hợp nhất các thay đổi của bạn vào nhánh đích.",
+      "enableAutoMergeConfirmTitle": "Bật tự động hợp nhất?",
+      "enableAutoMergeConfirmMessage": "GitHub sẽ tự động hợp nhất PR này khi tất cả các bước kiểm tra bắt buộc đều đạt yêu cầu.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} sẽ được hợp nhất tự động khi pipeline thành công.",
+      "enableAutoMergeDescriptionTerm": "GitLab sẽ tự động hợp nhất {{term}} này khi pipeline thành công.",
+      "forbidden": "Bạn không có quyền hợp nhất PR này.",
+      "cannotMerge": "Không thể hợp nhất PR này ở trạng thái hiện tại.",
+      "couldNotMerge": "Không thể hợp nhất PR.",
       "methods": {
         "merge": "Hợp nhất",
         "rebase": "Chuyển gốc",
         "squash": "Gộp bản ghi"
       },
-      "noEnabledMethods": "Kho lưu trữ này chưa bật phương thức hợp nhất nào. Hãy nhờ quản trị viên bật phương thức tạo bản ghi hợp nhất, gộp bản ghi hoặc chuyển gốc.",
+      "terminal": {
+        "alreadyMerged": "Đã hợp nhất",
+        "closed": "PR này đã đóng",
+        "closedMergeRequest": "Merge request này đã đóng"
+      },
       "partialSuccessBanner": {
         "accessibility": "Đã hợp nhất. Không thể xóa nhánh: {{reason}}",
         "body": "Không thể xóa nhánh: {{reason}}."
       },
-      "refreshMergeability": "Kiểm tra lại khả năng hợp nhất",
-      "terminal": {
-        "alreadyMerged": "Đã hợp nhất",
-        "closed": "PR này đã đóng"
-      },
-      "updateBranch": "Cập nhật nhánh",
-      "updateBranchFromBase": "Cập nhật nhánh từ nhánh đích",
+      "loadFailedTitle": "Không thể tải các tùy chọn hợp nhất.",
       "blocked": {
         "unknownStateTitle": "GitHub chưa xác nhận có thể hợp nhất",
         "unknownStateDetail": "Đợi một lát rồi thử làm mới phần tổng quan.",
@@ -2623,6 +2783,18 @@
         "behindDetail": "Nhánh nguồn chưa có các thay đổi mới nhất từ nhánh đích. Chuyển gốc hoặc cập nhật nhánh trước khi hợp nhất.",
         "notMergeableTitle": "Chưa thể hợp nhất PR này",
         "notMergeableDetail": "GitHub đã báo cáo trạng thái hợp nhất là {{state}}."
+      },
+      "restrictions": {
+        "title": "Hạn chế hợp nhất",
+        "approvalsRequired_one": "Cần {{displayCount}} phê duyệt",
+        "approvalsRequired_other": "Cần {{displayCount}} phê duyệt",
+        "pipelineMustSucceed": "Pipeline phải thành công trước khi hợp nhất."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline đang thất bại ở bản ghi mới nhất.",
+        "pendingPipeline": "Pipeline vẫn đang chạy ở bản ghi mới nhất.",
+        "permission": "Bạn không có quyền hợp nhất {{term}} này.",
+        "draft": "Đánh dấu {{term}} là sẵn sàng để đánh giá trước khi hợp nhất."
       },
       "methodLabels": {
         "merge": "Tạo bản ghi hợp nhất",
@@ -2681,8 +2853,11 @@
     "pullRequestUnavailable": "Không thể truy cập PR",
     "pullRequestUnavailableDescription": "Không thể mở PR này. Có thể PR đã bị xóa, kho lưu trữ ở chế độ riêng tư hoặc ứng dụng Kilo trên GitHub chưa được cài đặt cho kho lưu trữ này.",
     "reconnectNotice": {
+      "title": "Kết nối GitHub đã hết hạn.",
       "message": "Kết nối GitHub của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
-      "title": "Kết nối GitHub đã hết hạn."
+      "gitlabTitle": "Kết nối GitLab đã hết hạn.",
+      "bitbucketTitle": "Kết nối Bitbucket đã hết hạn.",
+      "providerMessage": "Kết nối {{provider}} của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần."
     },
     "review": "Rà soát",
     "reviewPullRequest": "Đánh giá PR",
@@ -2730,10 +2905,12 @@
       "statusContext": "Ngữ cảnh",
       "lineLabel": "Dòng {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "Dòng {{status}}: {{text}}",
-      "emptyLine": "(trống)"
+      "emptyLine": "(trống)",
+      "truncationBanner_one": "Đang hiển thị {{limit}} tệp đầu tiên trong số {{total}} tệp đã thay đổi do giới hạn API của GitHub.",
+      "truncationBanner_other": "Đang hiển thị {{limit}} tệp đầu tiên trong số {{total}} tệp đã thay đổi do giới hạn API của GitHub."
     },
     "linkPasteClipboardEmpty": "Bộ nhớ tạm trống.",
-    "linkPasteNotAPullRequest": "Đây không phải là liên kết PR trên GitHub.",
+    "linkPasteNotAPullRequest": "Đây không phải là liên kết PR hoặc merge request",
     "announce": {
       "commentPosted": "Đã đăng bình luận",
       "reviewSubmitted": "Đã gửi đánh giá",
@@ -2742,6 +2919,7 @@
     "mutationError": {
       "commentNotPosted": "Không thể đăng bình luận này. Dòng đã chọn có thể đã thay đổi hoặc PR có thể đã được cập nhật.",
       "reviewNotSubmitted": "Không thể gửi bản đánh giá này ở trạng thái hiện tại. Có thể PR đã thay đổi hoặc đây là PR của bạn nên bạn không thể tự đánh giá.",
+      "reviewNotSubmittedTerm": "Không thể gửi đánh giá này ở trạng thái hiện tại. {{term}} có thể đã thay đổi, hoặc bạn không thể đánh giá {{term}} của chính mình.",
       "couldNotPostComment": "Không thể đăng bình luận.",
       "couldNotSubmitReview": "Không thể gửi đánh giá. Kiểm tra kết nối và thử lại."
     },
@@ -2749,9 +2927,31 @@
       "couldNotReply": "Không thể trả lời.",
       "couldNotCompleteAction": "Không thể hoàn tất thao tác này.",
       "mergeResultDefaultError": "GitHub chưa hoàn tất việc hợp nhất.",
+      "mergeResultNotCompleted": "{{term}} chưa được hợp nhất. Kiểm tra trạng thái và thử lại.",
       "ambiguous": "Không thể xác nhận — hãy kiểm tra PR trước khi thử lại.",
       "persistenceFailed": "Không thể ghi nhận thao tác này. Vui lòng thử lại sau.",
       "forbidden": "Bạn không có quyền thực hiện thao tác này."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Không khả dụng trên nhà cung cấp này",
+        "accessibility": "Không khả dụng trên nhà cung cấp này: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Yêu cầu hợp nhất",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Chia sẻ merge request",
+      "viewOnProvider": "Xem trên {{provider}}",
+      "mergeRequestUnavailable": "Không thể truy cập merge request",
+      "unavailableDescription": "Có thể nó đã bị xóa, hoặc bạn không có quyền truy cập.",
+      "accessDeniedMergeRequest": "Bạn không có quyền xem merge request này.",
+      "couldNotLoadMergeRequest": "Không thể tải merge request.",
+      "discussionAccessDenied": "Bạn không có quyền xem thảo luận của merge request này.",
+      "discussionUnavailableMessage": "Merge request này có thể đã bị xóa.",
+      "noDiscussionDescription": "Merge request này chưa có chuỗi thảo luận đánh giá hay bình luận nào.",
+      "noFilesChangedDescription": "Merge request này không có tệp nào thay đổi."
     }
   },
   "organization": {
@@ -2919,6 +3119,14 @@
     "tooManySignInAttempts": "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi một lát rồi thử lại."
   },
   "models": {
+    "auto": {
+      "frontier": "Tự động Tiên tiến",
+      "balanced": "Tự động Cân bằng",
+      "efficient": "Tự động Hiệu quả",
+      "small": "Tự động Nhỏ",
+      "free": "Tự động Miễn phí",
+      "organization": "Tự động Tổ chức"
+    },
     "dataCollected": "Có thu thập dữ liệu",
     "free": "Miễn phí",
     "couldNotUpdateFavorites": "Không thể cập nhật mục yêu thích.",
@@ -2957,8 +3165,17 @@
     "privacy": "Mở Kilo để xem tác nhân",
     "openAgents": "Mở danh sách tác nhân",
     "needsInput": "Cần phản hồi",
+    "newestSession": "Mới nhất: {{title}}",
+    "noneWaiting": "Không có tác nhân nào chờ",
+    "newAgent": "Tác nhân mới",
+    "approving": "Đang phê duyệt...",
+    "couldNotApprove": "Không thể phê duyệt",
+    "couldNotStart": "Không thể bắt đầu",
     "channelName": "Tác nhân đang hoạt động",
-    "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
+    "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
+    "openSession": "Mở",
+    "approveFailed": "Không thể phê duyệt. Nhấn $t(common.approve) để thử lại.",
+    "newestResult": "Kết quả mới nhất"
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",
@@ -2966,5 +3183,56 @@
     "emptyTitle": "Không có mô hình chuyển giọng nói thành văn bản",
     "emptyDescription": "Hiện Kilo Gateway không cung cấp mô hình chuyển giọng nói thành văn bản.",
     "loadFailed": "Không thể tải các mô hình chuyển giọng nói thành văn bản."
+  },
+  "voiceLanguage": {
+    "title": "Ngôn ngữ nhập bằng giọng nói",
+    "automatic": "Tự động",
+    "loadFailed": "Không thể tải các ngôn ngữ mà thiết bị này hỗ trợ.",
+    "emptyTitle": "Không có ngôn ngữ được hỗ trợ",
+    "emptyDescription": "Tính năng nhận dạng giọng nói của thiết bị này không báo cáo ngôn ngữ được hỗ trợ nào."
+  },
+  "tour": {
+    "eyebrow": "Tour nhanh",
+    "forkTitle": "Bạn muốn chạy Kilo ở đâu?",
+    "forkSubtitle": "Chọn nơi Kilo chạy phiên đầu tiên của bạn.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Chạy Kilo trong môi trường đám mây biệt lập mà không cần cài đặt gì.",
+    "remoteOptionTitle": "Máy tính của bạn",
+    "remoteOptionBody": "Chạy Kilo trên máy của bạn qua CLI `kilo remote`.",
+    "skip": "Bỏ qua tour",
+    "tutorialLabel": "Hướng dẫn"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Bắt đầu trợ lý cần một lời nhắc. Thêm lời nhắc và chạy lại.",
+      "repositoryUnknown": "Kilo không nhận diện {{repository}} là kho mã nguồn GitHub hoặc GitLab. Chọn kho mã nguồn khác trong Kilo.",
+      "repositoryUnsupported": "{{repository}} là kho mã nguồn Bitbucket — Bắt đầu trợ lý chưa thể dùng nó. Chọn kho mã nguồn khác trong Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Mở phiên gần nhất"
+  },
+  "spendAlerts": {
+    "subtitle": "Gửi cảnh báo qua email hoặc push tới các liên hệ thanh toán khi chi tiêu của phạm vi này vượt một giới hạn hoặc tăng vọt trên mức thường lệ theo giờ.",
+    "enable": "Bật cảnh báo chi tiêu",
+    "thresholdTitle": "Vượt ngưỡng",
+    "thresholdSubtitle": "Chi tiêu tích lũy vượt giới hạn của bạn",
+    "anomalyTitle": "Tăng vọt theo giờ",
+    "anomalySubtitle": "Một giờ cao hơn hẳn mức thường lệ của phạm vi này",
+    "limitLabel": "Giới hạn (USD)",
+    "windowLabel": "Khoảng thời gian",
+    "window24h": "24 giờ",
+    "window7d": "7 ngày",
+    "window30d": "30 ngày",
+    "multiplierLabel": "Hệ số tăng vọt",
+    "saved": "Đã lưu cài đặt cảnh báo chi tiêu",
+    "loadError": "Không thể tải cảnh báo chi tiêu.",
+    "saveError": "Không thể lưu cảnh báo chi tiêu.",
+    "empty": "Cảnh báo chi tiêu đang tắt. Bật chúng để thông báo cho các liên hệ thanh toán của phạm vi này.",
+    "noSpend": "Chưa ghi nhận chi tiêu nào",
+    "spend24h": "Chi tiêu trong 24 giờ qua",
+    "multiplierError": "Nhập hệ số từ 1 trở lên",
+    "permissionDenied": "Bạn không có quyền quản lý cảnh báo chi tiêu.",
+    "pushOffByCategory": "Đã tắt trong Thông báo"
   }
 }

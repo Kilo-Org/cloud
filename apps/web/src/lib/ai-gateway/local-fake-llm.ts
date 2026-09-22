@@ -1,5 +1,5 @@
 import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/openrouter-definition';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 

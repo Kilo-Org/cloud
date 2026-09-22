@@ -1,9 +1,15 @@
-import type { PreparationAttempt } from '@kilocode/cloud-agent-sdk';
+import type {
+  PreparationAttempt,
+  SessionCommit,
+  SessionStatusIndicator,
+} from '@kilocode/cloud-agent-sdk';
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { Part, ReasoningPart, StoredMessage, TextPart, ToolPart } from './types';
 import {
   getVisibleAssistantParts,
   groupConversationMessages,
+  commitsByMessageAnchor,
+  isCommitSummaryRepresented,
   shouldRenderToolPart,
 } from './message-presentation';
 
@@ -195,6 +201,101 @@ describe('groupConversationMessages', () => {
     expect(groups[0]).not.toBe(messages);
     expect(groups[0]?.[0]).toBe(first);
     expect(groups[0]?.[1]).toBe(second);
+  });
+});
+
+describe('commitsByMessageAnchor', () => {
+  const user: StoredMessage = {
+    info: {
+      id: 'user-1',
+      sessionID: 'ses-1',
+      role: 'user',
+      time: { created: 1 },
+      agent: 'code',
+      model: { providerID: 'test', modelID: 'test' },
+    },
+    parts: [],
+  };
+  const commit = {
+    commitHash: 'a'.repeat(40),
+    commitMessage: 'Actual commit',
+    messageId: 'assistant-2',
+    userMessageId: user.info.id,
+    committedAt: '2026-09-01T10:00:00Z',
+    pushStatus: 'unknown',
+  } satisfies SessionCommit;
+
+  it('waits for a known assistant anchor instead of moving the commit to an older answer', () => {
+    const first = assistantMessage('assistant-1');
+    expect([...commitsByMessageAnchor([user, first], [commit])]).toEqual([]);
+    const anchor = assistantMessage(commit.messageId);
+    expect([...commitsByMessageAnchor([user, first, anchor], [commit])]).toEqual([
+      [anchor.info.id, [commit]],
+    ]);
+  });
+
+  it('places the commit only once across completed and dynamic transcript chunks', () => {
+    const completed = [user, assistantMessage('assistant-1')];
+    const dynamic = [assistantMessage(commit.messageId)];
+    expect([...commitsByMessageAnchor(completed, [commit])]).toEqual([]);
+    expect([...commitsByMessageAnchor(dynamic, [commit])]).toEqual([[commit.messageId, [commit]]]);
+    expect([...commitsByMessageAnchor([...completed, ...dynamic], [commit])]).toEqual([
+      [commit.messageId, [commit]],
+    ]);
+  });
+
+  it('uses user-turn fallback only for an explicit user anchor and after its turn completes', () => {
+    const userAnchored = { ...commit, messageId: user.info.id };
+    const first = assistantMessage('assistant-1');
+    const running = assistantMessage('assistant-2', { time: { created: 3 } });
+    expect([...commitsByMessageAnchor([user, first, running], [userAnchored])]).toEqual([]);
+    expect([...commitsByMessageAnchor([user, first], [userAnchored])]).toEqual([
+      [first.info.id, [userAnchored]],
+    ]);
+  });
+
+  it('deduplicates replay and prevents grouping across the exact commit boundary', () => {
+    const first = assistantMessage(commit.messageId);
+    const second = assistantMessage('assistant-3');
+    const commits = Object.freeze([commit, { ...commit }]);
+    const anchors = commitsByMessageAnchor([first, second], commits);
+    expect([...anchors]).toEqual([[first.info.id, [commit]]]);
+    expect(groupConversationMessages([first, second], noPreparations, anchors)).toEqual([
+      [first],
+      [second],
+    ]);
+  });
+});
+
+describe('commit summary suppression', () => {
+  const commit: SessionCommit = {
+    commitHash: 'a'.repeat(40),
+    messageId: 'assistant',
+    userMessageId: 'user',
+    committedAt: '2026-09-01T10:00:00.000Z',
+    commitMessage: 'Actual message',
+    pushStatus: 'pushed',
+  };
+  const represented = new Map([['assistant', [commit]]]);
+  const indicator: SessionStatusIndicator = {
+    type: 'info',
+    message: 'Committed',
+    timestamp: 1,
+    commitHash: commit.commitHash,
+  };
+
+  it('suppresses only an informational summary represented by the same full-SHA line', () => {
+    expect(isCommitSummaryRepresented(indicator, represented)).toBe(true);
+    expect(isCommitSummaryRepresented(indicator, new Map())).toBe(false);
+    expect(
+      isCommitSummaryRepresented({ ...indicator, commitHash: `${'a'.repeat(39)}b` }, represented)
+    ).toBe(false);
+    expect(isCommitSummaryRepresented({ ...indicator, commitHash: undefined }, represented)).toBe(
+      false
+    );
+    for (const type of ['progress', 'error', 'warning'] as const) {
+      expect(isCommitSummaryRepresented({ ...indicator, type }, represented)).toBe(false);
+    }
   });
 });
 

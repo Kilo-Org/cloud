@@ -17,7 +17,8 @@ import { ai_gateway_sync_providers_state, modelsByProvider } from '@kilocode/db/
 import { db } from '@/lib/drizzle';
 import { desc, eq, lt, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { OPENROUTER, VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@kilocode/db/schema-types';

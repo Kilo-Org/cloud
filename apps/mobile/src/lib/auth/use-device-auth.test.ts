@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN hooks under vitest (node env, no jsdom) */
 /* eslint-disable import/first -- vi.mock must precede the hook import so the native modules are stubbed */
 import * as React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getDeviceAuth429Message } from '@/lib/auth/poll-response';

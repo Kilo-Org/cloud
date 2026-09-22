@@ -26,27 +26,33 @@ import { useMemo } from 'react';
 
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { type ConversationComment } from '@/lib/pr-review/discussion/review-discussion-types';
+import {
+  buildPrThreadsQueryOptions,
+  normalizePrThreadsPages,
+} from '@/lib/pr-review/provider-pr-queries';
+import {
+  githubPrRef,
+  providerPrRefKey,
+  type ProviderPrScope,
+  useProviderPrScope,
+} from '@/lib/pr-review/provider-pr-ref';
 import { withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { useTRPC } from '@/lib/trpc';
 
 /**
  * Build the discussion-threads infinite-query options. Kept as a pure builder
  * so the retention bound is testable without mounting the hook.
+ *
+ * The provider is decided by `scope`; without one the caller is on the GitHub
+ * route and this is the `listReviewThreads` query that route always ran.
  */
 export function buildPrReviewDiscussionThreadsQueryOptions(
   trpc: ReturnType<typeof useTRPC>,
-  args: { owner: string; repo: string; number: number }
+  args: { owner: string; repo: string; number: number; scope?: ProviderPrScope }
 ) {
   const { owner, repo, number } = args;
-  return withInfiniteRetention(
-    trpc.githubPrReview.listReviewThreads.infiniteQueryOptions(
-      { owner, repo, number },
-      {
-        staleTime: 15_000,
-        getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
-      }
-    )
-  );
+  const scope = args.scope ?? { ref: githubPrRef(owner, repo, number), organizationId: null };
+  return withInfiniteRetention(buildPrThreadsQueryOptions(trpc, scope));
 }
 
 /**
@@ -66,14 +72,11 @@ export function retainConversation<C>(
   return first && first.length > 0 ? first : retained;
 }
 
-// Module-level retention store. Keyed by the PR identity so the retained
-// first-page conversation survives the tab's unmount/remount cycle, which
-// a component ref cannot.
+// Module-level retention store. Keyed by the provider ref so the retained
+// first-page conversation survives the tab's unmount/remount cycle (which a
+// component ref cannot) and so two same-named repositories on different
+// providers never share one entry.
 const conversationRetention = new Map<string, readonly ConversationComment[]>();
-
-function conversationRetentionKey(args: { owner: string; repo: string; number: number }): string {
-  return `${args.owner}/${args.repo}#${args.number}`;
-}
 
 /**
  * Read and update the retained first-page conversation for one PR.
@@ -102,8 +105,9 @@ export function usePrReviewDiscussionThreads(args: {
 }) {
   const { owner, repo, number } = args;
   const trpc = useTRPC();
+  const scope = useProviderPrScope({ owner, repo, number });
   const query = useInfiniteQuery(
-    buildPrReviewDiscussionThreadsQueryOptions(trpc, { owner, repo, number })
+    buildPrReviewDiscussionThreadsQueryOptions(trpc, { owner, repo, number, scope })
   );
 
   const hasLoadedPages = (query.data?.pages.length ?? 0) > 0;
@@ -119,18 +123,19 @@ export function usePrReviewDiscussionThreads(args: {
   // the tab (full re-sort of the entire loaded set).
   // Memoized so identity changes only when page data changes (RQ
   // structural sharing keeps `pages` stable across unrelated re-renders).
-  const pages = query.data?.pages;
-  const threads = useMemo(() => (pages ?? []).flatMap(page => page.threads), [pages]);
+  // Provider pages arrive in the provider's own shape; normalizing here is
+  // what lets the tab render one list for all three providers.
+  const platform = scope.ref.platform;
+  const rawPages = query.data?.pages;
+  const pages = useMemo(() => normalizePrThreadsPages(platform, rawPages), [platform, rawPages]);
+  const threads = useMemo(() => pages.flatMap(page => page.threads), [pages]);
 
   // Conversation comments live only on the first page. Retention trims the
   // oldest page once the bound is exceeded, which would erase the comments if
   // we read `pages[0]` directly. Keep the last non-empty conversation in a
   // module-level store keyed by the PR identity so it survives both the trim
   // and the tab's unmount/remount cycle.
-  const conversation = retainConversationAcrossMounts(
-    conversationRetentionKey({ owner, repo, number }),
-    pages
-  );
+  const conversation = retainConversationAcrossMounts(providerPrRefKey(scope.ref), pages);
 
   return {
     query,

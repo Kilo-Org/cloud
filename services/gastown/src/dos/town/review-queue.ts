@@ -49,13 +49,11 @@ function extractFailureMessage(
   metadata: Record<string, unknown> | null | undefined
 ): string | null {
   if (status !== 'failed' || !metadata) return null;
-  // Structured failure_reason (from status_changed events via updateBeadStatus)
   const fr = metadata.failure_reason;
   if (typeof fr === 'object' && fr !== null && 'message' in fr) {
     const msg = (fr as Record<string, unknown>).message;
     if (typeof msg === 'string') return msg;
   }
-  // Top-level message (from review_completed / pr_creation_failed events)
   if (typeof metadata.message === 'string') return metadata.message;
   return null;
 }
@@ -64,8 +62,6 @@ export function initReviewQueueTables(_sql: SqlStorage): void {
   // Review queue and molecule tables are now part of beads + satellite tables.
   // Initialization happens in beads.initBeadTables().
 }
-
-// ── Review Queue ────────────────────────────────────────────────────
 
 const REVIEW_JOIN = /* sql */ `
   SELECT ${beads}.*,
@@ -173,7 +169,6 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
     ]
   );
 
-  // Link MR bead → source bead via bead_dependencies so the DAG is queryable
   query(
     sql,
     /* sql */ `
@@ -186,7 +181,6 @@ export function submitToReviewQueue(sql: SqlStorage, input: ReviewQueueInput): v
     [id, input.bead_id]
   );
 
-  // Create the review_metadata satellite
   query(
     sql,
     /* sql */ `
@@ -232,11 +226,9 @@ export function completeReviewWithResult(
     commit_sha?: string;
   }
 ): void {
-  // On conflict, mark the review entry as failed and create an escalation bead
   const resolvedStatus = input.status === 'conflict' ? 'failed' : input.status;
   completeReview(sql, input.entry_id, resolvedStatus);
 
-  // Find the review entry to get agent IDs
   const entryRows = [
     ...query(sql, /* sql */ `${REVIEW_JOIN} WHERE ${beads.bead_id} = ?`, [input.entry_id]),
   ];
@@ -295,7 +287,6 @@ export function completeReviewWithResult(
     // recounts after the MR bead is closed.
     updateConvoyProgress(sql, entry.bead_id, mergeTimestamp);
 
-    // If this was a convoy landing MR, also set landed_at on the convoy metadata
     const sourceBead = getBead(sql, entry.bead_id);
     if (sourceBead?.type === 'convoy') {
       query(
@@ -309,7 +300,6 @@ export function completeReviewWithResult(
       );
     }
   } else if (input.status === 'conflict') {
-    // Create an escalation bead so the conflict is visible and actionable
     createBead(sql, {
       type: 'escalation',
       title: `Merge conflict: ${input.message ?? entry.branch}`,
@@ -414,7 +404,6 @@ export function setReviewPrUrl(sql: SqlStorage, entryId: string, prUrl: string):
     [prUrl, entryId]
   );
 
-  // Also write to bead metadata so the PR URL is visible in the standard bead list
   query(
     sql,
     /* sql */ `
@@ -443,8 +432,6 @@ export function markReviewInReview(sql: SqlStorage, entryId: string): void {
     [new Date().toISOString(), entryId]
   );
 }
-
-// ── Agent Done ──────────────────────────────────────────────────────
 
 export function agentDone(sql: SqlStorage, agentId: string, input: AgentDoneInput): void {
   const agent = getAgent(sql, agentId);
@@ -799,8 +786,6 @@ export function agentCompleted(
   return result;
 }
 
-// ── Merge Queue Data ────────────────────────────────────────────────
-
 /**
  * 24 hours in milliseconds — MR beads in_review longer than this are "stale".
  */
@@ -1024,7 +1009,6 @@ export type ActivityLogEntry = {
 export function getMergeQueueData(sql: SqlStorage, params: MergeQueueParams): MergeQueueData {
   const rigId = params.rigId ?? null;
 
-  // ── 1. Query MR beads with full joins ───────────────────────────────
   // Statuses: in_progress = "in review" (PR created, awaiting merge),
   //           open = pending review, failed = review failed
   // We fetch all non-closed MR beads for the needs-attention section.
@@ -1117,7 +1101,6 @@ export function getMergeQueueData(sql: SqlStorage, params: MergeQueueParams): Me
     // open/in_review without pr_url are pending queue items, not shown in needs-attention
   }
 
-  // ── 2. Query activity log events ────────────────────────────────────
   const limit = params.limit ?? 50;
   const since = params.since ?? null;
 
@@ -1324,8 +1307,6 @@ function eventRowToEntry(row: z.output<typeof ActivityLogRow>): ActivityLogEntry
   };
 }
 
-// ── Molecules ───────────────────────────────────────────────────────
-
 /**
  * Create a molecule: a parent bead with type='molecule', child step beads
  * linked via parent_bead_id, and step ordering via bead_dependencies.
@@ -1335,7 +1316,6 @@ export function createMolecule(sql: SqlStorage, beadId: string, formula: unknown
   const timestamp = now();
   const formulaArr = Array.isArray(formula) ? formula : [];
 
-  // Create the molecule parent bead
   query(
     sql,
     /* sql */ `
@@ -1367,7 +1347,6 @@ export function createMolecule(sql: SqlStorage, beadId: string, formula: unknown
     ]
   );
 
-  // Create child step beads and dependency chain
   let prevStepId: string | null = null;
   for (let i = 0; i < formulaArr.length; i++) {
     const stepId = generateId();
@@ -1404,7 +1383,6 @@ export function createMolecule(sql: SqlStorage, beadId: string, formula: unknown
       ]
     );
 
-    // Chain dependencies: each step blocks on the previous
     if (prevStepId) {
       query(
         sql,
@@ -1421,7 +1399,6 @@ export function createMolecule(sql: SqlStorage, beadId: string, formula: unknown
     prevStepId = stepId;
   }
 
-  // Link molecule to source bead in metadata
   query(
     sql,
     /* sql */ `
@@ -1519,7 +1496,6 @@ export function advanceMoleculeStep(
 
   const { molecule } = current;
 
-  // Close the current step bead
   const steps = getStepBeads(sql, molecule.id);
   const currentStepBead = steps[molecule.current_step];
   if (currentStepBead) {
@@ -1537,13 +1513,11 @@ export function advanceMoleculeStep(
     );
   }
 
-  // Check if molecule is now complete
   const formula = molecule.formula;
   const nextStep = molecule.current_step + 1;
   const isComplete = !Array.isArray(formula) || nextStep >= formula.length;
 
   if (isComplete) {
-    // Close the molecule bead itself
     const timestamp = now();
     query(
       sql,

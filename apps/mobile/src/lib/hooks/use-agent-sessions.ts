@@ -5,9 +5,9 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
-import { useActiveSessions } from '@/lib/active-sessions-live-sync-mount';
+import { useActiveSessions } from '@/lib/active-sessions-query';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import {
@@ -36,6 +36,7 @@ import {
   DEFAULT_AGENT_SESSION_SORT,
   parseAgentSessionSortBy,
 } from '@/lib/agent-session-sort';
+import { useLiveSessionsHold } from '@/lib/hooks/use-live-sessions-hold';
 import { reconcileFirstPage, withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { useTRPC } from '@/lib/trpc';
@@ -107,6 +108,26 @@ function getUpdatedSince(days: number): string {
 // ── Queries ──────────────────────────────────────────────────────────
 
 /**
+ * Retention bound for the session-history infinite queries.
+ *
+ * The history browser pages the stored-sessions query forward and the user
+ * scrolls back over everything already loaded. The shared
+ * `INFINITE_QUERY_MAX_PAGES` (5) trims the oldest page from the front on every
+ * forward fetch (`addToEnd(..., max)` slices index 0), so past five pages the
+ * top of the history is evicted and the list can never scroll back to it: the
+ * oldest date header becomes the top of the list. This bound holds the
+ * e2e history (8 pages of 30 sessions) with headroom while still stopping a
+ * server that keeps handing out cursors from growing the cache without bound.
+ *
+ * `maxPages` also bounds a single refetch: React Query re-requests every page
+ * retained in the cache on `refetch()`, and the history list refetches on focus
+ * return and app foreground. Staying near the browsable requirement (instead of
+ * a 100-page bound) keeps one focus/foreground refetch to a small, bounded
+ * number of page requests, matching `INBOX_MAX_PAGES`.
+ */
+const SESSION_HISTORY_MAX_PAGES = 20;
+
+/**
  * Build the stored-sessions infinite-query options shared by every stored
  * refetch path on the Agents screen (focus return, pull-to-refresh, retry,
  * departure trigger, backfill). Kept as a pure builder so the query options
@@ -127,7 +148,8 @@ export function buildStoredSessionsQueryOptions(
       // so the native query lifecycle must not start a stored refetch that
       // bypasses the operation coordinator shared with backfill and departure.
       refetchOnWindowFocus: options?.refetchOnWindowFocus ?? true,
-    })
+    }),
+    SESSION_HISTORY_MAX_PAGES
   );
 }
 
@@ -173,7 +195,8 @@ export function buildAgentSessionSearchQueryOptions(
       enabled: (options.enabled ?? true) && options.searchQuery.length > 0,
       placeholderData: keepPreviousData,
       getNextPageParam: lastPage => lastPage.nextCursor,
-    })
+    }),
+    SESSION_HISTORY_MAX_PAGES
   );
 }
 
@@ -214,6 +237,17 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   const queryClient = useQueryClient();
   const stored = useStoredSessions(options);
   const active = useActiveSessions(options);
+
+  // Rows delivered since this hook mounted, as opposed to rows restored from
+  // the query cache (in-memory or the encrypted read cache). `dataUpdatedAt`
+  // only advances when the stored query successfully delivers data, so a fresh
+  // screen mount that cannot reach the API has no fresh rows even when a
+  // previous mount left rows cached. The Agents history screen uses this to
+  // show its retryable full-screen error on a failed fresh open instead of
+  // presenting stale rows as loaded, while a failure after rows were actually
+  // delivered this mount keeps them with the inline error.
+  const [storedDataUpdatedAtAtMount] = useState(stored.dataUpdatedAt);
+  const storedFetchedSinceMount = stored.dataUpdatedAt > storedDataUpdatedAtAtMount;
 
   // One coordinator per hook instance, shared by the stored list's next-page
   // fetch and every stored refetch (focus return, pull-to-refresh, retry,
@@ -347,6 +381,19 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // vs "keep showing stale data") should use these instead of `isError`.
     storedIsError: stored.isError,
     storedIsSuccess: stored.isSuccess,
+    // A paused stored query (offline, no cached page) is neither loading nor
+    // errored, but it has no rows and will not resolve until the network
+    // returns. Callers that gate on "nothing to show" must treat paused as
+    // unresolved rather than as a settled page, so they can offer a retry
+    // instead of a skeleton that never settles.
+    storedIsPaused: stored.isPaused,
+    storedFetchedSinceMount,
+    // React Query v5's `isLoading` is `isPending && isFetching`, so it is false
+    // on the first render (the observer has not started the fetch yet) and
+    // while a query is paused (offline). `isPending` stays true until the query
+    // settles, so the list surfaces must key "no data yet" off this flag — a
+    // cached list has `isPending: false` and keeps rendering during a refetch.
+    storedIsPending: stored.isPending,
     // Any stored-list fetch in flight (initial load, refetch, next page),
     // used by the backfill selector to serialize automatic fetches behind
     // user- or focus-driven refetches on the same infinite query. The selector
@@ -358,6 +405,11 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     // rendered row count, because active-set exclusion can hide whole pages.
     storedLoadedPageCount: stored.data?.pages.length ?? 0,
     activeIsError: active.isError,
+    // A paused active query is neither loading (`isLoading` is
+    // `isPending && isFetching`, and a paused query is not fetching) nor
+    // errored, yet its liveness result is unresolved. Callers that gate on
+    // "nothing live" must treat paused as unknown, not as settled empty.
+    activeIsPaused: active.isPaused,
     hasNextPage: stored.hasNextPage,
     isFetchingNextPage: stored.isFetchingNextPage,
     fetchNextPage,
@@ -395,8 +447,19 @@ export function useLiveAgentSessions(options?: UseAgentSessionsOptions) {
     [active.canRead, active.data, options?.organizationId]
   );
 
+  // The socket writers (`sessions.list`, `sessions.heartbeat`,
+  // `cli.disconnected`) empty the live set the moment a CLI socket blips, and
+  // the reconnect restores the rows a moment later. Hold the last rows through
+  // that window so the surface does not flash the empty state on a reconnect;
+  // the hold is scoped to the query key so a context change still loads.
+  const renderedActiveSessions = useLiveSessionsHold({
+    current: activeSessions,
+    scopeKey: JSON.stringify(active.queryKey),
+    canHold: active.canRead,
+  });
+
   return {
-    activeSessions,
+    activeSessions: renderedActiveSessions,
     // Preserve the old flags; presentation must use provenance, not isLoading,
     // to distinguish unconfirmed empty data from accepted empty success.
     isLoading: active.isLoading,

@@ -56,31 +56,24 @@ describe('getDaysRemainingInTrial', () => {
   });
 
   it('calculates days remaining correctly using free_trial_end_at', () => {
-    // Organization created 5 days before fixed now
     const createdAt = new Date(FIXED_NOW_MS - 5 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Organization with trial ending in 14 days
     const freeTrialEndAt14 = new Date(FIXED_NOW_MS + 14 * 24 * 60 * 60 * 1000).toISOString();
     expect(getDaysRemainingInTrial(freeTrialEndAt14, createdAt)).toBe(14);
 
-    // Organization with trial expired 5 days ago
     const freeTrialEndAtExpired = new Date(FIXED_NOW_MS - 5 * 24 * 60 * 60 * 1000).toISOString();
     expect(getDaysRemainingInTrial(freeTrialEndAtExpired, createdAt)).toBe(-5);
   });
 
   it('falls back to created_at + 14 days when free_trial_end_at is null', () => {
-    // Organization created today (no free_trial_end_at set)
     expect(getDaysRemainingInTrial(null, FIXED_NOW)).toBe(14);
 
-    // Organization created 10 days ago (no free_trial_end_at set)
     const tenDaysAgo = new Date(FIXED_NOW_MS - 10 * 24 * 60 * 60 * 1000).toISOString();
     expect(getDaysRemainingInTrial(null, tenDaysAgo)).toBe(4);
 
-    // Organization created 14 days ago (expires today, no free_trial_end_at set)
     const fourteenDaysAgo = new Date(FIXED_NOW_MS - 14 * 24 * 60 * 60 * 1000).toISOString();
     expect(getDaysRemainingInTrial(null, fourteenDaysAgo)).toBe(0);
 
-    // Organization created 19 days ago (expired 5 days ago, no free_trial_end_at set)
     const nineteenDaysAgo = new Date(FIXED_NOW_MS - 19 * 24 * 60 * 60 * 1000).toISOString();
     expect(getDaysRemainingInTrial(null, nineteenDaysAgo)).toBe(-5);
   });

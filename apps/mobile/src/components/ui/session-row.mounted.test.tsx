@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests. */
 import { type ComponentProps, createElement } from 'react';
 import { View } from 'react-native';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -84,9 +83,13 @@ describe('SessionRow mounted layout', () => {
     // The eyebrow label yields before the timestamp: flex-1 basis 0 sizes
     // the right cluster at its full natural width first, so a long agent
     // label truncates instead of ellipsizing the relative time (SPOT-DEFECT:
-    // rows clipped "1 HOUR AGO" to "1 HOUR A...").
+    // rows clipped "1 HOUR AGO" to "1 HOUR A..."). The label is the repo
+    // identifier, so it ellipsizes in the middle — a tail ellipsis hid the
+    // distinguishing suffix (device finding: "TAX-REPORT-GENERA…"), while
+    // middle keeps both ends legible (same convention as `KvRow`).
     const label = textNode(root, content.agentLabel);
     expect(label.props.numberOfLines).toBe(1);
+    expect(label.props.ellipsizeMode).toBe('middle');
     expect((label.props.className as string).split(' ')).toEqual(
       expect.arrayContaining(['min-w-0', 'flex-1'])
     );
@@ -107,6 +110,23 @@ describe('SessionRow mounted layout', () => {
         expect((cluster?.props.className as string | undefined)?.split(' ')).toContain('shrink');
       }
     }
+  });
+
+  // Device finding (agents-active): a long repo label was clipped to
+  // "TAX-REPORT-GENERA…", cutting the agent identifier mid-word so its
+  // distinguishing suffix was hidden. The identifier now ellipsizes in the
+  // middle, keeping both ends legible, while the relative time still keeps its
+  // full natural width.
+  it('keeps a long repo identifier legible at both ends with a middle ellipsis', () => {
+    const longLabel = 'TAX-REPORT-GENERATOR';
+    const root = renderRow({ agentLabel: longLabel, live: true, meta, metaWhileLive: true });
+    const label = textNode(root, longLabel);
+    expect(label.props.numberOfLines).toBe(1);
+    expect(label.props.ellipsizeMode).toBe('middle');
+    expect((label.props.className as string).split(' ')).toEqual(
+      expect.arrayContaining(['min-w-0', 'flex-1'])
+    );
+    expect(textNode(root, meta).props.ellipsizeMode).toBe('tail');
   });
 
   it.each<{

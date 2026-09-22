@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the composer suite covers the draft clear rules and the provider-arm anchored post in one cohesive file */
 // Clear-rule coverage for the comment composer's durable draft. The composer
 // clears its draft on three committed outcomes — comment post, add-to-review,
 // and a confirmed discard — and keeps it on a dismissed-without-confirmation
@@ -14,6 +15,7 @@ import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 import { PrReviewCommentComposer } from './pr-review-comment-composer';
 import { clearDraft } from '@/lib/persist/drafts';
+import { providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -256,6 +258,18 @@ describe('PrReviewCommentComposer draft clear rules', () => {
     footerProp(element, 'onCommentNow')?.();
     await flushMicrotasks();
 
+    // The GitHub arm keeps its exact pre-s6 variables: the position rides
+    // the flat input fields, never the provider `anchor` shape (c3).
+    expect(createCommentMocks.mutateAsync).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      body: 'hello',
+      path: 'src/a.ts',
+      line: 10,
+      side: 'RIGHT',
+      commitSha: 'a'.repeat(40),
+    });
     expect(clearDraft).toHaveBeenCalledWith('u1', 'pr-comment:key');
   });
 
@@ -285,5 +299,75 @@ describe('PrReviewCommentComposer draft clear rules', () => {
     call.buttons.find(b => b.text === 'Keep editing')?.onPress?.();
 
     expect(clearDraft).not.toHaveBeenCalled();
+  });
+});
+
+describe('PrReviewCommentComposer provider arm (s6)', () => {
+  // A GitLab MR with the same owner/repo/number triple as the GitHub
+  // fixtures: the folded draft key and the anchored post must differ from
+  // the GitHub arm in both bytes.
+  const gitlabRef = { platform: 'gitlab' as const, projectPath: 'octocat/hello', mrIid: 1 };
+  const providerProps = { ...baseProps, prRef: gitlabRef };
+
+  function mountProviderComposer(): React.ReactElement {
+    // eslint-disable-next-line new-cap
+    return PrReviewCommentComposer(providerProps);
+  }
+
+  beforeEach(() => {
+    createCommentMocks.mutateAsync.mockReset();
+    createCommentMocks.isPending = false;
+    createCommentMocks.error = null;
+    vi.clearAllMocks();
+  });
+
+  it('posts the tapped diff position as the real anchor through the provider arm (c3)', async () => {
+    createCommentMocks.mutateAsync.mockResolvedValueOnce({});
+    const element = mountProviderComposer();
+    typeBody(element, 'hello');
+    footerProp(element, 'onCommentNow')?.();
+    await flushMicrotasks();
+
+    expect(createCommentMocks.mutateAsync).toHaveBeenCalledWith({
+      body: 'hello',
+      anchor: { path: 'src/a.ts', side: 'RIGHT', line: 10 },
+    });
+  });
+
+  it('carries a multi-line range into the anchor (c3)', async () => {
+    createCommentMocks.mutateAsync.mockResolvedValueOnce({});
+    // eslint-disable-next-line new-cap
+    const element = PrReviewCommentComposer({
+      ...providerProps,
+      startLine: 8,
+    });
+    typeBody(element, 'hello');
+    footerProp(element, 'onCommentNow')?.();
+    await flushMicrotasks();
+
+    expect(createCommentMocks.mutateAsync).toHaveBeenCalledWith({
+      body: 'hello',
+      anchor: { path: 'src/a.ts', side: 'RIGHT', line: 10, startLine: 8 },
+    });
+  });
+
+  it('keeps the provider comment out of the pending queue path (comment now is direct)', () => {
+    createCommentMocks.mutateAsync.mockResolvedValueOnce({});
+    const element = mountProviderComposer();
+    typeBody(element, 'hello');
+    footerProp(element, 'onAddToReview')?.();
+
+    // Add-to-review stays provider-agnostic: the queue is local and the
+    // submit sheet folds it into the review body later.
+    expect(createCommentMocks.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('folds the provider ref identity into the durable comment draft key', () => {
+    const element = mountProviderComposer();
+    typeBody(element, 'hello');
+    footerProp(element, 'onAddToReview')?.();
+
+    const expected = `pr-comment:key@${providerPrRefKey(gitlabRef)}`;
+    expect(clearDraft).toHaveBeenCalledWith('u1', expected);
   });
 });

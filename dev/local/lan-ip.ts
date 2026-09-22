@@ -14,6 +14,18 @@ function isUsableIpv4(value: string | undefined): value is string {
   return value.split('.').every(part => Number(part) <= 255);
 }
 
+// `localhost` is a hostname, not an IPv4 literal, so isUsableIpv4 rejects it.
+// The device paths reach the stack on loopback (an emulator through `adb
+// reverse`, a simulator on the shared host), and the dev stack starts with
+// MOBILE_DEV_HOST=localhost, so a loopback hostname must be accepted wherever a
+// dev host is validated. Without it `pnpm dev:start mobile` dies in
+// prepareMobileEnvironment before a single service starts.
+const LOOPBACK_HOSTNAMES = new Set(['localhost']);
+
+function isUsableDevHost(value: string | undefined): value is string {
+  return typeof value === 'string' && (isUsableIpv4(value) || LOOPBACK_HOSTNAMES.has(value));
+}
+
 function detectLanIp(
   deps: LanIpDeps = { execFileSync: defaultExecFileSync, networkInterfaces: os.networkInterfaces }
 ): string | undefined {
@@ -48,5 +60,5 @@ function detectLanIp(
   return undefined;
 }
 
-export { detectLanIp, isUsableIpv4 };
+export { detectLanIp, isUsableDevHost, isUsableIpv4 };
 export type { LanIpDeps };

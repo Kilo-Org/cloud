@@ -18,9 +18,10 @@ import {
   type NativeRuntimeRetirementWorkflow,
 } from './native-runtime-retirement.js';
 import { beginStop, type PhysicalRecord } from './physical-lifecycle.js';
-import type { SessionRoute } from './session-routes.js';
+import { pinsEnvironmentWithinLiveness, type SessionRoute } from './session-routes.js';
 
 export const RECOVERY_CLEANUP_REASON = 'Control recovery exhausted';
+export const RECOVERY_SETTLED_REAP_REASON = 'recovery_settled_reap';
 
 type CleanupRoot = {
   sessionId: string;
@@ -105,20 +106,15 @@ function provesRetirement(
   );
 }
 
-export function ownsRecoveryCleanupAllocation(
-  decision: recovery.SandboxRecoveryDecision,
-  physical: PhysicalRecord,
-  routes: Map<string, SessionRoute>,
-  now: number
+export type RecoveryCleanupEligibility = 'targeted' | 'settled';
+
+function recoveryCleanupRootsAccounted(
+  roots: readonly recovery.RecoveryRoot[],
+  routes: Map<string, SessionRoute>
 ): boolean {
-  const authority: recovery.RecoveryAuthority | undefined = decision.authority;
-  if (!authority?.wholeAllocation || !matchesAllocation(decision, physical)) return false;
-  const roots = selectRecoveryCleanupRoots(authority, now);
   return (
-    roots.length > 0 &&
-    authority.roots?.length === roots.length &&
-    authority.roots.every(root => root.observation === 'known' || root.observation === 'idle') &&
     routes.size > 0 &&
+    roots.every(root => root.observation === 'known' || root.observation === 'idle') &&
     roots.every(root => {
       const route = routes.get(root.sessionId);
       return route !== undefined && matchesRoot(route, root);
@@ -127,6 +123,32 @@ export function ownsRecoveryCleanupAllocation(
       roots.some(root => root.ownerId === route.ownerId && matchesRoot(route, root))
     )
   );
+}
+
+export function recoveryCleanupEligibility(
+  decision: recovery.SandboxRecoveryDecision,
+  physical: PhysicalRecord,
+  routes: Map<string, SessionRoute>,
+  now: number
+): RecoveryCleanupEligibility | null {
+  const authority = decision.authority;
+  if (!authority?.wholeAllocation || !matchesAllocation(decision, physical)) return null;
+  const selected = selectRecoveryCleanupRoots(authority, now);
+
+  if (selected.length > 0) {
+    return authority.roots !== undefined &&
+      authority.roots.length === selected.length &&
+      recoveryCleanupRootsAccounted(authority.roots, routes)
+      ? 'targeted'
+      : null;
+  }
+
+  return authority.roots !== undefined &&
+    authority.roots.length > 0 &&
+    recoveryCleanupRootsAccounted(authority.roots, routes) &&
+    [...routes.values()].every(route => !pinsEnvironmentWithinLiveness(route, now))
+    ? 'settled'
+    : null;
 }
 
 export function canRecoveryRetirementStopAllocation(
@@ -147,7 +169,7 @@ export function canRecoveryRetirementStopAllocation(
       receipt.allocation.createIntentId === decision.authority?.allocation.createIntentId &&
       receipt.allocation.providerRef === decision.providerInstanceId &&
       receipt.connection.wrapperInstanceId === decision.wrapperInstanceId &&
-      ownsRecoveryCleanupAllocation(decision, physical, routes, now)
+      recoveryCleanupEligibility(decision, physical, routes, now) === 'targeted'
   );
 }
 
@@ -155,6 +177,7 @@ export function createRecoveryCleanup(input: {
   storage: CleanupStorage;
   retirement: Pick<NativeRuntimeRetirementWorkflow, 'retire'>;
   getConnection: () => NativeRuntimeRetirementConnection | undefined;
+  isConnectionReady: () => boolean;
   supportsTargetedRetirement: () => boolean;
   persistPhysical: (from: PhysicalRecord, to: PhysicalRecord, reason: string) => Promise<void>;
   onPhysicalStop: (from: PhysicalRecord, to: PhysicalRecord, reason: string) => Promise<void>;
@@ -299,20 +322,29 @@ export function createRecoveryCleanup(input: {
       const current = decisions.find(item => item.episodeId === episodeId);
       if (!current || current.exhaustedAt === undefined) return undefined;
       const connection = input.getConnection();
+      const eligibility = recoveryCleanupEligibility(current, physical, routes, now());
+      const runtimeReady =
+        connection !== undefined &&
+        recovery.sameRuntime(connection, current) &&
+        input.isConnectionReady();
+      const reason =
+        eligibility === 'settled' ? RECOVERY_SETTLED_REAP_REASON : RECOVERY_CLEANUP_REASON;
+      const vetoed = eligibility === 'settled' && runtimeReady;
       const canStop =
         (!connection || recovery.sameRuntime(connection, current)) &&
+        !vetoed &&
         current.cleanupState !== 'unconfirmed' &&
         current.cleanupState !== 'completed' &&
         current.cleanupDeadlineAt !== undefined &&
         now() >= current.cleanupDeadlineAt &&
-        ownsRecoveryCleanupAllocation(current, physical, routes, now());
+        eligibility !== null;
       const stopping = matchesAllocation(current, physical) && physical.stopTombstone !== null;
       const next =
         canStop && physical.state === 'running' && !physical.stopTombstone
-          ? beginStop(physical, RECOVERY_CLEANUP_REASON, now(), current.wrapperInstanceId)
+          ? beginStop(physical, reason, now(), current.wrapperInstanceId)
           : undefined;
-      if (next) await input.persistPhysical(physical, next, RECOVERY_CLEANUP_REASON);
-      const state = next || stopping ? 'physical_fallback' : 'unconfirmed';
+      if (next) await input.persistPhysical(physical, next, reason);
+      const state = next || stopping ? 'physical_fallback' : vetoed ? 'pending' : 'unconfirmed';
       if (state === 'unconfirmed') {
         await saveNativeRuntimeRetirements(
           tx,
@@ -334,15 +366,16 @@ export function createRecoveryCleanup(input: {
             ? recovery.updateRecoveryCleanup(
                 item,
                 state,
-                state === 'physical_fallback' ? now() + DEADLINE_MS.reconciliation : undefined
+                state === 'physical_fallback' || state === 'pending'
+                  ? now() + DEADLINE_MS.reconciliation
+                  : undefined
               )
             : item
         )
       );
-      return next ? { physical, next } : undefined;
+      return next ? { physical, next, reason } : undefined;
     });
-    if (committed)
-      await input.onPhysicalStop(committed.physical, committed.next, RECOVERY_CLEANUP_REASON);
+    if (committed) await input.onPhysicalStop(committed.physical, committed.next, committed.reason);
   };
 
   const retireRoot = async (episodeId: string, root: CleanupRoot): Promise<void> => {
@@ -417,7 +450,7 @@ export function createRecoveryCleanup(input: {
       const roots = selectRecoveryCleanupRoots(authority, now());
       const connection = input.getConnection();
       const cleanupDeadlineAt = decision.cleanupDeadlineAt;
-      if (cleanupDeadlineAt === undefined || roots.length === 0) {
+      if (cleanupDeadlineAt === undefined) {
         await update(decision.episodeId, 'unconfirmed');
         continue;
       }

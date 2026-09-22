@@ -1,14 +1,15 @@
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { AlertCircle, Info, Search, SearchX } from '@/components/ui/icons';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { FlatList, TextInput, View } from 'react-native';
+import { AlertCircle, Info, Search, SearchX, X } from '@/components/ui/icons';
+import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
+import { FlatList, Pressable, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { ModelPickerOptionRow } from '@/components/agents/model-selector';
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
+import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -33,6 +34,12 @@ export function ModelPickerContent() {
   const routeKey = parseParam(rawRouteKey) ?? UNFENCED_ROUTE_KEY;
   useRouteRegistry(routeKey);
   const [search, setSearch] = useState('');
+  // The input stays urgent; the list derivation and its rows trail behind so a
+  // typing burst on a large catalog does not filter/reconcile on every key.
+  const deferredSearch = useDeferredValue(search);
+  // The input remains uncontrolled (iOS TextInput rules), so the in-field X
+  // clears the native text imperatively and `search` stays the rows' source.
+  const searchInputRef = useRef<TextInput>(null);
   const [bridge, setBridge] = useState(() => modelPickerSlot.get(routeKey));
   const [selectedModel, setSelectedModel] = useState(bridge?.currentValue ?? '');
   const [selectedVariant, setSelectedVariant] = useState(bridge?.currentVariant ?? '');
@@ -60,6 +67,7 @@ export function ModelPickerContent() {
       setSelectedModel(nextModel);
       setSelectedVariant(nextVariant);
       setSearch('');
+      searchInputRef.current?.clear();
 
       return () => {
         if (closePickerTimerRef.current) {
@@ -82,9 +90,19 @@ export function ModelPickerContent() {
   );
 
   const rows = useMemo<ModelPickerRow[]>(
-    () => buildModelPickerRows({ models: bridge?.options ?? [], search, favoriteIds }),
-    [bridge, search, favoriteIds]
+    () =>
+      buildModelPickerRows({ models: bridge?.options ?? [], search: deferredSearch, favoriteIds }),
+    [bridge, deferredSearch, favoriteIds]
   );
+
+  // Shared by the in-field X and the "No matches" empty state's CTA: drops the
+  // query and the input's visible text in one step, so the full list returns
+  // without backspacing. The field carries its own control because Android has
+  // no native `clearButtonMode` counterpart.
+  const handleClearSearch = useCallback(() => {
+    searchInputRef.current?.clear();
+    setSearch('');
+  }, []);
 
   // The favorite star button in ModelPickerOptionRow already fires its own
   // selection haptic on press — this callback must not fire a second one.
@@ -164,15 +182,28 @@ export function ModelPickerContent() {
           <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
             <Search size={18} color={colors.mutedForeground} />
             <TextInput
+              ref={searchInputRef}
               placeholder={t('common.searchModels')}
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"
               autoCorrect={false}
-              clearButtonMode="while-editing"
               returnKeyType="search"
               className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
               onChangeText={setSearch}
             />
+            {/* In-field clear, on every platform: `clearButtonMode` is iOS
+                only, so Android rendered the query with no way to reset it. */}
+            {search.length > 0 ? (
+              <Pressable
+                onPress={handleClearSearch}
+                accessibilityLabel={t('common.clearSearch')}
+                accessibilityRole="button"
+                hitSlop={12}
+                className="active:opacity-70"
+              >
+                <X size={16} color={colors.mutedForeground} />
+              </Pressable>
+            ) : null}
           </View>
           {favoritesError ? (
             <View className="mx-4 mb-3 flex-row items-center gap-1.5">
@@ -185,14 +216,23 @@ export function ModelPickerContent() {
     >
       {rows.length === 0 ? (
         <EmptyState
-          icon={search.trim() ? SearchX : Info}
+          icon={deferredSearch.trim() ? SearchX : Info}
           title={
-            search.trim() ? t('agentChat.repoPicker.noMatches') : t('common.noModelsAvailable')
+            deferredSearch.trim()
+              ? t('agentChat.repoPicker.noMatches')
+              : t('common.noModelsAvailable')
           }
           description={
-            search.trim()
+            deferredSearch.trim()
               ? t('agents.sessionList.tryDifferentSearch')
               : t('agentChat.modelPicker.noModelsDescription')
+          }
+          action={
+            deferredSearch.trim() ? (
+              <Button variant="outline" onPress={handleClearSearch}>
+                <Text>{t('common.clearSearch')}</Text>
+              </Button>
+            ) : undefined
           }
         />
       ) : (

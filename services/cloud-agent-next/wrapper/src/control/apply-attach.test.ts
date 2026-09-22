@@ -462,6 +462,65 @@ describe('applySessionAttach', () => {
     }
   });
 
+  it('classifies a probe request timeout as session_probe_timeout', async () => {
+    const diagnostics: Array<Record<string, string | number | boolean | undefined>> = [];
+    const result = await applySessionAttach(
+      session,
+      { kilo },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        onDiagnostic: (_event, fields) => diagnostics.push(fields),
+        sessionExists: async () => {
+          throw new Error('Kilo request timed out');
+        },
+      }
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'not_ready', retryable: true },
+    });
+    expect(diagnostics).toContainEqual(
+      expect.objectContaining({
+        phase: 'failed',
+        stage: 'session_probe',
+        reason: 'session_probe_timeout',
+        timedOut: true,
+        errorCode: 'not_ready',
+      })
+    );
+  });
+
+  it('classifies an aborted attach as attachment_cancelled', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const diagnostics: Array<Record<string, string | number | boolean | undefined>> = [];
+    const result = await applySessionAttach(
+      session,
+      { kilo },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        onDiagnostic: (_event, fields) => diagnostics.push(fields),
+        signal: controller.signal,
+      }
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        retryable: true,
+        message: 'Session attachment cancelled',
+      },
+    });
+    expect(diagnostics).toContainEqual(
+      expect.objectContaining({
+        phase: 'failed',
+        stage: 'runtime_attach',
+        reason: 'attachment_cancelled',
+        aborted: true,
+      })
+    );
+  });
+
   it('clones and checks out a non-default branch without mutating process.env', async () => {
     const gitCalls: string[][] = [];
     const mkdirCalls: string[] = [];

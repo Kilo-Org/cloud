@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free React Native section tests */
 import { type ComponentProps, createElement } from 'react';
 import * as ReactQuery from '@tanstack/react-query';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -70,6 +69,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: () => null }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: vi.fn() }));
 vi.mock('@/lib/organization-context', () => ({

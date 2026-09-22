@@ -1,10 +1,8 @@
 import { describe, expect, test } from '@jest/globals';
 
-import {
-  LONGCAT,
-  OPENROUTER,
-  tryGetProviderById,
-} from '@/lib/ai-gateway/providers/provider-definitions';
+import { LONGCAT } from '@/lib/ai-gateway/providers/definitions/longcat';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { tryGetProviderById } from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
   ReasoningDetailsTransform,
@@ -68,6 +66,5 @@ describe('tryGetProviderById', () => {
 
   test('does not claim dynamically constructed providers', () => {
     expect(tryGetProviderById('direct-byok')).toBeUndefined();
-    expect(tryGetProviderById('perplexity')).toBeUndefined();
   });
 });

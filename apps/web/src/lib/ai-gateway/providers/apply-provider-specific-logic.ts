@@ -21,7 +21,6 @@ import {
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import {
   ReasoningDetailsTransform,
@@ -53,6 +52,8 @@ import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { ReasoningFormat } from '@/lib/ai-gateway/custom-llm/format';
 import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
+import { isGeminiModel } from '@/lib/ai-gateway/providers/google';
+import { sanitizeJsonRefToolResults } from '@/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -214,8 +215,7 @@ export function applyAnthropicThinkingDefault(
 ) {
   const defaultsToThinking =
     (isMinimaxModel(requestedModel) && requestedModel.includes('m3')) ||
-    requestedModel === 'z-ai/glm-5.2' ||
-    requestedModel === PERPLEXITY_KIMI_PUBLIC_ID;
+    requestedModel === 'z-ai/glm-5.2';
   if (
     defaultsToThinking &&
     requestToMutate.kind === 'messages' &&
@@ -294,6 +294,10 @@ export async function applyProviderSpecificLogic(
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
+
+  if (isGeminiModel(requestedModel)) {
+    sanitizeJsonRefToolResults(requestToMutate);
+  }
 
   if (requestToMutate.kind === 'chat_completions') {
     scrubOpenCodeSpecificProperties(requestToMutate.body);

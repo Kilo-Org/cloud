@@ -1,8 +1,7 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/lib/hooks/use-force-update.mounted.test.tsx) */
 import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type * as TanStackReactQuery from '@tanstack/react-query';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';

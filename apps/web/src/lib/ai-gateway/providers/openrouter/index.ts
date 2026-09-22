@@ -8,7 +8,7 @@ import {
   getLocalFakeTranscriptionModelsUrl,
   LOCAL_FAKE_LLM_API_KEY,
 } from '@/lib/ai-gateway/local-fake-llm';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import {
   OpenRouterModelsResponseSchema,
@@ -229,6 +229,7 @@ function removeUpstreamEnkrypt(response: unknown): unknown {
  */
 export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse> {
   const response = await fetch(`${OPENROUTER.apiUrl}/models`, {
+    cache: 'force-cache',
     method: 'GET',
     headers: {
       Authorization: `Bearer ${OPENROUTER.apiKey}`,

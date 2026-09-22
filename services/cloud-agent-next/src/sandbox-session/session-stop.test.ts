@@ -76,6 +76,64 @@ describe('Session Stop admission', () => {
     ]);
   });
 
+  it('admits a Stop deadline ahead of the acting clock and saturates the cleanup window', () => {
+    const admission = admitSessionStop({
+      messages: [message('a', 'accepted', RUNTIME_A)],
+      request: { ...stopRequest(), cleanupDeadlineAt: 11_500 },
+      currentSandboxId: 'sandbox-a',
+      currentWrapperInstanceId: RUNTIME_A,
+      now: 1_000,
+    });
+
+    expect(admission.stop).toBeDefined();
+    expect(admission.receipt).toMatchObject({
+      operationId: STOP_ID,
+      state: 'accepted',
+      cleanupDeadlineAt: 11_000,
+    });
+    expect(admission.messages).toMatchObject([
+      { messageId: 'a', cancellation: { operationId: STOP_ID, deadlineAt: 11_000 } },
+    ]);
+  });
+
+  it('maps a retry of the same skewed request onto the persisted Stop window', () => {
+    const first = admitSessionStop({
+      messages: [message('a', 'accepted', RUNTIME_A)],
+      request: { ...stopRequest(), cleanupDeadlineAt: 11_500 },
+      currentSandboxId: 'sandbox-a',
+      currentWrapperInstanceId: RUNTIME_A,
+      now: 1_000,
+    });
+    if (!first.stop) throw new Error('First Stop was not admitted');
+
+    const retry = admitSessionStop({
+      messages: first.messages,
+      existing: first.stop,
+      request: { ...stopRequest(), cleanupDeadlineAt: 11_500 },
+      currentSandboxId: 'sandbox-a',
+      currentWrapperInstanceId: RUNTIME_A,
+      now: 1_200,
+    });
+
+    expect(retry.receipt).toEqual(first.receipt);
+    expect(retry.receipt.message).toBeUndefined();
+  });
+
+  it('still rejects a Stop deadline that is already elapsed', () => {
+    const admission = admitSessionStop({
+      messages: [message('a', 'accepted', RUNTIME_A)],
+      request: { ...stopRequest(), cleanupDeadlineAt: 11_000 },
+      currentSandboxId: 'sandbox-a',
+      currentWrapperInstanceId: RUNTIME_A,
+      now: 12_000,
+    });
+
+    expect(admission.receipt).toMatchObject({
+      state: 'rejected',
+      message: 'Stop cleanup deadline is invalid',
+    });
+  });
+
   it('fails closed when a Stop targets an older wrapper incarnation', () => {
     const admission = admitSessionStop({
       messages: [message('a', 'accepted', RUNTIME_A)],

@@ -5,7 +5,9 @@ import type { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
 import type { CloudChatPage as CloudChatPageComponent } from './CloudChatPage';
 import type { ChatHeader } from './ChatHeader';
 import type { WorktreeChangesDrawer } from './WorktreeChanges';
-import type { StoredSession } from './types';
+import type { ConversationMessages } from './ConversationMessages';
+import type { StoredMessage, StoredSession } from './types';
+import type { SessionCommit } from '@kilocode/cloud-agent-sdk';
 import {
   CHAT_TAB_ID,
   addTerminalTab,
@@ -21,8 +23,10 @@ import {
 Object.assign(globalThis, { React });
 
 let mockSessionId: string | null = 'ses_recent';
+let mockAtParam: string | null = null;
 let mockWorktreeId: string | null = 'worktree_shared';
 let mockTabs: ComponentProps<typeof CloudAgentWorkspaceTabs>;
+let mockConversation: ComponentProps<typeof ConversationMessages>;
 let mockAtomValues: Record<string, unknown>;
 const mockClosedPtys: string[] = [];
 const mockChats = [
@@ -38,10 +42,13 @@ const mockChats = [
   },
 ] as StoredSession[];
 const mockSetAtom = jest.fn();
+const mockRequestOlderMessages = jest.fn();
+let mockChatInput: Record<string, unknown> | null = null;
 const mockManager = {
   atoms: new Proxy({}, { get: (_target, key) => key }),
   switchSession: jest.fn(),
   destroy: jest.fn(),
+  send: jest.fn(async () => true),
 };
 const mockQueryClient = { invalidateQueries: jest.fn() };
 const mockUploadEndpoint = { mutationOptions: () => ({}) };
@@ -55,14 +62,23 @@ jest.mock('jotai', () => ({
   useSetAtom: () => mockSetAtom,
 }));
 jest.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(mockSessionId ? { sessionId: mockSessionId } : {}),
+  useSearchParams: () =>
+    new URLSearchParams({
+      ...(mockSessionId ? { sessionId: mockSessionId } : {}),
+      ...(mockAtParam ? { at: mockAtParam } : {}),
+    }),
 }));
 jest.mock('@tanstack/react-query', () => ({
   useMutation: () => ({ mutateAsync: jest.fn() }),
   useQueryClient: () => mockQueryClient,
 }));
 jest.mock('@/lib/trpc/utils', () => ({ useTRPC: () => mockTrpc }));
-jest.mock('./CloudAgentProvider', () => ({ useManager: () => mockManager }));
+jest.mock('./CloudAgentProvider', () => ({
+  useManager: () => mockManager,
+  useCloudAgent: () => ({}),
+}));
+jest.mock('./useWorktreeReview', () => ({ useWorktreeReview: () => ({ scope: null }) }));
+jest.mock('./WorktreeReviewDialog', () => ({ WorktreeReviewDialog: () => null }));
 jest.mock('./CloudSidebarLayout', () => ({
   useWorktreeChatCreation: () => ({
     createWorktreeChat: jest.fn(),
@@ -120,7 +136,10 @@ jest.mock('./hooks/useSessionModels', () => ({
   }),
 }));
 jest.mock('./older-messages-scroll', () => ({
-  useOlderMessagesPagination: () => ({}),
+  useOlderMessagesPagination: () => ({
+    requestOlderMessages: mockRequestOlderMessages,
+    tryLoadOlderFromScroll: jest.fn(),
+  }),
   shouldAnnounceOlderMessagesArrival: () => false,
 }));
 jest.mock('./MobileSidebarToggle', () => ({ MobileSidebarToggle: () => null }));
@@ -162,10 +181,16 @@ jest.mock('./WorktreeFilePane', () => ({
     }),
 }));
 jest.mock('./ChatInput', () => ({
-  ChatInput: () => createElement('input', { 'data-composer': true }),
+  ChatInput: (props: Record<string, unknown>) => {
+    mockChatInput = props;
+    return createElement('input', { 'data-composer': true });
+  },
 }));
 jest.mock('./ConversationMessages', () => ({
-  ConversationMessages: () => createElement('section', { 'data-conversation': true }),
+  ConversationMessages: (props: ComponentProps<typeof ConversationMessages>) => {
+    mockConversation = props;
+    return createElement('section', { 'data-conversation': true });
+  },
 }));
 jest.mock('./OlderMessagesHeader', () => ({ OlderMessagesHeader: () => null }));
 jest.mock('./MessageBubble', () => ({ MessageBubble: () => null }));
@@ -356,6 +381,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
 
   beforeEach(() => {
     mockSessionId = 'ses_recent';
+    mockAtParam = null;
     mockWorktreeId = 'worktree_shared';
     mockClosedPtys.length = 0;
     mockAtomValues = {
@@ -371,6 +397,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
       dynamicMessages: [],
       pendingMessages: new Map(),
       preparationAttempts: [],
+      commits: [],
       chatUI: { shouldAutoScroll: false },
     };
     dom = installTerminalTestDom();
@@ -528,6 +555,94 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     expect(mockTabs.files).toEqual([]);
   });
 
+  function receiveCommit() {
+    const commitHash = 'a'.repeat(40);
+    const commits: SessionCommit[] = [
+      {
+        commitHash,
+        commitMessage: 'Actual commit',
+        messageId: 'assistant',
+        userMessageId: 'user',
+        committedAt: '2026-09-01T10:00:00.000Z',
+        pushStatus: 'pushed',
+      },
+    ];
+    mockAtomValues.commits = commits;
+    mockAtomValues.dynamicMessages = [
+      {
+        info: {
+          id: 'assistant',
+          sessionID: 'ses_recent',
+          role: 'assistant',
+          time: { created: 1, completed: 2 },
+          parentID: 'user',
+          modelID: 'test',
+          providerID: 'test',
+          mode: 'code',
+          agent: 'code',
+          path: { cwd: '/', root: '/' },
+          cost: 0,
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+        parts: [],
+      },
+    ] satisfies StoredMessage[];
+    render();
+    const anchors = mockConversation.commitsAfterMessage;
+    expect(anchors?.get('assistant')).toEqual(commits);
+    render();
+    expect(mockConversation.commitsAfterMessage).toBe(anchors);
+    return anchors;
+  }
+
+  it('adds commit metadata without changing workspace tabs, chats, the draft, or the mounted PTY', () => {
+    render();
+    const composer = dom.container.querySelector<HTMLInputElement>('[data-composer]');
+    if (!composer) throw new Error('Missing composer');
+    composer.value = 'Unsent draft';
+    const conversation = dom.container.querySelector('[data-conversation]');
+    const terminal = openTerminal();
+    const tabId = mockTabs.activeTabId;
+    const terminals = mockTabs.terminals;
+    const files = mockTabs.files;
+    const switches = mockManager.switchSession.mock.calls.length;
+    receiveCommit();
+    expect(mockTabs.activeTabId).toBe(tabId);
+    expect(mockTabs.terminals).toBe(terminals);
+    expect(mockTabs.files).toBe(files);
+    expect(mockTabs).not.toHaveProperty('commits');
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+    expect(composer.value).toBe('Unsent draft');
+    expect(dom.container.querySelector('[data-conversation]')).toBe(conversation);
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    expect(mockSessionId).toBe('ses_recent');
+    expect(mockManager.switchSession.mock.calls.length).toBe(switches);
+    expect(mockClosedPtys).toEqual([]);
+  });
+
+  it('withholds old commit metadata before sibling atoms resolve while preserving the worktree PTY', () => {
+    render();
+    const terminal = openTerminal();
+    receiveCommit();
+    mockSessionId = 'ses_historical';
+    render();
+    expect(mockConversation.commitsAfterMessage?.size).toBe(0);
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+  });
+
+  it('withholds commit metadata when the organization does not match the loaded session', () => {
+    receiveCommit();
+    render({ organizationId: 'another-organization' });
+    expect(mockConversation.commitsAfterMessage?.size).toBe(0);
+  });
+
+  it('withholds commit metadata when access becomes read-only', () => {
+    receiveCommit();
+    mockAtomValues.isReadOnly = true;
+    render();
+    expect(mockConversation.commitsAfterMessage?.size).toBe(0);
+  });
+
   it('scopes changes to each sibling control session without replacing its worktree terminal', () => {
     render();
     const terminal = openTerminal();
@@ -636,6 +751,197 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     render();
     expect(dom.container.querySelector('[data-pty-owner]')).toBeNull();
     expect(mockClosedPtys).toEqual(['workspace_ses_recent']);
+  });
+
+  it('hands an unresolvable ?at= link back to the tail, like a link without it', () => {
+    mockAtParam = 'msg_gone';
+    mockAtomValues.staticMessages = [
+      {
+        info: {
+          id: 'msg_1',
+          role: 'user',
+          sessionID: 'ses_recent',
+          parentID: 'ses_recent',
+          error: null,
+        },
+        parts: [],
+      },
+    ];
+    mockSetAtom.mockClear();
+
+    render();
+
+    const chatUiWrites = mockSetAtom.mock.calls
+      .map(call => call[0] as { shouldAutoScroll?: boolean } | null)
+      .filter(
+        (value): value is { shouldAutoScroll: boolean } =>
+          typeof value === 'object' && value !== null && 'shouldAutoScroll' in value
+      );
+
+    // The resume paused follow while it looked for the anchor...
+    expect(chatUiWrites).toContainEqual({ shouldAutoScroll: false });
+    // ...and an anchor the session no longer has opens at the bottom, following
+    // new output, exactly as a link without `at=` does.
+    expect(chatUiWrites.at(-1)).toEqual({ shouldAutoScroll: true });
+  });
+
+  /** A transcript row the resume can group; the harness renders no DOM rows. */
+  function anchorMessage(id: string): { info: Record<string, unknown>; parts: never[] } {
+    return {
+      info: { id, role: 'user', sessionID: 'ses_recent', parentID: 'ses_recent', error: null },
+      parts: [],
+    };
+  }
+
+  /** Every `chatUI` write the render made, in order. */
+  function chatUiWrites(): { shouldAutoScroll: boolean }[] {
+    return mockSetAtom.mock.calls
+      .map(call => call[0] as { shouldAutoScroll?: boolean } | null)
+      .filter(
+        (value): value is { shouldAutoScroll: boolean } =>
+          typeof value === 'object' && value !== null && 'shouldAutoScroll' in value
+      );
+  }
+
+  it('hands a resolved but unrendered ?at= anchor back to the tail', () => {
+    mockAtParam = 'msg_1';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    // Older history exists, so the tail hand-off can only come from the anchor
+    // being resolved-but-unrendered. Without it the exhausted-history branch
+    // writes the same value and the test would not discriminate.
+    mockAtomValues.hasOlderMessages = true;
+    mockRequestOlderMessages.mockClear();
+    mockSetAtom.mockClear();
+
+    render();
+
+    // The anchor is in the loaded window, but the group that holds it drew no
+    // row. No older page can change that, so the open must land at the bottom
+    // and follow new output instead of paging for an id it already has.
+    expect(mockRequestOlderMessages).not.toHaveBeenCalled();
+    expect(chatUiWrites().at(-1)).toEqual({ shouldAutoScroll: true });
+  });
+
+  it('keeps waiting when a retried older page is in flight', () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    // A retry of a failed page leaves the error set while it loads (see the
+    // manager's `loadOlderMessages`), so both flags are true for the whole
+    // request.
+    mockAtomValues.isLoadingOlderMessages = true;
+    mockAtomValues.olderMessagesError = { kind: 'retryable' };
+    mockSetAtom.mockClear();
+
+    render();
+
+    // The page the resume is waiting for may hold the anchor: staying paused
+    // is the only answer that can still land it. Giving up here would open at
+    // the bottom even though the retry arrives with the anchor.
+    expect(chatUiWrites()).toContainEqual({ shouldAutoScroll: false });
+    expect(chatUiWrites()).not.toContainEqual({ shouldAutoScroll: true });
+  });
+
+  it('keeps a ?at= resume when the send is refused', async () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    mockRequestOlderMessages.mockClear();
+    mockManager.send.mockResolvedValueOnce(false);
+
+    render();
+    // The resume is still looking: it paused follow and asked for an older page.
+    expect(mockRequestOlderMessages).toHaveBeenCalledTimes(1);
+    mockSetAtom.mockClear();
+
+    await act(async () => {
+      await (mockChatInput?.onSend as ((prompt: string) => Promise<unknown>) | undefined)?.(
+        'hello'
+      );
+    });
+
+    // The refused send is not a position take-over: no follow write, so the
+    // reader stays where the resume left them.
+    expect(chatUiWrites()).toEqual([]);
+
+    // The transcript re-renders (the dropped optimistic row): the resume must
+    // still be pending and pause follow, exactly as it did before the send.
+    mockSetAtom.mockClear();
+    mockAtomValues.staticMessages = [anchorMessage('msg_1'), anchorMessage('msg_2')];
+    render();
+    expect(chatUiWrites()).toContainEqual({ shouldAutoScroll: false });
+  });
+
+  it('gives up a ?at= resume when an older page fails instead of waiting forever', () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    mockAtomValues.olderMessagesError = { kind: 'retryable' };
+    mockSetAtom.mockClear();
+
+    render();
+
+    // A failed page cannot reach the anchor, and the one-shot resume would
+    // otherwise sit paused on it: give up the way a link without `at=` opens.
+    expect(chatUiWrites().at(-1)).toEqual({ shouldAutoScroll: true });
+  });
+
+  it('ends a ?at= resume when a message is sent, so the send is not re-paused', async () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    mockRequestOlderMessages.mockClear();
+    mockSetAtom.mockClear();
+
+    render();
+    // The resume is still looking: it paused follow and asked for an older page.
+    expect(mockRequestOlderMessages).toHaveBeenCalledTimes(1);
+
+    // The accepted send takes the position over.
+    await act(async () => {
+      await (mockChatInput?.onSend as ((prompt: string) => Promise<unknown>) | undefined)?.(
+        'hello'
+      );
+    });
+
+    // The sent message lands and the resume effect re-runs over the new rows.
+    mockSetAtom.mockClear();
+    mockAtomValues.staticMessages = [anchorMessage('msg_1'), anchorMessage('msg_2')];
+    render();
+
+    // The send owns the position now: the effect must not pause follow again
+    // (which also cancels the send's scheduled scroll).
+    expect(chatUiWrites()).toEqual([]);
+  });
+
+  it('ends a ?at= resume when a slash command is sent, so the command is not re-paused', async () => {
+    mockAtParam = 'msg_older';
+    mockAtomValues.staticMessages = [anchorMessage('msg_1')];
+    mockAtomValues.hasOlderMessages = true;
+    mockRequestOlderMessages.mockClear();
+    mockSetAtom.mockClear();
+
+    render();
+    // The resume is still looking: it paused follow and asked for an older page.
+    expect(mockRequestOlderMessages).toHaveBeenCalledTimes(1);
+
+    // The accepted command takes the position over.
+    await act(async () => {
+      await (
+        mockChatInput?.onSendCommand as
+          | ((command: string, args: string) => Promise<unknown>)
+          | undefined
+      )?.('review', '');
+    });
+
+    // The command's output lands and the resume effect re-runs over the new
+    // rows. The command send owns the position now: the effect must not pause
+    // follow again (which also cancels the command's scheduled scroll).
+    mockSetAtom.mockClear();
+    mockAtomValues.staticMessages = [anchorMessage('msg_1'), anchorMessage('msg_2')];
+    render();
+
+    expect(chatUiWrites()).toEqual([]);
   });
 });
 

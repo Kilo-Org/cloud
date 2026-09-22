@@ -4,6 +4,29 @@ import { eq, desc } from 'drizzle-orm';
 import type { Owner } from '@/lib/integrations/core/types';
 
 /**
+ * Unicode NUL (\u0000) is not representable in PostgreSQL text, so a payload or
+ * header value that contains one makes the jsonb insert fail with 22P05. Webhook
+ * bodies are external JSON, so strip NULs recursively before insert rather than
+ * rejecting the whole event. NULs are replaced with the empty string so the rest
+ * of the field is preserved.
+ */
+function stripNulBytes(value: unknown): unknown {
+  if (typeof value === 'string') return value.replaceAll('\u0000', '');
+  if (Array.isArray(value)) return value.map(stripNulBytes);
+  if (value !== null && typeof value === 'object') {
+    // Object.fromEntries defines own properties, so a '__proto__' key survives
+    // instead of being routed through the inherited setter and dropped.
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key.replaceAll('\u0000', ''),
+        stripNulBytes(entry),
+      ])
+    );
+  }
+  return value;
+}
+
+/**
  * Logs a webhook event
  * Returns isDuplicate=true if event signature already exists
  */
@@ -25,8 +48,8 @@ export async function logWebhookEvent(data: {
         platform: data.platform,
         event_type: data.event_type,
         event_action: data.event_action,
-        payload: data.payload,
-        headers: data.headers,
+        payload: stripNulBytes(data.payload),
+        headers: stripNulBytes(data.headers),
         event_signature: data.event_signature,
       })
       .returning();

@@ -1,7 +1,9 @@
-import { act, createElement, type ReactNode } from 'react';
+import { act, createElement, Fragment, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
+
+import '@/i18n';
 import { type ShareCliSpawnRow } from './share-cli-spawn';
 import { ShareDestinationList } from './share-destination-list';
 import { type ShareDestinationRow } from './share-destinations';
@@ -21,7 +23,10 @@ vi.mock('react-native', () => ({
       null,
       props.ListHeaderComponent,
       props.data.length > 0
-        ? props.data.map((item): ReactNode => props.renderItem({ item }))
+        ? props.data.map(
+            (item, index): ReactNode =>
+              createElement(Fragment, { key: index }, props.renderItem({ item }))
+          )
         : props.ListEmptyComponent
     ),
 }));

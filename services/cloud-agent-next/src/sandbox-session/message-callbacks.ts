@@ -39,6 +39,11 @@ export type MessageCallbacks = {
     message: SessionMessageRecord,
     metadata?: SessionMetadata | null
   ): boolean;
+  persistDrainedBatchCallback(
+    messages: readonly SessionMessageRecord[],
+    newlyTerminalMessageIds: ReadonlySet<string>,
+    metadata?: SessionMetadata | null
+  ): boolean;
   pendingCallbackCount(): number;
   nextCallbackDueAt(): number | undefined;
   repair(now?: number): Promise<void>;
@@ -198,6 +203,7 @@ export function createMessageCallbacks(
         lastSeenBranch: metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName,
         kiloSessionId,
         lastAssistantMessageText,
+        ...(message.gateResult !== undefined ? { gateResult: message.gateResult } : {}),
         idempotencyKey: message.messageId,
       },
     };
@@ -242,6 +248,23 @@ export function createMessageCallbacks(
       dueAt: Date.now(),
     });
     return true;
+  }
+
+  function persistDrainedBatchCallback(
+    messages: readonly SessionMessageRecord[],
+    newlyTerminalMessageIds: ReadonlySet<string>,
+    metadata = getMetadata()
+  ): boolean {
+    if (newlyTerminalMessageIds.size === 0) return false;
+    if (messages.some(message => message.state === 'queued' || message.state === 'accepted')) {
+      return false;
+    }
+    let representative: SessionMessageRecord | undefined;
+    for (const message of messages) {
+      if (callbackStatus(message) !== undefined) representative = message;
+    }
+    if (!representative) return false;
+    return persistTerminalCallback(representative, metadata);
   }
 
   function pendingEntries(): Array<[string, PendingCallbackJob | undefined]> {
@@ -339,6 +362,7 @@ export function createMessageCallbacks(
 
   return {
     persistTerminalCallback,
+    persistDrainedBatchCallback,
     pendingCallbackCount,
     nextCallbackDueAt,
     repair,

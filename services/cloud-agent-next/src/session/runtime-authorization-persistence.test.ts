@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { logger } from '../logger.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
@@ -331,4 +332,97 @@ describe('recovery lock diagnostics', () => {
       );
     }
   );
+});
+
+describe('runtime authorization diagnostics', () => {
+  afterEach(() => vi.restoreAllMocks());
+  it('still persists revocation and preserves the error when logging throws', async () => {
+    vi.spyOn(logger, 'withFields').mockImplementation(() => {
+      throw new Error('private-logger-error');
+    });
+    const record = authorization('00000000-0000-4000-8000-000000000011');
+    const putAuthorization = vi.fn();
+    const error = new RuntimeAuthorizationRevokedError();
+    await expect(
+      renewStoredRuntimeAuthorization({
+        metadata: metadata('private-token'),
+        getAuthorization: async () => record,
+        putAuthorization,
+        getMetadata: async () => metadata(),
+        putMetadata: async () => {},
+        renew: async () => {
+          throw error;
+        },
+        now: Date.UTC(2026, 0, 1),
+      })
+    ).rejects.toBe(error);
+    expect(putAuthorization).toHaveBeenCalledWith({ ...record, state: 'revoked' });
+  });
+
+  it.each(['revoked', 'expired', 'transient', 'metadata_changed'] as const)(
+    'reports %s without exposing renewal secrets and preserves storage behavior',
+    async kind => {
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      let record = authorization('00000000-0000-4000-8000-000000000011');
+      const stored = metadata('private-token');
+      const error =
+        kind === 'revoked'
+          ? new RuntimeAuthorizationRevokedError()
+          : kind === 'expired'
+            ? new RuntimeAuthorizationExpiredError()
+            : new Error('private-error');
+      await expect(
+        renewStoredRuntimeAuthorization({
+          metadata: stored,
+          getAuthorization: async () => record,
+          putAuthorization: async value => {
+            record = value;
+          },
+          getMetadata: async () => (kind === 'metadata_changed' ? null : stored),
+          putMetadata: async () => {},
+          renew: async () => {
+            if (kind === 'metadata_changed') return { token: 'private-renewed-token' };
+            throw error;
+          },
+          now: Date.UTC(2026, 0, 1),
+        })
+      ).rejects.toThrow(
+        kind === 'metadata_changed' ? 'Runtime authorization has been revoked' : error.message
+      );
+      const reason = {
+        revoked: 'renewal_revoked',
+        expired: 'delegation_expired',
+        transient: 'renewal_failed',
+        metadata_changed: 'post_renewal_state_changed',
+      }[kind];
+      const revoked = kind === 'revoked' || kind === 'metadata_changed';
+      expect(fields.mock.calls).toEqual([
+        [{ sessionId: 'agent_1', stage: 'renewal', reason }],
+        ...(revoked
+          ? [[{ sessionId: 'agent_1', stage: 'renewal', reason: 'revocation_persisted' }]]
+          : []),
+      ]);
+      expect(record.state).toBe(revoked ? 'revoked' : 'active');
+      expect(JSON.stringify(fields.mock.calls)).not.toContain('private-');
+      expect(JSON.stringify(fields.mock.calls)).not.toContain(record.bindings.userPepperDigest);
+    }
+  );
+  it.each(['invalid', 'revoked'] as const)('distinguishes %s stored recovery state', async kind => {
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const token = jwt.sign({ runtimeAuthorization: { id: 'private-claim' } }, 'private-secret');
+    await expect(
+      getRuntimeAuthorizationRecoveryState({
+        metadata: metadata(token),
+        getAuthorization: async () =>
+          kind === 'invalid'
+            ? { private: 'private-record' }
+            : authorization('00000000-0000-4000-8000-000000000011', 'revoked'),
+      })
+    ).resolves.toEqual({ state: 'revoked' });
+    expect(fields.mock.calls).toEqual([
+      [{ sessionId: 'agent_1', stage: 'recovery_state', reason: `stored_authorization_${kind}` }],
+    ]);
+  });
 });

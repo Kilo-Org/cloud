@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  resolveSessionConnectionDisplay,
   resolveSessionConnectionState,
+  type SessionConnectionDisplay,
   type SessionConnectionState,
 } from '@/components/agents/session-connection-indicator-state';
 
@@ -190,5 +192,85 @@ describe('resolveSessionConnectionState - exhausted precedence', () => {
         ).toBe(status === 'disconnected' ? 'down' : 'up');
       }
     }
+  });
+});
+
+function resolveDisplay(input: {
+  transport: SessionConnectionState;
+  userWebConnected: boolean;
+  reconnectExhausted?: boolean;
+  everConnected?: boolean;
+  sessionRefresh?: { isLoading: boolean };
+}): SessionConnectionDisplay {
+  return resolveSessionConnectionDisplay({
+    transport: input.transport,
+    userWebConnected: input.userWebConnected,
+    reconnectExhausted: input.reconnectExhausted ?? false,
+    everConnected: input.everConnected ?? false,
+    ...(input.sessionRefresh ? { sessionRefresh: input.sessionRefresh } : {}),
+  });
+}
+
+describe('resolveSessionConnectionDisplay', () => {
+  it('reports connected for an up transport', () => {
+    expect(resolveDisplay({ transport: 'up', userWebConnected: true })).toBe('connected');
+  });
+
+  it('reports connecting without an ever-up and reconnecting with one', () => {
+    expect(resolveDisplay({ transport: 'down', userWebConnected: false })).toBe('connecting');
+    expect(
+      resolveDisplay({ transport: 'down', userWebConnected: false, everConnected: true })
+    ).toBe('reconnecting');
+  });
+
+  it('reports lost for an exhausted transport', () => {
+    expect(resolveDisplay({ transport: 'exhausted', userWebConnected: false })).toBe('lost');
+  });
+
+  it('reports lost for a failed cached-metadata refresh', () => {
+    expect(
+      resolveDisplay({
+        transport: 'up',
+        userWebConnected: true,
+        sessionRefresh: { isLoading: false },
+      })
+    ).toBe('lost');
+  });
+
+  it('reports connecting/reconnecting while a cached-metadata refresh is in flight', () => {
+    expect(
+      resolveDisplay({
+        transport: 'up',
+        userWebConnected: true,
+        sessionRefresh: { isLoading: true },
+      })
+    ).toBe('connecting');
+    expect(
+      resolveDisplay({
+        transport: 'up',
+        userWebConnected: true,
+        everConnected: true,
+        sessionRefresh: { isLoading: true },
+      })
+    ).toBe('reconnecting');
+  });
+
+  it('falls back to the app-wide leg for a read-only or unresolved transport', () => {
+    expect(resolveDisplay({ transport: 'none', userWebConnected: true })).toBe('connected');
+    expect(resolveDisplay({ transport: 'none', userWebConnected: false })).toBe('connecting');
+    expect(
+      resolveDisplay({ transport: 'none', userWebConnected: false, everConnected: true })
+    ).toBe('reconnecting');
+    expect(
+      resolveDisplay({ transport: 'none', userWebConnected: true, reconnectExhausted: true })
+    ).toBe('lost');
+  });
+
+  it('never consults the app-wide leg for a cloud-agent transport', () => {
+    expect(resolveDisplay({ transport: 'down', userWebConnected: true })).toBe('connecting');
+    expect(
+      resolveDisplay({ transport: 'down', userWebConnected: true, reconnectExhausted: true })
+    ).toBe('connecting');
+    expect(resolveDisplay({ transport: 'up', userWebConnected: false })).toBe('connected');
   });
 });

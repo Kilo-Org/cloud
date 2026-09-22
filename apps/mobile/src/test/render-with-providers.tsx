@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree, and @testing-library/react-native (which itself wraps react-test-renderer) cannot be transformed by the current vitest pipeline (react-native ships Flow). */
 import { type ComponentType, createElement, type ReactElement, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from './renderer';
 
 /**
  * Mounted-test harness for the mobile app's data layer.
@@ -13,7 +12,7 @@ import TestRenderer, { act } from 'react-test-renderer';
  * the minimal provider needed to exercise data-fetching behavior, so it is the
  * default here.
  *
- * Rendering uses `react-test-renderer`, which is DOM-free (no jsdom): the mounted
+ * Rendering uses `test-renderer`, which is DOM-free (no jsdom): the mounted
  * tests run in a `node` environment. This harness deliberately does NOT statically
  * import the app's TRPC/Auth/Organization providers: those pull in `react-native`,
  * whose Flow-typed source the vitest (rolldown) transform cannot currently parse.
@@ -53,7 +52,7 @@ export function createTestQueryClient(): QueryClient {
 
 /**
  * Mount `ui` inside `QueryClientProvider` (plus an optional caller `wrapper`) using
- * `react-test-renderer`, flushing effects within `act`. Returns the renderer and the
+ * `test-renderer`, flushing effects within `act`. Returns the renderer and the
  * `QueryClient` so tests can assert async state.
  */
 export async function renderWithProviders(

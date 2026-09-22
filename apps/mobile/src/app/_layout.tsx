@@ -5,12 +5,15 @@
 import '@/i18n/rtl';
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
-// Enter the local module's JS in the main process on both platforms. Its
-// Android branch stays a no-op until slice `and` lands; iOS runs the
-// registered glanceable sink below. Imported by path: the module is
-// autolinked from modules/ and intentionally absent from dependencies.
+// Enter the local Android Live Update module's JS in the main process on both
+// platforms: its import side effect registers the Live Update sink on the one
+// platform that can load it, and the require is the capability gate (see the
+// module's src/index.ts). Imported by path: the module is autolinked from
+// modules/ and intentionally absent from dependencies.
 import '../../modules/active-agents-live-update/src';
-// Registers the iOS Live Activity and widget sink with the glanceable publisher.
+// Registers the iOS Live Activity and widget sink with the glanceable
+// publisher. iOS-only by capability (WidgetKit/ActivityKit): the module loads
+// on Android but registers nothing there.
 import '@/glanceable-ios/register';
 
 import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
@@ -46,14 +49,16 @@ import { toast } from 'sonner-native';
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
+import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
+import { OfflineBannerSpaceGate } from '@/components/offline-banner';
 import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
-import { QueryError } from '@/components/query-error';
+import { RuntimeErrorScreen } from '@/components/runtime-error-screen';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
 import { useAuth } from '@/lib/auth/auth-context';
-import { resolveBootstrapDecision } from '@/lib/bootstrap-decision';
+import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
@@ -67,6 +72,7 @@ import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
+import { useSystemSearchOpenListener } from '@/lib/hooks/use-system-search-open-listener';
 import { preloadHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
 import {
@@ -91,6 +97,7 @@ import {
   subscribeToPendingDeepLink,
 } from '@/lib/deep-link-launch';
 import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
+import { registerNeedsInputCategories } from '@/lib/notification-actions';
 import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
@@ -122,6 +129,7 @@ import {
   type SharePayload,
 } from '@/lib/share-payload';
 import { persistShareNavigationNow, restoreShareNavigation } from '@/lib/share-navigation';
+import { captureSystemSearchLaunch } from '@/lib/system-search-route';
 import {
   flushDraft,
   isStringDraft,
@@ -131,6 +139,7 @@ import {
 } from '@/lib/persist/drafts';
 import { setSentryContext } from '@/lib/sentry-context';
 import { initSentry } from '@/lib/sentry-init';
+import { installErrorReporting } from '@/lib/telemetry/install-error-reporting';
 import { useSentryConsentSync } from '@/lib/hooks/use-sentry-consent-sync';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { reapTempFiles } from '@/lib/temp-file-registry';
@@ -139,6 +148,9 @@ import { reapTempFiles } from '@/lib/temp-file-registry';
 installE2EWebSocketLatency();
 
 initSentry(false);
+// Install the Sentry sink and the global fetch wrapper before any other
+// module-scope side effect can start a request.
+installErrorReporting();
 
 // Kick the font load off at module scope so it overlaps JS bootstrap; the
 // same family names make `loadAsync` dedupe with the `useFonts` call in
@@ -156,12 +168,20 @@ function preloadStartupFonts(): void {
 
 void SplashScreen.preventAutoHideAsync();
 void ensureAndroidNotificationChannels();
+// The Approve / Reply / Open PR / Open session buttons a needs-input
+// notification carries; idempotent, one pass per launch.
+void registerNeedsInputCategories();
 setupNotificationHandler();
 // Applies the aggregate glanceable push while backgrounded/killed via a
 // headless expo-notifications task; see setupNotificationBackgroundHandler.
 setupNotificationBackgroundHandler();
 checkInitialNotification();
 captureLaunchDeepLink();
+// A tap on a result in the phone's own search: capture the cold-launch payload
+// now, before any screen mounts. The warm `onSystemSearchOpen` wake-up is held
+// by the mounted layout (useSystemSearchOpenListener below). Both feed the
+// pending deep-link slot the layout already consumes.
+captureSystemSearchLaunch();
 prefetchCurrentUser();
 preloadThemePreference();
 preloadHideBalancePreference();
@@ -374,6 +394,11 @@ function RootLayoutNav({
         await i18n.changeLanguage('en');
       }
       void renameAndroidNotificationChannels();
+      // The module-scope category registration ran under the English default
+      // while the stored preference was still loading; re-register the
+      // Approve / Reply / Open PR / Open session buttons in the applied
+      // language (same localization pass as the channel rename above).
+      void registerNeedsInputCategories();
       if (!cancelled) {
         if (reloadFailed) {
           setLanguageReloadFailed(true);
@@ -839,6 +864,12 @@ function RootLayoutNav({
     restoreFailed,
   });
 
+  // Post-startup hidden windows (a sign-in's redirect + consent check, a
+  // sign-out's redirect to login) have no splash over them, so the hidden
+  // wrapper would otherwise paint an empty background. Keep one spinner up
+  // for exactly those windows (app-blank-after-oauth).
+  const showBootstrapLoading = shouldShowBootstrapLoading({ startupFinished, hidden });
+
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
   // both accessibility trees. On the hidden → visible transition,
   // `announceForA11y` is the deterministic entry context for screen-reader
@@ -986,6 +1017,7 @@ function RootLayoutNav({
       >
         <Slot />
       </View>
+      {showBootstrapLoading && !showRestoreError ? <BootstrapLoadingSurface /> : null}
       {showRestoreError ? (
         <View className="absolute inset-0">
           <BootstrapErrorScreen
@@ -1035,6 +1067,12 @@ function RootLayout() {
     };
   }, []);
 
+  // The warm half of a tap on one of the app's own search results: the native
+  // wake-up re-reads the pending slot, so registering it with this tree is
+  // enough. Held here rather than at module scope so unmounting releases the
+  // native listener instead of leaving it alive past the tree that uses it.
+  useSystemSearchOpenListener();
+
   // Reap expired temp files at cold start and whenever the app returns to the
   // foreground, deferred past the current interaction frame so a navigation
   // never waits on it. AppState is already `active` at launch, so the change
@@ -1059,15 +1097,20 @@ function RootLayout() {
     <MotionProvider>
       <ShareIntentProvider options={SHARE_INTENT_OPTIONS}>
         <ThemeProvider value={navigationTheme}>
-          <AppRootProviders languageReady={languageReady}>
-            <StatusBar style="auto" />
-            <AppContentReveal>
-              <StateSurface className="flex-1">
-                <RootLayoutNav languageReady={languageReady} setLanguageReady={setLanguageReady} />
-              </StateSurface>
-            </AppContentReveal>
-            <AnimatedSplashOverlay />
-          </AppRootProviders>
+          <OfflineBannerSpaceGate>
+            <AppRootProviders languageReady={languageReady}>
+              <StatusBar style="auto" />
+              <AppContentReveal>
+                <StateSurface className="flex-1">
+                  <RootLayoutNav
+                    languageReady={languageReady}
+                    setLanguageReady={setLanguageReady}
+                  />
+                </StateSurface>
+              </AppContentReveal>
+              <AnimatedSplashOverlay />
+            </AppRootProviders>
+          </OfflineBannerSpaceGate>
         </ThemeProvider>
       </ShareIntentProvider>
     </MotionProvider>
@@ -1075,11 +1118,7 @@ function RootLayout() {
 }
 
 function RootErrorBoundary({ retry }: ErrorBoundaryProps) {
-  return (
-    <StateSurface className="flex-1 bg-background">
-      <QueryError onRetry={() => void retry()} />
-    </StateSurface>
-  );
+  return <RuntimeErrorScreen onRetry={() => void retry()} />;
 }
 
 export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(RootErrorBoundary);

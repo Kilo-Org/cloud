@@ -1,4 +1,4 @@
-import { withTimeoutAndAbort } from '../utils.js';
+import { logToFile, withTimeoutAndAbort } from '../utils.js';
 import {
   emitControlDiagnostic,
   type ControlDiagnosticReporter,
@@ -28,6 +28,7 @@ type StartOptions = {
   onConnected?: (client: SandboxControlClient) => void;
   onDisconnected?: () => void;
   onEventReceiptFailure?: () => void;
+  onEventPublication?: SandboxControlClientOptions['onEventPublication'];
   onReconcile?: (phase: 'drain' | 'ready' | 'commit', deadlineAt: number) => Promise<void> | void;
   getHeartbeatPayload?: () => SandboxHeartbeatPayload;
   sampleHeartbeat?: (signal: AbortSignal) => Promise<void>;
@@ -35,23 +36,56 @@ type StartOptions = {
   onDiagnostic?: ControlDiagnosticReporter;
 };
 
+export type KiloFeedRecoveryReason = KiloEventFeedError['reason'];
+
+/**
+ * Per-connection hooks the SSE connection layer calls while it owns reconnection.
+ * The episode owner (startSandboxControlEventFeed) supplies these; the SDK only
+ * reports errors, so the wrapper state supplies the attempt identity.
+ */
+export type KiloFeedConnectionHooks = {
+  /** Allocate a per-attempt abort window and return its composite signal. */
+  beginAttempt(): AbortSignal;
+  /** Abort only the current GET; leave the lifetime signal live. */
+  abortAttempt(): void;
+  /** Called once per real fetch, after admission. */
+  onGetStart(): void;
+  /** Called when the SDK is about to back off because a GET failed. */
+  onSseError(error: unknown): void;
+  /** Called when SDK backoff ends, before it admits the next GET. */
+  onSleepWake(): void;
+};
+
+export type KiloFeedConnection = {
+  hooks: KiloFeedConnectionHooks;
+  /** Remaining recovery GETs for the one SDK generator this snapshot covers. */
+  sseMaxRetryAttempts: number;
+};
+
 type SandboxControlEventFeedOptions = {
   signal: AbortSignal;
   open: (
     signal: AbortSignal,
     onActivity: () => void,
-    onFrame: (frame: string) => void
+    onFrame: (frame: string) => void,
+    connection: KiloFeedConnection
   ) => Promise<{ stream?: AsyncIterable<unknown> }>;
   consume: (stream: AsyncIterable<unknown>) => Promise<void>;
   deadlineAt?: number;
   onUnexpectedClose: (error: unknown) => void;
   onDiagnostic?: ControlDiagnosticReporter;
   now?: () => number;
+  log?: (message: string) => void;
+  identity?: { scopeId: string; runtimeId: string; directory?: string };
 };
 
 export const SANDBOX_CONTROL_REPORT_INTERVAL_MS = 15_000;
 export const KILO_FEED_FRESHNESS_TIMEOUT_MS = 30_000;
 export const KILO_CONTROL_REQUEST_TIMEOUT_MS = 10_000;
+/** Absolute recovery budget for one feed episode, independent of byte freshness. */
+export const KILO_FEED_RECOVERY_DEADLINE_MS = 120_000;
+/** Recovery GETs per episode (excluding the pre-episode startup GET); GET 6 is allowed, GET 7 refused. */
+export const KILO_FEED_RECOVERY_MAX_ATTEMPTS = 6;
 
 export class KiloEventFeedError extends Error {
   constructor(
@@ -155,10 +189,32 @@ function isFeedConnectedFrame(frame: string): boolean {
   return false;
 }
 
+export function feedDirectoryName(directory: string): string {
+  const trimmed = directory.replace(/\/+$/, '');
+  const slash = trimmed.lastIndexOf('/');
+  return slash === -1 ? trimmed : trimmed.slice(slash + 1);
+}
+
+function feedTerminalMessage(
+  cause: 'attempts_exhausted' | 'deadline_expired',
+  reason: KiloFeedRecoveryReason
+): string {
+  return cause === 'deadline_expired'
+    ? 'Kilo global event feed recovery deadline expired'
+    : `Kilo global event feed recovery exhausted (${reason})`;
+}
+
+/**
+ * Owns the /global/event recovery episode: per-attempt abort windows, the
+ * admission-capped GET budget, the absolute episode deadline and the reopen of
+ * the SDK generator. The SSE connection layer (the SDK) owns per-GET reconnect
+ * and backoff; this function only decides when an episode starts and ends.
+ */
 export async function startSandboxControlEventFeed(
   options: SandboxControlEventFeedOptions
 ): Promise<{
   isFresh: () => boolean;
+  isRecovering: () => boolean;
   usable: Promise<boolean>;
   close: () => void;
   settled: Promise<void>;
@@ -166,132 +222,193 @@ export async function startSandboxControlEventFeed(
   const controller = new AbortController();
   const signal = AbortSignal.any([options.signal, controller.signal]);
   const now = options.now ?? Date.now;
-  const deadlineAt = Math.min(
+  const log = options.log ?? logToFile;
+  const identity = options.identity
+    ? `scopeId=${options.identity.scopeId} runtimeId=${options.identity.runtimeId}${
+        options.identity.directory
+          ? ` directory=${feedDirectoryName(options.identity.directory)}`
+          : ''
+      }`
+    : '';
+  const logFeed = (fields: string): void =>
+    log(`control feed${identity ? ` ${identity}` : ''} ${fields}`);
+
+  const startupDeadlineAt = Math.min(
     options.deadlineAt ?? Infinity,
     now() + KILO_FEED_FRESHNESS_TIMEOUT_MS
   );
+
   let lastEventAt = now();
-  const onActivity = () => {
-    if (!signal.aborted) lastEventAt = now();
-  };
-  const usable = Promise.withResolvers<boolean>();
-  let usableSettled = false;
-  let initialFrameSeen = false;
+  let attemptStartedAt: number | undefined;
+  let attemptController: AbortController | undefined;
+  let attemptId = 0;
+  let gets = 0;
+  let terminal = false;
+  let closed = false;
+  let started = false;
+  let eventsReceived = 0;
   let iterator: AsyncIterator<unknown> | undefined;
   let disposed = false;
-  let closed = false;
-  const settleUsable = (value: boolean): void => {
+  let episode: { deadlineAt: number; reason: KiloFeedRecoveryReason } | undefined;
+
+  const usable = Promise.withResolvers<boolean>();
+  const settled = Promise.withResolvers<void>();
+  let usableSettled = false;
+
+  function settleUsable(value: boolean): void {
     if (usableSettled) return;
     usableSettled = true;
     usable.resolve(value);
+  }
+
+  function isFresh(): boolean {
+    return !signal.aborted && now() - lastEventAt < KILO_FEED_FRESHNESS_TIMEOUT_MS;
+  }
+
+  function isRecovering(): boolean {
+    return !signal.aborted && (episode !== undefined || (started && !isFresh()));
+  }
+
+  function diagnostic(phase: string, extra?: Record<string, string | number | undefined>): void {
+    emitControlDiagnostic(options.onDiagnostic, 'control.feed', {
+      phase,
+      lastEventAt,
+      ageMs: Math.max(0, now() - lastEventAt),
+      eventsReceived,
+      gets,
+      ...extra,
+    });
+  }
+
+  function feedTiming(): string {
+    return `lastEventAt=${lastEventAt} ageMs=${Math.max(0, now() - lastEventAt)}`;
+  }
+
+  /** The single owner of the episode's GET budget. */
+  function recoveryGetsExhausted(): boolean {
+    return gets >= KILO_FEED_RECOVERY_MAX_ATTEMPTS;
+  }
+
+  /** The SDK snapshot is only evaluated when the episode still has GETs left. */
+  function sdkRetrySnapshot(): number {
+    return KILO_FEED_RECOVERY_MAX_ATTEMPTS - gets;
+  }
+
+  function beginEpisode(reason: KiloFeedRecoveryReason): void {
+    if (episode || signal.aborted) return;
+    episode = {
+      deadlineAt: now() + KILO_FEED_RECOVERY_DEADLINE_MS,
+      reason,
+    };
+    // The pre-episode startup GET is not part of the recovery budget.
+    gets = 0;
+    diagnostic('retry_scheduled', { detail: reason });
+    logFeed(`phase=recovering reason=${reason} gets=${gets} ${feedTiming()}`);
+  }
+
+  function disarmAttempt(): void {
+    attemptStartedAt = undefined;
+    attemptController = undefined;
+  }
+
+  function abortAttempt(): void {
+    const current = attemptController;
+    disarmAttempt();
+    current?.abort();
+  }
+
+  const hooks: KiloFeedConnectionHooks = {
+    beginAttempt(): AbortSignal {
+      if (signal.aborted) return signal;
+      if (reportDeadlineIfExpired()) return AbortSignal.abort();
+      if (recoveryGetsExhausted()) return AbortSignal.abort();
+      gets += 1;
+      attemptId += 1;
+      attemptStartedAt = now();
+      attemptController = new AbortController();
+      return AbortSignal.any([signal, attemptController.signal]);
+    },
+    abortAttempt,
+    onGetStart(): void {
+      logFeed(`phase=get_start attempt=${attemptId} gets=${gets} ${feedTiming()}`);
+    },
+    onSseError(error: unknown): void {
+      if (signal.aborted || closed) return;
+      disarmAttempt();
+      const reason = error instanceof KiloEventFeedError ? error.reason : 'feed_failed';
+      beginEpisode(reason);
+      logFeed(`phase=retry reason=${reason} attempt=${attemptId} gets=${gets} ${feedTiming()}`);
+    },
+    onSleepWake(): void {
+      reportDeadlineIfExpired();
+    },
   };
-  const disposeIterator = (): void => {
+
+  const onActivity = (): void => {
+    if (!signal.aborted) lastEventAt = now();
+  };
+  const onFrame = (frame: string): void => {
+    if (!isFeedConnectedFrame(frame)) settleUsable(true);
+  };
+
+  function disposeIterator(): void {
     if (disposed || !iterator) return;
     disposed = true;
     try {
       const returned = iterator.return?.();
       if (returned) void returned.catch(() => undefined);
     } catch {
-      return;
+      // Ignore failed disposal.
     }
-  };
-  const close = (): void => {
+  }
+
+  function close(): void {
     if (closed) return;
     closed = true;
+    disarmAttempt();
+    clearInterval(watchdog);
     controller.abort();
     settleUsable(false);
     disposeIterator();
-  };
-  signal.addEventListener(
-    'abort',
-    () => {
-      settleUsable(false);
-      disposeIterator();
-    },
-    { once: true }
-  );
-  const onFrame = (frame: string): void => {
-    if (!initialFrameSeen) {
-      initialFrameSeen = true;
-      return;
-    }
-    if (!isFeedConnectedFrame(frame)) settleUsable(true);
-  };
-  let first: IteratorResult<unknown>;
-  emitControlDiagnostic(options.onDiagnostic, 'control.feed', { phase: 'opening' });
-  try {
-    if (now() >= deadlineAt) throw new Error('Kilo feed attempt expired');
-    const feed = await withTimeoutAndAbort(options.open(signal, onActivity, onFrame), {
-      signal,
-      timeoutMs: Math.max(1, deadlineAt - now()),
-      timeoutMessage: 'Kilo global event feed startup timed out',
-      abortMessage: 'Kilo global event feed cancelled',
-    });
-    if (!feed.stream) {
-      throw new Error('Kilo global event feed is unavailable');
-    }
-    iterator = feed.stream[Symbol.asyncIterator]();
-    first = await withTimeoutAndAbort(iterator.next(), {
-      signal,
-      timeoutMs: Math.max(1, deadlineAt - now()),
-      timeoutMessage: 'Kilo global event feed startup timed out',
-      abortMessage: 'Kilo global event feed cancelled',
-    });
-    signal.throwIfAborted();
-    if (first.done) {
-      throw new Error('Kilo global event feed ended before startup');
-    }
-  } catch (error) {
-    emitControlDiagnostic(options.onDiagnostic, 'control.feed', { phase: 'start_failed' });
-    close();
-    throw error;
+    settled.resolve();
   }
 
-  onActivity();
-  let eventsReceived = 1;
-  const diagnostic = (phase: string): void =>
-    emitControlDiagnostic(options.onDiagnostic, 'control.feed', {
-      phase,
-      lastEventAt,
-      ageMs: Math.max(0, now() - lastEventAt),
-      eventsReceived,
-    });
-  diagnostic('started');
-  const isFresh = () => !signal.aborted && now() - lastEventAt < KILO_FEED_FRESHNESS_TIMEOUT_MS;
-  const fail = (error: unknown, phase: 'stale' | 'ended' | 'failed'): void => {
-    if (signal.aborted) return;
-    diagnostic(phase);
+  function reportTerminal(
+    reason: KiloFeedRecoveryReason,
+    cause: 'attempts_exhausted' | 'deadline_expired'
+  ): void {
+    if (terminal || signal.aborted) return;
+    terminal = true;
+    clearInterval(watchdog);
+    diagnostic('failed', { detail: reason });
+    logFeed(`phase=terminal cause=${cause} reason=${reason} gets=${gets} ${feedTiming()}`);
+    options.onUnexpectedClose(new KiloEventFeedError(reason, feedTerminalMessage(cause, reason)));
     close();
-    options.onUnexpectedClose(error);
-  };
-  const freshnessTimer = setInterval(() => {
-    if (!isFresh())
-      fail(
-        new KiloEventFeedError('feed_stale', 'Kilo global event feed stopped responding'),
-        'stale'
-      );
-    else diagnostic('freshness');
-  }, 10_000);
-  freshnessTimer.unref();
-  signal.addEventListener('abort', () => clearInterval(freshnessTimer), { once: true });
+  }
 
-  const next = (): Promise<IteratorResult<unknown>> => {
-    if (!iterator || signal.aborted) return Promise.resolve({ done: true, value: undefined });
+  function reportDeadlineIfExpired(): boolean {
+    if (!episode || now() < episode.deadlineAt) return false;
+    reportTerminal(episode.reason, 'deadline_expired');
+    return true;
+  }
+
+  function next(current: AsyncIterator<unknown>): Promise<IteratorResult<unknown>> {
+    if (signal.aborted) return Promise.resolve({ done: true, value: undefined });
     let pending: Promise<IteratorResult<unknown>>;
     try {
-      pending = Promise.resolve(iterator.next());
+      pending = Promise.resolve(current.next());
     } catch (error) {
       return Promise.reject(error);
     }
     return new Promise((resolve, reject) => {
-      let settled = false;
+      let finished = false;
       const finish = (callback: () => void): void => {
-        if (settled) return;
-        settled = true;
+        if (finished) return;
+        finished = true;
         signal.removeEventListener('abort', onAbort);
         callback();
       };
-      const onAbort = () => finish(() => resolve({ done: true, value: undefined }));
+      const onAbort = (): void => finish(() => resolve({ done: true, value: undefined }));
       signal.addEventListener('abort', onAbort, { once: true });
       pending.then(
         result => finish(() => resolve(result)),
@@ -299,36 +416,201 @@ export async function startSandboxControlEventFeed(
       );
       if (signal.aborted) onAbort();
     });
-  };
+  }
 
-  async function* establishedFeed(): AsyncGenerator<unknown> {
+  function markEvent(): boolean {
+    if (reportDeadlineIfExpired()) return false;
+    lastEventAt = now();
+    eventsReceived += 1;
+    if (episode) {
+      diagnostic('reconnected');
+      logFeed(`phase=recovered gets=${gets} ${feedTiming()}`);
+      episode = undefined;
+    }
+    gets = 0;
+    settleUsable(true);
+    return true;
+  }
+
+  async function* establishedStream(
+    current: AsyncIterator<unknown>,
+    first: IteratorResult<unknown>
+  ): AsyncGenerator<unknown> {
     try {
-      yield first.value;
-      while (!signal.aborted) {
-        const value = await next();
-        if (signal.aborted || value.done) return;
-        if (isFeedConnectedEvent(value.value)) {
-          diagnostic('reconnected');
-          throw new KiloEventFeedError(
-            'feed_reconnected',
-            'Kilo global event feed reconnected with a delivery gap'
-          );
+      if (!first.done) {
+        if (isFeedConnectedEvent(first.value)) onActivity();
+        else if (markEvent()) {
+          yield first.value;
+        } else {
+          return;
         }
-        lastEventAt = now();
-        eventsReceived += 1;
-        settleUsable(true);
-        yield value.value;
+      }
+      while (!signal.aborted) {
+        const result = await next(current);
+        if (signal.aborted || result.done) return;
+        if (isFeedConnectedEvent(result.value)) {
+          onActivity();
+          continue;
+        }
+        if (!markEvent()) return;
+        yield result.value;
       }
     } finally {
       disposeIterator();
     }
   }
 
-  const settled = options.consume(establishedFeed()).then(
-    () => fail(new KiloEventFeedError('feed_ended', 'Kilo global event feed ended'), 'ended'),
-    error => fail(error, 'failed')
+  async function openStream(
+    deadlineAt: number
+  ): Promise<{ iterator: AsyncIterator<unknown>; first: IteratorResult<unknown> }> {
+    const feed = await withTimeoutAndAbort(
+      options.open(signal, onActivity, onFrame, {
+        hooks,
+        sseMaxRetryAttempts: sdkRetrySnapshot(),
+      }),
+      {
+        signal,
+        timeoutMs: Math.max(1, deadlineAt - now()),
+        timeoutMessage: 'Kilo global event feed startup timed out',
+        abortMessage: 'Kilo global event feed cancelled',
+      }
+    );
+    if (!feed.stream) {
+      throw new Error('Kilo global event feed is unavailable');
+    }
+    const streamIterator = feed.stream[Symbol.asyncIterator]();
+    const first = await withTimeoutAndAbort(streamIterator.next(), {
+      signal,
+      timeoutMs: Math.max(1, deadlineAt - now()),
+      timeoutMessage: 'Kilo global event feed startup timed out',
+      abortMessage: 'Kilo global event feed cancelled',
+    });
+    return { iterator: streamIterator, first };
+  }
+
+  async function consumeCycle(
+    current: AsyncIterator<unknown>,
+    first: IteratorResult<unknown>
+  ): Promise<{ error?: unknown }> {
+    iterator = current;
+    disposed = false;
+    try {
+      await options.consume(establishedStream(current, first));
+      return {};
+    } catch (error) {
+      return { error };
+    } finally {
+      disposeIterator();
+    }
+  }
+
+  /**
+   * The single "attempt failed, maybe reopen" path. Reports terminal when the
+   * episode deadline has expired or its GET budget is spent; otherwise returns a
+   * fresh iterator/first. An open failure is retried here and never falls
+   * through to consuming a previous stream.
+   */
+  async function reopenOrExhaust(): Promise<
+    { iterator: AsyncIterator<unknown>; first: IteratorResult<unknown> } | undefined
+  > {
+    while (!signal.aborted && !terminal) {
+      if (reportDeadlineIfExpired()) return undefined;
+      if (recoveryGetsExhausted()) {
+        reportTerminal(episode?.reason ?? 'feed_failed', 'attempts_exhausted');
+        return undefined;
+      }
+      try {
+        return await openStream(episode?.deadlineAt ?? now());
+      } catch (error) {
+        if (signal.aborted || terminal) return undefined;
+        disarmAttempt();
+        beginEpisode(error instanceof KiloEventFeedError ? error.reason : 'feed_failed');
+      }
+    }
+    return undefined;
+  }
+
+  async function recoveryLoop(
+    initialIterator: AsyncIterator<unknown>,
+    initialFirst: IteratorResult<unknown>
+  ): Promise<void> {
+    let currentIterator = initialIterator;
+    let currentFirst = initialFirst;
+    while (!signal.aborted && !terminal) {
+      const outcome = await consumeCycle(currentIterator, currentFirst);
+      disarmAttempt();
+      if (signal.aborted || terminal) return;
+      const reason: KiloFeedRecoveryReason =
+        outcome.error === undefined
+          ? 'feed_ended'
+          : outcome.error instanceof KiloEventFeedError
+            ? outcome.error.reason
+            : 'feed_failed';
+      beginEpisode(reason);
+      const opened = await reopenOrExhaust();
+      if (!opened) return;
+      currentIterator = opened.iterator;
+      currentFirst = opened.first;
+    }
+  }
+
+  const watchdog = setInterval(() => {
+    if (!started || signal.aborted || terminal) return;
+    if (reportDeadlineIfExpired()) return;
+    if (!isFresh()) {
+      if (
+        attemptStartedAt !== undefined &&
+        now() - attemptStartedAt >= KILO_FEED_FRESHNESS_TIMEOUT_MS
+      ) {
+        if (!episode) {
+          beginEpisode('feed_stale');
+          logFeed(`phase=stale attempt=${attemptId} gets=${gets} ${feedTiming()}`);
+        }
+        diagnostic('stale');
+        abortAttempt();
+      }
+    } else {
+      diagnostic('freshness');
+    }
+  }, 10_000);
+  watchdog.unref();
+
+  let first: IteratorResult<unknown>;
+  emitControlDiagnostic(options.onDiagnostic, 'control.feed', { phase: 'opening' });
+  logFeed('phase=opening');
+  try {
+    if (now() >= startupDeadlineAt) throw new Error('Kilo feed attempt expired');
+    const opened = await openStream(startupDeadlineAt);
+    iterator = opened.iterator;
+    first = opened.first;
+    signal.throwIfAborted();
+    if (first.done) throw new Error('Kilo global event feed ended before startup');
+  } catch (error) {
+    emitControlDiagnostic(options.onDiagnostic, 'control.feed', { phase: 'start_failed' });
+    logFeed('phase=start_failed');
+    close();
+    throw error;
+  }
+
+  started = true;
+  lastEventAt = now();
+  diagnostic('started');
+  logFeed(`phase=started gets=${gets}`);
+
+  signal.addEventListener(
+    'abort',
+    () => {
+      clearInterval(watchdog);
+      settleUsable(false);
+      disposeIterator();
+      settled.resolve();
+    },
+    { once: true }
   );
-  return { isFresh, usable: usable.promise, close, settled };
+
+  void recoveryLoop(iterator, first).catch(() => undefined);
+
+  return { isFresh, isRecovering, usable: usable.promise, close, settled: settled.promise };
 }
 
 export function maybeStartSandboxControlClient(
@@ -358,6 +640,13 @@ export function maybeStartSandboxControlClient(
       lastSentAt,
       sinceLastSentMs: lastSentAt === undefined ? undefined : Date.now() - lastSentAt,
     });
+  // `phase=sent` means `sendEvent` returned, not that the worker received the
+  // frame. File logs give the pre-pause send outcome and sequence for E2E
+  // correlation; it is not receipt proof.
+  const logHeartbeat = (phase: string): void =>
+    log(
+      `control heartbeat phase=${phase} sequence=${heartbeatSequence} lastSentAt=${lastSentAt ?? 0}`
+    );
 
   function stopHeartbeat(): void {
     sampleAbort.abort();
@@ -405,11 +694,13 @@ export function maybeStartSandboxControlClient(
     if (!options.getHeartbeatPayload) return;
     heartbeatSequence += 1;
     diagnostic('sending');
+    logHeartbeat('sending');
     let payload: SandboxHeartbeatPayload;
     try {
       payload = options.getHeartbeatPayload();
     } catch {
       diagnostic('send_threw');
+      logHeartbeat('send_threw');
       log('sandbox control heartbeat failed');
       return;
     }
@@ -417,13 +708,16 @@ export function maybeStartSandboxControlClient(
     try {
       if (!active.sendEvent?.('sandbox.heartbeat', payload)) {
         diagnostic('send_failed');
+        logHeartbeat('send_failed');
         handleConnectionLost();
       } else {
         lastSentAt = Date.now();
         diagnostic('sent');
+        logHeartbeat('sent');
       }
     } catch {
       diagnostic('send_threw');
+      logHeartbeat('send_threw');
       handleConnectionLost();
     }
   }
@@ -460,6 +754,7 @@ export function maybeStartSandboxControlClient(
     ...(options.onEventReceiptFailure
       ? { onEventReceiptFailure: options.onEventReceiptFailure }
       : {}),
+    ...(options.onEventPublication ? { onEventPublication: options.onEventPublication } : {}),
     onConnected: () => {
       connectedThroughCallback = true;
       handleConnected(client);

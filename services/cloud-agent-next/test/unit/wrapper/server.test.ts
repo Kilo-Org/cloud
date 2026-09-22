@@ -28,10 +28,6 @@ import {
 } from '../../../wrapper/src/server.js';
 import type { WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
 
-// ---------------------------------------------------------------------------
-// Test Helpers
-// ---------------------------------------------------------------------------
-
 function createMockKiloClient(): WrapperKiloClient {
   return {
     createSession: vi.fn().mockResolvedValue({ id: 'kilo_sess' }),
@@ -109,10 +105,6 @@ afterEach(async () => {
 afterEach(() => {
   vi.unstubAllGlobals();
 });
-
-// ---------------------------------------------------------------------------
-// Kilo Proxy Handler
-// ---------------------------------------------------------------------------
 
 describe('createKiloProxyHandler', () => {
   it('matches only the wrapper kilo proxy path family', () => {
@@ -211,10 +203,6 @@ describe('createKiloProxyHandler', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Answer Permission
-// ---------------------------------------------------------------------------
 
 describe('createAnswerPermissionHandler', () => {
   it('returns NO_SESSION when no session is bound', async () => {
@@ -329,10 +317,6 @@ describe('createAnswerPermissionHandler', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Answer Question
-// ---------------------------------------------------------------------------
-
 describe('createAnswerQuestionHandler', () => {
   it('returns NO_SESSION when no session is bound', async () => {
     const state = new WrapperState();
@@ -366,10 +350,6 @@ describe('createAnswerQuestionHandler', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Reject Question
-// ---------------------------------------------------------------------------
-
 describe('createRejectQuestionHandler', () => {
   it('returns NO_SESSION when no session is bound', async () => {
     const state = new WrapperState();
@@ -402,10 +382,6 @@ describe('createRejectQuestionHandler', () => {
     expect(deps.kiloClient.rejectQuestion).toHaveBeenCalledWith('q_1');
   });
 });
-
-// ---------------------------------------------------------------------------
-// Abort
-// ---------------------------------------------------------------------------
 
 describe('createAbortHandler', () => {
   it('returns NO_SESSION when no session is bound', async () => {
@@ -444,10 +420,6 @@ describe('createAbortHandler', () => {
     expect(triggerDrainAndClose).toHaveBeenCalled();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Session Binding (bindSessionContext)
-// ---------------------------------------------------------------------------
 
 const defaultServerConfig: ServerConfig = {
   port: 5000,
@@ -597,10 +569,6 @@ describe('bindSessionContext', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Prompt Handler
-// ---------------------------------------------------------------------------
-
 describe('createPromptHandler', () => {
   it('returns NO_SESSION on fresh wrapper without session binding', async () => {
     const state = new WrapperState();
@@ -638,48 +606,6 @@ describe('createPromptHandler', () => {
     expect(state.hasSession).toBe(true);
     expect(deps.openConnection).toHaveBeenCalled();
   });
-
-  it('waits silently for slow snapshot initialization in Cloud Agent web prompts', async () => {
-    const state = new WrapperState();
-    const deps = createMockDeps(state);
-    const handler = createPromptHandler(
-      { ...defaultServerConfig, platform: 'cloud-agent-web' },
-      deps
-    );
-
-    const response = await handler(
-      jsonRequest({
-        message: { id: 'msg_web_snapshot', prompt: 'Hello' },
-        session: completeBinding,
-      })
-    );
-
-    expect(response.status).toBe(200);
-    expect(deps.kiloClient.sendPromptAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ snapshotInitialization: 'wait' })
-    );
-  });
-
-  it.each([undefined, 'slack', 'code-review', 'app-builder'])(
-    'does not wait for snapshot initialization in %s-origin prompts',
-    async platform => {
-      const state = new WrapperState();
-      const deps = createMockDeps(state);
-      const handler = createPromptHandler({ ...defaultServerConfig, platform }, deps);
-
-      const response = await handler(
-        jsonRequest({
-          message: { id: 'msg_non_web_snapshot', prompt: 'Hello' },
-          session: completeBinding,
-        })
-      );
-
-      expect(response.status).toBe(200);
-      expect(deps.kiloClient.sendPromptAsync).toHaveBeenCalledWith(
-        expect.not.objectContaining({ snapshotInitialization: expect.anything() })
-      );
-    }
-  );
 
   it('materializes a PDF before opening ingest and sends its local file part to Kilo', async () => {
     const state = new WrapperState();
@@ -1101,55 +1027,7 @@ describe('createPromptHandler', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Command Handler
-// ---------------------------------------------------------------------------
-
 describe('createCommandHandler', () => {
-  it('waits silently for slow snapshot initialization in Cloud Agent web commands', async () => {
-    const state = new WrapperState();
-    const deps = createMockDeps(state);
-    const handler = createCommandHandler(
-      { ...defaultServerConfig, platform: 'cloud-agent-web' },
-      deps
-    );
-
-    const response = await handler(
-      jsonRequest({ command: 'review', messageId: 'msg_web_command', session: completeBinding })
-    );
-
-    expect(response.status).toBe(200);
-    expect(deps.kiloClient.sendCommand).toHaveBeenCalledWith({
-      sessionId: 'kilo_sess_1',
-      command: 'review',
-      args: undefined,
-      messageId: 'msg_web_command',
-      snapshotInitialization: 'wait',
-    });
-  });
-
-  it.each([undefined, 'slack', 'code-review', 'app-builder'])(
-    'does not wait for snapshot initialization in %s-origin commands',
-    async platform => {
-      const state = new WrapperState();
-      const deps = createMockDeps(state);
-      const handler = createCommandHandler({ ...defaultServerConfig, platform }, deps);
-
-      const response = await handler(
-        jsonRequest({
-          command: 'review',
-          messageId: 'msg_non_web_command',
-          session: completeBinding,
-        })
-      );
-
-      expect(response.status).toBe(200);
-      expect(deps.kiloClient.sendCommand).toHaveBeenCalledWith(
-        expect.not.objectContaining({ snapshotInitialization: expect.anything() })
-      );
-    }
-  );
-
   it('routes compact through session summarize with the selected model', async () => {
     const state = new WrapperState();
     const sendToIngest = vi.fn();
@@ -1245,10 +1123,6 @@ describe('createCommandHandler', () => {
     expect(state.getMessageConfig('msg_compact')).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Session Ready Handler
-// ---------------------------------------------------------------------------
 
 describe('createSessionReadyHandler', () => {
   it('delegates readiness to the wrapper runtime', async () => {

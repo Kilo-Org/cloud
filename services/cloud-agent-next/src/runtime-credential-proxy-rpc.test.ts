@@ -6,19 +6,20 @@ import {
   issuePersistedRuntimeProxyGrant,
   resolvePersistedRuntimeProxyCredential,
 } from './runtime-credential-proxy-rpc.js';
-import { RUNTIME_PROXY_GRANT_KEY, type RuntimeProxyGrant } from './runtime-credential-proxy.js';
+import {
+  issueRuntimeCredentialProxyHandle,
+  RUNTIME_PROXY_GRANT_KEY,
+  runtimeProxyGrantSchema,
+  type RuntimeProxyFence,
+  type RuntimeProxyGrant,
+} from './runtime-credential-proxy.js';
 
 const secret = 'test-secret';
 const env = { NEXTAUTH_SECRET: secret } as never;
 const authorizationId = '00000000-0000-4000-8000-000000000001';
 
-type Fence = {
-  plane: 'legacy';
-  generation: number;
-  allocationId: string;
-  wrapperRunId: string;
-  wrapperConnectionId: string;
-};
+type Fence = RuntimeProxyFence;
+type ControlFence = Extract<RuntimeProxyFence, { plane: 'control' }>;
 
 function authorization(state: 'active' | 'revoked' = 'active'): RuntimeAuthorization {
   const issuedAt = new Date(Date.now());
@@ -47,13 +48,22 @@ function metadata(kiloSessionId = 'kilo_1'): SessionMetadata {
   };
 }
 
-function fence(generation = 1): Fence {
+function fence(instanceGeneration = 1): Fence {
   return {
     plane: 'legacy',
-    generation,
     allocationId: 'allocation_1',
-    wrapperRunId: 'run_1',
-    wrapperConnectionId: 'connection_1',
+    instanceGeneration,
+  };
+}
+
+function controlFence(connectionId: string, overrides: Partial<ControlFence> = {}): ControlFence {
+  return {
+    plane: 'control',
+    allocationId: 'allocation_1',
+    providerInstanceId: 'provider_1',
+    connectionId,
+    wrapperInstanceId: 'wrapper_1',
+    ...overrides,
   };
 }
 
@@ -126,6 +136,104 @@ describe('persisted runtime credential proxy RPC', () => {
       token: signedToken(Date.now() + 4 * 60 * 60_000, 'backing-token-after-renewal'),
     });
     expect(second).toBe(first);
+    vi.useRealTimers();
+  });
+
+  it('reuses the handle when physical binding is unchanged', async () => {
+    const store = storage();
+    const token = signedToken(Date.now() + 10 * 60_000);
+    const first = await issue({ store, currentFence: fence(1), token });
+    const second = await issue({ store, currentFence: fence(1), token });
+    expect(second).toBe(first);
+  });
+
+  it('resolves a persisted control credential across a connection-only change', async () => {
+    const store = storage();
+    const token = signedToken(Date.now() + 10 * 60_000);
+    const handle = await issue({ store, currentFence: controlFence('connection_1'), token });
+    expect(handle).toEqual(expect.any(String));
+
+    const resolveWith = (currentFence: Fence) =>
+      resolvePersistedRuntimeProxyCredential({
+        env,
+        storage: store,
+        handle: handle!,
+        metadata: async () => metadata(),
+        authorization: async () => authorization(),
+        fence: async () => currentFence,
+        token: async () => token,
+      });
+
+    await expect(resolveWith(controlFence('connection_2'))).resolves.toEqual({
+      token,
+      organizationId: 'org_1',
+      runtimeAuthorization: {
+        userId: 'user_1',
+        authorizationId,
+        resourceId: 'agent_1',
+      },
+    });
+    await expect(
+      resolveWith(controlFence('connection_2', { wrapperInstanceId: 'wrapper_2' }))
+    ).resolves.toBeNull();
+    await expect(
+      resolveWith(controlFence('connection_2', { allocationId: 'allocation_2' }))
+    ).resolves.toBeNull();
+    await expect(
+      resolveWith(controlFence('connection_2', { providerInstanceId: 'provider_2' }))
+    ).resolves.toBeNull();
+  });
+
+  it('refreshes the persisted control connection pin on reuse without changing the handle', async () => {
+    const store = storage();
+    const token = signedToken(Date.now() + 10 * 60_000);
+    const first = await issue({ store, currentFence: controlFence('connection_1'), token });
+    const second = await issue({ store, currentFence: controlFence('connection_2'), token });
+
+    expect(second).toBe(first);
+    const stored = await store.get<RuntimeProxyGrant>(RUNTIME_PROXY_GRANT_KEY);
+    expect(stored).toMatchObject({
+      plane: 'control',
+      allocationId: 'allocation_1',
+      providerInstanceId: 'provider_1',
+      wrapperInstanceId: 'wrapper_1',
+      connectionId: 'connection_2',
+    });
+  });
+
+  it('upgrades a persisted v2 grant with issuedAt to v3 and re-signs the same handle', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+    const store = storage();
+    const issuedAt = Date.now();
+    const legacyV2 = runtimeProxyGrantSchema.parse({
+      version: 2,
+      plane: 'legacy',
+      grantId: '33333333-3333-4333-8333-333333333333',
+      authorizationId,
+      sessionId: 'agent_1',
+      kiloSessionId: 'kilo_1',
+      userId: 'user_1',
+      orgId: 'org_1',
+      nonce: 'a'.repeat(43),
+      mode: 'contained',
+      allocationId: 'allocation_1',
+      generation: 1,
+      wrapperRunId: 'run_1',
+      wrapperConnectionId: 'connection_1',
+      issuedAt,
+      leaseExpiresAt: issuedAt + 60 * 60_000,
+      state: 'active',
+    });
+    await store.put(RUNTIME_PROXY_GRANT_KEY, legacyV2);
+    const first = await issueRuntimeCredentialProxyHandle(env, legacyV2, issuedAt);
+
+    const handle = await issue({ store, token: signedToken(Date.now() + 2 * 60 * 60_000) });
+
+    expect(handle).toBe(first);
+    const stored = await store.get<RuntimeProxyGrant>(RUNTIME_PROXY_GRANT_KEY);
+    expect(stored?.version).toBe(3);
+    expect(stored).toMatchObject({ allocationId: 'allocation_1', instanceGeneration: 1 });
     vi.useRealTimers();
   });
 
@@ -316,6 +424,38 @@ describe('persisted runtime credential proxy RPC', () => {
     vi.useRealTimers();
   });
 
+  it('invalidates the previous handle when a new fence overwrites the persisted grant', async () => {
+    const store = storage();
+    const token = signedToken(Date.now() + 10 * 60_000);
+    const handleA = await issue({ store, currentFence: fence(1), token });
+    const handleB = await issue({ store, currentFence: fence(2), token });
+    expect(handleA).toEqual(expect.any(String));
+    expect(handleB).toEqual(expect.any(String));
+    expect(handleB).not.toBe(handleA);
+
+    const resolveWith = (handle: string) =>
+      resolvePersistedRuntimeProxyCredential({
+        env,
+        storage: store,
+        handle,
+        metadata: async () => metadata(),
+        authorization: async () => authorization(),
+        fence: async () => fence(2),
+        token: async () => token,
+      });
+
+    await expect(resolveWith(handleA!)).resolves.toBeNull();
+    await expect(resolveWith(handleB!)).resolves.toEqual({
+      token,
+      organizationId: 'org_1',
+      runtimeAuthorization: {
+        userId: 'user_1',
+        authorizationId,
+        resourceId: 'agent_1',
+      },
+    });
+  });
+
   it.each(['fence', 'grant'] as const)(
     '%s changes are handled according to the stable grant fence',
     async replacement => {
@@ -354,4 +494,78 @@ describe('persisted runtime credential proxy RPC', () => {
       vi.useRealTimers();
     }
   );
+
+  it('keeps a control handle valid when a concurrent issuance changes only the connection pin', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+    const store = storage();
+    const nearExpiry = signedToken(Date.now() + 5 * 60_000);
+    const renewed = signedToken(Date.now() + 2 * 60 * 60_000);
+    const handle = await issue({
+      store,
+      currentFence: controlFence('connection_1'),
+      token: nearExpiry,
+    });
+    const original = await store.get<RuntimeProxyGrant>(RUNTIME_PROXY_GRANT_KEY);
+    let currentFence: Fence = controlFence('connection_1');
+    let calls = 0;
+
+    const resolved = await resolvePersistedRuntimeProxyCredential({
+      env,
+      storage: store,
+      handle: handle!,
+      metadata: async () => metadata(),
+      authorization: async () => authorization(),
+      fence: async () => currentFence,
+      token: async () => {
+        calls += 1;
+        if (calls === 2) {
+          currentFence = controlFence('connection_2');
+          await issue({ store, currentFence, token: renewed });
+        }
+        return calls === 1 ? nearExpiry : renewed;
+      },
+    });
+
+    expect(resolved).toMatchObject({ token: renewed });
+    const stored = await store.get<RuntimeProxyGrant>(RUNTIME_PROXY_GRANT_KEY);
+    expect(stored).toMatchObject({ plane: 'control', connectionId: 'connection_2' });
+    expect(stored?.leaseExpiresAt).toBe(original?.leaseExpiresAt);
+    vi.useRealTimers();
+  });
+
+  it('rejects a control handle when a concurrent issuance replaces the wrapper incarnation', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+    const store = storage();
+    const nearExpiry = signedToken(Date.now() + 5 * 60_000);
+    const renewed = signedToken(Date.now() + 2 * 60 * 60_000);
+    const handle = await issue({
+      store,
+      currentFence: controlFence('connection_1'),
+      token: nearExpiry,
+    });
+    let currentFence: Fence = controlFence('connection_1');
+    let calls = 0;
+
+    const resolved = await resolvePersistedRuntimeProxyCredential({
+      env,
+      storage: store,
+      handle: handle!,
+      metadata: async () => metadata(),
+      authorization: async () => authorization(),
+      fence: async () => currentFence,
+      token: async () => {
+        calls += 1;
+        if (calls === 2) {
+          currentFence = controlFence('connection_2', { wrapperInstanceId: 'wrapper_2' });
+          await issue({ store, currentFence, token: renewed });
+        }
+        return calls === 1 ? nearExpiry : renewed;
+      },
+    });
+
+    expect(resolved).toBeNull();
+    vi.useRealTimers();
+  });
 });

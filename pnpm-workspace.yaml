@@ -11,7 +11,15 @@ packages:
 
 catalog:
   '@cloudflare/vitest-pool-workers': 0.16.13
+  # The OAuth 2.1 provider the kilo-mcp worker delegates its hand-rolled
+  # authorization/token server to. Pinned exactly; adopted with the KV binding
+  # and zod schemas in the same change.
+  '@cloudflare/workers-oauth-provider': 0.10.3
   '@cloudflare/workers-types': 4.20260605.1
+  # Workers-compatible JSON Schema validator for the kilo-mcp call tool.
+  # AJV cannot run on Workerd: it compiles schemas with `new Function`, which
+  # the Workers runtime forbids. Pinned exactly.
+  '@cfworker/json-schema': 4.1.1
   '@octokit/auth-app': 8.2.0
   # Only for packages that shell out to the `sentry-cli` binary directly (Workers,
   # mobile). Must NOT be added to `overrides`: the Sentry bundler plugins consume
@@ -42,12 +50,26 @@ catalog:
   ulid: 3.0.2
   vitest: 4.1.6
   workers-tagged-logger: 1.0.0
-  wrangler: 4.112.0
+  wrangler: 4.135.0
   zod: 4.4.3
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx
+  # Cloudflare's DO-managed container runtime (ctx.container, snapshotContainer).
+  # wrangler 4.134.0 is the first release with local development support for
+  # DO-managed Containers (named-image selection via ctx.container.images).
+  # 4.135.0 exact-pins its own workerd/miniflare runtime, so those exact versions
+  # are exempted with it. Approved early-access exception; remove all eight entries
+  # when 4.135.0 matures (workerd 2026-09-18, wrangler 2026-09-18).
+  - wrangler@4.135.0
+  - workerd@1.20260918.1
+  - miniflare@5.20260918.0-alpha
+  - '@cloudflare/workerd-darwin-64@1.20260918.1'
+  - '@cloudflare/workerd-darwin-arm64@1.20260918.1'
+  - '@cloudflare/workerd-linux-64@1.20260918.1'
+  - '@cloudflare/workerd-linux-arm64@1.20260918.1'
+  - '@cloudflare/workerd-windows-64@1.20260918.1'
   # Expo SDK 57 alignment: the 2026-09-08 patch releases `expo install --check`
   # expects, plus the exact transitive versions that aligned graph resolves to.
   # Each entry exempts exactly the listed package@version required by that
@@ -136,6 +158,15 @@ overrides:
   serialize-javascript: '>=7.0.3'
   hono: 4.12.34
   '@modelcontextprotocol/sdk@1.30.0>@hono/node-server': 2.0.10
+  # @simplewebauthn/server's ASN.1 parser must come from the same
+  # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their
+  # schemas into. apps/web pins asn1-schema/-x509 to 2.8.0 for its Apple App
+  # Attest code, and pnpm deduped the WebAuthn library's ^2.6.0 range onto that
+  # copy while asn1-ecc resolved 2.9.4, so `AsnParser.parse(DER, ECDSASigValue)`
+  # threw "Cannot get schema for 'ECDSASigValue' target" and every ES256
+  # assertion was refused. Scope the newer copy to this dependency only.
+  '@simplewebauthn/server>@peculiar/asn1-schema': 2.9.4
+  '@simplewebauthn/server>@peculiar/asn1-x509': 2.9.4
   undici@^6: 6.28.0
   undici@^8: 8.9.0
   # 1.30.2+ regresses var() round-trip through JS visitors, breaking
@@ -195,6 +226,17 @@ patchedDependencies:
   expo-task-manager@57.0.16: patches/expo-task-manager@57.0.16.patch
   expo-widgets@57.0.18: patches/expo-widgets@57.0.18.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
+  # Fabric mounting race: RCTComponentViewFactory registers component views from
+  # the JS thread without the class-map mutex, so a mounting transaction can
+  # dereference an unregistered handle and crash (EXC_BAD_ACCESS 0x18,
+  # KILO-APP-6H; react/react-native#58299). Also synchronizes the
+  # LegacyViewManagerInterop cache. iOS needs buildReactNativeFromSource to
+  # compile this in — see apps/mobile/app.config.ts.
+  # Bounds-guard the unmountChildComponentView assert message. Without it a
+  # stale Fabric child index throws NSRangeException while the assert is being
+  # formatted, which SIGABRTs release builds that link the assert-enabled
+  # prebuilt React core (Kilo-Org/kilocode#14065; react/react-native#57865).
+  react-native@0.86.3: patches/react-native@0.86.3.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

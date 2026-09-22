@@ -1,8 +1,7 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free React Native row integration */
 import { createElement } from 'react';
 import { Pressable } from 'react-native';
 import { type QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RemoteSessionRow } from './remote-session-row';

@@ -20,9 +20,14 @@ export const secureStore = {
   getItemAsync: vi.fn<(key: string) => Promise<string | null>>(),
 };
 
+/**
+ * The default tray: one permission wait — the only kind the widget can answer
+ * in place — one retry wait it cannot, and two working agents. Two agents wait,
+ * so the counts read 2 and the Approve chip is offered for the permission.
+ */
 export function snapshotFor(
   sessions: { status: string }[] = [
-    { status: 'question' },
+    { status: 'permission' },
     { status: 'retry' },
     { status: 'busy' },
     { status: 'busy' },
@@ -38,10 +43,15 @@ export function snapshotFor(
   });
 }
 
-export async function runWidgetTask(handler: WidgetTaskHandler, width: number) {
+async function runTask(
+  handler: WidgetTaskHandler,
+  width: number,
+  action: Pick<Parameters<WidgetTaskHandler>[0], 'widgetAction' | 'clickAction'>
+): Promise<WidgetRepresentation[]> {
   const renders: WidgetRepresentation[] = [];
   await handler({
-    widgetAction: 'WIDGET_UPDATE',
+    widgetAction: action.widgetAction,
+    clickAction: action.clickAction,
     widgetInfo: {
       widgetName: 'ActiveAgentsWidget',
       widgetId: 1,
@@ -58,6 +68,11 @@ export async function runWidgetTask(handler: WidgetTaskHandler, width: number) {
       renders.push(widget);
     },
   });
+  return renders;
+}
+
+export async function runWidgetTask(handler: WidgetTaskHandler, width: number) {
+  const renders = await runTask(handler, width, { widgetAction: 'WIDGET_UPDATE' });
   const [rendered] = renders;
   if (rendered === undefined || !('light' in rendered)) {
     throw new Error('The widget task did not render its themed layouts');
@@ -65,7 +80,26 @@ export async function runWidgetTask(handler: WidgetTaskHandler, width: number) {
   return rendered;
 }
 
-export function collectText(node: ReactNode): string[] {
+/**
+ * Run a task for one of the widget's own click actions. A custom `clickAction`
+ * launches a headless task, and the handler redraws per step, so the caller
+ * gets every render in order.
+ */
+/** The themed half of a representation; the task always draws both layouts. */
+export type ThemedWidgets = { light: React.JSX.Element; dark: React.JSX.Element | null };
+
+export async function runWidgetClickTask(
+  handler: WidgetTaskHandler,
+  width: number,
+  clickAction: string
+): Promise<ThemedWidgets[]> {
+  const renders = await runTask(handler, width, { widgetAction: 'WIDGET_CLICK', clickAction });
+  return renders.flatMap(rendered =>
+    'light' in rendered ? [{ light: rendered.light, dark: rendered.dark }] : []
+  );
+}
+
+export function collectText(node: ReactNode | undefined): string[] {
   if (Array.isArray(node)) {
     return node.flatMap((child: ReactNode) => collectText(child));
   }

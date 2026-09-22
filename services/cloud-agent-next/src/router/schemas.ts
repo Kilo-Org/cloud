@@ -1,4 +1,8 @@
 import * as z from 'zod';
+import {
+  getKiloSandboxAllocation,
+  sandboxAllocationInputSchema,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import {
@@ -52,6 +56,15 @@ export {
 };
 
 export const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
+
+const ManagedSandboxAllocationInput = sandboxAllocationInputSchema.transform((request, ctx) => {
+  const allocation = getKiloSandboxAllocation(request);
+  if (allocation === undefined) {
+    ctx.addIssue({ code: 'custom', message: 'BYOC sandbox allocation is not available' });
+    return z.NEVER;
+  }
+  return allocation;
+});
 
 // Re-export types
 export type {
@@ -488,7 +501,6 @@ const PrepareSessionSharedFields = {
     .regex(/^[0-9a-f]{40}$/)
     .optional(),
 
-  // Optional configuration
   envVars: envVarsSchema.optional().describe('Environment variables to inject into the session'),
   encryptedSecrets: EncryptedSecretsSchema.optional().describe(
     'Encrypted secret env vars (from agent environment profiles). These are stored encrypted in the DO and decrypted only at execution time.'
@@ -531,12 +543,10 @@ const PrepareSessionSharedFields = {
     .optional()
     .describe('Custom text to append to the system prompt'),
 
-  // Callback configuration
   callbackTarget: CallbackTargetSchema.optional().describe(
     'Optional callback target configuration for execution completion notifications'
   ),
 
-  // Organization context
   kilocodeOrganizationId: z.string().uuid().optional().describe('Organization ID (UUID, optional)'),
 
   // Profile resolution — cloud-agent-next resolves the profile stack
@@ -578,10 +588,9 @@ const PrepareSessionSharedFields = {
     .describe(
       'When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes'
     ),
-  sandboxAllocation: z
-    .literal('isolated-standard')
-    .optional()
-    .describe('Allocate a dedicated Standard Cloudflare container for this session'),
+  sandboxAllocation: ManagedSandboxAllocationInput.optional().describe(
+    'Select a provider account and instance type instead of default routing'
+  ),
 };
 
 const PrepareSessionNonCloneVariant = z.object({
@@ -652,21 +661,18 @@ export const PrepareSessionInput = z
     path: ['githubRepo'],
   })
   .superRefine((data, ctx) => {
-    if (data.sandboxAllocation === 'isolated-standard' && data.devcontainer) {
+    if (data.sandboxAllocation !== undefined && data.devcontainer) {
       ctx.addIssue({
         code: 'custom',
         path: ['sandboxAllocation'],
-        message: 'Isolated Standard allocation cannot be combined with devcontainer',
+        message: 'Sandbox allocation cannot be combined with devcontainer',
       });
     }
-    if (
-      data.sandboxAllocation === 'isolated-standard' &&
-      data.createdOnPlatform === 'code-review'
-    ) {
+    if (data.sandboxAllocation !== undefined && data.createdOnPlatform === 'code-review') {
       ctx.addIssue({
         code: 'custom',
         path: ['sandboxAllocation'],
-        message: 'Isolated Standard allocation cannot be combined with code review',
+        message: 'Sandbox allocation cannot be combined with code review',
       });
     }
 
@@ -908,6 +914,10 @@ export const StartSessionInput = z
       .optional(),
     repository: RepositoryInputSchema,
     profile: ProfileInputSchema,
+    runtime: z
+      .object({ sandboxAllocation: ManagedSandboxAllocationInput.optional() })
+      .strict()
+      .optional(),
     options: z
       .object({
         kilocodeOrganizationId: z.string().uuid().optional(),
@@ -1101,7 +1111,6 @@ export const ExecutionStatusSchema = z
  * Explicitly excludes secrets (tokens, env var values, setup commands, MCP configs).
  */
 export const GetSessionOutput = z.object({
-  // Session identifiers
   sessionId: z.string().describe('Cloud-agent session ID'),
   kiloSessionId: z.string().optional().describe('Kilo CLI session ID'),
   userId: z.string().describe('Owner user ID'),
@@ -1111,12 +1120,28 @@ export const GetSessionOutput = z.object({
     .optional()
     .describe('Sandbox ID (hashed format like usr-abc123...) for correlating with Cloudflare logs'),
 
+  // Worktree ownership (present only for worktree sessions)
+  worktreeId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Worktree ID when this session belongs to a shared worktree'),
+  parentSessionId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Parent Kilo session ID for a grouped worktree session (null when no group)'),
+  cloudAgentSessionScopeId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Cloud-agent session scope ID for a grouped worktree session (null when no group)'),
+
   // Repository info (no tokens)
   githubRepo: z.string().optional().describe('GitHub repository in org/repo format'),
   gitUrl: z.string().optional().describe('Generic git URL'),
   platform: z.enum(['github', 'gitlab', 'bitbucket']).optional().describe('Git platform type'),
 
-  // Execution params
   prompt: z.string().optional().describe('Task prompt'),
   mode: z.string().optional().describe('Execution mode (built-in or custom slug)'),
   model: z.string().optional().describe('AI model'),
@@ -1140,7 +1165,6 @@ export const GetSessionOutput = z.object({
       'Custom agents available on this session (slug + name, plus optional model and thinking-effort overrides)'
     ),
 
-  // Execution status (grouped for cleaner API)
   execution: ExecutionStatusSchema,
 
   // Lifecycle timestamps (critical for idempotency)
@@ -1155,10 +1179,8 @@ export const GetSessionOutput = z.object({
   // to any user who can run a flow that creates a session on their behalf.
   // Use service-internal logs/storage if you need to inspect the target.
 
-  // Initial message ID for correlation
   initialMessageId: MessageIdSchema.optional(),
 
-  // Versioning
   timestamp: z.number().describe('Last update timestamp'),
   version: z.number().describe('Metadata version for cache invalidation'),
 

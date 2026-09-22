@@ -2,7 +2,6 @@ import * as z from 'zod';
 
 export const DEFAULT_VERCEL_PERCENTAGE = 50;
 export const DEFAULT_VERCEL_PERCENTAGE_FREE = 50;
-export const DEFAULT_PERPLEXITY_PERCENTAGE = 0;
 
 export const RoutingPercentageSchema = z.number().min(0).max(100).multipleOf(0.001);
 
@@ -14,7 +13,6 @@ export const GatewayConfigSchema = z.object({
   vercel_routing_percentage: RoutingPercentageSchema.nullable(),
   vercel_routing_percentage_free: RoutingPercentageSchema.nullable().default(null),
   vercel_routing_opt_out_models: z.array(z.string().min(1)).default([]),
-  perplexity_routing_percentage: RoutingPercentageSchema.nullable().default(null),
   updated_at: z.string().nullable(),
   updated_by: z.string().nullable(),
   updated_by_email: z.string().nullable(),
@@ -27,7 +25,6 @@ export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
   vercel_routing_percentage: null,
   vercel_routing_percentage_free: null,
   vercel_routing_opt_out_models: [],
-  perplexity_routing_percentage: null,
   updated_at: null,
   updated_by: null,
   updated_by_email: null,
@@ -49,7 +46,6 @@ export const GatewayRoutingConfigSchema = z.object({
   vercel_routing_percentage: RoutingPercentageSchema.nullable(),
   vercel_routing_percentage_free: RoutingPercentageSchema.nullable().default(null),
   vercel_routing_opt_out_models: z.array(z.string().min(1)).default([]),
-  perplexity_routing_percentage: RoutingPercentageSchema.nullable().default(null),
 });
 
 /** Schema for the admin set-mutation input. */
@@ -57,6 +53,5 @@ export const GatewayConfigInputSchema = z.object({
   vercel_routing_percentage: RoutingPercentageSchema.nullable(),
   vercel_routing_percentage_free: RoutingPercentageSchema.nullable(),
   vercel_routing_opt_out_models: z.array(z.string()),
-  perplexity_routing_percentage: RoutingPercentageSchema.nullable(),
   note: note.nullable(),
 });

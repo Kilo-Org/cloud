@@ -395,6 +395,71 @@ describe('runtime authorization', () => {
     ).rejects.toBeInstanceOf(RuntimeAuthorizationRevokedError);
   });
 
+  it.each([
+    'principal_missing',
+    'principal_blocked',
+    'pepper_changed',
+    'membership_missing',
+    'organization_deleted',
+    'membership_role_invalid',
+    'membership_changed',
+  ] as const)('reports only the fixed binding reason %s', async reason => {
+    const result = await createRuntimeAuthorization({
+      token: (await admission()).token,
+      secret,
+      connectionString: 'postgres://unused',
+      resourceKind: 'cloud-agent-next',
+      resourceId: 'session',
+      organizationId: 'org',
+      adapters: adapters(),
+    });
+    const onBindingRejected = vi.fn();
+    const failingAdapters: RuntimeAuthorizationAdapters = {
+      getPrincipal: async () =>
+        reason === 'principal_missing'
+          ? null
+          : {
+              id: 'user',
+              apiTokenPepper: reason === 'pepper_changed' ? 'private-new-pepper' : 'user-pepper',
+              blockedAt: null,
+              blockedReason: reason === 'principal_blocked' ? 'private-block-reason' : null,
+              isBot: false,
+            },
+      getMembership: async () =>
+        reason === 'membership_missing'
+          ? null
+          : {
+              id: reason === 'membership_changed' ? 'private-new-membership' : 'membership-user',
+              role: reason === 'membership_role_invalid' ? 'private-role' : 'admin',
+              organizationDeletedAt: reason === 'organization_deleted' ? '2026-01-01' : null,
+            },
+    };
+    await expect(
+      renewRuntimeAuthorization({
+        authorization: result.authorization,
+        secret,
+        connectionString: 'postgres://unused',
+        adapters: failingAdapters,
+        onBindingRejected,
+      })
+    ).rejects.toMatchObject({
+      name: 'RuntimeAuthorizationRevokedError',
+      message: 'Runtime authorization has been revoked',
+    });
+    expect(onBindingRejected.mock.calls).toEqual([[reason]]);
+    await expect(
+      renewRuntimeAuthorization({
+        authorization: result.authorization,
+        secret,
+        connectionString: 'postgres://unused',
+        adapters: failingAdapters,
+        onBindingRejected: () => {
+          throw new Error('private-logger-error');
+        },
+      })
+    ).rejects.toBeInstanceOf(RuntimeAuthorizationRevokedError);
+  });
+
   it('seals only the exact intended runtime record', async () => {
     const result = await createRuntimeAuthorization({
       token: (await admission({ audience: 'gastown' })).token,

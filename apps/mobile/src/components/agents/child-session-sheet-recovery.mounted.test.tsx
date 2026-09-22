@@ -1,6 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts the native tree without a DOM. */
+/* eslint-disable max-lines -- one mounted harness pins first-page, older-page, and runtime-error recovery together. */
 import { createElement, Fragment } from 'react';
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildProps,
@@ -26,12 +26,17 @@ import {
 import { type FlashListProps } from '@shopify/flash-list';
 import { type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { QueryError } from '@/components/query-error';
+import { performCopy } from '@/components/agents/use-message-copy';
 import { i18n } from '@/i18n';
 
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+vi.mock('@/components/agents/use-message-copy', () => ({
+  useMessageCopy: () => ({ copyMessage: vi.fn() }),
+  performCopy: vi.fn(),
+}));
 
 async function mountRecovery(messages = [makeAssistantMessage()]) {
   const fetchPage = vi
@@ -44,12 +49,15 @@ async function mountRecovery(messages = [makeAssistantMessage()]) {
       storage.upsertPart(message.info.id, part);
     }
   }
+  const childId = 'child-1' as KiloSessionId;
+  // Hydrate before rows land: with rows already in storage the manager treats
+  // the stream as the truth and keeps the load in-flight instead of storing
+  // the failure.
+  let pending = manager.hydrateChildSession(childId);
+  await pending;
   for (const message of messages) {
     receive(message);
   }
-  const childId = 'child-1' as KiloSessionId;
-  let pending = manager.hydrateChildSession(childId);
-  await pending;
   const props = {
     ...buildProps({
       getChildMessages: store.get(manager.atoms.childMessages),
@@ -100,9 +108,20 @@ async function mountRecovery(messages = [makeAssistantMessage()]) {
 }
 
 describe('ChildSessionSheet recovery', () => {
-  it('keeps rows, Retry, and the viewport through pending duplicates, another failure, and a deduplicated success', async () => {
-    const sheet = await mountRecovery();
-    const { renderer, fetchPage } = sheet;
+  it('keeps Retry through pending duplicates, drops the banner once streamed rows land, and recovers on a deduplicated reopen', async () => {
+    // Storage starts empty so the settled failures keep owning the outcome:
+    // with rows already in storage the manager drops the error instead.
+    const sheet = await mountRecovery([]);
+    const { renderer, fetchPage, manager } = sheet;
+    const failure = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
+    fetchPage.mockReturnValueOnce(failure.promise);
+    // Both presses arrive before React commits the disabled state.
+    await sheet.retry(2);
+
+    // A live child row lands while the retry is in flight: the banner and the
+    // busy Retry persist — the in-flight request still owns the outcome.
+    sheet.receive(makeAssistantMessage('m2', 'Live arrival'));
+    await sheet.sync();
     const list = host(renderer.root, 'FlashList');
     const button = retryButton(renderer.root);
     const listProps = list.props as FlashListProps<StoredMessage>;
@@ -120,47 +139,41 @@ describe('ChildSessionSheet recovery', () => {
       listProps.onScrollEndDrag?.(event);
       await vi.advanceTimersByTimeAsync(1000);
     });
-    const failure = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
-    fetchPage.mockReturnValueOnce(failure.promise);
-    // Both presses arrive before React commits the disabled state.
-    await sheet.retry(2);
-    expect(retryButton(renderer.root)).toBe(button);
-    expect(button.props.disabled).toBe(true);
     expect(button.props.accessibilityState).toEqual({ disabled: true, busy: true });
-    expect(textValues(renderer.root)).toContain('Connection failed. Please retry in a moment.');
-    sheet.receive(makeAssistantMessage('m2', 'Live arrival'));
-    await sheet.sync();
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
-    });
-    expect(button.props.accessibilityState).toEqual({ disabled: true, busy: true });
-    expect(textValues(list)).toEqual(['child text', 'Live arrival']);
-    expect(host(renderer.root, 'FlashList')).toBe(list);
+    expect(textValues(list)).toEqual(['Live arrival']);
     expect(viewport.offset).toBe(320);
+
     failure.reject(new Error('fetch failed'));
     await sheet.settle();
-    expect(textValues(renderer.root)).toContain('Connection lost. Please retry in a moment.');
-    expect(button.props.accessibilityState).toEqual({ disabled: false, busy: false });
+    // The landed rows are the truth: the settled failure must not resurface as
+    // "could not load" — the banner and Retry go away instead.
+    expect(textValues(renderer.root)).not.toContain('Connection lost. Please retry in a moment.');
+    expect(textValues(renderer.root)).not.toContain('Connection failed. Please retry in a moment.');
+    expect(renderer.root.findAllByType(QueryError)).toHaveLength(0);
+    expect(textValues(list)).toEqual(['Live arrival']);
     expect(host(renderer.root, 'FlashList')).toBe(list);
     expect(viewport.offset).toBe(320);
 
+    // Reopening the sheet re-issues the load; overlapping opens dedupe to one
+    // request and the recovered page lands above the live row.
     const success = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
     fetchPage.mockReturnValueOnce(success.promise);
-    await sheet.retry();
-    expect(retryButton(renderer.root)).toBe(button);
-    expect(button.props.accessibilityState).toEqual({ disabled: true, busy: true });
-    expect(textValues(renderer.root)).toContain('Connection lost. Please retry in a moment.');
+    const reopen = manager.hydrateChildSession('child-1' as KiloSessionId);
+    const duplicate = manager.hydrateChildSession('child-1' as KiloSessionId);
     success.resolve(
       historyPage([
         makeAssistantMessage('m0', 'Older history'),
         makeAssistantMessage('m1', 'Complete child text'),
       ])
     );
+    await reopen;
+    await duplicate;
     await sheet.settle();
     expect(textValues(list)).toEqual(['Older history', 'Complete child text', 'Live arrival']);
     expect(renderer.root.findAllByType(QueryError)).toHaveLength(0);
     expect(host(renderer.root, 'FlashList')).toBe(list);
     expect(viewport.offset).toBe(320);
+    expect(fetchPage).toHaveBeenCalledTimes(3);
   });
 
   it('allows dismissal during Retry without reopening on a late success', async () => {
@@ -221,7 +234,10 @@ describe('ChildSessionSheet recovery', () => {
     const list = host(renderer.root, 'FlashList');
     await sheet.sync({ sessionError: 'Runtime failure' });
     expect(textValues(renderer.root)).toEqual(
-      expect.arrayContaining(['Connection failed. Please retry in a moment.', 'Runtime failure'])
+      expect.arrayContaining([
+        i18n.t('agentChat.session.connectionTrouble'),
+        i18n.t('agentChat.messageFailure.assistantFailed'),
+      ])
     );
     sheet.fetchPage.mockResolvedValueOnce(historyPage([], 'older-cursor'));
     await sheet.retry();
@@ -233,13 +249,13 @@ describe('ChildSessionSheet recovery', () => {
     const older = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
     sheet.fetchPage.mockReturnValueOnce(older.promise);
     await sheet.retry();
-    expect(textValues(renderer.root)).toContain('Runtime failure');
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
     expect(textValues(renderer.root)).toContain(i18n.t('agentChat.olderMessages.couldNotLoad'));
     expect(renderer.root.findAllByType(QueryError)).toHaveLength(0);
     older.resolve(historyPage([makeAssistantMessage('m0', 'Older recovered row')]));
     await sheet.settle();
     expect(textValues(list)).toEqual(['Older recovered row', 'child text']);
-    expect(textValues(renderer.root)).toContain('Runtime failure');
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
     expect(textValues(renderer.root)).not.toContain('Retry');
     expect(host(renderer.root, 'FlashList')).toBe(list);
   });
@@ -264,7 +280,7 @@ describe('ChildSessionSheet recovery', () => {
   it('preserves uncached Retry, loading, confirmed empty history, and later live content', async () => {
     const sheet = await mountRecovery([]);
     expect(textValues(sheet.renderer.root)).toContain(
-      'Connection failed. Please retry in a moment.'
+      i18n.t('agentChat.session.connectionTrouble')
     );
     expect(retryButton(sheet.renderer.root).props.disabled).toBe(false);
     const pending = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
@@ -292,7 +308,33 @@ describe('ChildSessionSheet recovery', () => {
       ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
       sessionError: 'Runtime failure',
     });
-    expect(textValues(renderer.root)).toContain('Runtime failure');
+    // The sheet's own failure screen (child-session-sheet.tsx) is not the
+    // transcript status slot, so it resolves the runtime failure through
+    // `describeSessionRuntimeFailure`: an unrecognized failure is the
+    // assistant-failure line, never the page-load fallback.
+    expect(textValues(renderer.root)).toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
+    expect(textValues(renderer.root)).not.toContain(
+      i18n.t('agentChat.session.failedToLoadDetails')
+    );
     expect(textValues(renderer.root)).not.toContain('Retry');
+  });
+
+  it('copies the untranslated runtime failure from the full-screen child error', async () => {
+    const renderer = await renderSheet({
+      ...buildProps({ getChildMessages: () => [], hydrationState: readyState }),
+      sessionError: 'Runtime failure',
+    });
+    const copy = renderer.root.find(
+      node =>
+        (node.type as string) === 'Pressable' &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.copyErrorDetails')
+    );
+    await act(async () => {
+      (copy.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(performCopy).toHaveBeenCalledWith(
+      'child-1\nSubagent session failed\nThe response failed.\nRuntime failure'
+    );
   });
 });

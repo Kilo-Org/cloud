@@ -1,6 +1,6 @@
 import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
-  SANDBOX_CONTROL_OPERATION_LIMIT,
+  SANDBOX_CONTROL_FORWARD_OPERATION_LIMIT,
 } from '../shared/sandbox-control-protocol.js';
 
 const MAX_SESSION_FORWARD_BYTES = 4 * MAX_SANDBOX_CONTROL_FRAME_BYTES;
@@ -40,7 +40,12 @@ export type SessionForwarding = {
 };
 
 export function createSessionForwarding(): SessionForwarding {
-  const chains = new Map<string, Promise<void>>();
+  type Chain = {
+    tail: Promise<void>;
+    active: number;
+    detached: boolean;
+  };
+  const chains = new Map<string, Chain>();
   const stats: SessionForwardingStats = {
     waiting: 0,
     inFlight: 0,
@@ -48,15 +53,31 @@ export function createSessionForwarding(): SessionForwarding {
     highWater: 0,
   };
 
+  const cleanup = (sessionId: string, chain: Chain): void => {
+    if (chain.active === 0 && chain.detached && chains.get(sessionId) === chain)
+      chains.delete(sessionId);
+  };
+
   const enqueue = <T>(sessionId: string, forward: () => Promise<T>): Promise<T> => {
-    const previous = chains.get(sessionId) ?? Promise.resolve();
+    const chain =
+      chains.get(sessionId) ??
+      (() => {
+        const created: Chain = { tail: Promise.resolve(), active: 0, detached: false };
+        chains.set(sessionId, created);
+        return created;
+      })();
+    chain.active++;
+    const previous = chain.tail;
     const next = previous.catch(() => undefined).then(forward);
-    chains.set(
-      sessionId,
-      next.then(
-        () => undefined,
-        () => undefined
-      )
+    chain.tail = next.then(
+      () => {
+        chain.active--;
+        cleanup(sessionId, chain);
+      },
+      () => {
+        chain.active--;
+        cleanup(sessionId, chain);
+      }
     );
     return next;
   };
@@ -67,7 +88,7 @@ export function createSessionForwarding(): SessionForwarding {
       if (input.bytes > MAX_SANDBOX_CONTROL_FRAME_BYTES)
         return Promise.reject(new SessionForwardingError('Forwarded frame is too large', false));
       if (
-        stats.waiting + stats.inFlight >= SANDBOX_CONTROL_OPERATION_LIMIT ||
+        stats.waiting + stats.inFlight >= SANDBOX_CONTROL_FORWARD_OPERATION_LIMIT ||
         stats.bufferedBytes + input.bytes > MAX_SESSION_FORWARD_BYTES
       )
         return Promise.reject(
@@ -101,8 +122,15 @@ export function createSessionForwarding(): SessionForwarding {
       });
     },
     stats: () => ({ ...stats }),
-    get: sessionId => chains.get(sessionId),
-    values: () => chains.values(),
-    delete: sessionId => chains.delete(sessionId),
+    get: sessionId => chains.get(sessionId)?.tail,
+    values: function* () {
+      for (const chain of chains.values()) yield chain.tail;
+    },
+    delete: sessionId => {
+      const chain = chains.get(sessionId);
+      if (!chain) return;
+      chain.detached = true;
+      cleanup(sessionId, chain);
+    },
   };
 }

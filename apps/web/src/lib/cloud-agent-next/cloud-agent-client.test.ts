@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type * as TrpcClientModule from '@trpc/client';
 import type * as CloudAgentClientModule from './cloud-agent-client';
+import {
+  getSandboxAllocationRequest,
+  type SandboxAllocationInput,
+  type SandboxSelectionCapabilities,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import type {
   ComputeBillingStatus,
   CreateWorktreeChatInput,
@@ -101,6 +106,80 @@ const realCloudAgentClientModule =
   jest.requireActual<typeof CloudAgentClientModule>('./cloud-agent-client');
 const { closeCloudAgentOrgStreams, CloudAgentNextClient, createAppBuilderCloudAgentNextClient } =
   realCloudAgentClientModule;
+
+describe('CloudAgentNextClient review message results', () => {
+  const input = {
+    cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    messageId: 'msg_123456789abc123456789ABCDE',
+  };
+  const query = jest.fn<(request: typeof input) => Promise<unknown>>();
+
+  beforeEach(() => {
+    query.mockReset();
+    mockCreateTRPCClient.mockReturnValueOnce({ getMessageResult: { query } });
+  });
+
+  it('returns only admission metadata without assistant text or diagnostics', async () => {
+    query.mockResolvedValue({
+      ...input,
+      status: 'failed',
+      acceptedAt: 1,
+      terminalAt: 2,
+      failure: { message: 'private diagnostic' },
+      assistant: { text: 'source code' },
+    });
+    await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toEqual({
+      ...input,
+      status: 'failed',
+      acceptedAt: 1,
+    });
+    expect(query).toHaveBeenCalledWith(input);
+  });
+
+  it('distinguishes the exact message-not-found response from missing sessions', async () => {
+    query.mockRejectedValueOnce(
+      new TRPCClientError('Message not found', {
+        result: {
+          error: {
+            message: 'Message not found',
+            code: -32004,
+            data: { code: 'NOT_FOUND', httpStatus: 404 },
+          },
+        },
+      })
+    );
+    await expect(new CloudAgentNextClient('token').getMessageResult(input)).resolves.toBeNull();
+  });
+
+  it.each(['Session not found', 'Access denied'])(
+    'does not interpret %s as permission to retry',
+    async message => {
+      const failure = new TRPCClientError(message, {
+        result: {
+          error: { message, code: -32004, data: { code: 'NOT_FOUND', httpStatus: 404 } },
+        },
+      });
+      query.mockRejectedValueOnce(failure);
+      const thrown = await new CloudAgentNextClient('token').getMessageResult(input).then(
+        () => undefined,
+        (error: unknown) => error
+      );
+      expect(thrown).toMatchObject({ message: 'Message result unavailable' });
+      expect((thrown as { cause?: unknown }).cause).toBe(failure);
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        failure,
+        expect.objectContaining({
+          tags: { source: 'cloud-agent-next-client', endpoint: 'getMessageResult' },
+        })
+      );
+    }
+  );
+
+  it('rejects unrecognized lifecycle state instead of confirming admission', async () => {
+    query.mockResolvedValue({ ...input, status: 'not-admitted' });
+    await expect(new CloudAgentNextClient('token').getMessageResult(input)).rejects.toThrow();
+  });
+});
 
 describe('CloudAgentNextClient worktree changes', () => {
   const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
@@ -410,6 +489,143 @@ describe('createAppBuilderCloudAgentNextClient', () => {
     expect(initiateFromKilocodeSessionV2).toHaveBeenCalledWith({ cloudAgentSessionId });
     expect(sendMessageV2).toHaveBeenCalledTimes(1);
   });
+});
+
+describe('CloudAgentNextClient sandbox selection', () => {
+  const kilocodeOrganizationId = '9a283301-b75d-4375-a1ba-e319a02e18b7';
+
+  it('forwards personal capability discovery without an organization', async () => {
+    const query = jest
+      .fn<CloudAgentClientModule.CloudAgentNextClient['getSandboxSelectionOptions']>()
+      .mockResolvedValue({ enabled: true, options: [] });
+    mockCreateTRPCClient.mockReturnValueOnce({ getSandboxSelectionOptions: { query } });
+
+    await expect(
+      new CloudAgentNextClient('auth-token').getSandboxSelectionOptions({})
+    ).resolves.toEqual({ enabled: true, options: [] });
+    expect(query).toHaveBeenCalledWith({});
+  });
+
+  it.each([undefined, false, true])(
+    'forwards optional devcontainer context: %j',
+    async devcontainer => {
+      const input = {
+        kilocodeOrganizationId,
+        ...(devcontainer !== undefined ? { devcontainer } : {}),
+      };
+      const capabilities: SandboxSelectionCapabilities = {
+        enabled: true,
+        defaultDestination: {
+          provider: { id: 'vercel', account: 'kilo' },
+          instanceType: 'default',
+        },
+        options: [
+          { allocation: getSandboxAllocationRequest('vercel-large') },
+          {
+            allocation: { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' },
+          },
+        ],
+      };
+      const query = jest
+        .fn<CloudAgentClientModule.CloudAgentNextClient['getSandboxSelectionOptions']>()
+        .mockResolvedValue(capabilities);
+      mockCreateTRPCClient.mockReturnValueOnce({ getSandboxSelectionOptions: { query } });
+
+      await expect(
+        new CloudAgentNextClient('auth-token').getSandboxSelectionOptions(input)
+      ).resolves.toEqual(capabilities);
+      expect(query).toHaveBeenCalledWith(input);
+    }
+  );
+
+  it('normalizes older capabilities without inventing a default destination', async () => {
+    mockCreateTRPCClient.mockReturnValueOnce({
+      getSandboxSelectionOptions: {
+        query: jest.fn(async () => ({
+          enabled: true,
+          options: [{ allocation: 'cloudflare-single', available: true }],
+        })),
+      },
+    });
+    await expect(
+      new CloudAgentNextClient('auth-token').getSandboxSelectionOptions({ kilocodeOrganizationId })
+    ).resolves.toEqual({
+      enabled: true,
+      options: [{ allocation: getSandboxAllocationRequest('cloudflare-single') }],
+    });
+  });
+
+  it('does not turn capability failure into an available default', async () => {
+    const error = new Error('Worker unavailable');
+    mockCreateTRPCClient.mockReturnValueOnce({
+      getSandboxSelectionOptions: {
+        query: jest.fn(async () => {
+          throw error;
+        }),
+      },
+    });
+    await expect(
+      new CloudAgentNextClient('auth-token').getSandboxSelectionOptions({ kilocodeOrganizationId })
+    ).rejects.toBe(error);
+  });
+
+  it('rejects invalid capability descriptors', async () => {
+    mockCreateTRPCClient.mockReturnValueOnce({
+      getSandboxSelectionOptions: {
+        query: jest.fn(async () => ({
+          enabled: true,
+          options: [
+            {
+              allocation: {
+                provider: { id: 'cloudflare', account: 'byoc' },
+                instanceType: 'single',
+              },
+            },
+          ],
+        })),
+      },
+    });
+    await expect(
+      new CloudAgentNextClient('auth-token').getSandboxSelectionOptions({ kilocodeOrganizationId })
+    ).rejects.toThrow();
+  });
+
+  it.each([
+    undefined,
+    'isolated-standard',
+    'vercel-small',
+    getSandboxAllocationRequest('cloudflare-shared'),
+    getSandboxAllocationRequest('vercel-large'),
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' },
+  ] satisfies Array<SandboxAllocationInput | undefined>)(
+    'forwards the prepare wire allocation unchanged: %j',
+    async sandboxAllocation => {
+      const input: PrepareSessionInput = {
+        kilocodeOrganizationId,
+        githubRepo: 'acme/repo',
+        prompt: 'Build the feature',
+        mode: 'code',
+        model: 'kilo/test-model',
+        operationKey: '12345678-1234-4234-9234-123456789abc',
+        autoInitiate: true,
+        ...(sandboxAllocation ? { sandboxAllocation } : {}),
+      };
+      const output = {
+        kiloSessionId: 'ses_12345678901234567890123456',
+        cloudAgentSessionId: 'agent_123',
+        replayed: true,
+      };
+      const mutate = jest
+        .fn<CloudAgentClientModule.CloudAgentNextClient['prepareSession']>()
+        .mockResolvedValue(output);
+      mockCreateTRPCClient.mockReturnValueOnce({ prepareSession: { mutate } });
+
+      await expect(new CloudAgentNextClient('auth-token').prepareSession(input)).resolves.toEqual(
+        output
+      );
+      expect(mutate).toHaveBeenCalledWith(input);
+    }
+  );
 });
 
 describe('CloudAgentNextClient sensitive error reporting', () => {
@@ -959,6 +1175,33 @@ describe('CloudAgentNextClient.getSandboxStatus', () => {
       message: 'Session not found or access denied',
       cause: undefined,
     });
+  });
+});
+
+describe('CloudAgentNextClient.getPendingInteractions', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const query = jest.fn<(input: { cloudAgentSessionId: string }) => Promise<unknown>>();
+  const { CloudAgentNextClient } =
+    jest.requireActual<typeof CloudAgentClientModule>('./cloud-agent-client');
+  let client: InstanceType<typeof CloudAgentNextClient>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    query.mockReset();
+    jest.mocked(createTRPCClient).mockReturnValue({ getPendingInteractions: { query } } as never);
+    client = new CloudAgentNextClient('test-token');
+  });
+
+  it('calls the Worker procedure and unwraps the pending interactions it returns', async () => {
+    const pending = {
+      questions: [{ id: 'q_1', sessionID: 'ses_root' }],
+      permissions: [{ id: 'perm_1', sessionID: 'ses_root' }],
+    };
+    query.mockResolvedValue(pending);
+
+    await expect(client.getPendingInteractions(cloudAgentSessionId)).resolves.toEqual(pending);
+    expect(query).toHaveBeenCalledWith({ cloudAgentSessionId });
+    expect(captureException).not.toHaveBeenCalled();
   });
 });
 

@@ -14,6 +14,11 @@
 // comment id; the user actions target the author's GitHub login.
 // User actions are hidden when the author is null (deleted account)
 // and disabled when the author is the viewer (self-target).
+//
+// The trailing group beside that menu is the "Fix with Kilo" CTA
+// (`PrCommentFixWithKilo`): it opens the new-session composer prefilled
+// with this comment's link, scoped to the provider surface the row is on,
+// and renders nothing when the comment has no addressable URL.
 
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -24,10 +29,13 @@ import { MarkdownText } from '@/components/agents/markdown-text';
 import { MoreHorizontal } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
+import { PrCommentFixWithKilo } from '@/components/pr-review/discussion/pr-comment-fix-with-kilo';
 import { ReactionsRow } from '@/components/pr-review/discussion/reactions-row';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { COMMENT_ACTIONS_HIT_SLOP } from '@/lib/pr-review/comment-trailing-controls';
+import { type PrCommentKind } from '@/lib/pr-review/fix-with-kilo';
 import {
   type ReviewComment,
   type ReviewReactionContent,
@@ -41,8 +49,21 @@ import { Alert, Pressable, View } from 'react-native';
 type CommentRowProps = {
   readonly comment: ReviewComment;
   readonly onToggleReaction: (content: ReviewReactionContent) => void;
+  /** The provider surface the row is on, for the Fix with Kilo CTA's link. */
+  readonly owner: string;
+  readonly repo: string;
+  readonly number: number;
+  /** Where this row's comment lives on the provider's page (s1 anchor). */
+  readonly commentKind: PrCommentKind;
   readonly reactionsDisabled?: boolean;
   readonly readOnly?: boolean;
+  /**
+   * The `capabilities.reactions.supported` flag (s6). False renders NO
+   * reactions row at all — the provider has no reaction affordance to
+   * offer, so the row shows nothing instead of an empty or failing one.
+   * Defaults to true, so the GitHub call sites are unchanged.
+   */
+  readonly reactionsSupported?: boolean;
   /** The viewer's GitHub login, used to disable self-target moderation. */
   readonly viewerLogin?: string | null;
 };
@@ -94,8 +115,13 @@ function showModerationFailure(action: ModerationAction, error: unknown, retry: 
 export function CommentRow({
   comment,
   onToggleReaction,
+  owner,
+  repo,
+  number,
+  commentKind,
   reactionsDisabled,
   readOnly,
+  reactionsSupported = true,
   viewerLogin = null,
 }: Readonly<CommentRowProps>) {
   const authorName = selectCommentAuthorName(comment.author);
@@ -235,34 +261,59 @@ export function CommentRow({
             className="size-6 rounded-full"
             transition={0}
             cachePolicy="memory"
+            recyclingKey={comment.author.avatarUrl}
             accessibilityIgnoresInvertColors
           />
         ) : (
           <View className="size-6 rounded-full bg-muted" />
         )}
-        <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+        <Text className="flex-1 text-sm font-medium text-foreground" numberOfLines={1}>
           {authorName}
         </Text>
         <Text variant="muted" className="text-xs">
           {relative}
         </Text>
-        <Pressable
-          onPress={openOverflow}
-          accessibilityRole="button"
-          accessibilityLabel={t('prReview.discussion.commentActions')}
-          hitSlop={8}
-          className="ml-auto h-7 w-7 items-center justify-center rounded-full active:bg-muted"
-        >
-          <MoreHorizontal size={16} color={colors.mutedForeground} />
-        </Pressable>
+        {/* `gap-3` (10.5pt at NativeWind's 14pt rem) exceeds the pill's 2pt
+            right hitSlop plus the overflow's 3pt left slop, leaving
+            commentTrailingControlsClearanceDp() dp between the two tap areas,
+            so a tap anywhere on the pill — including its right edge — opens the
+            session and never the moderation sheet (vr1). See
+            comment-trailing-controls.ts. */}
+        <View className="ml-auto flex-row items-center gap-3">
+          <PrCommentFixWithKilo
+            owner={owner}
+            repo={repo}
+            number={number}
+            commentId={comment.commentId}
+            kind={commentKind}
+          />
+          <Pressable
+            onPress={openOverflow}
+            accessibilityRole="button"
+            accessibilityLabel={t('prReview.discussion.commentActions')}
+            hitSlop={COMMENT_ACTIONS_HIT_SLOP}
+            // The frame, not the 16pt glyph, is what the size audit measures.
+            // The author row holds the whole frame (no negative margin: RN
+            // stops delivering touches outside the parent, so a shrunk layout
+            // box would leave part of the target dead). The visible circle
+            // stays compact at 28pt.
+            className="h-11 w-11 items-center justify-center rounded-full active:bg-muted"
+          >
+            <View className="h-[28px] w-[28px] items-center justify-center">
+              <MoreHorizontal size={16} color={colors.mutedForeground} />
+            </View>
+          </Pressable>
+        </View>
       </View>
       <MarkdownText value={comment.bodyMarkdown} selectable={false} />
-      <ReactionsRow
-        reactions={comment.reactions}
-        onToggle={onToggleReaction}
-        disabled={reactionsDisabled}
-        readOnly={readOnly}
-      />
+      {reactionsSupported ? (
+        <ReactionsRow
+          reactions={comment.reactions}
+          onToggle={onToggleReaction}
+          disabled={reactionsDisabled}
+          readOnly={readOnly}
+        />
+      ) : null}
     </View>
   );
 }

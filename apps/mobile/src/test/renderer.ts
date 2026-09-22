@@ -1,0 +1,324 @@
+import { createElement, type ElementType, type ReactElement } from 'react';
+import { createRoot, type Fiber, type JsonElement, type Root } from 'test-renderer';
+
+import { act } from './renderer-act';
+export { act } from './renderer-act';
+
+// Rendering and scheduling belong to the maintained renderer used by RNTL 14.
+// The existing contract tests also inspect provider/component props and identity.
+// Keep those assertions via its documented Fiber escape hatch, not a second
+// reconciler or the deprecated react-test-renderer package.
+type FindOptions = { deep?: boolean };
+type Predicate = (node: Instance) => boolean;
+
+type Instance = {
+  type: ElementType;
+  props: JsonElement['props'];
+  parent: Instance | null;
+  children: (Instance | string)[];
+  find: (predicate: Predicate) => Instance;
+  findAll: (predicate: Predicate, options?: FindOptions) => Instance[];
+  findByType: (type: ElementType | string) => Instance;
+  findAllByType: (type: ElementType | string, options?: FindOptions) => Instance[];
+  findByProps: (props: Record<string, unknown>) => Instance;
+  findAllByProps: (props: Record<string, unknown>, options?: FindOptions) => Instance[];
+};
+
+type Renderer = {
+  root: Instance;
+  update: (element: ReactElement) => void;
+  unmount: () => void;
+  toJSON: () => JsonElement | JsonElement[] | null;
+};
+
+export type { Instance as ReactTestInstance, Renderer as ReactTestRenderer };
+
+function only(nodes: Instance[]): Instance {
+  const node = nodes[0];
+  if (nodes.length !== 1 || !node) {
+    throw new Error(`Expected one matching instance, received ${nodes.length}`);
+  }
+  return node;
+}
+
+function matchesProps(node: Instance, props: Record<string, unknown>): boolean {
+  return Object.entries(props).every(([key, value]) => node.props[key] === value);
+}
+
+type FiberTree = {
+  get: () => Instance;
+  clear: () => void;
+};
+
+/** A fiber and the alternate tree's twin, the pair the slow path walks. */
+type FiberPair = { a: Fiber; b: Fiber };
+
+/** Which of the pair a child list holds, if either. */
+function childSide(child: Fiber | null, a: Fiber, b: Fiber): 'a' | 'b' | null {
+  for (let node = child; node; node = node.sibling) {
+    if (node === a) {
+      return 'a';
+    }
+    if (node === b) {
+      return 'b';
+    }
+  }
+  return null;
+}
+
+function containsChild(child: Fiber | null, target: Fiber): boolean {
+  for (let node = child; node; node = node.sibling) {
+    if (node === target) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The pair order after both `return` chains converge: the child list holding the
+ * fiber decides, and `parentB`'s list swaps the pair. `null` means neither list
+ * holds either fiber.
+ */
+function alignFiberSides(
+  pair: FiberPair,
+  parentA: Fiber,
+  parentB: Fiber
+): 'same' | 'swapped' | null {
+  if (containsChild(parentA.child, pair.a) || containsChild(parentB.child, pair.b)) {
+    return 'same';
+  }
+  if (containsChild(parentA.child, pair.b) || containsChild(parentB.child, pair.a)) {
+    return 'swapped';
+  }
+  return null;
+}
+
+/** The tree whose root `stateNode.current` names is the current one. */
+function rootSide(root: Fiber, fiber: Fiber, alternate: Fiber): Fiber {
+  if (root.tag !== 3) {
+    return fiber;
+  }
+  const state = root.stateNode as { current?: Fiber } | null;
+  return state?.current === root ? fiber : alternate;
+}
+
+type WalkStep = { next: FiberPair } | { resolved: Fiber };
+
+/** One step of the slow path: the pair to walk next, or the resolved fiber. */
+function walkStep(pair: FiberPair, fiber: Fiber, alternate: Fiber): WalkStep {
+  const parentA = pair.a.return;
+  if (parentA === null) {
+    return { resolved: rootSide(pair.a, fiber, alternate) };
+  }
+  const parentB = parentA.alternate;
+  if (parentB === null) {
+    const next = parentA.return;
+    return next === null
+      ? { resolved: rootSide(pair.a, fiber, alternate) }
+      : { next: { a: next, b: next } };
+  }
+  if (parentA.child === parentB.child) {
+    return { resolved: childSide(parentA.child, pair.a, pair.b) === 'b' ? alternate : fiber };
+  }
+  if (pair.a.return !== pair.b.return) {
+    return { next: { a: parentA, b: parentB } };
+  }
+  const side = alignFiberSides(pair, parentA, parentB);
+  if (side === null) {
+    return { resolved: fiber };
+  }
+  return { next: side === 'same' ? { a: parentA, b: parentB } : { a: parentB, b: parentA } };
+}
+
+/**
+ * Resolve a cached fiber to its partner in the current tree.
+ *
+ * Every `Instance` getter reads through the fiber captured when the instance was
+ * wrapped, but React alternates two fiber trees across commits, so after a commit
+ * the captured fiber may belong to the previous tree. The renderer used to walk
+ * the whole tree into a `Set` on every property read to answer this, which made
+ * `findAll` quadratic: the 400-line fence suites spent seconds walking thousands
+ * of fibers and timed out on a loaded host. React's own slow path
+ * (`findCurrentFiberUsingSlowPath` in `react-reconciler`) answers the same
+ * question by walking only the two `return` chains until they converge; the tree
+ * whose root `stateNode.current` names is the current one. Ported here so reading
+ * a deep tree costs a walk per fiber, not a tree scan per property.
+ */
+function findCurrentFiber(fiber: Fiber): Fiber {
+  const alternate = fiber.alternate;
+  if (!alternate) {
+    return fiber;
+  }
+  let pair: FiberPair = { a: fiber, b: alternate };
+  for (;;) {
+    const step = walkStep(pair, fiber, alternate);
+    if ('resolved' in step) {
+      return step.resolved;
+    }
+    pair = step.next;
+  }
+}
+
+function createTree(root: Root): FiberTree {
+  const cache = new WeakMap<Fiber, Instance>();
+  let rootState: { current: Fiber } | undefined = undefined;
+
+  function wrap(fiber: Fiber): Instance {
+    const cached = cache.get(fiber) ?? (fiber.alternate && cache.get(fiber.alternate));
+    if (cached) {
+      return cached;
+    }
+    const current = () => findCurrentFiber(fiber);
+    const node: Instance = {
+      get type() {
+        return current().type as ElementType;
+      },
+      get props() {
+        return current().memoizedProps ?? {};
+      },
+      get parent() {
+        let parent = current().return;
+        if (parent?.type === 'TestRoot') {
+          return null;
+        }
+        while (parent && !parent.type) {
+          parent = parent.return;
+        }
+        return parent ? wrap(parent) : null;
+      },
+      get children() {
+        const active = current();
+        return children(active.tag === 3 ? (active.child?.child ?? null) : active.child);
+      },
+      find: predicate => only(node.findAll(predicate, { deep: false })),
+      findAll: (predicate, options) => {
+        const matched = predicate(node);
+        if (matched && options?.deep === false) {
+          return [node];
+        }
+        return [
+          ...(matched ? [node] : []),
+          ...node.children.flatMap(child =>
+            typeof child === 'string' ? [] : child.findAll(predicate, options)
+          ),
+        ];
+      },
+      findByType: type => only(node.findAllByType(type, { deep: false })),
+      findAllByType: (type, options) => node.findAll(child => child.type === type, options),
+      findByProps: props => only(node.findAllByProps(props, { deep: false })),
+      findAllByProps: (props, options) =>
+        node.findAll(child => matchesProps(child, props), options),
+    };
+    cache.set(fiber, node);
+    return node;
+  }
+
+  function children(first: Fiber | null): (Instance | string)[] {
+    const result: (Instance | string)[] = [];
+    for (let child = first; child; child = child.sibling) {
+      if (child.tag === 6) {
+        result.push(child.memoizedProps as string);
+      } else if (child.type && child.tag !== 10) {
+        result.push(wrap(child));
+      } else {
+        result.push(...children(child.child));
+      }
+    }
+    return result;
+  }
+
+  return {
+    get: () => {
+      const host = root.container.queryAll(() => true)[0];
+      let fiber = host?.unstable_fiber;
+      if (!fiber) {
+        throw new Error('No mounted host instance');
+      }
+      while (fiber.return) {
+        fiber = fiber.return;
+      }
+      rootState = fiber.stateNode as { current: Fiber };
+      const tree = rootState.current;
+      const nodes = children(tree.child?.child ?? null);
+      const first = nodes[0];
+      if (nodes.length === 1 && first && typeof first !== 'string') {
+        return first;
+      }
+      return wrap(tree);
+    },
+    // Release the root fiber the renderer held. Without this the renderer,
+    // while still held, keeps the whole unmounted tree alive.
+    clear: () => {
+      rootState = undefined;
+    },
+  };
+}
+
+// react-test-renderer's default `createNodeMock` handed `null` to a ref on a
+// host element, so an imperative call made through a host ref (a component that
+// keeps a ref to a host `TextInput` and calls `clear()` on it) was a no-op. The
+// maintained renderer exposes its host node to the ref instead. Keep the old
+// no-op contract by giving that node the TextInput imperative surface as inert
+// methods, so those components keep working without a per-test ref mock.
+const HOST_REF_INERT_METHODS: Record<string, (...args: unknown[]) => unknown> = {
+  blur: () => undefined,
+  clear: () => undefined,
+  focus: () => undefined,
+  getNativeRef: () => undefined,
+  getScrollableNode: () => undefined,
+  isFocused: () => false,
+  measure: () => undefined,
+  measureInWindow: () => undefined,
+  measureLayout: () => undefined,
+  setNativeProps: () => undefined,
+  setSelection: () => undefined,
+};
+
+function applyHostRefParity(container: object): void {
+  const prototype = Object.getPrototypeOf(container) as Record<string, unknown>;
+  for (const [name, method] of Object.entries(HOST_REF_INERT_METHODS)) {
+    if (!(name in prototype)) {
+      Object.defineProperty(prototype, name, { value: method, configurable: true, writable: true });
+    }
+  }
+}
+
+function create(element: ReactElement): Renderer {
+  const root = createRoot();
+  applyHostRefParity(root.container);
+  const tree = createTree(root);
+  // A host anchor exposes the Fiber tree even when the component renders null.
+  // It is excluded from queries and serialized output.
+  const update = (next: ReactElement) => {
+    root.render(createElement('TestRoot', null, next));
+  };
+  update(element);
+  return {
+    get root() {
+      return tree.get();
+    },
+    update,
+    unmount: () => {
+      act(() => {
+        root.unmount();
+      });
+      tree.clear();
+    },
+    toJSON: () => {
+      const anchor = root.container.children[0];
+      const children =
+        anchor && typeof anchor !== 'string' ? (anchor.toJSON()?.children ?? []) : [];
+      const elements = children.filter(child => typeof child !== 'string');
+      return elements.length <= 1 ? (elements[0] ?? null) : elements;
+    },
+  };
+}
+
+export const TestRenderer = { create, act };
+
+export namespace TestRenderer {
+  export type ReactTestInstance = Instance;
+  export type ReactTestRenderer = Renderer;
+  export type ReactTestRendererJSON = JsonElement;
+}

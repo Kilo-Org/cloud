@@ -48,7 +48,7 @@ export async function getUserByokProviderIds(
     .from(byok_api_keys)
     .where(and(eq(byok_api_keys.kilo_user_id, userId), eq(byok_api_keys.is_enabled, true)));
 
-  return rows.map(row => UserByokProviderIdSchema.parse(row.provider_id));
+  return parseUserByokProviderIds(rows);
 }
 
 export async function getOrganizationByokProviderIds(
@@ -62,7 +62,14 @@ export async function getOrganizationByokProviderIds(
       and(eq(byok_api_keys.organization_id, organizationId), eq(byok_api_keys.is_enabled, true))
     );
 
-  return rows.map(row => UserByokProviderIdSchema.parse(row.provider_id));
+  return parseUserByokProviderIds(rows);
+}
+
+function parseUserByokProviderIds(rows: { provider_id: string }[]): UserByokProviderId[] {
+  return rows.flatMap(row => {
+    const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
+    return providerId.success ? [providerId.data] : [];
+  });
 }
 
 export async function addUserByokAvailability(

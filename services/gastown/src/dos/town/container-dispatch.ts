@@ -163,7 +163,6 @@ export async function ensureContainerToken(
   const token = signContainerJWT({ townId, userId }, jwtSecret);
   const container = getTownContainerStub(env, townId);
 
-  // Store for next boot
   try {
     await container.setEnvVar('GASTOWN_CONTAINER_TOKEN', token);
     await container.setEnvVar('GASTOWN_TOWN_ID', townId);
@@ -174,7 +173,6 @@ export async function ensureContainerToken(
     );
   }
 
-  // Push to running process so existing agents pick up the fresh token.
   // Throw on non-2xx so the alarm's throttle doesn't advance on failure.
   try {
     const resp = await container.fetch('http://container/refresh-token', {
@@ -415,9 +413,6 @@ export async function startAgentInContainer(
     `${TOWN_LOG} startAgentInContainer: agentId=${params.agentId} role=${params.role} name=${params.agentName}`
   );
   try {
-    // Mint a container-scoped JWT (8h expiry, refreshed by TownDO alarm).
-    // One token per container — shared by all agents in the town.
-    // Carries { townId, userId, scope: 'container' }.
     const containerToken = await ensureContainerToken(env, params.townId, params.userId);
 
     // Also mint a per-agent JWT as fallback during rollout.
@@ -436,7 +431,6 @@ export async function startAgentInContainer(
       return { started: false, containerFetchMs: 0 };
     }
 
-    // Build env vars from town config
     const envVars: Record<string, string> = { ...(params.townConfig.env_vars ?? {}) };
 
     // Map git_auth tokens. Resolve GitHub token through resolveGitHubTokenString so
@@ -467,7 +461,6 @@ export async function startAgentInContainer(
       envVars.GITHUB_CLI_PAT = params.townConfig.github_cli_pat;
     }
 
-    // Custom git commit identity
     if (params.townConfig.git_author_name) {
       envVars.GASTOWN_GIT_AUTHOR_NAME = params.townConfig.git_author_name;
     }
@@ -482,7 +475,6 @@ export async function startAgentInContainer(
     // Legacy per-agent JWT kept as fallback during rollout.
     if (containerToken) envVars.GASTOWN_CONTAINER_TOKEN = containerToken;
     if (agentToken) envVars.GASTOWN_SESSION_TOKEN = agentToken;
-    // kilocodeToken: prefer rig-level, fall back to town config
     const kilocodeToken = params.kilocodeToken ?? params.townConfig.kilocode_token;
     if (kilocodeToken) envVars.KILOCODE_TOKEN = kilocodeToken;
 

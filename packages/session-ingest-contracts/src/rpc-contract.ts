@@ -8,7 +8,7 @@ export type CloudAgentWorktreeId = z.infer<typeof cloudAgentWorktreeIdSchema>;
 export const cloudAgentWorktreeLocationSchema = z
   .object({
     sandboxId: z.string().regex(/^[A-Za-z0-9._:-]{1,256}$/),
-    provider: z.enum(['cloudflare', 'vercel']),
+    provider: z.enum(['cloudflare', 'vercel', 'cloudflare-containers']),
   })
   .strict();
 export type CloudAgentWorktreeLocation = z.infer<typeof cloudAgentWorktreeLocationSchema>;
@@ -367,6 +367,13 @@ const kiloSdkUserMessageBaseShape = {
   sessionID: sessionIdSchema,
   role: z.literal('user'),
   time: z.object({ created: z.number() }),
+  /**
+   * Kilo extension: marks a client-materialised row not yet confirmed by the
+   * server (the optimistic send-time insert and the `cloud.message.queued`
+   * synthesize). Declared so a round-trip through this contract preserves the
+   * flag instead of stripping it.
+   */
+  synthetic: z.boolean().optional(),
   format: z
     .discriminatedUnion('type', [
       z.object({ type: z.literal('text') }),
@@ -449,6 +456,22 @@ const sdkPartBaseShape = {
 };
 const sdkPartBaseSchema = z.object(sdkPartBaseShape);
 export type KiloSdkPartBase = z.infer<typeof sdkPartBaseSchema>;
+
+/**
+ * The identity a part is PERSISTED under: `id` + `messageID`, with no
+ * `sessionID`. The ingest seam accepts a part on exactly those two fields
+ * (`services/session-ingest/src/types/session-sync.ts`), the storage item id is
+ * `messageID/id` (`services/session-ingest/src/util/compaction.ts`), and the
+ * Durable Object's own part reader checks the same pair
+ * (`services/session-ingest/src/dos/kilo-sdk-materialization.ts`,
+ * `readPartIdentity`). A stored part that omits `sessionID` is therefore
+ * well-formed persisted data whose body this contract's union may still not
+ * understand.
+ */
+const persistedSdkPartIdentitySchema = z.object({
+  id: sdkPartBaseShape.id,
+  messageID: sdkPartBaseShape.messageID,
+});
 
 export const sdkFilePartSchema = z.object({
   ...sdkPartBaseShape,
@@ -639,10 +662,6 @@ function normalizePersistedSnapshotFileDiffs(value: unknown): unknown {
   return parsed.success ? parsed.data : value;
 }
 
-function isKnownKiloSdkPartType(type: string): boolean {
-  return kiloSdkPartSchema.options.some(option => option.shape.type.safeParse(type).success);
-}
-
 type NormalizedPersistedStoredMessage = {
   message: unknown;
   omittedItemCount: number;
@@ -678,20 +697,26 @@ function normalizePersistedKiloSdkParts(value: unknown): {
   }
   const parts: unknown[] = [];
   let omittedItemCount = 0;
-  for (const part of value) {
-    if (isRecord(part)) {
-      const textNormalized = normalizePersistedMissingPartText(part);
-      if (textNormalized) {
-        parts.push(textNormalized);
-        continue;
-      }
+  for (const part of value as unknown[]) {
+    // Normalize the known wire omissions first so a part that only needs the
+    // text fix (KILO-APP-99) still renders.
+    const textNormalized = isRecord(part) ? normalizePersistedMissingPartText(part) : null;
+    const candidate = textNormalized ?? part;
+    if (kiloSdkPartSchema.safeParse(candidate).success) {
+      parts.push(candidate);
+      continue;
     }
-    if (
-      isRecord(part) &&
-      typeof part['type'] === 'string' &&
-      !isKnownKiloSdkPartType(part['type']) &&
-      sdkPartBaseSchema.safeParse(part).success
-    ) {
+    // A part whose PERSISTED identity is well-formed but whose body this client
+    // cannot parse (an unknown `type`, a field shape this contract does not
+    // understand yet, or the `sessionID` this union declares but persistence
+    // does not) must not degrade the whole page to `invalid_data`. The session
+    // keeps receiving parts from whichever client drives it, so one such part
+    // would freeze the transcript on an older message while the separately
+    // projected session cost kept updating. Drop and count it instead, so the
+    // rest of the transcript still renders. A part with a malformed persisted
+    // identity stays untouched: that is corrupt data the caller must not
+    // silently paper over.
+    if (isRecord(candidate) && persistedSdkPartIdentitySchema.safeParse(candidate).success) {
       omittedItemCount += 1;
       continue;
     }

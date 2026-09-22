@@ -1,6 +1,6 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest; max-lines holds the focus and foreground refetch tests beside the existing render-branch assertions in one mount test. */
+/* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest; max-lines holds the focus and foreground refetch tests beside the existing render-branch assertions in one mount test. */
 import { createElement, type ReactElement } from 'react';
-import { act, type default as TestRenderer } from 'react-test-renderer';
+import { act, type TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -23,6 +23,13 @@ const listState = vi.hoisted(() => ({
   storedSessions: [] as MockStoredSession[],
   isSearching: false,
   isError: false,
+  // Mirrors the real hook's stored-query flags so the screen's loading
+  // decision can be exercised on the first render, before the request
+  // settles (isFetching false, isPending true).
+  storedIsPending: false,
+  storedIsFetching: false,
+  storedFetchedSinceMount: true,
+  storedLoadedPageCount: 1,
   organization: { organizationId: null as string | null, isLoaded: true },
   storedQuery: vi.fn<(options: Parameters<typeof useAgentSessions>[0]) => void>(),
   searchQuery: vi.fn<(options: Parameters<typeof useAgentSessionSearch>[0]) => void>(),
@@ -49,6 +56,32 @@ const appState = vi.hoisted(() => {
   };
 });
 
+const platformState = vi.hoisted(() => ({ OS: 'ios' as string }));
+
+const keyboardState = vi.hoisted(() => {
+  const listeners = new Map<string, Set<(payload: unknown) => void>>();
+  return {
+    addListener: (event: string, listener: (payload: unknown) => void) => {
+      const set = listeners.get(event) ?? new Set<(payload: unknown) => void>();
+      set.add(listener);
+      listeners.set(event, set);
+      return {
+        remove: () => {
+          set.delete(listener);
+        },
+      };
+    },
+    emit: (event: string, payload: unknown): void => {
+      for (const listener of listeners.get(event) ?? []) {
+        listener(payload);
+      }
+    },
+    clear: (): void => {
+      listeners.clear();
+    },
+  };
+});
+
 const focusState = vi.hoisted(() => ({ current: true as boolean }));
 const focusCallbacks = vi.hoisted(() => ({
   current: new Set<() => void>(),
@@ -61,7 +94,17 @@ vi.mock('react-native', () => ({
   Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  Platform: platformState,
+  Keyboard: { addListener: keyboardState.addListener },
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
   AppState: { addEventListener: appState.addEventListener },
+}));
+// The modal mock below still loads the real module through `importOriginal`,
+// which imports `react-native-safe-area-context`; that package's `react-native`
+// entry points at its untranspiled `src/` TypeScript, which vitest cannot parse,
+// so stub the hook here.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', X: 'X' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -135,8 +178,10 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         dateGroups: storedSessions.length > 0 ? [{ label: 'Today', sessions: storedSessions }] : [],
         activeIsError: false,
         storedIsError: listState.isError,
-        storedIsFetching: false,
-        storedLoadedPageCount: 1,
+        storedIsPending: listState.storedIsPending,
+        storedIsFetching: listState.storedIsFetching,
+        storedFetchedSinceMount: listState.storedFetchedSinceMount,
+        storedLoadedPageCount: listState.storedLoadedPageCount,
         hasNextPage: false,
         isFetchingNextPage: false,
         fetchNextPage: vi.fn(),
@@ -252,12 +297,42 @@ async function renderScreen(
   return renderer;
 }
 
+function hasType(node: TestRenderer.ReactTestInstance, type: string): boolean {
+  return typeof node.type === 'string' && node.type === type;
+}
+
+/** The single screen-level body container wrapping the list content. */
+function isHistoryBodyContainer(node: TestRenderer.ReactTestInstance): boolean {
+  return (
+    hasType(node, 'View') &&
+    node.props.className === 'flex-1' &&
+    node.findAllByType('AgentSessionListContent').length === 1
+  );
+}
+
+function findHistoryBodyContainer(
+  renderer: TestRenderer.ReactTestRenderer
+): TestRenderer.ReactTestInstance {
+  return renderer.root.find(isHistoryBodyContainer);
+}
+
+function bodyPaddingBottom(node: TestRenderer.ReactTestInstance): number {
+  const style = node.props.style as [unknown, { paddingBottom: number }];
+  return style[1].paddingBottom;
+}
+
 describe('SessionHistoryScreen', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    platformState.OS = 'ios';
+    keyboardState.clear();
     listState.storedSessions = [];
     listState.isSearching = false;
     listState.isError = false;
+    listState.storedIsPending = false;
+    listState.storedIsFetching = false;
+    listState.storedFetchedSinceMount = true;
+    listState.storedLoadedPageCount = 1;
     Object.assign(listState.organization, { organizationId: null, isLoaded: true });
     listState.storedQuery.mockClear();
     listState.searchQuery.mockClear();
@@ -342,9 +417,66 @@ describe('SessionHistoryScreen', () => {
       expect(findNodeByType(renderer, 'SessionListSearchHeader')).toBe(searchHeader);
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
-        tree.children?.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
-      ).toEqual(['ScreenHeader', 'SessionListSearchHeader', 'View']);
+        tree.children.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
+      ).toEqual(['ScreenHeader', 'SessionListSearchHeader', 'KeyboardAvoidingView']);
     }
+  });
+
+  it('offers a filter row for every recent repository, not only the first three', async () => {
+    const gitUrls = [
+      'https://github.com/kilo/alpha.git',
+      'https://github.com/kilo/beta.git',
+      'https://github.com/kilo/gamma.git',
+      'https://github.com/kilo/delta.git',
+      'https://github.com/kilo/epsilon.git',
+    ];
+    listState.storedSessions = [
+      ...gitUrls.map((git_url, index) => ({
+        session_id: `s${index}`,
+        organization_id: null,
+        git_url,
+        created_on_platform: 'cloud-agent',
+      })),
+      // The same repository again: the sheet must not render a duplicate row.
+      {
+        session_id: 'alpha-again',
+        organization_id: null,
+        git_url: gitUrls[0],
+        created_on_platform: 'cli',
+      },
+    ];
+    const renderer = await renderScreen();
+    act(() => {
+      historyHeaderActions(renderer).onOpenFilters();
+    });
+
+    const modal = findNodeByType(renderer, 'SessionFilterModal');
+    const options = modal.props.projectOptions as { gitUrl: string }[];
+    expect(options.map(option => option.gitUrl)).toEqual(gitUrls);
+  });
+
+  it('keeps a selected project row that is no longer in the recent repositories', async () => {
+    const recent = 'https://github.com/kilo/alpha.git';
+    const stale = 'https://github.com/kilo/removed.git';
+    listState.storedSessions = [
+      {
+        session_id: 's0',
+        organization_id: null,
+        git_url: recent,
+        created_on_platform: 'cloud-agent',
+      },
+    ];
+    readFilterRecord.mockResolvedValue(
+      JSON.stringify({ projectFilter: [stale], platformFilter: [] })
+    );
+    const renderer = await renderScreen();
+    act(() => {
+      historyHeaderActions(renderer).onOpenFilters();
+    });
+
+    const modal = findNodeByType(renderer, 'SessionFilterModal');
+    const options = modal.props.projectOptions as { gitUrl: string }[];
+    expect(options.map(option => option.gitUrl)).toEqual([recent, stale]);
   });
 
   it('keeps saved repository and platform selections after a successful history retry', async () => {
@@ -460,6 +592,50 @@ describe('SessionHistoryScreen', () => {
     }
   );
 
+  // Regression: the empty state ("No past sessions") must not flash on the
+  // cold-open render. React Query v5 reports `isFetching: false` until the
+  // observer subscribes and starts the first fetch, while `isPending` stays
+  // true until the query settles — the screen must treat that first frame as
+  // loading, not as a settled empty list.
+  it('shows loading on the cold-open render before the request settles', async () => {
+    listState.storedSessions = [];
+    listState.storedIsPending = true;
+    listState.storedIsFetching = false;
+    listState.storedLoadedPageCount = 0;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isLoading).toBe(true);
+    expect(content.props.hasAnySessions).toBe(false);
+  });
+
+  it('stops loading and renders cached rows during a background refetch', async () => {
+    listState.storedSessions = [{ session_id: 'cached', organization_id: null }];
+    listState.storedIsPending = false;
+    listState.storedIsFetching = true;
+    listState.storedLoadedPageCount = 1;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isLoading).toBe(false);
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.sections).toHaveLength(1);
+  });
+
+  it('shows the settled empty state once the request completes with no rows', async () => {
+    listState.storedSessions = [];
+    listState.storedIsPending = false;
+    listState.storedIsFetching = false;
+    listState.storedLoadedPageCount = 1;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isLoading).toBe(false);
+    expect(content.props.hasAnySessions).toBe(false);
+  });
+
   it('renders the agents title with a back button and default header size', async () => {
     const renderer = await renderScreen();
     const header = findNodeByType(renderer, 'ScreenHeader');
@@ -490,6 +666,19 @@ describe('SessionHistoryScreen', () => {
     const renderer = await renderScreen();
 
     expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(0);
+  });
+
+  it('reserves the search header while the first stored page loads', async () => {
+    // Cold open: no rows yet, first page in flight. The header must occupy its
+    // final space now so the loading skeletons sit where the rows will land
+    // instead of shifting down when the header appears with the rows. The
+    // merged loading decision keys "no data yet" off `storedIsPending`.
+    listState.storedIsPending = true;
+    listState.storedLoadedPageCount = 0;
+    const renderer = await renderScreen();
+
+    expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(1);
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isLoading).toBe(true);
   });
 
   it('mounts the search header once stored rows exist', async () => {
@@ -578,5 +767,32 @@ describe('SessionHistoryScreen', () => {
     });
 
     expect(handleRefetchSpy).not.toHaveBeenCalled();
+  });
+
+  // Regression: the finding's empty-state subtitle sat half-drawn behind the
+  // on-screen keyboard. The whole body (empty state, list, refresh band) must
+  // live inside one permanently mounted keyboard container so it lifts with the
+  // keyboard while the header and search field above it stay put.
+  it('mounts the history body inside the iOS keyboard-avoiding container', async () => {
+    const renderer = await renderScreen();
+
+    const container = findNodeByType(renderer, 'KeyboardAvoidingView');
+    expect(container.props.behavior).toBe('padding');
+    expect(container.props.className).toBe('flex-1');
+    expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
+  });
+
+  it('pads the history body above the Android keyboard without remounting it', async () => {
+    platformState.OS = 'android';
+    const renderer = await renderScreen();
+    expect(bodyPaddingBottom(findHistoryBodyContainer(renderer))).toBe(0);
+
+    act(() => {
+      keyboardState.emit('keyboardDidShow', { endCoordinates: { height: 320 } });
+    });
+
+    const container = findHistoryBodyContainer(renderer);
+    expect(bodyPaddingBottom(container)).toBe(320);
+    expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
   });
 });

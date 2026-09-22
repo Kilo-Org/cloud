@@ -71,6 +71,7 @@ export function WriteToolCard({ part }: Readonly<{ part: ToolPart }>) {
     <FixedPartRow
       icon={FilePlus}
       label={display.subtitle ?? display.title}
+      translatable={display.translatable}
       status={part.state.status}
       accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
         name: display.subtitle ?? display.title,

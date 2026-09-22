@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree. */
 /* eslint-disable max-lines -- the CTA terminal-state and draft-on-type suites share one screen harness. */
 
 // Dismiss-screen terminal-state contract: a persistence failure (the ledger
@@ -9,7 +8,7 @@
 // under the same hoisted key.
 
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ScrollView } from 'react-native';

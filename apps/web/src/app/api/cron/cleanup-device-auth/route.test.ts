@@ -9,6 +9,10 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
 
 jest.mock('@/lib/device-auth/device-auth', () => ({ cleanupExpiredDeviceAuthRequests: jest.fn() }));
 jest.mock('@/lib/auth/native-admission', () => ({ cleanupExpiredAdmissionChallenges: jest.fn() }));
+jest.mock('@/lib/auth/passkey', () => ({
+  cleanupExpiredPasskeyChallenges: jest.fn(),
+  cleanupExpiredPasskeySignInTickets: jest.fn(),
+}));
 jest.mock('@/lib/kiloclaw/access-codes', () => ({ cleanupExpiredAccessCodes: jest.fn() }));
 jest.mock('@/lib/integrations/github/install-state', () => ({
   cleanupExpiredInstallStates: jest.fn(),
@@ -17,6 +21,10 @@ jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => jest.fn()) 
 
 import { cleanupExpiredDeviceAuthRequests } from '@/lib/device-auth/device-auth';
 import { cleanupExpiredAdmissionChallenges } from '@/lib/auth/native-admission';
+import {
+  cleanupExpiredPasskeyChallenges,
+  cleanupExpiredPasskeySignInTickets,
+} from '@/lib/auth/passkey';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
 import { cleanupExpiredInstallStates } from '@/lib/integrations/github/install-state';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
@@ -30,6 +38,8 @@ describe('GET /api/cron/cleanup-device-auth', () => {
   it('emits one success event with all cleanup counts', async () => {
     jest.mocked(cleanupExpiredDeviceAuthRequests).mockResolvedValue(2);
     jest.mocked(cleanupExpiredAdmissionChallenges).mockResolvedValue(1);
+    jest.mocked(cleanupExpiredPasskeyChallenges).mockResolvedValue(5);
+    jest.mocked(cleanupExpiredPasskeySignInTickets).mockResolvedValue(6);
     jest.mocked(cleanupExpiredAccessCodes).mockResolvedValue(3);
     jest.mocked(cleanupExpiredInstallStates).mockResolvedValue(4);
 
@@ -44,6 +54,8 @@ describe('GET /api/cron/cleanup-device-auth', () => {
       outcome: 'succeeded',
       deleted_device_auth_request_count: 2,
       deleted_admission_challenge_count: 1,
+      deleted_passkey_challenge_count: 5,
+      deleted_passkey_sign_in_ticket_count: 6,
       deleted_access_code_count: 3,
       deleted_install_state_count: 4,
     });

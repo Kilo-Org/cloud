@@ -1,4 +1,24 @@
+import {
+  CLOUDFLARE_CONTAINERS_INSTANCES,
+  vercelSandboxResourcesSchema,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import { z } from 'zod';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
+
+export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider', [
+  z.object({ provider: z.literal('cloudflare') }).strict(),
+  z
+    .object({ provider: z.literal('vercel'), resources: vercelSandboxResourcesSchema.optional() })
+    .strict(),
+  z
+    .object({
+      provider: z.literal('cloudflare-containers'),
+      instance: z.enum(CLOUDFLARE_CONTAINERS_INSTANCES).optional(),
+    })
+    .strict(),
+]);
+
+export type SandboxProviderConfiguration = z.infer<typeof sandboxProviderConfigurationSchema>;
 
 export type PhysicalState = 'stopped' | 'creating' | 'running' | 'stopping' | 'failed' | 'unknown';
 
@@ -28,7 +48,7 @@ export type CreateIntent = {
   allocationName?: string;
   vercel?: Pick<
     VercelSandboxRuntimeConfig,
-    'projectId' | 'snapshotId' | 'runtimeBuildId' | 'runtime'
+    'projectId' | 'snapshotId' | 'runtimeBuildId' | 'runtime' | 'resources'
   >;
   containment?: CredentialContainmentRequirements;
 };

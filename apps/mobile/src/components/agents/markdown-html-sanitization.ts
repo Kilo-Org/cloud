@@ -51,6 +51,12 @@ const EMPTY_CONTAINER_RE = /<([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*>\s*<\/\1\s*>/g;
 
 /** True when the HTML renderer removes every non-whitespace character. */
 export function htmlSanitizesToEmpty(value: string): boolean {
+  // Fast path for the streamed-text case: with no '<' there is no HTML to
+  // remove, so the sanitized text is the input itself. Skipping the four
+  // allocating replaces keeps a long streamed part O(1) per publish here.
+  if (!value.includes('<')) {
+    return !/\S/.test(value);
+  }
   let sanitized = value;
   for (;;) {
     const next = sanitized

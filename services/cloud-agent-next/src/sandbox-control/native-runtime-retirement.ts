@@ -253,7 +253,9 @@ function matchesRetirementLifetime(
   );
 }
 
-function holdsNativeRuntimeRetirementFence(receipt: NativeRuntimeRetirementReceipt): boolean {
+export function holdsNativeRuntimeRetirementFence(
+  receipt: NativeRuntimeRetirementReceipt
+): boolean {
   return (
     receipt.state === 'pending' ||
     receipt.state === 'unconfirmed' ||

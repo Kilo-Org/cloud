@@ -66,6 +66,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
   useWindowDimensions: () => ({ fontScale: 1 }),
 }));
 vi.mock('react-native-safe-area-context', () => ({
@@ -81,6 +82,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));

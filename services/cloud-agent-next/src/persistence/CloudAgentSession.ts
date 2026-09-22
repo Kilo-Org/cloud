@@ -4,6 +4,10 @@
  * Uses RPC methods for type-safe communication.
  */
 
+import {
+  logRuntimeAuthorizationDiagnostic,
+  runtimeAuthorizationRecoveryDenied,
+} from '../session/runtime-authorization-diagnostics.js';
 import { DurableObject } from 'cloudflare:workers';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
@@ -212,10 +216,6 @@ import {
   VERCEL_WRAPPER_LAUNCH_INTENT_KEY,
 } from '../agent-sandbox/vercel/vercel-runtime-state.js';
 import { updateProviderRuntime } from './session-metadata.js';
-
-// ---------------------------------------------------------------------------
-// Alarm Constants
-// ---------------------------------------------------------------------------
 
 /** Reaper alarm interval: 5 minutes */
 const REAPER_INTERVAL_MS_DEFAULT = 5 * 60 * 1000;
@@ -1249,7 +1249,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private async getIngestHandler(): Promise<IngestHandler> {
     const sessionId = await this.requireSessionId();
     if (!this.ingestHandler || this.ingestHandlerSessionId !== sessionId) {
-      // Create DO context for the ingest handler to call back into the DO
       const doContext: IngestDOContext = {
         updateKiloSessionId: (id: string) => this.updateKiloSessionId(id),
         updateUpstreamBranch: (branch: string) => this.updateUpstreamBranch(branch),
@@ -1308,18 +1307,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     await this.keepContainerAlive();
   }
 
-  // ---------------------------------------------------------------------------
-  // HTTP/WebSocket Routing
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Handle incoming HTTP requests and WebSocket upgrades.
-   * Routes to appropriate handler based on URL pathname.
-   */
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // Route WebSocket upgrade requests
     if (url.pathname === '/stream') {
       const sessionIdParam = url.searchParams.get('cloudAgentSessionId') as SessionId | null;
       const ticket = url.searchParams.get('ticket');
@@ -1371,13 +1361,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return ingestHandler.handleIngestRequest(request);
     }
 
-    // No matching route
     return new Response('Not Found', { status: 404 });
   }
-
-  // ---------------------------------------------------------------------------
-  // WebSocket Lifecycle Methods (Hibernation API)
-  // ---------------------------------------------------------------------------
 
   /**
    * Handle incoming messages from WebSocket clients.
@@ -1386,7 +1371,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const tags = this.ctx.getTags(ws);
 
-    // Check if this is an ingest connection
     if (tags.some(tag => tag.startsWith('ingest:'))) {
       if (await this.hasDeletionIntent()) return;
       const ingestHandler = await this.getIngestHandler();
@@ -1410,7 +1394,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   ): Promise<void> {
     const tags = this.ctx.getTags(ws);
 
-    // Clean up ingest connection tracking
     if (tags.some(tag => tag.startsWith('ingest:'))) {
       if (await this.hasDeletionIntent()) return;
       const ingestHandler = await this.getIngestHandler();
@@ -1455,10 +1438,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       })
       .error('WebSocket error');
   }
-
-  // ---------------------------------------------------------------------------
-  // Event Broadcasting
-  // ---------------------------------------------------------------------------
 
   /**
    * Broadcast a new event to all connected /stream clients.
@@ -1675,9 +1654,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return closed;
   }
 
-  // ---------------------------------------------------------------------------
-  // Metadata RPC Methods
-  // ---------------------------------------------------------------------------
   /**
    * Get session metadata.
    * Returns null if no metadata has been written yet (e.g., before first CLI execution).
@@ -1708,6 +1684,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           authorization,
           secret,
           connectionString: this.env.HYPERDRIVE.connectionString,
+          onBindingRejected: reason =>
+            logRuntimeAuthorizationDiagnostic(
+              metadata?.identity.sessionId,
+              'binding_check',
+              reason
+            ),
         }),
     });
   }
@@ -1780,14 +1762,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     runtimeToken: string;
   }): Promise<{ status: 'recovered' | 'not-needed' | 'denied' | 'busy' | 'retry' }> {
     const metadata = await this.getMetadata();
-    if (!metadata || metadata.identity.userId !== input.ownerId) return { status: 'denied' };
+    const denied = (reason: Parameters<typeof runtimeAuthorizationRecoveryDenied>[1]) =>
+      runtimeAuthorizationRecoveryDenied(metadata?.identity.sessionId ?? this.sessionId, reason);
+    if (!metadata) return denied('metadata_unavailable');
+    if (metadata.identity.userId !== input.ownerId) return denied('owner_mismatch');
     const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) {
-      logger
-        .withFields({ sessionId: metadata.identity.sessionId, reason: 'missing_secret' })
-        .error('Runtime authorization recovery denied');
-      return { status: 'denied' };
-    }
+    if (!secret) return denied('missing_secret');
     let fresh: RuntimeAuthorization;
     try {
       fresh = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
@@ -1797,12 +1777,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         organizationId: metadata.identity.orgId,
       });
     } catch {
-      return { status: 'denied' };
+      return denied('invalid_seal');
     }
-    if (fresh.state !== 'active') return { status: 'denied' };
+    if (fresh.state !== 'active') return denied('fresh_authorization_inactive');
     const state = await this.getRuntimeAuthorizationRecoveryState();
     if (state.state === 'legacy' || state.state === 'active') return { status: 'not-needed' };
-    if (state.state !== 'expired' || state.id !== input.expectedOldId) return { status: 'denied' };
+    if (state.state !== 'expired' || state.id !== input.expectedOldId)
+      return denied('authorization_state_changed');
     const [active, pending] = await Promise.all([
       hasNonTerminalSessionMessage(this.ctx.storage),
       countPendingSessionMessages(this.ctx.storage),
@@ -1912,7 +1893,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         diagnostic('authorization_state_changed');
         return latest.state === 'active' || latest.state === 'legacy'
           ? { status: 'not-needed' }
-          : { status: 'denied' };
+          : denied('authorization_state_changed');
       }
       failureReason = 'authorization_commit_failed';
       await this.ctx.storage.transaction(async transaction => {
@@ -1959,27 +1940,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   private async runtimeProxyFence(): Promise<RuntimeProxyFence | null> {
-    const [metadata, runtime, lease] = await Promise.all([
+    const [metadata, lease] = await Promise.all([
       this.getMetadata(),
-      getWrapperRuntimeState(this.ctx.storage),
       getWrapperLease(this.ctx.storage),
     ]);
-    if (
-      !metadata ||
-      !metadata.workspace?.sandboxId ||
-      !runtime.wrapperRunId ||
-      !runtime.wrapperConnectionId ||
-      lease.state !== 'owns_wrapper' ||
-      lease.instance.instanceGeneration !== runtime.wrapperGeneration
-    ) {
+    if (!metadata || !metadata.workspace?.sandboxId || lease.state !== 'owns_wrapper') {
       return null;
     }
     return {
       plane: 'legacy',
-      generation: runtime.wrapperGeneration,
       allocationId: lease.instance.instanceId,
-      wrapperRunId: runtime.wrapperRunId,
-      wrapperConnectionId: runtime.wrapperConnectionId,
+      instanceGeneration: lease.instance.instanceGeneration,
     };
   }
 
@@ -1988,41 +1959,57 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     wrapperGeneration: number;
     wrapperConnectionId: string;
   }): Promise<string | null> {
-    const currentFence = await this.runtimeProxyFence();
-    if (
-      !currentFence ||
-      currentFence.plane !== 'legacy' ||
-      currentFence.wrapperRunId !== fence.wrapperRunId ||
-      currentFence.generation !== fence.wrapperGeneration ||
-      currentFence.wrapperConnectionId !== fence.wrapperConnectionId
-    ) {
-      return null;
-    }
+    const readDeliveryFence = async (): Promise<{
+      metadata: SessionMetadata | null;
+      physical: RuntimeProxyFence | null;
+    }> => {
+      const [metadata, runtime, lease] = await Promise.all([
+        this.getMetadata(),
+        getWrapperRuntimeState(this.ctx.storage),
+        getWrapperLease(this.ctx.storage),
+      ]);
+      if (
+        !metadata ||
+        !metadata.workspace?.sandboxId ||
+        lease.state !== 'owns_wrapper' ||
+        !runtime.wrapperRunId ||
+        !runtime.wrapperConnectionId ||
+        runtime.wrapperRunId !== fence.wrapperRunId ||
+        runtime.wrapperConnectionId !== fence.wrapperConnectionId ||
+        runtime.wrapperGeneration !== fence.wrapperGeneration ||
+        lease.instance.instanceGeneration !== runtime.wrapperGeneration
+      ) {
+        return { metadata, physical: null };
+      }
+      return {
+        metadata,
+        physical: {
+          plane: 'legacy',
+          allocationId: lease.instance.instanceId,
+          instanceGeneration: lease.instance.instanceGeneration,
+        },
+      };
+    };
+
+    const before = await readDeliveryFence();
+    if (!before.physical) return null;
     const token = await this.getRuntimeToken();
-    const [metadata, storedAuthorization, latestFence] = await Promise.all([
-      this.getMetadata(),
-      this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
-      this.runtimeProxyFence(),
-    ]);
-    if (
-      !latestFence ||
-      latestFence.plane !== 'legacy' ||
-      latestFence.wrapperRunId !== fence.wrapperRunId ||
-      latestFence.generation !== fence.wrapperGeneration ||
-      latestFence.wrapperConnectionId !== fence.wrapperConnectionId
-    ) {
-      return null;
-    }
-    const authorization = RuntimeAuthorizationSchema.safeParse(storedAuthorization);
+    const after = await readDeliveryFence();
+    if (!after.physical) return null;
+    const authorization = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
     return issuePersistedRuntimeProxyGrant({
       env: this.env,
       storage: this.ctx.storage,
-      metadata,
+      metadata: after.metadata,
       authorization: authorization.success ? authorization.data : null,
-      fence: latestFence,
+      fence: after.physical,
       token,
       mode:
-        metadata && getEffectiveCredentialContainment(metadata).kilocode ? 'contained' : 'direct',
+        after.metadata && getEffectiveCredentialContainment(after.metadata).kilocode
+          ? 'contained'
+          : 'direct',
     });
   }
 
@@ -2204,7 +2191,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     }
     await this.ctx.storage.put('metadata', newMetadata);
 
-    // Track activity for session TTL
     await this.updateLastActivity();
   }
 
@@ -2345,10 +2331,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     await this.updateMetadata(updated);
   }
-
-  // ---------------------------------------------------------------------------
-  // Wrapper Communication Methods
-  // ---------------------------------------------------------------------------
 
   /**
    * Send a command to the wrapper via its ingest WebSocket connection.
@@ -3150,7 +3132,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     await this.ctx.storage.put('metadata', serialized);
 
-    // Track activity for session TTL
     await this.updateLastActivity();
 
     return { success: true };
@@ -3274,10 +3255,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     await this.updateLastActivity();
   }
 
-  // ---------------------------------------------------------------------------
-  // Alarm Reaper
-  // ---------------------------------------------------------------------------
-
   /**
    * Alarm handler for periodic cleanup tasks.
    * Runs periodic retention/TTL cleanup and schedules nearer deadlines for
@@ -3310,7 +3287,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
       await this.getSandboxLifecycle().reconcileCreateIntent(now);
 
-      // Check if session should be deleted due to inactivity (90 days)
       const lastActivity = await this.ctx.storage.get<number>(LAST_ACTIVITY_KEY);
       if (lastActivity && now - lastActivity > Limits.SESSION_TTL_MS) {
         logger
@@ -3340,7 +3316,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         await this.interruptAcceptedWrapperMessages();
       });
 
-      // Run cleanup tasks
       this.cleanupOldEvents(now);
       this.cleanupExpiredLeases(now);
       await this.cleanupIdleKiloServer(now);
@@ -3520,7 +3495,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     const lastActivity = metadata.lifecycle.kiloServerLastActivity;
     if (!lastActivity) {
-      // No kilo server activity recorded, nothing to clean up
       return;
     }
 
@@ -3528,7 +3502,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const idleTimeoutMs = this.getKiloServerIdleTimeoutMs();
 
     if (idleMs < idleTimeoutMs) {
-      // Server is still within idle threshold
       return;
     }
 
@@ -3543,7 +3516,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return;
     }
 
-    // Server has been idle too long and no wrapper/pending work remains, stop it
     logger
       .withTags({ logTag: 'idle_kilo_server_stopped' })
       .withFields({
@@ -3579,10 +3551,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (await this.hasDeletionIntent()) return;
     await this.getAgentRuntime().keepSandboxAlive();
   }
-
-  // ---------------------------------------------------------------------------
-  // Execution Management RPC Methods
-  // ---------------------------------------------------------------------------
 
   /**
    * Add a new execution with initial 'pending' status.
@@ -3824,7 +3792,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     // The RPC remains for public execution compatibility; current wrapper-run
     // cleanup is owned by message supervision rather than legacy execution IDs.
 
-    // 1. Update status (enqueues callback notification on terminal unless suppressed)
     const statusResult = await this.updateExecutionStatus(
       {
         executionId,
@@ -3842,7 +3809,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return false;
     }
 
-    // 2. Broadcast to /stream clients
     const sessionId = await this.requireSessionId();
     this.insertAndBroadcastEvent({
       executionId,
@@ -4041,10 +4007,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.executionQueries.clearInterrupt();
   }
 
-  // ---------------------------------------------------------------------------
-  // Lease Management RPC Methods
-  // ---------------------------------------------------------------------------
-
   /**
    * Try to acquire a lease for an execution.
    * Used by queue consumers for idempotent processing.
@@ -4085,10 +4047,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   releaseLease(executionId: ExecutionId, leaseId: string): boolean {
     return this.leaseQueries.release(executionId, leaseId);
   }
-
-  // ---------------------------------------------------------------------------
-  // Direct Execution Methods
-  // ---------------------------------------------------------------------------
 
   async hasMessageAdmission(messageId: string): Promise<boolean> {
     return this.getSessionMessageQueue().hasMessageAdmission(messageId);

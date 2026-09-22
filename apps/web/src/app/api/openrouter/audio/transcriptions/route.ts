@@ -18,7 +18,7 @@ import {
   invalidRequestResponse,
   modelNotAllowedResponse,
   temporarilyUnavailableResponse,
-  usageLimitExceededResponse,
+  creditsBlockedResponse,
   wrapInSafeNextResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -26,8 +26,6 @@ import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openro
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
   extractTranscriptionPromptInfo,
@@ -256,12 +254,20 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   setTag('ui.ai_model', requestedModel);
 
-  const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user);
+  const { balance, settings, plan, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
+    organizationId,
+    user
+  );
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
   if (balance <= 0 && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
-    return await usageLimitExceededResponse(user, balance);
+    return await creditsBlockedResponse({
+      user,
+      balance,
+      organizationId,
+      balanceLimitedByUserAllowance,
+    });
   }
 
   const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
@@ -334,25 +340,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;
   usageContext.status_code = response.status;
-
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: false,
-      isStreaming: false,
-      userByok: !!userByok,
-      provider: provider.id,
-      requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(requestedModelLowerCased),
-      toolsAvailable: [],
-      toolsUsed: [],
-      ttfbMs,
-      statusCode: response.status,
-    },
-    response.clone(),
-    requestStartedAt
-  );
 
   if (response.status === 402 && !userByok) {
     await captureProxyError({

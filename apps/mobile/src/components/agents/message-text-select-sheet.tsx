@@ -25,6 +25,7 @@ export function MessageTextSelectSheet({ text, onClose }: Readonly<MessageTextSe
         title={t('agentChat.messageDetails.selectText')}
         onDone={onClose}
         doneLabel={t('common.done')}
+        topInset="ios-page-sheet"
       />
 
       {text.length > 0 ? (

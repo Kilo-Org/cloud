@@ -3,13 +3,17 @@ import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { type VoiceInputControllerSnapshot } from './voice-input-controller';
+import { useVoiceInputLanguage } from './voice-input-language-preference';
 import { voiceInputController } from './native-voice-input';
-import { type VoiceInputStatus } from './voice-input-state';
+import { type VoiceInputFeedback, type VoiceInputStatus } from './voice-input-state';
 import { resolveOwnerVoiceInputView } from './voice-input-view-state';
 import {
   createVoiceInputActions,
+  publishVoiceInputFeedback,
+  readVoiceInputFeedback,
   runVoiceInputListeningFeedback,
   shouldAbortVoiceInputForOwner,
+  subscribeVoiceInputFeedback,
   type VoiceInputActions,
 } from './use-voice-input-actions';
 
@@ -22,6 +26,8 @@ type UseVoiceInputOptions = {
 type UseVoiceInputResult = {
   abort: () => Promise<boolean>;
   available: boolean;
+  /** Last failure feedback, mirrored from `showFeedback`; null between sessions. */
+  feedback: VoiceInputFeedback | null;
   isActive: boolean;
   settleBeforeSubmit: () => Promise<boolean>;
   status: VoiceInputStatus;
@@ -74,13 +80,26 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
   const getUserIdRef = useRef(userId);
   getUserIdRef.current = userId;
 
+  // Read through a ref so an action created once in `actionsRef` always sees
+  // the latest persisted language choice.
+  const voiceLanguage = useVoiceInputLanguage();
+  const voiceLanguageRef = useRef(voiceLanguage);
+  voiceLanguageRef.current = voiceLanguage;
+
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
+  const feedback = useSyncExternalStore(
+    subscribeVoiceInputFeedback,
+    readVoiceInputFeedback,
+    readVoiceInputFeedback
+  );
 
   const actionsRef = useRef<VoiceInputActions | null>(null);
   actionsRef.current ??= createVoiceInputActions({
     controller: voiceInputController,
     getDisabled: () => getDisabledRef.current,
     getDraft: () => getDraftRef.current(),
+    getLanguageTag: () => voiceLanguageRef.current,
     getOnDraftChange: () => getOnDraftChangeRef.current,
     getOwner: () => owner,
     getUserId: () => getUserIdRef.current,
@@ -139,12 +158,16 @@ export function useVoiceInput(options: UseVoiceInputOptions): UseVoiceInputResul
   }, [actions]);
 
   const toggle = useCallback(async () => {
+    // A new tap clears the previous failure so the surface never shows a stale
+    // message while the next session is starting.
+    publishVoiceInputFeedback(null);
     await actions.toggle();
   }, [actions]);
 
   return {
     abort,
     available: view.available,
+    feedback,
     isActive: view.isActive,
     settleBeforeSubmit,
     status: view.status,

@@ -1,10 +1,14 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  getOpenRouterModelsFromDatabase: jest.fn(async () => new Set<string>()),
+  ...jest.requireActual<typeof GatewayModelsCache>(
+    '@/lib/ai-gateway/providers/gateway-models-cache'
+  ),
+  getOpenRouterModelsFromDatabase: jest.fn(),
 }));
 
-import { resolveAutoModel } from './resolution';
+import type * as AutoModelResolution from './resolution';
 import {
   FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
@@ -14,6 +18,8 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+
+const { resolveAutoModel } = jest.requireActual<typeof AutoModelResolution>('./resolution');
 
 const baseParams = {
   model: KILO_AUTO_EFFICIENT_MODEL.id,
@@ -27,6 +33,9 @@ const baseParams = {
 const nullUserPromise = Promise.resolve(null);
 const zeroBalancePromise = Promise.resolve(0);
 const primaryDefaultFallback = { model: PRIMARY_DEFAULT_MODEL };
+const { getOpenRouterModelsFromDatabase: mockedGetOpenRouterModels } = jest.requireMock<
+  jest.Mocked<typeof GatewayModelsCache>
+>('@/lib/ai-gateway/providers/gateway-models-cache');
 
 const sampleDecision: AutoRoutingDecision = {
   model: 'anthropic/claude-haiku-4',
@@ -406,9 +415,13 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
 });
 
 describe('resolveAutoModel — kilo-auto/free branch', () => {
+  beforeEach(() => {
+    mockedGetOpenRouterModels.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
+  });
+
   it('excludes candidates denied by the effective organization policy', async () => {
     const isAutoFreeCandidateAllowed = jest.fn(
-      async (modelId: string) => modelId === 'stepfun/step-3.7-flash:free'
+      async (modelId: string) => modelId === 'poolside/laguna-s-2.1:free'
     );
 
     const result = await resolveAutoModel(
@@ -425,11 +438,11 @@ describe('resolveAutoModel — kilo-auto/free branch', () => {
     expect(result).toEqual({
       kind: 'ok',
       resolved: {
-        model: 'stepfun/step-3.7-flash:free',
+        model: 'poolside/laguna-s-2.1:free',
         reasoning: { enabled: true, effort: 'high' },
       },
     });
-    expect(isAutoFreeCandidateAllowed).toHaveBeenCalledWith('stepfun/step-3.7-flash:free');
+    expect(isAutoFreeCandidateAllowed).toHaveBeenCalledWith('poolside/laguna-s-2.1:free');
   });
 
   it('reports no free models when organization policy denies every candidate', async () => {

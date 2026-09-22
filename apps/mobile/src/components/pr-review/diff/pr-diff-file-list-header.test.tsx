@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as pr-diff-file-list-loading.test.tsx) */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -116,11 +115,31 @@ describe('PrDiffFileListHeader side insets (landscape)', () => {
     });
 
     expect(routerPush).toHaveBeenCalledTimes(1);
-    expect(routerPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/(app)/pr-review/[owner]/[repo]/[number]/file-navigator',
-        params: { owner: 'octocat', repo: 'hello', number: 7 },
-      })
-    );
+    // GitHub keeps the existing three-segment sibling; `providerPrChildRoutePath`
+    // resolves the ref to a string href (locked by provider-pr-ref.test.ts).
+    expect(routerPush).toHaveBeenCalledWith('/(app)/pr-review/octocat/hello/7/file-navigator');
+  });
+});
+
+describe('PrDiffFileListHeader container padding', () => {
+  beforeEach(() => {
+    insets.top = 0;
+    insets.bottom = 0;
+    insets.left = 0;
+    insets.right = 0;
+  });
+
+  it('pads the summary row above and below the file list', () => {
+    const renderer = mountHeader();
+    const pressable = findNavigatorPressable(renderer.root);
+    const container = pressable.parent?.parent;
+
+    // The owner reported the row sitting flush against the tab bar above and
+    // the first file path below; `py-4` gives 16pt on both edges while the
+    // `px-4` gutter, background and hairline are unchanged.
+    expect(container?.props.className).toContain('px-4');
+    expect(container?.props.className).toContain('py-4');
+    expect(container?.props.className).toContain('bg-background');
+    expect(container?.props.className).toContain('border-b');
   });
 });

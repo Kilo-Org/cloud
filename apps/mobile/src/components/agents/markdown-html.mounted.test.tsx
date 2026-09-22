@@ -1,6 +1,6 @@
-/* eslint-disable max-classes-per-file, typescript-eslint/no-deprecated, typescript-eslint/no-extraneous-class, typescript-eslint/no-unnecessary-condition, eslint/class-methods-use-this, eslint/no-empty-function, eslint-plugin-promise/prefer-await-to-callbacks, eslint-plugin-promise/prefer-await-to-then, typescript-eslint/promise-function-async -- the react-native host stub must mimic the module surface the real react-native-render-html engine consumes (classes with no-op methods, promise-returning Linking shims); react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
+/* eslint-disable max-classes-per-file, typescript-eslint/no-extraneous-class, typescript-eslint/no-unnecessary-condition, eslint/class-methods-use-this, eslint/no-empty-function, eslint-plugin-promise/prefer-await-to-callbacks, eslint-plugin-promise/prefer-await-to-then, typescript-eslint/promise-function-async -- the react-native host stub must mimic the module surface the real react-native-render-html engine consumes (classes with no-op methods, promise-returning Linking shims); test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { MarkdownHtml, splitMarkdownHtml } from './markdown-html';

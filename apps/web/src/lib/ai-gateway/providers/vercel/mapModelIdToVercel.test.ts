@@ -5,6 +5,7 @@ import {
   CLAUDE_OPUS_CURRENT_VERCEL_MODEL_ID,
   CLAUDE_SONNET_CURRENT_VERCEL_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
 import {
   GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID,
   GEMINI_PRO_CURRENT_VERCEL_MODEL_ID,
@@ -25,11 +26,17 @@ import {
   CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
   CLAUDE_OPUS_LATEST_MODEL_ALIAS,
   CLAUDE_SONNET_LATEST_MODEL_ALIAS,
+  DEEPSEEK_FLASH_LATEST_MODEL_ALIAS,
+  DEEPSEEK_PRO_LATEST_MODEL_ALIAS,
   DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
   GEMINI_FLASH_LATEST_MODEL_ALIAS,
   GEMINI_PRO_LATEST_MODEL_ALIAS,
+  GPT_ASTRA_LATEST_MODEL_ALIAS,
   GPT_LATEST_MODEL_ALIAS,
+  GPT_LUNA_LATEST_MODEL_ALIAS,
   GPT_MINI_LATEST_MODEL_ALIAS,
+  GPT_SOL_LATEST_MODEL_ALIAS,
+  GPT_TERRA_LATEST_MODEL_ALIAS,
   GLM_FLASH_LATEST_MODEL_ALIAS,
   GLM_LATEST_MODEL_ALIAS,
   GROK_LATEST_MODEL_ALIAS,
@@ -46,12 +53,18 @@ describe('mapModelIdToVercel', () => {
       [CLAUDE_HAIKU_LATEST_MODEL_ALIAS, CLAUDE_HAIKU_CURRENT_VERCEL_MODEL_ID],
       [GPT_LATEST_MODEL_ALIAS, GPT_CURRENT_VERCEL_MODEL_ID],
       [GPT_MINI_LATEST_MODEL_ALIAS, GPT_MINI_CURRENT_VERCEL_MODEL_ID],
+      [GPT_ASTRA_LATEST_MODEL_ALIAS, 'openai/gpt-6-astra'],
+      [GPT_LUNA_LATEST_MODEL_ALIAS, 'openai/gpt-5.6-luna'],
+      [GPT_SOL_LATEST_MODEL_ALIAS, 'openai/gpt-5.6-sol'],
+      [GPT_TERRA_LATEST_MODEL_ALIAS, 'openai/gpt-5.6-terra'],
       [KIMI_LATEST_MODEL_ALIAS, KIMI_CURRENT_VERCEL_MODEL_ID],
       [GEMINI_PRO_LATEST_MODEL_ALIAS, GEMINI_PRO_CURRENT_VERCEL_MODEL_ID],
       [GEMINI_FLASH_LATEST_MODEL_ALIAS, GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID],
       [GROK_LATEST_MODEL_ALIAS, GROK_CURRENT_VERCEL_MODEL_ID],
       [GLM_LATEST_MODEL_ALIAS, GLM_CURRENT_VERCEL_MODEL_ID],
       [GLM_FLASH_LATEST_MODEL_ALIAS, GLM_FLASH_CURRENT_VERCEL_MODEL_ID],
+      [DEEPSEEK_PRO_LATEST_MODEL_ALIAS, 'deepseek/deepseek-v4-pro-0813'],
+      [DEEPSEEK_FLASH_LATEST_MODEL_ALIAS, DEEPSEEK_V4_1_FLASH_MODEL_ID],
       [DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS, 'deepseek/deepseek-v4-flash-0731'],
     ])('maps %s to the current Vercel model id', (input, expected) => {
       expect(mapModelIdToVercel(input)).toBe(expected);
@@ -65,12 +78,18 @@ describe('mapModelIdToVercel', () => {
         CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
         GPT_LATEST_MODEL_ALIAS,
         GPT_MINI_LATEST_MODEL_ALIAS,
+        GPT_ASTRA_LATEST_MODEL_ALIAS,
+        GPT_LUNA_LATEST_MODEL_ALIAS,
+        GPT_SOL_LATEST_MODEL_ALIAS,
+        GPT_TERRA_LATEST_MODEL_ALIAS,
         KIMI_LATEST_MODEL_ALIAS,
         GEMINI_PRO_LATEST_MODEL_ALIAS,
         GEMINI_FLASH_LATEST_MODEL_ALIAS,
         GROK_LATEST_MODEL_ALIAS,
         GLM_LATEST_MODEL_ALIAS,
         GLM_FLASH_LATEST_MODEL_ALIAS,
+        DEEPSEEK_PRO_LATEST_MODEL_ALIAS,
+        DEEPSEEK_FLASH_LATEST_MODEL_ALIAS,
         DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
       ]);
     });
@@ -102,7 +121,6 @@ describe('mapModelIdToVercel', () => {
       ['anthropic/claude-sonnet-4-5', 'anthropic/claude-sonnet-4.5'],
       ['anthropic/claude-sonnet-4-6', 'anthropic/claude-sonnet-4.6'],
       ['anthropic/claude-sonnet-5-20260630', 'anthropic/claude-sonnet-5'],
-      ['claude-opus-5', 'anthropic/claude-opus-5'],
       ['claude-sonnet-4', 'anthropic/claude-sonnet-4'],
       ['claude-sonnet-4.5', 'anthropic/claude-sonnet-4.5'],
       ['claude-sonnet-5', 'anthropic/claude-sonnet-5'],
@@ -155,8 +173,8 @@ describe('mapModelIdToVercel', () => {
       expect(mapModelIdToVercel('qwen/some-new-qwen-model')).toBe('alibaba/some-new-qwen-model');
     });
 
-    it('rewrites x-ai/ to xai/', () => {
-      expect(mapModelIdToVercel('x-ai/some-new-grok')).toBe('xai/some-new-grok');
+    it('rewrites x-ai/ to spacexai/', () => {
+      expect(mapModelIdToVercel('x-ai/some-new-grok')).toBe('spacexai/some-new-grok');
     });
 
     it('rewrites z-ai/ to zai/', () => {

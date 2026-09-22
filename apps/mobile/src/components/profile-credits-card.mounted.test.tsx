@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
+/* eslint-disable max-lines -- test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 
 // Balance across owners: the card keeps the raw 2-element tRPC query key
 // (`[path, { input, type }]`), never a userId-suffixed key. Owner switches are
@@ -8,7 +8,7 @@
 import { createElement, type ElementType } from 'react';
 import type * as ReactModule from 'react';
 import { Platform, Pressable } from 'react-native';
-import { act, type ReactTestRenderer } from 'react-test-renderer';
+import { act, type ReactTestRenderer } from '@/test/renderer';
 import { type QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -214,6 +214,7 @@ beforeEach(() => {
   });
   showPicker.mockReset();
   getContextBalanceQueryFn.mockReset();
+  getContextBalanceQueryFn.mockResolvedValue(null);
   personalCreditBlocksQueryFn.mockReset();
   orgCreditBlocksQueryFn.mockReset();
   refetchUserId.mockReset();

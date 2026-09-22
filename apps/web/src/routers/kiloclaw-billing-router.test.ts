@@ -65,10 +65,16 @@ jest.mock('@/lib/stripe-client', () => {
       retrieve: jest.fn(),
     },
     checkout: {
-      sessions: { create: jest.fn(), list: jest.fn(), expire: jest.fn() },
+      sessions: {
+        create: jest.fn(),
+        list: jest.fn(),
+        expire: jest.fn(),
+        listLineItems: jest.fn(),
+      },
     },
     billingPortal: { sessions: { create: jest.fn() } },
     invoices: { list: jest.fn() },
+    prices: { retrieve: jest.fn() },
     errors,
   };
   return { client: stripeMock, __stripeMock: stripeMock };
@@ -170,7 +176,9 @@ jest.mock('@/lib/posthog', () => ({
 let createCallerForUser: (userId: string) => Promise<any>;
 
 type StripeMockShape = {
-  checkout: { sessions: { create: AnyMock; list: AnyMock; expire: AnyMock } };
+  checkout: {
+    sessions: { create: AnyMock; list: AnyMock; expire: AnyMock; listLineItems: AnyMock };
+  };
   billingPortal: { sessions: { create: AnyMock } };
   subscriptions: { retrieve: AnyMock; update: AnyMock; list: AnyMock };
   subscriptionSchedules: {
@@ -180,6 +188,7 @@ type StripeMockShape = {
     retrieve: AnyMock;
   };
   invoices: { list: AnyMock };
+  prices: { retrieve: AnyMock };
   errors: Stripe['errors'];
 };
 
@@ -293,6 +302,8 @@ beforeEach(async () => {
   stripeMock.checkout.sessions.list.mockResolvedValue({ data: [], has_more: false });
   stripeMock.checkout.sessions.expire.mockReset();
   stripeMock.checkout.sessions.expire.mockResolvedValue({});
+  stripeMock.checkout.sessions.listLineItems.mockReset();
+  stripeMock.checkout.sessions.listLineItems.mockResolvedValue({ data: [], has_more: false });
   stripeMock.billingPortal.sessions.create.mockReset();
   stripeMock.subscriptions.retrieve.mockReset();
   stripeMock.subscriptions.update.mockReset();
@@ -304,6 +315,13 @@ beforeEach(async () => {
   stripeMock.subscriptionSchedules.retrieve.mockReset();
   stripeMock.invoices.list.mockReset();
   stripeMock.invoices.list.mockResolvedValue({ data: [], has_more: false });
+  stripeMock.prices.retrieve.mockReset();
+  stripeMock.prices.retrieve.mockResolvedValue({
+    id: 'price_test_kilo_pass',
+    currency: 'usd',
+    unit_amount: 1900,
+    tax_behavior: 'unspecified',
+  });
   kiloclawInternalClientMock.__provisionMock.mockReset();
   kiloclawInternalClientMock.__provisionMock.mockResolvedValue(defaultProvisionResult);
   kiloclawInternalClientMock.__destroyMock.mockReset();

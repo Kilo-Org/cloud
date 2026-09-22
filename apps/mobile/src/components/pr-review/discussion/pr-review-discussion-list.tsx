@@ -9,15 +9,19 @@ import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/empty-state';
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
 import { DiscussionThread } from '@/components/pr-review/discussion/discussion-thread';
 import { Button } from '@/components/ui/button';
+import { MessageSquarePlus } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
   type DiscussionListItem,
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { expandedForThread } from '@/lib/pr-review/discussion/thread-expansion';
+import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
+import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import { useTRPC } from '@/lib/trpc';
 
@@ -73,11 +77,22 @@ export function PrReviewDiscussionList({
   onReplyInputFocus,
   onViewportLayout,
 }: Readonly<PrReviewDiscussionListProps>) {
+  const { t } = useTranslation();
   const trpc = useTRPC();
+  // Provider noun for the empty message below (GitLab calls it a merge
+  // request); the same scope the tab reads for its own copy.
+  const { ref } = useProviderPrScope({ owner, repo, number });
+  const isMergeRequest = ref.platform === 'gitlab';
   // Account-local hidden users (blocked + muted GitHub logins) filter rows.
   const hiddenUsers = useQuery(trpc.moderation.listHiddenUsers.queryOptions());
-  // Viewer login for self-target gating on the comment overflow menu.
-  const pr = useQuery(trpc.githubPrReview.getPullRequest.queryOptions({ owner, repo, number }));
+  // Viewer login for self-target gating on the comment overflow menu. The
+  // overview goes through the provider seam, not `githubPrReview` directly:
+  // this list also renders under a GitLab MR / Bitbucket PR scope, where the
+  // GitHub-shaped triple is a synthesized stand-in and a GitHub call with it
+  // would fail on every render. On GitHub the key is unchanged, so this
+  // still dedupes with the screen's own overview query.
+  const queries = useProviderPrQueries({ owner, repo, number });
+  const pr = useQuery(queries.overviewOptions());
   const viewerLogin = pr.data?.repo.viewerLogin ?? null;
 
   const hiddenLogins = useMemo(() => {
@@ -142,7 +157,14 @@ export function PrReviewDiscussionList({
               <View className="gap-2.5 rounded-xl border border-border bg-card p-3.5">
                 <CommentRow
                   comment={item.comment}
+                  owner={owner}
+                  repo={repo}
+                  number={number}
+                  commentKind="conversation"
                   readOnly
+                  // s6: reactions render only when the provider exposes them;
+                  // a provider without them shows no reaction row at all.
+                  reactionsSupported={queries.capabilities.reactions.supported}
                   viewerLogin={viewerLogin}
                   onToggleReaction={noopReactionToggle}
                 />
@@ -176,6 +198,23 @@ export function PrReviewDiscussionList({
       onLayout={event => {
         onViewportLayout?.(event.nativeEvent.layout.height);
       }}
+      ListEmptyComponent={
+        // Every loaded row can be hidden (blocked/muted authors) while the
+        // tab still counts the discussion as content. Without this the list
+        // renders an empty body under the pinned Comment bar: no rows, no
+        // loading, no message (spot check e7). The copy is the discussion's
+        // existing empty copy — new copy belongs to the translation slice.
+        <EmptyState
+          placement="top"
+          icon={MessageSquarePlus}
+          title={t('prReview.discussion.noDiscussion')}
+          description={
+            isMergeRequest
+              ? t('prReview.terms.noDiscussionDescription')
+              : t('prReview.discussion.noDiscussionDescription')
+          }
+        />
+      }
       ListFooterComponent={
         <ListFooter
           hasNextPage={hasNextPage}

@@ -86,11 +86,27 @@ describe('kilo config.json schema merge', () => {
     expect(props.remote_control).toBeDefined();
     expect(props.auto_expand_history).toBeDefined();
     expect(props.auto_collapse_reasoning).toBeDefined();
+    expect(props.reasoning_display).toBeDefined();
     expect(props.terminal_command_display).toBeDefined();
     expect(props.code_edit_display).toBeDefined();
     expect(props.hide_prompt_training_models).toBeDefined();
     expect(props.web_search).toEqual(expect.objectContaining({ type: 'boolean', default: false }));
     expect(props.privacy_mode).toBeDefined();
+    expect(props.retention).toBeDefined();
+  });
+
+  test('retention exposes enabled boolean and maxAgeDays number', () => {
+    const retention = props.retention as {
+      type: string;
+      additionalProperties: boolean;
+      properties: { enabled: unknown; maxAgeDays: unknown };
+    };
+    expect(retention.type).toBe('object');
+    expect(retention.additionalProperties).toBe(false);
+    expect(retention.properties.enabled).toEqual(expect.objectContaining({ type: 'boolean' }));
+    expect(retention.properties.maxAgeDays).toEqual(
+      expect.objectContaining({ type: 'number', minimum: 1 })
+    );
   });
 
   test('privacy_mode is a boolean', () => {
@@ -114,6 +130,12 @@ describe('kilo config.json schema merge', () => {
     const ced = props.code_edit_display as { type: string; enum: string[] };
     expect(ced.type).toBe('string');
     expect(ced.enum).toEqual(['expanded', 'collapsed']);
+  });
+
+  test('reasoning_display is an enum of expanded/preview/headline', () => {
+    const rd = props.reasoning_display as { type: string; enum: string[] };
+    expect(rd.type).toBe('string');
+    expect(rd.enum).toEqual(['expanded', 'preview', 'headline']);
   });
 
   test('commit_message has a prompt string property', () => {
@@ -195,7 +217,9 @@ describe('kilo config.json schema merge', () => {
     expect(agent.properties.orchestrator).toBeDefined();
     expect(agent.properties.build).toBeDefined();
 
-    const experimental = props.experimental as { properties: Record<string, unknown> };
+    const experimental = props.experimental as {
+      properties: Record<string, unknown>;
+    };
     expect(experimental.properties.codebase_search).toBeUndefined();
     expect(experimental.properties.batch_tool).toBeDefined();
     expect(config.additionalProperties).toBe(false);

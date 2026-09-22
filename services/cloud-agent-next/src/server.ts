@@ -23,6 +23,8 @@ import {
   consumeCloudAgentReportBatch,
   removeExpiredCloudAgentReportData,
 } from './telemetry/report-consumer.js';
+import { runCloudAgentOutcomeCollection } from './telemetry/outcome-aggregate.js';
+import { runCloudAgentOpenStockCollection } from './telemetry/open-stock.js';
 import { authMiddleware } from './middleware/auth.js';
 import { balanceMiddleware } from './middleware/balance.js';
 import { resolveTerminalWrapperClient } from './terminal/access.js';
@@ -1089,6 +1091,9 @@ app.use(
 app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler(logger, { includeMessage: false }));
 
+export const REPORT_RETENTION_CRON = '17 2 * * *';
+export const OUTCOME_AGGREGATE_CRON = '*/3 * * * *';
+
 export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
     const url = new URL(request.url);
@@ -1112,8 +1117,22 @@ export default {
 
     logger.warn(`Received message from unexpected queue: ${batch.queue}`);
   },
-  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
-    await removeExpiredCloudAgentReportData(env);
+  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    if (controller.cron === REPORT_RETENTION_CRON) {
+      await removeExpiredCloudAgentReportData(env);
+      return;
+    }
+    if (controller.cron === OUTCOME_AGGREGATE_CRON) {
+      try {
+        await runCloudAgentOutcomeCollection(env);
+      } finally {
+        await runCloudAgentOpenStockCollection(env);
+      }
+      return;
+    }
+    logger.warn('Cloud Agent scheduled handler received an unrecognized cron', {
+      cron: controller.cron,
+    });
   },
 };
 

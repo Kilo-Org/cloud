@@ -8,7 +8,7 @@ import {
   type CodingPlanQuotaWindow,
 } from '@/lib/coding-plans/usage-contract';
 
-const MINIMAX_USAGE_URL = 'https://api.minimax.io/v1/token_plan/remains';
+export const MINIMAX_USAGE_URL = 'https://api.minimax.io/v1/token_plan/remains';
 const MINIMAX_USAGE_TIMEOUT_MS = 5_000;
 
 const NativePercentSchema = z.number().finite().min(0).max(100);
@@ -28,14 +28,15 @@ const MiniMaxModelRemainsSchema = z.object({
   current_weekly_status: NativeIntegerSchema.optional(),
 });
 
-// `model_remains` is optional so a non-zero application status without quota
-// rows still parses and maps to an `application` failure instead of
-// `invalid_response`.
+// MiniMax returns `model_remains: null` with a zero status code when it holds
+// no quota rows for the managed key. The field stays optional so a non-zero
+// application status without rows still maps to `application`; a zero status
+// with the field absent is a response-shape problem and is rejected below.
 const MiniMaxUsageResponseSchema = z.object({
   base_resp: z.object({
     status_code: NativeIntegerSchema,
   }),
-  model_remains: z.array(MiniMaxModelRemainsSchema).max(64).optional(),
+  model_remains: z.array(MiniMaxModelRemainsSchema).max(64).nullish(),
 });
 
 type MiniMaxModelRemains = z.infer<typeof MiniMaxModelRemainsSchema>;
@@ -133,8 +134,15 @@ export async function getMiniMaxUsage(apiKey: string) {
   if (result.data.base_resp.status_code !== 0) {
     throw new CodingPlanUsageError('application');
   }
+  const rows = result.data.model_remains;
+  if (rows === undefined) {
+    throw new CodingPlanUsageError('invalid_response');
+  }
+  if (rows === null || rows.length === 0) {
+    throw new CodingPlanUsageError('provider_plan_inactive');
+  }
   return {
     fetchedAt: new Date().toISOString(),
-    windows: normalizeUsage(result.data.model_remains ?? []),
+    windows: normalizeUsage(rows),
   };
 }

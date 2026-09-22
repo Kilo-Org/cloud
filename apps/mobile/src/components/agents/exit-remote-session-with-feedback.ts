@@ -4,9 +4,32 @@ import { type Href } from 'expo-router';
 import { i18n } from '@/i18n';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
+import {
+  isNonRetryableExitError,
+  REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE,
+  REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE,
+  REMOTE_SESSION_EXIT_UPGRADE_PREFIX,
+} from './remote-session-exit-messages';
+
 /** Structural subset of Expo Router's router used for post-exit navigation. */
 type ExitRemoteSessionRouter = {
   dismissTo: (href: Href) => void;
+};
+
+/**
+ * A retryable exit transport failure, surfaced to the host so it can render a
+ * durable retry affordance. The transient toast the helper uses as a fallback
+ * auto-dismisses before a dropped transport can come back, so a caller that
+ * wants the retry to survive the outage must render this state itself.
+ */
+export type RetryableExitFailure = {
+  /** Copy for the reader, with pinned SDK messages already localized. */
+  message: string;
+  /**
+   * Re-runs the exit mutation under the same SubmitLock the initial send held.
+   * Never shows another confirmation.
+   */
+  retry: () => Promise<void>;
 };
 
 type ExitRemoteSessionWithFeedbackInput = {
@@ -26,32 +49,22 @@ type ExitRemoteSessionWithFeedbackInput = {
    * mutation under the lock above.
    */
   settleVoiceInput?: () => Promise<boolean>;
+  /**
+   * Receives a retryable transport failure instead of the helper's transient
+   * toast. A host that renders the failure inline (so the retry survives a
+   * connectivity outage) passes this; callers that do not keep the toast.
+   */
+  onRetryableFailure?: (failure: RetryableExitFailure) => void;
+  /**
+   * Called when an exit attempt (including a host-owned retry) fails with a
+   * non-retryable SDK message. A host that renders `onRetryableFailure` inline
+   * must clear that surface here: the retry can never succeed, so keeping the
+   * row would leave a stale message and a permanently failing retry button.
+   */
+  onNonRetryableFailure?: () => void;
 };
 
 const SESSIONS_ROUTE = '/(app)/(tabs)/(2_agents)' as const;
-/**
- * Pinned to the SDK's exported `REMOTE_SESSION_EXIT_NOT_SUPPORTED` constant
- * (see `apps/web/src/lib/cloud-agent-sdk/session.ts`). The barrel import is
- * not used here because the mobile test runner cannot resolve the SDK's
- * transitive web-only `@/...` aliases; the literal must stay in sync with
- * the SDK source. The same pinning rule applies to the two literals below.
- */
-const REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE =
-  'Remote session exit is not supported for the current session';
-/**
- * Internal SDK message: `cli-live-transport` throws this when the live
- * catalog reports a non-`true` `canExitSession`. The SDK does not export the
- * constant, so the literal is matched here. The producer/consumer contract
- * pins these strings — changing them requires updating this classifier.
- */
-const REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE =
-  'Remote session exit is unavailable for the current session';
-const REMOTE_SESSION_EXIT_UPGRADE_PREFIX = 'Remote slash commands require a newer Kilo CLI';
-
-const NON_RETRYABLE_EXIT_MESSAGES: ReadonlySet<string> = new Set([
-  REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE,
-  REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE,
-]);
 
 /** Catalog copy for a pinned SDK exit message, or null when it is not one. */
 function exitErrorCopy(message: string): string | null {
@@ -67,13 +80,6 @@ function exitErrorCopy(message: string): string | null {
   return null;
 }
 
-function isNonRetryableExitError(message: string): boolean {
-  if (NON_RETRYABLE_EXIT_MESSAGES.has(message)) {
-    return true;
-  }
-  return message.startsWith(REMOTE_SESSION_EXIT_UPGRADE_PREFIX);
-}
-
 export async function exitRemoteSessionWithFeedback({
   exit,
   onAccepted,
@@ -83,6 +89,8 @@ export async function exitRemoteSessionWithFeedback({
     await Promise.resolve();
     return true;
   },
+  onRetryableFailure,
+  onNonRetryableFailure,
 }: Readonly<ExitRemoteSessionWithFeedbackInput>): Promise<void> {
   const runExit = async (): Promise<void> => {
     try {
@@ -91,37 +99,48 @@ export async function exitRemoteSessionWithFeedback({
       const message =
         error instanceof Error ? error.message : i18n.t('agentChat.remoteSession.failedToExit');
       // The three pinned SDK messages are a producer/consumer contract, matched
-      // above in English. Once matched, show the reader their own language.
+      // in English by `remote-session-exit-messages`. Once matched, show the
+      // reader their own language.
       const shown = exitErrorCopy(message) ?? message;
       if (isNonRetryableExitError(message)) {
         // Fail-closed: the SDK already signalled "do not send" by rejecting
         // before any wire command. Surface the message with no CTA so the
-        // user sees the upgrade copy but cannot trigger another attempt.
+        // user sees the upgrade copy but cannot trigger another attempt. When
+        // the host owns an inline retry surface, release it: a retry against a
+        // permanent failure would keep failing forever.
         toast.error(shown);
+        onNonRetryableFailure?.();
       } else {
         // Retryable: transport / ACK / heartbeat failure. The draft is
         // preserved by the submit-lock contract; the retry action re-runs
         // the exit mutation under the same SubmitLock the initial send held.
-        toast.error(shown, {
-          action: {
-            label: i18n.t('common.tryAgain'),
-            onClick: () => {
-              void (async () => {
-                try {
-                  await settleVoiceInputBeforeSubmit({
-                    lock,
-                    settleVoiceInput,
-                    submit: runExit,
-                  });
-                } catch {
-                  // Retry errors are already surfaced by the toast inside
-                  // runExit; swallow them so the async action does not leak
-                  // an unhandled promise rejection.
-                }
-              })();
+        const retry = async (): Promise<void> => {
+          try {
+            await settleVoiceInputBeforeSubmit({
+              lock,
+              settleVoiceInput,
+              submit: runExit,
+            });
+          } catch {
+            // Retry errors are already surfaced by the inline failure or the
+            // toast inside runExit; swallow them so the async action does not
+            // leak an unhandled promise rejection.
+          }
+        };
+        if (onRetryableFailure) {
+          // A host-owned durable surface: the retry stays reachable while the
+          // transport is down, so the reader can restore connectivity first.
+          onRetryableFailure({ message: shown, retry });
+        } else {
+          toast.error(shown, {
+            action: {
+              label: i18n.t('common.tryAgain'),
+              onClick: () => {
+                void retry();
+              },
             },
-          },
-        });
+          });
+        }
       }
       throw error;
     }

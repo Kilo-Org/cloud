@@ -1,23 +1,37 @@
-// P1-A-08c wiring tests for `useCreateReviewCommentMutation` and
+/* eslint-disable max-lines -- the comment and review-submit suites share one mock harness for the review seam */
+// P1-A-08c + s6 wiring tests for `useCreateReviewCommentMutation` and
 // `useSubmitReviewMutation`.
 //
 // The sheet / composer / pending-review surfaces own the inline error
 // rendering; these tests assert the HOOK WIRING: each `mutationFn`
-// delegates to the matching `trpcClient.githubPrReview.<procedure>.mutate`,
-// the hoisted operation key is merged into the input, and the key rotation
+// delegates to the matching `trpcClient.<router>.<procedure>.mutate`, the
+// hoisted operation key is merged into the input, and the key rotation
 // policy (real `isPrMutationRetryable` + `mapPrOperationError`) runs inside
 // `mutationFn`. Only `useHoistedOperationKey` is mocked (it holds React ref
 // state that needs a mounted renderer, covered by
 // `operation-key.mounted.test.tsx`).
+//
+// s6: the GitHub arms stay byte-identical (same procedures, same inputs,
+// same pinned fingerprints). The provider arms route the same intents
+// through `providerReview.*` with the s1 provider identity, and the
+// fingerprint pins below mirror the server's `gitlabFingerprintInput` /
+// `bitbucketFingerprintInput` exactly — a GitLab comment and a same-named
+// GitHub comment can never share a ledger key (identity rule 17).
+// c3: the provider arms carry the REAL diff position — an `anchor` on
+// addComment and a `comments` batch on submitReview — and the pinned
+// fingerprints below mirror the server folding the anchor flat and the
+// parsed batch into the ledger key.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as OperationKeyModule from '@/lib/operation-key';
 import { prIntentFingerprint } from '@kilocode/app-shared/pr-review';
+import type * as ProviderPrRefModule from '@/lib/pr-review/provider-pr-ref';
+import { type ProviderPrRef, type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
 import { useCreateReviewCommentMutation, useSubmitReviewMutation } from './use-pr-review-mutations';
 
 const hoistedKeys = vi.hoisted(() => ({
-  getKey: vi.fn(() => 'hoisted-op-key'),
+  getKey: vi.fn((_: string) => 'hoisted-op-key'),
   rotateKey: vi.fn(),
 }));
 
@@ -30,6 +44,21 @@ vi.mock('@/lib/operation-key', async importOriginal => {
   return { ...actual, useHoistedOperationKey: () => hoistedKeys };
 });
 
+// The hooks read the live provider scope from context. These tests call the
+// hooks as plain functions (no renderer), so the context hook is replaced by
+// a settable override: null keeps the GitHub fallback the pre-s6 surface
+// used; a provider scope drives the provider arms.
+let scopeOverride: { ref: ProviderPrRef; organizationId: string | null } | null = null;
+
+vi.mock('@/lib/pr-review/provider-pr-ref', async importOriginal => {
+  const actual = await importOriginal<typeof ProviderPrRefModule>();
+  return {
+    ...actual,
+    useProviderPrScope: (fallback: ProviderPrTriple) =>
+      scopeOverride ?? { ref: { platform: 'github', ...fallback }, organizationId: null },
+  };
+});
+
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
   onError?: (error: unknown) => void;
@@ -39,6 +68,8 @@ type MutationOptions = {
 let lastCapturedOptions: MutationOptions | null = null;
 const createCommentMutateMock = vi.fn();
 const submitReviewMutateMock = vi.fn();
+const providerAddCommentMutateMock = vi.fn();
+const providerSubmitReviewMutateMock = vi.fn();
 const invalidateQueriesMock = vi.fn();
 const toastErrorMock = vi.fn();
 
@@ -60,6 +91,10 @@ vi.mock('@/lib/trpc', () => ({
       getPullRequest: { queryKey: () => ['githubPrReview', 'getPullRequest'] },
       listReviewThreads: { pathFilter: () => ['githubPrReview', 'listReviewThreads'] },
     },
+    providerReview: {
+      getPullRequest: { queryKey: () => ['providerReview', 'getPullRequest'] },
+      listDiscussions: { pathFilter: () => ['providerReview', 'listDiscussions'] },
+    },
   }),
   trpcClient: {
     githubPrReview: {
@@ -67,6 +102,12 @@ vi.mock('@/lib/trpc', () => ({
       createReviewComment: { mutate: (vars: unknown) => createCommentMutateMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       submitReview: { mutate: (vars: unknown) => submitReviewMutateMock(vars) },
+    },
+    providerReview: {
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      addComment: { mutate: (vars: unknown) => providerAddCommentMutateMock(vars) },
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      submitReview: { mutate: (vars: unknown) => providerSubmitReviewMutateMock(vars) },
     },
   },
 }));
@@ -89,6 +130,36 @@ vi.mock('react-native', () => ({
 
 const REF = { owner: 'octocat', repo: 'hello', number: 1 };
 
+const GITLAB_REF: ProviderPrRef = {
+  platform: 'gitlab',
+  projectPath: 'group/sub/app',
+  mrIid: 12,
+  instanceHint: 'https://gl.example.com',
+};
+
+const BITBUCKET_REF: ProviderPrRef = {
+  platform: 'bitbucket',
+  workspace: 'acme',
+  repoSlug: 'widgets',
+  prId: 77,
+};
+
+const GITLAB_IDENTITY = {
+  platform: 'gitlab',
+  projectPath: 'group/sub/app',
+  mrIid: 12,
+  instanceHint: 'https://gl.example.com',
+  organizationId: 'org-9',
+};
+
+const BITBUCKET_IDENTITY = {
+  platform: 'bitbucket',
+  workspace: 'acme',
+  repoSlug: 'widgets',
+  prId: 77,
+  organizationId: 'org-9',
+};
+
 const COMMENT_INPUT = {
   owner: 'octocat',
   repo: 'hello',
@@ -110,14 +181,22 @@ const REVIEW_INPUT = {
   comments: [{ path: 'README.md', line: 3, side: 'RIGHT' as const, body: 'nit' }],
 };
 
+function resetMocks() {
+  lastCapturedOptions = null;
+  scopeOverride = null;
+  createCommentMutateMock.mockReset();
+  submitReviewMutateMock.mockReset();
+  providerAddCommentMutateMock.mockReset();
+  providerSubmitReviewMutateMock.mockReset();
+  invalidateQueriesMock.mockReset();
+  toastErrorMock.mockReset();
+  hoistedKeys.getKey.mockClear();
+  hoistedKeys.rotateKey.mockClear();
+}
+
 describe('useCreateReviewCommentMutation (P1-A-08c wiring)', () => {
   beforeEach(() => {
-    lastCapturedOptions = null;
-    createCommentMutateMock.mockReset();
-    invalidateQueriesMock.mockReset();
-    toastErrorMock.mockReset();
-    hoistedKeys.getKey.mockClear();
-    hoistedKeys.rotateKey.mockClear();
+    resetMocks();
   });
 
   afterEach(() => {
@@ -216,14 +295,196 @@ describe('useCreateReviewCommentMutation (P1-A-08c wiring)', () => {
   });
 });
 
+describe('useCreateReviewCommentMutation (s6 gitlab arm)', () => {
+  beforeEach(() => {
+    resetMocks();
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('routes the body through providerReview.addComment with the full identity', async () => {
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useCreateReviewCommentMutation(GITLAB_REF);
+
+    await expect(lastCapturedOptions?.mutationFn?.({ body: 'inline nit' })).resolves.toEqual({
+      done: true,
+      replayed: false,
+    });
+    expect(createCommentMutateMock).not.toHaveBeenCalled();
+    expect(providerAddCommentMutateMock).toHaveBeenCalledWith({
+      ...GITLAB_IDENTITY,
+      body: 'inline nit',
+      operationKey: 'hoisted-op-key',
+    });
+  });
+
+  it('folds the GitLab instance into the fingerprint (identity rule 17)', async () => {
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useCreateReviewCommentMutation(GITLAB_REF);
+
+    await lastCapturedOptions?.mutationFn?.({ body: 'inline nit' });
+
+    // Pinned bytes mirroring the server's gitlabFingerprintInput: platform +
+    // instanceHint + projectPath + number (as `number`) + body.
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["gitlab","https://gl.example.com","group/sub/app",12],"body":"inline nit"}'
+    );
+  });
+
+  it('sends the tapped diff position as the real anchor and folds it into the fingerprint (c3)', async () => {
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useCreateReviewCommentMutation(GITLAB_REF);
+
+    await lastCapturedOptions?.mutationFn?.({
+      body: 'inline nit',
+      anchor: { path: 'src/a.ts', side: 'RIGHT', line: 12, startLine: 10 },
+    });
+    expect(providerAddCommentMutateMock).toHaveBeenCalledWith({
+      ...GITLAB_IDENTITY,
+      body: 'inline nit',
+      anchor: { path: 'src/a.ts', side: 'RIGHT', line: 12, startLine: 10 },
+      operationKey: 'hoisted-op-key',
+    });
+    // Pinned bytes mirroring the server's gitlabFingerprintInput: the anchor
+    // folds FLAT into the s1 create_review_comment field order (body, path,
+    // line, side, startLine) — a retried anchored comment keeps its key.
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["gitlab","https://gl.example.com","group/sub/app",12],"body":"inline nit","path":"src/a.ts","line":12,"side":"RIGHT","startLine":10}'
+    );
+  });
+
+  it('rotates the key when the same body moves to another line (changed intent)', async () => {
+    providerAddCommentMutateMock.mockResolvedValue({ done: true, replayed: false });
+    useCreateReviewCommentMutation(GITLAB_REF);
+
+    await lastCapturedOptions?.mutationFn?.({
+      body: 'inline nit',
+      anchor: { path: 'src/a.ts', side: 'RIGHT', line: 12 },
+    });
+    const atLine12 = hoistedKeys.getKey.mock.calls[0]?.[0];
+    await lastCapturedOptions?.mutationFn?.({
+      body: 'inline nit',
+      anchor: { path: 'src/a.ts', side: 'RIGHT', line: 13 },
+    });
+    const atLine13 = hoistedKeys.getKey.mock.calls[1]?.[0];
+    expect(atLine12).not.toBe(atLine13);
+    expect(atLine12).toBe(
+      '{"resource":["gitlab","https://gl.example.com","group/sub/app",12],"body":"inline nit","path":"src/a.ts","line":12,"side":"RIGHT"}'
+    );
+  });
+
+  it('keys a GitLab comment apart from the same GitHub comment and from the same MR on another instance', async () => {
+    providerAddCommentMutateMock.mockResolvedValue({ done: true, replayed: false });
+    const onInstanceA = prIntentFingerprint('create_review_comment', {
+      platform: 'gitlab',
+      projectPath: 'group/sub/app',
+      instanceHint: 'https://gl.example.com',
+      number: 12,
+      body: 'inline nit',
+    });
+    const onInstanceB = prIntentFingerprint('create_review_comment', {
+      platform: 'gitlab',
+      projectPath: 'group/sub/app',
+      instanceHint: 'https://gl.other.example',
+      number: 12,
+      body: 'inline nit',
+    });
+    const onGitHub = prIntentFingerprint('create_review_comment', COMMENT_INPUT);
+    expect(onInstanceA).not.toBe(onInstanceB);
+    expect(onInstanceA).not.toBe(onGitHub);
+
+    useCreateReviewCommentMutation({ ...GITLAB_REF, instanceHint: 'https://gl.other.example' });
+    await lastCapturedOptions?.mutationFn?.({ body: 'inline nit' });
+    expect(hoistedKeys.getKey).toHaveBeenLastCalledWith(
+      '{"resource":["gitlab","https://gl.other.example","group/sub/app",12],"body":"inline nit"}'
+    );
+  });
+
+  it('keeps the key on an in-progress CONFLICT and rotates on a non-retryable refusal', async () => {
+    providerAddCommentMutateMock.mockRejectedValueOnce(new Error('operation_in_progress'));
+    useCreateReviewCommentMutation(GITLAB_REF);
+    await expect(lastCapturedOptions?.mutationFn?.({ body: 'x' })).rejects.toBeInstanceOf(Error);
+    expect(hoistedKeys.rotateKey).not.toHaveBeenCalled();
+
+    const refused = new Error('Merge request is locked');
+    Object.assign(refused, { data: { code: 'BAD_REQUEST' } });
+    providerAddCommentMutateMock.mockRejectedValueOnce(refused);
+    await expect(lastCapturedOptions?.mutationFn?.({ body: 'x' })).rejects.toMatchObject({
+      message: 'Merge request is locked',
+    });
+    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('onSettled invalidates the provider caches (overview + discussions)', async () => {
+    useCreateReviewCommentMutation(GITLAB_REF);
+
+    await lastCapturedOptions?.onSettled?.();
+
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({
+      queryKey: ['providerReview', 'getPullRequest'],
+    });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith(['providerReview', 'listDiscussions']);
+  });
+});
+
+describe('useCreateReviewCommentMutation (s6 bitbucket arm)', () => {
+  beforeEach(() => {
+    resetMocks();
+    scopeOverride = { ref: BITBUCKET_REF, organizationId: 'org-9' };
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('routes through providerReview.addComment with the workspace identity', async () => {
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useCreateReviewCommentMutation(BITBUCKET_REF);
+
+    await lastCapturedOptions?.mutationFn?.({ body: 'inline nit' });
+    expect(providerAddCommentMutateMock).toHaveBeenCalledWith({
+      ...BITBUCKET_IDENTITY,
+      body: 'inline nit',
+      operationKey: 'hoisted-op-key',
+    });
+  });
+
+  it('folds the workspace into the fingerprint (identity rule 17)', async () => {
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useCreateReviewCommentMutation(BITBUCKET_REF);
+
+    await lastCapturedOptions?.mutationFn?.({ body: 'inline nit' });
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["bitbucket","acme","widgets",77],"body":"inline nit"}'
+    );
+  });
+
+  it('sends the anchor through the seam with the workspace fingerprint (c3)', async () => {
+    providerAddCommentMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useCreateReviewCommentMutation(BITBUCKET_REF);
+
+    await lastCapturedOptions?.mutationFn?.({
+      body: 'inline nit',
+      anchor: { path: 'src/a.ts', side: 'LEFT', line: 5 },
+    });
+    expect(providerAddCommentMutateMock).toHaveBeenCalledWith({
+      ...BITBUCKET_IDENTITY,
+      body: 'inline nit',
+      anchor: { path: 'src/a.ts', side: 'LEFT', line: 5 },
+      operationKey: 'hoisted-op-key',
+    });
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["bitbucket","acme","widgets",77],"body":"inline nit","path":"src/a.ts","line":5,"side":"LEFT"}'
+    );
+  });
+});
+
 describe('useSubmitReviewMutation (P1-A-08c wiring)', () => {
   beforeEach(() => {
-    lastCapturedOptions = null;
-    submitReviewMutateMock.mockReset();
-    invalidateQueriesMock.mockReset();
-    toastErrorMock.mockReset();
-    hoistedKeys.getKey.mockClear();
-    hoistedKeys.rotateKey.mockClear();
+    resetMocks();
   });
 
   afterEach(() => {
@@ -313,6 +574,103 @@ describe('useSubmitReviewMutation (P1-A-08c wiring)', () => {
   });
 });
 
+describe('useSubmitReviewMutation (s6 provider arms)', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('gitlab: routes event + summary through providerReview.submitReview', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    providerSubmitReviewMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useSubmitReviewMutation(GITLAB_REF);
+
+    await lastCapturedOptions?.mutationFn?.({ event: 'approve', body: 'LGTM' });
+    expect(submitReviewMutateMock).not.toHaveBeenCalled();
+    expect(providerSubmitReviewMutateMock).toHaveBeenCalledWith({
+      ...GITLAB_IDENTITY,
+      event: 'approve',
+      body: 'LGTM',
+      operationKey: 'hoisted-op-key',
+    });
+    // Pinned bytes mirroring the server's submitReview fingerprint input.
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["gitlab","https://gl.example.com","group/sub/app",12],"event":"approve","body":"LGTM"}'
+    );
+  });
+
+  it('gitlab: an event-only review omits the body from the input and the fingerprint', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    providerSubmitReviewMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useSubmitReviewMutation(GITLAB_REF);
+
+    await lastCapturedOptions?.mutationFn?.({ event: 'comment' });
+    const sent = providerSubmitReviewMutateMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(sent).not.toHaveProperty('body');
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["gitlab","https://gl.example.com","group/sub/app",12],"event":"comment"}'
+    );
+  });
+
+  it('gitlab: sends the anchored comments batch and folds it into the fingerprint (c3)', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    providerSubmitReviewMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useSubmitReviewMutation(GITLAB_REF);
+
+    const comments = [
+      { path: 'src/a.ts', side: 'RIGHT' as const, line: 10, body: 'first' },
+      { path: 'src/b.ts', side: 'LEFT' as const, line: 2, startLine: 1, body: 'second' },
+    ];
+    await lastCapturedOptions?.mutationFn?.({ event: 'approve', body: 'LGTM', comments });
+    expect(providerSubmitReviewMutateMock).toHaveBeenCalledWith({
+      ...GITLAB_IDENTITY,
+      event: 'approve',
+      body: 'LGTM',
+      comments,
+      operationKey: 'hoisted-op-key',
+    });
+    // Pinned bytes mirroring the server's submitReview fingerprint input:
+    // the batch serializes in the router's field order (path, side, line,
+    // startLine, body), so a retried batch keeps its ledger identity.
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["gitlab","https://gl.example.com","group/sub/app",12],"event":"approve","body":"LGTM","comments":[{"path":"src/a.ts","side":"RIGHT","line":10,"body":"first"},{"path":"src/b.ts","side":"LEFT","line":2,"startLine":1,"body":"second"}]}'
+    );
+  });
+
+  it('gitlab: an empty comments batch is no batch — pre-c3 bytes unchanged (c3)', async () => {
+    scopeOverride = { ref: GITLAB_REF, organizationId: 'org-9' };
+    providerSubmitReviewMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useSubmitReviewMutation(GITLAB_REF);
+
+    await lastCapturedOptions?.mutationFn?.({ event: 'approve', body: 'LGTM', comments: [] });
+    const sent = providerSubmitReviewMutateMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(sent).not.toHaveProperty('comments');
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["gitlab","https://gl.example.com","group/sub/app",12],"event":"approve","body":"LGTM"}'
+    );
+  });
+
+  it('bitbucket: routes request-changes through the seam with the workspace fingerprint', async () => {
+    scopeOverride = { ref: BITBUCKET_REF, organizationId: 'org-9' };
+    providerSubmitReviewMutateMock.mockResolvedValueOnce({ done: true, replayed: false });
+    useSubmitReviewMutation(BITBUCKET_REF);
+
+    await lastCapturedOptions?.mutationFn?.({ event: 'request_changes', body: 'Fix this' });
+    expect(providerSubmitReviewMutateMock).toHaveBeenCalledWith({
+      ...BITBUCKET_IDENTITY,
+      event: 'request_changes',
+      body: 'Fix this',
+      operationKey: 'hoisted-op-key',
+    });
+    expect(hoistedKeys.getKey).toHaveBeenCalledWith(
+      '{"resource":["bitbucket","acme","widgets",77],"event":"request_changes","body":"Fix this"}'
+    );
+  });
+});
+
 describe('create_review_comment fingerprint (P1-A-08c changed-input)', () => {
   it('stays stable for a retry of the same comment and rotates when any intent input changes', () => {
     const original = prIntentFingerprint('create_review_comment', COMMENT_INPUT);
@@ -363,5 +721,49 @@ describe('submit_review fingerprint (P1-A-08c changed-input)', () => {
       comments: [{ path: 'README.md', line: 4, side: 'RIGHT' as const, body: 'nit' }],
     });
     expect(changedComment).not.toBe(original);
+  });
+});
+
+describe('provider pending-comment body builders (s6, c3)', () => {
+  it('formatPendingCommentBody anchors a single-line position like the pending list shows it', async () => {
+    const { formatPendingCommentBody } = await import('./use-pr-review-mutations');
+    expect(formatPendingCommentBody({ path: 'src/a.ts', line: 10, body: 'note' })).toBe(
+      'src/a.ts:L10\n\nnote'
+    );
+    expect(
+      formatPendingCommentBody({ path: 'src/a.ts', line: 12, startLine: 10, body: 'range' })
+    ).toBe('src/a.ts:L10–L12\n\nrange');
+  });
+  it('buildProviderSubmitInput sends anchored items as a real comments batch (c3)', async () => {
+    const { buildProviderSubmitInput } = await import('./use-pr-review-mutations');
+    expect(
+      buildProviderSubmitInput('Looks good overall.', [
+        { path: 'src/a.ts', side: 'RIGHT' as const, line: 10, body: 'first' },
+        { path: 'src/b.ts', side: 'LEFT' as const, line: 2, startLine: 1, body: 'second' },
+      ])
+    ).toEqual({
+      body: 'Looks good overall.',
+      comments: [
+        { path: 'src/a.ts', side: 'RIGHT', line: 10, body: 'first' },
+        { path: 'src/b.ts', side: 'LEFT', line: 2, startLine: 1, body: 'second' },
+      ],
+    });
+  });
+  it('buildProviderSubmitInput keeps the text-anchored body for items without an anchor (c3)', async () => {
+    const { buildProviderSubmitInput } = await import('./use-pr-review-mutations');
+    expect(
+      buildProviderSubmitInput('Summary.', [
+        { path: 'src/a.ts', line: 10, body: 'folded' },
+        { path: 'src/b.ts', side: 'RIGHT' as const, line: 2, body: 'anchored' },
+      ])
+    ).toEqual({
+      body: 'Summary.\n\nsrc/a.ts:L10\n\nfolded',
+      comments: [{ path: 'src/b.ts', side: 'RIGHT', line: 2, body: 'anchored' }],
+    });
+  });
+  it('buildProviderSubmitInput drops empty parts: a summary-only approve posts exactly the summary', async () => {
+    const { buildProviderSubmitInput } = await import('./use-pr-review-mutations');
+    expect(buildProviderSubmitInput('  LGTM  ', [])).toEqual({ body: 'LGTM', comments: [] });
+    expect(buildProviderSubmitInput('', [])).toEqual({ body: '', comments: [] });
   });
 });

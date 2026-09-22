@@ -394,6 +394,17 @@ describe('WrapperLease', () => {
     expect(nextSandboxRecoveryDeadline(retrying)).toBe(3_000);
   });
 
+  it('adopts an explicit wrapper generation instead of incrementing the runtime counter', async () => {
+    const storage = createMemoryStorage();
+    await storage.put('wrapper_runtime_state', { wrapperGeneration: 7 });
+
+    const { state, allocatedNewIdentity } = await allocateWrapperRuntimeState(storage, 1_000, 2);
+
+    expect(allocatedNewIdentity).toBe(true);
+    expect(state.wrapperGeneration).toBe(2);
+    await expect(getWrapperRuntimeState(storage)).resolves.toMatchObject({ wrapperGeneration: 2 });
+  });
+
   it('marks a newly allocated wrapper run as maintaining its message index', async () => {
     const storage = createMemoryStorage();
 

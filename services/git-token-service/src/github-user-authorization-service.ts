@@ -67,12 +67,16 @@ type GitHubUserAuthorizationEnv = CloudflareEnv & {
   GITHUB_APP_CLIENT_ID?: string;
   GITHUB_APP_CLIENT_SECRET?: string;
   GITHUB_OAUTH_BASE_URL?: string;
+  // Dev-only override that points the REST API at a local stub; absent in
+  // production, where the probe uses real api.github.com.
+  GITHUB_API_BASE_URL?: string;
 };
 type CredentialKind = 'access' | 'refresh';
 type RevokeResult = 'revoked' | 'token_invalid';
 type DisconnectRefreshResult = AuthorizationRow | 'terminal_refresh_token' | null;
 type RefreshResult = 'refreshed' | 'transient_failure' | 'terminal_rejection';
 const DEFAULT_GITHUB_OAUTH_BASE_URL = 'https://github.com';
+const DEFAULT_GITHUB_API_BASE_URL = 'https://api.github.com';
 
 class CredentialSelectionError extends Error {
   constructor(readonly reason: 'credential_unreadable' | 'credential_configuration_error') {
@@ -131,7 +135,16 @@ export class GitHubUserAuthorizationService {
 
       const token = this.decryptCredential(authorization, 'access');
       const repoParts = params.githubRepo.split('/');
-      const endpoint = `https://api.github.com/repos/${encodeURIComponent(repoParts[0])}/${encodeURIComponent(repoParts[1])}`;
+      // Same base override the PR-review client honors (apps/web), so a dev
+      // stub serving api.github.com is probed through the stub instead of
+      // rejecting the stub token against real GitHub and revoking the row. An
+      // empty override counts as unset — `.dev.vars.example` ships
+      // `GITHUB_API_BASE_URL=`, and `??` would keep it, making the probe target
+      // a relative URL.
+      const apiBaseUrl = (
+        this.env.GITHUB_API_BASE_URL?.trim() || DEFAULT_GITHUB_API_BASE_URL
+      ).replace(/\/+$/, '');
+      const endpoint = `${apiBaseUrl}/repos/${encodeURIComponent(repoParts[0])}/${encodeURIComponent(repoParts[1])}`;
       let response: Response;
       try {
         response = await fetch(endpoint, {

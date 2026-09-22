@@ -40,6 +40,13 @@ export type LiveSessionRefreshState = Readonly<{
   /** The last pull/retry failed or ran past the feedback budget. */
   failed: boolean;
   onRetry: () => void;
+  /**
+   * This pull's progress belongs to the surface's centered refreshable body
+   * (the no-match body), which draws it itself while reduced motion is on,
+   * so the reserved line carries the "Updating" copy without a second
+   * spinner: one indicator per pull.
+   */
+  progressInBody?: boolean;
 }>;
 
 /** Notices stay outside the rows so refresh and connection changes cannot remount them. */
@@ -96,7 +103,17 @@ export function LiveSessionFeedback({
   const denied = context.isReady && sessions.terminalError?.kind === 'non-retryable';
   const unavailable = !context.isResolving && !context.isReady && !context.isError;
   let failure: ReactNode = null;
+  // A whole-surface load failure (no readable rows) is one outage: the block
+  // owns the surface and draws its own Retry for it, so the connection row
+  // stands down while the block is shown. Otherwise the exhausted connection
+  // row stacked a second "Connection lost / Retry" above the error card, two
+  // affordances for one failure (device defect uxs1). The row returns as soon
+  // as the block clears, so the socket's own recovery stays reachable. Rows
+  // that remain readable keep both: the list is still usable there, and the
+  // query retry and the socket retry are separate actions.
+  let failureOwnsRetry = false;
   if (context.isError) {
+    failureOwnsRetry = true;
     failure = (
       <QueryError
         placement="top"
@@ -151,6 +168,10 @@ export function LiveSessionFeedback({
     !statusLineOwnsFailure
   ) {
     const compact = content === 'rows';
+    // The compact form sits beside rows that are still readable, so the two
+    // retries stay separate there; the card form is the whole surface, so it
+    // is the single recovery action (see `failureOwnsRetry` above).
+    failureOwnsRetry = !compact;
     failure = (
       <View className="gap-1">
         {!compact && (
@@ -179,7 +200,11 @@ export function LiveSessionFeedback({
   let connectionLabel: string | null = null;
   if (context.isReady && !isConnected && internet !== 'offline') {
     if (reconnectExhausted) {
-      connectionLabel = t('agentChat.sessionConnection.connectionLost');
+      // The exhausted fact carries the surface's recovery action, so it yields
+      // while the load-failure block already owns one (see `failureOwnsRetry`).
+      // The passive Connecting…/Reconnecting… facts stay: they duplicate
+      // nothing.
+      connectionLabel = failureOwnsRetry ? null : t('agentChat.sessionConnection.connectionLost');
     } else if (!sessions.isPaused) {
       connectionLabel = wasConnected.current
         ? t('agentChat.sessionConnection.reconnecting')
@@ -203,7 +228,7 @@ export function LiveSessionFeedback({
             )}
           />
         )}
-        {context.isReady && !isConnected && reconnectExhausted && (
+        {context.isReady && !isConnected && reconnectExhausted && !failureOwnsRetry && (
           <Button
             variant="ghost"
             size="sm"
@@ -216,11 +241,28 @@ export function LiveSessionFeedback({
           </Button>
         )}
       </View>
-      <AccessibleStatus
-        message={content === 'pending' ? t('common.loading') : null}
-        tone="status"
-        className="absolute size-px overflow-hidden"
-      />
+      {refresh && content === 'rows' ? (
+        // The live tab's reserved status line: screen-reader Updating while
+        // the pull is in flight, visible "Couldn't refresh" + Retry when it
+        // failed. It takes the slot of the (layout-free) loading status so the
+        // column has the same children either way, and its height is allocated
+        // whenever rows are shown: a failure that arrives while the kept rows
+        // are on screen replaces empty space instead of pushing the rows down.
+        <View className="min-h-5">
+          <SessionListRefreshStatus
+            busy={refresh.busy}
+            failed={refresh.failed}
+            onRetry={handleRefreshRetry}
+            progressInBody={refresh.progressInBody}
+          />
+        </View>
+      ) : (
+        <AccessibleStatus
+          message={content === 'pending' ? t('common.loading') : null}
+          tone="status"
+          className="absolute size-px overflow-hidden"
+        />
+      )}
       {content === 'rows' && sessions.isFetching && !sessions.isPaused && !refresh?.busy && (
         <AccessibleStatus
           message={t('agents.sessionList.updating')}
@@ -228,17 +270,6 @@ export function LiveSessionFeedback({
           className="absolute size-px overflow-hidden"
         />
       )}
-      {/* The live tab's reserved status line: screen-reader Updating while
-          the pull is in flight, visible "Couldn't refresh" + Retry when it
-          failed. Home passes no refresh state and keeps its a11y-only
-          announcement. */}
-      {refresh && content === 'rows' ? (
-        <SessionListRefreshStatus
-          busy={refresh.busy}
-          failed={refresh.failed}
-          onRetry={handleRefreshRetry}
-        />
-      ) : null}
       {failure}
     </View>
   );

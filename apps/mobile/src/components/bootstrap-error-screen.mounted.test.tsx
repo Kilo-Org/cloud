@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as language-reload-error-screen.mounted.test.tsx) */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
@@ -117,7 +116,10 @@ describe('BootstrapErrorScreen primaryLoading', () => {
     const primary = findPressableByAccessibilityLabel(renderer.root, 'Retry loading account');
     expect(primary.props.disabled).toBe(true);
     expect(primary.props.accessibilityState).toEqual({ disabled: true, busy: true });
-    expect(primary.props.className).toContain('opacity-50');
+    // A busy primary keeps its brand fill: dimming the whole control would
+    // composite the ink label into the washed fill (about 2.4:1 in light).
+    expect(primary.props.className).toContain('bg-primary');
+    expect(primary.props.className).not.toContain('opacity-50');
     // The busy indicator is the button's inline spinner; the label stays.
     expect(
       renderer.root.findAll(

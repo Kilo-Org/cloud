@@ -156,18 +156,26 @@ type ActionHarness = {
 };
 
 function buildActions(
-  overrides: { disabled?: boolean; draft?: string; owner?: string; userId?: string } = {}
+  overrides: {
+    disabled?: boolean;
+    draft?: string;
+    languageTag?: string | null;
+    owner?: string;
+    userId?: string;
+  } = {}
 ): ActionHarness {
   const owner = overrides.owner ?? 'owner-A';
   const draft = vi.fn<() => string>(() => overrides.draft ?? 'draft text');
   const onDraftChange = vi.fn<(nextDraft: string) => void>();
   const disabled = vi.fn<() => boolean>(() => overrides.disabled ?? false);
   const userId = vi.fn<() => string | undefined>(() => overrides.userId);
+  const languageTag = overrides.languageTag;
 
   const actions = createVoiceInputActions({
     controller: mockController,
     getDisabled: disabled,
     getDraft: draft,
+    getLanguageTag: languageTag === undefined ? undefined : () => languageTag,
     getOnDraftChange: () => onDraftChange,
     getOwner: () => owner,
     getUserId: userId,
@@ -252,6 +260,65 @@ describe('useVoiceInput integration', () => {
         expect(startOptions.owner).toBe(owner);
         expect(startOptions.onDraftChange).toBe(onDraftChange);
         expect(startOptions.onFeedback).toBe(showFeedback);
+      });
+
+      it('uses the persisted language choice instead of resolving the app language', async () => {
+        const { actions } = buildActions({ languageTag: 'nl-NL', userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('granted');
+
+        await actions.toggle();
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        const startOptions = mockController.start.mock.calls[0]?.[0];
+        if (!startOptions) {
+          throw new Error('controller.start was not called');
+        }
+        expect(startOptions.languageTag).toBe('nl-NL');
+      });
+
+      it('reconciles a gateway language tag onto the device locale before starting', async () => {
+        const { actions } = buildActions({ languageTag: 'zh-Hans', userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('granted');
+        getSupportedLocalesMock.mockResolvedValue({
+          locales: ['zh-CN', 'en-US'],
+          installedLocales: ['zh-CN'],
+        });
+
+        await actions.toggle();
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.languageTag).toBe('zh-CN');
+      });
+
+      it('reconciles a device locale onto the app language in gateway mode without a device fetch', async () => {
+        const { actions } = buildActions({ languageTag: 'de-DE', userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
+
+        await actions.toggle();
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.languageTag).toBe('de');
+        expect(getSupportedLocalesMock).not.toHaveBeenCalled();
+      });
+
+      it('resolves the app/device language when no language choice is persisted', async () => {
+        const { actions } = buildActions({ languageTag: null });
+        mockController.setSnapshot(idleSnapshot());
+        localizationMock.getLocales.mockReturnValue([{ languageTag: 'en-US' }]);
+
+        await actions.toggle();
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        const startOptions = mockController.start.mock.calls[0]?.[0];
+        if (!startOptions) {
+          throw new Error('controller.start was not called');
+        }
+        expect(startOptions.languageTag).toBe('en-US');
       });
 
       it('resolves an en-DE device locale to en-US when the supported list contains en-AU and en-US', async () => {

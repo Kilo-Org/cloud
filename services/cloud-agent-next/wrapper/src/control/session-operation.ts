@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.js';
 import {
   diagnosticDetail,
   emitControlDiagnostic,
@@ -113,6 +114,7 @@ export type SessionOperationDependencies = {
     options?: { retained?: true; nativeRuntimeId?: string }
   ) => unknown;
   sendOperationResult?: OperationResultSender;
+  consumeGateResult?: () => 'pass' | 'fail' | undefined;
   onLocalCompletion: (retain: boolean) => void;
   onCleanupConfirmed: () => void;
   onDiagnostic?: ControlDiagnosticReporter;
@@ -140,6 +142,13 @@ function fail(message: string, retryable: boolean): ControlHandlerResult {
 
 function kiloFailure(error: unknown): ControlHandlerResult {
   return fail('Kilo request failed', isKiloServerUnreachableError(error));
+}
+
+function assistantFailureFacts(
+  source: unknown
+): Pick<SessionMessageOutcome, 'assistantReason' | 'providerOwnership'> {
+  const failure = classifyAssistantFailure(source);
+  return { assistantReason: failure.reason, providerOwnership: failure.providerOwnership };
 }
 
 export class SessionOperation {
@@ -521,7 +530,7 @@ export class SessionOperation {
         try {
           work.emitPreparing?.(retained ?? event, this.eventOptions());
         } catch {
-          if (!this.authorization) throw new Error('Preparation event delivery failed');
+          this.diagnostic('send_failed');
         }
       },
     });
@@ -571,10 +580,9 @@ export class SessionOperation {
     if (this.authorization && requiresRetention && !retained) return;
     try {
       const delivered = this.deps.emitSessionEvent(retained ?? payload.data, this.eventOptions());
-      if (delivered === false && !this.authorization)
-        throw new Error('Finalization event delivery failed');
+      if (delivered === false) this.diagnostic('send_failed');
     } catch {
-      if (!this.authorization) throw new Error('Finalization event delivery failed');
+      this.diagnostic('send_failed');
     }
   }
 
@@ -647,6 +655,7 @@ export class SessionOperation {
     const { runtime } = work;
     const { kiloClient, env } = runtime;
     this.captureRuntime(runtime);
+    this.deps.consumeGateResult?.();
     const assertCurrent = (submitting = false) => {
       signal.throwIfAborted();
       if (
@@ -768,6 +777,7 @@ export class SessionOperation {
             kiloClient,
             env,
             messageId: completion?.info.id ?? messageId,
+            userMessageId: messageId,
             signal,
             onEvent: event => this.emitFinalizationEvent(event),
           });
@@ -798,6 +808,7 @@ export class SessionOperation {
             messageId,
             status: error.name === 'MessageAbortedError' ? 'cancelled' : 'failed',
             reason: `Kilo execution ended with ${error.name}`,
+            ...(error.name === 'MessageAbortedError' ? {} : assistantFailureFacts(error)),
           }
         : { messageId, status: 'completed' };
     } catch (error) {
@@ -844,6 +855,9 @@ export class SessionOperation {
           messageId,
           status: original.error.name === 'MessageAbortedError' ? 'cancelled' : 'failed',
           reason: `Kilo execution ended with ${original.error.name}`,
+          ...(original.error.name === 'MessageAbortedError'
+            ? {}
+            : assistantFailureFacts(original.error)),
         };
       else if (
         this.native.state === 'unknown' &&
@@ -867,25 +881,25 @@ export class SessionOperation {
       )
         outcome = { messageId, status: 'completed' };
     }
+    const gateResult = this.deps.consumeGateResult?.();
+    if (outcome.status === 'completed' && gateResult !== undefined) {
+      outcome = { ...outcome, gateResult };
+    }
     this.outcome = sessionMessageOutcomeSchema.parse(outcome);
     if (!this.authorization) {
       try {
         diagnostic('outcome_sending', outcome.status);
-        if (
-          this.deps.emitSessionEvent(
-            {
-              type: 'session.message.outcome',
-              properties: this.outcome,
-            },
-            this.eventOptions()
-          ) === false
-        )
-          throw new Error('Session outcome delivery failed');
-        diagnostic('outcome_sent', outcome.status);
+        const delivered = this.deps.emitSessionEvent(
+          {
+            type: 'session.message.outcome',
+            properties: this.outcome,
+          },
+          this.eventOptions()
+        );
+        if (delivered === false) diagnostic('send_failed', outcome.status);
+        else diagnostic('outcome_sent', outcome.status);
       } catch {
         diagnostic('outcome_failed', outcome.status);
-        this.requestRetirement('Session outcome delivery failed', this.captureCleanupDeadline());
-        return fail('Session outcome delivery failed', false);
       }
     }
     return result;

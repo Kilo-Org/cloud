@@ -46,6 +46,7 @@ import {
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
 import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
+import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
@@ -1318,22 +1319,37 @@ export const cliSessionsV2Router = createTRPCRouter({
   get: baseProcedure.input(GetSessionInputSchema).query(async ({ ctx, input }) => {
     const { session_id } = input;
 
-    const [session] = await db
+    // Look the rows up without the owner filter first, so a session that exists
+    // but belongs to another account is distinguishable from one that does not
+    // exist. The session-resume gate (web) and the mobile session route render
+    // the two denials differently ("Not found" vs "Access denied"), which is
+    // only possible when the lookup says which one happened. Session ids are
+    // high-entropy, so the existence signal is not enumerable; the row itself
+    // is never returned to a non-owner.
+    //
+    // `session_id` alone is not unique — the primary key is
+    // `(session_id, kilo_user_id)` — so the lookup cannot take the first row:
+    // that could pick another account's row for the same id and deny the owner
+    // their own session. Read the rows for the id and prefer the caller's.
+    const sessions = await db
       .select()
       .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, session_id),
-          eq(cli_sessions_v2.kilo_user_id, ctx.user.id)
-        )
-      )
-      .limit(1);
+      .where(eq(cli_sessions_v2.session_id, session_id));
+
+    const session = sessions.find(row => row.kilo_user_id === ctx.user.id);
 
     if (!session) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Session not found',
-      });
+      throw new TRPCError(
+        sessions.length > 0
+          ? {
+              code: 'UNAUTHORIZED',
+              message: 'You do not have access to this session',
+            }
+          : {
+              code: 'NOT_FOUND',
+              message: 'Session not found',
+            }
+      );
     }
 
     if (session.organization_id) {
@@ -1423,54 +1439,66 @@ export const cliSessionsV2Router = createTRPCRouter({
       const session = await getSessionWithAccessCheck(input.session_id, ctx);
 
       // Read the event-log watermark from the existing getSession response
-      // before the initial history page, so the transport can use `fromId`
-      // on its first WebSocket connect instead of `replay=false`. Cursor
-      // pages skip the Cloud Agent read — the watermark is only seeded once.
+      // for the initial history page, so the transport can use `fromId` on
+      // its first WebSocket connect instead of `replay=false`. Cursor pages
+      // skip the Cloud Agent read — the watermark is only seeded once.
       // Failures are swallowed and return null so the page endpoint is
-      // never blocked on an optional watermark read.
-      let watermarkEventId: number | null = null;
-      if (!input.cursor && session.cloud_agent_session_id) {
+      // never blocked on an optional watermark read. The page response does
+      // not depend on the watermark, so the read runs concurrently with the
+      // worker page fetch rather than serially ahead of it.
+      const cloudAgentSessionId = !input.cursor ? session.cloud_agent_session_id : null;
+      const watermarkPromise: Promise<number | null> = cloudAgentSessionId
+        ? (async () => {
+            try {
+              const authToken = (
+                await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+                  headers: ctx.headersList,
+                  organizationId: session.organization_id ?? undefined,
+                  tokenSource: 'cloud-agent',
+                })
+              ).token;
+              const client = createCloudAgentNextClient(authToken);
+              const sessionState = await client.getSession(cloudAgentSessionId);
+              return sessionState.latestEventId ?? null;
+            } catch (error) {
+              console.warn(
+                `Failed to fetch watermark for session ${input.session_id}:`,
+                error instanceof Error ? error.message : error
+              );
+              return null;
+            }
+          })()
+        : Promise.resolve(null);
+
+      // Start the page fetch first so it is in flight before the optional
+      // watermark read above resolves.
+      const pagePromise = (async () => {
         try {
-          const authToken = (
-            await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
-              headers: ctx.headersList,
-              organizationId: session.organization_id ?? undefined,
-              tokenSource: 'cloud-agent',
-            })
-          ).token;
-          const client = createCloudAgentNextClient(authToken);
-          const sessionState = await client.getSession(session.cloud_agent_session_id);
-          watermarkEventId = sessionState.latestEventId ?? null;
+          return await fetchSessionMessagesPage(input.session_id, ctx.user.id, {
+            limit: input.limit,
+            ...(input.cursor !== undefined ? { before: input.cursor } : {}),
+          });
         } catch (error) {
-          console.warn(
-            `Failed to fetch watermark for session ${input.session_id}:`,
+          // Match the existing `getSessionMessages` error contract: surface a
+          // stable INTERNAL_SERVER_ERROR so the mobile client can map the
+          // outcome without inferring retry semantics from the worker's
+          // text. The client already calls `captureException`; we do not
+          // double-capture here.
+          console.error(
+            `Failed to fetch session messages page for session ${input.session_id}:`,
             error instanceof Error ? error.message : error
           );
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to fetch session messages page',
+            cause: error,
+          });
         }
-      }
+      })();
 
-      let result;
-      try {
-        result = await fetchSessionMessagesPage(input.session_id, ctx.user.id, {
-          limit: input.limit,
-          ...(input.cursor !== undefined ? { before: input.cursor } : {}),
-        });
-      } catch (error) {
-        // Match the existing `getSessionMessages` error contract: surface a
-        // stable INTERNAL_SERVER_ERROR so the mobile client can map the
-        // outcome without inferring retry semantics from the worker's
-        // text. The client already calls `captureException`; we do not
-        // double-capture here.
-        console.error(
-          `Failed to fetch session messages page for session ${input.session_id}:`,
-          error instanceof Error ? error.message : error
-        );
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch session messages page',
-          cause: error,
-        });
-      }
+      // The watermark promise never rejects (it resolves to null on failure),
+      // so a rejecting page promise cannot leave it as an unhandled rejection.
+      const [result, watermarkEventId] = await Promise.all([pagePromise, watermarkPromise]);
 
       // The worker returns `null` only for sessions the user cannot read; the
       // router's own access check above already enforces this, so the only
@@ -1484,17 +1512,25 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
+      // Project the session goal from the snapshot metadata so clients can
+      // restore the fixed goal section on open and on reconnect. The raw
+      // session metadata stays server-side; only the validated goal is
+      // returned, so no private CLI metadata leaks to the client.
+      const { sessionMetadata, ...pageResult } = result;
+      const sessionGoal = projectSessionGoal(sessionMetadata);
+
       return {
         ...(session.cloud_agent_worktree_id
           ? projectGroupedSessionTranscript(
-              result,
+              pageResult,
               input.session_id,
-              result.history && 'messages' in result.history
-                ? result.history.messages.map(message => message.info)
+              pageResult.history && 'messages' in pageResult.history
+                ? pageResult.history.messages.map(message => message.info)
                 : []
             )
-          : result),
+          : pageResult),
         watermarkEventId,
+        ...(sessionGoal === undefined ? {} : { sessionGoal }),
       };
     }),
 

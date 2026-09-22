@@ -6,8 +6,11 @@ import { AppState } from 'react-native';
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
 import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
+import { LauncherSurfacesMount } from '@/components/launcher-surfaces-mount';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
+import { TourAutoOpen } from '@/components/tour/tour-auto-open';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
+import { ArtifactMirrorSyncMount } from '@/lib/artifacts/artifact-mirror-sync-mount';
 import { attemptLogoutReconciliation } from '@/lib/auth/logout-reconciliation';
 import { GlanceablePublisherMount } from '@/lib/glanceable/mount';
 import { useGlanceableOrgFence } from '@/lib/glanceable/org-fence';
@@ -15,12 +18,14 @@ import {
   attemptPushRegistrationReconciliation,
   subscribeToPushTokenRotation,
 } from '@/lib/auth/push-registration-reconciliation';
-import { useFormSheetDetents } from '@/lib/form-sheet';
+import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
+import { SystemSearchIndexMount } from '@/lib/system-search-index-mount';
+import { ToolSummaryTranslationRetryMount } from '@/lib/tool-summary-translation/tool-summary-translation-retry-mount';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -108,19 +113,24 @@ function AppWideFreshnessMount() {
 
 export default function AppLayout() {
   const colors = useThemeColors();
-  const { fullSheetDetent } = useFormSheetDetents();
+  const sheetOptions = useFormSheetScreenOptions();
   useSecurityLifecycleInvalidation();
   useGlanceableOrgFence();
 
   return (
     <UserWebConnectionProvider>
       <ActiveSessionsLiveSyncMount />
+      <ArtifactMirrorSyncMount />
+      <SystemSearchIndexMount />
       <GlanceablePublisherMount />
+      <LauncherSurfacesMount />
       <CachePersistenceMount />
+      <ToolSummaryTranslationRetryMount />
       <LogoutReconciliationMount />
       <PushRegistrationMount />
       <AppWideFreshnessMount />
       <SharePayloadNavigator />
+      <TourAutoOpen />
       <KiloChatProvider>
         <KiloChatPresenceMount>
           <Stack
@@ -140,78 +150,19 @@ export default function AppLayout() {
             />
             <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
             <Stack.Screen name="agent-chat/[session-id]" />
-            <Stack.Screen
-              name="agent-chat/model-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="agent-chat/repo-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
+            <Stack.Screen name="agent-chat/model-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/repo-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/branch-picker" options={sheetOptions} />
             <Stack.Screen
               name="agent-chat/mode-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
+              options={{ ...sheetOptions, sheetAllowedDetents: [0.5] }}
             />
-            <Stack.Screen
-              name="agent-chat/instance-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="agent-chat/folder-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="share-gate"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="language-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="transcription-model-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
+            <Stack.Screen name="agent-chat/instance-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/folder-picker" options={sheetOptions} />
+            <Stack.Screen name="share-gate" options={sheetOptions} />
+            <Stack.Screen name="language-picker" options={sheetOptions} />
+            <Stack.Screen name="transcription-model-picker" options={sheetOptions} />
+            <Stack.Screen name="voice-language-picker" options={sheetOptions} />
             <Stack.Screen
               name="kilo-pass"
               options={{
@@ -224,6 +175,18 @@ export default function AppLayout() {
               options={{
                 presentation: 'modal',
                 headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
+              name="tour"
+              options={{
+                presentation: 'modal',
+                headerShown: false,
+                // A swipe-down dismissal would bypass the tour's own dismissal
+                // (which records the per-account decision). Match `onboarding`
+                // and `consent`: the only exits are the tour's own controls and
+                // Android hardware Back, both of which record first.
                 gestureEnabled: false,
               }}
             />

@@ -1,9 +1,8 @@
 /* eslint-disable import/first -- mocks must be defined before the module under test is imported */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom) */
 /* eslint-disable max-lines -- cohesive resolver suite: cache seeding, sweeper, renew-on-read, and refresh coalescing share one harness */
 import { type FilePart } from '@kilocode/cloud-agent-sdk';
 import { createElement, type FC } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getAttachmentDownloadUrlMutate = vi.hoisted(() => vi.fn());

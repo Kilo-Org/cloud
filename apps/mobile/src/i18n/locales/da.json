@@ -36,6 +36,7 @@
     "cost": "Pris",
     "discard": "Kassér",
     "findings": "Fund",
+    "mergeRequest": "merge request",
     "notConnected": "Ikke tilknyttet",
     "notifications": "Notifikationer",
     "pullRequest": "pR",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Brug en anden e-mailadresse",
     "signInWithApple": "Log ind med Apple",
     "signInWithGoogle": "Log ind med Google",
+    "signInWithPasskey": "Log ind med en adgangsnøgle",
     "emailAddress": "E-mailadresse",
     "emailPlaceholder": "du@eksempel.dk",
     "continueWithEmail": "Fortsæt med e-mail",
@@ -174,6 +176,10 @@
     "termsConnector": " og ",
     "termsSuffix": ".",
     "moreSignInOptions": "Flere muligheder for login",
+    "passkeyCancelled": "Logind med adgangsnøgle blev annulleret. Prøv igen.",
+    "passkeyNotFound": "Der er ikke gemt nogen adgangsnøgle på denne enhed. Log i stedet ind med Apple, Google eller din e-mail.",
+    "passkeyUnsupported": "Adgangsnøgler er ikke tilgængelige på denne enhed. Log i stedet ind med Apple, Google eller din e-mail.",
+    "passkeyFailed": "Kunne ikke logge ind med en adgangsnøgle. Prøv igen.",
     "couldNotCompleteSignIn": "Kunne ikke fuldføre login. Prøv igen.",
     "sessionEnded": "Din session er afsluttet. Log ind igen.",
     "signInCodeExpired": "Din loginkode er udløbet. Prøv igen.",
@@ -224,11 +230,36 @@
     "providerTestAccount": "Testkonto",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO til virksomheder"
+    "providerEnterpriseSso": "SSO til virksomheder",
+    "passkeysTitle": "Adgangsnøgler",
+    "passkeysSubtitle": "Log ind uden en adgangskode",
+    "passkeysEmpty": "Ingen adgangsnøgler endnu",
+    "passkeysEmptyHint": "$t(profile.addPasskey) for at logge ind uden en adgangskode.",
+    "passkeysCouldNotLoad": "Kunne ikke indlæse adgangsnøgler",
+    "passkeysLoadFailed": "Adgangsnøgler er utilgængelige, indtil dette indlæses.",
+    "addPasskey": "Tilføj en adgangsnøgle",
+    "passkeyDefaultName": "Adgangsnøgle",
+    "passkeyAddedOn": "Tilføjet {{date}}",
+    "passkeyAdded": "Adgangsnøgle tilføjet.",
+    "passkeyAddFailed": "Kunne ikke tilføje en adgangsnøgle. Prøv igen.",
+    "passkeyAddUnsupported": "Denne enhed kan ikke oprette adgangsnøgler.",
+    "passkeyAddCancelled": "Oprettelsen af adgangsnøglen blev annulleret.",
+    "passkeyRemoved": "Adgangsnøgle fjernet.",
+    "passkeyRemoveFailed": "Kunne ikke fjerne den adgangsnøgle. Prøv igen.",
+    "passkeyRenamed": "Adgangsnøgle omdøbt.",
+    "passkeyName": "Navn på adgangsnøgle",
+    "renamePasskey": "Omdøb adgangsnøgle",
+    "removePasskey": "Fjern adgangsnøgle",
+    "removePasskeyTitle": "Fjern adgangsnøgle?",
+    "removePasskeyMessage": "Du kan ikke længere logge ind med denne adgangsnøgle."
   },
   "preferences": {
+    "general": "Generelt",
+    "voiceInput": "Stemmeinput",
     "autoExpandThinking": "Fold ræsonnementer ud automatisk",
     "autoExpandThinkingSubtitle": "Vis agentens ræsonnement foldet ud, når det er færdigt.",
+    "hideThinking": "Skjul detaljer om ræsonnement",
+    "hideThinkingSubtitle": "Vis ikke agentens ræsonnement på sessionssiden.",
     "keepScreenOn": "Hold skærmen tændt på sessionssiden",
     "keepScreenOnSubtitle": "Hold skærmen tændt, mens sessionen kører.",
     "appearance": "Udseende",
@@ -237,6 +268,7 @@
     "appearanceLight": "Lys",
     "appearanceDark": "Mørk",
     "account": "Konto",
+    "accountSubtitle": "Sprog, betroede domæner og enhedssessioner",
     "prReviewAttribution": "Angiv appen i PR-gennemgange",
     "prReviewAttributionSubtitle": "Tilføj en sidefod om, at gennemgangen er lavet via Kilo, når du indsender den.",
     "returnSendsMessage": "Returtasten sender beskeden",
@@ -250,7 +282,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transskription via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transskribér stemmeinput med en Kilo Gateway-model i stedet for enhedens stemmegenkendelse. Din optagelse sendes til Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Komprimer værktøjskald",
+    "condenseToolCallsSubtitle": "Gruppér fortløbende værktøjskald i én række, du kan åbne.",
+    "toolSummaryTranslation": "Oversæt værktøjssammendrag",
+    "toolSummaryTranslationSubtitle": "Send hvert værktøjssammendrag til en model for at oversætte det til dit appsprog. Originalen vises, hvis oversættelsen mislykkes.",
+    "toolSummaryTranslationModelUnavailableNotice": "Denne model tilbydes ikke længere. Tryk på $t(common.model) for at vælge en anden."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ikke tilgængelig",
@@ -312,10 +349,10 @@
       "expandContext": "Vis kontekst",
       "expandMoreContext": "Vis mere kontekst",
       "expandLines": "Vis {{displayCount}} linjer ({{start}}–{{end}})",
-      "expandMoreLines": "Vis {{displayCount}} flere linjer ({{start}}–{{end}})",
+      "expandMoreLines": "Vis flere linjer ({{displayCount}}) ({{start}}–{{end}})",
       "expandLinesOfContext": "Vis {{displayCount}} linjer med kontekst",
       "expandAll": "Vis alle",
-      "expandAllLines": "Vis alle {{displayCount}} linjer",
+      "expandAllLines": "Vis alle linjer ({{displayCount}})",
       "loadingMoreFiles": "Indlæser flere filer…",
       "retryLoadingNextPage": "Prøv at indlæse næste side igen",
       "failedToLoadMoreFiles": "Kunne ikke indlæse flere filer — tryk for at prøve igen",
@@ -332,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} af {{total}} filer indlæst",
       "filesStillLoading": "Filer indlæses stadig. Træk ned for at opdatere.",
       "goToOverview": "Gå til oversigten",
-      "goToOverviewTab": "Gå til fanen Oversigt"
+      "goToOverviewTab": "Gå til fanen Oversigt",
+      "expandAllLines_one": "Vis alle linjer ({{displayCount}})",
+      "expandAllLines_other": "Vis alle linjer ({{displayCount}})",
+      "expandLines_one": "Vis {{displayCount}} linje ({{start}}–{{end}})",
+      "expandLines_other": "Vis {{displayCount}} linjer ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Vis {{displayCount}} linje med kontekst",
+      "expandLinesOfContext_other": "Vis {{displayCount}} linjer med kontekst",
+      "expandMoreLines_one": "Vis flere linjer ({{displayCount}}) ({{start}}–{{end}})",
+      "expandMoreLines_other": "Vis flere linjer ({{displayCount}}) ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} af {{total}} filer indlæst",
+      "loadedOfTotalFiles_other": "{{loaded}} af {{total}} filer indlæst"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ filen slutter ikke med et linjeskift.",
@@ -347,6 +394,7 @@
       "merge": "Fletning",
       "mergeNow": "Flet nu",
       "mergePullRequest": "Flet pull request",
+      "mergeTermTitle": "Flet {{term}}",
       "enableAutoMerge": "Aktivér automatisk fletning",
       "disableAutoMerge": "Deaktivér automatisk fletning",
       "autoMergeOn": "Automatisk fletning er aktiveret",
@@ -365,9 +413,12 @@
       "deleteBranchAfterMerge": "Slet gren efter fletning",
       "noEnabledMethods": "Ingen flettemetoder er aktiveret for dette kodelager. Bed en administrator om at aktivere fletning, sammenlægning af commits eller flytning af basis.",
       "confirmTitle": "Flet pull request?",
+      "confirmTitleTerm": "Flet {{term}}?",
       "confirmMessage": "Dine ændringer flettes ind i målgrenen.",
       "enableAutoMergeConfirmTitle": "Aktivér automatisk fletning?",
       "enableAutoMergeConfirmMessage": "GitHub fletter automatisk denne pull request, når alle påkrævede kontroller er bestået.",
+      "enableAutoMergeConfirmMessageTerm": "Når pipelinen er lykkedes, bliver {{term}} flettet automatisk.",
+      "enableAutoMergeDescriptionTerm": "GitLab fletter automatisk denne {{term}}, når pipelinen er lykkedes.",
       "forbidden": "Du har ikke tilladelse til at flette denne pull request.",
       "cannotMerge": "Denne pull request kan ikke flettes, som den er.",
       "couldNotMerge": "Denne pull request kunne ikke flettes.",
@@ -378,7 +429,8 @@
       },
       "terminal": {
         "alreadyMerged": "Allerede flettet",
-        "closed": "Denne pull request er lukket"
+        "closed": "Denne pull request er lukket",
+        "closedMergeRequest": "Denne merge request er lukket"
       },
       "partialSuccessBanner": {
         "body": "Grenen kunne ikke slettes: {{reason}}.",
@@ -403,6 +455,18 @@
         "behindDetail": "Kildegrenen mangler ændringer fra målgrenen. Flyt grenens basis, eller opdater grenen, før du fletter.",
         "notMergeableTitle": "Denne pull request kan ikke flettes endnu",
         "notMergeableDetail": "GitHub har angivet flettestatussen {{state}}."
+      },
+      "restrictions": {
+        "title": "Fletterestriktioner",
+        "approvalsRequired_one": "{{displayCount}} godkendelse påkrævet",
+        "approvalsRequired_other": "{{displayCount}} godkendelser påkrævet",
+        "pipelineMustSucceed": "Pipelinen skal gennemføres, før der kan flettes."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipelinen fejler ved seneste commit.",
+        "pendingPipeline": "Pipelinen kører stadig ved seneste commit.",
+        "permission": "Du har ikke tilladelse til at flette denne {{term}}.",
+        "draft": "Markér denne {{term}} som klar til gennemgang, før du fletter."
       },
       "methodLabels": {
         "merge": "Opret en flettecommit",
@@ -452,6 +516,8 @@
       "replyBadRequest": "Dette svar kan ikke sendes. Tråden kan have ændret sig.",
       "replyForbidden": "Du har ikke tilladelse til at svare på denne pull request.",
       "addCommentCta": "Kommenter på denne pull request",
+      "fixWithKilo": "Ret med Kilo",
+      "fixWithKiloPrompt": "Håndter venligst følgende kommentar på pull requesten: {{link}}",
       "commentBadRequest": "Denne kommentar kan ikke sendes. Pull requesten kan have ændret sig.",
       "commentForbidden": "Du har ikke tilladelse til at kommentere på denne pull request.",
       "moderation": {
@@ -481,7 +547,7 @@
       "noDiscussionDescription": "Der er endnu ingen tråde med kodegennemgang eller kommentarer i diskussionen om denne pull request.",
       "reviewFiles": "Gennemgå filer",
       "quotedDiffSnippet": "Citeret uddrag af ændringsvisningen",
-      "moreLinesAbove": "… der er {{displayCount}} flere linjer ovenfor.",
+      "moreLinesAbove": "… der er flere linjer ovenfor: {{displayCount}}.",
       "termsAcceptRequired": "Du skal acceptere tjenestevilkårene for at skrive kommentarer.",
       "termsOutdatedCopy": "Tjenestevilkårene er blevet ændret. Åbn denne skærm igen for at acceptere den nyeste version.",
       "termsCheckRetryCopy": "Kunne ikke kontrollere tjenestevilkårene. Tjek din forbindelse og prøv igen.",
@@ -502,7 +568,10 @@
         "outdatedOnLines": "Forældet på {{lines}}",
         "outdatedOnPath": "Forældet i {{path}}"
       },
-      "deletedUser": "slettet bruger"
+      "deletedUser": "slettet bruger",
+      "replyForbiddenTerm": "Du har ikke tilladelse til at svare på denne {{term}}.",
+      "moreLinesAbove_one": "… der er flere linjer ovenfor: {{displayCount}}.",
+      "moreLinesAbove_other": "… der er flere linjer ovenfor: {{displayCount}}."
     },
     "couldNotOpenGitHubAppSettings": "Indstillingerne for GitHub-appen kunne ikke åbnes.",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
@@ -514,17 +583,19 @@
     "reviewPullRequest": "Gennemgå pull request",
     "headLine": "{{counts}} · seneste commit {{sha}}",
     "entry": {
-      "eyebrow": "Åbn en pull request via dens URL.",
-      "pastePrLink": "Indsæt et PR-link",
-      "noRecentPrs": "Ingen seneste PR'er",
-      "noRecentPrsDescription": "Indsæt et PR-link ovenfor for at starte en gennemgang. Denne PR vises her næste gang.",
+      "eyebrow": "Åbn en pull request eller merge request via dens URL",
+      "pastePrLink": "Indsæt et pull request- eller merge request-link",
+      "noRecentPrs": "Ingen seneste gennemgange",
+      "noRecentPrsDescription": "Indsæt et link ovenfor for at starte en gennemgang — den vises her næste gang.",
       "couldNotLoad": "Indholdet kunne ikke indlæses.",
       "removeFromRecentsTitle": "Fjern fra listen over seneste?",
-      "removeFromRecentsMessage": "Denne pull request fjernes fra listen over dine seneste pull requests.",
+      "removeFromRecentsMessage": "Denne gennemgang fjernes fra listen over dine seneste.",
       "removeRecentAccessibility": "Fjern {{repo}} fra listen over seneste",
-      "urlAccessibility": "URL til en pull request på GitHub",
-      "clearLink": "Ryd pull request-link",
-      "pasteLink": "Indsæt et pull request-link",
+      "urlAccessibility": "Indtast en pull request- eller merge request-URL",
+      "urlPlaceholder": "URL på pull request eller merge request",
+      "openAccessibility": "Åbn pull request eller merge request",
+      "clearLink": "Ryd link",
+      "pasteLink": "Indsæt pull request- eller merge request-link",
       "open": "Åbn"
     },
     "checks": {
@@ -541,6 +612,8 @@
       "pending": "{{displayCount}} afventer",
       "skipped": "{{displayCount}} sprunget over",
       "checksCount": "{{displayCount}} kontroller",
+      "checksCount_one": "{{displayCount}} kontrol",
+      "checksCount_other": "{{displayCount}} kontroller",
       "checkDetails": "detaljer om kontrollen"
     },
     "inbox": {
@@ -573,9 +646,15 @@
     "connect": {
       "checkFailedTitle": "GitHub-forbindelsen kunne ikke kontrolleres.",
       "checkFailedMessage": "Din loginstatus kan først vises, når indlæsningen er færdig.",
+      "checkFailedTitleGitLab": "GitLab-forbindelsen kunne ikke kontrolleres.",
+      "checkFailedTitleBitbucket": "Bitbucket-forbindelsen kunne ikke kontrolleres.",
+      "providerCheckFailedMessage": "Din forbindelsesstatus kan først vises, når indlæsningen er færdig.",
       "reconnectTitle": "Opret forbindelse til GitHub igen",
       "reconnectDescription": "Adgangen til din GitHub-konto er blevet tilbagekaldt. Opret forbindelse igen for at fortsætte med at gennemgå pull requests på mobilen.",
-      "description": "Tilslut din GitHub-konto for at gennemgå pull requests på mobilen."
+      "description": "Tilslut din GitHub-konto for at gennemgå pull requests på mobilen.",
+      "gitlabDescription": "Tilslut din GitLab-konto for at gennemgå merge requests på mobilen.",
+      "bitbucketDescription": "Tilslut Bitbucket til denne organisation for at gennemgå pull requests på mobilen.",
+      "bitbucketOrgOnlyDescription": "Vælg en organisation i din profil for at gennemgå dens Bitbucket-pull requests."
     },
     "screen": {
       "title": "#{{number}}",
@@ -597,7 +676,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub-forbindelsen er udløbet.",
-      "message": "Din GitHub-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt."
+      "message": "Din GitHub-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt.",
+      "gitlabTitle": "GitLab-forbindelsen er udløbet.",
+      "bitbucketTitle": "Bitbucket-forbindelsen er udløbet.",
+      "providerMessage": "Din {{provider}}-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt."
     },
     "eventChips": {
       "comment": "Kommentar",
@@ -662,10 +744,12 @@
       "statusContext": "Kontekst",
       "lineLabel": "{{status}} linje {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} – {{text}}",
-      "emptyLine": "(tom)"
+      "emptyLine": "(tom)",
+      "truncationBanner_one": "Kun de første {{limit}} af {{total}} ændrede filer vises på grund af en begrænsning i GitHub API.",
+      "truncationBanner_other": "Kun de første {{limit}} af {{total}} ændrede filer vises på grund af en begrænsning i GitHub API."
     },
     "linkPasteClipboardEmpty": "Udklipsholderen er tom.",
-    "linkPasteNotAPullRequest": "Linket fører ikke til en pull request på GitHub.",
+    "linkPasteNotAPullRequest": "Linket fører ikke til en pull request eller merge request",
     "announce": {
       "commentPosted": "Kommentar sendt",
       "reviewSubmitted": "Gennemgang sendt",
@@ -674,6 +758,7 @@
     "mutationError": {
       "commentNotPosted": "Denne kommentar kan ikke sendes. Den valgte linje kan have ændret sig, eller PR'en kan være blevet opdateret.",
       "reviewNotSubmitted": "Denne gennemgang kan ikke sendes, som den er. PR'en kan være ændret, eller fejlen skyldes, at du ikke kan gennemgå din egen pull request.",
+      "reviewNotSubmittedTerm": "Denne gennemgang kan ikke sendes, som den er. {{term}} kan være ændret, eller også kan du ikke gennemgå din egen {{term}}.",
       "couldNotPostComment": "Kunne ikke sende kommentaren.",
       "couldNotSubmitReview": "Gennemgangen kunne ikke sendes. Tjek din forbindelse, og prøv igen."
     },
@@ -681,9 +766,31 @@
       "couldNotReply": "Svaret kunne ikke sendes.",
       "couldNotCompleteAction": "Kunne ikke fuldføre denne handling.",
       "mergeResultDefaultError": "GitHub fuldførte ikke fletningen.",
+      "mergeResultNotCompleted": "{{term}} blev ikke flettet. Tjek dens status, og prøv igen.",
       "ambiguous": "Handlingen kunne ikke bekræftes. Tjek PR'en, før du prøver igen.",
       "persistenceFailed": "Vi kunne ikke registrere denne handling. Prøv igen senere.",
       "forbidden": "Du har ikke tilladelse til denne handling."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ikke tilgængelig hos denne udbyder",
+        "accessibility": "Ikke tilgængelig hos denne udbyder: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Del merge request",
+      "viewOnProvider": "Se på {{provider}}",
+      "mergeRequestUnavailable": "Merge request ikke tilgængelig",
+      "unavailableDescription": "Den er muligvis blevet slettet, eller også har du ikke adgang til den.",
+      "accessDeniedMergeRequest": "Du har ikke tilladelse til at se denne merge request.",
+      "couldNotLoadMergeRequest": "Denne merge request kunne ikke indlæses.",
+      "discussionAccessDenied": "Du har ikke tilladelse til at se diskussionen om denne merge request.",
+      "discussionUnavailableMessage": "Denne merge request kan være fjernet.",
+      "noDiscussionDescription": "Der er endnu ingen tråde med kodegennemgang eller kommentarer i diskussionen om denne merge request.",
+      "noFilesChangedDescription": "Der er ingen filændringer i denne merge request."
     }
   },
   "notifications": {
@@ -716,11 +823,12 @@
     "previewFullDescription": "Notifikationer viser beskedteksten på din låseskærm.",
     "previewGenericDescription": "Notifikationer viser kun, at der er sket noget. Åbn Kilo for at læse beskeden.",
     "channel": {
-      "agent": "Agentsessioner",
+      "agentProgress": "Agentforløb",
       "chat": "Chatbeskeder",
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Advarsler om saldo",
-      "security": "Sikkerhedsfund"
+      "security": "Sikkerhedsfund",
+      "spend": "Forbrugsadvarsler"
     },
     "category": {
       "chatMessagesSubtitle": "svar i dine samtaler",
@@ -731,8 +839,22 @@
       "sessionStatusTitle": "Sessionsstatus",
       "sessionStatusSubtitle": "afsluttet / mislykket / klar til styring",
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
+      "kiloclawActivityUnavailable": "Start en KiloClaw-instans for at få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "advarsler om lav saldo i organisationen",
-      "securityFindingsSubtitle": "nye fund og SLA-påmindelser"
+      "balanceAlertsUnavailable": "Tilmeld dig en organisation for at få saldoadvarsler.",
+      "securityFindingsSubtitle": "nye fund og SLA-påmindelser",
+      "securityFindingsUnavailable": "Aktivér Kilo-sikkerhedsagenten på et område for at få sikkerhedsfund.",
+      "spendAlertsSubtitle": "grænseoverskridelser og spikes pr. time",
+      "spendAlertsToggle": "Kategorien forbrugsadvarsler"
+    },
+    "action": {
+      "openSession": "Åbn session"
+    },
+    "needsInputAction": {
+      "approved": "Anmodning godkendt",
+      "replied": "Svar sendt",
+      "failed": "Kunne ikke svare. Tryk igen for at prøve igen.",
+      "unavailable": "Denne anmodning venter ikke længere."
     }
   },
   "tabs": {
@@ -813,7 +935,9 @@
       "uploadFailed": "Uploaden mislykkedes.",
       "failedToUploadFile": "Filen kunne ikke uploades: {{reason}}",
       "nothingToPaste": "Der er ikke noget at indsætte.",
-      "metadataStripFailed": "Billedets metadata kunne ikke fjernes."
+      "metadataStripFailed": "Billedets metadata kunne ikke fjernes.",
+      "limit_one": "Du kan vedhæfte op til {{displayCount}} fil.",
+      "limit_other": "Du kan vedhæfte op til {{displayCount}} filer."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1557,7 +1681,11 @@
       "syncFindings": "Synkronisér fund",
       "syncNow": "Synkronisér nu",
       "syncQueued": "Synkronisering i kø",
-      "syncStatusUnavailable": "Status for synkroniseringen er ikke tilgængelig."
+      "syncStatusUnavailable": "Status for synkroniseringen er ikke tilgængelig.",
+      "daysOverdue_one": "Frist overskredet med {{displayCount}} dag",
+      "daysOverdue_other": "Frist overskredet med {{displayCount}} dage",
+      "findingsCount_one": "{{displayCount}} fund",
+      "findingsCount_other": "{{displayCount}} fund"
     },
     "dashboardMetrics": {
       "openFindings": "Åbne fund",
@@ -1954,6 +2082,10 @@
       "couldNotLoad": "Kunne ikke indlæse sessionen.",
       "failedToLoadDetails": "Kunne ikke indlæse oplysninger om sessionen.",
       "failedToStopExecution": "Kunne ikke stoppe kørslen.",
+      "stopped": "Sessionen er stoppet",
+      "committing": "Committer…",
+      "committed": "Commit gennemført",
+      "commitFailed": "Commit mislykkedes",
       "renameSession": "Omdøb session",
       "renamePlaceholder": "Sessionens navn",
       "transcriptAccessibility": "Sessionens samtalehistorik",
@@ -1988,17 +2120,56 @@
       "exitNeedsNewerCli": "Du skal have en nyere version af Kilo CLI for at bruge skråstregskommandoer via fjernadgang. Opdatér Kilo CLI og opret forbindelse igen."
     },
     "sessionConnection": {
+      "label": "Forbindelse",
       "connecting": "Opretter forbindelse…",
       "reconnecting": "Genopretter forbindelsen…",
       "connectionLost": "Forbindelsen er afbrudt",
       "retryConnection": "Prøv at oprette forbindelse igen"
     },
+    "goal": {
+      "title": "Mål",
+      "statusActive": "Aktivt mål",
+      "statusPaused": "Mål sat på pause",
+      "statusComplete": "Mål fuldført",
+      "statusBlocked": "Mål blokeret",
+      "edit": "Rediger mål",
+      "remove": "Fjern mål",
+      "pause": "Sæt mål på pause",
+      "resume": "Genoptag mål",
+      "editPlaceholder": "Beskriv målet",
+      "removeConfirmTitle": "Fjern mål?",
+      "removeConfirmMessage": "CLI rydder dette sessions mål.",
+      "updateFailed": "Målet kunne ikke opdateres.",
+      "sectionAccessibility": "{{status}}. Mål: {{text}}",
+      "collapse": "Fold målet sammen",
+      "expand": "Fold målet ud"
+    },
     "newSession": {
+      "recentlyUsed": "Senest brugt",
+      "couldNotLoadGithubRepositories": "Kunne ikke indlæse kodelagre fra GitHub.",
+      "couldNotLoadGitlabRepositories": "Kunne ikke indlæse kodelagre fra GitLab.",
+      "couldNotLoadBitbucketRepositories": "Kunne ikke indlæse kodelagre fra Bitbucket.",
       "connectGithubDescription": "Tilknyt GitHub i din browser og vend tilbage hertil for at vælge et kodelager.",
+      "connectGitlabDescription": "Tilknyt GitLab i din browser og vend tilbage hertil for at vælge et kodelager.",
+      "connectBitbucketDescription": "Tilknyt Bitbucket i din browser og vend tilbage hertil for at vælge et kodelager.",
       "openGithub": "Åbn GitHub",
+      "openGitlab": "Åbn GitLab",
+      "openBitbucket": "Åbn Bitbucket",
       "refreshRepositories": "Opdatér kodelagre",
       "githubConnected": "GitHub tilknyttet",
+      "gitlabConnected": "GitLab tilknyttet",
       "noRepositoriesVisible": "Der er ingen synlige kodelagre. Kontrollér, at Kilos GitHub-app har adgang til dine kodelagre, og opdatér derefter listen.",
+      "noRepositoriesVisibleGitlab": "Der er ingen synlige kodelagre. Kontrollér adgangen til dine kodelagre på GitLab og opdatér derefter listen.",
+      "noRepositoriesVisibleBitbucket": "Der er ingen synlige kodelagre. Kontrollér adgangen til dine kodelagre på Bitbucket og opdatér derefter listen.",
+      "bitbucketOrganizationsOnly": "Bitbucket er kun tilgængeligt for organisationer.",
+      "branchPickerTitle": "Vælg gren",
+      "branchDefault": "Standard",
+      "branchAccessibility": "Gren: {{label}}",
+      "branchLoading": "Indlæser grene",
+      "branchLoadError": "Grene kunne ikke indlæses",
+      "branchUnavailable": "For dette kodelager er der ingen tilgængelige grene. Tjek din adgang hos udbyderen, og vælg et andet kodelager.",
+      "branchEmpty": "Ingen tilgængelige grene",
+      "branchPlaceholder": "Vælg en gren",
       "runOnWithTarget": "Kør på: {{target}}",
       "environment": "Miljø",
       "couldNotLoadEnvironment": "Kunne ikke indlæse dit miljø.",
@@ -2019,24 +2190,13 @@
       "couldNotRefreshRepositories": "Kunne ikke opdatere listen over kodelagre. Prøv igen.",
       "discardDraftTitle": "Kassér kladde?",
       "discardDraftMessage": "Din forespørgsel går tabt.",
+      "discardWithUploadsMessage": "Din forespørgsel og eventuelle uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
       "discardFailed": "Kunne ikke kassere kladden. Prøv igen.",
       "remoteHint": "Kør `kilo remote` på din computer eller `/remote` i en aktiv CLI-session for at styre en lokal kilo-proces.",
-      "connectBitbucketDescription": "Tilknyt Bitbucket i din browser og vend tilbage hertil for at vælge et kodelager.",
-      "connectGitlabDescription": "Tilknyt GitLab i din browser og vend tilbage hertil for at vælge et kodelager.",
-      "couldNotLoadBitbucketRepositories": "Kunne ikke indlæse kodelagre fra Bitbucket.",
-      "couldNotLoadGithubRepositories": "Kunne ikke indlæse kodelagre fra GitHub.",
-      "couldNotLoadGitlabRepositories": "Kunne ikke indlæse kodelagre fra GitLab.",
-      "gitlabConnected": "GitLab tilknyttet",
-      "noRepositoriesVisibleBitbucket": "Der er ingen synlige kodelagre. Kontrollér adgangen til dine kodelagre på Bitbucket og opdatér derefter listen.",
-      "noRepositoriesVisibleGitlab": "Der er ingen synlige kodelagre. Kontrollér adgangen til dine kodelagre på GitLab og opdatér derefter listen.",
-      "openBitbucket": "Åbn Bitbucket",
-      "openGitlab": "Åbn GitLab",
-      "recentlyUsed": "Senest brugt",
-      "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
       "continueFrom": "Sessionen {{title}} fortsættes.",
-      "importFailed": "Kunne ikke importere denne session.",
       "importingSession": "Importerer session",
-      "discardWithUploadsMessage": "Din forespørgsel og eventuelle uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet."
+      "cliCannotContinue": "Denne CLI kan ikke fortsætte en session. Vælg Cloud Agent eller en anden CLI.",
+      "importFailed": "Kunne ikke importere denne session."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil er opdateret.",
@@ -2060,7 +2220,14 @@
       "updateTodos": "Opdatér opgavelisten",
       "linesBadge": "{{displayCount}} linjer",
       "filesBadge": "{{displayCount}} filer",
-      "matchesBadge": "{{displayCount}} resultater"
+      "matchesBadge": "{{displayCount}} resultater",
+      "filesBadge_one": "{{displayCount}} fil",
+      "filesBadge_other": "{{displayCount}} filer",
+      "linesBadge_one": "{{displayCount}} linje",
+      "linesBadge_other": "{{displayCount}} linjer",
+      "matchesBadge_one": "{{displayCount}} resultat",
+      "matchesBadge_other": "{{displayCount}} resultater",
+      "noOutput": "Ingen output."
     },
     "readToolMarkdown": {
       "linesTruncated": "linje {{start}}–{{end}} (forkortet)",
@@ -2350,7 +2517,11 @@
       "files": "Filer",
       "couldNotOpenPhotoPicker": "Kunne ikke åbne billedvælgeren. Genstart Kilo og prøv igen.",
       "maxFilesAllowed": "Du kan højst tilføje {{displayCount}} filer.",
-      "onlyAddingFiles": "Tilføjer kun {{accepted}} af {{total}} filer (maks. {{max}})"
+      "onlyAddingFiles": "Tilføjer kun {{accepted}} af {{total}} filer (maks. {{max}})",
+      "maxFilesAllowed_one": "Du kan højst tilføje {{displayCount}} fil.",
+      "maxFilesAllowed_other": "Du kan højst tilføje {{displayCount}} filer.",
+      "onlyAddingFiles_one": "Tilføjer kun {{accepted}} af {{total}} filer (maks. {{max}})",
+      "onlyAddingFiles_other": "Tilføjer kun {{accepted}} af {{total}} filer (maks. {{max}})"
     },
     "composer": {
       "addAttachment": "Vedhæft fil",
@@ -2368,7 +2539,9 @@
       "discardAttachmentsMessage": "Uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
       "discardAttachmentsTitle": "Kassér vedhæftede filer?",
       "charactersRemaining": "{{count}} tegn tilbage",
-      "insertNewline": "Indsæt linjeskift"
+      "insertNewline": "Indsæt linjeskift",
+      "charactersRemaining_one": "{{count}} tegn tilbage",
+      "charactersRemaining_other": "{{count}} tegn tilbage"
     },
     "chatLink": {
       "linkCopied": "Link kopieret",
@@ -2402,6 +2575,12 @@
       "startNewSession": "Start en ny session",
       "exitSession": "Afslut sessionen",
       "clearSession": "Afslut denne session og start en ny",
+      "compactDescription": "komprimér konteksten for den aktuelle session",
+      "goalDescription": "Fortsæt med at arbejde mod et sessionsmål. /goal <objective> eller pause, resume, clear",
+      "initDescription": "guidet AGENTS.md-opsætning",
+      "resumeClaudeDescription": "importér et Claude Code-sessionstranskript",
+      "resumeCodexDescription": "importér et OpenAI Codex-sessionstranskript",
+      "reviewDescription": "gennemgå ændringer [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Brug /{{command}}",
       "insert": "Indsæt",
       "upgradeRequiredFallback": "Opdatér din CLI for at bruge denne kommando.",
@@ -2434,7 +2613,14 @@
       "stepsCount_one": "{{steps}} trin",
       "stepsCount": "{{steps}} trin",
       "stepsCount_other": "{{steps}} trin",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modeller ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "Automatisk godkendelse",
+      "description": "Godkend tilladelsesanmodninger for denne session automatisk. Værktøjer kører derefter uden en prompt.",
+      "unavailable": "Denne session kan ikke modtage tilladelsesanmodninger."
     },
     "prBadge": {
       "open": "åben PR",
@@ -2466,6 +2652,12 @@
       "retryableDescription": "Kontrollér forbindelsen og tryk på Prøv igen. Du kan stadig vælge denne mappe ved at trykke på Færdig.",
       "unsupportedTitle": "Kan ikke vise mapper",
       "unsupportedDescription": "Denne CLI kan ikke vise mapper. Tryk på Færdig for at beholde startmappen. Sessionen starter i denne mappe, når du trykker på Start en session."
+    },
+    "toolRun": {
+      "sheetTitle": "Værktøjskald",
+      "condensedLabel": "{{itemCount}} elementer; {{last}}",
+      "condensedLabel_one": "{{itemCount}} element; {{last}}",
+      "condensedLabel_other": "{{itemCount}} elementer; {{last}}"
     }
   },
   "bootstrap": {
@@ -2510,6 +2702,7 @@
     "couldNotLoadActiveSessions": "De aktive sessioner kunne ikke indlæses.",
     "agentSessions": "I gang nu",
     "newCodingTask": "Ny programmeringsopgave",
+    "newTaskFromPicture": "Ny opgave fra et billede",
     "explore": "Udforsk",
     "seeAll": "Se alle",
     "noLiveSessions": "Intet kører lige nu"
@@ -2576,8 +2769,12 @@
     "gatewayUnreachable": "Kunne ikke nå Kilo Gateway. Tjek din forbindelse og prøv igen.",
     "gatewayTimeout": "Transskriptionen tog for lang tid. Prøv igen.",
     "gatewayModelUnavailable": "Denne transskriptionsmodel er ikke tilgængelig. Vælg en anden under Indstillinger.",
+    "gatewayModelUnavailableNotice": "Denne model tilbydes ikke længere. Tryk på $t(transcriptionModel.title) for at vælge en anden.",
     "gatewaySignInRequired": "Log ind for at bruge transskription via Kilo Gateway.",
-    "gatewayNoModel": "Vælg først en transskriptionsmodel under Indstillinger."
+    "gatewayNoModel": "Vælg først en transskriptionsmodel under Indstillinger.",
+    "testTitle": "Test diktering",
+    "testPlaceholder": "Tryk på mikrofonen, og begynd at tale.",
+    "testClear": "Ryd tekst"
   },
   "share": {
     "title": "Del med Kilo",
@@ -2595,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "Denne session kan ikke modtage filer",
     "cliCantReceiveFilesMessage": "Den Kilo CLI, der kører denne session, kan ikke modtage filer. Opdater CLI'en på den maskine, eller del indholdet med en ny session i stedet.",
     "contentlessMessage": "Der er intet at dele, da der hverken er tekst eller filer.",
-    "couldNotReadContent": "Det delte indhold kunne ikke læses."
+    "couldNotReadContent": "Det delte indhold kunne ikke læses.",
+    "onlyFirstFilesAttached_one": "Kun de første {{displayCount}} fil vedhæftes.",
+    "onlyFirstFilesAttached_other": "Kun de første {{displayCount}} filer vedhæftes."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2727,7 +2926,8 @@
     "aiProvidersWhat": "Dine forespørgsler, din samtalehistorik og eventuelle filer, du vedhæfter.",
     "aiProvidersWhy": "For at generere AI-svar.",
     "aiProvidersWho": "Anthropic, OpenAI, Google og andre udbydere, som du vælger for hver anmodning.",
-    "gatewayWhat": "Konto-id, metadata om anmodninger og tokenforbrug.",
+    "gatewayWhat": "Konto-id, metadata om anmodninger, tokenforbrug samt de prompts og lydoptagelser, som appen sender gennem det.",
+    "viaGateway": "Via Kilo Gateway",
     "gatewayWhy": "Bekræftelse af din identitet, videresendelse af anmodninger og afstemning af fakturering.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Rapporter om nedbrud og fejl, hvor indhold fra appen er fjernet.",
@@ -2747,7 +2947,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Din optagelse, mens du dikterer.",
     "voiceTranscriptionWhy": "For at omdanne tale til tekst.",
-    "voiceTranscriptionWho": "Kun på enheden eller hos Apple eller Google, hvis enheden ikke kan transskribere offline.",
+    "voiceTranscriptionWho": "Din enhed, Kilo Gateway med den transskriptionsmodel, du har valgt, eller Apple eller Google til genkendelse online.",
     "installAttributionPromptTitle": "Tillad sporing af installationskilde?",
     "installAttributionPromptMessage": "Kilo bruger kun Apples sporingstilladelse til at se, hvilken kanal du fandt os gennem. Dine forespørgsler og samtaler bruges aldrig til dette.",
     "what": "Hvad",
@@ -2919,6 +3119,14 @@
     "tooManySignInAttempts": "For mange loginforsøg. Vent lidt, og prøv igen."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Avanceret",
+      "balanced": "Auto Afbalanceret",
+      "efficient": "Auto Effektiv",
+      "small": "Auto Lille",
+      "free": "Auto Gratis",
+      "organization": "Organisation-Auto"
+    },
     "dataCollected": "Data indsamles",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Kunne ikke opdatere favoritterne.",
@@ -2957,8 +3165,17 @@
     "privacy": "Åbn Kilo for at se agenter",
     "openAgents": "Åbn agenter",
     "needsInput": "Afventer svar",
+    "newestSession": "Nyeste: {{title}}",
+    "noneWaiting": "Ingen agenter venter",
+    "newAgent": "Ny agent",
+    "approving": "Godkender...",
+    "couldNotApprove": "Kunne ikke godkende",
+    "couldNotStart": "Kunne ikke starte",
     "channelName": "Aktive agenter",
-    "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen."
+    "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen.",
+    "openSession": "Åbn",
+    "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen.",
+    "newestResult": "Nyeste resultat"
   },
   "transcriptionModel": {
     "title": "Transskriptionsmodel",
@@ -2966,5 +3183,56 @@
     "emptyTitle": "Ingen transskriptionsmodeller",
     "emptyDescription": "Kilo Gateway tilbyder ikke nogen transskriptionsmodeller lige nu.",
     "loadFailed": "Transskriptionsmodellerne kunne ikke indlæses."
+  },
+  "voiceLanguage": {
+    "title": "Dikteringssprog",
+    "automatic": "Automatisk",
+    "loadFailed": "Kunne ikke indlæse de sprog, denne enhed understøtter.",
+    "emptyTitle": "Ingen understøttede sprog",
+    "emptyDescription": "Denne enheds talegenkendelse rapporterer ingen understøttede sprog."
+  },
+  "tour": {
+    "eyebrow": "Hurtig omvisning",
+    "forkTitle": "Hvor vil du køre Kilo?",
+    "forkSubtitle": "Vælg hvor Kilo kører for din første session.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Kør Kilo i et isoleret cloud-miljø uden at du skal installere noget.",
+    "remoteOptionTitle": "Din computer",
+    "remoteOptionBody": "Kør Kilo på din egen maskin via `kilo remote`-CLI'en.",
+    "skip": "Spring omvisning over",
+    "tutorialLabel": "Vejledning"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Start agenten kræver en forespørgsel. Tilføj en forespørgsel, og kør den igen.",
+      "repositoryUnknown": "Kilo genkender ikke {{repository}} som et GitHub- eller GitLab-kodelager. Vælg et andet kodelager i Kilo.",
+      "repositoryUnsupported": "{{repository}} er et Bitbucket-kodelager — Start agenten kan endnu ikke bruge det. Vælg et andet kodelager i Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Åbn seneste session"
+  },
+  "spendAlerts": {
+    "subtitle": "Send en advarsel via e-mail eller push til faktureringskontakterne, når dette områdes forbrug overskrider en grænse eller stiger over den sædvanlige timesats.",
+    "enable": "Aktivér forbrugsadvarsler",
+    "thresholdTitle": "Grænseoverskridelse",
+    "thresholdSubtitle": "Løbende forbrug overskrider din grænse",
+    "anomalyTitle": "Spike pr. time",
+    "anomalySubtitle": "En time er langt over dette områdes sædvanlige sats",
+    "limitLabel": "Grænse (USD)",
+    "windowLabel": "Vindue",
+    "window24h": "24 timer",
+    "window7d": "7 dage",
+    "window30d": "30 dage",
+    "multiplierLabel": "Spike-multiplikator",
+    "saved": "Indstillinger for forbrugsadvarsler er gemt",
+    "loadError": "Forbrugsadvarsler kunne ikke indlæses.",
+    "saveError": "Forbrugsadvarsler kunne ikke gemmes.",
+    "empty": "Forbrugsadvarsler er slået fra. Slå dem til for at advare dette områdes faktureringskontakter.",
+    "noSpend": "Der er endnu ikke registreret noget forbrug",
+    "spend24h": "Forbrug de seneste 24 timer",
+    "multiplierError": "Angiv en multiplikator på 1 eller mere",
+    "permissionDenied": "Du har ikke tilladelse til at administrere forbrugsadvarsler.",
+    "pushOffByCategory": "Fra i Notifikationer"
   }
 }

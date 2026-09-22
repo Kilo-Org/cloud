@@ -36,6 +36,7 @@
     "cost": "Koste",
     "discard": "Gooi weg",
     "findings": "Bevindings",
+    "mergeRequest": "merge request",
     "notConnected": "Nie gekoppel nie",
     "notifications": "Kennisgewings",
     "pullRequest": "trekversoek",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Gebruik 'n ander e-posadres",
     "signInWithApple": "Meld aan met Apple",
     "signInWithGoogle": "Meld aan met Google",
+    "signInWithPasskey": "Meld aan met ’n passkey",
     "emailAddress": "E-posadres",
     "emailPlaceholder": "jou@voorbeeld.com",
     "continueWithEmail": "Gaan voort met e-pos",
@@ -174,6 +176,10 @@
     "termsConnector": " en ",
     "termsSuffix": ".",
     "moreSignInOptions": "Meer aanmeldopsies",
+    "passkeyCancelled": "Passkey-aanmelding is gekanselleer. Probeer asseblief weer.",
+    "passkeyNotFound": "Geen passkey is vir hierdie toestel gestoor nie. Meld eerder aan met Apple, Google of jou e-pos.",
+    "passkeyUnsupported": "Passkeys is nie op hierdie toestel beskikbaar nie. Meld eerder aan met Apple, Google of jou e-pos.",
+    "passkeyFailed": "Kon nie met ’n passkey aanmeld nie. Probeer asseblief weer.",
     "couldNotCompleteSignIn": "Die aanmelding kon nie voltooi word nie. Probeer asseblief weer.",
     "sessionEnded": "Jou sessie is beëindig. Meld asseblief weer aan.",
     "signInCodeExpired": "Jou aanmeldkode het verval. Probeer asseblief weer.",
@@ -224,11 +230,36 @@
     "providerTestAccount": "Toetsrekening",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Onderneming-SSO"
+    "providerEnterpriseSso": "Onderneming-SSO",
+    "passkeysTitle": "Passkeys",
+    "passkeysSubtitle": "Meld aan sonder ’n wagwoord",
+    "passkeysEmpty": "Nog geen passkeys nie",
+    "passkeysEmptyHint": "$t(profile.addPasskey) om sonder ’n wagwoord aan te meld.",
+    "passkeysCouldNotLoad": "Kon nie passkeys laai nie",
+    "passkeysLoadFailed": "Passkeys is onbeskikbaar totdat dit laai.",
+    "addPasskey": "Voeg ’n passkey by",
+    "passkeyDefaultName": "Passkey",
+    "passkeyAddedOn": "Bygevoeg {{date}}",
+    "passkeyAdded": "Passkey bygevoeg.",
+    "passkeyAddFailed": "Kon nie ’n passkey byvoeg nie. Probeer weer.",
+    "passkeyAddUnsupported": "Hierdie toestel kan nie passkeys skep nie.",
+    "passkeyAddCancelled": "Passkey-skepping is gekanselleer.",
+    "passkeyRemoved": "Passkey verwyder.",
+    "passkeyRemoveFailed": "Kon nie daardie passkey verwyder nie. Probeer weer.",
+    "passkeyRenamed": "Passkey hernoem.",
+    "passkeyName": "Passkey-naam",
+    "renamePasskey": "Hernoem passkey",
+    "removePasskey": "Verwyder passkey",
+    "removePasskeyTitle": "Verwyder passkey?",
+    "removePasskeyMessage": "Jy sal nie meer met hierdie passkey kan aanmeld nie."
   },
   "preferences": {
+    "general": "Algemeen",
+    "voiceInput": "Steminvoer",
     "autoExpandThinking": "Vou denke outomaties uit",
     "autoExpandThinkingSubtitle": "Wys die agent se denke volledig wanneer dit klaar gedink het.",
+    "hideThinking": "Versteek denke-besonderhede",
+    "hideThinkingSubtitle": "Moenie die agent se denke op die sessiebladsy wys nie.",
     "keepScreenOn": "Hou die skerm aan op die sessiebladsy",
     "keepScreenOnSubtitle": "Hou die skerm aan terwyl die sessie werk.",
     "appearance": "Voorkoms",
@@ -237,6 +268,7 @@
     "appearanceLight": "Lig",
     "appearanceDark": "Donker",
     "account": "Rekening",
+    "accountSubtitle": "Taal, vertroude gashere en toestelsessies",
     "prReviewAttribution": "Voeg toepvermelding by PR-hersienings",
     "prReviewAttributionSubtitle": "Voeg 'n voetskrif met die woorde Hersien via Kilo by wanneer jy 'n hersiening indien.",
     "returnSendsMessage": "Return-toets stuur boodskap",
@@ -250,7 +282,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Gateway-transkripsie",
     "gatewayTranscriptionSubtitle": "Transkribeer steminvoer met 'n Kilo Gateway-model in plaas van die toestel se spraakherkenning. Jou opname word na die Kilo Gateway gestuur.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Kondenseer nutsmiddel-oproepe",
+    "condenseToolCallsSubtitle": "Groepeer opeenvolgende nutsmiddel-oproepe in een ry wat jy kan oopmaak.",
+    "toolSummaryTranslation": "Vertaal hulpmiddelopsommings",
+    "toolSummaryTranslationSubtitle": "Stuur elke hulpmiddelopsomming na 'n model om dit in jou app-taal te vertaal. Die oorspronklike word gewys as die vertaling misluk.",
+    "toolSummaryTranslationModelUnavailableNotice": "Hierdie model word nie meer aangebied nie. Tik op $t(common.model) om 'n ander een te kies."
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
@@ -332,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} van {{total}} lêers gelaai",
       "filesStillLoading": "Lêers laai nog. Trek af om te verfris.",
       "goToOverview": "Gaan na oorsig",
-      "goToOverviewTab": "Gaan na die oorsigoortjie"
+      "goToOverviewTab": "Gaan na die oorsigoortjie",
+      "expandAllLines_one": "Vou al {{displayCount}} reël uit",
+      "expandAllLines_other": "Vou al {{displayCount}} reëls uit",
+      "expandLines_one": "Vou {{displayCount}} reël uit ({{start}}–{{end}})",
+      "expandLines_other": "Vou {{displayCount}} reëls uit ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Vou {{displayCount}} reël konteks uit",
+      "expandLinesOfContext_other": "Vou {{displayCount}} reëls konteks uit",
+      "expandMoreLines_one": "Vou nog {{displayCount}} reël uit ({{start}}–{{end}})",
+      "expandMoreLines_other": "Vou nog {{displayCount}} reëls uit ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} van {{total}} lêers gelaai",
+      "loadedOfTotalFiles_other": "{{loaded}} van {{total}} lêers gelaai"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ die lêer eindig nie met 'n reëleinde nie.",
@@ -347,6 +394,7 @@
       "merge": "Samevoeging",
       "mergeNow": "Voeg nou saam",
       "mergePullRequest": "Voeg trekversoek saam",
+      "mergeTermTitle": "Voeg {{term}} saam",
       "enableAutoMerge": "Aktiveer outomatiese samevoeging",
       "disableAutoMerge": "Deaktiveer outomatiese samevoeging",
       "autoMergeOn": "Outomatiese samevoeging is aan",
@@ -365,9 +413,12 @@
       "deleteBranchAfterMerge": "Skrap die tak ná samevoeging",
       "noEnabledMethods": "Geen samevoegingsmetodes is vir hierdie bewaarplek geaktiveer nie. Vra 'n administrateur van die bewaarplek om gewone samevoeging, saampersing of herbasering te aktiveer.",
       "confirmTitle": "Voeg trekversoek saam?",
+      "confirmTitleTerm": "Voeg {{term}} saam?",
       "confirmMessage": "Dit sal jou veranderings met die basistak saamvoeg.",
       "enableAutoMergeConfirmTitle": "Aktiveer outomatiese samevoeging?",
       "enableAutoMergeConfirmMessage": "GitHub sal hierdie trekversoek outomaties saamvoeg wanneer alle vereiste kontroles slaag.",
+      "enableAutoMergeConfirmMessageTerm": "Sodra die pipeline slaag, word die {{term}} outomaties saamgevoeg.",
+      "enableAutoMergeDescriptionTerm": "GitLab voeg hierdie {{term}} outomaties saam sodra die pipeline slaag.",
       "forbidden": "Jy het nie toestemming om hierdie trekversoek saam te voeg nie.",
       "cannotMerge": "Hierdie trekversoek kan nie in sy huidige vorm saamgevoeg word nie.",
       "couldNotMerge": "Kon nie die trekversoek saamvoeg nie.",
@@ -378,7 +429,8 @@
       },
       "terminal": {
         "alreadyMerged": "Reeds saamgevoeg",
-        "closed": "Hierdie trekversoek is gesluit"
+        "closed": "Hierdie trekversoek is gesluit",
+        "closedMergeRequest": "Hierdie merge request is gesluit"
       },
       "partialSuccessBanner": {
         "body": "Kon nie die tak skrap nie: {{reason}}.",
@@ -403,6 +455,18 @@
         "behindDetail": "Die brontak is agter die basistak. Herbaseer die tak of werk dit by voordat jy saamvoeg.",
         "notMergeableTitle": "Hierdie trekversoek kan nog nie saamgevoeg word nie",
         "notMergeableDetail": "GitHub het die samevoegingstatus as {{state}} aangegee."
+      },
+      "restrictions": {
+        "title": "Saamvoegbeperkings",
+        "approvalsRequired_one": "{{displayCount}} goedkeuring vereis",
+        "approvalsRequired_other": "{{displayCount}} goedkeurings vereis",
+        "pipelineMustSucceed": "Die pipeline moet slaag voordat saamgevoeg kan word."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Die pipeline misluk by die laaste commit.",
+        "pendingPipeline": "Die pipeline hardloop nog by die laaste commit.",
+        "permission": "Jy het nie toestemming om hierdie {{term}} saam te voeg nie.",
+        "draft": "Merk die {{term}} as gereed vir hersiening voordat jy saamvoeg."
       },
       "methodLabels": {
         "merge": "Skep 'n samevoegingsvaslegging",
@@ -452,6 +516,8 @@
       "replyBadRequest": "Hierdie antwoord kan nie geplaas word nie. Die draad het dalk verander.",
       "replyForbidden": "Jy het nie toestemming om op hierdie trekversoek te antwoord nie.",
       "addCommentCta": "Kommenteer op hierdie trekversoek",
+      "fixWithKilo": "Maak reg met Kilo",
+      "fixWithKiloPrompt": "Hanteer asseblief die volgende kommentaar op die trekversoek: {{link}}",
       "commentBadRequest": "Hierdie kommentaar kan nie geplaas word nie. Die trekversoek het dalk verander.",
       "commentForbidden": "Jy het nie toestemming om op hierdie trekversoek kommentaar te lewer nie.",
       "moderation": {
@@ -502,7 +568,10 @@
         "outdatedOnLines": "Verouderd op {{lines}}",
         "outdatedOnPath": "Verouderd op {{path}}"
       },
-      "deletedUser": "geskrapte gebruiker"
+      "deletedUser": "geskrapte gebruiker",
+      "replyForbiddenTerm": "Jy het nie toestemming om op hierdie {{term}} te antwoord nie.",
+      "moreLinesAbove_one": "… nog {{displayCount}} reël hierbo",
+      "moreLinesAbove_other": "… nog {{displayCount}} reëls hierbo"
     },
     "couldNotOpenGitHubAppSettings": "Die GitHub-toepassing se instellings kon nie oopgemaak word nie.",
     "installKiloGitHubApp": "Installeer die Kilo GitHub-toep",
@@ -514,17 +583,19 @@
     "reviewPullRequest": "Hersien trekversoek",
     "headLine": "{{counts}} · jongste vaslegging {{sha}}",
     "entry": {
-      "eyebrow": "Maak 'n trekversoek met sy URL oop.",
-      "pastePrLink": "Plak 'n PR-skakel",
-      "noRecentPrs": "Geen onlangse PR's nie",
-      "noRecentPrsDescription": "Plak hierbo 'n PR-skakel om 'n hersiening te begin — dit sal volgende keer hier verskyn.",
+      "eyebrow": "Maak 'n trekversoek of merge request met sy URL oop",
+      "pastePrLink": "Plak 'n trekversoek- of merge request-skakel",
+      "noRecentPrs": "Geen onlangse hersieninge nie",
+      "noRecentPrsDescription": "Plak hierbo 'n skakel om 'n hersiening te begin — dit sal volgende keer hier verskyn.",
       "couldNotLoad": "Kon nie laai nie.",
       "removeFromRecentsTitle": "Verwyder uit onlangse trekversoeke?",
-      "removeFromRecentsMessage": "Hierdie trekversoek sal uit jou lys van onlangse trekversoeke verwyder word.",
+      "removeFromRecentsMessage": "Hierdie hersiening sal uit jou onlangse lys verwyder word.",
       "removeRecentAccessibility": "Verwyder {{repo}} uit onlangse trekversoeke",
-      "urlAccessibility": "GitHub-trekversoek-URL",
-      "clearLink": "Vee die trekversoekskakel uit",
-      "pasteLink": "Plak trekversoekskakel",
+      "urlAccessibility": "Voer 'n trekversoek- of merge request-URL in",
+      "urlPlaceholder": "Trekversoek- of merge request-URL",
+      "openAccessibility": "Maak trekversoek of merge request oop",
+      "clearLink": "Vee die skakel uit",
+      "pasteLink": "Plak trekversoek- of merge request-skakel",
       "open": "Oop"
     },
     "checks": {
@@ -541,6 +612,8 @@
       "pending": "{{displayCount}} uitstaande",
       "skipped": "{{displayCount}} oorgeslaan",
       "checksCount": "{{displayCount}} kontroles",
+      "checksCount_one": "{{displayCount}} kontrole",
+      "checksCount_other": "{{displayCount}} kontroles",
       "checkDetails": "kontrolebesonderhede"
     },
     "inbox": {
@@ -573,9 +646,15 @@
     "connect": {
       "checkFailedTitle": "Kon nie die GitHub-verbinding kontroleer nie.",
       "checkFailedMessage": "Die aanmeldstatus is nie beskikbaar voordat hierdie inligting gelaai is nie.",
+      "checkFailedTitleGitLab": "Kon nie die GitLab-verbinding kontroleer nie.",
+      "checkFailedTitleBitbucket": "Kon nie die Bitbucket-verbinding kontroleer nie.",
+      "providerCheckFailedMessage": "Verbindingsstatus is nie beskikbaar voordat die laai voltooi is nie.",
       "reconnectTitle": "Koppel GitHub weer",
       "reconnectDescription": "Jou GitHub-verbinding is herroep. Koppel weer om steeds trekversoeke op jou foon te kan hersien.",
-      "description": "Koppel jou GitHub-rekening om trekversoeke op jou foon te hersien."
+      "description": "Koppel jou GitHub-rekening om trekversoeke op jou foon te hersien.",
+      "gitlabDescription": "Koppel jou GitLab-rekening om merge requests op jou foon te hersien.",
+      "bitbucketDescription": "Koppel Bitbucket aan hierdie organisasie om trekversoeke op jou foon te hersien.",
+      "bitbucketOrgOnlyDescription": "Kies 'n organisasie in jou profiel om sy Bitbucket-trekversoeke te hersien."
     },
     "screen": {
       "title": "#{{number}}",
@@ -597,7 +676,10 @@
     },
     "reconnectNotice": {
       "title": "Die GitHub-verbinding het verval.",
-      "message": "Jou GitHub-verbinding is nie meer geldig nie. Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig."
+      "message": "Jou GitHub-verbinding is nie meer geldig nie. Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig.",
+      "gitlabTitle": "Die GitLab-verbinding het verval.",
+      "bitbucketTitle": "Die Bitbucket-verbinding het verval.",
+      "providerMessage": "Jou {{provider}}-verbinding is nie meer geldig nie. Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig."
     },
     "eventChips": {
       "comment": "Kommentaar",
@@ -662,10 +744,12 @@
       "statusContext": "Konteks",
       "lineLabel": "{{status}} reël {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(leeg)"
+      "emptyLine": "(leeg)",
+      "truncationBanner_one": "Die eerste {{limit}} van {{total}} gewysigde lêers word vertoon — dit is die GitHub-API se limiet.",
+      "truncationBanner_other": "Die eerste {{limit}} van {{total}} gewysigde lêers word vertoon — dit is die GitHub-API se limiet."
     },
     "linkPasteClipboardEmpty": "Die knipbord is leeg.",
-    "linkPasteNotAPullRequest": "Dit is nie 'n skakel na 'n GitHub-trekversoek nie.",
+    "linkPasteNotAPullRequest": "Dit is nie 'n skakel na 'n trekversoek of merge request nie",
     "announce": {
       "commentPosted": "Kommentaar geplaas",
       "reviewSubmitted": "Hersiening ingedien",
@@ -674,6 +758,7 @@
     "mutationError": {
       "commentNotPosted": "Hierdie kommentaar kan nie geplaas word nie. Die gekose reël het dalk verander, of die PR is dalk bygewerk.",
       "reviewNotSubmitted": "Hierdie hersiening kan nie in sy huidige vorm ingedien word nie. Die PR het dalk verander, of jy probeer dalk jou eie trekversoek hersien, wat nie toegelaat word nie.",
+      "reviewNotSubmittedTerm": "Hierdie hersiening kan nie in sy huidige vorm ingedien word nie. Die {{term}} het dalk verander, of jy kan nie jou eie {{term}} hersien nie.",
       "couldNotPostComment": "Kon nie kommentaar plaas nie.",
       "couldNotSubmitReview": "Kon nie die hersiening indien nie. Kontroleer jou verbinding en probeer weer."
     },
@@ -681,9 +766,31 @@
       "couldNotReply": "Die antwoord kon nie gestuur word nie.",
       "couldNotCompleteAction": "Kon nie hierdie aksie voltooi nie.",
       "mergeResultDefaultError": "GitHub het nie die samevoeging voltooi nie.",
+      "mergeResultNotCompleted": "Die {{term}} is nie saamgevoeg nie. Gaan sy status na en probeer weer.",
       "ambiguous": "Kon nie bevestig nie — kyk na die PR voordat jy weer probeer.",
       "persistenceFailed": "Ons kon nie hierdie aksie aanteken nie. Probeer asseblief later weer.",
       "forbidden": "Toegang is verbode."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Nie beskikbaar by hierdie verskaffer nie",
+        "accessibility": "Nie beskikbaar by hierdie verskaffer nie: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Trekversoek",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Deel merge request",
+      "viewOnProvider": "Bekyk op {{provider}}",
+      "mergeRequestUnavailable": "Merge request onbeskikbaar",
+      "unavailableDescription": "Dit is dalk uitgevee, of jy het nie toegang daartoe nie.",
+      "accessDeniedMergeRequest": "Jy het nie toestemming om hierdie merge request te bekyk nie.",
+      "couldNotLoadMergeRequest": "Kon nie die merge request laai nie.",
+      "discussionAccessDenied": "Jy het nie toestemming om hierdie merge request se bespreking te bekyk nie.",
+      "discussionUnavailableMessage": "Hierdie merge request is dalk verwyder.",
+      "noDiscussionDescription": "Daar is nog geen hersieningsdrade of gesprekskommentare op hierdie merge request nie.",
+      "noFilesChangedDescription": "Hierdie merge request het geen lêerveranderings nie."
     }
   },
   "notifications": {
@@ -716,11 +823,12 @@
     "previewFullDescription": "Kennisgewings wys die boodskapteks op jou sluitskerm.",
     "previewGenericDescription": "Kennisgewings wys dat iets gebeur het. Maak Kilo oop om dit te lees.",
     "channel": {
-      "agent": "Agentsessies",
+      "agentProgress": "Agentvordering",
       "chat": "Kletsboodskappe",
       "kiloclaw": "KiloClaw-aktiwiteit",
       "balance": "Saldowaarskuwings",
-      "security": "Sekuriteitsbevindings"
+      "security": "Sekuriteitsbevindings",
+      "spend": "Bestedingswaarskuwings"
     },
     "category": {
       "chatMessagesSubtitle": "antwoorde in jou gesprekke",
@@ -731,8 +839,22 @@
       "sessionStatusTitle": "Sessiestatus",
       "sessionStatusSubtitle": "klaar / misluk / gereed om te beheer",
       "kiloclawActivitySubtitle": "instansie gereed/misluk, geskeduleerde aksies",
+      "kiloclawActivityUnavailable": "Begin 'n KiloClaw-instansie om KiloClaw-aktiwiteit te kry.",
       "balanceAlertsSubtitle": "waarskuwings oor die organisasie se lae saldo",
-      "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe"
+      "balanceAlertsUnavailable": "Sluit by 'n organisasie aan om balanswaarskuwings te kry.",
+      "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe",
+      "securityFindingsUnavailable": "Aktiveer Kilo Sekuriteitsagent op 'n bestek om sekuriteitsbevindings te kry.",
+      "spendAlertsSubtitle": "oorskryding van drempels en uurlikse pieke",
+      "spendAlertsToggle": "Kategorie vir bestedingswaarskuwings"
+    },
+    "action": {
+      "openSession": "Maak sessie oop"
+    },
+    "needsInputAction": {
+      "approved": "Versoek goedgekeur",
+      "replied": "Antwoord gestuur",
+      "failed": "Kon nie antwoord nie. Tik weer om weer te probeer.",
+      "unavailable": "Hierdie versoek wag nie meer nie."
     }
   },
   "tabs": {
@@ -813,7 +935,9 @@
       "uploadFailed": "Die oplaai het misluk.",
       "failedToUploadFile": "Die lêer kon nie opgelaai word nie: {{reason}}",
       "nothingToPaste": "Daar is niks om te plak nie.",
-      "metadataStripFailed": "Die foto se metadata kon nie verwyder word nie."
+      "metadataStripFailed": "Die foto se metadata kon nie verwyder word nie.",
+      "limit_one": "Jy kan tot {{displayCount}} lêer aanheg.",
+      "limit_other": "Jy kan tot {{displayCount}} lêers aanheg."
     },
     "attachmentPreview": {
       "accessibility": "Lêer: {{filename}}, {{status}}",
@@ -1557,7 +1681,11 @@
       "syncFindings": "Sinkroniseer bevindings",
       "syncNow": "Sinkroniseer nou",
       "syncQueued": "Sinkronisasie in die tou geplaas",
-      "syncStatusUnavailable": "Die sinkronisasiestatus is nie beskikbaar nie."
+      "syncStatusUnavailable": "Die sinkronisasiestatus is nie beskikbaar nie.",
+      "daysOverdue_one": "{{displayCount}} dag agterstallig",
+      "daysOverdue_other": "{{displayCount}} dae agterstallig",
+      "findingsCount_one": "{{displayCount}} bevinding",
+      "findingsCount_other": "{{displayCount}} bevindings"
     },
     "dashboardMetrics": {
       "openFindings": "Oop bevindings",
@@ -1954,6 +2082,10 @@
       "couldNotLoad": "Die sessie kon nie gelaai word nie.",
       "failedToLoadDetails": "Die sessiebesonderhede kon nie gelaai word nie.",
       "failedToStopExecution": "Die uitvoering kon nie gestop word nie.",
+      "stopped": "Sessie gestop",
+      "committing": "Besig om te vaslê…",
+      "committed": "Vasgelê",
+      "commitFailed": "Vaslê het misluk",
       "renameSession": "Hernoem sessie",
       "renamePlaceholder": "Sessienaam",
       "transcriptAccessibility": "Sessietranskripsie",
@@ -1988,17 +2120,56 @@
       "exitNeedsNewerCli": "Skuinsstreepopdragte op afstand vereis 'n nuwer weergawe van Kilo CLI. Werk Kilo CLI by en koppel weer."
     },
     "sessionConnection": {
+      "label": "Verbinding",
       "connecting": "Koppel…",
       "reconnecting": "Herkoppel…",
       "connectionLost": "Verbinding verloor",
       "retryConnection": "Probeer weer koppel"
     },
+    "goal": {
+      "title": "Doel",
+      "statusActive": "Aktiewe doel",
+      "statusPaused": "Doel opgeskort",
+      "statusComplete": "Doel voltooi",
+      "statusBlocked": "Doel geblokkeer",
+      "edit": "Doel wysig",
+      "remove": "Doel verwyder",
+      "pause": "Doel onderbreek",
+      "resume": "Doel hervat",
+      "editPlaceholder": "Beskryf die doel",
+      "removeConfirmTitle": "Doel verwyder?",
+      "removeConfirmMessage": "Die CLI verwyder hierdie sessie se doel.",
+      "updateFailed": "Kon nie die doel bywerk nie.",
+      "sectionAccessibility": "{{status}}. Doel: {{text}}",
+      "collapse": "Vou doel toe",
+      "expand": "Vou doel uit"
+    },
     "newSession": {
+      "recentlyUsed": "Onlangs gebruik",
+      "couldNotLoadGithubRepositories": "Die GitHub-bewaarplekke kon nie gelaai word nie.",
+      "couldNotLoadGitlabRepositories": "Die GitLab-bewaarplekke kon nie gelaai word nie.",
+      "couldNotLoadBitbucketRepositories": "Die Bitbucket-bewaarplekke kon nie gelaai word nie.",
       "connectGithubDescription": "Koppel GitHub in jou blaaier en kom dan hierheen terug om 'n bewaarplek te kies.",
+      "connectGitlabDescription": "Koppel GitLab in jou blaaier en kom dan hierheen terug om 'n bewaarplek te kies.",
+      "connectBitbucketDescription": "Koppel Bitbucket in jou blaaier en kom dan hierheen terug om 'n bewaarplek te kies.",
       "openGithub": "Maak GitHub oop",
+      "openGitlab": "Maak GitLab oop",
+      "openBitbucket": "Maak Bitbucket oop",
       "refreshRepositories": "Verfris bewaarplekke",
       "githubConnected": "GitHub gekoppel",
+      "gitlabConnected": "GitLab gekoppel",
       "noRepositoriesVisible": "Geen bewaarplekke is sigbaar nie. Gaan die Kilo GitHub-toep se toegang tot bewaarplekke na en verfris dan die lys.",
+      "noRepositoriesVisibleGitlab": "Geen bewaarplekke is sigbaar nie. Gaan GitLab se toegang tot bewaarplekke na en verfris dan die lys.",
+      "noRepositoriesVisibleBitbucket": "Geen bewaarplekke is sigbaar nie. Gaan Bitbucket se toegang tot bewaarplekke na en verfris dan die lys.",
+      "bitbucketOrganizationsOnly": "Bitbucket is slegs vir organisasies beskikbaar.",
+      "branchPickerTitle": "Kies tak",
+      "branchDefault": "Verstek",
+      "branchAccessibility": "Tak: {{label}}",
+      "branchLoading": "Takke word gelaai",
+      "branchLoadError": "Takke kon nie gelaai word nie",
+      "branchUnavailable": "Takke is nie beskikbaar vir hierdie bewaarplek nie. Gaan jou toegang by die verskaffer na en kies 'n ander bewaarplek.",
+      "branchEmpty": "Geen takke beskikbaar nie",
+      "branchPlaceholder": "Kies 'n tak",
       "runOnWithTarget": "Voer uit op: {{target}}",
       "environment": "Omgewing",
       "couldNotLoadEnvironment": "Jou omgewing kon nie gelaai word nie.",
@@ -2019,24 +2190,13 @@
       "couldNotRefreshRepositories": "Die bewaarplekke kon nie verfris word nie. Probeer asseblief weer.",
       "discardDraftTitle": "Konsep weggooi?",
       "discardDraftMessage": "Jou opdrag sal verlore gaan.",
+      "discardWithUploadsMessage": "Jou opdrag en enige opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word.",
       "discardFailed": "Die konsep kon nie weggegooi word nie. Probeer asseblief weer.",
       "remoteHint": "Voer `kilo remote` op jou rekenaar uit, of `/remote` in 'n aktiewe CLI-sessie, om 'n plaaslike kilo-proses te beheer.",
-      "connectBitbucketDescription": "Koppel Bitbucket in jou blaaier en kom dan hierheen terug om 'n bewaarplek te kies.",
-      "connectGitlabDescription": "Koppel GitLab in jou blaaier en kom dan hierheen terug om 'n bewaarplek te kies.",
-      "couldNotLoadBitbucketRepositories": "Die Bitbucket-bewaarplekke kon nie gelaai word nie.",
-      "couldNotLoadGithubRepositories": "Die GitHub-bewaarplekke kon nie gelaai word nie.",
-      "couldNotLoadGitlabRepositories": "Die GitLab-bewaarplekke kon nie gelaai word nie.",
-      "gitlabConnected": "GitLab gekoppel",
-      "noRepositoriesVisibleBitbucket": "Geen bewaarplekke is sigbaar nie. Gaan Bitbucket se toegang tot bewaarplekke na en verfris dan die lys.",
-      "noRepositoriesVisibleGitlab": "Geen bewaarplekke is sigbaar nie. Gaan GitLab se toegang tot bewaarplekke na en verfris dan die lys.",
-      "openBitbucket": "Maak Bitbucket oop",
-      "openGitlab": "Maak GitLab oop",
-      "recentlyUsed": "Onlangs gebruik",
       "continueFrom": "Die sessie {{title}} word voortgesit.",
       "importingSession": "Sessie word ingevoer",
       "cliCannotContinue": "Hierdie CLI kan nie 'n sessie voortsit nie. Kies Cloud Agent of 'n ander CLI.",
-      "importFailed": "Hierdie sessie kon nie ingevoer word nie.",
-      "discardWithUploadsMessage": "Jou opdrag en enige opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word."
+      "importFailed": "Hierdie sessie kon nie ingevoer word nie."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} lêer is bygewerk.",
@@ -2060,7 +2220,14 @@
       "updateTodos": "Werk taaklys by",
       "linesBadge": "{{displayCount}} reëls",
       "filesBadge": "{{displayCount}} lêers",
-      "matchesBadge": "{{displayCount}} treffers"
+      "matchesBadge": "{{displayCount}} treffers",
+      "filesBadge_one": "{{displayCount}} lêer",
+      "filesBadge_other": "{{displayCount}} lêers",
+      "linesBadge_one": "{{displayCount}} reël",
+      "linesBadge_other": "{{displayCount}} reëls",
+      "matchesBadge_one": "{{displayCount}} treffer",
+      "matchesBadge_other": "{{displayCount}} treffers",
+      "noOutput": "Geen uitset nie."
     },
     "readToolMarkdown": {
       "linesTruncated": "reëls {{start}}–{{end}} (afgekap)",
@@ -2350,7 +2517,11 @@
       "files": "Lêers",
       "couldNotOpenPhotoPicker": "Die fotokieser kon nie oopgemaak word nie. Herbegin Kilo en probeer weer.",
       "maxFilesAllowed": "Jy kan hoogstens {{displayCount}} lêers byvoeg.",
-      "onlyAddingFiles": "Slegs {{accepted}} van {{total}} lêers word bygevoeg (maks. {{max}})"
+      "onlyAddingFiles": "Slegs {{accepted}} van {{total}} lêers word bygevoeg (maks. {{max}})",
+      "maxFilesAllowed_one": "Jy kan hoogstens {{displayCount}} lêer byvoeg.",
+      "maxFilesAllowed_other": "Jy kan hoogstens {{displayCount}} lêers byvoeg.",
+      "onlyAddingFiles_one": "Slegs {{accepted}} van {{total}} lêers word bygevoeg (maks. {{max}})",
+      "onlyAddingFiles_other": "Slegs {{accepted}} van {{total}} lêers word bygevoeg (maks. {{max}})"
     },
     "composer": {
       "addAttachment": "Voeg aanhegsel by",
@@ -2368,7 +2539,9 @@
       "discardAttachmentsMessage": "Opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word.",
       "discardAttachmentsTitle": "Aanhegsels weggooi?",
       "charactersRemaining": "{{count}} karakters oor",
-      "insertNewline": "Voeg nuwe reël in"
+      "insertNewline": "Voeg nuwe reël in",
+      "charactersRemaining_one": "{{count}} karakter oor",
+      "charactersRemaining_other": "{{count}} karakters oor"
     },
     "chatLink": {
       "linkCopied": "Skakel gekopieer",
@@ -2402,6 +2575,12 @@
       "startNewSession": "Begin 'n nuwe sessie",
       "exitSession": "Sluit die sessie",
       "clearSession": "Beëindig hierdie sessie en begin 'n nuwe een",
+      "compactDescription": "kompakteer die huidige sessiekonteks",
+      "goalDescription": "Hou aan werk aan 'n sessiedoel. /goal <objective> of pause, resume, clear",
+      "initDescription": "geleide AGENTS.md-opstelling",
+      "resumeClaudeDescription": "voer 'n Claude Code-sessietranskripsie in",
+      "resumeCodexDescription": "voer 'n OpenAI Codex-sessietranskripsie in",
+      "reviewDescription": "hersien veranderinge [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Gebruik /{{command}}",
       "insert": "Voeg in",
       "upgradeRequiredFallback": "Werk asseblief jou CLI by om hierdie opdrag te gebruik.",
@@ -2434,7 +2613,14 @@
       "stepsCount_one": "{{steps}} stap",
       "stepsCount": "{{steps}} stappe",
       "stepsCount_other": "{{steps}} stappe",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modelle ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "Outo-goedkeuring",
+      "description": "Keur toestemmingsversoeke vir hierdie sessie outomaties goed. Gereedskap hardloop dan sonder om te vra.",
+      "unavailable": "Hierdie sessie kan nie toestemmingsversoeke ontvang nie."
     },
     "prBadge": {
       "open": "oop trekversoek",
@@ -2466,6 +2652,12 @@
       "tapToListHint": "Tik op 'n map om die inhoud daarvan te wys.",
       "unsupportedDescription": "Hierdie CLI kan nie mappe lys nie. Tik op Klaar om die beginmap te behou. Die sessie sal in daardie map begin.",
       "unsupportedTitle": "Kan nie mappe lys nie"
+    },
+    "toolRun": {
+      "sheetTitle": "Nutsmiddel-oproepe",
+      "condensedLabel": "{{itemCount}} items; {{last}}",
+      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel_other": "{{itemCount}} items; {{last}}"
     }
   },
   "bootstrap": {
@@ -2510,6 +2702,7 @@
     "couldNotLoadActiveSessions": "Die aktiewe sessies kon nie gelaai word nie.",
     "agentSessions": "Tans aktief",
     "newCodingTask": "Nuwe koderingstaak",
+    "newTaskFromPicture": "Nuwe taak vanaf 'n prentjie",
     "explore": "Verken",
     "seeAll": "Bekyk alles",
     "noLiveSessions": "Niks loop tans nie"
@@ -2576,8 +2769,12 @@
     "gatewayUnreachable": "Die Kilo Gateway kon nie bereik word nie. Gaan jou verbinding na en probeer weer.",
     "gatewayTimeout": "Die transkripsie het te lank geneem. Probeer weer.",
     "gatewayModelUnavailable": "Hierdie transkripsiemodel is nie beskikbaar nie. Kies 'n ander een in Voorkeure.",
+    "gatewayModelUnavailableNotice": "Hierdie model word nie meer aangebied nie. Tik op $t(transcriptionModel.title) om 'n ander een te kies.",
     "gatewaySignInRequired": "Teken in om gateway-transkripsie te gebruik.",
-    "gatewayNoModel": "Kies eers 'n transkripsiemodel in Voorkeure."
+    "gatewayNoModel": "Kies eers 'n transkripsiemodel in Voorkeure.",
+    "testTitle": "Toets steminvoer",
+    "testPlaceholder": "Tik op die mikrofoon en begin praat.",
+    "testClear": "Vee teks uit"
   },
   "share": {
     "title": "Deel met Kilo",
@@ -2595,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "Hierdie sessie kan nie lêers ontvang nie",
     "cliCantReceiveFilesMessage": "Die Kilo CLI wat hierdie sessie laat loop, kan nie lêers ontvang nie. Dateer die CLI op daardie masjien op of deel die lêers eerder met 'n nuwe sessie.",
     "contentlessMessage": "Niks om te deel nie — geen teks of lêers is ingesluit nie.",
-    "couldNotReadContent": "Kon nie die gedeelde inhoud lees nie."
+    "couldNotReadContent": "Kon nie die gedeelde inhoud lees nie.",
+    "onlyFirstFilesAttached_one": "Slegs die eerste {{displayCount}} lêer sal aangeheg word.",
+    "onlyFirstFilesAttached_other": "Slegs die eerste {{displayCount}} lêers sal aangeheg word."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2727,7 +2926,8 @@
     "aiProvidersWhat": "Jou opdragte, gespreksgeskiedenis en enige lêers wat jy aanheg.",
     "aiProvidersWhy": "Om AI-antwoorde te genereer.",
     "aiProvidersWho": "Anthropic, OpenAI, Google en ander verskaffers wat jy per versoek kies.",
-    "gatewayWhat": "Rekening-ID, versoekmetadata, tekengebruik.",
+    "gatewayWhat": "Rekening-ID, versoekmetadata, tekengebruik, en die prompts en stemopnames wat die app daardeur stuur.",
+    "viaGateway": "Deur die Kilo Gateway",
     "gatewayWhy": "Identiteitsverifikasie, roetering van versoeke, rekonsiliasie van fakturering.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Verslae oor ineenstortings en foute waaruit die toepinhoud verwyder is.",
@@ -2747,7 +2947,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Jou opname terwyl jy dikteer.",
     "voiceTranscriptionWhy": "Om spraak in teks te omskep.",
-    "voiceTranscriptionWho": "Slegs op die toestel, of Apple of Google wanneer hierdie toestel nie vanlyn kan transkribeer nie.",
+    "voiceTranscriptionWho": "Jou toestel, die Kilo Gateway met jou gekose transkripsiemodel, of Apple of Google vir aanlyn herkenning.",
     "installAttributionPromptTitle": "Installasietoeskrywing toelaat?",
     "installAttributionPromptMessage": "Kilo gebruik Apple se nasporingstoestemming net om vas te stel watter kanaal jou hierheen gebring het. Jou opdragte en gesprekke word nooit gebruik nie.",
     "what": "Wat",
@@ -2919,6 +3119,14 @@
     "tooManySignInAttempts": "Te veel aanmeldpogings. Wag asseblief en probeer weer."
   },
   "models": {
+    "auto": {
+      "frontier": "Outo Toonaangewend",
+      "balanced": "Outo Gebalanseerd",
+      "efficient": "Outo Doeltreffend",
+      "small": "Outo Klein",
+      "free": "Outo Gratis",
+      "organization": "Organisasie-outo"
+    },
     "dataCollected": "Data ingesamel",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Die gunstelinge kon nie bygewerk word nie.",
@@ -2957,8 +3165,17 @@
     "privacy": "Maak Kilo oop om agente te sien",
     "openAgents": "Maak agente oop",
     "needsInput": "Wag op invoer",
+    "newestSession": "Nuutste: {{title}}",
+    "noneWaiting": "Geen agente wag nie",
+    "newAgent": "Nuwe agent",
+    "approving": "Besig om goed te keur...",
+    "couldNotApprove": "Kon nie goedkeur nie",
+    "couldNotStart": "Kon nie begin nie",
     "channelName": "Aktiewe agente",
-    "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien."
+    "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
+    "openSession": "Oop",
+    "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer.",
+    "newestResult": "Nuutste resultaat"
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",
@@ -2966,5 +3183,56 @@
     "emptyTitle": "Geen transkripsiemodelle nie",
     "emptyDescription": "Die Kilo Gateway bied tans geen transkripsiemodelle nie.",
     "loadFailed": "Die transkripsiemodelle kon nie gelaai word nie."
+  },
+  "voiceLanguage": {
+    "title": "Stemtaal",
+    "automatic": "Outomaties",
+    "loadFailed": "Kon nie die tale laai wat hierdie toestel ondersteun nie.",
+    "emptyTitle": "Geen ondersteunde tale",
+    "emptyDescription": "Hierdie toestel se spraakherkenning rapporteer geen ondersteunde tale nie."
+  },
+  "tour": {
+    "eyebrow": "Vinnige toer",
+    "forkTitle": "Waar wil jy Kilo uitvoer?",
+    "forkSubtitle": "Kies waar Kilo vir jou eerste sessie uitvoer.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Voer Kilo uit in 'n geïsoleerde wolomgewing sonder iets om te installeer.",
+    "remoteOptionTitle": "Jou rekenaar",
+    "remoteOptionBody": "Voer Kilo op jou eie masjien uit deur die `kilo remote`-CLI.",
+    "skip": "Slaan toer oor",
+    "tutorialLabel": "Tutorial"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Begin agent benodig 'n opdrag. Voeg 'n opdrag by en voer dit weer uit.",
+      "repositoryUnknown": "Kilo herken nie {{repository}} as 'n GitHub- of GitLab-bewaarplek nie. Kies 'n ander bewaarplek in Kilo.",
+      "repositoryUnsupported": "{{repository}} is 'n Bitbucket-bewaarplek — Begin agent kan dit nog nie gebruik nie. Kies 'n ander bewaarplek in Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Maak laaste sessie oop"
+  },
+  "spendAlerts": {
+    "subtitle": "E-pos of stoot 'n waarskuwing na die faktuurkontakte wanneer hierdie omvang se besteding 'n limiet oorskry of bo sy gewone uurlikse tempo styg.",
+    "enable": "Aktiveer bestedingswaarskuwings",
+    "thresholdTitle": "Oorskryding van drempel",
+    "thresholdSubtitle": "Lopende besteding oorskry jou limiet",
+    "anomalyTitle": "Uurlikse piek",
+    "anomalySubtitle": "'n Uur is ver bo hierdie omvang se gewone tempo",
+    "limitLabel": "Limiet (USD)",
+    "windowLabel": "Venster",
+    "window24h": "24 uur",
+    "window7d": "7 dae",
+    "window30d": "30 dae",
+    "multiplierLabel": "Piekvermenigvuldiger",
+    "saved": "Instellings vir bestedingswaarskuwings gestoor",
+    "loadError": "Kon nie bestedingswaarskuwings laai nie.",
+    "saveError": "Kon nie bestedingswaarskuwings stoor nie.",
+    "empty": "Bestedingswaarskuwings is af. Skakel dit aan om hierdie omvang se faktuurkontakte te waarsku.",
+    "noSpend": "Nog geen besteding aangeteken nie",
+    "spend24h": "Besteding in die afgelope 24 uur",
+    "multiplierError": "Voer 'n vermenigvuldiger van 1 of meer in",
+    "permissionDenied": "Jy het nie toestemming om bestedingswaarskuwings te bestuur nie.",
+    "pushOffByCategory": "Af in Kennisgewings"
   }
 }

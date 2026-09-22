@@ -7,7 +7,7 @@ import {
   type SandboxHeartbeatPayload,
 } from '../shared/sandbox-control-protocol.js';
 import { createSandboxControlSocketHandler, readSandboxControlConnection } from './socket.js';
-import { createControlRequestWaiters } from './waiters.js';
+import { createControlRequestWaiters, type ControlRequestWaiters } from './waiters.js';
 
 vi.mock('../logger.js', () => {
   const logger = {
@@ -89,6 +89,18 @@ const WRAPPER_INSTANCE_ID = '11111111-1111-4111-8111-111111111111';
 const REPLACEMENT_WRAPPER_INSTANCE_ID = '22222222-2222-4222-8222-222222222222';
 
 describe('sandbox control socket handler', () => {
+  it('exposes the current isolate outstanding control-request waiter count', () => {
+    const pendingCount = vi.fn(() => 4);
+    const handler = createSandboxControlSocketHandler(createFakeState(), 'sbx_test', {
+      wait: vi.fn(),
+      settle: vi.fn(),
+      rejectAll: vi.fn(),
+      pendingCount,
+    } as unknown as ControlRequestWaiters);
+    expect(handler.pendingControlRequests()).toBe(4);
+    expect(pendingCount).toHaveBeenCalledTimes(1);
+  });
+
   it('accepts old heartbeats and ignores invalid optional versions without rejecting readiness', () => {
     const heartbeat = { state: 'idle', kilo: { ready: true }, sessions: [] };
     expect(sandboxHeartbeatPayloadSchema.parse(heartbeat)).toEqual(heartbeat);
@@ -359,6 +371,7 @@ describe('sandbox control socket handler', () => {
             sessionOperationResults: true,
             scopedStopAbort: true,
             nativeRuntimeRetirement: true,
+            eventBatches: true,
           },
         },
       })
@@ -1113,6 +1126,164 @@ describe('sandbox control socket handler', () => {
       requestId: 'event-receipt',
       ok: true,
       result: { receiptId, applied: true },
+    });
+  });
+
+  it('returns per-item outcomes for a negotiated event batch', async () => {
+    const ws = createFakeWebSocket({
+      handshakeComplete: true,
+      acceptedAt: Date.now(),
+      protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+      providerInstanceId: 'inst_1',
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
+      capabilities: { eventBatches: true, eventReceipts: true },
+    });
+    const firstReceipt = '123e4567-e89b-42d3-a456-426614174199';
+    const secondReceipt = '223e4567-e89b-42d3-a456-426614174199';
+    const outcomes = [
+      { receiptId: firstReceipt, status: 'applied' },
+      { receiptId: secondReceipt, status: 'rejected', retryable: true },
+    ];
+    const onSessionEventBatch = vi.fn().mockResolvedValue({ outcomes });
+    const handler = createSandboxControlSocketHandler(
+      createFakeState([ws]),
+      'sbx_test',
+      undefined,
+      {
+        onSessionEventBatch,
+      }
+    );
+
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'request',
+        requestId: 'batch_1',
+        operation: 'sandbox.event.publishBatch',
+        payload: {
+          items: [
+            {
+              event: 'session.event',
+              receiptId: firstReceipt,
+              sequence: 1,
+              session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+              payload: { type: 'message.updated', properties: { id: 'msg_1' } },
+            },
+            {
+              event: 'session.event',
+              receiptId: secondReceipt,
+              sequence: 2,
+              session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+              payload: { type: 'message.updated', properties: { id: 'msg_2' } },
+            },
+          ],
+        },
+      })
+    );
+
+    expect(onSessionEventBatch).toHaveBeenCalledTimes(1);
+    expect(ws.send).toHaveBeenLastCalledWith(
+      JSON.stringify({
+        type: 'response',
+        requestId: 'batch_1',
+        ok: true,
+        result: { outcomes },
+      })
+    );
+  });
+
+  it('rejects a batch frame when batching was not negotiated', async () => {
+    const ws = createFakeWebSocket({
+      handshakeComplete: true,
+      acceptedAt: Date.now(),
+      protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+      providerInstanceId: 'inst_1',
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
+    });
+    const onSessionEventBatch = vi.fn();
+    const handler = createSandboxControlSocketHandler(
+      createFakeState([ws]),
+      'sbx_test',
+      undefined,
+      {
+        onSessionEventBatch,
+      }
+    );
+
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'request',
+        requestId: 'batch_unnegotiated',
+        operation: 'sandbox.event.publishBatch',
+        payload: {
+          items: [
+            {
+              event: 'session.event',
+              receiptId: '123e4567-e89b-42d3-a456-426614174199',
+              sequence: 1,
+              session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+              payload: { type: 'message.updated', properties: { id: 'msg_1' } },
+            },
+          ],
+        },
+      })
+    );
+
+    expect(onSessionEventBatch).not.toHaveBeenCalled();
+    expect(JSON.parse(ws.send.mock.calls.at(-1)?.[0] as string)).toMatchObject({
+      type: 'response',
+      requestId: 'batch_unnegotiated',
+      ok: false,
+      error: { code: 'protocol_error', message: 'Event batching is not negotiated' },
+    });
+  });
+
+  it('rejects a batch frame when event receipts are not negotiated', async () => {
+    const ws = createFakeWebSocket({
+      handshakeComplete: true,
+      acceptedAt: Date.now(),
+      protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+      providerInstanceId: 'inst_1',
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
+      capabilities: { eventBatches: true },
+    });
+    const onSessionEventBatch = vi.fn();
+    const handler = createSandboxControlSocketHandler(
+      createFakeState([ws]),
+      'sbx_test',
+      undefined,
+      {
+        onSessionEventBatch,
+      }
+    );
+
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'request',
+        requestId: 'batch_without_receipts',
+        operation: 'sandbox.event.publishBatch',
+        payload: {
+          items: [
+            {
+              event: 'session.event',
+              receiptId: '123e4567-e89b-42d3-a456-426614174199',
+              sequence: 1,
+              session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+              payload: { type: 'message.updated', properties: { id: 'msg_1' } },
+            },
+          ],
+        },
+      })
+    );
+
+    expect(onSessionEventBatch).not.toHaveBeenCalled();
+    expect(JSON.parse(ws.send.mock.calls.at(-1)?.[0] as string)).toMatchObject({
+      type: 'response',
+      requestId: 'batch_without_receipts',
+      ok: false,
+      error: { code: 'protocol_error', message: 'Event batching is not negotiated' },
     });
   });
 

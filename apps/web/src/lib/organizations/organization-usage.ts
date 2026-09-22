@@ -42,11 +42,12 @@ export async function getBalanceAndOrgSettings(
   balance: number;
   settings?: OrganizationSettings;
   plan?: OrganizationPlan;
+  balanceLimitedByUserAllowance?: boolean;
 }> {
   const balanceSpan = startInactiveSpan({ name: 'balance-check' });
   const result = organizationId
     ? await getBalanceForOrganizationUser(organizationId, user.id, { fromDb })
-    : await getBalanceForUser(user);
+    : { ...(await getBalanceForUser(user)), balanceLimitedByUserAllowance: false };
   balanceSpan.end();
   return result;
 }
@@ -60,14 +61,18 @@ export async function getBalanceForOrganizationUser(
     /** Database instance to use (defaults to primary db, pass readDb for replica) */
     fromDb?: typeof db;
   } = {}
-): Promise<{ balance: number; settings?: OrganizationSettings; plan?: OrganizationPlan }> {
+): Promise<{
+  balance: number;
+  settings?: OrganizationSettings;
+  plan?: OrganizationPlan;
+  balanceLimitedByUserAllowance?: boolean;
+}> {
   const { limitType = 'daily', fromDb = db } = options;
   const startTime = performance.now();
   logExceptInTest(
     `[getBalanceForOrganizationUser] Starting balance check for user ${userId} in org ${organizationId}`
   );
 
-  // Single query to get user limits, usage, organization balance, require_seats, and verify membership
   const result = await fromDb
     .select({
       microdollar_limit: organization_user_limits.microdollar_limit,
@@ -111,7 +116,6 @@ export async function getBalanceForOrganizationUser(
     )
     .limit(1);
 
-  // If no result, user is not a member of the organization
   if (result.length === 0) {
     const endTime = performance.now();
     const duration = endTime - startTime;
@@ -119,7 +123,7 @@ export async function getBalanceForOrganizationUser(
       `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: 0 (not a member)`
     );
 
-    return { balance: 0, settings: {} };
+    return { balance: 0, settings: {}, balanceLimitedByUserAllowance: false };
   }
 
   const {
@@ -176,10 +180,14 @@ export async function getBalanceForOrganizationUser(
       `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(organization_balance)} (require_seats: ignoring limits)`
     );
 
-    return { balance: fromMicrodollars(organization_balance), settings, plan };
+    return {
+      balance: fromMicrodollars(organization_balance),
+      settings,
+      plan,
+      balanceLimitedByUserAllowance: false,
+    };
   }
 
-  // If user has no limits set, return organization's total balance
   if (microdollar_limit == null) {
     const endTime = performance.now();
     const duration = endTime - startTime;
@@ -187,10 +195,14 @@ export async function getBalanceForOrganizationUser(
       `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(organization_balance)} (no limits)`
     );
 
-    return { balance: fromMicrodollars(organization_balance), settings, plan };
+    return {
+      balance: fromMicrodollars(organization_balance),
+      settings,
+      plan,
+      balanceLimitedByUserAllowance: false,
+    };
   }
 
-  // User has limits - calculate remaining allowance
   const usageAmount = microdollar_usage || 0;
   const remainingAllowance = microdollar_limit - usageAmount;
 
@@ -205,7 +217,15 @@ export async function getBalanceForOrganizationUser(
     `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(cappedBalance)} (allowance: ${fromMicrodollars(remainingAllowance)}, org balance: ${fromMicrodollars(organization_balance)})`
   );
 
-  return { balance: fromMicrodollars(cappedBalance), settings, plan };
+  return {
+    balance: fromMicrodollars(cappedBalance),
+    settings,
+    plan,
+    // An organization top-up raises only the organization balance, so it clears
+    // the block only while the member still has allowance left. An exhausted
+    // allowance (remainingAllowance <= 0) is a per-user limit no top-up fixes.
+    balanceLimitedByUserAllowance: remainingAllowance <= 0,
+  };
 }
 
 export type OrganizationUsageMutationResult = {
@@ -397,7 +417,6 @@ export async function updateOrganizationUserLimit(
         )
       );
   } else {
-    // Validate the limit is within acceptable range
     if (dailyUsageLimitUsd < 0 || dailyUsageLimitUsd > MAX_DAILY_LIMIT_USD) {
       throw new Error(`Daily usage limit must be between $0 and $${MAX_DAILY_LIMIT_USD}`);
     }
@@ -451,9 +470,6 @@ export async function getAgentInteractionsPerDay(
     .groupBy(microdollar_usage.kilo_user_id, sql`DATE(${microdollar_usage.created_at})`);
 }
 
-/**
- * Fetch cloud agent sessions per day for given users
- */
 export async function getCloudAgentSessionsPerDay(
   userIds: string[],
   startDate: string,
@@ -476,9 +492,6 @@ export async function getCloudAgentSessionsPerDay(
     .groupBy(sharedCliSessions.kilo_user_id, sql`DATE(${sharedCliSessions.created_at})`);
 }
 
-/**
- * Fetch code review runs per day for given users
- */
 export async function getCodeReviewsPerDay(
   organizationId: Organization['id'],
   userIds: string[],

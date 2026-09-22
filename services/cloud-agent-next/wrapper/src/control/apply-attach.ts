@@ -131,6 +131,31 @@ function attachFailureFields(
   };
 }
 
+// `withKiloRequestDeadline` rejects a probe/create with this message. Diagnostics
+// only: it distinguishes the 10s control-request deadline from an abort.
+const KILO_REQUEST_TIMEOUT_MESSAGE = 'Kilo request timed out';
+
+function isKiloRequestTimeout(error: unknown): boolean {
+  return error instanceof Error && error.message === KILO_REQUEST_TIMEOUT_MESSAGE;
+}
+
+// Closed failure category for a failed attach diagnostic. Falls back to the
+// emitted `errorCode` when no stage-specific category applies.
+function attachFailureReason(input: {
+  stage: ControlDiagnosticRecord['fields']['stage'];
+  aborted: boolean;
+  timedOut: boolean;
+  errorCode?: ControlDiagnosticRecord['fields']['errorCode'];
+}): string {
+  if (input.aborted) return 'attachment_cancelled';
+  if (input.stage === 'runtime_attach') return 'runtime_attach_failed';
+  if (input.stage === 'session_probe')
+    return input.timedOut ? 'session_probe_timeout' : (input.errorCode ?? 'not_ready');
+  if (input.stage === 'session_restore') return 'session_restore_failed';
+  if (input.stage === 'session_create') return 'session_create_failed';
+  return input.errorCode ?? 'not_ready';
+}
+
 async function defaultHasGit(directory: string): Promise<boolean> {
   try {
     await fs.access(path.join(directory, '.git', 'HEAD'));
@@ -332,7 +357,8 @@ async function executeSessionAttach(
   const diagnostic = (
     phase: 'completed' | 'failed',
     extra: Partial<ControlDiagnosticRecord['fields']> = {}
-  ): void =>
+  ): void => {
+    const aborted = Boolean(deps.signal?.aborted || attachment?.signal.aborted);
     emitControlDiagnostic(deps.onDiagnostic, 'control.request', {
       operation: 'session.attach',
       phase,
@@ -344,9 +370,20 @@ async function executeSessionAttach(
       sessionResolution,
       elapsedMs: Math.max(0, Date.now() - startedAt),
       ok: phase === 'completed',
-      aborted: Boolean(deps.signal?.aborted || attachment?.signal.aborted),
+      aborted,
+      ...(phase === 'failed'
+        ? {
+            reason: attachFailureReason({
+              stage,
+              aborted,
+              timedOut: extra.timedOut === true,
+              errorCode: extra.errorCode,
+            }),
+          }
+        : {}),
       ...extra,
     });
+  };
   const existingDirectory = directoryForSession(session.kiloSessionId);
   if (existingDirectory && existingDirectory !== directory) {
     const result = fail('unauthorized', 'Session directory mismatch', false);
@@ -619,11 +656,14 @@ async function executeSessionAttach(
       }
       signal.throwIfAborted();
       progress.complete('kilo_session', 'phase:kilo_session');
-    } catch {
+    } catch (error) {
       const message = signal.aborted ? 'Session attachment cancelled' : 'kilo session is not ready';
       progress.fail('kilo_session', 'phase:kilo_session', message);
       const result = fail('not_ready', message, true);
-      diagnostic('failed', attachFailureFields(result));
+      diagnostic('failed', {
+        ...attachFailureFields(result),
+        timedOut: isKiloRequestTimeout(error),
+      });
       return result;
     }
     stage = 'attachment_commit';

@@ -16,7 +16,7 @@ import type {
   SessionOperationAck,
   SessionOperationDelivery,
 } from '../../../src/shared/sandbox-control-protocol';
-import type { NativeRetirement } from './session-operation-cleanup';
+import type { NativeRetirement, RetireDirectoryResult } from './session-operation-cleanup';
 
 const session = {
   directory: '/workspace',
@@ -32,10 +32,10 @@ describe('native-scoped control event failures', () => {
   });
 
   it.each([
-    ['session.preparing', false],
+    ['session.preparing', true],
     ['session.event', true],
   ] as const)(
-    'retires the runtime after an expired %s only when required',
+    'routes an expired %s publication to its native runtime owner',
     async (event, retires) => {
       const clock = spyOn(Date, 'now').mockReturnValue(1_000);
       const runtime = { runtimeId: crypto.randomUUID() };
@@ -49,14 +49,14 @@ describe('native-scoped control event failures', () => {
         supportsReceipts: () => true,
         prepare: input => input,
         publish: async () => {},
-        sendLegacy: () => false,
+        sendLegacy: () => ({ sent: false, reason: 'send_failed' }),
         onFailure: reported,
       });
       try {
         expect(
           transport.enqueue(event, payload, { ...session, nativeRuntimeId: runtime.runtimeId })
         ).toBe(true);
-        clock.mockReturnValue(31_000);
+        clock.mockReturnValue(61_000);
         expect(await transport.resume()).toBe(true);
         expect(reported).toHaveBeenCalledTimes(1);
         expect(retired).toHaveBeenCalledTimes(retires ? 1 : 0);
@@ -88,7 +88,7 @@ describe('native-scoped control event failures', () => {
           published.push(publication);
           if (publication.sequence === 1) throw new ControlDeliveryError('rejected', false);
         },
-        sendLegacy: () => false,
+        sendLegacy: () => ({ sent: false, reason: 'send_failed' }),
         onFailure: failure => {
           failures.push(failure);
           handleFailure(failure);
@@ -99,7 +99,7 @@ describe('native-scoped control event failures', () => {
         identity.nativeRuntimeId = replacement.runtimeId;
         clock.mockReturnValue(2_000);
         expect(transport.enqueue('session.event', payload, identity)).toBe(true);
-        if (reason === 'expired') clock.mockReturnValue(31_000);
+        if (reason === 'expired') clock.mockReturnValue(61_000);
         expect(await transport.resume()).toBe(true);
         expect(failures).toHaveLength(1);
         expect(failures[0]).toMatchObject({
@@ -127,7 +127,7 @@ describe('native-scoped control event failures', () => {
     }
   );
 
-  it('coalesces retirement of the failed native lifetime without poisoning its replacement', async () => {
+  it('reports each failed native-lifetime publication and ignores stale runtime failures', async () => {
     const original = { runtimeId: crypto.randomUUID() };
     let current = original;
     const retired = mock();
@@ -149,7 +149,7 @@ describe('native-scoped control event failures', () => {
         if (publication.session.nativeRuntimeId === original.runtimeId)
           throw new ControlDeliveryError('rejected', false);
       },
-      sendLegacy: () => false,
+      sendLegacy: () => ({ sent: false, reason: 'send_failed' }),
       onFailure: failure => {
         failures.push(failure);
         handleFailure(failure);
@@ -165,12 +165,11 @@ describe('native-scoped control event failures', () => {
         ).toBe(true);
       expect(await transport.resume()).toBe(true);
       expect(failures).toHaveLength(2);
-      expect(retired).toHaveBeenCalledTimes(1);
+      expect(retired).toHaveBeenCalledTimes(2);
       expect(retired).toHaveBeenCalledWith(failures[0], original);
+      expect(retired).toHaveBeenCalledWith(failures[1], original);
       cleanup.resolve();
       await Promise.resolve();
-      handleFailure(failures[0]);
-      expect(retired).toHaveBeenCalledTimes(2);
       current = { runtimeId: crypto.randomUUID() };
       expect(
         await transport.publishSessionEvent(payload, {
@@ -180,10 +179,10 @@ describe('native-scoped control event failures', () => {
       ).toBe(true);
       expect(await transport.resume()).toBe(true);
       expect(published.at(-1)?.session.nativeRuntimeId).toBe(current.runtimeId);
+      handleFailure(failures[0]);
       expect(retired).toHaveBeenCalledTimes(2);
       const failure = failures[0];
       if (!failure) throw new Error('Missing native failure');
-      handleFailure(failure);
       handleFailure({
         ...failure,
         publication: {
@@ -198,7 +197,7 @@ describe('native-scoped control event failures', () => {
     }
   });
 
-  it('coalesces distinct roots only during registry cleanup and separates a reused native object incarnation', async () => {
+  it('reports distinct-root native failures to the runtime owner and ignores stale incarnations', async () => {
     rememberAttachedRoot('root_a', session.directory);
     rememberAttachedRoot('root_b', session.directory);
     const runtime = { runtimeId: 'N1' };
@@ -225,16 +224,16 @@ describe('native-scoped control event failures', () => {
     handleFailure(failure('root_a', 'N1'));
     handleFailure(failure('root_a', 'N1'));
     handleFailure(failure('root_b', 'N1'));
-    expect(failures).toHaveLength(2);
+    expect(failures).toHaveLength(3);
     cleanup.resolve();
     await Promise.resolve();
     handleFailure(failure('root_a', 'N1'));
-    expect(failures).toHaveLength(3);
+    expect(failures).toHaveLength(4);
 
     runtime.runtimeId = 'N2';
     handleFailure(failure('root_a', 'N1'));
     handleFailure(failure('root_a', 'N2'));
-    expect(failures).toHaveLength(4);
+    expect(failures).toHaveLength(5);
   });
 
   it('preserves a sealed result and its acknowledgement when failure retires the matching native runtime', async () => {
@@ -288,14 +287,14 @@ describe('native-scoped control event failures', () => {
     );
     await operation.done;
     const sealed = await sending.promise;
-    let retirement: Promise<NativeRetirement> | undefined;
+    let retirement: Promise<RetireDirectoryResult> | undefined;
     const transport = createControlEventTransport({
       supportsReceipts: () => true,
       prepare: input => input,
       publish: async () => {
         throw new ControlDeliveryError('rejected', false);
       },
-      sendLegacy: () => false,
+      sendLegacy: () => ({ sent: false, reason: 'send_failed' }),
       onFailure: createControlEventFailureHandler({
         getRuntime: () => runtime,
         onFailure: failure => {
@@ -373,7 +372,7 @@ describe('native-scoped control event failures', () => {
       publish: async () => {
         throw new ControlDeliveryError('rejected', false);
       },
-      sendLegacy: () => false,
+      sendLegacy: () => ({ sent: false, reason: 'send_failed' }),
       onFailure: reported,
     });
     try {
@@ -470,5 +469,141 @@ describe('native-scoped control event failures', () => {
 
     expect(getRuntime).not.toHaveBeenCalled();
     expect(onFailure).not.toHaveBeenCalled();
+  });
+});
+
+describe('legacy publication admission reporting', () => {
+  it.each([
+    ['disconnected', { sent: false as const, reason: 'disconnected' as const }, 'disconnected'],
+    [
+      'socket_overflow',
+      { sent: false as const, reason: 'socket_overflow' as const },
+      'socket_overflow',
+    ],
+    ['send_failed', { sent: false as const, reason: 'send_failed' as const }, 'send_failed'],
+  ] as const)(
+    'reports the classified legacy %s failure once through both publication APIs',
+    async (_outcome, result, expectedReason) => {
+      const admissions: Array<{ event: string; reason: string; directory: string }> = [];
+      const sendLegacy = mock(() => result);
+      const transport = createControlEventTransport({
+        supportsReceipts: () => false,
+        publish: async () => {},
+        prepare: input => input,
+        sendLegacy,
+        onFailure: () => {},
+        onAdmissionFailure: input =>
+          admissions.push({
+            event: input.event,
+            reason: input.reason,
+            directory: input.session.directory,
+          }),
+      });
+      try {
+        expect(transport.enqueue('session.event', payload, session)).toBe(false);
+        expect(await transport.publishSessionEvent(payload, session)).toBe(false);
+        expect(sendLegacy).toHaveBeenCalledTimes(2);
+        expect(admissions).toEqual([
+          { event: 'session.event', reason: expectedReason, directory: session.directory },
+          { event: 'session.event', reason: expectedReason, directory: session.directory },
+        ]);
+      } finally {
+        transport.close();
+      }
+    }
+  );
+
+  it('classifies a thrown legacy send as send_failed through both publication APIs', async () => {
+    const admissions: string[] = [];
+    const transport = createControlEventTransport({
+      supportsReceipts: () => false,
+      publish: async () => {},
+      prepare: input => input,
+      sendLegacy: () => {
+        throw new Error('serialize failed');
+      },
+      onFailure: () => {},
+      onAdmissionFailure: input => admissions.push(input.reason),
+    });
+    try {
+      expect(transport.enqueue('session.event', payload, session)).toBe(false);
+      expect(await transport.publishSessionEvent(payload, session)).toBe(false);
+      expect(admissions).toEqual(['send_failed', 'send_failed']);
+    } finally {
+      transport.close();
+    }
+  });
+
+  it('does not report a successful legacy publication', async () => {
+    const admissions = mock();
+    const transport = createControlEventTransport({
+      supportsReceipts: () => false,
+      publish: async () => {},
+      prepare: input => input,
+      sendLegacy: () => ({ sent: true }),
+      onFailure: () => {},
+      onAdmissionFailure: admissions,
+    });
+    try {
+      expect(transport.enqueue('session.event', payload, session)).toBe(true);
+      expect(await transport.publishSessionEvent(payload, session)).toBe(true);
+      expect(admissions).not.toHaveBeenCalled();
+    } finally {
+      transport.close();
+    }
+  });
+
+  it('does not report a receipt-backed admission failure as a legacy failure', async () => {
+    const admissions: string[] = [];
+    const transport = createControlEventTransport({
+      supportsReceipts: () => true,
+      publish: async () => {},
+      prepare: () => {
+        throw new Error('prepare failed');
+      },
+      sendLegacy: () => ({ sent: true }),
+      onFailure: () => {},
+      onAdmissionFailure: input => admissions.push(input.reason),
+    });
+    try {
+      expect(transport.enqueue('session.event', payload, session)).toBe(false);
+      expect(admissions).toEqual(['prepare_failed']);
+    } finally {
+      transport.close();
+    }
+  });
+});
+
+describe('receipt-backed producer admission', () => {
+  it('holds a producer enqueue while paused and publishes it on resume', async () => {
+    const published: ControlEventPublication[] = [];
+    const transport = createControlEventTransport({
+      supportsReceipts: () => true,
+      prepare: input => input,
+      publish: async publication => {
+        published.push(publication);
+      },
+      sendLegacy: () => ({ sent: false, reason: 'send_failed' }),
+      onFailure: () => {},
+    });
+    try {
+      transport.pause();
+      expect(await transport.publishSessionEvent(payload, session)).toBe(true);
+      expect(published).toHaveLength(0);
+
+      expect(await transport.resume()).toBe(true);
+      expect(published).toHaveLength(1);
+      expect(published[0]).toMatchObject({
+        event: 'session.event',
+        receiptId: expect.any(String),
+        sequence: 1,
+        session,
+        payload,
+      });
+      expect(await transport.resume()).toBe(true);
+      expect(published).toHaveLength(1);
+    } finally {
+      transport.close();
+    }
   });
 });

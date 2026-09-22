@@ -130,6 +130,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
   let firstTokenReceived = false;
   let usage: MessagesApiUsage | null = null;
   let finish_reason: string | null = null;
+  let wasRefusal = false;
   let providerMetadata: VercelProviderMetaData | null = null;
   let inference_provider: string | null = null;
 
@@ -175,6 +176,8 @@ export async function parseMessagesMicrodollarUsageFromStream(
       if (json.type === 'message_start') {
         messageId = json.message.id;
         model = json.message.model;
+        wasRefusal ||=
+          json.message.stop_reason === 'refusal' || json.message.stop_details?.type === 'refusal';
         const openRouterProvider = (json.message as MaybeHasOpenRouterProvider).provider;
         if (openRouterProvider) {
           inference_provider = openRouterProvider;
@@ -191,6 +194,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
 
       if (json.type === 'message_delta') {
         finish_reason = json.delta.stop_reason;
+        wasRefusal ||= finish_reason === 'refusal' || json.delta.stop_details?.type === 'refusal';
         usage = json.usage ?? usage;
         const meta = (json as MaybeHasVercelProviderMetadata).provider_metadata;
         if (meta) {
@@ -219,6 +223,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
   const coreProps = {
     messageId,
     hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
+    wasRefusal: wasRefusal || undefined,
     model,
     responseContent,
     inference_provider,
@@ -255,9 +260,11 @@ export function parseMessagesMicrodollarUsageFromString(
     .join('');
 
   const finish_reason = responseJson?.stop_reason ?? null;
+  const wasRefusal = finish_reason === 'refusal' || responseJson?.stop_details?.type === 'refusal';
   const coreProps = {
     messageId: responseJson?.id ?? null,
     hasError: !responseJson?.model || statusCode >= 400 || isErrorFinishReason(finish_reason),
+    wasRefusal: wasRefusal || undefined,
     model: getVercelResolvedModel(providerMetadata) ?? responseJson?.model ?? null,
     responseContent,
     inference_provider,

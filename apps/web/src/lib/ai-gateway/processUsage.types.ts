@@ -81,6 +81,7 @@ export type NotYetCostedUsageStats = {
   model: string | null;
   responseContent: string;
   hasError: boolean;
+  wasRefusal?: boolean;
   inference_provider: string | null;
   upstream_id: string | null;
   finish_reason: string | null;

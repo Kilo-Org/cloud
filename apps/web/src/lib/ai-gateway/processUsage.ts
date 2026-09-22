@@ -66,6 +66,8 @@ import type {
   UsageRecordWriteOutcome,
   VercelProviderMetaData,
 } from '@/lib/ai-gateway/processUsage.types';
+import { recordClaudeRefusal } from '@/lib/ai-gateway/claude-refusal-limit';
+import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
   parseResponsesMicrodollarUsageFromStream,
   parseResponsesMicrodollarUsageFromString,
@@ -1017,6 +1019,10 @@ export function processOpenRouterUsage(
   };
 }
 
+function isRefusalFinishReason(finishReason: string | null): boolean {
+  return finishReason === 'refusal';
+}
+
 export async function parseMicrodollarUsageFromStream(
   stream: ReadableStream,
   kiloUserId: string,
@@ -1045,6 +1051,7 @@ export async function parseMicrodollarUsageFromStream(
   let usage: OpenRouterUsage | null = null;
   let inference_provider: string | null = null;
   let finish_reason: string | null = null;
+  let wasRefusal = false;
   let vercelProviderMetadata: VercelProviderMetaData | null = null;
 
   const sseStreamParser = createParser({
@@ -1106,6 +1113,12 @@ export async function parseMicrodollarUsageFromStream(
         chunkProviderMetadata?.gateway?.routing?.finalProvider ??
         inference_provider;
       finish_reason = choice?.finish_reason ?? finish_reason;
+      wasRefusal ||=
+        isRefusalFinishReason(finish_reason) ||
+        (choice?.delta != null &&
+          'refusal' in choice.delta &&
+          typeof choice.delta.refusal === 'string' &&
+          choice.delta.refusal.length > 0);
 
       const contentDelta = choice?.delta?.content;
       if (contentDelta) {
@@ -1132,6 +1145,7 @@ export async function parseMicrodollarUsageFromStream(
     kiloUserId,
     messageId,
     hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
+    wasRefusal: wasRefusal || undefined,
     model,
     responseContent,
     inference_provider,
@@ -1169,11 +1183,18 @@ export function parseMicrodollarUsageFromString(
   }
   const choice = responseJson?.choices?.[0];
   const finish_reason = choice?.finish_reason ?? null;
+  const wasRefusal =
+    isRefusalFinishReason(finish_reason) ||
+    (choice?.message != null &&
+      'refusal' in choice.message &&
+      typeof choice.message.refusal === 'string' &&
+      choice.message.refusal.length > 0);
   const vercelProviderMetadata = choice?.message?.provider_metadata ?? null;
   const coreProps = {
     kiloUserId,
     messageId: responseJson?.id ?? null,
     hasError: !responseJson?.model || statusCode >= 400 || isErrorFinishReason(finish_reason),
+    wasRefusal: wasRefusal || undefined,
     model: responseJson?.model ?? null,
     responseContent: choice?.message.content ?? '',
     inference_provider:
@@ -1268,6 +1289,7 @@ export async function processTokenData(
     genStats.model = usageStats.model; // openrouter bug?
     genStats.upstream_id ??= usageStats.upstream_id; // keep the id the response already reported
     genStats.hasError = usageStats.hasError; // retain by choice
+    genStats.wasRefusal = usageStats.wasRefusal;
     genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;
     if (genStats.cost_mUsd !== usageStats.cost_mUsd) {
@@ -1316,7 +1338,15 @@ export async function processTokenData(
     usageStats.cacheDiscount_mUsd = 0;
   }
 
-  return logMicrodollarUsage(usageStats, usageContext);
+  const usageIdentity = await logMicrodollarUsage(usageStats, usageContext);
+  if (
+    usageIdentity &&
+    usageStats.wasRefusal &&
+    isClaudeModel(usageStats.model ?? usageContext.requested_model)
+  ) {
+    await recordClaudeRefusal(usageContext.organizationId ?? usageContext.kiloUserId);
+  }
+  return usageIdentity;
 }
 
 async function getGenerationLookupProvider(

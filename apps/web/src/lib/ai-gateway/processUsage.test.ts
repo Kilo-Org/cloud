@@ -7,6 +7,7 @@ import {
   countAndStoreUsage,
   parseMicrodollarUsageFromStream,
   parseMicrodollarUsageFromString,
+  processTokenData,
   mapToUsageStats,
   logMicrodollarUsage,
   insertUsageRecord,
@@ -40,12 +41,18 @@ import { Readable } from 'node:stream';
 import { getFraudDetectionHeaders, toMicrodollars } from '../utils';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { recordClaudeRefusal } from '@/lib/ai-gateway/claude-refusal-limit';
 
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
   captureException: jest.fn(),
   captureMessage: jest.fn(),
 }));
+jest.mock('@/lib/ai-gateway/claude-refusal-limit', () => ({
+  recordClaudeRefusal: jest.fn(),
+}));
+
+const mockedRecordClaudeRefusal = jest.mocked(recordClaudeRefusal);
 
 describe('processOpenRouterUsage', () => {
   const coreProps = {
@@ -173,6 +180,65 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
+  });
+
+  test('detects a streamed refusal', async () => {
+    const refusalChunk =
+      'data: {"id":"gen-1","model":"anthropic/claude-sonnet-4.5","choices":[{"delta":{"refusal":"I cannot help with that."},"finish_reason":"content_filter"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2,"prompt_tokens_details":{"cached_tokens":0},"completion_tokens_details":{"reasoning_tokens":0}}}\n\n';
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(refusalChunk));
+        controller.close();
+      },
+    });
+
+    const result = await parseMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200
+    );
+
+    expect(result.wasRefusal).toBe(true);
+  });
+
+  test('detects a non-streamed refusal', () => {
+    const result = parseMicrodollarUsageFromString(
+      JSON.stringify({
+        id: 'gen-1',
+        model: 'anthropic/claude-sonnet-4.5',
+        choices: [
+          {
+            message: { role: 'assistant', content: null, refusal: 'I cannot help with that.' },
+            finish_reason: 'stop',
+          },
+        ],
+      }),
+      'fake-user-id',
+      200
+    );
+
+    expect(result.wasRefusal).toBe(true);
+  });
+
+  test('does not count generic content filtering as a model refusal', () => {
+    const result = parseMicrodollarUsageFromString(
+      JSON.stringify({
+        id: 'gen-1',
+        model: 'anthropic/claude-sonnet-4.5',
+        choices: [
+          {
+            message: { role: 'assistant', content: null },
+            finish_reason: 'content_filter',
+          },
+        ],
+      }),
+      'fake-user-id',
+      200
+    );
+
+    expect(result.wasRefusal).toBeUndefined();
   });
 
   const interruptedStreamErrors: [name: string, error: Error][] = [
@@ -725,6 +791,26 @@ describe('logMicrodollarUsage', () => {
     expect(usageRecord?.has_error).toBe(false);
     expect(usageRecord?.created_at).toBeTruthy();
     expect(metadataRecord?.created_at).toBe(usageRecord?.created_at);
+  });
+
+  test('records a persisted Claude refusal against the account', async () => {
+    const user = await insertTestUser({
+      id: 'test-claude-refusal-user',
+      microdollars_used: 0,
+      google_user_email: 'claude-refusal@example.com',
+    });
+
+    const result = await processTokenData(
+      {
+        ...BASE_USAGE_STATS,
+        messageId: 'test-claude-refusal-message',
+        wasRefusal: true,
+      },
+      createBaseUsageContext(user)
+    );
+
+    expect(result).not.toBeNull();
+    expect(mockedRecordClaudeRefusal).toHaveBeenCalledWith('test-claude-refusal-user');
   });
 
   test('stores session_id when provided', async () => {

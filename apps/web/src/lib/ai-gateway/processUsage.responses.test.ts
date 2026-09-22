@@ -12,6 +12,15 @@ import { Readable } from 'node:stream';
 
 const sampleDir = join(process.cwd(), 'src/tests/sample');
 
+function streamFromText(text: string): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(text));
+      controller.close();
+    },
+  });
+}
+
 describe('processResponsesApiUsage', () => {
   const coreProps = {
     messageId: 'test-message-id',
@@ -132,6 +141,21 @@ describe('processResponsesApiUsage', () => {
 });
 
 describe('parseMicrodollarUsageFromStream approval tests', () => {
+  test('detects a streamed refusal', async () => {
+    const result = await parseResponsesMicrodollarUsageFromStream(
+      streamFromText(
+        'data: {"type":"response.refusal.delta","delta":"I cannot help with that."}\n\n' +
+          'data: {"type":"response.completed","response":{"id":"resp-1","model":"anthropic/claude-sonnet-4.5","status":"completed","usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2,"input_tokens_details":{"cached_tokens":0},"output_tokens_details":{"reasoning_tokens":0}},"output":[]}}\n\n'
+      ),
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200
+    );
+
+    expect(result.wasRefusal).toBe(true);
+  });
+
   const openrouterResponses = 'openrouter-responses.log.resp.sse';
   test(openrouterResponses, async () => {
     const inputFile = join(sampleDir, openrouterResponses);
@@ -200,6 +224,30 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
 });
 
 describe('parseMicrodollarUsageFromString approval tests', () => {
+  test('detects a non-streamed refusal', () => {
+    const result = parseResponsesMicrodollarUsageFromString(
+      JSON.stringify({
+        id: 'resp-1',
+        object: 'response',
+        created_at: 1,
+        model: 'anthropic/claude-sonnet-4.5',
+        status: 'completed',
+        output: [
+          {
+            id: 'msg-1',
+            type: 'message',
+            role: 'assistant',
+            status: 'completed',
+            content: [{ type: 'refusal', refusal: 'I cannot help with that.' }],
+          },
+        ],
+      }),
+      200
+    );
+
+    expect(result.wasRefusal).toBe(true);
+  });
+
   const openrouterResponsesJson = 'openrouter-responses.log.resp.json';
   test(openrouterResponsesJson, async () => {
     const inputFile = join(sampleDir, openrouterResponsesJson);

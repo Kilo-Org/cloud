@@ -227,6 +227,25 @@ describe('parseMessagesMicrodollarUsageFromStream approval tests', () => {
 });
 
 describe('parseMessagesMicrodollarUsageFromStream', () => {
+  test('detects a streamed refusal', async () => {
+    const stream = streamFromText(
+      'event: message_start\n' +
+        'data: {"type":"message_start","message":{"id":"generation-id","type":"message","role":"assistant","content":[],"model":"anthropic/claude-sonnet-4.5","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":1,"output_tokens":0}}}\n\n' +
+        'event: message_delta\n' +
+        'data: {"type":"message_delta","delta":{"stop_reason":"refusal","stop_sequence":null},"usage":{"input_tokens":1,"output_tokens":1}}\n\n'
+    );
+
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200
+    );
+
+    expect(result.wasRefusal).toBe(true);
+  });
+
   test('records the successful Vercel routed model instead of the message start model', async () => {
     const stream = streamFromText(
       'event: message_start\n' +
@@ -295,5 +314,23 @@ describe('parseMessagesMicrodollarUsageFromString approval tests', () => {
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
+  });
+
+  test('detects a non-streamed refusal', () => {
+    const result = parseMessagesMicrodollarUsageFromString(
+      JSON.stringify({
+        id: 'generation-id',
+        type: 'message',
+        role: 'assistant',
+        content: [],
+        model: 'anthropic/claude-sonnet-4.5',
+        stop_reason: 'refusal',
+        stop_sequence: null,
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+      200
+    );
+
+    expect(result.wasRefusal).toBe(true);
   });
 });

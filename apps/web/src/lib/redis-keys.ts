@@ -28,6 +28,9 @@ export const codingPlanUsageRedisKey = (input: {
     `coding-plan-usage:v1:${input.userId}:${input.subscriptionId}:${input.planId}:${input.providerId}:${input.inventoryId}`
   );
 
+export const claudeRefusalCountRedisKey = (accountId: string) =>
+  redisKey(`ai-gateway:claude-refusals:v1:${accountId}`);
+
 export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
   'public-api:leaderboard-model-provider-usage'
 );

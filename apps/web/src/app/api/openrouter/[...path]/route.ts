@@ -110,9 +110,14 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
-import { isFableModel, isOpus5Model } from '@/lib/ai-gateway/providers/anthropic.constants';
+import {
+  isClaudeModel,
+  isFableModel,
+  isOpus5Model,
+} from '@/lib/ai-gateway/providers/anthropic.constants';
 import { CLAUDE_OPUS_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
 import { withRestTiming } from '@/lib/observability/request-timing';
+import { isClaudeRefusalLimited } from '@/lib/ai-gateway/claude-refusal-limit';
 
 export const maxDuration = 800;
 
@@ -623,6 +628,21 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
           console.error('Failed to bill classifier cost for auto routing', error);
         }
       })()
+    );
+  }
+
+  if (
+    !isAnonymousContext(user) &&
+    isClaudeModel(effectiveModelIdLowerCased) &&
+    (await isClaudeRefusalLimited(organizationId ?? user.id))
+  ) {
+    return NextResponse.json(
+      {
+        error: 'Rate limit exceeded',
+        error_type: ProxyErrorType.rate_limit_exceeded,
+        message: 'Claude access is temporarily unavailable after repeated model refusals.',
+      },
+      { status: 429 }
     );
   }
 

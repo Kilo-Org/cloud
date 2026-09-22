@@ -104,6 +104,12 @@ function extractResponseContent(output: OpenAI.Responses.ResponseOutputItem[]): 
     .join('');
 }
 
+function responseContainsRefusal(output: OpenAI.Responses.ResponseOutputItem[]): boolean {
+  return output.some(
+    item => item.type === 'message' && item.content.some(content => content.type === 'refusal')
+  );
+}
+
 export async function parseResponsesMicrodollarUsageFromStream(
   stream: ReadableStream,
   kiloUserId: string,
@@ -131,6 +137,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
   let providerMetadata: VercelProviderMetaData | null = null;
   let inference_provider: string | null = null;
   let finish_reason: string | null = null;
+  let wasRefusal = false;
 
   const sseStreamParser = createParser({
     onEvent(event: EventSourceMessage) {
@@ -167,12 +174,16 @@ export async function parseResponsesMicrodollarUsageFromStream(
       if (json.type === 'response.output_text.delta' && json.delta) {
         responseContent += json.delta;
       }
+      if (json.type === 'response.refusal.delta' || json.type === 'response.refusal.done') {
+        wasRefusal = true;
+      }
 
       // Extract metadata whenever json.response is present so that aborted
       // streams still capture messageId/model/usage from early events like
       // response.created and response.in_progress.
       if (json.response) {
         const response = json.response;
+        wasRefusal ||= responseContainsRefusal(response.output);
         messageId = response.id ?? messageId;
         model = response.model ?? model;
         if (response.usage) {
@@ -209,6 +220,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
   const coreProps = {
     messageId,
     hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
+    wasRefusal: wasRefusal || undefined,
     model,
     responseContent,
     inference_provider,
@@ -236,10 +248,12 @@ export function parseResponsesMicrodollarUsageFromString(
   const providerMetadata = responseJson?.provider_metadata ?? null;
 
   const inference_provider = providerMetadata?.gateway?.routing?.finalProvider ?? null;
+  const wasRefusal = responseJson?.output ? responseContainsRefusal(responseJson.output) : false;
 
   const coreProps = {
     messageId: responseJson?.id ?? null,
     hasError: !responseJson?.model || statusCode >= 400 || responseJson?.status !== 'completed',
+    wasRefusal: wasRefusal || undefined,
     model: responseJson?.model ?? null,
     responseContent: responseJson?.output ? extractResponseContent(responseJson.output) : '',
     inference_provider,

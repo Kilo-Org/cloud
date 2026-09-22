@@ -39,6 +39,7 @@ import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 import { CLAUDE_OPUS_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
+import { isClaudeRefusalLimited } from '@/lib/ai-gateway/claude-refusal-limit';
 
 jest.mock('next/server', () => {
   return {
@@ -68,6 +69,7 @@ jest.mock('@/lib/creditTransactions', () => ({
 }));
 jest.mock('@/lib/drizzle', () => ({ readDb: {} }));
 jest.mock('@/lib/free-model-rate-limiter');
+jest.mock('@/lib/ai-gateway/claude-refusal-limit');
 jest.mock('@/lib/organizations/organization-group-policy-context.server', () => ({
   getOrganizationGroupPolicyContext: jest.fn().mockResolvedValue({}),
 }));
@@ -139,6 +141,7 @@ const mockedCheckFreeModelRateLimitByUser = jest.mocked(checkFreeModelRateLimitB
 const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
 const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
+const mockedIsClaudeRefusalLimited = jest.mocked(isClaudeRefusalLimited);
 
 const provider = {
   id: 'openrouter',
@@ -262,6 +265,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+    mockedIsClaudeRefusalLimited.mockResolvedValue(false);
   });
 
   it('serves a free model to a client that sends the anonymous sentinel', async () => {
@@ -562,6 +566,43 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
     mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+    mockedIsClaudeRefusalLimited.mockResolvedValue(false);
+  });
+
+  it('blocks Claude requests after an organization reaches the refusal limit', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedIsClaudeRefusalLimited.mockResolvedValue(true);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('anthropic/claude-sonnet-4.5')) as never);
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({
+      error_type: 'rate_limit_exceeded',
+      message: 'Claude access is temporarily unavailable after repeated model refusals.',
+    });
+    expect(mockedIsClaudeRefusalLimited).toHaveBeenCalledWith('org-123');
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('does not apply the Claude refusal limit to other models', async () => {
+    mockedIsClaudeRefusalLimited.mockResolvedValue(true);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('openai/gpt-4o')) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedIsClaudeRefusalLimited).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).toHaveBeenCalled();
   });
 
   it('rejects providerOptions and directs clients to provider', async () => {

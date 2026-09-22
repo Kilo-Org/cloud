@@ -86,7 +86,7 @@ type SessionMessageLifecycle = {
    * Consecutive delivery-deadline deferrals granted while the control plane
    * reported a runtime replacement in flight. Bounds a retirement fence that
    * never clears so the head still reaches its terminal preparation timeout.
-   * The count resets when the head binds a replacement runtime identity: that
+   * The count resets when the head binds a replacement native runtime: that
    * closes the chain, so a later retirement gets its own budget.
    */
   replacementWaits?: number;
@@ -724,6 +724,24 @@ export function streamCloudStatus(
   return messages.length > 0 ? { type: 'ready' } : null;
 }
 
+/**
+ * Mint the next attach epoch. A retired proof keeps its epoch in the pool: the
+ * native-runtime fence rejects an in-place rebind recorded at an epoch it
+ * already holds, and the retired proof's epoch is the one that fence carries, so
+ * re-minting it would make the replacement attach look like a stale result.
+ */
+function nextAttachmentEpoch(messages: readonly SessionMessageRecord[]): number {
+  return (
+    Math.max(
+      0,
+      ...messages.flatMap(message => [
+        message.operations?.attach?.attachmentEpoch ?? 0,
+        message.operations?.retiredAttach?.attachmentEpoch ?? 0,
+      ])
+    ) + 1
+  );
+}
+
 export function applySessionOperationResult(
   messages: readonly SessionMessageRecord[],
   delivery: SessionOperationDelivery,
@@ -795,10 +813,7 @@ export function applySessionOperationResult(
     at: resultMessage.terminalAt ?? delivery.completedAt,
   };
   const attachmentEpoch =
-    kind === 'attach'
-      ? (proof.attachmentEpoch ??
-        Math.max(0, ...messages.map(item => item.operations?.attach?.attachmentEpoch ?? 0)) + 1)
-      : undefined;
+    kind === 'attach' ? (proof.attachmentEpoch ?? nextAttachmentEpoch(messages)) : undefined;
   return {
     messages: applied.map(item =>
       item.messageId === message.messageId
@@ -957,9 +972,7 @@ export function completeSessionOperationAttachment(
     nextQueuedMessageId(messages) !== message.messageId
   )
     return undefined;
-  const attachmentEpoch =
-    proof.attachmentEpoch ??
-    Math.max(0, ...messages.map(item => item.operations?.attach?.attachmentEpoch ?? 0)) + 1;
+  const attachmentEpoch = proof.attachmentEpoch ?? nextAttachmentEpoch(messages);
   return messages.map(item =>
     item.messageId === message.messageId
       ? {

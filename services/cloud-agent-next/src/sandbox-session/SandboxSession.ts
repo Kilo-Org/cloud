@@ -2144,6 +2144,7 @@ export class SandboxSession extends DurableObject<Env> {
         authorization: authorization.data,
       })
     );
+    this.clearRuntimeReplacementWaits(epoch);
     logControlDiagnostic('native_fence_transition', {
       sessionId: this.sessionId,
       sandboxId: input.sandboxId,
@@ -3512,10 +3513,13 @@ export class SandboxSession extends DurableObject<Env> {
                   message.wrapperInstanceId === runtime.data
                     ? message.unresolvedDispatch
                     : undefined,
-                // A different runtime identity means the replacement the head
-                // was waiting on has rebound, so the deferral chain that spent
-                // the previous budget is over. The next retirement starts with a
-                // fresh budget instead of inheriting the spent one.
+                // A different wrapper incarnation means the replacement the
+                // head was waiting on has rebound, so the deferral chain that
+                // spent the previous budget is over. The next retirement starts
+                // with a fresh budget instead of inheriting the spent one. A
+                // directory-native replacement keeps the wrapper incarnation
+                // and is reset where the native runtime is recorded instead
+                // (`recordNativeRuntime`).
                 ...(message.wrapperInstanceId === runtime.data
                   ? {}
                   : { replacementWaits: undefined }),
@@ -4398,6 +4402,26 @@ export class SandboxSession extends DurableObject<Env> {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * End the deferral chain once the session binds a native runtime, so the next
+   * retirement gets a full budget instead of inheriting a spent one. Keyed on the
+   * native runtime identity because a directory-native retirement recreates the
+   * native runtime in place inside the same wrapper incarnation, which the
+   * wrapper-identity reset in `recordRuntime` cannot observe.
+   */
+  private clearRuntimeReplacementWaits(epoch: number): void {
+    const messages = this.loadMessages();
+    if (!messages.some(message => message.replacementWaits !== undefined)) return;
+    this.saveMessages(
+      messages.map(message =>
+        message.replacementWaits === undefined
+          ? message
+          : { ...message, replacementWaits: undefined }
+      ),
+      epoch
+    );
   }
 
   /**

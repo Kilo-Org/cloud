@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   NEXT_RUNTIME_ID,
   RUNTIME_ID,
+  SANDBOX_ID,
   controlFailure,
+  controlResponse,
   createSessionFixture,
   delegateRequest,
 } from '../session-fixture.test-helpers.js';
@@ -398,6 +400,94 @@ describe('runtime replacement in flight', () => {
     expect(fixture.record('a')).toMatchObject({
       state: 'failed',
       failedReason: 'preparation_timeout',
+    });
+  });
+
+  it('resets the deferral budget when a native runtime rebinds in place', async () => {
+    const fixture = createSessionFixture(fixtureDeps);
+    const retiredNativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementNativeRuntimeId = '44444444-4444-4444-8444-444444444444';
+    delegateRequest(fixture, 'session.attach', async () => controlFailure(true, 'not_ready'));
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      runtimeReplacementInFlight: true,
+      operationResults: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    const dispatchedAttach = fixture.record('a')?.operations?.attach;
+    if (!dispatchedAttach?.dispatched) throw new Error('Missing dispatched attach proof');
+
+    // The head had bound a native runtime (the same wrapper incarnation) before
+    // the directory-native retirement. The fence therefore carries the retired
+    // attach proof's epoch, and the replacement attach must advance it instead
+    // of re-minting the same epoch.
+    fixture.storage.kv.put(
+      'session_messages',
+      (fixture.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? []).map(message =>
+        message.messageId === 'a'
+          ? {
+              ...message,
+              operations: {
+                ...message.operations,
+                attach: { ...dispatchedAttach, completedAt: Date.now(), attachmentEpoch: 1 },
+              },
+            }
+          : message
+      )
+    );
+    await fixture.session.recordNativeRuntime({
+      sandboxId: SANDBOX_ID,
+      wrapperInstanceId: RUNTIME_ID,
+      nativeRuntimeId: retiredNativeRuntimeId,
+      authorization: dispatchedAttach.authorization,
+    });
+    expect(fixture.values.get('native_runtime_fence')).toMatchObject({
+      nativeRuntimeId: retiredNativeRuntimeId,
+      attachmentEpoch: 1,
+    });
+
+    // Fence A: the head defers once and spends one unit of the budget.
+    const fenceDeadline = Date.now() + 20_000;
+    const stored = fixture.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+    fixture.storage.kv.put(
+      'session_messages',
+      stored.map(message =>
+        message.messageId === 'a' ? { ...message, deliveryDeadlineAt: fenceDeadline } : message
+      )
+    );
+    vi.setSystemTime(fenceDeadline);
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({ state: 'queued', replacementWaits: 1 });
+    expect(fixture.record('a')?.operations?.retiredAttach).toMatchObject({ attachmentEpoch: 1 });
+
+    // Fence A clears by recreating only the native runtime in place: the wrapper
+    // incarnation stays RUNTIME_ID, so only the attach result's native runtime
+    // identity changes. The attach binds it while the prompt stays retryable, so
+    // the head is still queued when the replacement has bound.
+    delegateRequest(fixture, 'session.attach', async () =>
+      controlResponse({ attached: true, nativeRuntimeId: replacementNativeRuntimeId })
+    );
+    delegateRequest(fixture, 'session.prompt', async () => controlFailure(true, 'not_ready'));
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.values.get('native_runtime_fence')).toMatchObject({
+      nativeRuntimeId: replacementNativeRuntimeId,
+    });
+    expect(fixture.record('a')).toMatchObject({
+      state: 'queued',
+      wrapperInstanceId: RUNTIME_ID,
+      replacementWaits: undefined,
     });
   });
 });

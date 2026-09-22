@@ -3,12 +3,14 @@ import { Table2, X } from '@/components/ui/icons';
 import {
   type ComponentRef,
   type ComponentType,
+  createContext,
   Fragment,
   memo,
   type ReactElement,
   type ReactNode,
   type RefObject,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -62,12 +64,20 @@ const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
 const ZOOM_DEFAULT = 1;
 
-// A table mounts at most TABLE_ROW_MOUNT_LIMIT rows; the footer row reveals
-// TABLE_ROW_MOUNT_STEP more on each tap. The body cannot be virtualized: it
-// lives inside the pinch-zoom gesture and the natural-size sizer, so a capped
-// mount is the bound that keeps the modal's open animation cheap.
+// A table mounts at most TABLE_ROW_MOUNT_LIMIT rows; the reveal control below
+// the table reveals TABLE_ROW_MOUNT_STEP more on each tap. The body cannot be
+// virtualized: it lives inside the pinch-zoom gesture and the natural-size
+// sizer, so a capped mount is the bound that keeps the modal's open animation
+// cheap.
 export const TABLE_ROW_MOUNT_LIMIT = 40;
 export const TABLE_ROW_MOUNT_STEP = 40;
+
+// The mount limit is read by CappedTableRows, which renders inside the table
+// box, while the reveal control it drives is rendered below the horizontal
+// ScrollView so it stays in the viewport at every horizontal scroll position.
+// A context keeps the limit out of the renderer constructor, whose identity
+// must not change when the limit grows (that would re-create the parser).
+const TableRowLimitContext = createContext(TABLE_ROW_MOUNT_LIMIT);
 
 type MarkdownTableProps = {
   palette: MarkdownPalette;
@@ -127,6 +137,7 @@ export function MarkdownTable({
   const insets = useSafeAreaInsets();
 
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
+  const [rowLimit, setRowLimit] = useState(TABLE_ROW_MOUNT_LIMIT);
   const [natural, setNatural] = useState<{ width: number; height: number } | undefined>(undefined);
   const scale = useSharedValue(ZOOM_DEFAULT);
   const savedScale = useSharedValue(ZOOM_DEFAULT);
@@ -158,6 +169,7 @@ export function MarkdownTable({
   useEffect(() => {
     if (!open) {
       setZoom(ZOOM_DEFAULT);
+      setRowLimit(TABLE_ROW_MOUNT_LIMIT);
       scale.value = ZOOM_DEFAULT;
       savedScale.value = ZOOM_DEFAULT;
     }
@@ -232,18 +244,43 @@ export function MarkdownTable({
   }));
   const scrollContentStyle = { padding: 16, paddingBottom: insets.bottom + 16 };
 
-  function renderTableContent(cells: ReactNode) {
+  // The reveal control is a sibling of the horizontal ScrollView, not a row
+  // inside the table box: centred across the table's natural width it would sit
+  // outside the visible range for any table wider than the viewport, leaving
+  // the capped rows with no visible way to reveal them.
+  function renderTableContent(cells: ReactNode, options?: { totalRows: number }) {
+    const hasMoreRows = options !== undefined && options.totalRows > rowLimit;
     return (
       <ScrollView ref={verticalRef} className="flex-1" contentContainerStyle={scrollContentStyle}>
         <ScrollView ref={horizontalRef} horizontal showsHorizontalScrollIndicator>
           <GestureDetector gesture={zoomGesture}>
             <View style={sizerStyle}>
               <Animated.View className="self-start" onLayout={handleTableLayout} style={tableStyle}>
-                {cells}
+                <TableRowLimitContext.Provider value={rowLimit}>
+                  {cells}
+                </TableRowLimitContext.Provider>
               </Animated.View>
             </View>
           </GestureDetector>
         </ScrollView>
+        {hasMoreRows ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.loadMore')}
+            onPress={() => {
+              setRowLimit(current => current + TABLE_ROW_MOUNT_STEP);
+            }}
+            className="mt-2 items-center self-stretch py-3 active:opacity-70"
+          >
+            {/* eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant text color */}
+            <Text
+              className="text-sm font-medium"
+              style={withRtlWritingDirection({ color: palette.textColor })}
+            >
+              {t('common.loadMore')}
+            </Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
     );
   }
@@ -342,7 +379,8 @@ export function MarkdownTable({
                     header={header ?? []}
                     rows={rows ?? []}
                     columnCount={columnCount}
-                  />
+                  />,
+                  { totalRows: (rows ?? []).length }
                 )
               )}
             </GestureHandlerRootView>
@@ -406,7 +444,12 @@ function MarkdownTableCells({
 }
 
 type MarkdownTableBodyProps = {
-  children: (cells: ReactNode) => ReactElement;
+  /**
+   * Renders the parsed cells inside the table's scroll chrome. `options` is
+   * passed only for a parsed table body: its `totalRows` drives the reveal
+   * control, which stays hidden while the wait or empty state is shown.
+   */
+  children: (cells: ReactNode, options?: { totalRows: number }) => ReactElement;
   palette: MarkdownPalette;
   raw: string;
   columnCount: number;
@@ -476,7 +519,10 @@ function MarkdownTableBody({
   if (cells !== null) {
     // Key each parsed cell: `elements` is a plain array, and rendering it as an
     // unkeyed child list warns even though the cells never reorder.
-    return children(cells.map((cell, index) => <Fragment key={index}>{cell}</Fragment>));
+    return children(
+      cells.map((cell, index) => <Fragment key={index}>{cell}</Fragment>),
+      { totalRows: rowCount }
+    );
   }
 
   if (rowCount === 0) {
@@ -645,10 +691,12 @@ type CappedTableRowsProps = {
   headerTexts: string[];
 };
 
-// Body rows mount only up to the cap; the footer row reveals one more step per
-// tap. The header row is rendered by the caller and is never capped. A capped
-// table marks no body row as last, so the final visible row keeps its bottom
-// border and the box bottom is drawn after the footer.
+// Body rows mount only up to the limit supplied by TableRowLimitContext; the
+// reveal control that grows that limit is rendered by the table's owner, below
+// the horizontal ScrollView, so it stays visible for a table wider than the
+// viewport. The header row is rendered by the caller and is never capped. A
+// capped table marks no body row as last, so the final visible row keeps its
+// bottom border and the box bottom closes the table above the control.
 function CappedTableRows({
   palette,
   rows,
@@ -656,8 +704,7 @@ function CappedTableRows({
   columnWidth,
   headerTexts,
 }: Readonly<CappedTableRowsProps>) {
-  const { t } = useTranslation();
-  const [limit, setLimit] = useState(TABLE_ROW_MOUNT_LIMIT);
+  const limit = useContext(TableRowLimitContext);
   const visible = rows.slice(0, limit);
   return (
     <>
@@ -672,24 +719,6 @@ function CappedTableRows({
           headerTexts={headerTexts}
         />
       ))}
-      {rows.length > limit ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('common.loadMore')}
-          onPress={() => {
-            setLimit(current => current + TABLE_ROW_MOUNT_STEP);
-          }}
-          className="items-center self-stretch py-3 active:opacity-70"
-        >
-          {/* eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant text color */}
-          <Text
-            className="text-sm font-medium"
-            style={withRtlWritingDirection({ color: palette.textColor })}
-          >
-            {t('common.loadMore')}
-          </Text>
-        </Pressable>
-      ) : null}
     </>
   );
 }

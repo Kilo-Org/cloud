@@ -605,7 +605,7 @@ describe('MarkdownTableBodyRenderer table()', () => {
     expect(tableRows[1]?.props.isLastRow).toBe(true);
   });
 
-  it('caps the mounted rows at the limit and reveals one step per Load more press', () => {
+  it('caps the mounted rows at the limit', () => {
     const bodyRenderer = new MarkdownTableBodyRenderer(mockPalette, 200, 1, true, {});
     const rows = Array.from(
       { length: TABLE_ROW_MOUNT_LIMIT + TABLE_ROW_MOUNT_STEP + 5 },
@@ -619,17 +619,61 @@ describe('MarkdownTableBodyRenderer table()', () => {
     const mounted = memoTableRows(renderer);
     expect(mounted).toHaveLength(1 + TABLE_ROW_MOUNT_LIMIT);
     expect(mounted[0]?.props.isHeader).toBe(true);
-    // A capped table marks no body row as last, so the Load more footer keeps
-    // its separating border and the box bottom is drawn after it.
+    // A capped table marks no body row as last, so the final visible row keeps
+    // its bottom border and the box bottom closes the table.
     expect(mounted[TABLE_ROW_MOUNT_LIMIT]?.props.isLastRow).toBe(false);
+  });
+});
+
+describe('MarkdownTable capped reveal control', () => {
+  function renderCappedTable(): TestRenderer.ReactTestRenderer {
+    const rows = Array.from(
+      { length: TABLE_ROW_MOUNT_LIMIT + TABLE_ROW_MOUNT_STEP + 5 },
+      (_, index) => [[`Row ${index}`]]
+    );
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    act(() => {
+      ref.current = TestRenderer.create(
+        createElement(MarkdownTable, {
+          palette: mockPalette,
+          tableKey: 'md-table-0',
+          columnCount: 1,
+          rowCount: rows.length,
+          selectable: true,
+          header: [['Column 1']],
+          rows,
+        })
+      );
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    openTable(renderer);
+    return renderer;
+  }
+
+  it('keeps the Load more control out of the horizontal scroll region', () => {
+    const renderer = renderCappedTable();
+    const horizontal = renderer.root.findAll(
+      node => (node.type as string) === 'ScrollView' && node.props.horizontal === true
+    );
+    expect(horizontal).toHaveLength(1);
+    expect(
+      horizontal[0]?.findAll(node => node.props.accessibilityLabel === 'Load more')
+    ).toHaveLength(0);
     expect(loadMoreNode(renderer)).toBeTruthy();
+  });
+
+  it('reveals one more step of rows per Load more press', () => {
+    const renderer = renderCappedTable();
+    expect(memoTableRows(renderer)).toHaveLength(1 + TABLE_ROW_MOUNT_LIMIT);
 
     act(() => {
       (loadMoreNode(renderer).props.onPress as (() => void) | undefined)?.();
     });
 
     expect(memoTableRows(renderer)).toHaveLength(1 + TABLE_ROW_MOUNT_LIMIT + TABLE_ROW_MOUNT_STEP);
-    // Rows still remain, so the footer stays mounted.
     expect(loadMoreNode(renderer)).toBeTruthy();
   });
 });
@@ -926,6 +970,50 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
       });
 
       expect(renderer.root.findAllByProps({ animationType: 'slide' })).toHaveLength(0);
+    } finally {
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  });
+
+  it('keeps the cap reveal control out of the horizontal scroll region for a raw table', async () => {
+    const { MarkdownText } = await import('./markdown-text');
+    const tableModule = await import('./markdown-table');
+    const bodyRows = Array.from(
+      { length: TABLE_ROW_MOUNT_LIMIT + 5 },
+      (_, index) => `| Row ${index} |`
+    );
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    await act(async () => {
+      await Promise.resolve();
+      ref.current = TestRenderer.create(
+        createElement(MarkdownText, { value: `| Name |\n| --- |\n${bodyRows.join('\n')}` })
+      );
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+
+    try {
+      openTable(renderer);
+
+      const mountedRows = renderer.root.findAll(
+        node => node.type === tableModule.MemoTableRow || node.type === tableModule.TableRow
+      );
+      expect(mountedRows).toHaveLength(1 + TABLE_ROW_MOUNT_LIMIT);
+
+      const horizontal = renderer.root.findAll(
+        node => (node.type as string) === 'ScrollView' && node.props.horizontal === true
+      );
+      expect(horizontal).toHaveLength(1);
+      expect(
+        horizontal[0]?.findAll(node => node.props.accessibilityLabel === 'Load more')
+      ).toHaveLength(0);
+      expect(
+        renderer.root.findAll(node => node.props.accessibilityLabel === 'Load more')
+      ).toHaveLength(1);
     } finally {
       act(() => {
         renderer.unmount();

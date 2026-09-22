@@ -69,16 +69,6 @@ vi.mock('expo-haptics', () => ({
 vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn(), push: status.push }) }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-// The keyboard-lift view reads the device insets through
-// `react-native-safe-area-context`, whose CommonJS entry requires a Flow
-// react-native subpath this node project cannot load. Stub the two kilo-chat
-// modules the way the sibling node-only screen tests do.
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
-  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
-}));
-vi.mock('@/components/kilo-chat/use-reveal-end-on-keyboard', () => ({
-  useRevealEndOnKeyboard: () => ({ current: null }),
-}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -144,6 +134,13 @@ function only<T>(items: T[], what: string): T {
   return item;
 }
 
+async function renderScreen() {
+  const { renderer, unmount } = await renderWithProviders(
+    createElement(ManualReviewScreen, { scope: 'personal' })
+  );
+  return { renderer, unmount };
+}
+
 /** Every inline `paddingBottom` on the way up from a node, nearest first. */
 function paddingBottomsAbove(node: TestRenderer.ReactTestInstance): number[] {
   const values: number[] = [];
@@ -182,9 +179,7 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
   });
 
   it('pins the start action outside the scroll viewport, clear of the tab bar', async () => {
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ManualReviewScreen, { scope: 'personal' })
-    );
+    const { renderer, unmount } = await renderScreen();
 
     const scrollViews = findAllOfType(renderer.root, 'ScrollView');
     expect(scrollViews).toHaveLength(1);
@@ -207,9 +202,7 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
   });
 
   it('drops the tab bar clearance while the keyboard lifts the footer', async () => {
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ManualReviewScreen, { scope: 'personal' })
-    );
+    const { renderer, unmount } = await renderScreen();
 
     const event = platform === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
     const keyboardShow = keyboard.listeners.get(event) ?? [];
@@ -250,9 +243,7 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
   });
 
   it('keeps the tab bar clearance a short keyboard does not cover', async () => {
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ManualReviewScreen, { scope: 'personal' })
-    );
+    const { renderer, unmount } = await renderScreen();
 
     const event = platform === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
     const keyboardShow = keyboard.listeners.get(event) ?? [];
@@ -289,9 +280,7 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
   it('keeps the action pinned and disabled while provider status is loading', async () => {
     status.loading = true;
     status.connected = false;
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ManualReviewScreen, { scope: 'personal' })
-    );
+    const { renderer, unmount } = await renderScreen();
     expect(findAllOfType(renderer.root, 'Skeleton')).toHaveLength(2);
     const button = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     expect((button.props as { disabled: boolean }).disabled).toBe(true);
@@ -301,9 +290,7 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
 
   it('keeps the pending action in the same footer', async () => {
     status.pending = true;
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ManualReviewScreen, { scope: 'personal' })
-    );
+    const { renderer, unmount } = await renderScreen();
     const button = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     expect((button.props as { loading: boolean }).loading).toBe(true);
     expect(paddingBottomsAbove(button)).toHaveLength(2);
@@ -317,9 +304,7 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
   ])('preserves the recovery action for %s', async (code, retryable) => {
     status.connected = false;
     status.errorCode = code;
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ManualReviewScreen, { scope: 'personal' })
-    );
+    const { renderer, unmount } = await renderScreen();
     const error = only(findAllOfType(renderer.root, 'QueryError'), 'provider error');
     const { onRetry } = error.props as { onRetry?: () => void };
     expect(Boolean(onRetry)).toBe(retryable);
@@ -334,9 +319,7 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
 
   it('offers provider connection instead of a start action when empty', async () => {
     status.connected = false;
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ManualReviewScreen, { scope: 'personal' })
-    );
+    const { renderer, unmount } = await renderScreen();
     const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
     const { action } = empty.props as { action: { props: { onPress: () => void } } };
     act(() => {
@@ -353,9 +336,7 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
 describe('ManualReviewScreen connect provider CTA', () => {
   it('renders the Connect GitHub action full-width like the PR-review connect gate', async () => {
     status.connected = false;
-    const { renderer, unmount } = await renderWithProviders(
-      createElement(ManualReviewScreen, { scope: 'personal' })
-    );
+    const { renderer, unmount } = await renderScreen();
 
     const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
     const { action } = empty.props as { action: ReactElement<{ className?: string }> };

@@ -144,11 +144,6 @@ describe('shared branded splash', () => {
     ).toBeTypeOf('function');
     expect(config.mods?.android?.styles).toBeTypeOf('function');
 
-    // Introspect against a fresh project root: `compileModsAsync` seeds the
-    // Android color/style mods from the resources already on disk, so pointing
-    // it at this package's root would read a local prebuild's `colors.xml`
-    // (absent in CI) and make the assertion depend on the developer's machine.
-    const { root } = createAndroidProject();
     const evaluated = await compileModsAsync(config, {
       projectRoot: root,
       platforms: ['ios', 'android'],

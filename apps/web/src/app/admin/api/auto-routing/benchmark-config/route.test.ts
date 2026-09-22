@@ -9,6 +9,7 @@ import { findExperimentReservedModelIds } from '@/lib/ai-gateway/experiments/res
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import type * as ModelsModule from '@/lib/ai-gateway/models';
+import type * as ProviderDefinitionsModule from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
 
 jest.mock('@/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
@@ -24,9 +25,9 @@ jest.mock('@/lib/ai-gateway/experiments/reserved-ids', () => ({
 }));
 
 jest.mock('@/lib/ai-gateway/providers/definitions/try-get-provider-by-id', () => {
-  const actual = jest.requireActual<
-    typeof import('@/lib/ai-gateway/providers/definitions/try-get-provider-by-id')
-  >('@/lib/ai-gateway/providers/definitions/try-get-provider-by-id');
+  const actual = jest.requireActual<typeof ProviderDefinitionsModule>(
+    '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id'
+  );
   return {
     ...actual,
     tryGetProviderById: (providerId: ProviderId) =>

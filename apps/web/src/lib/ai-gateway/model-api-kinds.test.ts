@@ -3,11 +3,12 @@ import { gatewayChatApisForModel, modelServesAllGatewayChatApis } from './model-
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import type * as ModelsModule from '@/lib/ai-gateway/models';
+import type * as ProviderDefinitionsModule from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
 
 jest.mock('@/lib/ai-gateway/providers/definitions/try-get-provider-by-id', () => {
-  const actual = jest.requireActual<
-    typeof import('@/lib/ai-gateway/providers/definitions/try-get-provider-by-id')
-  >('@/lib/ai-gateway/providers/definitions/try-get-provider-by-id');
+  const actual = jest.requireActual<typeof ProviderDefinitionsModule>(
+    '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id'
+  );
   return {
     ...actual,
     tryGetProviderById: (providerId: ProviderId) =>

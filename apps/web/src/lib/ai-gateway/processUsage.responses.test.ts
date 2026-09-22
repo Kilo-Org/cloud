@@ -1,5 +1,6 @@
 import { test, describe, expect } from '@jest/globals';
 import {
+  extractResponsesPromptInfo,
   parseResponsesMicrodollarUsageFromStream,
   parseResponsesMicrodollarUsageFromString,
   processResponsesApiUsage,
@@ -11,6 +12,45 @@ import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 
 const sampleDir = join(process.cwd(), 'src/tests/sample');
+
+describe('extractResponsesPromptInfo', () => {
+  test('extracts system and developer input messages', () => {
+    expect(
+      extractResponsesPromptInfo({
+        model: 'openai/gpt-5.4',
+        input: [
+          {
+            role: 'system',
+            content: [{ type: 'input_text', text: 'You are Kilo Code.' }],
+          },
+          { role: 'developer', content: 'Follow the repository instructions.' },
+          { role: 'user', content: 'Fix the bug.' },
+        ],
+      })
+    ).toEqual({
+      system_prompt_prefix: 'You are Kilo Code.\nFollow the repository instructions.',
+      system_prompt_length: 54,
+      user_prompt_prefix: 'Fix the bug.',
+    });
+  });
+
+  test('combines top-level instructions with input message instructions', () => {
+    expect(
+      extractResponsesPromptInfo({
+        model: 'openai/gpt-5.4',
+        instructions: 'Use concise language.',
+        input: [
+          { role: 'developer', content: 'Return plain text.' },
+          { role: 'user', content: 'Summarize this.' },
+        ],
+      })
+    ).toEqual({
+      system_prompt_prefix: 'Use concise language.\nReturn plain text.',
+      system_prompt_length: 40,
+      user_prompt_prefix: 'Summarize this.',
+    });
+  });
+});
 
 describe('processResponsesApiUsage', () => {
   const coreProps = {

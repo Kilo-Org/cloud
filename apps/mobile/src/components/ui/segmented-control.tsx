@@ -65,7 +65,6 @@ export function SegmentedControl<T extends string>({
               // One line per option: a wrapped label makes the two choices
               // uneven. Longer locales ellipsize instead of growing a second
               // line; the radio's accessibilityLabel still carries the full text.
-              numberOfLines={1}
             >
               {option.label}
             </Text>

@@ -38,6 +38,19 @@ describe('stripInlineCodeMarkers', () => {
 });
 
 describe('run-location help copy', () => {
+  it('keeps the English new-session hint in plain mobile language', () => {
+    const value = valueAt(CATALOG_LOADERS.en(), ['agentChat', 'newSession', 'remoteHint']);
+    expect(typeof value).toBe('string');
+
+    // The phone user reads one actionable sentence naming the command they
+    // type on their computer; no CLI-only entry point, no internal vocabulary.
+    expect(value).toBe('Run kilo remote in a project on your computer to start sessions there.');
+    expect(value as string).not.toContain('/remote');
+    expect(value as string).not.toContain('CLI session');
+    expect(value as string).not.toContain('local kilo process');
+    expect(value as string).not.toContain('`');
+  });
+
   it.each(SUPPORTED_LANGUAGES)('%s never renders an authoring marker', tag => {
     const catalog = CATALOG_LOADERS[tag]();
 

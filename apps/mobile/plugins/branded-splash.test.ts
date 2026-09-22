@@ -164,8 +164,19 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // Introspection reads the real `apps/mobile` project, so the colors the
+    // app's own config already generated (adaptive-icon and notification
+    // palette) are present too — and a worktree that has been prebuilt has
+    // them on disk while a clean checkout does not. Assert the splash color is
+    // written, not that it is the only color: `toMatchObject` on a bare array
+    // requires the same length, so the assertion flipped on the worktree's
+    // prebuild state alone.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([
+          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+        ]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

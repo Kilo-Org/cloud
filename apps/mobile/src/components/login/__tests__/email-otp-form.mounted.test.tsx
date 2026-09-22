@@ -47,6 +47,15 @@ function destination(root: TestRenderer.ReactTestInstance, email = reportedEmail
   );
 }
 
+function label(root: TestRenderer.ReactTestInstance, copy: string) {
+  return root.find(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Text' &&
+      node.props.children === copy
+  );
+}
+
 afterEach(async () => {
   act(() => renderer?.unmount());
   renderer = undefined;
@@ -127,6 +136,30 @@ describe('EmailOtpForm destination layout', () => {
       expect(props.onResend).toHaveBeenCalledOnce();
     }
   );
+});
+
+describe('EmailOtpForm button labels', () => {
+  // The reported capture: the Arabic secondary label ("إعادة إرسال الرمز")
+  // wrapped onto two lines inside a full-width button, so the copy did not fit
+  // its control. A single-line label is the same remedy the sign-in provider
+  // buttons and the segmented control take.
+  it.each(['en', 'ar'])('keeps the resend label on one line in %s', async language => {
+    await i18n.changeLanguage(language);
+    const { mounted } = mount();
+
+    const resend = label(mounted.root, i18n.t('login.resendCode'));
+    expect(resend.props.numberOfLines).toBe(1);
+    expect(resend.props.adjustsFontSizeToFit).toBe(true);
+    // The full label stays the control's accessible name.
+    expect(
+      mounted.root.findByProps({ accessibilityLabel: i18n.t('login.resendCode') })
+    ).toBeTruthy();
+  });
+
+  it('keeps the verify label on one line', () => {
+    const { mounted } = mount();
+    expect(label(mounted.root, 'Verify code').props.numberOfLines).toBe(1);
+  });
 });
 
 describe('EmailOtpForm controls', () => {

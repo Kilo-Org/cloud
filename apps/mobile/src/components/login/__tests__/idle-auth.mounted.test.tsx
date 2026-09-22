@@ -11,9 +11,9 @@ import {
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
+import { i18n } from '@/i18n';
 
 import { IdleAuth } from '../idle-auth';
-import '@/i18n';
 
 type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
 
@@ -357,6 +357,36 @@ describe('IdleAuth passkey control', () => {
     expect(texts(renderer.root)).not.toContain('Sign in with a passkey');
     // The other ways in are untouched.
     expect(findButton(renderer.root, 'Continue with email')).toBeTruthy();
+  });
+
+  // The reported capture: the Arabic passkey label ("تسجيل الدخول بمفتاح
+  // المرور") wrapped onto two lines and made the passkey button visibly taller
+  // than the single-line Google button directly above it. Both provider labels
+  // are pinned to one line so the stack keeps one row height.
+  it.each(['ar', 'en'])('keeps both provider labels on one line in %s', async language => {
+    providers.googleConfigured = true;
+    passkeySupport.supported = true;
+    await i18n.changeLanguage(language);
+
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    const copies = [i18n.t('login.signInWithGoogle'), i18n.t('login.signInWithPasskey')];
+
+    for (const copy of copies) {
+      const text = renderer.root.find(
+        n =>
+          typeof n.type === 'string' && (n.type as string) === 'Text' && n.props.children === copy
+      );
+      expect(text.props.numberOfLines).toBe(1);
+      expect(text.props.adjustsFontSizeToFit).toBe(true);
+      const button = renderer.root.findByProps({ accessibilityLabel: copy });
+      // The row itself must not wrap either: a wrapping row moves the pinned
+      // label onto a second line and grows the button again.
+      expect(button.props.className).not.toContain('flex-wrap');
+      // The full label stays the control's accessible name.
+      expect(button.props.accessibilityLabel).toBe(copy);
+    }
+
+    await i18n.changeLanguage('en');
   });
 });
 describe('IdleAuth email continue copy', () => {

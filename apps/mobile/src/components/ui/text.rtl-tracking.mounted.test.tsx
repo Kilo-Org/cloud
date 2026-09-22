@@ -102,7 +102,10 @@ describe('Text tracked labels in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
-    expect(hostText(root).props.className as string).toContain('tracking-[1.5px]');
+    // The eyebrow variant owns the tracked display classes and drops them in
+    // RTL (see `Text`'s eyebrow variant and `EYEBROW_LATIN_DISPLAY`); the
+    // shared reset is what keeps any caller-supplied tracking at zero.
+    expect(hostText(root).props.className as string).not.toContain('tracking-[1.5px]');
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
   });
 });

@@ -24,13 +24,21 @@ describe('platform-aware keyboard bottom occlusion', () => {
     ).toBe(300);
   });
 
-  it('reserves the system-bar inset alone while the keyboard is hidden', () => {
+  it('floors the system-bar inset at the bottom chrome while the keyboard is hidden', () => {
+    // A reported inset of 63 (Android's navigation bar at a large font scale)
+    // is already taller than the floor and wins; the smaller reported insets
+    // are floored at 48, the tallest bottom chrome either platform draws, so a
+    // window that reports 0 for the bar still clears the home indicator
+    // (landscape, 2026-09-22 device finding).
     expect(
       resolveKeyboardBottomPadding({ platform: 'android', keyboardHeight: 0, bottomInset: 63 })
     ).toBe(63);
     expect(
       resolveKeyboardBottomPadding({ platform: 'ios', keyboardHeight: 0, bottomInset: 34 })
-    ).toBe(34);
+    ).toBe(48);
+    expect(
+      resolveKeyboardBottomPadding({ platform: 'android', keyboardHeight: 0, bottomInset: 0 })
+    ).toBe(48);
   });
 });
 

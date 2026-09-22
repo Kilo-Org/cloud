@@ -124,12 +124,6 @@ describe('shared branded splash', () => {
   });
 
   it('generates both native splash surfaces from the same options', async () => {
-    // Introspect against a throwaway Android project, never the checkout. The
-    // Android colors mod merges the colors.xml already on disk, so root here
-    // would fold a developer's git-ignored prebuild palette (the alert-dialog
-    // and launcher tokens from app.config.ts) into the result and make the
-    // assertion below depend on whether `pnpm android` had ever run.
-    const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
       { image: './assets/images/logo-mark.png', backgroundColor: '#FAF74F', imageWidth: 100 }

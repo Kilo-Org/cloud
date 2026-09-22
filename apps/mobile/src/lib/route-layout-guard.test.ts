@@ -34,9 +34,10 @@ function readsAsLayout(fileName: string): boolean {
   return routeName(fileName) === '_layout';
 }
 
-/** The one file allowed to carry the `_layout` route name. */
+/** The files allowed to carry the `_layout` route name: the base layout and the
+ *  platform-specific variants expo-router strips (its `validPlatforms`). */
 function isLayoutFile(fileName: string): boolean {
-  return /^_layout\.[jt]sx?$/.test(fileName);
+  return /^_layout(\.(android|ios|native|web))?\.[jt]sx?$/.test(fileName);
 }
 
 function routeFiles(dir: string): string[] {
@@ -56,6 +57,16 @@ describe('expo-router route file names', () => {
     expect(readsAsLayout('tabs-layout.mounted.test.tsx')).toBe(false);
     expect(isLayoutFile('_layout.mounted.test.tsx')).toBe(false);
     expect(isLayoutFile('_layout.tsx')).toBe(true);
+  });
+
+  it('allows the platform-specific layout variants expo-router resolves', () => {
+    expect(isLayoutFile('_layout.android.tsx')).toBe(true);
+    expect(isLayoutFile('_layout.ios.tsx')).toBe(true);
+    expect(isLayoutFile('_layout.native.tsx')).toBe(true);
+    expect(isLayoutFile('_layout.web.tsx')).toBe(true);
+    // Not an expo-router platform token: expo-router keeps this as a second
+    // layout for the directory, so the guard must keep flagging it.
+    expect(isLayoutFile('_layout.macos.tsx')).toBe(false);
   });
 
   it('reserves the `_layout` route name for the real layout file', () => {

@@ -102,18 +102,15 @@ describe('Text tracked labels in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
-    // The eyebrow variant's Latin display class is LTR-only (see `Text`'s
-    // eyebrow variant and `SectionHeader`), so in RTL the shared label carries
-    // no tracked class and the reset style is its whole treatment.
-    expect(hostText(root).props.className as string).not.toContain('tracking-[1.5px]');
-    // The eyebrow variant owns its Latin display classes, so an RTL eyebrow
-    // drops them (the rule `text.mounted.test.tsx` pins) rather than keeping
-    // them like a caller-supplied tracked class; no uppercase/tracked class is
-    // left for the shared reset to neutralize on this label, and the zero
-    // letter-spacing reset still lands.
-    const classes = (hostText(root).props.className as string).split(' ');
-    expect(classes).not.toContain('uppercase');
-    expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
+    // The eyebrow variant owns its Latin display classes in either direction
+    // (`Text` always adds `EYEBROW_LATIN_DISPLAY` for the variant; the rule
+    // text.mounted.test.tsx pins), so an RTL eyebrow keeps the tracked and
+    // uppercase classes on the element and the shared style array neutralizes
+    // its letter-spacing rather than the class being dropped. The reset is what
+    // keeps the Arabic copy's letterforms joined; the tracked class itself is
+    // the LTR design's and stays on the element.
+    expect(hostText(root).props.className as string).toContain('tracking-[1.5px]');
+    expect(hostText(root).props.className as string).toContain('uppercase');
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
   });
 });

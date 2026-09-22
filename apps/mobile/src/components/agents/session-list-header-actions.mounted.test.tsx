@@ -237,9 +237,12 @@ describe('SessionListHeaderActions new-session control', () => {
     // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
     expect(gapDp).toBe(14);
 
-    // `hitSlopInsets` (inside `slopSideDp`) validates and normalizes either
-    // shape, because the filter expresses its slop as one dp value for every
-    // side while the new-session control caps its right side.
+    // The new-session control carries per-side insets; the filter control
+    // carries one slop value for every side rather than an insets object, so
+    // its facing reach comes from the shape-agnostic helper: `hitSlopInsets`
+    // (inside `slopSideDp`) validates and normalizes either shape, because the
+    // filter expresses its slop as one dp value for every side while the
+    // new-session control caps its right side.
     // The new-session control sits left of the filter, so the gap has to fit
     // both facing slops; more than the gap means the two regions overlap. Either
     // control may express hitSlop as one number or as per-side insets: the

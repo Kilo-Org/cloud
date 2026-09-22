@@ -50,9 +50,10 @@ const ARIA_LEVEL = {
 
 /**
  * The eyebrow's Latin display treatment: full capitals, letterspaced. It is an
- * LTR-only addition to the variant because `letter-spacing` pulls a cursive
- * script apart — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت'. An RTL
- * interface keeps the mono family, size and color and drops both classes.
+ * addition to the variant in both directions because the tracked class is the
+ * LTR design's and the RTL style array neutralizes its letter-spacing (see
+ * `RTL_NO_LETTER_SPACING`) — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت'
+ * only when the class's `letter-spacing` actually draws.
  *
  * Exported so the eyebrow-scale labels rendered outside the variant — the
  * `SectionHeader` action link — carry the identical treatment instead of a
@@ -78,7 +79,7 @@ function Text({
     <Component
       className={cn(
         textVariants({ variant }),
-        variant === 'eyebrow' && !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY,
+        variant === 'eyebrow' && EYEBROW_LATIN_DISPLAY,
         textClass,
         className
       )}

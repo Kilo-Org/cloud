@@ -37,6 +37,29 @@ export function intersectStateFrames(frame: StateFrame, clip: StateFrame): State
 }
 
 /**
+ * The band a centered state may occupy: the measured viewport clipped to the
+ * surface and to the reserved top/bottom insets. `getCenteredStateLayout`
+ * centers inside it; a state that cannot fit it renders its compact form, so
+ * the two must read the same numbers.
+ */
+export function getCenteredStateBand({
+  surface,
+  viewport,
+  topInset = 0,
+  bottomInset = 0,
+}: {
+  surface: StateFrame;
+  viewport: StateFrame;
+  topInset?: number;
+  bottomInset?: number;
+}) {
+  const visible = intersectStateFrames(viewport, surface);
+  const top = Math.max(visible.top, surface.top + topInset);
+  const bottom = Math.min(visible.bottom, surface.bottom - bottomInset);
+  return { top, bottom, band: Math.max(0, bottom - top) };
+}
+
+/**
  * The bottom reserve a nested surface resolves. `replace` sets the given inset
  * as the surface's own reserve; otherwise the inset only raises the inherited
  * one, so a nested reservation can never shrink a surface's clearance. A screen
@@ -68,9 +91,12 @@ export function getCenteredStateLayout({
   roundToPixel = (value: number) => value,
 }: CenteredStateLayoutInput) {
   const viewportBottom = nativeViewportFillsSurface ? nativeViewportBottom : viewport.bottom;
-  const visible = intersectStateFrames(viewport, surface);
-  const top = Math.max(visible.top, surface.top + topInset);
-  const bottom = Math.min(visible.bottom, surface.bottom - bottomInset);
+  const { top, bottom } = getCenteredStateBand({
+    surface,
+    viewport,
+    topInset,
+    bottomInset,
+  });
   const idealTop = (surface.top + surface.bottom - contentHeight) / 2;
   const fits = contentHeight <= roundToPixel(bottom - top);
   const clearance = Math.min(PREFERRED_CLEARANCE, Math.max(0, (bottom - top - contentHeight) / 2));

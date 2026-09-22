@@ -29,7 +29,6 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { SessionPrIndicator } from './SessionPrIndicator';
 import { CHAT_TAB_ID, fileTabId, terminalTabId } from './workspace-tabs';
 import type { FileWorkspaceTab, TerminalWorkspaceTab, WorkspaceTabId } from './workspace-tabs';
 import type { StoredSession } from './types';
@@ -268,8 +267,7 @@ export function CloudAgentWorkspaceTabs({
                       tabTriggerClassName,
                       'max-w-52',
                       canRename && 'touch-manipulation select-none',
-                      (onCloseChat || isEditing || isDeleting || session.associatedPr) &&
-                        'rounded-r-none'
+                      (onCloseChat || isEditing || isDeleting) && 'rounded-r-none'
                     )}
                     onDoubleClick={event => {
                       if (!canRename || lastPointerTypeRef.current === 'touch') return;
@@ -377,12 +375,6 @@ export function CloudAgentWorkspaceTabs({
                 {progress && !isEditing && (
                   <span role="status" aria-live="polite" className="sr-only">
                     {progress.message}
-                  </span>
-                )}
-
-                {!isEditing && session.associatedPr && (
-                  <span className="shrink-0 px-1 [@media(any-pointer:coarse)]:[&_button]:min-h-11 [@media(any-pointer:coarse)]:[&_button]:min-w-11">
-                    <SessionPrIndicator session={session} />
                   </span>
                 )}
 

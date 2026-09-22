@@ -27,6 +27,10 @@
   "observability": {
     "enabled": true,
   },
+  // Send this Worker's Trace Events to Workers Logpush, so the MCP request log
+  // reaches the account's log sink. This flag does not create the Logpush job
+  // itself; the account owns that job.
+  "logpush": true,
 
   // Workers AI: query embedding for the semantic half of hybrid search
   // (src/search-knn.ts). The model is pinned in src/embedding.ts.

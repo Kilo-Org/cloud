@@ -5,6 +5,7 @@ export const MISTRAL = {
   id: 'mistral',
   apiUrl: 'https://api.mistral.ai/v1',
   apiUrlOverrides: {},
+  disableUrlSuffix: false,
   apiKey: getEnvVariable('MISTRAL_API_KEY'),
   apiKeyHeader: null,
   supportedChatApis: [],

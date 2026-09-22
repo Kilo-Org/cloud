@@ -14,7 +14,7 @@ import {
 import { type LayoutChangeEvent, Platform, View, type ViewProps } from 'react-native';
 import { type Stack } from 'expo-router';
 
-import { getStateSurfaceInsets } from '@/lib/centered-state-layout';
+import { getStateSurfaceInsets, resolveBottomReservation } from '@/lib/centered-state-layout';
 import {
   type SurfaceMeasurement,
   useStateSurfaceMeasurement,
@@ -225,9 +225,17 @@ export function NativeStateSurface({ children, navigation, options }: ScreenLayo
 export function StateSurfaceInsets({
   children,
   bottomInset,
+  replaceBottomReservation = false,
 }: {
   children: ReactNode;
   bottomInset: number;
+  /** Set `bottomInset` as the surface's own bottom reserve instead of only
+   *  raising the inherited one. A nested surface whose centered state must use
+   *  the whole room above a hard overlay passes this, so the inherited content
+   *  gap does not shrink the state's clear region (the Agents no-match state,
+   *  device capture `agents-search-empty`). Defaults to raising, so a nested
+   *  reservation can never shrink a surface's clearance. */
+  replaceBottomReservation?: boolean;
 }) {
   const surface = useStateSurface();
   const geometry = useMemo(
@@ -235,12 +243,16 @@ export function StateSurfaceInsets({
       surface
         ? resolveSurfaceGeometry(surface, {
             top: surface.topReservation,
-            bottom: Math.max(surface.bottomReservation, bottomInset),
+            bottom: resolveBottomReservation({
+              inherited: surface.bottomReservation,
+              bottomInset,
+              replace: replaceBottomReservation,
+            }),
             nativeViewportFillsSurface: surface.nativeViewportFillsSurface,
             register: surface.register,
           })
         : null,
-    [surface, bottomInset]
+    [surface, bottomInset, replaceBottomReservation]
   );
   return <StateSurfaceContext value={geometry}>{children}</StateSurfaceContext>;
 }

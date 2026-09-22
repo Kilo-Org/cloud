@@ -10,9 +10,11 @@ import { AgentSessionListScreen } from './session-list-screen';
 import { RowsRefreshControl } from './rows-refresh-control';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
+import { LiveSessionListEmptyState } from './live-session-list-empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
+import { EMPTY_STATE_FULL_HEIGHT, SESSION_ROW_PITCH } from '@/lib/agents-bottom-chrome';
 import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { type BannerState } from '@/lib/offline-banner-state';
 
@@ -291,6 +293,17 @@ function action(label: string) {
 function press(label: string) {
   (action(label).props.onPress as () => void)();
 }
+/** Fire the body wrapper's layout with the height the list can use. */
+function layoutBody(height: number) {
+  const wrapper = nodes('View').find(node => typeof node.props.onLayout === 'function');
+  if (!wrapper) {
+    throw new Error('Missing body wrapper');
+  }
+  const onLayout = wrapper.props.onLayout as (event: {
+    nativeEvent: { layout: { height: number } };
+  }) => void;
+  onLayout({ nativeEvent: { layout: { height } } });
+}
 type HeaderElement = {
   type: string;
   props: {
@@ -462,9 +475,14 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(nodes('CenteredState')).toHaveLength(test.empty || (test.error && !test.rows) ? 1 : 0);
-    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(
-      state.tabBarHeight + (test.empty ? 0 : 64)
-    );
+    // The tab bar is the whole surface reserve: the FAB is a 56dp corner
+    // overlay the centered content clears by layout, and only the list's own
+    // frame keeps the FAB band (see `useAgentsListChrome`). The reserve
+    // replaces the tab layout's inherited bar-plus-content-gap reservation, so
+    // the centered states keep the bar alone above them.
+    const surface = root().findByType(StateSurfaceInsets);
+    expect(surface.props.bottomInset).toBe(state.tabBarHeight);
+    expect(surface.props.replaceBottomReservation).toBe(true);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
@@ -1019,6 +1037,35 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight + 64 });
   });
 
+  it('clamps the live list frame to one row pitch in a short window and scrolls the rest under the FAB', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const listStyle = () => nodes('FlatList')[0]?.props.style as Record<string, number>;
+    const contentContainerStyle = () =>
+      nodes('FlatList')[0]?.props.contentContainerStyle as Record<string, number>;
+    const fullBand = state.tabBarHeight + 64;
+
+    // Short landscape window: the body keeps less than the full FAB band, so
+    // the frame yields the soft band down to one row pitch — the branch line
+    // is never clipped at rest — and the yielded part rides on the content so
+    // the last row can still be scrolled clear of the button.
+    const shortHeight = 180;
+    act(() => {
+      layoutBody(shortHeight);
+    });
+    const clampedFrame = shortHeight - SESSION_ROW_PITCH;
+    expect(clampedFrame).toBeLessThan(fullBand);
+    expect(listStyle()).toEqual({ marginBottom: clampedFrame });
+    expect(contentContainerStyle().paddingBottom).toBe(fullBand - clampedFrame);
+
+    // A tall window keeps the whole band and puts nothing on the content.
+    act(() => {
+      layoutBody(900);
+    });
+    expect(listStyle()).toEqual({ marginBottom: fullBand });
+    expect(contentContainerStyle().paddingBottom).toBe(0);
+  });
+
   it('renders no history list, animated wrappers, or active-now section and keeps one history label without a plus icon', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
@@ -1384,7 +1431,15 @@ describe('AgentSessionListScreen live filtering', () => {
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
         tree.children.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
-      ).toEqual(['View', 'SessionListSearchHeader', 'View', 'FlatList']);
+      ).toEqual(['View', 'SessionListSearchHeader', 'View', 'View']);
+      // The fourth child is the body wrapper that measures the list's available
+      // height; the rows list stays its only child.
+      const body = tree.children[3];
+      const bodyChildren =
+        typeof body === 'string' || body === undefined
+          ? undefined
+          : body.children.map(child => (typeof child === 'string' ? child : child.type));
+      expect(bodyChildren).toEqual(['FlatList']);
     }
   });
 
@@ -1507,6 +1562,71 @@ describe('AgentSessionListScreen live filtering', () => {
     // survives in the native content description after the badge unmounts.
     expect(filterButtonProps().accessibilityLabel).toBe('Filter sessions');
     expect(nodes('ScrollView')).toHaveLength(0);
+  });
+
+  it('renders the no-match state compact while the clear region is short and full when it grows', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const compact = () => root().findByType(EmptyState).props.compact as boolean;
+
+    const searchHeader = requireNode('SessionListSearchHeader');
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+    // The first, unmeasured frame keeps the full presentation.
+    expect(compact()).toBe(false);
+
+    // The 420dp-tall landscape capture: the body keeps ~180dp and the 81dp bar
+    // leaves ~99dp, short of the full 184dp state. Compact drops the icon
+    // bubble and tightens the gaps so the hint and the action stay above the
+    // bar.
+    act(() => {
+      layoutBody(180);
+    });
+    expect(compact()).toBe(true);
+    expect(nodes('Pressable').some(node => node.props.testID === 'agents-new-session-fab')).toBe(
+      true
+    );
+    const surface = root().findByType(StateSurfaceInsets);
+    expect(surface.props.bottomInset).toBe(state.tabBarHeight);
+    // The state's surface keeps the bar alone: the tabs layout's inherited
+    // content gap must not shrink the clear region the decision measures.
+    expect(surface.props.replaceBottomReservation).toBe(true);
+
+    // A body that exactly clears the bar holds the whole full state; one dp
+    // less is compact.
+    act(() => {
+      layoutBody(EMPTY_STATE_FULL_HEIGHT + state.tabBarHeight - 1);
+    });
+    expect(compact()).toBe(true);
+
+    act(() => {
+      layoutBody(EMPTY_STATE_FULL_HEIGHT + state.tabBarHeight);
+    });
+    expect(compact()).toBe(false);
+
+    act(() => {
+      layoutBody(900);
+    });
+    expect(compact()).toBe(false);
+  });
+
+  it('renders the live empty state compact in a short window and full in a tall one', async () => {
+    await renderScreen();
+    const compact = () => root().findByType(LiveSessionListEmptyState).props.compact as boolean;
+    expect(compact()).toBe(false);
+
+    act(() => {
+      layoutBody(180);
+    });
+    expect(compact()).toBe(true);
+    expect(root().findByType(EmptyState).props.compact).toBe(true);
+
+    act(() => {
+      layoutBody(900);
+    });
+    expect(compact()).toBe(false);
+    expect(root().findByType(EmptyState).props.compact).toBe(false);
   });
 });
 

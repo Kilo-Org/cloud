@@ -18,8 +18,8 @@ import { useLiveSessionQuery } from '@/components/agents/use-live-session-query'
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
-import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
+import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -27,6 +27,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { getEmptyStatePresentation } from '@/lib/agents-bottom-chrome';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
@@ -206,45 +207,28 @@ export function AgentSessionListScreen() {
     [navigateToSession, organizationId]
   );
 
-  // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
-  // content must clear them. The inset rides on the list's frame as a
-  // `marginBottom` (the viewport ends above the band) — the same viewport inset
-  // `TabScreenScrollView` uses — never on the list's content and never as
-  // `style` padding: a content inset only cleared the end of the list, so every
-  // row the user scrolled into the button's band had its right-aligned
-  // timestamp and chevron covered, and a scroll view's padding is not part of
-  // its scrollable content on iOS, so padding on the frame clipped the last
-  // rows under the bar with no way to scroll them clear. The vertical value
-  // matches the screen's `StateSurfaceInsets`. The landscape side insets keep
-  // row text clear of the sensor housing; portrait insets are 0, keeping the
-  // geometry unchanged.
-  const listInsets = useMemo(
-    () => ({
-      frame: { marginBottom: showFab ? tabBarHeight + FAB_SIZE + FAB_MARGIN : tabBarHeight },
-      content: { paddingTop: 0, paddingBottom: 0, paddingLeft: left, paddingRight: right },
-    }),
-    [showFab, tabBarHeight, left, right]
-  );
+  // The list's frame/content insets, the FAB style, and the body measurement:
+  // the tab bar and the FAB are absolutely-positioned overlays, and in a short
+  // window the frame yields the soft FAB band so one row stays readable (see
+  // `useAgentsListChrome`).
+  const { bodyHeight, onBodyLayout, listInsets, fabStyle, sidePadding } = useAgentsListChrome({
+    showFab,
+    tabBarHeight,
+    left,
+    right,
+  });
 
-  // The fixed 20pt margin gains the landscape right inset so the FAB clears the
-  // sensor area; portrait insets are 0, keeping the geometry unchanged.
-  const fabStyle = useMemo(
-    () => ({
-      bottom: tabBarHeight + FAB_MARGIN,
-      right: 20 + right,
-      width: FAB_SIZE,
-      height: FAB_SIZE,
-    }),
-    [tabBarHeight, right]
-  );
-
-  // The fixed 22px margins on the skeleton rows and the status wrapper gain
-  // the landscape side insets so they clear the sensor housing too; portrait
-  // insets are 0, keeping the geometry unchanged.
-  const sidePadding = useMemo(
-    () => ({ paddingLeft: 22 + left, paddingRight: 22 + right }),
-    [left, right]
-  );
+  // The empty states' clear region is the measured body minus the inset their
+  // surface resolves. That surface replaces the tab layout's inherited
+  // reservation (`replaceBottomReservation` below) so it reserves the tab bar
+  // alone: the tab layout adds a 16dp content gap for scrolled content, and
+  // keeping it would shrink the states' clear region by 16dp until the hint and
+  // the action ran under the bar (device capture `agents-search-empty`). Below
+  // the full state's height the compact presentation drops the icon bubble and
+  // tightens the gaps so the hint and the action stay above the bar. The
+  // unmeasured first frame is full.
+  const compactEmptyState =
+    getEmptyStatePresentation({ available: bodyHeight, bottomInset: tabBarHeight }) === 'compact';
 
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
@@ -269,6 +253,7 @@ export function AgentSessionListScreen() {
       <EmptyState
         icon={Bot}
         title={t('agents.sessionList.noMatches')}
+        compact={compactEmptyState}
         refreshControl={rowsControl}
         description={
           isSearching
@@ -278,6 +263,7 @@ export function AgentSessionListScreen() {
         action={
           <Button
             variant="outline"
+            size={compactEmptyState ? 'sm' : 'default'}
             onPress={isSearching ? query.handleClearSearch : query.handleClearFilters}
           >
             <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
@@ -287,7 +273,11 @@ export function AgentSessionListScreen() {
     );
   } else if (content === 'empty') {
     body = (
-      <LiveSessionListEmptyState organizationId={organizationId} refreshControl={refreshControl} />
+      <LiveSessionListEmptyState
+        organizationId={organizationId}
+        refreshControl={refreshControl}
+        compact={compactEmptyState}
+      />
     );
   } else if (hasLiveRows) {
     // The FAB-band inset shrinks the list's frame (`marginBottom`), so the
@@ -309,7 +299,7 @@ export function AgentSessionListScreen() {
   }
 
   return (
-    <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
+    <StateSurfaceInsets bottomInset={tabBarHeight} replaceBottomReservation>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}
@@ -360,7 +350,14 @@ export function AgentSessionListScreen() {
             refreshControl={refreshControl}
           />
         </View>
-        {body}
+        {/* The body's wrapper measures the height the list can use; the error
+            state renders no body (its centered surface owns the space), so the
+            wrapper is skipped there to keep that layout unchanged. */}
+        {body ? (
+          <View className="flex-1" onLayout={onBodyLayout}>
+            {body}
+          </View>
+        ) : null}
         {/* Empty content owns its creation action; other admitted states keep the FAB. */}
         {showFab && (
           <Pressable

@@ -28,6 +28,10 @@ type EmptyStateProps = {
   iconStrokeWidth?: number;
   /** Set to 'header' when the title acts as the screen's heading (QueryError does). */
   titleAccessibilityRole?: 'header';
+  /** Renders the short presentation (no icon bubble, tighter block gaps) for a
+   *  caller whose clear region cannot hold the full height; the title, the
+   *  description and the action all stay. Defaults to the full presentation. */
+  compact?: boolean;
 };
 
 export function EmptyState({
@@ -42,14 +46,24 @@ export function EmptyState({
   iconSize = 24,
   iconStrokeWidth = 1.5,
   titleAccessibilityRole,
+  compact = false,
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
 
   const content = (
-    <View className={cn('items-center gap-4 px-6', placement === 'top' && 'pt-16', className)}>
-      <View className={cn('items-center justify-center', iconContainerClassName)}>
-        <Icon size={iconSize} color={colors.mutedForeground} strokeWidth={iconStrokeWidth} />
-      </View>
+    <View
+      className={cn(
+        'items-center px-6',
+        compact ? 'gap-2' : 'gap-4',
+        placement === 'top' && 'pt-16',
+        className
+      )}
+    >
+      {compact ? null : (
+        <View className={cn('items-center justify-center', iconContainerClassName)}>
+          <Icon size={iconSize} color={colors.mutedForeground} strokeWidth={iconStrokeWidth} />
+        </View>
+      )}
       <View className="items-center gap-1">
         <Text variant="large" accessibilityRole={titleAccessibilityRole}>
           {title}

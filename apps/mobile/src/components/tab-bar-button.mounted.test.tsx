@@ -8,7 +8,9 @@ import { act, TestRenderer } from '@/test/renderer';
 import { TabBarButton } from './tab-bar-button';
 
 vi.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
+  // The Android case on purpose: the cursor is one value for both platforms, so
+  // the entry must not fall back to `auto` here.
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
 }));
 
@@ -61,8 +63,9 @@ describe('TabBarButton mounted layout', () => {
   });
 
   // The library's PlatformPressable cursors the entry on iOS pointer devices;
-  // React Native's Pressable does not, so the entry must set it itself.
-  it('keeps the pointer cursor the library applied on iOS', () => {
+  // React Native's Pressable does not, so the entry must set it itself, with the
+  // one value both platforms get.
+  it('keeps the pointer cursor on every platform', () => {
     const button = renderButton({ style: { opacity: 1 } });
     expect(button.props.style).toEqual(expect.arrayContaining([{ cursor: 'pointer' }]));
   });

@@ -1,12 +1,14 @@
-import { Platform, Pressable, type ViewStyle } from 'react-native';
+import { Pressable, type ViewStyle } from 'react-native';
 import { type BottomTabBarButtonProps } from 'expo-router/js-tabs';
 
-// `PlatformPressable` cursors the entry on an iOS pointer device and leaves
-// Android's cursor alone; React Native's `Pressable` sets neither, so the iPadOS
-// pointing hand would be lost without this (review finding on this file). The
+// `PlatformPressable` cursors the entry on an iOS pointer device, and React
+// Native's `Pressable` sets no cursor at all, so the iPadOS pointing hand would
+// be lost without this (review finding on this file). `cursor` is one style
+// value for both platforms: iOS applies the pointing hand and Android has no
+// cursor capability to apply it to, so the single value is inert there. The
 // bar's own style is merged after it.
 const POINTER_CURSOR_STYLE = {
-  cursor: Platform.OS === 'ios' ? 'pointer' : 'auto',
+  cursor: 'pointer',
 } satisfies ViewStyle;
 
 /**

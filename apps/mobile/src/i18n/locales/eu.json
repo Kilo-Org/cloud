@@ -3163,7 +3163,8 @@
     "channelName": "Agente aktiboak",
     "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko.",
     "openSession": "Ireki",
-    "approveFailed": "Ezin izan da onartu. Sakatu $t(common.approve) berriro saiatzeko."
+    "approveFailed": "Ezin izan da onartu. Sakatu $t(common.approve) berriro saiatzeko.",
+    "newestResult": "Emaitza berriena"
   },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",

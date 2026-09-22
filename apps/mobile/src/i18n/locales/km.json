@@ -3163,7 +3163,8 @@
     "channelName": "ភ្នាក់ងារសកម្ម",
     "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។",
     "openSession": "បើក",
-    "approveFailed": "មិនអាចយល់ព្រមបានទេ។ ប៉ះ $t(common.approve) ដើម្បីព្យាយាមម្តងទៀត។"
+    "approveFailed": "មិនអាចយល់ព្រមបានទេ។ ប៉ះ $t(common.approve) ដើម្បីព្យាយាមម្តងទៀត។",
+    "newestResult": "លទ្ធផលថ្មីបំផុត"
   },
   "transcriptionModel": {
     "title": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទ",

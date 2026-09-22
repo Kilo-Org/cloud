@@ -7,7 +7,7 @@ import {
 } from 'expo-apple-authentication';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, useColorScheme, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -39,7 +39,6 @@ export function IdleAuth({
   initialSsoRecovery?: SsoRecoveryDraft | null;
   onBusyChange?: (busy: boolean) => void;
 }>) {
-  const colorScheme = useColorScheme();
   const {
     busy,
     emailError,
@@ -226,11 +225,13 @@ export function IdleAuth({
         >
           <AppleAuthenticationButton
             buttonType={AppleAuthenticationButtonType.SIGN_IN}
-            buttonStyle={
-              colorScheme === 'dark'
-                ? AppleAuthenticationButtonStyle.WHITE
-                : AppleAuthenticationButtonStyle.BLACK
-            }
+            // WHITE_OUTLINE keeps Apple's control at the same secondary weight
+            // as the outlined Google and passkey buttons, so the brand-filled
+            // "Continue" is the surface's only filled primary action. Apple's
+            // solid BLACK/WHITE styles made a second full-width filled button,
+            // and Apple's own guidance picks the outlined style when the
+            // background does not contrast with a solid fill.
+            buttonStyle={AppleAuthenticationButtonStyle.WHITE_OUTLINE}
             cornerRadius={8}
             // eslint-disable-next-line react-native/no-inline-styles -- AppleAuthenticationButton isn't NativeWind-aware; height/width must be set via style, not className
             style={{ height: 44, width: '100%' }}

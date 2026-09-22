@@ -111,6 +111,7 @@ function InlineRetry({ label, color, onPress }: InlineRetryProps) {
   );
 }
 
+/** One row per notification category. */
 const CATEGORY_META = [
   {
     key: 'chatMessages',
@@ -236,8 +237,12 @@ function CategoryRow({
     : (preferences?.[meta.key] ?? readAgentPushPreference(queryClient, queryKey, meta.key));
   const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
   // An unavailable category is a terminal, non-retryable state: the switch is
-  // disabled and the row explains itself in the reader's language. A missing
-  // entry (the `noUncheckedIndexedAccess` widening) defaults to available.
+  // disabled and the row explains itself in the reader's language. The server's
+  // old `unavailableReason` sentence is English prose and must never render — it
+  // cannot be translated — so the reason comes from the code map, or from
+  // `CATEGORY_UNAVAILABLE_SUBTITLE_KEYS` when the response carries no code. A
+  // missing entry (the `noUncheckedIndexedAccess` widening) defaults to
+  // available.
   const unavailable = capability?.available === false;
   const unavailableReasonCode = capability?.unavailableReasonCode;
   const isDisabled = disabled || !editable || unavailable;

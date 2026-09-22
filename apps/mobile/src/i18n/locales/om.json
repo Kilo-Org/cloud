@@ -3163,7 +3163,8 @@
     "channelName": "Eejentoota hojii irra jiran",
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi.",
     "openSession": "Bani",
-    "approveFailed": "Raggaasisuun hin danda'amne. Deebi'anii yaaluuf $t(common.approve) tuqi."
+    "approveFailed": "Raggaasisuun hin danda'amne. Deebi'anii yaaluuf $t(common.approve) tuqi.",
+    "newestResult": "Bu'aa haaraa"
   },
   "transcriptionModel": {
     "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",

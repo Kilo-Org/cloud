@@ -3163,7 +3163,8 @@
     "channelName": "فعال اجنټان",
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ.",
     "openSession": "پرانیستل",
-    "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ."
+    "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ.",
+    "newestResult": "تر ټولو نوې پایله"
   },
   "transcriptionModel": {
     "title": "د غږ د متن ته بدلولو ماډل",

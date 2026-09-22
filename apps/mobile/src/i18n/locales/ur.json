@@ -3163,7 +3163,8 @@
     "channelName": "فعال ایجنٹس",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
     "openSession": "کھولیں",
-    "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔"
+    "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔",
+    "newestResult": "تازہ ترین نتیجہ"
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",

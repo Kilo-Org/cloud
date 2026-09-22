@@ -18,5 +18,5 @@ export function acceptedAlarmDecision(
  * turn that was never accepted.
  */
 export function acceptedInactivityDue(activityAt: number, now: number): boolean {
-  return now >= activityAt + DEADLINE_MS.idleStop;
+  return now >= activityAt + DEADLINE_MS.kiloInactivity;
 }

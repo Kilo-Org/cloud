@@ -3163,7 +3163,8 @@
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
     "openSession": "Ava",
-    "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve)."
+    "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve).",
+    "newestResult": "Uusim tulemus"
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",

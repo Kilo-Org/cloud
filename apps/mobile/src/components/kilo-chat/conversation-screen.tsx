@@ -199,7 +199,10 @@ export function ConversationScreen({
           }}
         />
       ) : null}
-      <AppAwareKeyboardPaddingView className="flex-1">
+      {/* The composer below already pads the platform's bottom inset inside
+          this view (message-input-layout), so the keyboard lift must not add it
+          a second time and float the composer above the keyboard. */}
+      <AppAwareKeyboardPaddingView className="flex-1" contentReservesBottomInset>
         <MessageList
           client={client}
           conversationId={conversationId}

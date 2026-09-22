@@ -3163,7 +3163,8 @@
     "channelName": "アクティブなエージェント",
     "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。",
     "openSession": "開く",
-    "approveFailed": "承認できませんでした。もう一度試すには$t(common.approve)をタップしてください。"
+    "approveFailed": "承認できませんでした。もう一度試すには$t(common.approve)をタップしてください。",
+    "newestResult": "最新の結果"
   },
   "transcriptionModel": {
     "title": "文字起こしモデル",

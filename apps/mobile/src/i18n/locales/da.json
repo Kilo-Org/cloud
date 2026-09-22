@@ -3163,7 +3163,8 @@
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen.",
     "openSession": "Åbn",
-    "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen."
+    "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen.",
+    "newestResult": "Nyeste resultat"
   },
   "transcriptionModel": {
     "title": "Transskriptionsmodel",

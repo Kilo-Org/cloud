@@ -14,6 +14,8 @@ import { NotificationsScreen } from './notifications-screen';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { i18n } from '@/i18n';
 import ar from '@/i18n/locales/ar.json';
+import en from '@/i18n/locales/en.json';
+import ur from '@/i18n/locales/ur.json';
 
 const prefsQueryFn = vi.hoisted(() => vi.fn());
 const pushTokensQueryFn = vi.hoisted(() => vi.fn());
@@ -489,10 +491,37 @@ describe('NotificationsScreen category availability', () => {
 
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(true);
     expect(
-      textWithChildren(renderer.root, i18n.t('notifications.category.balanceAlertsUnavailable'))
-        .length
+      textWithChildren(renderer.root, en.notifications.category.balanceAlertsUnavailable).length
     ).toBe(1);
     expect(textWithChildren(renderer.root, 'SERVER PROSE SENTINEL').length).toBe(0);
+  });
+
+  it('non-retryable unhappy: an unavailable category keeps its translated description, never the response sentence', async () => {
+    // The defect: the row rendered the response's `unavailableReason`, an
+    // English sentence, inside a localized screen. The description must come
+    // from the catalog, so a stale response string must never reach the screen.
+    // A server that predates the reason code sends no code at all.
+    const staleServerReason = 'stale server prose';
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          balanceAlerts: { available: false, unavailableReason: staleServerReason },
+        }),
+      })
+    );
+    const { renderer } = await renderScreen();
+
+    // Wait for an available sibling row to be enabled first: the master gate
+    // disables every row until the permission/device-token/push-token queries
+    // settle, so the unavailable row is disabled from the first render. Waiting
+    // on the sibling proves the gate settled and capabilities loaded.
+    await waitForEnabledSwitch(renderer, 'Chat messages');
+
+    expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(true);
+    expect(
+      textWithChildren(renderer.root, en.notifications.category.balanceAlertsUnavailable).length
+    ).toBe(1);
+    expect(textWithChildren(renderer.root, staleServerReason).length).toBe(0);
   });
 
   it('repro: an unavailable Security findings row reads in the app language, never the server prose', async () => {
@@ -575,6 +604,41 @@ describe('NotificationsScreen category availability', () => {
       expect(textWithChildren(renderer.root, code).length).toBe(0);
     }
   );
+
+  it('non-retryable unhappy: an unavailable category reads its description from the active catalog', async () => {
+    // The exact finding, on the screen that reported it: an Urdu Notifications
+    // screen showed the response's English sentence on the Security findings
+    // row. The row must read its copy from the catalog of the active language,
+    // so a localized screen never prints the response sentence.
+    // `securityFindingsUnavailable` is translated in ur.json, so this proves the
+    // Urdu screen, not an English fallback.
+    const serverReason = 'Enable Kilo Security Agent on a scope to get security findings.';
+    prefsQueryFn.mockResolvedValue(
+      fullPrefs({
+        capabilities: fullCapabilities({
+          securityFindings: { available: false, unavailableReason: serverReason },
+        }),
+      })
+    );
+
+    await i18n.changeLanguage('ur');
+    const { renderer, unmount } = await renderScreen();
+    try {
+      await waitForEnabledSwitch(renderer, ur.notifications.channel.chat);
+
+      expect(
+        switchesByLabel(renderer.root, ur.notifications.channel.security)[0]?.props.disabled
+      ).toBe(true);
+      expect(
+        textWithChildren(renderer.root, ur.notifications.category.securityFindingsUnavailable)
+          .length
+      ).toBe(1);
+      expect(textWithChildren(renderer.root, serverReason).length).toBe(0);
+    } finally {
+      unmount();
+      await i18n.changeLanguage('en');
+    }
+  });
 
   it('retryable unhappy: a category save failure rolls back the optimistic flip', async () => {
     prefsQueryFn.mockResolvedValue(fullPrefs());

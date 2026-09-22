@@ -38,8 +38,10 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-// The screen wraps its body in the keyboard-padding view, which loads the
-// native safe-area module this project's transform cannot parse.
+// The screen wraps its body in the keyboard-padding view, which reads the
+// device insets through `react-native-safe-area-context`; its CommonJS entry
+// requires a Flow react-native subpath this node project cannot load. Stub the
+// two kilo-chat modules the way the sibling node-only screen tests do.
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));

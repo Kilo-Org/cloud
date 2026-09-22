@@ -174,6 +174,10 @@ describe('shared branded splash', () => {
     // compile above inspects the fresh root `createAndroidProject()` created
     // (no prebuilt `colors.xml`), and `arrayContaining` leaves any other
     // entries in `resources.color` unpinned.
+    // Introspection reads the project's own native resources, so the colors
+    // modResults carry whatever the worktree's generated `android/` project
+    // declares (adaptive-icon, notification, app background) next to the
+    // splash color. Assert the splash color the plugin owns, not the array.
     // `introspect` merges into the colors a local prebuild already generated, so
     // a worktree with a prebuilt `android/` directory carries that file's extra
     // entries. Assert the generated entry among them, not as the only one.

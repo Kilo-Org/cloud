@@ -170,9 +170,7 @@ describe('shared branded splash', () => {
     // pinning the whole array to the machine's prebuild state.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
-        color: expect.arrayContaining([
-          { $: { name: 'splashscreen_background' }, _: '#FAF74F' },
-        ]),
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
       },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({

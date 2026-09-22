@@ -8,6 +8,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { MIN_TAP_TARGET_DP, TOUCH_TARGET_DP } from '@/lib/a11y/tap-target';
+import { COMPACT_CONTROL_FRAME_DP } from '@/lib/a11y/touch-target';
 
 import { SessionListHeaderActions } from './session-list-header-actions';
 import '@/i18n';
@@ -223,47 +224,63 @@ describe('SessionListHeaderActions new-session control', () => {
     });
   });
 
-  it('meets the filter control at the row gap instead of overlapping its touch region', async () => {
-    const renderer = await mountHeader(true, noop);
+  // React Native mirrors the row's `flex-row` order under RTL but does not
+  // mirror `hitSlop` (`screen-header.tsx:165` spells its own slop per direction
+  // for the same reason), so the gap-facing pair follows the physical order the
+  // direction gives the row: the new-session control's right with the filter's
+  // left in LTR, and its left with the filter's right under RTL.
+  it.each([false, true])(
+    'meets the filter control at the row gap instead of overlapping its touch region (RTL=%s)',
+    async isRTL => {
+      const renderer = await mountHeader(true, noop);
 
-    const newSession = pressesWithLabel(renderer.root, 'New session')[0];
-    const filter = pressesWithLabel(renderer.root, 'Filter sessions')[0];
-    if (!newSession || !filter) {
-      throw new Error('header controls not found');
+      const newSession = pressesWithLabel(renderer.root, 'New session')[0];
+      const filter = pressesWithLabel(renderer.root, 'Filter sessions')[0];
+      if (!newSession || !filter) {
+        throw new Error('header controls not found');
+      }
+
+      const row = renderer.root.find(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'View' &&
+          typeof node.props.className === 'string' &&
+          node.props.className.split(/\s+/).includes('gap-4')
+      );
+      const gapDp = await compiledGapDp(row.props.className as string);
+      // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
+      expect(gapDp).toBe(14);
+
+      // `hitSlopInsets` validates and normalizes either shape; `slopSideDp` then
+      // reads the facing side, because the filter expresses its slop as one dp
+      // value for every side while the new-session control caps its right side.
+      const newSessionSlop = hitSlopInsets(newSession.props.hitSlop);
+      const filterSlop = hitSlopInsets(filter.props.hitSlop);
+      // The gap has to fit the pair's two facing slops in either direction;
+      // more than the gap means the two touch regions overlap, and the later
+      // sibling (the filter) claims the taps inside the overlap. Either control
+      // may express hitSlop as one number or as per-side insets.
+      const facingDp = isRTL
+        ? slopSideDp(newSessionSlop, 'left') + slopSideDp(filterSlop, 'right')
+        : slopSideDp(newSessionSlop, 'right') + slopSideDp(filterSlop, 'left');
+      expect(facingDp).toBeLessThanOrEqual(gapDp);
+      // Capping the facing sides must not drop either control below the design
+      // target: the compact new-session box plus its symmetric slop, and the
+      // filter's `h-11` frame plus the capped slop.
+      const box = boxDp(newSession.props.className as string);
+      expect(
+        box.width + slopSideDp(newSessionSlop, 'left') + slopSideDp(newSessionSlop, 'right')
+      ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+      expect(String(filter.props.className)).toContain('h-11 w-11');
+      expect(
+        COMPACT_CONTROL_FRAME_DP + slopSideDp(filterSlop, 'left') + slopSideDp(filterSlop, 'right')
+      ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+
+      act(() => {
+        renderer.unmount();
+      });
     }
-
-    const row = renderer.root.find(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'View' &&
-        typeof node.props.className === 'string' &&
-        node.props.className.split(/\s+/).includes('gap-4')
-    );
-    const gapDp = await compiledGapDp(row.props.className as string);
-    // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
-    expect(gapDp).toBe(14);
-
-    // `hitSlopInsets` validates and normalizes either shape; `slopSideDp` then
-    // reads the facing side, because the filter expresses its slop as one dp
-    // value for every side while the new-session control caps its right side.
-    const newSessionSlop = hitSlopInsets(newSession.props.hitSlop);
-    const filterSlop = hitSlopInsets(filter.props.hitSlop);
-    // The new-session control sits left of the filter, so the gap has to fit
-    // both facing slops; more than the gap means the two regions overlap. Either
-    // control may express hitSlop as one number or as per-side insets.
-    expect(
-      slopSideDp(newSessionSlop, 'right') + slopSideDp(filterSlop, 'left')
-    ).toBeLessThanOrEqual(gapDp);
-    // Capping the right side must not drop the control below the design target.
-    const box = boxDp(newSession.props.className as string);
-    expect(
-      box.width + slopSideDp(newSessionSlop, 'left') + slopSideDp(newSessionSlop, 'right')
-    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
+  );
 
   it('renders no new-session control when showNewSession is false', async () => {
     const renderer = await mountHeader(false, noop);

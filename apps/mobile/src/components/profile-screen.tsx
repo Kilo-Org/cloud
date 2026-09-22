@@ -35,7 +35,6 @@ import { useDeleteAccount } from '@/components/use-delete-account';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
-import { needsInAppDestructiveConfirm } from '@/lib/destructive-confirm-platform';
 import { showFeedbackPrompt } from '@/lib/feedback';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -86,11 +85,6 @@ export function ProfileScreen() {
   // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
-  // Android's native alert paints every button with the theme accent, so
-  // `Alert.alert`'s destructive style never shows the red affordance there.
-  // Android opens the in-app confirmation instead; iOS keeps the native alert,
-  // which already renders the destructive sign-out choice in red.
-  const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
   const {
     data,
     isLoading,
@@ -141,19 +135,15 @@ export function ProfileScreen() {
     ]);
   };
 
+  // One destructive confirm for both platforms: the in-app dialog carries the
+  // destructive (red) affordance on iOS and Android alike. The native alert
+  // cannot be the shared implementation — Android's `AlertDialog` paints every
+  // button with the theme accent, so `Alert.alert`'s `style: 'destructive'`
+  // never reaches the screen there.
+  const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
+
   const confirmSignOut = () => {
-    if (needsInAppDestructiveConfirm()) {
-      setSignOutConfirmVisible(true);
-      return;
-    }
-    Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.signOut'),
-        style: 'destructive',
-        onPress: () => void signOut(),
-      },
-    ]);
+    setSignOutConfirmVisible(true);
   };
 
   const showPrivacyChoices = () => {

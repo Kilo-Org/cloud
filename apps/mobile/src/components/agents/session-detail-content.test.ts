@@ -2303,12 +2303,29 @@ describe('SessionDetailContent goal visibility', () => {
     const section = goalSectionOf(view);
     expect(section.props.goal).toBeNull();
     expect(section.findAllByType('SessionPrBadge')).toHaveLength(1);
+    // The row exists because the PR landed, so the badge never renders the
+    // session-loading skeleton; the wrapper's FadeIn reveals it.
+    expect(section.findAllByType('SessionPrBadge')[0]?.props.loading).toBe(false);
   });
 
   it('omits the goal row when it holds neither a goal nor a PR', async () => {
     const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
 
     expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+  });
+
+  it('omits the goal row while a no-goal, no-PR session is still loading', async () => {
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    act(() => {
+      view.store.set(view.manager.atoms.isLoading, true);
+    });
+
+    // The fetch is in flight and the session has neither a goal nor a PR, so
+    // row 2 has nothing to hold. It must not reserve a min-h-12 box for a
+    // phantom PR skeleton that unmounts (and jumps the transcript 48px) the
+    // moment the fetch lands with no PR.
+    expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+    expect(view.renderer.root.findAllByType('SessionPrBadge')).toHaveLength(0);
   });
 
   it('persists the goal disclosure through the per-session store', async () => {

@@ -214,7 +214,6 @@
     "showBalance": "Muuji hadhaaga",
     "balanceHidden": "Hadhaaga waa la qariyay",
     "bonusCreditsExpiring": "Lacag gunno ah oo dhan {{amount}} ayaa dhacaysa {{date}}.",
-    "creditBalanceEmpty": "Lacagtii isticmaalka way kaa dhammaatay. Lacagta akoonkan waxaa laga maamulaa meel ka baxsan barnaamijka iOS.",
     "signOutTitle": "Ma ka baxaysaa?",
     "signOutMessage": "Si aad goobtaada shaqada u isticmaasho, waa inaad mar kale soo gashaa.",
     "deleteAccountTitle": "Ma tirtiraysaa akoonka?",
@@ -2672,6 +2671,18 @@
     "cta": "Ku dar lacagta isticmaalka",
     "description": "Ku dar lacagta isticmaalka si aad u sii isticmaasho.",
     "billingPage": "bogga biilasha"
+  },
+  "credits": {
+    "title": "Iibso lacag adeeg",
+    "description": "Lacagta adeeg waa iib hal mar ah oo lagu daraa dheelitirkaaga Kilo si loogu shaqeeyo kalfadhiyada codeynta AI ee app-ka Kilo. Dukaanku wuxuu ka qaadaa akoonkaaga, lacagta adeegna waxaa lagu daraa ka dib marka dukaanku xaqiijiyo lacag bixinta.",
+    "packLabel": "Ku dar {{amount}} oo lacag adeeg ah",
+    "priceUnavailable": "Qiimaha lama heli karo",
+    "purchased": "Lacag adeeg ayaa lagu daray dheelitirkaaga.",
+    "empty": "Xirmooyinka lacagta adeeg hadda lama heli karo.",
+    "noMatchingProducts": "App Store ma soo celin xirmooyin lacag adeeg oo u dhigma.",
+    "noMatchingProductsPlay": "Google Play ma soo celin xirmooyin lacag adeeg oo u dhigma.",
+    "purchaseOwnedByAnotherAccount": "Lacagta adeeg ee ku jirta Apple Account-kan waxaa leh akoon kale oo Kilo ah. Isticmaalka, soo gal akoonkaas Kilo.",
+    "purchaseOwnedByAnotherAccountPlay": "Lacagta adeeg ee ku yaal xisaabtan Google Play waxaa leh koonto Kilo oo kale. Isticmaalka, ku saxiix bax koontada Kilo-ga ah."
   },
   "deviceSessions": {
     "couldNotLoadDescription": "Kalfadhiyadaada firfircoon lama heli karo ilaa xogtan la soo shubo.",

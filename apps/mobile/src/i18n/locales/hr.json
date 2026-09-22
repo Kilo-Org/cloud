@@ -214,7 +214,6 @@
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je skriven",
     "bonusCreditsExpiring": "Bonus krediti u iznosu od {{amount}} istječu {{date}}.",
-    "creditBalanceEmpty": "Nemaš preostalih kredita. Kreditima za ovaj račun upravlja se izvan aplikacije za iOS.",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Za pristup svom radnom prostoru morat ćeš se ponovno prijaviti.",
     "deleteAccountTitle": "Izbrisati račun?",
@@ -2713,6 +2712,18 @@
     "cta": "Dodaj kredite",
     "description": "Dodaj kredite za nastavak korištenja.",
     "billingPage": "stranica za naplatu"
+  },
+  "credits": {
+    "title": "Kupi kredite",
+    "description": "Krediti su jednokratna kupnja koja se dodaje tvom Kilo saldu za pokretanje AI sesija kodiranja u aplikaciji Kilo. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",
+    "packLabel": "Dodaj {{amount}} kredita",
+    "priceUnavailable": "Cijena nije dostupna",
+    "purchased": "Krediti su dodani na tvoj saldo.",
+    "empty": "Paketi kredita trenutačno nisu dostupni.",
+    "noMatchingProducts": "App Store nije vratio odgovarajuće pakete kredita.",
+    "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
+    "purchaseOwnedByAnotherAccount": "Krediti na ovom računu Apple Account pripadaju drugom Kilo računu. Prijavi se na taj Kilo račun da ih koristiš.",
+    "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play računu pripadaju drugom Kilo računu. Prijavite se na taj Kilo račun da biste ih koristili."
   },
   "deviceSessions": {
     "couldNotLoadDescription": "Tvoje aktivne sesije nisu dostupne dok se podaci ne učitaju.",

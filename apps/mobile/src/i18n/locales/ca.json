@@ -214,7 +214,6 @@
     "showBalance": "Mostra el saldo",
     "balanceHidden": "Saldo amagat",
     "bonusCreditsExpiring": "{{amount}} en crèdits de bonificació caduquen el {{date}}.",
-    "creditBalanceEmpty": "No et queden crèdits. Per a aquest compte, els crèdits es gestionen fora de l'aplicació d'iOS.",
     "signOutTitle": "Vols tancar la sessió?",
     "signOutMessage": "Hauràs de tornar a iniciar la sessió per accedir al teu espai de treball.",
     "deleteAccountTitle": "Vols eliminar el compte?",
@@ -2713,6 +2712,18 @@
     "cta": "Afegeix crèdits",
     "description": "Afegeix crèdits per continuar utilitzant el servei.",
     "billingPage": "pàgina de facturació"
+  },
+  "credits": {
+    "title": "Compra crèdits",
+    "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
+    "packLabel": "Afegeix {{amount}} en crèdits",
+    "priceUnavailable": "Preu no disponible",
+    "purchased": "S'han afegit crèdits al teu saldo.",
+    "empty": "Els paquets de crèdits no estan disponibles ara mateix.",
+    "noMatchingProducts": "L'App Store no ha retornat cap paquet de crèdits coincident.",
+    "noMatchingProductsPlay": "Google Play no ha retornat cap paquet de crèdits coincident.",
+    "purchaseOwnedByAnotherAccount": "Els crèdits d'aquest Apple Account pertanyen a un altre compte de Kilo. Inicia la sessió en aquell compte de Kilo per utilitzar-los.",
+    "purchaseOwnedByAnotherAccountPlay": "Els crèdits d'aquest compte de Google Play pertanyen a un compte de Kilo diferent. Inicia la sessió en aquest compte de Kilo per utilitzar-los."
   },
   "deviceSessions": {
     "couldNotLoadDescription": "Les teves sessions actives no estaran disponibles fins que s'hagin carregat les dades.",

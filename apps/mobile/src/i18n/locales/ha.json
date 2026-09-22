@@ -214,7 +214,6 @@
     "showBalance": "Nuna ragowar kuɗi",
     "balanceHidden": "An ɓoye ragowar kuɗi",
     "bonusCreditsExpiring": "Kuɗin amfani na kyauta {{amount}} za su ƙare {{date}}.",
-    "creditBalanceEmpty": "Ba ka da ragowar kuɗin amfani. Ana sarrafa kuɗin amfani na wannan asusun a wajen manhajar iOS.",
     "signOutTitle": "Fita?",
     "signOutMessage": "Za ka buƙaci sake shiga don samun damar wurin aikinka.",
     "deleteAccountTitle": "Share asusu?",
@@ -2672,6 +2671,18 @@
     "cta": "Ƙara kuɗin amfani",
     "description": "Ƙara kuɗin amfani don ci gaba da aiki.",
     "billingPage": "shafin biyan kuɗi"
+  },
+  "credits": {
+    "title": "Sayi kuɗin amfani",
+    "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",
+    "packLabel": "Ƙara kuɗin amfani na {{amount}}",
+    "priceUnavailable": "Farashi ba ya nan",
+    "purchased": "An ƙara kuɗin amfani a ma'auninka.",
+    "empty": "Fakitin kuɗin amfani ba su nan a yanzu.",
+    "noMatchingProducts": "App Store bai dawo da wani fakitin kuɗin amfani da ya dace ba.",
+    "noMatchingProductsPlay": "Google Play bai dawo da wani fakitin kuɗin amfani da ya dace ba.",
+    "purchaseOwnedByAnotherAccount": "Kuɗin amfani da ke kan wannan Apple Account na wani asusun Kilo ne daban. Shiga wancan asusun Kilo don amfani da shi.",
+    "purchaseOwnedByAnotherAccountPlay": "Kuɗin amfani da ke kan wannan Google Play account na wani asusun Kilo ne daban. Shiga wannan asusun Kilo don amfani da shi."
   },
   "deviceSessions": {
     "couldNotLoadDescription": "Ba za a iya nuna zamanninka da ke aiki ba har sai an loda waɗannan bayanan.",

@@ -214,7 +214,6 @@
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
     "bonusCreditsExpiring": "{{amount}} اعتبار هدیه در {{date}} منقضی می‌شود.",
-    "creditBalanceEmpty": "موجودی اعتبار شما صفر است. اعتبار این حساب خارج از برنامهٔ iOS مدیریت می‌شود.",
     "signOutTitle": "از حساب خود خارج می‌شوید؟",
     "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید.",
     "deleteAccountTitle": "حساب حذف شود؟",
@@ -2672,6 +2671,18 @@
     "cta": "افزودن اعتبار",
     "description": "برای ادامه استفاده، اعتبار اضافه کنید.",
     "billingPage": "صفحه صورتحساب"
+  },
+  "credits": {
+    "title": "خرید اعتبار",
+    "description": "اعتبار یک خرید یکباره است که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App به موجودی Kilo شما اضافه می‌شود. فروشگاه مبلغ را از حساب شما دریافت می‌کند و اعتبار پس از تأیید پرداخت توسط فروشگاه اضافه می‌شود.",
+    "packLabel": "افزودن {{amount}} اعتبار",
+    "priceUnavailable": "قیمت در دسترس نیست",
+    "purchased": "اعتبار به موجودی شما اضافه شد.",
+    "empty": "بسته‌های اعتبار در حال حاضر در دسترس نیستند.",
+    "noMatchingProducts": "App Store هیچ بسته اعتبار منطبقی برنگرداند.",
+    "noMatchingProductsPlay": "Google Play هیچ بسته اعتبار منطبقی برنگرداند.",
+    "purchaseOwnedByAnotherAccount": "اعتبار این Apple Account متعلق به حساب دیگری در Kilo است. برای استفاده از آن وارد همان حساب Kilo شوید.",
+    "purchaseOwnedByAnotherAccountPlay": "اعتبار این حساب Google Play متعلق به یک حساب Kilo دیگر است. برای استفاده از آن وارد آن حساب Kilo شوید."
   },
   "deviceSessions": {
     "couldNotLoadDescription": "تا زمانی که بارگذاری کامل شود، نشست‌های فعال شما در دسترس نیستند.",

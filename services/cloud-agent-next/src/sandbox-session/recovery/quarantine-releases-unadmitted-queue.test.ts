@@ -4,28 +4,19 @@ import {
   failWaitingMessages,
   nextQueuedMessageId,
   releaseUnadmittedWaitingMessages,
-  type SessionMessageRecord,
+  type SessionMessage,
   type SessionOperationProof,
 } from '../session-message-queue.js';
+import { acceptedMessage, queuedMessage, terminalState } from '../session-state.test-helpers.js';
 
 describe('quarantine releases unadmitted queued messages', () => {
   const wrapperA = 'wrapper-a';
   const wrapperB = 'wrapper-b';
 
-  function queued(
-    messageId: string,
-    overrides: Partial<SessionMessageRecord> = {}
-  ): SessionMessageRecord {
-    return {
-      messageId,
-      state: 'queued' as const,
-      wrapperInstanceId: wrapperA,
-      ...overrides,
-    } as SessionMessageRecord;
-  }
-
   it('releases a queued message with retryable not_ready attach failure and no prompt', () => {
-    const messages: SessionMessageRecord[] = [queued('unadmitted', { attachFailures: 1 })];
+    const messages: SessionMessage[] = [
+      queuedMessage('unadmitted', { wrapperInstanceId: wrapperA, attachFailures: 1 }),
+    ];
 
     const { messages: released, releasedIds } = releaseUnadmittedWaitingMessages(
       messages,
@@ -33,21 +24,19 @@ describe('quarantine releases unadmitted queued messages', () => {
     );
 
     expect(releasedIds).toEqual(['unadmitted']);
-    expect(released[0]).toEqual(
-      expect.objectContaining({
-        messageId: 'unadmitted',
-        state: 'queued',
-        wrapperInstanceId: undefined,
-        attachFailures: 1,
-      })
-    );
-    expect(released[0].wrapperInstanceId).toBeUndefined();
+    expect(released[0]).toMatchObject({
+      messageId: 'unadmitted',
+      state: { kind: 'queued', attachFailures: 1 },
+    });
+    expect(
+      (released[0]!.state as unknown as Record<string, unknown>).wrapperInstanceId
+    ).toBeUndefined();
   });
 
   it('still fails an accepted message on the same wrapper', () => {
-    const messages: SessionMessageRecord[] = [
-      { messageId: 'accepted', state: 'accepted', acceptedAt: 5, wrapperInstanceId: wrapperA },
-      queued('unadmitted', { attachFailures: 1 }),
+    const messages: SessionMessage[] = [
+      acceptedMessage('accepted', { acceptedAt: 5, wrapperInstanceId: wrapperA }),
+      queuedMessage('unadmitted', { wrapperInstanceId: wrapperA, attachFailures: 1 }),
     ];
 
     const { messages: released, releasedIds } = releaseUnadmittedWaitingMessages(
@@ -58,8 +47,8 @@ describe('quarantine releases unadmitted queued messages', () => {
     // Accepted message is untouched by release — only queued unadmitted are released
     expect(releasedIds).toEqual(['unadmitted']);
     const accepted = released.find(m => m.messageId === 'accepted');
-    expect(accepted?.state).toBe('accepted');
-    expect(accepted?.wrapperInstanceId).toBe(wrapperA);
+    expect(accepted?.state.kind).toBe('accepted');
+    expect(accepted?.state.kind === 'accepted' && accepted.state.wrapperInstanceId).toBe(wrapperA);
 
     // failWaitingMessages then fails the accepted message
     const { failedIds } = failWaitingMessages(released, 'kilo_unhealthy', wrapperA, false);
@@ -73,8 +62,12 @@ describe('quarantine releases unadmitted queued messages', () => {
       completedAt: 100,
       attachmentEpoch: 1,
     } as SessionOperationProof;
-    const messages: SessionMessageRecord[] = [
-      queued('attached', { operations: { attach: attachProof }, deliveryDeadlineAt: 7_000 }),
+    const messages: SessionMessage[] = [
+      queuedMessage(
+        'attached',
+        { wrapperInstanceId: wrapperA, deadlineAt: 7_000 },
+        { proofs: { attach: attachProof } }
+      ),
     ];
 
     const { releasedIds, messages: released } = releaseUnadmittedWaitingMessages(
@@ -83,13 +76,10 @@ describe('quarantine releases unadmitted queued messages', () => {
     );
     expect(releasedIds).toEqual(['attached']);
     expect(released[0]).toMatchObject({
-      state: 'queued',
-      wrapperInstanceId: undefined,
-      preparationAttemptId: undefined,
-      deliveryDeadlineAt: 7_000,
-      operations: { retiredAttach: attachProof },
+      state: { kind: 'queued', deadlineAt: 7_000 },
+      proofs: { retiredAttach: attachProof },
     });
-    expect(released[0].operations?.attach).toBeUndefined();
+    expect(released[0]!.proofs?.attach).toBeUndefined();
   });
 
   it('does not release a queued message that has a prompt operation', () => {
@@ -97,8 +87,12 @@ describe('quarantine releases unadmitted queued messages', () => {
       authorization: {},
       dispatched: true,
     } as SessionOperationProof;
-    const messages: SessionMessageRecord[] = [
-      queued('prompted', { operations: { prompt: promptProof } }),
+    const messages: SessionMessage[] = [
+      queuedMessage(
+        'prompted',
+        { wrapperInstanceId: wrapperA },
+        { proofs: { prompt: promptProof } }
+      ),
     ];
 
     const { releasedIds } = releaseUnadmittedWaitingMessages(messages, wrapperA);
@@ -106,8 +100,11 @@ describe('quarantine releases unadmitted queued messages', () => {
   });
 
   it('does not release a queued message with exhausted attach failures', () => {
-    const messages: SessionMessageRecord[] = [
-      queued('exhausted', { attachFailures: ATTACH_FAILURE_LIMIT }),
+    const messages: SessionMessage[] = [
+      queuedMessage('exhausted', {
+        wrapperInstanceId: wrapperA,
+        attachFailures: ATTACH_FAILURE_LIMIT,
+      }),
     ];
 
     const { releasedIds } = releaseUnadmittedWaitingMessages(messages, wrapperA);
@@ -115,8 +112,8 @@ describe('quarantine releases unadmitted queued messages', () => {
   });
 
   it('does not release messages bound to a different wrapper', () => {
-    const messages: SessionMessageRecord[] = [
-      queued('other-wrapper', { wrapperInstanceId: wrapperB }),
+    const messages: SessionMessage[] = [
+      queuedMessage('other-wrapper', { wrapperInstanceId: wrapperB }),
     ];
 
     const { releasedIds } = releaseUnadmittedWaitingMessages(messages, wrapperA);
@@ -124,16 +121,16 @@ describe('quarantine releases unadmitted queued messages', () => {
   });
 
   it('does not release unassigned queued messages', () => {
-    const messages: SessionMessageRecord[] = [
-      queued('unassigned', { wrapperInstanceId: undefined }),
-    ];
+    const messages: SessionMessage[] = [queuedMessage('unassigned')];
 
     const { releasedIds } = releaseUnadmittedWaitingMessages(messages, wrapperA);
     expect(releasedIds).toEqual([]);
   });
 
   it('released message is picked up by drain against wrapper B', () => {
-    const messages: SessionMessageRecord[] = [queued('unadmitted', { attachFailures: 1 })];
+    const messages: SessionMessage[] = [
+      queuedMessage('unadmitted', { wrapperInstanceId: wrapperA, attachFailures: 1 }),
+    ];
 
     const { messages: released } = releaseUnadmittedWaitingMessages(messages, wrapperA);
 
@@ -142,16 +139,20 @@ describe('quarantine releases unadmitted queued messages', () => {
 
     // The message can be bound to wrapper B by the normal delivery path
     const rebound = released.map(m =>
-      m.messageId === 'unadmitted' ? { ...m, wrapperInstanceId: wrapperB } : m
+      m.messageId === 'unadmitted' && m.state.kind === 'queued'
+        ? { ...m, state: { ...m.state, wrapperInstanceId: wrapperB } }
+        : m
     );
-    expect(rebound[0].wrapperInstanceId).toBe(wrapperB);
+    expect(rebound[0]!.state.kind === 'queued' && rebound[0]!.state.wrapperInstanceId).toBe(
+      wrapperB
+    );
   });
 
   it('preserves completed and failed history', () => {
-    const messages: SessionMessageRecord[] = [
-      { messageId: 'done', state: 'completed' },
-      { messageId: 'old-fail', state: 'failed', failedReason: 'prompt_exhausted' },
-      queued('unadmitted'),
+    const messages: SessionMessage[] = [
+      { messageId: 'done', state: terminalState('completed') },
+      { messageId: 'old-fail', state: terminalState('failed', { reason: 'prompt_exhausted' }) },
+      queuedMessage('unadmitted', { wrapperInstanceId: wrapperA }),
     ];
 
     const { messages: released, releasedIds } = releaseUnadmittedWaitingMessages(
@@ -160,27 +161,28 @@ describe('quarantine releases unadmitted queued messages', () => {
     );
 
     expect(releasedIds).toEqual(['unadmitted']);
-    expect(released[0]).toEqual({ messageId: 'done', state: 'completed' });
+    expect(released[0]).toEqual({ messageId: 'done', state: terminalState('completed') });
     expect(released[1]).toEqual({
       messageId: 'old-fail',
-      state: 'failed',
-      failedReason: 'prompt_exhausted',
+      state: terminalState('failed', { reason: 'prompt_exhausted' }),
     });
   });
 
-  it('clears preparationAttemptId but preserves deliveryDeadlineAt on release', () => {
-    const messages: SessionMessageRecord[] = [
-      queued('unadmitted', {
+  it('clears preparationAttemptId but preserves the preparation bound on release', () => {
+    const messages: SessionMessage[] = [
+      queuedMessage('unadmitted', {
+        wrapperInstanceId: wrapperA,
         preparationAttemptId: 'attempt-1',
-        deliveryDeadlineAt: 999_999,
+        deadlineAt: 999_999,
         attachFailures: 1,
       }),
     ];
 
     const { messages: released } = releaseUnadmittedWaitingMessages(messages, wrapperA);
-    expect(released[0].preparationAttemptId).toBeUndefined();
+    const state = released[0]!.state;
+    expect(state.kind === 'queued' && state.preparationAttemptId).toBeUndefined();
     // The head keeps its original preparation bound across release.
-    expect(released[0].deliveryDeadlineAt).toBe(999_999);
+    expect(state.kind === 'queued' && state.deadlineAt).toBe(999_999);
   });
 
   it('drops incomplete attach proofs on release', () => {
@@ -188,8 +190,12 @@ describe('quarantine releases unadmitted queued messages', () => {
       authorization: {},
       dispatched: false,
     } as SessionOperationProof;
-    const messages: SessionMessageRecord[] = [
-      queued('unadmitted', { attachFailures: 1, operations: { attach: attachProof } }),
+    const messages: SessionMessage[] = [
+      queuedMessage(
+        'unadmitted',
+        { wrapperInstanceId: wrapperA, attachFailures: 1 },
+        { proofs: { attach: attachProof } }
+      ),
     ];
 
     const { messages: released, releasedIds } = releaseUnadmittedWaitingMessages(
@@ -198,6 +204,6 @@ describe('quarantine releases unadmitted queued messages', () => {
     );
 
     expect(releasedIds).toEqual(['unadmitted']);
-    expect(released[0].operations).toBeUndefined();
+    expect(released[0]!.proofs).toBeUndefined();
   });
 });

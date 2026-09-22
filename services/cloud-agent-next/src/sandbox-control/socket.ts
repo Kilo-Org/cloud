@@ -54,7 +54,27 @@ import {
   createControlRequestWaiters,
   type ControlRequestWaiters,
 } from './waiters.js';
-import { summarizeHeartbeatIdle } from './status-projection.js';
+import { sha256Hex } from '../utils/sha256.js';
+
+export async function summarizeHeartbeatIdle(
+  payload: SandboxHeartbeatPayload
+): Promise<SandboxControlObservation['idle']> {
+  if (
+    !payload.kilo.ready ||
+    payload.state !== 'idle' ||
+    payload.pendingMessages !== 0 ||
+    (payload.activeKiloSessions !== undefined && payload.activeKiloSessions !== 0) ||
+    payload.sessions.some(session => session.state !== 'idle' || session.waitingOn !== undefined)
+  ) {
+    return null;
+  }
+  const sessionIds = payload.sessions.map(session => session.kiloSessionId);
+  if (new Set(sessionIds).size !== sessionIds.length) return null;
+  return {
+    sessionCount: sessionIds.length,
+    sessionIdsHash: await sha256Hex(JSON.stringify(sessionIds.sort())),
+  };
+}
 
 export type SandboxControlSocketState = DurableObjectState;
 
@@ -133,10 +153,8 @@ export type SandboxControlSocketHandler = {
   sendRequest(input: SandboxControlOutboundRequest): Promise<ResponseFrame>;
   hasHandshakenSocket(): boolean;
   supportsOperationResults(): boolean;
-  supportsScopedStopAbort(): boolean;
-  supportsScopedCleanupResult?(): boolean;
-  supportsNativeRuntimeRetirement(): boolean;
   supportsWorkingBranches?(): boolean;
+  supportsNativeRuntimeIdCapture(): boolean;
   supportsConnectionRecovery(): boolean;
   getConnectionIdentity(): SandboxControlConnectionIdentity | null;
   getReadySocket(): WebSocket | null;
@@ -371,33 +389,18 @@ export function createSandboxControlSocketHandler(
       );
     },
 
-    supportsScopedStopAbort(): boolean {
-      const current = currentHandshakenSocket(state);
-      return (
-        current !== null && readAttachment(current.socket)?.capabilities?.scopedStopAbort === true
-      );
-    },
-
-    supportsScopedCleanupResult(): boolean {
-      const current = currentHandshakenSocket(state);
-      return (
-        current !== null &&
-        readAttachment(current.socket)?.capabilities?.scopedCleanupResult === true
-      );
-    },
-
-    supportsNativeRuntimeRetirement(): boolean {
-      const current = currentHandshakenSocket(state);
-      return (
-        current !== null &&
-        readAttachment(current.socket)?.capabilities?.nativeRuntimeRetirement === true
-      );
-    },
-
     supportsWorkingBranches(): boolean {
       const current = currentHandshakenSocket(state);
       return (
         current !== null && readAttachment(current.socket)?.capabilities?.workingBranches === true
+      );
+    },
+
+    supportsNativeRuntimeIdCapture(): boolean {
+      const current = currentHandshakenSocket(state);
+      return (
+        current !== null &&
+        readAttachment(current.socket)?.capabilities?.nativeRuntimeIdCapture === true
       );
     },
 
@@ -634,7 +637,7 @@ export function createSandboxControlSocketHandler(
               connectionRecovery: payload.capabilities?.connectionRecovery === true,
               eventReceipts: payload.capabilities?.eventReceipts === true,
               eventBatches: true,
-              scopedCleanupResult: payload.capabilities?.scopedCleanupResult === true,
+              kiloLocalPhase: true,
             })
           )
         );

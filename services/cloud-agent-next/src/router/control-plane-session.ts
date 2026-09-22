@@ -1,26 +1,33 @@
+import { z } from 'zod';
 import type { Env } from '../types.js';
-import {
-  controlSessionStateSchema,
-  controlStopReceiptSchema,
-  createControlStopRequest,
-  type ControlStopReceipt,
-} from '../shared/control-plane-session.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import { withDORetry } from '../utils/do-retry.js';
 
-type ControlStopSession = {
-  getControlState: () => Promise<unknown>;
-  interruptExecution: (request: unknown) => Promise<unknown>;
+/**
+ * Local receipt for the migrated `CANCEL{message}` cancellation contract. The
+ * outward contract is preserved deliberately: a receipt with `state`/`message`
+ * that `user-kilo-facade.ts` maps to `{success}` / `{success:false,message}`.
+ * The `shared/control-plane-session.ts` schemas are not imported here so C3d can
+ * delete them with their last consumer.
+ */
+export const controlCancelReceiptSchema = z
+  .object({
+    state: z.enum(['accepted', 'confirmed', 'unconfirmed', 'rejected']),
+    message: z.string().optional(),
+  })
+  .strict();
+export type ControlCancelReceipt = z.infer<typeof controlCancelReceiptSchema>;
+
+type ControlCancelSession = {
+  interruptExecution: () => Promise<{ success: boolean; message?: string }>;
 };
 
-type ControlSessionStopDependencies = {
-  getStub?: () => ControlStopSession;
+type ControlSessionCancelDependencies = {
+  getStub?: () => ControlCancelSession;
   retry?: <T>(
-    operation: (session: ControlStopSession) => Promise<T>,
+    operation: (session: ControlCancelSession) => Promise<T>,
     operationName: string
   ) => Promise<T>;
-  now?: number;
-  operationId?: string;
 };
 
 export async function interruptControlSession(
@@ -29,29 +36,18 @@ export async function interruptControlSession(
     ownerId: string;
     sessionId: string;
   },
-  dependencies: ControlSessionStopDependencies = {}
-): Promise<ControlStopReceipt | undefined> {
+  dependencies: ControlSessionCancelDependencies = {}
+): Promise<ControlCancelReceipt | undefined> {
   const stub =
     dependencies.getStub ??
     (() => getSandboxSessionStub(input.env, input.ownerId, input.sessionId));
   const retry =
     dependencies.retry ??
-    (<T>(operation: (session: ControlStopSession) => Promise<T>, operationName: string) =>
+    (<T>(operation: (session: ControlCancelSession) => Promise<T>, operationName: string) =>
       withDORetry(stub, operation, operationName));
-  const state = await retry(session => session.getControlState(), 'getControlState');
-  if (!state) return undefined;
-  const controlState = controlSessionStateSchema.parse(state);
-  if (controlState.targets.length === 0) {
-    return controlState.stops?.[0];
-  }
-  const request = createControlStopRequest(
-    controlState,
-    dependencies.now,
-    dependencies.operationId
-  );
-  return retry(
-    session =>
-      session.interruptExecution(request).then(receipt => controlStopReceiptSchema.parse(receipt)),
-    'interruptControlSession'
-  );
+  const result = await retry(session => session.interruptExecution(), 'interruptControlSession');
+  return controlCancelReceiptSchema.parse({
+    state: result.success ? 'confirmed' : 'rejected',
+    ...(result.message !== undefined ? { message: result.message } : {}),
+  });
 }

@@ -25,6 +25,8 @@ type CollapsibleSectionProps = {
   className?: string;
   titleClassName?: string;
   contentClassName?: string;
+  /** Drop the Reanimated layout transition — see `DisclosureLayout`. */
+  animateLayout?: boolean;
   children: ReactNode;
 };
 
@@ -53,16 +55,24 @@ function useDisclosureRotation(targetAngle: 0 | 180) {
  * Height transition for a block that grows or shrinks — the same Reanimated
  * layout transition on iOS and Android, so one implementation covers both and
  * the change animates instead of snapping. Reduced motion drops the transition.
+ *
+ * `animateLayout={false}` drops it for a caller that stacks this block under
+ * plain siblings in a scroll column: the transition interpolates this block's
+ * frame while the siblings snap, so for its 200ms it can be drawn over the row
+ * above it (the new-session connect card over the repository picker, e5 spot
+ * check, 2026-09-21). Reanimated has no way to clip a transition to its own
+ * box, so the caller that cannot afford the overlap opts out.
  */
 export function DisclosureLayout({
   className,
   children,
-}: Readonly<{ className?: string; children: ReactNode }>) {
+  animateLayout = true,
+}: Readonly<{ className?: string; children: ReactNode; animateLayout?: boolean }>) {
   const { reducedMotion } = useMotionPolicy();
 
   return (
     <Animated.View
-      layout={reducedMotion ? undefined : LinearTransition.duration(200)}
+      layout={reducedMotion || !animateLayout ? undefined : LinearTransition.duration(200)}
       className={className}
     >
       {children}
@@ -118,6 +128,7 @@ export function CollapsibleSection({
   className,
   titleClassName,
   contentClassName,
+  animateLayout = true,
   children,
 }: Readonly<CollapsibleSectionProps>) {
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);
@@ -130,7 +141,10 @@ export function CollapsibleSection({
   const chevronStyle = useDisclosureRotation(resolvedExpanded ? 180 : 0);
 
   return (
-    <DisclosureLayout className={cn('gap-2 rounded-lg bg-secondary p-3', className)}>
+    <DisclosureLayout
+      className={cn('gap-2 rounded-lg bg-secondary p-3', className)}
+      animateLayout={animateLayout}
+    >
       <Pressable
         className="flex-row items-center justify-between gap-2"
         hitSlop={12}

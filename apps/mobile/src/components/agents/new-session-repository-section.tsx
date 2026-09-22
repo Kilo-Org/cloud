@@ -224,9 +224,10 @@ export function NewSessionRepositorySection({
         title={t(copy.connectTitle)}
         // The card stacks under the repository picker in a scrolling column,
         // and the picker's height settles asynchronously (repos load, the
-        // selection changes). An animated layout here interpolates the card's
+        // selection changes), while the branch row mounts above the card once a
+        // repository is chosen. An animated layout here interpolates the card's
         // frame against a sibling that has already snapped, so it paints over
-        // the picker's bottom edge for the length of the transition.
+        // the row above it — the picker's bottom edge or the branch row.
         animateLayout={false}
         expanded={!collapsedCtas.includes(platform)}
         onToggle={() => {

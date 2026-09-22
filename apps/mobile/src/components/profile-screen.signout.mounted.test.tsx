@@ -35,6 +35,9 @@ vi.mock('react-native-reanimated', () => ({
 // The screen reads its side insets through `@/lib/screen-insets`, whose real
 // `react-native-safe-area-context` entry is a Flow source this pipeline cannot
 // transform; the insets are irrelevant to the sign-out flow.
+// The screen reads its side insets through `@/lib/screen-insets`; the native
+// module's source is not parseable by this project's transform, and the
+// sign-out confirmation does not depend on the values.
 // The Profile screen reads its landscape side insets through `@/lib/screen-insets`,
 // whose real module loads the native safe-area package. The node project cannot
 // load that native module, so the screen's own tests stub the hook.

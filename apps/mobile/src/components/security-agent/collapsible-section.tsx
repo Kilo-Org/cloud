@@ -22,11 +22,19 @@ type CollapsibleSectionProps = {
   expanded?: boolean;
   /** Called on every header press, before the uncontrolled fallback toggles. */
   onToggle?: () => void;
+  /**
+   * Whether siblings above this section may mount or resize asynchronously.
+   * A layout transition animates this box's position, and Reanimated keeps the
+   * box painted at its pre-change position until the transition ends, so
+   * siblings that shifted are covered. Pass `false` for such a section: opacity
+   * fades stay safe and the position snap does not lag. `profile-screen.tsx`
+   * names the same hazard on a sibling section; see `DisclosureLayout` for the
+   * transition it drops.
+   */
+  animateLayout?: boolean;
   className?: string;
   titleClassName?: string;
   contentClassName?: string;
-  /** Drop the Reanimated layout transition — see `DisclosureLayout`. */
-  animateLayout?: boolean;
   children: ReactNode;
 };
 
@@ -56,7 +64,8 @@ function useDisclosureRotation(targetAngle: 0 | 180) {
  * layout transition on iOS and Android, so one implementation covers both and
  * the change animates instead of snapping. Reduced motion drops the transition.
  *
- * `animateLayout={false}` drops it for a caller that stacks this block under
+ * `animateLayout={false}` drops it too, for a section whose siblings above it
+ * mount or resize asynchronously, and for a caller that stacks this block under
  * plain siblings in a scroll column: the transition interpolates this block's
  * frame while the siblings snap, so for its 200ms it can be drawn over the row
  * above it (the new-session connect card over the repository picker, e5 spot
@@ -65,9 +74,9 @@ function useDisclosureRotation(targetAngle: 0 | 180) {
  */
 export function DisclosureLayout({
   className,
-  children,
   animateLayout = true,
-}: Readonly<{ className?: string; children: ReactNode; animateLayout?: boolean }>) {
+  children,
+}: Readonly<{ className?: string; animateLayout?: boolean; children: ReactNode }>) {
   const { reducedMotion } = useMotionPolicy();
 
   return (
@@ -125,10 +134,10 @@ export function CollapsibleSection({
   defaultExpanded = false,
   expanded,
   onToggle,
+  animateLayout = true,
   className,
   titleClassName,
   contentClassName,
-  animateLayout = true,
   children,
 }: Readonly<CollapsibleSectionProps>) {
   const [internalExpanded, setInternalExpanded] = useState(defaultExpanded);

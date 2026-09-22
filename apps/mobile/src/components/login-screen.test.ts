@@ -118,6 +118,19 @@ function findByType(
   return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
 }
 
+function findButtonByLabel(
+  root: TestRenderer.ReactTestInstance,
+  label: string
+): TestRenderer.ReactTestInstance {
+  const control = findByType(root, 'Button').find(
+    button => button.props.accessibilityLabel === label
+  );
+  if (!control) {
+    throw new Error(`button ${label} not found`);
+  }
+  return control;
+}
+
 function keyboardEventsFor(platform: 'android' | 'ios') {
   return platform === 'ios'
     ? ({ show: 'keyboardWillShow', hide: 'keyboardWillHide' } as const)
@@ -375,6 +388,51 @@ describe('login-screen language globe', () => {
     expect(setLanguagePickerBridge).toHaveBeenCalledWith({ beforeReload: persistLoginDrafts });
     expect(push).toHaveBeenCalledTimes(1);
     expect(push).toHaveBeenCalledWith('/(auth)/language-picker');
+
+    renderer.unmount();
+  });
+});
+
+describe('login-screen device-code actions', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    deviceAuth.status = 'pending';
+    deviceAuth.token = undefined;
+    deviceAuth.code = 'UC-1234';
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = 'https://kilo.example/device';
+    deviceAuth.resumed = false;
+  });
+
+  it('renders both device-code actions as icon-free label-only buttons', async () => {
+    const renderer = await mountLoginScreen();
+
+    const openInBrowser = findButtonByLabel(renderer.root, 'Open sign-in page in browser');
+    const copyLink = findButtonByLabel(renderer.root, 'Copy sign-in link');
+
+    // The pair reads as one iconography: each action is a single label child.
+    expect(openInBrowser.children).toHaveLength(1);
+    expect(copyLink.children).toHaveLength(1);
+
+    const openChild = openInBrowser.children[0];
+    const copyChild = copyLink.children[0];
+    if (
+      !openChild ||
+      !copyChild ||
+      typeof openChild === 'string' ||
+      typeof copyChild === 'string'
+    ) {
+      throw new Error('expected a rendered label child for each action');
+    }
+    expect(openChild.type).toBe('Text');
+    expect(copyChild.type).toBe('Text');
+    expect(
+      openInBrowser.findAll(
+        node => typeof node.type === 'string' && (node.type as string) === 'ExternalLink'
+      )
+    ).toHaveLength(0);
 
     renderer.unmount();
   });

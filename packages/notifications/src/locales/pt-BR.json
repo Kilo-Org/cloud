@@ -7,6 +7,7 @@
       "instanceLifecycle": "Sua instância tem uma atualização",
       "scheduledAction": "Uma ação agendada tem uma atualização",
       "lowBalance": "Seu saldo precisa de atenção",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Um achado de segurança precisa de atenção",
       "activeAgentsGlanceable": "Os agentes ativos têm uma atualização"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Alerta de saldo baixo",
       "body": "O saldo de {{organizationName}} caiu abaixo de ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Novo achado de segurança ({{severity}})",

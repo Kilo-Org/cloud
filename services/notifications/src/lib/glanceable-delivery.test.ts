@@ -42,6 +42,8 @@ const snapshot: ActiveAgentsGlanceable = {
   updatedAt: '2026-08-27T10:00:00.000Z',
   expiresAt: '2026-08-27T18:00:00.000Z',
   needsInputSince: '2026-08-27T09:00:00.000Z',
+  newestResultKind: 'needsInput',
+  newestResultAt: '2026-08-27T09:00:00.000Z',
 };
 
 function fakeDeps(overrides: Partial<GlanceableDeliveryDeps> = {}): {

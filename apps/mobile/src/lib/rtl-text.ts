@@ -16,10 +16,17 @@ import { I18nManager, type TextStyle } from 'react-native';
 export const RTL_WRITING_DIRECTION: TextStyle = { writingDirection: 'rtl' };
 
 /**
- * `tracking-*` is a Latin device that opens every glyph from its neighbour, and
- * an Arabic-script word is one connected shape, so a tracked label renders its
- * letters as isolated forms. An explicit style outranks a `className` rule, so
- * applying this leaves the tracked class the LTR design owns inert in RTL.
+ * Letter-spacing — Tailwind's `tracking-*` — is a Latin typographic device:
+ * it opens every glyph from its neighbour, and the RTL scripts the app ships
+ * do not take it. An Arabic-script word is one connected shape, so a tracked
+ * label renders its letters as isolated forms ('استكشف'); a letter-spacing of
+ * 0 keeps the paragraph's natural spacing. An explicit style outranks a
+ * `className` rule, so applying this leaves the tracked class the LTR design
+ * owns inert in RTL.
+ *
+ * `@/components/ui/text` applies this to the Arabic-script copy that needs it,
+ * in the same RTL style array as `RTL_WRITING_DIRECTION` (see
+ * `hasArabicScript`): Latin copy in an RTL interface keeps its tracking.
  */
 export const RTL_NO_LETTER_SPACING: TextStyle = { letterSpacing: 0 };
 

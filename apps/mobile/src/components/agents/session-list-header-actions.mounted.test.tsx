@@ -65,7 +65,7 @@ function slopDp(hitSlop: unknown): number {
   return 0;
 }
 
-/** One side's reach from a hitSlop that is either a number (every side) or a per-side map. */
+/** One side's reach, from a hitSlop that is one number for every side or per-side insets. */
 function slopSideDp(hitSlop: unknown, side: keyof Insets): number {
   return hitSlopInsets(hitSlop)[side];
 }
@@ -237,8 +237,12 @@ describe('SessionListHeaderActions new-session control', () => {
     // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
     expect(gapDp).toBe(14);
 
+    // `hitSlopInsets` (inside `slopSideDp`) validates and normalizes either
+    // shape, because the filter expresses its slop as one dp value for every
+    // side while the new-session control caps its right side.
     // The new-session control sits left of the filter, so the gap has to fit
-    // both facing slops; more than the gap means the two regions overlap.
+    // both facing slops; more than the gap means the two regions overlap. Either
+    // control may express hitSlop as one number or as per-side insets.
     expect(
       slopSideDp(newSession.props.hitSlop, 'right') + slopSideDp(filter.props.hitSlop, 'left')
     ).toBeLessThanOrEqual(gapDp);

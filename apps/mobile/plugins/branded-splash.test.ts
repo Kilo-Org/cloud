@@ -137,8 +137,9 @@ describe('shared branded splash', () => {
 
     // Introspect against a fresh project root: `compileModsAsync` seeds the
     // Android color/style mods from the resources already on disk, so pointing
-    // it at this package's root would read a local prebuild's `colors.xml`
-    // (absent in CI) and make the assertion depend on the developer's machine.
+    // it at this package's root would read a developer's prebuilt `android/`
+    // tree — its `colors.xml` is absent in CI — and merge colors this test does
+    // not own into the mod results, making the assertion machine-dependent.
     const { root } = createAndroidProject();
     const evaluated = await compileModsAsync(config, {
       projectRoot: root,

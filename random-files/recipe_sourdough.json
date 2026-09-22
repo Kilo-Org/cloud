@@ -1,0 +1,14 @@
+{
+  "name": "Stubborn Sourdough",
+  "hydration": 0.78,
+  "starter_percent": 20,
+  "salt_percent": 2.1,
+  "steps": [
+    "autolyse 40m",
+    "fold every 30m x4",
+    "cold proof 14h",
+    "bake 500F covered 20m",
+    "uncover, 475F, 22m"
+  ],
+  "notes": "Do not argue with the dough. It wins."
+}

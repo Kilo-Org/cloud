@@ -1,13 +1,9 @@
-ALTER TABLE "platform_integrations" ADD COLUMN "github_connection_role" text;--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_platform_integrations_github_workflow_canonical" ON "platform_integrations" USING btree ("github_installation_id") WHERE "platform_integrations"."github_connection_role" = 'workflow';--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_platform_integrations_github_workflow_identity" ON "platform_integrations" USING btree (COALESCE("github_app_type", 'standard'),"platform_installation_id") WHERE "platform_integrations"."github_connection_role" = 'workflow';--> statement-breakpoint
-ALTER TABLE "platform_integrations" ADD CONSTRAINT "platform_integrations_github_connection_role_check" CHECK ("platform_integrations"."github_connection_role" IS NULL OR (
-        "platform_integrations"."platform" = 'github' AND "platform_integrations"."integration_type" = 'app'
-        AND "platform_integrations"."platform_installation_id" IS NOT NULL
-        AND "platform_integrations"."github_connection_role" IN ('workflow', 'agent_only')
-        AND ("platform_integrations"."github_connection_role" <> 'agent_only' OR "platform_integrations"."github_installation_id" IS NOT NULL)
-      ));
--->  statement-breakpoint
+COMMIT;--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "UQ_platform_integrations_github_workflow_canonical" ON "platform_integrations" USING btree ("github_installation_id") WHERE "platform_integrations"."github_connection_role" = 'workflow';--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "UQ_platform_integrations_github_workflow_identity" ON "platform_integrations" USING btree (COALESCE("github_app_type", 'standard'),"platform_installation_id") WHERE "platform_integrations"."github_connection_role" = 'workflow';
+--> statement-breakpoint
+BEGIN;
+--> statement-breakpoint
 WITH eligible AS (
   SELECT pi.*,
     COALESCE(pi.metadata, '{}'::jsonb) ?| ARRAY['pending_approval', 'completed_installation'] AS has_pending_history,
@@ -28,7 +24,7 @@ WITH eligible AS (
       pi.integration_status = 'active' AND pi.suspended_at IS NULL AND pi.auth_invalid_at IS NULL
       AND pi.github_disconnected_at IS NULL
     ))
-), ranked AS (
+), ranked AS MATERIALIZED (
   SELECT id, github_installation_id,
     count(*) FILTER (WHERE has_workflow) OVER identity AS workflow_claims,
     count(*) FILTER (WHERE has_pending_history) OVER identity AS pending_histories,

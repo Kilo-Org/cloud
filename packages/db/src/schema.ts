@@ -4342,12 +4342,6 @@ export const platform_integrations = pgTable(
       .where(
         sql`${table.platform} = 'github' AND ${table.owned_by_organization_id} IS NOT NULL AND ${table.github_installation_id} IS NOT NULL`
       ),
-    uniqueIndex('UQ_platform_integrations_github_workflow_canonical')
-      .on(table.github_installation_id)
-      .where(sql`${table.github_connection_role} = 'workflow'`),
-    uniqueIndex('UQ_platform_integrations_github_workflow_identity')
-      .on(sql`COALESCE(${table.github_app_type}, 'standard')`, table.platform_installation_id)
-      .where(sql`${table.github_connection_role} = 'workflow'`),
     check(
       'platform_integrations_github_connection_role_check',
       sql`${table.github_connection_role} IS NULL OR (
@@ -4357,6 +4351,14 @@ export const platform_integrations = pgTable(
         AND (${table.github_connection_role} <> 'agent_only' OR ${table.github_installation_id} IS NOT NULL)
       )`
     ),
+    uniqueIndex('UQ_platform_integrations_github_workflow_canonical')
+      .on(table.github_installation_id)
+      .where(sql`${table.github_connection_role} = 'workflow'`)
+      .concurrently(),
+    uniqueIndex('UQ_platform_integrations_github_workflow_identity')
+      .on(sql`COALESCE(${table.github_app_type}, 'standard')`, table.platform_installation_id)
+      .where(sql`${table.github_connection_role} = 'workflow'`)
+      .concurrently(),
     uniqueIndex('UQ_platform_integrations_github_user_canonical')
       .on(table.owned_by_user_id, table.github_installation_id)
       .concurrently()

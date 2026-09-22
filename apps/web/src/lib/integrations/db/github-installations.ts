@@ -259,7 +259,24 @@ export async function connectVerifiedGitHubInstallation(
       return { ok: false, reason: 'installation_unavailable' };
     }
 
-    if (existing && existing.github_connection_role === null) {
+    const canRecoverLegacyWorkflow =
+      existing?.github_connection_role === null &&
+      existingMatches.length === 1 &&
+      existing.integration_type === 'app' &&
+      existing.integration_status !== INTEGRATION_STATUS.PENDING &&
+      /^[1-9][0-9]*$/.test(data.platformInstallationId) &&
+      existing.suspended_by !== 'migration-0205-github-dedup' &&
+      !['github_dedup', 'pending_approval', 'completed_installation'].some(key =>
+        Object.hasOwn(existing.metadata ?? {}, key)
+      ) &&
+      canonical.sharing_mode === 'exclusive' &&
+      canonical.sharing_admission_checked_at === null &&
+      (existing.github_installation_id === null ||
+        (existing.integration_status === INTEGRATION_STATUS.ACTIVE &&
+          existing.suspended_at === null &&
+          existing.auth_invalid_at === null &&
+          existing.github_disconnected_at === null));
+    if (existing && existing.github_connection_role === null && !canRecoverLegacyWorkflow) {
       return { ok: false, reason: 'installation_unavailable' };
     }
     const role: 'workflow' | 'agent_only' =

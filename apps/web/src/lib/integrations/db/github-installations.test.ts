@@ -91,6 +91,22 @@ const legacyUnboundDisconnectedAssociation = (organizationId: string, installati
   repository_access: 'all',
 });
 
+async function applyConnectionRoleBackfill() {
+  const migration = readFileSync(
+    resolve(
+      process.cwd(),
+      '../../packages/db/src/migrations/0255_github_connection_role_indexes.sql'
+    ),
+    'utf8'
+  );
+  const backfill = migration
+    .split('--> statement-breakpoint')
+    .map(statement => statement.trim())
+    .filter(statement => statement.startsWith('WITH eligible AS'));
+  expect(backfill).toHaveLength(1);
+  await db.execute(sql.raw(backfill[0]));
+}
+
 describe('GitHub installation persistence', () => {
   beforeEach(async () => {
     process.env.GITHUB_AGENT_ONLY_CONNECTIONS_ENABLED = 'true';
@@ -116,6 +132,142 @@ describe('GitHub installation persistence', () => {
   });
 
   afterEach(cleanupDbForTest);
+
+  test.each([
+    'auth_invalid',
+    'suspended',
+    'disconnected',
+    'active_old_writer',
+    'bound_old_writer',
+  ] as const)('recovers an unambiguous verified legacy owner after %s', async state => {
+    const organization = await createTestOrganization('Legacy recovery', ownerId, 0);
+    const oldWriter = state === 'active_old_writer' || state === 'bound_old_writer';
+    if (oldWriter) await applyConnectionRoleBackfill();
+    const [canonical] =
+      state === 'bound_old_writer'
+        ? await db
+            .insert(github_app_installations)
+            .values({
+              installation_id: '996001',
+              github_app_type: 'standard',
+              lifecycle_state: 'active',
+            })
+            .returning()
+        : [];
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '996001',
+        github_app_type: null,
+        github_installation_id: canonical?.id ?? null,
+        integration_status: state === 'suspended' ? 'suspended' : 'active',
+        suspended_at: state === 'suspended' ? new Date().toISOString() : null,
+        auth_invalid_at: state === 'auth_invalid' ? new Date().toISOString() : null,
+        github_disconnected_at: state === 'disconnected' ? new Date().toISOString() : null,
+      })
+      .returning();
+    if (!oldWriter) await applyConnectionRoleBackfill();
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
+    ).resolves.toMatchObject({ github_connection_role: null });
+    await expect(
+      connectVerifiedGitHubInstallation({ type: 'org', id: organization.id }, data('996001'))
+    ).resolves.toEqual({ ok: true, integrationId: legacy.id });
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
+    ).resolves.toMatchObject({
+      github_connection_role: 'workflow',
+      github_installation_id: expect.any(String),
+      integration_status: 'active',
+      auth_invalid_at: null,
+      suspended_at: null,
+      github_disconnected_at: null,
+      github_authorized_by_user_id: ownerId,
+    });
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('996001', 'standard', legacy.id)
+    ).resolves.toBeUndefined();
+  });
+
+  test('does not recover an unhealthy legacy shadow over a current canonical workflow owner', async () => {
+    const original = await createTestOrganization('Canonical incumbent', ownerId, 0);
+    const shadowOwner = await createTestOrganization('Legacy shadow', otherOwnerId, 0);
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: original.id },
+      data('996002')
+    );
+    if (!connected.ok) throw new Error('Expected incumbent');
+    const [shadow] = await db
+      .insert(platform_integrations)
+      .values({
+        ...legacyUnboundDisconnectedAssociation(shadowOwner.id, '996002'),
+        github_app_type: null,
+      })
+      .returning();
+    await applyConnectionRoleBackfill();
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: shadowOwner.id },
+        { ...data('996002'), kiloUserId: otherOwnerId }
+      )
+    ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+    await expect(
+      connectVerifiedGitHubInstallation({ type: 'org', id: original.id }, data('996002'))
+    ).resolves.toEqual({ ok: true, integrationId: connected.integrationId });
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, shadow.id) })
+    ).resolves.toMatchObject({
+      github_connection_role: null,
+      github_disconnected_at: expect.any(String),
+    });
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('996002', 'standard', connected.integrationId)
+    ).resolves.toBeUndefined();
+  });
+
+  test.each(['github_dedup', 'pending_approval', 'completed_installation'] as const)(
+    'does not infer legacy authority from a sole row with %s history',
+    async history => {
+      const organization = await createTestOrganization('Unreconciled legacy history', ownerId, 0);
+      const [legacy] = await db
+        .insert(platform_integrations)
+        .values({
+          ...legacyUnboundDisconnectedAssociation(organization.id, '996003'),
+          metadata: { [history]: {} },
+        })
+        .returning();
+      await applyConnectionRoleBackfill();
+      await expect(
+        connectVerifiedGitHubInstallation({ type: 'org', id: organization.id }, data('996003'))
+      ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+      await expect(
+        db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
+      ).resolves.toMatchObject({ github_connection_role: null });
+    }
+  );
+
+  test('keeps inactive same-identity legacy owners unreconciled after verified reconnect', async () => {
+    const organizationA = await createTestOrganization('Inactive legacy A', ownerId, 0);
+    const organizationB = await createTestOrganization('Inactive legacy B', otherOwnerId, 0);
+    await db
+      .insert(platform_integrations)
+      .values([
+        legacyUnboundDisconnectedAssociation(organizationA.id, '996004'),
+        legacyUnboundDisconnectedAssociation(organizationB.id, '996004'),
+      ]);
+    await applyConnectionRoleBackfill();
+    await expect(
+      connectVerifiedGitHubInstallation({ type: 'org', id: organizationA.id }, data('996004'))
+    ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+    const roles = await db
+      .select({ role: platform_integrations.github_connection_role })
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '996004'));
+    expect(roles).toEqual([{ role: null }, { role: null }]);
+  });
 
   test('connects two approved organizations to one canonical installation', async () => {
     const organizationA = await createTestOrganization('Shared GitHub A', ownerId, 0);
@@ -420,11 +572,7 @@ describe('GitHub installation persistence', () => {
         created_by: ownerId,
       });
     }
-    const migration = readFileSync(
-      resolve(process.cwd(), '../../packages/db/src/migrations/0254_messy_prodigy.sql'),
-      'utf8'
-    );
-    await db.execute(sql.raw(migration.slice(migration.indexOf('WITH eligible AS'))));
+    await applyConnectionRoleBackfill();
     const updated = await db
       .select()
       .from(platform_integrations)

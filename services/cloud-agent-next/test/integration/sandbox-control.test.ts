@@ -589,7 +589,8 @@ function captureAndAcceptControlRequests(
 async function installProvider(
   control: ReturnType<typeof env.SANDBOX_CONTROL.getByName>,
   initialRef?: string,
-  sandboxProvider: AgentSandboxProvider = 'cloudflare'
+  sandboxProvider: AgentSandboxProvider = 'cloudflare',
+  githubAuthorization?: GitHubAuthorizationSubject
 ) {
   const allocations = new Set(initialRef ? [initialRef] : []);
   const allocationRef = (sandboxName: string, instanceId: string) =>
@@ -628,6 +629,8 @@ async function installProvider(
     ),
   } satisfies ProviderAdapter;
   await runInDurableObject(control, instance => {
+    const broker = fakeCredentialBroker();
+    if (githubAuthorization) broker.githubAuthorizations.splice(0, 1, githubAuthorization);
     const prototype = Object.getPrototypeOf(instance) as {
       createProviderAdapter: () => ProviderAdapter;
     };
@@ -642,7 +645,7 @@ async function installProvider(
       VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
       VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
       ...fakeCloudflareContainers(() => instance.getPhysicalRecord()).bindings,
-      GIT_TOKEN_SERVICE: fakeCredentialBroker().binding,
+      GIT_TOKEN_SERVICE: broker.binding,
       KILOCODE_BACKEND_BASE_URL: CONTAINMENT_TARGETS.backendBaseUrl,
       KILO_OPENROUTER_BASE: CONTAINMENT_TARGETS.providerBaseUrl,
       KILO_SESSION_INGEST_URL: CONTAINMENT_TARGETS.sessionIngestBaseUrl,
@@ -846,6 +849,9 @@ function policyUpdateInput(ownerId = CONTAINMENT_OWNER): {
 type CredentialRegistration = Parameters<SandboxSession['registerSession']>[0];
 type KiloSubject = Parameters<GitTokenService['issueKiloSessionCapability']>[0];
 type GitHubSubject = Parameters<GitTokenService['issueGitHubSessionCapability']>[0];
+type GitHubAuthorizationSubject = Parameters<
+  NonNullable<GitTokenService['authorizeCloudAgentGitHubRepo']>
+>[0];
 
 const VERCEL_ENV = {
   VERCEL_TOKEN: 'fixture-vercel-token',
@@ -858,26 +864,55 @@ const VERCEL_ENV = {
   VERCEL_SANDBOX_EXTEND_DURATION_MS: '120000',
 };
 
-function fakeCredentialBroker() {
+function fakeCredentialBroker(accessPurpose: 'workflow' | 'agent' = 'workflow') {
   const kiloSubjects = new Map<string, KiloSubject>();
   const githubSubjects = new Map<string, GitHubSubject>();
   const tokens = { github: GITHUB_TOKEN };
+  const githubAuthorization = {
+    userId: CONTAINMENT_OWNER,
+    orgId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    githubRepo: 'acme/repo',
+    expectedIntegrationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    accessPurpose,
+  };
+  const githubRequests: GitHubAuthorizationSubject[] = [];
+  const githubAuthorizations: GitHubAuthorizationSubject[] = [githubAuthorization];
+  const authorizeGitHub = (subject: GitHubAuthorizationSubject) => {
+    githubRequests.push({ ...subject });
+    return githubAuthorizations.some(
+      expected =>
+        subject.userId === expected.userId &&
+        subject.orgId === expected.orgId &&
+        subject.githubRepo === expected.githubRepo &&
+        subject.expectedIntegrationId === expected.expectedIntegrationId &&
+        subject.accessPurpose === expected.accessPurpose
+    );
+  };
   let serial = 0;
   const unexpected = async (): Promise<never> => {
     throw new Error('Unexpected raw credential lookup or capability redemption');
   };
   const binding: GitTokenService = {
-    async getTokenForRepo() {
+    getTokenForRepo: unexpected,
+    async authorizeCloudAgentGitHubRepo(subject) {
+      return authorizeGitHub(subject)
+        ? { success: true }
+        : { success: false, reason: 'integration_mismatch' };
+    },
+    async getCloudAgentAuthForRepo(subject) {
+      if (!authorizeGitHub(subject)) return { success: false, reason: 'integration_mismatch' };
+      expect(subject.allowUserAuthorization).toBe(false);
       return {
         success: true,
-        token: tokens.github,
+        githubToken: tokens.github,
         installationId: '42',
         accountLogin: 'acme',
         appType: 'standard',
+        source: 'installation',
+        gitAuthor: { name: 'fixture bot', email: 'fixture@example.com' },
       };
     },
     getToken: unexpected,
-    getCloudAgentAuthForRepo: unexpected,
     getGitLabToken: unexpected,
     issueGitLabSessionCapability: unexpected,
     redeemGitLabSessionCapability: unexpected,
@@ -891,6 +926,7 @@ function fakeCredentialBroker() {
       return { success: true, capability };
     },
     async issueGitHubSessionCapability(subject) {
+      if (!authorizeGitHub(subject)) return { success: false, reason: 'integration_mismatch' };
       const capability = `kgh2.fixture-${++serial}`;
       githubSubjects.set(capability, subject);
       return {
@@ -904,7 +940,15 @@ function fakeCredentialBroker() {
       };
     },
   };
-  return { binding, kiloSubjects, githubSubjects, tokens };
+  return {
+    binding,
+    kiloSubjects,
+    githubSubjects,
+    tokens,
+    githubAuthorization,
+    githubAuthorizations,
+    githubRequests,
+  };
 }
 
 type WrapperLaunch = {
@@ -1128,10 +1172,11 @@ async function registerCredentialSession(registration: CredentialRegistration) {
 async function credentialFixture(
   provider: AgentSandboxProvider = 'cloudflare',
   id: SandboxId = `${provider === 'vercel' ? 'ses' : 'usr'}-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`,
-  sandboxAllocation?: SandboxAllocation
+  sandboxAllocation?: SandboxAllocation,
+  githubAccessPurpose?: 'workflow' | 'agent'
 ) {
   const control = env.SANDBOX_CONTROL.getByName(id);
-  const broker = fakeCredentialBroker();
+  const broker = fakeCredentialBroker(githubAccessPurpose);
   const environment = {
     ...env,
     ...VERCEL_ENV,
@@ -1174,6 +1219,7 @@ async function credentialFixture(
       type: 'github',
       repo: 'acme/repo',
       githubIntegrationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      ...(githubAccessPurpose ? { githubAccessPurpose } : {}),
     },
     workspace: {
       sandboxId: id,
@@ -3249,6 +3295,66 @@ describe('SandboxControl contained Vercel lifecycle', () => {
 });
 
 describe('SandboxControl mandatory worktree credentials', () => {
+  it.each(['cloudflare', 'vercel'] as const)(
+    'preserves exact managed agent authorization in %s Workers RPCs',
+    async provider => {
+      const { control, registration, broker } = await credentialFixture(
+        provider,
+        undefined,
+        undefined,
+        'agent'
+      );
+      const ready = await control.ensureReady({
+        ...credentialInput(registration),
+        provider,
+        allowCreate: true,
+      });
+      expect(ready.attachment).toBeDefined();
+      expect(broker.githubRequests.length).toBeGreaterThan(0);
+      for (const request of broker.githubRequests)
+        expect(request).toMatchObject(broker.githubAuthorization);
+      expect(await storedGrants(control)).toMatchObject([
+        {
+          repository: {
+            type: 'github',
+            repo: 'acme/repo',
+            expectedIntegrationId: broker.githubAuthorization.expectedIntegrationId,
+            accessPurpose: 'agent',
+          },
+        },
+      ]);
+    }
+  );
+
+  it.each(
+    (['cloudflare', 'vercel'] as const).flatMap(provider =>
+      (['userId', 'orgId', 'githubRepo', 'expectedIntegrationId', 'accessPurpose'] as const).map(
+        field => ({ provider, field })
+      )
+    )
+  )(
+    'rejects a managed $field mismatch before $provider provisioning',
+    async ({ provider, field }) => {
+      const { control, registration, broker, containers, vercel } = await credentialFixture(
+        provider,
+        undefined,
+        undefined,
+        'agent'
+      );
+      const expected = { ...broker.githubAuthorization };
+      if (field === 'accessPurpose') broker.githubAuthorization.accessPurpose = 'workflow';
+      else broker.githubAuthorization[field] = `${broker.githubAuthorization[field]}-other`;
+      await expect(async () =>
+        control.ensureReady({ ...credentialInput(registration), provider, allowCreate: true })
+      ).rejects.toThrow('GitHub credential is unavailable');
+      expect(broker.githubRequests).toEqual([expect.objectContaining(expected)]);
+      expect(await storedGrants(control)).toEqual([]);
+      expect(containers.launches).toEqual([]);
+      expect(vercel.runtime.creates).toBe(0);
+      expect(broker.githubSubjects.size).toBe(0);
+    }
+  );
+
   it('joins authoritative session metadata, native containment, wrapper handshake, and sanitized attach', async () => {
     const fixture = await credentialFixture();
     const { control, registration, broker, containers } = fixture;
@@ -3357,6 +3463,11 @@ describe('SandboxControl mandatory worktree credentials', () => {
   it('shares stable aliases across two roots of one worktree without granting access to another worktree', async () => {
     const fixture = await credentialFixture();
     const { control, registration, broker } = fixture;
+    broker.githubAuthorizations.push({
+      ...broker.githubAuthorization,
+      githubRepo: 'acme/other',
+      expectedIntegrationId: undefined,
+    });
     const second: CredentialRegistration = {
       ...registration,
       identity: { ...registration.identity, sessionId: `workspace_${crypto.randomUUID()}` },
@@ -4001,6 +4112,11 @@ describe('SandboxControl native worktree containment', () => {
   it('installs, refreshes, and removes the combined Vercel policy for exact worktree roots', async () => {
     const fixture = await credentialFixture('vercel');
     const { control, registration, session, broker, vercel } = fixture;
+    broker.githubAuthorizations.push({
+      ...broker.githubAuthorization,
+      githubRepo: 'acme/other',
+      expectedIntegrationId: undefined,
+    });
     const second: CredentialRegistration = {
       ...registration,
       identity: { ...registration.identity, sessionId: `workspace_${crypto.randomUUID()}` },
@@ -7110,7 +7226,11 @@ async function worktreeFixture(
     inTransaction: boolean;
   }[] = [];
   await seedRunningCredential(credential, sandboxId);
-  const { provider } = await installProvider(control, cloudflareRef(sandboxId));
+  const { provider } = await installProvider(control, cloudflareRef(sandboxId), 'cloudflare', {
+    userId,
+    githubRepo: 'acme/demo',
+    accessPurpose: 'workflow',
+  });
   await runInDurableObject(control, async (instance, state) => {
     await instance.initializeOwner(userId);
     const waitUntil = state.waitUntil.bind(state);
@@ -11048,10 +11168,17 @@ describe('SandboxSession control-plane regressions', () => {
       model: modelB,
       variant: 'low',
     });
+    const registered = await session.getCredentialMetadata();
+    if (!registered) throw new Error('Missing registered fixture');
     await expect(
       session.createSessionWithInitialAdmission({
-        identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+        identity: {
+          sessionId: fixture.sessionId,
+          userId: fixture.ownerId,
+          orgId: registered.identity.orgId,
+        },
         auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+        repository: registered.repository,
         agent: { mode: 'reviewer', model: agentA.model },
         message: {
           initialTurn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'initial' },
@@ -13431,7 +13558,11 @@ describe('SandboxSession worktree admission', () => {
         await instance.initializeOwner(ownerId);
         await seedRunningCloudflare(instance);
       });
-      await installProvider(control, cloudflareRef(targetSandboxId));
+      await installProvider(control, cloudflareRef(targetSandboxId), 'cloudflare', {
+        userId: ownerId,
+        githubRepo: 'Kilo-Org/cloud',
+        accessPurpose: 'workflow',
+      });
 
       const ws = await connect(credential, targetSandboxId);
       await completeHello(ws, 'hello-grouped-initial', { wrapperInstanceId: crypto.randomUUID() });
@@ -13529,7 +13660,11 @@ describe('SandboxSession worktree admission', () => {
       await instance.initializeOwner(ownerId);
       await seedRunningCloudflare(instance);
     });
-    await installProvider(control, cloudflareRef(targetSandboxId));
+    await installProvider(control, cloudflareRef(targetSandboxId), 'cloudflare', {
+      userId: ownerId,
+      githubRepo: 'Kilo-Org/cloud',
+      accessPurpose: 'workflow',
+    });
 
     const wrapper = await connect(credential, targetSandboxId);
     await completeHello(wrapper, 'hello-grouped-command', {
@@ -13645,7 +13780,11 @@ describe('SandboxSession worktree admission', () => {
       await instance.initializeOwner(ownerId);
       await seedRunningCloudflare(instance);
     });
-    await installProvider(control, cloudflareRef(targetSandboxId));
+    await installProvider(control, cloudflareRef(targetSandboxId), 'cloudflare', {
+      userId: ownerId,
+      githubRepo: 'Kilo-Org/cloud',
+      accessPurpose: 'workflow',
+    });
 
     const wrapper = await connect(credential, targetSandboxId);
     await completeHello(wrapper, 'hello-grouped-attachment', {
@@ -13761,7 +13900,11 @@ describe('SandboxSession worktree admission', () => {
       await instance.initializeOwner(ownerId);
       await seedRunningCloudflare(instance);
     });
-    await installProvider(control, cloudflareRef(targetSandboxId));
+    await installProvider(control, cloudflareRef(targetSandboxId), 'cloudflare', {
+      userId: ownerId,
+      githubRepo: 'Kilo-Org/cloud',
+      accessPurpose: 'workflow',
+    });
 
     const wrapper = await connect(credential, targetSandboxId);
     await completeHello(wrapper, 'hello-ungrouped-followup-command', {
@@ -14010,7 +14153,11 @@ describe('SandboxSession worktree admission', () => {
         await instance.initializeOwner(ownerId);
         await seedRunningCloudflare(instance);
       });
-      await installProvider(control, cloudflareRef(targetSandboxId));
+      await installProvider(control, cloudflareRef(targetSandboxId), 'cloudflare', {
+        userId: ownerId,
+        githubRepo: 'Kilo-Org/cloud',
+        accessPurpose: 'workflow',
+      });
 
       const wrapper = await connect(credential, targetSandboxId);
       await completeHello(wrapper, 'hello-grouped-legacy-record', {
@@ -14119,7 +14266,11 @@ describe('SandboxSession durable message lifecycle', () => {
       await instance.initializeOwner(ownerId);
       await seedRunningCloudflare(instance);
     });
-    await installProvider(control, cloudflareRef(targetSandboxId));
+    await installProvider(control, cloudflareRef(targetSandboxId), 'cloudflare', {
+      userId: ownerId,
+      githubRepo: 'Kilo-Org/cloud',
+      accessPurpose: 'workflow',
+    });
 
     const wrapper = await connect(credential, targetSandboxId);
     await completeHello(wrapper, 'hello-grouped-sent', { wrapperInstanceId: crypto.randomUUID() });

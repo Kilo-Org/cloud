@@ -8,18 +8,41 @@
  * meaningful while other shards dispatch to the same fake.
  *
  * Usage:
+ *   E2E_BATCH=<name> pnpm --filter cloud-agent-next run e2e:parallel
  *   E2E_PARALLEL=4 pnpm --filter cloud-agent-next run e2e:parallel
  *   E2E_PARALLEL=all pnpm --filter cloud-agent-next run e2e:parallel
  *
- * `E2E_PARALLEL` accepts a positive integer or `all` (every supported scenario
- * at once); it defaults to 4. Capability-gated scenarios are filtered out up
- * front and are not spawned, so a child's non-zero exit is a failure: exit `1`
- * when any scenario failed, else `0`. A child that does not exit within its
- * watchdog deadline is killed and reported as a failure.
+ * `E2E_BATCH` selects one batch from `E2E_BATCHES` (declared order preserved);
+ * unset runs every scenario, so job selection is unchanged. `E2E_PARALLEL`
+ * accepts a positive integer or `all` (every selected scenario at once) and is
+ * an explicit override; when it is unset, a selected batch uses its own
+ * `parallel` and the all-scenarios mode defaults to 4.
+ *
+ * Batch membership is validated unconditionally against the real registry
+ * before any scenario runs; an unknown batch, a duplicate or missing scenario,
+ * or an out-of-range `parallel` prints every error and exits `2`. A scenario
+ * added to `SHARED_SCENARIOS` without a batch therefore fails here (both modes)
+ * until it is batched.
+ *
+ * Capability-gated scenarios are filtered out up front and are not spawned, so
+ * a child's non-zero exit is a failure: exit `1` when any scenario failed, else
+ * `0`. A child that does not exit within its watchdog deadline is killed and
+ * reported as a failure.
+ *
+ * End-of-run output (one `Batch:` header, one `unsupported:` line per
+ * capability-filtered scenario, one `Summary:`, one `Wall time:`):
+ *
+ *   Batch: <name> (<n> scenarios, concurrency <p>)
+ *   unsupported: <name>
+ *   Summary: <pass> passed, <fail> failed, <unsupported> unsupported
+ *   Wall time: <seconds>s
+ *
+ * `<n>` is the selected registry-key count before capability filtering; the
+ * runner asserts `pass + fail + unsupported === n` and exits `2` otherwise.
  *
  * Cold boots contend on container provisioning, so `all` maximises the chance
  * of a container cold-start timeout (240 s/turn budget) showing up as a false
- * failure. A modest default (4) trades wall time for stability.
+ * failure. A modest default trades wall time for stability.
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -30,6 +53,7 @@ import { fileURLToPath } from 'node:url';
 import { bootstrapDeployedProfile } from './deployed-auth.js';
 import { createDeployedScenarioEnvironment } from './capabilities-deployed.js';
 import { isScenarioSupported } from './scenario-capabilities.js';
+import { E2E_BATCHES, resolveBatch, validateScenarioBatches } from './scenarios-batches.js';
 import { SHARED_SCENARIOS } from './scenarios-shared.js';
 import { requireScenarioApi } from './run.js';
 
@@ -57,9 +81,9 @@ type JobResult = {
   durationMs: number;
 };
 
-function resolveParallelism(total: number): number {
+function resolveParallelism(total: number, batchParallel: number | undefined): number {
   const raw = process.env.E2E_PARALLEL;
-  if (raw === undefined || raw === '') return Math.min(DEFAULT_PARALLEL, total);
+  if (raw === undefined || raw === '') return Math.min(batchParallel ?? DEFAULT_PARALLEL, total);
   const trimmed = raw.trim();
   if (trimmed.toLowerCase() === 'all') return total;
   const parsed = /^\d+$/.test(trimmed) ? Number.parseInt(trimmed, 10) : Number.NaN;
@@ -85,7 +109,13 @@ function killTree(child: ChildProcess): void {
   }
 }
 
-function buildJobs(): Job[] {
+type JobSelection = {
+  jobs: Job[];
+  /** Selected scenarios this profile cannot run, in selection order. */
+  unsupported: string[];
+};
+
+function buildJobs(selectedKeys: readonly string[]): JobSelection {
   const profile = bootstrapDeployedProfile();
   const env = createDeployedScenarioEnvironment({
     surfaceUrl: profile.workerUrl,
@@ -94,9 +124,15 @@ function buildJobs(): Job[] {
   });
 
   const jobs: Job[] = [];
-  for (const [name, definition] of Object.entries(SHARED_SCENARIOS)) {
+  const unsupported: string[] = [];
+  for (const name of selectedKeys) {
+    const definition = SHARED_SCENARIOS[name];
+    if (definition === undefined) {
+      // Selection is derived from the registry, so this is a programming error.
+      throw new Error(`selected scenario "${name}" is not in SHARED_SCENARIOS`);
+    }
     if (!isScenarioSupported(definition, env)) {
-      console.log(`skipping unsupported on this profile: ${name}`);
+      unsupported.push(name);
       continue;
     }
     jobs.push({
@@ -106,7 +142,7 @@ function buildJobs(): Job[] {
       timeoutMs: definition.defaultTimeoutMs,
     });
   }
-  return jobs;
+  return { jobs, unsupported };
 }
 
 function runScenario(job: Job, scope: string, total: number, index: number): Promise<JobResult> {
@@ -180,12 +216,42 @@ function runScenario(job: Job, scope: string, total: number, index: number): Pro
 }
 
 async function main(): Promise<void> {
-  const jobs = buildJobs();
-  if (jobs.length === 0) {
-    console.log('No supported scenarios to run.');
-    process.exit(0);
+  const registryKeys = Object.keys(SHARED_SCENARIOS);
+
+  // Unconditional: a registry scenario that is not batched must fail both the
+  // batch and the all-scenarios mode instead of being silently skipped.
+  const validationErrors = validateScenarioBatches(E2E_BATCHES, registryKeys);
+  if (validationErrors.length > 0) {
+    for (const error of validationErrors) {
+      console.error(`scenario-batch validation error: ${error}`);
+    }
+    process.exit(2);
   }
-  const parallelism = resolveParallelism(jobs.length);
+
+  const requestedBatch = process.env.E2E_BATCH;
+  let batchName = 'all';
+  let selectedKeys = registryKeys;
+  let batchParallel: number | undefined;
+  // Only an absent `E2E_BATCH` selects every scenario. Any supplied value,
+  // including empty or whitespace-only, must name a known batch.
+  if (requestedBatch !== undefined) {
+    const resolved = resolveBatch(requestedBatch, registryKeys);
+    if (resolved === null || !resolved.ok) {
+      console.error(
+        `E2E_BATCH must be one of ${JSON.stringify(Object.keys(E2E_BATCHES))}; got ${JSON.stringify(requestedBatch)}`
+      );
+      if (resolved !== null) {
+        for (const error of resolved.errors) console.error(`batch resolution error: ${error}`);
+      }
+      process.exit(2);
+    }
+    batchName = resolved.name;
+    selectedKeys = [...resolved.scenarios];
+    batchParallel = resolved.parallel;
+  }
+
+  const { jobs, unsupported } = buildJobs(selectedKeys);
+  const parallelism = resolveParallelism(jobs.length, batchParallel);
   console.log(
     `Running ${jobs.length} scenarios with concurrency ${parallelism} against ${process.env.WORKER_URL ?? '(unset WORKER_URL)'}`
   );
@@ -206,11 +272,20 @@ async function main(): Promise<void> {
 
   const pass = results.filter(result => result.outcome === 'pass');
   const failures = results.filter(result => result.outcome === 'failure');
+  const scenarios = selectedKeys.length;
+  if (pass.length + failures.length + unsupported.length !== scenarios) {
+    console.error(
+      `batch accounting error: ${pass.length} passed + ${failures.length} failed + ${unsupported.length} unsupported !== ${scenarios} selected`
+    );
+    process.exit(2);
+  }
+
+  console.log(`\nBatch: ${batchName} (${scenarios} scenarios, concurrency ${parallelism})`);
+  for (const name of unsupported) console.log(`unsupported: ${name}`);
   console.log(
-    `\nSummary: ${pass.length} passed, ${failures.length} failed (wall time ${wallSeconds}s)`
+    `Summary: ${pass.length} passed, ${failures.length} failed, ${unsupported.length} unsupported`
   );
-  for (const result of failures)
-    console.log(`failed: ${result.job.name} (exit=${result.exitCode})`);
+  console.log(`Wall time: ${wallSeconds}s`);
 
   process.exit(failures.length > 0 ? 1 : 0);
 }

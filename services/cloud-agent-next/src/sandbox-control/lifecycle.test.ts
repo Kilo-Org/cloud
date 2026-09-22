@@ -587,6 +587,215 @@ describe('SandboxControl lifecycle boundaries', () => {
     ]);
   });
 
+  it('replays fence-rejected session events after the wrapper reconnects', async () => {
+    const h = await harness();
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+    await h.create();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+
+    const batchSession = {
+      directory: ROUTE.directory,
+      kiloSessionId: ROUTE.kiloSessionId,
+      rootKiloSessionId: ROUTE.kiloSessionId,
+      nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+    };
+    const batchItems = (sequence: number) => [
+      {
+        event: 'session.event' as const,
+        session: batchSession,
+        payload: {
+          type: 'session.updated',
+          properties: { info: { id: ROUTE.kiloSessionId, title: `replay ${sequence}` } },
+        },
+        receiptId: crypto.randomUUID(),
+        sequence,
+      },
+    ];
+    const firstItems = batchItems(1);
+    const secondItems = batchItems(2);
+    const firstForward = deferred<{
+      outcomes: Array<{ receiptId: string; status: 'applied' }>;
+    }>();
+    h.session.receiveSandboxControlEventBatch
+      .mockReturnValueOnce(firstForward.promise)
+      .mockImplementation(async ({ items }: { items: Array<{ receiptId: string }> }) => ({
+        outcomes: items.map(item => ({ receiptId: item.receiptId, status: 'applied' as const })),
+      }));
+    const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      const pendingFirst = h.hooks.onSessionEventBatch?.({ items: firstItems }, first);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledTimes(1);
+
+      const pendingSecond = h.hooks.onSessionEventBatch?.({ items: secondItems }, first);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledTimes(1);
+
+      const replacement = { ...first, connectionId: crypto.randomUUID() };
+      h.replaceConnection(replacement);
+      await h.hooks.onHandshakeComplete?.(replacement);
+      await h.hooks.onReady?.(replacement);
+      await vi.advanceTimersByTimeAsync(0);
+
+      firstForward.resolve({
+        outcomes: firstItems.map(item => ({ receiptId: item.receiptId, status: 'applied' })),
+      });
+      await pendingFirst;
+      await pendingSecond;
+      await h.flush();
+
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledWith({
+        items: secondItems,
+        wrapperInstanceId: first.wrapperInstanceId,
+      });
+      const recovered = withFields.mock.calls
+        .map(([fields]) => fields as Record<string, unknown>)
+        .filter(fields => fields.diagnosticEvent === 'forward_recovered');
+      expect(recovered.length).toBeGreaterThan(0);
+      expect(Math.max(...recovered.map(fields => Number(fields.recovered)))).toBeGreaterThanOrEqual(
+        2
+      );
+      expect(recovered.at(-1)).toMatchObject({
+        eventType: 'session.event.batch',
+        sessionId: ROUTE.sessionId,
+      });
+    } finally {
+      withFields.mockRestore();
+    }
+  });
+
+  it('keeps the remaining queued session events when the fence changes during their replay', async () => {
+    const h = await harness();
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+    await h.create();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+
+    const batchSession = {
+      directory: ROUTE.directory,
+      kiloSessionId: ROUTE.kiloSessionId,
+      rootKiloSessionId: ROUTE.kiloSessionId,
+      nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+    };
+    const batchItems = (sequence: number) => [
+      {
+        event: 'session.event' as const,
+        session: batchSession,
+        payload: {
+          type: 'session.updated',
+          properties: { info: { id: ROUTE.kiloSessionId, title: `replay ${sequence}` } },
+        },
+        receiptId: crypto.randomUUID(),
+        sequence,
+      },
+    ];
+    const batches = [batchItems(1), batchItems(2), batchItems(3), batchItems(4)];
+
+    const firstForward = deferred<{
+      outcomes: Array<{ receiptId: string; status: 'applied' }>;
+    }>();
+    const outcomesFor = (items: Array<{ receiptId: string }>) => ({
+      outcomes: items.map(item => ({ receiptId: item.receiptId, status: 'applied' as const })),
+    });
+    h.session.receiveSandboxControlEventBatch
+      .mockReturnValueOnce(firstForward.promise)
+      .mockImplementation(async ({ items }: { items: Array<{ receiptId: string }> }) =>
+        outcomesFor(items)
+      );
+
+    const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      // Four frames for the same session: the first is held in flight and the
+      // other three queue behind it in the forwarding chain.
+      const pending = batches.map(batch => h.hooks.onSessionEventBatch?.({ items: batch }, first));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledTimes(1);
+
+      // The fence changes before any replacement handshake, so all four frames
+      // are retained while the automatic replay has no current connection.
+      h.replaceConnection({ ...first, connectionId: crypto.randomUUID() });
+      firstForward.resolve(outcomesFor(batches[0]));
+      await Promise.all(pending);
+      await h.flush();
+
+      // A handshake replays the retained frames. The fence changes again before
+      // the head frame's replay settles, so that single in-flight attempt is
+      // abandoned; the three frames still queued behind it must survive.
+      const replacementA = { ...first, connectionId: crypto.randomUUID() };
+      h.replaceConnection(replacementA);
+      await h.hooks.onHandshakeComplete?.(replacementA);
+      await h.hooks.onReady?.(replacementA);
+      const replacementB = { ...first, connectionId: crypto.randomUUID() };
+      h.replaceConnection(replacementB);
+      await h.hooks.onHandshakeComplete?.(replacementB);
+      await h.hooks.onReady?.(replacementB);
+      await vi.advanceTimersByTimeAsync(0);
+      await h.flush();
+
+      // The three frames the first replay never reached are delivered by the
+      // next handshake's replay instead of being discarded.
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledWith({
+        items: batches[1],
+        wrapperInstanceId: first.wrapperInstanceId,
+      });
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledWith({
+        items: batches[2],
+        wrapperInstanceId: first.wrapperInstanceId,
+      });
+      expect(h.session.receiveSandboxControlEventBatch).toHaveBeenCalledWith({
+        items: batches[3],
+        wrapperInstanceId: first.wrapperInstanceId,
+      });
+      const recovered = withFields.mock.calls
+        .map(([fields]) => fields as Record<string, unknown>)
+        .filter(fields => fields.diagnosticEvent === 'forward_recovered');
+      expect(Math.max(...recovered.map(fields => Number(fields.recovered)))).toBe(3);
+    } finally {
+      withFields.mockRestore();
+    }
+  });
+
   it('retains observed versions through readiness, eviction and stop, then clears them on a new allocation', async () => {
     const h = await harness();
     const status = () => h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' });

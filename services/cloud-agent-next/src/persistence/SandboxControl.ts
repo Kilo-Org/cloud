@@ -63,6 +63,10 @@ import {
   createSessionForwarding,
   SessionForwardingError,
 } from '../sandbox-control/session-forwarding.js';
+import {
+  createSessionEventReplayQueue,
+  SESSION_EVENT_REPLAY_TTL_MS,
+} from '../sandbox-control/session-event-replay.js';
 import { errorResponse, parseOperationPayload } from '../sandbox-control/frames.js';
 import {
   generateSandboxCredential,
@@ -377,6 +381,14 @@ function sessionForwardFrameBytes(frame: unknown): number {
   return new TextEncoder().encode(JSON.stringify(frame)).byteLength;
 }
 
+function isSessionEventReplayFrame(frame: unknown): frame is SessionEventReplayFrame {
+  return (
+    typeof frame === 'object' &&
+    frame !== null &&
+    Array.isArray((frame as { items?: unknown }).items)
+  );
+}
+
 function batchOutcomes(
   payload: SandboxEventBatchPayload,
   status: SandboxEventBatchItemOutcome['status'],
@@ -415,6 +427,27 @@ export type RuntimeQuarantineResult =
   | { quarantined: true; disposition: 'native_retired' | 'native_pending' | 'physical_stopping' }
   | { quarantined: false; disposition: 'physical_stopped' | 'wrapper_replaced' | 'unconfirmed' };
 
+// A session frame retained after its forwarding fence changed. It is re-driven
+// through the existing forward chain with the connection that is current when
+// the replay runs, but with the frame's original `wrapperInstanceId` so the
+// session DO's runtime gate stays authoritative.
+type PendingSessionReplay = {
+  identity: SessionEventIdentity;
+  eventType: string;
+  frame: unknown;
+  wrapperInstanceId?: string;
+  forward: (
+    route: SessionRoute,
+    diagnostic: ControlDiagnosticFields,
+    physical: PhysicalRecord,
+    deadlineAt: number,
+    wrapperInstanceId: string | undefined,
+    connection: SandboxControlConnectionIdentity
+  ) => Promise<SandboxControlEventResult>;
+};
+
+type SessionEventReplayFrame = { items: unknown[] };
+
 export class SandboxControl extends DurableObject<Env> {
   readonly sandboxId: string;
   private socketHandler: SandboxControlSocketHandler;
@@ -425,6 +458,7 @@ export class SandboxControl extends DurableObject<Env> {
   private vercelResources: VercelSandboxResources | undefined;
   private containersInstance: CloudflareContainersInstance | undefined;
   private readonly sessionForwarding = createSessionForwarding();
+  private readonly sessionEventReplay = createSessionEventReplayQueue<PendingSessionReplay>();
   private readonly forwarding = {
     enqueued: 0,
     settled: 0,
@@ -432,6 +466,7 @@ export class SandboxControl extends DurableObject<Env> {
     inFlight: 0,
     highWater: 0,
     dropped: 0,
+    recovered: 0,
     notApplied: 0,
     failed: 0,
     bufferedBytes: 0,
@@ -3757,6 +3792,7 @@ export class SandboxControl extends DurableObject<Env> {
     this.kiloReady = false;
     this.logDiagnostic('handshake_committed', diagnosticConnection(identity));
     this.socketHandler.closeProvisionalSockets();
+    this.ctx.waitUntil(this.replayPendingSessionEvents(identity));
   }
 
   private async onWrapperReady(identity: SandboxControlConnectionIdentity): Promise<void> {
@@ -3856,6 +3892,7 @@ export class SandboxControl extends DurableObject<Env> {
       ...diagnosticConnection(identity),
       heartbeatDeadlineAt: now + DEADLINE_MS.heartbeatExpiry,
     });
+    this.ctx.waitUntil(this.replayPendingSessionEvents(identity));
   }
 
   private async onHeartbeat(
@@ -4081,18 +4118,18 @@ export class SandboxControl extends DurableObject<Env> {
       payload.type,
       connection,
       { identity, payload, ...(receiptId ? { receiptId, sequence } : {}) },
-      (route, fields, physical, deadlineAt) =>
+      (route, fields, physical, deadlineAt, wrapperInstanceId, forwardConnection) =>
         this.forwardSessionFrame(
           route,
           physical,
-          connection,
+          forwardConnection,
           fields,
           'receiveSandboxControlEvent',
           stub =>
             stub.receiveSandboxControlEvent({
               identity,
               payload,
-              wrapperInstanceId: connection.wrapperInstanceId,
+              wrapperInstanceId,
               ...(receiptId ? { receiptId, sequence } : {}),
             }),
           receiptId !== undefined,
@@ -4130,18 +4167,18 @@ export class SandboxControl extends DurableObject<Env> {
       'session.preparing',
       connection,
       { identity, payload, ...(receiptId ? { receiptId, sequence } : {}) },
-      (route, fields, physical, deadlineAt) =>
+      (route, fields, physical, deadlineAt, wrapperInstanceId, forwardConnection) =>
         this.forwardSessionFrame(
           route,
           physical,
-          connection,
+          forwardConnection,
           fields,
           'receiveSandboxControlPreparing',
           stub =>
             stub.receiveSandboxControlPreparing({
               identity,
               payload,
-              wrapperInstanceId: connection.wrapperInstanceId,
+              wrapperInstanceId,
               ...(receiptId ? { receiptId, sequence } : {}),
             }),
           receiptId !== undefined,
@@ -4178,7 +4215,6 @@ export class SandboxControl extends DurableObject<Env> {
       this.recordForwardDrop('missing_wrapper_identity', diagnostic);
       return batchOutcomes(payload, 'rejected', false);
     }
-    const wrapperInstanceId = connection.wrapperInstanceId;
     let outcomes: SandboxEventBatchItemOutcome[] | undefined;
     let attempted = false;
     await this.forwardRoutedSessionFrame(
@@ -4186,18 +4222,18 @@ export class SandboxControl extends DurableObject<Env> {
       'session.event.batch',
       connection,
       { items: payload.items },
-      (route, fields, physical, deadlineAt) =>
+      (route, fields, physical, deadlineAt, frameWrapperInstanceId, forwardConnection) =>
         this.forwardSessionFrame(
           route,
           physical,
-          connection,
+          forwardConnection,
           fields,
           'receiveSandboxControlEventBatch',
           async stub => {
             attempted = true;
             const result = await stub.receiveSandboxControlEventBatch({
               items: payload.items,
-              wrapperInstanceId,
+              wrapperInstanceId: frameWrapperInstanceId,
             });
             outcomes = result.outcomes;
             return { applied: outcomes.every(outcome => outcome.status === 'applied') };
@@ -4431,12 +4467,9 @@ export class SandboxControl extends DurableObject<Env> {
     eventType: string,
     connection: SandboxControlConnectionIdentity,
     frame: unknown,
-    forward: (
-      route: SessionRoute,
-      diagnostic: ControlDiagnosticFields,
-      physical: PhysicalRecord,
-      deadlineAt: number
-    ) => Promise<SandboxControlEventResult>
+    forward: PendingSessionReplay['forward'],
+    wrapperInstanceId: string | undefined = connection.wrapperInstanceId,
+    bufferOnDrop = true
   ): Promise<SandboxControlEventResult> {
     const diagnostic = {
       ...diagnosticConnection(connection),
@@ -4523,7 +4556,9 @@ export class SandboxControl extends DurableObject<Env> {
             route,
             { ...fields, sessionId: route.sessionId },
             physical,
-            forwardDeadlineAt
+            forwardDeadlineAt,
+            wrapperInstanceId,
+            connection
           );
         } finally {
           this.forwarding.settled++;
@@ -4542,15 +4577,78 @@ export class SandboxControl extends DurableObject<Env> {
     });
     this.ctx.waitUntil(
       next.catch(error => {
-        this.recordForwardDrop(
-          error instanceof SessionForwardingError && !error.retryable
-            ? 'forwarding_frame_rejected'
-            : 'forwarding_capacity_exhausted',
-          fields
-        );
+        if (error instanceof SessionForwardingError && !error.retryable) {
+          this.recordForwardDrop('forwarding_frame_rejected', fields);
+          if (bufferOnDrop) {
+            const retained = this.sessionEventReplay.push({
+              sessionId: admission.sessionId,
+              bytes: frameBytes,
+              expiresAt: Date.now() + SESSION_EVENT_REPLAY_TTL_MS,
+              value: { identity, eventType, frame, wrapperInstanceId, forward },
+            });
+            if (retained === 'overflow') this.recordForwardDrop('replay_overflow', fields);
+            else
+              this.ctx.waitUntil(
+                this.replayPendingSessionEvents(this.socketHandler.getConnectionIdentity())
+              );
+          }
+          return;
+        }
+        this.recordForwardDrop('forwarding_capacity_exhausted', fields);
       })
     );
     return next.catch(() => ({ applied: false, retryable: true }));
+  }
+
+  // Re-drives retained session frames through the existing forward chain once a
+  // wrapper connection is current again. One entry is shifted at a time and
+  // `bufferOnDrop` is false for a replay, so a flip-flopping fence cannot retain
+  // an entry indefinitely. A fence change mid-replay leaves the untouched tail
+  // queued for the next handshake instead of discarding it.
+  private async replayPendingSessionEvents(
+    connection: SandboxControlConnectionIdentity | null
+  ): Promise<void> {
+    if (!connection || !this.isCurrentConnection(connection)) return;
+    const now = Date.now();
+    for (const entry of this.sessionEventReplay.expire(now)) {
+      this.recordForwardDrop('replay_expired', {
+        ...diagnosticConnection(connection),
+        eventType: entry.eventType,
+      });
+    }
+    for (const sessionId of this.sessionEventReplay.sessions()) {
+      while (this.isCurrentConnection(connection)) {
+        const entry = this.sessionEventReplay.shift(sessionId, Date.now());
+        if (!entry) break;
+        if (entry.expiresAt <= Date.now()) {
+          this.recordForwardDrop('replay_expired', {
+            ...diagnosticConnection(connection),
+            eventType: entry.value.eventType,
+          });
+          continue;
+        }
+        const result = await this.forwardRoutedSessionFrame(
+          entry.value.identity,
+          entry.value.eventType,
+          connection,
+          entry.value.frame,
+          entry.value.forward,
+          entry.value.wrapperInstanceId,
+          false
+        );
+        if (result.applied !== true) continue;
+        this.forwarding.recovered += isSessionEventReplayFrame(entry.value.frame)
+          ? entry.value.frame.items.length
+          : 1;
+        this.logDiagnostic('forward_recovered', {
+          ...diagnosticConnection(connection),
+          eventType: entry.value.eventType,
+          sessionId,
+          ...this.forwarding,
+        });
+      }
+      if (!this.isCurrentConnection(connection)) return;
+    }
   }
 
   private recordForwardDrop(reason: string, fields: ControlDiagnosticFields): void {

@@ -174,8 +174,8 @@ describe('mapModelIdToVercel', () => {
       expect(mapModelIdToVercel('qwen/some-new-qwen-model')).toBe('alibaba/some-new-qwen-model');
     });
 
-    it('rewrites x-ai/ to xai/', () => {
-      expect(mapModelIdToVercel('x-ai/some-new-grok')).toBe('xai/some-new-grok');
+    it('rewrites x-ai/ to spacexai/', () => {
+      expect(mapModelIdToVercel('x-ai/some-new-grok')).toBe('spacexai/some-new-grok');
     });
 
     it('rewrites z-ai/ to zai/', () => {

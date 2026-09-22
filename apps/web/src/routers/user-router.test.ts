@@ -54,18 +54,18 @@ const mockSendDeletionSupportNotification = jest.mocked(sendAccountDeletionSuppo
 const mockPerformGdprRemoval = jest.mocked(performGdprRemoval);
 const mockAssertUserCanBeSoftDeleted = jest.mocked(assertUserCanBeSoftDeleted);
 
-const AVAILABLE_CAPABILITY = { available: true, unavailableReason: null };
+const AVAILABLE_CAPABILITY = { available: true, unavailableReasonCode: null };
 const UNAVAILABLE_BALANCE_ALERTS = {
   available: false,
-  unavailableReason: 'Join an organization to get balance alerts.',
+  unavailableReasonCode: 'organizationRequired',
 };
 const UNAVAILABLE_SECURITY_FINDINGS = {
   available: false,
-  unavailableReason: 'Enable Kilo Security Agent on a scope to get security findings.',
+  unavailableReasonCode: 'securityAgentRequired',
 };
 const UNAVAILABLE_KILOCLAW_ACTIVITY = {
   available: false,
-  unavailableReason: 'Start a KiloClaw instance to get KiloClaw activity.',
+  unavailableReasonCode: 'kiloclawInstanceRequired',
 };
 
 /** Capabilities for a user with no org, no Security config, and no KiloClaw instance. */

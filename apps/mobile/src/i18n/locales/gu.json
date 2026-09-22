@@ -843,7 +843,7 @@
       "balanceAlertsSubtitle": "સંસ્થાનું બેલેન્સ ઓછું થવાની ચેતવણીઓ",
       "balanceAlertsUnavailable": "બેલેન્સ ચેતવણીઓ મેળવવા માટે સંસ્થામાં જોડાઓ.",
       "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર",
-      "securityFindingsUnavailable": "સુરક્ષા તારણો મેળવવા માટે વ્યાપમાં Kilo સુરક્ષા એજન્ટ ચાલુ કરો.",
+      "securityFindingsUnavailable": "સુરક્ષા તારણો મેળવવા માટે એક અવકાશમાં Kilo સુરક્ષા એજન્ટ સક્ષમ કરો.",
       "spendAlertsSubtitle": "મર્યાદા ઓળંગવી અને કલાકદીઠ ઉછાળા",
       "spendAlertsToggle": "ખર્ચની ચેતવણીની શ્રેણી"
     },

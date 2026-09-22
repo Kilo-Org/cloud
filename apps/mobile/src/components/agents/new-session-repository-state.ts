@@ -1,4 +1,5 @@
 import { type RepoPlatform } from '@/lib/picker-bridge';
+import { dedupeBy } from '@/lib/query/dedupe-by-id';
 
 export type RepositoryPlatform = RepoPlatform;
 
@@ -120,16 +121,7 @@ const repositoryKey = (repository: NewSessionRepository): string =>
 export function dedupeRepositoriesByPlatformAndFullName(
   repositories: readonly NewSessionRepository[]
 ): NewSessionRepository[] {
-  const seen = new Set<string>();
-  const result: NewSessionRepository[] = [];
-  for (const repository of repositories) {
-    const key = repositoryKey(repository);
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(repository);
-    }
-  }
-  return result;
+  return dedupeBy(repositories, repositoryKey);
 }
 
 /**

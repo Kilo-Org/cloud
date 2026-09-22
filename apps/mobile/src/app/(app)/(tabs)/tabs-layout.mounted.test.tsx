@@ -1,3 +1,7 @@
+// Deliberately not `_layout.mounted.test.tsx`: expo-router's typed-route
+// generator treats any `_layout.*` file in the route tree as that group's
+// layout and skips its children, which drops every `(tabs)` route from
+// `.expo/types/router.d.ts` and makes `Href` reject `/(app)/(tabs)/...` paths.
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

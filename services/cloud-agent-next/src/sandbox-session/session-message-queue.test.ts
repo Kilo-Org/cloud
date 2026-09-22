@@ -5017,7 +5017,10 @@ describe('SandboxSession orchestration', () => {
       expect(input.acquisition).toEqual(acquisition);
       expect(input.allowCreate).toBeUndefined();
     }
-    expect(fixture.control.getStatus).not.toHaveBeenCalled();
+    // The deadline check probes the control plane for an in-flight runtime
+    // replacement before terminalizing. Absent one, it terminalizes without
+    // dispatching or quarantining.
+    expect(fixture.control.getStatus).toHaveBeenCalledWith({ sessionId: SESSION_ID });
     expect(fixture.control.request).not.toHaveBeenCalled();
     expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
   });

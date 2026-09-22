@@ -83,6 +83,14 @@ type SessionMessageLifecycle = {
   executionDeadlineAt?: number;
   cancellation?: { operationId: string; deadlineAt: number };
   /**
+   * Consecutive delivery-deadline deferrals granted while the control plane
+   * reported a runtime replacement in flight. Bounds a retirement fence that
+   * never clears so the head still reaches its terminal preparation timeout.
+   * The count resets when the head binds a replacement runtime identity: that
+   * closes the chain, so a later retirement gets its own budget.
+   */
+  replacementWaits?: number;
+  /**
    * PR gate verdict reported by a code-review turn. Present only on a completed
    * terminal record whose wrapper observed a gate result; absent otherwise.
    */
@@ -116,6 +124,15 @@ export type SessionMessageRecord = SessionMessageRecordV2 | LegacySessionMessage
 
 export const ATTACH_FAILURE_LIMIT = 2;
 export const PROMPT_FAILURE_LIMIT = 5;
+
+/**
+ * Deferral budget for a head whose preparation deadline lands while a runtime
+ * replacement is in flight. Each deferral grants a fresh delivery window, so
+ * the budget caps the wait inside one retirement cycle and leaves the existing
+ * terminal path to run when a retirement fence never clears. Binding the
+ * replacement runtime ends the cycle and starts the next budget.
+ */
+export const RUNTIME_REPLACEMENT_WAIT_LIMIT = 6;
 
 export function resolveSessionMessageIntent(
   input: ControlSessionMessageInput,

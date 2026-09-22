@@ -12,6 +12,7 @@ import { i18n } from '@/i18n';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { __resetSessionAttentionForTests } from '@/lib/session-attention';
 import { RemoteSessionRow } from './remote-session-row';
+import { showRenamePrompt, showSessionActionMenu } from './session-row-actions';
 import { StoredSessionRow } from './session-row';
 
 vi.mock('react-native', async () => {
@@ -325,6 +326,50 @@ describe('StoredSessionRow live speech', () => {
       expect(selectedId).toBe(destinationsDisabled ? null : 'stored-1');
     }
   );
+
+  const placeholderTitle = 'New session - 2026-09-21T15:44:47.176Z';
+
+  it('renders the generic untitled label for the server creation-default title', () => {
+    const renderer = mount(row({ session: { ...session, title: placeholderTitle } }));
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain(placeholderTitle);
+    const button = hosts(renderer, 'Pressable')[0];
+    expect(button?.props.accessibilityLabel).toContain('Untitled session');
+    expect(button?.props.accessibilityLabel).not.toContain('2026-09-21');
+  });
+
+  it('passes the resolved label to the rename prompt, never the placeholder', () => {
+    const renderer = mount(
+      row({
+        session: { ...session, title: placeholderTitle },
+        onRename: () => undefined,
+        onDelete: () => undefined,
+      })
+    );
+    const button = hosts(renderer, 'Pressable')[0];
+    if (!button) {
+      throw new Error('Missing row button');
+    }
+    act(() => {
+      (button.props as { onLongPress?: () => void }).onLongPress?.();
+    });
+    const options = vi.mocked(showSessionActionMenu).mock.calls[0]?.[0];
+    if (!options?.onRename) {
+      throw new Error('Missing rename action');
+    }
+    options.onRename();
+    expect(vi.mocked(showRenamePrompt)).toHaveBeenCalledWith(
+      'Untitled session',
+      expect.any(Function)
+    );
+  });
+
+  it('keeps a real title that merely starts with "New session"', () => {
+    const renderer = mount(
+      row({ session: { ...session, title: 'New session plan for the login redirect' } })
+    );
+    expect(texts(renderer)).toContain('New session plan for the login redirect');
+  });
 });
 
 describe('RemoteSessionRow live speech', () => {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import {
   getSessionDetailRenameState,
   initialRenameState,
@@ -108,6 +110,70 @@ describe('getSessionDetailRenameState', () => {
         renameState: { ...initialRenameState(), isModalOpen: true, optimisticTitle: 'Pending' },
       }).modalInitialValue
     ).toBe('Pending');
+  });
+
+  const placeholderTitle = 'New session - 2026-09-21T15:44:47.176Z';
+
+  it('replaces the server creation-default title with the fallback label', () => {
+    // The server stamps `New session - <ISO timestamp>` at creation and only
+    // replaces it after the first message. The header must never paint it.
+    const state = getSessionDetailRenameState({
+      fallbackTitle,
+      isLoaded: true,
+      serverTitle: placeholderTitle,
+      renameState: initialRenameState(),
+    });
+    expect(state.title).toBe(fallbackTitle);
+    expect(state.title).not.toContain('2026-09-21');
+  });
+
+  it('seeds the rename modal with the resolved label, never the placeholder', () => {
+    const state = getSessionDetailRenameState({
+      fallbackTitle,
+      isLoaded: true,
+      serverTitle: placeholderTitle,
+      renameState: { ...initialRenameState(), isModalOpen: true },
+    });
+    expect(state.modalInitialValue).toBe(fallbackTitle);
+    expect(state.modalInitialValue).not.toContain('2026-09-21');
+  });
+
+  it('resolves a placeholder fallback title to the generic Session label while loading', () => {
+    // The list cache can hand the detail screen a placeholder as its
+    // `cachedTitle`; the header still shows the generic label, not a
+    // timestamp, while the session record loads.
+    const state = getSessionDetailRenameState({
+      fallbackTitle: placeholderTitle,
+      isLoaded: false,
+      serverTitle: undefined,
+      renameState: initialRenameState(),
+    });
+    expect(state.title).toBe(i18n.t('agentChat.session.title'));
+    expect(state.title).toBe('Session');
+    expect(state.title).not.toContain('2026-09-21');
+  });
+
+  it('keeps an optimistic rename even when the typed title looks like a placeholder', () => {
+    // Only server-derived titles are filtered; whatever the user typed is
+    // their title.
+    const state = getSessionDetailRenameState({
+      fallbackTitle,
+      isLoaded: true,
+      serverTitle: 'Original',
+      renameState: { ...initialRenameState(), optimisticTitle: placeholderTitle },
+    });
+    expect(state.title).toBe(placeholderTitle);
+  });
+
+  it('trims a real server title before showing it', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: '  Original  ',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe('Original');
   });
 });
 

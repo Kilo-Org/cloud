@@ -25,6 +25,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { resolveSessionDisplayTitle } from '@/lib/session-title';
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
@@ -90,7 +91,10 @@ export function RemoteSessionRow({
     };
   }, [refreshScope]);
   const exitingRef = useRef(false);
-  const title = session.title.length > 0 ? session.title : t('agents.sessionRow.untitled');
+  // The server's creation-default title (`New session - <ISO timestamp>`) is
+  // an internal marker, never row copy: resolve it once here so the same
+  // label feeds the row, the accessibility label, and the rename prompt.
+  const title = resolveSessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
   const agentLabel = remoteSessionEyebrowLabel(session);

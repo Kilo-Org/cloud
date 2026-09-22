@@ -1,3 +1,6 @@
+import { i18n } from '@/i18n';
+import { resolveSessionDisplayTitle } from '@/lib/session-title';
+
 export type RenameState = {
   isModalOpen: boolean;
   optimisticTitle: string | null;
@@ -54,6 +57,13 @@ type SessionDetailRenameState = {
 /**
  * Pure helper that derives the session-detail header display state from the
  * authoritative server title and the reducer state.
+ *
+ * Both the server title and the cached fallback run through
+ * `resolveSessionDisplayTitle`, so the server's creation-default placeholder
+ * (`New session - <ISO timestamp>`) can never reach the header or seed the
+ * rename field — either would otherwise show a raw timestamp. A missing or
+ * placeholder fallback becomes the generic `Session` label. The user's
+ * `optimisticTitle` is their own input and is never filtered.
  */
 export function getSessionDetailRenameState(input: {
   fallbackTitle: string;
@@ -61,9 +71,10 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
-  const baseTitle = input.isLoaded
-    ? (input.serverTitle ?? input.fallbackTitle)
-    : input.fallbackTitle;
+  const fallbackTitle =
+    resolveSessionDisplayTitle(input.fallbackTitle) ?? i18n.t('agentChat.session.title');
+  const serverTitle = resolveSessionDisplayTitle(input.serverTitle);
+  const baseTitle = input.isLoaded ? (serverTitle ?? fallbackTitle) : fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
     title,

@@ -19,7 +19,7 @@ import {
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { modelPickerCostLabel } from '@/lib/model-cost';
-import { autoModelNameKey } from '@/lib/model-id';
+import { localizedModelName } from '@/lib/model-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ModelPickerSelection, type ModelPickerSelectionScope } from '@/lib/picker-bridge';
 import { modelPickerSlot } from '@/lib/route-registry';
@@ -82,21 +82,6 @@ function toSessionModelOption(option: ModelOption | SessionModelOption): Session
   }
 
   return { ...option, displayId: option.id, showGatewayMetadata: true };
-}
-
-/**
- * The name to render for a model. Kilo's own auto models arrive from the
- * gateway with an English product name (`Auto Efficient`), which was the one
- * English word left on the Arabic new-session screen; their names live in the
- * catalogs. Every other name is the vendor's own and stays as the gateway
- * spells it.
- */
-function localizedModelName(
-  option: Pick<SessionModelOption, 'id' | 'name' | 'modelRef'>,
-  t: (key: string) => string
-): string {
-  const key = autoModelNameKey(option.modelRef?.modelID ?? option.id);
-  return key ? t(key) : option.name;
 }
 
 export function openModelPicker(

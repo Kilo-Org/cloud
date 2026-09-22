@@ -1,4 +1,5 @@
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+import { localizedModelName } from '@/lib/model-id';
 import { i18n } from '@/i18n';
 
 export type ModelPickerRow =
@@ -123,7 +124,16 @@ export function buildModelPickerRows({
 }
 
 function searchableText(model: SessionModelOption): string {
-  return [model.name, model.displayId, model.provider?.name, model.provider?.id]
+  return [
+    model.name,
+    // The row renders `localizedModelName`, so an auto model's translated name
+    // (`Auto Efficiente`) must be searchable too; matching only the gateway's
+    // English spelling answered "No matches" for the name the user could see.
+    localizedModelName(model, key => i18n.t(key)),
+    model.displayId,
+    model.provider?.name,
+    model.provider?.id,
+  ]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();

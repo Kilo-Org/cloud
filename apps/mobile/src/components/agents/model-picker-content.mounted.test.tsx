@@ -1,9 +1,9 @@
 /* eslint-disable max-lines -- The picker's search, empty-state and bottom-inset contracts share one mount harness. */
 import { createElement, Fragment, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type ModelPickerRow } from '@/lib/model-picker-rows';
 import { type ModelPickerBridge } from '@/lib/picker-bridge';
@@ -242,6 +242,38 @@ describe('ModelPickerContent deferred search', () => {
     slotState.bridge = makeBridge();
     safeAreaInsets.bottom = 0;
     routerBack.mockClear();
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('finds an auto model by the translated name its row renders', async () => {
+    // The row shows the catalog's name for a Kilo auto model, so the query a
+    // user types is the translated one. The picker must match it, not answer
+    // "No matches" for the name it drew.
+    const autoModel: SessionModelOption = {
+      id: 'kilo-auto/efficient',
+      name: 'Auto Efficient',
+      displayId: 'kilo-auto/efficient',
+      variants: [],
+      isPreferred: true,
+      showGatewayMetadata: true,
+    };
+    slotState.bridge = { ...makeBridge(), options: [autoModel] };
+    await i18n.changeLanguage('it');
+    const renderer = await mount();
+
+    await act(async () => {
+      typeSearch(renderer, 'Efficiente');
+      await Promise.resolve();
+    });
+
+    expect(listedDisplayIds(renderer)).toEqual(['kilo-auto/efficient']);
+
+    act(() => {
+      renderer.unmount();
+    });
   });
 
   it('holds the rows while typing and commits only the settled query', async () => {

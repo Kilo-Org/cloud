@@ -47,6 +47,24 @@ export function autoModelNameKey(modelId: string | null | undefined): string | u
   return modelId ? lookup(AUTO_MODEL_NAME_KEYS, modelId) : undefined;
 }
 
+/**
+ * The name to render for a model. Kilo's own auto models arrive from the
+ * gateway with an English product name (`Auto Efficient`) and their names live
+ * in the catalogs; every other name is the vendor's own and stays as the
+ * gateway spells it.
+ *
+ * Shared with the model picker's search so the name a row renders is also a
+ * name a query matches — the row shows `Auto Efficiente` in Italian, and
+ * searching for it must not answer "No matches".
+ */
+export function localizedModelName(
+  option: { id: string; name: string; modelRef?: { modelID: string } | null },
+  t: (key: string) => string
+): string {
+  const key = autoModelNameKey(option.modelRef?.modelID ?? option.id);
+  return key ? t(key) : option.name;
+}
+
 export function formatModelName(strippedId: string): string {
   return lookup(AUTO_MODEL_LABELS, strippedId) ?? strippedId;
 }

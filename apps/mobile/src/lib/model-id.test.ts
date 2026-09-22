@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { autoModelNameKey, formatModelName, stripModelPrefix } from './model-id';
+import {
+  autoModelNameKey,
+  formatModelName,
+  localizedModelName,
+  stripModelPrefix,
+} from './model-id';
 
 describe('autoModelNameKey', () => {
   it('names a catalog key for every Kilo auto tier the gateway exposes', () => {
@@ -17,6 +22,35 @@ describe('autoModelNameKey', () => {
     expect(autoModelNameKey('')).toBeUndefined();
     expect(autoModelNameKey(null)).toBeUndefined();
     expect(autoModelNameKey(undefined)).toBeUndefined();
+  });
+});
+
+/** Stands in for the i18n `t`: the key is echoed so a resolution is visible. */
+function t(key: string): string {
+  return key;
+}
+
+describe('localizedModelName', () => {
+  it('resolves a Kilo auto model through the catalogs, by id or model ref', () => {
+    expect(localizedModelName({ id: 'kilo-auto/efficient', name: 'Auto Efficient' }, t)).toBe(
+      'common.autoModelEfficient'
+    );
+    expect(
+      localizedModelName(
+        {
+          id: 'remote-model-0',
+          name: 'Auto Efficient',
+          modelRef: { modelID: 'kilo-auto/efficient' },
+        },
+        t
+      )
+    ).toBe('common.autoModelEfficient');
+  });
+
+  it('keeps the gateway name for a vendor model', () => {
+    expect(
+      localizedModelName({ id: 'deepseek/deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash' }, t)
+    ).toBe('DeepSeek V4.1 Flash');
   });
 });
 

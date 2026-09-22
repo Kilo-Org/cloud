@@ -113,6 +113,32 @@ describe('buildModelPickerRows', () => {
     ]);
   });
 
+  it('matches an auto model by the translated name its row renders', async () => {
+    // The row renders `common.autoModelEfficient` ("Auto Efficiente" in
+    // Italian) instead of the gateway's English "Auto Efficient", so the
+    // search must match the translated name the user can see.
+    await i18n.changeLanguage('it');
+    const autoEfficient: SessionModelOption = {
+      id: 'kilo-auto/efficient',
+      name: 'Auto Efficient',
+      displayId: 'kilo-auto/efficient',
+      variants: [],
+      isPreferred: true,
+      showGatewayMetadata: true,
+    };
+
+    const rows = buildModelPickerRows({
+      models: [autoEfficient],
+      search: 'Efficiente',
+      favoriteIds: noFavorites,
+    });
+
+    expect(rows).toEqual([
+      { key: 'recommended', title: i18n.t('common.recommended'), type: 'header' },
+      { key: 'model:kilo-auto/efficient', model: autoEfficient, isFavorite: false, type: 'model' },
+    ]);
+  });
+
   it('pulls a favorited model into its own FAVORITES group ahead of everything else', () => {
     const favoriteIds = new Set(['openai/gpt-5']);
     expect(buildModelPickerRows({ models: gatewayModels, search: '', favoriteIds })).toEqual([

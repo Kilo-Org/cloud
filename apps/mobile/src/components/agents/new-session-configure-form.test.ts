@@ -124,18 +124,22 @@ vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
-// The loading profile row renders the reanimated `Skeleton`; stub it so this
-// node suite neither loads reanimated nor loses the `findElementByType`
-// assertion for the loading placeholder.
+// The environment row and the loading profile row both render the reanimated
+// `Skeleton`; the real Skeleton pulls in react-native-reanimated (and
+// react-native-worklets), whose extensionless ESM imports do not load in this
+// node-only project. Stub it so this node suite neither loads reanimated nor
+// loses the `findElementByType` assertion for the loading placeholder; the pure
+// test only needs the element type, as new-session-profile-row.mounted.test.tsx does.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 // The profile row and the environment row both render a loading `Skeleton`,
-// whose module imports `react-native-reanimated`: this pure suite does not set
-// Reanimated up, and this project runs in plain Node, where the
-// Reanimated/worklets native entry cannot resolve (the published worklets
-// build uses bundler-style extensionless imports). The stub is the type the
-// pending-environment case asserts by name; its own rendering is not under test
-// here.
+// whose module imports `react-native-reanimated`: Reanimated's worklets entry
+// is unavailable in the pure project, so the skeleton leaf that reaches it is
+// stubbed as the other pure suites do. This suite does not set Reanimated up,
+// and this project runs in plain Node, where the Reanimated/worklets native
+// entry cannot resolve (the published worklets build uses bundler-style
+// extensionless imports). The stub is the type the pending-environment case
+// asserts by name; its own rendering is not under test here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/segmented-control', () => ({
@@ -827,7 +831,7 @@ describe('NewSessionConfigureForm', () => {
   });
 
   // ── Case 12: kilo remote hint ──
-  it('names both `kilo remote` and `/remote` for cloud and remote targets', async () => {
+  it('names both kilo remote and /remote, with no literal markdown, for cloud and remote targets', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention

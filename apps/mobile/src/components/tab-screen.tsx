@@ -1,22 +1,19 @@
 import { type Ref } from 'react';
-import {
-  Platform,
-  ScrollView,
-  type ScrollViewProps,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScrollView, type ScrollViewProps, View } from 'react-native';
 
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
-/** The tab bar's rendered height for the current platform, insets and font scale. */
+/**
+ * The tab bar's rendered height for this screen's clearance:
+ * `useEffectiveTabBarHeight` supplies the tabs layout's label decision, the
+ * safe-area bottom inset and the platform, so the clearance cannot drift from
+ * the rendered bar height. Shared by the scroll viewport and by
+ * `useTabBarBottomPadding`.
+ */
 function useTabBarHeight() {
-  const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
-  return getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale });
+  return useEffectiveTabBarHeight();
 }
 
 // FlatList/FlashList screens use this directly for contentContainerStyle.paddingBottom.

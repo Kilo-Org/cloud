@@ -14,6 +14,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
 import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { SESSION_ROW_PITCH } from '@/lib/agents-bottom-chrome';
 import { type BannerState } from '@/lib/offline-banner-state';
 
 type Org = { organizationId: string; organizationName: string };
@@ -261,6 +262,9 @@ function root() {
 function nodes(type: string) {
   return root().findAll(node => typeof node.type === 'string' && node.type === type);
 }
+function nodesIn(instance: TestRenderer.ReactTestInstance, type: string) {
+  return instance.findAll(node => typeof node.type === 'string' && node.type === type);
+}
 function header() {
   return root().findByType(ScreenHeader);
 }
@@ -352,6 +356,20 @@ function foreground() {
   for (const listener of state.listeners) {
     listener('active');
   }
+}
+// The body wrapper carries the only `onLayout` in the screen; drive it to
+// simulate the measured viewport. Before the fix no body View had one, so this
+// throws 'Missing body wrapper' — the repro for finding 1.
+function layoutBody(height: number) {
+  const wrapper = nodes('View').find(node => typeof node.props.onLayout === 'function');
+  if (!wrapper) {
+    throw new Error('Missing body wrapper');
+  }
+  act(() => {
+    (wrapper.props.onLayout as (event: { nativeEvent: { layout: { height: number } } }) => void)({
+      nativeEvent: { layout: { height } },
+    });
+  });
 }
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -449,6 +467,11 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(listSkeletons()).toHaveLength(test.skeleton ? 8 : 0);
     if (test.skeleton) {
       expect(listSkeletons()[0]?.props.className).toContain('h-[76px]');
+      // The skeleton pitch the screen renders (h-[76px] inside a py-1.5 row,
+      // i.e. 76 + 12) must equal the pitch the clamp reserves, so the first
+      // skeleton row also fits the clamped viewport.
+      expect(listSkeletons()[0]?.parent?.props.className).toContain('py-1.5');
+      expect(SESSION_ROW_PITCH).toBe(76 + 12);
     }
     expect(text().includes('Nothing running right now')).toBe(Boolean(test.empty));
     // With cached rows on screen, a retryable failure is a refresh failure and
@@ -1016,7 +1039,36 @@ describe('AgentSessionListScreen live presentation', () => {
     // park under the bar (and a content inset only cleared the row under the
     // button once the user scrolled).
     const listStyle = () => nodes('FlatList')[0]?.props.style as Record<string, number>;
+    const contentStyle = () =>
+      nodes('FlatList')[0]?.props.contentContainerStyle as Record<string, number>;
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight + 64 });
+    // Before the first layout the whole band sits on the frame, exactly as it
+    // did before the short-window clamp: nothing is handed to the content.
+    expect(contentStyle().paddingBottom).toBe(0);
+  });
+
+  it('clamps the short-window frame to one row pitch and hands the rest to the content', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const fullBand = state.tabBarHeight + 64;
+    const listStyle = () => nodes('FlatList')[0]?.props.style as Record<string, number>;
+    const contentStyle = () =>
+      nodes('FlatList')[0]?.props.contentContainerStyle as Record<string, number>;
+
+    // A 180dp body leaves the frame only `180 - SESSION_ROW_PITCH`, so the
+    // first row fits whole at rest; the yielded band rides on the content so
+    // the last row can still be scrolled clear of the button.
+    layoutBody(180);
+    expect(listStyle()).toEqual({ marginBottom: 180 - SESSION_ROW_PITCH });
+    expect(contentStyle().paddingBottom).toBe(fullBand - (180 - SESSION_ROW_PITCH));
+    const frameInset = listStyle().marginBottom ?? 0;
+    const contentInset = contentStyle().paddingBottom ?? 0;
+    expect(frameInset + contentInset).toBe(fullBand);
+
+    // A tall window restores the whole band on the frame and clears the content.
+    layoutBody(900);
+    expect(listStyle()).toEqual({ marginBottom: fullBand });
+    expect(contentStyle().paddingBottom).toBe(0);
   });
 
   it('renders no history list, animated wrappers, or active-now section and keeps one history label without a plus icon', async () => {
@@ -1384,7 +1436,15 @@ describe('AgentSessionListScreen live filtering', () => {
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
         tree.children.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
-      ).toEqual(['View', 'SessionListSearchHeader', 'View', 'FlatList']);
+      ).toEqual(['View', 'SessionListSearchHeader', 'View', 'View']);
+      // The fourth child is the measured body wrapper, and its only child is
+      // the rows list.
+      const wrapper = nodes('View').find(node => typeof node.props.onLayout === 'function');
+      if (!wrapper) {
+        throw new Error('Missing body wrapper');
+      }
+      expect(wrapper.children).toHaveLength(1);
+      expect(nodesIn(wrapper, 'FlatList')).toHaveLength(1);
     }
   });
 

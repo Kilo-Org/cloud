@@ -14,6 +14,7 @@ import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
+import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
@@ -206,45 +207,12 @@ export function AgentSessionListScreen() {
     [navigateToSession, organizationId]
   );
 
-  // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
-  // content must clear them. The inset rides on the list's frame as a
-  // `marginBottom` (the viewport ends above the band) — the same viewport inset
-  // `TabScreenScrollView` uses — never on the list's content and never as
-  // `style` padding: a content inset only cleared the end of the list, so every
-  // row the user scrolled into the button's band had its right-aligned
-  // timestamp and chevron covered, and a scroll view's padding is not part of
-  // its scrollable content on iOS, so padding on the frame clipped the last
-  // rows under the bar with no way to scroll them clear. The vertical value
-  // matches the screen's `StateSurfaceInsets`. The landscape side insets keep
-  // row text clear of the sensor housing; portrait insets are 0, keeping the
-  // geometry unchanged.
-  const listInsets = useMemo(
-    () => ({
-      frame: { marginBottom: showFab ? tabBarHeight + FAB_SIZE + FAB_MARGIN : tabBarHeight },
-      content: { paddingTop: 0, paddingBottom: 0, paddingLeft: left, paddingRight: right },
-    }),
-    [showFab, tabBarHeight, left, right]
-  );
-
-  // The fixed 20pt margin gains the landscape right inset so the FAB clears the
-  // sensor area; portrait insets are 0, keeping the geometry unchanged.
-  const fabStyle = useMemo(
-    () => ({
-      bottom: tabBarHeight + FAB_MARGIN,
-      right: 20 + right,
-      width: FAB_SIZE,
-      height: FAB_SIZE,
-    }),
-    [tabBarHeight, right]
-  );
-
-  // The fixed 22px margins on the skeleton rows and the status wrapper gain
-  // the landscape side insets so they clear the sensor housing too; portrait
-  // insets are 0, keeping the geometry unchanged.
-  const sidePadding = useMemo(
-    () => ({ paddingLeft: 22 + left, paddingRight: 22 + right }),
-    [left, right]
-  );
+  const { onBodyLayout, listInsets, fabStyle, sidePadding } = useAgentsListChrome({
+    tabBarHeight,
+    showFab,
+    left,
+    right,
+  });
 
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
@@ -360,7 +328,15 @@ export function AgentSessionListScreen() {
             refreshControl={refreshControl}
           />
         </View>
-        {body}
+        {body ? (
+          // A `flex-1` child of the screen's column, so its height does not
+          // depend on the reserve the list carries (no measure loop). The
+          // centered error body owns its own surface, so the wrapper is mounted
+          // only for the bodies that need the measured viewport.
+          <View className="flex-1" onLayout={onBodyLayout}>
+            {body}
+          </View>
+        ) : null}
         {/* Empty content owns its creation action; other admitted states keep the FAB. */}
         {showFab && (
           <Pressable

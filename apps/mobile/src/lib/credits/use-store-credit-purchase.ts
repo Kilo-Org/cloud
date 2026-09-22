@@ -15,11 +15,10 @@ import { type StoreCreditProduct } from './store-products';
  * its own (`credits.purchaseOwnedByAnotherAccount*`), owned by the screen slice.
  */
 export const CREDIT_PURCHASE_FAILED_KEY = 'kiloPass.purchaseFailed';
-export const CREDIT_PURCHASE_DIFFERENT_ACCOUNT_KEY = 'kiloPass.purchaseDifferentAccount';
-export const CREDIT_PURCHASE_DIFFERENT_ACCOUNT_PLAY_KEY = 'kiloPass.purchaseDifferentAccountPlay';
-export const CREDIT_PURCHASE_MISSING_SIGNED_TRANSACTION_KEY =
-  'kiloPass.purchaseMissingSignedTransaction';
-export const CREDIT_PURCHASE_MISSING_PURCHASE_TOKEN_KEY = 'kiloPass.purchaseMissingPurchaseToken';
+const CREDIT_PURCHASE_DIFFERENT_ACCOUNT_KEY = 'kiloPass.purchaseDifferentAccount';
+const CREDIT_PURCHASE_DIFFERENT_ACCOUNT_PLAY_KEY = 'kiloPass.purchaseDifferentAccountPlay';
+const CREDIT_PURCHASE_MISSING_SIGNED_TRANSACTION_KEY = 'kiloPass.purchaseMissingSignedTransaction';
+const CREDIT_PURCHASE_MISSING_PURCHASE_TOKEN_KEY = 'kiloPass.purchaseMissingPurchaseToken';
 export const CREDIT_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_KEY = 'credits.purchaseOwnedByAnotherAccount';
 export const CREDIT_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_PLAY_KEY =
   'credits.purchaseOwnedByAnotherAccountPlay';

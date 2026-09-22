@@ -65,6 +65,12 @@ export type CreditNativeIapContextValue = {
   completingProductId: string | null;
   /** Catalog key of the last purchase error, or null. The screen translates it. */
   errorMessageKey: string | null;
+  /**
+   * Increments once per purchase the backend granted, so a screen can announce
+   * the credit without guessing success from the in-flight state (a cancelled
+   * purchase releases the request with no error key).
+   */
+  completedPurchaseCount: number;
   clearError: () => void;
 };
 
@@ -92,6 +98,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [completingProductId, setCompletingProductId] = useState<string | null>(null);
   const [errorMessageKey, setErrorMessageKey] = useState<string | null>(null);
+  const [completedPurchaseCount, setCompletedPurchaseCount] = useState(0);
   const clearError = useCallback(() => {
     setErrorMessageKey(null);
   }, []);
@@ -185,6 +192,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         invalidateAfterCompletion,
         onPurchaseCompleted: () => {
           setErrorMessageKey(null);
+          setCompletedPurchaseCount(count => count + 1);
         },
         showError,
       }),
@@ -293,9 +301,17 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
       purchase: startPurchase,
       completingProductId,
       errorMessageKey,
+      completedPurchaseCount,
       clearError,
     }),
-    [clearError, completingProductId, connected, errorMessageKey, startPurchase]
+    [
+      clearError,
+      completedPurchaseCount,
+      completingProductId,
+      connected,
+      errorMessageKey,
+      startPurchase,
+    ]
   );
 
   return createElement(CreditNativeIapContext.Provider, { value }, children);

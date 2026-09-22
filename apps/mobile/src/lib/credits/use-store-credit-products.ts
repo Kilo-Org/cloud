@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useTRPC } from '@/lib/trpc';
-import { getStoreCreditProductsState, type StoreCreditProductListing } from './store-products';
+import {
+  getStoreCreditProductsState,
+  type StoreCreditProduct,
+  type StoreCreditProductListing,
+} from './store-products';
 import {
   getAuthoredProductsErrorMessageKey,
   loadStoreCreditProducts,
@@ -71,6 +75,14 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
     staleTime: STORE_CREDIT_PRODUCTS_STALE_TIME_MS,
   });
 
+  // The backend catalog on its own, so a store that failed to answer still has
+  // the pack amounts to render. The loader reads the same query through the
+  // cache, so this is a subscription, not a second fetch.
+  const backendProductsQuery = useQuery({
+    ...trpc.credits.getMobileStoreProducts.queryOptions(),
+    enabled: isIapPlatform && userId != null,
+  });
+
   const { refetch: refetchProducts } = productsQuery;
   const refetch = useCallback(async () => {
     setStoreErrorMessage(null);
@@ -93,15 +105,46 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
     queryErrorMessage,
   });
 
+  // The backend catalog answered with nothing to sell. That is the empty
+  // state, not a store failure: the store is never asked for a price when the
+  // catalog is empty, so its absence of prices must not read as unavailable.
+  const catalogEmpty =
+    backendProductsQuery.isSuccess && backendProductsQuery.data.products.length === 0;
+  // A failed backend catalog fetch surfaces the same retryable banner as a
+  // failed store fetch, so a network failure never reads as "nothing for sale".
+  const storeUnavailable =
+    !catalogEmpty && (productsState.storeUnavailable || backendProductsQuery.isError);
+
+  // A store failure must not blank the rows: keep the backend packs with no
+  // store price, so the amounts stay on screen and each row shows the
+  // price-unavailable note instead of disappearing.
+  const unpricedBackendProducts = useMemo<StoreCreditProduct[]>(
+    () =>
+      (backendProductsQuery.data?.products ?? []).map(backend => ({
+        backend,
+        storeProductId: null,
+        displayPrice: null,
+      })),
+    [backendProductsQuery.data]
+  );
+  let products = productsState.products;
+  if (products.length === 0 && storeUnavailable) {
+    products = unpricedBackendProducts;
+  }
+
   return {
-    products: productsState.products,
+    products,
     isLoading:
       storeErrorMessage === null &&
       (productsQuery.isLoading || (isIapPlatform && !options.connected)),
     isRefetching: productsQuery.isRefetching,
     isError: productsState.isError,
-    errorMessageKey: productsState.errorMessageKey,
-    storeUnavailable: productsState.storeUnavailable,
+    errorMessageKey:
+      productsState.errorMessageKey ??
+      // The loader authored no key because the failure was the backend catalog
+      // itself, not the store; say so instead of blaming the store.
+      (backendProductsQuery.isError ? 'common.somethingWentWrong' : null),
+    storeUnavailable,
     refetch,
   };
 }

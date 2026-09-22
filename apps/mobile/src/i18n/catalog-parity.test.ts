@@ -29,8 +29,22 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  *
  * The notifications.category.*Unavailable reasons below landed in all 86
  * catalogs, so nothing is pending translation today.
+ *
+ * The `credits.*` keys are the Buy credits screen copy. English is written
+ * first and the translation slice lands them in every catalog next.
  */
-const PENDING_TRANSLATION_KEYS = new Set<string>();
+const PENDING_TRANSLATION_KEYS = new Set<string>([
+  'credits.title',
+  'credits.description',
+  'credits.packLabel',
+  'credits.priceUnavailable',
+  'credits.purchased',
+  'credits.empty',
+  'credits.noMatchingProducts',
+  'credits.noMatchingProductsPlay',
+  'credits.purchaseOwnedByAnotherAccount',
+  'credits.purchaseOwnedByAnotherAccountPlay',
+]);
 
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {

@@ -583,7 +583,6 @@
     "reviewPullRequest": "Diniho ny fangatahana fampiraisana",
     "headLine": "{{counts}} · firaketana farany {{sha}}",
     "entry": {
-      "eyebrow": "Sokafy ny fangatahana fampiraisana amin'ny URL",
       "pastePrLink": "Apetaho ny rohy fangatahana fampiraisana",
       "noRecentPrs": "Tsy misy fandinihana vao haingana",
       "noRecentPrsDescription": "Apetaho ny rohy ambony mba hanombohana fandinihana — hita eto izy amin'ny manaraka.",

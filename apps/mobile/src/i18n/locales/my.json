@@ -583,7 +583,6 @@
     "reviewPullRequest": "PR ကို သုံးသပ်ပါ",
     "headLine": "{{counts}} · နောက်ဆုံးကွန်မစ် {{sha}}",
     "entry": {
-      "eyebrow": "URL ဖြင့် PR သို့မဟုတ် merge request ကို ဖွင့်ပါ",
       "pastePrLink": "PR သို့မဟုတ် merge request လင့်ခ်ကို ကူးထည့်ပါ",
       "noRecentPrs": "မကြာသေးမီက သုံးသပ်ချက်များ မရှိပါ",
       "noRecentPrsDescription": "သုံးသပ်မှုစရန် အပေါ်တွင် လင့်ခ်ကို ကူးထည့်ပါ — နောက်တစ်ကြိမ်တွင် ဤနေရာ၌ ပေါ်လာမည်။",

@@ -594,7 +594,6 @@
     "reviewPullRequest": "Pregledaj zahtjev za spajanje",
     "headLine": "{{counts}} · najnovija revizija {{sha}}",
     "entry": {
-      "eyebrow": "Otvori zahtjev za spajanje ili merge request putem URL-a",
       "pastePrLink": "Zalijepi povezanicu na zahtjev za spajanje ili merge request",
       "noRecentPrs": "Nema nedavnih pregleda",
       "noRecentPrsDescription": "Da započnete pregled, zalijepite povezanicu gore — sljedeći put će se pojaviti ovdje.",

@@ -605,7 +605,6 @@
     "reviewPullRequest": "Peržiūrėti pakeitimų užklausą",
     "headLine": "{{counts}} · naujausias įrašas {{sha}}",
     "entry": {
-      "eyebrow": "Atidaryk pakeitimų užklausą arba merge request pagal URL",
       "pastePrLink": "Įklijuoti pakeitimų užklausos arba merge request nuorodą",
       "noRecentPrs": "Nėra nesenių peržiūrų",
       "noRecentPrsDescription": "Įklijuok nuorodą viršuje ir pradėk peržiūrą — kitą kartą ji bus rodoma čia.",

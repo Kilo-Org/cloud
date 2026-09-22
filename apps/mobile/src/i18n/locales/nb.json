@@ -583,7 +583,6 @@
     "reviewPullRequest": "Gå gjennom PR-en",
     "headLine": "{{counts}} · siste commit {{sha}}",
     "entry": {
-      "eyebrow": "Åpne en PR eller merge request med en URL",
       "pastePrLink": "Lim inn en PR- eller merge request-lenke",
       "noRecentPrs": "Ingen nylige gjennomganger",
       "noRecentPrsDescription": "Lim inn en lenke ovenfor for å starte en kodegjennomgang — den vises her neste gang.",

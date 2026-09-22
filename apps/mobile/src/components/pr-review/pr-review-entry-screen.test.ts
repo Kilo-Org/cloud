@@ -20,6 +20,7 @@ import {
   renderLoaded,
   resetHookSlots,
   seedRecents,
+  textValues,
 } from './pr-review-entry-screen-test-utils';
 
 // The field draws the visible placeholder with the same one-line overlay on
@@ -185,5 +186,29 @@ describe('provider-neutral URL field', () => {
     (propsOf(input).onChangeText as (value: string) => void)('anything');
     const after = render();
     expect(find(after, 'Pressable', p => p.accessibilityLabel === 'Clear link')).toBeTruthy();
+  });
+
+  it('keeps the header title but drops the duplicated eyebrow instruction', async () => {
+    const tree = await renderLoaded();
+    const header = find(tree, 'ScreenHeader', () => true);
+    // Finding: the eyebrow rendered as letter-spaced chrome caps directly above
+    // the title, repeating the field's own "Paste a pull request or merge
+    // request link" caption. The header keeps its context title; the
+    // instruction is stated once, by the field's caption and placeholder.
+    expect(header.props?.eyebrow).toBeUndefined();
+    expect(JSON.stringify(header.props)).not.toContain(
+      'Open a pull request or merge request by URL'
+    );
+    expect(header.props?.title).toBe('PR Review');
+    // No text node anywhere carries the dropped instruction.
+    expect(
+      textValues(tree).some(value => value.includes('Open a pull request or merge request by URL'))
+    ).toBe(false);
+    // The field's caption and placeholder still render.
+    expect(textValues(tree)).toContain('Paste a pull request or merge request link');
+    const input = find(tree, 'TextInput', () => true);
+    expect(input.props?.placeholder).toBe('Pull request or merge request URL');
+    // The prop cannot come back without the copy key returning to en.json.
+    expect(ENTRY_SCREEN_SOURCE).not.toContain('prReview.entry.eyebrow');
   });
 });

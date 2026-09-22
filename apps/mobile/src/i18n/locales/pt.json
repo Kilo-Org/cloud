@@ -594,7 +594,6 @@
     "reviewPullRequest": "Rever PR",
     "headLine": "{{counts}} · commit mais recente: {{sha}}",
     "entry": {
-      "eyebrow": "Abre um PR ou um merge request através do URL",
       "pastePrLink": "Colar uma ligação de PR ou de merge request",
       "noRecentPrs": "Sem revisões recentes",
       "noRecentPrsDescription": "Cola uma ligação acima para iniciar uma revisão — aparecerá aqui na próxima vez.",

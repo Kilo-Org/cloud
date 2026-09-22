@@ -583,7 +583,6 @@
     "reviewPullRequest": "Birləşdirmə sorğusunu nəzərdən keçir",
     "headLine": "{{counts}} · son kommit: {{sha}}",
     "entry": {
-      "eyebrow": "Birləşdirmə sorğusunu və ya merge sorğusunu URL ilə aç",
       "pastePrLink": "Birləşdirmə sorğusu və ya merge sorğusu keçidini yapışdır",
       "noRecentPrs": "Son baxış yoxdur",
       "noRecentPrsDescription": "Kod baxışına başlamaq üçün yuxarıya keçid yapışdır — növbəti dəfə burada görünəcək.",

@@ -2603,7 +2603,6 @@
       "moreLinesAbove_other": "… 위에 {{displayCount}}줄이 더 있습니다."
     },
     "entry": {
-      "eyebrow": "URL로 풀 리퀘스트 또는 머지 요청 열기",
       "pastePrLink": "풀 리퀘스트 또는 머지 요청 링크 붙여넣기",
       "noRecentPrs": "최근 리뷰 없음",
       "noRecentPrsDescription": "위에 링크를 붙여넣어 리뷰를 시작하세요. 다음부터는 여기에 표시됩니다.",

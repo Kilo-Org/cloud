@@ -583,7 +583,6 @@
     "reviewPullRequest": "PRni ko'rib chiqish",
     "headLine": "{{counts}} · oxirgi kommit: {{sha}}",
     "entry": {
-      "eyebrow": "PR yoki merge so‘rovini URL orqali oching",
       "pastePrLink": "PR yoki merge so‘rovi havolasini joylashtirish",
       "noRecentPrs": "Oxirgi ko‘rib chiqishlar yo‘q",
       "noRecentPrsDescription": "Ko‘rib chiqishni boshlash uchun yuqoriga havolani joylashtiring — keyingi safar u shu yerda ko‘rinadi.",

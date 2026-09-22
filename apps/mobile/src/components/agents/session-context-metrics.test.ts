@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import { SessionContextMetrics } from './session-context-metrics';
+import { findAll } from './session-context-metrics-test-helpers';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -26,35 +27,6 @@ function render(props: React.ComponentProps<typeof SessionContextMetrics>): Reac
   return SessionContextMetrics(props) as React.ReactElement;
 }
 
-function findAll(
-  node: unknown,
-  predicate: (el: React.ReactElement) => boolean
-): React.ReactElement[] {
-  const matches: React.ReactElement[] = [];
-
-  function walk(value: unknown): void {
-    if (value == null || typeof value === 'string' || typeof value === 'number') {
-      return;
-    }
-    if (Array.isArray(value)) {
-      for (const child of value) {
-        walk(child);
-      }
-      return;
-    }
-    if (React.isValidElement(value)) {
-      if (predicate(value)) {
-        matches.push(value);
-      }
-      const props = value.props as { children?: unknown };
-      walk(props.children);
-    }
-  }
-
-  walk(node);
-  return matches;
-}
-
 const PILL_LAYOUT_TOKENS = [
   'h-[44px]',
   'flex-row',
@@ -65,6 +37,11 @@ const PILL_LAYOUT_TOKENS = [
   'border-border',
   'bg-secondary',
   'px-3',
+  // The header row hands the trailing cluster a capped 50% box, but RN's
+  // default flexShrink is 0. Without these the pill keeps its natural width
+  // and paints past the row's right edge instead of compressing.
+  'shrink',
+  'min-w-0',
 ] as const;
 
 function expectHiddenReservedBox(root: React.ReactElement): void {
@@ -299,6 +276,43 @@ describe('SessionContextMetrics', () => {
     expect(className).not.toContain('opacity-0');
     const label = (root.props as { accessibilityLabel?: string }).accessibilityLabel ?? '';
     expect(label).not.toContain('Tap to view');
+  });
+
+  // The header row hands the trailing cluster a capped 50% box, but RN's
+  // default flexShrink is 0, so the pill must opt in to shrinking and let its
+  // inner text row compress. Otherwise the pill keeps its natural width and
+  // paints past the row's right edge — off-screen on a narrow phone.
+  it('lets the pill and its text row compress inside a constrained header row', () => {
+    const root = render({
+      hasMessages: true,
+      info: info(),
+      totalCostMicrodollars: 150_000,
+      onPress: vi.fn(() => undefined),
+    });
+    const textRow = findAll(
+      root,
+      el =>
+        el.type === 'View' &&
+        ((el.props as { className?: string }).className ?? '').includes('items-baseline')
+    )[0];
+    expect(textRow).toBeDefined();
+    if (textRow == null) {
+      throw new Error('expected the inner text row');
+    }
+    const textRowClassName = (textRow.props as { className?: string }).className ?? '';
+    expect(textRowClassName).toContain('min-w-0');
+    expect(textRowClassName).toContain('shrink');
+    const texts = findAll(root, el => el.type === 'Text');
+    expect(texts.length).toBeGreaterThan(0);
+    for (const text of texts) {
+      // The row shrinks, but the texts inside it keep RN's default
+      // flexShrink: 0 unless they opt in too, so a squeezed row can never
+      // compress them and the second text paints past the pill's right edge.
+      const textClassName = (text.props as { className?: string }).className ?? '';
+      expect(textClassName).toContain('shrink');
+      expect(textClassName).toContain('min-w-0');
+      expect((text.props as { numberOfLines?: number }).numberOfLines).toBe(1);
+    }
   });
 
   it('messages with neither info nor cost show a visible track-only ring', () => {

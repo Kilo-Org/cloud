@@ -34,19 +34,33 @@ vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
-  Platform: { OS: 'ios' },
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
 }));
-// The screen renders the shared keyboard-lift view, which reads the safe-area
-// inset. The mounted project cannot load the real package, so mock it like the
-// view's own test does.
+// The screen renders the shared keyboard-lift view, which reads the platform
+// and the safe-area insets through a `react-native` entry this node project
+// cannot load, so stub it like the sibling node-only screen tests do. The
+// mounted project cannot load the real safe-area package either, so mock it
+// with every inset the view reads.
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
+  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
+  useAppAwareKeyboardPadding: () => 0,
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+// The screen reads `useRevealEndOnKeyboard()` on every render, before the
+// provider-status branches, and that hook reaches the keyboard-padding module
+// (whose safe-area import is not resolvable under this project's Node
+// environment). Sibling mounted tests of a screen that reserves keyboard
+// height mock the module the same way.
+vi.mock('@/components/kilo-chat/use-reveal-end-on-keyboard', () => ({
+  useRevealEndOnKeyboard: () => ({ current: null }),
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));

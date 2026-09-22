@@ -1,8 +1,3 @@
-// src/types.ts
-
-// ============================================
-// Environment Types
-// ============================================
 import type { Sandbox } from '@cloudflare/sandbox';
 
 export const DEFAULT_SANDBOX_PORT = 8080;
@@ -65,9 +60,6 @@ export interface Env extends Omit<CloudflareEnv, 'SANDBOX' | 'DB_PROXY'> {
   GIT_TOKEN_SERVICE: GitTokenService;
 }
 
-// ============================================
-// Git Repository Types
-// ============================================
 export interface GitObject {
   path: string;
   data: string;
@@ -80,9 +72,6 @@ export interface RepositoryStats {
   initialized: boolean;
 }
 
-// ============================================
-// Git Service Types
-// ============================================
 export type RepositoryBuildOptions = {
   gitObjects: Array<{ path: string; data: Uint8Array }>;
 };
@@ -99,9 +88,6 @@ export interface ReceivePackResult {
   errors: string[];
 }
 
-// ============================================
-// Filesystem Error Types (Node.js-compatible for isomorphic-git)
-// ============================================
 /**
  * Error interface compatible with Node.js ErrnoException
  * Used by isomorphic-git for filesystem error handling
@@ -112,10 +98,6 @@ export interface ErrnoException extends Error {
   path?: string;
   syscall?: string;
 }
-
-// ============================================
-// Preview Types
-// ============================================
 
 /**
  * Possible states for a preview sandbox

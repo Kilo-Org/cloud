@@ -63,7 +63,9 @@ vi.mock('react-native', () => ({
 // resolves to its untransformed `react-native` entry (`src/index.tsx`): the
 // CommonJS entry requires a Flow react-native subpath this node project cannot
 // load, and every mounted suite mocks it. So stub the module's only native
-// dependency instead of the module itself, and keep the real footer and lift.
+// dependency instead of the module itself, and keep the real footer and lift:
+// a whole-module mock of `app-aware-keyboard-padding` strips the hook the
+// footer reads and the lift assertions below fail.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: BOTTOM_INSET, left: 0, right: 0 }),
 }));
@@ -80,12 +82,6 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field-a11y', () => ({ formFieldA11y: () => 'a11y' }));
-// The screen wraps its scroll view in the shared keyboard padding; the real
-// components pull the React Native CJS module, which the mounted project
-// cannot parse. Mock them like the other screen dependencies above.
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
-  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
-}));
 vi.mock('@/components/kilo-chat/use-reveal-end-on-keyboard', () => ({
   useRevealEndOnKeyboard: () => ({ current: null }),
 }));

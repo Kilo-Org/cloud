@@ -2,7 +2,6 @@
 import { useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BookOpenCheck,
@@ -23,7 +22,6 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
-import { signOutWithConfirmation } from '@/components/profile-sign-out-confirmation';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -33,6 +31,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
+import { useSignOutConfirmation } from '@/components/use-sign-out-confirmation';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -87,10 +86,14 @@ export function ProfileScreen() {
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   // Android's native alert paints every button with the theme accent, so
-  // `Alert.alert`'s destructive style never shows the red affordance there:
-  // Android opens the in-app confirmation instead, iOS the native alert.
-  // `signOutWithConfirmation` keeps that platform fork off this screen.
-  const [signOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
+  // `Alert.alert`'s destructive style never shows the red affordance there.
+  // Android opens the in-app confirmation instead; iOS keeps the native alert,
+  // which already renders the destructive sign-out choice in red.
+  // The confirmation's platform split lives in the hook, keeping this screen's
+  // shared layout path free of platform forks (`screen-insets.test.ts`).
+  const { confirmVisible, requestSignOut, dismissConfirm, confirmSignOut } = useSignOutConfirmation(
+    () => void signOut()
+  );
   const {
     data,
     isLoading,
@@ -139,23 +142,6 @@ export function ProfileScreen() {
         onPress: beginDelete,
       },
     ]);
-  };
-
-  const confirmSignOut = () => {
-    signOutWithConfirmation(
-      {
-        title: t('profile.signOutTitle'),
-        message: t('profile.signOutMessage'),
-        cancelLabel: t('common.cancel'),
-        confirmLabel: t('common.signOut'),
-      },
-      {
-        signOut: () => void signOut(),
-        showInAppConfirmation: () => {
-          setSignOutConfirmVisible(true);
-        },
-      }
-    );
   };
 
   const showPrivacyChoices = () => {
@@ -361,7 +347,7 @@ export function ProfileScreen() {
             label={t('profile.privacyChoices')}
             onPress={showPrivacyChoices}
           />
-          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={confirmSignOut} />
+          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={requestSignOut} />
           <ActionTile
             icon={Trash2}
             label={t('profile.deleteAccount')}
@@ -397,18 +383,13 @@ export function ProfileScreen() {
         </View>
       </TabScreenScrollView>
 
-      {signOutConfirmVisible && (
+      {confirmVisible && (
         <DestructiveConfirmDialog
           title={t('profile.signOutTitle')}
           message={t('profile.signOutMessage')}
           confirmLabel={t('common.signOut')}
-          onCancel={() => {
-            setSignOutConfirmVisible(false);
-          }}
-          onConfirm={() => {
-            setSignOutConfirmVisible(false);
-            void signOut();
-          }}
+          onCancel={dismissConfirm}
+          onConfirm={confirmSignOut}
         />
       )}
     </View>

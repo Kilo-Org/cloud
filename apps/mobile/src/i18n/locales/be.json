@@ -859,7 +859,8 @@
       "chat": "Паведамленні ў чаце",
       "kiloclaw": "Актыўнасць KiloClaw",
       "balance": "Апавяшчэнні аб балансе",
-      "security": "Выяўленыя праблемы бяспекі"
+      "security": "Выяўленыя праблемы бяспекі",
+      "spend": "Апавяшчэнні аб выдатаках"
     },
     "category": {
       "chatMessagesSubtitle": "адказы ў вашых размовах",
@@ -870,8 +871,13 @@
       "sessionStatusTitle": "Статус сеанса",
       "sessionStatusSubtitle": "завершаны / памылка / гатовы да кіравання",
       "kiloclawActivitySubtitle": "экзэмпляр гатовы або завяршыўся з памылкай, запланаваныя дзеянні",
+      "kiloclawActivityUnavailable": "Запусціце экзэмпляр KiloClaw, каб атрымліваць актыўнасць KiloClaw.",
       "balanceAlertsSubtitle": "папярэджанні аб нізкім балансе арганізацыі",
-      "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA"
+      "balanceAlertsUnavailable": "Далучыцеся да арганізацыі, каб атрымліваць папярэджанні аб балансе.",
+      "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA",
+      "securityFindingsUnavailable": "Уключыце Агента бяспекі Kilo у пэўным абсягу, каб атрымліваць праблемы бяспекі.",
+      "spendAlertsSubtitle": "перасячэнні парогаў і гадзінныя ўсплёскі",
+      "spendAlertsToggle": "Катэгорыя апавяшчэнняў аб выдатаках"
     },
     "action": {
       "openSession": "Адкрыць сеанс"
@@ -2132,6 +2138,10 @@
       "couldNotLoad": "Не ўдалося загрузіць сеанс.",
       "failedToLoadDetails": "Не ўдалося загрузіць падрабязнасці сеанса.",
       "failedToStopExecution": "Не ўдалося спыніць выкананне.",
+      "stopped": "Сеанс спынены",
+      "committing": "Ствараецца каміт…",
+      "committed": "Каміт створаны",
+      "commitFailed": "Не ўдалося стварыць каміт",
       "renameSession": "Перайменаваць сеанс",
       "renamePlaceholder": "Назва сеанса",
       "transcriptAccessibility": "Гісторыя паведамленняў сеанса",
@@ -2280,7 +2290,8 @@
       "matchesBadge_one": "супадзенне: {{displayCount}}",
       "matchesBadge_other": "супадзенняў: {{displayCount}}",
       "matchesBadge_few": "супадзенні: {{displayCount}}",
-      "matchesBadge_many": "супадзенняў: {{displayCount}}"
+      "matchesBadge_many": "супадзенняў: {{displayCount}}",
+      "noOutput": "Няма вываду."
     },
     "readToolMarkdown": {
       "linesTruncated": "радкі {{start}}–{{end}} (скарочана)",
@@ -3194,6 +3205,14 @@
     "tooManySignInAttempts": "Занадта шмат спроб уваходу. Пачакай і паспрабуй яшчэ раз."
   },
   "models": {
+    "auto": {
+      "frontier": "Аўта Перадавы",
+      "balanced": "Аўта Збалансаваны",
+      "efficient": "Аўта Эфектыўны",
+      "small": "Аўта Малы",
+      "free": "Аўта Бясплатны",
+      "organization": "Аўта арганізацыі"
+    },
     "dataCollected": "Збор даных",
     "free": "Бясплатна",
     "couldNotUpdateFavorites": "Не ўдалося абнавіць абранае.",
@@ -3241,7 +3260,8 @@
     "channelName": "Актыўныя агенты",
     "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі.",
     "openSession": "Адкрыць",
-    "approveFailed": "Не ўдалося ўхваліць. Націсніце $t(common.approve), каб паспрабаваць яшчэ раз."
+    "approveFailed": "Не ўдалося ўхваліць. Націсніце $t(common.approve), каб паспрабаваць яшчэ раз.",
+    "newestResult": "Найноўшы вынік"
   },
   "transcriptionModel": {
     "title": "Мадэль распазнавання маўлення",
@@ -3266,15 +3286,7 @@
     "remoteOptionTitle": "Ваш камп'ютар",
     "remoteOptionBody": "Запускайце Kilo на ўласнай машыне праз CLI `kilo remote`.",
     "skip": "Прапусціць агляд",
-    "tutorialLabel": "Навучанне",
-    "remoteTitle": "Пачніце свой першы аддалены сеанс",
-    "remoteBody": "Падключыце свой камп'ютар, а затым пачніце сеанс адсюль.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Яшчэ няма падключанага камп'ютара",
-    "remoteEmptyBody": "Каб падключыць яго, выканайце `kilo remote` на сваім камп'ютары.",
-    "remoteFound": "Камп'ютар падключаны",
-    "checkAgain": "Праверыць яшчэ раз",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Навучанне"
   },
   "appActions": {
     "start": {
@@ -3285,5 +3297,28 @@
   },
   "launcher": {
     "openLastSession": "Адкрыць апошні сеанс"
+  },
+  "spendAlerts": {
+    "subtitle": "Дасылайце апавяшчэнне па электроннай пошце або пуш-паведамленнем кантактам па аплаце, калі выдатакі гэтай сферы перавышаюць ліміт або рэзка ўзрастаюць вышэй за звычайную гадзінную хуткасць.",
+    "enable": "Уключыць апавяшчэнні аб выдатаках",
+    "thresholdTitle": "Перасячэнне парога",
+    "thresholdSubtitle": "Бягучыя выдатакі перавышаюць ваш ліміт",
+    "anomalyTitle": "Гадзінны ўсплёск",
+    "anomalySubtitle": "Гадзіна значна вышэй за звычайную хуткасць гэтай сферы",
+    "limitLabel": "Ліміт (USD)",
+    "windowLabel": "Акно",
+    "window24h": "24 гадзіны",
+    "window7d": "7 дзён",
+    "window30d": "30 дзён",
+    "multiplierLabel": "Множнік усплёску",
+    "saved": "Налады апавяшчэнняў аб выдатаках захаваны",
+    "loadError": "Не ўдалося загрузіць апавяшчэнні аб выдатаках.",
+    "saveError": "Не ўдалося захаваць апавяшчэнні аб выдатаках.",
+    "empty": "Апавяшчэнні аб выдатаках выключаны. Уключыце іх, каб папярэджваць кантакты па аплаце гэтай сферы.",
+    "noSpend": "Выдаткі яшчэ не зафіксаваны",
+    "spend24h": "Выдаткі за апошнія 24 гадзіны",
+    "multiplierError": "Увядзіце множнік 1 або больш",
+    "permissionDenied": "У вас няма дазволу кіраваць апавяшчэннямі аб выдатаках.",
+    "pushOffByCategory": "Выключана ў апавяшчэннях"
   }
 }

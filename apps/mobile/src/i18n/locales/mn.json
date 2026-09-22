@@ -827,7 +827,8 @@
       "chat": "Чатын мессеж",
       "kiloclaw": "KiloClaw-ийн үйл ажиллагаа",
       "balance": "Үлдэгдлийн анхааруулга",
-      "security": "Аюулгүй байдлын илэрсэн асуудал"
+      "security": "Аюулгүй байдлын илэрсэн асуудал",
+      "spend": "Зарцуулалтын анхааруулга"
     },
     "category": {
       "chatMessagesSubtitle": "харилцан яриан дахь хариултууд",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Сессийн төлөв",
       "sessionStatusSubtitle": "дууссан / амжилтгүй / удирдахад бэлэн",
       "kiloclawActivitySubtitle": "инстанц бэлэн/амжилтгүй, төлөвлөсөн үйлдлүүд",
+      "kiloclawActivityUnavailable": "KiloClaw үйл ажиллагаа авахын тулд KiloClaw инстанцыг эхлүүлнэ үү.",
       "balanceAlertsSubtitle": "байгууллагын үлдэгдэл багасах анхааруулга",
-      "securityFindingsSubtitle": "шинээр илэрсэн эмзэг байдал болон SLA сануулга"
+      "balanceAlertsUnavailable": "Үлдэгдлийн анхааруулга авахын тулд байгууллагад элсэнэ үү.",
+      "securityFindingsSubtitle": "шинээр илэрсэн эмзэг байдал болон SLA сануулга",
+      "securityFindingsUnavailable": "Аюулгүй байдлын эмзэг байдлын мэдээлэл авахын тулд Kilo аюулгүй байдлын агентыг хүрээнд идэвхжүүлнэ үү.",
+      "spendAlertsSubtitle": "босго давсан болон цагийн огцом өсөлт",
+      "spendAlertsToggle": "Зарцуулалтын анхааруулгын ангилал"
     },
     "action": {
       "openSession": "Сесс нээх"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Сессийг ачаалж чадсангүй.",
       "failedToLoadDetails": "Сессийн дэлгэрэнгүй мэдээллийг ачаалж чадсангүй.",
       "failedToStopExecution": "Гүйцэтгэлийг зогсоож чадсангүй.",
+      "stopped": "Сесс зогслоо",
+      "committing": "Коммит хийж байна…",
+      "committed": "Коммит хийгдлээ",
+      "commitFailed": "Коммит хийж чадсангүй",
       "renameSession": "Сессийн нэрийг өөрчлөх",
       "renamePlaceholder": "Сессийн нэр",
       "transcriptAccessibility": "Сессийн ярианы бичвэр",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} мөр",
       "linesBadge_other": "{{displayCount}} мөр",
       "matchesBadge_one": "{{displayCount}} илэрц",
-      "matchesBadge_other": "{{displayCount}} илэрц"
+      "matchesBadge_other": "{{displayCount}} илэрц",
+      "noOutput": "Гаралт байхгүй."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} мөр (товчилсон)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "Хэт олон удаа нэвтрэхийг оролдсон байна. Түр хүлээгээд дахин оролдоно уу."
   },
   "models": {
+    "auto": {
+      "frontier": "Авто Тэргүүлэх",
+      "balanced": "Авто Тэнцвэртэй",
+      "efficient": "Авто Үр ашигтай",
+      "small": "Авто Жижиг",
+      "free": "Авто Үнэгүй",
+      "organization": "Байгууллагын авто"
+    },
     "dataCollected": "Өгөгдөл цуглуулдаг",
     "free": "Үнэгүй",
     "couldNotUpdateFavorites": "Дуртай загваруудыг шинэчилж чадсангүй.",
@@ -3155,7 +3174,8 @@
     "channelName": "Идэвхтэй агентууд",
     "activityKitDisabledBody": "Түгжээтэй дэлгэц дээр идэвхтэй агентуудыг харахын тулд тохиргооноос шууд үйл ажиллагааг идэвхжүүлнэ үү.",
     "openSession": "Нээх",
-    "approveFailed": "Зөвшөөрч чадсангүй. Дахин оролдохын тулд $t(common.approve)-г товшино уу."
+    "approveFailed": "Зөвшөөрч чадсангүй. Дахин оролдохын тулд $t(common.approve)-г товшино уу.",
+    "newestResult": "Хамгийн сүүлийн үр дүн"
   },
   "transcriptionModel": {
     "title": "Яриаг бичвэр болгох загвар",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "Таны компьютер",
     "remoteOptionBody": "Өөрийн машинаасаа `kilo remote` CLI-ээр Kilo-г ажиллуул.",
     "skip": "Танилцуулгыг алгасах",
-    "tutorialLabel": "Заавар",
-    "remoteTitle": "Эхний зайн сессээ эхлүүл",
-    "remoteBody": "Компьютерээ холбоод, эндээс сессээ эхлүүлээрэй.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Одоогоор компьютер холбогдоогүй байна",
-    "remoteEmptyBody": "Холбохын тулд компьютер дээрээ `kilo remote` командыг ажиллуулна уу.",
-    "remoteFound": "Компьютер холбогдлоо",
-    "checkAgain": "Дахин шалгах",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Заавар"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "Сүүлийн сессийг нээх"
+  },
+  "spendAlerts": {
+    "subtitle": "Энэ хүрээний зарцуулалт хязгаараас хэтэрсэн эсвэл ердийн цагийн хурдаас дээш өссөн үед төлбөрийн холбоо барих хаягуудад имэйл эсвэл push-ээр анхааруулга илгээ.",
+    "enable": "Зарцуулалтын анхааруулгыг идэвхжүүлэх",
+    "thresholdTitle": "Босго давсан",
+    "thresholdSubtitle": "Гүйлтийн зарцуулалт таны хязгаараас хэтэрч байна",
+    "anomalyTitle": "Цагийн огцом өсөлт",
+    "anomalySubtitle": "Нэг цаг энэ хүрээний ердийн хурдаас хамаагүй өндөр байна",
+    "limitLabel": "Хязгаар (USD)",
+    "windowLabel": "Цонх",
+    "window24h": "24 цаг",
+    "window7d": "7 хоног",
+    "window30d": "30 хоног",
+    "multiplierLabel": "Огцом өсөлтийн үржүүлэгч",
+    "saved": "Зарцуулалтын анхааруулгын тохиргоо хадгалагдлаа",
+    "loadError": "Зарцуулалтын анхааруулгыг ачаалж чадсангүй.",
+    "saveError": "Зарцуулалтын анхааруулгыг хадгалж чадсангүй.",
+    "empty": "Зарцуулалтын анхааруулга унтарсан байна. Энэ хүрээний төлбөрийн хаягуудад мэдэгдэхийн тулд асаа.",
+    "noSpend": "Одоогоор зарцуулалт бүртгэгдээгүй",
+    "spend24h": "Сүүлийн 24 цагийн зарцуулалт",
+    "multiplierError": "1 буюу түүнээс их үржүүлэгч оруул",
+    "permissionDenied": "Зарцуулалтын анхааруулгыг удирдах эрх танд байхгүй.",
+    "pushOffByCategory": "Мэдэгдэлд унтарсан"
   }
 }

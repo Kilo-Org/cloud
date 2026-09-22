@@ -427,7 +427,7 @@ async function enrichDeductionsWithInstanceNames(
   });
 }
 
-// The seven notification category keys are owned by the mobile app:
+// The eight notification category keys are owned by the mobile app:
 // `NOTIFICATION_CATEGORY_KEYS` / `NotificationCategoryKey` in
 // `apps/mobile/src/lib/hooks/agent-push-preference.ts`. The server hard-codes
 // the same string literals; do not define a duplicate server category-key type.
@@ -438,10 +438,22 @@ const NOTIFICATION_CATEGORY_KEYS = [
   'sessionStatus',
   'kiloclawActivity',
   'balanceAlerts',
+  'spendAlerts',
   'securityFindings',
 ] as const;
 
-type NotificationCapability = { available: boolean; unavailableReason: string | null };
+/** Machine-readable reason a gated category is unavailable. The client owns the
+ *  wording: it maps each code to a catalog key, so the row reads in the reader's
+ *  language. A server sentence rendered in English on every locale. */
+type NotificationCapabilityReason =
+  | 'organizationRequired'
+  | 'securityAgentRequired'
+  | 'kiloclawInstanceRequired';
+
+type NotificationCapability = {
+  available: boolean;
+  unavailableReasonCode: NotificationCapabilityReason | null;
+};
 type NotificationCapabilities = Record<
   (typeof NOTIFICATION_CATEGORY_KEYS)[number],
   NotificationCapability
@@ -449,15 +461,15 @@ type NotificationCapabilities = Record<
 
 const ALWAYS_AVAILABLE_CAPABILITY: NotificationCapability = {
   available: true,
-  unavailableReason: null,
+  unavailableReasonCode: null,
 };
 
-function unavailableCapability(reason: string): NotificationCapability {
-  return { available: false, unavailableReason: reason };
+function unavailableCapability(reason: NotificationCapabilityReason): NotificationCapability {
+  return { available: false, unavailableReasonCode: reason };
 }
 
 /**
- * Compute the per-category availability map for the signed-in user. The four
+ * Compute the per-category availability map for the signed-in user. The five
  * always-on categories need no data; the three gated categories each run one
  * read-only existence check.
  */
@@ -498,13 +510,16 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
     sessionStatus: ALWAYS_AVAILABLE_CAPABILITY,
     balanceAlerts: hasOrganization
       ? ALWAYS_AVAILABLE_CAPABILITY
-      : unavailableCapability('Join an organization to get balance alerts.'),
+      : unavailableCapability('organizationRequired'),
+    // Every signed-in account has a personal scope, so spend alerts are always
+    // available; the spend view offers the same switch for that scope.
+    spendAlerts: ALWAYS_AVAILABLE_CAPABILITY,
     securityFindings: hasSecurityConfig
       ? ALWAYS_AVAILABLE_CAPABILITY
-      : unavailableCapability('Enable Kilo Security Agent on a scope to get security findings.'),
+      : unavailableCapability('securityAgentRequired'),
     kiloclawActivity: hasKiloclawInstance
       ? ALWAYS_AVAILABLE_CAPABILITY
-      : unavailableCapability('Start a KiloClaw instance to get KiloClaw activity.'),
+      : unavailableCapability('kiloclawInstanceRequired'),
   };
 }
 
@@ -1379,6 +1394,7 @@ export const userRouter = createTRPCRouter({
         session_status_enabled: user_notification_preferences.session_status_enabled,
         kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
         balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
+        spend_alerts_enabled: user_notification_preferences.spend_alerts_enabled,
         security_findings_enabled: user_notification_preferences.security_findings_enabled,
         notification_previews: user_notification_preferences.notification_previews,
       })
@@ -1396,6 +1412,7 @@ export const userRouter = createTRPCRouter({
       sessionStatus: row?.session_status_enabled ?? true,
       kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
       balanceAlerts: row?.balance_alerts_enabled ?? true,
+      spendAlerts: row?.spend_alerts_enabled ?? true,
       securityFindings: row?.security_findings_enabled ?? true,
       notificationPreviews: row?.notification_previews ?? 'generic',
       agentPushEnabled,
@@ -1412,6 +1429,7 @@ export const userRouter = createTRPCRouter({
         sessionStatus: z.boolean().optional(),
         kiloclawActivity: z.boolean().optional(),
         balanceAlerts: z.boolean().optional(),
+        spendAlerts: z.boolean().optional(),
         securityFindings: z.boolean().optional(),
         notificationPreviews: z.enum(['generic', 'full']).optional(),
         // Legacy shipped-client input: still accepted and writes the same column as `agentUpdates`.
@@ -1449,6 +1467,10 @@ export const userRouter = createTRPCRouter({
         set.balance_alerts_enabled = input.balanceAlerts;
         values.balance_alerts_enabled = input.balanceAlerts;
       }
+      if (input.spendAlerts !== undefined) {
+        set.spend_alerts_enabled = input.spendAlerts;
+        values.spend_alerts_enabled = input.spendAlerts;
+      }
       if (input.securityFindings !== undefined) {
         set.security_findings_enabled = input.securityFindings;
         values.security_findings_enabled = input.securityFindings;
@@ -1482,6 +1504,7 @@ export const userRouter = createTRPCRouter({
           session_status_enabled: user_notification_preferences.session_status_enabled,
           kiloclaw_activity_enabled: user_notification_preferences.kiloclaw_activity_enabled,
           balance_alerts_enabled: user_notification_preferences.balance_alerts_enabled,
+          spend_alerts_enabled: user_notification_preferences.spend_alerts_enabled,
           security_findings_enabled: user_notification_preferences.security_findings_enabled,
           notification_previews: user_notification_preferences.notification_previews,
         })
@@ -1496,6 +1519,7 @@ export const userRouter = createTRPCRouter({
         sessionStatus: row?.session_status_enabled ?? true,
         kiloclawActivity: row?.kiloclaw_activity_enabled ?? true,
         balanceAlerts: row?.balance_alerts_enabled ?? true,
+        spendAlerts: row?.spend_alerts_enabled ?? true,
         securityFindings: row?.security_findings_enabled ?? true,
         notificationPreviews: row?.notification_previews ?? 'generic',
         agentPushEnabled: effectiveAgentPush,

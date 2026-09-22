@@ -827,7 +827,8 @@
       "chat": "ข้อความแชท",
       "kiloclaw": "กิจกรรม KiloClaw",
       "balance": "การแจ้งเตือนยอดเงิน",
-      "security": "ข้อค้นพบด้านความปลอดภัย"
+      "security": "ข้อค้นพบด้านความปลอดภัย",
+      "spend": "การแจ้งเตือนการใช้จ่าย"
     },
     "category": {
       "chatMessagesSubtitle": "การตอบกลับในการสนทนาของคุณ",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "สถานะเซสชัน",
       "sessionStatusSubtitle": "เสร็จสิ้น / ล้มเหลว / พร้อมควบคุม",
       "kiloclawActivitySubtitle": "อินสแตนซ์พร้อมใช้งานหรือทำงานล้มเหลว และการดำเนินการตามกำหนดเวลา",
+      "kiloclawActivityUnavailable": "เริ่มอินสแตนซ์ KiloClaw เพื่อรับกิจกรรมของ KiloClaw",
       "balanceAlertsSubtitle": "คำเตือนเมื่อยอดคงเหลือขององค์กรต่ำ",
-      "securityFindingsSubtitle": "ปัญหาที่ตรวจพบใหม่และการเตือนตาม SLA"
+      "balanceAlertsUnavailable": "เข้าร่วมองค์กรเพื่อรับการแจ้งเตือนยอดคงเหลือ",
+      "securityFindingsSubtitle": "ปัญหาที่ตรวจพบใหม่และการเตือนตาม SLA",
+      "securityFindingsUnavailable": "เปิดใช้งานเอเจนต์ความปลอดภัย Kilo ในขอบเขตเพื่อรับข้อค้นพบด้านความปลอดภัย",
+      "spendAlertsSubtitle": "การเกินเกณฑ์และการพุ่งขึ้นรายชั่วโมง",
+      "spendAlertsToggle": "หมวดหมู่การแจ้งเตือนการใช้จ่าย"
     },
     "action": {
       "openSession": "เปิดเซสชัน"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "ไม่สามารถโหลดเซสชันได้",
       "failedToLoadDetails": "ไม่สามารถโหลดรายละเอียดเซสชันได้",
       "failedToStopExecution": "ไม่สามารถหยุดการทำงานได้",
+      "stopped": "หยุดเซสชันแล้ว",
+      "committing": "กำลังคอมมิต…",
+      "committed": "คอมมิตแล้ว",
+      "commitFailed": "คอมมิตไม่สำเร็จ",
       "renameSession": "เปลี่ยนชื่อเซสชัน",
       "renamePlaceholder": "ชื่อเซสชัน",
       "transcriptAccessibility": "บันทึกการสนทนาของเซสชัน",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} บรรทัด",
       "linesBadge_other": "{{displayCount}} บรรทัด",
       "matchesBadge_one": "พบ {{displayCount}} รายการ",
-      "matchesBadge_other": "พบ {{displayCount}} รายการ"
+      "matchesBadge_other": "พบ {{displayCount}} รายการ",
+      "noOutput": "ไม่มีเอาต์พุต"
     },
     "readToolMarkdown": {
       "linesTruncated": "บรรทัด {{start}}–{{end}} (ตัดบางส่วนออก)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "ลองเข้าสู่ระบบหลายครั้งเกินไป โปรดรอสักครู่แล้วลองอีกครั้ง"
   },
   "models": {
+    "auto": {
+      "frontier": "อัตโนมัติ ล้ำหน้า",
+      "balanced": "อัตโนมัติ สมดุล",
+      "efficient": "อัตโนมัติ มีประสิทธิภาพ",
+      "small": "อัตโนมัติ เล็ก",
+      "free": "อัตโนมัติ ฟรี",
+      "organization": "อัตโนมัติ องค์กร"
+    },
     "dataCollected": "มีการเก็บข้อมูล",
     "free": "ฟรี",
     "couldNotUpdateFavorites": "ไม่สามารถอัปเดตรายการโปรดได้",
@@ -3155,7 +3174,8 @@
     "channelName": "เอเจนต์ที่กำลังทำงาน",
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก",
     "openSession": "เปิด",
-    "approveFailed": "อนุมัติไม่สำเร็จ แตะ $t(common.approve) เพื่อลองอีกครั้ง"
+    "approveFailed": "อนุมัติไม่สำเร็จ แตะ $t(common.approve) เพื่อลองอีกครั้ง",
+    "newestResult": "ผลลัพธ์ล่าสุด"
   },
   "transcriptionModel": {
     "title": "โมเดลถอดเสียง",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "คอมพิวเตอร์ของคุณ",
     "remoteOptionBody": "รัน Kilo บนเครื่องของคุณเองผ่าน CLI `kilo remote`",
     "skip": "ข้ามทัวร์",
-    "tutorialLabel": "บทช่วยสอน",
-    "remoteTitle": "เริ่มเซสชันทางไกลแรกของคุณ",
-    "remoteBody": "เชื่อมต่อคอมพิวเตอร์ของคุณ แล้วเริ่มเซสชันจากที่นี่",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ยังไม่มีคอมพิวเตอร์เชื่อมต่อ",
-    "remoteEmptyBody": "หากต้องการเชื่อมต่อ ให้รัน `kilo remote` บนคอมพิวเตอร์ของคุณ",
-    "remoteFound": "เชื่อมต่อคอมพิวเตอร์แล้ว",
-    "checkAgain": "ตรวจสอบอีกครั้ง",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "บทช่วยสอน"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "เปิดเซสชันล่าสุด"
+  },
+  "spendAlerts": {
+    "subtitle": "ส่งการแจ้งเตือนทางอีเมลหรือพุชให้ผู้ติดต่อด้านการเรียกเก็บเงินเมื่อการใช้จ่ายของขอบเขตนี้เกินขีดจำกัดหรือพุ่งสูงกว่าอัตรารายชั่วโมงปกติ",
+    "enable": "เปิดใช้การแจ้งเตือนการใช้จ่าย",
+    "thresholdTitle": "การเกินเกณฑ์",
+    "thresholdSubtitle": "การใช้จ่ายสะสมเกินขีดจำกัดของคุณ",
+    "anomalyTitle": "การพุ่งขึ้นรายชั่วโมง",
+    "anomalySubtitle": "หนึ่งชั่วโมงสูงกว่าอัตราปกติของขอบเขตนี้มาก",
+    "limitLabel": "ขีดจำกัด (USD)",
+    "windowLabel": "ช่วงเวลา",
+    "window24h": "24 ชั่วโมง",
+    "window7d": "7 วัน",
+    "window30d": "30 วัน",
+    "multiplierLabel": "ตัวคูณการพุ่งขึ้น",
+    "saved": "บันทึกการตั้งค่าการแจ้งเตือนการใช้จ่ายแล้ว",
+    "loadError": "ไม่สามารถโหลดการแจ้งเตือนการใช้จ่ายได้",
+    "saveError": "ไม่สามารถบันทึกการแจ้งเตือนการใช้จ่ายได้",
+    "empty": "การแจ้งเตือนการใช้จ่ายปิดอยู่ เปิดใช้งานเพื่อแจ้งเตือนผู้ติดต่อด้านการเรียกเก็บเงินของขอบเขตนี้",
+    "noSpend": "ยังไม่มีการบันทึกการใช้จ่าย",
+    "spend24h": "การใช้จ่ายใน 24 ชั่วโมงที่ผ่านมา",
+    "multiplierError": "ป้อนตัวคูณ 1 หรือมากกว่า",
+    "permissionDenied": "คุณไม่มีสิทธิ์จัดการการแจ้งเตือนการใช้จ่าย",
+    "pushOffByCategory": "ปิดในการแจ้งเตือน"
   }
 }

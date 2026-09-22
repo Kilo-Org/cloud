@@ -5,6 +5,7 @@ export const STREAMLAKE = {
   id: 'streamlake',
   apiUrl: 'https://vanchin.streamlake.ai/api/gateway/v1/endpoints',
   apiUrlOverrides: {},
+  disableUrlSuffix: false,
   apiKey: getEnvVariable('STREAMLAKE_API_KEY'),
   apiKeyHeader: null,
   supportedChatApis: ['chat_completions'],

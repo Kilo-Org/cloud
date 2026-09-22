@@ -17,6 +17,7 @@ import {
 import type { EvalTabResult } from './tab-debugger';
 
 type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
+type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
 
 export interface TurnUsage {
   readonly costUsd?: number;
@@ -44,7 +45,9 @@ interface RunLlmTurnOptions<ToolCall extends ToolCallEvent> {
   readonly token: string;
   readonly tools: KiloGatewayToolDefinition[];
   readonly tooManyToolRoundsMessage: string;
-  readonly toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) => ToolCall[];
+  readonly toToolCallEvents: (
+    toolCalls: KiloGatewayToolCallRequest[]
+  ) => (ToolCall | ToolResultEvent)[];
   readonly updateAssistantMessage: (eventId: string, text: string) => void;
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
   /** Fires with the assistant event id on first content delta; fires undefined when that stream ends. */
@@ -241,6 +244,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   ): Promise<{
     completionEvents: AgentConversationEvent[];
     finishReason: string | undefined;
+    resolvedToolResultEvents: ToolResultEvent[];
     toolCallEvents: ToolCall[];
   }> => {
     const completionEvents: AgentConversationEvent[] = [];
@@ -388,11 +392,20 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         completionEvents.push(createThinkingBlock(completion.reasoning));
       }
 
-      const toolCallEvents = withReasoningDetails(
-        toToolCallEvents(completion.toolCalls),
+      const turnEvents = toToolCallEvents(completion.toolCalls);
+      // A converter can answer a call itself (a safe-mode browser refusal): the exchange is shown and replayed, and the call never executes.
+      const resolvedToolResultEvents = turnEvents.filter(
+        (event): event is ToolResultEvent => event.type === 'tool-result'
+      );
+      const resolvedToolCallIds = new Set(resolvedToolResultEvents.map(event => event.toolCallId));
+      // The reasoning attaches to the first call of the assistant tool_calls message and must reach the persisted events, so replay carries it.
+      const turnToolCallEvents = withReasoningDetails(
+        turnEvents.filter((event): event is ToolCall => event.type === 'tool-call'),
         completion.reasoningDetails
       );
-      completionEvents.push(...toolCallEvents);
+      const toolCallEvents = turnToolCallEvents.filter(event => !resolvedToolCallIds.has(event.id));
+      // Calls first, then resolved results: an interleaved refusal would split the assistant tool_calls message and leave a call unanswered.
+      completionEvents.push(...turnToolCallEvents, ...resolvedToolResultEvents);
 
       appendEvents(
         completionEvents.filter(
@@ -400,7 +413,12 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         )
       );
 
-      return { completionEvents, finishReason: completion.finishReason, toolCallEvents };
+      return {
+        completionEvents,
+        finishReason: completion.finishReason,
+        resolvedToolResultEvents,
+        toolCallEvents,
+      };
     } finally {
       if (didStartAssistantStreaming) {
         // Explicit clear: callers key collapse chrome off this id being undefined.
@@ -422,7 +440,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         return;
       }
 
-      const { completionEvents, finishReason, toolCallEvents } =
+      const { completionEvents, finishReason, resolvedToolResultEvents, toolCallEvents } =
         await appendCompletion(nextConversationEvents);
 
       if (completionEvents.length === 0) {
@@ -432,7 +450,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
 
       nextConversationEvents.push(...completionEvents);
 
-      if (toolCallEvents.length === 0) {
+      if (toolCallEvents.length === 0 && resolvedToolResultEvents.length === 0) {
         const lastAssistantText =
           completionEvents
             .toReversed()

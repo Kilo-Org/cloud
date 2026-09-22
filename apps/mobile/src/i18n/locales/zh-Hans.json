@@ -323,7 +323,8 @@
       "chat": "聊天消息",
       "kiloclaw": "KiloClaw 活动",
       "balance": "余额提醒",
-      "security": "安全问题"
+      "security": "安全问题",
+      "spend": "支出提醒"
     },
     "category": {
       "chatMessagesSubtitle": "对话中的回复",
@@ -334,8 +335,13 @@
       "sessionStatusTitle": "会话状态",
       "sessionStatusSubtitle": "已完成 / 已失败 / 可接管",
       "kiloclawActivitySubtitle": "实例就绪/失败、计划操作",
+      "kiloclawActivityUnavailable": "启动 KiloClaw 实例以接收 KiloClaw 活动。",
       "balanceAlertsSubtitle": "组织余额不足警告",
-      "securityFindingsSubtitle": "新发现的安全问题和 SLA 提醒"
+      "balanceAlertsUnavailable": "加入组织以接收余额提醒。",
+      "securityFindingsSubtitle": "新发现的安全问题和 SLA 提醒",
+      "securityFindingsUnavailable": "在某个范围启用 Kilo 安全智能体以接收安全问题。",
+      "spendAlertsSubtitle": "阈值突破与每小时激增",
+      "spendAlertsToggle": "支出提醒类别"
     },
     "action": {
       "openSession": "打开会话"
@@ -1572,6 +1578,10 @@
       "couldNotLoad": "无法加载会话。",
       "failedToLoadDetails": "无法加载会话详情。",
       "failedToStopExecution": "停止执行失败。",
+      "stopped": "会话已停止",
+      "committing": "正在提交…",
+      "committed": "已提交",
+      "commitFailed": "提交失败",
       "renameSession": "重命名会话",
       "renamePlaceholder": "会话名称",
       "transcriptAccessibility": "会话记录",
@@ -1712,7 +1722,8 @@
       "linesBadge_one": "{{displayCount}} 行",
       "linesBadge_other": "{{displayCount}} 行",
       "matchesBadge_one": "{{displayCount}} 项匹配",
-      "matchesBadge_other": "{{displayCount}} 项匹配"
+      "matchesBadge_other": "{{displayCount}} 项匹配",
+      "noOutput": "没有输出。"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截断）",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "登录尝试次数过多。请稍等片刻再试。"
   },
   "models": {
+    "auto": {
+      "frontier": "自动前沿",
+      "balanced": "自动均衡",
+      "efficient": "自动高效",
+      "small": "自动小型",
+      "free": "自动免费",
+      "organization": "组织自动"
+    },
     "dataCollected": "会收集数据",
     "free": "免费",
     "couldNotUpdateFavorites": "无法更新收藏。",
@@ -3155,7 +3174,8 @@
     "channelName": "运行中的智能体",
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。",
     "openSession": "打开",
-    "approveFailed": "无法批准。点按$t(common.approve)重试。"
+    "approveFailed": "无法批准。点按$t(common.approve)重试。",
+    "newestResult": "最新结果"
   },
   "transcriptionModel": {
     "title": "转写模型",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "你的电脑",
     "remoteOptionBody": "通过 `kilo remote` CLI 在你自己的电脑上运行 Kilo。",
     "skip": "跳过导览",
-    "tutorialLabel": "教程",
-    "remoteTitle": "开始你的首个远程会话",
-    "remoteBody": "连接你的电脑，然后从这里启动会话。",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "尚未连接电脑",
-    "remoteEmptyBody": "在你的电脑上运行 `kilo remote` 以完成连接。",
-    "remoteFound": "电脑已连接",
-    "checkAgain": "重新检查",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "教程"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "打开上次会话"
+  },
+  "spendAlerts": {
+    "subtitle": "当此范围的支出超过限额或高于其平时每小时速率时，通过邮件或推送向账单联系人发送提醒。",
+    "enable": "启用支出提醒",
+    "thresholdTitle": "阈值突破",
+    "thresholdSubtitle": "累计支出超过你的限额",
+    "anomalyTitle": "每小时激增",
+    "anomalySubtitle": "某一小时的支出远高于此范围的平时速率",
+    "limitLabel": "限额 (USD)",
+    "windowLabel": "时间窗口",
+    "window24h": "24 小时",
+    "window7d": "7 天",
+    "window30d": "30 天",
+    "multiplierLabel": "激增倍数",
+    "saved": "支出提醒设置已保存",
+    "loadError": "无法加载支出提醒。",
+    "saveError": "无法保存支出提醒。",
+    "empty": "支出提醒已关闭。开启后会通知此范围的账单联系人。",
+    "noSpend": "尚无支出记录",
+    "spend24h": "过去 24 小时的支出",
+    "multiplierError": "请输入 1 或更大的倍数",
+    "permissionDenied": "你没有管理支出提醒的权限。",
+    "pushOffByCategory": "已在通知中关闭"
   }
 }

@@ -843,7 +843,8 @@
       "chat": "Mesaje din conversații",
       "kiloclaw": "Activitate KiloClaw",
       "balance": "Alerte privind soldul",
-      "security": "Probleme de securitate detectate"
+      "security": "Probleme de securitate detectate",
+      "spend": "Alerte de cheltuieli"
     },
     "category": {
       "chatMessagesSubtitle": "răspunsuri în conversațiile tale",
@@ -854,8 +855,13 @@
       "sessionStatusTitle": "Starea sesiunii",
       "sessionStatusSubtitle": "finalizată / eșuată / pregătită pentru control",
       "kiloclawActivitySubtitle": "instanță pregătită sau eșuată, acțiuni programate",
+      "kiloclawActivityUnavailable": "Pornește o instanță KiloClaw pentru a primi activitate KiloClaw.",
       "balanceAlertsSubtitle": "avertismente de sold scăzut al organizației",
-      "securityFindingsSubtitle": "constatări noi și mementouri SLA"
+      "balanceAlertsUnavailable": "Alătură-te unei organizații pentru a primi alerte de sold.",
+      "securityFindingsSubtitle": "constatări noi și mementouri SLA",
+      "securityFindingsUnavailable": "Activează Agentul de securitate Kilo într-un domeniu pentru a primi constatări de securitate.",
+      "spendAlertsSubtitle": "depășiri de praguri și vârfuri orare",
+      "spendAlertsToggle": "Categoria alerte de cheltuieli"
     },
     "action": {
       "openSession": "Deschide sesiunea"
@@ -2104,6 +2110,10 @@
       "couldNotLoad": "Nu s-a putut încărca sesiunea.",
       "failedToLoadDetails": "Nu s-au putut încărca detaliile sesiunii.",
       "failedToStopExecution": "Nu s-a putut opri execuția.",
+      "stopped": "Sesiune oprită",
+      "committing": "Se creează commitul…",
+      "committed": "Commit creat",
+      "commitFailed": "Crearea commitului a eșuat",
       "renameSession": "Redenumește sesiunea",
       "renamePlaceholder": "Numele sesiunii",
       "transcriptAccessibility": "Transcrierea sesiunii",
@@ -2248,7 +2258,8 @@
       "linesBadge_few": "{{displayCount}} linii",
       "matchesBadge_one": "{{displayCount}} potrivire",
       "matchesBadge_other": "{{displayCount}} potriviri",
-      "matchesBadge_few": "{{displayCount}} potriviri"
+      "matchesBadge_few": "{{displayCount}} potriviri",
+      "noOutput": "Nicio ieșire."
     },
     "readToolMarkdown": {
       "linesTruncated": "liniile {{start}}–{{end}} (trunchiate)",
@@ -3151,6 +3162,14 @@
     "tooManySignInAttempts": "Prea multe încercări de autentificare. Așteaptă și încearcă din nou."
   },
   "models": {
+    "auto": {
+      "frontier": "Automat Avansat",
+      "balanced": "Automat Echilibrat",
+      "efficient": "Automat Eficient",
+      "small": "Automat Mic",
+      "free": "Automat Gratuit",
+      "organization": "Automat de organizație"
+    },
     "dataCollected": "Date colectate",
     "free": "Gratuit",
     "couldNotUpdateFavorites": "Nu s-au putut actualiza favoritele.",
@@ -3198,7 +3217,8 @@
     "channelName": "Agenți activi",
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare.",
     "openSession": "Deschide",
-    "approveFailed": "Aprobarea nu a reușit. Atinge $t(common.approve) pentru a încerca din nou."
+    "approveFailed": "Aprobarea nu a reușit. Atinge $t(common.approve) pentru a încerca din nou.",
+    "newestResult": "Cel mai recent rezultat"
   },
   "transcriptionModel": {
     "title": "Model de transcriere",
@@ -3223,15 +3243,7 @@
     "remoteOptionTitle": "Computerul tău",
     "remoteOptionBody": "Rulează Kilo pe propria ta mașină prin CLI-ul `kilo remote`.",
     "skip": "Sari peste tur",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Pornește prima ta sesiune la distanță",
-    "remoteBody": "Conectează computerul și apoi pornește sesiunea de aici.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Niciun computer conectat încă",
-    "remoteEmptyBody": "Pentru a-l conecta, rulează `kilo remote` pe computerul tău.",
-    "remoteFound": "Computer conectat",
-    "checkAgain": "Verifică din nou",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {
@@ -3242,5 +3254,28 @@
   },
   "launcher": {
     "openLastSession": "Deschide ultima sesiune"
+  },
+  "spendAlerts": {
+    "subtitle": "Trimite o alertă prin e-mail sau push către contactele de facturare când cheltuielile acestui domeniu depășesc o limită sau sar peste ritmul orar obișnuit.",
+    "enable": "Activează alertele de cheltuieli",
+    "thresholdTitle": "Depășirea pragului",
+    "thresholdSubtitle": "Cheltuielile cumulate depășesc limita ta",
+    "anomalyTitle": "Vârf orar",
+    "anomalySubtitle": "O oră este mult peste ritmul obișnuit al acestui domeniu",
+    "limitLabel": "Limită (USD)",
+    "windowLabel": "Fereastră",
+    "window24h": "24 de ore",
+    "window7d": "7 zile",
+    "window30d": "30 de zile",
+    "multiplierLabel": "Multiplicatorul vârfului",
+    "saved": "Setările alertelor de cheltuieli au fost salvate",
+    "loadError": "Alertele de cheltuieli nu au putut fi încărcate.",
+    "saveError": "Alertele de cheltuieli nu au putut fi salvate.",
+    "empty": "Alertele de cheltuieli sunt oprite. Activează-le pentru a-i avertiza pe contactele de facturare ale acestui domeniu.",
+    "noSpend": "Încă nu s-a înregistrat nicio cheltuială",
+    "spend24h": "Cheltuieli din ultimele 24 de ore",
+    "multiplierError": "Introdu un multiplicator de 1 sau mai mare",
+    "permissionDenied": "Nu ai permisiunea de a gestiona alertele de cheltuieli.",
+    "pushOffByCategory": "Oprit în Notificări"
   }
 }

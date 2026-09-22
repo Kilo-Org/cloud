@@ -827,7 +827,8 @@
       "chat": "Àwọn ìfiránṣẹ́ ìfọ̀rọ̀wérọ̀",
       "kiloclaw": "Àwọn ìgbòkègbodò KiloClaw",
       "balance": "Àwọn ìkìlọ̀ nípa owó tó kù",
-      "security": "Àwọn àwárí ààbò"
+      "security": "Àwọn àwárí ààbò",
+      "spend": "Àwọn ìkìlọ̀ ìnáwó"
     },
     "category": {
       "chatMessagesSubtitle": "àwọn ìdáhùn nínú ìjíròrò rẹ",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Ipò ìgbà iṣẹ́",
       "sessionStatusSubtitle": "ó parí / ó kùnà / ó ti ṣe tán fún ìṣàkóso",
       "kiloclawActivitySubtitle": "ẹ̀rọ iṣẹ́ ti ṣe tán/ó kùnà, àwọn ìṣe tí a ṣètò àkókò wọn",
+      "kiloclawActivityUnavailable": "Bẹ̀rẹ̀ ẹ̀rọ iṣẹ́ KiloClaw kan láti gba ìṣe KiloClaw.",
       "balanceAlertsSubtitle": "àwọn ìkìlọ̀ pé owó àjọ tó kù ti dín kù",
-      "securityFindingsSubtitle": "àwọn àwárí tuntun àti ìránnilétí SLA"
+      "balanceAlertsUnavailable": "Darapọ̀ mọ́ àjọ kan láti gba àwọn ìkìlọ̀ owó tó kù.",
+      "securityFindingsSubtitle": "àwọn àwárí tuntun àti ìránnilétí SLA",
+      "securityFindingsUnavailable": "Mu Aṣojú ààbò Kilo ṣiṣẹ́ ní ààyè kan láti gba àwọn àwárí ààbò.",
+      "spendAlertsSubtitle": "àwọn ìkọjá ààlà àti ìgbésókè lójú wákàtí",
+      "spendAlertsToggle": "Ẹ̀ka àwọn ìkìlọ̀ ìnáwó"
     },
     "action": {
       "openSession": "Ṣí ìgbà iṣẹ́"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "A kò lè gbé ìgbà iṣẹ́ náà wọlé.",
       "failedToLoadDetails": "A kò lè gbé àwọn àlàyé ìgbà iṣẹ́ náà wọlé.",
       "failedToStopExecution": "A kò lè dá ìṣiṣẹ́ náà dúró.",
+      "stopped": "A ti dá ìgbà iṣẹ́ dúró",
+      "committing": "Ń ṣe àkọsílẹ̀…",
+      "committed": "A ti ṣe àkọsílẹ̀",
+      "commitFailed": "Àkọsílẹ̀ kùnà",
       "renameSession": "Yí orúkọ ìgbà iṣẹ́ padà",
       "renamePlaceholder": "Orúkọ ìgbà iṣẹ́",
       "transcriptAccessibility": "Àkọsílẹ̀ ìgbà iṣẹ́",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "ìlà {{displayCount}}",
       "linesBadge_other": "ìlà {{displayCount}}",
       "matchesBadge_one": "ìbámu {{displayCount}}",
-      "matchesBadge_other": "ìbámu {{displayCount}}"
+      "matchesBadge_other": "ìbámu {{displayCount}}",
+      "noOutput": "Kò sí ìjáde."
     },
     "readToolMarkdown": {
       "linesTruncated": "ìlà {{start}}–{{end}} (a gé kúrú)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "Ìgbìyànjú ìwọlé ti pọ̀ jù. Jọ̀wọ́ dúró, kí o sì gbìyànjú lẹ́ẹ̀kan sí i."
   },
   "models": {
+    "auto": {
+      "frontier": "Aládàáṣiṣẹ́ Tó ga jù lọ",
+      "balanced": "Aládàáṣiṣẹ́ Dọ́gba",
+      "efficient": "Aládàáṣiṣẹ́ Daradara",
+      "small": "Aládàáṣiṣẹ́ Kékeré",
+      "free": "Aládàáṣiṣẹ́ Ọ̀fẹ́",
+      "organization": "Aládàáṣiṣẹ́ Àjọ"
+    },
     "dataCollected": "A ń gba dátà",
     "free": "Ọ̀fẹ́",
     "couldNotUpdateFavorites": "A kò lè ṣe ìmúdójúìwọ̀n àwọn àyànfẹ́.",
@@ -3155,7 +3174,8 @@
     "channelName": "Àwọn aṣojú tó ń ṣiṣẹ́",
     "activityKitDisabledBody": "Tan àwọn ìgbòkègbodò ìsinsìnyí nínú àwọn ètò láti rí àwọn aṣojú tó ń ṣiṣẹ́ lórí ojú ìwé títìpa.",
     "openSession": "Ṣí",
-    "approveFailed": "A kò lè fọwọ́ sí. Tẹ $t(common.approve) láti tún gbìyànjú."
+    "approveFailed": "A kò lè fọwọ́ sí. Tẹ $t(common.approve) láti tún gbìyànjú.",
+    "newestResult": "Àbájáde tuntun jùlọ"
   },
   "transcriptionModel": {
     "title": "Àwòṣe ìyípadà ohùn sí ọ̀rọ̀",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "Kọ̀ǹpútà rẹ",
     "remoteOptionBody": "Ṣiṣẹ́ Kilo lórí ẹ̀rọ tirẹ pẹ̀lú CLI `kilo remote`.",
     "skip": "Fo ìrìn àjò sí",
-    "tutorialLabel": "Ìtọ́sọ́nà",
-    "remoteTitle": "Bẹ̀rẹ̀ ìgbà iṣẹ́ ìjìnnà àkọ́kọ́ rẹ",
-    "remoteBody": "So kọ̀ǹpútà rẹ pọ̀, lẹ́yìn náà bẹ̀rẹ̀ ìgbà iṣẹ́ láti ibí yìí.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Kò sí kọ̀ǹpútà tí a so pọ̀ sí báyìí",
-    "remoteEmptyBody": "Láti so ó pọ̀, ṣiṣẹ́ `kilo remote` lórí kọ̀ǹpútà rẹ.",
-    "remoteFound": "Kọ̀ǹpútà ti so pọ̀",
-    "checkAgain": "Tún ṣe àyẹ̀wò",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Ìtọ́sọ́nà"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "Ṣí ìgbà iṣẹ́ tó kẹ́yìn"
+  },
+  "spendAlerts": {
+    "subtitle": "Fi ìkìlọ̀ ránṣẹ́ nípasẹ̀ ímeèlì tàbí push sí àwọn olùbáṣepọ̀ ìsanwó nígbà tí ìnáwó ẹ̀ka yìí bá kọjá ààlà tàbí gòkè ju ìwọ̀n wákàtí tó máa ń ṣe lọ.",
+    "enable": "Tan àwọn ìkìlọ̀ ìnáwó",
+    "thresholdTitle": "Ìkọjá ààlà",
+    "thresholdSubtitle": "Ìnáwó tí ń lọ kọjá ààlà rẹ",
+    "anomalyTitle": "Ìgbésókè lójú wákàtí",
+    "anomalySubtitle": "Wákàtí kan ga ju ìwọ̀n ìṣe ẹ̀ka yìí lọ",
+    "limitLabel": "Ààlà (USD)",
+    "windowLabel": "Àkókò",
+    "window24h": "Wákàtí 24",
+    "window7d": "Ọjọ́ 7",
+    "window30d": "Ọjọ́ 30",
+    "multiplierLabel": "Ìlọ́po ìgbésókè",
+    "saved": "A ti fipamọ́ àwọn ètò ìkìlọ̀ ìnáwó",
+    "loadError": "A kò lè gbé àwọn ìkìlọ̀ ìnáwó wọlé.",
+    "saveError": "A kò lè fipamọ́ àwọn ìkìlọ̀ ìnáwó.",
+    "empty": "Àwọn ìkìlọ̀ ìnáwó ti pa. Tan wọ́n kí o lè kìlọ̀ fún àwọn olùbáṣepọ̀ ìsanwó ẹ̀ka yìí.",
+    "noSpend": "A kò tíì ṣe àkọsílẹ̀ ìnáwó kankan",
+    "spend24h": "Ìnáwó ní wákàtí 24 sẹ́yìn",
+    "multiplierError": "Tẹ ìlọ́po 1 tàbí jù bẹ́ẹ̀ lọ",
+    "permissionDenied": "O kò ní ìyọ̀ǹda láti ṣàkóso àwọn ìkìlọ̀ ìnáwó.",
+    "pushOffByCategory": "Ti pa nínú Àwọn ìfitónilétí"
   }
 }

@@ -859,7 +859,8 @@
       "chat": "Pokalbių žinutės",
       "kiloclaw": "KiloClaw veikla",
       "balance": "Įspėjimai apie likutį",
-      "security": "Saugos problemos"
+      "security": "Saugos problemos",
+      "spend": "Išlaidų įspėjimai"
     },
     "category": {
       "chatMessagesSubtitle": "atsakymai jūsų pokalbiuose",
@@ -870,8 +871,13 @@
       "sessionStatusTitle": "Sesijos būsena",
       "sessionStatusSubtitle": "baigta / nepavyko / paruošta valdyti",
       "kiloclawActivitySubtitle": "egzemplioriaus parengtis ar klaida, suplanuoti veiksmai",
+      "kiloclawActivityUnavailable": "Paleiskite KiloClaw egzempliorių, kad gautumėte KiloClaw veiklą.",
       "balanceAlertsSubtitle": "įspėjimai apie mažą organizacijos likutį",
-      "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai"
+      "balanceAlertsUnavailable": "Prisijunkite prie organizacijos, kad gautumėte balanso įspėjimus.",
+      "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai",
+      "securityFindingsUnavailable": "Įjunkite Kilo saugos agentą apimtyje, kad gautumėte saugos radinius.",
+      "spendAlertsSubtitle": "slenksčių viršijimai ir valandiniai šuoliai",
+      "spendAlertsToggle": "Išlaidų įspėjimų kategorija"
     },
     "action": {
       "openSession": "Atidaryti sesiją"
@@ -2132,6 +2138,10 @@
       "couldNotLoad": "Nepavyko įkelti sesijos.",
       "failedToLoadDetails": "Nepavyko įkelti sesijos informacijos.",
       "failedToStopExecution": "Nepavyko sustabdyti vykdymo.",
+      "stopped": "Sesija sustabdyta",
+      "committing": "Įrašoma…",
+      "committed": "Įrašyta",
+      "commitFailed": "Nepavyko įrašyti",
       "renameSession": "Pervadinti sesiją",
       "renamePlaceholder": "Sesijos pavadinimas",
       "transcriptAccessibility": "Sesijos pokalbio išrašas",
@@ -2280,7 +2290,8 @@
       "matchesBadge_one": "atitiktis: {{displayCount}}",
       "matchesBadge_other": "atitikčių: {{displayCount}}",
       "matchesBadge_few": "atitiktys: {{displayCount}}",
-      "matchesBadge_many": "atitikčių: {{displayCount}}"
+      "matchesBadge_many": "atitikčių: {{displayCount}}",
+      "noOutput": "Nėra išvesties."
     },
     "readToolMarkdown": {
       "linesTruncated": "eilutės {{start}}–{{end}} (sutrumpinta)",
@@ -3194,6 +3205,14 @@
     "tooManySignInAttempts": "Per daug bandymų prisijungti. Palauk ir bandyk dar kartą."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatinis Pažangiausias",
+      "balanced": "Automatinis Subalansuotas",
+      "efficient": "Automatinis Efektyvus",
+      "small": "Automatinis Mažas",
+      "free": "Automatinis Nemokamas",
+      "organization": "Organizacijos automatinis"
+    },
     "dataCollected": "Duomenys renkami",
     "free": "Nemokama",
     "couldNotUpdateFavorites": "Nepavyko atnaujinti mėgstamiausių modelių.",
@@ -3241,7 +3260,8 @@
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
     "openSession": "Atidaryti",
-    "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą."
+    "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą.",
+    "newestResult": "Naujausias rezultatas"
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",
@@ -3266,15 +3286,7 @@
     "remoteOptionTitle": "Jūsų kompiuteris",
     "remoteOptionBody": "Paleiskite Kilo savo kompiuteryje per `kilo remote` CLI.",
     "skip": "Praleisti apžvalgą",
-    "tutorialLabel": "Pamoka",
-    "remoteTitle": "Pradėkite pirmąją nuotolinę sesiją",
-    "remoteBody": "Prijunkite savo kompiuterį, tada pradėkite sesiją čia.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Dar nėra prijungto kompiuterio",
-    "remoteEmptyBody": "Norėdami prijungti, kompiuteryje vykdykite `kilo remote`.",
-    "remoteFound": "Kompiuteris prijungtas",
-    "checkAgain": "Kartoti patikrinimą",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Pamoka"
   },
   "appActions": {
     "start": {
@@ -3285,5 +3297,28 @@
   },
   "launcher": {
     "openLastSession": "Atidaryti paskutinę sesiją"
+  },
+  "spendAlerts": {
+    "subtitle": "Siųsk įspėjimą el. paštu arba push pranešimu atsiskaitymo kontaktams, kai šios srities išlaidos viršija limitą arba pakyla virš įprasto valandinio tempo.",
+    "enable": "Įjungti išlaidų įspėjimus",
+    "thresholdTitle": "Slenksčio viršijimas",
+    "thresholdSubtitle": "Einamosios išlaidos viršija tavo limitą",
+    "anomalyTitle": "Valandinis šuolis",
+    "anomalySubtitle": "Viena valanda gerokai viršija įprastą šios srities tempą",
+    "limitLabel": "Limitas (USD)",
+    "windowLabel": "Langas",
+    "window24h": "24 valandos",
+    "window7d": "7 dienos",
+    "window30d": "30 dienų",
+    "multiplierLabel": "Šuolio daugiklis",
+    "saved": "Išlaidų įspėjimų nustatymai išsaugoti",
+    "loadError": "Nepavyko įkelti išlaidų įspėjimų.",
+    "saveError": "Nepavyko išsaugoti išlaidų įspėjimų.",
+    "empty": "Išlaidų įspėjimai išjungti. Įjunk juos, kad įspėtum šios srities atsiskaitymo kontaktus.",
+    "noSpend": "Išlaidų dar neužregistruota",
+    "spend24h": "Išlaidos per paskutines 24 valandas",
+    "multiplierError": "Įvesk daugiklį, lygų 1 arba didesnį",
+    "permissionDenied": "Neturite leidimo valdyti išlaidų įspėjimų.",
+    "pushOffByCategory": "Išjungta pranešimuose"
   }
 }

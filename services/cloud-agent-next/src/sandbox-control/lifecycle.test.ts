@@ -3,6 +3,7 @@ import { SandboxSession } from '../sandbox-session/SandboxSession.js';
 import { createMemoryEventQueries } from '../session/preparation-test-helpers.js';
 import type { BillingContext } from '@kilocode/container-usage';
 import {
+  CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
   getSandboxAllocationResources,
   type SandboxAllocation,
   type VercelSandboxResources,
@@ -48,7 +49,7 @@ import { getWorktreeWorkspacePath } from '../workspace.js';
 import type { ProviderAdapter } from './provider.js';
 import type * as cloudflareProvider from './cloudflare-provider.js';
 import type * as SocketModule from './socket.js';
-import { decodeCloudflareProviderRef } from './cloudflare-provider.js';
+import { decodeCloudflareProviderRef, encodeCloudflareProviderRef } from './cloudflare-provider.js';
 import { WORKTREE_CREDENTIAL_CONTAINMENT } from './physical-lifecycle.js';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
 import { logger } from '../logger.js';
@@ -297,6 +298,17 @@ async function harness(
     SandboxSmallContainment: makeNamespace('SandboxSmallContainment'),
   };
   const namespace = namespaces[expectedNamespace];
+  const containerStub = {
+    launchWrapper: vi.fn(async () => ({ started: true })),
+    observe: vi.fn(async () => ({ state: 'running', running: true, currentAllocationRef: null })),
+    stop: vi.fn(async () => 'terminal'),
+    ensureLeaseAtLeast: vi.fn(async () => undefined),
+    readLog: vi.fn(async () => ''),
+  };
+  const sandboxContainers = {
+    idFromName: (id: string) => ({ toString: () => `do:SANDBOX_CONTAINERS:${id}` }),
+    getByName: vi.fn((_id: string) => containerStub),
+  };
   const issueKiloSessionCapability = vi.fn(async () => ({
     success: true,
     capability: 'kka1.test-capability',
@@ -304,6 +316,7 @@ async function harness(
   const env = {
     WORKER_URL: 'https://example.test',
     ...namespaces,
+    SANDBOX_CONTAINERS: sandboxContainers,
     GIT_TOKEN_SERVICE: { issueKiloSessionCapability },
     KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
     KILO_OPENROUTER_BASE: 'https://provider.example.test',
@@ -397,6 +410,8 @@ async function harness(
     env,
     namespace,
     namespaces,
+    sandboxContainers,
+    containerStub,
     issueKiloSessionCapability,
     get transactionActive() {
       return transactionActive;
@@ -828,6 +843,143 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(
       await h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
     ).toMatchObject({ status: 'unknown', estimatedSleepAt: null });
+  });
+
+  it('wires the containers adapter to the control allocation and container namespace', async () => {
+    const h = await harness({ containmentEnabled: false });
+    h.session.getCredentialMetadata.mockResolvedValue(
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: ROUTE.sessionId, userId: OWNER },
+        auth: { kiloSessionId: ROUTE.kiloSessionId, kilocodeToken: 'test-token' },
+        workspace: {
+          sandboxId: SANDBOX_ID,
+          workspacePath: ROUTE.directory,
+          sandboxProvider: 'cloudflare-containers',
+          credentialContainment: {
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+            kilocode: false,
+          },
+        },
+        lifecycle: { version: 1, timestamp: Date.now() },
+      })
+    );
+    await h.control.ensureReady({
+      ownerId: OWNER,
+      sessionId: ROUTE.sessionId,
+      provider: 'cloudflare-containers',
+      allowCreate: true,
+      billing: BILLING,
+    });
+    expect(h.sandboxContainers.getByName).toHaveBeenCalledWith(SANDBOX_ID);
+
+    const physical = await h.control.getPhysicalRecord();
+    expect(physical.state).toBe('running');
+    expect(physical.createIntent?.allocationName).toMatch(/^ses-[0-9a-f]{48}$/);
+    expect(decodeCloudflareProviderRef(physical.providerRef ?? '')).toEqual({
+      sandboxId: physical.createIntent?.allocationName,
+      containment: false,
+      instanceId: physical.createIntent?.intentId,
+    });
+    expect(h.containerStub.launchWrapper).toHaveBeenCalledWith({
+      allocationRef: physical.providerRef,
+      instance: CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
+      env: expect.objectContaining({
+        PROVIDER_INSTANCE_ID: physical.providerRef,
+        WRAPPER_LOG_PATH: '/tmp/kilocode-control-wrapper.log',
+      }),
+    });
+
+    await h.control.ensureReady({
+      ownerId: OWNER,
+      sessionId: ROUTE.sessionId,
+      provider: 'cloudflare-containers',
+      allowCreate: false,
+    });
+    const unchanged = await h.control.getPhysicalRecord();
+    expect(unchanged.state).toBe('running');
+    expect(unchanged.stopTombstone).toBeNull();
+    expect(unchanged.providerRef).toBe(physical.providerRef);
+    expect(unchanged.createIntent?.intentId).toBe(physical.createIntent?.intentId);
+    expect(h.containerStub.launchWrapper).toHaveBeenCalledTimes(1);
+  });
+
+  it('projects a recorded containers allocation and rejects a foreign provider request', async () => {
+    const h = await harness();
+    const now = Date.now();
+    const providerRef = encodeCloudflareProviderRef({
+      sandboxId: SANDBOX_ID,
+      containment: false,
+      instanceId: 'intent-1',
+    });
+    const identity = {
+      connectionId: crypto.randomUUID(),
+      wrapperInstanceId: crypto.randomUUID(),
+      providerInstanceId: providerRef,
+    };
+    const first = {
+      ...ROUTE,
+      worktreeId: 'worktree_shared',
+      lastState: 'idle',
+      lastStateAt: now,
+      idleForMs: 0,
+      waitingOn: null,
+    };
+    const sibling = { ...first, sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' };
+    const idle = await summarizeHeartbeatIdle({
+      state: 'idle',
+      pendingMessages: 0,
+      kilo: { ready: true },
+      sessions: [first, sibling].map(route => ({
+        kiloSessionId: route.kiloSessionId,
+        state: 'idle',
+        idleForMs: 0,
+      })),
+    });
+    const attachment = {
+      ...identity,
+      handshakeComplete: true,
+      protocolVersion: 1,
+      acceptedAt: now - 1_000,
+      observation: { ready: true, receivedAt: now, idle },
+    };
+    const socket = {
+      readyState: 1,
+      deserializeAttachment: vi.fn(() => attachment),
+      serializeAttachment: vi.fn(),
+      send: vi.fn(),
+      close: vi.fn(),
+    };
+    vi.spyOn(h.ctx, 'getWebSockets').mockReturnValue([socket as unknown as WebSocket]);
+    h.records.set('provider_kind', 'cloudflare-containers');
+    h.records.set('physical_record', {
+      state: 'running',
+      providerRef,
+      createIntent: null,
+      stopTombstone: null,
+      resumable: false,
+    });
+    h.records.set('active_wrapper_runtime', {
+      ...identity,
+      readyConnectionId: identity.connectionId,
+    });
+    h.records.set('session_routes', [first, sibling]);
+    h.records.set('deadlines', {
+      idleStop: now + DEADLINE_MS.idleStop,
+      heartbeatExpiry: now + DEADLINE_MS.heartbeatExpiry,
+    });
+    await expect(
+      h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare-containers' })
+    ).resolves.toMatchObject({
+      status: 'active',
+      provider: 'Cloudflare',
+      estimatedSleepAt: now + DEADLINE_MS.idleStop,
+    });
+    await expect(
+      h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
+    ).resolves.toMatchObject({ status: 'unknown', provider: 'Unknown' });
   });
 
   describe.each(['create', 'acquire'] as const)('%s credential policy', createPath => {
@@ -2463,9 +2615,13 @@ describe('SandboxControl lifecycle boundaries', () => {
           identity
         );
       }
-      const before = await loadDeadlines(h.storage);
-      const idleAt = before.idleStop;
+      const armed = await loadDeadlines(h.storage);
+      const idleAt = armed.idleStop;
       if (idleAt === undefined) throw new Error('Missing idle deadline');
+      vi.setSystemTime(idleAt - DEADLINE_MS.heartbeatExpiry / 2);
+      await h.hooks.onHeartbeat?.({ state: 'idle', kilo: { ready: true }, sessions: [] }, identity);
+      const before = await loadDeadlines(h.storage);
+      expect(before.idleStop).toBe(idleAt);
       vi.setSystemTime(idleAt - 1);
       await h.create();
       expect((await loadDeadlines(h.storage)).idleStop).toBe(idleAt);

@@ -827,7 +827,8 @@
       "chat": "ચેટના સંદેશા",
       "kiloclaw": "KiloClawની પ્રવૃત્તિ",
       "balance": "બેલેન્સ અંગેની ચેતવણીઓ",
-      "security": "સુરક્ષા તપાસનાં તારણો"
+      "security": "સુરક્ષા તપાસનાં તારણો",
+      "spend": "ખર્ચની ચેતવણીઓ"
     },
     "category": {
       "chatMessagesSubtitle": "તમારી વાતચીતમાં જવાબો",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "સત્રની સ્થિતિ",
       "sessionStatusSubtitle": "પૂર્ણ / નિષ્ફળ / નિયંત્રિત કરવા તૈયાર",
       "kiloclawActivitySubtitle": "ઇન્સ્ટન્સ તૈયાર/નિષ્ફળ, નિર્ધારિત ક્રિયાઓ",
+      "kiloclawActivityUnavailable": "KiloClaw પ્રવૃત્તિ મેળવવા માટે KiloClaw ઇન્સ્ટન્સ શરૂ કરો.",
       "balanceAlertsSubtitle": "સંસ્થાનું બેલેન્સ ઓછું થવાની ચેતવણીઓ",
-      "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર"
+      "balanceAlertsUnavailable": "બેલેન્સ ચેતવણીઓ મેળવવા માટે સંસ્થામાં જોડાઓ.",
+      "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર",
+      "securityFindingsUnavailable": "સુરક્ષા તારણો મેળવવા માટે એક અવકાશમાં Kilo સુરક્ષા એજન્ટ સક્ષમ કરો.",
+      "spendAlertsSubtitle": "મર્યાદા ઓળંગવી અને કલાકદીઠ ઉછાળા",
+      "spendAlertsToggle": "ખર્ચની ચેતવણીની શ્રેણી"
     },
     "action": {
       "openSession": "સેશન ખોલો"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "સત્ર લોડ કરી શકાયું નહીં.",
       "failedToLoadDetails": "સત્રની વિગતો લોડ કરી શકાઈ નહીં.",
       "failedToStopExecution": "ચાલી રહેલું કાર્ય રોકી શકાયું નહીં.",
+      "stopped": "સત્ર બંધ થયું",
+      "committing": "કમિટ થઈ રહ્યું છે…",
+      "committed": "કમિટ થયું",
+      "commitFailed": "કમિટ નિષ્ફળ ગયું",
       "renameSession": "સત્રનું નામ બદલો",
       "renamePlaceholder": "સત્રનું નામ",
       "transcriptAccessibility": "સત્રની લેખિત વાતચીત",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} પંક્તિ",
       "linesBadge_other": "{{displayCount}} પંક્તિઓ",
       "matchesBadge_one": "{{displayCount}} મેળ",
-      "matchesBadge_other": "{{displayCount}} મેળ"
+      "matchesBadge_other": "{{displayCount}} મેળ",
+      "noOutput": "કોઈ આઉટપુટ નથી."
     },
     "readToolMarkdown": {
       "linesTruncated": "પંક્તિઓ {{start}}–{{end}} (ટૂંકાવેલી)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "સાઇન ઇન કરવાના ઘણા બધા પ્રયત્નો થયા છે. કૃપા કરીને થોડી રાહ જુઓ અને ફરી પ્રયત્ન કરો."
   },
   "models": {
+    "auto": {
+      "frontier": "આપમેળે અગ્રણી",
+      "balanced": "આપમેળે સંતુલિત",
+      "efficient": "આપમેળે કાર્યક્ષમ",
+      "small": "આપમેળે નાનું",
+      "free": "આપમેળે મફત",
+      "organization": "સંસ્થા આપમેળે"
+    },
     "dataCollected": "ડેટા એકત્ર થાય છે",
     "free": "મફત",
     "couldNotUpdateFavorites": "મનપસંદની યાદી અપડેટ કરી શકાઈ નહીં.",
@@ -3155,7 +3174,8 @@
     "channelName": "સક્રિય એજન્ટો",
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો.",
     "openSession": "ખોલો",
-    "approveFailed": "મંજૂર કરી શકાયું નહીં. ફરી પ્રયાસ કરવા $t(common.approve) પર ટૅપ કરો."
+    "approveFailed": "મંજૂર કરી શકાયું નહીં. ફરી પ્રયાસ કરવા $t(common.approve) પર ટૅપ કરો.",
+    "newestResult": "સૌથી નવું પરિણામ"
   },
   "transcriptionModel": {
     "title": "અવાજને લખાણમાં ફેરવવાનું મોડેલ",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "તમારું કમ્પ્યુટર",
     "remoteOptionBody": "તમારા પોતાના મશીન પર `kilo remote` CLI દ્વારા Kilo ચલાવો.",
     "skip": "ટૂર છોડી દો",
-    "tutorialLabel": "ટ્યુટોરિયલ",
-    "remoteTitle": "તમારી પહેલી રિમોટ સત્ર શરૂ કરો",
-    "remoteBody": "તમારું કમ્પ્યુટર કનેક્ટ કરો, પછી અહીંથી સત્ર શરૂ કરો.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "હજુ કોઈ કમ્પ્યુટર કનેક્ટ થયું નથી",
-    "remoteEmptyBody": "તેને કનેક્ટ કરવા તમારા કમ્પ્યુટર પર `kilo remote` ચલાવો.",
-    "remoteFound": "કમ્પ્યુટર કનેક્ટ થયું",
-    "checkAgain": "ફરી તપાસો",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ટ્યુટોરિયલ"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "છેલ્લું સત્ર ખોલો"
+  },
+  "spendAlerts": {
+    "subtitle": "આ સ્કોપનો ખર્ચ મર્યાદા ઓળંગે ત્યારે અથવા તેના સામાન્ય કલાકદીઠ દરથી ઉપર ઉછાળે ત્યારે બિલિંગ સંપર્કોને ઇમેઇલ અથવા પુશ દ્વારા ચેતવણી મોકલો.",
+    "enable": "ખર્ચની ચેતવણીઓ ચાલુ કરો",
+    "thresholdTitle": "મર્યાદા ઓળંગવી",
+    "thresholdSubtitle": "ચાલુ ખર્ચ તમારી મર્યાદા ઓળંગે છે",
+    "anomalyTitle": "કલાકદીઠ ઉછાળો",
+    "anomalySubtitle": "એક કલાક આ સ્કોપના સામાન્ય દરથી ઘણો ઊંચો છે",
+    "limitLabel": "મર્યાદા (USD)",
+    "windowLabel": "સમયગાળો",
+    "window24h": "24 કલાક",
+    "window7d": "7 દિવસ",
+    "window30d": "30 દિવસ",
+    "multiplierLabel": "ઉછાળ ગુણક",
+    "saved": "ખર્ચની ચેતવણીની સેટિંગ્સ સાચવી",
+    "loadError": "ખર્ચની ચેતવણીઓ લોડ કરી શકાઈ નથી.",
+    "saveError": "ખર્ચની ચેતવણીઓ સાચવી શકાઈ નથી.",
+    "empty": "ખર્ચની ચેતવણીઓ બંધ છે. આ સ્કોપના બિલિંગ સંપર્કોને ચેતવવા માટે તેમને ચાલુ કરો.",
+    "noSpend": "હજી કોઈ ખર્ચ નોંધાયો નથી",
+    "spend24h": "છેલ્લા 24 કલાકનો ખર્ચ",
+    "multiplierError": "1 કે તેથી વધુ ગુણક દાખલ કરો",
+    "permissionDenied": "તમને ખર્ચની ચેતવણીઓનું સંચાલન કરવાની પરવાનગી નથી.",
+    "pushOffByCategory": "સૂચનાઓમાં બંધ"
   }
 }

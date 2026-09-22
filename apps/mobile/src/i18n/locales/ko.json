@@ -323,7 +323,8 @@
       "chat": "채팅 메시지",
       "kiloclaw": "KiloClaw 활동",
       "balance": "잔액 알림",
-      "security": "보안 진단 결과"
+      "security": "보안 진단 결과",
+      "spend": "지출 알림"
     },
     "category": {
       "chatMessagesSubtitle": "대화에 달린 답장",
@@ -334,8 +335,13 @@
       "sessionStatusTitle": "세션 상태",
       "sessionStatusSubtitle": "완료 / 실패 / 제어 준비 완료",
       "kiloclawActivitySubtitle": "인스턴스 준비 완료 및 실패, 예약된 작업",
+      "kiloclawActivityUnavailable": "KiloClaw 활동을 받으려면 KiloClaw 인스턴스를 시작하세요.",
       "balanceAlertsSubtitle": "조직 잔액 부족 경고",
-      "securityFindingsSubtitle": "새 보안 문제 및 SLA 알림"
+      "balanceAlertsUnavailable": "잔액 경고를 받으려면 조직에 가입하세요.",
+      "securityFindingsSubtitle": "새 보안 문제 및 SLA 알림",
+      "securityFindingsUnavailable": "보안 문제를 받으려면 범위에서 Kilo 보안 에이전트를 사용 설정하세요.",
+      "spendAlertsSubtitle": "임계값 초과 및 시간당 급증",
+      "spendAlertsToggle": "지출 알림 카테고리"
     },
     "action": {
       "openSession": "세션 열기"
@@ -1572,6 +1578,10 @@
       "couldNotLoad": "세션을 불러올 수 없습니다.",
       "failedToLoadDetails": "세션 세부 정보를 불러오지 못했습니다.",
       "failedToStopExecution": "실행을 중지하지 못했습니다.",
+      "stopped": "세션이 중지되었습니다",
+      "committing": "커밋 중…",
+      "committed": "커밋 완료",
+      "commitFailed": "커밋 실패",
       "renameSession": "세션 이름 변경",
       "renamePlaceholder": "세션 이름",
       "transcriptAccessibility": "세션 기록",
@@ -1712,7 +1722,8 @@
       "linesBadge_one": "{{displayCount}}줄",
       "linesBadge_other": "{{displayCount}}줄",
       "matchesBadge_one": "{{displayCount}}건 일치",
-      "matchesBadge_other": "{{displayCount}}건 일치"
+      "matchesBadge_other": "{{displayCount}}건 일치",
+      "noOutput": "출력이 없습니다."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}}줄 (일부 생략)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "로그인 시도가 너무 많습니다. 잠시 기다린 후 다시 시도하세요."
   },
   "models": {
+    "auto": {
+      "frontier": "자동 프런티어",
+      "balanced": "자동 균형",
+      "efficient": "자동 효율",
+      "small": "자동 소형",
+      "free": "자동 무료",
+      "organization": "조직 자동"
+    },
     "dataCollected": "데이터 수집",
     "free": "무료",
     "couldNotUpdateFavorites": "즐겨찾기를 업데이트할 수 없습니다.",
@@ -3155,7 +3174,8 @@
     "channelName": "활성 에이전트",
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요.",
     "openSession": "열기",
-    "approveFailed": "승인하지 못했습니다. 다시 시도하려면 $t(common.approve)을 탭하세요."
+    "approveFailed": "승인하지 못했습니다. 다시 시도하려면 $t(common.approve)을 탭하세요.",
+    "newestResult": "최신 결과"
   },
   "transcriptionModel": {
     "title": "음성 텍스트 변환 모델",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "내 컴퓨터",
     "remoteOptionBody": "`kilo remote` CLI로 내 컴퓨터에서 Kilo를 실행하세요.",
     "skip": "투어 건너뛰기",
-    "tutorialLabel": "튜토리얼",
-    "remoteTitle": "첫 리모트 세션 시작하기",
-    "remoteBody": "컴퓨터를 연결한 뒤 여기서 세션을 시작하세요.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "연결된 컴퓨터가 없습니다",
-    "remoteEmptyBody": "연결하려면 컴퓨터에서 `kilo remote`를 실행하세요.",
-    "remoteFound": "컴퓨터 연결됨",
-    "checkAgain": "다시 확인",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "튜토리얼"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "마지막 세션 열기"
+  },
+  "spendAlerts": {
+    "subtitle": "이 범위의 지출이 한도를 넘거나 평소 시간당 속도를 크게 웃돌면 청구 담당자에게 이메일 또는 푸시로 알림을 보냅니다.",
+    "enable": "지출 알림 켜기",
+    "thresholdTitle": "임계값 초과",
+    "thresholdSubtitle": "누적 지출이 한도를 초과합니다",
+    "anomalyTitle": "시간당 급증",
+    "anomalySubtitle": "한 시간의 지출이 이 범위의 평소 속도를 크게 웃돕니다",
+    "limitLabel": "한도 (USD)",
+    "windowLabel": "기간",
+    "window24h": "24시간",
+    "window7d": "7일",
+    "window30d": "30일",
+    "multiplierLabel": "급증 배수",
+    "saved": "지출 알림 설정이 저장되었습니다",
+    "loadError": "지출 알림을 불러오지 못했습니다.",
+    "saveError": "지출 알림을 저장하지 못했습니다.",
+    "empty": "지출 알림이 꺼져 있습니다. 이 범위의 청구 담당자에게 알리려면 켜세요.",
+    "noSpend": "아직 기록된 지출이 없습니다",
+    "spend24h": "최근 24시간 지출",
+    "multiplierError": "1 이상의 배수를 입력하세요",
+    "permissionDenied": "지출 알림을 관리할 권한이 없습니다.",
+    "pushOffByCategory": "알림에서 꺼짐"
   }
 }

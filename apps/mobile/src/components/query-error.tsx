@@ -51,7 +51,7 @@ type QueryErrorProps = {
   onRetry?: () => void;
   isRetrying?: boolean;
   className?: string;
-  placement?: 'center' | 'top';
+  placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
 };
 

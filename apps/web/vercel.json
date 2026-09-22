@@ -131,6 +131,10 @@
     {
       "path": "/api/cron/cleanup-review-memory",
       "schedule": "0 */12 * * *"
+    },
+    {
+      "path": "/api/cron/dispatch-spend-alerts",
+      "schedule": "*/5 * * * *"
     }
   ],
   "build": {

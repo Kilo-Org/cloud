@@ -827,7 +827,8 @@
       "chat": "Söhbət mesajları",
       "kiloclaw": "KiloClaw fəaliyyəti",
       "balance": "Balans bildirişləri",
-      "security": "Təhlükəsizlik problemləri"
+      "security": "Təhlükəsizlik problemləri",
+      "spend": "Xərc bildirişləri"
     },
     "category": {
       "chatMessagesSubtitle": "söhbətlərindəki cavablar",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Sessiya statusu",
       "sessionStatusSubtitle": "tamamlanıb / uğursuz olub / idarəetməyə hazırdır",
       "kiloclawActivitySubtitle": "nüsxə hazırdır/uğursuz olub, planlaşdırılmış əməliyyatlar",
+      "kiloclawActivityUnavailable": "KiloClaw fəaliyyəti üçün KiloClaw nüsxəsini işə salın.",
       "balanceAlertsSubtitle": "təşkilatın balansının azalması barədə xəbərdarlıqlar",
-      "securityFindingsSubtitle": "yeni aşkarlamalar və SLA xatırlatmaları"
+      "balanceAlertsUnavailable": "Balans xəbərdarlıqları üçün təşkilata qoşulun.",
+      "securityFindingsSubtitle": "yeni aşkarlamalar və SLA xatırlatmaları",
+      "securityFindingsUnavailable": "Təhlükəsizlik aşkarlamaları üçün Kilo Təhlükəsizlik agentini bir əhatə dairəsində aktivləşdirin.",
+      "spendAlertsSubtitle": "hədd aşmaları və saatlıq sıçrayışlar",
+      "spendAlertsToggle": "Xərc bildirişləri kateqoriyası"
     },
     "action": {
       "openSession": "Sessiyanı aç"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Sessiyanı yükləmək mümkün olmadı.",
       "failedToLoadDetails": "Sessiyanın təfərrüatlarını yükləmək mümkün olmadı.",
       "failedToStopExecution": "İcranı dayandırmaq mümkün olmadı.",
+      "stopped": "Sessiya dayandırıldı",
+      "committing": "Təsdiqlənir…",
+      "committed": "Təsdiqləndi",
+      "commitFailed": "Təsdiqləmə uğursuz oldu",
       "renameSession": "Sessiyanın adını dəyiş",
       "renamePlaceholder": "Sessiya adı",
       "transcriptAccessibility": "Sessiyanın yazışma tarixçəsi",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} sətir",
       "linesBadge_other": "{{displayCount}} sətir",
       "matchesBadge_one": "{{displayCount}} uyğunluq",
-      "matchesBadge_other": "{{displayCount}} uyğunluq"
+      "matchesBadge_other": "{{displayCount}} uyğunluq",
+      "noOutput": "Çıxış yoxdur."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} sətirləri (qısaldılıb)",
@@ -3108,6 +3119,14 @@
     "tooManySignInAttempts": "Həddindən çox giriş cəhdi edilib. Bir az gözlə və yenidən cəhd et."
   },
   "models": {
+    "auto": {
+      "frontier": "Avtomatik Qabaqcıl",
+      "balanced": "Avtomatik Balanslı",
+      "efficient": "Avtomatik Səmərəli",
+      "small": "Avtomatik Kiçik",
+      "free": "Avtomatik Pulsuz",
+      "organization": "Təşkilat Avtomatik"
+    },
     "dataCollected": "Məlumat toplanır",
     "free": "Pulsuz",
     "couldNotUpdateFavorites": "Sevimliləri yeniləmək mümkün olmadı.",
@@ -3155,7 +3174,8 @@
     "channelName": "Aktiv agentlər",
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir.",
     "openSession": "Aç",
-    "approveFailed": "Təsdiqləmək mümkün olmadı. Yenidən cəhd etmək üçün $t(common.approve) üzərinə toxun."
+    "approveFailed": "Təsdiqləmək mümkün olmadı. Yenidən cəhd etmək üçün $t(common.approve) üzərinə toxun.",
+    "newestResult": "Ən yeni nəticə"
   },
   "transcriptionModel": {
     "title": "Səsin mətnə çevrilməsi modeli",
@@ -3180,15 +3200,7 @@
     "remoteOptionTitle": "Kompüterin",
     "remoteOptionBody": "Kilo-nu `kilo remote` CLI vasitəsilə öz cihazında işə sal.",
     "skip": "Turu ötür",
-    "tutorialLabel": "Təlimat",
-    "remoteTitle": "İlk uzaq sessiyanı başlat",
-    "remoteBody": "Kompüterini qoş, sonra sessiyanı buradan başlat.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Hələ kompüter qoşulmayıb",
-    "remoteEmptyBody": "Onu qoşmaq üçün kompüterində `kilo remote` əmrini işə sal.",
-    "remoteFound": "Kompüter qoşuldu",
-    "checkAgain": "Yenidən yoxla",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Təlimat"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3211,28 @@
   },
   "launcher": {
     "openLastSession": "Son sessiyanı aç"
+  },
+  "spendAlerts": {
+    "subtitle": "Bu əhatənin xərci həddi aşdıqda və ya adi saatlıq sürətindən yuxarı sıçradıqda ödəniş əlaqələrinə e-poçt və ya push ilə bildiriş göndər.",
+    "enable": "Xərc bildirişlərini aktivləşdir",
+    "thresholdTitle": "Həddin aşılması",
+    "thresholdSubtitle": "Yığılan xərc limitini aşır",
+    "anomalyTitle": "Saatlıq sıçrayış",
+    "anomalySubtitle": "Bir saat bu əhatənin adi sürətindən xeyli yuxarıdır",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Pəncərə",
+    "window24h": "24 saat",
+    "window7d": "7 gün",
+    "window30d": "30 gün",
+    "multiplierLabel": "Sıçrayış əmsalı",
+    "saved": "Xərc bildirişi parametrləri yadda saxlanıldı",
+    "loadError": "Xərc bildirişlərini yükləmək mümkün olmadı.",
+    "saveError": "Xərc bildirişlərini yadda saxlamaq mümkün olmadı.",
+    "empty": "Xərc bildirişləri söndürülüb. Bu əhatənin ödəniş əlaqələrini xəbərdar etmək üçün onları yandır.",
+    "noSpend": "Hələ heç bir xərc qeydə alınmayıb",
+    "spend24h": "Son 24 saatda xərc",
+    "multiplierError": "1 və ya daha böyük əmsal daxil et",
+    "permissionDenied": "Xərc bildirişlərini idarə etmək icazən yoxdur.",
+    "pushOffByCategory": "Bildirişlərdə söndürülüb"
   }
 }

@@ -303,6 +303,20 @@ describe('ScreenHeader mounted', () => {
     expect(capped).toHaveLength(0);
   });
 
+  it('renders inlineActions beside a centered title too', () => {
+    // A centered title (`centerTitle`, e.g. a modal with a title or eyebrow)
+    // shares its row with the leading control; the inline actions slot must not
+    // be dropped just because the title is centered.
+    const renderer = renderHeader({ modal: true, title: 'Filters', inlineActions: 'ACTIONS' });
+
+    const inline = findInlineActionsWrapper(renderer.root);
+    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.parent?.props.className).toContain('flex-row');
+    expect(inline.props.className).not.toContain('max-w-[50%]');
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.className).toContain('text-center');
+  });
+
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 

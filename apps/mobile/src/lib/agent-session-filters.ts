@@ -1,14 +1,15 @@
 import { z } from 'zod';
 
-import { projectOptionKey } from '@/components/agents/session-list-helpers';
+import { knownPlatformBucket, projectOptionKey } from '@/components/agents/session-list-helpers';
 
 /**
  * Pure contract for the persisted session filter set. Intentionally free of
  * any Expo / SecureStore / native-bridge imports so it can be unit-tested in
  * node and re-used by tests/mocks without touching the native bridge. It
- * imports the visible-label key (`projectOptionKey`) from the session-list
- * helpers so the badge counts one merged project option once; that module is
- * native-free too, so the node test still runs.
+ * imports the visible-label project key (`projectOptionKey`) and the
+ * platform-bucket collapse (`knownPlatformBucket`) from the session-list
+ * helpers so the badge counts each row the filter sheet renders once; that
+ * module is native-free too, so the node test still runs.
  *
  * Both session-list pages persist this shape, under their own storage key.
  */
@@ -82,5 +83,13 @@ export function countActiveSessionFilters(filters: AgentSessionFilters): number 
   // a `.git` suffix, host case) that render to one label, so the raw array
   // length over-counts the rows the sheet shows.
   const projectCount = new Set(filters.projectFilter.map(gitUrl => projectOptionKey(gitUrl))).size;
-  return filters.platformFilter.length + projectCount;
+  // The sheet collapses a persisted platform variant into its bucket row
+  // (`normalisePlatform` in the filter modal), so a legacy selection holding a
+  // bucket and one of its variants (`cloud-agent` + `cloud-agent-web`) renders
+  // one checked row and must count once. An unknown platform keeps its own row,
+  // so it counts as itself.
+  const platformCount = new Set(
+    filters.platformFilter.map(platform => knownPlatformBucket(platform) ?? platform)
+  ).size;
+  return platformCount + projectCount;
 }

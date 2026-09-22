@@ -44,7 +44,8 @@ type ScreenHeaderProps = {
   /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
   size?: 'default' | 'large';
   headerRight?: React.ReactNode;
-  /** Controls rendered at the trailing edge of the title row. The heading keeps
+  /** Controls rendered at the trailing edge of the title row, in the
+   * leading-aligned row and beside a centered title alike. The heading keeps
    * `flex-1 min-w-0`, so the title keeps its tail ellipsis and the controls keep
    * their full width instead of the `headerRight` half-row cap wrapping them. */
   inlineActions?: React.ReactNode;
@@ -281,7 +282,7 @@ export function ScreenHeader({
     </Pressable>
   ) : null;
   const centeredControls =
-    separateHeading && backControl && !headerRight ? (
+    separateHeading && backControl && !headerRight && !inlineActions ? (
       <View className="h-11 w-11 shrink-0" accessibilityElementsHidden pointerEvents="none" />
     ) : null;
 
@@ -294,9 +295,9 @@ export function ScreenHeader({
             <View className="min-w-0 flex-1 flex-row items-center justify-center">{heading}</View>
             {headerRight ? (
               <View className="ms-3 max-w-[50%] min-w-0 shrink">{headerRight}</View>
-            ) : (
-              centeredControls
-            )}
+            ) : null}
+            {inlineActions ? <View className="ms-3 min-w-0 shrink">{inlineActions}</View> : null}
+            {centeredControls}
           </View>
         ) : (
           <View className="flex-row items-center">

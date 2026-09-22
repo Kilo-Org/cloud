@@ -91,6 +91,31 @@ describe('countActiveSessionFilters', () => {
       })
     ).toBe(2);
   });
+
+  it('counts a persisted platform bucket and its variant as one checked row', () => {
+    expect(
+      countActiveSessionFilters({
+        platformFilter: ['cloud-agent', 'cloud-agent-web'],
+        projectFilter: [],
+      })
+    ).toBe(1);
+    expect(
+      countActiveSessionFilters({
+        platformFilter: ['extension', 'vscode', 'agent-manager'],
+        projectFilter: [],
+      })
+    ).toBe(1);
+  });
+
+  it('counts distinct platform buckets separately', () => {
+    expect(countActiveSessionFilters({ platformFilter: ['cli', 'slack'], projectFilter: [] })).toBe(
+      2
+    );
+  });
+
+  it('counts an unknown platform as its own row', () => {
+    expect(countActiveSessionFilters({ platformFilter: ['jetbrains'], projectFilter: [] })).toBe(1);
+  });
 });
 
 it('ignores a legacy stored sortBy field', () => {

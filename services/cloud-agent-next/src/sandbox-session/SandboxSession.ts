@@ -3459,12 +3459,12 @@ export class SandboxSession extends DurableObject<Env> {
     const deadlineAt = queued?.deliveryDeadlineAt;
     if (!queued || deadlineAt === undefined) return;
     if (Date.now() >= deadlineAt && !queued.operations?.prompt?.dispatched) {
-      await this.failDelivery(
+      await this.awaitRuntimeReplacementOrFail({
         messageId,
-        'preparation_timeout',
-        queued.wrapperInstanceId,
-        queued.deliveryRetryScope
-      );
+        sandboxId,
+        wrapperInstanceId: queued.wrapperInstanceId,
+        scope: queued.deliveryRetryScope,
+      });
       return;
     }
     if (queued.retryNotBefore !== undefined && queued.retryNotBefore > Date.now()) {
@@ -3667,12 +3667,12 @@ export class SandboxSession extends DurableObject<Env> {
     await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
     if (!isCurrent()) return;
     if (Date.now() >= deadlineAt && !queued.operations?.prompt?.dispatched) {
-      await this.failDelivery(
+      await this.awaitRuntimeReplacementOrFail({
         messageId,
-        'preparation_timeout',
+        sandboxId,
         wrapperInstanceId,
-        queued.deliveryRetryScope
-      );
+        scope: queued.deliveryRetryScope,
+      });
       return;
     }
     const intent = queued.intent;
@@ -3749,12 +3749,12 @@ export class SandboxSession extends DurableObject<Env> {
       if (!isCurrent()) return;
       const currentHead = this.queuedMessage(messageId, epoch, wrapperInstanceId);
       if (Date.now() >= deadlineAt && currentHead?.operations?.prompt?.dispatched !== true) {
-        await this.failDelivery(
+        await this.awaitRuntimeReplacementOrFail({
           messageId,
-          'preparation_timeout',
+          sandboxId,
           wrapperInstanceId,
-          currentHead?.deliveryRetryScope
-        );
+          scope: currentHead?.deliveryRetryScope,
+        });
         return;
       }
     }
@@ -3851,7 +3851,7 @@ export class SandboxSession extends DurableObject<Env> {
             await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
             return;
           }
-          await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId);
+          await this.awaitRuntimeReplacementOrFail({ messageId, sandboxId, wrapperInstanceId });
           return;
         }
         const provision = provisionPreparingStep(observed.physical, allowCreate);
@@ -4178,12 +4178,12 @@ export class SandboxSession extends DurableObject<Env> {
     if (!message) return;
     if (input.hadAcquisition && isSandboxAcquisitionLostError(error)) {
       if (Date.now() >= deadlineAt) {
-        await this.failDelivery(
+        await this.awaitRuntimeReplacementOrFail({
           messageId,
-          'preparation_timeout',
+          sandboxId: this.terminalLifecycle.getStoredMetadata()?.workspace?.sandboxId,
           wrapperInstanceId,
-          message.deliveryRetryScope
-        );
+          scope: message.deliveryRetryScope,
+        });
         return;
       }
       const retryNotBefore = Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS);
@@ -4216,7 +4216,13 @@ export class SandboxSession extends DurableObject<Env> {
         : retryableRejection && !message.unresolvedDispatch;
     const scope: 'message' | 'runtime' = messageRetryScope ? 'message' : 'runtime';
     if (Date.now() >= deadlineAt) {
-      await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId, scope, detail);
+      await this.awaitRuntimeReplacementOrFail({
+        messageId,
+        sandboxId: this.terminalLifecycle.getStoredMetadata()?.workspace?.sandboxId,
+        wrapperInstanceId,
+        scope,
+        detail,
+      });
       return;
     }
     const busy = retryableRejection && error.code === 'session_busy';
@@ -4365,6 +4371,81 @@ export class SandboxSession extends DurableObject<Env> {
       await this.armQueueRetry(Date.now() + SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
       return false;
     }
+  }
+
+  /**
+   * True while the control plane still fences this session to a
+   * directory-native retirement whose replacement runtime has not rebound. The
+   * probe is best-effort: an absent session id or a transport failure reports
+   * "no replacement in flight", so it adds no failure mode of its own and the
+   * existing terminal path runs unchanged.
+   */
+  private async runtimeReplacementInFlight(sandboxId: string): Promise<boolean> {
+    if (this.sessionId === undefined) return false;
+    try {
+      const status = await sandboxControlRpc(this.env, sandboxId).getStatus({
+        sessionId: this.sessionId,
+      });
+      return status.runtimeReplacementInFlight === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * A preparation deadline that lands while the control plane reports a
+   * runtime replacement in flight does not terminalize the head. It re-arms the
+   * head's existing durable delivery deadline and the existing 5 s queue-retry
+   * alarm, so the delivery resumes once the replacement rebinds. The bound is
+   * the control plane's own retirement lifecycle: once the allocation stops the
+   * retirement receipts are pruned, the probe reports false, and the next
+   * deadline check fails the head exactly as before.
+   *
+   * Every re-arm mints a fresh preparation attempt. A preparation attempt is
+   * the acquisition request identity, and `SandboxControl` binds it to its
+   * original deadline and rejects a changed deadline for the same id, so the
+   * re-armed window must be a new acquisition rather than a mutated one. A live
+   * attach proof bound the old attempt identity, so it is retired into the
+   * slot a late result is matched against and the replacement attach can carry
+   * the new identity.
+   */
+  private async awaitRuntimeReplacementOrFail(input: {
+    messageId: string;
+    sandboxId?: string;
+    wrapperInstanceId?: string;
+    scope?: 'message' | 'runtime';
+    detail?: string;
+  }): Promise<void> {
+    if (input.sandboxId !== undefined && (await this.runtimeReplacementInFlight(input.sandboxId))) {
+      const epoch = this.terminalLifecycle.captureEpoch();
+      if (epoch === null) return;
+      const now = Date.now();
+      const extended = this.loadMessages().map(message => {
+        if (message.messageId !== input.messageId) return message;
+        const operations = message.operations ? { ...message.operations } : undefined;
+        if (operations?.attach) {
+          operations.retiredAttach = operations.attach;
+          delete operations.attach;
+        }
+        return {
+          ...message,
+          preparationAttemptId: crypto.randomUUID(),
+          preparationWait: undefined,
+          deliveryDeadlineAt: now + SESSION_DELIVERY_TIMEOUT_MS,
+          ...(operations ? { operations } : {}),
+        };
+      });
+      if (!this.saveMessages(extended, epoch)) return;
+      await this.armQueueRetry(now + QUEUE_RETRY_MS);
+      return;
+    }
+    await this.failDelivery(
+      input.messageId,
+      'preparation_timeout',
+      input.wrapperInstanceId,
+      input.scope,
+      input.detail
+    );
   }
 
   private async failDelivery(

@@ -39,6 +39,7 @@ import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 import { CLAUDE_OPUS_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
+import { isTemporarilyBlockedModelAllowedForOrganization } from '@/lib/ai-gateway/temporarily-blocked-model-access';
 
 jest.mock('next/server', () => {
   return {
@@ -105,6 +106,9 @@ jest.mock('@/lib/ai-gateway/auto-routing-decision');
 jest.mock('@/lib/ai-gateway/auto-routing-denied-models', () => ({
   collectDeniedAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
 }));
+jest.mock('@/lib/ai-gateway/temporarily-blocked-model-access', () => ({
+  isTemporarilyBlockedModelAllowedForOrganization: jest.fn(async () => false),
+}));
 jest.mock('@/lib/ai-gateway/processUsage', () => {
   const actual = jest.requireActual('@/lib/ai-gateway/processUsage');
   return {
@@ -139,6 +143,9 @@ const mockedCheckFreeModelRateLimitByUser = jest.mocked(checkFreeModelRateLimitB
 const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
 const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
+const mockedIsTemporarilyBlockedModelAllowedForOrganization = jest.mocked(
+  isTemporarilyBlockedModelAllowedForOrganization
+);
 
 const provider = {
   id: 'openrouter',
@@ -810,6 +817,28 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       error_type: 'unavailable_model',
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('allows a direct temporarily blocked model request for an allowlisted organization', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-allowed',
+    });
+    mockedIsTemporarilyBlockedModelAllowedForOrganization.mockResolvedValueOnce(true);
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('anthropic/claude-opus-5')) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedIsTemporarilyBlockedModelAllowedForOrganization).toHaveBeenCalledWith(
+      'org-allowed'
+    );
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
   it.each([

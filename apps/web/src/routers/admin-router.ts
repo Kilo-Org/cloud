@@ -63,6 +63,7 @@ import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminModelExperimentsRouter } from '@/routers/admin/model-experiments-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
+import { adminTemporarilyBlockedModelAccessRouter } from '@/routers/admin/temporarily-blocked-model-access-router';
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
 import { adminKiloPassRouter } from '@/routers/admin/kilo-pass-router';
@@ -2608,6 +2609,7 @@ export const adminRouter = createTRPCRouter({
   modelExperiments: adminModelExperimentsRouter,
   gatewayConfig: adminGatewayConfigRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
+  temporarilyBlockedModelAccess: adminTemporarilyBlockedModelAccessRouter,
   requestLoggingOptIns: adminRequestLoggingOptInsRouter,
   bulkBlock: adminBulkBlockRouter,
   kiloPass: adminKiloPassRouter,

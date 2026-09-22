@@ -12,6 +12,7 @@ import { ModelExperimentsContent } from '@/app/admin/model-experiments/ModelExpe
 import { ModelExperimentRequestsContent } from '@/app/admin/model-experiments/ModelExperimentRequestsContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
+import { TemporarilyBlockedModelAccessContent } from '@/app/admin/gateway/TemporarilyBlockedModelAccessContent';
 
 const VALID_TABS: readonly string[] = [
   'sync-providers',
@@ -20,6 +21,7 @@ const VALID_TABS: readonly string[] = [
   'model-experiments',
   'experiment-requests',
   'api-request-log',
+  'model-access',
 ];
 type Tab =
   | 'sync-providers'
@@ -27,7 +29,8 @@ type Tab =
   | 'routing'
   | 'model-experiments'
   | 'experiment-requests'
-  | 'api-request-log';
+  | 'api-request-log'
+  | 'model-access';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -84,6 +87,9 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="routing" className={tabTriggerClass}>
               Routing
             </TabsTrigger>
+            <TabsTrigger value="model-access" className={tabTriggerClass}>
+              Model Access
+            </TabsTrigger>
             <TabsTrigger value="model-experiments" className={tabTriggerClass}>
               Model Experiments
             </TabsTrigger>
@@ -102,6 +108,9 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="routing" className="mt-4">
             <RoutingContent />
+          </TabsContent>
+          <TabsContent value="model-access" className="mt-4">
+            <TemporarilyBlockedModelAccessContent />
           </TabsContent>
           <TabsContent value="model-experiments" className="mt-4">
             <ModelExperimentsContent />

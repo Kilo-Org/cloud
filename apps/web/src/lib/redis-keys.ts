@@ -14,6 +14,9 @@ export type RedisKey = string & {
 const redisKey = <const Key extends string>(key: Key): Key & RedisKey => key as Key & RedisKey;
 
 export const BLACKLIST_DOMAINS_REDIS_KEY = redisKey('admin:blacklisted-domains');
+export const TEMPORARILY_BLOCKED_MODEL_ACCESS_REDIS_KEY = redisKey(
+  'admin:temporarily-blocked-model-access'
+);
 
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
 

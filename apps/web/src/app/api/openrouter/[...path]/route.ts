@@ -112,6 +112,7 @@ import {
 } from '@/lib/organizations/effective-model-access.server';
 import { isFableModel, isOpus5Model } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { CLAUDE_OPUS_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
+import { isTemporarilyBlockedModelAllowedForOrganization } from '@/lib/ai-gateway/temporarily-blocked-model-access';
 import { withRestTiming } from '@/lib/observability/request-timing';
 
 export const maxDuration = 800;
@@ -758,11 +759,15 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
     return temporarilyUnavailableResponse();
   }
 
-  if (
+  const isTemporarilyBlockedModel =
     !autoModel &&
     (isFableModel(effectiveModelIdLowerCased) ||
       isOpus5Model(effectiveModelIdLowerCased) ||
-      effectiveModelIdLowerCased === CLAUDE_OPUS_LATEST_MODEL_ALIAS)
+      effectiveModelIdLowerCased === CLAUDE_OPUS_LATEST_MODEL_ALIAS);
+
+  if (
+    isTemporarilyBlockedModel &&
+    !(await isTemporarilyBlockedModelAllowedForOrganization(organizationId))
   ) {
     console.warn(
       `User requested temporarily blocked model ${effectiveModelIdLowerCased}; rejecting.`

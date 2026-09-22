@@ -27,7 +27,6 @@ import { ScreenHeader } from '@/components/screen-header';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
-import { getEmptyStatePresentation } from '@/lib/agents-bottom-chrome';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
@@ -207,28 +206,18 @@ export function AgentSessionListScreen() {
     [navigateToSession, organizationId]
   );
 
-  // The list's frame/content insets, the FAB style, and the body measurement:
-  // the tab bar and the FAB are absolutely-positioned overlays, and in a short
-  // window the frame yields the soft FAB band so one row stays readable (see
-  // `useAgentsListChrome`).
-  const { bodyHeight, onBodyLayout, listInsets, fabStyle, sidePadding } = useAgentsListChrome({
-    showFab,
-    tabBarHeight,
-    left,
-    right,
-  });
-
-  // The empty states' clear region is the measured body minus the inset their
-  // surface resolves. That surface replaces the tab layout's inherited
-  // reservation (`replaceBottomReservation` below) so it reserves the tab bar
-  // alone: the tab layout adds a 16dp content gap for scrolled content, and
-  // keeping it would shrink the states' clear region by 16dp until the hint and
-  // the action ran under the bar (device capture `agents-search-empty`). Below
-  // the full state's height the compact presentation drops the icon bubble and
-  // tightens the gaps so the hint and the action stay above the bar. The
-  // unmeasured first frame is full.
-  const compactEmptyState =
-    getEmptyStatePresentation({ available: bodyHeight, bottomInset: tabBarHeight }) === 'compact';
+  // The list's frame/content insets, the FAB style, the body measurement, and
+  // the centered states' reserve and presentation: the tab bar and the FAB are
+  // absolutely-positioned overlays, and in a short window the frame yields the
+  // soft FAB band so one row stays readable (see `useAgentsListChrome`).
+  const {
+    onBodyLayout,
+    listInsets,
+    fabStyle,
+    sidePadding,
+    centeredBottomInset,
+    compactEmptyState,
+  } = useAgentsListChrome({ showFab, tabBarHeight, fontScale, left, right });
 
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
@@ -299,7 +288,7 @@ export function AgentSessionListScreen() {
   }
 
   return (
-    <StateSurfaceInsets bottomInset={tabBarHeight} replaceBottomReservation>
+    <StateSurfaceInsets bottomInset={centeredBottomInset} replaceBottomReservation>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}

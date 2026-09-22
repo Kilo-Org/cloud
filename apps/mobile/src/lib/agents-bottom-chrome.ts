@@ -48,38 +48,94 @@ export function getAgentsListBottomInset({
 }
 
 /**
- * The full empty-state presentation's height: the icon bubble (56dp), the
- * block gap (16dp), the title (28dp), the title-to-description gap (4dp), the
- * description (20dp), the block gap (16dp) and the 44dp action. The tab bar is
- * a hard overlay, so a clear region shorter than this cannot show the hint and
- * the action above it: the state must render compact (device capture
- * `agents-search-empty`, revision f2181ae79, where the hint and the Clear
- * search action sat behind the bar).
+ * The full empty-state stack's fixed chrome and its `fontScale === 1` text
+ * metrics: the icon bubble, a block gap, a `text-lg` title line, the
+ * title-to-description gap, a `text-sm` description line per wrapped line, a
+ * block gap, and the action's `min-h-[44px]` plus the button's `py-2`.
  */
-export const EMPTY_STATE_FULL_HEIGHT = 184;
+const EMPTY_STATE_BUBBLE_HEIGHT = 56;
+const EMPTY_STATE_BLOCK_GAP = 16;
+const EMPTY_STATE_TITLE_LINE_HEIGHT = 28;
+const EMPTY_STATE_DESCRIPTION_GAP = 4;
+const EMPTY_STATE_DESCRIPTION_LINE_HEIGHT = 20;
+const EMPTY_STATE_ACTION_MIN_HEIGHT = 44;
+const EMPTY_STATE_ACTION_PADDING = 16;
+
+/**
+ * Height the full empty-state presentation needs at `fontScale`. The text parts
+ * scale with Dynamic Type: the app renders large text (`Button` uses `min-h`
+ * exactly so a scaled label is not clipped, and the tabs layout switches its
+ * label wrapping at `fontScale > 1.8`), so the title, the description and the
+ * action all grow past their `fontScale === 1` values.
+ *
+ * The tab bar is a hard overlay, so a clear region shorter than this cannot
+ * show the hint and the action above it: the state must render compact (device
+ * capture `agents-search-empty`, revision f2181ae79, where the hint and the
+ * Clear search action sat behind the bar). A fixed 184dp assumed one line per
+ * text block at `fontScale === 1`, so a clear region between it and the state's
+ * real height still resolved `full` and left the hint and the action below the
+ * bar.
+ *
+ * `descriptionLines` defaults to 2: the copy the live empty state renders
+ * (`agents.sessionList.noSessionsYetDescription`) is longer than one line at
+ * phone width, so the state on screen is the two-line one.
+ */
+export function getEmptyStateFullHeight({
+  fontScale = 1,
+  descriptionLines = 2,
+}: {
+  fontScale?: number;
+  descriptionLines?: number;
+} = {}): number {
+  const title = EMPTY_STATE_TITLE_LINE_HEIGHT * fontScale;
+  const description = EMPTY_STATE_DESCRIPTION_LINE_HEIGHT * descriptionLines * fontScale;
+  // `Button`'s `text-sm` label scales; its `min-h-[44px]` is the floor below
+  // that point, and its `py-2` does not scale with the label.
+  const action = Math.max(
+    EMPTY_STATE_ACTION_MIN_HEIGHT,
+    EMPTY_STATE_DESCRIPTION_LINE_HEIGHT * fontScale + EMPTY_STATE_ACTION_PADDING
+  );
+  return Math.round(
+    EMPTY_STATE_BUBBLE_HEIGHT +
+      EMPTY_STATE_BLOCK_GAP +
+      title +
+      EMPTY_STATE_DESCRIPTION_GAP +
+      description +
+      EMPTY_STATE_BLOCK_GAP +
+      action
+  );
+}
 
 /**
  * Choose the empty state's presentation for the room the body actually keeps.
  *
- * `bottomInset` is the inset the state's `StateSurface` resolves. It is not a
- * hard-coded bar height: the screen's own `StateSurfaceInsets` replaces the
- * inherited reservation (`replaceBottomReservation`) so its centered states
- * keep the bar alone, where the tabs layout reserves the bar plus a 16dp
- * content gap for scrolled content. Measuring the decision against the bar
- * alone while the surface still resolved `tabBarHeight + 16` was 16dp
+ * `bottomInset` is the inset the state's `StateSurface` resolves: the tab bar
+ * alone while the FAB is hidden, and the bar plus the FAB band while it shows.
+ * It is not a hard-coded bar height: the screen's own `StateSurfaceInsets`
+ * replaces the inherited reservation (`replaceBottomReservation`) so its
+ * centered states keep the bar alone, where the tabs layout reserves the bar
+ * plus a 16dp content gap for scrolled content. Measuring the decision against
+ * the bar alone while the surface still resolved `tabBarHeight + 16` was 16dp
  * optimistic, and left the compact state running under the bar at the
  * capture's geometry (device capture `agents-search-empty`, revision
  * f2181ae79). The unmeasured first frame (`available === null`) stays full,
- * exactly the geometry before the body was measured.
+ * exactly the geometry before the body was measured, and the height the full
+ * state needs is measured at the current `fontScale` (see
+ * `getEmptyStateFullHeight`).
  */
 export function getEmptyStatePresentation({
   available,
   bottomInset,
+  fontScale = 1,
+  descriptionLines = 2,
 }: {
   available: number | null;
   bottomInset: number;
+  fontScale?: number;
+  descriptionLines?: number;
 }): 'compact' | 'full' {
-  return available !== null && available - bottomInset < EMPTY_STATE_FULL_HEIGHT
+  return available !== null &&
+    available - bottomInset < getEmptyStateFullHeight({ fontScale, descriptionLines })
     ? 'compact'
     : 'full';
 }

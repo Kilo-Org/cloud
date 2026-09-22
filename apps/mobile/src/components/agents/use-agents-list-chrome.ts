@@ -2,11 +2,12 @@ import { useCallback, useMemo, useState } from 'react';
 import { type LayoutChangeEvent } from 'react-native';
 
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
-import { getAgentsListBottomInset } from '@/lib/agents-bottom-chrome';
+import { getAgentsListBottomInset, getEmptyStatePresentation } from '@/lib/agents-bottom-chrome';
 
 /**
- * Bottom-chrome geometry for the Agents live list, plus the measurement that
- * keeps one row readable in a short window.
+ * Bottom-chrome geometry for the Agents live list: the measurement that keeps
+ * one row readable in a short window, the reserve the screen's centered states
+ * clear, and the empty states' presentation for the room those states keep.
  *
  * The body wrapper is a `flex-1` child of the screen's column, so its height
  * does not depend on the reserve the list carries (no measure loop). `null`
@@ -15,11 +16,13 @@ import { getAgentsListBottomInset } from '@/lib/agents-bottom-chrome';
 export function useAgentsListChrome({
   showFab,
   tabBarHeight,
+  fontScale,
   left,
   right,
 }: {
   showFab: boolean;
   tabBarHeight: number;
+  fontScale: number;
   left: number;
   right: number;
 }) {
@@ -27,6 +30,20 @@ export function useAgentsListChrome({
   const onBodyLayout = useCallback((event: LayoutChangeEvent) => {
     setBodyHeight(Math.round(event.nativeEvent.layout.height));
   }, []);
+
+  // The FAB band is soft chrome: the list's frame yields it in a short window,
+  // and the centered states reserve it while the button shows, so a full-width
+  // action (the load failure's Retry, the boundary's back-to-profile) cannot
+  // run under the corner overlay. The list's own inset splits the band (see
+  // `getAgentsListBottomInset`); the centered states keep all of it.
+  const fabBand = showFab ? FAB_SIZE + FAB_MARGIN : 0;
+  const centeredBottomInset = tabBarHeight + fabBand;
+  const compactEmptyState =
+    getEmptyStatePresentation({
+      available: bodyHeight,
+      bottomInset: centeredBottomInset,
+      fontScale,
+    }) === 'compact';
 
   // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
   // content must clear them. The inset rides on the list's frame as a
@@ -40,14 +57,15 @@ export function useAgentsListChrome({
   // frame yields the soft FAB band (never the tab bar) as far as one row pitch
   // needs and hands the yielded part to the content, so the first card's branch
   // line is not clipped at rest and the last row can still be scrolled clear of
-  // the button. The vertical value matches the screen's `StateSurfaceInsets`.
+  // the button. In a tall window the frame keeps the same reserve the screen's
+  // `StateSurfaceInsets` hands its centered states (`centeredBottomInset`).
   // The landscape side insets keep row text clear of the sensor housing;
   // portrait insets are 0, keeping the geometry unchanged.
   const listInsets = useMemo(() => {
     const inset = getAgentsListBottomInset({
       available: bodyHeight,
       tabBarHeight,
-      fabBand: showFab ? FAB_SIZE + FAB_MARGIN : 0,
+      fabBand,
     });
     return {
       frame: { marginBottom: inset.frame },
@@ -58,7 +76,7 @@ export function useAgentsListChrome({
         paddingRight: right,
       },
     };
-  }, [bodyHeight, showFab, tabBarHeight, left, right]);
+  }, [bodyHeight, fabBand, tabBarHeight, left, right]);
 
   // The fixed 20pt margin gains the landscape right inset so the FAB clears the
   // sensor area; portrait insets are 0, keeping the geometry unchanged.
@@ -80,5 +98,13 @@ export function useAgentsListChrome({
     [left, right]
   );
 
-  return { bodyHeight, onBodyLayout, listInsets, fabStyle, sidePadding };
+  return {
+    bodyHeight,
+    onBodyLayout,
+    listInsets,
+    fabStyle,
+    sidePadding,
+    centeredBottomInset,
+    compactEmptyState,
+  };
 }

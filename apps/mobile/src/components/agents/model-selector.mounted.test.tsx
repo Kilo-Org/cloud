@@ -273,6 +273,10 @@ describe('ModelSelector loading chip', () => {
     expect(chip?.props.accessibilityRole).toBe('button');
     expect(chip?.props.accessibilityState).toEqual({ busy: true, disabled: true });
     expect(chip?.props.accessibilityLabel).toBe('Model');
+    // A plain View is not an accessibility element by default (unlike the
+    // pressable the loaded chip renders), so the label and busy state above
+    // reach a screen reader only when the view is marked accessible.
+    expect(chip?.props.accessible).toBe(true);
   });
 
   it('renders the resolved model name once the catalog lands', () => {

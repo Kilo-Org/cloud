@@ -131,6 +131,7 @@ export function ModelSelector({
   if (isLoading) {
     return (
       <View
+        accessible
         accessibilityRole="button"
         accessibilityState={{ busy: true, disabled: true }}
         accessibilityLabel={t('common.model')}

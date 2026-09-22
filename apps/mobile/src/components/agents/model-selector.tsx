@@ -7,7 +7,6 @@ import { Keyboard, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { formatList } from '@/lib/format';
 import {
@@ -129,7 +128,22 @@ export function ModelSelector({
   const selectionContext = useContext(ModelPickerSelectionScopeContext);
 
   if (isLoading) {
-    return <Skeleton className="h-8 w-28 rounded-full" />;
+    // Keep the chip shell and its affordance while the model list loads: the
+    // sibling selectors on the composer keep their labels, so a blank pill here
+    // reads as a control with no text or affordance.
+    return (
+      <View
+        accessibilityRole="button"
+        accessibilityLabel={t('common.loading')}
+        accessibilityState={{ busy: true, disabled: true }}
+        className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 opacity-50"
+      >
+        <Text className="shrink text-sm font-medium text-muted-foreground" numberOfLines={1}>
+          {t('common.loading')}
+        </Text>
+        <ChevronDown size={14} color={colors.mutedForeground} />
+      </View>
+    );
   }
 
   const pickerOptions = options.map(option => toSessionModelOption(option));

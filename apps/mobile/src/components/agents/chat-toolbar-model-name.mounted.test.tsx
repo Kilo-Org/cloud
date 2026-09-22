@@ -1,8 +1,8 @@
-import { createElement } from 'react';
+import { type ComponentProps, createElement } from 'react';
 import { TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { ChatToolbar } from './chat-toolbar';
@@ -68,7 +68,9 @@ const MODEL_OPTIONS: SessionModelOption[] = [
   },
 ];
 
-function renderToolbar(): TestRenderer.ReactTestRenderer {
+function renderToolbar(
+  overrides: Partial<ComponentProps<typeof ChatToolbar>> = {}
+): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   TestRenderer.act(() => {
     ref.current = TestRenderer.create(
@@ -80,6 +82,7 @@ function renderToolbar(): TestRenderer.ReactTestRenderer {
         modelOptions: MODEL_OPTIONS,
         onModelSelect: vi.fn<(modelId: string, variant: string) => void>(),
         onPaste: vi.fn<() => void>(),
+        ...overrides,
       })
     );
   });
@@ -163,5 +166,24 @@ describe('ChatToolbar long model name', () => {
 
     // The button still ends the chip's line at its trailing edge.
     expect(pasteButton?.props.className).toContain('ml-auto');
+  });
+});
+
+describe('ChatToolbar model chip while the model list loads', () => {
+  it('keeps the chip shell with the loading label instead of a blank pill', () => {
+    const renderer = renderToolbar({ isLoadingModels: true });
+
+    // The chip must read as the control it is: its own label, not an empty pill.
+    const loadingLabel = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === i18n.t('common.loading')
+    );
+    expect(loadingLabel).toHaveLength(1);
+    expect(loadingLabel[0]?.props.numberOfLines).toBe(1);
+
+    // The loading chip is not the skeleton placeholder: it renders its own shell.
+    expect(renderer.root.findAllByType('Skeleton')).toHaveLength(0);
   });
 });

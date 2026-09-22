@@ -265,7 +265,8 @@ export function NewSessionRepositorySection({
             than the glyphs Android lays out, so "Open GitLab" wrapped onto two
             lines and grew the button taller than its one-line siblings; giving
             the label the free space keeps its box wider than the text, and
-            `numberOfLines` pins the line.
+            `numberOfLines` pins the line. The explorer captures
+            new-session-filled and new-session-kb-down both showed that wrap.
           */}
           <Text className="me-[24px] flex-1 text-center" numberOfLines={1}>
             {t(selectedRepository === null ? copy.openLabel : copy.connectTitle)}

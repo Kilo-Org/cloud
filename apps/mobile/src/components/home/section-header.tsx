@@ -15,7 +15,7 @@ type SectionHeaderProps = {
 
 export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<SectionHeaderProps>) {
   return (
-    <View className="flex-row flex-wrap items-center justify-between gap-2 px-4 pb-2 pt-2">
+    <View className="flex-row flex-wrap items-center justify-end gap-2 px-4 pb-2 pt-2">
       <Text variant="eyebrow" className="max-w-full grow">
         {label}
       </Text>
@@ -25,15 +25,19 @@ export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<Se
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
-          // The label alone grows, so the row's `justify-between` places this
-          // box at the row's end: the physical right in LTR, the physical left
-          // in RTL. It must NOT grow too — when both children grew, the row
-          // split in half and the action sat at the inner edge of its half (the
-          // screen centre in Arabic), so it never reached the margin while the
-          // tab bar, cards and rows below were fully mirrored
-          // (home-arabic-rtl, home). Never a physical `text-left`/`text-right`:
-          // React Native swaps those two under RTL (Android maps
-          // `textAlign: 'left'` to `Gravity.RIGHT` when the layout is RTL).
+          // The row packs each flex line to its end (`justify-end`) and only the
+          // label grows, so this box lands on the row's outer edge: the physical
+          // right in LTR, the physical left in RTL. `justify-between` would put a
+          // single item on its own wrapped line at the line start — when a long
+          // label pushes this box onto the next line it must still sit at the
+          // row end, not the margin it wrapped away from. It must NOT grow too:
+          // when both children grew the row split in half, and the action then
+          // sat at the inner edge of its half (the screen centre in Arabic), so
+          // it never reached the margin while the tab bar, cards and rows below
+          // were fully mirrored (home-arabic-rtl, home). Never a physical
+          // `text-left`/`text-right`: React Native swaps those two under RTL
+          // (Android maps `textAlign: 'left'` to `Gravity.RIGHT` when the layout
+          // is RTL).
           className="max-w-full shrink-0 flex-row active:opacity-70"
         >
           <Text

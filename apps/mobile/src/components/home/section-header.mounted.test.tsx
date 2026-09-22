@@ -87,17 +87,20 @@ describe('SectionHeader mounted layout', () => {
       expect(text.props.style).toBeUndefined();
     }
 
-    // The action copy must sit at the row's end in both directions, so the row
-    // keeps `justify-between` and only the label grows: an action box that grew
-    // too split the row in half, and its inner `justify-end` then pinned the
-    // copy to the box's physical right — the screen centre in Arabic — so the
-    // action never reached the outer margin (home-arabic-rtl, home). The
-    // layout is direction-relative and identical under RTL, and the row's outer
-    // edge comes from the row's own main-axis placement, never from a physical
-    // text alignment.
+    // The action copy must sit at the row's end in both directions: the row
+    // packs every flex line to its end (`justify-end`) and only the label grows,
+    // so a lone action box on a wrapped line still lands on the row's outer edge
+    // instead of the line start that `justify-between` gives it. The box must
+    // not grow too — when both children grew the row split in half and the
+    // action sat at the inner edge of its half (the screen centre in Arabic)
+    // instead of the margin the tab bar, cards and rows below share
+    // (home-arabic-rtl, home). The layout is direction-relative and identical
+    // under RTL, and the row's outer edge comes from the row's own main-axis
+    // placement, never from a physical text alignment.
     const rowClasses = ((action.parent?.props.className as string | undefined) ?? '').split(' ');
     expect(rowClasses).toContain('flex-wrap');
-    expect(rowClasses).toContain('justify-between');
+    expect(rowClasses).toContain('justify-end');
+    expect(rowClasses).not.toContain('justify-between');
     const actionBoxClasses = (action.props.className as string).split(' ');
     expect(actionBoxClasses).toEqual(expect.arrayContaining(ACTION_BOX_CLASSES));
     expect(actionBoxClasses).not.toContain('grow');

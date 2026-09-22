@@ -2080,6 +2080,13 @@
       "when": 1792700488980,
       "tag": "0296_fancy_the_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 297,
+      "version": "7",
+      "when": 1792701065416,
+      "tag": "0297_lazy_polaris",
+      "breakpoints": true
     }
   ]
 }

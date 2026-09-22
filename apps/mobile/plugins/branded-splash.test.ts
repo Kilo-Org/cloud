@@ -164,8 +164,13 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // The real projectRoot may carry a prebuilt android/ tree, whose existing
+    // colors the colors mod merges in; assert the splash entry, not that it is
+    // the only one (the styles assertion below matches the same way).
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

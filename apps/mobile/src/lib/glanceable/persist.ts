@@ -52,6 +52,12 @@ let persistEpoch = 0;
 // snapshot has to check this first.
 let restoreUnavailable = false;
 
+// True once a restore has run to completion, whether or not its read succeeded.
+// Until then a null snapshot is "not read yet", not "nothing persisted": the
+// mirror may still name a card owner, so a caller that retires cards on a null
+// snapshot must wait for this before acting on it.
+let restoreSettled = false;
+
 export function getLastGlanceableSnapshot(): GlanceableAgentsSnapshot | null {
   return lastSnapshot;
 }
@@ -64,6 +70,17 @@ export function getLastGlanceableSnapshot(): GlanceableAgentsSnapshot | null {
  */
 export function isGlanceableRestoreUnavailable(): boolean {
   return restoreUnavailable;
+}
+
+/**
+ * True once a `restorePersistedGlanceable` has completed. Before the first
+ * completion a null in-memory snapshot is not proof that nothing owns the
+ * surface: the mirror read may still be in flight, and its record may name a
+ * card owner. Distinct from `isGlanceableRestoreUnavailable`, which reports a
+ * read that failed rather than one that has not finished.
+ */
+export function isGlanceableRestoreSettled(): boolean {
+  return restoreSettled;
 }
 
 export function getLocalScopeKey(): string | null {
@@ -126,6 +143,11 @@ export async function restorePersistedGlanceable(): Promise<void> {
     // A read failure is different: the record may be there and own a card, so
     // record the uncertainty for callers that act on a null snapshot.
     restoreUnavailable = true;
+  } finally {
+    // Settled on every path, including the live-write early return and a failed
+    // read, so a null snapshot stops meaning "the read has not finished" only
+    // once the record has actually been consulted.
+    restoreSettled = true;
   }
 }
 
@@ -154,6 +176,9 @@ export function _setLastGlanceableSnapshotForTests(
   persistEpoch += 1;
   lastSnapshot = snapshot;
   localScopeKey = snapshot?.scopeKey ?? null;
+  // Seeding the mirror models a completed restore: callers act on this state as
+  // the read's result, the same way `restorePersistedGlanceable` would.
+  restoreSettled = true;
 }
 
 export function _setGlanceableRestoreUnavailableForTests(unavailable: boolean): void {
@@ -165,5 +190,6 @@ export function _resetGlanceablePersistForTests(): void {
   lastSnapshot = null;
   localScopeKey = null;
   restoreUnavailable = false;
+  restoreSettled = false;
   secureStoreForTests = null;
 }

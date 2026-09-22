@@ -10,6 +10,7 @@ import {
 import { i18n } from '@/i18n';
 import {
   getLastGlanceableSnapshot,
+  isGlanceableRestoreSettled,
   isGlanceableRestoreUnavailable,
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
@@ -357,10 +358,11 @@ function snapshotOwnsSurface(snapshot: GlanceableAgentsSnapshot | null, now: num
  * and ends every other instance immediately.
  *
  * A null snapshot is only proof that nothing owns the surface when the restore
- * actually read the mirror: if that read failed, native discovery still
- * collapses duplicates to one card, but that card is kept rather than every
- * instance being ended, so a push-to-start this process woke to adopt survives
- * a locked keychain.
+ * actually read the mirror: if that read failed, or has not finished yet,
+ * native discovery still collapses duplicates to one card, but that card is
+ * kept rather than every instance being ended, so a push-to-start this process
+ * woke to adopt survives a locked keychain or a launch whose read is still in
+ * flight.
  */
 export function sweepStrayActivities(): void {
   if (activityKitDeniedState) {
@@ -373,13 +375,14 @@ export function sweepStrayActivities(): void {
     return;
   }
   const snapshot = getLastGlanceableSnapshot();
-  if (snapshot === null && isGlanceableRestoreUnavailable()) {
-    // The persisted owner could not be read, so a null snapshot means
-    // "unknown", not "nothing can own the surface". This runs at import in the
-    // headless push process too, where ending every instance would tear down
-    // the card a push-to-start just raised before this process can adopt it.
-    // Reconciliation still ends every instance but the one native discovery
-    // keeps, so the surface never holds more than one card.
+  if (snapshot === null && (isGlanceableRestoreUnavailable() || !isGlanceableRestoreSettled())) {
+    // The persisted owner could not be read, or its read has not finished yet,
+    // so a null snapshot means "unknown", not "nothing can own the surface".
+    // This runs at import in the headless push process, and on the foreground
+    // edge before the launch restore settles, where ending every instance would
+    // tear down the card a push-to-start just raised before this process can
+    // adopt it. Reconciliation still ends every instance but the one native
+    // discovery keeps, so the surface never holds more than one card.
     refreshActivity();
     return;
   }

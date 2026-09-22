@@ -12,6 +12,7 @@ import {
   _setSecureStoreForTests,
   getLastGlanceableSnapshot,
   getLocalScopeKey,
+  isGlanceableRestoreSettled,
   isGlanceableRestoreUnavailable,
   persistGlanceableSink,
   restorePersistedGlanceable,
@@ -151,6 +152,26 @@ describe('restorePersistedGlanceable', () => {
 
     expect(getLastGlanceableSnapshot()).toBeNull();
     expect(isGlanceableRestoreUnavailable()).toBe(true);
+    expect(isGlanceableRestoreSettled()).toBe(true);
+  });
+
+  it('does not report a restore settled until the first read finishes', async () => {
+    const gate = deferred();
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await gate.promise;
+      return null;
+    });
+
+    const restore = restorePersistedGlanceable();
+
+    // A caller that reads a null snapshot must not treat it as "nothing
+    // persisted" until the read that could fill it has settled.
+    expect(isGlanceableRestoreSettled()).toBe(false);
+
+    gate.resolve();
+    await restore;
+
+    expect(isGlanceableRestoreSettled()).toBe(true);
   });
 
   it('clears the unreadable flag after a read that succeeds', async () => {

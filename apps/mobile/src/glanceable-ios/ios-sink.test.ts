@@ -17,6 +17,7 @@ import {
   _setGlanceableRestoreUnavailableForTests,
   _setLastGlanceableSnapshotForTests,
   _setSecureStoreForTests,
+  restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
 import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
@@ -1739,6 +1740,32 @@ describe('iosSink stray sweep', () => {
       expect(endedCount(cards)).toBe(1);
     });
     expect(mockState.started).toHaveLength(0);
+  });
+
+  it('keeps one card while the persisted owner is still being restored', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    // Launch: the AppState listener can reach the sweep before the SecureStore
+    // read lands, so a null in-memory snapshot means "not read yet", not
+    // "nothing persisted". The cards the mirror may still name must survive.
+    const gate = Promise.withResolvers<null>();
+    _setSecureStoreForTests({
+      setItemAsync: secureStoreMock.setItemAsync,
+      getItemAsync: async () => {
+        await gate.promise;
+        return null;
+      },
+    });
+
+    const restore = restorePersistedGlanceable();
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+    expect(mockState.started).toHaveLength(0);
+
+    gate.resolve(null);
+    await restore;
   });
 
   it.each(['signed_out', 'privacy'] as const)(

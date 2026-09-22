@@ -889,6 +889,25 @@ describe('SessionDetailContent header title', () => {
     expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
     expect(title.props.ellipsizeMode).toBe('tail');
   });
+
+  // `ScreenHeader` caps the trailing slot at 50% of the row, but RN's default
+  // flexShrink is 0: unless the cluster and the pill opt in, their children
+  // keep their natural width and paint past the row's right edge, off-screen.
+  it('lets the trailing header cluster shrink instead of spilling off-screen', async () => {
+    const { renderer } = await mountDetails();
+    const headerRight = renderer.root.findByType(ScreenHeader).props.headerRight as {
+      props: { className: string };
+    };
+    expect(headerRight.props.className).toContain('min-w-0');
+    expect(headerRight.props.className).toContain('shrink');
+    const metricsClassName = (
+      renderer.root.findByProps({ testID: 'session-context-metrics' }).props as {
+        className?: string;
+      }
+    ).className;
+    expect(metricsClassName).toContain('shrink');
+    expect(metricsClassName).toContain('min-w-0');
+  });
 });
 
 describe('session detail status placement', () => {

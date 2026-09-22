@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getCenteredStateBand,
   getCenteredStateLayout,
   getStateSurfaceInsets,
   intersectStateFrames,
@@ -206,6 +207,42 @@ describe('native keyboard clipping', () => {
     });
     const scrollRange = layout.paddingTop + 800 + layout.paddingBottom - layout.minHeight;
     expect(80 + layout.paddingTop + 800 - scrollRange).toBe(384);
+  });
+});
+
+describe('getCenteredStateBand', () => {
+  it('ends the band at the reserved bottom inset, above the tab bar', () => {
+    // The e8 geometry: a 540pt-tall landscape window, the Agents body starting
+    // below its header at 277pt, and a 117pt tab bar band. The empty state has
+    // 146pt to be centered in — not the 263pt of the viewport.
+    expect(
+      getCenteredStateBand({
+        surface: { top: 0, bottom: 540 },
+        viewport: { top: 277, bottom: 540 },
+        bottomInset: 117,
+      })
+    ).toEqual({ top: 277, bottom: 423, band: 146 });
+  });
+
+  it('clips the band to the visible viewport', () => {
+    expect(
+      getCenteredStateBand({
+        surface: { top: 0, bottom: 540 },
+        viewport: { top: 277, bottom: 400 },
+        bottomInset: 117,
+      })
+    ).toEqual({ top: 277, bottom: 400, band: 123 });
+  });
+
+  it('reserves the top inset as well', () => {
+    expect(
+      getCenteredStateBand({
+        surface: { top: 0, bottom: 800 },
+        viewport: { top: 0, bottom: 800 },
+        topInset: 60,
+        bottomInset: 100,
+      })
+    ).toEqual({ top: 60, bottom: 700, band: 640 });
   });
 });
 

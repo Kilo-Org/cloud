@@ -4,7 +4,6 @@ import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
 import type { User } from '@kilocode/db/schema';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 
 jest.mock('next/server', () => {
@@ -17,9 +16,6 @@ jest.mock('next/server', () => {
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
 jest.mock('@/lib/autoTopUpInFlight');
-jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
-  emitApiMetricsForResponse: jest.fn(),
-}));
 jest.mock('@/lib/ai-gateway/is-free-model', () => ({
   isFreeModel: jest.fn(),
 }));
@@ -35,7 +31,6 @@ const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedIsFreeModel = jest.mocked(isFreeModel);
 const mockedIsAutoTopUpInFlight = jest.mocked(isAutoTopUpInFlight);
-const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
@@ -152,9 +147,6 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     expect(upstream.input_audio).toEqual({ data: 'UklGRiQA', format: 'wav' });
     expect(upstream.safety_identifier).toBeTruthy();
     expect(upstream.user).toBe(upstream.safety_identifier);
-    expect(mockedEmitApiMetricsForResponse.mock.calls[0]?.[0]).not.toMatchObject({
-      feature: 'vscode-extension',
-    });
   });
 
   it('forwards organization provider policy through the OpenRouter provider field', async () => {

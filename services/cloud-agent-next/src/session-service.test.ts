@@ -3221,6 +3221,8 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
           '*': 'deny',
           '/tmp/agent_test/**': 'allow',
           '/tmp/attachments/agent_test/**': 'allow',
+          // Shared temp dir named by the bundled shell tool guidance (#6186).
+          '/tmp/kilo/**': 'allow',
         },
       },
     });

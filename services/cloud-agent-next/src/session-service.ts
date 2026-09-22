@@ -1429,6 +1429,10 @@ export class SessionService {
         '*': 'deny',
         [`/tmp/${sessionId}/**`]: 'allow',
         [`/tmp/attachments/${sessionId}/**`]: 'allow',
+        // The bundled shell tool tells the agent to use this shared temp dir
+        // for work outside the workspace. Keep it open so the guidance stays
+        // valid for deployed CLI builds that still name it. See #6186.
+        '/tmp/kilo/**': 'allow',
         [`${workspacePath}/**`]: 'allow',
         [`${sessionHome}/.kilocode/skills/**`]: 'allow',
         ...(bitbucketInputPath ? { [`${dirname(bitbucketInputPath)}/*`]: 'allow' } : {}),

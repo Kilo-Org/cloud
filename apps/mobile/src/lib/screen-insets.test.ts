@@ -36,12 +36,14 @@ const ENTRY_POINT = 'screen-insets.ts';
 const PROFILE_SCREEN = '../components/profile-screen.tsx';
 
 /**
- * The Android sign-out confirmation deliberately renders an in-app dialog
- * instead of the native alert (see `profile-screen.signout.mounted.test.tsx`).
- * Its `Platform.OS` fork sits outside the alignment path scanned below, so the
- * confirmation is held to its feature here: losing it must not pass silently.
+ * The sign-out confirmation renders an in-app `DestructiveConfirmDialog` whose
+ * platform split lives in the `useSignOutConfirmation` hook (see
+ * `profile-screen.signout.mounted.test.tsx`). That fork sits outside the
+ * alignment path scanned below, so the confirmation is held to its feature
+ * here: losing either the hook or the dialog must not pass silently.
  */
-const SIGN_OUT_CONFIRMATION = /const confirmSignOut = \(\) => \{[\s\S]*?\n {2}\};/;
+const SIGN_OUT_CONFIRMATION =
+  /^(?=[\s\S]*useSignOutConfirmation\()(?=[\s\S]*<DestructiveConfirmDialog)/;
 
 /**
  * The Profile screen's alignment path: from the line that reads
@@ -85,6 +87,10 @@ describe('screen side insets: one implementation for both platforms', () => {
     expect(profile, `${PROFILE_SCREEN} lost its sign-out confirmation`).toMatch(
       SIGN_OUT_CONFIRMATION
     );
+    // The screen forks once on purpose: Android's native alert cannot show a
+    // red destructive button, so sign-out opens the in-app confirmation there.
+    // That fork is not on the insets path — every other line, and in
+    // particular the ones that carry the insets, stays one implementation.
     expect(
       alignmentPath(profile),
       `${PROFILE_SCREEN}'s alignment path carries a per-platform branch`

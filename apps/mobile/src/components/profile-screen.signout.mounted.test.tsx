@@ -33,14 +33,9 @@ vi.mock('react-native-reanimated', () => ({
 }));
 
 // The screen reads its landscape side insets through `@/lib/screen-insets`,
-// whose native module is not transformable in this project; the hoisted
-// `safeArea` mock keeps the alignment path inert. The sign-out cases assert no
-// inset behaviour.
-// The Profile screen reads its landscape side insets through `@/lib/screen-insets`,
 // whose real module loads the native safe-area package. The node project cannot
-// load that native module, so the screen's own tests stub the hook.
-// The screen reads its side insets through `@/lib/screen-insets`, which imports
-// this native module; its untransformed source breaks the mounted project.
+// load that native module, so these tests stub the hook with the hoisted
+// `safeArea` mock; the sign-out cases assert no inset behaviour.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));

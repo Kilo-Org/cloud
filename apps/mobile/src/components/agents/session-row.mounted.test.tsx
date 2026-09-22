@@ -211,6 +211,14 @@ describe('StoredSessionRow live speech', () => {
     expect(hosts(renderer, 'SessionStatusIcon')).toHaveLength(0);
   });
 
+  it('paints the backend machine placeholder title as Untitled session', () => {
+    const machineTitle = 'New session - 2026-09-22T16:26:40.799Z';
+    const renderer = mount(row({ session: { ...session, title: machineTitle } }));
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain(machineTitle);
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toContain('Untitled session');
+  });
+
   it('keeps the live eyebrow to the status glyph alone (no platform mark beside it)', () => {
     // A platform glyph beside the status mark reads as a stray second mark
     // crowding the meta, so a live row draws the status glyph only. The
@@ -381,6 +389,14 @@ describe('RemoteSessionRow live speech', () => {
     ]);
     expect(texts(renderer)).toContain('5 MINUTES AGO');
     expect(texts(renderer)).toContain('feature/live');
+  });
+
+  it('paints the backend machine placeholder title as Untitled session', () => {
+    const machineTitle = 'New session - 2026-09-22T16:26:40.799Z';
+    const renderer = mountRemote({ title: machineTitle });
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain(machineTitle);
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toContain('Untitled session');
   });
 
   it('speaks Idle once the agent stops working', () => {

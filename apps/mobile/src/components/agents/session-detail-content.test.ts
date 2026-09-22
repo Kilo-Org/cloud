@@ -643,6 +643,8 @@ type MountDetailsOptions = {
   cachedRows?: StoredMessage[] | null;
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
+  /** The route's persisted metadata title, passed before the session resolves. */
+  cachedTitle?: string;
 };
 
 async function mountDetails(
@@ -654,6 +656,7 @@ async function mountDetails(
     displayScope = PERSONAL_DISPLAY_SCOPE,
     cachedRows = null,
     resumeAt,
+    cachedTitle,
   } = options;
   const store = createStore();
   // `null` stalls the root page: the request never resolves, so the open never
@@ -749,6 +752,7 @@ async function mountDetails(
         key: id,
         sessionId: id,
         displayScope,
+        ...(cachedTitle === undefined ? {} : { cachedTitle }),
         ...(at === undefined ? {} : { resumeAt: at }),
       })
     );
@@ -947,6 +951,32 @@ describe('SessionDetailContent header title', () => {
     ).className;
     expect(metricsClassName).toContain('shrink');
     expect(metricsClassName).toContain('min-w-0');
+  });
+
+  // The backend seeds `New session - <ISO>` as a placeholder until a session is
+  // named. The header must show its own label, never that raw machine string.
+  it('shows the header label instead of the backend machine placeholder title', async () => {
+    sessionTitleOverride = 'New session - 2026-09-22T16:26:40.799Z';
+    const { renderer } = await mountDetails();
+    const title = renderer.root
+      .findByType(ScreenHeader)
+      .findByProps({ accessibilityRole: 'header' });
+    expect(title.props.children).toBe(i18n.t('agentChat.session.title'));
+  });
+
+  // The route hands the screen the persisted metadata title before the session
+  // resolves (`cachedTitle` on `[session-id].tsx`), so the first frame must not
+  // print the machine placeholder either.
+  it('shows the header label for a cached machine placeholder before the session resolves', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const { renderer } = await mountDetails([taskMessage(ROOT_ID, CHILD_IDS)], {
+      metadataReady: metadata.promise,
+      cachedTitle: 'New session - 2026-09-22T16:26:40.799Z',
+    });
+    const title = renderer.root
+      .findByType(ScreenHeader)
+      .findByProps({ accessibilityRole: 'header' });
+    expect(title.props.children).toBe(i18n.t('agentChat.session.title'));
   });
 });
 

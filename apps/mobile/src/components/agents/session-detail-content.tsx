@@ -190,6 +190,7 @@ import {
 } from '@/components/agents/new-session-prefill';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import {
   areModelPickerSelectionScopesEqual,
   type ModelPickerSelection,
@@ -1579,14 +1580,19 @@ export function SessionDetailContent({
   });
 
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
-  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
+  // The backend seeds a machine placeholder as the title until the session is
+  // named; the header shows its own label rather than that raw string.
+  const fallbackTitle = sessionDisplayTitle(cachedTitle, t('agentChat.session.title'));
+  const serverTitle = isSessionLoaded
+    ? sessionDisplayTitle(fetchedData.title, fallbackTitle)
+    : undefined;
   const rename = useSessionDetailRename({
     sessionId,
     isLoaded: isSessionLoaded,
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
     // title it opened with instead of blinking back to "Session".
-    fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
+    fallbackTitle,
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;

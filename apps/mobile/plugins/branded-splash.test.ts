@@ -171,11 +171,11 @@ describe('shared branded splash', () => {
       },
     });
     // `introspect` merges into the colors a local prebuild already generated, so
-    // assert the plugin's entry instead of the whole array. Pin the splash color
-    // the same way the styles assertion below pins its theme: by containment,
-    // not by the exact length of a file the test does not own, so a prebuild's
-    // other colors (iconBackground, colorPrimary, …) surviving here cannot fail
-    // the case.
+    // a worktree with a prebuilt `android/` directory carries that file's extra
+    // entries. Assert the plugin's entry among them, by containment, the same
+    // way the styles assertion below pins its theme: not the whole array and not
+    // its exact length, so a prebuild's other colors (iconBackground,
+    // colorPrimary, …) surviving here cannot fail the case.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([

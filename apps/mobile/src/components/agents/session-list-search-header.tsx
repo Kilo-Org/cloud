@@ -1,12 +1,16 @@
 import { Search, X } from '@/components/ui/icons';
 import { type RefObject, useMemo } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { I18nManager, Pressable, TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+
+// In RTL the field's start edge is its physical right; TextInput maps
+// textAlign to a physical gravity (unlike Text), so it must be set explicitly.
+const SEARCH_RTL = { textAlign: 'right' } as const;
 
 type SessionListSearchHeaderProps = {
   inputRef: RefObject<TextInput | null>;
@@ -33,6 +37,7 @@ export function SessionListSearchHeader({
 }: Readonly<SessionListSearchHeaderProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const isRtl = I18nManager.isRTL;
   // The landscape side insets keep the field's rounded border and left tap
   // area clear of the sensor housing; portrait insets are 0, keeping the
   // fixed 22px margin unchanged.
@@ -68,6 +73,9 @@ export function SessionListSearchHeader({
           // Height comes from `min-h`, never `py`: iOS insets the already-centered
           // text rect by the padding and draws the placeholder low.
           className="min-h-[26px] flex-1 text-[15px] leading-[normal] text-foreground"
+          // textAlign is applied inline, not via a class: NativeWind maps it
+          // to a native prop for TextInput and crashes on it in this version.
+          style={isRtl ? SEARCH_RTL : undefined}
           // One line, always: at a narrow width with a large font scale the
           // placeholder wrapped inside the field and the field grew with it.
           numberOfLines={1}

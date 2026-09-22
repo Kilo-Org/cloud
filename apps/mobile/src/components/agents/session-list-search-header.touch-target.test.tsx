@@ -11,6 +11,7 @@ import { SessionListSearchHeader } from './session-list-search-header';
 import { COMPACT_CONTROL_FRAME_DP, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
 
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',

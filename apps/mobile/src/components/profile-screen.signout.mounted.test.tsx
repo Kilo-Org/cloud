@@ -35,6 +35,10 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// The native safe-area module cannot load in this node environment. The screen
+// reads its landscape side insets from it, so the mock returns the hoisted
+// `safeArea`; the alignment guard in `screen-insets.test.ts` holds that read to
+// the shared entry point.
 // ProfileScreen reads the landscape side insets, so the real native module
 // would load here. Its build requires `react-native` itself, whose Flow source
 // the vitest transform cannot parse (see `test/render-with-providers.tsx`), so

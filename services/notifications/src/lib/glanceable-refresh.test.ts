@@ -97,6 +97,8 @@ function snapshot(overrides: Partial<ActiveAgentsGlanceable> = {}): ActiveAgents
     updatedAt: '2026-09-18T00:00:00.000Z',
     expiresAt: '2026-09-18T08:00:00.000Z',
     needsInputSince: null,
+    newestResultKind: null,
+    newestResultAt: null,
     ...overrides,
   };
 }

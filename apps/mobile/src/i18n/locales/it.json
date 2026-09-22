@@ -259,7 +259,8 @@
       "chat": "Messaggi di chat",
       "kiloclaw": "Attività di KiloClaw",
       "balance": "Avvisi sul saldo",
-      "security": "Problemi di sicurezza"
+      "security": "Problemi di sicurezza",
+      "spend": "Avvisi di spesa"
     },
     "category": {
       "chatMessagesSubtitle": "risposte nelle tue conversazioni",
@@ -274,7 +275,9 @@
       "balanceAlertsSubtitle": "avvisi di saldo basso dell'organizzazione",
       "balanceAlertsUnavailable": "Unisciti a un'organizzazione per ricevere avvisi di saldo basso.",
       "securityFindingsSubtitle": "nuovi problemi di sicurezza e promemoria SLA",
-      "securityFindingsUnavailable": "Attiva l'agente di sicurezza Kilo su un ambito per ricevere problemi di sicurezza."
+      "securityFindingsUnavailable": "Attiva l'agente di sicurezza Kilo su un ambito per ricevere problemi di sicurezza.",
+      "spendAlertsSubtitle": "superamenti di soglia e picchi orari",
+      "spendAlertsToggle": "Categoria avvisi di spesa"
     },
     "liveActivities": "Attività in tempo reale",
     "liveActivitySubtitle": "Mostra gli agenti attivi nella schermata di blocco",
@@ -3206,7 +3209,8 @@
     "channelName": "Agenti attivi",
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco.",
     "openSession": "Apri",
-    "approveFailed": "Impossibile approvare. Tocca $t(common.approve) per riprovare."
+    "approveFailed": "Impossibile approvare. Tocca $t(common.approve) per riprovare.",
+    "newestResult": "Risultato più recente"
   },
   "transcriptionModel": {
     "title": "Modello di trascrizione",
@@ -3242,5 +3246,28 @@
   },
   "launcher": {
     "openLastSession": "Apri l'ultima sessione"
+  },
+  "spendAlerts": {
+    "subtitle": "Invia un avviso via email o push ai contatti di fatturazione quando la spesa di questo ambito supera un limite o schizza sopra il suo ritmo orario abituale.",
+    "enable": "Attiva gli avvisi di spesa",
+    "thresholdTitle": "Superamento della soglia",
+    "thresholdSubtitle": "La spesa progressiva supera il tuo limite",
+    "anomalyTitle": "Picco orario",
+    "anomalySubtitle": "Un'ora è molto sopra il ritmo abituale di questo ambito",
+    "limitLabel": "Limite (USD)",
+    "windowLabel": "Finestra",
+    "window24h": "24 ore",
+    "window7d": "7 giorni",
+    "window30d": "30 giorni",
+    "multiplierLabel": "Moltiplicatore del picco",
+    "saved": "Impostazioni degli avvisi di spesa salvate",
+    "loadError": "Impossibile caricare gli avvisi di spesa.",
+    "saveError": "Impossibile salvare gli avvisi di spesa.",
+    "empty": "Gli avvisi di spesa sono disattivati. Attivali per avvisare i contatti di fatturazione di questo ambito.",
+    "noSpend": "Nessuna spesa registrata finora",
+    "spend24h": "Spesa nelle ultime 24 ore",
+    "multiplierError": "Inserisci un moltiplicatore di 1 o più",
+    "permissionDenied": "Non hai l'autorizzazione per gestire gli avvisi di spesa.",
+    "pushOffByCategory": "Disattivato in Notifiche"
   }
 }

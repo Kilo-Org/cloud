@@ -103,16 +103,22 @@ export function NewSessionConfigureForm({
   // space below the last field of a long form.
   const bottomClearance = useDetailScreenBottomPadding();
   // The form is edge-to-edge and the window never resizes for the IME on
-  // either platform, so the primary action needs two floors: the
-  // navigation-bar inset, and the keyboard height. Start lives in a footer
-  // *outside* the ScrollView: the composer auto-focuses on arrival, and with
-  // the keyboard up the scroll body is only ~1300 px tall while the form is
-  // ~2000 px, so a Start inside the scroll sits below the fold — the user had
-  // to dismiss the keyboard to reach the primary action, and a scroll drag
-  // (keyboardDismissMode="on-drag") did that for them. The keyboard-lift view
-  // is the app's cross-platform IME primitive (keyboardDidShow/DidHide on
-  // Android, keyboardWillShow/WillHide on iOS), so the same implementation
-  // runs on both platforms, and it shrinks the scroll body as it lifts Start.
+  // either platform, so the screen needs two floors. The navigation-bar inset
+  // is the first: the Start action sits in a footer below the scroll body, and
+  // without the inset the footer would render in the navigation bar's region
+  // (a formSheet over this screen no longer leaves that region exposed below
+  // itself: the sheet is fixed at its shared options,
+  // `sheetShouldOverflowTopInset`). The keyboard height is the second: the
+  // composer auto-focuses on arrival, and with the keyboard up the scroll body
+  // is only ~1300 px tall while the form is ~2000 px, so a Start inside the
+  // scroll sits below the fold — the user had to dismiss the keyboard (a
+  // scroll drag with `keyboardDismissMode="on-drag"` did that for them) to
+  // reach the primary action. Start therefore lives in a footer *outside* the
+  // ScrollView. The keyboard-lift view is the app's cross-platform IME
+  // primitive (keyboardDidShow/DidHide on Android, keyboardWillShow/WillHide
+  // on iOS), so the same implementation runs on both platforms; the lift view
+  // wraps the footer alone, so the IME lifts the action and shrinks the scroll
+  // body instead of covering Start.
   // The ScrollView's keyboard-inset adjustment stays on for focused-field
   // scroll-into-view; it sizes against the scroll view's own frame, which
   // already ends above the footer, so the two never stack into a double lift.

@@ -164,8 +164,14 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // The compile introspects `projectRoot`, so a checkout with a generated
+    // `android/` tree (a dev machine, unlike CI) merges that project's own
+    // `res/values/colors.xml` into `colors`: assert the splash color is among
+    // them, the same way the styles below are asserted.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

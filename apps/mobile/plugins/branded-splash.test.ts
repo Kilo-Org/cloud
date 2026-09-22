@@ -164,8 +164,15 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // The introspected project is this repository's real `apps/mobile`, so its
+    // generated `values/colors.xml` also carries the other colors a prebuild
+    // writes (`colorPrimary`, `iconBackground`, `app_background`,
+    // `notification_icon_color`). Assert the splash color is present rather
+    // than pinning the exact list, as the styles assertion below does.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

@@ -247,7 +247,9 @@ export function ModelPickerOptionRow({
   // main select (row content) and the favorite star. A pressable nested
   // inside a pressable would shadow the favorite for assistive technology,
   // so the two must never nest. The selected check stays a static sibling
-  // to preserve the exact visual order (content, star, check).
+  // to preserve the exact visual order (content, star, check), and it keeps
+  // its slot on every row (transparent when unselected) so the star column
+  // never shifts between selected and unselected rows.
   return (
     <View className="border-b border-border">
       <View className={cn('flex-row items-center gap-3 pr-4', option.unavailable && 'opacity-50')}>
@@ -330,7 +332,7 @@ export function ModelPickerOptionRow({
           />
         </Pressable>
         <View className="w-[18px] items-center justify-center">
-          {selected ? <Check size={18} color={colors.primary} /> : null}
+          <Check size={18} color={selected ? colors.primary : 'transparent'} />
         </View>
       </View>
       {selected && option.variants.length > 1 ? (

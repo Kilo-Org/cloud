@@ -174,6 +174,8 @@ describe('shared branded splash', () => {
     // from the checked-out prebuild, which also carries the app's other colors
     // (colorPrimary, app_background, notification_icon_color). Asserting the
     // exact length made this pass only on a tree with no prebuilt android/.
+    // `introspect` merges into the colors a local prebuild already generated, so
+    // assert the plugin's entry instead of the whole array.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),

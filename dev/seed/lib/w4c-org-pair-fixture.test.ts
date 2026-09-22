@@ -5,6 +5,7 @@ import {
   W4C_ORG_PAIR_NAME_PREFIX,
   w4cOrgPairCleanupPredicate,
   w4cOrgPairName,
+  w4cOrgPairOrganizationId,
 } from './w4c-org-pair-fixture';
 
 /** Walk nested drizzle queryChunks and collect string Param values. */
@@ -49,4 +50,13 @@ void test('cleanup predicates for different owners never overlap', () => {
 
   assert.equal(first.includes(w4cOrgPairName('second@example.com')), false);
   assert.equal(second.includes(w4cOrgPairName('first@example.com')), false);
+});
+
+void test('fixture organization id is a stable, UUID-shaped value derived from the owner', () => {
+  const id = w4cOrgPairOrganizationId('owner@example.com');
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+  assert.match(id, uuidPattern);
+  assert.equal(id, w4cOrgPairOrganizationId('owner@example.com'));
+  assert.notEqual(id, w4cOrgPairOrganizationId('other@example.com'));
 });

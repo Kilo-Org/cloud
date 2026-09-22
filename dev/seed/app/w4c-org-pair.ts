@@ -5,20 +5,17 @@
  * already exist (created via `app:create-user`). Used to test that removing a
  * member closes their socket.
  *
- * Idempotent: deletes this fixture's previously created organizations for the
+ * Idempotent: deletes this fixture's previously created organization for the
  * given owner before recreating one pair, so reruns never accumulate the
  * repeated org rows the app lists. The organization carries the user-facing
- * name the app renders (`SEEDED_ORGANIZATION_NAME`), and the cleanup scopes to
- * the owner through the `role: 'owner'` membership the fixture always writes,
- * so it also finds the rows a seed run before this one wrote without a creator
- * (`created_by_kilo_user_id` is nullable with no default). Rows seeded before
- * the name became user-facing carry the stable
- * `[seed:w4c-org-pair] <owner-email>` marker instead.
+ * name the app renders (`SEEDED_ORGANIZATION_NAME`) and a fixture-specific id
+ * derived from the owner email, so cleanup targets that exact row. The cleanup
+ * also matches the rows this fixture wrote before the name became user-facing,
+ * which carry the stable `[seed:w4c-org-pair] <owner-email>` name. Neither
+ * branch keys on a display name an ordinary organization could share.
  *
  * Usage: pnpm dev:seed app:w4c-org-pair <owner-email> <member-email>
  */
-
-import { randomUUID } from 'node:crypto';
 
 import {
   kiloclaw_instances,
@@ -28,11 +25,11 @@ import {
   organization_seats_purchases,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { and, eq, inArray, or } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
-import { w4cOrgPairCleanupPredicate } from '../lib/w4c-org-pair-fixture';
+import { w4cOrgPairCleanupPredicate, w4cOrgPairOrganizationId } from '../lib/w4c-org-pair-fixture';
 import type { SeedResult } from '../index';
 
 export const usage = '<owner-email> <member-email>';
@@ -73,45 +70,32 @@ async function lookupUserId(email: string): Promise<string> {
 }
 
 /**
- * Selects this fixture's previously created organizations for one owner so
- * reruns stay idempotent. The owner is the stable key (the member email
- * changes between harness runs), and the selection is scoped to that owner
- * through the `role: 'owner'` membership the fixture always writes, so fixture
- * orgs seeded for a different owner survive and this user appearing there as a
- * plain member never selects them.
+ * Selects this fixture's previously created organization for one owner so
+ * reruns stay idempotent. It matches two fixture-specific values only:
  *
- * The creator column cannot scope the rows this fixture wrote before this
- * change: that seed inserted `{ id, name }` only, and
- * `organizations.created_by_kilo_user_id` is a nullable column with no
- * default, so every such row has a NULL creator and the owner membership is the
- * only owner signal those rows carry.
+ * - the deterministic id `w4cOrgPairOrganizationId` derives from the owner
+ *   email, the row this fixture writes now;
+ * - the legacy `[seed:w4c-org-pair] <owner-email>` name, which the fixture
+ *   wrote before the display name became user-facing.
  *
- * - rows named with the stable `[seed:w4c-org-pair] <owner-email>` marker,
- *   which this fixture inserted before the display name became user-facing;
- * - rows carrying the current user-facing display name.
- *
- * Must be used with an inner join on `organization_memberships`.
+ * Neither branch selects on the user-facing display name, so an ordinary
+ * organization owned by the same user is never deleted.
  */
-export function w4cOrgPairCleanupCondition(ownerEmail: string, ownerUserId: string) {
-  return and(
-    eq(organization_memberships.kilo_user_id, ownerUserId),
-    eq(organization_memberships.role, 'owner'),
-    or(w4cOrgPairCleanupPredicate(ownerEmail), eq(organizations.name, SEEDED_ORGANIZATION_NAME))
+export function w4cOrgPairCleanupCondition(ownerEmail: string) {
+  return or(
+    eq(organizations.id, w4cOrgPairOrganizationId(ownerEmail)),
+    w4cOrgPairCleanupPredicate(ownerEmail)
   );
 }
 
 /** Deletes the organizations `w4cOrgPairCleanupCondition` selects for one owner. */
-async function cleanupPreviousOrgs(ownerEmail: string, ownerUserId: string): Promise<void> {
+async function cleanupPreviousOrgs(ownerEmail: string): Promise<void> {
   const db = getSeedDb();
 
   const previousOrgs = await db
-    .selectDistinct({ id: organizations.id })
+    .select({ id: organizations.id })
     .from(organizations)
-    .innerJoin(
-      organization_memberships,
-      eq(organization_memberships.organization_id, organizations.id)
-    )
-    .where(w4cOrgPairCleanupCondition(ownerEmail, ownerUserId));
+    .where(w4cOrgPairCleanupCondition(ownerEmail));
 
   const orgIds = previousOrgs.map(org => org.id);
   if (orgIds.length === 0) {
@@ -158,9 +142,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('owner-email and member-email must refer to different users');
   }
 
-  await cleanupPreviousOrgs(trimmedOwnerEmail, ownerUserId);
+  await cleanupPreviousOrgs(trimmedOwnerEmail);
 
-  const organizationId = randomUUID();
+  const organizationId = w4cOrgPairOrganizationId(trimmedOwnerEmail);
 
   await db.insert(organizations).values({
     id: organizationId,

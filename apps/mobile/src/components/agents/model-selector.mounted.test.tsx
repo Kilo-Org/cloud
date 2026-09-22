@@ -129,25 +129,6 @@ function countWithAccessibilityLabel(root: TestRenderer.ReactTestInstance, label
     .length;
 }
 
-function renderSelector(option: SessionModelOption): TestRenderer.ReactTestRenderer {
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  TestRenderer.act(() => {
-    ref.current = TestRenderer.create(
-      createElement(ModelSelector, {
-        value: option.id,
-        variant: '',
-        options: [option],
-        onSelect: vi.fn<(modelId: string, variant: string) => void>(),
-      })
-    );
-  });
-  const renderer = ref.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
-
 function trailingSlots(renderer: TestRenderer.ReactTestRenderer): string[] {
   return renderer.root
     .findAll(
@@ -215,7 +196,7 @@ describe('Auto model labels', () => {
   });
 
   it('renders the catalog label, not the backend name, on the chip', () => {
-    const renderer = renderSelector(autoOption);
+    const renderer = renderSelector({ value: autoOption.id, options: [autoOption] });
     const texts = textStrings(renderer.root);
     expect(texts).toContain(i18n.t('models.auto.efficient'));
     expect(texts).not.toContain('backend name');

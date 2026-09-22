@@ -110,8 +110,6 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
-import { isFableModel, isOpus5Model } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { CLAUDE_OPUS_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
 import { withRestTiming } from '@/lib/observability/request-timing';
 
 export const maxDuration = 800;

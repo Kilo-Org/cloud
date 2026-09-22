@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getSessionDetailRenameState,
   initialRenameState,
+  namedSessionTitle,
   type RenameState,
   renameStateReducer,
   titleFromSessionUpdatedEvent,
@@ -57,6 +58,68 @@ describe('getSessionDetailRenameState', () => {
       modalInitialValue: null,
       isModalOpen: false,
     });
+  });
+
+  it('shows the localized fallback instead of the backend placeholder title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T02:05:22.778Z',
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+
+  it('shows the localized fallback for a child-session placeholder title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'Child session - 2026-09-22T02:05:22.778Z',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe(fallbackTitle);
+  });
+
+  it('shows the localized fallback for a blank server title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: '   ',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe(fallbackTitle);
+  });
+
+  it('keeps a real server title unchanged', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'Fix login',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe('Fix login');
+  });
+
+  it('seeds the rename modal with the localized fallback for a placeholder title', () => {
+    // The placeholder must not be editable as-is: the header shows "Session",
+    // so the modal must open on "Session" too.
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T02:05:22.778Z',
+        renameState: { ...initialRenameState(), isModalOpen: true },
+      }).modalInitialValue
+    ).toBe(fallbackTitle);
   });
 
   it('shows the optimistic override in the header when one is pending', () => {
@@ -230,5 +293,37 @@ describe('titleFromSessionUpdatedEvent', () => {
     expect(
       titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ title: '  ' }))
     ).toBeUndefined();
+  });
+
+  it('ignores the backend placeholder title', () => {
+    expect(
+      titleFromSessionUpdatedEvent(
+        'ses-1',
+        sessionUpdatedPayload({ title: 'New session - 2026-09-22T02:05:22.778Z' })
+      )
+    ).toBeUndefined();
+    expect(
+      titleFromSessionUpdatedEvent(
+        'ses-1',
+        sessionUpdatedPayload({ title: 'Child session - 2026-09-22T02:05:22.778Z' })
+      )
+    ).toBeUndefined();
+  });
+});
+
+describe('namedSessionTitle', () => {
+  it('returns undefined for a missing, null or blank title', () => {
+    expect(namedSessionTitle(undefined)).toBeUndefined();
+    expect(namedSessionTitle(null)).toBeUndefined();
+    expect(namedSessionTitle('   ')).toBeUndefined();
+  });
+
+  it('returns undefined for the backend placeholder titles', () => {
+    expect(namedSessionTitle('New session - 2026-09-22T02:05:22.778Z')).toBeUndefined();
+    expect(namedSessionTitle('Child session - 2026-09-22T02:05:22.778Z')).toBeUndefined();
+  });
+
+  it('returns the trimmed title for a real name', () => {
+    expect(namedSessionTitle('  Fix login  ')).toBe('Fix login');
   });
 });

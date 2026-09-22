@@ -601,6 +601,8 @@ type MountDetailsOptions = {
   metadataReady?: Promise<undefined>;
   displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
   cachedRows?: StoredMessage[] | null;
+  /** The route's cached metadata title, as `[session-id].tsx` passes it. */
+  cachedTitle?: string;
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
 };
@@ -613,6 +615,7 @@ async function mountDetails(
     metadataReady,
     displayScope = PERSONAL_DISPLAY_SCOPE,
     cachedRows = null,
+    cachedTitle,
     resumeAt,
   } = options;
   const store = createStore();
@@ -709,6 +712,7 @@ async function mountDetails(
         key: id,
         sessionId: id,
         displayScope,
+        ...(cachedTitle === undefined ? {} : { cachedTitle }),
         ...(at === undefined ? {} : { resumeAt: at }),
       })
     );
@@ -888,6 +892,20 @@ describe('SessionDetailContent header title', () => {
     const title = header.findByProps({ accessibilityRole: 'header' });
     expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
     expect(title.props.ellipsizeMode).toBe('tail');
+  });
+
+  it('shows the localized unnamed name instead of the backend placeholder cached title', async () => {
+    // The route passes its cached metadata title as `cachedTitle`, and that
+    // cache can hold the backend's ISO placeholder. It must not become the
+    // header's identity line while the session metadata is still loading.
+    const metadata = Promise.withResolvers<undefined>();
+    const { renderer } = await mountDetails([], {
+      cachedTitle: 'New session - 2026-09-22T02:05:22.778Z',
+      metadataReady: metadata.promise,
+    });
+    expect(renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
   });
 });
 

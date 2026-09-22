@@ -170,9 +170,7 @@ describe('shared branded splash', () => {
     // splash color. Assert the splash color the plugin owns, not the array.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
-        color: expect.arrayContaining([
-          { $: { name: 'splashscreen_background' }, _: '#FAF74F' },
-        ]),
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
       },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({

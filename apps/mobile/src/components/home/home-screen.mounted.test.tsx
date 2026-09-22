@@ -581,6 +581,9 @@ describe('Home live presentation', () => {
     try {
       const pending = Promise.withResolvers<boolean>();
       state.refetch.mockReturnValue(pending.promise);
+      // The accepted-empty surface draws no in-flight card of its own, so the
+      // platform pull indicator is that surface's single in-flight indicator.
+      state.live.hasAcceptedSuccess = true;
       await renderHome();
       const refresh = () =>
         nodes('ScrollView')[0]?.props.refreshControl as {
@@ -600,6 +603,49 @@ describe('Home live presentation', () => {
     } finally {
       unsubscribe();
     }
+  });
+
+  it('keeps one in-flight indicator while the live section shows its own loading card', async () => {
+    const loading = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(loading.promise);
+    state.live.isLoading = true;
+    state.live.isFetching = true;
+    state.live.hasAcceptedSuccess = false;
+    await renderHome();
+    const refresh = () =>
+      nodes('ScrollView')[0]?.props.refreshControl as {
+        props: { refreshing: boolean; onRefresh: () => void };
+      };
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    // The section's own card is the surface's single in-flight indicator: the
+    // platform pull spinner must not also hold the scroll inset open while it
+    // is pending.
+    expect(nodes('Skeleton')[0]?.props.className).toContain('min-h-[72px]');
+    expect(refresh().props.refreshing).toBe(false);
+    await act(async () => {
+      loading.resolve(true);
+      await loading.promise;
+    });
+
+    // The accepted-empty surface draws no in-flight card of its own, so the
+    // platform pull indicator is that surface's single in-flight indicator.
+    const accepted = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(accepted.promise);
+    state.live.isLoading = false;
+    state.live.isFetching = false;
+    state.live.hasAcceptedSuccess = true;
+    await renderHome();
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    expect(refresh().props.refreshing).toBe(true);
+    await act(async () => {
+      accepted.resolve(true);
+      await accepted.promise;
+    });
+    expect(refresh().props.refreshing).toBe(false);
   });
 
   it('keeps cold-loading feedback stable until an accepted result', async () => {

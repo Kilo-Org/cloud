@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- The Kilo Pass screen composes the presentation gate, loading, error, unavailable, and native-IAP surfaces; each is a small rendered surface that mirrors the shared header/scroll pattern. */
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -535,28 +535,27 @@ export function KiloPassSubscriptionScreen() {
     })
   );
 
+  // The owner is the route entry, not a branch behind the presentation query:
+  // it must mount while the presentation is still loading so the native store
+  // connection and the store-product query overlap that request instead of
+  // queuing behind it. Only the purchasable content is gated on `native_iap`;
+  // the loading, error, and non-native variants render as its children so the
+  // owner never unmounts and remounts as the query settles.
+  const presentation = presentationQuery.data;
+  let variant: ReactNode = <KiloPassNativeIapContent />;
   if (presentationQuery.isPending) {
-    return <KiloPassLoadingScreen />;
-  }
-
-  if (!presentationQuery.data) {
-    return (
+    variant = <KiloPassLoadingScreen />;
+  } else if (!presentation) {
+    variant = (
       <KiloPassPresentationErrorScreen
         onRetry={() => {
           void presentationQuery.refetch();
         }}
       />
     );
+  } else if (presentation.kind !== 'native_iap' || !isIapPlatform) {
+    variant = <KiloPassUnavailableScreen presentation={presentation} />;
   }
 
-  const presentation = presentationQuery.data;
-  if (presentation.kind !== 'native_iap' || !isIapPlatform) {
-    return <KiloPassUnavailableScreen presentation={presentation} />;
-  }
-
-  return (
-    <KiloPassNativeIapOwner>
-      <KiloPassNativeIapContent />
-    </KiloPassNativeIapOwner>
-  );
+  return <KiloPassNativeIapOwner>{variant}</KiloPassNativeIapOwner>;
 }

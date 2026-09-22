@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 // iOS-only by capability: the press subscription below reaches the Live
 // Activity through `expo-widgets` (WidgetKit/ActivityKit), which has no Android
@@ -17,7 +17,7 @@ import { adoptPushStartedActivity } from './adopt-activity';
 import { refreshActiveAgentsLiveActivityCopy } from './active-agents-live-activity';
 import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
 import { handleGlanceableInteraction } from './interaction';
-import { iosSink } from './ios-sink';
+import { iosSink, sweepStrayActivities } from './ios-sink';
 import { registerWidgetActionHandling } from './widget-actions';
 import { ensureWidgetLogo } from './widget-logo';
 
@@ -81,6 +81,17 @@ if (Platform.OS === 'ios') {
   // this process background run time for exactly that, and the server cannot
   // update or end the card until its update token arrives.
   void adoptPushStartedActivity();
+
+  // A card outlives the process that raised it, so a session that ends while
+  // the app is suspended leaves it on the Lock Screen at its frozen counts.
+  // The publisher only publishes when a snapshot changes; a foreground with no
+  // change would never read native truth. Sweep it here, the way the Android
+  // sink's own foreground hook retries its surface.
+  AppState.addEventListener('change', state => {
+    if (state === 'active') {
+      sweepStrayActivities();
+    }
+  });
 
   // The layouts bake their copy in at import, when i18n still holds English: the
   // stored language is applied a few ticks later. Re-bake on every language

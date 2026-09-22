@@ -12,13 +12,15 @@ import {
   _resetLiveActivitySwitchForTests,
   setLiveActivityEnabledValue,
 } from '@/lib/glanceable/live-activity-switch';
-import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
-import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import {
   _resetGlanceablePersistForTests,
+  _setGlanceableRestoreUnavailableForTests,
   _setLastGlanceableSnapshotForTests,
   _setSecureStoreForTests,
+  restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
+import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
+import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
 import {
   registerGlanceableSink,
@@ -39,6 +41,7 @@ import {
   iosSink,
   renderStoredSnapshotWithNotice,
   setGlanceableActionNotice,
+  sweepStrayActivities,
 } from './ios-sink';
 import {
   buildExpiredWidgetProps,
@@ -224,9 +227,15 @@ function snapshotFor(
   });
 }
 
+/** How many of the given native cards were asked to end. */
+function endedCount(cards: { end: ReturnType<typeof vi.fn> }[]): number {
+  return cards.filter(card => card.end.mock.calls.length > 0).length;
+}
+
 beforeEach(() => {
   _resetLiveActivitySwitchForTests();
   _resetIosSinkForTests();
+  _resetGlanceablePersistForTests();
   _resetWaitingAskForTests();
   _resetGlanceablePersistForTests();
   secureStore.clear();
@@ -1625,5 +1634,176 @@ describe('toWidgetProps', () => {
         { kind: 'idle', count: 0 },
       ],
     });
+  });
+});
+
+describe('iosSink stray sweep', () => {
+  /** A card this process never started, as native discovery reports it. */
+  function nativeStray(): { end: ReturnType<typeof vi.fn>; updated: unknown[] } {
+    const end = vi.fn();
+    const updated: unknown[] = [];
+    mockState.instances.push({
+      getPushToken: vi.fn().mockResolvedValue(null),
+      update: (next: unknown) => updated.push(next),
+      end,
+    });
+    return { end, updated };
+  }
+
+  /** A persisted snapshot stamped now, so its claim has not expired. */
+  function freshSnapshot(
+    sessions: { status: string }[] = [{ status: 'busy' }],
+    status?: GlanceableAgentsSnapshot['status']
+  ): GlanceableAgentsSnapshot {
+    return buildGlanceableSnapshot({
+      sessions,
+      userId: 'u1',
+      organizationId: null,
+      now: Date.now(),
+      ...(status === undefined ? {} : { status }),
+    });
+  }
+
+  it('keeps one card and ends the rest on launch while the persisted work claims one', async () => {
+    const cards = [nativeStray(), nativeStray(), nativeStray()];
+    _setLastGlanceableSnapshotForTests(freshSnapshot());
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(2);
+    });
+    // The single survivor is adopted, never replaced by a second start.
+    expect(mockState.started).toHaveLength(0);
+  });
+
+  it('keeps one card for an empty unexpired snapshot, for a push-to-start it has not adopted', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    _setLastGlanceableSnapshotForTests(freshSnapshot([], 'empty'));
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+    expect(mockState.started).toHaveLength(0);
+  });
+
+  it('ends every card on launch when the persisted claim has expired', async () => {
+    const cards = [nativeStray(), nativeStray(), nativeStray()];
+    _setLastGlanceableSnapshotForTests({
+      ...freshSnapshot(),
+      expiresAt: new Date(Date.now() - 1000).toISOString(),
+    });
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(3);
+    });
+  });
+
+  it('ends every card for an expired snapshot whose expiry was renewed', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    // `applyExpiry` stamps the lapsed snapshot eight hours out, so the timestamp
+    // alone reads as unexpired; the status is what says nothing owns a card.
+    _setLastGlanceableSnapshotForTests(freshSnapshot([], 'expired'));
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(2);
+    });
+  });
+
+  it('ends every card on launch when no snapshot claims one', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    _setLastGlanceableSnapshotForTests(null);
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(2);
+    });
+  });
+
+  it('keeps one card when the persisted owner could not be read', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    // A locked keychain at launch: the record may name an owner, so the card a
+    // push-to-start just raised must not be swept away as if none existed.
+    _setLastGlanceableSnapshotForTests(null);
+    _setGlanceableRestoreUnavailableForTests(true);
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+    expect(mockState.started).toHaveLength(0);
+  });
+
+  it('keeps one card while the persisted owner is still being restored', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    // Launch: the AppState listener can reach the sweep before the SecureStore
+    // read lands, so a null in-memory snapshot means "not read yet", not
+    // "nothing persisted". The cards the mirror may still name must survive.
+    const gate = Promise.withResolvers<null>();
+    _setSecureStoreForTests({
+      setItemAsync: secureStoreMock.setItemAsync,
+      getItemAsync: async () => {
+        await gate.promise;
+        return null;
+      },
+    });
+
+    const restore = restorePersistedGlanceable();
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(1);
+    });
+    expect(mockState.started).toHaveLength(0);
+
+    gate.resolve(null);
+    await restore;
+  });
+
+  it.each(['signed_out', 'privacy'] as const)(
+    'ends every card on launch after a %s blank',
+    async status => {
+      const cards = [nativeStray(), nativeStray()];
+      _setLastGlanceableSnapshotForTests({ ...freshSnapshot(), status });
+
+      sweepStrayActivities();
+
+      await vi.waitFor(() => {
+        expect(endedCount(cards)).toBe(2);
+      });
+    }
+  );
+
+  it('ends every card on foreground while the in-app switch is off', async () => {
+    const cards = [nativeStray(), nativeStray()];
+    _setLastGlanceableSnapshotForTests(freshSnapshot());
+    setLiveActivityEnabledValue(false);
+
+    sweepStrayActivities();
+
+    await vi.waitFor(() => {
+      expect(endedCount(cards)).toBe(2);
+    });
+  });
+
+  it('gives the surviving card the current counts instead of starting a second one', () => {
+    const card = nativeStray();
+    _setLastGlanceableSnapshotForTests(freshSnapshot());
+
+    sweepStrayActivities();
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }, { status: 'busy' }], 1), CTX);
+
+    expect(card.end).not.toHaveBeenCalled();
+    expect(mockState.started).toHaveLength(0);
+    expect(card.updated).toHaveLength(1);
+    expect(card.updated[0]).toMatchObject({ running: 2 });
   });
 });

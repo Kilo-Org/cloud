@@ -50,6 +50,15 @@ vi.mock('@/components/ui/radio-group', () => ({
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+// The screen reserves the keyboard's height in this view and reads it back in
+// `useRevealEndOnKeyboard`. The real module imports
+// `react-native-safe-area-context`, whose sources this Node project cannot
+// parse, so the module is stubbed like every other UI element: no reserved
+// height means the reveal hook is inert, the state these cases render in.
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
+  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
+  useAppAwareKeyboardPadding: () => 0,
+}));
 vi.mock('@/lib/code-reviewer-config', () => ({
   PLATFORM_CAPABILITIES: { github: { label: 'GitHub' }, gitlab: { label: 'GitLab' } },
 }));

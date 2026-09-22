@@ -164,8 +164,18 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // This case introspects the checked-out project, so on a machine that has
+    // run prebuild the base colors mod merges into the existing, gitignored
+    // `android/app/src/main/res/values/colors.xml` and its other colors
+    // (iconBackground, colorPrimary, …) survive. Pin the splash color the same
+    // way the styles assertion below pins its theme: by containment, not by the
+    // exact length of a file the test does not own.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([
+          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+        ]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

@@ -1,3 +1,7 @@
+// Deliberately not `_layout.mounted.test.tsx`: expo-router classifies any
+// `_layout.*` file as a layout (`getFileMeta`), so a test named `_layout.*`
+// shadows the real `_layout.tsx` and the typed-routes generator then drops
+// every route under `(tabs)` — failing `pnpm typecheck`.
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

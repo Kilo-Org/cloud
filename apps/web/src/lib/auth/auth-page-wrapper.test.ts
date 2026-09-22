@@ -72,6 +72,30 @@ describe('getAuthPageProps SSO account mismatch', () => {
     expect(mockedRedirect).toHaveBeenCalledWith('/users/after-sign-in?sso=true&email=');
   });
 
+  it('does not throw on a repeated email and compares its first value', async () => {
+    signedInAs('b@example.com');
+
+    const result = await getAuthPageProps(
+      Promise.resolve({ sso: 'true', email: ['a@example.com', 'b@example.com'] })
+    );
+
+    expect(mockedRedirect).not.toHaveBeenCalled();
+    expect(result.accountMismatch).toEqual({
+      expectedEmail: 'a@example.com',
+      signedInEmail: 'b@example.com',
+    });
+  });
+
+  it('collapses a repeated key to a single value for the rendered page', async () => {
+    signedInAs(null);
+
+    const result = await getAuthPageProps(
+      Promise.resolve({ email: ['a@example.com', 'b@example.com'] })
+    );
+
+    expect(result.params.email).toBe('a@example.com');
+  });
+
   it('redirects when the SSO request carries no email parameter', async () => {
     signedInAs('b@example.com');
 

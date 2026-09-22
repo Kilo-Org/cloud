@@ -9,6 +9,23 @@ export type AuthPageProps = {
 };
 
 /**
+ * Collapses raw search params to one string per key. The first value wins,
+ * matching the device-auth page. Without this, a repeated key (`?email=a&email=b`)
+ * arrives as an array and reaches `normalizeAccountEmail` (or the sign-in form),
+ * where `.trim()` throws a `TypeError` instead of rendering the page.
+ */
+function normalizeSearchParams(params: NextAppSearchParams): Record<string, string> {
+  const normalized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(params)) {
+    const firstValue = Array.isArray(value) ? value[0] : value;
+    if (firstValue !== undefined) {
+      normalized[key] = firstValue;
+    }
+  }
+  return normalized;
+}
+
+/**
  * Shared server-side logic for auth pages (sign in and sign up).
  * Checks if user is already logged in and redirects if so.
  * Returns the search params for use in the page component.
@@ -19,10 +36,10 @@ export type AuthPageProps = {
  * matching `email`, or a signed-out visitor, keeps the existing redirect.
  */
 export async function getAuthPageProps(
-  searchParams: Promise<Record<string, string>>,
+  searchParams: NextAppSearchParamsPromise,
   loggedInRedirectPath?: string
 ): Promise<AuthPageProps> {
-  const params = await searchParams;
+  const params = normalizeSearchParams(await searchParams);
   const currentUser = (
     await getUserFromAuth({ adminOnly: false, DANGEROUS_allowBlockedUsers: true })
   ).user;

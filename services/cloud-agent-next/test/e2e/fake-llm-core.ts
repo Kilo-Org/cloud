@@ -148,6 +148,12 @@ export type FakeLlmState = {
   chatCompletionRequests: number;
   /** Count of dispatched audio/transcriptions calls, exposed for fail-fast scenario assertions. */
   transcriptionRequests: number;
+  /**
+   * Durable: completions attributed to one `E2E_FAKE_SCOPE` marker, so a
+   * scenario can assert on its own dispatches while parallel shards use the
+   * same fake. A request without a marker is counted only in the totals.
+   */
+  scopedChatCompletionRequests: Map<string, number>;
   /** Durable: per-tag scenario counters. */
   scenarios: Map<string, InternalScenarioStatus>;
 };
@@ -156,6 +162,8 @@ const RELEASED_GATE_FOLLOWUP_TTL_MS = 10_000;
 
 /** Bound on scenarios retained in the persisted snapshot, in insertion (FIFO) order. */
 export const MAX_PERSISTED_SCENARIOS = 200;
+/** Bound on scopes retained in the persisted snapshot, in insertion (FIFO) order. */
+export const MAX_PERSISTED_SCOPES = 200;
 /** Tags longer than this are dropped from the persisted snapshot. */
 export const MAX_PERSISTED_TAG_LENGTH = 256;
 
@@ -185,6 +193,8 @@ export type PersistedFakeLlmState = {
   transcriptionRequests: number;
   releasedGateFollowups: Array<[string, number]>;
   scenarios: PersistedScenarioStatus[];
+  /** Optional for snapshots written before scope attribution existed. */
+  scopedChatCompletionRequests?: Array<[string, number]>;
 };
 
 export function createFakeLlmState(): FakeLlmState {
@@ -195,6 +205,7 @@ export function createFakeLlmState(): FakeLlmState {
     nextRequestId: 0,
     chatCompletionRequests: 0,
     transcriptionRequests: 0,
+    scopedChatCompletionRequests: new Map(),
     scenarios: new Map(),
   };
 }
@@ -232,12 +243,16 @@ export function serializeFakeLlmState(state: FakeLlmState): PersistedFakeLlmStat
   // FIFO: drop the oldest entries first, keeping the newest in insertion order.
   const retained = scenarios.slice(Math.max(0, scenarios.length - MAX_PERSISTED_SCENARIOS));
 
+  const scoped = [...state.scopedChatCompletionRequests.entries()];
+  const retainedScoped = scoped.slice(Math.max(0, scoped.length - MAX_PERSISTED_SCOPES));
+
   return {
     nextRequestId: state.nextRequestId,
     chatCompletionRequests: state.chatCompletionRequests,
     transcriptionRequests: state.transcriptionRequests,
     releasedGateFollowups,
     scenarios: retained,
+    scopedChatCompletionRequests: retainedScoped,
   };
 }
 
@@ -253,6 +268,9 @@ export function hydrateFakeLlmState(
   state.transcriptionRequests = persisted.transcriptionRequests ?? 0;
   for (const [tag, expiresAt] of persisted.releasedGateFollowups ?? []) {
     state.releasedGateFollowups.set(tag, expiresAt);
+  }
+  for (const [scope, count] of persisted.scopedChatCompletionRequests ?? []) {
+    state.scopedChatCompletionRequests.set(scope, count);
   }
   for (const scenario of persisted.scenarios ?? []) {
     state.scenarios.set(scenario.tag, {
@@ -317,6 +335,39 @@ export function parseDirective(text: string): Directive | null {
   }
   const args = rest.slice(1);
   return { scenario, args: args.length > 0 ? [args] : [''] };
+}
+
+/**
+ * Attribution marker a scenario prepends to its prompt when it runs under a
+ * scope (parallel matrix shards). `extractPromptScope` removes it before the
+ * directive is interpreted or the default echo is produced, so it never
+ * changes scenario-visible content; it only routes the completion into the
+ * scope's counter.
+ */
+export const FAKE_SCOPE_MARKER_PREFIX = '__e2e_scope__:';
+
+export function isFakeScopeToken(value: string): boolean {
+  return /^[A-Za-z0-9_-]{1,64}$/.test(value);
+}
+
+/**
+ * Split an optional leading `__e2e_scope__:<token>` marker from a prompt.
+ * Returns the scope (undefined when absent or malformed) and the prompt text
+ * with the marker and its trailing newline removed.
+ */
+export function extractPromptScope(text: string): { scope: string | undefined; text: string } {
+  const idx = text.indexOf(FAKE_SCOPE_MARKER_PREFIX);
+  if (idx < 0) return { scope: undefined, text };
+  const afterMarker = text.slice(idx + FAKE_SCOPE_MARKER_PREFIX.length);
+  const token = afterMarker.match(/^[A-Za-z0-9_-]{1,64}(?![A-Za-z0-9_-])/)?.[0];
+  if (token === undefined || !isFakeScopeToken(token)) return { scope: undefined, text };
+  const remainder = afterMarker.slice(token.length);
+  const stripped = remainder.startsWith('\r\n')
+    ? remainder.slice(2)
+    : remainder.startsWith('\n')
+      ? remainder.slice(1)
+      : remainder;
+  return { scope: token, text: text.slice(0, idx) + stripped };
 }
 
 const FILE_TAG = '[A-Za-z0-9_-]+';
@@ -1619,11 +1670,17 @@ async function handleChatCompletions(
   const messages = isRecord(body) ? body.messages : undefined;
   const messageCount = Array.isArray(messages) ? messages.length : 0;
   const bodyModel = isRecord(body) && typeof body.model === 'string' ? body.model : undefined;
-  const prompt = extractLastUserMessageText(body);
+  const { scope, text: prompt } = extractPromptScope(extractLastUserMessageText(body));
   const directive = parseDirective(prompt);
   const tools = advertisedTools(body);
   const tag = directiveTag(directive);
   if (tag) scenarioStatus(state, tag).requests += 1;
+  if (scope !== undefined) {
+    state.scopedChatCompletionRequests.set(
+      scope,
+      (state.scopedChatCompletionRequests.get(scope) ?? 0) + 1
+    );
+  }
 
   logEvent('request.start', {
     reqId: reqLogId,
@@ -1633,6 +1690,7 @@ async function handleChatCompletions(
     scenario: directive?.scenario ?? 'echo',
     args: directive === null ? '(default)' : undefined,
     tag,
+    scope,
     tools: tools.length,
   });
 
@@ -1843,10 +1901,23 @@ async function handleModelValidation(request: FakeLlmRequest, emit: FakeLlmEmit)
   emit.json(200, valid ? { valid: true } : { valid: false, reason: 'unavailable' });
 }
 
-function handleRequestCounts(emit: FakeLlmEmit, state: FakeLlmState): void {
+function handleRequestCounts(
+  request: FakeLlmRequest,
+  emit: FakeLlmEmit,
+  state: FakeLlmState
+): void {
+  const scope = new URL(request.url, 'http://fake').searchParams.get('scope');
+  if (scope !== null && !isFakeScopeToken(scope)) {
+    emit.json(400, { error: 'valid scope query param required' });
+    return;
+  }
   emit.json(200, {
-    chatCompletions: state.chatCompletionRequests,
+    chatCompletions:
+      scope === null
+        ? state.chatCompletionRequests
+        : (state.scopedChatCompletionRequests.get(scope) ?? 0),
     transcriptions: state.transcriptionRequests,
+    ...(scope === null ? {} : { scope }),
   });
 }
 
@@ -1955,7 +2026,7 @@ export async function handleFakeLlmRequest(
       return;
     }
     if (route === 'GET /test/requests') {
-      handleRequestCounts(emit, state);
+      handleRequestCounts(request, emit, state);
       return;
     }
     if (route === 'GET /test/scenario-status') {

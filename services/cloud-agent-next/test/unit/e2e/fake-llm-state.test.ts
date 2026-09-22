@@ -8,10 +8,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  FAKE_SCOPE_MARKER_PREFIX,
   MAX_PERSISTED_SCENARIOS,
+  MAX_PERSISTED_SCOPES,
   MAX_PERSISTED_TAG_LENGTH,
   MAX_SLOW_DELAY_MS,
   createFakeLlmState,
+  extractPromptScope,
   handleFakeLlmRequest,
   hydrateFakeLlmState,
   serializeFakeLlmState,
@@ -163,6 +166,21 @@ describe('serializeFakeLlmState', () => {
     expect(persisted.scenarios.some(scenario => scenario.tag === 't0')).toBe(false);
   });
 
+  it('keeps scoped completion counts and bounds them in FIFO order', () => {
+    const state = createFakeLlmState();
+    for (let i = 0; i < MAX_PERSISTED_SCOPES + 5; i++) {
+      state.scopedChatCompletionRequests.set(`s${i}`, i + 1);
+    }
+
+    const persisted = serializeFakeLlmState(state);
+
+    expect(persisted.scopedChatCompletionRequests).toHaveLength(MAX_PERSISTED_SCOPES);
+    expect(persisted.scopedChatCompletionRequests?.[0]).toEqual(['s5', 6]);
+    expect(persisted.scopedChatCompletionRequests?.at(-1)?.[0]).toBe(
+      `s${MAX_PERSISTED_SCOPES + 4}`
+    );
+  });
+
   it('skips tags longer than the persisted tag bound', () => {
     const state = createFakeLlmState();
     const longTag = 'x'.repeat(MAX_PERSISTED_TAG_LENGTH + 1);
@@ -215,6 +233,23 @@ describe('hydrateFakeLlmState', () => {
     });
     expect([...(writer?.seenToolResults ?? [])]).toEqual(['call_abc_write']);
     expect(writer?.fileCompleted).toBe(true);
+  });
+
+  it('round-trips scoped completion counts and tolerates their absence', () => {
+    const state = createFakeLlmState();
+    state.scopedChatCompletionRequests.set('shardA', 2);
+
+    const hydrated = hydrateFakeLlmState(serializeFakeLlmState(state));
+    expect(hydrated.scopedChatCompletionRequests.get('shardA')).toBe(2);
+
+    const legacy = hydrateFakeLlmState({
+      nextRequestId: 1,
+      chatCompletionRequests: 0,
+      transcriptionRequests: 0,
+      releasedGateFollowups: [],
+      scenarios: [],
+    });
+    expect(legacy.scopedChatCompletionRequests.size).toBe(0);
   });
 
   it('always starts with empty transient maps', () => {
@@ -276,6 +311,39 @@ describe('hydrateFakeLlmState', () => {
     expect(hydrated.scenarios.get('first-touched-beyond-bound')?.requests).toBe(4);
     // The live map is untouched by the snapshot bound.
     expect(state.scenarios.get('old-reused')?.requests).toBe(2);
+  });
+});
+
+describe('extractPromptScope', () => {
+  it('splits a leading marker from the prompt and strips the newline', () => {
+    expect(extractPromptScope(`${FAKE_SCOPE_MARKER_PREFIX}shardA\n__fake__:echo:hi`)).toEqual({
+      scope: 'shardA',
+      text: '__fake__:echo:hi',
+    });
+  });
+
+  it('returns the text unchanged when no marker is present', () => {
+    expect(extractPromptScope('__fake__:echo:hi')).toEqual({
+      scope: undefined,
+      text: '__fake__:echo:hi',
+    });
+  });
+
+  it('ignores a malformed marker without stripping text', () => {
+    const text = `${FAKE_SCOPE_MARKER_PREFIX}\n__fake__:echo:hi`;
+    expect(extractPromptScope(text)).toEqual({ scope: undefined, text });
+  });
+
+  it('ignores a token longer than the scope bound instead of truncating it', () => {
+    const text = `${FAKE_SCOPE_MARKER_PREFIX}${'a'.repeat(65)}\n__fake__:echo:hi`;
+    expect(extractPromptScope(text)).toEqual({ scope: undefined, text });
+  });
+
+  it('strips a marker with no following newline', () => {
+    expect(extractPromptScope(`${FAKE_SCOPE_MARKER_PREFIX}b plain text`)).toEqual({
+      scope: 'b',
+      text: ' plain text',
+    });
   });
 });
 

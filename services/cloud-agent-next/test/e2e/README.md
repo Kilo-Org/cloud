@@ -231,6 +231,7 @@ for any other offset, compute the real ports from `pnpm dev:status --json`
 | `E2E_USER_EMAIL` | unset (ephemeral `usr_e2e_*`). Set to the cloud-worktree-setup email to reuse that user and its GitHub integration. |
 | `E2E_BRANCH` | unset. Optional checkout ref (`upstreamBranch` / `repository.branch`). |
 | `E2E_MODEL` | `kilo/fake-deterministic` (the only model the fake serves) |
+| `E2E_FAKE_SCOPE` | unset. `[A-Za-z0-9_-]{1,64}` attribution token prepended to every prompt as `__e2e_scope__:<token>`. `fetchFakeRequests` then reads `GET /test/requests?scope=<token>` instead of the global total, so a parallel shard asserts only on its own completions. The fake strips the marker before parsing the directive or echoing, so it never reaches scenario-visible content. A malformed value fails the run. |
 | `E2E_INTERNAL_API_SECRET` | unset. Required in the launcher shell for the local HTTP e2e profile (`cloud-agent-next-http`): the render command writes it into the generated `.wrangler/.dev.vars` as the Worker's `INTERNAL_API_SECRET`. The shared rules (`requireE2eInternalSecret`) reject the development default, values shorter than 16 characters, and whitespace; the renderer additionally rejects values outside `[A-Za-z0-9._~-]`, because only it writes a dotenv line. Must differ from production's `INTERNAL_API_SECRET`. The local-HTTP driver resolves it like the deployed driver — the exported value or the auth file's `e2eInternalApiSecret` — so both ends must agree. |
 | `DATABASE_URL` | Optional direct database URL override for this harness |
 | `POSTGRES_URL` | Repo database fallback loaded from root `.env.local` / `.env` |
@@ -391,9 +392,12 @@ uses it.
 
 Honest limits, recorded deliberately:
 
-- `fetchFakeRequests` is a global counter on a shared fake, so the lazy-create
-  evidence holds only while no other run is dispatching. In `worktree-multi-chat`
-  a bounded increase in that same counter is the paced-readiness gate; it is
+- `fetchFakeRequests` reads the global counter on a shared fake when no
+  `E2E_FAKE_SCOPE` is set, so a single focused run's lazy-create evidence holds
+  only while no other run is dispatching. The parallel runner sets a per-shard
+  scope, which attributes only that shard's labeled requests; a request the shard
+  dials without its prompt marker is unattributed. In `worktree-multi-chat`
+  a bounded increase in that counter is the paced-readiness gate; it is
   **not** an authoritative paced-request signal. It is attributed to the paced
   request only under the assumption that no auxiliary/title request is in flight
   in that window, and the fake's aggregate `/test/requests` surface cannot
@@ -467,6 +471,30 @@ The `e2e-deployed` GitHub workflow (`.github/workflows/e2e-deployed.yml`) is a
 environment variables, tees the log, uploads it, and writes the counts plus the
 unsupported scenarios and missing capabilities to the job summary even when the
 runner fails.
+
+### Parallel deployed runner
+
+```bash
+E2E_PARALLEL=4 pnpm --filter cloud-agent-next run e2e:parallel
+E2E_PARALLEL=all pnpm --filter cloud-agent-next run e2e:parallel
+```
+
+`smoke-parallel.ts` runs the same supported `SHARED_SCENARIOS` entries as
+`smoke-deployed.ts`, but one scenario per child process under a bounded pool.
+`E2E_PARALLEL` accepts a positive integer or `all` (every supported scenario at
+once) and defaults to `4`. Each child gets a unique `E2E_FAKE_SCOPE`, so its
+completions are counted separately on the shared fake and its
+`fetchFakeRequests` "unchanged"/"increased" assertions stay meaningful while
+other shards dispatch. Capability-gated scenarios are filtered out up front and
+never spawned. Passes the same deployed-profile env as `e2e:deployed`; exit
+policy matches it (`1` failure, else `2` unexpected unsupported, else `0`).
+
+Cold boots contend on container provisioning, so `all` maximises the chance of a
+container cold-start timeout showing up as a false failure; the default `4`
+trades wall time for stability. The scoped counter attributes a completion only
+when its prompt carries that shard's marker; a request the harness dials without
+the scenario's prompt (for example a buggy lazy create) is not attributed and
+stays a documented limit.
 
 Accepted production-coupling risk (repeated from `deploy/README.md`): dedicated
 Worker names keep the stack addressable separately from production; they do
@@ -591,6 +619,9 @@ the insecure development default `local-fake-llm-admin`:
   so scenarios can detect leaked fake-server waiters after a terminal turn.
 - `GET /test/requests` — returns chat completion request counts so model
   preflight scenarios can prove that rejected models did not reach dispatch.
+  `?scope=<token>` returns that scope's count instead of the global total (400
+  for a malformed token); the token is the `__e2e_scope__:<token>` marker a
+  prompt carried.
 
 These are wrapped by `releaseGate()`, `waitForGateEngaged()`,
 `fetchFakeWaiters()`, and `fetchFakeRequests()` in `client.ts`, which attach the

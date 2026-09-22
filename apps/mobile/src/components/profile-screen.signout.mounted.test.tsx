@@ -32,6 +32,8 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
+// The screen reads its side insets through `@/lib/screen-insets`, whose native
+// module cannot load in this project.
 // The screen reads its side insets through `@/lib/screen-insets`; the native
 // module's source is not parseable by this project's transform, and the
 // sign-out confirmation does not depend on the values.

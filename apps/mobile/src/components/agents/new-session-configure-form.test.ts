@@ -51,6 +51,9 @@ const keyboardSubscribers = vi.hoisted(() => ({
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// `renderProfileRow` renders the shimmer skeleton while the profile query
+// loads, and Skeleton pulls in react-native-reanimated (native worklets) that
+// cannot load in this project; the profile-loading case asserts the host stub.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',

@@ -102,7 +102,14 @@ describe('Text tracked labels in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
-    expect(hostText(root).props.className as string).toContain('tracking-[1.5px]');
+    // The eyebrow variant's Latin display treatment is LTR-only: an RTL label
+    // drops the tracked (and uppercased) classes, and the RTL style zeroes any
+    // letter spacing a caller adds. `section-header.mounted.test.tsx` pins the
+    // same for the shared action label, which carries the identical class
+    // string (see `EYEBROW_LATIN_DISPLAY`).
+    const classes = (hostText(root).props.className as string).split(' ');
+    expect(classes).not.toContain('uppercase');
+    expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
   });
 });

@@ -5,10 +5,11 @@
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
+import { compiledDimensions } from '@/test/native-dimensions';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SessionListSearchHeader } from './session-list-search-header';
-import { COMPACT_CONTROL_FRAME_DP, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
+import { COMPACT_CONTROL_HIT_SLOP_DP, MIN_AUDITED_CONTROL_FRAME_DP } from '@/lib/a11y/touch-target';
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -51,12 +52,12 @@ function fieldOf(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTe
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'View' &&
-      String(node.props.className).includes('min-h-[44px]')
+      String(node.props.className).includes('min-h-[50px]')
   );
 }
 
 describe('SessionListSearchHeader clear button touch target', () => {
-  it('measures the clear button frame, not its 16pt glyph', () => {
+  it('measures the clear button frame, not its 16pt glyph', async () => {
     const renderer = mount(true);
     const clear = renderer.root.find(
       node =>
@@ -67,11 +68,23 @@ describe('SessionListSearchHeader clear button touch target', () => {
 
     // The glyph is 16pt; sized to it the audit reported 16dp. The frame is
     // what the audit measures and the slop on top of it is the 44pt target.
-    expect(clear.props.className).toContain('h-11 w-11');
+    // One box width/height pair only: compiling the class is what proves the
+    // real box, so a second, conflicting pair cannot hide behind the order
+    // Tailwind emits its rules in.
+    expect(clear.props.className).toContain('h-[38px] w-[38px]');
     expect(clear.props.className).toContain('items-center');
     const hitSlop = clear.props.hitSlop as number;
     expect(hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
-    expect(COMPACT_CONTROL_FRAME_DP + 2 * hitSlop).toBeGreaterThanOrEqual(44);
+
+    const declarations = (await compiledDimensions(clear.props.className as string)) as {
+      height?: number;
+      width?: number;
+    }[];
+    const box = Object.assign({}, ...declarations) as { height: number; width: number };
+    expect(box.height).toBeGreaterThanOrEqual(MIN_AUDITED_CONTROL_FRAME_DP);
+    expect(box.width).toBeGreaterThanOrEqual(MIN_AUDITED_CONTROL_FRAME_DP);
+    expect(box.height + 2 * hitSlop).toBeGreaterThanOrEqual(44);
+    expect(box.width + 2 * hitSlop).toBeGreaterThanOrEqual(44);
 
     renderer.unmount();
   });
@@ -81,10 +94,12 @@ describe('SessionListSearchHeader clear button touch target', () => {
     const withoutText = mount(false);
 
     // Same field height in both states: the X appears on the first keystroke
-    // and must not move the list below it.
+    // and must not move the list below it. A single `min-h` class, so the
+    // effective floor cannot depend on Tailwind's emit order.
     const fieldWithText = fieldOf(withText);
     const fieldWithoutText = fieldOf(withoutText);
-    expect(fieldWithText.props.className).toContain('min-h-[44px]');
+    expect(fieldWithText.props.className).toContain('min-h-[50px]');
+    expect(fieldWithText.props.className).not.toContain('min-h-[44px]');
     expect(fieldWithoutText.props.className).toBe(fieldWithText.props.className);
 
     const clear = withText.root.find(

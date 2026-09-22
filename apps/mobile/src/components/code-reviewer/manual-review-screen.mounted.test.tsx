@@ -37,6 +37,16 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
+// The keyboard-padding wrapper and its reveal hook reach
+// `react-native-safe-area-context`, whose native source this project's
+// transform cannot parse (see the mounted project's config). The connect CTA
+// under test does not depend on either.
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
+  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
+}));
+vi.mock('@/components/kilo-chat/use-reveal-end-on-keyboard', () => ({
+  useRevealEndOnKeyboard: () => ({ current: null }),
+}));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));

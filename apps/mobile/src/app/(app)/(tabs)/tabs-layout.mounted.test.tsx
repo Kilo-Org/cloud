@@ -1,3 +1,8 @@
+// Deliberately not named `_layout.mounted.test.tsx`: expo-router treats a file
+// whose extension-stripped name is `_layout` as a route layout, and the
+// typed-routes generator then drops that whole directory's subtree, so every
+// `(tabs)` route disappears from `.expo/types/router.d.ts` and `pnpm typecheck`
+// fails on the committed `/(app)/(tabs)/...` hrefs.
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

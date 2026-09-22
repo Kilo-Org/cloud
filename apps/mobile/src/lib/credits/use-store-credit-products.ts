@@ -24,9 +24,6 @@ const APP_STORE_CONNECTION_TIMEOUT_KEY = 'kiloPass.couldNotConnectToAppStore';
 const PLAY_CONNECTION_TIMEOUT_KEY = 'kiloPass.couldNotConnectToPlay';
 
 const isIapPlatform = Platform.OS === 'ios' || Platform.OS === 'android';
-const storefront = Platform.OS === 'ios' ? 'app_store' : 'play';
-const storeConnectionTimeoutKey =
-  Platform.OS === 'ios' ? APP_STORE_CONNECTION_TIMEOUT_KEY : PLAY_CONNECTION_TIMEOUT_KEY;
 
 export type StoreCreditProductsOptions = {
   /** Whether the store connection (from the IAP owner) is established. */
@@ -69,6 +66,13 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   const [storeErrorMessage, setStoreErrorMessage] = useState<string | null>(null);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
 
+  // Derived per render, from the same `Platform.OS` the screen reads, so the
+  // storefront the loader asks and the store name the banner shows can never
+  // come from two different platform branches.
+  const storefront = Platform.OS === 'ios' ? 'app_store' : 'play';
+  const storeConnectionTimeoutKey =
+    Platform.OS === 'ios' ? APP_STORE_CONNECTION_TIMEOUT_KEY : PLAY_CONNECTION_TIMEOUT_KEY;
+
   // Bounded wait for the store connection — without this, a stuck
   // connection leaves the screen showing loading skeletons forever.
   useEffect(() => {
@@ -81,7 +85,7 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
     return () => {
       clearTimeout(timer);
     };
-  }, [options.connected, connectionAttempt]);
+  }, [options.connected, connectionAttempt, storeConnectionTimeoutKey]);
 
   const productsQuery = useQuery({
     queryKey: ['credits', 'store-products', userId],

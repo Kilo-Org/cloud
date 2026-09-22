@@ -259,6 +259,12 @@ describe('CreditPurchaseScreen', () => {
 
     expect(packRows(renderer)).toHaveLength(4);
     expect(allText(renderer)).toContain('No matching credit packs were returned by App Store.');
+    // The iOS card names the App Store for both its title and its body; the
+    // Google Play copy must never leak onto it.
+    expect(allText(renderer)).not.toContain('Google Play products unavailable');
+    expect(allText(renderer)).not.toContain(
+      'No matching credit packs were returned by Google Play.'
+    );
     expect(allText(renderer)).toContain('Price unavailable');
     // The store SDK's own wording never reaches the screen.
     expect(allText(renderer)).not.toContain('Failed to query product');
@@ -275,6 +281,21 @@ describe('CreditPurchaseScreen', () => {
 
     expect(packRows(renderer)).toHaveLength(4);
     expect(allText(renderer)).toContain('Price unavailable');
+    unmount();
+  });
+
+  it('per-OS: the Android store banner names Google Play on both lines', async () => {
+    mockedPlatform.OS = 'android';
+    owner.fetchStoreProducts.mockRejectedValue(new Error('Failed to query product for sku'));
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('Google Play products unavailable'));
+
+    expect(allText(renderer)).toContain('No matching credit packs were returned by Google Play.');
+    // The App Store copy must never leak onto the Android card.
+    expect(allText(renderer)).not.toContain('App Store products unavailable');
+    expect(allText(renderer)).not.toContain('No matching credit packs were returned by App Store.');
+    expect(packRows(renderer)).toHaveLength(4);
     unmount();
   });
 

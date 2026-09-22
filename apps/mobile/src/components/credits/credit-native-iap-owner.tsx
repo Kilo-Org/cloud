@@ -13,7 +13,13 @@ import {
 } from 'react';
 import { Platform } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchProducts as fetchIapProducts, type ProductOrSubscription, useIAP } from 'expo-iap';
+import {
+  getAvailablePurchases as fetchAvailablePurchases,
+  fetchProducts as fetchIapProducts,
+  type ProductOrSubscription,
+  type Purchase,
+  useIAP,
+} from 'expo-iap';
 
 import { i18n } from '@/i18n';
 import {
@@ -143,13 +149,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     ]);
   }, [queryClient, trpc]);
 
-  const {
-    availablePurchases,
-    connected,
-    finishTransaction,
-    requestPurchase,
-    getAvailablePurchases,
-  } = useIAP({
+  const { connected, finishTransaction, requestPurchase } = useIAP({
     onPurchaseError: error => {
       releasePurchaseRequest();
       // A null key means the user cancelled — not a failure.
@@ -236,63 +236,70 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     [actions, appAccountToken, completingProductId, releasePurchaseRequest]
   );
 
+  // Recover the purchases the store already charged but the backend has not
+  // granted yet.
+  //
+  // The lookup uses the store SDK's value-returning `getAvailablePurchases`,
+  // not `useIAP().getAvailablePurchases`: the hook routes every failed query to
+  // `console.error`, and in a dev build the LogBox it raises sits on top of the
+  // screen's own store-unavailable banner — two error affordances, the extra one
+  // a raw library message. A store that cannot answer is exactly the state the
+  // screen reports inline, so its lookup must fail silently here.
   useEffect(() => {
     if (!isIapPlatform || !connected) {
-      return;
+      return undefined;
     }
+    if (creditPackAppleProductIds.length === 0 && creditPackGoogleProductIds.length === 0) {
+      return undefined;
+    }
+
+    const recoveryRun = { cancelled: false };
     void (async () => {
+      let storePurchases: Purchase[] = [];
       try {
-        // Publishes the store's unfinished purchases into `availablePurchases`
-        // so the recovery effect below can complete them.
-        await getAvailablePurchases();
+        storePurchases = await fetchAvailablePurchases();
       } catch {
-        // A failed lookup answers nothing; the next connect retries.
+        // The store is unreachable; the screen's inline banner says so. The
+        // next connect retries.
+        return;
+      }
+      if (recoveryRun.cancelled) {
+        return;
+      }
+
+      const unrecoveredPurchases = storePurchases.filter(availablePurchase => {
+        const id = getPurchaseCompletionId(availablePurchase);
+        if (
+          recoveredPurchaseIdsRef.current.has(id) ||
+          recoveryInFlightPurchaseIdsRef.current.has(id)
+        ) {
+          return false;
+        }
+        recoveryInFlightPurchaseIdsRef.current.add(id);
+        return true;
+      });
+      if (unrecoveredPurchases.length === 0) {
+        return;
+      }
+
+      try {
+        const recoveredPurchases = await actions.recoverPurchases(unrecoveredPurchases);
+        for (const recoveredPurchase of recoveredPurchases) {
+          recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(recoveredPurchase));
+        }
+      } finally {
+        for (const unrecoveredPurchase of unrecoveredPurchases) {
+          recoveryInFlightPurchaseIdsRef.current.delete(
+            getPurchaseCompletionId(unrecoveredPurchase)
+          );
+        }
       }
     })();
-  }, [connected, getAvailablePurchases]);
 
-  useEffect(() => {
-    if (
-      availablePurchases.length === 0 ||
-      (creditPackAppleProductIds.length === 0 && creditPackGoogleProductIds.length === 0)
-    ) {
-      return;
-    }
-
-    const unrecoveredPurchases = availablePurchases.filter(availablePurchase => {
-      const id = getPurchaseCompletionId(availablePurchase);
-      if (
-        recoveredPurchaseIdsRef.current.has(id) ||
-        recoveryInFlightPurchaseIdsRef.current.has(id)
-      ) {
-        return false;
-      }
-      recoveryInFlightPurchaseIdsRef.current.add(id);
-      return true;
-    });
-
-    if (unrecoveredPurchases.length > 0) {
-      void (async () => {
-        try {
-          const recoveredPurchases = await actions.recoverPurchases(unrecoveredPurchases);
-          for (const recoveredPurchase of recoveredPurchases) {
-            recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(recoveredPurchase));
-          }
-        } finally {
-          for (const unrecoveredPurchase of unrecoveredPurchases) {
-            recoveryInFlightPurchaseIdsRef.current.delete(
-              getPurchaseCompletionId(unrecoveredPurchase)
-            );
-          }
-        }
-      })();
-    }
-  }, [
-    actions,
-    availablePurchases,
-    creditPackAppleProductIds.length,
-    creditPackGoogleProductIds.length,
-  ]);
+    return () => {
+      recoveryRun.cancelled = true;
+    };
+  }, [actions, connected, creditPackAppleProductIds.length, creditPackGoogleProductIds.length]);
 
   const value = useMemo<CreditNativeIapContextValue>(
     () => ({

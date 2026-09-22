@@ -14,7 +14,6 @@ const APPLE_PRODUCT_ID = 'credits.usd10.v1';
 const APP_ACCOUNT_TOKEN = '550e8400-e29b-41d4-a716-446655440000';
 
 const mockedIap = vi.hoisted(() => ({
-  availablePurchases: [] as Purchase[],
   connected: false,
   fetchProducts: vi.fn(),
   finishTransaction: vi.fn(),
@@ -44,6 +43,10 @@ vi.mock('expo-iap', () => ({
     UserCancelled: 'user-cancelled',
   },
   fetchProducts: mockedIap.fetchProducts,
+  // The owner reads unfinished purchases through the SDK's value-returning API,
+  // not `useIAP().getAvailablePurchases`, which logs every failure to the dev
+  // LogBox (see credit-native-iap-owner.tsx).
+  getAvailablePurchases: mockedIap.getAvailablePurchases,
   useIAP: (handlers: {
     onPurchaseError: (error: unknown) => void;
     onPurchaseSuccess: (purchase: Purchase) => void;
@@ -51,10 +54,8 @@ vi.mock('expo-iap', () => ({
     mockedIap.useIAP(handlers);
     mockedIap.handlers = handlers;
     return {
-      availablePurchases: mockedIap.availablePurchases,
       connected: mockedIap.connected,
       finishTransaction: mockedIap.finishTransaction,
-      getAvailablePurchases: mockedIap.getAvailablePurchases,
       requestPurchase: mockedIap.requestPurchase,
     };
   },
@@ -155,10 +156,9 @@ async function flushPromises() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockedPlatform.OS = 'ios';
-  mockedIap.availablePurchases = [];
   mockedIap.connected = false;
   mockedIap.finishTransaction.mockResolvedValue(undefined);
-  mockedIap.getAvailablePurchases.mockResolvedValue(undefined);
+  mockedIap.getAvailablePurchases.mockResolvedValue([]);
   mockedIap.handlers = null;
   mockedIap.requestPurchase.mockResolvedValue(null);
   mockedQuery.completePurchase.mockResolvedValue({ alreadyProcessed: false });
@@ -209,7 +209,7 @@ describe('CreditNativeIapOwner', () => {
   });
 
   it('recovers an unfinished purchase once per transaction', async () => {
-    mockedIap.availablePurchases = [createPurchase()];
+    mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
     mockedIap.connected = true;
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,
@@ -218,19 +218,44 @@ describe('CreditNativeIapOwner', () => {
     const { handle, renderer } = await mountOwner();
     await flushPromises();
 
+    expect(mockedIap.getAvailablePurchases).toHaveBeenCalledTimes(1);
     expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
     expect(mockedIap.finishTransaction).toHaveBeenCalledTimes(1);
     expect(mockedQuery.invalidateQueries).toHaveBeenCalled();
 
-    // A new store snapshot with the same transaction must not complete it again.
-    mockedIap.availablePurchases = [createPurchase()];
+    // A second store lookup returning the same transaction must not complete it
+    // again: the recovered transaction id is remembered.
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
     await act(async () => {
       renderer.update(ownerElement(handle));
       await Promise.resolve();
     });
     await flushPromises();
 
+    expect(mockedIap.getAvailablePurchases).toHaveBeenCalledTimes(2);
     expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
     expect(handle.value?.completingProductId).toBeNull();
+  });
+
+  it('a failed store lookup adds no second error affordance', async () => {
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockRejectedValue(
+      new Error('Play Store service is not connected')
+    );
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+
+    const { handle } = await mountOwner();
+    await flushPromises();
+
+    // The screen's store-unavailable banner owns this state; the owner must not
+    // add its own error key or attempt a completion.
+    expect(handle.value?.errorMessageKey).toBeNull();
+    expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
   });
 });

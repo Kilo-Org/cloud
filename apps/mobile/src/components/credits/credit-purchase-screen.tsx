@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
+import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
 import { type StoreCreditProduct } from '@/lib/credits/store-products';
 import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
@@ -82,9 +83,11 @@ export function CreditPurchaseScreen() {
   const packsEmpty = !isLoading && !storeUnavailable && products.length === 0;
   const balancePending = balanceQuery.isPending;
   const balanceFailed = balanceQuery.isError;
-  const storeBannerBodyKey =
-    productsErrorMessageKey ??
-    (isAndroid ? 'credits.noMatchingProductsPlay' : 'credits.noMatchingProducts');
+  // The card's title and its default body come from one per-store source, so
+  // an iOS build can never name Google Play (or the reverse) for only one of
+  // the two lines.
+  const storeUnavailableCopy = getStoreUnavailableCopyKeys(isAndroid ? 'play' : 'app_store');
+  const storeBannerBodyKey = productsErrorMessageKey ?? storeUnavailableCopy.bodyKey;
 
   const handlePackPress = (pack: StoreCreditProduct) => {
     void Haptics.selectionAsync();
@@ -146,7 +149,7 @@ export function CreditPurchaseScreen() {
           {storeUnavailable && (
             <View className="gap-3 rounded-xl border border-border bg-card p-5">
               <Text className="font-semibold text-foreground">
-                {t(isAndroid ? 'kiloPass.productsUnavailablePlay' : 'kiloPass.productsUnavailable')}
+                {t(storeUnavailableCopy.titleKey)}
               </Text>
               <Text className="text-sm text-muted-foreground">{t(storeBannerBodyKey)}</Text>
               <Button

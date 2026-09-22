@@ -31,10 +31,38 @@ export function getAuthoredProductsErrorMessageKey(error: unknown): string | nul
   return error instanceof StoreCreditProductsError ? error.key : null;
 }
 
-function noMatchingProductsKey(storefront: 'app_store' | 'play'): string {
+/** The two catalog keys the store-unavailable card renders, per storefront. */
+export type StoreUnavailableCopyKeys = {
+  /** Card title: `<store> products unavailable`. */
+  titleKey: string;
+  /** Card body for a store the loader found no products for. */
+  bodyKey: string;
+};
+
+/**
+ * The per-store copy for the store-unavailable card, from one place.
+ *
+ * The card's title and its body must name the same store; deriving them from
+ * two separate per-OS branches is what let an iOS build show a Google Play
+ * body under an App Store title. Callers pass the storefront they buy from,
+ * so the store name is chosen exactly once.
+ */
+export function getStoreUnavailableCopyKeys(
+  storefront: 'app_store' | 'play'
+): StoreUnavailableCopyKeys {
   return storefront === 'play'
-    ? NO_MATCHING_CREDIT_PRODUCTS_PLAY_KEY
-    : NO_MATCHING_CREDIT_PRODUCTS_KEY;
+    ? {
+        titleKey: 'kiloPass.productsUnavailablePlay',
+        bodyKey: NO_MATCHING_CREDIT_PRODUCTS_PLAY_KEY,
+      }
+    : {
+        titleKey: 'kiloPass.productsUnavailable',
+        bodyKey: NO_MATCHING_CREDIT_PRODUCTS_KEY,
+      };
+}
+
+function noMatchingProductsKey(storefront: 'app_store' | 'play'): string {
+  return getStoreUnavailableCopyKeys(storefront).bodyKey;
 }
 
 export async function loadStoreCreditProducts(params: {

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   getAuthoredProductsErrorMessageKey,
+  getStoreUnavailableCopyKeys,
   loadStoreCreditProducts,
   NO_MATCHING_CREDIT_PRODUCTS_KEY,
   NO_MATCHING_CREDIT_PRODUCTS_PLAY_KEY,
@@ -137,6 +138,22 @@ describe('loadStoreCreditProducts', () => {
 
     expect(fetchStoreProducts).not.toHaveBeenCalled();
     expect(products).toEqual([]);
+  });
+});
+
+describe('getStoreUnavailableCopyKeys', () => {
+  it('names the App Store for the app_store storefront on both lines', () => {
+    expect(getStoreUnavailableCopyKeys('app_store')).toEqual({
+      titleKey: 'kiloPass.productsUnavailable',
+      bodyKey: NO_MATCHING_CREDIT_PRODUCTS_KEY,
+    });
+  });
+
+  it('names Google Play for the play storefront on both lines', () => {
+    expect(getStoreUnavailableCopyKeys('play')).toEqual({
+      titleKey: 'kiloPass.productsUnavailablePlay',
+      bodyKey: NO_MATCHING_CREDIT_PRODUCTS_PLAY_KEY,
+    });
   });
 });
 

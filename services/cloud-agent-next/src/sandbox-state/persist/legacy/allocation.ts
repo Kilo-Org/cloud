@@ -162,7 +162,7 @@ export function convertLegacyAllocation(record: LegacyAllocation): AllocationRec
       };
     }
     case 'running': {
-      if (!intent) return undefined;
+      if (!intent || record.providerRef === null) return undefined;
       return {
         v: 2,
         resumable: record.resumable,
@@ -172,7 +172,7 @@ export function convertLegacyAllocation(record: LegacyAllocation): AllocationRec
           createIntent: intent,
           health: {
             kind: 'connecting',
-            incarnation: intent.intentId,
+            incarnation: record.providerRef,
             deadlineAt: intent.createdAt + POLICY.connectingDeadlineMs,
           },
           idleAt: null,

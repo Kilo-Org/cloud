@@ -81,6 +81,19 @@ export async function readAllocationEntry(
   return value === undefined ? undefined : { key: ALLOCATION_RECORD_KEY, value };
 }
 
+// --- allocation, canonical envelope (sync) ---
+
+export function readCanonicalAllocationRecordSync(storage: SyncRecordReader): unknown {
+  return storage.get(CANONICAL_ALLOCATION_KEY);
+}
+
+// --- allocation, current flat record (sync) ---
+
+export function readAllocationEntrySync(storage: SyncRecordReader): StoredEntry | undefined {
+  const value = storage.get(ALLOCATION_RECORD_KEY);
+  return value === undefined ? undefined : { key: ALLOCATION_RECORD_KEY, value };
+}
+
 export async function readAllocationRecord<T = unknown>(
   storage: AsyncRecordReader
 ): Promise<T | undefined> {

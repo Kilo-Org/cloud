@@ -256,6 +256,7 @@ export const sandboxHelloPayloadSchema = z.object({
       eventBatches: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
     })
     .optional(),
 });
@@ -1071,6 +1072,7 @@ export const sandboxControlSocketAttachmentSchema = z.object({
       eventBatches: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
     })
     .optional(),
   providerInstanceId: z.string().min(1).max(256).optional(),

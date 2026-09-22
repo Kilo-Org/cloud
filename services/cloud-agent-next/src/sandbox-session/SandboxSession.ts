@@ -113,6 +113,7 @@ import type { NotifyEffectResult } from '../sandbox-control/control-effects.js';
 import type { StopProof } from '../sandbox-state/model/allocation.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
+import { POLICY } from '../sandbox-state/schedule.js';
 import { createMessageId } from '../session/message-id.js';
 import {
   getRuntimeAuthorizationStatus,
@@ -161,6 +162,7 @@ import {
   sessionOperationDeliverySchema,
   sessionOperationExpiresAt,
   sessionOperationResultHash,
+  sessionAbortResultSchema,
   sessionPromptResultSchema,
   sessionRuntimeRetireResultSchema,
   sessionSyncResultSchema,
@@ -250,7 +252,7 @@ import {
   type SessionMessage,
 } from './session-message-queue.js';
 import { bindingForAttachment } from './session-binding.js';
-import { terminalMessageState } from '../sandbox-state/session/reduce.js';
+import { decideSession, terminalMessageState } from '../sandbox-state/session/reduce.js';
 import type { Binding } from '../sandbox-state/model/session.js';
 import { createMessageCallbacks, type MessageCallbacks } from './message-callbacks.js';
 import {
@@ -1796,11 +1798,19 @@ export class SandboxSession extends DurableObject<Env> {
     return { dropped: true };
   }
 
-  async interruptExecution(): Promise<{ success: boolean; message?: string }> {
+  async interruptExecution(): Promise<{
+    success: boolean;
+    message?: string;
+    unconfirmed?: boolean;
+  }> {
     return this.interruptLegacyExecution();
   }
 
-  private async interruptLegacyExecution(): Promise<{ success: boolean; message?: string }> {
+  private async interruptLegacyExecution(): Promise<{
+    success: boolean;
+    message?: string;
+    unconfirmed?: boolean;
+  }> {
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null) return { success: false, message: 'Session not found' };
     const before = this.loadMessages();
@@ -1825,26 +1835,92 @@ export class SandboxSession extends DurableObject<Env> {
       ),
       epoch
     );
-    await this.armQueueRetry();
     if (!accepted) return { success: true };
-    this.worktreeChanges.markInterrupted(this.worktreeContext(metadata));
-    // `CANCEL{message}` settles only this message; the runtime is not aborted
-    // here. The canonical allocation machine owns any runtime teardown and
-    // notifies the session through the `STOPPED` seam.
-    if (!this.isCurrentAcceptedMessage(accepted, epoch)) return { success: true };
-    this.saveMessages(
-      this.loadMessages().map(message =>
-        message.messageId === accepted.messageId
-          ? {
-              ...message,
-              state: terminalMessageState(message.state, 'cancelled', now, 'coordinator', {}),
-            }
-          : message
-      ),
-      epoch
-    );
+
+    // The accepted turn is stopped by the wrapper, not by this coordinator. Mint
+    // the durable cancellation id and deadline before any early return or the RPC
+    // so a crash mid-abort still settles the row, and reuse them on retry.
+    const current = this.loadMessages().find(message => message.messageId === accepted.messageId);
+    const stored = current?.cancellation;
+    const operationId = stored?.operationId ?? crypto.randomUUID();
+    const deadlineAt = stored?.deadlineAt ?? now + POLICY.cancellationDeadlineMs;
+    if (!stored) {
+      const recorded = decideSession(
+        this.sessionAggregate(this.loadMessages()),
+        { type: 'RECORD_CANCELLATION', messageId: accepted.messageId, operationId, deadlineAt },
+        now
+      );
+      if (!recorded || !this.saveMessages(recorded.state.messages, epoch)) {
+        return { success: false, message: 'Session not found' };
+      }
+    }
+    await this.armQueueRetry(deadlineAt);
+
+    // An abort is only safe when it names the accepted message's own wrapper. A
+    // missing id cannot be fenced, so a replacement wrapper could answer for it.
+    const expectedWrapperInstanceId = activeWrapperInstanceId(accepted);
+    if (!expectedWrapperInstanceId) {
+      return { success: false, message: 'No wrapper found for session', unconfirmed: true };
+    }
+    const sandboxId = metadata?.workspace?.sandboxId;
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    const sessionId = this.sessionId;
+    if (!metadata || !sandboxId || !kiloSessionId || !sessionId) {
+      return { success: false, message: 'No wrapper found for session', unconfirmed: true };
+    }
+
+    let status: 'aborted' | 'already_idle' | 'unconfirmed' | undefined;
+    let failureMessage = 'Session abort was not confirmed';
+    try {
+      const response = await sandboxControlRpc(this.env, sandboxId).request({
+        operation: 'session.abort',
+        session: {
+          sessionId,
+          kiloSessionId,
+          directory: this.directory(metadata),
+        },
+        payload: { messageId: accepted.messageId, operationId, cleanupDeadlineAt: deadlineAt },
+        expectedWrapperInstanceId,
+      });
+      if (response.ok) {
+        const parsed = sessionAbortResultSchema.safeParse(response.result);
+        if (parsed.success) status = parsed.data.status;
+        else failureMessage = 'Session abort result was unreadable';
+      } else {
+        failureMessage = response.error?.message ?? failureMessage;
+      }
+    } catch (error) {
+      failureMessage = error instanceof Error ? error.message : failureMessage;
+    }
+
+    if (status === 'aborted' || status === 'already_idle') {
+      if (!this.isCurrentAcceptedMessage(accepted, epoch)) {
+        return { success: false, message: 'Session work changed', unconfirmed: true };
+      }
+      const at = Date.now();
+      const decided = decideSession(
+        this.sessionAggregate(this.loadMessages()),
+        {
+          type: 'OUTCOME',
+          messageId: accepted.messageId,
+          status: 'cancelled',
+          at,
+          source: 'coordinator',
+        },
+        at
+      );
+      if (decided && this.saveMessages(decided.state.messages, epoch)) {
+        this.worktreeChanges.markInterrupted(this.worktreeContext(metadata));
+        await this.armQueueRetry();
+        return { success: true };
+      }
+      return { success: false, message: 'Session work changed', unconfirmed: true };
+    }
+
+    // Unconfirmed, unsent, or unreadable: the accepted row keeps its marker and
+    // stays accepted so the alarm settles it at the cancellation deadline.
     await this.armQueueRetry();
-    return { success: true };
+    return { success: false, message: failureMessage, unconfirmed: true };
   }
 
   /**
@@ -3070,8 +3146,32 @@ export class SandboxSession extends DurableObject<Env> {
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null || this.deletedWorktreeId) return;
     const now = Date.now();
-    const messages = this.loadMessages();
+    let messages = this.loadMessages();
     if (!this.terminalLifecycle.isCurrent(epoch)) return;
+    // An accepted row with a cancellation marker is waiting for the wrapper abort
+    // result. Settle it at the marker deadline; while the marker is live, arm at
+    // the deadline and never start the healthy-accepted watchdog for that row.
+    const cancellationDeadlines: number[] = [];
+    let settledCancellation = false;
+    for (const message of messages) {
+      if (message.state.kind !== 'accepted') continue;
+      const cancellation = message.cancellation;
+      if (cancellation === undefined) continue;
+      if (cancellation.deadlineAt > now) {
+        cancellationDeadlines.push(cancellation.deadlineAt);
+        continue;
+      }
+      const failed = failAcceptedMessage(
+        this.sessionAggregate(this.loadMessages()),
+        message.messageId,
+        'cancellation_unconfirmed'
+      );
+      if (failed && this.saveMessages(failed.messages, epoch)) settledCancellation = true;
+    }
+    if (cancellationDeadlines.length > 0) {
+      await this.armQueueRetry(Math.min(...cancellationDeadlines));
+    }
+    if (settledCancellation) messages = this.loadMessages();
     const accepted = messages.find(
       message => message.state.kind === 'accepted' && message.cancellation === undefined
     );

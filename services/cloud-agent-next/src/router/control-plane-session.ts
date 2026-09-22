@@ -19,7 +19,11 @@ export const controlCancelReceiptSchema = z
 export type ControlCancelReceipt = z.infer<typeof controlCancelReceiptSchema>;
 
 type ControlCancelSession = {
-  interruptExecution: () => Promise<{ success: boolean; message?: string }>;
+  interruptExecution: () => Promise<{
+    success: boolean;
+    message?: string;
+    unconfirmed?: boolean;
+  }>;
 };
 
 type ControlSessionCancelDependencies = {
@@ -47,7 +51,7 @@ export async function interruptControlSession(
       withDORetry(stub, operation, operationName));
   const result = await retry(session => session.interruptExecution(), 'interruptControlSession');
   return controlCancelReceiptSchema.parse({
-    state: result.success ? 'confirmed' : 'rejected',
+    state: result.unconfirmed === true ? 'unconfirmed' : result.success ? 'confirmed' : 'rejected',
     ...(result.message !== undefined ? { message: result.message } : {}),
   });
 }

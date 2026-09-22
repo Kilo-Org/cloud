@@ -168,6 +168,35 @@ describe('sandbox control socket handler', () => {
     expect(response.result?.capabilities).not.toHaveProperty('nativeRuntimeRetirement');
     expect(response.result?.capabilities).not.toHaveProperty('scopedCleanupResult');
   });
+  it('treats the retired nativeRuntimeRetirement capability as native runtime id capture', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_retired', WRAPPER_INSTANCE_ID, 'req_retired', {
+        nativeRuntimeRetirement: true,
+      })
+    );
+
+    expect(handler.supportsNativeRuntimeIdCapture()).toBe(true);
+
+    const response = JSON.parse(incoming.send.mock.calls[0]?.[0] as string) as {
+      result?: { capabilities?: Record<string, boolean> };
+    };
+    expect(response.result?.capabilities).not.toHaveProperty('nativeRuntimeRetirement');
+  });
+  it('does not claim native runtime id capture when the hello advertises neither capability', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_plain', WRAPPER_INSTANCE_ID, 'req_plain', { workingBranches: true })
+    );
+
+    expect(handler.supportsNativeRuntimeIdCapture()).toBe(false);
+  });
   it.each([
     ['2.4.0', '2.4.0'],
     [undefined, null],

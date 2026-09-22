@@ -126,6 +126,14 @@ describe('canonical load — allocation dispatch', () => {
     expect(state.target.capabilities.persistentWorkspace).toBe(true);
   });
 
+  it('legacy running without a provider reference fails closed', async () => {
+    const result = await loadAllocation(
+      storageWith(seedAllocationRecord({}, { ...legacyRunning, providerRef: null }))
+    );
+    expect(result).toMatchObject({ ok: false, reason: 'invalid_legacy_allocation' });
+    expect(result.ok === false && isAllocationRecordKey(result.key)).toBe(true);
+  });
+
   it('legacy stopping preserves the stop tombstone wrapper identity and stop intent', async () => {
     const result = await loadAllocation(storageWith(seedAllocationRecord({}, legacyStopping)));
     expect(result.ok).toBe(true);
@@ -354,7 +362,7 @@ describe('canonical load — session dispatch', () => {
       throw new Error('expected a decoded allocated record');
     }
     const incarnation = allocation.value.state.health.incarnation;
-    expect(incarnation).toBe('intent-1');
+    expect(incarnation).toBe('provider-ref-1');
 
     const rows = [
       {

@@ -116,6 +116,7 @@ import {
   loadControlAlarmAnchors,
   scheduleControlAlarm,
   setControlAlarmAnchor,
+  setControlAlarmAnchorSync,
   type ControlAlarmAnchorId,
 } from '../sandbox-control/control-alarm.js';
 import {
@@ -137,6 +138,7 @@ import {
 import type { NotifyEffectResult } from '../sandbox-control/control-effects.js';
 import { createReconcilePort } from '../sandbox-state/ports/reconcile.js';
 import { loadAllocation as loadAllocationResult } from '../sandbox-state/persist/load.js';
+import { POLICY } from '../sandbox-state/schedule.js';
 import {
   WORKTREE_CREDENTIAL_CONTAINMENT,
   getWorktreeCredentialContainment,
@@ -168,9 +170,12 @@ import {
 import {
   eraseSandboxRecord,
   loadAllocation,
+  loadAllocationSync,
   initialRuntimeMetadata,
   loadRuntimeMetadata,
   saveRuntimeMetadata,
+  saveRuntimeMetadataSync,
+  storeAllocation,
   loadRouteTable,
   loadRouteTableSync,
   loadTransitionLog,
@@ -180,6 +185,7 @@ import {
   saveTransitionLog,
   loadSessionCredentialGrants,
   saveSessionCredentialGrants,
+  saveSessionCredentialGrantsSync,
 } from '../sandbox-control/durable-state.js';
 import {
   buildControlNetworkPolicy,
@@ -613,12 +619,36 @@ export class SandboxControl extends DurableObject<Env> {
   private ensureOperationalInitialized(): Promise<void> {
     return (this.operationalInitialization ??= this.ctx.blockConcurrencyWhile(async () => {
       const ctx = this.ctx;
-      const [readyAt, runtime, configuration, record] = await Promise.all([
+      const [readyAt, runtime, configuration, allocation] = await Promise.all([
         ctx.storage.get<number>(WRAPPER_READY_AT_KEY),
         ctx.storage.get<PersistedWrapperRuntime>(ACTIVE_WRAPPER_RUNTIME_KEY),
         this.readProviderConfiguration(),
-        loadAllocation(ctx.storage),
+        loadAllocationResult(ctx.storage),
       ]);
+      if (!allocation.ok) {
+        throw new Error(`Invalid canonical allocation: ${allocation.reason}`);
+      }
+      let record = allocation.value;
+      if (
+        record.state.kind === 'allocated' &&
+        record.state.health.kind === 'connecting' &&
+        record.state.target.providerRef !== null &&
+        (allocation.source === 'legacy' ||
+          record.state.health.incarnation === record.state.createIntent.intentId)
+      ) {
+        record = {
+          ...record,
+          state: {
+            ...record.state,
+            health: {
+              kind: 'connecting',
+              incarnation: record.state.target.providerRef,
+              deadlineAt: Date.now() + POLICY.connectingDeadlineMs,
+            },
+          },
+        };
+        await storeAllocation(ctx.storage, record);
+      }
       // One-time pre-cutover import, owned by the alarm module and run before
       // any anchor mutation at this boot boundary.
       await importLegacyControlAlarmAnchors(ctx.storage, Date.now());
@@ -1938,29 +1968,42 @@ export class SandboxControl extends DurableObject<Env> {
   private async afterCanonicalCommit(from: AllocationRecord, to: AllocationRecord): Promise<void> {
     const changed = canonicalAllocationChanged(from, to);
     const unavailable = to.state.kind !== 'creating' && to.state.kind !== 'allocated';
+    const creatingCleanup = from.state.kind === 'stopped' && to.state.kind === 'creating';
     const wrapperInstanceId =
       canonicalStopWrapperInstanceId(to) ??
       canonicalStopWrapperInstanceId(from) ??
       this.activeConnection?.wrapperInstanceId;
-    if (to.state.kind === 'creating' && from.state.kind === 'stopped') {
-      await saveRuntimeMetadata(this.ctx.storage, initialRuntimeMetadata(this.sandboxId));
-    }
-    if (to.state.kind === 'creating' || unavailable) {
-      await this.ctx.storage.delete([
-        CREDENTIAL_HASH_KEY,
-        ACTIVE_WRAPPER_RUNTIME_KEY,
-        WRAPPER_READY_AT_KEY,
-        WRAPPER_HEARTBEAT_OBSERVATION_KEY,
-      ]);
-    }
-    if (to.state.kind === 'stopped') {
-      await saveSessionCredentialGrants(this.ctx.storage, []);
-      await this.ctx.storage.delete(CREDENTIAL_POLICY_DIRTY_KEY);
-      // No grants remain, so the credential-expiry anchor is meaningless and
-      // must not keep an alarm armed.
-      await setControlAlarmAnchor(this.ctx.storage, 'credentialExpiry', null);
-    }
-    if (unavailable) {
+    const kv = this.ctx.storage.kv;
+    // Synchronous: an explicit `ctx.storage.transaction()` on this path aborts the
+    // workerd isolate, so the atomic read-decide-delete uses `transactionSync`.
+    const cleanedUnavailable = this.ctx.storage.transactionSync(() => {
+      const current = loadAllocationSync(kv, this.provider.resumable);
+      const cleanupUnavailable =
+        unavailable && (sameCanonicalAllocation(from, current) || current.state.kind === 'stopped');
+      const cleanupCreating = creatingCleanup && sameCanonicalAllocation(to, current);
+      if (cleanupCreating) {
+        saveRuntimeMetadataSync(kv, initialRuntimeMetadata(this.sandboxId));
+      }
+      if (cleanupCreating || cleanupUnavailable) {
+        for (const key of [
+          CREDENTIAL_HASH_KEY,
+          ACTIVE_WRAPPER_RUNTIME_KEY,
+          WRAPPER_READY_AT_KEY,
+          WRAPPER_HEARTBEAT_OBSERVATION_KEY,
+        ]) {
+          kv.delete(key);
+        }
+      }
+      if (cleanupUnavailable && to.state.kind === 'stopped') {
+        saveSessionCredentialGrantsSync(kv, []);
+        kv.delete(CREDENTIAL_POLICY_DIRTY_KEY);
+        // No grants remain, so the credential-expiry anchor is meaningless and
+        // must not keep an alarm armed.
+        setControlAlarmAnchorSync(kv, 'credentialExpiry', null);
+      }
+      return cleanupUnavailable;
+    });
+    if (cleanedUnavailable) {
       this.activeConnection = null;
       this.readyConnectionId = null;
       this.kiloReady = false;
@@ -4798,7 +4841,11 @@ export class SandboxControl extends DurableObject<Env> {
     incarnation?: string;
   }): Promise<ControlEffectStopResult> {
     const intent = await this.controlCreateIntentFor(input.target);
-    const result = await this.provider.stop(input.target.providerRef, intent);
+    const result = await withTimeout(
+      this.provider.stop(input.target.providerRef, intent),
+      DEADLINE_MS.stopAttempt,
+      'Sandbox stop timed out'
+    );
     const wrapper =
       this.readyWrapperRuntime()?.wrapperInstanceId ?? this.activeConnection?.wrapperInstanceId;
     return {
@@ -4814,7 +4861,11 @@ export class SandboxControl extends DurableObject<Env> {
     incarnation?: string;
   }): Promise<ControlEffectObserveResult> {
     const intent = await this.controlCreateIntentFor(input.target);
-    const observed = await this.provider.observe(input.target.providerRef, intent);
+    const observed = await withTimeout(
+      this.provider.observe(input.target.providerRef, intent),
+      DEADLINE_MS.stopAttempt,
+      'Sandbox observation timed out'
+    );
     // Carry the discovered reference in the fence so the reducer can adopt it
     // when the target never bound one (by-name observation of a lost create).
     return {

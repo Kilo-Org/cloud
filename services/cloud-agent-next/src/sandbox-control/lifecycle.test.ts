@@ -29,11 +29,17 @@ import { DEADLINE_MS } from './deadlines.js';
 import {
   loadRouteTable,
   loadSessionCredentialGrants,
+  saveSessionCredentialGrantsSync,
   loadSessionReferences,
   loadAllocation as loadCanonicalAllocation,
   storeAllocation,
 } from './durable-state.js';
-import { emptyControlAlarmAnchors, loadControlAlarmAnchors } from './control-alarm.js';
+import {
+  emptyControlAlarmAnchors,
+  loadControlAlarmAnchors,
+  setControlAlarmAnchor,
+  setControlAlarmAnchorSync,
+} from './control-alarm.js';
 import {
   addSessionReference,
   emptySessionReferenceState,
@@ -50,8 +56,15 @@ import { logger } from '../logger.js';
 import { validateControlLogUploadGrant } from './log-upload-grant.js';
 import { summarizeHeartbeatIdle } from './socket.js';
 
-import { seedCanonicalAllocationRecord } from '../sandbox-state/persist/access.js';
+import {
+  seedCanonicalAllocationRecord,
+  seedAllocationRecord,
+  CANONICAL_ALLOCATION_KEY,
+} from '../sandbox-state/persist/access.js';
 import { allocationFixture } from '../sandbox-state/model/allocation-fixtures.js';
+import { POLICY } from '../sandbox-state/schedule.js';
+import { createControlPlaneCredential } from './managed-credential.js';
+import type { SessionCredentialGrant } from './session-credentials.js';
 import type { AllocationRecord } from '../sandbox-state/model/allocation.js';
 
 function canonicalProviderRef(record: AllocationRecord): string | null {
@@ -63,6 +76,31 @@ function canonicalProviderRef(record: AllocationRecord): string | null {
 function canonicalCreateIntentId(record: AllocationRecord): string | undefined {
   const state = record.state;
   return state.kind === 'stopped' ? undefined : state.createIntent?.intentId;
+}
+
+/** A schema-valid grant used to prove a replacement's credentials survive an old stop. */
+function replacementCredentialGrant(): SessionCredentialGrant {
+  return {
+    version: 1,
+    scopeId: 'worktree_1',
+    sandboxId: 'ses-a1b2c3',
+    directory: '/workspace/a',
+    userId: OWNER,
+    provider: 'vercel',
+    members: [{ sessionId: ROUTE.sessionId, kiloSessionId: ROUTE.kiloSessionId }],
+    kilo: {
+      alias: createControlPlaneCredential('ses-a1b2c3', 'kilo'),
+      token: 'test-kilo-token',
+      targets: {
+        backendBaseUrl: 'https://backend.example.com',
+        providerBaseUrl: 'https://provider.example.com/api/openrouter',
+        sessionIngestBaseUrl: 'https://ingest.example.com',
+      },
+      capabilities: {},
+    },
+    preparedAt: 1000,
+    expiresAt: 2000,
+  };
 }
 
 function canonicalCreateIntent(record: AllocationRecord) {
@@ -302,6 +340,21 @@ async function harness(
       });
       transactionTail = pending.catch(() => undefined);
       return pending;
+    },
+    transactionSync<T>(operation: () => T): T {
+      const snapshot = structuredClone([...records]);
+      const previousAlarm = alarmAt;
+      transactionActive = true;
+      try {
+        return operation();
+      } catch (error) {
+        records.clear();
+        for (const [key, value] of snapshot) records.set(key, value);
+        alarmAt = previousAlarm;
+        throw error;
+      } finally {
+        transactionActive = false;
+      }
     },
   } as unknown as DurableObjectStorage;
   const pending: Promise<unknown>[] = [];
@@ -579,6 +632,237 @@ describe('SandboxControl lifecycle boundaries', () => {
     } finally {
       fields.mockRestore();
     }
+  });
+
+  it('re-anchors a migrated legacy running allocation to its provider reference', async () => {
+    const h = await harness();
+    const createdAt = Date.now() - 10 * 60_000;
+    seedAllocationRecord(h.records, {
+      state: 'running',
+      providerRef: 'provider-ref-1',
+      createIntent: { intentId: 'intent-1', createdAt },
+      stopTombstone: null,
+      resumable: true,
+    });
+    await h.evict(true);
+    const record = await h.control.getAllocationRecord();
+    if (record.state.kind !== 'allocated') throw new Error('Expected an allocated record');
+    if (record.state.health.kind !== 'connecting') throw new Error('Expected connecting health');
+    expect(record.state.health).toMatchObject({
+      kind: 'connecting',
+      incarnation: 'provider-ref-1',
+    });
+    expect(record.state.health.deadlineAt).toBeGreaterThan(Date.now());
+    expect(h.records.get(CANONICAL_ALLOCATION_KEY)).toMatchObject({
+      state: { kind: 'allocated', health: { kind: 'connecting', incarnation: 'provider-ref-1' } },
+    });
+  });
+
+  it('does not re-anchor a canonical connecting allocation that already carries the provider reference', async () => {
+    const h = await harness();
+    const createdAt = Date.now() - 10 * 60_000;
+    const seeded = allocationFixture({
+      state: 'running',
+      providerRef: 'provider-ref-1',
+      createIntent: { intentId: 'intent-1', createdAt },
+    });
+    if (!seeded) throw new Error('Expected a fixture');
+    if (seeded.state.kind !== 'allocated') throw new Error('Expected an allocated fixture');
+    if (seeded.state.health.kind !== 'connecting') throw new Error('Expected connecting health');
+    const originalDeadline = seeded.state.health.deadlineAt;
+    seedCanonicalAllocationRecord(h.records, seeded);
+    await h.evict(true);
+    const record = await h.control.getAllocationRecord();
+    if (record.state.kind !== 'allocated') throw new Error('Expected an allocated record');
+    expect(record.state.health).toMatchObject({
+      kind: 'connecting',
+      incarnation: 'provider-ref-1',
+      deadlineAt: originalDeadline,
+    });
+  });
+
+  it('keeps a replacement record, hash, grants and anchors when an old stop commits after a replacement create', async () => {
+    const h = await harness();
+    const old = allocationFixture({
+      state: 'running',
+      providerRef: 'provider-ref-old',
+      createIntent: { intentId: 'intent-old', createdAt: Date.now() - 60_000 },
+    });
+    if (!old) throw new Error('Expected a fixture');
+    seedCanonicalAllocationRecord(h.records, old);
+    h.records.set('wrapper_credential_hash', 'old-hash');
+    h.records.set('active_wrapper_runtime', { connectionId: 'old' });
+    await setControlAlarmAnchor(h.storage, 'credentialExpiry', Date.now() - 1_000);
+    const replacement = allocationFixture({
+      state: 'creating',
+      providerRef: null,
+      createIntent: { intentId: 'intent-new', createdAt: Date.now() },
+    });
+    if (!replacement) throw new Error('Expected a fixture');
+    const grant = replacementCredentialGrant();
+    const replacementAnchorAt = Date.now() + 60_000;
+    const transactionSync = h.storage.transactionSync.bind(h.storage);
+    vi.spyOn(h.storage, 'transactionSync').mockImplementationOnce(<T>(operation: () => T) => {
+      seedCanonicalAllocationRecord(h.records, replacement);
+      h.records.set('wrapper_credential_hash', 'replacement-hash');
+      h.records.set('active_wrapper_runtime', { connectionId: 'replacement' });
+      saveSessionCredentialGrantsSync(h.storage.kv, [grant]);
+      setControlAlarmAnchorSync(h.storage.kv, 'credentialExpiry', replacementAnchorAt);
+      return transactionSync(operation);
+    });
+    await h.control.beginStop('idle');
+    // The old stop must not tear down the replacement's committed state.
+    expect(h.records.get('wrapper_credential_hash')).toBe('replacement-hash');
+    expect(h.records.get('active_wrapper_runtime')).toEqual({ connectionId: 'replacement' });
+    expect(await loadSessionCredentialGrants(h.storage)).toEqual([grant]);
+    expect((await loadControlAlarmAnchors(h.storage)).credentialExpiryAt).toBe(replacementAnchorAt);
+    expect(h.records.get(CANONICAL_ALLOCATION_KEY)).toMatchObject({
+      state: { kind: 'creating', createIntent: { intentId: 'intent-new' } },
+    });
+  });
+
+  it('clears the credential hash and runtime keys on a same-allocation stop', async () => {
+    const h = await harness();
+    const allocated = allocationFixture({
+      state: 'running',
+      providerRef: 'provider-ref-1',
+      createIntent: { intentId: 'intent-1', createdAt: Date.now() - 60_000 },
+    });
+    if (!allocated) throw new Error('Expected a fixture');
+    seedCanonicalAllocationRecord(h.records, allocated);
+    h.records.set('wrapper_credential_hash', 'hash-1');
+    h.records.set('active_wrapper_runtime', { connectionId: 'c1' });
+    h.records.set('wrapper_ready_at', 111);
+    await h.control.beginStop('idle');
+    expect(h.records.has('wrapper_credential_hash')).toBe(false);
+    expect(h.records.has('active_wrapper_runtime')).toBe(false);
+    expect(h.records.has('wrapper_ready_at')).toBe(false);
+  });
+
+  it('skips a delayed stopped-to-creating cleanup once a replacement allocation exists', async () => {
+    const h = await harness();
+    const replacement = allocationFixture({
+      state: 'creating',
+      providerRef: null,
+      createIntent: { intentId: 'replacement-intent', createdAt: Date.now() },
+    });
+    if (!replacement) throw new Error('Expected a fixture');
+    const transaction = h.storage.transaction.bind(h.storage);
+    let seeded = false;
+    let captured = false;
+    let hashAfterCleanup: unknown;
+    vi.spyOn(h.storage, 'transaction').mockImplementation(
+      async <T>(operation: (transaction: DurableObjectTransaction) => Promise<T>) => {
+        const current = h.records.get(CANONICAL_ALLOCATION_KEY) as AllocationRecord | undefined;
+        if (!seeded && current?.state.kind === 'creating') {
+          seeded = true;
+          seedCanonicalAllocationRecord(h.records, replacement);
+          h.records.set('wrapper_credential_hash', 'replacement-hash');
+        }
+        const result = await transaction(operation);
+        if (seeded && !captured) {
+          captured = true;
+          hashAfterCleanup = h.records.get('wrapper_credential_hash');
+        }
+        return result;
+      }
+    );
+    await h.create().catch(() => undefined);
+    expect(seeded).toBe(true);
+    expect(hashAfterCleanup).toBe('replacement-hash');
+  });
+
+  it('does not clean a creating allocation that already issued its credential', async () => {
+    const h = await harness();
+    const creating = allocationFixture({
+      state: 'creating',
+      providerRef: null,
+      createIntent: { intentId: 'intent-c', createdAt: Date.now() },
+    });
+    if (!creating) throw new Error('Expected a fixture');
+    seedCanonicalAllocationRecord(h.records, creating);
+    h.records.set('wrapper_credential_hash', 'issued-hash');
+    h.records.set('active_wrapper_runtime', { connectionId: 'c1' });
+    await h.control.alarm();
+    expect(h.records.get('wrapper_credential_hash')).toBe('issued-hash');
+    expect(h.records.get('active_wrapper_runtime')).toEqual({ connectionId: 'c1' });
+  });
+
+  it('bounds each never-settling provider stop attempt at one stopAttempt interval', async () => {
+    const attemptStarts: number[] = [];
+    const h = await harness({
+      configureAllocation: value => {
+        value.handle.forceDestroyForControlPlane = () => {
+          attemptStarts.push(Date.now());
+          return new Promise<void>(() => {});
+        };
+      },
+    });
+    await h.create();
+    const setAlarm = vi.spyOn(h.storage, 'setAlarm');
+    const deleteAlarm = vi.spyOn(h.storage, 'deleteAlarm');
+    const scheduledBefore = setAlarm.mock.calls.length + deleteAlarm.mock.calls.length;
+    const startedAt = Date.now();
+    let settledAt: number | undefined;
+    const stopping = h.control.beginStop('idle').then(record => {
+      settledAt = Date.now();
+      return record;
+    });
+    for (let interval = 0; interval < 10 && settledAt === undefined; interval += 1) {
+      const attemptsBefore = attemptStarts.length;
+      await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt);
+      if (settledAt !== undefined) break;
+      // Still pending after one interval: a fresh attempt must have started. If
+      // it did not, this attempt's timeout waited past its own bound.
+      expect(attemptStarts.length).toBeGreaterThan(attemptsBefore);
+    }
+    expect(settledAt).toBeDefined();
+    const record = await stopping;
+    expect(record.state.kind).toBe('stopping');
+    // Every attempt that ran settled within one stopAttempt interval.
+    expect(settledAt! - startedAt).toBeLessThanOrEqual(
+      Math.max(1, attemptStarts.length) * DEADLINE_MS.stopAttempt
+    );
+    expect(setAlarm.mock.calls.length + deleteAlarm.mock.calls.length).toBeGreaterThan(
+      scheduledBefore
+    );
+  });
+
+  it('bounds a never-settling provider observation and arms the observe deadline', async () => {
+    let observeStartedAt: number | undefined;
+    const h = await harness({
+      configureAllocation: value => {
+        value.handle.isContainerRunning = () => {
+          observeStartedAt = Date.now();
+          return new Promise<boolean>(() => {});
+        };
+      },
+    });
+    await h.create();
+    const allocated = await h.control.getAllocationRecord();
+    if (allocated.state.kind !== 'allocated') throw new Error('Expected an allocated record');
+    const unknown = allocationFixture({
+      state: 'unknown',
+      providerRef: allocated.state.target.providerRef,
+      createIntent: {
+        intentId: allocated.state.createIntent.intentId,
+        createdAt: allocated.state.createIntent.createdAt - 10 * 60_000,
+      },
+    });
+    if (!unknown) throw new Error('Expected a fixture');
+    seedCanonicalAllocationRecord(h.records, unknown);
+    const setAlarm = vi.spyOn(h.storage, 'setAlarm');
+    setAlarm.mockClear();
+    // Move past the create alarm so the observe deadline is distinguishable.
+    vi.setSystemTime(Date.now() + 1_000);
+    const startedAt = Date.now();
+    const stopping = h.control.confirmStopped();
+    await vi.advanceTimersByTimeAsync(DEADLINE_MS.stopAttempt);
+    await stopping;
+    expect(observeStartedAt).toBeDefined();
+    // The timed-out observe wrote its own deadline; the create alarm is not proof.
+    expect(h.alarmAt).toBe(startedAt + POLICY.observeDeadlineMs);
+    expect(setAlarm).toHaveBeenCalled();
   });
 
   it('retains observed versions through readiness, eviction and stop, then clears them on a new allocation', async () => {

@@ -25,12 +25,16 @@ import {
 import { decodeLegacyAllocation } from './legacy/allocation.js';
 import { decodeLegacySession } from './legacy/session.js';
 import {
+  CANONICAL_ALLOCATION_KEY,
   readAllocationEntry,
+  readAllocationEntrySync,
+  readCanonicalAllocationRecordSync,
   readSessionEntry,
   readSessionValueSync,
+  type StoredEntry,
   type SyncRecordReader,
 } from './access.js';
-import { ALLOCATION_KEY, type CanonicalStorage } from './store.js';
+import type { CanonicalStorage } from './store.js';
 
 export type LoadSource = 'canonical' | 'legacy' | 'initial';
 
@@ -42,27 +46,50 @@ function hasOwn(value: object, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
+/**
+ * Pure allocation decision shared by the async and synchronous loaders. Canonical
+ * key present → strict parse or fail closed; absent → decode the legacy flat
+ * record when present; both absent → the initial record. The legacy entry is read
+ * by the caller only when the canonical raw is `undefined`.
+ */
+function resolveAllocation(
+  canonicalRaw: unknown,
+  legacyEntry: StoredEntry | undefined,
+  resumable = false
+): LoadResult<AllocationRecord> {
+  if (canonicalRaw !== undefined) {
+    const parsed = allocationRecordSchema.safeParse(canonicalRaw);
+    if (!parsed.success) {
+      return { ok: false, reason: 'invalid_canonical_allocation', key: CANONICAL_ALLOCATION_KEY };
+    }
+    return { ok: true, source: 'canonical', value: parsed.data };
+  }
+  if (legacyEntry === undefined) {
+    return { ok: true, source: 'initial', value: initialAllocationRecord(resumable) };
+  }
+  const converted = decodeLegacyAllocation(legacyEntry.value);
+  if (!converted) {
+    return { ok: false, reason: 'invalid_legacy_allocation', key: legacyEntry.key };
+  }
+  return { ok: true, source: 'legacy', value: converted };
+}
+
 export async function loadAllocation(
   storage: CanonicalStorage,
   resumable = false
 ): Promise<LoadResult<AllocationRecord>> {
-  const raw = await storage.get(ALLOCATION_KEY);
-  if (raw !== undefined) {
-    const parsed = allocationRecordSchema.safeParse(raw);
-    if (!parsed.success) {
-      return { ok: false, reason: 'invalid_canonical_allocation', key: ALLOCATION_KEY };
-    }
-    return { ok: true, source: 'canonical', value: parsed.data };
-  }
-  const legacy = await readAllocationEntry(storage);
-  if (legacy === undefined) {
-    return { ok: true, source: 'initial', value: initialAllocationRecord(resumable) };
-  }
-  const converted = decodeLegacyAllocation(legacy.value);
-  if (!converted) {
-    return { ok: false, reason: 'invalid_legacy_allocation', key: legacy.key };
-  }
-  return { ok: true, source: 'legacy', value: converted };
+  const raw = await storage.get(CANONICAL_ALLOCATION_KEY);
+  const legacy = raw === undefined ? await readAllocationEntry(storage) : undefined;
+  return resolveAllocation(raw, legacy, resumable);
+}
+
+export function loadAllocationSync(
+  storage: SyncRecordReader,
+  resumable = false
+): LoadResult<AllocationRecord> {
+  const raw = readCanonicalAllocationRecordSync(storage);
+  const legacy = raw === undefined ? readAllocationEntrySync(storage) : undefined;
+  return resolveAllocation(raw, legacy, resumable);
 }
 
 /**

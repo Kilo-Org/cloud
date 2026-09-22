@@ -398,9 +398,11 @@ export function createSandboxControlSocketHandler(
 
     supportsNativeRuntimeIdCapture(): boolean {
       const current = currentHandshakenSocket(state);
+      if (current === null) return false;
+      const capabilities = readAttachment(current.socket)?.capabilities;
       return (
-        current !== null &&
-        readAttachment(current.socket)?.capabilities?.nativeRuntimeIdCapture === true
+        capabilities?.nativeRuntimeIdCapture === true ||
+        capabilities?.nativeRuntimeRetirement === true
       );
     },
 

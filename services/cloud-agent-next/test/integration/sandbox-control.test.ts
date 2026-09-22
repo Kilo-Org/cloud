@@ -9394,6 +9394,7 @@ describe('SandboxSession worktree changes persistence', () => {
             state: acceptedState({
               acceptedAt: Date.now(),
               executionDeadlineAt: Date.now() + 60_000,
+              wrapperInstanceId: fixture.wrapperInstanceId,
             }),
           } satisfies SessionMessage,
         ]);
@@ -10448,10 +10449,21 @@ describe('SandboxSession control-plane regressions', () => {
             state: expect.objectContaining({ kind: 'cancelled' }),
           },
         ]);
-        // A session-scoped interrupt cancels messages only: the allocation machine
-        // owns runtime teardown, so no `session.abort` is sent and the provider is
-        // not stopped by the session.
-        expect(requests.filter(request => request.operation === 'session.abort')).toEqual([]);
+        // A session-scoped interrupt cancels messages only, and fences the accepted
+        // turn with the wrapper that received it. The allocation machine still owns
+        // provider teardown, so the session never stops the provider itself.
+        expect(requests.filter(request => request.operation === 'session.abort')).toEqual(
+          phase === 'execution'
+            ? [
+                expect.objectContaining({
+                  operation: 'session.abort',
+                  payload: expect.objectContaining({
+                    messageId: 'msg_ffffffffffff00000000000006',
+                  }),
+                }),
+              ]
+            : []
+        );
         expect(provider.stop).not.toHaveBeenCalled();
         const events = await lifecycleEvents(session);
         const failures = events.filter(event => event.type === 'cloud.message.failed');

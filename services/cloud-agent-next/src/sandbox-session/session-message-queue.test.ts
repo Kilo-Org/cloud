@@ -7521,13 +7521,192 @@ describe('SandboxSession orchestration', () => {
     const fixture = sessionFixture();
     await fixture.admit('a');
     await fixture.flush();
+    const abort = deferred<ResponseFrame>();
+    delegateRequest(fixture, 'session.abort', () => abort.promise);
     const interruption = fixture.session.interruptExecution();
     await fixture.flush();
     await fixture.admit('b');
     await fixture.flush();
+    // The accepted row waits for the abort result; the new submission stays.
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
+    expect(fixture.record('b')?.state.kind).toBe('queued');
+    abort.resolve(controlResponse({ status: 'aborted' }));
+    await expect(interruption).resolves.toEqual({ success: true });
+    await fixture.flush();
     expect(fixture.record('a')?.state.kind).toBe('cancelled');
+    expect(fixture.record('b')?.state.kind).not.toBe('cancelled');
+    await fixture.fireAlarm();
+    await fixture.flush();
     expect(fixture.record('b')?.state.kind).toBe('accepted');
-    await interruption;
+  });
+
+  it.each(['aborted', 'already_idle'] as const)(
+    'sends one fenced abort and confirms an accepted message only after the wrapper reports %s',
+    async status => {
+      const fixture = sessionFixture();
+      await fixture.admit('a');
+      await fixture.flush();
+      const abort = deferred<ResponseFrame>();
+      const abortRequests: SandboxControlOutboundRequest[] = [];
+      delegateRequest(fixture, 'session.abort', input => {
+        abortRequests.push(input);
+        return abort.promise;
+      });
+      fixture.control.ensureReady.mockClear();
+
+      const interruption = fixture.session.interruptExecution();
+      await fixture.flush();
+
+      // The accepted row is not terminalized before the abort resolves.
+      const pending = fixture.record('a');
+      expect(pending?.state.kind).toBe('accepted');
+      expect(pending?.cancellation?.operationId).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      );
+      expect(pending?.cancellation?.deadlineAt).toBe(Date.now() + POLICY.cancellationDeadlineMs);
+      expect(abortRequests).toHaveLength(1);
+      const request = abortRequests[0];
+      if (!request) throw new Error('Missing abort request');
+      expect(request).toMatchObject({
+        operation: 'session.abort',
+        expectedWrapperInstanceId: RUNTIME_ID,
+        session: { sessionId: SESSION_ID, kiloSessionId: 'kilo_root', directory: DIRECTORY },
+        payload: {
+          messageId: 'a',
+          operationId: pending?.cancellation?.operationId,
+          cleanupDeadlineAt: pending?.cancellation?.deadlineAt,
+        },
+      });
+      // No allocation stop was dispatched.
+      expect(fixture.control.ensureReady).not.toHaveBeenCalled();
+
+      abort.resolve(controlResponse({ status }));
+      await expect(interruption).resolves.toEqual({ success: true });
+      await fixture.flush();
+      expect(fixture.record('a')?.state.kind).toBe('cancelled');
+      expect(fixture.terminalEvents()).toHaveLength(1);
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.abort')
+      ).toHaveLength(1);
+    }
+  );
+
+  it('leaves the marker and reports unconfirmed when the wrapper cannot confirm the abort', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    delegateRequest(fixture, 'session.abort', async () =>
+      controlResponse({ status: 'unconfirmed' })
+    );
+
+    await expect(fixture.session.interruptExecution()).resolves.toEqual({
+      success: false,
+      unconfirmed: true,
+      message: expect.any(String),
+    });
+    await fixture.flush();
+    const record = fixture.record('a');
+    expect(record?.state.kind).toBe('accepted');
+    expect(record?.cancellation).toBeDefined();
+    expect(fixture.terminalEvents()).toHaveLength(0);
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.abort')
+    ).toHaveLength(1);
+  });
+
+  it('settles an expired cancellation marker on the alarm and unblocks the successor', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    delegateRequest(fixture, 'session.abort', async () =>
+      controlResponse({ status: 'unconfirmed' })
+    );
+    await expect(fixture.session.interruptExecution()).resolves.toEqual({
+      success: false,
+      unconfirmed: true,
+      message: expect.any(String),
+    });
+    await fixture.flush();
+    const deadlineAt = fixture.record('a')?.cancellation?.deadlineAt;
+    if (deadlineAt === undefined) throw new Error('Missing cancellation deadline');
+
+    // A successor submitted after the interrupt waits behind the live marker.
+    await fixture.admit('b');
+    await fixture.flush();
+    expect(fixture.record('b')?.state.kind).toBe('queued');
+
+    // First alarm before expiry keeps the marker and arms at the deadline.
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('a')?.state.kind).toBe('accepted');
+    expect(fixture.record('a')?.cancellation).toBeDefined();
+    expect(fixture.alarmAt()).toBe(deadlineAt);
+
+    // Second alarm at expiry settles the accepted row as an unconfirmed cancellation.
+    vi.setSystemTime(deadlineAt);
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({
+      state: { kind: 'failed', reason: 'cancellation_unconfirmed' },
+    });
+    expect(fixture.terminalEvents()).toHaveLength(1);
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('b')?.state.kind).toBe('accepted');
+  });
+
+  it('records the marker and sends no abort when the accepted row has no wrapper instance', async () => {
+    const fixture = sessionFixture();
+    writeMessages(fixture.storage.kv, [acceptedWith('a')]);
+
+    await expect(fixture.session.interruptExecution()).resolves.toEqual({
+      success: false,
+      unconfirmed: true,
+      message: expect.any(String),
+    });
+    await fixture.flush();
+
+    // No fence identity exists, so a replacement wrapper could answer the abort.
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.abort')
+    ).toHaveLength(0);
+    const record = fixture.record('a');
+    expect(record?.state.kind).toBe('accepted');
+    expect(record?.cancellation?.operationId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    );
+    expect(record?.cancellation?.deadlineAt).toBe(Date.now() + POLICY.cancellationDeadlineMs);
+    expect(fixture.alarmAt()).toBe(record?.cancellation?.deadlineAt);
+  });
+
+  it('records the marker before a missing sandbox return and settles it at the deadline', async () => {
+    const fixture = sessionFixture({ workspace: { workspacePath: DIRECTORY } });
+    writeMessages(fixture.storage.kv, [acceptedWith('a', { wrapperInstanceId: RUNTIME_ID })]);
+
+    await expect(fixture.session.interruptExecution()).resolves.toEqual({
+      success: false,
+      unconfirmed: true,
+      message: expect.any(String),
+    });
+    await fixture.flush();
+
+    // The missing routing data must not skip the durable marker.
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.abort')
+    ).toHaveLength(0);
+    const record = fixture.record('a');
+    expect(record?.state.kind).toBe('accepted');
+    const deadlineAt = record?.cancellation?.deadlineAt;
+    if (deadlineAt === undefined) throw new Error('Missing cancellation deadline');
+    expect(fixture.alarmAt()).toBe(deadlineAt);
+
+    vi.setSystemTime(deadlineAt);
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({
+      state: { kind: 'failed', reason: 'cancellation_unconfirmed' },
+    });
+    expect(fixture.terminalEvents()).toHaveLength(1);
   });
 });
 

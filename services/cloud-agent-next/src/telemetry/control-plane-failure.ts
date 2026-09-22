@@ -87,6 +87,8 @@ export function classifyControlPlaneFailure(
         ? POST_DISPATCH_WRAPPER_DISCONNECTED
         : PRE_DISPATCH_SANDBOX_CONNECT;
     case 'runtime_unhealthy':
+    case 'health_unhealthy_absent':
+    case 'health_unhealthy_unresponsive':
     case 'kilo_unhealthy':
     case 'control_replaced':
     case 'control_disconnected':

@@ -974,6 +974,27 @@ export function decideAllocation(
           if (!eager && now < state.deadlineAt) {
             return { state: record, commands: [], deadlineAt: state.deadlineAt };
           }
+          const anchor = state.stopIntent?.createdAt ?? state.createIntent?.createdAt;
+          if (
+            state.target?.provider === 'vercel' &&
+            anchor !== undefined &&
+            state.createIntent !== null &&
+            now >= anchor + POLICY.reconciliationWindowMs
+          ) {
+            const checkRequired: AllocationRecord = {
+              v: 2,
+              resumable: record.resumable,
+              state: {
+                kind: 'stopping',
+                step: 'check_required',
+                target: state.target,
+                createIntent: state.createIntent,
+                attempts: state.attempts,
+                stopIntent: state.stopIntent ?? { reason: state.reason, createdAt: now },
+              },
+            };
+            return { state: checkRequired, commands: [], deadlineAt: null };
+          }
           const deadlineAt = now + POLICY.observeDeadlineMs;
           const next: AllocationRecord = {
             v: 2,

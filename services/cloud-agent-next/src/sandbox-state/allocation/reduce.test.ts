@@ -753,6 +753,122 @@ describe('allocation reducer — design §5 transitions', () => {
     expect(decision?.deadlineAt).toBe(at + POLICY.observeDeadlineMs);
   });
 
+  function vercelUnknown(input: {
+    createdAt: number | null;
+    stopIntentCreatedAt?: number;
+    deadlineAt: number;
+  }): AllocationRecord {
+    const createIntent =
+      input.createdAt === null ? null : { intentId: 'intent-v', createdAt: input.createdAt };
+    const stopIntent =
+      input.stopIntentCreatedAt === undefined
+        ? null
+        : { reason: 'stop_deadline', createdAt: input.stopIntentCreatedAt };
+    return {
+      v: 2,
+      resumable: true,
+      state: {
+        kind: 'unknown',
+        target: VERCEL_TARGET,
+        createIntent,
+        stopIntent,
+        attempts: 2,
+        reason: 'stop_deadline',
+        deadlineAt: input.deadlineAt,
+      },
+    };
+  }
+
+  it('vercel unknown + DEADLINE past the reconciliation window becomes check_required', () => {
+    const anchor = NOW - 5_000;
+    const at = anchor + POLICY.reconciliationWindowMs;
+    const decision = decideAllocation(
+      vercelUnknown({ createdAt: anchor, deadlineAt: NOW }),
+      { type: 'DEADLINE' },
+      at
+    );
+    expect(commandKinds(decision)).toEqual([]);
+    expect(decision?.deadlineAt).toBeNull();
+    expect(decision?.state.state.kind).toBe('stopping');
+    if (decision?.state.state.kind !== 'stopping') return;
+    expect(decision.state.state.step).toBe('check_required');
+    expect(decision.state.state.attempts).toBe(2);
+    expect(decision.state.state.stopIntent).toEqual({ reason: 'stop_deadline', createdAt: at });
+  });
+
+  it('vercel unknown anchors the cutoff on stopIntent.createdAt', () => {
+    const stopAt = NOW - POLICY.reconciliationWindowMs;
+    const decision = decideAllocation(
+      vercelUnknown({ createdAt: NOW - 1_000, stopIntentCreatedAt: stopAt, deadlineAt: NOW }),
+      { type: 'DEADLINE' },
+      NOW
+    );
+    expect(commandKinds(decision)).toEqual([]);
+    expect(decision?.state.state.kind).toBe('stopping');
+    if (decision?.state.state.kind !== 'stopping') return;
+    expect(decision.state.state.step).toBe('check_required');
+    expect(decision.state.state.stopIntent).toEqual({
+      reason: 'stop_deadline',
+      createdAt: stopAt,
+    });
+  });
+
+  it('cloudflare unknown at the same time still re-arms Observe', () => {
+    const at = NOW - 5_000 + POLICY.reconciliationWindowMs;
+    const record: AllocationRecord = {
+      v: 2,
+      resumable: true,
+      state: {
+        kind: 'unknown',
+        target: TARGET,
+        createIntent: CREATE_INTENT,
+        stopIntent: null,
+        attempts: 0,
+        reason: 'stop_deadline',
+        deadlineAt: NOW,
+      },
+    };
+    const decision = decideAllocation(record, { type: 'DEADLINE' }, at);
+    expect(decision?.state.state.kind).toBe('unknown');
+    expect(commandKinds(decision)).toEqual(['Observe']);
+    expect(decision?.deadlineAt).toBe(at + POLICY.observeDeadlineMs);
+  });
+
+  it('vercel unknown inside the reconciliation window still re-arms Observe', () => {
+    const decision = decideAllocation(
+      vercelUnknown({ createdAt: NOW - 5_000, deadlineAt: NOW }),
+      { type: 'DEADLINE' },
+      NOW
+    );
+    expect(decision?.state.state.kind).toBe('unknown');
+    expect(commandKinds(decision)).toEqual(['Observe']);
+    expect(decision?.deadlineAt).toBe(NOW + POLICY.observeDeadlineMs);
+  });
+
+  it('vercel unknown with no anchor keeps the observe ladder', () => {
+    const decision = decideAllocation(
+      vercelUnknown({ createdAt: null, deadlineAt: NOW }),
+      { type: 'DEADLINE' },
+      NOW + POLICY.reconciliationWindowMs * 2
+    );
+    expect(decision?.state.state.kind).toBe('unknown');
+    expect(commandKinds(decision)).toEqual(['Observe']);
+  });
+
+  it('vercel unknown with a stop anchor but no createIntent keeps the observe ladder', () => {
+    const decision = decideAllocation(
+      vercelUnknown({
+        createdAt: null,
+        stopIntentCreatedAt: NOW - POLICY.reconciliationWindowMs,
+        deadlineAt: NOW,
+      }),
+      { type: 'DEADLINE' },
+      NOW
+    );
+    expect(decision?.state.state.kind).toBe('unknown');
+    expect(commandKinds(decision)).toEqual(['Observe']);
+  });
+
   it('unbound legacy unknown observes under the same fence OBSERVED accepts', () => {
     const record: AllocationRecord = {
       v: 2,

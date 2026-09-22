@@ -19,7 +19,11 @@ import {
 import { emptyTransitionLog, type TransitionRow } from './transition-log.js';
 import { CONTROL_ALARM_ANCHORS_KEY, LEGACY_CONTROL_DEADLINES_KEY } from './control-alarm.js';
 import { eraseAllocationRecord } from '../sandbox-state/persist/access.js';
-import { loadAllocation as loadCanonicalAllocation } from '../sandbox-state/persist/load.js';
+import type { SyncRecordReader, SyncRecordWriter } from '../sandbox-state/persist/access.js';
+import {
+  loadAllocation as loadCanonicalAllocation,
+  loadAllocationSync as loadCanonicalAllocationSync,
+} from '../sandbox-state/persist/load.js';
 import { storeAllocation as storeCanonicalAllocation } from '../sandbox-state/persist/store.js';
 import type { AllocationRecord } from '../sandbox-state/model/allocation.js';
 
@@ -77,6 +81,14 @@ export async function saveRuntimeMetadata(
   await storage.put(RUNTIME_METADATA_KEY, SandboxRuntimeMetadataSchema.parse(runtime));
 }
 
+/** Synchronous twin of `saveRuntimeMetadata` for use inside `transactionSync`. */
+export function saveRuntimeMetadataSync(
+  storage: SyncRecordWriter,
+  runtime: SandboxRuntimeMetadata
+): void {
+  storage.put(RUNTIME_METADATA_KEY, SandboxRuntimeMetadataSchema.parse(runtime));
+}
+
 /**
  * Canonical allocation aggregate under `sandbox_allocation_state`. The live path
  * reads and writes only this; a fail-closed load is surfaced as a thrown error,
@@ -87,6 +99,12 @@ export async function loadAllocation(
   resumable = false
 ): Promise<AllocationRecord> {
   const result = await loadCanonicalAllocation(storage, resumable);
+  if (!result.ok) throw new Error(`Invalid canonical allocation: ${result.reason}`);
+  return result.value;
+}
+
+export function loadAllocationSync(storage: SyncRecordReader, resumable = false): AllocationRecord {
+  const result = loadCanonicalAllocationSync(storage, resumable);
   if (!result.ok) throw new Error(`Invalid canonical allocation: ${result.reason}`);
   return result.value;
 }
@@ -159,6 +177,14 @@ export async function saveSessionCredentialGrants(
   grants: SessionCredentialGrant[]
 ): Promise<void> {
   await storage.put(CREDENTIAL_GRANTS_KEY, grants);
+}
+
+/** Synchronous twin of `saveSessionCredentialGrants` for use inside `transactionSync`. */
+export function saveSessionCredentialGrantsSync(
+  storage: SyncRecordWriter,
+  grants: SessionCredentialGrant[]
+): void {
+  storage.put(CREDENTIAL_GRANTS_KEY, grants);
 }
 
 export async function eraseSandboxRecord(storage: ControlStorage): Promise<void> {

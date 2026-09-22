@@ -52,6 +52,11 @@ type AnchorStorage = {
   put(key: string, value: unknown): Promise<void>;
 };
 
+type SyncAnchorStorage = {
+  get(key: string): unknown;
+  put(key: string, value: unknown): void;
+};
+
 const controlAlarmAnchorStateSchema = z.object({
   credentialExpiryAt: z.number().int().nonnegative().nullable(),
   socketHandshakeAt: z.number().int().nonnegative().nullable(),
@@ -118,6 +123,27 @@ export async function setControlAlarmAnchor(
       ? { ...current, credentialExpiryAt: at }
       : { ...current, socketHandshakeAt: at };
   await storage.put(CONTROL_ALARM_ANCHORS_KEY, next);
+  return next;
+}
+
+/** Synchronous twin of `loadControlAlarmAnchors` for use inside `transactionSync`. */
+export function loadControlAlarmAnchorsSync(storage: SyncAnchorStorage): ControlAlarmAnchorState {
+  const parsed = controlAlarmAnchorStateSchema.safeParse(storage.get(CONTROL_ALARM_ANCHORS_KEY));
+  return parsed.success ? parsed.data : emptyControlAlarmAnchors();
+}
+
+/** Synchronous twin of `setControlAlarmAnchor` for use inside `transactionSync`. */
+export function setControlAlarmAnchorSync(
+  storage: SyncAnchorStorage,
+  id: ControlAlarmAnchorId,
+  at: number | null
+): ControlAlarmAnchorState {
+  const current = loadControlAlarmAnchorsSync(storage);
+  const next: ControlAlarmAnchorState =
+    id === 'credentialExpiry'
+      ? { ...current, credentialExpiryAt: at }
+      : { ...current, socketHandshakeAt: at };
+  storage.put(CONTROL_ALARM_ANCHORS_KEY, next);
   return next;
 }
 

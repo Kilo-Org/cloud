@@ -22,6 +22,8 @@ export const POLICY = {
   recoveryMaxAttempts: 3,
   /** Replaces the deleted `reconciliation` observe loop. */
   observeDeadlineMs: 90_000,
+  /** DEADLINE_MS.reconciliationWindow */
+  reconciliationWindowMs: 60 * 60_000,
   /** DEADLINE_MS.stopAttemptLadder sum plus margin. */
   stopDeadlineMs: 60_000,
   stopMaxAttempts: 5,

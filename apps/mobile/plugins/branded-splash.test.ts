@@ -164,8 +164,15 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // `compileModsAsync` with `introspect: true` runs the Android colors mod
+    // against `projectRoot`, so on a worktree with a generated `android/` tree
+    // the introspected list also carries the app's other colors. Assert the
+    // splash surface is present rather than that it is the only entry, the same
+    // way the styles assertion below tolerates extra prebuilt styles.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

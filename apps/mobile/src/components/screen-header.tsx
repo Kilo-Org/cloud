@@ -269,10 +269,12 @@ export function ScreenHeader({
   // viewport (320 dp), so the title always keeps space to draw in.
   //
   // Content sizing gives a variable-width label nothing to shrink against, so
-  // a `headerRight` action whose width grows with its copy — pr-review's
-  // Submit review is the one today — must bound itself with its own max-w cap;
-  // an uncapped one pushes the whole cluster past the screen edge at large
-  // font scales (#6328).
+  // a `headerRight` action whose width grows with its copy must bound itself
+  // with its own max-w cap. PR review's Submit review (pr-review-screen.tsx)
+  // and the Security Agent settings Save button (settings-save-button.tsx)
+  // each carry a 140 dp cap; an uncapped one pushes the whole cluster past the
+  // screen edge at large font scales (#6328) or squeezes the flex-1 title to
+  // zero on a long catalog label.
   return (
     <View className={cn('bg-background px-4 pb-3', className)} style={safeAreaStyle}>
       <View style={sideInsetStyle}>

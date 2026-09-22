@@ -51,9 +51,21 @@ export function SettingsSaveButton({
           }
         })();
       }}
+      // ScreenHeader sizes the trailing cluster to its content and never
+      // shrinks it (fixed-width header actions must stay whole — the
+      // session-compose-kbup cut-off), so a label that grows with its copy has
+      // nothing to shrink against: the catalog "Save changes" is 28 glyphs in
+      // French, and at ~214 dp it consumed the row and left the screen title at
+      // ~0 width on the narrowest 320 dp viewport. A variable-width header
+      // action must bound itself at its source, so this carries the same
+      // 140 dp cap as PR review's Submit review (see the trailing-cluster note
+      // in screen-header.tsx). 140 dp keeps the button and the 44 dp back
+      // control inside the row and leaves the flex-1 title room to draw; the
+      // label wraps in place instead of clipping.
+      className="min-w-0 max-w-[140px] shrink"
     >
       {pending ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
-      <Text>{t('securityAgent.settingsSave.saveChanges')}</Text>
+      <Text className="shrink text-center">{t('securityAgent.settingsSave.saveChanges')}</Text>
     </Button>
   );
 }

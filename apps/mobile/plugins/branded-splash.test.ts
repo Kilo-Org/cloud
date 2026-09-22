@@ -164,8 +164,13 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // A developer's prebuild tree contributes its own colors to this mod's
+    // result, so assert the splash entry is present instead of matching the
+    // whole list (toMatchObject on an array also requires equal length).
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

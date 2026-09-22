@@ -30,6 +30,9 @@ import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from './git-review-r
 import { boundedUtf8Tail, cleanTerminalOutput, gitOperationError } from './git-errors.js';
 
 const LONG_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
+// Kept below WORKSPACE_PREPARATION_TIMEOUT_MS so a stuck long command (notably
+// the clone) fails as its own timeout with its own attribution and redelivery
+// budget, not as the generic preparation-deadline failure.
 const LONG_COMMAND_HARD_TIMEOUT_MS = 300_000;
 // Setup commands may legitimately stay silent for minutes (piped tools often
 // buffer), unlike git commands which run with --progress, so they get a more
@@ -210,15 +213,6 @@ function longGitOptions(
     inactivityTimeoutMs: LONG_COMMAND_INACTIVITY_TIMEOUT_MS,
     hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
     onOutput: gitProgressReporter(progress, step, progressPrefix),
-  };
-}
-
-// A clone that reports progress is not killed by a total wall clock; a silent
-// clone still stops at the inactivity bound.
-function cloneGitOptions(progress: BootstrapProgress | undefined): ProcessOptions {
-  return {
-    inactivityTimeoutMs: LONG_COMMAND_INACTIVITY_TIMEOUT_MS,
-    onOutput: gitProgressReporter(progress, 'cloning', 'Cloning repository...'),
   };
 }
 
@@ -433,7 +427,7 @@ async function cloneRepository(
       args.push('--filter=blob:none');
     }
     args.push(repoUrl, request.workspace.workspacePath);
-    return runGit(args, cloneGitOptions(progress));
+    return runGit(args, longGitOptions(progress, 'cloning', 'Cloning repository...'));
   };
 
   // Most servers without partial-clone support ignore the filter and full-clone,

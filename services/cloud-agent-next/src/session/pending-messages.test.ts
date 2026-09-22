@@ -489,7 +489,7 @@ describe('recordPendingFlushFailure', () => {
     expect(result.nextFlushAttemptAt).toBe(115_000);
   });
 
-  it('exhausts a clone timeout that follows a non-reset-eligible earlier failure', async () => {
+  it('starts the clone timeout retry budget fresh after a different earlier failure', async () => {
     const storage = createMemoryStorage();
     const message = makeMessage({
       createdAt: 1,
@@ -498,9 +498,9 @@ describe('recordPendingFlushFailure', () => {
     });
     await storePendingSessionMessage(storage, message);
 
-    // git_clone_timeout is deliberately not reset-eligible, so an earlier
-    // non-reset-eligible failure accumulates: the single-delay budget is
-    // already spent at attempt 2 and no redelivery is scheduled.
+    // git_clone_timeout is reset-eligible, so entering it from a
+    // non-reset-eligible failure resets to attempt 1 and the single 120s
+    // redelivery still applies.
     const result = await recordPendingFlushFailure(
       storage,
       message,
@@ -513,14 +513,14 @@ describe('recordPendingFlushFailure', () => {
       }
     );
 
-    expect(result.attempts).toBe(2);
-    expect(result.exhausted).toBe(true);
-    expect(result.nextFlushAttemptAt).toBeUndefined();
+    expect(result.attempts).toBe(1);
+    expect(result.exhausted).toBe(false);
+    expect(result.nextFlushAttemptAt).toBe(220_000);
   });
 
-  it('starts the git rate-limit retry budget fresh after a clone timeout', async () => {
+  it('does not reset when a rate-limit failure follows a clone timeout', async () => {
     const storage = createMemoryStorage();
-    let message = makeMessage({
+    const message = makeMessage({
       createdAt: 1,
       flushAttempts: 2,
       lastFlushFailureCode: 'WORKSPACE_SETUP_FAILED',
@@ -528,30 +528,23 @@ describe('recordPendingFlushFailure', () => {
     });
     await storePendingSessionMessage(storage, message);
 
-    const delays: (number | undefined)[] = [];
-    const now = 100_000;
+    // Both modes are reset-eligible, so entering rate-limit from a clone
+    // timeout does NOT reset: attempts accumulate and the message exhausts.
+    const result = await recordPendingFlushFailure(
+      storage,
+      message,
+      'The requested URL returned error: 429',
+      100_000,
+      {
+        policy: 'warm-followup',
+        code: 'WORKSPACE_SETUP_FAILED',
+        subtype: 'git_rate_limited',
+      }
+    );
 
-    // A rate-limit failure entering from a non-reset-eligible clone timeout
-    // still resets to attempt 1 and gets its full 15s/45s budget.
-    for (let i = 0; i < 3; i++) {
-      const result = await recordPendingFlushFailure(
-        storage,
-        message,
-        'The requested URL returned error: 429',
-        now,
-        {
-          policy: 'warm-followup',
-          code: 'WORKSPACE_SETUP_FAILED',
-          subtype: 'git_rate_limited',
-        }
-      );
-      delays.push(
-        result.nextFlushAttemptAt !== undefined ? result.nextFlushAttemptAt - now : undefined
-      );
-      message = result.message;
-    }
-
-    expect(delays).toEqual([15_000, 45_000, undefined]);
+    expect(result.attempts).toBe(3);
+    expect(result.exhausted).toBe(true);
+    expect(result.nextFlushAttemptAt).toBeUndefined();
   });
 
   it('bounds retries when failures alternate between storage-full and rate-limit modes', async () => {

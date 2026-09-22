@@ -22,7 +22,7 @@ import type {
 import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-environment.js';
 import { isWrapperSessionReadyRequest } from '../../src/shared/wrapper-bootstrap.js';
-import { runProcess, type ExecResult, type ProcessOptions } from './utils';
+import { runProcess, type ExecResult } from './utils';
 
 function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyRequest> = {}) {
   const request: WrapperSessionReadyRequest = {
@@ -983,7 +983,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     const cloneCall = gitCalls.find(call => call.args[0] === 'clone');
     expect(cloneCall?.args).toContain('--progress');
     expect(cloneCall?.opts?.inactivityTimeoutMs).toBe(120_000);
-    expect(cloneCall?.opts?.hardTimeoutMs).toBeUndefined();
+    expect(cloneCall?.opts?.hardTimeoutMs).toBe(300_000);
     expect(gitCalls.some(call => call.args.join(' ') === 'fetch --progress origin')).toBe(true);
     expect(gitCalls.some(call => call.args.join(' ') === 'checkout --progress -b main')).toBe(true);
     expect(progress).toHaveBeenCalledWith(
@@ -993,52 +993,41 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(progress.mock.calls.flat().join(' ')).not.toContain('gh-token');
   });
 
-  it('keeps a progressing clone alive without a total wall clock', async () => {
+  it('bounds a progressing clone with its own hard timeout below the preparation deadline', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    let cloneResult: ExecResult | undefined;
     const progressScript =
-      'for i in 1 2 3 4 5 6 7 8 9 10; do printf \'Receiving objects: %s%%\\n\' "$i"; sleep 0.1; done';
+      'for i in $(seq 1 50); do printf \'Receiving objects: %s%%\\n\' "$i"; sleep 0.05; done';
 
-    const runCloneScenario = async (extra: ProcessOptions) => {
-      const request = makeRequest(tmpDir);
-      request.materialized.setupCommands = [];
-      const captured: ProcessOptions[] = [];
-      let cloneResult: ExecResult | undefined;
-      const run = prepareWrapperBootstrapWorkspace(request, undefined, {
-        git: async (args, opts) => {
-          if (args[0] === 'clone') {
-            if (opts) captured.push(opts);
-            cloneResult = await runProcess('sh', ['-c', progressScript], { ...opts, ...extra });
-            await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), {
-              recursive: true,
-            });
-            return cloneResult;
-          }
-          if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
-          return { stdout: '', stderr: '', exitCode: 0 };
-        },
-        restoreSession: async () => ({
-          ok: true,
-          downloaded: false,
-          imported: true,
-          diffs: { applied: 0, skipped: 0, total: 0 },
-        }),
-      });
-      return { run, captured, result: () => cloneResult };
-    };
+    const preparation = prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async (args, opts) => {
+        if (args[0] === 'clone') {
+          expect(opts?.hardTimeoutMs).toBe(300_000);
+          cloneResult = await runProcess('sh', ['-c', progressScript], {
+            ...opts,
+            inactivityTimeoutMs: 400,
+            hardTimeoutMs: 400,
+          });
+          return cloneResult;
+        }
+        if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => {
+        throw new Error('restore should not run after clone timeout');
+      },
+    });
+    const preparationError = await preparation.catch(caught => caught);
 
-    // A fixed wall clock still kills a clone that keeps reporting progress.
-    const wallClock = await runCloneScenario({ inactivityTimeoutMs: 400, hardTimeoutMs: 400 });
-    const wallClockError = await wallClock.run.catch(caught => caught);
-    expect(wallClockError).toMatchObject({ subtype: 'git_clone_timeout' });
-    expect(wallClock.captured[0]?.hardTimeoutMs).toBeUndefined();
-    expect(wallClock.result()?.terminationReason).toBe('hard_timeout');
-
-    // The clone options carry no wall clock, so the same progress finishes.
-    const noWallClock = await runCloneScenario({ inactivityTimeoutMs: 400 });
-    const cloneTelemetry = await noWallClock.run;
-    expect(cloneTelemetry.clone?.mode).toBe('full');
-    expect(noWallClock.captured[0]?.hardTimeoutMs).toBeUndefined();
-    expect(noWallClock.result()?.exitCode).toBe(0);
-    expect(noWallClock.result()?.terminationReason).toBeUndefined();
+    // A progressing clone is still bounded by the clone's own wall clock, so it
+    // is attributed as git_clone_timeout rather than the preparation deadline.
+    expect(preparationError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'git_clone_timeout',
+      retryable: true,
+    });
+    expect(cloneResult?.terminationReason).toBe('hard_timeout');
   });
 
   it('fails a silent clone with the inactivity bound', async () => {
@@ -1049,7 +1038,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     const preparation = prepareWrapperBootstrapWorkspace(request, undefined, {
       git: async (args, opts) => {
         if (args[0] === 'clone') {
-          expect(opts?.hardTimeoutMs).toBeUndefined();
+          expect(opts?.hardTimeoutMs).toBe(300_000);
           cloneResult = await runProcess('sh', ['-c', 'sleep 3'], {
             ...opts,
             inactivityTimeoutMs: 400,

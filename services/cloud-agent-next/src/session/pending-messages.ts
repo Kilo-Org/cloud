@@ -510,9 +510,9 @@ export function shouldSkipPendingFlush(message: PendingSessionMessage, now: numb
 
 /**
  * Reset-eligible modes each start a fresh retry budget on entry (sandbox-connect
- * has a short reconnect budget; sandbox-capacity and git-rate-limit each have a
- * longer backed-off budget for transient, self-clearing conditions; cleanup-
- * exhausted has its own recovery budget).
+ * has a short reconnect budget; sandbox-capacity, git-rate-limit, and
+ * git-clone-timeout each have a longer backed-off budget for transient,
+ * self-clearing conditions; cleanup-exhausted has its own recovery budget).
  * Alternating between them must NOT keep resetting, so callers only reset when
  * entering one of these from a non-reset-eligible state.
  */
@@ -524,7 +524,9 @@ function isResetEligibleFailure(
     code === 'SANDBOX_CONNECT_FAILED' ||
     code === 'WRAPPER_CLEANUP_EXHAUSTED' ||
     (code === 'WORKSPACE_SETUP_FAILED' &&
-      (subtype === 'sandbox_storage_full' || subtype === 'git_rate_limited'))
+      (subtype === 'sandbox_storage_full' ||
+        subtype === 'git_rate_limited' ||
+        subtype === 'git_clone_timeout'))
   );
 }
 
@@ -583,11 +585,12 @@ export async function recordPendingFlushFailure(
       ? options.safeFailureMessage
       : undefined;
   // Reset the attempt counter only when a message ENTERS a reset-eligible
-  // transient mode (sandbox-connect, sandbox-capacity, git-rate-limit, or
-  // cleanup-exhausted) from a state that is not itself reset-eligible, so each
-  // fresh sequence gets its full backoff budget. When failures alternate between
-  // reset-eligible modes the counter is NOT reset, so attempts accumulate and
-  // the message still exhausts instead of flapping between modes forever.
+  // transient mode (sandbox-connect, sandbox-capacity, git-rate-limit,
+  // git-clone-timeout, or cleanup-exhausted) from a state that is not itself
+  // reset-eligible, so each fresh sequence gets its full backoff budget. When
+  // failures alternate between reset-eligible modes the counter is NOT reset, so
+  // attempts accumulate and the message still exhausts instead of flapping
+  // between modes forever.
   const attempts =
     isResetEligibleFailure(flushFailureCode, failureSubtype) &&
     !isResetEligibleFailure(message.lastFlushFailureCode, message.lastFlushFailureSubtype)

@@ -6,6 +6,7 @@ import {
   sandboxHeartbeatPayloadSchema,
   type SandboxHeartbeatPayload,
 } from '../shared/sandbox-control-protocol.js';
+import { logger } from '../logger.js';
 import {
   createSandboxControlSocketHandler,
   readSandboxControlConnection,
@@ -336,6 +337,105 @@ describe('sandbox control socket handler', () => {
       JSON.stringify({ type: 'response', requestId: request.requestId, ok: true })
     );
     await expect(pending).resolves.toMatchObject({ ok: true, requestId: request.requestId });
+  });
+
+  it('logs allowlisted errorCode on failed socket_response without the error message', async () => {
+    const withFields = vi.spyOn(logger, 'withFields');
+    const current = createFakeWebSocket({
+      handshakeComplete: true,
+      acceptedAt: Date.now(),
+      protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+      providerInstanceId: 'inst_1',
+    });
+    const handler = createSandboxControlSocketHandler(createFakeState([current]), 'sbx_test');
+    const pending = handler.sendRequest({ operation: 'sandbox.status', payload: {} });
+    const request = JSON.parse(current.send.mock.calls[0]?.[0] as string) as { requestId: string };
+    withFields.mockClear();
+
+    await handler.handleMessage(
+      asWs(current),
+      JSON.stringify({
+        type: 'response',
+        requestId: request.requestId,
+        ok: false,
+        error: {
+          code: 'not_ready',
+          message: 'Session directory is not attached',
+          retryable: false,
+        },
+      })
+    );
+    await expect(pending).resolves.toMatchObject({ ok: false, error: { code: 'not_ready' } });
+    expect(withFields).toHaveBeenCalledWith(
+      expect.objectContaining({
+        diagnosticEvent: 'socket_response',
+        ok: false,
+        errorCode: 'not_ready',
+      })
+    );
+    expect(JSON.stringify(withFields.mock.calls)).not.toContain(
+      'Session directory is not attached'
+    );
+  });
+
+  it('omits errorCode on successful socket_response and unknown codes', async () => {
+    const withFields = vi.spyOn(logger, 'withFields');
+    const current = createFakeWebSocket({
+      handshakeComplete: true,
+      acceptedAt: Date.now(),
+      protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+      providerInstanceId: 'inst_1',
+    });
+    const handler = createSandboxControlSocketHandler(createFakeState([current]), 'sbx_test');
+    const okPending = handler.sendRequest({ operation: 'sandbox.status', payload: {} });
+    const okRequest = JSON.parse(current.send.mock.calls.at(-1)?.[0] as string) as {
+      requestId: string;
+    };
+    withFields.mockClear();
+    await handler.handleMessage(
+      asWs(current),
+      JSON.stringify({ type: 'response', requestId: okRequest.requestId, ok: true })
+    );
+    await expect(okPending).resolves.toMatchObject({ ok: true });
+    expect(withFields).toHaveBeenCalledWith(
+      expect.objectContaining({ diagnosticEvent: 'socket_response', ok: true })
+    );
+    expect(
+      withFields.mock.calls.some(
+        ([fields]) =>
+          fields !== undefined &&
+          typeof fields === 'object' &&
+          'diagnosticEvent' in fields &&
+          fields.diagnosticEvent === 'socket_response' &&
+          'errorCode' in fields
+      )
+    ).toBe(false);
+
+    const failPending = handler.sendRequest({ operation: 'sandbox.status', payload: {} });
+    const failRequest = JSON.parse(current.send.mock.calls.at(-1)?.[0] as string) as {
+      requestId: string;
+    };
+    withFields.mockClear();
+    await handler.handleMessage(
+      asWs(current),
+      JSON.stringify({
+        type: 'response',
+        requestId: failRequest.requestId,
+        ok: false,
+        error: { code: 'not_a_control_code', message: 'ignored', retryable: false },
+      })
+    );
+    await expect(failPending).resolves.toMatchObject({ ok: false });
+    expect(
+      withFields.mock.calls.some(
+        ([fields]) =>
+          fields !== undefined &&
+          typeof fields === 'object' &&
+          'diagnosticEvent' in fields &&
+          fields.diagnosticEvent === 'socket_response' &&
+          'errorCode' in fields
+      )
+    ).toBe(false);
   });
 
   it.each([true, false])(

@@ -12,6 +12,7 @@ import {
   SANDBOX_CONTROL_PROTOCOL_VERSION,
   SANDBOX_CONTROL_WS_TAG,
   SANDBOX_HELLO_DEADLINE_MS,
+  controlErrorCodes,
   sandboxControlSocketAttachmentSchema,
   sandboxControlObservationSchema,
   sandboxEventPublicationPayloadSchema,
@@ -684,7 +685,14 @@ export function createSandboxControlSocketHandler(
       }
 
       if (frame.type === 'response') {
-        log('socket_response', { ...frameDiagnostic, ok: frame.ok });
+        log('socket_response', {
+          ...frameDiagnostic,
+          ok: frame.ok,
+          errorCode:
+            !frame.ok && frame.error
+              ? controlErrorCodes.find(code => code === frame.error?.code)
+              : undefined,
+        });
         waiters.settle(frame);
         return;
       }
@@ -751,6 +759,21 @@ export function createSandboxControlSocketHandler(
           return;
         }
         try {
+          const innerType =
+            publication.data.event === 'session.event' &&
+            typeof publication.data.payload === 'object' &&
+            publication.data.payload !== null &&
+            'type' in publication.data.payload &&
+            typeof publication.data.payload.type === 'string'
+              ? publication.data.payload.type
+              : publication.data.event;
+          log('event_publish_received', {
+            ...diagnostic,
+            receiptId: publication.data.receiptId,
+            sequence: publication.data.sequence,
+            publicationEvent: publication.data.event,
+            eventType: diagnosticEventType(innerType),
+          });
           const result =
             publication.data.event === 'session.event'
               ? await hooks.onSessionEvent?.(

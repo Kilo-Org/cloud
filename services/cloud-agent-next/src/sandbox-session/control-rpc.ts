@@ -27,6 +27,7 @@ import type { SandboxBillingInput } from '../container-usage-context.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { reconstructControlRequestError } from './control-dispatch.js';
+import type { SandboxProviderBinding } from '../sandbox-provider-binding.js';
 
 type SandboxControlRpc = {
   prepareSessionCredentials(input: {
@@ -39,6 +40,7 @@ type SandboxControlRpc = {
     provider?: AgentSandboxProvider;
     resources?: VercelSandboxResources;
     instance?: CloudflareContainersInstance;
+    providerBinding?: SandboxProviderBinding;
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;
     billing?: SandboxBillingInput;
@@ -51,6 +53,12 @@ type SandboxControlRpc = {
     operationResults?: true;
     runtimeRecovery?: true;
     attachment?: SessionAttachPayload;
+    failureReason?:
+      | 'byoc_credential_missing'
+      | 'byoc_vercel_not_ready'
+      | 'byoc_vercel_forbidden'
+      | 'byoc_vercel_capacity'
+      | 'environment_failed';
   }>;
   getStatus(): Promise<{
     connection: ConnectionState;
@@ -59,6 +67,12 @@ type SandboxControlRpc = {
     allocationIncarnation?: string;
     operationResults?: true;
     runtimeRecovery?: true;
+    failureReason?:
+      | 'byoc_credential_missing'
+      | 'byoc_vercel_not_ready'
+      | 'byoc_vercel_forbidden'
+      | 'byoc_vercel_capacity'
+      | 'environment_failed';
   }>;
   getRuntimeCredentialProxyFence(input: {
     ownerId: string;

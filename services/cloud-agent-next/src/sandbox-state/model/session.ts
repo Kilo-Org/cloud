@@ -314,6 +314,7 @@ export const failedMessageStateSchema = z
     source: sessionMessageTerminalSourceSchema,
     reason: z.string().optional(),
     detail: z.string().optional(),
+    error: z.string().optional(),
     assistantReason: CloudAgentAssistantFailureReasonSchema.optional(),
     providerOwnership: CloudAgentProviderOwnershipSchema.optional(),
     wrapperInstanceId: z.string().min(1).optional(),

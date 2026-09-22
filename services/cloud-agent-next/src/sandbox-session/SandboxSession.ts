@@ -72,10 +72,15 @@ import { nextMetadataAfterAdmittedAgentModel } from '../persistence/persist-admi
 import { assertKiloModelAvailable } from '../model-validation.js';
 import {
   getSandboxProvider,
+  getSandboxProviderBinding,
   parseSessionMetadata,
   serializeSessionMetadata,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
+import {
+  bindingFromLegacyProvider,
+  sameSandboxProviderBinding,
+} from '../sandbox-provider-binding.js';
 import type { OperationResult } from '../persistence/types.js';
 import type { CallbackTarget } from '../callbacks/index.js';
 import {
@@ -86,6 +91,7 @@ import {
   type SessionMessageAdmissionResult,
   type SubmittedSessionMessageRequest,
 } from '../execution/types.js';
+import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
 import type { MessageResultRPCResponse } from '../session/message-result.js';
 import type { LatestAssistantMessage } from '../session/types.js';
 import { createEventQueries, type EventQueries } from '../session/queries/index.js';
@@ -95,9 +101,10 @@ import {
   applyPendingInteractionEvent,
   pendingInteractionsSchema,
   persistSandboxControlSessionEvent,
+  sanitizeControlSessionEvent,
   type PendingInteractions,
+  type SandboxControlSessionEventInput,
 } from './sandbox-control-event.js';
-import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
 import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../workspace.js';
 import {
   childSessionLineage,
@@ -154,6 +161,7 @@ import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_OPERATION_LIMIT,
   SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
+  SANDBOX_CONTROL_ATTACHMENT_DOWNLOAD_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   controlErrorCodes,
   sessionAttachResultSchema,
@@ -224,6 +232,7 @@ import {
   deliveryWrapperInstanceId,
   failAcceptedMessage,
   failedDetailOf,
+  failedErrorOf,
   failedReasonOf,
   failQueuedMessage,
   failWaitingMessages as applyFailWaitingMessages,
@@ -254,6 +263,7 @@ import {
   type SessionMessage,
 } from './session-message-queue.js';
 import { bindingForAttachment } from './session-binding.js';
+import { validateModeAgainstRuntimeAgents } from '../session-profile.js';
 import { decideSession, terminalMessageState } from '../sandbox-state/session/reduce.js';
 import type { Binding } from '../sandbox-state/model/session.js';
 import { createMessageCallbacks, type MessageCallbacks } from './message-callbacks.js';
@@ -296,7 +306,7 @@ const DELETION_COMPLETED_KEY = 'deletion_completed';
 
 type SandboxControlEventInput = {
   identity: SessionEventIdentity;
-  payload: { type: string; properties: Record<string, unknown>; timestamp?: string };
+  payload: SandboxControlSessionEventInput;
   receiptId?: string;
   receiptHash?: string;
   sequence?: number;
@@ -375,12 +385,155 @@ type ControlEventEvaluationRequest =
     }
   | { contract: 'currency_recheck'; input: ControlEventInput; epoch: number };
 
+function registrationMetadata(
+  input: SandboxSessionRegistrationInput,
+  existingWorkspace?: SessionMetadata['workspace']
+): SessionMetadata {
+  validateControlSessionOptions(input);
+  const initialTurn = input.message?.turn;
+  const initialMessageId = input.message?.initialMessageId ?? initialTurn?.id ?? undefined;
+  const initialMessage: SessionMetadata['initialMessage'] = initialTurn
+    ? {
+        ...(initialMessageId ? { id: initialMessageId } : {}),
+        prompt:
+          initialTurn.type === 'prompt'
+            ? initialTurn.prompt
+            : renderExecutionTurnContent({
+                type: 'command',
+                messageId: initialMessageId ?? '',
+                command: initialTurn.command,
+                arguments: initialTurn.arguments,
+              }),
+        ...(initialTurn.type === 'prompt' && initialTurn.attachments
+          ? { attachments: initialTurn.attachments }
+          : {}),
+        turn:
+          initialTurn.type === 'prompt'
+            ? {
+                type: 'prompt',
+                prompt: initialTurn.prompt,
+                ...(initialTurn.attachments ? { attachments: initialTurn.attachments } : {}),
+              }
+            : {
+                type: 'command',
+                command: initialTurn.command,
+                arguments: initialTurn.arguments,
+              },
+      }
+    : undefined;
+  const repository =
+    input.repository?.branch !== undefined
+      ? {
+          ...input.repository,
+          upstreamBranch: input.repository.upstreamBranch ?? input.repository.branch,
+        }
+      : input.repository;
+
+  // A replay reuses the stored branch instead of generating a new slug, so a
+  // session registered without an explicit branch still matches its own replay.
+  const branchName =
+    input.workspace?.branchName ??
+    existingWorkspace?.branchName ??
+    (existingWorkspace === undefined
+      ? (repository?.upstreamBranch ?? `kilo/${generateBranchSlug()}`)
+      : undefined);
+
+  return parseSessionMetadata({
+    metadataSchemaVersion: 2,
+    identity: input.identity,
+    auth: input.auth,
+    ...(input.clone ? { clone: input.clone } : {}),
+    ...(repository ? { repository } : {}),
+    ...(initialMessage ? { initialMessage } : {}),
+    agent: input.agent,
+    workspace: {
+      ...(input.workspace ?? {}),
+      ...(branchName === undefined ? {} : { branchName }),
+    },
+    ...(input.callback ? { callback: input.callback } : {}),
+    ...(input.profile ? { profile: input.profile } : {}),
+    ...(input.finalization ? { finalization: input.finalization } : {}),
+    lifecycle: { version: 1, timestamp: Date.now() },
+  });
+}
+
+/**
+ * Identity of a registered initial message: the id and the canonical turn. The
+ * single comparison for both the registration-replay guard and the
+ * initial-admission guard, so the two cannot drift.
+ */
+function sameInitialMessage(
+  left: SessionMetadata['initialMessage'],
+  right: SessionMetadata['initialMessage']
+): boolean {
+  if (left === undefined || right === undefined) return left === right;
+  if (left.id !== right.id || left.turn?.type !== right.turn?.type) return false;
+  if (left.turn?.type === 'command') {
+    return (
+      right.turn?.type === 'command' &&
+      left.turn.command === right.turn.command &&
+      left.turn.arguments === right.turn.arguments
+    );
+  }
+  return (
+    right.turn?.type === 'prompt' &&
+    left.turn?.prompt === right.turn?.prompt &&
+    left.turn?.attachments?.path === right.turn?.attachments?.path &&
+    JSON.stringify(left.turn?.attachments?.files) ===
+      JSON.stringify(right.turn?.attachments?.files)
+  );
+}
+
+function sameInitialTurn(metadata: SessionMetadata, turn: AcceptedExecutionTurn): boolean {
+  return sameInitialMessage(metadata.initialMessage, {
+    id: turn.messageId,
+    turn:
+      turn.type === 'prompt'
+        ? {
+            type: 'prompt',
+            prompt: turn.prompt,
+            ...(turn.attachments ? { attachments: turn.attachments } : {}),
+          }
+        : { type: 'command', command: turn.command, arguments: turn.arguments },
+  });
+}
+
+function sameInitialAdmissionConfiguration(
+  current: SessionMetadata,
+  requested: SessionMetadata
+): boolean {
+  const {
+    sandboxProvider: currentProvider = 'cloudflare',
+    sandboxProviderBinding: currentBinding,
+    ...currentWorkspace
+  } = current.workspace ?? {};
+  const {
+    sandboxProvider: requestedProvider = 'cloudflare',
+    sandboxProviderBinding: requestedBinding,
+    ...requestedWorkspace
+  } = requested.workspace ?? {};
+  return (
+    JSON.stringify(current.identity) === JSON.stringify(requested.identity) &&
+    current.auth.kiloSessionId === requested.auth.kiloSessionId &&
+    JSON.stringify(current.clone) === JSON.stringify(requested.clone) &&
+    JSON.stringify(current.repository) === JSON.stringify(requested.repository) &&
+    current.agent?.appendSystemPrompt === requested.agent?.appendSystemPrompt &&
+    JSON.stringify(current.profile) === JSON.stringify(requested.profile) &&
+    sameSandboxProviderBinding(
+      currentBinding ?? bindingFromLegacyProvider(currentProvider),
+      requestedBinding ?? bindingFromLegacyProvider(requestedProvider)
+    ) &&
+    JSON.stringify(currentWorkspace) === JSON.stringify(requestedWorkspace)
+  );
+}
+
 type SandboxSessionRegistrationInput = {
   identity: SessionMetadata['identity'];
   auth: SessionMetadata['auth'];
   runtimeAuthorizationSeal?: string;
+  clone?: SessionMetadata['clone'];
   agent: SessionMetadata['agent'];
-  repository?: SessionMetadata['repository'];
+  repository?: SessionMetadata['repository'] & { branch?: string };
   workspace?: SessionMetadata['workspace'];
   callback?: SessionMetadata['callback'];
   profile?: SessionMetadata['profile'];
@@ -590,6 +743,7 @@ export class SandboxSession extends DurableObject<Env> {
           sandboxId: metadata?.workspace?.sandboxId,
           wrapperInstanceId: input.wrapperInstanceId,
           receiptId: input.receiptId,
+          sequence: input.sequence,
           eventType: diagnosticEventType(input.payload.type),
           applied,
           disposition,
@@ -808,6 +962,7 @@ export class SandboxSession extends DurableObject<Env> {
       );
     }
     const notifications: StoredEvent[] = [];
+    const payload = sanitizeControlSessionEvent(input.payload);
     const receipt = this.ctx.storage.transactionSync((): ControlEventDisposition => {
       const current = this.evaluateControlEvent(
         hasReceiptIdentity
@@ -818,7 +973,7 @@ export class SandboxSession extends DurableObject<Env> {
       this.recordPendingInteraction(input.payload);
       persistSandboxControlSessionEvent({
         sessionId,
-        payload: input.payload,
+        payload,
         eventQueries: this.eventQueries,
         broadcast: event => notifications.push(event),
       });
@@ -840,10 +995,10 @@ export class SandboxSession extends DurableObject<Env> {
     this.worktreeChanges.onEvent(
       this.worktreeContext(metadata),
       eventKiloSessionId,
-      input.payload.type,
-      input.payload.properties
+      payload.type,
+      payload.properties
     );
-    const ingestItems = controlEventToIngestItems(input.payload.type, input.payload.properties);
+    const ingestItems = controlEventToIngestItems(payload.type, payload.properties);
     const rootKiloSessionId = metadata.auth.kiloSessionId;
     const token = metadata.auth.kilocodeToken;
     if (ingestItems.length > 0 && rootKiloSessionId && token && this.env.SESSION_INGEST) {
@@ -1036,6 +1191,7 @@ export class SandboxSession extends DurableObject<Env> {
           sandboxId: metadata?.workspace?.sandboxId,
           wrapperInstanceId: input.wrapperInstanceId,
           receiptId: input.receiptId,
+          sequence: input.sequence,
           attemptId: input.payload.attemptId,
           action: input.payload.action,
           revision: input.payload.revision,
@@ -2647,10 +2803,19 @@ export class SandboxSession extends DurableObject<Env> {
   async registerSession(input: SandboxSessionRegistrationInput): Promise<OperationResult> {
     if (this.deletedWorktreeId) return { success: false, error: 'worktree_deleting' };
     if (this.terminalLifecycle.isBlocked()) return { success: false, error: 'Session not found' };
-    const initialMessage = input.message
-      ? this.initialMessageFromRegistration(input.message)
-      : undefined;
+    if (input.identity.sessionId !== this.requireSessionId()) {
+      return { success: false, error: 'Session identity does not match Durable Object' };
+    }
     const existing = this.terminalLifecycle.getStoredMetadata();
+    let metadata: SessionMetadata;
+    try {
+      metadata = registrationMetadata(input, existing?.workspace);
+    } catch (error) {
+      return {
+        success: false,
+        error: `Invalid metadata: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
     if (existing) {
       try {
         validateControlSessionOptions(existing);
@@ -2660,10 +2825,18 @@ export class SandboxSession extends DurableObject<Env> {
           error: error instanceof Error ? error.message : 'Unsupported session options',
         };
       }
-      if (initialMessage && !existing.initialMessage) {
+      if (
+        !sameInitialAdmissionConfiguration(existing, metadata) ||
+        (metadata.initialMessage &&
+          existing.initialMessage &&
+          !sameInitialMessage(metadata.initialMessage, existing.initialMessage))
+      ) {
+        return { success: false, error: 'Session registration conflicts with stored metadata' };
+      }
+      if (metadata.initialMessage && !existing.initialMessage) {
         this.ctx.storage.kv.put(
           METADATA_KEY,
-          serializeSessionMetadata({ ...existing, initialMessage })
+          serializeSessionMetadata({ ...existing, initialMessage: metadata.initialMessage })
         );
       }
       return { success: true };
@@ -2690,38 +2863,6 @@ export class SandboxSession extends DurableObject<Env> {
       }
       runtimeAuthorization = authorization;
     }
-    try {
-      validateControlSessionOptions(input);
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unsupported session options',
-      };
-    }
-    const repository =
-      input.repository &&
-      'branch' in input.repository &&
-      typeof input.repository.branch === 'string'
-        ? {
-            ...input.repository,
-            upstreamBranch: input.repository.upstreamBranch ?? input.repository.branch,
-          }
-        : input.repository;
-    const branchName =
-      input.workspace?.branchName ?? repository?.upstreamBranch ?? `kilo/${generateBranchSlug()}`;
-    const metadata = parseSessionMetadata({
-      metadataSchemaVersion: 2,
-      identity: input.identity,
-      auth: input.auth,
-      agent: input.agent,
-      ...(repository ? { repository } : {}),
-      ...(initialMessage ? { initialMessage } : {}),
-      workspace: { ...(input.workspace ?? {}), branchName },
-      ...(input.callback ? { callback: input.callback } : {}),
-      ...(input.profile ? { profile: input.profile } : {}),
-      ...(input.finalization ? { finalization: input.finalization } : {}),
-      lifecycle: { version: 1, timestamp: Date.now() },
-    });
     if (this.deletedWorktreeId) return { success: false, error: 'worktree_deleting' };
     if (this.terminalLifecycle.isBlocked()) return { success: false, error: 'Session not found' };
     if (runtimeAuthorization) {
@@ -2739,6 +2880,9 @@ export class SandboxSession extends DurableObject<Env> {
   async createSessionWithInitialAdmission(
     input: SandboxSessionInitialAdmissionInput
   ): Promise<SessionMessageAdmissionResult> {
+    if (this.deletedWorktreeId || this.terminalLifecycle.isBlocked()) {
+      return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
+    }
     try {
       validateControlSessionOptions(input);
     } catch (error) {
@@ -2749,18 +2893,7 @@ export class SandboxSession extends DurableObject<Env> {
       };
     }
     const initialTurn = input.message.initialTurn;
-    const existing = await this.getMetadata();
-    if (
-      existing?.initialMessage &&
-      !this.initialMessageMatches(existing.initialMessage, initialTurn)
-    ) {
-      return {
-        success: false,
-        code: 'BAD_REQUEST',
-        error: 'Initial turn does not match registered session intent',
-      };
-    }
-    const registered = await this.registerSession({
+    const registration: SandboxSessionRegistrationInput = {
       ...input,
       message: {
         initialMessageId: initialTurn.messageId,
@@ -2779,20 +2912,63 @@ export class SandboxSession extends DurableObject<Env> {
                 arguments: initialTurn.arguments,
               },
       },
-    });
-    if (!registered.success) {
-      return {
-        success: false,
-        code: registered.error === 'Session not found' ? 'NOT_FOUND' : 'INTERNAL',
-        error: registered.error ?? 'register failed',
-      };
+    };
+    const existing = await this.getMetadata();
+    if (this.deletedWorktreeId || this.terminalLifecycle.isBlocked()) {
+      return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
+    }
+    if (existing) {
+      const messages = this.loadMessages();
+      const admitted = messages.find(message => message.messageId === initialTurn.messageId);
+      if (
+        (existing.initialMessage && !sameInitialTurn(existing, initialTurn)) ||
+        (!existing.initialMessage && messages.length > 0 && !admitted)
+      ) {
+        return {
+          success: false,
+          code: 'BAD_REQUEST',
+          error: 'Initial turn does not match registered session intent',
+        };
+      }
+      let requestedMetadata: SessionMetadata;
+      try {
+        requestedMetadata = registrationMetadata(registration, existing.workspace);
+      } catch (error) {
+        return {
+          success: false,
+          code: 'BAD_REQUEST',
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+      if (!sameInitialAdmissionConfiguration(existing, requestedMetadata)) {
+        return {
+          success: false,
+          code: 'BAD_REQUEST',
+          error: 'Initial admission configuration does not match registered session intent',
+        };
+      }
+      if (!existing.initialMessage && !admitted) {
+        this.ctx.storage.kv.put(
+          METADATA_KEY,
+          serializeSessionMetadata({
+            ...existing,
+            initialMessage: requestedMetadata.initialMessage,
+          })
+        );
+      }
+    } else {
+      const registered = await this.registerSession(registration);
+      if (!registered.success) {
+        return {
+          success: false,
+          code: registered.error === 'Session not found' ? 'NOT_FOUND' : 'INTERNAL',
+          error: registered.error ?? 'Failed to register session',
+          failureBoundary: 'registration',
+        };
+      }
     }
     return this.queueAndDispatch(
-      {
-        turn: initialTurn,
-        agent: input.agent,
-        finalization: input.finalization,
-      },
+      { turn: initialTurn, agent: input.agent, finalization: input.finalization },
       'initial'
     );
   }
@@ -2837,7 +3013,23 @@ export class SandboxSession extends DurableObject<Env> {
   async admitSubmittedMessage(
     request: SubmittedSessionMessageRequest
   ): Promise<SessionMessageAdmissionResult> {
-    const messageId = request.turn.id ?? createMessageId();
+    const metadata = await this.getMetadata();
+    if (!metadata) return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
+    if (!this.ownsAdmission(metadata, request)) {
+      return {
+        success: false,
+        code: 'BAD_REQUEST',
+        error: 'Session ownership does not match admission request',
+      };
+    }
+    const requestedMessageId = request.turn.id;
+    if (
+      request.turn.type === 'prompt' &&
+      !request.turn.prompt.trim() &&
+      !(request.turn.attachments?.files.length ?? 0)
+    ) {
+      return { success: false, code: 'BAD_REQUEST', error: 'No prompt provided' };
+    }
     if (request.turn.type === 'command' && request.turn.attachments !== undefined) {
       return {
         success: false,
@@ -2845,6 +3037,7 @@ export class SandboxSession extends DurableObject<Env> {
         error: 'Attachments cannot be attached to slash commands',
       };
     }
+    const messageId = requestedMessageId ?? createMessageId();
     const turn: AcceptedExecutionTurn =
       request.turn.type === 'prompt'
         ? {
@@ -2886,10 +3079,17 @@ export class SandboxSession extends DurableObject<Env> {
    * the owner is control-plane enrolled (wrangler dev defaults it to `*`).
    */
   async admitPreparedInitialMessage(
-    _request: LegacyRegisteredInitialAdmissionRequest
+    request: LegacyRegisteredInitialAdmissionRequest
   ): Promise<SessionMessageAdmissionResult> {
     const metadata = await this.getMetadata();
     if (!metadata) return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
+    if (!this.ownsAdmission(metadata, request)) {
+      return {
+        success: false,
+        code: 'BAD_REQUEST',
+        error: 'Session ownership does not match admission request',
+      };
+    }
     const initialMessage = metadata.initialMessage;
     if (!initialMessage?.id) {
       return { success: false, code: 'BAD_REQUEST', error: 'No prompt provided' };
@@ -2920,11 +3120,11 @@ export class SandboxSession extends DurableObject<Env> {
               }
             : undefined;
     if (!turn) return { success: false, code: 'BAD_REQUEST', error: 'No prompt provided' };
+    const admitted = this.loadMessages().some(message => message.messageId === turn.messageId);
     return this.queueAndDispatch(
       {
         turn,
-        agent: metadata.agent,
-        finalization: metadata.finalization,
+        ...(!admitted ? { agent: metadata.agent, finalization: metadata.finalization } : {}),
       },
       'initial'
     );
@@ -3376,6 +3576,12 @@ export class SandboxSession extends DurableObject<Env> {
     if (current) await this.scheduleAcceptedRecheck(epoch, current.messageId);
   }
 
+  private ownsAdmission(
+    metadata: SessionMetadata,
+    request: Pick<LegacyRegisteredInitialAdmissionRequest, 'userId' | 'botId'>
+  ): boolean {
+    return metadata.identity.userId === request.userId && metadata.identity.botId === request.botId;
+  }
   private async queueAndDispatch(
     input: ControlSessionMessageInput,
     origin: 'initial' | 'followup'
@@ -3411,6 +3617,10 @@ export class SandboxSession extends DurableObject<Env> {
         );
     if (!existing && !intent) {
       return { success: false, code: 'BAD_REQUEST', error: 'Session is missing a valid model' };
+    }
+    if (intent) {
+      const modeError = validateModeAgainstRuntimeAgents(metadata, intent.agent.mode);
+      if (modeError) return { success: false, code: 'BAD_REQUEST', error: modeError };
     }
     if (!existing) {
       try {
@@ -3981,6 +4191,7 @@ export class SandboxSession extends DurableObject<Env> {
               provider,
               resources: getSandboxAllocationResources(metadata.workspace?.sandboxAllocation),
               instance: getSandboxAllocationInstance(metadata.workspace?.sandboxAllocation),
+              providerBinding: getSandboxProviderBinding(metadata),
               ...(acquisition ? { acquisition } : { allowCreate }),
               ...(metadata.workspace?.worktreeId
                 ? { worktreeId: metadata.workspace.worktreeId }
@@ -4011,7 +4222,7 @@ export class SandboxSession extends DurableObject<Env> {
       }
       recordRuntime(status.wrapperInstanceId);
       const stoppingDeadline = Math.min(deadlineAt, Date.now() + DEADLINE_MS.startup);
-      while (allowCreate && status.physical === 'stopping') {
+      while (allowCreate && status.physical === 'stopping' && status.failureReason === undefined) {
         const observed = await observeControlAfterStopping(
           status,
           () => {
@@ -4031,6 +4242,10 @@ export class SandboxSession extends DurableObject<Env> {
             return;
           }
           await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId);
+          return;
+        }
+        if (observed.failureReason) {
+          await this.failDelivery(messageId, observed.failureReason, wrapperInstanceId);
           return;
         }
         const provision = provisionPreparingStep(observed.physical, allowCreate);
@@ -4228,6 +4443,10 @@ export class SandboxSession extends DurableObject<Env> {
       }
       const attachedRuntime = await wait(() => control.getStatus());
       if (!isCurrent()) return;
+      if (attachedRuntime.failureReason) {
+        await this.failDelivery(messageId, attachedRuntime.failureReason, wrapperInstanceId);
+        return;
+      }
       if (
         attachedRuntime.physical !== 'running' ||
         attachedRuntime.connection !== 'ready' ||
@@ -4246,9 +4465,13 @@ export class SandboxSession extends DurableObject<Env> {
         allocationIncarnation: status.allocationIncarnation,
         epoch,
       });
+      this.recordSessionLifecycle('preparedAt', Date.now());
       recorder.finalize({ status: 'completed' });
       this.worktreeChanges.attached(preparationGeneration, this.worktreeContext(metadata));
       phase = 'prompt';
+      const promptTimeoutMs =
+        SANDBOX_CONTROL_REQUEST_TIMEOUT_MS +
+        attachments.length * SANDBOX_CONTROL_ATTACHMENT_DOWNLOAD_TIMEOUT_MS;
       const promptPayload = {
         messageId,
         turn:
@@ -4282,15 +4505,18 @@ export class SandboxSession extends DurableObject<Env> {
         }
       } else {
         await dispatch('prompt', async () => {
-          const prompt = await wait(async () =>
-            controlRequestResult(
-              await control.request({
-                operation: 'session.prompt',
-                session,
-                expectedWrapperInstanceId: wrapperInstanceId,
-                payload: promptPayload,
-              })
-            )
+          const prompt = await wait(
+            async () =>
+              controlRequestResult(
+                await control.request({
+                  operation: 'session.prompt',
+                  session,
+                  expectedWrapperInstanceId: wrapperInstanceId,
+                  payload: promptPayload,
+                  ...(attachments.length ? { timeoutMs: promptTimeoutMs } : {}),
+                })
+              ),
+            promptTimeoutMs
           );
           const result = sessionPromptResultSchema.parse(prompt);
           if (result.messageId !== messageId)
@@ -4349,6 +4575,25 @@ export class SandboxSession extends DurableObject<Env> {
     } catch {
       logger.withFields({ sessionId: this.sessionId }).warn('Control-plane session detach failed');
     }
+  }
+
+  private recordSessionLifecycle(key: 'preparedAt' | 'initiatedAt', timestamp: number): void {
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    if (!metadata || this.terminalLifecycle.isBlocked() || metadata.lifecycle[key] !== undefined) {
+      return;
+    }
+    this.ctx.storage.kv.put(
+      METADATA_KEY,
+      serializeSessionMetadata({
+        ...metadata,
+        lifecycle: {
+          ...metadata.lifecycle,
+          [key]: timestamp,
+          version: timestamp,
+          timestamp,
+        },
+      })
+    );
   }
 
   private queuedMessage(
@@ -4637,7 +4882,11 @@ export class SandboxSession extends DurableObject<Env> {
       before,
       reason,
       wrapperInstanceId,
-      false
+      false,
+      {
+        timestamp: Date.now(),
+        error: safeErrorFromQueueReason(reason),
+      }
     );
     const messagesWithDetail =
       detail && detailMessageId
@@ -4980,14 +5229,17 @@ export class SandboxSession extends DurableObject<Env> {
       if (
         status.connection !== 'ready' ||
         status.physical !== 'running' ||
-        status.wrapperInstanceId !== messageWrapperInstanceId
+        status.wrapperInstanceId !== messageWrapperInstanceId ||
+        status.failureReason !== undefined
       ) {
         diagnostic.reason =
           status.connection !== 'ready'
             ? 'connection_not_ready'
             : status.physical !== 'running'
               ? 'physical_not_running'
-              : 'wrapper_mismatch';
+              : status.failureReason !== undefined
+                ? status.failureReason
+                : 'wrapper_mismatch';
         throw new Error('Accepted runtime is not ready');
       }
       diagnostic.interactionRevision = revision;
@@ -5292,51 +5544,6 @@ export class SandboxSession extends DurableObject<Env> {
     return latest;
   }
 
-  private initialMessageFromRegistration(
-    message: NonNullable<SandboxSessionRegistrationInput['message']>
-  ): NonNullable<SessionMetadata['initialMessage']> {
-    const turn = message.turn;
-    if (turn.type === 'command') {
-      return {
-        id: message.initialMessageId ?? turn.id ?? undefined,
-        prompt:
-          turn.arguments.length > 0 ? `/${turn.command} ${turn.arguments}` : `/${turn.command}`,
-        turn: { type: 'command', command: turn.command, arguments: turn.arguments },
-      };
-    }
-    return {
-      id: message.initialMessageId ?? turn.id ?? undefined,
-      prompt: turn.prompt,
-      ...(turn.attachments ? { attachments: turn.attachments } : {}),
-      turn: {
-        type: 'prompt',
-        prompt: turn.prompt,
-        ...(turn.attachments ? { attachments: turn.attachments } : {}),
-      },
-    };
-  }
-
-  private initialMessageMatches(
-    initialMessage: NonNullable<SessionMetadata['initialMessage']>,
-    turn: AcceptedExecutionTurn
-  ): boolean {
-    if (initialMessage.id !== turn.messageId || initialMessage.turn?.type !== turn.type) {
-      return false;
-    }
-    if (turn.type === 'command') {
-      return (
-        initialMessage.turn.type === 'command' &&
-        initialMessage.turn.command === turn.command &&
-        initialMessage.turn.arguments === turn.arguments
-      );
-    }
-    return (
-      initialMessage.turn.type === 'prompt' &&
-      initialMessage.turn.prompt === turn.prompt &&
-      JSON.stringify(initialMessage.turn.attachments) === JSON.stringify(turn.attachments)
-    );
-  }
-
   private async requestSessionOperation(
     operation: 'session.permission.resolve' | 'session.question.resolve',
     payload: unknown
@@ -5550,6 +5757,10 @@ export class SandboxSession extends DurableObject<Env> {
           return previous;
         }
         if (state.kind === 'queued') return message;
+        const acceptedAt = acceptedAtOf(message);
+        if (acceptedAt !== undefined) {
+          this.recordSessionLifecycle('initiatedAt', acceptedAt);
+        }
         if (state.kind === 'accepted') {
           if (previousState?.kind !== 'accepted') {
             const event = this.persistMessageLifecycleEvent(message);
@@ -5607,6 +5818,7 @@ export class SandboxSession extends DurableObject<Env> {
                       state.kind === 'cancelled'
                         ? 'The message was interrupted'
                         : (failedDetailOf(message) ??
+                          failedErrorOf(message) ??
                           safeErrorFromQueueReason(reason ?? 'environment_failed')),
                     timestamp: state.at,
                   }

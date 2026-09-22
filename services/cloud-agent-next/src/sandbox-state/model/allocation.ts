@@ -20,6 +20,11 @@ export const vercelAllocationConfigSchema = z
     projectId: z.string().min(1).optional(),
     snapshotId: z.string().min(1).optional(),
     runtimeBuildId: z.string().min(1).optional(),
+    /**
+     * BYOC credential build generation the demand bound, persisted so the
+     * missing-snapshot projection is reconstructible after a DO eviction.
+     */
+    buildGeneration: z.string().min(1).optional(),
     runtime: z.string().min(1).optional(),
     resources: z
       .object({

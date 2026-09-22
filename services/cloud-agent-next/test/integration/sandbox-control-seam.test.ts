@@ -866,7 +866,7 @@ describe('sandbox control seam (live wiring)', () => {
         Object.assign(instance, {
           provider,
           createProviderAdapter: () => provider,
-          providerKind: 'cloudflare',
+          providerBinding: { kind: 'cloudflare' },
         });
         await instance.initializeOwner(ownerId);
         const providerRef = encodeCloudflareProviderRef({

@@ -301,6 +301,30 @@ describe('control effects — command to event runner', () => {
       fence: { operationId: 'observe:1', providerRef: 'ref-1', incarnation: INC },
       result: 'present',
     });
+    // The recoverable decision and the containment it binds travel on the
+    // event; the reducer consumes them instead of re-deriving either.
+    const resolvedContainment = { kilocode: true, github: false, providerRef: 'ref-1' };
+    expect(
+      await executeCommand(
+        fakePort({
+          observe: async () => ({
+            outcome: 'present',
+            providerRef: 'ref-1',
+            incarnation: INC,
+            recoverable: true,
+            resolvedContainment,
+          }),
+        }),
+        OBSERVE,
+        NOW
+      )
+    ).toEqual({
+      type: 'OBSERVED',
+      fence: { operationId: 'observe:1', providerRef: 'ref-1', incarnation: INC },
+      result: 'present',
+      recoverable: true,
+      resolvedContainment,
+    });
     const failed = await executeCommand(
       fakePort({
         observe: async () => {

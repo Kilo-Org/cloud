@@ -41,7 +41,7 @@ import { z } from 'zod';
 import type { Env } from '../types.js';
 import { resolveSecret } from '../auth.js';
 import {
-  getSandboxProvider,
+  getSandboxProviderBinding,
   requiresContainmentSandbox,
   type SessionMetadata,
 } from './session-metadata.js';
@@ -143,6 +143,7 @@ import { POLICY } from '../sandbox-state/schedule.js';
 import {
   WORKTREE_CREDENTIAL_CONTAINMENT,
   getWorktreeCredentialContainment,
+  allocatedConnecting,
   type AllocatedAllocation,
   type AllocationContainment,
   type AllocationRecord,
@@ -151,6 +152,7 @@ import {
   type StopProof,
   type CredentialContainmentRequirements,
 } from '../sandbox-state/model/allocation.js';
+import { connectingAt } from '../sandbox-state/health/reduce.js';
 import type { AcquireEvent, AllocationInputEvent, DemandEvent } from '../sandbox-state/events.js';
 import type { Command } from '../sandbox-state/commands.js';
 import { operationId } from '../sandbox-state/commands.js';
@@ -227,11 +229,32 @@ import {
   vercelProviderLocatorSchema,
   type VercelProviderLocator,
 } from '../sandbox-control/vercel-provider.js';
-import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import {
+  VercelSandboxRestError,
+  type VercelSandboxNetworkPolicy,
+} from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
   parseVercelSandboxRuntimeConfig,
+  parseVercelSandboxRuntimeDefaults,
   resolveVercelSandboxRuntimeConfig,
+  type VercelSandboxRuntimeConfig,
 } from '../agent-sandbox/vercel/vercel-runtime-config.js';
+import {
+  ByocCredentialMissingError,
+  ByocCredentialResolverError,
+  ByocVercelNotReadyError,
+  projectByocVercelSnapshotMissing,
+  resolveByocVercelCredentials,
+  resolveByocVercelRuntimeConfig,
+  type ByocVercelRuntimeSnapshot,
+} from '../byoc/vercel-credential-resolver.js';
+import {
+  bindingFromLegacyProvider,
+  providerKindFromBinding,
+  SandboxProviderBindingSchema,
+  sameSandboxProviderBinding,
+  type SandboxProviderBinding,
+} from '../sandbox-provider-binding.js';
 import { buildControlWrapperLaunchEnv } from '../sandbox-control/wrapper-launch-env.js';
 import {
   forceDestroyControlPlaneSandbox,
@@ -269,10 +292,44 @@ const DIAGNOSTIC_BUNDLE_KEY = 'diagnostic_bundle';
 const PROVIDER_KIND_KEY = 'provider_kind';
 const PROVIDER_LOCATOR_KEY = 'provider_locator';
 const PROVIDER_CONFIGURATION_KEY = 'provider_configuration';
+const PROVIDER_BINDING_KEY = 'provider_binding';
+const FAILURE_REASON_KEY = 'failure_reason';
+const NEXT_LEASE_CHECK_AT_KEY = 'next_lease_check_at';
+const BYOC_SNAPSHOT_RECOVERY_KEY = 'byoc_snapshot_recovery';
+const SNAPSHOT_VALIDATOR_REF_KEY = 'snapshot_validator_ref';
 const BILLING_INPUT_KEY = 'billing_input';
 const ACQUISITION_RECEIPTS_KEY = 'acquisition_receipts';
 const CREDENTIAL_POLICY_DIRTY_KEY = 'credential_policy_dirty';
 const TERMINAL_CREDENTIAL_RENEWAL_WINDOW_MS = 60 * 60 * 1000;
+const BYOC_SNAPSHOT_RECOVERY_MAX_ATTEMPTS = 5;
+
+const byocVercelRuntimeSnapshotSchema = z.object({
+  organizationId: z.string().min(1),
+  credentialId: z.string().min(1),
+  buildGeneration: z.string().min(1),
+  runtimeSnapshotId: z.string().min(1),
+});
+
+const byocSnapshotRecoverySchema = z.object({
+  snapshot: byocVercelRuntimeSnapshotSchema,
+  attempts: z.number().int().nonnegative(),
+});
+
+type ByocSnapshotRecovery = z.infer<typeof byocSnapshotRecoverySchema>;
+
+/** Identity of a pending projection: the attempt count and the exact snapshot. */
+function sameByocSnapshotRecovery(
+  left: ByocSnapshotRecovery,
+  right: ByocSnapshotRecovery
+): boolean {
+  return (
+    left.attempts === right.attempts &&
+    left.snapshot.organizationId === right.snapshot.organizationId &&
+    left.snapshot.credentialId === right.snapshot.credentialId &&
+    left.snapshot.buildGeneration === right.snapshot.buildGeneration &&
+    left.snapshot.runtimeSnapshotId === right.snapshot.runtimeSnapshotId
+  );
+}
 
 const sandboxAcquisitionSchema = z.object({
   id: z.string().min(1).max(128),
@@ -280,6 +337,21 @@ const sandboxAcquisitionSchema = z.object({
 });
 
 export type SandboxAcquisition = z.infer<typeof sandboxAcquisitionSchema>;
+
+const snapshotValidatorInputSchema = z.object({
+  build: z.object({
+    organizationId: z.uuid(),
+    credentialId: z.uuid(),
+    generation: z.uuid(),
+  }),
+  allocation: z.object({
+    providerRef: z.string().min(1),
+    locator: vercelProviderLocatorSchema,
+    createdAt: z.number().int().nonnegative().safe(),
+    expiresAt: z.number().int().positive().safe(),
+  }),
+  credentialHash: z.string().regex(/^[0-9a-f]{64}$/),
+});
 
 function assertAcquisitionDeadline(acquisition: SandboxAcquisition): void {
   if (Date.now() >= acquisition.deadlineAt) throw new Error('Sandbox acquisition expired');
@@ -506,7 +578,34 @@ export type SandboxControlStatus = StatusProjection & {
   allocationIncarnation?: string;
   operationResults?: true;
   runtimeRecovery?: true;
+  failureReason?: SandboxProviderFailureReason;
 };
+
+export type SandboxProviderFailureReason =
+  | 'byoc_credential_missing'
+  | 'byoc_vercel_not_ready'
+  | 'byoc_vercel_forbidden'
+  | 'byoc_vercel_capacity'
+  | 'environment_failed';
+
+function providerFailureReason(
+  binding: SandboxProviderBinding,
+  error: unknown
+): SandboxProviderFailureReason | undefined {
+  if (error instanceof ByocCredentialMissingError) return 'byoc_credential_missing';
+  if (error instanceof ByocVercelNotReadyError) return 'byoc_vercel_not_ready';
+  if (
+    binding.kind !== 'vercel' ||
+    binding.source.kind !== 'byoc' ||
+    !(error instanceof VercelSandboxRestError)
+  ) {
+    return undefined;
+  }
+  if (error.operation === 'create' && error.status === 410) return 'byoc_vercel_not_ready';
+  if (error.status === 401 || error.status === 403) return 'byoc_vercel_forbidden';
+  if (error.status === 429) return 'byoc_vercel_capacity';
+  return undefined;
+}
 
 export type ControlRuntimeCredentialProxyFence = {
   plane: 'control';
@@ -522,7 +621,13 @@ export class SandboxControl extends DurableObject<Env> {
   private kiloReady = false;
   private activeConnection: SandboxControlConnectionIdentity | null = null;
   private readyConnectionId: string | null = null;
-  private providerKind: AgentSandboxProvider = 'cloudflare';
+  private providerBinding: SandboxProviderBinding = { kind: 'cloudflare' };
+
+  /** The provider kind always derives from the binding; there is one owner. */
+  private get providerKind(): AgentSandboxProvider {
+    return providerKindFromBinding(this.providerBinding);
+  }
+
   private vercelResources: VercelSandboxResources | undefined;
   private containersInstance: CloudflareContainersInstance | undefined;
   private readonly sessionForwarding = createSessionForwarding();
@@ -647,9 +752,10 @@ export class SandboxControl extends DurableObject<Env> {
   private ensureOperationalInitialized(): Promise<void> {
     return (this.operationalInitialization ??= this.ctx.blockConcurrencyWhile(async () => {
       const ctx = this.ctx;
-      const [readyAt, runtime, configuration, allocation] = await Promise.all([
+      const [readyAt, runtime, storedBinding, configuration, allocation] = await Promise.all([
         ctx.storage.get<number>(WRAPPER_READY_AT_KEY),
         ctx.storage.get<PersistedWrapperRuntime>(ACTIVE_WRAPPER_RUNTIME_KEY),
+        ctx.storage.get<unknown>(PROVIDER_BINDING_KEY),
         this.readProviderConfiguration(),
         loadAllocationResult(ctx.storage),
       ]);
@@ -683,12 +789,17 @@ export class SandboxControl extends DurableObject<Env> {
       this.vercelLocator = vercelProviderLocatorSchema
         .optional()
         .parse(await ctx.storage.get(PROVIDER_LOCATOR_KEY));
-      this.providerKind = configuration?.provider ?? 'cloudflare';
+      this.providerBinding =
+        storedBinding !== undefined
+          ? SandboxProviderBindingSchema.parse(storedBinding)
+          : bindingFromLegacyProvider(configuration?.provider ?? 'cloudflare');
       this.vercelResources =
         configuration?.provider === 'vercel' ? configuration.resources : undefined;
       this.containersInstance =
         configuration?.provider === 'cloudflare-containers' ? configuration.instance : undefined;
-      this.provider = this.createProviderAdapter(this.providerKind, record);
+      if (!this.isByocBinding()) {
+        this.provider = this.createProviderAdapter(this.providerKind, record);
+      }
       this.runtimeDeleted = (await ctx.storage.get(RUNTIME_DELETED_KEY)) === true;
       this.exclusiveDeletionWorktreeId = cloudAgentWorktreeIdSchema
         .optional()
@@ -841,6 +952,153 @@ export class SandboxControl extends DurableObject<Env> {
     if (previous?.wrapperInstanceId) {
       await this.invalidateTerminalRuntime(previous.wrapperInstanceId, true);
     }
+  }
+
+  /**
+   * Seed a BYOC Vercel snapshot validator control. The validator sandbox was
+   * created out-of-band by the snapshot build, so the control adopts it as an
+   * allocated Vercel allocation bound to the customer credential instead of
+   * demanding one. A re-run with the same reference only rotates the wrapper
+   * credential.
+   */
+  async initializeSnapshotValidator(
+    input: z.infer<typeof snapshotValidatorInputSchema>
+  ): Promise<void> {
+    await this.ensureOperationalInitialized();
+    const { build, allocation, credentialHash } = snapshotValidatorInputSchema.parse(input);
+    const expectedId = `ses-byoc-validator-${build.generation.replaceAll('-', '')}`;
+    const reference = decodeVercelProviderRef(allocation.providerRef);
+    if (this.sandboxId !== expectedId || !reference) {
+      throw new Error('Snapshot validator identity mismatch');
+    }
+    const binding: SandboxProviderBinding = {
+      kind: 'vercel',
+      source: {
+        kind: 'byoc',
+        organizationId: build.organizationId,
+        credentialId: build.credentialId,
+      },
+    };
+    const intentId = `byoc-validator-${build.generation}`;
+    await this.ctx.storage.transaction(async () => {
+      const record = await this.readCanonicalAllocation();
+      const registered = await this.ctx.storage.get<string>(SNAPSHOT_VALIDATOR_REF_KEY);
+      const storedBinding = SandboxProviderBindingSchema.optional().parse(
+        await this.ctx.storage.get(PROVIDER_BINDING_KEY)
+      );
+      if (registered !== undefined) {
+        const locator = vercelProviderLocatorSchema
+          .optional()
+          .parse(await this.ctx.storage.get(PROVIDER_LOCATOR_KEY));
+        const target = record.state.kind === 'stopped' ? null : record.state.target;
+        if (
+          registered !== allocation.providerRef ||
+          !storedBinding ||
+          !sameSandboxProviderBinding(storedBinding, binding) ||
+          JSON.stringify(locator) !== JSON.stringify(allocation.locator) ||
+          record.state.kind !== 'allocated' ||
+          target?.providerRef !== allocation.providerRef ||
+          record.state.createIntent.intentId !== intentId ||
+          target.allocationName !== reference.sandboxName
+        ) {
+          throw new Error('Snapshot validator allocation changed');
+        }
+        if ((await this.ctx.storage.get(CREDENTIAL_HASH_KEY)) === credentialHash) return;
+        if (
+          (await this.ctx.storage.get(ACTIVE_WRAPPER_RUNTIME_KEY)) !== undefined ||
+          this.ctx.getWebSockets().length > 0
+        ) {
+          throw new Error('Snapshot validator wrapper already connected');
+        }
+        await this.ctx.storage.put(CREDENTIAL_HASH_KEY, credentialHash);
+        await this.appendLog(credentialTransition(Date.now(), 'rotated'));
+        return;
+      }
+      if (
+        record.state.kind !== 'stopped' ||
+        record.state.summary !== null ||
+        storedBinding !== undefined ||
+        (await this.ctx.storage.get(PROVIDER_KIND_KEY)) !== undefined ||
+        (await this.readOwner()) !== null ||
+        this.runtimeDeleted ||
+        allocation.expiresAt <= Math.max(Date.now(), allocation.createdAt)
+      ) {
+        throw new Error('Snapshot validator control is unavailable');
+      }
+      const { teamId: _teamId, ...vercel } = allocation.locator;
+      const containment = getWorktreeCredentialContainment(false);
+      const target: AllocationTarget = {
+        provider: 'vercel',
+        providerRef: allocation.providerRef,
+        allocationName: reference.sandboxName,
+        capabilities: { persistentWorkspace: true, destroysOnStop: false },
+        containment,
+        resolvedContainment: { ...containment, providerRef: allocation.providerRef },
+        vercel,
+      };
+      const now = Date.now();
+      const health = connectingAt(allocation.providerRef, now);
+      const next: AllocationRecord = {
+        v: 2,
+        resumable: false,
+        state: allocatedConnecting(target, { intentId, createdAt: allocation.createdAt }, health),
+      };
+      await storeAllocation(this.ctx.storage, next);
+      await this.ctx.storage.put({
+        [PROVIDER_BINDING_KEY]: binding,
+        [PROVIDER_KIND_KEY]: binding.kind,
+        [PROVIDER_LOCATOR_KEY]: allocation.locator,
+        [SNAPSHOT_VALIDATOR_REF_KEY]: allocation.providerRef,
+        [CREDENTIAL_HASH_KEY]: credentialHash,
+        [NEXT_LEASE_CHECK_AT_KEY]: allocation.expiresAt - leaseAtLeastMs(),
+      });
+      await this.scheduleAlarm();
+      await this.appendLog(credentialTransition(Date.now(), 'issued'));
+    });
+    this.providerBinding = binding;
+    this.vercelLocator = allocation.locator;
+  }
+
+  /** Confirm the snapshot validator's allocation is gone and release its control. */
+  async confirmSnapshotValidatorStopped(providerRef: string): Promise<void> {
+    await this.ensureOperationalInitialized();
+    if (
+      !/^ses-byoc-validator-[0-9a-f]{32}$/i.test(this.sandboxId) ||
+      !decodeVercelProviderRef(providerRef)
+    ) {
+      throw new Error('Snapshot validator identity mismatch');
+    }
+    await this.ctx.storage.transaction(async () => {
+      const registered = await this.ctx.storage.get<string>(SNAPSHOT_VALIDATOR_REF_KEY);
+      const record = await this.readCanonicalAllocation();
+      if (registered === undefined && record.state.kind === 'stopped') {
+        await this.ctx.storage.put(SNAPSHOT_VALIDATOR_REF_KEY, providerRef);
+      } else if (registered !== providerRef) {
+        throw new Error('Snapshot validator allocation changed');
+      }
+      if (record.state.kind !== 'stopped') {
+        if (canonicalProviderRefOf(record) !== providerRef) {
+          throw new Error('Snapshot validator allocation changed');
+        }
+        const summary = record.state.target?.allocationName;
+        const stopped: AllocationRecord = {
+          v: 2,
+          resumable: record.resumable,
+          state: {
+            kind: 'stopped',
+            summary: {
+              providerRef,
+              ...(summary === undefined ? {} : { allocationName: summary }),
+            },
+          },
+        };
+        await storeAllocation(this.ctx.storage, stopped);
+      }
+    });
+    this.activeConnection = null;
+    this.readyConnectionId = null;
+    this.kiloReady = false;
+    this.socketHandler.closeAll('Snapshot validator stopped');
   }
 
   async initializeOwner(ownerId: string): Promise<{ ownerId: string }> {
@@ -1283,11 +1541,12 @@ export class SandboxControl extends DurableObject<Env> {
       throw new Error('Sandbox credential preparation expired');
     }
     const metadata = await this.readCredentialMetadata(input);
-    const provider = getSandboxProvider(metadata);
-    await this.pinProvider(provider, {
+    const binding = getSandboxProviderBinding(metadata);
+    await this.pinProvider(binding, {
       resources: getSandboxAllocationResources(metadata.workspace?.sandboxAllocation),
       instance: getSandboxAllocationInstance(metadata.workspace?.sandboxAllocation),
     });
+    const provider = binding.kind;
     const record = await this.readCanonicalAllocation();
     const requiredContainment = getWorktreeCredentialContainment(
       requiresContainmentSandbox(metadata)
@@ -1457,6 +1716,7 @@ export class SandboxControl extends DurableObject<Env> {
     ownerId: string;
     sessionId: string;
     provider?: AgentSandboxProvider;
+    providerBinding?: SandboxProviderBinding;
     resources?: VercelSandboxResources;
     instance?: CloudflareContainersInstance;
     allowCreate?: boolean;
@@ -1500,11 +1760,33 @@ export class SandboxControl extends DurableObject<Env> {
       await this.ctx.storage.delete(RUNTIME_DELETED_KEY);
       this.runtimeDeleted = false;
     }
-    await this.pinProvider(input.provider, {
+    const metadataBinding = getSandboxProviderBinding(metadata);
+    const requestedBinding =
+      input.providerBinding !== undefined
+        ? SandboxProviderBindingSchema.parse(input.providerBinding)
+        : input.provider !== undefined
+          ? bindingFromLegacyProvider(input.provider)
+          : undefined;
+    if (
+      requestedBinding !== undefined &&
+      input.provider !== undefined &&
+      input.provider !== requestedBinding.kind
+    ) {
+      throw new Error('Sandbox provider binding mismatch');
+    }
+    const declaredBinding = metadata.workspace?.sandboxProviderBinding;
+    if (
+      declaredBinding !== undefined &&
+      requestedBinding !== undefined &&
+      !sameSandboxProviderBinding(declaredBinding, requestedBinding)
+    ) {
+      throw new Error('Sandbox provider binding mismatch');
+    }
+    const binding = await this.pinProvider(requestedBinding ?? metadataBinding, {
       resources: input.resources,
       instance: input.instance,
     });
-    if (acquisition && this.providerKind !== 'cloudflare') {
+    if (acquisition && binding.kind !== 'cloudflare') {
       throw new Error('Sandbox acquisition is only supported for Cloudflare');
     }
     const billing = await this.billingInput(ownerId, input.billing, worktreeId);
@@ -1577,7 +1859,7 @@ export class SandboxControl extends DurableObject<Env> {
       // Only a fresh demand pins the locator from the current environment. A
       // resumed create must keep the locator its intent was created with, so a
       // config rotation cannot redirect recovery or cleanup at a new project.
-      if (this.providerKind === 'vercel' && createCommands !== undefined) {
+      if (!this.isByocBinding() && this.providerKind === 'vercel' && createCommands !== undefined) {
         const vercel = parseVercelSandboxRuntimeConfig(this.env);
         if (vercel) {
           this.vercelLocator = vercelProviderLocatorSchema.parse({
@@ -1590,7 +1872,9 @@ export class SandboxControl extends DurableObject<Env> {
           await this.ctx.storage.put(PROVIDER_LOCATOR_KEY, this.vercelLocator);
         }
       }
-      this.provider = this.createProviderAdapter(this.providerKind, record);
+      if (!this.isByocBinding()) {
+        this.provider = this.createProviderAdapter(this.providerKind, record);
+      }
     }
     if (record.state.kind !== 'creating' && record.state.kind !== 'allocated') {
       return currentStatus();
@@ -1608,7 +1892,10 @@ export class SandboxControl extends DurableObject<Env> {
       record.state.target.providerRef !== null
     ) {
       await withTimeout(
-        this.provider.ensureBillingAdmission(record.state.target.providerRef, billing),
+        (await this.providerFor(record.state.target)).ensureBillingAdmission(
+          record.state.target.providerRef,
+          billing
+        ),
         DEADLINE_MS.stopAttempt,
         'Sandbox billing admission timed out'
       );
@@ -1760,6 +2047,7 @@ export class SandboxControl extends DurableObject<Env> {
     | { action: 'wait'; record: AllocationRecord }
   > {
     void sessionId;
+    const vercel = await this.vercelIntentConfigForDemand();
     const committed = await this.ctx.storage.transaction(async () => {
       const record = await this.readCanonicalAllocation();
       this.assertWorktreeAdmission(worktreeId);
@@ -1820,7 +2108,7 @@ export class SandboxControl extends DurableObject<Env> {
       }
       const intentId = crypto.randomUUID();
       const allocationName = await deriveSandboxAllocationId(this.sandboxId, intentId);
-      const target = this.canonicalTarget(requiredContainment, allocationName);
+      const target = this.canonicalTarget(requiredContainment, allocationName, vercel);
       const event: AcquireEvent = {
         type: 'ACQUIRE',
         requestId: acquisition.id,
@@ -1854,12 +2142,31 @@ export class SandboxControl extends DurableObject<Env> {
     requiredContainment: CredentialContainmentRequirements,
     worktreeId: string | undefined
   ): Promise<{ record: AllocationRecord; commands: Command[] }> {
+    // A fresh demand starts from a stopped record, so any reason recorded by the
+    // previous attempt is obsolete: a transient failure of this attempt must not
+    // surface it to the head. A permanent failure records its own reason below.
+    // The clear is fenced to the stopped record so it can never erase the
+    // failure of a live allocation.
+    this.ctx.storage.transactionSync(() => {
+      const current = this.readCanonicalAllocationSync();
+      if (current.state.kind !== 'stopped') return;
+      this.clearObsoleteProviderFailure();
+    });
+    const resolution = await this.resolveDemandVercelIntent();
+    if (!resolution.resolved) {
+      // A permanent BYOC configuration failure recorded its specific reason, and
+      // a transient credential-backend failure recorded nothing. Either way the
+      // allocation stays stopped: the head terminalizes with the specific
+      // reason, or the bounded queue retry re-drives the demand.
+      return { record: await this.readCanonicalAllocation(), commands: [] };
+    }
+    const vercel = resolution.vercel;
     const committed = await this.ctx.storage.transaction(async () => {
       const record = await this.readCanonicalAllocation();
       this.assertWorktreeAdmission(worktreeId);
       const intentId = crypto.randomUUID();
       const allocationName = await deriveSandboxAllocationId(this.sandboxId, intentId);
-      const target = this.canonicalTarget(requiredContainment, allocationName);
+      const target = this.canonicalTarget(requiredContainment, allocationName, vercel);
       const event: DemandEvent = {
         type: 'DEMAND',
         requestId: crypto.randomUUID(),
@@ -2008,6 +2315,19 @@ export class SandboxControl extends DurableObject<Env> {
       const cleanupUnavailable =
         unavailable && (sameCanonicalAllocation(from, current) || current.state.kind === 'stopped');
       const cleanupCreating = creatingCleanup && sameCanonicalAllocation(to, current);
+      // An authoritative recovery commits a non-allocated record to `allocated`
+      // (BYOC Vercel adopts a failed-but-active allocation). The failure that
+      // preceded recovery is obsolete and must not outrank the recovered
+      // readiness. Fenced both to the committed record (`to`) and to the record
+      // the transition started from (`from`): a delayed observation of a
+      // replaced allocation can commit `(from: old, to: current)` with no
+      // recovery at all, and must never clear the replacement's failure.
+      const recovered =
+        to.state.kind === 'allocated' &&
+        from.state.kind !== 'allocated' &&
+        sameCanonicalAllocation(from, to) &&
+        sameCanonicalAllocation(to, current);
+      if (recovered) this.clearObsoleteProviderFailure();
       if (cleanupCreating) {
         saveRuntimeMetadataSync(kv, initialRuntimeMetadata(this.sandboxId));
       }
@@ -2041,6 +2361,9 @@ export class SandboxControl extends DurableObject<Env> {
         );
       }
     }
+    if (to.state.kind === 'allocated' && from.state.kind !== 'allocated') {
+      await this.scheduleNextLeaseCheck('initial', Date.now());
+    }
     await this.scheduleAlarm();
   }
 
@@ -2071,7 +2394,7 @@ export class SandboxControl extends DurableObject<Env> {
     ) {
       throw new Error('Sandbox credential containment mismatch');
     }
-    const provider = this.provider;
+    const provider = await this.providerFor(record.state.target);
     if (!provider.updateNetworkPolicy) {
       throw new Error('Sandbox provider does not support network policy updates');
     }
@@ -2338,8 +2661,23 @@ export class SandboxControl extends DurableObject<Env> {
       throw new Error(WORKTREE_RUNTIME_HISTORY_UNAVAILABLE);
     }
     const getProvider = async () => {
-      await this.pinProvider(input.location.provider);
-      return this.provider;
+      const binding = await this.pinProvider();
+      if (
+        binding.kind !== input.location.provider ||
+        (binding.kind === 'vercel' &&
+          binding.source.kind === 'byoc' &&
+          binding.source.organizationId !== input.organizationId)
+      ) {
+        throw new Error('Sandbox provider binding mismatch');
+      }
+      const record = await this.readCanonicalAllocation();
+      return withTimeout(
+        this.providerFor(
+          record.state.kind === 'stopped' ? undefined : (record.state.target ?? undefined)
+        ),
+        DEADLINE_MS.stopAttempt,
+        'Sandbox provider resolution timed out'
+      );
     };
     this.deletingWorktrees.add(input.worktreeId);
     await this.ctx.storage.put(
@@ -2773,14 +3111,14 @@ export class SandboxControl extends DurableObject<Env> {
   /** Canonical create target: the identity fields the lossy legacy schema dropped. */
   private canonicalTarget(
     requiredContainment: CredentialContainmentRequirements,
-    allocationName: string
+    allocationName: string,
+    vercel: ProviderAllocationIntent['vercel']
   ): AllocationTarget {
     const provider = this.providerKind === 'vercel' ? 'vercel' : 'cloudflare';
     const capabilities =
       provider === 'vercel'
         ? { persistentWorkspace: true, destroysOnStop: false }
         : { persistentWorkspace: false, destroysOnStop: true };
-    const vercel = this.controlVercelIntentConfig();
     return {
       provider,
       providerRef: null,
@@ -2868,11 +3206,14 @@ export class SandboxControl extends DurableObject<Env> {
     const runtime = this.readyWrapperRuntime();
     const physical = legacyPhysicalState(record);
     const projection = projectStatus({ allocation: record, ownerPresent: true, now: Date.now() });
+    const failureReason =
+      await this.ctx.storage.get<SandboxProviderFailureReason>(FAILURE_REASON_KEY);
     return {
       ...projection,
       physical,
       connection,
       work,
+      ...(failureReason === undefined ? {} : { failureReason }),
       ...(record.state.kind === 'allocated' && runtime?.wrapperInstanceId
         ? { wrapperInstanceId: runtime.wrapperInstanceId }
         : {}),
@@ -3032,6 +3373,10 @@ export class SandboxControl extends DurableObject<Env> {
       DIAGNOSTIC_BUNDLE_KEY,
       PROVIDER_KIND_KEY,
       PROVIDER_CONFIGURATION_KEY,
+      PROVIDER_BINDING_KEY,
+      FAILURE_REASON_KEY,
+      NEXT_LEASE_CHECK_AT_KEY,
+      BYOC_SNAPSHOT_RECOVERY_KEY,
       BILLING_INPUT_KEY,
       CREDENTIAL_POLICY_DIRTY_KEY,
       PROVIDER_LOCATOR_KEY,
@@ -3040,6 +3385,7 @@ export class SandboxControl extends DurableObject<Env> {
     this.vercelLocator = undefined;
     this.vercelResources = undefined;
     this.containersInstance = undefined;
+    this.providerBinding = { kind: 'cloudflare' };
     this.activeConnection = null;
     this.readyConnectionId = null;
     this.kiloReady = false;
@@ -3210,6 +3556,252 @@ export class SandboxControl extends DurableObject<Env> {
     });
   }
 
+  private isByocBinding(): boolean {
+    return this.providerBinding.kind === 'vercel' && this.providerBinding.source.kind === 'byoc';
+  }
+
+  /**
+   * The provider adapter for the current binding. A BYOC Vercel binding builds an
+   * adapter per operation from the customer credential (the access token is never
+   * persisted); every other binding uses the pinned adapter. The canonical target
+   * carries the demand-time Vercel block, so observe/stop/launch target the same
+   * build the create bound.
+   */
+  private async providerFor(target?: AllocationTarget): Promise<ProviderAdapter> {
+    if (!this.isByocBinding()) return this.provider;
+    if (this.providerBinding.kind !== 'vercel' || this.providerBinding.source.kind !== 'byoc') {
+      return this.provider;
+    }
+    const allocationName = target?.allocationName ?? this.sandboxId;
+    const config = await this.resolveByocRuntimeConfig(target);
+    return createVercelProviderAdapter({ sandboxName: allocationName, config });
+  }
+
+  /**
+   * The single owner of the obsolete-failure decision: a stored provider
+   * failure and the missing-snapshot projection it armed are cleared together.
+   * The projection is only meaningful while the failure that recorded it is
+   * current, so clearing the veto without it would leave recovery armed against
+   * a snapshot that was just observed active. Attempt/exhaustion bookkeeping
+   * stays with `retryByocSnapshotRecovery`, which owns the pending record.
+   */
+  private clearObsoleteProviderFailure(): void {
+    const kv = this.ctx.storage.kv;
+    kv.delete(FAILURE_REASON_KEY);
+    kv.delete(BYOC_SNAPSHOT_RECOVERY_KEY);
+  }
+
+  private async recordProviderFailure(error: unknown): Promise<void> {
+    const reason =
+      providerFailureReason(this.providerBinding, error) ??
+      (this.isByocBinding() &&
+      ((error instanceof VercelSandboxRestError &&
+        error.status !== undefined &&
+        error.status >= 500) ||
+        error instanceof ByocCredentialResolverError)
+        ? 'environment_failed'
+        : undefined);
+    if (reason === undefined) return;
+    await this.ctx.storage.put(FAILURE_REASON_KEY, reason);
+    if (reason === 'byoc_vercel_not_ready') {
+      const snapshot = await this.byocRuntimeSnapshotForRecovery();
+      if (snapshot === undefined) return;
+      // Record the missing snapshot and arm the retry anchor. The alarm owns
+      // every projection attempt, so a failed projection is retried and
+      // eventually cleared instead of being written and forgotten.
+      await this.ctx.storage.put(BYOC_SNAPSHOT_RECOVERY_KEY, {
+        snapshot,
+        attempts: 0,
+      });
+      await this.armInfrastructureAnchor(
+        'byocSnapshotRecovery',
+        Date.now() + DEADLINE_MS.reconciliation
+      );
+    }
+  }
+
+  /**
+   * The missing-snapshot identity of the current canonical allocation, rebuilt
+   * from the persisted binding and demand-time target. The identity must not
+   * live in instance state: a DO eviction between the demand and the failing
+   * provider call would lose it and never arm recovery.
+   */
+  private async byocRuntimeSnapshotForRecovery(): Promise<ByocVercelRuntimeSnapshot | undefined> {
+    const binding = this.providerBinding;
+    if (binding.kind !== 'vercel' || binding.source.kind !== 'byoc') return undefined;
+    const state = (await this.readCanonicalAllocation()).state;
+    if (state.kind === 'stopped') return undefined;
+    const vercel = state.target?.vercel;
+    if (vercel?.buildGeneration === undefined || vercel.snapshotId === undefined) return undefined;
+    return {
+      organizationId: binding.source.organizationId,
+      credentialId: binding.source.credentialId,
+      buildGeneration: vercel.buildGeneration,
+      runtimeSnapshotId: vercel.snapshotId,
+    };
+  }
+
+  /**
+   * The single owner of the pending missing-snapshot projection. Each firing
+   * attempts the backend projection, then settles its own record: a settled
+   * attempt clears the key, an unsettled one is retried a bounded number of
+   * times before terminal cleanup. The settlement is applied only while the
+   * stored record is still the attempted one, so an attempt that overlapped a
+   * newer pending projection never deletes or rewrites it.
+   */
+  private async retryByocSnapshotRecovery(): Promise<void> {
+    const raw = await this.ctx.storage.get(BYOC_SNAPSHOT_RECOVERY_KEY);
+    if (raw === undefined) return;
+    const parsed = byocSnapshotRecoverySchema.safeParse(raw);
+    if (!parsed.success) {
+      await this.ctx.storage.delete(BYOC_SNAPSHOT_RECOVERY_KEY);
+      this.logDiagnostic('byoc_snapshot_recovery', { result: 'discarded' }, 'warn');
+      return;
+    }
+    const attempted = parsed.data;
+    const settled = await this.recoverMissingByocSnapshot(attempted.snapshot);
+    const attempts = attempted.attempts + 1;
+    const exhausted = attempts >= BYOC_SNAPSHOT_RECOVERY_MAX_ATTEMPTS;
+    const applied = await this.ctx.storage.transaction(async () => {
+      const current = byocSnapshotRecoverySchema.safeParse(
+        await this.ctx.storage.get(BYOC_SNAPSHOT_RECOVERY_KEY)
+      );
+      if (!current.success || !sameByocSnapshotRecovery(current.data, attempted)) return false;
+      if (settled || exhausted) {
+        await this.ctx.storage.delete(BYOC_SNAPSHOT_RECOVERY_KEY);
+        return true;
+      }
+      await this.ctx.storage.put(BYOC_SNAPSHOT_RECOVERY_KEY, {
+        snapshot: attempted.snapshot,
+        attempts,
+      });
+      return true;
+    });
+    if (!applied) return;
+    if (settled) {
+      this.logDiagnostic('byoc_snapshot_recovery', { result: 'settled' });
+      return;
+    }
+    if (exhausted) {
+      this.logDiagnostic('byoc_snapshot_recovery', { result: 'exhausted', attempts }, 'warn');
+      return;
+    }
+    await this.armInfrastructureAnchor(
+      'byocSnapshotRecovery',
+      Date.now() + DEADLINE_MS.reconciliation
+    );
+  }
+
+  /**
+   * Tell the backend that the customer's BYOC runtime snapshot is gone, so the
+   * enrollment is marked failed and re-provisioned instead of every session
+   * retrying against a snapshot that no longer exists. Returns true when the
+   * projection is settled: it landed, or the credential itself is gone. The
+   * caller owns deleting the pending record, so this never touches storage.
+   */
+  private async recoverMissingByocSnapshot(snapshot: ByocVercelRuntimeSnapshot): Promise<boolean> {
+    try {
+      await withTimeout(
+        projectByocVercelSnapshotMissing(this.env, snapshot),
+        DEADLINE_MS.stopAttempt,
+        'BYOC Vercel snapshot recovery timed out'
+      );
+      return true;
+    } catch (error) {
+      if (error instanceof ByocCredentialMissingError) return true;
+      this.logDiagnostic('byoc_snapshot_recovery', { result: 'failed' }, 'warn');
+      return false;
+    }
+  }
+
+  private async resolveByocRuntimeConfig(
+    target?: AllocationTarget
+  ): Promise<VercelSandboxRuntimeConfig> {
+    if (this.providerBinding.kind !== 'vercel' || this.providerBinding.source.kind !== 'byoc') {
+      throw new Error('BYOC Vercel runtime configuration is unavailable');
+    }
+    const defaults = parseVercelSandboxRuntimeDefaults(this.env);
+    if (!defaults) throw new Error('Vercel sandbox runtime configuration is unavailable');
+    const persisted = target?.vercel;
+    if (
+      persisted === undefined ||
+      persisted.projectId === undefined ||
+      persisted.snapshotId === undefined ||
+      persisted.runtimeBuildId === undefined
+    ) {
+      return resolveByocVercelRuntimeConfig(this.env, this.providerBinding.source);
+    }
+    const credentials = await resolveByocVercelCredentials(this.env, this.providerBinding.source);
+    const resources = vercelSandboxResourcesSchema
+      .optional()
+      .parse(persisted.resources ?? this.vercelResources);
+    return {
+      ...defaults,
+      ...credentials,
+      projectId: persisted.projectId,
+      snapshotId: persisted.snapshotId,
+      runtimeBuildId: persisted.runtimeBuildId,
+      runtime: persisted.runtime === 'node24' ? persisted.runtime : defaults.runtime,
+      ...(resources === undefined ? {} : { resources }),
+    };
+  }
+
+  /**
+   * Resolve the demand-time Vercel intent before any provider side effect. A
+   * permanent BYOC configuration failure (deleted credential, unfinished
+   * enrollment) records the specific reason so the head terminalizes with it. A
+   * transient credential-backend failure records nothing and reports unresolved,
+   * so the allocation stays stopped and the bounded queue retry re-drives the
+   * demand. Any other error propagates.
+   */
+  private async resolveDemandVercelIntent(): Promise<
+    { resolved: true; vercel: ProviderAllocationIntent['vercel'] } | { resolved: false }
+  > {
+    try {
+      return { resolved: true, vercel: await this.vercelIntentConfigForDemand() };
+    } catch (error) {
+      if (providerFailureReason(this.providerBinding, error) !== undefined) {
+        await this.recordProviderFailure(error);
+        return { resolved: false };
+      }
+      if (error instanceof ByocCredentialResolverError) {
+        this.logDiagnostic('byoc_credential_resolution', { result: 'retry' }, 'warn');
+        return { resolved: false };
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * The demand-time Vercel intent block. For a BYOC binding it resolves the
+   * customer credential and persists the credential's build generation on the
+   * block, so the missing-snapshot projection survives a DO eviction; for a
+   * platform binding it reconstructs the pinned environment block.
+   */
+  private async vercelIntentConfigForDemand(): Promise<ProviderAllocationIntent['vercel']> {
+    if (!this.isByocBinding()) return this.controlVercelIntentConfig();
+    if (this.providerBinding.kind !== 'vercel' || this.providerBinding.source.kind !== 'byoc') {
+      return undefined;
+    }
+    let buildGeneration: string | undefined;
+    const config = await resolveByocVercelRuntimeConfig(
+      this.env,
+      this.providerBinding.source,
+      snapshot => {
+        buildGeneration = snapshot.buildGeneration;
+      }
+    );
+    const resources = config.resources === undefined ? this.vercelResources : config.resources;
+    return {
+      projectId: config.projectId,
+      snapshotId: config.snapshotId,
+      runtimeBuildId: config.runtimeBuildId,
+      ...(buildGeneration === undefined ? {} : { buildGeneration }),
+      runtime: config.runtime,
+      ...(resources === undefined ? {} : { resources }),
+    };
+  }
+
   private async readProviderConfiguration(): Promise<SandboxProviderConfiguration | undefined> {
     const [raw, legacyKind] = await Promise.all([
       this.ctx.storage.get<unknown>(PROVIDER_CONFIGURATION_KEY),
@@ -3228,11 +3820,20 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   private async pinProvider(
-    requested?: AgentSandboxProvider,
+    requested?: SandboxProviderBinding | AgentSandboxProvider,
     allocation?: { resources?: VercelSandboxResources; instance?: CloudflareContainersInstance }
-  ): Promise<void> {
-    const configuration = await this.ctx.storage.transaction(async () => {
+  ): Promise<SandboxProviderBinding> {
+    const requestedBinding =
+      requested === undefined
+        ? undefined
+        : typeof requested === 'string'
+          ? bindingFromLegacyProvider(requested)
+          : requested;
+    const committed = await this.ctx.storage.transaction(async () => {
       const stored = await this.readProviderConfiguration();
+      const storedRaw = await this.ctx.storage.get<unknown>(PROVIDER_BINDING_KEY);
+      const storedBinding =
+        storedRaw === undefined ? undefined : SandboxProviderBindingSchema.parse(storedRaw);
       const resources =
         allocation !== undefined
           ? allocation.resources
@@ -3242,9 +3843,16 @@ export class SandboxControl extends DurableObject<Env> {
       const instance =
         allocation?.instance ??
         (stored?.provider === 'cloudflare-containers' ? stored.instance : undefined);
-      const provider = requested ?? stored?.provider ?? 'cloudflare';
+      const binding =
+        requestedBinding ??
+        storedBinding ??
+        bindingFromLegacyProvider(stored?.provider ?? 'cloudflare');
+      const provider = binding.kind;
       if (stored && stored.provider !== provider) {
         throw new Error('Sandbox provider mismatch');
+      }
+      if (storedBinding && !sameSandboxProviderBinding(storedBinding, binding)) {
+        throw new Error('Sandbox provider binding mismatch');
       }
       const next = sandboxProviderConfigurationSchema.parse({
         provider,
@@ -3267,24 +3875,33 @@ export class SandboxControl extends DurableObject<Env> {
       ) {
         throw new Error('Sandbox instance mismatch');
       }
-      if (next.provider === 'vercel' && parseVercelSandboxRuntimeConfig(this.env) === undefined) {
+      const isByoc = binding.kind === 'vercel' && binding.source.kind === 'byoc';
+      if (
+        !isByoc &&
+        next.provider === 'vercel' &&
+        parseVercelSandboxRuntimeConfig(this.env) === undefined
+      ) {
         throw new Error('Vercel sandbox runtime configuration is unavailable');
       }
       await this.ctx.storage.put({
         [PROVIDER_KIND_KEY]: next.provider,
         [PROVIDER_CONFIGURATION_KEY]: next,
+        [PROVIDER_BINDING_KEY]: binding,
       });
-      return next;
+      return { next, binding };
     });
-    this.providerKind = configuration.provider;
+    this.providerBinding = committed.binding;
     this.vercelResources =
-      configuration.provider === 'vercel' ? configuration.resources : undefined;
+      committed.next.provider === 'vercel' ? committed.next.resources : undefined;
     this.containersInstance =
-      configuration.provider === 'cloudflare-containers' ? configuration.instance : undefined;
-    this.provider = this.createProviderAdapter(
-      configuration.provider,
-      await this.readCanonicalAllocation()
-    );
+      committed.next.provider === 'cloudflare-containers' ? committed.next.instance : undefined;
+    if (!this.isByocBinding()) {
+      this.provider = this.createProviderAdapter(
+        committed.next.provider,
+        await this.readCanonicalAllocation()
+      );
+    }
+    return committed.binding;
   }
 
   private async billingInput(
@@ -3292,6 +3909,7 @@ export class SandboxControl extends DurableObject<Env> {
     supplied?: SandboxBillingInput,
     worktreeId?: string
   ): Promise<SandboxBillingInput | undefined> {
+    if (this.isByocBinding()) return undefined;
     const raw = await this.ctx.storage.get<unknown>(BILLING_INPUT_KEY);
     const stored = raw === undefined ? undefined : parseSandboxBillingInput(raw);
     let input = supplied === undefined ? stored : parseSandboxBillingInput(supplied);
@@ -3363,6 +3981,10 @@ export class SandboxControl extends DurableObject<Env> {
   private async handleInfrastructureDeadline(id: ControlAlarmAnchorId): Promise<void> {
     if (id === 'socketHandshake') {
       this.socketHandler.closeProvisionalSockets();
+      return;
+    }
+    if (id === 'byocSnapshotRecovery') {
+      await this.retryByocSnapshotRecovery();
       return;
     }
     if (id === 'credentialExpiry') {
@@ -3692,12 +4314,16 @@ export class SandboxControl extends DurableObject<Env> {
       return;
     }
     const providerRef = state.target.providerRef;
+    if (this.providerBinding.kind === 'vercel') {
+      const nextLeaseCheckAt = await this.ctx.storage.get<number>(NEXT_LEASE_CHECK_AT_KEY);
+      if (nextLeaseCheckAt !== undefined && nextLeaseCheckAt > Date.now()) return;
+    }
     const startedAt = Date.now();
     let timedOut = false;
     this.logDiagnostic('lease', { ...diagnostic, result: 'started' });
     try {
       await withTimeout(
-        this.provider.ensureLeaseAtLeast(providerRef, leaseAtLeastMs()),
+        (await this.providerFor(state.target)).ensureLeaseAtLeast(providerRef, leaseAtLeastMs()),
         DEADLINE_MS.stopAttempt,
         'Sandbox lease renewal timed out',
         () => {
@@ -3709,6 +4335,7 @@ export class SandboxControl extends DurableObject<Env> {
         result: 'completed',
         durationMs: Date.now() - startedAt,
       });
+      await this.scheduleNextLeaseCheck('renewal', Date.now());
     } catch {
       this.logDiagnostic(
         'lease',
@@ -3720,6 +4347,27 @@ export class SandboxControl extends DurableObject<Env> {
         'warn'
       );
     }
+  }
+
+  /**
+   * The next time a Vercel lease renewal is worth attempting. Renewals extend
+   * the lease by a fixed window, so re-checking before the current window is
+   * close to expiring only burns provider calls. Non-Vercel providers have no
+   * lease and no check.
+   */
+  private async scheduleNextLeaseCheck(phase: 'initial' | 'renewal', now: number): Promise<void> {
+    if (this.providerBinding.kind !== 'vercel') return;
+    const defaults = parseVercelSandboxRuntimeDefaults(this.env);
+    if (!defaults) return;
+    const minimumLeaseMs = leaseAtLeastMs();
+    const delay =
+      phase === 'initial'
+        ? Math.max(0, defaults.initialTimeoutMs - minimumLeaseMs)
+        : Math.min(
+            Math.max(0, defaults.extendDurationMs - minimumLeaseMs),
+            minimumLeaseMs - DEADLINE_MS.idleStopLeaseMargin
+          );
+    await this.ctx.storage.put(NEXT_LEASE_CHECK_AT_KEY, now + delay);
   }
 
   private async onSessionEvent(
@@ -4645,7 +5293,7 @@ export class SandboxControl extends DurableObject<Env> {
     let result: ProviderObservation;
     try {
       result = await withTimeout(
-        this.provider.observe(target?.providerRef ?? null),
+        (await this.providerFor(target ?? undefined)).observe(target?.providerRef ?? null),
         DEADLINE_MS.stopAttempt,
         'Sandbox loss observation timed out',
         () => {
@@ -5046,6 +5694,7 @@ export class SandboxControl extends DurableObject<Env> {
         allocation: record,
         credentialExpiryAt: anchors.credentialExpiryAt,
         socketHandshakeAt: anchors.socketHandshakeAt,
+        byocSnapshotRecoveryAt: anchors.byocSnapshotRecoveryAt ?? null,
       }
     );
   }
@@ -5105,8 +5754,15 @@ export class SandboxControl extends DurableObject<Env> {
       ...(billing === undefined ? {} : { billing }),
       ...(networkPolicy === undefined ? {} : { networkPolicy }),
     };
-    const created = await this.provider.create(intent);
+    let created: Awaited<ReturnType<ProviderAdapter['create']>>;
+    try {
+      created = await (await this.providerFor(target)).create(intent);
+    } catch (error) {
+      await this.recordProviderFailure(error);
+      throw error;
+    }
     if ('unresolved' in created) return { unresolved: true };
+    this.clearObsoleteProviderFailure();
     this.controlLaunchCredential = { providerRef: created.providerRef, credential, intentId };
     return {
       providerRef: created.providerRef,
@@ -5129,10 +5785,17 @@ export class SandboxControl extends DurableObject<Env> {
     if (this.controlAcquisitionDeadline !== null && Date.now() >= this.controlAcquisitionDeadline) {
       throw new Error('Sandbox acquisition expired');
     }
-    await this.provider.launch(
-      input.providerRef,
-      await this.wrapperLaunchEnv(pending.credential, pending.intentId)
-    );
+    try {
+      await (
+        await this.providerFor(input.target)
+      ).launch(
+        input.providerRef,
+        await this.wrapperLaunchEnv(pending.credential, pending.intentId)
+      );
+    } catch (error) {
+      await this.recordProviderFailure(error);
+      throw error;
+    }
   }
 
   private async controlProviderStop(input: {
@@ -5141,11 +5804,17 @@ export class SandboxControl extends DurableObject<Env> {
     incarnation?: string;
   }): Promise<ControlEffectStopResult> {
     const intent = await this.controlCreateIntentFor(input.target);
-    const result = await withTimeout(
-      this.provider.stop(input.target.providerRef, intent),
-      DEADLINE_MS.stopAttempt,
-      'Sandbox stop timed out'
-    );
+    let result: Awaited<ReturnType<ProviderAdapter['stop']>>;
+    try {
+      result = await withTimeout(
+        (await this.providerFor(input.target)).stop(input.target.providerRef, intent),
+        DEADLINE_MS.stopAttempt,
+        'Sandbox stop timed out'
+      );
+    } catch (error) {
+      await this.recordProviderFailure(error);
+      throw error;
+    }
     const wrapper =
       this.readyWrapperRuntime()?.wrapperInstanceId ?? this.activeConnection?.wrapperInstanceId;
     return {
@@ -5162,17 +5831,26 @@ export class SandboxControl extends DurableObject<Env> {
   }): Promise<ControlEffectObserveResult> {
     const intent = await this.controlCreateIntentFor(input.target);
     const observed = await withTimeout(
-      this.provider.observe(input.target.providerRef, intent),
+      (await this.providerFor(input.target)).observe(input.target.providerRef, intent),
       DEADLINE_MS.stopAttempt,
       'Sandbox observation timed out'
     );
     // Carry the discovered reference in the fence so the reducer can adopt it
     // when the target never bound one (by-name observation of a lost create).
+    const providerRef = observed.providerRef ?? input.target.providerRef;
+    const recoverable = this.isByocBinding() && observed.status === 'active';
     return {
       status: observed.status,
-      providerRef: observed.providerRef ?? input.target.providerRef,
+      providerRef,
       incarnation:
         input.incarnation ?? intent?.intentId ?? input.target.providerRef ?? this.sandboxId,
+      ...(recoverable ? { recoverable: true } : {}),
+      // The recovery policy also binds the create intent's containment to the
+      // adopted reference, using the same formula as the create effect, so the
+      // reducer never re-derives it.
+      ...(recoverable && providerRef !== null && input.target.containment !== undefined
+        ? { resolvedContainment: { ...input.target.containment, providerRef } }
+        : {}),
     };
   }
 

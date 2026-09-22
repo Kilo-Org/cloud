@@ -263,6 +263,7 @@ export function terminalMessageState(
     gateResult?: GateResult;
     assistantReason?: CloudAgentAssistantFailureReason;
     providerOwnership?: CloudAgentProviderOwnership;
+    error?: string;
   }
 ): MessageState {
   const carry = carryFields(previous);
@@ -294,6 +295,7 @@ export function terminalMessageState(
       source,
       ...(extra.reason !== undefined ? { reason: extra.reason } : {}),
       ...(extra.detail !== undefined ? { detail: extra.detail } : {}),
+      ...(extra.error !== undefined ? { error: extra.error } : {}),
       ...(extra.assistantReason !== undefined ? { assistantReason: extra.assistantReason } : {}),
       ...(extra.providerOwnership !== undefined
         ? { providerOwnership: extra.providerOwnership }
@@ -500,6 +502,7 @@ export function decideSession(
           gateResult: event.gateResult,
           assistantReason: event.assistantReason,
           providerOwnership: event.providerOwnership,
+          error: event.error,
         }),
       }));
       return deadlined(next);

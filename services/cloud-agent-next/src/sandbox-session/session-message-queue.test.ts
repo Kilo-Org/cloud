@@ -55,6 +55,8 @@ import {
   createSessionMessageRecord,
   failAcceptedMessage,
   failQueuedMessage,
+  failWaitingMessages,
+  failedErrorOf as failedErrorOfMessage,
   failedReasonOf as failedReasonOfMessage,
   freezeLegacyQueuedMessages,
   getSessionMessageTurn,
@@ -80,6 +82,7 @@ import {
   type SessionOperationProof,
 } from './session-message-queue.js';
 import { acceptedState, queuedState, terminalState } from './session-state.test-helpers.js';
+import { classifyAssistantFailureMessage } from '../shared/assistant-failure.js';
 import type {
   AcceptedMessageState,
   CancelledMessageState,
@@ -201,6 +204,10 @@ function activeWrapperInstanceId(record: SessionMessage | undefined): string | u
 
 function failedReasonOf(record: SessionMessage | undefined): string | undefined {
   return record ? failedReasonOfMessage(record) : undefined;
+}
+
+function failedErrorOf(record: SessionMessage | undefined): string | undefined {
+  return record ? failedErrorOfMessage(record) : undefined;
 }
 
 function terminalSourceOf(
@@ -1197,6 +1204,32 @@ describe('applyMessageOutcome', () => {
     expect(message?.state).not.toHaveProperty('providerOwnership');
   });
 
+  it('persists the classified user-safe error on a failed outcome', () => {
+    const before = [acceptedWith('a', { acceptedAt: 0, wrapperInstanceId: 'runtime' })];
+    const next = applyMessageOutcome(
+      boundAggregate(before),
+      { messageId: 'a', status: 'failed', reason: 'rate_limited' },
+      'runtime',
+      30
+    );
+    const message = next?.messages.find(item => item.messageId === 'a');
+    expect(message?.state.kind).toBe('failed');
+    expect(failedErrorOf(message)).toBe(classifyAssistantFailureMessage('rate_limited'));
+  });
+
+  it('leaves the error key absent when a failed outcome carries no reason', () => {
+    const before = [acceptedWith('a', { acceptedAt: 0, wrapperInstanceId: 'runtime' })];
+    const next = applyMessageOutcome(
+      boundAggregate(before),
+      { messageId: 'a', status: 'failed' },
+      'runtime',
+      30
+    );
+    const message = next?.messages.find(item => item.messageId === 'a');
+    expect(message?.state.kind).toBe('failed');
+    expect(failedErrorOf(message)).toBeUndefined();
+  });
+
   it.each(['completed', 'cancelled'] as const)(
     'stores no assistant facts on a %s outcome that carries them',
     status => {
@@ -1430,6 +1463,36 @@ describe('recordAcceptedMessageActivity', () => {
     expect(
       recordAcceptedMessageActivity([msg('a', 'queued'), msg('b', 'completed')], 30)
     ).toBeUndefined();
+  });
+
+  it('does not rewind a newer activity timestamp', () => {
+    const messages: SessionMessage[] = [acceptedWith('a', { acceptedAt: 10, lastActivityAt: 50 })];
+    const next = recordAcceptedMessageActivity(messages, 30);
+    expect(next?.[0]?.state.kind === 'accepted' ? next[0].state.lastActivityAt : undefined).toBe(
+      50
+    );
+  });
+});
+
+describe('failWaitingMessages', () => {
+  it('stores the caller-supplied terminal error and timestamp', () => {
+    const result = failWaitingMessages(
+      [queuedWith('a'), queuedWith('b')],
+      'byoc_vercel_not_ready',
+      undefined,
+      true,
+      { timestamp: 123, error: 'Environment is not ready' }
+    );
+    expect(result.failedIds).toEqual(['a', 'b']);
+    expect(failedReasonOf(result.messages[0])).toBe('byoc_vercel_not_ready');
+    expect(failedErrorOf(result.messages[0])).toBe('Environment is not ready');
+    expect(terminalAtOf(result.messages[0])).toBe(123);
+  });
+
+  it('leaves the error key absent when the caller supplies no terminal', () => {
+    const result = failWaitingMessages([queuedWith('a')], 'environment_failed');
+    expect(failedReasonOf(result.messages[0])).toBe('environment_failed');
+    expect(failedErrorOf(result.messages[0])).toBeUndefined();
   });
 });
 
@@ -7687,6 +7750,54 @@ describe('SandboxSession orchestration', () => {
         payload: expect.objectContaining({ finalization }),
       })
     );
+  });
+
+  it('preserves a BYOC Vercel binding through initial admission and rejects a rebind', async () => {
+    const binding = {
+      kind: 'vercel' as const,
+      source: {
+        kind: 'byoc' as const,
+        organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        credentialId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      },
+    };
+    const fixture = sessionFixture({
+      workspace: {
+        sandboxId: SANDBOX_ID,
+        workspacePath: DIRECTORY,
+        sandboxProvider: 'vercel',
+        sandboxProviderBinding: binding,
+      },
+    });
+    fixture.values.delete('session_metadata');
+    const messageId = 'msg_123456789abcABCDEFGHIJKLMN';
+    const input = {
+      identity: fixture.metadata.identity,
+      auth: fixture.metadata.auth,
+      agent: fixture.metadata.agent,
+      workspace: fixture.metadata.workspace,
+      message: {
+        initialTurn: { type: 'prompt' as const, messageId, prompt: 'Initial BYOC prompt' },
+      },
+    };
+    await expect(fixture.session.createSessionWithInitialAdmission(input)).resolves.toMatchObject({
+      success: true,
+    });
+    expect((await fixture.session.getMetadata())?.workspace?.sandboxProviderBinding).toEqual(
+      binding
+    );
+    await expect(
+      fixture.session.createSessionWithInitialAdmission({
+        ...input,
+        workspace: {
+          ...fixture.metadata.workspace,
+          sandboxProviderBinding: {
+            ...binding,
+            source: { ...binding.source, credentialId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' },
+          },
+        },
+      })
+    ).resolves.toMatchObject({ success: false, code: 'BAD_REQUEST' });
   });
 
   it.each([

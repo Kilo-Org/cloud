@@ -129,11 +129,6 @@ export type ControlDispatchDisposition =
   | { action: 'wait' }
   | { action: 'fail'; reason: QueueFailureReason };
 
-type ControlStatus = {
-  connection: ConnectionState;
-  physical: PhysicalState;
-};
-
 export type QueueFailureReason =
   | 'environment_failed'
   | 'provider_unknown'
@@ -142,13 +137,31 @@ export type QueueFailureReason =
   | 'accepted_overdue'
   | 'preparation_timeout'
   | 'runtime_unhealthy'
-  | 'missing_metadata';
+  | 'missing_metadata'
+  | 'byoc_credential_missing'
+  | 'byoc_vercel_not_ready'
+  | 'byoc_vercel_forbidden'
+  | 'byoc_vercel_capacity';
+
+type ControlStatus = {
+  connection: ConnectionState;
+  physical: PhysicalState;
+  failureReason?: Extract<
+    QueueFailureReason,
+    | 'byoc_credential_missing'
+    | 'byoc_vercel_not_ready'
+    | 'byoc_vercel_forbidden'
+    | 'byoc_vercel_capacity'
+    | 'environment_failed'
+  >;
+};
 
 export function controlDispatchDisposition(status: ControlStatus): ControlDispatchDisposition {
   // `unknown` is the only physical state from which creating a replacement is
   // not a legal next step; observation is the whole budget. Everything else
   // waits for the applicable head deadline so a stopped/failed allocation can
   // still be realized as a replacement (chunk 2 owns the create).
+  if (status.failureReason !== undefined) return { action: 'fail', reason: status.failureReason };
   if (status.physical === 'unknown') return { action: 'fail', reason: 'provider_unknown' };
   if (status.physical === 'failed' || status.physical === 'stopped') return { action: 'wait' };
   if (status.physical === 'stopping') return { action: 'wait' };
@@ -184,7 +197,7 @@ export async function observeControlAfterStopping(
     options.sleep ??
     (milliseconds => new Promise<void>(resolve => setTimeout(resolve, milliseconds)));
 
-  while (status.physical === 'stopping') {
+  while (status.physical === 'stopping' && status.failureReason === undefined) {
     const remaining = options.deadline - now();
     if (remaining <= 0) return undefined;
     await sleep(Math.min(options.retryMs, remaining));
@@ -210,6 +223,14 @@ export function safeErrorFromQueueReason(reason: string): string {
       return 'Environment preparation timed out';
     case 'runtime_unhealthy':
       return 'The session runtime stopped responding';
+    case 'byoc_credential_missing':
+      return 'Vercel credentials were removed. Reconfigure compute and start a new session.';
+    case 'byoc_vercel_not_ready':
+      return 'Vercel compute setup is not ready. Finish setup or contact an organization admin.';
+    case 'byoc_vercel_forbidden':
+      return 'Vercel access was denied. Check the token, team, and project permissions.';
+    case 'byoc_vercel_capacity':
+      return 'Vercel capacity or spend limits blocked this sandbox. Check the project limits.';
     default:
       return 'Environment failed';
   }

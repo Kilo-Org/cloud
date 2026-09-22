@@ -19,6 +19,7 @@ import {
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
+  getSandboxProviderBinding,
   getSandboxProvider,
   parseSessionMetadata,
   serializeSessionMetadata,
@@ -28,7 +29,8 @@ import {
   sessionRuntimeLocator,
   type SessionRuntimeLocator,
 } from '../sandbox-control/worktree-ownership.js';
-import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
+import { sameSandboxProviderBinding } from '../sandbox-provider-binding.js';
+import { validateModeAgainstRuntimeAgents, type SessionProfileBundle } from '../session-profile.js';
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
 import { projectTerminalClientError } from '../session/terminal-error-projector.js';
@@ -36,7 +38,7 @@ import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { commandQueue, events, executionLeases } from '../db/sqlite-schema.js';
 import { logger } from '../logger.js';
-import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
+import { Limits } from '../schema.js';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
 import {
@@ -243,18 +245,6 @@ type TerminalSizeInput = {
 
 type TerminalCreateInput = Partial<TerminalSizeInput>;
 
-function validateModeAgainstRuntimeAgents(
-  metadata: SessionMetadata,
-  mode = metadata.agent?.mode
-): string | null {
-  if (!mode || BUILTIN_AGENT_MODES.has(mode)) return null;
-
-  const knownSlugs = new Set((readProfileBundle(metadata).runtimeAgents ?? []).map(a => a.slug));
-  if (knownSlugs.has(mode)) return null;
-
-  return `Mode "${mode}" is not a built-in and does not match any runtimeAgents on this session`;
-}
-
 /**
  * Concatenate text content from assistant message parts.
  * Parts have a loose `Record<string, unknown>` type; only include those with
@@ -319,6 +309,7 @@ type GroupedRegisterSessionInput = {
     | 'sandboxId'
     | 'sandboxRoute'
     | 'sandboxProvider'
+    | 'sandboxProviderBinding'
     | 'shallow'
     | 'credentialContainment'
     | 'devcontainerRequested'
@@ -870,6 +861,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       this.sandboxLifecycle = createAgentSandboxLifecycle(this.env, {
         storage: this.ctx.storage,
         runtimeContext: this.getAgentSandboxRuntimeContext(),
+        getProviderBinding: async () => {
+          const metadata = await this.getStoredMetadata();
+          return metadata ? getSandboxProviderBinding(metadata) : undefined;
+        },
         scheduleAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
         eraseDurableObjectState: () => this.eraseDurableObjectState(),
         purgeDeletedSessionPayload: () => this.purgeDeletedSessionPayload(),
@@ -2172,7 +2167,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       if (existingMetadata.clone?.reportingCreatedAt && existingMetadata.initialMessage?.id) {
         newMetadata.initialMessage = existingMetadata.initialMessage;
       }
-      if (getSandboxProvider(existingMetadata) !== getSandboxProvider(newMetadata)) {
+      if (
+        !sameSandboxProviderBinding(
+          getSandboxProviderBinding(existingMetadata),
+          getSandboxProviderBinding(newMetadata)
+        )
+      ) {
         throw new Error('Registered sandbox provider cannot be changed');
       }
       if (existingMetadata.workspace?.sandboxId !== newMetadata.workspace?.sandboxId) {
@@ -2980,6 +2980,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         ...input.workspace,
         sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
         branchName: repository?.upstreamBranch ?? `kilo/${generateBranchSlug()}`,
+        sandboxProviderBinding: input.workspace?.sandboxProviderBinding,
       },
       lifecycle: {
         version: now,

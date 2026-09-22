@@ -123,4 +123,34 @@ describe('diagnosticDetail', () => {
       detail: 'feed_failed',
     });
   });
+
+  it('keeps outbox expiry comparison fields on control.event records', () => {
+    const record = createControlDiagnosticRecord(
+      'control.event',
+      {
+        phase: 'started',
+        category: 'session_event',
+        sessionId: 'ses_root',
+        receiptId: '11111111-1111-4111-8111-111111111111',
+        sequence: 1691,
+        deadlineAt: 31_000,
+        overdueMs: 0,
+        queueDepth: 1,
+        publishInFlight: true,
+        outboxPaused: false,
+        timedOut: true,
+      },
+      31_000
+    );
+    expect(record?.fields).toMatchObject({
+      receiptId: '11111111-1111-4111-8111-111111111111',
+      sequence: 1691,
+      deadlineAt: 31_000,
+      overdueMs: 0,
+      queueDepth: 1,
+      publishInFlight: true,
+      outboxPaused: false,
+      timedOut: true,
+    });
+  });
 });

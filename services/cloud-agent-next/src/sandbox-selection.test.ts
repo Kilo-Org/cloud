@@ -251,6 +251,35 @@ describe('sandbox selection policy', () => {
     }
   );
 
+  it('advertises only Vercel allocations to BYOC-enrolled organizations', () => {
+    const env = { ...configured, BYOC_VERCEL_ORG_IDS: owner.orgId } as Env;
+    expect(
+      getSandboxSelectionCapabilities(env, owner).options.map(option => option.allocation)
+    ).toEqual([
+      getSandboxAllocationRequest('vercel-small'),
+      getSandboxAllocationRequest('vercel-large'),
+    ]);
+    for (const preset of ['cloudflare-single', 'cloudflare-shared'] as const) {
+      expect(() => assertSandboxAllocationAvailable(env, owner, preset)).toThrow(
+        'cannot select non-Vercel allocations'
+      );
+    }
+    expect(() => assertSandboxAllocationAvailable(env, owner, 'vercel-small')).not.toThrow();
+  });
+
+  it('keeps Cloudflare allocations for personal sessions under a BYOC wildcard', () => {
+    const env = {
+      ...configured,
+      SANDBOX_SELECTION_IDS: '*',
+      BYOC_VERCEL_ORG_IDS: '*',
+    } as Env;
+    expect(
+      getSandboxSelectionCapabilities(env, { userId: owner.userId }).options.map(
+        option => option.allocation
+      )
+    ).toContainEqual(getSandboxAllocationRequest('cloudflare-single'));
+  });
+
   it('fails Vercel closed for enforced organization billing', () => {
     const env = {
       ...configured,

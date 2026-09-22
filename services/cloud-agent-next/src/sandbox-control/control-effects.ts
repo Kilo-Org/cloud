@@ -47,6 +47,8 @@ export type ObserveEffectResult = {
   outcome: 'absent' | 'present';
   providerRef: string | null;
   incarnation: string;
+  recoverable?: boolean;
+  resolvedContainment?: AllocationContainment;
 };
 
 export type ReconcileEffectResult =
@@ -233,6 +235,10 @@ export async function executeCommand(
             result.incarnation ?? command.incarnation
           ),
           result: result.outcome,
+          ...(result.recoverable === true ? { recoverable: true } : {}),
+          ...(result.resolvedContainment !== undefined
+            ? { resolvedContainment: result.resolvedContainment }
+            : {}),
         };
       } catch {
         // No "observation failed" event exists; the state deadline re-drives it.

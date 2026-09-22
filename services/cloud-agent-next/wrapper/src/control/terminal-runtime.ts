@@ -101,6 +101,22 @@ function sameSession(left: SessionRequestIdentity, right: SessionRequestIdentity
   );
 }
 
+const SESSION_UNAUTHORIZED = {
+  shutDown: 'Session runtime is shut down',
+  kiloRuntimeMissing: 'Session kilo runtime missing',
+  directoryMapMismatch: 'Session directory map mismatch',
+  rootMapMismatch: 'Session root map mismatch',
+  kiloSessionMismatch: 'Session kilo session mismatch',
+  attachedDirectoryMismatch: 'Session attached directory mismatch',
+  staleKiloRuntime: 'Session stale kilo runtime',
+  duplicateKiloSession: 'Session duplicate kilo session',
+  wrapperMismatch: 'Session wrapper mismatch',
+} as const;
+
+function rejectUnauthorized(reason: keyof typeof SESSION_UNAUTHORIZED): never {
+  throw new ControlTerminalRuntimeError('unauthorized', SESSION_UNAUTHORIZED[reason], false);
+}
+
 function safeKiloFailure(error: unknown, message: string): ControlTerminalRuntimeError {
   if (error instanceof ControlTerminalRuntimeError) return error;
   return new ControlTerminalRuntimeError('not_ready', message, isKiloServerUnreachableError(error));
@@ -177,18 +193,14 @@ export function createControlTerminalRuntime(options: {
     if (!attached || shutDown || recoveringSessions.has(identity.sessionId)) {
       throw new ControlTerminalRuntimeError('not_ready', 'Terminal session is not attached', true);
     }
-    if (
-      attached.wrapperInstanceId !== wrapperInstanceId ||
-      !sameSession(attached, identity) ||
-      directoryForSession(identity.kiloSessionId) !== identity.directory ||
-      rootForSession(identity.kiloSessionId) !== identity.kiloSessionId
-    ) {
-      throw new ControlTerminalRuntimeError(
-        'unauthorized',
-        'Terminal session ownership mismatch',
-        false
-      );
-    }
+    if (attached.wrapperInstanceId !== wrapperInstanceId) rejectUnauthorized('wrapperMismatch');
+    if (attached.kiloSessionId !== identity.kiloSessionId)
+      rejectUnauthorized('kiloSessionMismatch');
+    if (attached.directory !== identity.directory) rejectUnauthorized('attachedDirectoryMismatch');
+    if (directoryForSession(identity.kiloSessionId) !== identity.directory)
+      rejectUnauthorized('directoryMapMismatch');
+    if (rootForSession(identity.kiloSessionId) !== identity.kiloSessionId)
+      rejectUnauthorized('rootMapMismatch');
     const runtime = options.getKiloRuntime(identity);
     if (
       !runtime ||
@@ -391,13 +403,9 @@ export function createControlTerminalRuntime(options: {
   async function detachSession(identity: SessionRequestIdentity): Promise<void> {
     const attached = attachedSessions.get(identity.sessionId);
     if (!attached) return;
-    if (!sameSession(attached, identity)) {
-      throw new ControlTerminalRuntimeError(
-        'unauthorized',
-        'Terminal session ownership mismatch',
-        false
-      );
-    }
+    if (attached.kiloSessionId !== identity.kiloSessionId)
+      rejectUnauthorized('kiloSessionMismatch');
+    if (attached.directory !== identity.directory) rejectUnauthorized('attachedDirectoryMismatch');
 
     attachedSessions.delete(identity.sessionId);
 
@@ -461,43 +469,25 @@ export function createControlTerminalRuntime(options: {
   return {
     rememberAttachedSession(identity) {
       const kiloRuntime = options.getKiloRuntime(identity);
-      if (shutDown || !kiloRuntime) {
-        throw new ControlTerminalRuntimeError(
-          'unauthorized',
-          'Terminal session runtime unavailable',
-          false
-        );
-      }
+      if (shutDown) rejectUnauthorized('shutDown');
+      if (!kiloRuntime) rejectUnauthorized('kiloRuntimeMissing');
       if (
         kiloRuntime.isolation === 'per-session' &&
         (!kiloRuntime.identity || !sameSession(kiloRuntime.identity, identity))
       ) {
-        throw new ControlTerminalRuntimeError(
-          'unauthorized',
-          'Terminal session ownership mismatch',
-          false
-        );
+        rejectUnauthorized('kiloSessionMismatch');
       }
-      if (
-        directoryForSession(identity.kiloSessionId) !== identity.directory ||
-        rootForSession(identity.kiloSessionId) !== identity.kiloSessionId
-      ) {
-        throw new ControlTerminalRuntimeError(
-          'unauthorized',
-          'Terminal session belongs to another session',
-          false
-        );
-      }
+      if (directoryForSession(identity.kiloSessionId) !== identity.directory)
+        rejectUnauthorized('directoryMapMismatch');
+      if (rootForSession(identity.kiloSessionId) !== identity.kiloSessionId)
+        rejectUnauthorized('rootMapMismatch');
 
       const existing = attachedSessions.get(identity.sessionId);
       if (existing) {
-        if (!sameSession(existing, identity)) {
-          throw new ControlTerminalRuntimeError(
-            'unauthorized',
-            'Terminal session belongs to another session',
-            false
-          );
-        }
+        if (existing.kiloSessionId !== identity.kiloSessionId)
+          rejectUnauthorized('kiloSessionMismatch');
+        if (existing.directory !== identity.directory)
+          rejectUnauthorized('attachedDirectoryMismatch');
         if (existing.wrapperInstanceId !== wrapperInstanceId) {
           existing.wrapperInstanceId = wrapperInstanceId;
         }
@@ -505,13 +495,8 @@ export function createControlTerminalRuntime(options: {
       }
 
       for (const attached of attachedSessions.values()) {
-        if (attached.kiloSessionId === identity.kiloSessionId) {
-          throw new ControlTerminalRuntimeError(
-            'unauthorized',
-            'Terminal session belongs to another session',
-            false
-          );
-        }
+        if (attached.kiloSessionId === identity.kiloSessionId)
+          rejectUnauthorized('duplicateKiloSession');
       }
 
       attachedSessions.set(identity.sessionId, { ...identity, wrapperInstanceId });

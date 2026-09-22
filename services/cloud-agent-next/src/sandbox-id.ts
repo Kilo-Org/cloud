@@ -64,6 +64,8 @@ export type SandboxRoutingOptions = {
   sandboxAllocation?: SandboxAllocation;
   devcontainer?: boolean;
   createdOnPlatform?: string;
+  /** BYOC Vercel is intrinsically isolated and never uses a shared owner route. */
+  byoc?: boolean;
 };
 
 /**
@@ -430,6 +432,9 @@ export async function generateSandboxRoutingTarget(
   }
   if (routingOptions.createdOnPlatform === 'code-review') {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'crv') };
+  }
+  if (routingOptions.byoc) {
+    return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };
   }
   if (allocation !== 'cloudflare-shared' && isOrgInList(perSessionOrgIds, orgId)) {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };

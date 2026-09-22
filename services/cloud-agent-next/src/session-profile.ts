@@ -1,6 +1,7 @@
 import type { SessionProfileBundle } from './persistence/schemas.js';
 import type { CloudAgentSessionState } from './persistence/types.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
+import { BUILTIN_AGENT_MODES } from './schema.js';
 
 export type { SessionProfileBundle } from './persistence/schemas.js';
 
@@ -27,4 +28,21 @@ export function readProfileBundle(
  */
 export function profileFromMetadata(metadata: CloudAgentSessionState): SessionProfileBundle {
   return readProfileBundle(metadata);
+}
+
+/**
+ * A mode is valid when it is built in or matches a runtime agent installed on
+ * the session. Both the legacy and the control-plane admission paths use this
+ * single check.
+ */
+export function validateModeAgainstRuntimeAgents(
+  metadata: Pick<SessionMetadata, 'agent' | 'profile'>,
+  mode = metadata.agent?.mode
+): string | null {
+  if (!mode || BUILTIN_AGENT_MODES.has(mode)) return null;
+
+  const knownSlugs = new Set((readProfileBundle(metadata).runtimeAgents ?? []).map(a => a.slug));
+  if (knownSlugs.has(mode)) return null;
+
+  return `Mode "${mode}" is not a built-in and does not match any runtimeAgents on this session`;
 }

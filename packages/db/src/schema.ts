@@ -152,6 +152,11 @@ import type {
   OrganizationSettings,
   AuditLogAction,
   EncryptedData,
+  VercelComputeCredentialEnvelope,
+  VercelComputeSetupStatus,
+  VercelComputeTokenScope,
+  VercelComputeSetupStep,
+  VercelComputeUpgradeStatus,
   AuthProviderId,
   AbuseClassification,
   PlatformRepository,
@@ -3864,6 +3869,71 @@ export const organization_memberships = pgTable(
 );
 
 export type OrganizationMembership = typeof organization_memberships.$inferSelect;
+
+export const organization_vercel_compute_credentials = pgTable(
+  'organization_vercel_compute_credentials',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    token_encrypted: jsonb().$type<VercelComputeCredentialEnvelope>().notNull(),
+    token_scope: text().$type<VercelComputeTokenScope>().notNull().default('team'),
+    team_id: text().notNull(),
+    project_id: text().notNull(),
+    team_slug: text(),
+    project_slug: text(),
+    setup_status: text().$type<VercelComputeSetupStatus>().notNull().default('pending'),
+    setup_step: text().$type<VercelComputeSetupStep>(),
+    setup_error: text(),
+    build_generation: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`),
+    runtime_build_id: text(),
+    runtime_snapshot_id: text(),
+    runtime_wrapper_version: text(),
+    runtime_released_at: text(),
+    runtime_digest: text(),
+    upgrade_status: text().$type<VercelComputeUpgradeStatus>(),
+    upgrade_step: text().$type<VercelComputeSetupStep>(),
+    upgrade_error: text(),
+    setup_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    setup_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_organization_vercel_compute_credentials_organization').on(table.organization_id),
+    check(
+      'organization_vercel_compute_credentials_ids_non_empty',
+      sql`length(trim(${table.team_id})) > 0 AND length(trim(${table.project_id})) > 0`
+    ),
+    check(
+      'organization_vercel_compute_credentials_token_scope_check',
+      sql`${table.token_scope} IN ('team', 'project')`
+    ),
+    check(
+      'organization_vercel_compute_credentials_status_check',
+      sql`${table.setup_status} IN ('pending', 'building', 'ready', 'failed')`
+    ),
+    check(
+      'organization_vercel_compute_credentials_ready_fields_check',
+      sql`${table.setup_status} <> 'ready' OR (${table.runtime_snapshot_id} IS NOT NULL AND ${table.project_slug} IS NOT NULL AND ${table.setup_completed_at} IS NOT NULL)`
+    ),
+    check(
+      'organization_vercel_compute_credentials_upgrade_status_check',
+      sql`${table.upgrade_status} IS NULL OR ${table.upgrade_status} IN ('pending', 'building', 'failed')`
+    ),
+  ]
+);
+
+export type OrganizationVercelComputeCredential =
+  typeof organization_vercel_compute_credentials.$inferSelect;
+export type NewOrganizationVercelComputeCredential =
+  typeof organization_vercel_compute_credentials.$inferInsert;
 
 export const organization_groups = pgTable(
   'organization_groups',

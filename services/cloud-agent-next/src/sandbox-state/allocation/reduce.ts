@@ -319,6 +319,13 @@ export const ALLOCATION_TRANSITIONS: readonly TransitionMeta[] = [
   {
     from: 'unknown',
     event: 'OBSERVED',
+    to: 'allocated.connecting',
+    commands: [],
+    deadline: 'connect',
+  },
+  {
+    from: 'unknown',
+    event: 'OBSERVED',
     to: 'stopping.destroying',
     commands: EFFECT_COMMANDS,
     deadline: 'destroy',
@@ -944,6 +951,33 @@ export function decideAllocation(
             target.providerRef === null && discovered !== null
               ? { ...target, providerRef: discovered }
               : target;
+          // A failed allocation observed active is normally quarantined: the
+          // state is not trusted and the sandbox is destroyed. A recoverable
+          // binding (BYOC Vercel, running on the customer's account) instead
+          // adopts the live allocation and reconnects, provided no cleanup
+          // episode is already attached.
+          if (
+            event.recoverable === true &&
+            state.stopIntent === null &&
+            adopted.providerRef !== null
+          ) {
+            const health = connectingAt(adopted.providerRef, now);
+            // The policy that decided recovery also bound the create intent's
+            // containment to the adopted reference; copy it exactly as
+            // `CREATE_CONFIRMED` does. Readiness matches an allocated target only
+            // through its reference-bound `resolvedContainment`, so a missing
+            // binding would stop the recovered allocation as unusable.
+            const recovered: AllocationTarget =
+              event.resolvedContainment === undefined
+                ? adopted
+                : { ...adopted, resolvedContainment: event.resolvedContainment };
+            const allocated = allocatedConnecting(recovered, state.createIntent, health);
+            return {
+              state: { v: 2, resumable: record.resumable, state: allocated },
+              commands: [],
+              deadlineAt: health.deadlineAt,
+            };
+          }
           const stopping = enterStopping(
             adopted,
             state.createIntent,

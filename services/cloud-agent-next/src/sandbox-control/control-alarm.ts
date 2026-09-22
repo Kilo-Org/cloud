@@ -1,9 +1,9 @@
 /**
  * The control DO's single alarm. It composes `alarmAt` from the canonical
  * allocation deadline (`sandbox-state/schedule.ts`) plus the infrastructure
- * anchors the allocation machine does not own (the socket-handshake and
- * credential deadlines), and it is the only module that calls `setAlarm` /
- * `deleteAlarm`.
+ * anchors the allocation machine does not own (the socket-handshake, credential
+ * and BYOC snapshot-recovery deadlines), and it is the only module that calls
+ * `setAlarm` / `deleteAlarm`.
  *
  * The infrastructure anchors are owned here, under their own storage key. The
  * only read of the legacy deadline table is the one-time pre-cutover import
@@ -32,12 +32,17 @@ export type AlarmScheduler = {
   deleteAlarm(): Promise<void>;
 };
 
-/** The two infrastructure anchors the canonical allocation machine does not own. */
-export type ControlAlarmAnchorId = 'credentialExpiry' | 'socketHandshake';
+/** The infrastructure anchors the canonical allocation machine does not own. */
+export type ControlAlarmAnchorId = 'credentialExpiry' | 'socketHandshake' | 'byocSnapshotRecovery';
 
 export type ControlAlarmAnchorState = {
   credentialExpiryAt: number | null;
   socketHandshakeAt: number | null;
+  /**
+   * Optional so a state persisted before this anchor existed still parses
+   * instead of discarding the other anchors.
+   */
+  byocSnapshotRecoveryAt?: number | null;
 };
 
 export type ControlAlarmAnchors = {
@@ -45,6 +50,7 @@ export type ControlAlarmAnchors = {
   allocation: AllocationRecord | null;
   credentialExpiryAt: number | null;
   socketHandshakeAt: number | null;
+  byocSnapshotRecoveryAt?: number | null;
 };
 
 type AnchorStorage = {
@@ -60,6 +66,7 @@ type SyncAnchorStorage = {
 const controlAlarmAnchorStateSchema = z.object({
   credentialExpiryAt: z.number().int().nonnegative().nullable(),
   socketHandshakeAt: z.number().int().nonnegative().nullable(),
+  byocSnapshotRecoveryAt: z.number().int().nonnegative().nullable().optional(),
 });
 
 export function emptyControlAlarmAnchors(): ControlAlarmAnchorState {
@@ -70,7 +77,9 @@ export function controlAlarmAnchorAt(
   anchors: ControlAlarmAnchorState,
   id: ControlAlarmAnchorId
 ): number | null {
-  return id === 'credentialExpiry' ? anchors.credentialExpiryAt : anchors.socketHandshakeAt;
+  if (id === 'credentialExpiry') return anchors.credentialExpiryAt;
+  if (id === 'socketHandshake') return anchors.socketHandshakeAt;
+  return anchors.byocSnapshotRecoveryAt ?? null;
 }
 
 export async function loadControlAlarmAnchors(
@@ -121,7 +130,9 @@ export async function setControlAlarmAnchor(
   const next: ControlAlarmAnchorState =
     id === 'credentialExpiry'
       ? { ...current, credentialExpiryAt: at }
-      : { ...current, socketHandshakeAt: at };
+      : id === 'socketHandshake'
+        ? { ...current, socketHandshakeAt: at }
+        : { ...current, byocSnapshotRecoveryAt: at };
   await storage.put(CONTROL_ALARM_ANCHORS_KEY, next);
   return next;
 }
@@ -142,7 +153,9 @@ export function setControlAlarmAnchorSync(
   const next: ControlAlarmAnchorState =
     id === 'credentialExpiry'
       ? { ...current, credentialExpiryAt: at }
-      : { ...current, socketHandshakeAt: at };
+      : id === 'socketHandshake'
+        ? { ...current, socketHandshakeAt: at }
+        : { ...current, byocSnapshotRecoveryAt: at };
   storage.put(CONTROL_ALARM_ANCHORS_KEY, next);
   return next;
 }
@@ -159,6 +172,13 @@ export function dueControlAlarmAnchors(
   if (anchors.socketHandshakeAt !== null && anchors.socketHandshakeAt <= now) {
     due.push({ id: 'socketHandshake', at: anchors.socketHandshakeAt });
   }
+  if (
+    anchors.byocSnapshotRecoveryAt !== null &&
+    anchors.byocSnapshotRecoveryAt !== undefined &&
+    anchors.byocSnapshotRecoveryAt <= now
+  ) {
+    due.push({ id: 'byocSnapshotRecovery', at: anchors.byocSnapshotRecoveryAt });
+  }
   return due.sort((a, b) => a.at - b.at).map(entry => entry.id);
 }
 
@@ -171,6 +191,9 @@ export function composeControlAlarmAt(anchors: ControlAlarmAnchors): number | nu
   }
   if (anchors.credentialExpiryAt !== null) candidates.push(anchors.credentialExpiryAt);
   if (anchors.socketHandshakeAt !== null) candidates.push(anchors.socketHandshakeAt);
+  if (anchors.byocSnapshotRecoveryAt !== null && anchors.byocSnapshotRecoveryAt !== undefined) {
+    candidates.push(anchors.byocSnapshotRecoveryAt);
+  }
   return candidates.length === 0 ? null : Math.min(...candidates);
 }
 

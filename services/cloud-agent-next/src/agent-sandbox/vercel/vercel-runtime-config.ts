@@ -24,6 +24,8 @@ const runtimeConfigSchema = z.object({
 export type VercelSandboxRuntimeConfig = {
   accessToken: string;
   teamId: string;
+  /** Project-scoped tokens must omit team-level query parameters. */
+  scope?: 'team' | 'project';
   projectId: string;
   snapshotId: string;
   runtimeBuildId: string;
@@ -33,9 +35,16 @@ export type VercelSandboxRuntimeConfig = {
   extendDurationMs: number;
 };
 
+export type VercelSandboxRuntimeDefaults = Pick<
+  VercelSandboxRuntimeConfig,
+  'runtime' | 'initialTimeoutMs' | 'extendDurationMs'
+>;
+
 export type VercelSandboxCredentials = {
   accessToken: string;
   teamId: string;
+  /** Project-scoped tokens must omit team-level query parameters. */
+  scope?: 'team' | 'project';
 };
 
 export type VercelSandboxRuntimeConfigEnv = {
@@ -48,6 +57,25 @@ export type VercelSandboxRuntimeConfigEnv = {
   VERCEL_SANDBOX_INITIAL_TIMEOUT_MS?: string;
   VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
 };
+
+export function parseVercelSandboxRuntimeDefaults(
+  env: VercelSandboxRuntimeConfigEnv
+): VercelSandboxRuntimeDefaults | undefined {
+  const result = z
+    .object({
+      VERCEL_SANDBOX_RUNTIME: z.literal('node24'),
+      VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: positiveIntegerString,
+      VERCEL_SANDBOX_EXTEND_DURATION_MS: positiveIntegerString,
+    })
+    .safeParse(env);
+  if (!result.success) return undefined;
+
+  return {
+    runtime: result.data.VERCEL_SANDBOX_RUNTIME,
+    initialTimeoutMs: result.data.VERCEL_SANDBOX_INITIAL_TIMEOUT_MS,
+    extendDurationMs: result.data.VERCEL_SANDBOX_EXTEND_DURATION_MS,
+  };
+}
 
 export function parseVercelSandboxCredentials(
   env: VercelSandboxRuntimeConfigEnv

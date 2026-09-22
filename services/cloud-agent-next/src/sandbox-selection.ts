@@ -15,12 +15,31 @@ import type { Env } from './types.js';
 
 type SelectionOwner = { userId: string; orgId?: string };
 
+/**
+ * A BYOC-enrolled organization always runs on its own Vercel account, so a
+ * non-Vercel allocation would contradict the provider chosen at registration.
+ */
+export function isByocIncompatibleAllocation(
+  env: Env,
+  owner: { orgId?: string },
+  allocation: SandboxAllocation
+): boolean {
+  return (
+    owner.orgId !== undefined &&
+    isOrgInList(env.BYOC_VERCEL_ORG_IDS, owner.orgId) &&
+    getSandboxAllocationProvider(allocation) !== 'vercel'
+  );
+}
+
 function sandboxAllocationUnavailableReason(
   env: Env,
   owner: SelectionOwner,
   allocation: SandboxAllocation
 ): string | undefined {
   const provider = getSandboxAllocationProvider(allocation);
+  if (isByocIncompatibleAllocation(env, owner, allocation)) {
+    return 'BYOC Vercel organizations cannot select non-Vercel allocations';
+  }
   if (provider === 'cloudflare') return undefined;
   if (provider === 'vercel') {
     if (!parseVercelSandboxRuntimeConfig(env)) return 'Vercel sandboxes are not configured';

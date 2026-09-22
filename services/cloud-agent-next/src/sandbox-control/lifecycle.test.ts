@@ -4491,7 +4491,7 @@ function installStopProvider(h: Awaited<ReturnType<typeof harness>>) {
   Object.assign(h.control, {
     provider,
     createProviderAdapter: () => provider,
-    providerKind: 'cloudflare',
+    providerBinding: { kind: 'cloudflare' },
   });
   return { stop, confirm: () => (confirmed = true) };
 }

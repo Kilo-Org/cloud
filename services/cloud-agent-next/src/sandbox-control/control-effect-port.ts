@@ -58,6 +58,19 @@ export type ControlEffectObserveResult = {
   status: ObserveResult;
   providerRef: string | null;
   incarnation: string;
+  /**
+   * A failed-but-observed-active allocation that may be recovered in place
+   * instead of quarantined. Only a BYOC Vercel binding sets it: the sandbox runs
+   * on the customer's account, so an active observation is adopted rather than
+   * destroyed.
+   */
+  recoverable?: boolean;
+  /**
+   * The adopted reference bound into the create intent's containment, computed
+   * by the policy that owns the recoverable decision. The reducer copies it
+   * verbatim, exactly as it does for `CREATE_CONFIRMED`.
+   */
+  resolvedContainment?: AllocationContainment;
 };
 
 /**
@@ -176,6 +189,10 @@ export function createControlEffectPort(deps: ControlEffectPortDeps): ControlEff
         outcome: observed.status === 'terminal' ? 'absent' : 'present',
         providerRef: observed.providerRef,
         incarnation: observed.incarnation,
+        ...(observed.recoverable === true ? { recoverable: true } : {}),
+        ...(observed.resolvedContainment !== undefined
+          ? { resolvedContainment: observed.resolvedContainment }
+          : {}),
       };
     },
 

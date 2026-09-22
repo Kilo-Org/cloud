@@ -6,6 +6,7 @@ import type {
 import type { EventQueries } from '../session/queries/index.js';
 import type { StoredEvent } from '../websocket/types.js';
 import {
+  SANDBOX_CONTROL_ATTACHMENT_DOWNLOAD_TIMEOUT_MS,
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   sameSessionOperation,
@@ -34,7 +35,10 @@ import {
 import type { SessionAggregate } from '../sandbox-state/model/session.js';
 import { applyControlPlanePreparingEvent } from './control-plane-preparing.js';
 import { logControlDiagnostic } from '../sandbox-control/diagnostics.js';
-import { persistSandboxControlSessionEvent } from './sandbox-control-event.js';
+import {
+  persistSandboxControlSessionEvent,
+  sanitizeControlSessionEvent,
+} from './sandbox-control-event.js';
 import {
   ControlRequestError,
   controlRequestResult,
@@ -259,7 +263,11 @@ export async function dispatchSessionOperation(
     assertDispatchedCurrent();
     try {
       const timeoutMs =
-        kind === 'attach' ? SANDBOX_CONTROL_ATTACH_TIMEOUT_MS : SANDBOX_CONTROL_REQUEST_TIMEOUT_MS;
+        kind === 'attach'
+          ? SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
+          : SANDBOX_CONTROL_REQUEST_TIMEOUT_MS +
+            (sessionPromptPayloadSchema.parse(payload).attachments?.length ?? 0) *
+              SANDBOX_CONTROL_ATTACHMENT_DOWNLOAD_TIMEOUT_MS;
       const response = await withDeliveryDeadline(
         () =>
           effects.request(
@@ -367,7 +375,7 @@ export function commitSessionOperationResult(input: {
         for (const payload of delivery.events)
           persistSandboxControlSessionEvent({
             sessionId: authorization.session.sessionId,
-            payload,
+            payload: sanitizeControlSessionEvent(payload),
             eventQueries: input.eventQueries,
             broadcast: event => committedNotifications.push(event),
           });

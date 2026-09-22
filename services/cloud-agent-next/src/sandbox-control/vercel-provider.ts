@@ -113,6 +113,7 @@ export function createVercelProviderAdapter(deps: {
     new VercelSandboxRestClient({
       accessToken: config.accessToken,
       teamId: config.teamId,
+      scope: config.scope,
       projectId: config.projectId,
       fetch,
     });
@@ -144,7 +145,7 @@ export function createVercelProviderAdapter(deps: {
         name: intent.allocationName ?? deps.sandboxName,
         operationId: intent.intentId,
         runtimeBuildId: config.runtimeBuildId,
-        snapshotId: config.snapshotId,
+        source: { type: 'snapshot', snapshotId: config.snapshotId },
         runtime: config.runtime,
         timeoutMs: config.initialTimeoutMs,
         ...(config.resources === undefined ? {} : { resources: config.resources }),

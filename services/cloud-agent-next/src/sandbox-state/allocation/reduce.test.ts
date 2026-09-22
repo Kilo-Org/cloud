@@ -26,6 +26,11 @@ const UNRESOLVED_TARGET: AllocationTarget = {
 
 const TARGET: AllocationTarget = { ...UNRESOLVED_TARGET, providerRef: 'provider-ref-1' };
 
+const CONTAINED_TARGET: AllocationTarget = {
+  ...TARGET,
+  containment: { kilocode: false, github: false, worktreeScoped: true },
+};
+
 const VERCEL_TARGET: AllocationTarget = {
   provider: 'vercel',
   providerRef: 'vercel-ref-1',
@@ -693,6 +698,87 @@ describe('allocation reducer — design §5 transitions', () => {
     );
     expect(decision?.state.state.kind).toBe('stopping');
     expect(commandKinds(decision)).toEqual(['Destroy']);
+  });
+
+  it('unknown + OBSERVED present adopts a recoverable live allocation', () => {
+    const record = unknown();
+    if (record.state.kind !== 'unknown') throw new Error('expected unknown');
+    // The recovery policy owns the reference-bound containment and sends it on
+    // the event; the reducer must copy that value verbatim, exactly as it does
+    // for CREATE_CONFIRMED, and never re-derive it from the target. The event
+    // value deliberately differs from `CONTAINED_TARGET.containment`.
+    const resolvedContainment = { kilocode: true, github: true, providerRef: 'provider-ref-1' };
+    const decision = decideAllocation(
+      { ...record, state: { ...record.state, target: CONTAINED_TARGET } },
+      {
+        type: 'OBSERVED',
+        fence: fence(operationId('observe', 'provider-ref-1'), 'provider-ref-1'),
+        result: 'present',
+        recoverable: true,
+        resolvedContainment,
+      },
+      NOW
+    );
+    expect(decision?.state.state.kind).toBe('allocated');
+    if (decision?.state.state.kind !== 'allocated') return;
+    expect(decision.state.state.target.providerRef).toBe('provider-ref-1');
+    // The recovered target must bind its containment to the adopted reference,
+    // or readiness later stops it as credential_containment_unavailable.
+    expect(decision.state.state.target.resolvedContainment).toEqual(resolvedContainment);
+    expect(decision.state.state.health.kind).toBe('connecting');
+    // Recovery adopts the running sandbox; it must not re-launch or destroy it.
+    expect(commandKinds(decision)).toEqual([]);
+  });
+
+  it('unknown + OBSERVED present quarantines a recoverable binding with pending cleanup', () => {
+    const record = unknown();
+    if (record.state.kind !== 'unknown') throw new Error('expected unknown');
+    const withCleanup: AllocationRecord = {
+      ...record,
+      state: { ...record.state, stopIntent: { reason: 'worktree_deleted', createdAt: NOW } },
+    };
+    const decision = decideAllocation(
+      withCleanup,
+      {
+        type: 'OBSERVED',
+        fence: fence(operationId('observe', 'provider-ref-1'), 'provider-ref-1'),
+        result: 'present',
+        recoverable: true,
+      },
+      NOW
+    );
+    expect(decision?.state.state.kind).toBe('stopping');
+    expect(commandKinds(decision)).toEqual(['Destroy']);
+  });
+
+  it('unknown + OBSERVED present recovers a discovered reference when recoverable', () => {
+    const record: AllocationRecord = {
+      v: 2,
+      resumable: true,
+      state: {
+        kind: 'unknown',
+        target: UNRESOLVED_TARGET,
+        createIntent: CREATE_INTENT,
+        stopIntent: null,
+        attempts: 0,
+        reason: 'test',
+        deadlineAt: NOW + POLICY.observeDeadlineMs,
+      },
+    };
+    const decision = decideAllocation(
+      record,
+      {
+        type: 'OBSERVED',
+        fence: fence(operationId('observe', CREATE_INTENT.intentId), 'discovered-ref'),
+        result: 'present',
+        recoverable: true,
+      },
+      NOW
+    );
+    expect(decision?.state.state.kind).toBe('allocated');
+    if (decision?.state.state.kind !== 'allocated') return;
+    expect(decision.state.state.target.providerRef).toBe('discovered-ref');
+    expect(commandKinds(decision)).toEqual([]);
   });
 
   it('unknown + OBSERVED present adopts a discovered reference and stops it', () => {

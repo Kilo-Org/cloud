@@ -411,6 +411,26 @@ describe('control effect port — observe', () => {
       },
     }).observe(OBSERVE);
     expect(absent).toEqual({ outcome: 'absent', providerRef: null, incarnation: INC });
+
+    const resolvedContainment = { kilocode: true, github: false, providerRef: 'ref-1' };
+    const recoverable = await port({
+      provider: {
+        observe: async () => ({
+          status: 'active',
+          providerRef: 'ref-1',
+          incarnation: INC,
+          recoverable: true,
+          resolvedContainment,
+        }),
+      },
+    }).observe(OBSERVE);
+    expect(recoverable).toEqual({
+      outcome: 'present',
+      providerRef: 'ref-1',
+      incarnation: INC,
+      recoverable: true,
+      resolvedContainment,
+    });
   });
 
   it('rejects an inconclusive observation and drops it in the runner', async () => {

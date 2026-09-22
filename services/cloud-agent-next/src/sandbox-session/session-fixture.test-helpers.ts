@@ -8,7 +8,6 @@ import {
 import { createMemoryEventQueries } from '../session/preparation-test-helpers.js';
 import { createControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import type { Env } from '../types.js';
-import type { UserId } from '../types/ids.js';
 import type { CallbackJob } from '../callbacks/types.js';
 import type { sandboxControlRpc } from './control-rpc.js';
 import type { SandboxControlOutboundRequest } from '../sandbox-control/socket.js';
@@ -251,11 +250,19 @@ export function createSessionFixture(
     updateNetworkPolicy: vi.fn(async () => undefined),
     request,
   } satisfies Control;
+  const callbacks: CallbackJob[] = [];
+  const sendCallback = vi.fn(async (job: CallbackJob): Promise<QueueSendResponse> => {
+    callbacks.push(job);
+    return {} as QueueSendResponse;
+  });
+  const resolvedCallbackQueue = (callbackQueue ?? { send: sendCallback }) as {
+    send: typeof sendCallback;
+  };
   const env = {
     SANDBOX_CONTROL: { getByName: () => sharedControl ?? control },
     WORKER_URL: 'https://worker.example.test',
     NEXTAUTH_SECRET: 'test-secret',
-    CALLBACK_QUEUE: callbackQueue,
+    CALLBACK_QUEUE: resolvedCallbackQueue,
     CLOUD_AGENT_REPORT_QUEUE: { send: async () => undefined },
     CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
     CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org_1',
@@ -268,6 +275,8 @@ export function createSessionFixture(
     },
     control,
     env,
+    callbackQueue: resolvedCallbackQueue,
+    callbacks,
     settleBackground: () => Promise.all(background),
     metadata,
     storage,
@@ -312,7 +321,8 @@ export function createSessionFixture(
       } = {}
     ) =>
       session.admitSubmittedMessage({
-        userId: 'user_1' as UserId,
+        userId: metadata.identity.userId,
+        botId: metadata.identity.botId,
         turn: {
           type: 'prompt',
           id: messageId,

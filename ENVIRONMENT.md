@@ -405,6 +405,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `WORKTREE_CREATION_ENABLED_IDS` - Comma-separated user or org IDs allowed to create new worktrees, or `*` for all, including personal accounts. Omitted from production `wrangler.jsonc` so the Cloudflare dashboard value survives deploy; unset is off. Wrangler `dev` and `.dev.vars.example` default to `*`. Also requires enrollment in `CONTROL_PLANE_IDS`. Disabling it does not block existing worktrees or sibling chats in them. [SERVER]
 - `SANDBOX_SELECTION_IDS` - Comma-separated user or org IDs allowed to pick a Cloud Agent sandbox destination on the new-session page. Empty admits nobody. `*` includes personal accounts. Omitted from production `wrangler.jsonc` so the Cloudflare dashboard value survives deploy; unset admits nobody. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
 - `VERCEL_SANDBOX_ORG_IDS` - Comma-separated org IDs routed to Vercel sandboxes. Empty is off. `*` includes personal accounts. [SERVER]
+- `BYOC_VERCEL_ORG_IDS` - Comma-separated organization IDs enrolled in customer-paid Vercel compute. Empty is off; unlike `VERCEL_SANDBOX_ORG_IDS`, an enrolled organization fails closed when its ready credential is absent. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
 
 ### Gastown

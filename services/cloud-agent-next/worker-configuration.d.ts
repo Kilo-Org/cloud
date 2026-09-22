@@ -37,6 +37,7 @@ interface __BaseEnv_Env {
 	RUNTIME_ISOLATION_ENABLED: "true";
 	SANDBOX_SELECTION_IDS?: "*";
 	VERCEL_SANDBOX_ORG_IDS: "";
+	BYOC_VERCEL_ORG_IDS: "";
 	VERCEL_PROJECT_ID: "";
 	VERCEL_TEAM_ID: "";
 	VERCEL_SANDBOX_SNAPSHOT_ID: "";
@@ -57,6 +58,7 @@ interface __BaseEnv_Env {
 	SANDBOX_CONTROL: DurableObjectNamespace<import("./src/index").SandboxControl>;
 	SANDBOX_SESSION: DurableObjectNamespace<import("./src/index").SandboxSession>;
 	SANDBOX_CONTAINERS: DurableObjectNamespace<import("./src/index").SandboxContainers>;
+	VERCEL_SNAPSHOT_BUILD: DurableObjectNamespace<import("./src/index").VercelSnapshotBuild>;
 	SESSION_INGEST: Service /* entrypoint SessionIngestRPC from session-ingest */;
 	GIT_TOKEN_SERVICE: Service /* entrypoint GitTokenRPCEntrypoint from git-token-service-dev */ | Service /* entrypoint GitTokenRPCEntrypoint from git-token-service */;
 	NOTIFICATIONS: Service /* entrypoint NotificationsService from notifications */;
@@ -68,7 +70,7 @@ interface __BaseEnv_Env {
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/index");
-		durableNamespaces: "Sandbox" | "CloudAgentSession" | "SandboxSmall" | "SandboxDIND" | "UserKiloFacade" | "SandboxCodeReview" | "SandboxContainment" | "SandboxSmallContainment" | "SandboxCodeReviewContainment" | "StreamTicketNonceDO" | "SandboxControl" | "SandboxSession" | "SandboxContainers";
+		durableNamespaces: "Sandbox" | "CloudAgentSession" | "SandboxSmall" | "SandboxDIND" | "UserKiloFacade" | "SandboxCodeReview" | "SandboxContainment" | "SandboxSmallContainment" | "SandboxCodeReviewContainment" | "StreamTicketNonceDO" | "SandboxControl" | "SandboxSession" | "SandboxContainers" | "VercelSnapshotBuild";
 	}
 	interface DevEnv {
 		SHARED_SANDBOX_OVERRIDES: KVNamespace;
@@ -106,6 +108,7 @@ declare namespace Cloudflare {
 		RUNTIME_ISOLATION_ENABLED: "true";
 		SANDBOX_SELECTION_IDS: "*";
 		VERCEL_SANDBOX_ORG_IDS: "";
+		BYOC_VERCEL_ORG_IDS: "";
 		VERCEL_PROJECT_ID: "";
 		VERCEL_TEAM_ID: "";
 		VERCEL_SANDBOX_SNAPSHOT_ID: "";
@@ -126,6 +129,7 @@ declare namespace Cloudflare {
 		SANDBOX_CONTROL: DurableObjectNamespace<import("./src/index").SandboxControl>;
 		SANDBOX_SESSION: DurableObjectNamespace<import("./src/index").SandboxSession>;
 		SANDBOX_CONTAINERS: DurableObjectNamespace<import("./src/index").SandboxContainers>;
+		VERCEL_SNAPSHOT_BUILD: DurableObjectNamespace<import("./src/index").VercelSnapshotBuild>;
 		SESSION_INGEST: Service /* entrypoint SessionIngestRPC from session-ingest */;
 		GIT_TOKEN_SERVICE: Service /* entrypoint GitTokenRPCEntrypoint from git-token-service-dev */;
 		NOTIFICATIONS: Service /* entrypoint NotificationsService from notifications */;
@@ -138,10 +142,14 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "KILOCODE_BACKEND_BASE_URL" | "KILO_OPENROUTER_BASE" | "GITHUB_APP_SLUG" | "GITHUB_APP_BOT_USER_ID" | "GITHUB_LITE_APP_SLUG" | "GITHUB_LITE_APP_BOT_USER_ID" | "WORKER_URL" | "SANDBOX_TRANSPORT" | "CLI_TIMEOUT_SECONDS" | "REAPER_INTERVAL_MS" | "R2_ATTACHMENTS_BUCKET" | "BACKUP_BUCKET_NAME" | "CLOUDFLARE_R2_ACCOUNT_ID" | "WS_ALLOWED_ORIGINS" | "KILO_SESSION_INGEST_URL" | "PER_SESSION_SANDBOX_ORG_IDS" | "CREDENTIAL_CONTAINMENT_ENABLED" | "REPO_SNAPSHOT_ORG_IDS" | "CONTAINER_BILLING_HEARTBEAT_SECONDS" | "CLOUD_AGENT_CONTAINER_BILLING_ENABLED" | "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS" | "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS" | "CONTROL_PLANE_IDS" | "WORKTREE_CREATION_ENABLED_IDS" | "RUNTIME_ISOLATION_ENABLED" | "SANDBOX_SELECTION_IDS" | "VERCEL_SANDBOX_ORG_IDS" | "VERCEL_PROJECT_ID" | "VERCEL_TEAM_ID" | "VERCEL_SANDBOX_SNAPSHOT_ID" | "VERCEL_SANDBOX_RUNTIME_BUILD_ID" | "VERCEL_SANDBOX_RUNTIME" | "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS" | "VERCEL_SANDBOX_EXTEND_DURATION_MS" | "TOOL_CGROUP_RESERVE_MB" | "TOOL_CGROUP_CPU_WEIGHT" | "TOOL_CGROUP_SERVER_CPU_WEIGHT">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "KILOCODE_BACKEND_BASE_URL" | "KILO_OPENROUTER_BASE" | "GITHUB_APP_SLUG" | "GITHUB_APP_BOT_USER_ID" | "GITHUB_LITE_APP_SLUG" | "GITHUB_LITE_APP_BOT_USER_ID" | "WORKER_URL" | "SANDBOX_TRANSPORT" | "CLI_TIMEOUT_SECONDS" | "REAPER_INTERVAL_MS" | "R2_ATTACHMENTS_BUCKET" | "BACKUP_BUCKET_NAME" | "CLOUDFLARE_R2_ACCOUNT_ID" | "WS_ALLOWED_ORIGINS" | "KILO_SESSION_INGEST_URL" | "PER_SESSION_SANDBOX_ORG_IDS" | "CREDENTIAL_CONTAINMENT_ENABLED" | "REPO_SNAPSHOT_ORG_IDS" | "CONTAINER_BILLING_HEARTBEAT_SECONDS" | "CLOUD_AGENT_CONTAINER_BILLING_ENABLED" | "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS" | "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS" | "CONTROL_PLANE_IDS" | "WORKTREE_CREATION_ENABLED_IDS" | "RUNTIME_ISOLATION_ENABLED" | "SANDBOX_SELECTION_IDS" | "VERCEL_SANDBOX_ORG_IDS" | "BYOC_VERCEL_ORG_IDS" | "VERCEL_PROJECT_ID" | "VERCEL_TEAM_ID" | "VERCEL_SANDBOX_SNAPSHOT_ID" | "VERCEL_SANDBOX_RUNTIME_BUILD_ID" | "VERCEL_SANDBOX_RUNTIME" | "VERCEL_SANDBOX_INITIAL_TIMEOUT_MS" | "VERCEL_SANDBOX_EXTEND_DURATION_MS" | "TOOL_CGROUP_RESERVE_MB" | "TOOL_CGROUP_CPU_WEIGHT" | "TOOL_CGROUP_SERVER_CPU_WEIGHT">> {}
 }
 declare module "*.sql" {
 	const value: string;
+	export default value;
+	}
+declare module "*.js?binary" {
+	const value: ArrayBuffer;
 	export default value;
 	}
 // Begin runtime types

@@ -5,9 +5,9 @@ export type AcceptedAlarmDecision = { action: 'check' } | { action: 'rearm'; at:
 export function acceptedAlarmDecision(
   acceptedAt: number,
   now: number,
-  lastActivityAt?: number
+  lastActivityAt = acceptedAt
 ): AcceptedAlarmDecision {
-  const checkAt = (lastActivityAt ?? acceptedAt) + DEADLINE_MS.acceptedOverdue;
+  const checkAt = Math.max(acceptedAt, lastActivityAt) + DEADLINE_MS.acceptedOverdue;
   if (now >= checkAt) return { action: 'check' };
   return { action: 'rearm', at: Math.min(checkAt, now + DEADLINE_MS.acceptedAlarmCap) };
 }

@@ -8,7 +8,12 @@ import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../../src/shared/runtime-
 import type { WrapperKiloClient, WrapperPty } from '../kilo-api.js';
 import type { WorktreeKiloRuntime } from './worktree-runtime.js';
 import { createControlTerminalRuntime, type ControlTerminalRuntime } from './terminal-runtime.js';
-import { rememberAttachedRoot, resetSessionDirectoryState } from './session-directories.js';
+import {
+  forgetAttachedRoot,
+  rememberAttachedRoot,
+  rememberSessionDirectory,
+  resetSessionDirectoryState,
+} from './session-directories.js';
 
 const firstSession: SessionRequestIdentity = {
   sessionId: 'workspace_first',
@@ -91,6 +96,34 @@ function createRuntime(
 function attach(runtime: ControlTerminalRuntime, identity: SessionRequestIdentity): void {
   rememberAttachedRoot(identity.kiloSessionId, identity.directory);
   runtime.rememberAttachedSession(identity);
+}
+
+function makeWorktree(
+  kiloClient: WrapperKiloClient,
+  directory: string,
+  runtimeId: string
+): WorktreeKiloRuntime {
+  return {
+    runtimeId,
+    scopeId: directory,
+    directory,
+    env: { WORKTREE_VALUE: directory },
+    kiloClient,
+    signal: new AbortController().signal,
+  };
+}
+
+function createMappedRuntime(
+  kiloClient: WrapperKiloClient,
+  worktrees: Map<string, WorktreeKiloRuntime>
+): ControlTerminalRuntime {
+  const runtime = createControlTerminalRuntime({
+    controlUrl: 'ws://127.0.0.1:1/sandbox-control/sandbox',
+    wrapperInstanceId,
+    getKiloRuntime: identity => worktrees.get(identity.directory),
+  });
+  activeRuntimes.add(runtime);
+  return runtime;
 }
 
 function creationPayload(
@@ -253,7 +286,7 @@ describe('control terminal PTY ownership', () => {
 
     rememberAttachedRoot(firstSession.kiloSessionId, '/workspace/different');
     expect(() => runtime.rememberAttachedSession(firstSession)).toThrow(
-      'Terminal session belongs to another session'
+      'Session directory map mismatch'
     );
   });
 
@@ -266,7 +299,7 @@ describe('control terminal PTY ownership', () => {
     activeRuntimes.add(unavailable);
     rememberAttachedRoot(firstSession.kiloSessionId, firstSession.directory);
     expect(() => unavailable.rememberAttachedSession(firstSession)).toThrow(
-      'Terminal session runtime unavailable'
+      'Session kilo runtime missing'
     );
 
     const conflicting = createRuntime(fakeKilo());
@@ -275,12 +308,12 @@ describe('control terminal PTY ownership', () => {
     rememberAttachedRoot('kilo_other', firstSession.directory);
     expect(() =>
       conflicting.rememberAttachedSession({ ...firstSession, kiloSessionId: 'kilo_other' })
-    ).toThrow('Terminal session belongs to another session');
+    ).toThrow('Session kilo session mismatch');
     expect(() =>
       conflicting.rememberAttachedSession({ ...firstSession, directory: '/workspace/other' })
-    ).toThrow('Terminal session belongs to another session');
+    ).toThrow('Session directory map mismatch');
     expect(() => attach(conflicting, { ...firstSession, sessionId: 'workspace_other' })).toThrow(
-      'Terminal session belongs to another session'
+      'Session duplicate kilo session'
     );
   });
 
@@ -561,6 +594,94 @@ describe('control terminal PTY ownership', () => {
     expect(await terminalFailure(runtime.create(firstSession, creationPayload()))).toMatchObject({
       code: 'not_ready',
       message: 'Terminal session is not attached',
+    });
+  });
+
+  it('rejects rememberAttachedSession after shutdown', () => {
+    const runtime = createMappedRuntime(fakeKilo(), new Map());
+    runtime.shutdown();
+    expect(() => runtime.rememberAttachedSession(firstSession)).toThrow(
+      'Session runtime is shut down'
+    );
+  });
+
+  it('rejects rememberAttachedSession when the kilo runtime is missing', () => {
+    rememberAttachedRoot(firstSession.kiloSessionId, firstSession.directory);
+    expect(() =>
+      createMappedRuntime(fakeKilo(), new Map()).rememberAttachedSession(firstSession)
+    ).toThrow('Session kilo runtime missing');
+  });
+
+  it('rejects rememberAttachedSession when the root map is missing', () => {
+    rememberSessionDirectory(firstSession.kiloSessionId, firstSession.directory);
+    expect(() => createRuntime(fakeKilo()).rememberAttachedSession(firstSession)).toThrow(
+      'Session root map mismatch'
+    );
+  });
+
+  it('rejects rememberAttachedSession when the existing row has a different kilo session', () => {
+    const runtime = createRuntime(fakeKilo());
+    attach(runtime, firstSession);
+    rememberAttachedRoot('kilo_other', firstSession.directory);
+    expect(() =>
+      runtime.rememberAttachedSession({ ...firstSession, kiloSessionId: 'kilo_other' })
+    ).toThrow('Session kilo session mismatch');
+  });
+
+  it('rejects rememberAttachedSession when the existing row has a different directory', () => {
+    const kiloClient = fakeKilo();
+    const worktrees = new Map<string, WorktreeKiloRuntime>();
+    worktrees.set(firstSession.directory, makeWorktree(kiloClient, firstSession.directory, 'a'));
+    worktrees.set('/workspace/other', makeWorktree(kiloClient, '/workspace/other', 'b'));
+    const runtime = createMappedRuntime(kiloClient, worktrees);
+    attach(runtime, firstSession);
+    rememberAttachedRoot(firstSession.kiloSessionId, '/workspace/other');
+    expect(() =>
+      runtime.rememberAttachedSession({ ...firstSession, directory: '/workspace/other' })
+    ).toThrow('Session attached directory mismatch');
+  });
+
+  it('rejects rememberAttachedSession when another row already holds the kilo session', () => {
+    const runtime = createRuntime(fakeKilo());
+    attach(runtime, firstSession);
+    expect(() =>
+      runtime.rememberAttachedSession({
+        sessionId: 'workspace_other',
+        kiloSessionId: firstSession.kiloSessionId,
+        directory: firstSession.directory,
+      })
+    ).toThrow('Session duplicate kilo session');
+  });
+
+  it('names requireAttached and detach unauthorized guards', async () => {
+    const runtime = createRuntime(fakeKilo());
+    attach(runtime, firstSession);
+    expect(
+      await terminalFailure(runtime.detachSession({ ...firstSession, kiloSessionId: 'kilo_other' }))
+    ).toMatchObject({
+      code: 'unauthorized',
+      message: 'Session kilo session mismatch',
+    });
+    expect(
+      await terminalFailure(
+        runtime.detachSession({ ...firstSession, directory: '/workspace/other' })
+      )
+    ).toMatchObject({
+      code: 'unauthorized',
+      message: 'Session attached directory mismatch',
+    });
+
+    forgetAttachedRoot(firstSession.kiloSessionId, firstSession.directory);
+    rememberSessionDirectory(firstSession.kiloSessionId, firstSession.directory);
+    expect(await terminalFailure(runtime.create(firstSession, creationPayload()))).toMatchObject({
+      code: 'unauthorized',
+      message: 'Session root map mismatch',
+    });
+
+    rememberAttachedRoot(firstSession.kiloSessionId, '/workspace/different');
+    expect(await terminalFailure(runtime.create(firstSession, creationPayload()))).toMatchObject({
+      code: 'unauthorized',
+      message: 'Session directory map mismatch',
     });
   });
 
@@ -876,9 +997,7 @@ describe('control terminal PTY ownership', () => {
     activeRuntimes.add(runtime);
 
     attach(runtime, firstSession);
-    expect(() => runtime.rememberAttachedSession(sibling)).toThrow(
-      /Terminal session ownership mismatch/
-    );
+    expect(() => runtime.rememberAttachedSession(sibling)).toThrow(/Session kilo session mismatch/);
     expect(await runtime.create(firstSession, creationPayload())).toMatchObject({
       pty: { cwd: firstSession.directory },
     });

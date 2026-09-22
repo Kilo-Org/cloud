@@ -98,7 +98,14 @@ export type AllocationEvent =
   | { type: 'BUDGET_EXHAUSTED' }
   | { type: 'IDLE'; idleAt: number }
   | { type: 'CHECK' }
-  | { type: 'OBSERVED'; fence: ResultFence; result: 'absent' | 'present' }
+  | {
+      type: 'OBSERVED';
+      fence: ResultFence;
+      result: 'absent' | 'present';
+      recoverable?: boolean;
+      /** Reference-bound containment supplied by the policy that decided recovery. */
+      resolvedContainment?: AllocationContainment;
+    }
   | AllocationCancelEvent
   | { type: 'DEADLINE'; episodeId?: string };
 
@@ -214,6 +221,7 @@ export type OutcomeEvent = {
   gateResult?: GateResult;
   assistantReason?: CloudAgentAssistantFailureReason;
   providerOwnership?: CloudAgentProviderOwnership;
+  error?: string;
 };
 
 /** Allocation → session seam. Delivered by the allocation command runner. */

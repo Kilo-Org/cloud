@@ -8,7 +8,12 @@ import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { projectTerminalClientError } from '../session/terminal-error-projector.js';
 import type { LatestAssistantMessage } from '../session/types.js';
 import { safeErrorFromQueueReason } from './control-dispatch.js';
-import { failedDetailOf, failedReasonOf, type SessionMessage } from './session-message-queue.js';
+import {
+  failedDetailOf,
+  failedErrorOf,
+  failedReasonOf,
+  type SessionMessage,
+} from './session-message-queue.js';
 
 export const CALLBACK_OUTBOX_PREFIX = 'callback_outbox:';
 export const CALLBACK_ENQUEUE_MAX_ATTEMPTS = 5;
@@ -179,6 +184,7 @@ export function createMessageCallbacks(
         : status === 'interrupted'
           ? 'The message was interrupted'
           : (failedDetailOf(message) ??
+            failedErrorOf(message) ??
             safeErrorFromQueueReason(failedReasonOf(message) ?? 'environment_failed'));
 
     return {

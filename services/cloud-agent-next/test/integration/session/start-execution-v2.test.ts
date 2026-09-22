@@ -492,7 +492,7 @@ describe('CloudAgentSession message admission', () => {
     expect(result.inspectCalls[0]?.[0]).toMatchObject({
       name: 'ses-acde9012',
       operationId: 'operation-late',
-      snapshotId: 'snapshot-pinned',
+      source: { type: 'snapshot', snapshotId: 'snapshot-pinned' },
       runtimeBuildId: 'build-pinned',
     });
     expect(result.inspectCalls[0]?.[0]).not.toHaveProperty('timeoutMs');

@@ -683,7 +683,11 @@ export class SessionOperation {
     };
     const { messageId, turn, agent } = request;
     const startedAt = Date.now();
-    const diagnostic = (phase: string, status?: SessionMessageOutcome['status']): void =>
+    const diagnostic = (
+      phase: string,
+      status?: SessionMessageOutcome['status'],
+      detail?: string
+    ): void =>
       emitControlDiagnostic(this.deps.onDiagnostic, 'session.execution', {
         sessionId: session.sessionId,
         kiloSessionId: session.kiloSessionId,
@@ -692,6 +696,7 @@ export class SessionOperation {
         status,
         elapsedMs: Date.now() - startedAt,
         aborted: signal.aborted,
+        ...(detail === undefined ? {} : { detail }),
       });
     let outcome: SessionMessageOutcome;
     let result: ControlHandlerResult = { ok: true, result: {} };
@@ -826,7 +831,6 @@ export class SessionOperation {
           }
         : { messageId, status: 'completed' };
     } catch (error) {
-      diagnostic('execution_failed');
       this.recordUncertainty(error);
       const cancellation: unknown = signal.reason;
       outcome = {
@@ -839,6 +843,11 @@ export class SessionOperation {
               ? 'Kilo execution outcome is unconfirmed'
               : failureReason,
       };
+      diagnostic(
+        'execution_failed',
+        outcome.status,
+        outcome.reason === undefined ? undefined : diagnosticDetail(outcome.reason)
+      );
       try {
         diagnostic('abort_started');
         const cleanupDeadlineAt = this.captureCleanupDeadline();

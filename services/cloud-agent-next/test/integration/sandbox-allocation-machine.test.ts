@@ -44,7 +44,7 @@ function installMemoryProvider(
   Object.assign(instance, {
     provider,
     createProviderAdapter: () => provider,
-    providerKind: 'cloudflare',
+    providerBinding: { kind: 'cloudflare' },
     env: {
       ...instance['env'],
       KILOCODE_BACKEND_BASE_URL: targets.targets.backendBaseUrl,

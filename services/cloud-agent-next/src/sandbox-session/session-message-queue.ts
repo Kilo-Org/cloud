@@ -23,6 +23,7 @@ import {
   type SessionOperationAuthorization,
   type SessionOperationDelivery,
 } from '../shared/sandbox-control-protocol.js';
+import { classifyAssistantFailureMessage } from '../shared/assistant-failure.js';
 import {
   decideSession,
   headQueuedMessageId,
@@ -127,6 +128,10 @@ export function failedReasonOf(message: SessionMessage): string | undefined {
 
 export function failedDetailOf(message: SessionMessage): string | undefined {
   return message.state.kind === 'failed' ? message.state.detail : undefined;
+}
+
+export function failedErrorOf(message: SessionMessage): string | undefined {
+  return message.state.kind === 'failed' ? message.state.error : undefined;
 }
 
 export function assistantReasonOf(
@@ -339,7 +344,8 @@ export function assignPreparationAttemptId(
 export function terminalizeWaitingMessage(
   message: SessionMessage,
   reason: string,
-  at: number
+  at: number,
+  error?: string
 ): SessionMessage {
   if (message.cancellation !== undefined) {
     return {
@@ -349,7 +355,10 @@ export function terminalizeWaitingMessage(
   }
   return {
     ...message,
-    state: terminalMessageState(message.state, 'failed', at, 'coordinator', { reason }),
+    state: terminalMessageState(message.state, 'failed', at, 'coordinator', {
+      reason,
+      ...(error !== undefined ? { error } : {}),
+    }),
   };
 }
 
@@ -358,8 +367,9 @@ export function failWaitingMessages(
   reason: string,
   wrapperInstanceId?: string,
   includeUnassigned = true,
-  at: number = Date.now()
+  terminal?: { timestamp: number; error: string }
 ): { messages: SessionMessage[]; failedIds: string[] } {
+  const at = terminal?.timestamp ?? Date.now();
   const head =
     messages.find(message => message.state.kind === 'accepted') ??
     messages.find(message => message.state.kind === 'queued');
@@ -380,7 +390,7 @@ export function failWaitingMessages(
         return message;
       }
       failedIds.push(message.messageId);
-      return terminalizeWaitingMessage(message, reason, at);
+      return terminalizeWaitingMessage(message, reason, at, terminal?.error);
     }),
     failedIds,
   };
@@ -631,6 +641,9 @@ export function applyMessageOutcome(
       ...(outcome.providerOwnership !== undefined
         ? { providerOwnership: outcome.providerOwnership }
         : {}),
+      ...(outcome.status === 'failed' && outcome.reason
+        ? { error: classifyAssistantFailureMessage(outcome.reason) }
+        : {}),
     },
     now
   )?.state;
@@ -739,7 +752,13 @@ export function recordAcceptedMessageActivity(
   if (!hasAcceptedMessage(messages)) return undefined;
   return messages.map(message =>
     message.state.kind === 'accepted'
-      ? { ...message, state: { ...message.state, lastActivityAt } }
+      ? {
+          ...message,
+          state: {
+            ...message.state,
+            lastActivityAt: Math.max(message.state.lastActivityAt ?? 0, lastActivityAt),
+          },
+        }
       : message
   );
 }
@@ -761,6 +780,7 @@ export function failedMessageSnapshot(
   const cancelled = message.state.kind === 'cancelled';
   const reason = message.state.kind === 'failed' ? message.state.reason : undefined;
   const detail = message.state.kind === 'failed' ? message.state.detail : undefined;
+  const error = message.state.kind === 'failed' ? message.state.error : undefined;
   return {
     messageId: message.messageId,
     status: cancelled ? 'interrupted' : 'failed',
@@ -769,8 +789,8 @@ export function failedMessageSnapshot(
     reason: cancelled ? 'interrupted' : reason,
     ...(cancelled
       ? { error: 'The message was interrupted' }
-      : detail || reason
-        ? { error: detail ?? reason }
+      : detail || error || reason
+        ? { error: detail ?? error ?? reason }
         : {}),
     timestamp: acceptedAt ?? now,
   };

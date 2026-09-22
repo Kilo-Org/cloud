@@ -586,11 +586,24 @@ function payloadVariants(machine: MachineName, state: unknown, event: string): S
           now: NOW,
         }));
       case 'OBSERVED':
-        return (['absent', 'present'] as const).map(result => ({
-          state,
-          event: { ...(allocationEvent(record, 'OBSERVED') as object), result },
-          now: NOW,
-        }));
+        return [
+          ...(['absent', 'present'] as const).map(result => ({
+            state,
+            event: { ...(allocationEvent(record, 'OBSERVED') as object), result },
+            now: NOW,
+          })),
+          // A recoverable observation of a failed-but-active allocation adopts
+          // it in place (`unknown` → `allocated.connecting`).
+          {
+            state,
+            event: {
+              ...(allocationEvent(record, 'OBSERVED') as object),
+              result: 'present',
+              recoverable: true,
+            },
+            now: NOW,
+          },
+        ];
       case 'DEADLINE':
         return [
           { state, event: { type: 'DEADLINE', episodeId: EPISODE_ID }, now: NOW },

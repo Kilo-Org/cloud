@@ -30368,6 +30368,260 @@
     ],
     "searchBlob": "organizations.usageStats Get an organization's usage totals (cost, requests, tokens) over the last 30 days. organizations usagestats organizationid organizationId"
   },
+  "organizations.vercelCompute.add": {
+    "path": "organizations.vercelCompute.add",
+    "kind": "mutation",
+    "summary": "Enrol the organization for BYOC Vercel compute: validate and store the Vercel token, team and project, then start the runtime setup.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "teamId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "organizationId",
+        "token",
+        "teamId",
+        "projectId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "add",
+      "organizationid",
+      "token",
+      "teamid",
+      "projectid"
+    ],
+    "searchBlob": "organizations.vercelCompute.add Enrol the organization for BYOC Vercel compute: validate and store the Vercel token, team and project, then start the runtime setup. organizations vercelcompute add organizationid token teamid projectid organizationId token teamId projectId"
+  },
+  "organizations.vercelCompute.discoverProjects": {
+    "path": "organizations.vercelCompute.discoverProjects",
+    "kind": "mutation",
+    "summary": "List the Vercel projects available in a selected team for BYOC Vercel compute setup.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "teamId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "organizationId",
+        "token",
+        "teamId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "discoverprojects",
+      "organizationid",
+      "token",
+      "teamid"
+    ],
+    "searchBlob": "organizations.vercelCompute.discoverProjects List the Vercel projects available in a selected team for BYOC Vercel compute setup. organizations vercelcompute discoverprojects organizationid token teamid organizationId token teamId"
+  },
+  "organizations.vercelCompute.discoverTeams": {
+    "path": "organizations.vercelCompute.discoverTeams",
+    "kind": "mutation",
+    "summary": "List the Vercel teams the supplied token can access for BYOC Vercel compute setup. Use before choosing the team to enroll.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "organizationId",
+        "token"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "discoverteams",
+      "organizationid",
+      "token"
+    ],
+    "searchBlob": "organizations.vercelCompute.discoverTeams List the Vercel teams the supplied token can access for BYOC Vercel compute setup. Use before choosing the team to enroll. organizations vercelcompute discoverteams organizationid token organizationId token"
+  },
+  "organizations.vercelCompute.getEnrollment": {
+    "path": "organizations.vercelCompute.getEnrollment",
+    "kind": "query",
+    "summary": "Get the organization's BYOC Vercel compute enrollment state, including whether the organization is enrolled.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "getenrollment",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.vercelCompute.getEnrollment Get the organization's BYOC Vercel compute enrollment state, including whether the organization is enrolled. organizations vercelcompute getenrollment organizationid organizationId"
+  },
+  "organizations.vercelCompute.getStatus": {
+    "path": "organizations.vercelCompute.getStatus",
+    "kind": "query",
+    "summary": "Get the organization's BYOC Vercel compute status: setup progress, setup and upgrade errors, runtime build and snapshot identity, and whether a newer runtime is available.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "getstatus",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.vercelCompute.getStatus Get the organization's BYOC Vercel compute status: setup progress, setup and upgrade errors, runtime build and snapshot identity, and whether a newer runtime is available. organizations vercelcompute getstatus organizationid organizationId"
+  },
+  "organizations.vercelCompute.remove": {
+    "path": "organizations.vercelCompute.remove",
+    "kind": "mutation",
+    "summary": "Remove the organization's BYOC Vercel compute credentials and tear down its runtime. Use to disable BYOC Vercel compute for the organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "acknowledgeCleanupFailure": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "remove",
+      "organizationid",
+      "acknowledgecleanupfailure"
+    ],
+    "searchBlob": "organizations.vercelCompute.remove Remove the organization's BYOC Vercel compute credentials and tear down its runtime. Use to disable BYOC Vercel compute for the organization. organizations vercelcompute remove organizationid acknowledgecleanupfailure organizationId acknowledgeCleanupFailure"
+  },
+  "organizations.vercelCompute.retrySetup": {
+    "path": "organizations.vercelCompute.retrySetup",
+    "kind": "mutation",
+    "summary": "Retry a failed BYOC Vercel compute setup for the organization, rebuilding the runtime snapshot.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "retrysetup",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.vercelCompute.retrySetup Retry a failed BYOC Vercel compute setup for the organization, rebuilding the runtime snapshot. organizations vercelcompute retrysetup organizationid organizationId"
+  },
+  "organizations.vercelCompute.upgradeRuntime": {
+    "path": "organizations.vercelCompute.upgradeRuntime",
+    "kind": "mutation",
+    "summary": "Upgrade the organization's BYOC Vercel compute runtime to the latest wrapper version.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "upgraderuntime",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.vercelCompute.upgradeRuntime Upgrade the organization's BYOC Vercel compute runtime to the latest wrapper version. organizations vercelcompute upgraderuntime organizationid organizationId"
+  },
   "organizations.verifiedDomains.create": {
     "path": "organizations.verifiedDomains.create",
     "kind": "mutation",

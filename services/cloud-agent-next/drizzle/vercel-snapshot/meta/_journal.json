@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1787694805358,
+      "tag": "0000_vercel_snapshot_build",
+      "breakpoints": true
+    }
+  ]
+}

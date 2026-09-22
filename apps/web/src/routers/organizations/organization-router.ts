@@ -70,6 +70,7 @@ import { organizationDeploymentsRouter } from '@/routers/organizations/organizat
 import PostHogClient from '@/lib/posthog';
 import { organizationReviewAgentRouter } from '@/routers/organizations/organization-code-reviews-router';
 import { organizationCloudAgentNextRouter } from '@/routers/organizations/organization-cloud-agent-next-router';
+import { organizationVercelComputeRouter } from '@/routers/organizations/organization-vercel-compute-router';
 import { organizationAppBuilderRouter } from '@/routers/organizations/organization-app-builder-router';
 import { organizationSecurityAgentRouter } from '@/routers/organizations/organization-security-agent-router';
 import { organizationSecurityAuditLogRouter } from '@/routers/organizations/organization-security-audit-log-router';
@@ -150,6 +151,7 @@ export const organizationsRouter = createTRPCRouter({
   deployments: organizationDeploymentsRouter,
   reviewAgent: organizationReviewAgentRouter,
   cloudAgentNext: organizationCloudAgentNextRouter,
+  vercelCompute: organizationVercelComputeRouter,
   appBuilder: organizationAppBuilderRouter,
   securityAgent: organizationSecurityAgentRouter,
   securityAuditLog: organizationSecurityAuditLogRouter,

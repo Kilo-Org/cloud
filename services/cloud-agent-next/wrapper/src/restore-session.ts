@@ -11,10 +11,6 @@ import {
   runProcess,
 } from './utils.js';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type RestoreResult =
   | {
       ok: true;
@@ -63,10 +59,6 @@ const JQ_SANITIZE_TRANSIENT_PARTS_FILTER =
 // Both sanitizations run in a single jq pass so the snapshot is read+rewritten
 // once per restore — exports can be very large.
 const JQ_SANITIZE_SNAPSHOT_FILTER = `${JQ_SANITIZE_TOKEN_COUNTS_FILTER} | ${JQ_SANITIZE_TRANSIENT_PARTS_FILTER}`;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function log(msg: string): void {
   const message = `restore-session: ${msg}`;
@@ -843,10 +835,6 @@ async function applyPatch(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Main logic
-// ---------------------------------------------------------------------------
-
 export async function restoreSession(
   kiloSessionId: string,
   workspacePath: string,
@@ -886,7 +874,6 @@ export async function restoreSession(
 
       log(`ingestUrl=${ingestUrl}`);
 
-      // ---- Step 1: Download snapshot (stream directly to disk) ----
       log('downloading snapshot');
       try {
         const url = `${ingestUrl}/api/session/${encodeURIComponent(kiloSessionId)}/export`;
@@ -970,7 +957,6 @@ export async function restoreSession(
 
     await sanitizeSnapshot(tmpPath, options.signal, env);
 
-    // ---- Step 2: Run kilo import ----
     const importStartedAt = Date.now();
     log(
       `running kilo import kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} tmpPath=${tmpPath}`
@@ -1014,7 +1000,6 @@ export async function restoreSession(
       `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
     );
 
-    // ---- Step 3: Apply diffs ----
     // Extract diffs in a subprocess so the full snapshot JSON is never loaded
     // into this process's heap — only the small diff array crosses the boundary.
     const uniqueDiffs = await extractDiffs(tmpPath, options.signal, env);
@@ -1101,10 +1086,6 @@ export async function restoreSession(
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// CLI entrypoint — only runs when executed directly, not when imported
-// ---------------------------------------------------------------------------
 
 if (import.meta.main) {
   const rawArgs = process.argv.slice(2);

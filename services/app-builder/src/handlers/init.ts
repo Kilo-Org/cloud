@@ -21,7 +21,6 @@ async function extractTar(tarStream: ReadableStream<Uint8Array>): Promise<Record
   const files: Record<string, string> = {};
   const reader = tarStream.getReader();
 
-  // Collect all data from the stream
   const chunks: Uint8Array[] = [];
   while (true) {
     const { done, value } = await reader.read();
@@ -29,7 +28,6 @@ async function extractTar(tarStream: ReadableStream<Uint8Array>): Promise<Record
     if (value) chunks.push(value);
   }
 
-  // Concatenate all chunks into a single buffer
   const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
   const buffer = new Uint8Array(totalLength);
   let offset = 0;
@@ -38,12 +36,10 @@ async function extractTar(tarStream: ReadableStream<Uint8Array>): Promise<Record
     offset += chunk.length;
   }
 
-  // Parse TAR format
   let position = 0;
   const textDecoder = new TextDecoder('utf-8');
 
   while (position + 512 <= buffer.length) {
-    // Read 512-byte header
     const header = buffer.slice(position, position + 512);
 
     // Check for end of archive (two consecutive zero blocks)
@@ -58,20 +54,17 @@ async function extractTar(tarStream: ReadableStream<Uint8Array>): Promise<Record
     }
     let filename = textDecoder.decode(header.slice(0, filenameEnd)).trim();
 
-    // Normalize path: strip leading './' prefix
     if (filename.startsWith('./')) {
       filename = filename.slice(2);
     }
 
-    // Get the base filename for filtering
     const baseName = filename.split('/').pop() || '';
 
     // Skip macOS resource fork files (._*)
     if (baseName.startsWith('._')) {
-      // Skip content blocks for this entry
       const sizeStr = textDecoder.decode(header.slice(124, 136)).trim();
       const skipSize = parseInt(sizeStr, 8) || 0;
-      position += 512; // Move past header
+      position += 512;
       const contentBlocks = Math.ceil(skipSize / 512);
       position += contentBlocks * 512;
       continue;
@@ -84,26 +77,21 @@ async function extractTar(tarStream: ReadableStream<Uint8Array>): Promise<Record
     // Extract type flag (byte 156)
     const typeFlag = header[156];
 
-    // Move past header
     position += 512;
 
     // Skip if not a regular file (typeFlag 0 or ASCII '0')
     if (typeFlag !== 0 && typeFlag !== 48) {
-      // Skip content blocks for this entry
       const contentBlocks = Math.ceil(fileSize / 512);
       position += contentBlocks * 512;
       continue;
     }
 
-    // Skip empty files or directories
     if (fileSize === 0 || !filename || filename.endsWith('/')) {
       continue;
     }
 
-    // Read file content
     const content = buffer.slice(position, position + fileSize);
 
-    // Store file content as base64 to safely handle binary files through RPC
     let binaryString = '';
     for (let i = 0; i < content.length; i++) {
       binaryString += String.fromCharCode(content[i]);
@@ -158,7 +146,6 @@ export async function handleInit(request: Request, env: Env, appId: string): Pro
       );
     }
 
-    // Parse request body for optional template name
     let templateName = DEFAULT_TEMPLATE;
 
     const text = await request.text();
@@ -201,7 +188,6 @@ export async function handleInit(request: Request, env: Env, appId: string): Pro
       }
     }
 
-    // Initial template for the project
     const templatePath = `templates/${templateName}.tar.gz`;
     const tarObject = await env.TEMPLATES.get(templatePath);
 
@@ -224,7 +210,6 @@ export async function handleInit(request: Request, env: Env, appId: string): Pro
       );
     }
 
-    // Decompress gzip and extract TAR
     const decompressedStream = tarObject.body.pipeThrough(new DecompressionStream('gzip'));
     const files = await extractTar(decompressedStream);
 
@@ -258,7 +243,6 @@ export async function handleInit(request: Request, env: Env, appId: string): Pro
     try {
       await previewStub.triggerBuild();
     } catch (error) {
-      // Log error but don't fail the init
       logger.error('Failed to trigger preview build', formatError(error));
     }
 

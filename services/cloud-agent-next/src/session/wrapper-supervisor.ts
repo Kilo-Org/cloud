@@ -1071,8 +1071,12 @@ export function createWrapperSupervisor(
           completionSource: 'wrapper_failure',
           failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
           failureCode,
-          ...(failureCode === 'wrapper_no_output'
-            ? { attempts: (message.recoveryAttempts ?? 0) + 1 }
+          // Record the attempt count only once a recovery was actually spent on
+          // this turn. A first detection that could not be re-queued (no
+          // resolvable intent) spent nothing, and any non-null `attempts` maps
+          // to retry exhaustion on the client even though no retry ran.
+          ...(failureCode === 'wrapper_no_output' && message.recoveryAttempts !== undefined
+            ? { attempts: message.recoveryAttempts + 1 }
             : {}),
         };
       },

@@ -3289,6 +3289,153 @@ describe('SandboxSession orchestration', () => {
     }
   );
 
+  it('settles an accepted no-output turn from a stored completed reply instead of recovering it', async () => {
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    const authorization = fixture.record('a')?.operations?.prompt?.authorization;
+    if (!authorization) throw new Error('Missing prompt operation authorization');
+    // The runtime went silent, but the answer already reached the DO over the
+    // ingest channel. Re-dispatching would run the turn and its side effects a
+    // second time.
+    fixture.eventQueries.upsert({
+      executionId: '',
+      sessionId: SESSION_ID,
+      streamEventType: 'kilocode',
+      entityId: 'message/ase_stored_reply',
+      payload: JSON.stringify({
+        event: 'message.updated',
+        properties: {
+          info: {
+            id: 'ase_stored_reply',
+            role: 'assistant',
+            sessionID: 'kilo_root',
+            parentID: 'a',
+            time: { created: 1, completed: 2 },
+          },
+        },
+      }),
+      timestamp: 2,
+    });
+    delegateRequest(fixture, 'session.operation.get', async () =>
+      controlResponse({ state: 'running', authorization })
+    );
+
+    vi.setSystemTime(authorization.dispatchDeadlineAt + 1);
+    fixture.reload();
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')).toMatchObject({
+      state: 'completed',
+      terminalSource: 'coordinator',
+    });
+    expect(fixture.record('a')?.recoveryAttempts).toBeUndefined();
+    expect(fixture.record('a')?.failedReason).toBeUndefined();
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
+    ).toHaveLength(1);
+    expect(controlDiagnostics(fields, 'accepted_no_output_reconciled')).toHaveLength(1);
+  });
+
+  it('does not recover an accepted turn whose stop was admitted while the alarm observed it', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    const authorization = fixture.record('a')?.operations?.prompt?.authorization;
+    if (!authorization) throw new Error('Missing prompt operation authorization');
+    // The user's Stop lands while the alarm awaits the observation: the record
+    // stays `accepted` and only gains `cancellation`.
+    delegateRequest(fixture, 'session.operation.get', async () => {
+      const messages = fixture.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+      fixture.storage.kv.put(
+        'session_messages',
+        messages.map(message =>
+          message.messageId === 'a'
+            ? {
+                ...message,
+                cancellation: { operationId: 'stop_1', deadlineAt: Date.now() + 60_000 },
+              }
+            : message
+        )
+      );
+      return controlResponse({ state: 'running', authorization });
+    });
+
+    vi.setSystemTime(authorization.dispatchDeadlineAt + 1);
+    fixture.reload();
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    const record = fixture.record('a');
+    expect(record?.state).toBe('accepted');
+    expect(record?.cancellation).toEqual({
+      operationId: 'stop_1',
+      deadlineAt: expect.any(Number),
+    });
+    expect(record?.recoveryAttempts).toBeUndefined();
+    expect(record?.failedReason).toBeUndefined();
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
+    ).toHaveLength(1);
+    expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+  });
+
+  it('releases an accepted turn whose stop was admitted while the alarm awaited its health sync', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    const acceptedAt = fixture.record('a')?.acceptedAt;
+    if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
+    // The liveness snapshot cannot keep the turn alive, so the inactivity bound
+    // is due. The user's Stop lands while the alarm awaits that snapshot: the
+    // record stays `accepted` and only gains `cancellation`. The stop lifecycle
+    // owns the turn now, so the watchdog must release it instead of treating it
+    // as lost execution and failing it, which would quarantine the wrapper.
+    delegateRequest(fixture, 'session.sync', async () => {
+      const messages = fixture.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+      fixture.storage.kv.put(
+        'session_messages',
+        messages.map(message =>
+          message.messageId === 'a'
+            ? {
+                ...message,
+                cancellation: { operationId: 'stop_1', deadlineAt: Date.now() + 60_000 },
+              }
+            : message
+        )
+      );
+      return controlResponse({ status: { type: 'idle' }, questions: [], permissions: [] });
+    });
+
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    const record = fixture.record('a');
+    expect(record?.state).toBe('accepted');
+    expect(record?.cancellation).toEqual({
+      operationId: 'stop_1',
+      deadlineAt: expect.any(Number),
+    });
+    expect(record?.failedReason).toBeUndefined();
+    expect(fixture.terminalEvents()).toHaveLength(0);
+    expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
+  });
+
   describe('native startup attach authority', () => {
     it.each([false, true])(
       'applies preparing from its pending attach proof without changing prior fence=%s',

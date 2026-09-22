@@ -1322,13 +1322,22 @@ export async function requeueAcceptedMessageForRecovery(
   const intent = resolveRecoveryIntent(state);
   if (!intent) return false;
 
-  const queued = await markMessageQueuedForRecovery(storage, state.messageId);
-  if (!queued) return false;
-
   const callbackSnapshot = state.callbackRequired
     ? { required: true, target: state.callbackTarget }
     : undefined;
+  // Write the durable pending row before the queued state. The reverse order
+  // could strand a `queued` record with no pending row — invisible to both the
+  // pending drain and the accepted-only repair — if the write throws. With this
+  // order a failed pending write leaves the record accepted, so the next
+  // detection retries the recovery, and a state transition that no longer
+  // applies (the message already terminalized) compensates by dropping the row
+  // just written.
   await enqueuePendingSessionMessageIntent(storage, intent, Date.now(), callbackSnapshot);
+  const queued = await markMessageQueuedForRecovery(storage, state.messageId);
+  if (!queued) {
+    await deletePendingSessionMessageByMessageId(storage, state.messageId);
+    return false;
+  }
   return true;
 }
 
@@ -1336,6 +1345,26 @@ function resolveRecoveryIntent(state: SessionMessageState): SessionMessageIntent
   if (state.admissionSnapshot) return state.admissionSnapshot;
   const legacy = state.legacyAdmissionConstraints;
   if (!legacy?.turn || !legacy.agent?.model) return undefined;
+  if (legacy.turn.type === 'prompt') {
+    // The legacy pending shape cannot encode a prompt turn's attachments, so a
+    // predecessor prompt is rebuilt from the immutable constraints directly.
+    // Going through `decodeLegacyPendingMessage` would drop the user's files
+    // and re-run the recovered turn without them.
+    return {
+      turn: {
+        type: 'prompt',
+        messageId: legacy.turn.messageId,
+        prompt: legacy.turn.prompt,
+        ...(legacy.turn.attachments ? { attachments: legacy.turn.attachments } : {}),
+      },
+      agent: {
+        mode: legacy.agent.mode ?? 'code',
+        model: legacy.agent.model,
+        ...(legacy.agent.variant !== undefined ? { variant: legacy.agent.variant } : {}),
+      },
+      ...(legacy.finalization ? { finalization: legacy.finalization } : {}),
+    };
+  }
   const legacyMessage: PendingSessionMessage & { legacy: LegacyPendingSessionMessage } = {
     messageId: state.messageId,
     content: state.prompt,
@@ -1345,10 +1374,7 @@ function resolveRecoveryIntent(state: SessionMessageState): SessionMessageIntent
       role: 'user',
       content: state.prompt,
       createdAt: state.createdAt,
-      turn:
-        legacy.turn.type === 'command'
-          ? { type: 'command', command: legacy.turn.command, arguments: legacy.turn.arguments }
-          : { type: 'prompt' },
+      turn: { type: 'command', command: legacy.turn.command, arguments: legacy.turn.arguments },
       executionOptions: {
         mode: legacy.agent.mode,
         model: legacy.agent.model,

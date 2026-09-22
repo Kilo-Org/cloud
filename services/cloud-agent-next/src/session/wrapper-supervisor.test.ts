@@ -1641,6 +1641,29 @@ describe('WrapperSupervisor', () => {
     expect(harness.requestPendingDrainIfNeeded).not.toHaveBeenCalled();
   });
 
+  it('omits the attempt count when the first no-output detection spent no recovery', async () => {
+    const acceptedAt = 2_000;
+    const noOutputDeadlineAt = acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS;
+    const harness = createHarness([
+      liveRuntimeState({ noOutputDeadlineAt, nextPingAt: noOutputDeadlineAt + 1 }),
+      OWNED_WRAPPER_LEASE,
+    ]);
+    // A predecessor record with no resolvable intent: the recovery cannot be
+    // spent, so this first detection is terminal and no retry ran to count.
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.runMaintenance(noOutputDeadlineAt);
+
+    const state = await getSessionMessageState(harness.storage, MESSAGE_ID);
+    expect(state).toMatchObject({ status: 'failed', failureCode: 'wrapper_no_output' });
+    expect(state?.attempts).toBeUndefined();
+    const payloads = harness.events.map(
+      event => JSON.parse(event.payload) as Record<string, unknown>
+    );
+    expect(payloads).not.toHaveLength(0);
+    expect(payloads.every(payload => !('attempts' in payload))).toBe(true);
+  });
+
   it('keeps terminalizing a ping timeout on the first detection', async () => {
     const pingDeadlineAt = 92_000;
     const noOutputDeadlineAt = 332_000;

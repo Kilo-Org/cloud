@@ -246,6 +246,9 @@ describe('SessionListHeaderActions new-session control', () => {
     // The new-session control carries per-side insets; the filter control
     // carries one slop value for every side rather than an insets object, so
     // its facing reach comes from the shape-agnostic helper.
+    // `hitSlopInsets` validates and normalizes either shape; `slopSideDp` then
+    // reads the facing side, because the filter expresses its slop as one dp
+    // value for every side while the new-session control caps its right side.
     const newSessionSlop = hitSlopInsets(newSession.props.hitSlop);
     const filterSlop = slopDp(filter.props.hitSlop);
     // The new-session control sits left of the filter, so the gap has to fit

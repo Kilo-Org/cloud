@@ -1421,6 +1421,7 @@ describe('KiloPassNativeIapOwner', () => {
 
     const failed = owner.render();
     expect(failed.errorMessage).toBe(i18n.t('kiloPass.couldNotConnectToAppStore'));
+    expect(failed.storeConnectionError).toBe(true);
     expect(failed.ownershipCheckFailed).toBe(true);
 
     mockedIap.getAvailablePurchases.mockResolvedValue(undefined);
@@ -1429,8 +1430,30 @@ describe('KiloPassNativeIapOwner', () => {
 
     const recovered = owner.render();
     expect(recovered.errorMessage).toBeNull();
+    expect(recovered.storeConnectionError).toBe(false);
     expect(recovered.ownershipCheckFailed).toBe(false);
     expect(recovered.ownershipChecked).toBe(true);
+  });
+
+  it('drops the store-connection identity when a purchase error replaces the message', async () => {
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockRejectedValue(
+      new Error('Play Store service is not connected')
+    );
+    const owner = renderKiloPassNativeIapOwner();
+    owner.render();
+    await flushPromises();
+
+    expect(owner.render().storeConnectionError).toBe(true);
+
+    // Park the ownership effect: a purchase failure is a different error, and
+    // the screen must keep rendering it inline even while its card is up.
+    mockedIap.connected = false;
+    mockedIap.handlers?.onPurchaseError(new Error('StoreKit failed'));
+    const replaced = owner.render();
+
+    expect(replaced.errorMessage).toBe('StoreKit failed');
+    expect(replaced.storeConnectionError).toBe(false);
   });
 
   it('clears the ownership failure once a restore proves the store answered', async () => {

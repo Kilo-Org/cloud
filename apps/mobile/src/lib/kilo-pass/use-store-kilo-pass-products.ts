@@ -144,11 +144,18 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
 
   const queryErrorMessage = getAuthoredProductsErrorMessage(productsQuery.error);
 
+  // A successful fetch proves the store answered, so the connection message it
+  // raised is spent. `isSuccess` alone cannot carry this: React Query keeps the
+  // status at success while the query is disabled, so after a loaded catalog the
+  // store can drop, the bounded wait raise the message, and the retry that loads
+  // the catalog again never re-runs this effect — the stale message would keep
+  // forcing `products` to `[]` and the card would never clear (review WARNING).
+  // `dataUpdatedAt` moves on every successful fetch, so the retry clears it.
   useEffect(() => {
     if (productsQuery.isSuccess) {
       setStoreErrorMessage(null);
     }
-  }, [productsQuery.isSuccess]);
+  }, [productsQuery.isSuccess, productsQuery.dataUpdatedAt]);
 
   const productsState = getStoreKiloPassProductsState({
     data: productsQuery.data,

@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   nativeIap: {
     clearError: vi.fn(),
     errorMessage: null as string | null,
+    storeConnectionError: false,
     isPending: false,
     products: [] as unknown[],
     productsError: null as string | null,
@@ -279,6 +280,7 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.ownerMount.mockReset();
     mocks.nativeIap.clearError.mockReset();
     mocks.nativeIap.errorMessage = null;
+    mocks.nativeIap.storeConnectionError = false;
     mocks.nativeIap.isPending = false;
     mocks.nativeIap.products = [];
     mocks.nativeIap.productsError = null;
@@ -741,6 +743,7 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.nativeIap.products = [];
     mocks.nativeIap.errorMessage =
       'Could not connect to Google Play. Check your connection and try again.';
+    mocks.nativeIap.storeConnectionError = true;
     mocks.nativeIap.ownershipCheckFailed = true;
 
     const renderer = await renderScreen();
@@ -755,6 +758,28 @@ describe('KiloPassSubscriptionScreen', () => {
 
     expect(mocks.nativeIap.productsRefetch).toHaveBeenCalledTimes(1);
     expect(mocks.nativeIap.retryOwnershipCheck).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('hides the store-connection line by identity, not by comparing the translated copy', async () => {
+    setAndroidNativeIapPresentation();
+    mocks.nativeIap.products = [];
+    mocks.nativeIap.ownershipCheckFailed = true;
+    // The owner stored that message before the app language changed, so the copy
+    // it holds is no longer the copy this render resolves. A copy comparison
+    // fails then and puts the failure the card already states back inline.
+    mocks.nativeIap.errorMessage =
+      'Could not connect to the App Store. Check your connection and try again.';
+    mocks.nativeIap.storeConnectionError = true;
+
+    const renderer = await renderScreen();
+
+    expect(allText(renderer)).toContain('Google Play products unavailable');
+    expect(allText(renderer)).not.toContain('Could not connect to the App Store');
+
+    const buttons = renderer.root.findAll(node => String(node.type) === 'Button');
+    expect(buttons).toHaveLength(1);
 
     renderer.unmount();
   });

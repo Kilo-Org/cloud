@@ -178,6 +178,7 @@ function KiloPassNativeIapContent() {
   const {
     clearError,
     errorMessage,
+    storeConnectionError,
     isPending,
     products,
     productsError,
@@ -209,10 +210,12 @@ function KiloPassNativeIapContent() {
   // A store failure leaves the catalog empty and may also surface `errorMessage`.
   // The products-unavailable card is the single surface for that failure, so only
   // the store connection message stays hidden while the card is shown; every
-  // other failure (a failed restore, a purchase error) still renders inline.
+  // other failure (a failed restore, a purchase error) still renders inline. The
+  // owner reports the message's identity, never the translated copy: the app
+  // language can change while the message is on screen and an equality check
+  // would then fail and duplicate the card's failure inline.
   const productsUnavailable = !productsIsLoading && products.length === 0;
-  const storeErrorMessageHidden =
-    productsUnavailable && errorMessage === getStoreConnectionErrorMessage(isAndroid);
+  const storeErrorMessageHidden = productsUnavailable && storeConnectionError;
   // The ownership retry below renders from `ownershipCheckFailed` alone, so its
   // explanation must come from the same flag: when the screen has already cleared
   // the message (its unmount clears it), a retry must not stand there with no

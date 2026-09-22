@@ -97,11 +97,12 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/login/email-otp-form', () => ({ EmailOtpForm: 'EmailOtpForm' }));
-vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
 vi.mock('@/components/login/apple-logo', () => ({ AppleLogo: 'AppleLogo' }));
+vi.mock('@/components/login/google-logo', () => ({ GoogleLogo: 'GoogleLogo' }));
 vi.mock('@/components/ui/icons', () => ({ KeyRound: 'KeyRound' }));
 
-// The real hook pulls expo-router, which the mounted project cannot load.
+// The idle screen reads the foreground ink for the Apple mark; the real hook
+// pulls expo-router, which the mounted project cannot load.
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#14130f', mutedForeground: '#6f6a61' }),
 }));

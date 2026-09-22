@@ -1,11 +1,16 @@
 import Svg, { Path } from 'react-native-svg';
 
-// Official Apple mark, used on the provider row we draw ourselves. The native
-// `AppleAuthenticationButton` renders its title in the device language, which
-// put English "Sign in with Apple" next to the catalog's translated Google and
-// passkey rows whenever the app language differed from the device language.
-// The mark is our themed ink, matching the Google and passkey rows' leading
-// glyphs (Apple's own outline style is a monochrome mark on the button chrome).
+// The Apple mark, single-colour so the outlined provider button draws it in the
+// label's own ink. Apple's HIG pairs this mark with the exact wording "Sign in
+// with Apple"; the app renders both inside its own outline Button, beside the
+// custom Google mark, so all three provider controls share one chrome.
+//
+// We draw the mark ourselves rather than use `AppleAuthenticationButton`: the
+// native control titles itself in the device language, which put English
+// "Sign in with Apple" next to the catalog's translated Google and passkey rows
+// whenever the app language differed from the device language. The mark is our
+// themed ink, matching the Google and passkey rows' leading glyphs (Apple's own
+// outline style is a monochrome mark on the button chrome).
 export function AppleLogo({ size = 18, color }: { size?: number; color: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">

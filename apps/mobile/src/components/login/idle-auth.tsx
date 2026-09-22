@@ -17,7 +17,8 @@ import { Text } from '@/components/ui/text';
 import {
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
-  INLINE_LINK_HIT_SLOP_DP,
+  INLINE_LINK_HIT_SLOP,
+  INLINE_LINK_ROW_CLASS,
 } from '@/lib/a11y/tap-target';
 import { useNativeAuth } from '@/lib/auth/use-native-auth';
 import { passkeysSupported } from '@/lib/auth/passkey-client';
@@ -221,9 +222,14 @@ export function IdleAuth({
         // The provider row is ours, not Apple's native control: the native
         // button titles itself in the device language, which left English
         // "Sign in with Apple" next to the translated Google and passkey rows
-        // when the app language differed from the device language. The label
-        // comes from the catalog (`login.signInWithApple`), and the mark and
-        // outline chrome match the two rows below it.
+        // when the app language differed from the device language, and it draws
+        // its own dark border (about twice the design system hairline) that no
+        // buttonStyle can match. The label comes from the catalog
+        // (`login.signInWithApple`), and the mark and outline chrome match the
+        // two rows below it: one border colour and width, one fill, radius,
+        // height and label weight across the three. Apple's HIG requires the
+        // mark and the exact "Sign in with Apple" wording; a custom control
+        // satisfies it, as does the Google button.
         <Button
           variant="outline"
           size="lg"
@@ -312,11 +318,6 @@ export function IdleAuth({
       <FormField
         label={t('login.emailAddress')}
         error={emailError}
-        reserveErrorMessages={[
-          t('login.pleaseEnterEmail'),
-          t('authErrors.invalidRequest'),
-          t('authErrors.invalidEmail'),
-        ]}
         placeholder={t('login.emailPlaceholder')}
         keyboardType="email-address"
         autoCapitalize="none"
@@ -355,17 +356,24 @@ export function IdleAuth({
         {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
         <Text>{t('common.continue')}</Text>
       </Button>
-      <View className="flex-row flex-wrap items-center justify-center">
+      <View className={cn('flex-row flex-wrap items-center justify-center', INLINE_LINK_ROW_CLASS)}>
         {/* The sentence is a row of nodes, not one Text with nested handlers: an
             inline link's own box is what the control-size audit measures, so
             each link carries the shared inline-link box and its own reach. The
-            connector between them reserves at least both facing slops, so the
-            two touch regions never overlap in a catalog with a short
-            conjunction. */}
+            box adds no height to the line (its 28dp floor is cancelled by the
+            shared layout-neutral form), so the only gaps between the words are
+            the sentence's own spaces, and the connector's min-width keeps both
+            facing slops apart in a catalog with a short conjunction. The links'
+            44pt vertical reach needs `(28 - 14) / 2 + 8 = 15dp` of free space
+            above and below the `text-xs` line, which the screen's `gap-3`
+            gutter (10.5dp) cannot give it, so the row carries the extra 5dp
+            margin: both regions then stay clear of the Continue button above
+            and the ghost button below. */}
+
         <Text className="text-xs text-muted-foreground">{t('login.termsPrefix')} </Text>
         <Pressable
-          className={cn(INLINE_LINK_BOX_CLASS, 'px-1')}
-          hitSlop={INLINE_LINK_HIT_SLOP_DP}
+          className={INLINE_LINK_BOX_CLASS}
+          hitSlop={INLINE_LINK_HIT_SLOP}
           accessibilityRole="link"
           accessibilityLabel={t('login.terms')}
           onPress={() => void WebBrowser.openBrowserAsync(TERMS_URL)}
@@ -376,8 +384,8 @@ export function IdleAuth({
           {t('login.termsConnector')}
         </Text>
         <Pressable
-          className={cn(INLINE_LINK_BOX_CLASS, 'px-1')}
-          hitSlop={INLINE_LINK_HIT_SLOP_DP}
+          className={INLINE_LINK_BOX_CLASS}
+          hitSlop={INLINE_LINK_HIT_SLOP}
           accessibilityRole="link"
           accessibilityLabel={t('common.privacyPolicy')}
           onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}

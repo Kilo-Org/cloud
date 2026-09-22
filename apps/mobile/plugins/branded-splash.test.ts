@@ -164,8 +164,16 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // arrayContaining, like the styles assertion below: introspection reads the
+    // project's existing colors.xml, so a prebuilt `android/` tree carries the
+    // app's other colors beside the splash one. A fixed-length array made this
+    // pass only on a clean checkout.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([
+          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+        ]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

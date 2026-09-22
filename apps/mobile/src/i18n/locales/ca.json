@@ -843,7 +843,8 @@
       "chat": "Missatges de xat",
       "kiloclaw": "Activitat de KiloClaw",
       "balance": "Alertes de saldo",
-      "security": "Problemes de seguretat"
+      "security": "Problemes de seguretat",
+      "spend": "Alertes de despesa"
     },
     "category": {
       "chatMessagesSubtitle": "respostes a les teves converses",
@@ -858,7 +859,9 @@
       "balanceAlertsSubtitle": "avisos de saldo baix de l'organització",
       "balanceAlertsUnavailable": "Uneix-te a una organització per rebre avisos de saldo baix.",
       "securityFindingsSubtitle": "noves deteccions i recordatoris d'SLA",
-      "securityFindingsUnavailable": "Activa l'agent de seguretat de Kilo en un àmbit per rebre problemes de seguretat."
+      "securityFindingsUnavailable": "Activa l'agent de seguretat de Kilo en un àmbit per rebre problemes de seguretat.",
+      "spendAlertsSubtitle": "superacions de llindars i pics horaris",
+      "spendAlertsToggle": "Categoria d'alertes de despesa"
     },
     "action": {
       "openSession": "Obre la sessió"
@@ -3243,5 +3246,28 @@
   },
   "launcher": {
     "openLastSession": "Obre l'última sessió"
+  },
+  "spendAlerts": {
+    "subtitle": "Envia una alerta per correu o notificació push als contactes de facturació quan la despesa d'aquest àmbit superi un límit o augmenti per sobre de la seva taxa horària habitual.",
+    "enable": "Activa les alertes de despesa",
+    "thresholdTitle": "Superació del llindar",
+    "thresholdSubtitle": "La despesa acumulada supera el teu límit",
+    "anomalyTitle": "Pic horari",
+    "anomalySubtitle": "Una hora està molt per sobre de la taxa habitual d'aquest àmbit",
+    "limitLabel": "Límit (USD)",
+    "windowLabel": "Finestra",
+    "window24h": "24 hores",
+    "window7d": "7 dies",
+    "window30d": "30 dies",
+    "multiplierLabel": "Multiplicador del pic",
+    "saved": "S'ha desat la configuració de les alertes de despesa",
+    "loadError": "No s'han pogut carregar les alertes de despesa.",
+    "saveError": "No s'han pogut desar les alertes de despesa.",
+    "empty": "Les alertes de despesa estan desactivades. Activa-les per avisar els contactes de facturació d'aquest àmbit.",
+    "noSpend": "Encara no s'ha registrat cap despesa",
+    "spend24h": "Despesa de les últimes 24 hores",
+    "multiplierError": "Introdueix un multiplicador d'1 o més",
+    "permissionDenied": "No tens permís per gestionar les alertes de despesa.",
+    "pushOffByCategory": "Desactivat a Notificacions"
   }
 }

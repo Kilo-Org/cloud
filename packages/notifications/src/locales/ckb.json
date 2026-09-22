@@ -7,6 +7,7 @@
       "instanceLifecycle": "دۆخەکەت نوێکراوەتەوە",
       "scheduledAction": "کردارێکی دیاریکراو نوێکراوەتەوە",
       "lowBalance": "تەوازنەکەت پێویستی بە سەرنجە",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "دۆزینەوەیەکی ئاسایش پێویستی بە سەرنجە",
       "activeAgentsGlanceable": "ئەجێنتە چالاکەکان نوێکارییەکیان هەیە"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "ئاگادارکردنەوەی تەوازنی نزم",
       "body": "تەوازنی {{organizationName}} لە ${{minimumBalanceUsd}} خوارتر کەوت"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "دۆزینەوەی ئاسایشی نوێ ({{severity}})",

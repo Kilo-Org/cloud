@@ -19,8 +19,8 @@ import {
   buildLocalE2eWorkerConfig,
   requireE2eInternalSecret,
   renderLocal,
-} from '../../e2e/deploy/render-e2e-worker-config.mjs';
-import { LOCAL_E2E_INTERNAL_API_SECRET } from '../../e2e/e2e-internal-secret';
+} from '../e2e/deploy/render-e2e-worker-config.mjs';
+import { LOCAL_E2E_INTERNAL_API_SECRET } from '../e2e/e2e-internal-secret';
 
 const overrides = {
   workerUrl: 'https://cloud-agent-e2e-test.engineering-e11.workers.dev',
@@ -35,6 +35,11 @@ const REMOVED_CONTAINER_CLASSES = [
   'SandboxContainment',
   'SandboxSmallContainment',
   'SandboxCodeReviewContainment',
+  // `SandboxContainers` is the newest production container class (migration
+  // `v11`). The e2e render keeps only `SandboxSmall`, so it is removed here
+  // alongside the older sandbox classes; the pinned list must gain it whenever
+  // production adds a container class.
+  'SandboxContainers',
 ];
 
 const KEPT_DO_CLASSES = [

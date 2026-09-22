@@ -1,3 +1,6 @@
+// Imported first: the helper registers the partial `@/lib/utils` mock (a
+// `parseTimestamp` spy delegating to the real export) before the hook loads.
+import { parseTimestampSpy } from './use-provider-inbox.test-helpers';
 import { describe, expect, it, vi } from 'vitest';
 
 import { classifyPrReviewQueryState } from './classify-pr-review-query-state';
@@ -124,6 +127,19 @@ describe('inbox rows', () => {
 });
 
 describe('mergeProviderInboxSources', () => {
+  it('parses each row timestamp exactly once per merge', () => {
+    // The comparator used to call `parseTimestamp` on BOTH operands of every
+    // comparison, so a three-provider merge re-parsed its timestamps O(n log n)
+    // times. The merge decorates once, so the count equals the row count.
+    const spy = vi.mocked(parseTimestampSpy).mockClear();
+    mergeProviderInboxSources([
+      source({ platform: 'github', rows: githubRows }),
+      source({ platform: 'gitlab', rows: gitlabRows }),
+      source({ platform: 'bitbucket', rows: bitbucketRows }),
+    ]);
+    expect(spy).toHaveBeenCalledTimes(3);
+  });
+
   it('merges every enabled provider newest-first', () => {
     const merged = mergeProviderInboxSources([
       source({ platform: 'github', rows: githubRows }),

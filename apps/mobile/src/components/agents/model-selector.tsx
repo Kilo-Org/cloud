@@ -7,7 +7,6 @@ import { Keyboard, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
@@ -130,7 +129,20 @@ export function ModelSelector({
   const selectionContext = useContext(ModelPickerSelectionScopeContext);
 
   if (isLoading) {
-    return <Skeleton className="h-8 w-28 rounded-full" />;
+    return (
+      <View
+        accessible
+        accessibilityRole="button"
+        accessibilityState={{ busy: true, disabled: true }}
+        accessibilityLabel={t('common.model')}
+        className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 opacity-50"
+      >
+        <Text className="shrink text-sm font-medium text-muted-foreground" numberOfLines={1}>
+          {t('common.model')}
+        </Text>
+        <ChevronDown size={14} color={colors.mutedForeground} />
+      </View>
+    );
   }
 
   const pickerOptions = options.map(option => toSessionModelOption(option));

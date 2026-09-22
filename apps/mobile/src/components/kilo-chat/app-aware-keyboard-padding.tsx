@@ -1,27 +1,53 @@
 import { type ComponentProps, useEffect, useState } from 'react';
-import { AppState, Keyboard, type KeyboardEvent, Platform, View } from 'react-native';
+import { AppState, Dimensions, Keyboard, type KeyboardEvent, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { resolveKeyboardBottomPadding } from '@/components/login-screen-state';
 import {
   resolveAppAwareKeyboardPadding,
   resolveKeyboardPaddingEventsForPlatform,
 } from './app-aware-keyboard-padding-state';
 
+/**
+ * The platform's own keyboard metric, in the coordinates the IME event reports
+ * it in. Android edge-to-edge reports the visible-frame height with the bottom
+ * system-bar inset already subtracted (`ReactRootView` reports
+ * `imeInsets.bottom − barInsets.bottom`), so the metric stops at the navigation
+ * bar; iOS reports the keyboard frame in screen coordinates.
+ *
+ * A keyboard docked to the screen bottom reaches it, so the distance from the
+ * keyboard top to the screen bottom is its own height. An undocked (floating or
+ * split) iPad keyboard sits above the bottom, where that distance counts the
+ * uncovered screen below it — hundreds of points — and overstates the lift the
+ * shared keyboard view applies. Clamping the overlap to the reported frame
+ * height keeps the docked metric and caps a floating keyboard at the strip it
+ * actually hides (2026-09-22 review finding). An event that carries no screen
+ * position falls back to the reported height too.
+ */
 function keyboardPaddingFromEvent(event: KeyboardEvent): number {
-  return event.endCoordinates.height;
+  if (Platform.OS === 'android') {
+    return event.endCoordinates.height;
+  }
+  const keyboardTop = event.endCoordinates.screenY;
+  if (!Number.isFinite(keyboardTop)) {
+    return event.endCoordinates.height;
+  }
+  return Math.min(Dimensions.get('screen').height - keyboardTop, event.endCoordinates.height);
 }
 
 /**
- * Height of the software keyboard while it is up, `0` otherwise, resolved for
- * the current platform (`keyboardWillShow` on iOS, `keyboardDidShow` on
- * Android, where the window never resizes for the IME under API 35+).
+ * The strip the IME hides from the screen bottom — its reported height plus the
+ * bottom system-bar inset on Android, the screen overlap on iOS — and `0` while
+ * the keyboard is down.
  *
- * A screen that must react to the keyboard beyond reserving its height (e.g.
- * revealing a call-to-action the IME covers) reads it from here instead of
- * adding a second listener.
+ * This is the app's one keyboard read (`keyboardWillShow` on iOS,
+ * `keyboardDidShow` on Android, where the window never resizes for the IME
+ * under API 35+). Exported so a screen that must react to the keyboard beyond
+ * reserving its height — a pinned footer measuring its own clearance — reads the
+ * same lift `AppAwareKeyboardPaddingView` applies instead of adding a second
+ * listener.
  */
 export function useAppAwareKeyboardPadding(): number {
+  const { bottom } = useSafeAreaInsets();
   const [keyboardPadding, setKeyboardPadding] = useState(0);
 
   useEffect(() => {
@@ -66,7 +92,14 @@ export function useAppAwareKeyboardPadding(): number {
     };
   }, []);
 
-  return keyboardPadding;
+  // Android reports the IME height with the navigation bar already subtracted
+  // (ReactRootView: imeInsets.bottom − barInsets.bottom), so the shared lift
+  // adds it back and covers the whole strip the keyboard hides. A caller whose
+  // own container or wrapped content already reserved that inset passes
+  // `containerReservesBottomInset` / `contentReservesBottomInset` so the view
+  // subtracts it again: the screen resolves the inset once, never twice.
+  const systemBarInset = Platform.OS === 'android' ? bottom : 0;
+  return keyboardPadding > 0 ? keyboardPadding + systemBarInset : 0;
 }
 
 /**
@@ -76,24 +109,20 @@ export function useAppAwareKeyboardPadding(): number {
  * The two platforms measure the IME from different origins: Android's stops at
  * the navigation bar (`ReactRootView` reports `imeInsets.bottom −
  * barInsets.bottom`) while iOS's frame reaches the screen bottom. The reserved
- * space is anchored to the screen bottom, so resolve the occlusion with the same
- * rule the login screen and the Toaster use (`resolveKeyboardBottomPadding`);
- * padding by the raw Android height left the manual review form's Start button
- * behind the IME's navigation row (2026-09-20). A caller that reserves the
- * keyboard's height in its own layout (a surface inset) reads the occlusion from
- * here; the padded view below also needs the raw metric.
+ * space is anchored to the screen bottom, and `useAppAwareKeyboardPadding`
+ * already reports it that way (`resolveKeyboardBottomPadding`: the raw height
+ * plus the Android system-bar inset; padding by the raw Android height left the
+ * manual review form's Start button behind the IME's navigation row,
+ * 2026-09-20). The raw platform metric is therefore the occlusion less the inset
+ * that hook adds back, and it is `0` while the keyboard is down. A caller that
+ * reserves the keyboard's height in its own layout (a surface inset) reads the
+ * occlusion from here; the padded view below also needs the raw metric.
  */
 export function useKeyboardOcclusion() {
-  const keyboardHeight = useAppAwareKeyboardPadding();
   const { bottom } = useSafeAreaInsets();
-  const keyboardOcclusion =
-    keyboardHeight > 0
-      ? resolveKeyboardBottomPadding({
-          keyboardHeight,
-          bottomInset: bottom,
-          platform: Platform.OS,
-        })
-      : 0;
+  const keyboardOcclusion = useAppAwareKeyboardPadding();
+  const systemBarInset = Platform.OS === 'android' ? bottom : 0;
+  const keyboardHeight = Math.max(keyboardOcclusion - systemBarInset, 0);
   return { keyboardHeight, keyboardOcclusion };
 }
 
@@ -140,6 +169,8 @@ export function AppAwareKeyboardPaddingView({
   if (containerReservesBottomInset) {
     keyboardPadding = Math.max(keyboardOcclusion - bottom, 0);
   } else if (contentReservesBottomInset) {
+    // The platform's raw metric, which the content's own inset padding
+    // completes.
     keyboardPadding = keyboardHeight;
   }
 

@@ -2233,10 +2233,6 @@
       "linesTruncated": "دێڕەکانی {{start}}–{{end}} (کورتکراوە)",
       "linesOf": "دێڕەکانی {{start}}–{{end}} لە {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "{{action}} بۆ Cloud Agent سەرکەوتوو نەبوو ({{status}}).",
-      "failed": "{{action}} بۆ Cloud Agent سەرکەوتوو نەبوو."
-    },
     "collectCopyableText": {
       "unserializableInput": "[تێدراوەکە ناتوانرێت بە زنجیرەیەکی داتا بنووسرێت]",
       "errorPrefix": "هەڵە: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "دابینکەرەکە داواکارییەکەی ڕەتکردەوە.",
       "assistantStopped": "وەڵامەکە وەستێنرا.",
       "assistantContextOverflow": "گفتوگۆکە بۆ ئەم مۆدێلە زۆر درێژە.",
-      "assistantFailed": "وەڵامدانەوە سەرکەوتوو نەبوو.",
-      "sendFailed": "نەتوانرا پەیامەکە بنێردرێت. تکایە دووبارە هەوڵ بدەرەوە."
+      "assistantFailed": "وەڵامدانەوە سەرکەوتوو نەبوو."
     },
     "filePart": {
       "loadingImage": "بارکردنی وێنە",

@@ -2233,10 +2233,6 @@
       "linesTruncated": "መስመሮች {{start}}–{{end}} (በከፊል የታዩ)",
       "linesOf": "ከ{{total}} መስመሮች {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "የCloud Agent {{action}} አልተሳካም ({{status}})።",
-      "failed": "የCloud Agent {{action}} አልተሳካም።"
-    },
     "collectCopyableText": {
       "unserializableInput": "[ወደ ተከታታይ ውሂብ ሊቀየር የማይችል ግብዓት]",
       "errorPrefix": "ስህተት: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "አቅራቢው ጥያቄውን ውድቅ አድርጓል።",
       "assistantStopped": "ምላሹ ቆሟል።",
       "assistantContextOverflow": "ውይይቱ ለሞዴሉ በጣም ረጅም ነው።",
-      "assistantFailed": "ምላሹ አልተሳካም።",
-      "sendFailed": "መልእክቱን መላክ አልተሳካም። እባክዎ እንደገና ይሞክሩ።"
+      "assistantFailed": "ምላሹ አልተሳካም።"
     },
     "filePart": {
       "loadingImage": "ምስሉን በመጫን ላይ",

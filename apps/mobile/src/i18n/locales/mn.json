@@ -2233,10 +2233,6 @@
       "linesTruncated": "{{start}}–{{end}} мөр (товчилсон)",
       "linesOf": "{{start}}–{{end}} мөр, нийт {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent-ийн {{action}} үйлдэл амжилтгүй боллоо ({{status}}).",
-      "failed": "Cloud Agent-ийн {{action}} үйлдэл амжилтгүй боллоо."
-    },
     "collectCopyableText": {
       "unserializableInput": "[цуваа хэлбэрт хөрвүүлэх боломжгүй оролт]",
       "errorPrefix": "Алдаа: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "Үйлчилгээ үзүүлэгч хүсэлтийг хүлээн авахаас татгалзлаа.",
       "assistantStopped": "Хариулт үүсгэхийг зогсоосон.",
       "assistantContextOverflow": "Харилцан яриа загварын боловсруулах хэмжээнээс хэтэрсэн байна.",
-      "assistantFailed": "Хариулт үүсгэж чадсангүй.",
-      "sendFailed": "Мессежийг илгээж чадсангүй. Дахин оролдоно уу."
+      "assistantFailed": "Хариулт үүсгэж чадсангүй."
     },
     "filePart": {
       "loadingImage": "Зургийг ачаалж байна",

@@ -1729,10 +1729,6 @@
       "linesTruncated": "zeilen {{start}}–{{end}} (gekürzt)",
       "linesOf": "zeilen {{start}}–{{end}} von {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Die Aktion „{{action}}“ in Cloud Agent ist fehlgeschlagen ({{status}}).",
-      "failed": "Die Aktion „{{action}}“ in Cloud Agent ist fehlgeschlagen."
-    },
     "collectCopyableText": {
       "unserializableInput": "[nicht serialisierbare Eingabe]",
       "errorPrefix": "Fehler: {{error}}"
@@ -1828,8 +1824,7 @@
       "assistantProviderRejected": "Der Anbieter hat die Anfrage abgelehnt.",
       "assistantStopped": "Die Erstellung der Antwort wurde abgebrochen.",
       "assistantContextOverflow": "Die Unterhaltung ist zu lang für das Modell.",
-      "assistantFailed": "Die Antwort konnte nicht erstellt werden.",
-      "sendFailed": "Die Nachricht konnte nicht gesendet werden. Bitte versuche es erneut."
+      "assistantFailed": "Die Antwort konnte nicht erstellt werden."
     },
     "filePart": {
       "loadingImage": "Bild wird geladen",

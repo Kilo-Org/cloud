@@ -1,4 +1,8 @@
 import { logger } from '../logger.js';
+import {
+  githubRepositoryAuthorizationResultSchema,
+  type GitHubRepositoryAuthorizationFailureReason,
+} from '@kilocode/worker-utils/github-authorization';
 import type {
   BitbucketTokenFailureReason,
   GitAuthorConfig,
@@ -19,7 +23,14 @@ export type ResolvedGitHubToken = {
 };
 
 export type ResolveGitHubTokenError = {
-  reason: string;
+  reason:
+    | GitHubRepositoryAuthorizationFailureReason
+    | 'capability_configuration_error'
+    | 'invalid_targets'
+    | 'invalid_capability'
+    | 'expired_capability'
+    | 'service_not_configured'
+    | 'rpc_error';
   message: string;
 };
 
@@ -239,7 +250,18 @@ export async function authorizeCloudAgentGitHubRepo(
     };
   }
   try {
-    const result = await env.GIT_TOKEN_SERVICE.authorizeCloudAgentGitHubRepo(params);
+    const response = await env.GIT_TOKEN_SERVICE.authorizeCloudAgentGitHubRepo(params);
+    const parsed = githubRepositoryAuthorizationResultSchema.safeParse(response);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: {
+          reason: 'rpc_error',
+          message: 'GitHub credential service returned an invalid authorization response',
+        },
+      };
+    }
+    const result = parsed.data;
     return result.success
       ? { success: true }
       : {

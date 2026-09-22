@@ -1,6 +1,10 @@
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type {
+  GitHubRepositoryAuthorizationFailureReason,
+  GitHubRepositoryAuthorizationResult,
+} from '@kilocode/worker-utils/github-authorization';
 import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { SandboxControl } from './persistence/SandboxControl.js';
@@ -193,13 +197,7 @@ type GetTokenForRepoResult =
     }
   | {
       success: false;
-      reason:
-        | 'database_not_configured'
-        | 'invalid_repo_format'
-        | 'no_installation_found'
-        | 'repository_not_installed'
-        | 'integration_mismatch'
-        | 'invalid_org_id';
+      reason: GitHubRepositoryAuthorizationFailureReason;
     };
 
 export type ManagedGitHubFallbackReason =
@@ -239,13 +237,7 @@ type GetCloudAgentAuthForRepoResult =
     }
   | {
       success: false;
-      reason:
-        | 'database_not_configured'
-        | 'invalid_repo_format'
-        | 'no_installation_found'
-        | 'repository_not_installed'
-        | 'integration_mismatch'
-        | 'invalid_org_id';
+      reason: GitHubRepositoryAuthorizationFailureReason;
     };
 
 type IssueGitHubSessionCapabilityResult =
@@ -262,14 +254,7 @@ type IssueGitHubSessionCapabilityResult =
     }
   | {
       success: false;
-      reason:
-        | 'database_not_configured'
-        | 'invalid_repo_format'
-        | 'no_installation_found'
-        | 'repository_not_installed'
-        | 'integration_mismatch'
-        | 'invalid_org_id'
-        | 'capability_configuration_error';
+      reason: GitHubRepositoryAuthorizationFailureReason | 'capability_configuration_error';
     };
 
 type RedeemGitHubSessionCapabilityResult =
@@ -446,7 +431,7 @@ type RedeemKiloSessionCapabilityResult =
 export type GitTokenService = {
   authorizeCloudAgentGitHubRepo?(
     params: Omit<ManagedGitHubAuthParams, 'allowUserAuthorization'>
-  ): Promise<{ success: true } | { success: false; reason: string }>;
+  ): Promise<GitHubRepositoryAuthorizationResult>;
   getTokenForRepo(params: {
     githubRepo: string;
     userId: string;

@@ -343,6 +343,18 @@ describe('githubAppsRouter organization install capability', () => {
     });
   });
 
+  it('does not offer refresh for an unassigned connection role', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([
+      { ...organizationIntegration(), github_connection_role: null },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(caller.listOrganizationInstallations({ organizationId })).resolves.toMatchObject({
+      installations: [{ status: 'connected', connectionRole: null, canRefresh: false }],
+    });
+  });
+
   it('does not let a locally disconnected connection block adding another installation', async () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
     mockListIntegrations.mockResolvedValue([

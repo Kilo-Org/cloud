@@ -6,6 +6,7 @@ import {
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentGitLabSessionCapability,
   issueCloudAgentKiloSessionCapability,
+  authorizeCloudAgentGitHubRepo,
   resolveCloudAgentGitHubAuthForRepo,
   resolveGitHubTokenForRepo,
   resolveManagedBitbucketToken,
@@ -42,6 +43,7 @@ function expectSecretSafeLogs(): void {
 function createGitTokenService() {
   return {
     getTokenForRepo: vi.fn(),
+    authorizeCloudAgentGitHubRepo: vi.fn(),
     getToken: vi.fn(),
     getGitLabToken: vi.fn(),
     issueGitHubSessionCapability: vi.fn(),
@@ -58,6 +60,21 @@ function createEnv(service: Partial<GitTokenService>) {
 }
 
 describe('broker exception safety', () => {
+  it('maps an unknown authorization RPC reason to rpc_error', async () => {
+    const service = createGitTokenService();
+    service.authorizeCloudAgentGitHubRepo = vi
+      .fn()
+      .mockResolvedValue({ success: false, reason: 'unrecognized_worker_reason' } as never);
+
+    await expect(
+      authorizeCloudAgentGitHubRepo(createEnv(service), {
+        githubRepo: 'acme/repo',
+        userId: 'user-1',
+        expectedIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+      })
+    ).resolves.toMatchObject({ success: false, error: { reason: 'rpc_error' } });
+  });
+
   it('never falls back to generic credentials for an agent-purpose association', async () => {
     const service = createGitTokenService();
     const result = await resolveCloudAgentGitHubAuthForRepo(createEnv(service), {

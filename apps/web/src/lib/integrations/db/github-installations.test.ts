@@ -268,6 +268,103 @@ describe('GitHub installation persistence', () => {
     expect(roles).toEqual([{ role: null }, { role: null }]);
   });
 
+  test('rerunning the role backfill assigns late legacy writes without changing existing roles', async () => {
+    const organizationA = await createTestOrganization('Reconcile workflow', ownerId, 0);
+    const organizationB = await createTestOrganization('Reconcile secondary', otherOwnerId, 0);
+    const organizationC = await createTestOrganization('Reconcile late legacy', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = `${organizationB.id},${organizationC.id}`;
+    const workflow = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data('996005')
+    );
+    const secondary = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data('996005'), kiloUserId: otherOwnerId }
+    );
+    if (!workflow.ok || !secondary.ok) throw new Error('Expected role-bearing associations');
+    const [lateLegacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organizationC.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '996005',
+        github_app_type: 'standard',
+        github_installation_id: (
+          await db.query.platform_integrations.findFirst({
+            where: eq(platform_integrations.id, workflow.integrationId),
+          })
+        )?.github_installation_id,
+        integration_status: 'active',
+        created_at: new Date().toISOString(),
+      })
+      .returning();
+    await applyConnectionRoleBackfill();
+    const roles = await db
+      .select({ id: platform_integrations.id, role: platform_integrations.github_connection_role })
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '996005'));
+    expect(roles).toEqual(
+      expect.arrayContaining([
+        { id: workflow.integrationId, role: 'workflow' },
+        { id: secondary.integrationId, role: 'agent_only' },
+        { id: lateLegacy.id, role: 'agent_only' },
+      ])
+    );
+  });
+
+  test('assigns a late legacy row as secondary beside an assigned workflow', async () => {
+    const workflowOwner = await createTestOrganization('Reconcile evidence workflow', ownerId, 0);
+    const lateOwner = await createTestOrganization(
+      'Reconcile evidence late owner',
+      otherOwnerId,
+      0
+    );
+    const workflow = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: workflowOwner.id },
+      data('996006')
+    );
+    if (!workflow.ok) throw new Error('Expected a workflow association');
+    const [lateLegacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: lateOwner.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '996006',
+        github_app_type: 'standard',
+        github_installation_id: (
+          await db.query.platform_integrations.findFirst({
+            where: eq(platform_integrations.id, workflow.integrationId),
+          })
+        )?.github_installation_id,
+        integration_status: 'active',
+        created_at: new Date().toISOString(),
+      })
+      .returning();
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: lateOwner.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      is_enabled: true,
+      config: {},
+      created_by: otherOwnerId,
+    });
+
+    await applyConnectionRoleBackfill();
+
+    await expect(
+      db.query.platform_integrations.findFirst({
+        where: eq(platform_integrations.id, workflow.integrationId),
+      })
+    ).resolves.toMatchObject({ github_connection_role: 'workflow' });
+    await expect(
+      db.query.platform_integrations.findFirst({
+        where: eq(platform_integrations.id, lateLegacy.id),
+      })
+    ).resolves.toMatchObject({ github_connection_role: 'agent_only' });
+  });
+
   test('connects two approved organizations to one canonical installation', async () => {
     const organizationA = await createTestOrganization('Shared GitHub A', ownerId, 0);
     const organizationB = await createTestOrganization('Shared GitHub B', otherOwnerId, 0);

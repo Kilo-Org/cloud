@@ -5,6 +5,7 @@ import {
   verifyKiloToken,
 } from '@kilocode/worker-utils';
 import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
+import type { GitHubRepositoryAuthorizationFailureReason } from '@kilocode/worker-utils/github-authorization';
 import {
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
@@ -120,13 +121,7 @@ export type GetTokenForRepoSuccess = {
 
 export type GetTokenForRepoFailure = {
   success: false;
-  reason:
-    | 'database_not_configured'
-    | 'invalid_repo_format'
-    | 'no_installation_found'
-    | 'repository_not_installed'
-    | 'invalid_org_id'
-    | 'integration_mismatch';
+  reason: GitHubRepositoryAuthorizationFailureReason;
 };
 
 export type GetTokenForRepoResult = GetTokenForRepoSuccess | GetTokenForRepoFailure;

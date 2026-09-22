@@ -328,19 +328,32 @@ export function OrganizationGitHubInstallations({
                           {installation.isPrimary && installations.length > 1 && (
                             <Badge variant="outline">Primary</Badge>
                           )}
-                          {installation.connectionRole === 'agent_only' && (
-                            <Badge variant="outline">Agent access</Badge>
-                          )}
+                          {installation.status === 'connected' &&
+                            installation.connectionRole === 'agent_only' && (
+                              <Badge variant="outline">Agent access</Badge>
+                            )}
                           {installation.status === 'connected' && !hasConnectionRole && (
                             <Badge variant="outline">Access unavailable</Badge>
                           )}
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">{repositoryScope}</p>
-                        {installation.connectionRole === 'agent_only' && (
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            Slack and Cloud Agent only. The original connection keeps its workflows.
-                          </p>
-                        )}
+                        {installation.connectionRole === 'agent_only' &&
+                          (installation.status === 'connected' ? (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Slack and Cloud Agent only. The original connection keeps its
+                              workflows.
+                            </p>
+                          ) : installation.status === 'disconnected' ? (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Disconnected from this Kilo organization. Slack and Cloud Agent access
+                              is unavailable until fresh verification.
+                            </p>
+                          ) : (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Slack and Cloud Agent access is unavailable until this connection is
+                              healthy.
+                            </p>
+                          ))}
                       </div>
                       {installation.repositorySelection === 'selected' && selectedCount > 0 && (
                         <CollapsibleTrigger asChild>
@@ -443,33 +456,41 @@ export function OrganizationGitHubInstallations({
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                    {installation.status === 'connected' && (
-                      <div className="space-y-3 rounded-lg border p-4">
-                        <ModelCombobox
-                          id={`model-combobox-${installation.id}`}
-                          label="AI Model"
-                          helperText={
-                            installation.connectionRole === 'agent_only'
-                              ? 'This saves a GitHub connection preference. Choose the Slack model in Slack integration settings and the Cloud Agent model in the session.'
-                              : installation.connectionRole === 'workflow'
-                                ? 'Select the AI model to use when responding to GitHub bot mentions'
-                                : 'This connection needs role reconciliation before agent or workflow access is available.'
-                          }
-                          models={modelOptions}
-                          value={installation.modelSlug ?? undefined}
-                          onValueChange={modelSlug =>
-                            updateModel.mutate({
-                              organizationId,
-                              integrationId: installation.id,
-                              modelSlug,
-                            })
-                          }
-                          isLoading={isLoadingModels}
-                          disabled={!installation.canManageModel || !hasConnectionRole}
-                          placeholder="Select a model"
-                          triggerAriaLabel={`AI model for ${accountName}`}
-                        />
-                      </div>
+                    {installation.status === 'connected' &&
+                      installation.connectionRole === 'workflow' && (
+                        <div className="space-y-3 rounded-lg border p-4">
+                          <ModelCombobox
+                            id={`model-combobox-${installation.id}`}
+                            label="AI Model"
+                            helperText="Select the AI model to use when responding to GitHub bot mentions"
+                            models={modelOptions}
+                            value={installation.modelSlug ?? undefined}
+                            onValueChange={modelSlug =>
+                              updateModel.mutate({
+                                organizationId,
+                                integrationId: installation.id,
+                                modelSlug,
+                              })
+                            }
+                            isLoading={isLoadingModels}
+                            disabled={!installation.canManageModel}
+                            placeholder="Select a model"
+                            triggerAriaLabel={`AI model for ${accountName}`}
+                          />
+                        </div>
+                      )}
+                    {installation.status === 'connected' &&
+                      installation.connectionRole === 'agent_only' && (
+                        <p className="rounded-lg border p-4 text-sm text-muted-foreground">
+                          Choose the Slack model in Slack integration settings and the Cloud Agent
+                          model in the session.
+                        </p>
+                      )}
+                    {installation.status === 'connected' && !hasConnectionRole && (
+                      <p className="rounded-lg border p-4 text-sm text-muted-foreground">
+                        This connection needs role reconciliation before agent or workflow access is
+                        available.
+                      </p>
                     )}
                   </div>
                   {installation.repositorySelection === 'selected' && (

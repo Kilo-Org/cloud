@@ -238,6 +238,9 @@ export const githubAppsRouter = createTRPCRouter({
                 role === 'admin' ||
                 integration.kilo_requester_user_id === ctx.user.id);
             const metadata = integration.metadata as Record<string, unknown> | null;
+            const hasConnectionRole =
+              integration.github_connection_role === 'workflow' ||
+              integration.github_connection_role === 'agent_only';
 
             return {
               id: integration.id,
@@ -248,7 +251,8 @@ export const githubAppsRouter = createTRPCRouter({
               repositorySelection: integration.repository_access,
               repositories,
               isPrimary: integration.id === primaryId,
-              canRefresh: status === 'connected' || status === 'needs_attention',
+              canRefresh:
+                hasConnectionRole && (status === 'connected' || status === 'needs_attention'),
               canDisconnect:
                 canManageConnections && status !== 'disconnected' && status !== 'pending',
               canUninstall:

@@ -43,7 +43,7 @@ import {
 import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
 import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
-import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { providerPrRefKey, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
 import { EmptyFilesView, TabStateMessage } from '@/components/pr-review/diff/pr-diff-rows';
@@ -58,6 +58,7 @@ import {
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { usePrDiffListScroll } from '@/lib/pr-review/diff/use-pr-diff-list-scroll';
 import { usePrDiffListContentPadding } from '@/lib/pr-review/diff/use-pr-diff-list-content-padding';
+import { usePrDiffPageGate } from '@/lib/pr-review/diff/use-pr-diff-page-gate';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { CenteredState } from '@/components/centered-state';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
@@ -228,6 +229,20 @@ export function PrReviewFileList({
 
   const items = useMemo(() => [...fileItems, paginationItem], [fileItems, paginationItem]);
 
+  // FlashList reports the end as reached as soon as its content fits the
+  // viewport, so a first page shorter than the screen used to be replaced by
+  // the next pages before the partial-load row (`prReview.hunkRows
+  // .loadedOfTotalFiles`, "1 of 5 files loaded") and its Load all action could
+  // be read. `usePrDiffPageGate` keeps the row the resting state until the
+  // user's own drag, and keeps the end report FlashList makes before it. The
+  // gate is keyed by the provider ref so a drag on one PR never opens the gate
+  // of a different PR rendered by the same mounted list.
+  //
+  // The drag arrives on `onScrollBeginDrag` only when the list can scroll; a
+  // page that fits the viewport still delivers the finger's own movement, so
+  // `onTouchMove` opens the same gate (see `usePrDiffPageGate`).
+  const { onDragStart, onEndReached } = usePrDiffPageGate(query, providerPrRefKey(scope.ref));
+
   const stickyHeaderIndices = useMemo(() => stickyFileHeaderIndices(items), [items]);
 
   usePrDiffListScroll({
@@ -345,11 +360,12 @@ export function PrReviewFileList({
             maintainVisibleContentPosition={{ disabled: true }}
             // Re-measure rows when the bounded font scale changes.
             extraData={diffFontMetrics.scale}
-            onEndReached={() => {
-              if (query.hasNextPage && !query.isFetchingNextPage) {
-                void query.fetchNextPage();
-              }
-            }}
+            onScrollBeginDrag={onDragStart}
+            // The reader's finger still moves when the first page fits the
+            // viewport and the list cannot scroll, so this is the drag report
+            // that opens the gate in the case the row exists for.
+            onTouchMove={onDragStart}
+            onEndReached={onEndReached}
             onEndReachedThreshold={0.5}
             contentContainerStyle={listContentStyle}
             ItemSeparatorComponent={null}

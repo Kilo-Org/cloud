@@ -2,6 +2,13 @@ import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { resolveFakeAdminToken } from '../../services/cloud-agent-next/test/e2e/fake-llm-admin';
+import { resolveE2eInternalSecret } from '../../services/cloud-agent-next/test/e2e/e2e-internal-secret';
+import { readEnvFile } from './env-sync/parse';
+
+const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
+const CLOUD_AGENT_DEV_VARS_PATH = path.join(REPO_ROOT, 'services/cloud-agent-next/.dev.vars');
+
 type ServiceType = 'infra' | 'nextjs' | 'worker' | 'process';
 
 type ServiceGroup = {
@@ -27,6 +34,12 @@ const groups: ServiceGroup[] = [
   {
     id: 'cloud-agent',
     label: 'Cloud Agent',
+    alwaysOn: false,
+    groupDependsOn: ['git-token-service', 'notifications'],
+  },
+  {
+    id: 'cloud-agent-next-http',
+    label: 'Cloud Agent (HTTP e2e)',
     alwaysOn: false,
     groupDependsOn: ['git-token-service', 'notifications'],
   },
@@ -138,6 +151,28 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'cloud-agent',
     dependsOn: [],
     dir: 'services/cloud-agent-next/test/e2e',
+  },
+  // HTTP e2e profile: the Worker runs the rendered e2e config and the fake LLM
+  // runs as a Worker (same core, different adapter) instead of the Node server.
+  'cloud-agent-next-http': {
+    group: 'cloud-agent-next-http',
+    dependsOn: [
+      'postgres',
+      'nextjs',
+      'cloudflare-session-ingest',
+      'cloudflare-git-token-service',
+      'container-usage-meter',
+      'notifications',
+      'fake-llm-worker',
+      'cloud-agent-public-tunnels',
+    ],
+    dir: 'services/cloud-agent-next',
+    useLanIp: true,
+  },
+  'fake-llm-worker': {
+    group: 'cloud-agent-next-http',
+    dependsOn: [],
+    dir: 'services/cloud-agent-next',
   },
   'cloud-agent-public-tunnels': { group: 'cloud-agent-public-tunnels', dependsOn: [] },
   // git-token-service (shared by cloud-agent, app-builder, gastown)
@@ -253,6 +288,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres'],
     dir: 'services/model-eval-ingest',
   },
+  'latency-ingest': {
+    group: 'observability',
+    dependsOn: [],
+    dir: 'services/latency-ingest',
+  },
   'cloudflare-ai-attribution': {
     group: 'observability',
     dependsOn: [],
@@ -260,7 +300,12 @@ const serviceMeta: Record<string, ServiceMeta> = {
   },
   grafana: { group: 'observability', dependsOn: [] },
   // mobile
-  mobile: { group: 'mobile', dependsOn: [], dir: 'apps/mobile' },
+  // The app POSTs its client-observed latency batches to the latency-ingest
+  // worker in every dev session (`LATENCY_INGEST_URL` in the mobile env points
+  // at its wrangler port), so a stack started for mobile work runs it;
+  // otherwise the app POSTs to a dead listener and the ingest path cannot be
+  // observed locally.
+  mobile: { group: 'mobile', dependsOn: ['latency-ingest'], dir: 'apps/mobile' },
   // storybook
   storybook: { group: 'storybook', dependsOn: [] },
   // deletion-mock
@@ -434,6 +479,58 @@ export function resolveDeletionMockSessionEnv(args: {
   return sessionEnv;
 }
 
+// The E2E driver resolves `FAKE_LLM_ADMIN_TOKEN` from its own process
+// environment and the spawned fake server must agree, but a tmux pane only
+// receives the curated session environment. Publish the token here rather than
+// in the service command string, which tmux mirrors into `dev/logs/*`. The HTTP
+// e2e profile's fake *Worker* also needs `NEXTAUTH_SECRET` for the same reason;
+// it is delivered the same way so neither secret is written to a log.
+export function resolveFakeLlmSessionEnv(args: {
+  serviceNames: string[];
+  env?: NodeJS.ProcessEnv;
+  devVars?: Map<string, string>;
+}): Record<string, string> | undefined {
+  const env = args.env ?? process.env;
+  const wantsNodeFake = args.serviceNames.includes('fake-llm');
+  const wantsWorkerFake = args.serviceNames.includes('fake-llm-worker');
+  if (!wantsNodeFake && !wantsWorkerFake) return undefined;
+
+  const sessionEnv: Record<string, string> = {
+    FAKE_LLM_ADMIN_TOKEN: resolveFakeAdminToken(env),
+  };
+  if (wantsWorkerFake) {
+    // The fake Worker verifies the same Kilo JWTs as the main Worker, so it
+    // needs the identical NEXTAUTH_SECRET. It is not in the dev shell's
+    // process env; read the package `.dev.vars` the main Worker also loads.
+    const devVars = args.devVars ?? readEnvFile(CLOUD_AGENT_DEV_VARS_PATH);
+    const secret = env.NEXTAUTH_SECRET?.trim() || devVars.get('NEXTAUTH_SECRET')?.trim();
+    if (secret) sessionEnv.NEXTAUTH_SECRET = secret;
+  }
+  return sessionEnv;
+}
+
+/**
+ * The HTTP e2e Worker reads its `INTERNAL_API_SECRET` binding from the generated
+ * `.wrangler/.dev.vars`, which the render command writes from this variable.
+ * Publish the resolved value into the tmux session environment so the render can
+ * see it; the renderer rejects the development default, so an unexported value
+ * fails the group start loudly instead of publishing a known secret.
+ *
+ * Provisioning is active, not inert: once the value reaches the Worker its
+ * holder can call internal tRPC procedures and `/internal/*` directly, so it must
+ * be e2e-scoped and must never be production's value. It is published through
+ * the session environment, never through the service command string, which tmux
+ * mirrors into `dev/logs/*`.
+ */
+export function resolveE2eInternalSecretSessionEnv(args: {
+  serviceNames: string[];
+  env?: NodeJS.ProcessEnv;
+}): Record<string, string> | undefined {
+  const env = args.env ?? process.env;
+  if (!args.serviceNames.includes('cloud-agent-next-http')) return undefined;
+  return { E2E_INTERNAL_API_SECRET: resolveE2eInternalSecret(env) };
+}
+
 // ---------------------------------------------------------------------------
 // Wrangler config discovery
 // ---------------------------------------------------------------------------
@@ -473,10 +570,10 @@ function stripJsonComments(text: string): string {
   return result.replace(/,(\s*[}\]])/g, '$1');
 }
 
-function readWranglerPort(dir: string): number {
-  const configPath = path.join(dir, 'wrangler.jsonc');
+function readWranglerPort(dir: string, fileName = 'wrangler.jsonc'): number {
+  const configPath = path.join(dir, fileName);
   if (!fs.existsSync(configPath)) {
-    throw new Error(`No wrangler.jsonc found in ${dir}`);
+    throw new Error(`No ${fileName} found in ${dir}`);
   }
   const text = fs.readFileSync(configPath, 'utf-8');
   const config = JSON.parse(stripJsonComments(text));
@@ -485,6 +582,16 @@ function readWranglerPort(dir: string): number {
     throw new Error(`No dev.port in ${configPath}`);
   }
   return port;
+}
+
+/** Host port of the fake-LLM Worker under the active offset. */
+export function resolveFakeLlmWorkerPort(): number {
+  return (
+    readWranglerPort(
+      path.join(REPO_ROOT, 'services/cloud-agent-next'),
+      'test/e2e/wrangler.fake-llm.jsonc'
+    ) + portOffset
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -563,7 +670,7 @@ function workerEnvPrefix(): string[] {
 }
 
 function buildServiceDefs(): ServiceDef[] {
-  const repoRoot = path.resolve(import.meta.dirname, '../..');
+  const repoRoot = REPO_ROOT;
   const defs: ServiceDef[] = [];
 
   for (const [name, meta] of Object.entries(serviceMeta)) {
@@ -619,6 +726,76 @@ function buildServiceDefs(): ServiceDef[] {
         dependsOn: meta.dependsOn,
         command: ['env', `PORT=${fakeLlmPort}`, 'pnpm', 'exec', 'tsx', 'fake-llm-server.ts'],
         group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'fake-llm-worker') {
+      const fakeLlmWorkerPort = resolveFakeLlmWorkerPort();
+      // The secrets are referenced through shell variables, never inlined, so
+      // the command string does not carry them into `dev/logs/*`. The session
+      // environment (see `resolveFakeLlmSessionEnv`) supplies the values.
+      defs.push({
+        name,
+        type: 'worker',
+        dir: meta.dir ?? name,
+        port: fakeLlmWorkerPort,
+        dependsOn: meta.dependsOn,
+        command: [
+          'pnpm',
+          'exec',
+          'wrangler',
+          'dev',
+          '--config',
+          'test/e2e/wrangler.fake-llm.jsonc',
+          '--var',
+          'NEXTAUTH_SECRET:$NEXTAUTH_SECRET',
+          '--var',
+          'FAKE_LLM_ADMIN_TOKEN:$FAKE_LLM_ADMIN_TOKEN',
+          '--port',
+          String(fakeLlmWorkerPort),
+          '--inspector-port',
+          String(fakeLlmWorkerPort + 10000),
+          '--ip',
+          '0.0.0.0',
+        ],
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'cloud-agent-next-http') {
+      const basePort = readWranglerPort(path.join(repoRoot, dir));
+      const port = basePort + portOffset;
+      defs.push({
+        name,
+        type: 'worker',
+        dir,
+        port,
+        dependsOn: meta.dependsOn,
+        command: [
+          'node',
+          'test/e2e/deploy/render-e2e-worker-config.mjs',
+          '--local',
+          '&&',
+          ...workerEnvPrefix(),
+          'pnpm',
+          'run',
+          'dev',
+          '--config',
+          '.wrangler/wrangler.e2e-local.jsonc',
+          // `--env dev` is supplied by the package `dev` script
+          // (`.wrangler/wrangler.e2e-local.jsonc` keeps `env.dev`), so it must
+          // not be repeated here.
+          '--port',
+          String(port),
+          '--inspector-port',
+          String(port + 10000),
+          '--ip',
+          '0.0.0.0',
+        ],
+        group: meta.group,
+        ...(meta.useLanIp ? { useLanIp: true } : {}),
       });
       continue;
     }
@@ -745,6 +922,9 @@ function buildServiceDefs(): ServiceDef[] {
         readWranglerPort(path.join(repoRoot, 'services/cloud-agent-next')) + portOffset;
       const sessionIngestPort =
         readWranglerPort(path.join(repoRoot, 'services/session-ingest')) + portOffset;
+      // The optional fake-LLM port is omitted here and added by
+      // `serviceCommand` only when the fake Worker is part of the same
+      // selection, so a standalone tunnels start never requires it.
       defs.push({
         name,
         type: 'process',
@@ -800,6 +980,15 @@ let serviceDefs = buildServiceDefs();
 
 export const services = new Map<string, ServiceDef>(serviceDefs.map(s => [s.name, s]));
 
+// Services that are reachable only by asking for them (or their group) by
+// name. `all` must not start them implicitly: the public tunnels and the HTTP
+// e2e profile are opt-in, and the HTTP worker shares the plain worker's port.
+const SERVICES_EXCLUDED_FROM_ALL = new Set([
+  'cloud-agent-public-tunnels',
+  'cloud-agent-next-http',
+  'fake-llm-worker',
+]);
+
 export const shortcuts: Record<string, string[]> = {
   app: ['nextjs'],
   'data-export': ['nextjs', 'user-data-export'],
@@ -813,7 +1002,7 @@ export const shortcuts: Record<string, string[]> = {
     'cloudflare-app-builder',
   ],
   agents: ['cloud-agent-next', 'nextjs', 'cloudflare-session-ingest'],
-  all: serviceDefs.map(s => s.name).filter(name => name !== 'cloud-agent-public-tunnels'),
+  all: serviceDefs.map(s => s.name).filter(name => !SERVICES_EXCLUDED_FROM_ALL.has(name)),
 };
 
 // Rebuild every port-derived service definition (ports, commands) for a new
@@ -827,7 +1016,7 @@ export function applyPortOffset(offset: number): void {
   for (const def of serviceDefs) services.set(def.name, def);
   shortcuts.all = serviceDefs
     .map(s => s.name)
-    .filter(name => name !== 'cloud-agent-public-tunnels');
+    .filter(name => !SERVICES_EXCLUDED_FROM_ALL.has(name));
 }
 
 // Successive +100 candidate offsets through the same (0, 5000] range the slug
@@ -942,6 +1131,47 @@ export function getService(name: string): ServiceDef {
   const svc = services.get(name);
   if (!svc) throw new Error(`Unknown service: ${name}`);
   return svc;
+}
+
+/**
+ * Resolve a service's start command for a concrete selection. The public
+ * tunnels optionally publish the fake-LLM tunnel; that only makes sense when
+ * the fake Worker is in the same selection, and including the port
+ * unconditionally would make a standalone tunnels start depend on a running
+ * fake Worker.
+ */
+export function serviceCommand(serviceName: string, serviceNames: readonly string[]): string[] {
+  const command = getService(serviceName).command;
+  if (serviceName === 'cloud-agent-public-tunnels' && serviceNames.includes('fake-llm-worker')) {
+    return [...command, String(resolveFakeLlmWorkerPort())];
+  }
+  return command;
+}
+
+/**
+ * The decision every tunnel restart/capture path shares, derived from the
+ * active service selection:
+ *
+ * - `selection` is forwarded to `restartServiceInTmux` so a relaunch or a
+ *   recreate keeps the fake-LLM Worker port (`serviceCommand` appends the
+ *   fourth tunnel port only when the fake Worker is selected);
+ * - `reloadTarget` is the cloud-agent Worker whose renderer bakes the captured
+ *   tunnel URLs into its own config. The HTTP e2e profile also refreshes its
+ *   `.wrangler/.dev.vars` copy, so the reload must follow the running variant.
+ *   The two share a port and are mutually exclusive; HTTP wins if both appear.
+ */
+export type TunnelRestartPlan = {
+  selection: string[];
+  reloadTarget: string | undefined;
+};
+
+export function planTunnelRestart(serviceNames: readonly string[]): TunnelRestartPlan {
+  const reloadTarget = serviceNames.includes('cloud-agent-next-http')
+    ? 'cloud-agent-next-http'
+    : serviceNames.includes('cloud-agent-next')
+      ? 'cloud-agent-next'
+      : undefined;
+  return { selection: [...serviceNames], reloadTarget };
 }
 
 export function getPortMap(): Map<string, number> {

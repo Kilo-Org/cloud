@@ -8,9 +8,11 @@ import {
   renderNonAutolinkedText,
   renderTemplate,
   sendAccountDeletionCompletedEmail,
+  sendSpendAlertEmail,
   subjects,
 } from '@/lib/email';
 import { sendViaMailgun } from '@/lib/email-mailgun';
+import { NEXTAUTH_URL } from '@/lib/config.server';
 import { USER_DELETION_COMPLETION_HTML } from '@/lib/user/deletion-queue/deletion-constants';
 
 describe('email rendering helpers', () => {
@@ -80,5 +82,115 @@ describe('account deletion completed email', () => {
         html: expect.stringContaining(USER_DELETION_COMPLETION_HTML),
       })
     );
+  });
+});
+
+describe('spend alert email', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('carries this scope amount and threshold and exactly one call to action', async () => {
+    expect(subjects.spendAlert).toBe('Kilo: Spend alert');
+
+    await sendSpendAlertEmail({
+      to: ['billing@example.com'],
+      scopeType: 'organization',
+      scopeId: 'org-1',
+      scopeName: 'Acme',
+      kindLabel: 'Spend threshold',
+      amountUsd: 12.5,
+      thresholdUsd: 10,
+    });
+
+    expect(sendViaMailgun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'billing@example.com',
+        subject: subjects.spendAlert,
+        category: 'spendAlert',
+      })
+    );
+    const { html } = jest.mocked(sendViaMailgun).mock.calls[0][0];
+
+    expect(html).toContain('Acme');
+    expect(html).toContain('12.50');
+    expect(html).toContain('10.00');
+    expect(html).toContain(`${NEXTAUTH_URL}/organizations/org-1/usage-details`);
+    // The alert has a single call to action: the scope's spend view.
+    expect((html.match(/href=/g) ?? []).length).toBe(1);
+  });
+
+  it('links a personal scope to the personal spend view', async () => {
+    await sendSpendAlertEmail({
+      to: ['owner@example.com'],
+      scopeType: 'personal',
+      scopeId: 'user-1',
+      scopeName: 'Your account',
+      kindLabel: 'Hourly spike',
+      amountUsd: 5,
+      thresholdUsd: 4,
+    });
+
+    const { html } = jest.mocked(sendViaMailgun).mock.calls[0][0];
+    expect(html).toContain(`${NEXTAUTH_URL}/usage`);
+    expect(html).not.toContain('/organizations/');
+  });
+
+  it('reports an accepted recipient as delivered', async () => {
+    await expect(
+      sendSpendAlertEmail({
+        to: ['billing@example.com'],
+        scopeType: 'organization',
+        scopeId: 'org-1',
+        scopeName: 'Acme',
+        kindLabel: 'Spend threshold',
+        amountUsd: 12.5,
+        thresholdUsd: 10,
+      })
+    ).resolves.toEqual({
+      delivered: ['billing@example.com'],
+      retryable: [],
+      undeliverable: [],
+    });
+  });
+
+  it('classifies an unconfigured provider as undeliverable, not retryable', async () => {
+    jest.mocked(sendViaMailgun).mockResolvedValueOnce(false);
+
+    const outcome = await sendSpendAlertEmail({
+      to: ['billing@example.com'],
+      scopeType: 'organization',
+      scopeId: 'org-1',
+      scopeName: 'Acme',
+      kindLabel: 'Spend threshold',
+      amountUsd: 12.5,
+      thresholdUsd: 10,
+    });
+
+    expect(outcome).toEqual({
+      delivered: [],
+      retryable: [],
+      undeliverable: ['billing@example.com'],
+    });
+  });
+
+  it('classifies a thrown transport error as retryable', async () => {
+    jest.mocked(sendViaMailgun).mockRejectedValueOnce(new Error('socket hang up'));
+
+    const outcome = await sendSpendAlertEmail({
+      to: ['billing@example.com'],
+      scopeType: 'organization',
+      scopeId: 'org-1',
+      scopeName: 'Acme',
+      kindLabel: 'Spend threshold',
+      amountUsd: 12.5,
+      thresholdUsd: 10,
+    });
+
+    expect(outcome).toEqual({
+      delivered: [],
+      retryable: ['billing@example.com'],
+      undeliverable: [],
+    });
   });
 });

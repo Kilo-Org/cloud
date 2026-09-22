@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["KiloLauncherSurfacesModule"],
+    "appDelegateSubscribers": ["KiloLauncherSurfacesAppDelegateSubscriber"]
+  },
+  "android": {
+    "modules": ["com.kilocode.kilaunchersurfaces.KiloLauncherSurfacesModule"]
+  }
+}

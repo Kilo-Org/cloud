@@ -9,6 +9,7 @@ import {
   magic_link_tokens,
   organization_memberships,
   organizations,
+  passkey_credentials,
   user_activity_tokens,
   user_notification_preferences,
   user_push_tokens,
@@ -75,12 +76,39 @@ const NO_GATES_CAPABILITIES = {
   sessionStatus: AVAILABLE_CAPABILITY,
   kiloclawActivity: UNAVAILABLE_KILOCLAW_ACTIVITY,
   balanceAlerts: UNAVAILABLE_BALANCE_ALERTS,
+  spendAlerts: AVAILABLE_CAPABILITY,
   securityFindings: UNAVAILABLE_SECURITY_FINDINGS,
 };
 
 let testUser: User;
 let surveyTestUser: User;
 let skipTestUser: User;
+
+describe('user router - getMe', () => {
+  it('getMe returns isAdmin: true for an admin user', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.user.getMe()).resolves.toEqual({
+      success: true,
+      id: admin.id,
+      email: admin.google_user_email,
+      isAdmin: true,
+    });
+  });
+
+  it('getMe returns isAdmin: false for a non-admin user', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+
+    await expect(caller.user.getMe()).resolves.toEqual({
+      success: true,
+      id: user.id,
+      email: user.google_user_email,
+      isAdmin: false,
+    });
+  });
+});
 
 describe('user router - updateProfile', () => {
   beforeAll(async () => {
@@ -641,6 +669,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: true,
@@ -648,6 +677,9 @@ describe('user router - notification preferences', () => {
     });
     // Legacy compat: agentUpdates and agentPushEnabled always share the same value.
     expect(result.agentUpdates).toBe(result.agentPushEnabled);
+    // Spend alerts are default-ON with no row, exactly like the spend view's
+    // push channel reads the same column.
+    expect(result.spendAlerts).toBe(true);
   });
 
   it('returns the stored preferences when a row exists', async () => {
@@ -659,6 +691,7 @@ describe('user router - notification preferences', () => {
       session_status_enabled: true,
       kiloclaw_activity_enabled: false,
       balance_alerts_enabled: false,
+      spend_alerts_enabled: false,
       security_findings_enabled: true,
     });
 
@@ -672,6 +705,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: false,
       balanceAlerts: false,
+      spendAlerts: false,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: false,
@@ -691,6 +725,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: false,
@@ -707,6 +742,7 @@ describe('user router - notification preferences', () => {
     expect(row?.session_status_enabled).toBe(true);
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
 
     // Calling again with true must update, not insert
@@ -734,6 +770,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: true,
@@ -748,6 +785,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: false,
@@ -786,6 +824,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: false,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: true,
@@ -804,6 +843,7 @@ describe('user router - notification preferences', () => {
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.agent_push_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
   });
 
@@ -823,6 +863,7 @@ describe('user router - notification preferences', () => {
     expect(result.sessionStatus).toBe(true);
     expect(result.kiloclawActivity).toBe(true);
     expect(result.balanceAlerts).toBe(true);
+    expect(result.spendAlerts).toBe(true);
     expect(result.securityFindings).toBe(true);
     expect(result.agentPushEnabled).toBe(true);
 
@@ -836,8 +877,42 @@ describe('user router - notification preferences', () => {
     expect(row?.session_status_enabled).toBe(true);
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
     expect(row?.agent_push_enabled).toBe(true);
+  });
+
+  it('persists spendAlerts and echoes it, without touching the other columns', async () => {
+    const caller = await createCallerForUser(firstUser.id);
+
+    const result = await caller.user.setNotificationPreferences({ spendAlerts: false });
+    expect(result).toEqual({
+      chatMessages: true,
+      agentAttention: true,
+      agentUpdates: true,
+      sessionStatus: true,
+      kiloclawActivity: true,
+      balanceAlerts: true,
+      spendAlerts: false,
+      securityFindings: true,
+      notificationPreviews: 'generic',
+      agentPushEnabled: true,
+    });
+
+    const [row] = await db
+      .select()
+      .from(user_notification_preferences)
+      .where(eq(user_notification_preferences.user_id, firstUser.id));
+    expect(row?.spend_alerts_enabled).toBe(false);
+    // Unrelated category columns remain at their defaults: the partial upsert
+    // writes only the provided column, which is what keeps this screen and the
+    // spend view's push channel writing the same value.
+    expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.security_findings_enabled).toBe(true);
+    expect(row?.agent_push_enabled).toBe(true);
+
+    const got = await caller.user.getNotificationPreferences();
+    expect(got.spendAlerts).toBe(false);
   });
 
   it('persists balanceAlerts and securityFindings independently via provided-only upsert', async () => {
@@ -851,6 +926,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: false,
+      spendAlerts: true,
       securityFindings: true,
       notificationPreviews: 'generic',
       agentPushEnabled: true,
@@ -873,6 +949,7 @@ describe('user router - notification preferences', () => {
       sessionStatus: true,
       kiloclawActivity: true,
       balanceAlerts: false,
+      spendAlerts: true,
       securityFindings: false,
       notificationPreviews: 'generic',
       agentPushEnabled: true,
@@ -880,6 +957,7 @@ describe('user router - notification preferences', () => {
 
     const got = await caller.user.getNotificationPreferences();
     expect(got.balanceAlerts).toBe(false);
+    expect(got.spendAlerts).toBe(true);
     expect(got.securityFindings).toBe(false);
 
     const [row] = await db
@@ -915,10 +993,11 @@ describe('user router - notification preferences', () => {
     expect(row?.session_status_enabled).toBe(true);
     expect(row?.kiloclaw_activity_enabled).toBe(true);
     expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(true);
     expect(row?.security_findings_enabled).toBe(true);
   });
 
-  it('one category toggle cannot delete unrelated subscriptions (six other categories + agent_push_enabled preserved)', async () => {
+  it('one category toggle cannot delete unrelated subscriptions (seven other categories + agent_push_enabled preserved)', async () => {
     const caller = await createCallerForUser(firstUser.id);
 
     // Seed every category OFF and the master gate OFF. A full-row overwrite
@@ -932,12 +1011,14 @@ describe('user router - notification preferences', () => {
       session_status_enabled: false,
       kiloclaw_activity_enabled: false,
       balance_alerts_enabled: false,
+      spend_alerts_enabled: false,
       security_findings_enabled: false,
     });
 
     // Flip exactly one category ON.
     const result = await caller.user.setNotificationPreferences({ balanceAlerts: true });
     expect(result.balanceAlerts).toBe(true);
+    expect(result.spendAlerts).toBe(false);
 
     const [row] = await db
       .select()
@@ -946,11 +1027,13 @@ describe('user router - notification preferences', () => {
 
     // The single flipped column changed; every other column is untouched.
     expect(row?.balance_alerts_enabled).toBe(true);
+    expect(row?.spend_alerts_enabled).toBe(false);
     expect(row?.agent_push_enabled).toBe(false);
     expect(row?.chat_messages_enabled).toBe(false);
     expect(row?.agent_attention_enabled).toBe(false);
     expect(row?.session_status_enabled).toBe(false);
     expect(row?.kiloclaw_activity_enabled).toBe(false);
+    expect(row?.spend_alerts_enabled).toBe(false);
     expect(row?.security_findings_enabled).toBe(false);
   });
 });
@@ -989,11 +1072,13 @@ describe('user router - notification capabilities', () => {
     expect(result.capabilities.balanceAlerts).toEqual(UNAVAILABLE_BALANCE_ALERTS);
     expect(result.capabilities.kiloclawActivity).toEqual(UNAVAILABLE_KILOCLAW_ACTIVITY);
     expect(result.capabilities.securityFindings).toEqual(UNAVAILABLE_SECURITY_FINDINGS);
-    // The four always-on categories stay available for a signed-in user.
+    // The five always-on categories stay available for a signed-in user. Spend
+    // alerts are always available: every account has a personal scope.
     expect(result.capabilities.chatMessages).toEqual(AVAILABLE_CAPABILITY);
     expect(result.capabilities.agentAttention).toEqual(AVAILABLE_CAPABILITY);
     expect(result.capabilities.agentUpdates).toEqual(AVAILABLE_CAPABILITY);
     expect(result.capabilities.sessionStatus).toEqual(AVAILABLE_CAPABILITY);
+    expect(result.capabilities.spendAlerts).toEqual(AVAILABLE_CAPABILITY);
   });
 
   it('reports securityFindings unavailable when Security is disabled everywhere', async () => {
@@ -1077,6 +1162,7 @@ describe('user router - notification capabilities', () => {
       sessionStatus: AVAILABLE_CAPABILITY,
       kiloclawActivity: AVAILABLE_CAPABILITY,
       balanceAlerts: AVAILABLE_CAPABILITY,
+      spendAlerts: AVAILABLE_CAPABILITY,
       securityFindings: AVAILABLE_CAPABILITY,
     });
   });
@@ -1208,6 +1294,7 @@ describe('user router - register push token', () => {
       session_status_enabled: false,
       kiloclaw_activity_enabled: false,
       balance_alerts_enabled: false,
+      spend_alerts_enabled: false,
       security_findings_enabled: false,
       notification_previews: 'full',
     });
@@ -1226,6 +1313,7 @@ describe('user router - register push token', () => {
     expect(afterRegister?.session_status_enabled).toBe(false);
     expect(afterRegister?.kiloclaw_activity_enabled).toBe(false);
     expect(afterRegister?.balance_alerts_enabled).toBe(false);
+    expect(afterRegister?.spend_alerts_enabled).toBe(false);
     expect(afterRegister?.security_findings_enabled).toBe(false);
     expect(afterRegister?.notification_previews).toBe('full');
 
@@ -1249,6 +1337,7 @@ describe('user router - register push token', () => {
     expect(afterUnregister?.session_status_enabled).toBe(false);
     expect(afterUnregister?.kiloclaw_activity_enabled).toBe(false);
     expect(afterUnregister?.balance_alerts_enabled).toBe(false);
+    expect(afterUnregister?.spend_alerts_enabled).toBe(false);
     expect(afterUnregister?.security_findings_enabled).toBe(false);
     expect(afterUnregister?.notification_previews).toBe('full');
 
@@ -1869,5 +1958,148 @@ describe('user router - account deletion', () => {
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
 
     expect(mockPerformGdprRemoval).not.toHaveBeenCalled();
+  });
+});
+
+describe('user router - passkeys', () => {
+  let owner: User;
+  let other: User;
+
+  beforeAll(async () => {
+    owner = await insertTestUser({ google_user_email: 'passkey-owner@example.com' });
+    other = await insertTestUser({ google_user_email: 'passkey-other@example.com' });
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(passkey_credentials)
+      .where(inArray(passkey_credentials.kilo_user_id, [owner.id, other.id]));
+  });
+
+  async function insertPasskey(kiloUserId: string, name: string | null = null) {
+    const [row] = await db
+      .insert(passkey_credentials)
+      .values({
+        kilo_user_id: kiloUserId,
+        credential_id: `credential-${crypto.randomUUID()}`,
+        public_key: 'cose-public-key-bytes',
+        name,
+      })
+      .returning();
+    return row;
+  }
+
+  it('lists the caller passkeys without the public key or the credential id', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const caller = await createCallerForUser(owner.id);
+
+    const result = await caller.user.getPasskeys();
+
+    expect(result.success).toBe(true);
+    expect(result.passkeys).toHaveLength(1);
+    expect(result.passkeys[0]).toMatchObject({
+      id: row.id,
+      name: 'Work laptop',
+      backed_up: false,
+    });
+    // The response is the list the UI renders and nothing else: no credential
+    // material can leak through it.
+    expect(Object.keys(result.passkeys[0]).sort()).toEqual([
+      'backed_up',
+      'created_at',
+      'device_type',
+      'id',
+      'last_used_at',
+      'name',
+    ]);
+  });
+
+  it('lists only the caller passkeys', async () => {
+    await insertPasskey(owner.id, 'Owner passkey');
+    await insertPasskey(other.id, 'Other passkey');
+    const caller = await createCallerForUser(owner.id);
+
+    const result = await caller.user.getPasskeys();
+
+    expect(result.passkeys.map(passkey => passkey.name)).toEqual(['Owner passkey']);
+  });
+
+  it('renames an owned passkey', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const caller = await createCallerForUser(owner.id);
+
+    const result = await caller.user.renamePasskey({ id: row.id, name: 'Home desktop' });
+
+    expect(result).toEqual({ success: true });
+    const [stored] = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe('Home desktop');
+  });
+
+  it('refuses to rename another user passkey', async () => {
+    const row = await insertPasskey(other.id, 'Other passkey');
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.user.renamePasskey({ id: row.id, name: 'Hijacked' })).rejects.toMatchObject(
+      { code: 'NOT_FOUND' }
+    );
+
+    const [stored] = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe('Other passkey');
+  });
+
+  it('deletes an owned passkey', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const caller = await createCallerForUser(owner.id);
+
+    const result = await caller.user.deletePasskey({ id: row.id });
+
+    expect(result).toEqual({ success: true });
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(0);
+  });
+
+  it('refuses to delete another user passkey and leaves it in place', async () => {
+    const row = await insertPasskey(other.id, 'Other passkey');
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.user.deletePasskey({ id: row.id })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+
+    const stored = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored).toHaveLength(1);
+  });
+
+  it('refuses an unknown passkey id', async () => {
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.user.deletePasskey({ id: '11111111-1111-4111-8111-111111111111' })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('refuses an empty passkey name', async () => {
+    const row = await insertPasskey(owner.id, 'Work laptop');
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(caller.user.renamePasskey({ id: row.id, name: '   ' })).rejects.toThrow();
+
+    const [stored] = await db
+      .select()
+      .from(passkey_credentials)
+      .where(eq(passkey_credentials.id, row.id));
+    expect(stored?.name).toBe('Work laptop');
   });
 });

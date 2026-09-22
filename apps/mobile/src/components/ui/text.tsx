@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { I18nManager, Text as RNText, type Role } from 'react-native';
 
-import { RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
+import { RTL_NO_LETTER_SPACING, RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 const textVariants = cva('text-foreground text-base font-medium', {
@@ -22,7 +22,7 @@ const textVariants = cva('text-foreground text-base font-medium', {
       small: 'text-sm font-medium leading-none',
       muted: 'text-muted-foreground text-sm',
       mono: 'font-mono-medium text-sm',
-      eyebrow: 'font-mono-medium text-[10px] uppercase tracking-[1.5px] text-muted-foreground',
+      eyebrow: 'font-mono-medium text-[10px] text-muted-foreground',
     },
   },
   defaultVariants: {
@@ -48,6 +48,18 @@ const ARIA_LEVEL = {
   h4: '4',
 } satisfies Partial<Record<TextVariant, string>>;
 
+/**
+ * The eyebrow's Latin display treatment: full capitals, letterspaced. It is an
+ * LTR-only addition to the variant because `letter-spacing` pulls a cursive
+ * script apart — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت'. An RTL
+ * interface keeps the mono family, size and color and drops both classes.
+ *
+ * Exported so the eyebrow-scale labels rendered outside the variant — the
+ * `SectionHeader` action link — carry the identical treatment instead of a
+ * second copy of the class string that can drift.
+ */
+export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
+
 const TextClassContext = React.createContext<string | undefined>(undefined);
 
 function Text({
@@ -64,11 +76,20 @@ function Text({
   const Component = asChild ? Slot.Text : RNText;
   return (
     <Component
-      className={cn(textVariants({ variant }), textClass, className)}
+      className={cn(
+        textVariants({ variant }),
+        variant === 'eyebrow' && !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY,
+        textClass,
+        className
+      )}
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
-      style={I18nManager.isRTL ? [RTL_WRITING_DIRECTION, props.style] : props.style}
+      style={
+        I18nManager.isRTL
+          ? [RTL_WRITING_DIRECTION, RTL_NO_LETTER_SPACING, props.style]
+          : props.style
+      }
     />
   );
 }

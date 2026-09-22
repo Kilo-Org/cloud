@@ -8,6 +8,21 @@ jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
   resolveOpenAiChatGptAccessToken: jest.fn(),
   OPENAI_CHATGPT_RECONNECT_MESSAGE: 'Your ChatGPT connection has expired. Reconnect to continue.',
 }));
+// The catalog's live Kilo-exclusive models come and go as promotions are
+// disabled, and at one point none were live at all, which silently turned the
+// exclusive cases below into ordinary-model cases. Stub a synthetic alias, but
+// preserve the real lookup for the catalog status regression tests below.
+jest.mock('@/lib/ai-gateway/models', () => {
+  const actual = jest.requireActual<typeof gatewayModels>('@/lib/ai-gateway/models');
+  return {
+    ...actual,
+    findKiloExclusiveModel: jest.fn((model: string) =>
+      model === 'openai/kilo-exclusive-test-model'
+        ? { public_id: model }
+        : actual.findKiloExclusiveModel(model)
+    ),
+  };
+});
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
@@ -21,7 +36,9 @@ jest.mock('next/server', () => ({
   }),
 }));
 
-import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import type * as gatewayModels from '@/lib/ai-gateway/models';
+import { gpt_6_astra_flex_model } from '@/lib/ai-gateway/providers/openai-exclusive';
 import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import { isOpenAiModelServed } from '@/lib/ai-gateway/openai-chatgpt/served-models';
@@ -42,11 +59,15 @@ import {
   type OpenAiChatGptRoutingInput,
 } from './routing';
 import type { OpenAiChatGptConnection } from './types';
+import type { OpenAiChatGptOwner } from './store';
 
 const PARTNER_KEY = 'partner-project-key';
 const DELEGATED_TOKEN = 'delegated-access-token';
 const REQUESTED_MODEL = 'openai/gpt-5-nano';
 const USER_ID = 'user-1';
+const ORG_ID = '00000000-0000-4000-8000-000000000001';
+const USER_OWNER: OpenAiChatGptOwner = { kiloUserId: USER_ID, organizationId: null };
+const ORG_OWNER: OpenAiChatGptOwner = { kiloUserId: USER_ID, organizationId: ORG_ID };
 
 const originalOpenAiChatGptApiKey = process.env.OPENAI_CHATGPT_API_KEY;
 const originalFetch = global.fetch;
@@ -88,6 +109,7 @@ function routingInput(
     request: responsesRequest(REQUESTED_MODEL),
     requestedModel: REQUESTED_MODEL,
     userId: USER_ID,
+    organizationId: undefined,
     ...overrides,
   };
 }
@@ -145,7 +167,15 @@ afterAll(() => {
 describe('isOpenAiChatGptEligible', () => {
   it('is eligible for a responses request for a prefixed OpenAI model', async () => {
     await expect(isOpenAiChatGptEligible(routingInput())).resolves.toBe(true);
-    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(USER_ID);
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(USER_OWNER);
+  });
+
+  it('reads the organization connection for an organization request and never the personal one', async () => {
+    await expect(isOpenAiChatGptEligible(routingInput({ organizationId: ORG_ID }))).resolves.toBe(
+      true
+    );
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(ORG_OWNER);
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalledWith(USER_OWNER);
   });
 
   it('matches and strips the model id case-insensitively, ignoring surrounding whitespace', async () => {
@@ -176,8 +206,8 @@ describe('isOpenAiChatGptEligible', () => {
     {
       label: 'a Kilo-exclusive OpenAI model',
       overrides: {
-        request: responsesRequest('openai/gpt-5.6-sol-discounted'),
-        requestedModel: 'openai/gpt-5.6-sol-discounted',
+        request: responsesRequest('openai/kilo-exclusive-test-model'),
+        requestedModel: 'openai/kilo-exclusive-test-model',
       },
     },
     { label: 'an anonymous caller', overrides: { userId: null } },
@@ -252,43 +282,54 @@ describe('getOpenAiChatGptByokModelIds', () => {
     });
 
     await expect(
-      getOpenAiChatGptByokModelIds(USER_ID, [
+      getOpenAiChatGptByokModelIds(USER_OWNER, [
         'openai/gpt-5-nano',
         'openai/gpt-5.6-luna-pro',
         'anthropic/claude-sonnet-5',
       ])
     ).resolves.toEqual(new Set(['openai/gpt-5-nano']));
-    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(USER_ID);
+    expect(getOpenAiChatGptStoredConnection).toHaveBeenCalledWith(USER_OWNER);
     expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5-nano');
     expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5.6-luna-pro');
   });
 
   it('returns null without a usable connection so the list stays untouched', async () => {
     jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(null);
-    await expect(getOpenAiChatGptByokModelIds(USER_ID, ['openai/gpt-5-nano'])).resolves.toBeNull();
+    await expect(
+      getOpenAiChatGptByokModelIds(USER_OWNER, ['openai/gpt-5-nano'])
+    ).resolves.toBeNull();
 
     jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue({
       connection: connectedConnection(),
       isEnabled: false,
     });
-    await expect(getOpenAiChatGptByokModelIds(USER_ID, ['openai/gpt-5-nano'])).resolves.toBeNull();
+    await expect(
+      getOpenAiChatGptByokModelIds(USER_OWNER, ['openai/gpt-5-nano'])
+    ).resolves.toBeNull();
 
     jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue({
       connection: { ...connectedConnection(), status: 'error' },
       isEnabled: true,
     });
-    await expect(getOpenAiChatGptByokModelIds(USER_ID, ['openai/gpt-5-nano'])).resolves.toBeNull();
+    await expect(
+      getOpenAiChatGptByokModelIds(USER_OWNER, ['openai/gpt-5-nano'])
+    ).resolves.toBeNull();
   });
 
   it('returns null without the deployment partner key', async () => {
     process.env.OPENAI_CHATGPT_API_KEY = '';
 
-    await expect(getOpenAiChatGptByokModelIds(USER_ID, ['openai/gpt-5-nano'])).resolves.toBeNull();
+    await expect(
+      getOpenAiChatGptByokModelIds(USER_OWNER, ['openai/gpt-5-nano'])
+    ).resolves.toBeNull();
   });
 
   it('never tags a gpt-oss or Kilo-exclusive model', async () => {
     await expect(
-      getOpenAiChatGptByokModelIds(USER_ID, ['openai/gpt-oss-20b', 'openai/gpt-5.6-sol-discounted'])
+      getOpenAiChatGptByokModelIds(USER_OWNER, [
+        'openai/gpt-oss-20b',
+        'openai/kilo-exclusive-test-model',
+      ])
     ).resolves.toEqual(new Set());
     expect(isOpenAiModelServed).not.toHaveBeenCalled();
   });
@@ -301,7 +342,7 @@ describe('tagOpenAiChatGptByokModels', () => {
     });
 
     await expect(
-      tagOpenAiChatGptByokModels(USER_ID, [
+      tagOpenAiChatGptByokModels(USER_OWNER, [
         { id: 'openai/gpt-5-nano' },
         { id: 'anthropic/claude-sonnet-5' },
         { id: 'openai/gpt-5-nano', hasUserByokAvailable: false },
@@ -317,7 +358,53 @@ describe('tagOpenAiChatGptByokModels', () => {
     jest.mocked(getOpenAiChatGptStoredConnection).mockResolvedValue(null);
     const models = [{ id: 'openai/gpt-5-nano' }];
 
-    await expect(tagOpenAiChatGptByokModels(USER_ID, models)).resolves.toBe(models);
+    await expect(tagOpenAiChatGptByokModels(USER_OWNER, models)).resolves.toBe(models);
+  });
+});
+
+describe.each(['public', 'hidden', 'disabled'] as const)('%s Kilo-exclusive aliases', status => {
+  const modelId = gpt_6_astra_flex_model.public_id;
+
+  beforeEach(() => {
+    jest.replaceProperty(gpt_6_astra_flex_model, 'status', status);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('rejects eligibility before looking up the upstream model or connection', async () => {
+    await expect(
+      isOpenAiChatGptEligible(
+        routingInput({ request: responsesRequest(modelId), requestedModel: ` ${modelId} ` })
+      )
+    ).resolves.toBe(false);
+    expect(isOpenAiModelServed).not.toHaveBeenCalled();
+    expect(getOpenAiChatGptStoredConnection).not.toHaveBeenCalled();
+  });
+
+  it('does not mark the alias BYOK-available, even when the upstream lookup would accept it', async () => {
+    await expect(tagOpenAiChatGptByokModels(USER_OWNER, [{ id: modelId }])).resolves.toEqual([
+      { id: modelId },
+    ]);
+    expect(isOpenAiModelServed).not.toHaveBeenCalled();
+  });
+
+  it('still tags a served ordinary model alongside the exclusive alias', async () => {
+    await expect(
+      tagOpenAiChatGptByokModels(USER_OWNER, [{ id: modelId }, { id: REQUESTED_MODEL }])
+    ).resolves.toEqual([{ id: modelId }, { id: REQUESTED_MODEL, hasUserByokAvailable: true }]);
+    expect(isOpenAiModelServed).toHaveBeenCalledTimes(1);
+    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5-nano');
+  });
+
+  it('does not resolve a delegated token or build a provider for the alias', async () => {
+    await expect(
+      checkOpenAiChatGptByok(
+        routingInput({ request: responsesRequest(modelId), requestedModel: modelId })
+      )
+    ).resolves.toBeNull();
+    expect(resolveOpenAiChatGptAccessToken).not.toHaveBeenCalled();
   });
 });
 
@@ -433,6 +520,13 @@ describe('checkOpenAiChatGptByok', () => {
     expect(JSON.parse(init.body as string)).not.toHaveProperty('provider');
   });
 
+  it('resolves the organization credential for an organization request', async () => {
+    const result = await checkOpenAiChatGptByok(routingInput({ organizationId: ORG_ID }));
+
+    expect(result?.kind).toBe('provider');
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(ORG_OWNER);
+  });
+
   it('requires a reconnect instead of another billing path when the credential is terminal', async () => {
     jest.mocked(resolveOpenAiChatGptAccessToken).mockResolvedValue({ kind: 'terminal' });
 
@@ -458,7 +552,7 @@ describe('checkOpenAiChatGptByok', () => {
     process.env.OPENAI_CHATGPT_API_KEY = '   ';
 
     await expect(checkOpenAiChatGptByok(routingInput())).resolves.toBeNull();
-    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(USER_ID);
+    expect(resolveOpenAiChatGptAccessToken).toHaveBeenCalledWith(USER_OWNER);
   });
 
   it('builds no provider without the deployment partner key', () => {

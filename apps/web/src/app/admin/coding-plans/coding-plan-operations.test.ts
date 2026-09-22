@@ -1,5 +1,6 @@
 import {
   canSubmitExtensionDays,
+  canSubmitReduceCount,
   getCancelSubscriptionDialogCopy,
   getCodingPlanInsights,
   getCodingPlanProviderDisplayName,
@@ -7,11 +8,15 @@ import {
   getInventoryReplacementCompleteToast,
   getInventoryReplacementDialogCopy,
   getPlanPerformanceRows,
+  getReduceInventoryCompleteToast,
+  getReduceInventoryDialogCopy,
   getReplacementCompleteToast,
   getReplacementDialogCopy,
   getRevocationCompleteToast,
   getRevocationDialogCopy,
   getSubscriptionSummaryItems,
+  getSwapCredentialCompleteToast,
+  getSwapCredentialDialogCopy,
 } from '@/app/admin/coding-plans/coding-plan-operations';
 
 const CATALOG = [
@@ -105,6 +110,48 @@ describe('subscription action copy', () => {
     expect(getExtendSubscriptionDialogCopy('Ada').title).toBe("Extend Ada's current period?");
     expect(getExtendSubscriptionDialogCopy('Ada').description).toContain(
       'without charging credits'
+    );
+  });
+
+  it('names the user in the swap credential dialog and warns billing is unaffected', () => {
+    expect(getSwapCredentialDialogCopy('Ada').title).toBe("Swap Ada's credential?");
+    expect(getSwapCredentialDialogCopy('Ada').description).toContain('Billing');
+    expect(getSwapCredentialCompleteToast()).toBe('Subscription moved to a new pooled credential.');
+  });
+});
+
+describe('reduce inventory copy', () => {
+  it('names the plan and explains the manual provider-side step', () => {
+    const dialog = getReduceInventoryDialogCopy('minimax-token-plan-plus');
+    expect(dialog.title).toBe('Queue minimax-token-plan-plus inventory for removal?');
+    expect(dialog.description).toContain('Pending Key Removal queue');
+    expect(dialog.description).toContain('remove the key from the provider');
+  });
+
+  it('bounds the requested count to a positive integer no greater than what is available', () => {
+    expect(canSubmitReduceCount('3', 5)).toBe(true);
+    expect(canSubmitReduceCount('5', 5)).toBe(true);
+    expect(canSubmitReduceCount('6', 5)).toBe(false);
+    expect(canSubmitReduceCount('0', 5)).toBe(false);
+    expect(canSubmitReduceCount('1.5', 5)).toBe(false);
+    expect(canSubmitReduceCount('abc', 5)).toBe(false);
+  });
+
+  it('reports the exact queued count and upstream plan IDs on success', () => {
+    expect(getReduceInventoryCompleteToast(3, 3, ['plan-a', 'plan-b', 'plan-c'])).toBe(
+      'Queued 3 credentials for removal in Pending Key Rotation. Deprovision using upstream plan IDs: plan-a, plan-b, plan-c'
+    );
+  });
+
+  it('flags a shortfall when fewer credentials were queued than requested', () => {
+    expect(getReduceInventoryCompleteToast(2, 5, ['plan-a', 'plan-b'])).toBe(
+      'Queued 2 of 5 requested credentials for removal (the rest were claimed before queuing). Find them in Pending Key Rotation and deprovision using upstream plan IDs: plan-a, plan-b'
+    );
+  });
+
+  it('explains that nothing was queued when every candidate was already claimed', () => {
+    expect(getReduceInventoryCompleteToast(0, 2, [])).toBe(
+      'No credentials were queued. They may have just been claimed by a subscription; refresh and try again.'
     );
   });
 });

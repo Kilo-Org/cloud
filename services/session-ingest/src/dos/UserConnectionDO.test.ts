@@ -6,6 +6,7 @@ import {
 import { getWorkerDb } from '@kilocode/db/client';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import { NotificationChannelDO, NotificationsService } from '../../../notifications/src/index';
+import { GLANCEABLE_DELIVERY_MIN_INTERVAL_MS } from '../../../notifications/src/lib/glanceable-refresh';
 import {
   sendPushNotifications,
   type ExpoPushMessage,
@@ -50,6 +51,7 @@ vi.mock('../services/session-access', () => ({
 }));
 
 import {
+  CLI_ABSENCE_ATTENTION_RESET_MS,
   MAX_CATALOG_RESULT_BYTES,
   MAX_DURABLE_RESULT_BYTES,
   UserConnectionDO,
@@ -83,9 +85,10 @@ function createMockWs(tags: string[] = [], attachment?: unknown): MockWS {
   return ws;
 }
 
-/** In-memory Map-backed KV fake for ctx.storage (put/get/delete/list). */
+/** In-memory Map-backed KV fake for ctx.storage (put/get/delete/list/alarm). */
 function makeStorageFake() {
   const store = new Map<string, unknown>();
+  let alarmTime: number | null = null;
   return {
     store,
     kv: {
@@ -97,7 +100,9 @@ function makeStorageFake() {
       list: (opts?: { prefix?: string }) =>
         new Map([...store].filter(([key]) => key.startsWith(opts?.prefix ?? ''))),
     },
-    deleteAlarm: vi.fn(async () => undefined),
+    deleteAlarm: vi.fn(async () => {
+      alarmTime = null;
+    }),
     put: vi.fn(async (key: string, value: unknown) => {
       store.set(key, value);
     }),
@@ -117,7 +122,12 @@ function makeStorageFake() {
       }
       return result;
     }),
-    setAlarm: vi.fn(),
+    // The glanceable deferral reads the current alarm before re-arming it, so
+    // the fake must model the alarm rather than return `undefined`.
+    getAlarm: vi.fn(async () => alarmTime),
+    setAlarm: vi.fn(async (scheduledTime: number | Date) => {
+      alarmTime = typeof scheduledTime === 'number' ? scheduledTime : scheduledTime.getTime();
+    }),
   };
 }
 
@@ -167,6 +177,24 @@ async function flushAsync(): Promise<void> {
   });
 }
 
+/**
+ * The aggregate delivery coordinator wakes a device at most once per account
+ * scope per `GLANCEABLE_DELIVERY_MIN_INTERVAL_MS`, deferring a change inside the
+ * window to the Durable Object alarm. The glanceable cases below assert the
+ * connection DO's own per-status-change trigger, so step the wall clock past
+ * the window between heartbeats. The window itself is covered by
+ * `services/notifications/src/lib/glanceable-refresh.test.ts`.
+ */
+function useDeliveryWindowClock(): { tick: () => void } {
+  let now = Date.now();
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
+  return {
+    tick: () => {
+      now += GLANCEABLE_DELIVERY_MIN_INTERVAL_MS + 1_000;
+    },
+  };
+}
+
 function makeSession(
   id: string,
   status = 'busy',
@@ -213,6 +241,10 @@ function setup(env: Partial<Env> = {}) {
   const ctx = mockCtx.build();
   const doInstance = new UserConnectionDO(ctx as never, env as Env);
   return { doInstance, ctx, mockCtx };
+}
+
+function pendingGlanceableKey(userId: string, organizationId: string | null): string {
+  return `glanceable-pending:${JSON.stringify([userId, organizationId])}`;
 }
 
 function setupGlanceableDelivery(foreignSessionIds: string[] = []) {
@@ -268,7 +300,7 @@ function setupGlanceableDelivery(foreignSessionIds: string[] = []) {
       })
     );
   });
-  return { ...result, env, messages };
+  return { ...result, env, messages, channelStorage: storage };
 }
 
 function connectWebSocket(doInstance: UserConnectionDO, connectionId: string): MockWS {
@@ -575,7 +607,9 @@ describe('UserConnectionDO', () => {
     it('delivers rowless personal busy, retry, attention-clear, and idle heartbeats through the real coordinator', async () => {
       const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
       for (const status of ['busy', 'retry', 'question', 'busy', 'idle']) {
+        clock.tick();
         sendHeartbeat(doInstance, cliWs, [makeSession('s1', status)]);
         await flushAsync();
       }
@@ -601,6 +635,46 @@ describe('UserConnectionDO', () => {
       expect(messages.every(message => message.data?.organizationBound === false)).toBe(true);
     });
 
+    it('delivers a question -> permission move inside the delivery window', async () => {
+      const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
+      clock.tick();
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      await flushAsync();
+      expect(messages).toHaveLength(1);
+      // No clock tick: still inside the delivery window. The Approve control
+      // gates nothing here except this window, so the move must not wait it out.
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'permission')]);
+      await flushAsync();
+      expect(messages.map(message => message.data)).toMatchObject([
+        { needsInput: 1, needsApproval: 0 },
+        { needsInput: 1, needsApproval: 1 },
+      ]);
+    });
+
+    it('defers a counts-only move inside the delivery window and arms the trailing alarm', async () => {
+      const { doInstance, mockCtx, messages, channelStorage } = setupGlanceableDelivery();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
+      clock.tick();
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await flushAsync();
+      expect(messages).toHaveLength(1);
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'idle')]);
+      await flushAsync();
+      // Deferred to the trailing alarm, not delivered on the spot.
+      expect(messages).toHaveLength(1);
+      // The deferral is stored and the alarm is armed at its deadline. Without
+      // both, the trailing delivery that lands the final counts never runs and
+      // the deferral is a silent drop.
+      const pending = (await channelStorage.get(pendingGlanceableKey('usr_1', null))) as
+        | { dueAt: number }
+        | undefined;
+      expect(pending).toMatchObject({ userId: 'usr_1', organizationId: null });
+      expect(channelStorage.setAlarm).toHaveBeenCalledWith(pending?.dueAt);
+    });
+
     it('does not authorize a foreign-owned row from a real authenticated heartbeat', async () => {
       const { doInstance, mockCtx, messages } = setupGlanceableDelivery(['foreign']);
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
@@ -613,18 +687,23 @@ describe('UserConnectionDO', () => {
     it('resends only when a reorder, rename, or child attention changes the roots', async () => {
       const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2', 'retry')]);
       await flushAsync();
       // A reorder and a rename leave every root status unchanged: no resend.
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [makeSession('s2', 'retry', 'Renamed'), makeSession('s1')]);
       await flushAsync();
       // A child raise hoists NEEDS INPUT onto its root, so the counts change.
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [
         makeSession('s1'),
         makeSession('s2', 'retry'),
         makeSession('child', 'question', 'Child', 's1'),
       ]);
       await flushAsync();
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [
         makeSession('s1'),
         makeSession('s2', 'retry'),
@@ -663,8 +742,11 @@ describe('UserConnectionDO', () => {
     it('delivers an empty aggregate when a root disappears from the heartbeat', async () => {
       const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const clock = useDeliveryWindowClock();
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
       await flushAsync();
+      clock.tick();
       sendHeartbeat(doInstance, cliWs, []);
       await flushAsync();
       expect(messages.map(message => message.data)).toMatchObject([
@@ -674,29 +756,61 @@ describe('UserConnectionDO', () => {
     });
 
     it.each([true, false])(
-      'delivers disconnect only after attention reset (socket still listed: %s)',
+      'delivers disconnect without clearing the raise (socket still listed: %s)',
       async listed => {
-        const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+        const { doInstance, mockCtx, ctx, messages } = setupGlanceableDelivery();
         const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+        const clock = useDeliveryWindowClock();
+        clock.tick();
         sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
         await flushAsync();
         messages.length = 0;
-        const reset = Promise.withResolvers<undefined>();
-        sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockImplementation(
-          () => reset.promise
-        );
         if (!listed) mockCtx.removeSocket(cliWs);
-        const disconnect = disconnectCli(doInstance, cliWs);
+        // The disconnect's empty aggregate is a counts-only change and the
+        // preceding heartbeat consumed the delivery window, so step the clock
+        // past it; otherwise the refresh is deferred to the alarm.
+        clock.tick();
+        await disconnectCli(doInstance, cliWs);
         await flushAsync();
-        expect(messages).toEqual([]);
-        reset.resolve(undefined);
-        await disconnect;
-        await flushAsync();
+        // The raise is held, not cleared: no delegate write happens on the
+        // disconnect, so the disconnect broadcast does not wait for one.
+        expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+        expect(ctx.storage.store.has('attentionReset:s1')).toBe(true);
         expect(messages.map(message => message.data)).toMatchObject([
           { status: 'empty', running: 0, needsInput: 0, idle: 0 },
         ]);
       }
     );
+
+    it('names the owning root when a disconnecting CLI owned a permission subagent', async () => {
+      // A subagent raise carries `permission` on the child row and is only
+      // hoisted onto its root for display. The disconnect caller names root ids
+      // in `cliSessionIds`, so naming the child id in `approvalChangedSessionIds`
+      // would be unknown to the server's batch query, which resolves it to the
+      // personal scope — the org scope whose permission cleared would lose the
+      // delivery-window exemption and the Approve control would lag a window.
+      const { doInstance, mockCtx, env } = setupGlanceableDelivery();
+      const service = env.NOTIFICATIONS as unknown as NotificationsService;
+      const refreshParams: unknown[] = [];
+      const spy = async (params: unknown) => {
+        refreshParams.push(params);
+      };
+      service.refreshGlanceableSessions = spy as never;
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('root'),
+        makeSession('child', 'permission', 'Child', 'root'),
+      ]);
+      await flushAsync();
+      refreshParams.length = 0; // the heartbeat's own refresh is a different case
+      await disconnectCli(doInstance, cliWs);
+      await flushAsync();
+      // The named ids must stay a subset of `cliSessionIds`: the root owns the
+      // child's raise, so it is the root's scope that actually moved.
+      expect(refreshParams).toEqual([
+        { userId: 'usr_1', cliSessionIds: ['root'], approvalChangedSessionIds: ['root'] },
+      ]);
+    });
 
     it.each(['cli-1', 'cli-2'])(
       'does not send a stale close after replacement by %s',
@@ -1787,8 +1901,8 @@ describe('UserConnectionDO', () => {
       });
     });
 
-    it('resets attention status for owned sessions before broadcasting cli.disconnected', async () => {
-      const { doInstance, mockCtx } = setup();
+    it('holds attention for owned sessions for the CLI absence window on disconnect', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
       const webWs = addWebSocket(mockCtx, 'web-1');
 
@@ -1797,52 +1911,36 @@ describe('UserConnectionDO', () => {
         makeSession('s-busy', 'busy'),
       ]);
       webWs.send.mockClear();
-
-      const callOrder: string[] = [];
-      sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockImplementation(async () => {
-        callOrder.push('reset');
-        // Disconnect must not have been broadcast yet (ordering guarantee).
-        expect(
-          allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')
-        ).toBe(false);
-      });
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
 
       // Leave the socket in getWebSockets() — matches workerd during webSocketClose.
       await disconnectCli(doInstance, cliWs);
 
-      callOrder.push('disconnect');
-
-      expect(sessionIngestMocks.getSessionIngestDO).toHaveBeenCalledWith(expect.anything(), {
+      // A dropped socket is not proof the CLI is gone: the raise is held, not
+      // cleared, so the user can still answer once the CLI is back.
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+      expect(sessionIngestMocks.getSessionIngestDO).not.toHaveBeenCalled();
+      expect(ctx.storage.store.get('attentionReset:s-question')).toEqual({
         kiloUserId: 'usr_1',
-        sessionId: 's-question',
+        dueAt: now + CLI_ABSENCE_ATTENTION_RESET_MS,
+        connectionId: 'cli-1',
       });
-      expect(sessionIngestMocks.getSessionIngestDO).toHaveBeenCalledWith(expect.anything(), {
+      expect(ctx.storage.store.get('attentionReset:s-busy')).toMatchObject({
         kiloUserId: 'usr_1',
-        sessionId: 's-busy',
+        dueAt: now + CLI_ABSENCE_ATTENTION_RESET_MS,
       });
-      // Both owned sessions are delegated; attention-only filtering is on the metadata side.
-      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledTimes(2);
-      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledWith(
-        'usr_1',
-        's-question'
-      );
-      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledWith(
-        'usr_1',
-        's-busy'
-      );
-      expect(callOrder.filter(step => step === 'reset')).toHaveLength(2);
-      expect(callOrder.at(-1)).toBe('disconnect');
       expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
         true
       );
     });
 
-    it('resets attention when the closing socket is still listed in getWebSockets (workerd)', async () => {
+    it('holds attention when the closing socket is still listed in getWebSockets (workerd)', async () => {
       // Production wrangler/workerd keeps the closing WebSocket in getWebSockets()
       // during webSocketClose. Matching connectionId without excluding self would
-      // treat every disconnect as a stale reconnect and skip the attention reset.
+      // treat every disconnect as a stale reconnect and skip the attention hold.
       // Prior unit tests always called removeSocket first, so they never caught this.
-      const { doInstance, mockCtx } = setup();
+      const { doInstance, mockCtx, ctx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
       const webWs = addWebSocket(mockCtx, 'web-1');
 
@@ -1855,18 +1953,15 @@ describe('UserConnectionDO', () => {
       expect(mockCtx.sockets).toContain(cliWs);
       await disconnectCli(doInstance, cliWs);
 
-      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledTimes(1);
-      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledWith(
-        'usr_1',
-        's-question'
-      );
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+      expect(ctx.storage.store.has('attentionReset:s-question')).toBe(true);
       expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
         true
       );
     });
 
-    it('does not reset attention when kiloUserId is missing on the attachment', async () => {
-      const { doInstance, mockCtx } = setup();
+    it('does not hold attention when kiloUserId is missing on the attachment', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1');
       const webWs = addWebSocket(mockCtx, 'web-1');
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -1878,7 +1973,7 @@ describe('UserConnectionDO', () => {
       await disconnectCli(doInstance, cliWs);
 
       expect(sessionIngestMocks.getSessionIngestDO).not.toHaveBeenCalled();
-      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+      expect(ctx.storage.store.size).toBe(0);
       expect(warn).toHaveBeenCalledWith(
         'Skipping attention status reset on CLI disconnect: missing kiloUserId on attachment',
         { ownedSessionCount: 1 }
@@ -1888,8 +1983,8 @@ describe('UserConnectionDO', () => {
       );
     });
 
-    it('does not reset attention for sessions owned by another live connection', async () => {
-      const { doInstance, mockCtx } = setup();
+    it('does not hold attention for sessions owned by another live connection', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
       const cli2 = addCliSocket(mockCtx, 'cli-2', [], undefined, 'usr_1');
       const webWs = addWebSocket(mockCtx, 'web-1');
@@ -1904,13 +1999,14 @@ describe('UserConnectionDO', () => {
       await disconnectCli(doInstance, cli1);
 
       expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+      expect(ctx.storage.store.has('attentionReset:s1')).toBe(false);
       expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
         true
       );
     });
 
-    it('stale reconnect close does not reset attention status', async () => {
-      const { doInstance, mockCtx } = setup();
+    it('stale reconnect close does not hold attention status', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
       const cli1 = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
       const cli2 = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
 
@@ -1924,30 +2020,167 @@ describe('UserConnectionDO', () => {
 
       expect(sessionIngestMocks.getSessionIngestDO).not.toHaveBeenCalled();
       expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+      expect(ctx.storage.store.has('attentionReset:s1')).toBe(false);
     });
 
-    it('still broadcasts cli.disconnected when attention reset fails', async () => {
-      const { doInstance, mockCtx } = setup();
+    it('clears held attention once the CLI absence window elapses', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
       const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
-      const webWs = addWebSocket(mockCtx, 'web-1');
-      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
 
       sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
-      webWs.send.mockClear();
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+
+      vi.spyOn(Date, 'now').mockReturnValue(now + CLI_ABSENCE_ATTENTION_RESET_MS - 1_000);
+      await doInstance.alarm();
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+      expect(ctx.storage.store.has('attentionReset:s1')).toBe(true);
+
+      vi.spyOn(Date, 'now').mockReturnValue(now + CLI_ABSENCE_ATTENTION_RESET_MS + 1);
+      await doInstance.alarm();
+
+      expect(sessionIngestMocks.getSessionIngestDO).toHaveBeenCalledWith(expect.anything(), {
+        kiloUserId: 'usr_1',
+        sessionId: 's1',
+      });
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledWith(
+        'usr_1',
+        's1'
+      );
+      expect(ctx.storage.store.has('attentionReset:s1')).toBe(false);
+    });
+
+    it('keeps held attention when a live CLI re-owns the session within the window', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+      expect(ctx.storage.store.has('attentionReset:s1')).toBe(true);
+
+      const reconnected = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      sendHeartbeat(doInstance, reconnected, [makeSession('s1', 'question')]);
+      await flushAsync();
+
+      expect(ctx.storage.store.has('attentionReset:s1')).toBe(false);
+
+      vi.spyOn(Date, 'now').mockReturnValue(now + 10 * 60_000);
+      await doInstance.alarm();
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
+    });
+
+    it('re-arms a held clear whose delegate write failed instead of dropping it', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+      mockCtx.removeSocket(cliWs);
+      await disconnectCli(doInstance, cliWs);
+
       sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockRejectedValueOnce(
         new Error('db down')
       );
+      vi.spyOn(Date, 'now').mockReturnValue(now + CLI_ABSENCE_ATTENTION_RESET_MS + 1);
+      await doInstance.alarm();
 
-      // Leave socket listed (workerd close semantics).
-      await disconnectCli(doInstance, cliWs);
-
-      expect(allSent(webWs).some(m => m.type === 'system' && m.event === 'cli.disconnected')).toBe(
-        true
-      );
+      expect(ctx.storage.store.get('attentionReset:s1')).toMatchObject({
+        dueAt: now + CLI_ABSENCE_ATTENTION_RESET_MS + 1 + 5_000,
+      });
       expect(error).toHaveBeenCalledWith(
-        'Failed to reset attention status on CLI disconnect',
-        expect.objectContaining({ error: 'db down' })
+        'Failed to reset attention status after the CLI absence window',
+        expect.objectContaining({ sessionId: 's1', error: 'db down' })
       );
+    });
+
+    it('keeps the alarm when a held attention reset outlives its in-memory mirror', async () => {
+      const { ctx } = setup();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      // The hold was written durably, then the DO was evicted: every in-memory
+      // set is gone while the KV entry (the source of truth) remains.
+      await ctx.storage.put('attentionReset:s1', {
+        kiloUserId: 'usr_1',
+        dueAt: now + CLI_ABSENCE_ATTENTION_RESET_MS,
+        connectionId: 'cli-1',
+      });
+      const revived = new UserConnectionDO(ctx as never, {} as Env);
+
+      // Any later RPC that clears an unrelated session must not drop the alarm
+      // the durable hold is waiting on.
+      await revived.clearSession('s-other');
+
+      expect(ctx.storage.deleteAlarm).not.toHaveBeenCalled();
+      // The hold is still armed, so the durable entry cannot strand.
+      await flushAsync();
+      expect(ctx.storage.setAlarm).toHaveBeenCalledWith(now + CLI_ABSENCE_ATTENTION_RESET_MS);
+
+      // The hold still fires once its window elapses.
+      vi.spyOn(Date, 'now').mockReturnValue(now + CLI_ABSENCE_ATTENTION_RESET_MS + 1);
+      await revived.alarm();
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).toHaveBeenCalledWith(
+        'usr_1',
+        's1'
+      );
+      expect(ctx.storage.store.has('attentionReset:s1')).toBe(false);
+    });
+
+    it('arms the alarm for a durable held reset whose mirror was lost', async () => {
+      const { doInstance, mockCtx, ctx } = setup();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      await ctx.storage.put('attentionReset:s1', {
+        kiloUserId: 'usr_1',
+        dueAt: now + 5_000,
+        connectionId: 'cli-1',
+      });
+      const internal = doInstance as unknown as {
+        pendingAttentionResetAt: Map<string, number>;
+      };
+      expect(internal.pendingAttentionResetAt.size).toBe(0);
+
+      // A wake that only ends in scheduleNextAlarm must re-list KV: the durable
+      // hold has to get the alarm that fires it.
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      ctx.storage.setAlarm.mockClear();
+      sendHeartbeat(doInstance, cliWs, []);
+      await flushAsync();
+
+      expect(internal.pendingAttentionResetAt.get('s1')).toBe(now + 5_000);
+      expect(ctx.storage.setAlarm).toHaveBeenCalledWith(now + 5_000);
+    });
+
+    it('durably cancels a held reset when a reconnect re-owns the session after eviction', async () => {
+      const { mockCtx, ctx } = setup();
+      const now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(now);
+      // The hold was written durably, then the DO was evicted: the in-memory
+      // mirror is empty until `scheduleNextAlarm`'s asynchronous re-list.
+      await ctx.storage.put('attentionReset:s1', {
+        kiloUserId: 'usr_1',
+        dueAt: now + CLI_ABSENCE_ATTENTION_RESET_MS,
+        connectionId: 'cli-1',
+      });
+      const revived = new UserConnectionDO(ctx as never, {} as Env);
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+
+      sendHeartbeat(revived, cliWs, [makeSession('s1', 'question')]);
+      await flushAsync();
+
+      // The reconnect must delete the durable hold even though the mirror had
+      // no entry when the cancel ran, and the re-list must not re-arm it.
+      expect(ctx.storage.store.has('attentionReset:s1')).toBe(false);
+
+      vi.spyOn(Date, 'now').mockReturnValue(now + CLI_ABSENCE_ATTENTION_RESET_MS + 1);
+      await revived.alarm();
+      expect(sessionIngestMocks.resetAttentionStatusOnCliDisconnect).not.toHaveBeenCalled();
     });
   });
 

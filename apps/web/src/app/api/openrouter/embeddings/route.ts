@@ -18,6 +18,7 @@ import {
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   invalidRequestResponse,
+  invalidTokenResponse,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
   temporarilyUnavailableResponse,
@@ -122,6 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const {
     user: maybeUser,
     authFailedResponse,
+    credentialsRejected,
     organizationId: authOrganizationId,
     botId: authBotId,
     tokenSource: authTokenSource,
@@ -137,6 +139,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
+    // A credential we could not verify is not the absence of one. Fail the
+    // request rather than answering as anonymous; see `invalidTokenResponse`.
+    if (credentialsRejected) {
+      return invalidTokenResponse();
+    }
+
     if (!(await isFreeModel(requestedModelLowerCased))) {
       return NextResponse.json(
         {

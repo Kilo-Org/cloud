@@ -6,10 +6,12 @@ import { TurnstileView } from '@/components/auth/sign-in/TurnstileView';
 import { ProviderSelectView } from '@/components/auth/sign-in/ProviderSelectView';
 import { EmailInputForm } from '@/components/auth/sign-in/EmailInputForm';
 import { AuthProviderButtons } from '@/components/auth/sign-in/AuthProviderButtons';
+import { PasskeySignInButton } from '@/components/auth/sign-in/PasskeySignInButton';
 import { SignInButton } from '@/components/auth/SigninButton';
 import { Separator } from '@/components/ui/separator';
 import { FakeLoginForm } from '@/components/auth/FakeLoginForm';
 import { AuthErrorNotification } from '@/components/auth/AuthErrorNotification';
+import { INLINE_LINK_TOUCH_TARGET } from '@/components/auth/touch-targets';
 import { AnimatedLogoMark } from '@/components/AnimatedLogoMark';
 import Link from 'next/link';
 import { SquareUserRound } from 'lucide-react';
@@ -18,6 +20,7 @@ import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
 import { useChatGptSignInAccess } from '@/hooks/useChatGptSignInAccess';
 import { OAuthProviderIds, type AuthProviderId } from '@/lib/auth/provider-metadata';
 import { buildEnterpriseSsoHref, buildNormalSignInHref } from '@/lib/auth/sign-in-navigation';
+import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
 
 /**
  * 'Sign in with ChatGPT' is restricted by the PostHog flag's email allow-list.
@@ -158,6 +161,9 @@ export function SignInForm({
   // Landing state - render based on tier
   // ────────────────────────────────────
 
+  // A passkey sign-in lands where the other providers land.
+  const passkeyCallbackUrl = getSignInCallbackUrl(searchParams);
+
   return (
     <>
       {allowFakeLogin && <FakeLoginForm searchParams={searchParams} />}
@@ -188,7 +194,7 @@ export function SignInForm({
                   <p className="text-foreground mb-2 text-xl font-medium">{flow.hint.lastEmail}</p>
                   <button
                     onClick={flow.handleClearHint}
-                    className="text-muted-foreground mb-8 cursor-pointer text-sm hover:underline"
+                    className="text-muted-foreground mb-8 cursor-pointer text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                   >
                     Not you? Use a different account
                   </button>
@@ -203,13 +209,16 @@ export function SignInForm({
                 const lastAuthMethod = hint.lastAuthMethod;
 
                 if (lastAuthMethod === 'workos' && hint.orgId) {
-                  // SSO user - only show SSO button, no "other methods" option
+                  // SSO user - no "other methods" discovery, so the SSO button is
+                  // the whole list of remembered methods; a passkey the user
+                  // registered is offered beside it rather than behind a link.
                   const orgId = hint.orgId;
                   return (
                     <div className="mx-auto max-w-md space-y-4">
                       <SignInButton onClick={() => flow.handleSSOContinue(orgId)}>
                         Sign in with Enterprise SSO
                       </SignInButton>
+                      <PasskeySignInButton callbackUrl={passkeyCallbackUrl} />
                     </div>
                   );
                 }
@@ -235,6 +244,9 @@ export function SignInForm({
 
                 return (
                   <div className="mx-auto max-w-md space-y-4">
+                    {/* A passkey sits beside the remembered provider, never replacing it */}
+                    <PasskeySignInButton callbackUrl={passkeyCallbackUrl} />
+
                     {/* Preferred provider button only */}
                     <AuthProviderButtons
                       providers={displayedProviders}
@@ -244,7 +256,7 @@ export function SignInForm({
 
                     <button
                       onClick={flow.handleClearHint}
-                      className="text-muted-foreground text-sm hover:underline"
+                      className="text-muted-foreground text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                     >
                       or see other sign-in methods
                     </button>
@@ -268,7 +280,7 @@ export function SignInForm({
               />
               <button
                 onClick={flow.handleBack}
-                className="text-muted-foreground mt-6 text-sm hover:underline"
+                className="text-muted-foreground mt-6 text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
               >
                 ← Back to sign in options
               </button>
@@ -293,7 +305,7 @@ export function SignInForm({
                   </div>
                   <button
                     onClick={flow.handleClearInvite}
-                    className="text-muted-foreground mt-6 cursor-pointer text-sm hover:underline"
+                    className="text-muted-foreground mt-6 cursor-pointer text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                   >
                     Use a different account
                   </button>
@@ -324,7 +336,7 @@ export function SignInForm({
                     // In SSO mode, show a link back to the main sign-in page
                     <Link
                       href={buildNormalSignInHref(searchParams)}
-                      className="text-muted-foreground mt-6 inline-block text-sm hover:underline"
+                      className="text-muted-foreground mt-6 inline-block text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                     >
                       ← Back to sign in options
                     </Link>
@@ -332,7 +344,7 @@ export function SignInForm({
                     // In regular email input mode (not emailOnly), show back button
                     <button
                       onClick={flow.handleBack}
-                      className="text-muted-foreground mt-6 text-sm hover:underline"
+                      className="text-muted-foreground mt-6 text-sm hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                     >
                       ← Back to sign in options
                     </button>
@@ -362,7 +374,7 @@ export function SignInForm({
                           href="https://kilo.ai/terms"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:text-foreground underline underline-offset-4 transition-colors"
+                          className={`hover:text-foreground underline underline-offset-4 transition-colors ${INLINE_LINK_TOUCH_TARGET}`}
                         >
                           Terms &amp; Conditions
                         </a>
@@ -374,6 +386,8 @@ export function SignInForm({
                 // Provider buttons view (initial state)
                 <>
                   <div className="space-y-2">
+                    {/* Passkey sign-in sits above the OAuth providers; none of them move */}
+                    <PasskeySignInButton callbackUrl={passkeyCallbackUrl} />
                     {/* OAuth provider buttons - Google first */}
                     <AuthProviderButtons
                       providers={withoutChatGptWhenUnavailable(OAuthProviderIds, chatGptAllowed)}
@@ -390,7 +404,7 @@ export function SignInForm({
                       href="https://kilo.ai/terms"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:text-foreground underline underline-offset-4 transition-colors"
+                      className={`hover:text-foreground underline underline-offset-4 transition-colors ${INLINE_LINK_TOUCH_TARGET}`}
                     >
                       Terms &amp; Conditions
                     </a>
@@ -405,7 +419,7 @@ export function SignInForm({
             <div className="border-border mt-8 flex flex-col items-center gap-3 border-t pt-6">
               <Link
                 href={buildEnterpriseSsoHref(searchParams)}
-                className="w-full flex h-10 items-center justify-center rounded-md border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none [&_svg]:size-4 [&_svg]:shrink-0"
+                className="w-full flex h-10 items-center justify-center rounded-md border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none [&_svg]:size-4 [&_svg]:shrink-0 pointer-coarse:min-h-11"
               >
                 <SquareUserRound className="size-4" />
                 Enterprise SSO
@@ -413,7 +427,7 @@ export function SignInForm({
               {!flow.showEmailInput && (
                 <Link
                   href="/get-started"
-                  className="mt-4 text-center text-brand-primary text-sm font-medium underline-offset-4 hover:underline"
+                  className="mt-4 inline-block text-center text-brand-primary text-sm font-medium underline-offset-4 hover:underline pointer-coarse:min-h-11 pointer-coarse:content-center"
                 >
                   Install Kilo Code
                 </Link>
@@ -429,7 +443,7 @@ export function SignInForm({
                   Already have an account?{' '}
                   <Link
                     href={buildNormalSignInHref(searchParams)}
-                    className="text-brand-primary font-medium underline-offset-4 hover:underline"
+                    className={`text-brand-primary font-medium underline-offset-4 hover:underline ${INLINE_LINK_TOUCH_TARGET}`}
                   >
                     Sign in
                   </Link>
@@ -447,7 +461,7 @@ export function SignInForm({
               <p className="text-muted-foreground text-sm">
                 <Link
                   href="/get-started"
-                  className="text-brand-primary font-medium underline-offset-4 hover:underline"
+                  className="text-brand-primary font-medium underline-offset-4 hover:underline pointer-coarse:inline-block pointer-coarse:min-h-11 pointer-coarse:content-center"
                 >
                   Install Kilo Code
                 </Link>

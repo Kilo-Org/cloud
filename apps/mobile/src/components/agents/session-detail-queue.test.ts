@@ -52,12 +52,22 @@ vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurf
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useOfflineBannerState: () => false,
 }));
+// `credentials.ts` reads `WHEN_UNLOCKED_THIS_DEVICE_ONLY` at module scope via
+// the manager -> approve-ask import; the real expo-secure-store entry imports
+// react-native, so this suite only needs the import to resolve.
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'whenUnlockedThisDeviceOnly',
 }));
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
+// The session header's copy-link action reaches the native clipboard and the
+// browser helper; neither native module loads in the DOM-free node suite. The
+// handoff advertiser is a platform boundary with its own mounted suites.
+vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/session-handoff', () => ({ SessionHandoffAdvertiser: () => null }));
 vi.mock('@kilocode/cloud-agent-sdk', () => ({
   createSessionManager: vi.fn(),
 }));
@@ -81,6 +91,13 @@ vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
 vi.mock('@/lib/persist/session-transcript-cache', () => ({
   readSessionTranscriptPage: vi.fn(async () => null),
   writeSessionTranscriptPage: vi.fn(async () => undefined),
+}));
+// Same seam for the resolved-delivery-failure memory: it shares that chain, so
+// without this mock `mobile-session-manager.ts` pulls the native encrypted KV
+// (and its `react-native` promise shim) into this node suite.
+vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
+  readResolvedDeliveryFailures: vi.fn(async () => []),
+  persistResolvedDeliveryFailure: vi.fn(async () => undefined),
 }));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
@@ -147,7 +164,7 @@ vi.mock('@/components/agents/message-text-select-sheet', () => ({
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), setParams: vi.fn() }),
 }));
 
 // `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
@@ -163,6 +180,7 @@ vi.mock('expo-keep-awake', () => ({
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(async () => undefined),
   notificationAsync: vi.fn(async () => undefined),
+  selectionAsync: vi.fn(async () => undefined),
   NotificationFeedbackType: { Error: 'error', Success: 'success' },
 }));
 vi.mock('react-native-reanimated', () => ({
@@ -379,6 +397,7 @@ vi.mock('@/components/agents/use-message-copy', () => ({
 }));
 vi.mock('@/components/agents/session-detail-content-helpers', () => ({
   countInFlightMessages: () => 0,
+  lastVisibleMessageFailure: () => null,
   resolveRetryPrompt: () => null,
   retryFailedMessage: vi.fn(),
 }));
@@ -495,6 +514,7 @@ vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
 vi.mock('@/components/ui/icons', () => ({
+  Link2: 'Link2',
   MessageSquare: 'MessageSquare',
 }));
 

@@ -81,9 +81,6 @@ vi.mock('@/lib/analytics/posthog', () => ({
   FEATURE_FLAG_PR_REVIEW: 'mobile-pr-review',
   useFeatureFlag: () => true,
 }));
-vi.mock('@/lib/hooks/use-after-interactions', () => ({
-  useAfterInteractions: () => false,
-}));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1' }),
 }));

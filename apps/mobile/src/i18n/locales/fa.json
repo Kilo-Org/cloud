@@ -163,6 +163,7 @@
     "useDifferentEmail": "استفاده از ایمیل دیگر",
     "signInWithApple": "ورود با Apple",
     "signInWithGoogle": "ورود با Google",
+    "signInWithPasskey": "ورود با کلید عبور",
     "emailAddress": "نشانی ایمیل",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "ادامه با ایمیل",
@@ -175,6 +176,10 @@
     "termsConnector": " و ",
     "termsSuffix": ".",
     "moreSignInOptions": "گزینه‌های بیشتر برای ورود",
+    "passkeyCancelled": "ورود با کلید عبور لغو شد. لطفاً دوباره تلاش کنید.",
+    "passkeyNotFound": "هیچ کلید عبوری برای این دستگاه ذخیره نشده است. به‌جای آن با Apple، Google یا ایمیل خود وارد شوید.",
+    "passkeyUnsupported": "کلیدهای عبور روی این دستگاه در دسترس نیستند. به‌جای آن با Apple، Google یا ایمیل خود وارد شوید.",
+    "passkeyFailed": "ورود با کلید عبور ممکن نشد. لطفاً دوباره تلاش کنید.",
     "couldNotCompleteSignIn": "تکمیل ورود ممکن نشد. لطفاً دوباره تلاش کنید.",
     "sessionEnded": "نشست شما به پایان رسید. لطفاً دوباره وارد شوید.",
     "signInCodeExpired": "کد ورود شما منقضی شده است. لطفاً دوباره تلاش کنید.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "حساب آزمایشی",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO سازمانی"
+    "providerEnterpriseSso": "SSO سازمانی",
+    "passkeysTitle": "کلیدهای عبور",
+    "passkeysSubtitle": "بدون گذرواژه وارد شوید",
+    "passkeysEmpty": "هنوز هیچ کلید عبوری وجود ندارد",
+    "passkeysEmptyHint": "$t(profile.addPasskey) تا بدون گذرواژه وارد شوید.",
+    "passkeysCouldNotLoad": "بارگذاری کلیدهای عبور ممکن نشد",
+    "passkeysLoadFailed": "کلیدهای عبور تا زمانی که این بارگذاری نشود در دسترس نیستند.",
+    "addPasskey": "افزودن کلید عبور",
+    "passkeyDefaultName": "کلید عبور",
+    "passkeyAddedOn": "افزوده‌شده در {{date}}",
+    "passkeyAdded": "کلید عبور افزوده شد.",
+    "passkeyAddFailed": "افزودن کلید عبور ممکن نشد. دوباره تلاش کنید.",
+    "passkeyAddUnsupported": "این دستگاه نمی‌تواند کلید عبور بسازد.",
+    "passkeyAddCancelled": "ساخت کلید عبور لغو شد.",
+    "passkeyRemoved": "کلید عبور حذف شد.",
+    "passkeyRemoveFailed": "حذف آن کلید عبور ممکن نشد. دوباره تلاش کنید.",
+    "passkeyRenamed": "کلید عبور تغییر نام یافت.",
+    "passkeyName": "نام کلید عبور",
+    "renamePasskey": "تغییر نام کلید عبور",
+    "removePasskey": "حذف کلید عبور",
+    "removePasskeyTitle": "کلید عبور حذف شود؟",
+    "removePasskeyMessage": "دیگر نمی‌توانید با این کلید عبور وارد شوید."
   },
   "preferences": {
     "general": "عمومی",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{displayCount}} فایل از {{total}} فایل بارگذاری شد",
       "filesStillLoading": "فایل‌ها هنوز در حال بارگذاری هستند. برای بازخوانی، صفحه را به پایین بکشید.",
       "goToOverview": "رفتن به مرور کلی",
-      "goToOverviewTab": "رفتن به برگهٔ مرور کلی"
+      "goToOverviewTab": "رفتن به برگهٔ مرور کلی",
+      "expandAllLines_one": "نمایش همهٔ {{displayCount}} خط",
+      "expandAllLines_other": "نمایش همهٔ {{displayCount}} خط",
+      "expandLines_one": "نمایش {{displayCount}} خط ({{start}}–{{end}})",
+      "expandLines_other": "نمایش {{displayCount}} خط ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "نمایش {{displayCount}} خط از اطراف",
+      "expandLinesOfContext_other": "نمایش {{displayCount}} خط از اطراف",
+      "expandMoreLines_one": "نمایش {{displayCount}} خط دیگر ({{start}}–{{end}})",
+      "expandMoreLines_other": "نمایش {{displayCount}} خط دیگر ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} از {{total}} فایل بارگذاری شد",
+      "loadedOfTotalFiles_other": "{{loaded}} از {{total}} فایل بارگذاری شد"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "فایل با نویسهٔ خط جدید پایان نمی‌یابد.",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "مربوط به نسخهٔ قبلی: {{path}}"
       },
       "deletedUser": "کاربر حذف‌شده",
-      "replyForbiddenTerm": "اجازهٔ پاسخ دادن در این {{term}} را ندارید."
+      "replyForbiddenTerm": "اجازهٔ پاسخ دادن در این {{term}} را ندارید.",
+      "moreLinesAbove_one": "… {{displayCount}} خط دیگر در بالا",
+      "moreLinesAbove_other": "… {{displayCount}} خط دیگر در بالا"
     },
     "couldNotOpenGitHubAppSettings": "باز کردن تنظیمات برنامه GitHub ناموفق بود.",
     "installKiloGitHubApp": "نصب برنامهٔ Kilo در GitHub",
@@ -706,7 +744,9 @@
       "statusContext": "بدون تغییر",
       "lineLabel": "خط {{line}}، {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}} — {{text}}",
-      "emptyLine": "(خالی)"
+      "emptyLine": "(خالی)",
+      "truncationBanner_one": "به‌دلیل محدودیت API در GitHub، فقط {{limit}} فایل اول از {{total}} فایل تغییریافته نمایش داده می‌شود.",
+      "truncationBanner_other": "به‌دلیل محدودیت API در GitHub، فقط {{limit}} فایل اول از {{total}} فایل تغییریافته نمایش داده می‌شود."
     },
     "linkPasteClipboardEmpty": "کلیپ‌بورد خالی است.",
     "linkPasteNotAPullRequest": "این پیوند مربوط به پول ریکوئست یا درخواست ادغام نیست.",
@@ -783,11 +823,12 @@
     "previewFullDescription": "اعلان‌ها متن پیام را روی صفحهٔ قفل شما نشان می‌دهند.",
     "previewGenericDescription": "اعلان‌ها فقط وقوع یک رویداد را نشان می‌دهند. برای خواندن پیام، Kilo را باز کنید.",
     "channel": {
-      "agent": "نشست‌های عامل",
+      "agentProgress": "پیشرفت عامل",
       "chat": "پیام‌های گفت‌وگو",
       "kiloclaw": "فعالیت KiloClaw",
       "balance": "هشدارهای موجودی",
-      "security": "یافته‌های امنیتی"
+      "security": "یافته‌های امنیتی",
+      "spend": "هشدارهای هزینه"
     },
     "category": {
       "chatMessagesSubtitle": "پاسخ‌های گفت‌وگوهای شما",
@@ -798,8 +839,22 @@
       "sessionStatusTitle": "وضعیت نشست",
       "sessionStatusSubtitle": "تمام‌شده / ناموفق / آمادهٔ کنترل",
       "kiloclawActivitySubtitle": "نمونه آماده/ناموفق، اقدامات زمان‌بندی‌شده",
+      "kiloclawActivityUnavailable": "برای دریافت فعالیت KiloClaw، یک نمونه KiloClaw راه‌اندازی کنید.",
       "balanceAlertsSubtitle": "هشدارهای موجودی کم سازمان",
-      "securityFindingsSubtitle": "یافته‌های جدید و یادآوری‌های SLA"
+      "balanceAlertsUnavailable": "برای دریافت هشدارهای موجودی کم، به یک سازمان بپیوندید.",
+      "securityFindingsSubtitle": "یافته‌های جدید و یادآوری‌های SLA",
+      "securityFindingsUnavailable": "برای دریافت یافته‌های امنیتی، عامل امنیتی Kilo را در یک محدوده فعال کنید.",
+      "spendAlertsSubtitle": "عبور از آستانه‌ها و جهش‌های ساعتی",
+      "spendAlertsToggle": "دستهٔ هشدارهای هزینه"
+    },
+    "action": {
+      "openSession": "باز کردن نشست"
+    },
+    "needsInputAction": {
+      "approved": "درخواست تأیید شد",
+      "replied": "پاسخ ارسال شد",
+      "failed": "پاسخ دادن ممکن نشد. برای تلاش دوباره دوباره ضربه بزنید.",
+      "unavailable": "این درخواست دیگر در انتظار نیست."
     }
   },
   "tabs": {
@@ -880,7 +935,9 @@
       "uploadFailed": "بارگذاری ناموفق بود.",
       "failedToUploadFile": "بارگذاری فایل ناموفق بود: {{reason}}.",
       "nothingToPaste": "چیزی برای جای‌گذاری وجود ندارد.",
-      "metadataStripFailed": "حذف فراداده عکس ممکن نشد."
+      "metadataStripFailed": "حذف فراداده عکس ممکن نشد.",
+      "limit_one": "می‌توانید حداکثر {{displayCount}} فایل پیوست کنید.",
+      "limit_other": "می‌توانید حداکثر {{displayCount}} فایل پیوست کنید."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1624,7 +1681,11 @@
       "syncFindings": "همگام‌سازی یافته‌ها",
       "syncNow": "همگام‌سازی فوری",
       "syncQueued": "همگام‌سازی در صف قرار گرفت",
-      "syncStatusUnavailable": "وضعیت همگام‌سازی در دسترس نیست."
+      "syncStatusUnavailable": "وضعیت همگام‌سازی در دسترس نیست.",
+      "daysOverdue_one": "{{displayCount}} روز تأخیر",
+      "daysOverdue_other": "{{displayCount}} روز تأخیر",
+      "findingsCount_one": "{{displayCount}} یافته",
+      "findingsCount_other": "{{displayCount}} یافته"
     },
     "dashboardMetrics": {
       "openFindings": "یافته‌های باز",
@@ -2021,6 +2082,10 @@
       "couldNotLoad": "بارگذاری نشست ممکن نشد.",
       "failedToLoadDetails": "بارگذاری جزئیات نشست ممکن نشد.",
       "failedToStopExecution": "توقف اجرا ممکن نشد.",
+      "stopped": "نشست متوقف شد",
+      "committing": "در حال کامیت…",
+      "committed": "کامیت شد",
+      "commitFailed": "کامیت ناموفق بود",
       "renameSession": "تغییر نام نشست",
       "renamePlaceholder": "نام نشست",
       "transcriptAccessibility": "متن گفت‌وگوی نشست",
@@ -2131,20 +2196,7 @@
       "continueFrom": "نشست {{title}} را ادامه می‌دهید.",
       "importingSession": "در حال وارد کردن نشست",
       "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
-      "importFailed": "وارد کردن این نشست ممکن نشد.",
-      "sandbox": "سندباکس",
-      "sandboxAccessibility": "سندباکس: {{label}}",
-      "sandboxDefaultWithDestination": "پیش‌فرض · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "کوچک",
-      "sandboxInstanceShared": "اشتراکی",
-      "sandboxInstanceLarge": "بزرگ",
-      "sandboxInstanceDevcontainer": "کانتینر توسعه",
-      "sandboxInstanceProviderDefault": "پیش‌فرض ارائه‌دهنده",
-      "sandboxCouldNotLoad": "بارگیری گزینه‌های سندباکس ممکن نشد",
-      "sandboxUnavailable": "این سندباکس در دسترس نیست. سندباکس دیگری یا پیش‌فرض را انتخاب کنید.",
-      "sandboxUseDefault": "استفاده از پیش‌فرض"
+      "importFailed": "وارد کردن این نشست ممکن نشد."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل به‌روزرسانی شد.",
@@ -2168,7 +2220,14 @@
       "updateTodos": "به‌روزرسانی فهرست کارها",
       "linesBadge": "{{displayCount}} خط",
       "filesBadge": "{{displayCount}} فایل",
-      "matchesBadge": "{{displayCount}} تطابق"
+      "matchesBadge": "{{displayCount}} تطابق",
+      "filesBadge_one": "{{displayCount}} فایل",
+      "filesBadge_other": "{{displayCount}} فایل",
+      "linesBadge_one": "{{displayCount}} خط",
+      "linesBadge_other": "{{displayCount}} خط",
+      "matchesBadge_one": "{{displayCount}} تطابق",
+      "matchesBadge_other": "{{displayCount}} تطابق",
+      "noOutput": "هیچ خروجی وجود ندارد."
     },
     "readToolMarkdown": {
       "linesTruncated": "خطوط {{start}}–{{end}} (نمایش ناقص)",
@@ -2458,7 +2517,11 @@
       "files": "فایل",
       "couldNotOpenPhotoPicker": "انتخاب‌گر عکس باز نشد. Kilo را ببندید و دوباره باز کنید، سپس دوباره تلاش کنید.",
       "maxFilesAllowed": "حداکثر {{displayCount}} فایل مجاز است.",
-      "onlyAddingFiles": "فقط {{accepted}} فایل از {{total}} فایل اضافه می‌شود (سقف مجاز: {{max}})"
+      "onlyAddingFiles": "فقط {{accepted}} فایل از {{total}} فایل اضافه می‌شود (سقف مجاز: {{max}})",
+      "maxFilesAllowed_one": "حداکثر {{displayCount}} فایل مجاز است.",
+      "maxFilesAllowed_other": "حداکثر {{displayCount}} فایل مجاز است.",
+      "onlyAddingFiles_one": "فقط {{accepted}} فایل از {{total}} فایل اضافه می‌شود (سقف مجاز: {{max}})",
+      "onlyAddingFiles_other": "فقط {{accepted}} فایل از {{total}} فایل اضافه می‌شود (سقف مجاز: {{max}})"
     },
     "composer": {
       "addAttachment": "افزودن پیوست",
@@ -2476,7 +2539,9 @@
       "discardAttachmentsMessage": "فایل‌های آپلودشده‌ای که به هیچ پیام ارسالی پیوست نشده‌اند، حذف می‌شوند.",
       "discardAttachmentsTitle": "پیوست‌ها حذف شوند؟",
       "charactersRemaining": "{{count}} نویسه باقی‌مانده",
-      "insertNewline": "درج خط جدید"
+      "insertNewline": "درج خط جدید",
+      "charactersRemaining_one": "{{count}} نویسه باقی‌مانده",
+      "charactersRemaining_other": "{{count}} نویسه باقی‌مانده"
     },
     "chatLink": {
       "linkCopied": "پیوند کپی شد",
@@ -2548,7 +2613,9 @@
       "stepsCount_one": "{{steps}} گام",
       "stepsCount": "{{steps}} گام",
       "stepsCount_other": "{{steps}} گام",
-      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
+      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
+      "modelsCount_one": "مدل ({{displayCount}})",
+      "modelsCount_other": "مدل‌ها ({{displayCount}})"
     },
     "autoApprove": {
       "title": "تأیید خودکار",
@@ -2588,7 +2655,9 @@
     },
     "toolRun": {
       "sheetTitle": "فراخوانی‌های ابزار",
-      "condensedLabel": "{{itemCount}} مورد؛ {{last}}"
+      "condensedLabel": "{{itemCount}} مورد؛ {{last}}",
+      "condensedLabel_one": "{{itemCount}} مورد؛ {{last}}",
+      "condensedLabel_other": "{{itemCount}} مورد؛ {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "این نشست نمی‌تواند فایل دریافت کند",
     "cliCantReceiveFilesMessage": "Kilo CLI که این نشست را اجرا می‌کند، نمی‌تواند فایل دریافت کند. CLI را روی آن دستگاه به‌روزرسانی کنید یا فایل‌ها را با نشست جدیدی به اشتراک بگذارید.",
     "contentlessMessage": "چیزی برای اشتراک‌گذاری وجود ندارد. هیچ متن یا فایلی اضافه نشده است.",
-    "couldNotReadContent": "خواندن محتوای اشتراک‌گذاری‌شده ممکن نشد."
+    "couldNotReadContent": "خواندن محتوای اشتراک‌گذاری‌شده ممکن نشد.",
+    "onlyFirstFilesAttached_one": "فقط {{displayCount}} فایل اول پیوست می‌شوند.",
+    "onlyFirstFilesAttached_other": "فقط {{displayCount}} فایل اول پیوست می‌شوند."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3164,10 @@
     "couldNotApprove": "تأیید نشد",
     "couldNotStart": "شروع نشد",
     "channelName": "عامل‌های فعال",
-    "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید."
+    "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید.",
+    "openSession": "باز کن",
+    "approveFailed": "تأیید ممکن نشد. برای تلاش دوباره روی $t(common.approve) ضربه بزنید.",
+    "newestResult": "جدیدترین نتیجه"
   },
   "transcriptionModel": {
     "title": "مدل تبدیل گفتار به متن",
@@ -3118,15 +3192,7 @@
     "remoteOptionTitle": "رایانهٔ شما",
     "remoteOptionBody": "Kilo را با دستور `kilo remote` روی ماشین خودتان اجرا کنید.",
     "skip": "رد کردن تور",
-    "tutorialLabel": "آموزش",
-    "remoteTitle": "نخستین نشست راه دور خود را شروع کنید",
-    "remoteBody": "رایانهٔ خود را متصل کنید، سپس نشست را از همین‌جا شروع کنید.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "هنوز رایانه‌ای متصل نشده است",
-    "remoteEmptyBody": "برای اتصال آن، دستور `kilo remote` را روی رایانهٔ خود اجرا کنید.",
-    "remoteFound": "رایانه متصل شد",
-    "checkAgain": "دوباره بررسی کنید",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "آموزش"
   },
   "appActions": {
     "start": {
@@ -3134,5 +3200,31 @@
       "repositoryUnknown": "Kilo مخزن {{repository}} را به عنوان مخزن GitHub یا GitLab نمی‌شناسد. در Kilo مخزن دیگری انتخاب کنید.",
       "repositoryUnsupported": "{{repository}} یک مخزن Bitbucket است — شروع عامل هنوز نمی‌تواند از آن استفاده کند. در Kilo مخزن دیگری انتخاب کنید."
     }
+  },
+  "launcher": {
+    "openLastSession": "باز کردن آخرین نشست"
+  },
+  "spendAlerts": {
+    "subtitle": "وقتی هزینهٔ این حوزه از حدی فراتر می‌رود یا از نرخ ساعتی معمول آن بالاتر می‌جهد، هشداری را با ایمیل یا نوتیفیکیشن برای مخاطبان صورتحساب بفرست.",
+    "enable": "فعال‌سازی هشدارهای هزینه",
+    "thresholdTitle": "عبور از آستانه",
+    "thresholdSubtitle": "هزینهٔ جاری از حد شما فراتر می‌رود",
+    "anomalyTitle": "جهش ساعتی",
+    "anomalySubtitle": "یک ساعت بسیار بالاتر از نرخ معمول این حوزه است",
+    "limitLabel": "حد (USD)",
+    "windowLabel": "بازهٔ زمانی",
+    "window24h": "۲۴ ساعت",
+    "window7d": "۷ روز",
+    "window30d": "۳۰ روز",
+    "multiplierLabel": "ضریب جهش",
+    "saved": "تنظیمات هشدار هزینه ذخیره شد",
+    "loadError": "هشدارهای هزینه بارگذاری نشد.",
+    "saveError": "هشدارهای هزینه ذخیره نشد.",
+    "empty": "هشدارهای هزینه خاموش است. برای هشدار دادن به مخاطبان صورتحساب این حوزه آن‌ها را روشن کن.",
+    "noSpend": "هنوز هیچ هزینه‌ای ثبت نشده است",
+    "spend24h": "هزینه در ۲۴ ساعت گذشته",
+    "multiplierError": "ضریبی برابر ۱ یا بیشتر وارد کن",
+    "permissionDenied": "شما اجازهٔ مدیریت هشدارهای هزینه را ندارید.",
+    "pushOffByCategory": "در اعلان‌ها خاموش"
   }
 }

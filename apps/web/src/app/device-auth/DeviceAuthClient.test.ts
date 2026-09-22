@@ -1,5 +1,8 @@
+import * as React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from '@jest/globals';
 
+import { DeviceAuthClient } from './DeviceAuthClient';
 import {
   buildDeviceAuthVerificationUrl,
   closeDeviceAuthWindowIfAppMode,
@@ -7,6 +10,10 @@ import {
   getDeviceAuthSignInUrl,
   getDeviceAuthShellClassName,
 } from './device-auth-url';
+
+// @swc/jest compiles JSX with the classic runtime, and the component imports no
+// React default, so its `React.createElement` calls need React on the global.
+Object.assign(globalThis, { React });
 
 describe('getDeviceAuthSignInUrl', () => {
   test('preserves the device auth code through sign in', () => {
@@ -67,11 +74,60 @@ describe('getDeviceAuthShellClassName', () => {
     expect(getDeviceAuthShellClassName(true)).toContain('px-4');
   });
 
-  test('uses the dynamic viewport height to center app-mode authorization content', () => {
-    expect(getDeviceAuthShellClassName(true)).toContain('h-dvh');
-    expect(getDeviceAuthShellClassName(true)).toContain('w-full');
-    expect(getDeviceAuthShellClassName(true)).toContain('items-center');
-    expect(getDeviceAuthShellClassName(true)).toContain('justify-center');
+  test('uses the dynamic viewport minimum height to center app-mode authorization content', () => {
+    const tokens = getDeviceAuthShellClassName(true).split(' ');
+    expect(tokens).toContain('min-h-dvh');
+    expect(tokens).not.toContain('h-dvh');
+    expect(tokens).toContain('w-full');
+    expect(tokens).toContain('items-center');
+    expect(tokens).toContain('justify-center');
+    expect(tokens).toContain('max-[22rem]:px-2');
+  });
+});
+
+describe('DeviceAuthClient layout', () => {
+  const renderClient = (user: { name: string; email: string; imageUrl: string }) =>
+    renderToStaticMarkup(
+      React.createElement(DeviceAuthClient, {
+        code: 'ABC-123',
+        viewerToken: 'v',
+        isAppMode: true,
+        user,
+      })
+    );
+
+  test('reflows the identity row so the account identity stays visible at narrow width', () => {
+    const html = renderClient({ name: 'Test User', email: 'test@example.com', imageUrl: '' });
+
+    expect(html).toContain('min-h-dvh');
+    expect(html).toContain('max-[22rem]:flex-col');
+    expect(html).toContain('max-[22rem]:items-stretch');
+    expect(html).toContain('class="min-w-0 flex-1"');
+    expect(html).toContain('shrink-0');
+    expect(html).toContain('max-[22rem]:w-full');
+    expect(html).toContain('space-y-4 max-[22rem]:px-2');
+    expect(html).toContain('p-3 max-[22rem]:flex-col max-[22rem]:items-stretch max-[22rem]:p-2');
+    expect(html).toContain(
+      'class="flex min-w-0 flex-1 items-center gap-3 max-[22rem]:flex-col max-[22rem]:items-stretch"'
+    );
+    expect(html).toContain('class="space-y-2 rounded-lg border p-4 max-[22rem]:p-2"');
+    expect(html).toContain('class="flex gap-3 max-[22rem]:flex-col"');
+    expect(html).toContain('flex-1 max-[22rem]:w-full max-[22rem]:px-2');
+    expect(html).toContain('Signed in as');
+    expect(html).toContain('Test User');
+    expect(html).toContain('test@example.com');
+  });
+
+  test('shows the email once as the account name when the viewer has no display name', () => {
+    const html = renderClient({ name: '', email: 'test@example.com', imageUrl: '' });
+
+    expect(html.split('test@example.com')).toHaveLength(2);
+  });
+
+  test('lets the verification code wrap so it stays inside the card border at narrow width', () => {
+    const html = renderClient({ name: 'Test User', email: 'test@example.com', imageUrl: '' });
+
+    expect(html).toContain('class="text-2xl font-bold tracking-wider break-all"');
   });
 });
 

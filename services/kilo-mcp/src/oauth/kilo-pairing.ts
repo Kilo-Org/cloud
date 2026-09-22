@@ -10,6 +10,8 @@
  *   (`GET /api/device-auth/codes/{code}`).
  * - `fetchOrgOptions` lists the paired identity's organizations by calling the
  *   read-only `organizations.list` catalog query with the Kilo bearer.
+ * - `fetchUserIsAdmin` answers whether the paired identity is a platform admin
+ *   by calling the read-only `user.getMe` catalog query with the same bearer.
  *
  * This module now owns the pairing I/O that the hand-rolled authorization
  * endpoint and consent page used to do, so the new defaultHandler routes own
@@ -169,4 +171,41 @@ export async function fetchOrgOptions(
     options.push({ id, name: typeof name === 'string' && name.length > 0 ? name : id });
   }
   return options;
+}
+
+/** The catalog query that answers whether the caller is a platform admin (s2). */
+export const USER_ME_QUERY_PATH = 'user.getMe';
+
+/**
+ * Answer whether the paired Kilo identity is a platform admin by calling the
+ * catalog `user.getMe` query with the approved Kilo bearer. Unlike
+ * `pollKiloPairing` this THROWS on any upstream failure (transport error or
+ * non-ok status) instead of folding it into a false answer: the picker has to
+ * tell 'not an admin' (a valid `false`) apart from 'could not check' (an error),
+ * because only the latter raises the reload notice — and both stay fail-closed.
+ * apps/web responses are trusted, so the envelope is read without zod and only
+ * an explicit `true` counts as admin (missing/mistyped ⇒ false).
+ */
+export async function fetchUserIsAdmin(
+  deps: Pick<KiloPairingDeps, 'webBaseUrl' | 'fetchImpl'>,
+  kiloToken: string
+): Promise<boolean> {
+  const fetchImpl = deps.fetchImpl ?? fetch;
+  const url = new URL(`/api/trpc/${USER_ME_QUERY_PATH}`, deps.webBaseUrl);
+  let response: Response;
+  try {
+    response = await fetchImpl(url.toString(), {
+      method: 'GET',
+      headers: { Accept: 'application/json', Authorization: `Bearer ${kiloToken}` },
+    });
+  } catch {
+    throw new Error('user.getMe upstream unreachable');
+  }
+  if (!response.ok) {
+    throw new Error(`user.getMe upstream returned ${response.status}`);
+  }
+  // apps/web responses are trusted: read the tRPC envelope without zod.
+  const body: unknown = await response.json().catch(() => null);
+  const data = (body as { result?: { data?: unknown } } | null)?.result?.data;
+  return (data as { isAdmin?: unknown } | null)?.isAdmin === true;
 }

@@ -133,7 +133,7 @@ function createChatProcessor(
               break;
             }
           }
-          sessionStorage.upsertPart(stripped.messageID, stripped);
+          sessionStorage.upsertPart(stripped.messageID, stripped, event.time);
           break;
         }
         case 'message.part.delta':

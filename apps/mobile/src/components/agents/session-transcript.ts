@@ -23,7 +23,13 @@ export type SessionTranscriptItem =
       parts?: Part[];
     }
   | { type: 'preparation'; attempt: PreparationAttempt }
-  | { type: 'tool-run'; id: string; parts: ToolPart[] }
+  | {
+      type: 'tool-run';
+      id: string;
+      /** The run's first part's message id, for resume-anchor matching. */
+      messageId: string;
+      parts: ToolPart[];
+    }
   | { type: 'time'; created: number; messageId: string; dayChanged: boolean };
 
 /**
@@ -70,6 +76,50 @@ export function getSessionTranscriptItemType(item: SessionTranscriptItem): strin
   return item.type;
 }
 
+/**
+ * The message id a resume anchor matches this item by: a message row's own id,
+ * a condensed run's first part's message, or a time marker's message (the
+ * marker renders above that message). A preparation attempt has no message row
+ * of its own, so it can never be an anchor target.
+ */
+export function getSessionTranscriptItemMessageId(item: SessionTranscriptItem): string | null {
+  if (item.type === 'message') {
+    return item.message.info.id;
+  }
+  if (item.type === 'preparation') {
+    return null;
+  }
+  return item.messageId;
+}
+
+/**
+ * Whether `mergeSessionTranscript` emits a row for this message: it renders
+ * content, or its delivery failed and its typed footer is the row's own
+ * surface. Everything else is dropped and cannot own a failure row.
+ *
+ * An unconfirmed row with no parts at all stays invisible: unlike a confirmed
+ * user row (whose parts may still stream in, so a zero-part row stays
+ * transient), a client materialised row that never received its parts will not
+ * gain content on its own — it would otherwise leave the reported empty yellow
+ * stub above the submitted text. A synthetic row whose parts exist but render
+ * nothing is already dropped by `messageRendersContent`, so this rule only has
+ * to name the zero-part case. The row is keyed by the id the client sent (the
+ * server honors `messageId`), so the run that failed it attaches here and a
+ * failed submission keeps its one row with the typed footer. Two rows with the
+ * same prompt are two submissions and stay two rows. If the server later
+ * confirms the id, the authoritative record replaces the info and the row
+ * re-renders through the normal path.
+ */
+export function transcriptRendersMessage(
+  message: StoredMessage,
+  deliveryStates?: ReadonlyMap<string, MessageDeliveryState>
+): boolean {
+  const failed = deliveryStates?.get(message.info.id)?.status === 'failed';
+  const unconfirmedWithoutParts =
+    isUnconfirmedSubmission(message) && !failed && message.parts.length === 0;
+  return !unconfirmedWithoutParts && (messageRendersContent(message) || failed);
+}
+
 export function mergeSessionTranscript(
   messages: readonly StoredMessage[],
   preparationAttempts: readonly PreparationAttempt[],
@@ -94,22 +144,7 @@ export function mergeSessionTranscript(
   let previousCreated: number | undefined = undefined;
   for (const message of messages) {
     messageIds.add(message.info.id);
-    const failed = deliveryStates?.get(message.info.id)?.status === 'failed';
-    // An unconfirmed row with no parts at all stays invisible: unlike a
-    // confirmed user row (whose parts may still stream in, so a zero-part row
-    // stays transient), a client materialised row that never received its parts
-    // will not gain content on its own — it would otherwise leave the reported
-    // empty yellow stub above the submitted text. A synthetic row whose parts
-    // exist but render nothing is already dropped by `messageRendersContent`
-    // below, so this rule only has to name the zero-part case. The row is keyed
-    // by the id the client sent (the server honors `messageId`), so the run that
-    // failed it attaches here and a failed submission keeps its one row with the
-    // typed footer. Two rows with the same prompt are two submissions and stay
-    // two rows. If the server later confirms the id, the authoritative record
-    // replaces the info and the row re-renders through the normal path.
-    const unconfirmedWithoutParts =
-      isUnconfirmedSubmission(message) && !failed && message.parts.length === 0;
-    if (!unconfirmedWithoutParts && (messageRendersContent(message) || failed)) {
+    if (transcriptRendersMessage(message, deliveryStates)) {
       const created = message.info.time.created;
       // One validity rule, shared with the marker component: a timestamp the label
       // cannot format must never produce a marker row.
@@ -207,9 +242,11 @@ export function condenseTranscriptToolRuns(
     }
     if (run.length >= 2) {
       flushFragment();
+      const first = run[0];
       condensed.push({
         type: 'tool-run',
-        id: `tool-run:${run[0]?.part.id ?? ''}`,
+        id: `tool-run:${first?.part.id ?? ''}`,
+        messageId: first?.message.info.id ?? '',
         parts: run.map(entry => entry.part),
       });
     } else {

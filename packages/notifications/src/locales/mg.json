@@ -7,6 +7,7 @@
       "instanceLifecycle": "Misy fanavaozana ny instance anao",
       "scheduledAction": "Misy fanavaozana ny hetsika voalahatra",
       "lowBalance": "Mila jerena ny balan-nao",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Misy hitan'ny fiarovana mila jerena",
       "activeAgentsGlanceable": "Misy fanavaozana ny agent mavitrika"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Fampandrenesana balan ambany",
       "body": "Ny balan’ny {{organizationName}} dia latsaka ambany ny ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Hitan'ny fiarovana vaovao ({{severity}})",

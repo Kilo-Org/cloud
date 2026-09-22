@@ -470,6 +470,19 @@ describe('startOpenAiChatGptConnect', () => {
     );
   });
 
+  it('returns to the organization BYOK page when an organization is given', async () => {
+    const { startOpenAiChatGptConnect, signIn } = await loadConnect();
+    const createLinkingSession = jest.fn(async () => ({}));
+
+    await startOpenAiChatGptConnect(createLinkingSession, '00000000-0000-4000-8000-000000000001');
+
+    expect(signIn).toHaveBeenCalledWith(
+      'openai',
+      { callbackUrl: '/organizations/00000000-0000-4000-8000-000000000001/byok' },
+      { scope: OPENAI_TOKEN_SHARING_SCOPE }
+    );
+  });
+
   it('does not start the OpenAI authorization when the linking session fails', async () => {
     const { startOpenAiChatGptConnect, signIn } = await loadConnect();
     const createLinkingSession = jest.fn(async () => {

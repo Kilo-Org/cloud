@@ -163,6 +163,7 @@
     "useDifferentEmail": "અલગ ઇમેઇલ વાપરો",
     "signInWithApple": "Apple વડે સાઇન ઇન કરો",
     "signInWithGoogle": "Google વડે સાઇન ઇન કરો",
+    "signInWithPasskey": "પાસકી વડે સાઇન ઇન કરો",
     "emailAddress": "ઇમેઇલ સરનામું",
     "emailPlaceholder": "તમારું ઇમેઇલ સરનામું",
     "continueWithEmail": "ઇમેઇલ વડે આગળ વધો",
@@ -175,6 +176,10 @@
     "termsConnector": " અને ",
     "termsSuffix": "ને સ્વીકારો છો.",
     "moreSignInOptions": "સાઇન ઇન માટેના વધુ વિકલ્પો",
+    "passkeyCancelled": "પાસકી વડે સાઇન ઇન રદ થયું. ફરી પ્રયાસ કરો.",
+    "passkeyNotFound": "આ ઉપકરણ માટે કોઈ પાસકી સાચવેલી નથી. તેના બદલે Apple, Google અથવા તમારા ઇમેલથી સાઇન ઇન કરો.",
+    "passkeyUnsupported": "આ ઉપકરણ પર પાસકી ઉપલબ્ધ નથી. તેના બદલે Apple, Google અથવા તમારા ઇમેલથી સાઇન ઇન કરો.",
+    "passkeyFailed": "પાસકી વડે સાઇન ઇન થઈ શક્યું નથી. ફરી પ્રયાસ કરો.",
     "couldNotCompleteSignIn": "સાઇન ઇન પૂર્ણ કરી શકાયું નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
     "sessionEnded": "તમારું સત્ર સમાપ્ત થઈ ગયું. કૃપા કરીને ફરી સાઇન ઇન કરો.",
     "signInCodeExpired": "સાઇન ઇન માટેના તમારા કોડની મુદત પૂરી થઈ ગઈ છે. કૃપા કરીને ફરી પ્રયાસ કરો.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "પરીક્ષણ એકાઉન્ટ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "એન્ટરપ્રાઇઝ SSO"
+    "providerEnterpriseSso": "એન્ટરપ્રાઇઝ SSO",
+    "passkeysTitle": "પાસકી",
+    "passkeysSubtitle": "પાસવર્ડ વગર સાઇન ઇન કરો",
+    "passkeysEmpty": "હજી કોઈ પાસકી નથી",
+    "passkeysEmptyHint": "$t(profile.addPasskey) કરીને પાસવર્ડ વગર સાઇન ઇન કરો.",
+    "passkeysCouldNotLoad": "પાસકી લોડ થઈ શકી નથી",
+    "passkeysLoadFailed": "આ લોડ ન થાય ત્યાં સુધી પાસકી ઉપલબ્ધ નથી.",
+    "addPasskey": "પાસકી ઉમેરો",
+    "passkeyDefaultName": "પાસકી",
+    "passkeyAddedOn": "{{date}} ઉમેરાયું",
+    "passkeyAdded": "પાસકી ઉમેરાઈ.",
+    "passkeyAddFailed": "પાસકી ઉમેરી શકાઈ નથી. ફરી પ્રયાસ કરો.",
+    "passkeyAddUnsupported": "આ ઉપકરણ પાસકી બનાવી શકતું નથી.",
+    "passkeyAddCancelled": "પાસકી બનાવવી રદ થઈ.",
+    "passkeyRemoved": "પાસકી દૂર કરી.",
+    "passkeyRemoveFailed": "તે પાસકી દૂર કરી શકાઈ નથી. ફરી પ્રયાસ કરો.",
+    "passkeyRenamed": "પાસકીનું નામ બદલાયું.",
+    "passkeyName": "પાસકીનું નામ",
+    "renamePasskey": "પાસકીનું નામ બદલો",
+    "removePasskey": "પાસકી દૂર કરો",
+    "removePasskeyTitle": "પાસકી દૂર કરવી?",
+    "removePasskeyMessage": "હવે તમે આ પાસકીથી સાઇન ઇન કરી શકશો નહીં."
   },
   "preferences": {
     "general": "સામાન્ય",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{total}}માંથી {{displayCount}} ફાઇલો લોડ થઈ",
       "filesStillLoading": "ફાઇલો હજી લોડ થઈ રહી છે. ફરી લોડ કરવા નીચે ખેંચો.",
       "goToOverview": "ઝાંખી પર જાઓ",
-      "goToOverviewTab": "ઝાંખી ટેબ પર જાઓ"
+      "goToOverviewTab": "ઝાંખી ટેબ પર જાઓ",
+      "expandAllLines_one": "બધી {{displayCount}} લીટી બતાવો",
+      "expandAllLines_other": "બધી {{displayCount}} લીટીઓ બતાવો",
+      "expandLines_one": "{{displayCount}} લીટી બતાવો ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} લીટીઓ બતાવો ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "સંદર્ભની {{displayCount}} લીટી બતાવો",
+      "expandLinesOfContext_other": "સંદર્ભની {{displayCount}} લીટીઓ બતાવો",
+      "expandMoreLines_one": "વધુ {{displayCount}} લીટી બતાવો ({{start}}–{{end}})",
+      "expandMoreLines_other": "વધુ {{displayCount}} લીટીઓ બતાવો ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}}માંથી {{loaded}} ફાઇલો લોડ થઈ",
+      "loadedOfTotalFiles_other": "{{total}}માંથી {{loaded}} ફાઇલો લોડ થઈ"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ફાઇલના અંતે કોઈ નવી લીટી નથી",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "{{path}} પર જૂનું"
       },
       "deletedUser": "કાઢી નાખેલો વપરાશકર્તા",
-      "replyForbiddenTerm": "તમને આ {{term}} પર જવાબ આપવાની પરવાનગી નથી."
+      "replyForbiddenTerm": "તમને આ {{term}} પર જવાબ આપવાની પરવાનગી નથી.",
+      "moreLinesAbove_one": "… ઉપર વધુ {{displayCount}} લીટી છે.",
+      "moreLinesAbove_other": "… ઉપર વધુ {{displayCount}} લીટીઓ છે."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ઍપનાં સેટિંગ્સ ખોલી શકાયાં નહીં.",
     "installKiloGitHubApp": "Kilo GitHub એપ ઇન્સ્ટોલ કરો",
@@ -706,7 +744,9 @@
       "statusContext": "સંદર્ભ",
       "lineLabel": "{{status}} લીટી {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(ખાલી)"
+      "emptyLine": "(ખાલી)",
+      "truncationBanner_one": "બદલાયેલી કુલ {{total}} ફાઇલોમાંથી પહેલી {{limit}} દેખાય છે — આ GitHub APIની મર્યાદા છે.",
+      "truncationBanner_other": "બદલાયેલી કુલ {{total}} ફાઇલોમાંથી પહેલી {{limit}} દેખાય છે — આ GitHub APIની મર્યાદા છે."
     },
     "linkPasteClipboardEmpty": "ક્લિપબોર્ડ ખાલી છે.",
     "linkPasteNotAPullRequest": "આ પુલ રિક્વેસ્ટ કે મર્જ રિક્વેસ્ટનો લિંક નથી",
@@ -783,11 +823,12 @@
     "previewFullDescription": "સૂચનાઓ તમારી લૉક સ્ક્રીન પર સંદેશનું લખાણ બતાવે છે.",
     "previewGenericDescription": "સૂચનાઓ માત્ર કોઈ પ્રવૃત્તિ થઈ હોવાનું જણાવે છે. સંદેશ વાંચવા Kilo ખોલો.",
     "channel": {
-      "agent": "એજન્ટનાં સત્રો",
+      "agentProgress": "એજન્ટની પ્રગતિ",
       "chat": "ચેટના સંદેશા",
       "kiloclaw": "KiloClawની પ્રવૃત્તિ",
       "balance": "બેલેન્સ અંગેની ચેતવણીઓ",
-      "security": "સુરક્ષા તપાસનાં તારણો"
+      "security": "સુરક્ષા તપાસનાં તારણો",
+      "spend": "ખર્ચની ચેતવણીઓ"
     },
     "category": {
       "chatMessagesSubtitle": "તમારી વાતચીતમાં જવાબો",
@@ -798,8 +839,22 @@
       "sessionStatusTitle": "સત્રની સ્થિતિ",
       "sessionStatusSubtitle": "પૂર્ણ / નિષ્ફળ / નિયંત્રિત કરવા તૈયાર",
       "kiloclawActivitySubtitle": "ઇન્સ્ટન્સ તૈયાર/નિષ્ફળ, નિર્ધારિત ક્રિયાઓ",
+      "kiloclawActivityUnavailable": "KiloClaw પ્રવૃત્તિ મેળવવા માટે KiloClaw ઇન્સ્ટન્સ શરૂ કરો.",
       "balanceAlertsSubtitle": "સંસ્થાનું બેલેન્સ ઓછું થવાની ચેતવણીઓ",
-      "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર"
+      "balanceAlertsUnavailable": "બેલેન્સ ચેતવણીઓ મેળવવા માટે સંસ્થામાં જોડાઓ.",
+      "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર",
+      "securityFindingsUnavailable": "સુરક્ષા તારણો મેળવવા માટે વ્યાપમાં Kilo સુરક્ષા એજન્ટ ચાલુ કરો.",
+      "spendAlertsSubtitle": "મર્યાદા ઓળંગવી અને કલાકદીઠ ઉછાળા",
+      "spendAlertsToggle": "ખર્ચની ચેતવણીની શ્રેણી"
+    },
+    "action": {
+      "openSession": "સેશન ખોલો"
+    },
+    "needsInputAction": {
+      "approved": "વિનંતી મંજૂર થઈ",
+      "replied": "જવાબ મોકલાયો",
+      "failed": "જવાબ આપી શકાયો નથી. ફરી પ્રયાસ કરવા ફરી ટેપ કરો.",
+      "unavailable": "આ વિનંતી હવે રાહ જોતી નથી."
     }
   },
   "tabs": {
@@ -880,7 +935,9 @@
       "uploadFailed": "અપલોડ નિષ્ફળ થયું.",
       "failedToUploadFile": "ફાઇલ અપલોડ કરી શકાઈ નહીં: {{reason}}.",
       "nothingToPaste": "પેસ્ટ કરવા માટે કંઈ નથી.",
-      "metadataStripFailed": "ફોટોનો મેટાડેટા દૂર કરી શકાયો નહીં."
+      "metadataStripFailed": "ફોટોનો મેટાડેટા દૂર કરી શકાયો નહીં.",
+      "limit_one": "તમે વધુમાં વધુ {{displayCount}} ફાઇલ જોડી શકો છો.",
+      "limit_other": "તમે વધુમાં વધુ {{displayCount}} ફાઇલો જોડી શકો છો."
     },
     "attachmentPreview": {
       "accessibility": "ફાઇલ: {{filename}}, સ્થિતિ: {{status}}",
@@ -1624,7 +1681,11 @@
       "syncFindings": "તારણો સિંક કરો",
       "syncNow": "હવે સિંક કરો",
       "syncQueued": "સિંક કરવાની વિનંતી કતારમાં મૂકાઈ",
-      "syncStatusUnavailable": "સિંકની સ્થિતિ ઉપલબ્ધ નથી."
+      "syncStatusUnavailable": "સિંકની સ્થિતિ ઉપલબ્ધ નથી.",
+      "daysOverdue_one": "સમયમર્યાદા વટાવ્યાને {{displayCount}} દિવસ",
+      "daysOverdue_other": "સમયમર્યાદા વટાવ્યાને {{displayCount}} દિવસ",
+      "findingsCount_one": "{{displayCount}} તારણ",
+      "findingsCount_other": "{{displayCount}} તારણો"
     },
     "dashboardMetrics": {
       "openFindings": "ખુલ્લાં તારણો",
@@ -2021,6 +2082,10 @@
       "couldNotLoad": "સત્ર લોડ કરી શકાયું નહીં.",
       "failedToLoadDetails": "સત્રની વિગતો લોડ કરી શકાઈ નહીં.",
       "failedToStopExecution": "ચાલી રહેલું કાર્ય રોકી શકાયું નહીં.",
+      "stopped": "સત્ર બંધ થયું",
+      "committing": "કમિટ થઈ રહ્યું છે…",
+      "committed": "કમિટ થયું",
+      "commitFailed": "કમિટ નિષ્ફળ ગયું",
       "renameSession": "સત્રનું નામ બદલો",
       "renamePlaceholder": "સત્રનું નામ",
       "transcriptAccessibility": "સત્રની લેખિત વાતચીત",
@@ -2131,20 +2196,7 @@
       "continueFrom": "{{title}} સત્ર આગળ ચાલુ થઈ રહ્યું છે.",
       "importingSession": "સત્ર આયાત થઈ રહ્યું છે",
       "cliCannotContinue": "આ CLI સત્ર ચાલુ રાખી શકતું નથી. Cloud Agent અથવા બીજું CLI પસંદ કરો.",
-      "importFailed": "આ સત્ર આયાત કરી શકાયું નહીં.",
-      "sandbox": "સેન્ડબોક્સ",
-      "sandboxAccessibility": "સેન્ડબોક્સ: {{label}}",
-      "sandboxDefaultWithDestination": "ડિફોલ્ટ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "નાનું",
-      "sandboxInstanceShared": "શેર કરેલું",
-      "sandboxInstanceLarge": "મોટું",
-      "sandboxInstanceDevcontainer": "ડેવ કન્ટેનર",
-      "sandboxInstanceProviderDefault": "પ્રદાતાનું ડિફોલ્ટ",
-      "sandboxCouldNotLoad": "સેન્ડબોક્સના વિકલ્પો લોડ કરી શકાયા નથી",
-      "sandboxUnavailable": "આ સેન્ડબોક્સ અનુપલબ્ધ છે. બીજું સેન્ડબોક્સ અથવા ડિફોલ્ટ પસંદ કરો.",
-      "sandboxUseDefault": "ડિફોલ્ટ વાપરો"
+      "importFailed": "આ સત્ર આયાત કરી શકાયું નહીં."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ફાઇલ અપડેટ થઈ.",
@@ -2168,7 +2220,14 @@
       "updateTodos": "કરવાનાં કાર્યો અપડેટ કરો",
       "linesBadge": "{{displayCount}} પંક્તિઓ",
       "filesBadge": "{{displayCount}} ફાઇલો",
-      "matchesBadge": "{{displayCount}} મેળ"
+      "matchesBadge": "{{displayCount}} મેળ",
+      "filesBadge_one": "{{displayCount}} ફાઇલ",
+      "filesBadge_other": "{{displayCount}} ફાઇલો",
+      "linesBadge_one": "{{displayCount}} પંક્તિ",
+      "linesBadge_other": "{{displayCount}} પંક્તિઓ",
+      "matchesBadge_one": "{{displayCount}} મેળ",
+      "matchesBadge_other": "{{displayCount}} મેળ",
+      "noOutput": "કોઈ આઉટપુટ નથી."
     },
     "readToolMarkdown": {
       "linesTruncated": "પંક્તિઓ {{start}}–{{end}} (ટૂંકાવેલી)",
@@ -2458,7 +2517,11 @@
       "files": "ફાઇલો",
       "couldNotOpenPhotoPicker": "ફોટો પસંદ કરવાની સુવિધા ખોલી શકાઈ નહીં. Kilo ફરી શરૂ કરીને ફરી પ્રયાસ કરો.",
       "maxFilesAllowed": "વધુમાં વધુ {{displayCount}} ફાઇલો ઉમેરી શકાય છે.",
-      "onlyAddingFiles": "કુલ {{total}} માંથી ફક્ત {{accepted}} ફાઇલો ઉમેરવામાં આવી રહી છે (મહત્તમ {{max}})"
+      "onlyAddingFiles": "કુલ {{total}} માંથી ફક્ત {{accepted}} ફાઇલો ઉમેરવામાં આવી રહી છે (મહત્તમ {{max}})",
+      "maxFilesAllowed_one": "વધુમાં વધુ {{displayCount}} ફાઇલ ઉમેરી શકાય છે.",
+      "maxFilesAllowed_other": "વધુમાં વધુ {{displayCount}} ફાઇલો ઉમેરી શકાય છે.",
+      "onlyAddingFiles_one": "કુલ {{total}} માંથી ફક્ત {{accepted}} ફાઇલો ઉમેરવામાં આવી રહી છે (મહત્તમ {{max}})",
+      "onlyAddingFiles_other": "કુલ {{total}} માંથી ફક્ત {{accepted}} ફાઇલો ઉમેરવામાં આવી રહી છે (મહત્તમ {{max}})"
     },
     "composer": {
       "addAttachment": "ફાઇલ જોડો",
@@ -2476,7 +2539,9 @@
       "discardAttachmentsMessage": "હજી કોઈ સંદેશમાં જોડાઈ ન હોય તેવી અપલોડ કરેલી ફાઇલો કાઢી નાખવામાં આવશે.",
       "discardAttachmentsTitle": "જોડેલી ફાઇલો કાઢી નાખવી છે?",
       "charactersRemaining": "{{count}} અક્ષરો બાકી",
-      "insertNewline": "નવી પંક્તિ ઉમેરો"
+      "insertNewline": "નવી પંક્તિ ઉમેરો",
+      "charactersRemaining_one": "{{count}} અક્ષર બાકી",
+      "charactersRemaining_other": "{{count}} અક્ષરો બાકી"
     },
     "chatLink": {
       "linkCopied": "લિંકની નકલ થઈ",
@@ -2548,7 +2613,9 @@
       "stepsCount_one": "{{steps}} પગલું",
       "stepsCount": "{{steps}} પગલાં",
       "stepsCount_other": "{{steps}} પગલાં",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "મોડલ ({{displayCount}})",
+      "modelsCount_other": "મોડલ ({{displayCount}})"
     },
     "autoApprove": {
       "title": "સ્વતઃ મંજૂરી",
@@ -2588,7 +2655,9 @@
     },
     "toolRun": {
       "sheetTitle": "ટૂલ કૉલ્સ",
-      "condensedLabel": "{{itemCount}} વસ્તુઓ; {{last}}"
+      "condensedLabel": "{{itemCount}} વસ્તુઓ; {{last}}",
+      "condensedLabel_one": "{{itemCount}} વસ્તુ; {{last}}",
+      "condensedLabel_other": "{{itemCount}} વસ્તુઓ; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "આ સત્ર ફાઇલો મેળવી શકતું નથી",
     "cliCantReceiveFilesMessage": "આ સત્ર ચલાવતું Kilo CLI ફાઇલો મેળવી શકતું નથી. તે મશીન પર CLI અપડેટ કરો, અથવા તેના બદલે નવા સત્રમાં શેર કરો.",
     "contentlessMessage": "શેર કરવા માટે કંઈ નથી — કોઈ લખાણ કે ફાઇલ સામેલ નથી.",
-    "couldNotReadContent": "શેર કરેલી સામગ્રી વાંચી શકાઈ નહીં."
+    "couldNotReadContent": "શેર કરેલી સામગ્રી વાંચી શકાઈ નહીં.",
+    "onlyFirstFilesAttached_one": "ફક્ત પહેલી {{displayCount}} ફાઇલ જોડવામાં આવશે.",
+    "onlyFirstFilesAttached_other": "ફક્ત પહેલી {{displayCount}} ફાઇલો જોડવામાં આવશે."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3164,10 @@
     "couldNotApprove": "મંજૂર કરી શકાયું નથી",
     "couldNotStart": "શરૂ કરી શકાયું નથી",
     "channelName": "સક્રિય એજન્ટો",
-    "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો."
+    "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો.",
+    "openSession": "ખોલો",
+    "approveFailed": "મંજૂર કરી શકાયું નહીં. ફરી પ્રયાસ કરવા $t(common.approve) પર ટૅપ કરો.",
+    "newestResult": "સૌથી નવું પરિણામ"
   },
   "transcriptionModel": {
     "title": "અવાજને લખાણમાં ફેરવવાનું મોડેલ",
@@ -3118,15 +3192,7 @@
     "remoteOptionTitle": "તમારું કમ્પ્યુટર",
     "remoteOptionBody": "તમારા પોતાના મશીન પર `kilo remote` CLI દ્વારા Kilo ચલાવો.",
     "skip": "ટૂર છોડી દો",
-    "tutorialLabel": "ટ્યુટોરિયલ",
-    "remoteTitle": "તમારી પહેલી રિમોટ સત્ર શરૂ કરો",
-    "remoteBody": "તમારું કમ્પ્યુટર કનેક્ટ કરો, પછી અહીંથી સત્ર શરૂ કરો.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "હજુ કોઈ કમ્પ્યુટર કનેક્ટ થયું નથી",
-    "remoteEmptyBody": "તેને કનેક્ટ કરવા તમારા કમ્પ્યુટર પર `kilo remote` ચલાવો.",
-    "remoteFound": "કમ્પ્યુટર કનેક્ટ થયું",
-    "checkAgain": "ફરી તપાસો",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ટ્યુટોરિયલ"
   },
   "appActions": {
     "start": {
@@ -3134,5 +3200,31 @@
       "repositoryUnknown": "Kilo {{repository}} ને GitHub કે GitLab રિપોઝિટરી તરીકે ઓળખતું નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો.",
       "repositoryUnsupported": "{{repository}} એ Bitbucket રિપોઝિટરી છે — એજન્ટ શરૂ કરો હજી તેનો ઉપયોગ કરી શકતું નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો."
     }
+  },
+  "launcher": {
+    "openLastSession": "છેલ્લું સત્ર ખોલો"
+  },
+  "spendAlerts": {
+    "subtitle": "આ સ્કોપનો ખર્ચ મર્યાદા ઓળંગે ત્યારે અથવા તેના સામાન્ય કલાકદીઠ દરથી ઉપર ઉછાળે ત્યારે બિલિંગ સંપર્કોને ઇમેઇલ અથવા પુશ દ્વારા ચેતવણી મોકલો.",
+    "enable": "ખર્ચની ચેતવણીઓ ચાલુ કરો",
+    "thresholdTitle": "મર્યાદા ઓળંગવી",
+    "thresholdSubtitle": "ચાલુ ખર્ચ તમારી મર્યાદા ઓળંગે છે",
+    "anomalyTitle": "કલાકદીઠ ઉછાળો",
+    "anomalySubtitle": "એક કલાક આ સ્કોપના સામાન્ય દરથી ઘણો ઊંચો છે",
+    "limitLabel": "મર્યાદા (USD)",
+    "windowLabel": "સમયગાળો",
+    "window24h": "24 કલાક",
+    "window7d": "7 દિવસ",
+    "window30d": "30 દિવસ",
+    "multiplierLabel": "ઉછાળ ગુણક",
+    "saved": "ખર્ચની ચેતવણીની સેટિંગ્સ સાચવી",
+    "loadError": "ખર્ચની ચેતવણીઓ લોડ કરી શકાઈ નથી.",
+    "saveError": "ખર્ચની ચેતવણીઓ સાચવી શકાઈ નથી.",
+    "empty": "ખર્ચની ચેતવણીઓ બંધ છે. આ સ્કોપના બિલિંગ સંપર્કોને ચેતવવા માટે તેમને ચાલુ કરો.",
+    "noSpend": "હજી કોઈ ખર્ચ નોંધાયો નથી",
+    "spend24h": "છેલ્લા 24 કલાકનો ખર્ચ",
+    "multiplierError": "1 કે તેથી વધુ ગુણક દાખલ કરો",
+    "permissionDenied": "તમને ખર્ચની ચેતવણીઓનું સંચાલન કરવાની પરવાનગી નથી.",
+    "pushOffByCategory": "સૂચનાઓમાં બંધ"
   }
 }

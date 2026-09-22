@@ -1,7 +1,14 @@
 /* eslint-disable new-cap -- SuggestionCard is invoked as a plain function, matching repo test convention */
+// eslint-disable-next-line import/no-nodejs-modules -- Use the compiler's compatible CommonJS export.
+import { createRequire } from 'node:module';
+import tailwindcss from '@tailwindcss/postcss';
+import postcss from 'postcss';
 import type * as React from 'react';
 import type * as ReactI18next from 'react-i18next';
+import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { cn } from '@/lib/utils';
 
 import { SuggestionCard } from './suggestion-card';
 
@@ -58,6 +65,26 @@ vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'Accessi
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#666' }),
 }));
+
+const { compile } = createRequire(import.meta.url)(
+  'react-native-css/compiler'
+) as typeof NativeCSSCompiler;
+
+// The row no longer scrolls, so a model-generated label wider than the card has
+// no scroll recovery path. These tests compile the classes with the app's own
+// theme and compiler, so they assert the native styles that keep the button
+// inside the row and let the label shrink and wrap instead of overflowing.
+async function nativeStyle(className: string) {
+  const { css } = await postcss([tailwindcss()]).process(
+    `@reference "../../global.css"; .target { @apply ${className}; }`,
+    { from: import.meta.filename }
+  );
+  const rules = compile(css, { inlineVariables: false }).stylesheet().s;
+  const declarations = rules
+    ?.find(([name]) => name === 'target')?.[1]
+    .flatMap(rule => rule.d ?? []);
+  return Object.assign({}, ...(declarations ?? [])) as Record<string, unknown>;
+}
 
 const text = 'Review the new parseDuration implementation and tests.';
 const actions: CardProps['actions'] = [
@@ -142,6 +169,36 @@ describe('SuggestionCard', () => {
       accessibilityHint: 'Inspect every changed file.\nDo not edit.',
     });
     expect(requireChild(buttons[2], 'dismiss').props.accessibilityLabel).toBe('Dismiss suggestion');
+  });
+
+  it('keeps an over-wide action label inside the row instead of overflowing it', async () => {
+    const longAction: CardProps['actions'][number] = {
+      label: 'Review the new parseDuration implementation and its tests before shipping',
+      prompt: '/review',
+    };
+    const root = renderCard({
+      text,
+      actions: [longAction],
+      onAccept: vi.fn<() => Promise<void>>(),
+      onDismiss: vi.fn<() => Promise<void>>(),
+    });
+    const button = requireChild(childrenOf(parts(root).actionRow)[0], 'first action');
+    const label = requireChild(childrenOf(button)[0], 'action label');
+
+    expect(label.props.children).toBe(longAction.label);
+    // The button itself is clamped to the row it sits in, however long the
+    // label: it never keeps the `shrink-0` the shared Button defaults to.
+    expect(await nativeStyle(button.props.className as string)).toMatchObject({
+      maxWidth: '100%',
+      flexShrink: 1,
+    });
+    // The shared Button's base class is `shrink-0`, so the card's class has to
+    // win that merge or the button could never shrink to the row.
+    expect(cn('shrink-0', button.props.className as string)).not.toContain('shrink-0');
+    // Wrapping, not truncating: no line limit, and the label shrinks to the
+    // width the button has left for it.
+    expect(label.props.numberOfLines).toBeUndefined();
+    expect(await nativeStyle(label.props.className as string)).toMatchObject({ flexShrink: 1 });
   });
 
   it('surfaces the apply failure and re-enables the action buttons', async () => {

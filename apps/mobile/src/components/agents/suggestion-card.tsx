@@ -82,6 +82,10 @@ export function SuggestionCard({
             key={`${action.label}-${index}`}
             variant={index === 0 ? 'default' : 'outline'}
             size="sm"
+            // The row no longer scrolls, so a model-generated label wider than
+            // the card cannot be reached by scrolling. The button is clamped to
+            // the row and its label shrinks and wraps instead of overflowing.
+            className="max-w-full shrink"
             onPress={() => {
               void handleAccept(index);
             }}
@@ -91,9 +95,7 @@ export function SuggestionCard({
             accessibilityLabel={action.label}
             accessibilityHint={action.description}
           >
-            <Text className="text-sm" numberOfLines={1}>
-              {action.label}
-            </Text>
+            <Text className="shrink text-sm">{action.label}</Text>
           </Button>
         ))}
 

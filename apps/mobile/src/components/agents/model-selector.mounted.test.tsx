@@ -86,6 +86,33 @@ function renderRow(
   return renderer;
 }
 
+function renderSelector(
+  overrides: Partial<{
+    value: string;
+    variant: string;
+    options: SessionModelOption[];
+    isLoading: boolean;
+  }> = {}
+): TestRenderer.ReactTestRenderer {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  TestRenderer.act(() => {
+    ref.current = TestRenderer.create(
+      createElement(ModelSelector, {
+        value: overrides.value ?? '',
+        variant: overrides.variant ?? '',
+        options: overrides.options ?? [],
+        isLoading: overrides.isLoading ?? false,
+        onSelect: vi.fn<(modelId: string, variant: string) => void>(),
+      })
+    );
+  });
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
 function textStrings(root: TestRenderer.ReactTestInstance): string[] {
   return root
     .findAll(
@@ -100,25 +127,6 @@ function textStrings(root: TestRenderer.ReactTestInstance): string[] {
 function countWithAccessibilityLabel(root: TestRenderer.ReactTestInstance, label: string): number {
   return root.findAll(node => (node.props.accessibilityLabel as string | undefined) === label)
     .length;
-}
-
-function renderSelector(option: SessionModelOption): TestRenderer.ReactTestRenderer {
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-  TestRenderer.act(() => {
-    ref.current = TestRenderer.create(
-      createElement(ModelSelector, {
-        value: option.id,
-        variant: '',
-        options: [option],
-        onSelect: vi.fn<(modelId: string, variant: string) => void>(),
-      })
-    );
-  });
-  const renderer = ref.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
 }
 
 function trailingSlots(renderer: TestRenderer.ReactTestRenderer): string[] {
@@ -188,7 +196,7 @@ describe('Auto model labels', () => {
   });
 
   it('renders the catalog label, not the backend name, on the chip', () => {
-    const renderer = renderSelector(autoOption);
+    const renderer = renderSelector({ value: autoOption.id, options: [autoOption] });
     const texts = textStrings(renderer.root);
     expect(texts).toContain(i18n.t('models.auto.efficient'));
     expect(texts).not.toContain('backend name');
@@ -239,5 +247,38 @@ describe('ModelPickerOptionRow trailing accessory slot', () => {
     expect(checkAccessories(renderRow(option, { selected: true }))).toEqual([
       { color: '#4F5A10', size: 18 },
     ]);
+  });
+});
+
+describe('ModelSelector loading chip', () => {
+  it('labels the chip while the catalog loads instead of rendering a blank skeleton', () => {
+    const renderer = renderSelector({ isLoading: true });
+
+    expect(textStrings(renderer.root)).toContain('Model');
+    expect(renderer.root.findAllByType('Skeleton')).toHaveLength(0);
+    expect(renderer.root.findAllByType('ChevronDown')).toHaveLength(1);
+  });
+
+  it('marks the loading chip as a busy disabled button', () => {
+    const renderer = renderSelector({ isLoading: true });
+
+    const chip = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        (node.props.accessibilityState as { busy?: boolean } | undefined)?.busy === true
+    )[0];
+
+    expect(chip).toBeDefined();
+    expect(chip?.props.accessibilityRole).toBe('button');
+    expect(chip?.props.accessibilityState).toEqual({ busy: true, disabled: true });
+    expect(chip?.props.accessibilityLabel).toBe('Model');
+  });
+
+  it('renders the resolved model name once the catalog lands', () => {
+    const option = cliCatalogOption();
+    const renderer = renderSelector({ value: option.id, options: [option] });
+
+    expect(textStrings(renderer.root)).toContain(option.name);
   });
 });

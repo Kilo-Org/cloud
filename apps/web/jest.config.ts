@@ -1,5 +1,6 @@
 /** @jest-config-loader esbuild-register */
 
+import { availableParallelism } from 'node:os';
 import type { Config } from 'jest';
 
 const config: Config = {
@@ -58,8 +59,15 @@ const config: Config = {
     'node_modules/.pnpm/(?!(@octokit|universal-user-agent|universal-github-app-jwt|before-after-hook|bottleneck|p-limit|yocto-queue|jose@|ai@|@ai-sdk|@standard-schema|@workflow|eventsource-parser|cbor2|@cto\\.af|jotai@3))',
   ],
 
-  // Parallel execution configuration
-  maxWorkers: process.env.JEST_MAX_WORKERS ? process.env.JEST_MAX_WORKERS : '50%',
+  // Parallel execution configuration. Each Jest worker migrates its own
+  // database (src/tests/setup/workerSetup.ts) against the one shared Postgres,
+  // so more workers than the database can migrate at once makes the DB-backed
+  // beforeAll/beforeEach hooks time out instead of failing. CI pins
+  // JEST_MAX_WORKERS=4 for that reason; cap the local default the same way so
+  // a 16-core developer machine does not oversubscribe Postgres.
+  maxWorkers: process.env.JEST_MAX_WORKERS
+    ? process.env.JEST_MAX_WORKERS
+    : Math.min(4, Math.max(1, Math.floor(availableParallelism() / 2))),
 
   globalSetup: '<rootDir>/src/tests/setup/globalSetup.ts',
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup/workerSetup.ts'],

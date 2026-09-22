@@ -54,6 +54,18 @@ catalog:
   workers-tagged-logger: 1.0.0
   wrangler: 4.112.0
   zod: 4.6.5
+catalogs:
+  # Every published @cloudflare/vitest-pool-workers (through 0.22.0) declares a
+  # `vitest ^4.1.0` peer and imports internal Vitest APIs that vitest 5 reworked,
+  # so the pool's proxy worker fails to boot under vitest 5
+  # (`SyntaxError: Unexpected identifier 'file'`). Workspaces whose tests run the
+  # workerd pool stay on the pre-move vitest 4.1.6 through this catalog; the
+  # default catalog's vitest 5.0.1 covers everything else. @vitest/ui moves with
+  # them so its exact `vitest` peer keeps matching. Keep these exact, and keep
+  # this comment.
+  vitest4:
+    '@vitest/ui': 4.1.6
+    vitest: 4.1.6
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:

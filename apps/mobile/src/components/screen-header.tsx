@@ -35,6 +35,14 @@ type ScreenHeaderProps = {
   titleContent?: React.ReactNode;
   /** Line cap for the title, at most {@link MAX_TITLE_LINES}. */
   titleNumberOfLines?: number;
+  /**
+   * Cap the eyebrow to this many lines, overriding the header's default single
+   * line. When set the eyebrow ellipsizes in the middle: the repo name is the
+   * distinguishing tail of a path, so a middle ellipsis keeps more of it than a
+   * tail ellipsis. Left undefined every caller keeps the default one-line tail
+   * ellipsis, so a long repository label never reflows the header.
+   */
+  eyebrowNumberOfLines?: number;
   /** Reserve the title's line cap so state changes do not move the screen body. */
   reserveTitleSpace?: boolean;
   /** Optional mono-uppercase line above the title. */
@@ -91,6 +99,7 @@ export function ScreenHeader({
   title,
   titleContent,
   titleNumberOfLines = 2,
+  eyebrowNumberOfLines,
   reserveTitleSpace = false,
   eyebrow,
   reserveEyebrow = false,
@@ -221,8 +230,8 @@ export function ScreenHeader({
       {eyebrow || reserveEyebrow ? (
         <Eyebrow
           className={cn('mb-0.5', centerTitle && 'text-center', !eyebrow && 'opacity-0')}
-          numberOfLines={1}
-          ellipsizeMode="tail"
+          numberOfLines={eyebrowNumberOfLines ?? 1}
+          ellipsizeMode={eyebrowNumberOfLines === undefined ? 'tail' : 'middle'}
           accessible={Boolean(eyebrow)}
           accessibilityElementsHidden={!eyebrow}
           importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}

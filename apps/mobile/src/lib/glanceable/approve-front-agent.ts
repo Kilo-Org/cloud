@@ -333,7 +333,6 @@ async function defaultFrontApprovalDeps(): Promise<FrontApprovalDeps> {
           store,
           userWebConnection: connection,
           organizationId: approvalScope.organizationId ?? undefined,
-          userId: approvalScope.userId ?? '',
         });
         headlessConnections.set(manager, connection);
         return { manager, store };

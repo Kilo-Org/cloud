@@ -206,7 +206,7 @@ export default function SessionDetailScreen() {
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
           backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={
-            <View className="flex-row items-center gap-2">
+            <View className="min-w-0 shrink flex-row items-center gap-2">
               <SessionContextMetrics
                 info={undefined}
                 totalCostMicrodollars={null}

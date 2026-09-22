@@ -5,7 +5,11 @@ import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-a
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { SandboxControl } from './persistence/SandboxControl.js';
 import type { SandboxSession } from './sandbox-session/SandboxSession.js';
+import type { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
+// Type-only exception to "no reverse import from production code": erased at
+// build time, so it cannot make the e2e sink reachable or ship e2e code.
+import type { E2eCallbackSink } from './persistence/E2eCallbackSink.js';
 import type { CallbackJob } from './callbacks/index.js';
 import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
@@ -133,7 +137,9 @@ export type SandboxId =
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
 
-export type AgentSandboxProvider = 'cloudflare' | 'vercel';
+export const agentSandboxProviderSchema = z.enum(['cloudflare', 'vercel', 'cloudflare-containers']);
+
+export type AgentSandboxProvider = z.infer<typeof agentSandboxProviderSchema>;
 
 /** Unique identifier for a session within a sandbox */
 export type SessionId = `agent_${string}` | `workspace_${string}`;
@@ -540,10 +546,14 @@ export type Env = {
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
   /** Durable Object namespace for control-plane sessions */
   SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
+  /** Durable Object namespace for DO-managed Cloudflare containers (control-plane only) */
+  SANDBOX_CONTAINERS: DurableObjectNamespace<SandboxContainers>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   /** Durable Object namespace for one-time stream/terminal ticket nonce consumption */
   STREAM_TICKET_NONCE_DO: DurableObjectNamespace<StreamTicketNonceDO>;
+  /** e2e-only callback sink; bound only by the rendered e2e configs. */
+  E2E_CALLBACK_SINK?: DurableObjectNamespace<E2eCallbackSink>;
   /** One-way shared sandbox failover overrides keyed by shared identity */
   SHARED_SANDBOX_OVERRIDES: KVNamespace;
   /** Service binding for the session ingest worker */
@@ -630,6 +640,8 @@ export type Env = {
   VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
   /** Comma-separated org IDs routed to Vercel. Empty is off. `*` includes personal. */
   VERCEL_SANDBOX_ORG_IDS?: string;
+  /** Comma-separated org IDs routed to DO-managed Cloudflare containers. Empty is off. `*` includes personal. */
+  CLOUDFLARE_CONTAINERS_ORG_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

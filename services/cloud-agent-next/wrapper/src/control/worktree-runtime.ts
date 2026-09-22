@@ -5,13 +5,18 @@ import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk';
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
-import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
+import type {
+  ControlDiagnosticFields,
+  ControlDiagnosticReporter,
+} from '../../../src/shared/control-diagnostics.js';
 import { safeSandboxRuntimeVersion } from '../../../src/shared/sandbox-status.js';
 import {
   SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS,
+  worktreeDeletePayloadSchema,
   type ControlErrorCode,
   type SessionAttachPayload,
   type SessionRequestIdentity,
+  type SessionEventIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
 import {
@@ -19,16 +24,25 @@ import {
   type KiloServerHandle,
   type WrapperKiloClient,
 } from '../kilo-api.js';
-import { withTimeoutAndAbort } from '../utils.js';
+import { logToFile, withTimeoutAndAbort } from '../utils.js';
 import { isKiloServerProcess } from '../tool-cgroup.js';
 import {
   createOwnedProcessScope,
   OWNED_PROCESS_OBSERVATION_TIMEOUT_MS,
+  type DirectProcessObserver,
   type OwnedProcessScope,
 } from './owned-processes.js';
 import type { NativeOperationTarget, NativeRetirement } from './session-operation-cleanup.js';
-import { retireWorktreeRuntime } from './worktree-runtime-cleanup.js';
-import { forgetAttachedRoot, rememberAttachedRoot } from './session-directories.js';
+import {
+  retireWorktreeRuntime,
+  settleNativeCleanup,
+  stopWithinCleanupBudget,
+} from './worktree-runtime-cleanup.js';
+import {
+  forgetAttachedRoot,
+  ownerDirectoryForSession,
+  rememberAttachedRoot,
+} from './session-directories.js';
 import { withKiloRequestDeadline, type KiloEventFeedError } from './sandbox-control-runtime.js';
 import { createWorktreeFeed, type KiloFeedEvent, type WorktreeFeed } from './worktree-feed.js';
 
@@ -126,6 +140,13 @@ export type WorktreeKiloRuntimes = {
     deadlineAt: number,
     reason?: string
   ): Promise<NativeRetirement | 'shared'>;
+  deferRuntimeRetirementIfShared?(
+    directory: string,
+    target: NativeOperationTarget,
+    retiringRoot: string,
+    deadlineAt: number,
+    reason?: string
+  ): Promise<NativeRetirement | 'shared'>;
   rootRetirementScope?(
     directory: string,
     target: NativeOperationTarget,
@@ -136,12 +157,21 @@ export type WorktreeKiloRuntimes = {
     target: NativeOperationTarget,
     deadlineAt: number
   ): Promise<boolean>;
-  getRetained?(directory: string, runtimeId?: string): WorktreeKiloRuntime | undefined;
+  getRetained?(
+    identity: SessionRequestIdentity | string,
+    runtimeId?: string
+  ): WorktreeKiloRuntime | undefined;
   get(identity: SessionRequestIdentity | string): WorktreeKiloRuntime | undefined;
   getAll?(directory: string): WorktreeKiloRuntime[];
   isCurrent?(runtime: WorktreeKiloRuntime): boolean;
   getEntryRuntimeId?(directory: string, root?: string): string | undefined;
   prepareForNewWork?(directory: string): boolean;
+  feedRecovering?(directory: string): boolean;
+  recordRootPublicationDiagnostic?(
+    identity: SessionEventIdentity,
+    fields: ControlDiagnosticFields
+  ): boolean;
+  snapshotRootPublicationDiagnostics?(): void;
   isHealthy(): boolean;
   shutdown(): void;
 };
@@ -154,6 +184,7 @@ type ServerOptions = {
   signal: AbortSignal;
   timeoutMs?: number;
   onProcessScope?: (scope: OwnedProcessScope) => void;
+  onProcessObserver?: (observer: DirectProcessObserver) => void;
   claimCleanupDeadline?: (deadlineAt?: number) => number;
 };
 
@@ -162,6 +193,7 @@ type WorktreeKiloServerHandle = Omit<KiloServerHandle, 'close'> & {
   stopped?: Promise<void>;
   exited?: Promise<void>;
   processes?: OwnedProcessScope;
+  processObserver?: DirectProcessObserver;
 };
 
 type RuntimeEntry = {
@@ -176,6 +208,8 @@ type RuntimeEntry = {
   kiloClient?: WrapperKiloClient;
   processAbort?: AbortController;
   processes?: OwnedProcessScope;
+  processObserver?: DirectProcessObserver;
+  descendantsUnverified?: boolean;
   processIssued?: boolean;
   runtimeId: string;
   pendingPtys: number;
@@ -189,11 +223,31 @@ type RuntimeEntry = {
 };
 
 type RootAttachment = {
+  createdAt: number;
   identity: SessionRequestIdentity;
   entry: RuntimeEntry;
   abort: AbortController;
   attached: boolean;
   pending: Set<symbol>;
+  publication: RootPublicationCounters;
+};
+
+type RootPublicationCounters = {
+  failures: number;
+  acknowledged: number;
+  rejected: number;
+  timedOut: number;
+  connectionClosed: number;
+  trackingEvicted: number;
+  expired: number;
+  queueOverflow: number;
+  socketOverflow: number;
+  pendingCount: number;
+  pendingBytes: number;
+  socketBufferedBytes: number;
+  outstandingEventAcks: number;
+  dirty: boolean;
+  firstFailure?: ControlDiagnosticFields;
 };
 
 const KILO_STARTUP_TIMEOUT_MS = 30_000;
@@ -304,6 +358,8 @@ export async function startWorktreeKiloServer(
     cwd: options.directory,
     env: options.env,
   });
+  const processObserver = processes.observeChild(proc);
+  if (processObserver) options.onProcessObserver?.(processObserver);
   proc.stderr.resume();
   const stopped = new Promise<void>(resolve => {
     proc.once('close', () => resolve());
@@ -371,10 +427,10 @@ export async function startWorktreeKiloServer(
     proc.once('exit', close);
     await processes.captureBaseline(isKiloServerProcess);
     options.signal.throwIfAborted();
-    return { url, close: closeAt, stopped, exited, processes };
+    return { url, close: closeAt, stopped, exited, processes, processObserver };
   } catch {
     const deadlineAt = claimCleanupDeadline();
-    const cleanup = processes.stop(deadlineAt);
+    const cleanup = stopWithinCleanupBudget(processes, true, deadlineAt);
     closeAt(deadlineAt);
     await withTimeoutAndAbort(cleanup, {
       timeoutMs: Math.max(1, deadlineAt - Date.now()),
@@ -397,6 +453,107 @@ function sameAuth(left: WorktreeKiloAuth, right: WorktreeKiloAuth): boolean {
   );
 }
 
+// Environment keys whose value derives from the Kilo token. A difference in any of
+// these is the only wrapper-side proof that the payload rotated the token.
+const TOKEN_DERIVED_ENV_KEYS = new Set([
+  'KILOCODE_TOKEN',
+  'KILO_AUTH_CONTENT',
+  'KILO_CONFIG_CONTENT',
+  'OPENCODE_CONFIG_CONTENT',
+]);
+
+type WorktreeAttachAction = 'reuse' | 'mint' | 'refresh';
+
+function worktreeIdFromDirectory(directory: string): string | undefined {
+  const parsed = worktreeDeletePayloadSchema.shape.worktreeId.safeParse(path.basename(directory));
+  return parsed.success ? parsed.data : undefined;
+}
+
+// Diagnostics only: reports which `attach()` branch ran and why. Never includes
+// credential values — only environment key names and the token-change flag.
+function emitWorktreeAttachDecision(
+  onDiagnostic: ControlDiagnosticReporter | undefined,
+  decision: {
+    directory: string;
+    kiloSessionId: string;
+    scopeId: string;
+    action: WorktreeAttachAction;
+    reason: string;
+    runtimeId?: string;
+    previousPresent: boolean;
+    retiring: boolean;
+    retirementResult?: NativeRetirement;
+    newRoot: boolean;
+    aborted: boolean;
+    committedCount: number;
+    pendingCount: number;
+    tokenChanged: boolean;
+    changedKeys: string[];
+  }
+): void {
+  const worktreeId = worktreeIdFromDirectory(decision.directory);
+  const changedKeys = decision.changedKeys.join(',');
+  // `tc` is first so the token-change discriminator survives `detail` truncation.
+  const detail = [
+    `tc=${decision.tokenChanged ? 1 : 0}`,
+    `newRoot=${decision.newRoot ? 1 : 0}`,
+    `prev=${decision.previousPresent ? 1 : 0}`,
+    `ret=${decision.retiring ? 1 : 0}`,
+    `unconf=${decision.retirementResult === 'unconfirmed' ? 1 : 0}`,
+    ...(decision.retirementResult ? [`rr=${decision.retirementResult}`] : []),
+    ...(changedKeys ? [`changed=${changedKeys}`] : []),
+  ]
+    .join(',')
+    .slice(0, 128);
+  onDiagnostic?.('control.request', {
+    operation: 'session.attach',
+    phase: 'started',
+    stage: 'runtime_attach',
+    kiloSessionId: decision.kiloSessionId,
+    scopeId: decision.scopeId,
+    ...(worktreeId ? { worktreeId } : {}),
+    ...(decision.runtimeId ? { nativeRuntimeId: decision.runtimeId } : {}),
+    reason: `${decision.action}:${decision.reason}`,
+    sessionCount: decision.committedCount,
+    pendingCount: decision.pendingCount,
+    aborted: decision.aborted,
+    detail,
+  });
+  logToFile(
+    `worktree runtime attach decision action=${decision.action} reason=${decision.reason} directory=${path.basename(decision.directory)} kiloSessionId=${decision.kiloSessionId} runtimeId=${decision.runtimeId ?? 'none'} prev=${decision.previousPresent ? 1 : 0} ret=${decision.retiring ? 1 : 0} rr=${decision.retirementResult ?? 'none'} newRoot=${decision.newRoot ? 1 : 0} aborted=${decision.aborted ? 1 : 0} unconf=${decision.retirementResult === 'unconfirmed' ? 1 : 0} tokenChanged=${decision.tokenChanged ? 1 : 0} committed=${decision.committedCount} pending=${decision.pendingCount} changed=${changedKeys || 'none'}`
+  );
+}
+
+// Diagnostics only: emitted when refresh/mint actually allocates a new runtime id,
+// so the pre-decision and post-allocation identities are both observable.
+function emitWorktreeRuntimeAllocation(
+  onDiagnostic: ControlDiagnosticReporter | undefined,
+  allocation: {
+    directory: string;
+    kiloSessionId?: string;
+    scopeId: string;
+    action: 'mint' | 'refresh';
+    previousRuntimeId?: string;
+    runtimeId: string;
+  }
+): void {
+  const worktreeId = worktreeIdFromDirectory(allocation.directory);
+  onDiagnostic?.('control.request', {
+    operation: 'session.attach',
+    phase: 'started',
+    stage: 'runtime_attach',
+    ...(allocation.kiloSessionId ? { kiloSessionId: allocation.kiloSessionId } : {}),
+    scopeId: allocation.scopeId,
+    ...(worktreeId ? { worktreeId } : {}),
+    nativeRuntimeId: allocation.runtimeId,
+    reason: `${allocation.action}:allocated`,
+    detail: `previousRuntimeId=${allocation.previousRuntimeId ?? 'none'}`,
+  });
+  logToFile(
+    `worktree runtime allocation action=${allocation.action} directory=${path.basename(allocation.directory)} runtimeId=${allocation.runtimeId} previousRuntimeId=${allocation.previousRuntimeId ?? 'none'}`
+  );
+}
+
 export function createWorktreeKiloRuntimes(options: {
   homeRoot?: string;
   inheritedEnv?: NodeJS.ProcessEnv;
@@ -410,7 +567,6 @@ export function createWorktreeKiloRuntimes(options: {
 }): WorktreeKiloRuntimes {
   const entries = new Map<string, RuntimeEntry>();
   const directoriesByScope = new Map<string, string>();
-  const failedDirectories = new Set<string>();
   const roots = new Map<string, RootAttachment>();
   const recoveryGates = new Map<string, Promise<void>>();
   const recoveryAcknowledgements = new Map<string, Map<string, Promise<RecoveryRetirement>>>();
@@ -431,6 +587,168 @@ export function createWorktreeKiloRuntimes(options: {
   const evaluatingDeferredRetirements = new Set<RuntimeEntry>();
   let observedVersion: string | null | undefined;
   let closed = false;
+
+  const emptyPublicationCounters = (): RootPublicationCounters => ({
+    failures: 0,
+    acknowledged: 0,
+    rejected: 0,
+    timedOut: 0,
+    connectionClosed: 0,
+    trackingEvicted: 0,
+    expired: 0,
+    queueOverflow: 0,
+    socketOverflow: 0,
+    pendingCount: 0,
+    pendingBytes: 0,
+    socketBufferedBytes: 0,
+    outstandingEventAcks: 0,
+    dirty: false,
+  });
+
+  function publicationRoot(identity: SessionEventIdentity): RootAttachment | undefined {
+    const rootId = identity.rootKiloSessionId ?? identity.kiloSessionId;
+    if (!rootId) return undefined;
+    const ownerDirectory = ownerDirectoryForSession(identity);
+    const root = [...roots.values()].find(
+      candidate =>
+        candidate.identity.kiloSessionId === rootId &&
+        candidate.identity.directory === ownerDirectory
+    );
+    if (!root) return undefined;
+    if (identity.nativeRuntimeId !== undefined && identity.nativeRuntimeId !== root.entry.runtimeId)
+      return undefined;
+    return root;
+  }
+
+  function recordRootPublicationDiagnostic(
+    identity: SessionEventIdentity,
+    fields: ControlDiagnosticFields
+  ): boolean {
+    const root = publicationRoot(identity);
+    if (!root) return false;
+    if (
+      (typeof fields.sentAt === 'number' && fields.sentAt < root.createdAt) ||
+      (typeof fields.preparedAt === 'number' && fields.preparedAt < root.createdAt)
+    )
+      return false;
+    const counters = root.publication;
+    counters.dirty = true;
+    const outcome = fields.outcome;
+    const failure =
+      fields.phase === 'publication_failed' ||
+      (typeof outcome === 'string' && outcome !== 'acknowledged');
+    const firstFailure = failure && counters.firstFailure === undefined;
+    if (fields.phase === 'publication_failed') {
+      counters.failures = Math.min(Number.MAX_SAFE_INTEGER, counters.failures + 1);
+      if (fields.failureReason === 'expired')
+        counters.expired = Math.min(Number.MAX_SAFE_INTEGER, counters.expired + 1);
+      if (fields.failureReason === 'queue_overflow')
+        counters.queueOverflow = Math.min(Number.MAX_SAFE_INTEGER, counters.queueOverflow + 1);
+      if (fields.failureReason === 'socket_overflow')
+        counters.socketOverflow = Math.min(Number.MAX_SAFE_INTEGER, counters.socketOverflow + 1);
+    } else if (outcome === 'acknowledged') {
+      counters.acknowledged = Math.min(Number.MAX_SAFE_INTEGER, counters.acknowledged + 1);
+    } else if (outcome === 'rejected') {
+      if (fields.neverSent === true)
+        counters.failures = Math.min(Number.MAX_SAFE_INTEGER, counters.failures + 1);
+      else counters.rejected = Math.min(Number.MAX_SAFE_INTEGER, counters.rejected + 1);
+    } else if (outcome === 'timed_out') {
+      counters.timedOut = Math.min(Number.MAX_SAFE_INTEGER, counters.timedOut + 1);
+    } else if (outcome === 'connection_closed') {
+      counters.connectionClosed = Math.min(Number.MAX_SAFE_INTEGER, counters.connectionClosed + 1);
+    } else if (outcome === 'tracking_evicted') {
+      counters.trackingEvicted = Math.min(Number.MAX_SAFE_INTEGER, counters.trackingEvicted + 1);
+    }
+    if (fields.phase === 'publication_failed') {
+      if (typeof fields.pendingCount === 'number') counters.pendingCount = fields.pendingCount;
+      if (typeof fields.pendingBytes === 'number') counters.pendingBytes = fields.pendingBytes;
+    }
+    if (typeof fields.socketBufferedBytes === 'number')
+      counters.socketBufferedBytes = fields.socketBufferedBytes;
+    if (typeof fields.outstandingEventAcks === 'number')
+      counters.outstandingEventAcks = fields.outstandingEventAcks;
+    if (firstFailure) {
+      counters.firstFailure = { ...fields };
+      options.onDiagnostic?.('control.event', fields);
+    }
+    return true;
+  }
+
+  function emitRootPublicationSummary(root: RootAttachment): void {
+    const counters = root.publication;
+    if (!counters.dirty) return;
+    options.onDiagnostic?.('control.event', {
+      phase: 'publication_summary',
+      category: 'session_event',
+      kiloSessionId: root.identity.kiloSessionId,
+      rootKiloSessionId: root.identity.kiloSessionId,
+      nativeRuntimeId: root.entry.runtimeId,
+      failureCount: counters.failures,
+      acknowledgedCount: counters.acknowledged,
+      rejectedCount: counters.rejected,
+      timeoutCount: counters.timedOut,
+      connectionClosedCount: counters.connectionClosed,
+      trackingEvictionCount: counters.trackingEvicted,
+      expiredCount: counters.expired,
+      queueOverflowCount: counters.queueOverflow,
+      socketOverflowCount: counters.socketOverflow,
+      pendingCount: counters.pendingCount,
+      pendingBytes: counters.pendingBytes,
+      socketBufferedBytes: counters.socketBufferedBytes,
+      outstandingEventAcks: counters.outstandingEventAcks,
+      ...(counters.firstFailure?.failureReason
+        ? { failureReason: counters.firstFailure.failureReason }
+        : {}),
+      ...(counters.firstFailure?.outcome ? { outcome: counters.firstFailure.outcome } : {}),
+      ...(counters.firstFailure?.reason ? { reason: counters.firstFailure.reason } : {}),
+      ...(counters.firstFailure?.requestId ? { requestId: counters.firstFailure.requestId } : {}),
+      ...(counters.firstFailure?.receiptId ? { receiptId: counters.firstFailure.receiptId } : {}),
+      ...(counters.firstFailure?.sequence !== undefined
+        ? { sequence: counters.firstFailure.sequence }
+        : {}),
+      ...(counters.firstFailure?.sentAt !== undefined
+        ? { sentAt: counters.firstFailure.sentAt }
+        : {}),
+      ...(counters.firstFailure?.preparedAt !== undefined
+        ? { preparedAt: counters.firstFailure.preparedAt }
+        : {}),
+      ...(counters.firstFailure?.eventType ? { eventType: counters.firstFailure.eventType } : {}),
+      ...(counters.firstFailure?.detail ? { detail: counters.firstFailure.detail } : {}),
+      ...(counters.firstFailure?.queueWaitMs !== undefined
+        ? { queueWaitMs: counters.firstFailure.queueWaitMs }
+        : {}),
+      ...(counters.firstFailure?.requestWaitMs !== undefined
+        ? { requestWaitMs: counters.firstFailure.requestWaitMs }
+        : {}),
+      ...(counters.firstFailure?.connectionState
+        ? { connectionState: counters.firstFailure.connectionState }
+        : {}),
+      ...(counters.firstFailure?.connectionId
+        ? { connectionId: counters.firstFailure.connectionId }
+        : {}),
+      ...(counters.firstFailure?.wrapperInstanceId
+        ? { wrapperInstanceId: counters.firstFailure.wrapperInstanceId }
+        : {}),
+      ...(counters.firstFailure?.neverSent !== undefined
+        ? { neverSent: counters.firstFailure.neverSent }
+        : {}),
+      ...(counters.firstFailure?.sentWithoutResponse !== undefined
+        ? { sentWithoutResponse: counters.firstFailure.sentWithoutResponse }
+        : {}),
+    });
+    counters.dirty = false;
+  }
+
+  function snapshotRootPublicationDiagnostics(): void {
+    for (const root of roots.values()) emitRootPublicationSummary(root);
+  }
+
+  function resetRootPublicationCountersForRuntimeRotation(entry: RuntimeEntry): void {
+    for (const root of entry.roots) {
+      emitRootPublicationSummary(root);
+      root.publication = emptyPublicationCounters();
+    }
+  }
 
   function recordVersion(value: unknown): void {
     const version = safeSandboxRuntimeVersion(value);
@@ -454,10 +772,6 @@ export function createWorktreeKiloRuntimes(options: {
       requested ?? entry.cleanupDeadlineAt
     );
     return entry.cleanupDeadlineAt;
-  }
-
-  function deferredRetirementKey(root: string, nativeRuntimeId: string): string {
-    return JSON.stringify([root, nativeRuntimeId]);
   }
 
   function runtimeTargetMatches(entry: RuntimeEntry, target: NativeOperationTarget): boolean {
@@ -485,6 +799,14 @@ export function createWorktreeKiloRuntimes(options: {
   ): Promise<NativeRetirement> {
     void retirement.then(result => reportRootRetirement(intent, result));
     return retirement;
+  }
+
+  function liveRoots(entry: RuntimeEntry): RootAttachment[] {
+    return [...entry.roots].filter(root => root.attached || root.pending.size > 0);
+  }
+
+  function deferredRetirementKey(root: string, nativeRuntimeId: string): string {
+    return JSON.stringify([root, nativeRuntimeId]);
   }
 
   function settleDeferredRetirement(
@@ -522,10 +844,6 @@ export function createWorktreeKiloRuntimes(options: {
       settleDeferredRetirement(intent, result);
     }
     return settled;
-  }
-
-  function liveRoots(entry: RuntimeEntry): RootAttachment[] {
-    return [...entry.roots].filter(root => root.attached || root.pending.size > 0);
   }
 
   function evaluateDeferredRetirements(entry: RuntimeEntry): void {
@@ -566,6 +884,7 @@ export function createWorktreeKiloRuntimes(options: {
   }
 
   function unregisterRoot(root: RootAttachment): void {
+    emitRootPublicationSummary(root);
     root.entry.roots.delete(root);
     root.attached = false;
     root.pending.clear();
@@ -613,6 +932,7 @@ export function createWorktreeKiloRuntimes(options: {
     const retirement = retireWorktreeRuntime(entry, requested, target, {
       cleanupDeadline,
       unregisterRoot,
+      unverifiedCleanup: directProcessAbsent,
       removeEntry: retiring => {
         if (entries.get(entryKey(retiring.identity, retiring.isolation)) === retiring) {
           entries.delete(entryKey(retiring.identity, retiring.isolation));
@@ -624,21 +944,20 @@ export function createWorktreeKiloRuntimes(options: {
     void retirement.then(result => {
       const settled = settleEntryDeferredRetirements(entry, target, result);
       for (const root of affectedRoots) {
-        const id = deferredRetirementKey(root, settlementTarget.runtimeId);
-        if (!settled.has(id))
-          reportRootRetirement(
-            {
-              directory: entry.directory,
-              root,
-              nativeRuntimeId: settlementTarget.runtimeId,
-              target: settlementTarget,
-              retirementId,
-              reason,
-              cleanupDeadlineAt,
-              ...(metadata.reportToService ? { reportToService: true } : {}),
-            },
-            result
-          );
+        if (settled.has(deferredRetirementKey(root, settlementTarget.runtimeId))) continue;
+        reportRootRetirement(
+          {
+            directory: entry.directory,
+            root,
+            nativeRuntimeId: settlementTarget.runtimeId,
+            target: settlementTarget,
+            retirementId,
+            reason,
+            cleanupDeadlineAt,
+            ...(metadata.reportToService ? { reportToService: true } : {}),
+          },
+          result
+        );
       }
     });
     return retirement;
@@ -649,28 +968,23 @@ export function createWorktreeKiloRuntimes(options: {
     target: NativeOperationTarget,
     retiringRoot: string,
     deadlineAt: number,
-    reason = 'Native runtime retirement requested'
+    reason = 'Native runtime retirement requested',
+    defer = false
   ): Promise<NativeRetirement | 'shared'> {
     const entry = [...entries.values()].find(
       entry => entry.directory === directory && runtimeTargetMatches(entry, target)
     );
-    if (!entry || !runtimeTargetMatches(entry, target)) {
-      const intent = {
-        directory,
-        root: retiringRoot,
-        nativeRuntimeId: target.runtimeId,
-        target,
-      };
-      settleDeferredRetirement(intent, 'stale');
-      return reportRuntimeRetirement(intent, Promise.resolve('stale'));
-    }
-    const live = liveRoots(entry);
     const intent = {
       directory,
       root: retiringRoot,
       nativeRuntimeId: target.runtimeId,
       target,
     };
+    if (!entry || !runtimeTargetMatches(entry, target)) {
+      settleDeferredRetirement(intent, 'stale');
+      return reportRuntimeRetirement(intent, Promise.resolve('stale'));
+    }
+    const live = liveRoots(entry);
     if (entry.retiring) return entry.retiring;
     const failedRoot = [...entry.roots].find(root => root.identity.kiloSessionId === retiringRoot);
     if (!failedRoot || !(failedRoot.attached || failedRoot.pending.size > 0)) {
@@ -678,16 +992,13 @@ export function createWorktreeKiloRuntimes(options: {
       return reportRuntimeRetirement(intent, Promise.resolve('stale'));
     }
     if (live.some(root => root !== failedRoot)) {
-      const id = deferredRetirementKey(retiringRoot, target.runtimeId);
-      deferredRetirements.set(id, {
-        directory,
-        root: retiringRoot,
-        nativeRuntimeId: target.runtimeId,
-        entry,
-        target,
-        reason,
-        deadlineAt,
-      });
+      if (defer)
+        deferredRetirements.set(deferredRetirementKey(retiringRoot, target.runtimeId), {
+          ...intent,
+          entry,
+          reason,
+          deadlineAt,
+        });
       return Promise.resolve('shared');
     }
     deferredRetirements.delete(deferredRetirementKey(retiringRoot, target.runtimeId));
@@ -697,6 +1008,16 @@ export function createWorktreeKiloRuntimes(options: {
       cleanupDeadlineAt: physicalDeadlineAt,
       reportToService: true,
     });
+  }
+
+  function deferRuntimeRetirementIfShared(
+    directory: string,
+    target: NativeOperationTarget,
+    retiringRoot: string,
+    deadlineAt: number,
+    reason?: string
+  ): Promise<NativeRetirement | 'shared'> {
+    return retireRuntimeIfUnshared(directory, target, retiringRoot, deadlineAt, reason, true);
   }
 
   function rootRetirementScope(
@@ -713,18 +1034,56 @@ export function createWorktreeKiloRuntimes(options: {
     return liveRoots(entry).some(root => root !== failedRoot) ? 'shared' : 'sole';
   }
 
+  // Mutates the entry and reports diagnostics: releases abandoned streams when recovery is allowed.
+  async function directProcessAbsent(entry: RuntimeEntry, deadlineAt: number): Promise<boolean> {
+    const observer = entry.processObserver;
+    if (!observer) {
+      const absent = (await entry.processes?.verify(false, deadlineAt)) === true;
+      if (!absent) {
+        options.onDiagnostic?.('wrapper.lifecycle', {
+          phase: 'stopped',
+          stage: 'process_cleanup',
+          ok: false,
+          detail: 'direct process observation unavailable',
+          nativeRuntimeId: entry.runtimeId,
+        });
+      }
+      return absent;
+    }
+    const observation = await observer.observe(deadlineAt).catch(() => 'unknown' as const);
+    if (observation !== 'absent' && observation !== 'reused') {
+      options.onDiagnostic?.('wrapper.lifecycle', {
+        phase: 'stopped',
+        stage: 'process_cleanup',
+        ok: false,
+        detail:
+          observation === 'alive'
+            ? 'direct process is still alive'
+            : 'direct process identity unavailable',
+        nativeRuntimeId: entry.runtimeId,
+      });
+      return false;
+    }
+    entry.processes?.releaseAbandoned?.();
+    entry.descendantsUnverified = true;
+    options.onDiagnostic?.('wrapper.lifecycle', {
+      phase: 'stopped',
+      stage: 'process_cleanup',
+      ok: true,
+      detail: 'direct process absent; descendants unverified',
+      nativeRuntimeId: entry.runtimeId,
+      ...(observation === 'reused' ? { reason: 'pid_identity_reused' } : {}),
+    });
+    return true;
+  }
+
   function observeRetained(entry: RuntimeEntry): Promise<boolean> {
     if (entry.observing) return entry.observing;
     const runtimeId = entry.runtimeId;
     const runtime = entry.runtime;
     const deadlineAt = Date.now() + OWNED_PROCESS_OBSERVATION_TIMEOUT_MS;
     const observation = Promise.resolve()
-      .then(() => {
-        const processes = entry.processes;
-        return processes && typeof processes.verify === 'function'
-          ? processes.verify(false, deadlineAt)
-          : false;
-      })
+      .then(() => directProcessAbsent(entry, deadlineAt))
       .catch(() => false)
       .then(async proven => {
         if (!proven || Date.now() >= deadlineAt) return false;
@@ -755,7 +1114,6 @@ export function createWorktreeKiloRuntimes(options: {
         entries.delete(entryKey(entry.identity, entry.isolation));
         if (directoriesByScope.get(entry.kilo.scopeId) === entry.directory)
           directoriesByScope.delete(entry.kilo.scopeId);
-        failedDirectories.delete(entry.directory);
         return true;
       })
       .then(
@@ -787,14 +1145,14 @@ export function createWorktreeKiloRuntimes(options: {
       reason,
       cleanupDeadlineAt: deadlineAt,
     }).then(result => {
-      if (result === 'unconfirmed') failedDirectories.add(entry.directory);
       options.onUnexpectedClose({
         identity: entry.identity,
         retirementId: crypto.randomUUID(),
         directory: entry.directory,
         reason,
         runtimeId,
-        cleanup: result === 'unconfirmed' ? 'unconfirmed' : 'confirmed',
+        cleanup:
+          result === 'unconfirmed' || entry.descendantsUnverified ? 'unconfirmed' : 'confirmed',
         cleanupDeadlineAt: deadlineAt,
       });
     });
@@ -809,6 +1167,8 @@ export function createWorktreeKiloRuntimes(options: {
     entry.feed?.close();
     entry.feed = undefined;
     entry.processes = undefined;
+    entry.processObserver = undefined;
+    entry.descendantsUnverified = undefined;
     entry.processIssued = false;
     entry.stopped = undefined;
     entry.processAbort = abort;
@@ -855,10 +1215,14 @@ export function createWorktreeKiloRuntimes(options: {
           entry.processIssued = true;
           if (entry.cleanupDeadlineAt !== undefined) void processes.stop(entry.cleanupDeadlineAt);
         },
+        onProcessObserver: observer => {
+          entry.processObserver = observer;
+        },
         claimCleanupDeadline: deadlineAt =>
           entry.processAbort === abort ? cleanupDeadline(entry, deadlineAt) : (deadlineAt ?? 0),
       });
       entry.processes = server.processes ?? entry.processes;
+      entry.processObserver = server.processObserver ?? entry.processObserver;
       entry.processIssued = true;
       entry.stopped = server.stopped;
       void (server.exited ?? server.stopped)?.then(() => {
@@ -979,36 +1343,75 @@ export function createWorktreeKiloRuntimes(options: {
       throw new WorktreeKiloRuntimeError('not_ready', 'Worktree cannot refresh credentials', true);
     }
     if (entry.pendingPtys > 0 || !canRefreshCredentials()) throw retry();
+    const startedAt = Date.now();
+    let probeStep: 'session_status' | 'pty' | 'pty_body' = 'session_status';
     try {
       const idle = await withKiloRequestDeadline(async signal => {
+        probeStep = 'session_status';
         const statuses = await client.getSessionStatuses(entry.directory, signal);
         if (Object.values(statuses).some(status => status.type !== 'idle')) return false;
         const url = new URL('/pty', client.serverUrl);
         url.searchParams.set('directory', entry.directory);
+        probeStep = 'pty';
         const response = await fetch(url, { signal });
-        if (!response.ok) throw new Error('Worktree PTY probe failed');
-        const ptys: unknown = await response.json();
-        if (!Array.isArray(ptys)) throw new Error('Worktree PTY probe failed');
+        if (!response.ok) throw new Error(`Worktree PTY probe failed: HTTP ${response.status}`);
+        probeStep = 'pty_body';
+        let ptys: unknown;
+        try {
+          ptys = await response.json();
+        } catch (error) {
+          if (signal.aborted) throw error;
+          throw new Error('Worktree PTY probe failed: invalid payload');
+        }
+        if (!Array.isArray(ptys)) throw new Error('Worktree PTY probe failed: invalid payload');
         return ptys.length === 0;
       }, entry.abort.signal);
       if (!idle || entry.pendingPtys > 0 || !canRefreshCredentials()) throw retry();
     } catch (error) {
       if (error instanceof WorktreeKiloRuntimeError) throw error;
-      throw new WorktreeKiloRuntimeError('not_ready', 'Worktree idle probe failed', true);
+      const elapsedMs = Date.now() - startedAt;
+      const name = (error instanceof Error ? error.name : typeof error).slice(0, 128);
+      const message = (error instanceof Error ? error.message : '').slice(0, 128);
+      const cause =
+        error instanceof Error && error.cause instanceof Error
+          ? `;cause=${error.cause.name.slice(0, 128)}:${error.cause.message.slice(0, 128)}`
+          : '';
+      const target = `${client.serverUrl}${path.basename(entry.directory)}`;
+      logToFile(
+        `worktree idle probe failed step=${probeStep} target=${target} attempt=1 elapsedMs=${elapsedMs} name=${name} message=${message}${cause}`
+      );
+      const failure = new WorktreeKiloRuntimeError(
+        'session_busy',
+        'Worktree idle probe failed',
+        true
+      );
+      options.onDiagnostic?.('control.request', {
+        operation: 'session.attach',
+        phase: 'failed',
+        stage: 'runtime_attach',
+        errorCode: failure.code,
+        retryable: failure.retryable,
+        elapsedMs,
+        attempt: 1,
+        reason: 'idle_probe_failed',
+        detail: `step=${probeStep};name=${name}:${message}`.slice(0, 128),
+      });
+      throw failure;
     }
     const deadlineAt = cleanupDeadline(entry);
     onDestructiveRefresh?.();
-    const stopped =
-      entry.processes?.stop(deadlineAt) ?? Promise.resolve(entry.processIssued !== true);
     entry.processAbort.abort();
     try {
-      await withTimeoutAndAbort(entry.stopped, {
-        signal: entry.abort.signal,
-        timeoutMs: Math.max(1, deadlineAt - Date.now()),
-        timeoutMessage: 'Kilo worktree credential refresh timed out',
-        abortMessage: 'Kilo worktree credential refresh cancelled',
+      const settled = await settleNativeCleanup({
+        processes: entry.processes,
+        processIssued: entry.processIssued === true,
+        deadlineAt,
+        observeDirect: innerDeadlineAt => directProcessAbsent(entry, innerDeadlineAt),
       });
-      if (!(await stopped) || Date.now() >= deadlineAt) {
+      if (!settled) {
+        throw new Error('Original native execution is not contained');
+      }
+      if (Date.now() >= deadlineAt) {
         throw new Error('Original native execution is not contained');
       }
       settleEntryDeferredRetirements(entry, undefined, 'stale');
@@ -1016,7 +1419,16 @@ export function createWorktreeKiloRuntimes(options: {
       entry.env = env;
       entry.cleanupDeadlineAt = undefined;
       entry.kiloClient = undefined;
+      resetRootPublicationCountersForRuntimeRotation(entry);
+      const previousRuntimeId = entry.runtimeId;
       entry.runtimeId = crypto.randomUUID();
+      emitWorktreeRuntimeAllocation(options.onDiagnostic, {
+        directory: entry.directory,
+        scopeId: entry.kilo.scopeId,
+        action: 'refresh',
+        previousRuntimeId,
+        runtimeId: entry.runtimeId,
+      });
       return await start(entry, undefined, beforeMutation);
     } catch {
       failRuntime(entry, 'credential_refresh_failed');
@@ -1062,6 +1474,13 @@ export function createWorktreeKiloRuntimes(options: {
       const previous = entries.get(key);
       let entry = previous?.retiring ? undefined : previous;
       let cleanupRequired = false;
+      let entryCreated = false;
+      let refreshStarted = false;
+      let changedEnvKeys: string[] = [];
+      // A root is new when no attachment is already registered for this identity.
+      // The containment-off refresh branch below must distinguish a sibling join
+      // from renewal of an already-attached root.
+      const newRoot = !root;
       if (
         (scopeDirectory && scopeDirectory !== directory) ||
         (entry && !sameAuth(entry.kilo, kilo)) ||
@@ -1100,10 +1519,19 @@ export function createWorktreeKiloRuntimes(options: {
           options.inheritedEnv
         );
         const currentEnv = entry.env;
-        const changed = Object.keys({ ...currentEnv, ...env }).some(
+        changedEnvKeys = Object.keys({ ...currentEnv, ...env }).filter(
           key => currentEnv[key] !== env[key]
         );
-        if (changed) {
+        // One live native runtime owns each directory. A brand-new root joining an
+        // entry that already has live roots must reuse that runtime and its
+        // credentials instead of rotating the fenced incarnation out from under a
+        // committed sibling. Mandatory renewal stays on re-attach of an
+        // already-attached root (newRoot === false); a sole root with no other live
+        // root (for example after a detach) still refreshes. The incoming root is
+        // not yet registered, so liveRoots() describes the siblings already in the
+        // entry.
+        const joiningLiveEntry = newRoot && liveRoots(entry).length > 0;
+        if (changedEnvKeys.length > 0 && !joiningLiveEntry) {
           if (
             !entry.runtime ||
             entry.starting ||
@@ -1134,6 +1562,7 @@ export function createWorktreeKiloRuntimes(options: {
             .finally(() => {
               refreshing.starting = undefined;
             });
+          refreshStarted = true;
         }
       }
       if (!entry) {
@@ -1169,16 +1598,66 @@ export function createWorktreeKiloRuntimes(options: {
         homesByDirectory.set(directory, homes);
         entries.set(key, entry);
         cleanupRequired = true;
-        failedDirectories.delete(directory);
         if (isolation === 'directory-shared') directoriesByScope.set(kilo.scopeId, directory);
+        entryCreated = true;
+      }
+      // Capture the decision before this root is registered as pending so the
+      // committed/pending counts describe the entry as the attaching root sees it.
+      const decisionEntry = previous ?? entry;
+      const committedRootCount = [...decisionEntry.roots].filter(
+        current => current.attached
+      ).length;
+      const pendingRootCount = liveRoots(decisionEntry).length - committedRootCount;
+      const action: WorktreeAttachAction = refreshStarted
+        ? 'refresh'
+        : entryCreated
+          ? 'mint'
+          : 'reuse';
+      const reason = refreshStarted
+        ? newRoot
+          ? 'new_root_env_changed'
+          : 'existing_root_env_changed'
+        : entryCreated
+          ? previous
+            ? 'retiring'
+            : 'no_entry'
+          : 'live_entry';
+      emitWorktreeAttachDecision(options.onDiagnostic, {
+        directory,
+        kiloSessionId: identity.kiloSessionId,
+        scopeId: kilo.scopeId,
+        action,
+        reason,
+        ...(previous ? { runtimeId: previous.runtimeId } : {}),
+        previousPresent: previous !== undefined,
+        retiring: previous?.retiring !== undefined,
+        ...(previous?.retirementResult ? { retirementResult: previous.retirementResult } : {}),
+        newRoot,
+        aborted: decisionEntry.abort.signal.aborted,
+        committedCount: committedRootCount,
+        pendingCount: pendingRootCount,
+        tokenChanged: changedEnvKeys.some(key => TOKEN_DERIVED_ENV_KEYS.has(key)),
+        changedKeys: changedEnvKeys,
+      });
+      if (entryCreated) {
+        emitWorktreeRuntimeAllocation(options.onDiagnostic, {
+          directory,
+          kiloSessionId: identity.kiloSessionId,
+          scopeId: kilo.scopeId,
+          action: 'mint',
+          ...(previous ? { previousRuntimeId: previous.runtimeId } : {}),
+          runtimeId: entry.runtimeId,
+        });
       }
       if (!root) {
         root = {
+          createdAt: Date.now(),
           identity: { ...identity },
           entry,
           abort: new AbortController(),
           attached: false,
           pending: new Set(),
+          publication: emptyPublicationCounters(),
         };
         roots.set(identityKey(identity), root);
         entry.roots.add(root);
@@ -1328,6 +1807,9 @@ export function createWorktreeKiloRuntimes(options: {
     async retireRuntimeIfUnshared(directory, target, retiringRoot, deadlineAt, reason) {
       return retireRuntimeIfUnshared(directory, target, retiringRoot, deadlineAt, reason);
     },
+    async deferRuntimeRetirementIfShared(directory, target, retiringRoot, deadlineAt, reason) {
+      return deferRuntimeRetirementIfShared(directory, target, retiringRoot, deadlineAt, reason);
+    },
     rootRetirementScope,
     async verifyQuiescence(directory, target, deadlineAt) {
       const entry = [...entries.values()].find(
@@ -1350,10 +1832,22 @@ export function createWorktreeKiloRuntimes(options: {
         !entry.abort.signal.aborted
       );
     },
-    getRetained(directory, runtimeId) {
-      if (runtimeId === undefined) return entries.get(directory)?.runtime;
+    getRetained(identity, runtimeId) {
+      if (typeof identity === 'string') {
+        const entry =
+          runtimeId === undefined
+            ? (entries.get(identity) ??
+              [...entries.values()].find(entry => entry.directory === identity))
+            : [...entries.values()].find(
+                entry => entry.directory === identity && entry.runtimeId === runtimeId
+              );
+        return entry?.runtime;
+      }
+      const entry =
+        entries.get(entryKey(identity, 'per-session')) ?? entries.get(identity.directory);
+      if (runtimeId === undefined || entry?.runtimeId === runtimeId) return entry?.runtime;
       return [...entries.values()].find(
-        entry => entry.directory === directory && entry.runtimeId === runtimeId
+        entry => entry.directory === identity.directory && entry.runtimeId === runtimeId
       )?.runtime;
     },
     getEntryRuntimeId(directory, root) {
@@ -1403,8 +1897,19 @@ export function createWorktreeKiloRuntimes(options: {
         !runtime.signal.aborted
       );
     },
+    feedRecovering(directory) {
+      return [...entries.values()].some(
+        entry =>
+          entry.directory === directory &&
+          !entry.abort.signal.aborted &&
+          entry.runtime !== undefined &&
+          entry.feed?.isRecovering() === true
+      );
+    },
+    recordRootPublicationDiagnostic,
+    snapshotRootPublicationDiagnostics,
     isHealthy() {
-      return !closed && failedDirectories.size === 0;
+      return !closed;
     },
     shutdown() {
       if (closed) return;

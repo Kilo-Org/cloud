@@ -39,7 +39,7 @@ export type {
   PermissionResponse,
 } from './session';
 
-export { normalize, normalizeCliEvent, isChatEvent } from './normalizer';
+export { normalize, normalizeCliEvent, isChatEvent, projectSessionGoal } from './normalizer';
 export type { NormalizedEvent, ChatEvent, ServiceEvent } from './normalizer';
 
 export { reduce } from './reducer';
@@ -153,6 +153,7 @@ export type {
   SessionPhase,
   SessionActivity,
   AgentStatus,
+  SdkStatusMessageCode,
   CloudStatus,
   QuestionState,
   PermissionState,
@@ -160,6 +161,7 @@ export type {
   SuggestionAction,
   SuggestionState,
   MessageDeliveryState,
+  SessionCommit,
   PreparationAttempt,
   PreparationAttemptStatus,
   PreparationStepKind,
@@ -167,6 +169,8 @@ export type {
   PreparationStepStatus,
   ServiceStateSnapshot,
   SessionInfo,
+  SessionGoal,
+  SessionGoalStatus,
   KiloSessionId,
   CloudAgentSessionId,
   ResolvedSession,

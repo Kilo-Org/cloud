@@ -97,7 +97,7 @@ function fixture() {
   };
 }
 
-describe('Kilo 7.4.20 cleanup HTTP compatibility', () => {
+describe('Kilo cleanup HTTP compatibility', () => {
   test('awaits confirmed legacy cancellation and deletes lazy and never-run sessions without the unavailable v2 wait', async () => {
     const f = fixture();
     f.add(sessionId(0));
@@ -147,7 +147,6 @@ describe('Kilo 7.4.20 cleanup HTTP compatibility', () => {
           await f.client.stopSessionProcesses(dir, url.pathname.split('/')[3]);
           return Response.json(true);
         }
-        if (url.pathname === '/interactive-terminal') return Response.json([]);
         if (url.pathname === '/pty') {
           return Response.json(f.terminals.has(dir) ? [{ id: 'pty_qa' }] : []);
         }

@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts React/RN trees without a DOM */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type ConnectivityState } from '@/lib/connectivity-online';
@@ -63,7 +62,7 @@ function textChildren(renderer: TestRenderer.ReactTestRenderer): string[] | null
   if (!json || Array.isArray(json)) {
     return null;
   }
-  return json.children?.filter((child): child is string => typeof child === 'string') ?? null;
+  return json.children.filter((child): child is string => typeof child === 'string');
 }
 
 async function renderProbe(hooks: Hooks): Promise<TestRenderer.ReactTestRenderer> {

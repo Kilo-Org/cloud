@@ -39,10 +39,6 @@ const store = createSecureStorePreference<string[]>({
 // for Preferences to mount.
 store.preload();
 
-export function preloadTrustedHosts(): void {
-  store.preload();
-}
-
 export function useTrustedHosts() {
   const trustedHosts = useSyncExternalStore(store.subscribe, store.get);
   const hasLoaded = useSyncExternalStore(store.subscribe, store.getHasLoaded);

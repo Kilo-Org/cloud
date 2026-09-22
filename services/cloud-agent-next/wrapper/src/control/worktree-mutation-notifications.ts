@@ -46,7 +46,6 @@ const executionEvents = new Set<string>([
 
 const resourceInfoEvents = new Set<string>([
   'background_process.updated',
-  'interactive_terminal.updated',
   'pty.created',
   'pty.updated',
 ] satisfies Event['type'][]);
@@ -94,7 +93,6 @@ function isMutation({ type, properties }: KiloEvent): boolean {
         typeof properties.scope === 'string'
       );
     }
-    return info.status === 'running' || info.status === 'closed';
   }
   if (type === 'pty.exited' || type === 'pty.deleted') {
     return (
@@ -105,13 +103,6 @@ function isMutation({ type, properties }: KiloEvent): boolean {
   if (typeof properties.sessionID !== 'string' || !properties.sessionID) return false;
   if (type === 'background_process.deleted') {
     return isNonemptyString(properties.processID) && typeof properties.scope === 'string';
-  }
-  if (type === 'interactive_terminal.data' || type === 'interactive_terminal.deleted') {
-    return (
-      isNonemptyString(properties.terminalID) &&
-      (type === 'interactive_terminal.deleted' ||
-        (typeof properties.data === 'string' && typeof properties.cursor === 'number'))
-    );
   }
   if (executionEvents.has(type)) return typeof properties.callID === 'string';
   if (type === 'session.diff') return Array.isArray(properties.diff);

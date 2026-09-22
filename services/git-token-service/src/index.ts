@@ -9,6 +9,7 @@ import {
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
   GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
@@ -84,7 +85,12 @@ import {
   BitbucketDeleteWebhookRequestSchema,
   BitbucketEnsureWebhookRequestSchema,
   BitbucketPullRequestRequestSchema,
+  BitbucketWorkspaceTargetSchema,
 } from './bitbucket-code-review-service.js';
+import {
+  BitbucketWorkspaceAccessTokenAuthorizationService,
+  type BitbucketWorkspaceAccessTokenAuthorizationResult,
+} from './bitbucket-workspace-access-token-authorization-service.js';
 import {
   KiloSessionCapabilityCodec,
   KiloSessionCapabilityError,
@@ -313,9 +319,12 @@ export type RedeemKiloSessionCapabilityResult =
 const DISCONNECT_PATH = '/internal/github-user-authorizations/disconnect';
 const USER_ACCESS_TOKEN_PATH = '/internal/github-user-authorizations/token';
 const BITBUCKET_REPOSITORIES_PATH = '/internal/bitbucket/repositories';
+const BITBUCKET_WORKSPACE_ACCESS_TOKEN_PATH = '/internal/bitbucket/workspace-access-token';
 const BITBUCKET_CODE_REVIEW_PULL_REQUEST_PATH = '/internal/bitbucket/code-review/pull-request';
 const BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_PATH = '/internal/bitbucket/code-review/webhooks/ensure';
 const BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_PATH = '/internal/bitbucket/code-review/webhooks/delete';
+const BITBUCKET_GIT_ORIGIN = 'https://bitbucket.org';
+const BITBUCKET_API_ORIGIN = 'https://api.bitbucket.org';
 const GITLAB_CREDENTIAL_BROKER_PATH = '/internal/gitlab/credentials';
 const INTERNAL_REQUEST_MAX_BYTES = 16_000;
 
@@ -326,6 +335,9 @@ const BitbucketEnsureWebhookHttpRequestSchema = BitbucketEnsureWebhookRequestSch
   owner: true,
 });
 const BitbucketDeleteWebhookHttpRequestSchema = BitbucketDeleteWebhookRequestSchema.omit({
+  owner: true,
+});
+const BitbucketWorkspaceAccessTokenHttpRequestSchema = BitbucketWorkspaceTargetSchema.omit({
   owner: true,
 });
 
@@ -566,27 +578,33 @@ function validateGitLabCapabilityUpstream(
 function validateBitbucketCapabilityUpstream(
   requestUrl: string,
   repositoryFullName: string
-): { failure: RedeemBitbucketSessionCapabilityFailureReason | null } {
+): { failure: RedeemBitbucketSessionCapabilityFailureReason | null; authSurface: 'git' | 'api' } {
   // Bitbucket smart-HTTP repo paths are /<workspace>/<repo>.git with literal
   // slashes and never carry an encoded slash, so reject %2f outright. This guard
   // deliberately differs from validateGitLabCapabilityUpstream, which must allow
   // %2f because GitLab addresses projects by encoded path (e.g.
   // /api/v4/projects/group%2Fproject); do not "reconcile" the two.
-  if (/%2f|%5c/i.test(requestUrl) || /\/(?:(?:\.|%2e){1,2})(?:\/|$)/i.test(requestUrl)) {
-    return { failure: 'invalid_upstream_url' };
+  // Only the path is scanned: a query string may legitimately carry %2f data, such
+  // as a branch name with a slash in `bb pr current`'s q= filter, and it cannot
+  // change how the path resolves against the repository prefix checked below.
+  const queryStart = requestUrl.search(/[?#]/);
+  const requestPath = queryStart === -1 ? requestUrl : requestUrl.slice(0, queryStart);
+  if (/%2f|%5c/i.test(requestPath) || /\/(?:(?:\.|%2e){1,2})(?:\/|$)/i.test(requestPath)) {
+    return { failure: 'invalid_upstream_url', authSurface: 'git' };
   }
   let url: URL;
   try {
     url = new URL(requestUrl);
   } catch {
-    return { failure: 'invalid_upstream_url' };
+    return { failure: 'invalid_upstream_url', authSurface: 'git' };
   }
   if (url.protocol !== 'https:' || url.username || url.password || url.hash) {
-    return { failure: 'invalid_upstream_url' };
+    return { failure: 'invalid_upstream_url', authSurface: 'git' };
   }
-  if (url.origin !== 'https://bitbucket.org') {
-    return { failure: 'upstream_origin_not_allowed' };
+  if (url.origin !== BITBUCKET_GIT_ORIGIN && url.origin !== BITBUCKET_API_ORIGIN) {
+    return { failure: 'upstream_origin_not_allowed', authSurface: 'git' };
   }
+  const authSurface = url.origin === BITBUCKET_API_ORIGIN ? 'api' : 'git';
   // Defense in depth against nested percent-encoding: the raw check above only
   // catches single-encoded traversal (%2e/%2f). Decode the pathname iteratively
   // and re-check, so sequences like %252e%252e%252f — which survive the raw pass
@@ -597,15 +615,20 @@ function validateBitbucketCapabilityUpstream(
     decodedPathname.includes('\\') ||
     /(?:^|\/)\.{1,2}(?:\/|$)/.test(decodedPathname)
   ) {
-    return { failure: 'invalid_upstream_url' };
+    return { failure: 'invalid_upstream_url', authSurface };
   }
-  // Bitbucket smart-HTTP paths live under /<workspace>/<repo>.git/... The full
-  // name was validated (single slash, no traversal) when the capability decoded.
-  const repoPath = `/${repositoryFullName}.git`;
+  // The full repository name was validated (single slash, no traversal) when the
+  // capability decoded. The git surface is Bitbucket smart-HTTP under
+  // /<workspace>/<repo>.git/...; the API surface is the REST API under
+  // /2.0/repositories/<workspace>/<repo>/...
+  const repoPath =
+    authSurface === 'api'
+      ? `/2.0/repositories/${repositoryFullName}`
+      : `/${repositoryFullName}.git`;
   if (url.pathname !== repoPath && !url.pathname.startsWith(`${repoPath}/`)) {
-    return { failure: 'repository_mismatch' };
+    return { failure: 'repository_mismatch', authSurface };
   }
-  return { failure: null };
+  return { failure: null, authSurface };
 }
 
 function validateLegacyGitLabCapabilityUpstream(
@@ -1248,6 +1271,12 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         return { success: false, reason: 'source_unavailable' };
       }
     }
+    if (upstream.authSurface === 'api') {
+      return {
+        success: true,
+        headers: { authorization: `Bearer ${subject.token}` },
+      };
+    }
     return {
       success: true,
       headers: {
@@ -1486,9 +1515,12 @@ export default {
     const isGitLabCredentialBroker = url.pathname === GITLAB_CREDENTIAL_BROKER_PATH;
     // Credential-bearing endpoints must never be cached, including on their
     // shared early-return error paths (405/401/503). The GitHub user-access
-    // token endpoint joins the GitLab private endpoints here.
+    // token endpoint joins the GitLab private endpoints here, and the
+    // Bitbucket workspace access-token release endpoint with them.
     const privateNoStoreHeaders =
-      isGitLabCredentialBroker || url.pathname === USER_ACCESS_TOKEN_PATH
+      isGitLabCredentialBroker ||
+      url.pathname === USER_ACCESS_TOKEN_PATH ||
+      url.pathname === BITBUCKET_WORKSPACE_ACCESS_TOKEN_PATH
         ? { 'Cache-Control': 'no-store' }
         : undefined;
     const codeReviewAudience = bitbucketCodeReviewAudiences.get(url.pathname);
@@ -1496,6 +1528,7 @@ export default {
       url.pathname !== DISCONNECT_PATH &&
       url.pathname !== USER_ACCESS_TOKEN_PATH &&
       url.pathname !== BITBUCKET_REPOSITORIES_PATH &&
+      url.pathname !== BITBUCKET_WORKSPACE_ACCESS_TOKEN_PATH &&
       url.pathname !== GITLAB_CREDENTIAL_BROKER_PATH &&
       !codeReviewAudience
     ) {
@@ -1534,11 +1567,13 @@ export default {
       const audience =
         url.pathname === BITBUCKET_REPOSITORIES_PATH
           ? BITBUCKET_REPOSITORY_LIST_AUDIENCE
-          : url.pathname === GITLAB_CREDENTIAL_BROKER_PATH
-            ? GITLAB_CREDENTIAL_BROKER_AUDIENCE
-            : url.pathname === USER_ACCESS_TOKEN_PATH
-              ? GITHUB_USER_ACCESS_TOKEN_AUDIENCE
-              : codeReviewAudience;
+          : url.pathname === BITBUCKET_WORKSPACE_ACCESS_TOKEN_PATH
+            ? BITBUCKET_WORKSPACE_ACCESS_TOKEN_AUDIENCE
+            : url.pathname === GITLAB_CREDENTIAL_BROKER_PATH
+              ? GITLAB_CREDENTIAL_BROKER_AUDIENCE
+              : url.pathname === USER_ACCESS_TOKEN_PATH
+                ? GITHUB_USER_ACCESS_TOKEN_AUDIENCE
+                : codeReviewAudience;
       authorization =
         url.pathname === DISCONNECT_PATH
           ? await verifyKiloTokenForResource(token, secret, {
@@ -1565,6 +1600,77 @@ export default {
         return Response.json(result);
       } catch {
         return Response.json({ status: 'temporarily_unavailable' });
+      }
+    }
+
+    if (url.pathname === BITBUCKET_WORKSPACE_ACCESS_TOKEN_PATH) {
+      if (!authorization.organizationId) {
+        return Response.json(
+          { error: 'organization_required' },
+          { status: 403, headers: privateNoStoreHeaders }
+        );
+      }
+      let body: unknown;
+      try {
+        body = await readBoundedInternalJsonRequest(request);
+      } catch {
+        return Response.json(
+          { status: 'invalid_request' },
+          { status: 400, headers: privateNoStoreHeaders }
+        );
+      }
+      const parsed = BitbucketWorkspaceAccessTokenHttpRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        return Response.json(
+          { status: 'invalid_request' },
+          { status: 400, headers: privateNoStoreHeaders }
+        );
+      }
+
+      // The owner comes from the verified token claims, never from the body:
+      // the release re-resolves the org integration and decrypts the
+      // credential, then answers only when the requested workspace identity
+      // matches the integration the token belongs to.
+      const requested = parsed.data;
+      try {
+        const authorizationService = new BitbucketWorkspaceAccessTokenAuthorizationService(env);
+        const workspaceAuthorization: BitbucketWorkspaceAccessTokenAuthorizationResult =
+          await authorizationService.getAuthorization({
+            userId: authorization.kiloUserId,
+            orgId: authorization.organizationId,
+          });
+        if (workspaceAuthorization.status !== 'available') {
+          return Response.json(
+            { status: workspaceAuthorization.status },
+            { headers: privateNoStoreHeaders }
+          );
+        }
+        if (
+          workspaceAuthorization.integrationId !== requested.integrationId ||
+          workspaceAuthorization.workspace.uuid !== requested.workspaceUuid ||
+          workspaceAuthorization.workspace.slug !== requested.workspaceSlug
+        ) {
+          return Response.json(
+            { status: 'reconnect_required' },
+            { headers: privateNoStoreHeaders }
+          );
+        }
+        return Response.json(
+          {
+            status: 'available',
+            token: workspaceAuthorization.token,
+            workspace: {
+              uuid: workspaceAuthorization.workspace.uuid,
+              slug: workspaceAuthorization.workspace.slug,
+            },
+          },
+          { headers: privateNoStoreHeaders }
+        );
+      } catch {
+        return Response.json(
+          { status: 'temporarily_unavailable' },
+          { headers: privateNoStoreHeaders }
+        );
       }
     }
 

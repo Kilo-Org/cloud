@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { Cpu, Mic } from '@/components/ui/icons';
+import { Cpu, Globe, Mic } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -9,9 +9,15 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { Text } from '@/components/ui/text';
+import { VoiceTestField } from '@/components/voice-test-field';
 import { useOrganization } from '@/lib/organization-context';
 import { useGatewayTranscriptionModelSelection } from '@/lib/voice-input/gateway/gateway-transcription-model-selection';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
+import { voiceInputLanguageDisplayName } from '@/lib/voice-input/voice-input-language';
+import {
+  useVoiceInputLanguage,
+  useVoiceInputLanguageLoaded,
+} from '@/lib/voice-input/voice-input-language-preference';
 
 /**
  * Neutral row value while the catalogue is missing (failed or empty). The
@@ -36,6 +42,8 @@ export function VoiceInputSettingsScreen() {
   const { status, model, isFetching, refetch } = useGatewayTranscriptionModelSelection(
     organizationId ?? undefined
   );
+  const chosen = useVoiceInputLanguage();
+  const languageLoaded = useVoiceInputLanguageLoaded();
   const { t } = useTranslation();
 
   // Only a live choice can open the picker; while off, loading, or without a
@@ -58,13 +66,32 @@ export function VoiceInputSettingsScreen() {
     modelSubtitle = model.name;
   }
 
+  // The stored tag is a BCP-47 value the picker wrote, so naming it by its
+  // endonym reads like the picker rows. Until the SecureStore read resolves,
+  // the row shows the loading caption instead of claiming "Automatic" for a
+  // choice that may exist.
+  let languageSubtitle = t('voiceLanguage.automatic');
+  if (!languageLoaded) {
+    languageSubtitle = t('common.loading');
+  } else if (chosen) {
+    languageSubtitle = voiceInputLanguageDisplayName(chosen);
+  }
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('preferences.voiceInput')} />
       <TabScreenScrollView
+        automaticallyAdjustKeyboardInsets
         className="flex-1"
         contentContainerClassName="px-6 gap-3 pt-4"
         showsVerticalScrollIndicator={false}
+        // The test field and its Clear control live in this scroll view. With
+        // the keyboard up, the default ('never') spends the first tap outside
+        // the input on dismissing the keyboard, so tapping Clear only closed
+        // the keyboard and kept the text (e3, 2026-09-12). 'handled' delivers
+        // the tap to the Clear pressable itself; taps on inert space still
+        // dismiss.
+        keyboardShouldPersistTaps="handled"
       >
         <PreferenceRow
           icon={Mic}
@@ -79,10 +106,20 @@ export function VoiceInputSettingsScreen() {
           title={t('preferences.transcriptionModel')}
           subtitle={modelSubtitle}
           className="rounded-lg bg-secondary px-3"
-          last
           disabled={modelRowDisabled}
           onPress={() => {
             router.push('/(app)/transcription-model-picker' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={Globe}
+          title={t('common.language')}
+          subtitle={languageSubtitle}
+          className="rounded-lg bg-secondary px-3"
+          last
+          disabled={!languageLoaded}
+          onPress={() => {
+            router.push('/(app)/voice-language-picker' as Href);
           }}
         />
         {status === 'unavailable' ? (
@@ -113,6 +150,7 @@ export function VoiceInputSettingsScreen() {
             isRetrying={isFetching}
           />
         ) : null}
+        <VoiceTestField />
       </TabScreenScrollView>
     </View>
   );

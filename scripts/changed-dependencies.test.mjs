@@ -319,11 +319,15 @@ for (const [file, paths, filterName] of [
       for (const path of paths) assert.equal(matchesPatterns(path, patterns), true, path);
       assert.equal(matchesPatterns('docs/unrelated.md', patterns), false);
     } else {
+      // The mobile workflow admits every PR and every main push: the suite
+      // jobs are required checks and gate their own work on the internal
+      // change-detection step.
       assert.equal(
         admitsEvent(workflow.on.pull_request, 'mobile-ux-ad6d-s1', 'docs/unrelated.md'),
-        false
+        true,
+        'mobile PR admission must not filter paths'
       );
-      assert.equal(admitsEvent(workflow.on.push, 'main', 'docs/unrelated.md'), false);
+      assert.equal(admitsEvent(workflow.on.push, 'main', 'docs/unrelated.md'), true);
       assert.ok(Object.hasOwn(workflow.on, 'workflow_call'));
     }
   });

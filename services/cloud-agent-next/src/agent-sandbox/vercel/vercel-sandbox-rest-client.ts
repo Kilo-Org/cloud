@@ -1,3 +1,7 @@
+import {
+  vercelSandboxResourcesSchema,
+  type VercelSandboxResources,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
 
 const VERCEL_SANDBOX_API_BASE_URL = 'https://api.vercel.com';
@@ -123,6 +127,7 @@ export type CreateSandboxInput = {
   snapshotId: string;
   runtime: VercelSandboxRuntime;
   timeoutMs: number;
+  resources?: VercelSandboxResources;
   networkPolicy?: VercelSandboxNetworkPolicy;
 };
 
@@ -292,7 +297,10 @@ export class VercelSandboxRestClient {
     requireIdentifier(input.runtimeBuildId, operation);
     requireIdentifier(input.snapshotId, operation);
     requirePositiveDuration(input.timeoutMs, operation);
-    if (!runtimeSchema.safeParse(input.runtime).success) {
+    if (
+      !runtimeSchema.safeParse(input.runtime).success ||
+      !vercelSandboxResourcesSchema.optional().safeParse(input.resources).success
+    ) {
       throw new VercelSandboxRestError('invalid_request', operation);
     }
 
@@ -311,6 +319,7 @@ export class VercelSandboxRestClient {
           [VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG]: input.operationId,
           [VERCEL_CLOUD_AGENT_RUNTIME_BUILD_TAG]: input.runtimeBuildId,
         },
+        ...(input.resources === undefined ? {} : { resources: input.resources }),
         ...(input.networkPolicy === undefined ? {} : { networkPolicy: input.networkPolicy }),
       }),
     });
@@ -329,7 +338,10 @@ export class VercelSandboxRestClient {
     requireIdentifier(input.operationId, operation);
     requireIdentifier(input.runtimeBuildId, operation);
     requireIdentifier(input.snapshotId, operation);
-    if (!runtimeSchema.safeParse(input.runtime).success) {
+    if (
+      !runtimeSchema.safeParse(input.runtime).success ||
+      !vercelSandboxResourcesSchema.optional().safeParse(input.resources).success
+    ) {
       throw new VercelSandboxRestError('invalid_request', operation);
     }
     const url = this.namedSandboxUrl(input.name, projectId);
@@ -557,6 +569,9 @@ export class VercelSandboxRestClient {
       envelope.session.projectId !== this.config.projectId ||
       envelope.session.sourceSnapshotId !== input.snapshotId ||
       envelope.session.runtime !== input.runtime ||
+      (input.resources !== undefined &&
+        (envelope.session.vcpus !== input.resources.vcpus ||
+          envelope.session.memory !== input.resources.memory)) ||
       tags[VERCEL_CLOUD_AGENT_RESOURCE_TAG] !== VERCEL_CLOUD_AGENT_RESOURCE_TAG_VALUE ||
       tags[VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG] !== input.operationId ||
       tags[VERCEL_CLOUD_AGENT_RUNTIME_BUILD_TAG] !== input.runtimeBuildId

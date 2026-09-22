@@ -107,6 +107,93 @@ describe('scrubEvent', () => {
     expect(result.tags.session).toBe('[redacted]');
   });
 
+  it('redacts token-shaped runs that mix cases or carry digits', () => {
+    const event = {
+      extra: {
+        upper: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
+        hyphenated: 'sk-proj-abc123def456ghi789jkl',
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.upper).toBe('[redacted]');
+    expect(result.extra.hyphenated).toBe('[redacted]');
+  });
+
+  it('redacts token values nested in extra', () => {
+    const event = {
+      extra: { cause: { token: 'abcdefghijklmnopqrst' } },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.cause.token).toBe('[redacted]');
+  });
+
+  it('handles a cyclic extra value without throwing', () => {
+    const cyclic: Record<string, unknown> = { name: 'x' };
+    cyclic.self = cyclic;
+    const event = { extra: cyclic };
+
+    expect(() => scrubEvent(event)).not.toThrow();
+  });
+
+  it('redacts token values in an object reachable through two references', () => {
+    const shared = { token: 'abcdefghijklmnopqrst' };
+    const event = { extra: { first: shared, second: shared } };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.first.token).toBe('[redacted]');
+    expect(result.extra.second.token).toBe('[redacted]');
+  });
+
+  it('redacts token values in a cyclic extra value', () => {
+    const cyclic: Record<string, unknown> = { token: 'abcdefghijklmnopqrst' };
+    cyclic.self = cyclic;
+    const event = { extra: cyclic };
+
+    const result = scrubEvent(event);
+
+    expect(result.extra.token).toBe('[redacted]');
+    expect((result.extra.self as Record<string, unknown>).token).toBe('[redacted]');
+  });
+
+  it('redacts token values in the context extraErrorDataIntegration attaches', () => {
+    const event = {
+      exception: { values: [{ type: 'TRPCClientError' }] },
+      contexts: { TRPCClientError: { data: { token: 'abcdefghijklmnopqrst' } } },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts.TRPCClientError.data.token).toBe('[redacted]');
+  });
+
+  it('leaves structured network and trace contexts intact', () => {
+    const event = {
+      exception: { values: [{ type: 'TypeError' }] },
+      contexts: {
+        TypeError: { data: { code: 'FORBIDDEN' } },
+        network: {
+          url: 'https://api.example.com/api/trpc/cliSessionsV2.getSessionMessagesPage',
+          procedure: 'cliSessionsV2.getSessionMessagesPage',
+          trpcCode: 'INTERNAL_SERVER_ERROR',
+        },
+        trace: { trace_id: 'abcdef0123456789abcdef0123456789' },
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts.network.url).toBe(
+      'https://api.example.com/api/trpc/cliSessionsV2.getSessionMessagesPage'
+    );
+    expect(result.contexts.network.trpcCode).toBe('INTERNAL_SERVER_ERROR');
+    expect(result.contexts.trace.trace_id).toBe('abcdef0123456789abcdef0123456789');
+  });
+
   it('returns malformed event unchanged without throwing', () => {
     const event = null;
     expect(() => scrubEvent(event)).not.toThrow();

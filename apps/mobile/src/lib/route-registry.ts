@@ -11,6 +11,7 @@ import { useEffect } from 'react';
 
 import { type DiffSelection } from './pr-review/diff-selection-bridge';
 import {
+  type BranchPickerBridge,
   type FolderPickerBridge,
   type InstancePickerBridge,
   type ModelPickerBridge,
@@ -47,6 +48,7 @@ type SlotValue = {
   modelPicker: ModelPickerBridge;
   modePicker: ModePickerBridge;
   repoPicker: RepoPickerBridge;
+  branchPicker: BranchPickerBridge;
   instancePicker: InstancePickerBridge;
   folderPicker: FolderPickerBridge;
   prFileNav: Set<FileNavigatorListener>;
@@ -62,6 +64,7 @@ const slots: RegistrySlots = {
   modelPicker: new Map<RouteKey, ModelPickerBridge>(),
   modePicker: new Map<RouteKey, ModePickerBridge>(),
   repoPicker: new Map<RouteKey, RepoPickerBridge>(),
+  branchPicker: new Map<RouteKey, BranchPickerBridge>(),
   instancePicker: new Map<RouteKey, InstancePickerBridge>(),
   folderPicker: new Map<RouteKey, FolderPickerBridge>(),
   prFileNav: new Map<RouteKey, Set<FileNavigatorListener>>(),
@@ -73,6 +76,7 @@ const ALL_SLOT_KINDS: readonly SlotKind[] = [
   'modelPicker',
   'modePicker',
   'repoPicker',
+  'branchPicker',
   'instancePicker',
   'folderPicker',
   'prFileNav',
@@ -106,6 +110,7 @@ function createSlot<K extends SlotKind>(kind: K): RouteSlot<K> {
 export const modelPickerSlot = createSlot('modelPicker');
 export const modePickerSlot = createSlot('modePicker');
 export const repoPickerSlot = createSlot('repoPicker');
+export const branchPickerSlot = createSlot('branchPicker');
 export const instancePickerSlot = createSlot('instancePicker');
 export const folderPickerSlot = createSlot('folderPicker');
 export const prFileNavSlot = createSlot('prFileNav');

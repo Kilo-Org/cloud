@@ -35,6 +35,10 @@ test('builds LAN URLs for every mobile-facing local service', () => {
     values.get('NOTIFICATIONS_URL'),
     `http://192.168.1.10:${getService('notifications').port}`
   );
+  assert.equal(
+    values.get('LATENCY_INGEST_URL'),
+    `http://192.168.1.10:${getService('latency-ingest').port}`
+  );
 });
 
 test('rewrites only requested env keys while preserving comments and other values', () => {
@@ -94,6 +98,35 @@ test('validates IPv4-looking host values', () => {
   assert.equal(isUsableIpv4(undefined), false);
 });
 
+test('prepares loopback URLs when the dev host is localhost', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-mobile-env-'));
+  fs.mkdirSync(path.join(root, 'apps/mobile'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.env.local'), 'NEXTAUTH_URL="http://localhost:3000"\n');
+  fs.writeFileSync(
+    path.join(root, 'apps/mobile/.env.local.example'),
+    'API_BASE_URL=http://localhost:3000\nWEB_BASE_URL=http://localhost:3000\n'
+  );
+
+  const result = prepareMobileEnvironment(root, 'localhost');
+
+  const appUrl = `http://localhost:${getService('nextjs').port}`;
+  assert.equal(result.appUrl, appUrl);
+  assert.equal(result.sessionEnv.API_BASE_URL, appUrl);
+  assert.equal(
+    result.sessionEnv.LATENCY_INGEST_URL,
+    `http://localhost:${getService('latency-ingest').port}`
+  );
+
+  const written = fs.readFileSync(path.join(root, 'apps/mobile/.env.local'), 'utf8');
+  assert.match(written, new RegExp(`^API_BASE_URL=${appUrl}$`, 'm'));
+  assert.match(written, new RegExp(`^WEB_BASE_URL=${appUrl}$`, 'm'));
+  const writtenHosts = [...written.matchAll(/^[A-Z0-9_]+=(?:https?|wss?):\/\/([^:/]+)/gm)].map(
+    match => match[1]
+  );
+  assert.deepEqual([...new Set(writtenHosts)], ['localhost']);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test('copies the primary worktree root env when a secondary worktree is missing it', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-mobile-env-'));
   const primary = path.join(root, 'primary');
@@ -126,6 +159,10 @@ test('prepares mobile URLs before returning values for the Metro tmux environmen
   assert.equal(result.appUrl, appUrl);
   assert.equal(result.sessionEnv.API_BASE_URL, appUrl);
   assert.equal(result.sessionEnv.WEB_BASE_URL, appUrl);
+  assert.equal(
+    result.sessionEnv.LATENCY_INGEST_URL,
+    `http://192.168.1.10:${getService('latency-ingest').port}`
+  );
   assert.equal(result.sessionEnv.NEXTAUTH_URL, undefined);
   assert.equal(result.sessionEnv.APP_URL_OVERRIDE, undefined);
   fs.rmSync(root, { recursive: true, force: true });

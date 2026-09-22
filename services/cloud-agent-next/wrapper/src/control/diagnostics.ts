@@ -11,6 +11,7 @@ import {
 
 export type ControlDiagnostics = {
   onDiagnostic: ControlDiagnosticReporter;
+  setSnapshot(callback: () => void): void;
   start(): void;
   flush(): Promise<void>;
   finalize(timeoutMs?: number): Promise<void>;
@@ -76,6 +77,7 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
   let timer: ReturnType<typeof setInterval> | undefined;
   let stopped = false;
   let accepting = true;
+  let snapshot: (() => void) | undefined;
   const stop = new AbortController();
 
   function accountDrop(record?: ControlDiagnosticRecord): void {
@@ -249,6 +251,14 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
     }
   }
 
+  function runSnapshot(): void {
+    try {
+      snapshot?.();
+    } catch {
+      // Diagnostics must never throw into the caller.
+    }
+  }
+
   function flush(): Promise<void> {
     if (active) return active;
     if (stopped || !options.uploadUrl || !options.uploadGrant) return Promise.resolve();
@@ -262,8 +272,10 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
 
   function start(): void {
     if (timer || stopped || !options.uploadUrl || !options.uploadGrant) return;
+    runSnapshot();
     void flush();
     timer = setInterval(() => {
+      runSnapshot();
       void flush();
     }, options.intervalMs ?? 5000);
     timer.unref();
@@ -271,6 +283,7 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
 
   function finalize(timeoutMs = 4000): Promise<void> {
     if (finalizing) return finalizing;
+    runSnapshot();
     accepting = false;
     if (timer) clearInterval(timer);
     finalizing = (async () => {
@@ -298,5 +311,13 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
     return finalizing;
   }
 
-  return { onDiagnostic, start, flush, finalize };
+  return {
+    onDiagnostic,
+    setSnapshot(callback) {
+      snapshot = callback;
+    },
+    start,
+    flush,
+    finalize,
+  };
 }

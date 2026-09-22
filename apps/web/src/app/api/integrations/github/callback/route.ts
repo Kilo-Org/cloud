@@ -18,13 +18,15 @@ import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/m
 import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-installations';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
+  effectiveAppTypeCondition,
+  lockGitHubInstallationIdentity,
   observeGitHubInstallationLifecycle,
   updateGitHubInstallationRepositories,
 } from '@/lib/integrations/db/github-installations';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
   createPendingIntegration,
-  findIntegrationByInstallationId,
+  findGitHubBotLinkIntegrations,
   findIntegrationByInstallationIdForOwner,
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
@@ -34,19 +36,20 @@ import type {
   Owner,
 } from '@/lib/integrations/core/types';
 import { db } from '@/lib/drizzle';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
-import { PLATFORM } from '@/lib/integrations/core/constants';
+import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { APP_URL } from '@/lib/constants';
 import {
   consumeInstallState,
   type InstallStateRejectionReason,
 } from '@/lib/integrations/github/install-state';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import { isGitHubSharedInstallationAdmissionEnabled } from '@/lib/integrations/github/multiple-installations';
 
 const appendQueryParam = (path: string, queryParam: string): string =>
   `${path}${path.includes('?') ? '&' : '?'}${queryParam}`;
@@ -102,11 +105,18 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
   }
 
   const stateAppType = state.githubAppType ?? 'standard';
-  const integration = await findIntegrationByInstallationId(
-    PLATFORM.GITHUB,
-    state.installationId,
-    stateAppType
-  );
+  const usableCandidates = await findGitHubBotLinkIntegrations({
+    installationId: state.installationId,
+    appType: stateAppType,
+    platformIntegrationId: state.platformIntegrationId,
+  });
+  const legacyAllowed =
+    !isGitHubConnectionManagementEnabled() && !isGitHubSharedInstallationAdmissionEnabled();
+  const integration = state.platformIntegrationId
+    ? usableCandidates[0]
+    : legacyAllowed && usableCandidates.length === 1
+      ? usableCandidates[0]
+      : undefined;
 
   if (!integration) {
     return htmlPage('Link Failed', 'No matching GitHub integration was found.', 404);
@@ -478,6 +488,12 @@ async function handleCoreInstallFlow(params: {
   // installation before using app credentials to fetch or persist it.
   let verifiedGitHubUserId: string | null = null;
   let verifiedAccountType: 'Organization' | 'User' | null = null;
+  // The authenticated GitHub identity resolved by the OAuth exchange below,
+  // captured regardless of which authorization check ran. Used to record
+  // authorization provenance even on the legacy access-list admin check
+  // path, which only proves membership (not org ownership) but still
+  // authenticates a real GitHub user via the same code exchange.
+  let exchangedGitHubUserId: string | null = null;
   if (setupAction === 'install' || setupAction === 'update') {
     const code = searchParams.get('code');
     const rejectUnauthorizedInstallation = () =>
@@ -500,6 +516,7 @@ async function handleCoreInstallFlow(params: {
 
     try {
       const exchangeResult = await exchangeGitHubOAuthCode(code, githubAppType);
+      exchangedGitHubUserId = exchangeResult.id;
       const authorization = isGitHubConnectionManagementEnabled()
         ? await verifyGitHubInstallationAuthorization({
             accessToken: exchangeResult.accessToken,
@@ -643,23 +660,116 @@ async function handleCoreInstallFlow(params: {
     const installedAt = installation.created_at
       ? new Date(installation.created_at).toISOString()
       : new Date().toISOString();
-    const upsertResult =
+    // Capture the verified identity once, narrowing both values here, so the
+    // verified writer and the later bind gating agree on which path ran.
+    const verifiedIdentity =
       isGitHubConnectionManagementEnabled() && verifiedGitHubUserId && verifiedAccountType
-        ? await connectVerifiedGitHubInstallation(owner, {
-            platformInstallationId: installationId,
-            platformAccountId: accountId,
-            platformAccountLogin: accountLogin,
-            permissions: installation.permissions as IntegrationPermissions,
-            scopes: installation.events || [],
-            repositoryAccess: installation.repository_selection,
-            repositories: repositories && repositories.length > 0 ? repositories : null,
-            installedAt,
-            githubAppType,
-            kiloUserId: user.id,
-            githubUserId: verifiedGitHubUserId,
-            accountType: verifiedAccountType,
-          })
-        : await upsertPlatformIntegrationForOwner(owner, {
+        ? { githubUserId: verifiedGitHubUserId, accountType: verifiedAccountType }
+        : null;
+    const redirectWithError = (error: string) => {
+      if (isAppInitiated) {
+        return NextResponse.redirect(new URL(appFallbackPath(`error=${error}`), APP_URL));
+      }
+      return NextResponse.redirect(
+        new URL(appendQueryParam(redirectPath, `error=${error}`), APP_URL)
+      );
+    };
+    const describeUpsertFailure = (reason: string) =>
+      reason === 'multiple_installations_disabled'
+        ? 'multiple_installations_disabled'
+        : reason === 'shared_installation_disabled'
+          ? 'shared_installation_disabled'
+          : reason === 'incompatible_workflow'
+            ? 'incompatible_workflow'
+            : reason === 'retryable_conflict'
+              ? 'connection_temporarily_unavailable'
+              : 'installation_already_claimed';
+
+    if (verifiedIdentity) {
+      // The verified writer admits and commits this association itself
+      // (including sharing admission for a shared installation), so nothing
+      // here needs the legacy competing-tenant guard.
+      const verifiedResult = await connectVerifiedGitHubInstallation(owner, {
+        platformInstallationId: installationId,
+        platformAccountId: accountId,
+        platformAccountLogin: accountLogin,
+        permissions: installation.permissions as IntegrationPermissions,
+        scopes: installation.events || [],
+        repositoryAccess: installation.repository_selection,
+        repositories: repositories && repositories.length > 0 ? repositories : null,
+        installedAt,
+        githubAppType,
+        kiloUserId: user.id,
+        githubUserId: verifiedIdentity.githubUserId,
+        accountType: verifiedIdentity.accountType,
+      });
+      if (!verifiedResult.ok) {
+        return redirectWithError(describeUpsertFailure(verifiedResult.reason));
+      }
+      await observeGitHubInstallationLifecycle({
+        installationId,
+        appType: githubAppType,
+        state: 'active',
+        accountId,
+        accountLogin,
+        accountType:
+          verifiedIdentity.accountType ??
+          (installation.target_type === 'Organization' ? 'Organization' : 'User'),
+        permissions: installation.permissions as IntegrationPermissions,
+        scopes: installation.events || [],
+        repositoryAccess: installation.repository_selection,
+      });
+      const writtenIntegration = await findIntegrationByInstallationIdForOwner(
+        owner,
+        PLATFORM.GITHUB,
+        installationId,
+        githubAppType
+      );
+      if (!writtenIntegration) {
+        throw new Error('GitHub integration writer did not resolve to the verified destination');
+      }
+      await bindGitHubIntegrationToCanonicalInstallation({
+        integrationId: writtenIntegration.id,
+        installationId,
+        appType: githubAppType,
+      });
+    } else {
+      // Legacy (management-disabled) path: the write, the competing-tenant
+      // guard, and the canonical bind are ONE transaction holding the
+      // installation lock. Two transactions would leave a committed active
+      // but unbound association behind whenever the bind fails or the
+      // request is interrupted, and a concurrent pending-install completion
+      // could then attach a second tenant.
+      const legacyResult = await db.transaction(async tx => {
+        await lockGitHubInstallationIdentity(tx, githubAppType, installationId);
+        const [competingAssociation] = await tx
+          .select({ id: platform_integrations.id })
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.platform, PLATFORM.GITHUB),
+              effectiveAppTypeCondition(githubAppType),
+              eq(platform_integrations.platform_installation_id, installationId),
+              isNull(platform_integrations.github_disconnected_at),
+              inArray(platform_integrations.integration_status, [
+                INTEGRATION_STATUS.PENDING,
+                INTEGRATION_STATUS.ACTIVE,
+              ]),
+              // IS DISTINCT FROM is NULL-safe (a competitor owned by the
+              // other owner type has NULL in this column, and `<>` would
+              // yield NULL rather than true), and comparing as text keeps a
+              // non-uuid owner value from failing the query outright.
+              owner.type === 'org'
+                ? sql`${platform_integrations.owned_by_organization_id}::text is distinct from ${owner.id}`
+                : sql`${platform_integrations.owned_by_user_id}::text is distinct from ${owner.id}`
+            )
+          );
+        if (competingAssociation) {
+          return { ok: false as const, reason: 'claimed_by_other_owner' as const };
+        }
+        const written = await upsertPlatformIntegrationForOwner(
+          owner,
+          {
             platform: 'github',
             integrationType: 'app',
             platformInstallationId: installationId,
@@ -671,47 +781,52 @@ async function handleCoreInstallFlow(params: {
             repositories: repositories && repositories.length > 0 ? repositories : null,
             installedAt,
             githubAppType,
-          });
-
-    if (!upsertResult.ok) {
-      const error =
-        upsertResult.reason === 'multiple_installations_disabled'
-          ? 'multiple_installations_disabled'
-          : 'installation_already_claimed';
-      if (isAppInitiated) {
-        return NextResponse.redirect(new URL(appFallbackPath(`error=${error}`), APP_URL));
+            // `exchangeGitHubOAuthCode` always resolves a real authenticated
+            // GitHub identity on this path, even when connection management
+            // is disabled and only the weaker access-list admin check ran.
+            // Record it so authorization provenance stays consistent with
+            // the verified writer above.
+            kiloUserId: user.id,
+            githubUserId: exchangedGitHubUserId ?? undefined,
+          },
+          tx
+        );
+        if (!written.ok) return written;
+        await observeGitHubInstallationLifecycle(
+          {
+            installationId,
+            appType: githubAppType,
+            state: 'active',
+            accountId,
+            accountLogin,
+            accountType: installation.target_type === 'Organization' ? 'Organization' : 'User',
+            permissions: installation.permissions as IntegrationPermissions,
+            scopes: installation.events || [],
+            repositoryAccess: installation.repository_selection,
+          },
+          tx
+        );
+        const row = await findIntegrationByInstallationIdForOwner(
+          owner,
+          PLATFORM.GITHUB,
+          installationId,
+          githubAppType,
+          tx
+        );
+        if (!row) {
+          throw new Error('GitHub integration writer did not resolve to the verified destination');
+        }
+        await bindGitHubIntegrationToCanonicalInstallation(
+          { integrationId: row.id, installationId, appType: githubAppType },
+          tx
+        );
+        return { ok: true as const };
+      });
+      if (!legacyResult.ok) {
+        return redirectWithError(describeUpsertFailure(legacyResult.reason));
       }
-      return NextResponse.redirect(
-        new URL(appendQueryParam(redirectPath, `error=${error}`), APP_URL)
-      );
     }
-    await observeGitHubInstallationLifecycle({
-      installationId,
-      appType: githubAppType,
-      state: 'active',
-      accountId,
-      accountLogin,
-      accountType:
-        verifiedAccountType ??
-        (installation.target_type === 'Organization' ? 'Organization' : 'User'),
-      permissions: installation.permissions as IntegrationPermissions,
-      scopes: installation.events || [],
-      repositoryAccess: installation.repository_selection,
-    });
-    const writtenIntegration = await findIntegrationByInstallationIdForOwner(
-      owner,
-      PLATFORM.GITHUB,
-      installationId,
-      githubAppType
-    );
-    if (!writtenIntegration) {
-      throw new Error('GitHub integration writer did not resolve to the verified destination');
-    }
-    await bindGitHubIntegrationToCanonicalInstallation({
-      integrationId: writtenIntegration.id,
-      installationId,
-      appType: githubAppType,
-    });
+
     if (repositories?.length) {
       await updateGitHubInstallationRepositories({
         installationId,

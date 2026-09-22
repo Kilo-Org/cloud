@@ -4,6 +4,8 @@
     "done": "סיום",
     "retry": "ניסיון חוזר",
     "tryAgain": "ניסיון נוסף",
+    "continue": "המשך",
+    "notNow": "לא עכשיו",
     "language": "שפה",
     "device": "מכשיר",
     "share": "שיתוף {{title}}",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "לא ניתן היה להעתיק ללוח ההעתקה.",
     "required": "חובה",
     "error": "שגיאה: {{error}}",
-    "notNow": "לא עכשיו",
-    "continue": "המשך",
     "back": "חזרה",
     "somethingWentWrong": "משהו השתבש.",
     "couldNotOpen": "לא ניתן היה לפתוח את {{label}}.",
@@ -36,6 +36,7 @@
     "cost": "עלות",
     "discard": "ויתור על השינויים",
     "findings": "ממצאים",
+    "mergeRequest": "בקשת מיזוג",
     "notConnected": "לא מחובר",
     "notifications": "התראות",
     "pullRequest": "pR",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "שימוש בכתובת דוא״ל אחרת",
     "signInWithApple": "כניסה באמצעות Apple",
     "signInWithGoogle": "כניסה באמצעות Google",
+    "signInWithPasskey": "כניסה באמצעות מפתח גישה",
     "emailAddress": "כתובת דוא״ל",
     "emailPlaceholder": "כתובת הדוא״ל שלך",
     "continueWithEmail": "המשך באמצעות דוא״ל",
@@ -174,6 +176,10 @@
     "termsConnector": " וכן ",
     "termsSuffix": ".",
     "moreSignInOptions": "אפשרויות כניסה נוספות",
+    "passkeyCancelled": "הכניסה באמצעות מפתח גישה בוטלה. נסו שוב.",
+    "passkeyNotFound": "לא נשמר מפתח גישה עבור המכשיר הזה. היכנסו במקום זאת עם Apple, Google או האימייל שלכם.",
+    "passkeyUnsupported": "מפתחות גישה אינם זמינים במכשיר הזה. היכנסו במקום זאת עם Apple, Google או האימייל שלכם.",
+    "passkeyFailed": "לא ניתן היה להיכנס באמצעות מפתח גישה. נסו שוב.",
     "couldNotCompleteSignIn": "לא ניתן להשלים את הכניסה. נסה שוב.",
     "sessionEnded": "תוקף החיבור שלך פג. היכנס שוב.",
     "signInCodeExpired": "תוקף קוד הכניסה שלך פג. נסה שוב.",
@@ -224,13 +230,36 @@
     "providerTestAccount": "חשבון בדיקה",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO ארגוני"
+    "providerEnterpriseSso": "SSO ארגוני",
+    "passkeysTitle": "מפתחות גישה",
+    "passkeysSubtitle": "היכנסו בלי סיסמה",
+    "passkeysEmpty": "אין עדיין מפתחות גישה",
+    "passkeysEmptyHint": "$t(profile.addPasskey) כדי להיכנס בלי סיסמה.",
+    "passkeysCouldNotLoad": "לא ניתן היה לטעון את מפתחות הגישה",
+    "passkeysLoadFailed": "מפתחות הגישה אינם זמינים עד שזה ייטען.",
+    "addPasskey": "הוספת מפתח גישה",
+    "passkeyDefaultName": "מפתח גישה",
+    "passkeyAddedOn": "נוסף ב-{{date}}",
+    "passkeyAdded": "מפתח הגישה נוסף.",
+    "passkeyAddFailed": "לא ניתן היה להוסיף מפתח גישה. נסו שוב.",
+    "passkeyAddUnsupported": "המכשיר הזה אינו יכול ליצור מפתחות גישה.",
+    "passkeyAddCancelled": "יצירת מפתח הגישה בוטלה.",
+    "passkeyRemoved": "מפתח הגישה הוסר.",
+    "passkeyRemoveFailed": "לא ניתן היה להסיר את מפתח הגישה הזה. נסו שוב.",
+    "passkeyRenamed": "שם מפתח הגישה שונה.",
+    "passkeyName": "שם מפתח גישה",
+    "renamePasskey": "שינוי שם מפתח גישה",
+    "removePasskey": "הסרת מפתח גישה",
+    "removePasskeyTitle": "להסיר את מפתח הגישה?",
+    "removePasskeyMessage": "לא תוכלו עוד להיכנס עם מפתח הגישה הזה."
   },
   "preferences": {
     "general": "כללי",
     "voiceInput": "קלט קולי",
     "autoExpandThinking": "הרחבה אוטומטית של תהליך החשיבה",
     "autoExpandThinkingSubtitle": "הצג את תהליך החשיבה המלא של הסוכן בסיומו.",
+    "hideThinking": "הסתרת פרטי החשיבה",
+    "hideThinkingSubtitle": "לא להציג את החשיבה של הסוכן במסך הסשן.",
     "keepScreenOn": "השארת המסך דלוק במסך הסשן",
     "keepScreenOnSubtitle": "השאר את המסך דלוק כשהסשן פעיל.",
     "appearance": "מראה",
@@ -253,7 +282,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "תמלול דרך Kilo Gateway",
     "gatewayTranscriptionSubtitle": "תמלל את ההכתבה בעזרת מודל של Kilo Gateway במקום זיהוי הדיבור של המכשיר. ההקלטה נשלחת ל־Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "כיווץ קריאות כלים",
+    "condenseToolCallsSubtitle": "קבץ קריאות כלים רצופות לשורה אחת שתוכל לפתוח.",
+    "toolSummaryTranslation": "תרגם סיכומי כלים",
+    "toolSummaryTranslationSubtitle": "שלח כל סיכום כלי למודל כדי לתרגם אותו לשפת האפליקציה שלך. המקור יוצג אם התרגום ייכשל.",
+    "toolSummaryTranslationModelUnavailableNotice": "המודל הזה כבר לא מוצע. הקש על $t(common.model) כדי לבחור אחר."
   },
   "notifications": {
     "liveActivities": "פעילויות בזמן אמת",
@@ -285,11 +319,12 @@
     "previewFullDescription": "התראות מציגות את טקסט ההודעה במסך הנעילה שלך.",
     "previewGenericDescription": "ההתראות מציינות שיש עדכון, בלי להציג את התוכן. פתח את Kilo כדי לקרוא אותו.",
     "channel": {
-      "agent": "סשנים של סוכנים",
+      "agentProgress": "התקדמות הסוכנים",
       "chat": "הודעות צ׳אט",
       "kiloclaw": "פעילות KiloClaw",
       "balance": "התראות על היתרה",
-      "security": "ממצאי אבטחה"
+      "security": "ממצאי אבטחה",
+      "spend": "התראות הוצאות"
     },
     "category": {
       "chatMessagesSubtitle": "תשובות בשיחות שלך",
@@ -300,8 +335,22 @@
       "sessionStatusTitle": "מצב הסשן",
       "sessionStatusSubtitle": "הסתיים / נכשל / מוכן לשליטה",
       "kiloclawActivitySubtitle": "מופע מוכן או שנכשל, פעולות מתוזמנות",
+      "kiloclawActivityUnavailable": "הפעל מופע KiloClaw כדי לקבל פעילות KiloClaw.",
       "balanceAlertsSubtitle": "אזהרות על יתרה נמוכה בארגון",
-      "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA"
+      "balanceAlertsUnavailable": "הצטרף לארגון כדי לקבל התראות יתרה.",
+      "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA",
+      "securityFindingsUnavailable": "הפעל את סוכן האבטחה של Kilo בהיקף כדי לקבל ממצאי אבטחה.",
+      "spendAlertsSubtitle": "חציית ספים וזינוקים שעתיים",
+      "spendAlertsToggle": "קטגוריית התראות הוצאות"
+    },
+    "action": {
+      "openSession": "פתיחת סשן"
+    },
+    "needsInputAction": {
+      "approved": "הבקשה אושרה",
+      "replied": "התשובה נשלחה",
+      "failed": "לא ניתן היה לענות. הקישו שוב כדי לנסות שוב.",
+      "unavailable": "הבקשה הזאת כבר לא מחכה."
     }
   },
   "tabs": {
@@ -382,7 +431,10 @@
       "uploadFailed": "ההעלאה נכשלה.",
       "failedToUploadFile": "העלאת הקובץ נכשלה: {{reason}}.",
       "nothingToPaste": "אין תוכן להדבקה.",
-      "metadataStripFailed": "לא ניתן להסיר את נתוני המטא של התמונה."
+      "metadataStripFailed": "לא ניתן להסיר את נתוני המטא של התמונה.",
+      "limit_one": "ניתן לצרף עד {{displayCount}} קובץ.",
+      "limit_other": "ניתן לצרף עד {{displayCount}} קבצים.",
+      "limit_two": "ניתן לצרף עד {{displayCount}} קבצים."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, מצב: {{status}}",
@@ -1154,7 +1206,13 @@
       "syncNow": "סנכרון עכשיו",
       "syncQueued": "הסנכרון נוסף לתור",
       "syncStatusUnavailable": "מצב הסנכרון אינו זמין.",
-      "withinDeadline": "ללא איחור"
+      "withinDeadline": "ללא איחור",
+      "daysOverdue_one": "איחור של {{displayCount}} יום",
+      "daysOverdue_other": "איחור של {{displayCount}} ימים",
+      "daysOverdue_two": "איחור של {{displayCount}} ימים",
+      "findingsCount_one": "{{displayCount}} ממצא",
+      "findingsCount_other": "{{displayCount}} ממצאים",
+      "findingsCount_two": "{{displayCount}} ממצאים"
     },
     "dashboardMetrics": {
       "openFindings": "ממצאים פתוחים",
@@ -1532,6 +1590,10 @@
       "couldNotLoad": "לא ניתן היה לטעון את הסשן.",
       "failedToLoadDetails": "לא ניתן היה לטעון את פרטי הסשן.",
       "failedToStopExecution": "לא ניתן היה לעצור את ההרצה.",
+      "stopped": "הסשן הופסק",
+      "committing": "מבצע קומיט…",
+      "committed": "בוצע קומיט",
+      "commitFailed": "הקומיט נכשל",
       "renameSession": "שינוי שם הסשן",
       "renamePlaceholder": "שם הסשן",
       "transcriptAccessibility": "תמליל הסשן",
@@ -1566,17 +1628,56 @@
       "exitNeedsNewerCli": "פקודות לוכסן מרוחקות דורשות גרסה חדשה יותר של Kilo CLI. עדכן את Kilo CLI והתחבר מחדש."
     },
     "sessionConnection": {
+      "label": "חיבור",
       "connecting": "מתחבר…",
       "reconnecting": "מתחבר מחדש…",
       "connectionLost": "החיבור נותק",
       "retryConnection": "ניסיון התחברות נוסף"
     },
+    "goal": {
+      "title": "מטרה",
+      "statusActive": "מטרה פעילה",
+      "statusPaused": "מטרה מושהית",
+      "statusComplete": "המטרה הושלמה",
+      "statusBlocked": "המטרה חסומה",
+      "edit": "ערוך מטרה",
+      "remove": "הסר מטרה",
+      "pause": "השהה מטרה",
+      "resume": "המשך מטרה",
+      "editPlaceholder": "תאר את המטרה",
+      "removeConfirmTitle": "להסיר את המטרה?",
+      "removeConfirmMessage": "ה-CLI מנקה את מטרת ההפעלה הזו.",
+      "updateFailed": "לא ניתן היה לעדכן את המטרה.",
+      "sectionAccessibility": "{{status}}. מטרה: {{text}}",
+      "collapse": "כיווץ המטרה",
+      "expand": "הרחבת המטרה"
+    },
     "newSession": {
+      "recentlyUsed": "בשימוש לאחרונה",
+      "couldNotLoadGithubRepositories": "לא ניתן היה לטעון את המאגרים מ-GitHub.",
+      "couldNotLoadGitlabRepositories": "לא ניתן היה לטעון את המאגרים מ-GitLab.",
+      "couldNotLoadBitbucketRepositories": "לא ניתן היה לטעון את המאגרים מ-Bitbucket.",
       "connectGithubDescription": "חבר את חשבון GitHub דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר.",
+      "connectGitlabDescription": "חבר את חשבון GitLab דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר.",
+      "connectBitbucketDescription": "חבר את חשבון Bitbucket דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר.",
       "openGithub": "פתיחת GitHub",
+      "openGitlab": "פתיחת GitLab",
+      "openBitbucket": "פתיחת Bitbucket",
       "refreshRepositories": "רענון המאגרים",
       "githubConnected": "GitHub מחובר",
+      "gitlabConnected": "GitLab מחובר",
       "noRepositoriesVisible": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים של אפליקציית Kilo ב-GitHub, ואז רענן את הרשימה.",
+      "noRepositoriesVisibleGitlab": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים ב-GitLab, ואז רענן את הרשימה.",
+      "noRepositoriesVisibleBitbucket": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים ב-Bitbucket, ואז רענן את הרשימה.",
+      "bitbucketOrganizationsOnly": "Bitbucket זמין לארגונים בלבד.",
+      "branchPickerTitle": "בחירת ענף",
+      "branchDefault": "ברירת מחדל",
+      "branchAccessibility": "ענף: {{label}}",
+      "branchLoading": "טוען ענפים",
+      "branchLoadError": "לא ניתן היה לטעון את הענפים",
+      "branchUnavailable": "הענפים אינם זמינים למאגר הזה. בדקו את הגישה שלך מול הספק, ואז בחרו מאגר אחר.",
+      "branchEmpty": "אין ענפים זמינים",
+      "branchPlaceholder": "בחרו ענף",
       "runOnWithTarget": "יעד ההרצה: {{target}}",
       "environment": "סביבה",
       "couldNotLoadEnvironment": "לא ניתן היה לטעון את הסביבה שלך.",
@@ -1595,26 +1696,15 @@
       "couldNotReadPendingSessions": "לא ניתן היה לקרוא את הסשנים הממתינים. נסה שוב.",
       "failedToCreate": "לא ניתן היה ליצור סשן.",
       "couldNotRefreshRepositories": "לא ניתן היה לרענן מאגרים. נסה שוב.",
-      "discardDraftMessage": "ההנחיה שלך תימחק.",
       "discardDraftTitle": "למחוק את הטיוטה?",
+      "discardDraftMessage": "ההנחיה שלך תימחק.",
+      "discardWithUploadsMessage": "ההנחיה שלך וכל הקבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
       "discardFailed": "לא ניתן היה למחוק את הטיוטה. נסה שוב.",
       "remoteHint": "הרץ `kilo remote` במחשב שלך, או `/remote` בסשן CLI פעיל, כדי לשלוט בתהליך kilo מקומי.",
-      "connectBitbucketDescription": "חבר את חשבון Bitbucket דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר.",
-      "connectGitlabDescription": "חבר את חשבון GitLab דרך הדפדפן, ואז חזור לכאן כדי לבחור מאגר.",
-      "couldNotLoadBitbucketRepositories": "לא ניתן היה לטעון את המאגרים מ-Bitbucket.",
-      "couldNotLoadGithubRepositories": "לא ניתן היה לטעון את המאגרים מ-GitHub.",
-      "couldNotLoadGitlabRepositories": "לא ניתן היה לטעון את המאגרים מ-GitLab.",
-      "gitlabConnected": "GitLab מחובר",
-      "noRepositoriesVisibleBitbucket": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים ב-Bitbucket, ואז רענן את הרשימה.",
-      "noRepositoriesVisibleGitlab": "לא מוצגים מאגרים. בדוק את הרשאות הגישה למאגרים ב-GitLab, ואז רענן את הרשימה.",
-      "openBitbucket": "פתיחת Bitbucket",
-      "openGitlab": "פתיחת GitLab",
-      "recentlyUsed": "בשימוש לאחרונה",
-      "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
       "continueFrom": "ממשיך את הסשן {{title}}.",
-      "importFailed": "לא ניתן היה לייבא את הסשן הזה.",
       "importingSession": "מייבא סשן…",
-      "discardWithUploadsMessage": "ההנחיה שלך וכל הקבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו."
+      "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",
+      "importFailed": "לא ניתן היה לייבא את הסשן הזה."
     },
     "partRenderer": {
       "updatedFileCount_one": "מספר הקבצים שעודכנו הוא {{displayCount}}.",
@@ -1639,7 +1729,17 @@
       "updateTodos": "עדכון משימות",
       "linesBadge": "{{displayCount}} שורות",
       "filesBadge": "{{displayCount}} קבצים",
-      "matchesBadge": "{{displayCount}} התאמות"
+      "matchesBadge": "{{displayCount}} התאמות",
+      "filesBadge_one": "{{displayCount}} קובץ",
+      "filesBadge_other": "{{displayCount}} קבצים",
+      "filesBadge_two": "{{displayCount}} קבצים",
+      "linesBadge_one": "{{displayCount}} שורה",
+      "linesBadge_other": "{{displayCount}} שורות",
+      "linesBadge_two": "{{displayCount}} שורות",
+      "matchesBadge_one": "{{displayCount}} התאמה",
+      "matchesBadge_other": "{{displayCount}} התאמות",
+      "matchesBadge_two": "{{displayCount}} התאמות",
+      "noOutput": "אין פלט."
     },
     "readToolMarkdown": {
       "linesTruncated": "שורות {{start}}–{{end}} (התוכן נחתך)",
@@ -1932,7 +2032,13 @@
       "files": "קבצים",
       "couldNotOpenPhotoPicker": "לא ניתן היה לפתוח את חלון בחירת התמונות. הפעל מחדש את Kilo ונסה שוב.",
       "maxFilesAllowed": "אפשר לצרף עד {{displayCount}} קבצים.",
-      "onlyAddingFiles": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (עד {{max}})"
+      "onlyAddingFiles": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (עד {{max}})",
+      "maxFilesAllowed_one": "אפשר לצרף עד {{displayCount}} קובץ.",
+      "maxFilesAllowed_other": "אפשר לצרף עד {{displayCount}} קבצים.",
+      "maxFilesAllowed_two": "אפשר לצרף עד {{displayCount}} קבצים.",
+      "onlyAddingFiles_one": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (עד {{max}})",
+      "onlyAddingFiles_other": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (עד {{max}})",
+      "onlyAddingFiles_two": "מוסיף רק {{accepted}} מתוך {{total}} קבצים (עד {{max}})"
     },
     "composer": {
       "addAttachment": "צירוף קובץ",
@@ -1950,7 +2056,10 @@
       "discardAttachmentsMessage": "קבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
       "discardAttachmentsTitle": "למחוק את הקבצים המצורפים?",
       "charactersRemaining": "נותרו {{count}} תווים",
-      "insertNewline": "הוספת שורה חדשה"
+      "insertNewline": "הוספת שורה חדשה",
+      "charactersRemaining_one": "נותר {{count}} תו",
+      "charactersRemaining_other": "נותרו {{count}} תווים",
+      "charactersRemaining_two": "נותרו {{count}} תווים"
     },
     "chatLink": {
       "linkCopied": "הקישור הועתק",
@@ -1984,6 +2093,12 @@
       "startNewSession": "התחלת סשן חדש",
       "exitSession": "יציאה מהסשן",
       "clearSession": "סיום הסשן הזה והתחלת סשן חדש",
+      "compactDescription": "כווץ את הקשר הסשן הנוכחי",
+      "goalDescription": "המשך לעבוד לקראת מטרת סשן. /goal <objective> או pause, resume, clear",
+      "initDescription": "הגדרת AGENTS.md מודרכת",
+      "resumeClaudeDescription": "ייבא תמלול של סשן Claude Code",
+      "resumeCodexDescription": "ייבא תמלול של סשן OpenAI Codex",
+      "reviewDescription": "סקור את השינויים [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "שימוש בפקודה /{{command}}",
       "insert": "הוספה",
       "upgradeRequiredFallback": "עדכן את ה-CLI שלך כדי להשתמש בפקודה זו.",
@@ -2017,7 +2132,15 @@
       "stepsCount": "{{steps}} צעדים",
       "stepsCount_other": "{{steps}} צעדים",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "stepsCount_two": "{{steps}} שלבים"
+      "stepsCount_two": "{{steps}} שלבים",
+      "modelsCount_one": "מודל ({{displayCount}})",
+      "modelsCount_other": "מודלים ({{displayCount}})",
+      "modelsCount_two": "מודלים ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "אישור אוטומטי",
+      "description": "אשר אוטומטית בקשות הרשאה עבור הפעלה זו. לאחר מכן הכלים פועלים ללא בקשה.",
+      "unavailable": "הפעלה זו אינה יכולה לקבל בקשות הרשאה."
     },
     "prBadge": {
       "open": "pR פתוח",
@@ -2049,6 +2172,13 @@
       "tapToListHint": "הקש על תיקייה כדי להציג את התוכן שלה.",
       "unsupportedDescription": "ה-CLI הזה אינו יכול להציג רשימת תיקיות. לחיצה על סיום תשמור את תיקיית ההפעלה. לחיצה על התחלת סשן תתחיל את הסשן בתיקייה הזו.",
       "unsupportedTitle": "לא ניתן להציג את התיקיות"
+    },
+    "toolRun": {
+      "sheetTitle": "קריאות כלים",
+      "condensedLabel": "{{itemCount}} פריטים; {{last}}",
+      "condensedLabel_one": "{{itemCount}} פריט; {{last}}",
+      "condensedLabel_other": "{{itemCount}} פריטים; {{last}}",
+      "condensedLabel_two": "{{itemCount}} פריטים; {{last}}"
     }
   },
   "bootstrap": {
@@ -2093,6 +2223,7 @@
     "couldNotLoadActiveSessions": "לא ניתן לטעון את הסשנים הפעילים.",
     "agentSessions": "פעילים עכשיו",
     "newCodingTask": "משימת תכנות חדשה",
+    "newTaskFromPicture": "משימה חדשה מתמונה",
     "explore": "גילוי אפשרויות",
     "seeAll": "הצגת הכול",
     "noLiveSessions": "אין כרגע סשנים פעילים"
@@ -2161,7 +2292,10 @@
     "gatewayModelUnavailable": "מודל התמלול הזה אינו זמין. בחר מודל אחר בהעדפות.",
     "gatewayModelUnavailableNotice": "המודל הזה כבר לא מוצע. הקש על $t(transcriptionModel.title) כדי לבחור אחר.",
     "gatewaySignInRequired": "היכנס כדי להשתמש בתמלול דרך Kilo Gateway.",
-    "gatewayNoModel": "בחר קודם מודל תמלול בהעדפות."
+    "gatewayNoModel": "בחר קודם מודל תמלול בהעדפות.",
+    "testTitle": "בדיקת הכתבה",
+    "testPlaceholder": "הקישו על המיקרופון והתחילו לדבר.",
+    "testClear": "נקה טקסט"
   },
   "share": {
     "title": "שיתוף עם Kilo",
@@ -2179,7 +2313,10 @@
     "cliCantReceiveFilesTitle": "לא ניתן לשלוח קבצים לשיחה הזו",
     "cliCantReceiveFilesMessage": "Kilo CLI שמפעיל את השיחה הזו אינו יכול לקבל קבצים. עדכן את ה-CLI במחשב הזה או שתף את הקבצים בשיחה חדשה.",
     "contentlessMessage": "אין מה לשתף — לא נכללו טקסט או קבצים.",
-    "couldNotReadContent": "לא ניתן היה לקרוא את התוכן ששותף."
+    "couldNotReadContent": "לא ניתן היה לקרוא את התוכן ששותף.",
+    "onlyFirstFilesAttached_one": "רק {{displayCount}} הקובץ הראשונים יצורפו.",
+    "onlyFirstFilesAttached_other": "רק {{displayCount}} הקבצים הראשונים יצורפו.",
+    "onlyFirstFilesAttached_two": "רק {{displayCount}} הקבצים הראשונים יצורפו."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2311,7 +2448,8 @@
     "aiProvidersWhat": "ההנחיות שלך, היסטוריית השיחות וכל הקבצים שאתה מצרף.",
     "aiProvidersWhy": "כדי ליצור תשובות AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google וספקים אחרים שאתה בוחר לכל בקשה.",
-    "gatewayWhat": "מזהה החשבון, המטא-נתונים של הבקשות ונתוני השימוש בטוקנים.",
+    "gatewayWhat": "מזהה החשבון, המטא-נתונים של הבקשות, השימוש בטוקנים, וכן ההנחיות והקלטות הקול שהאפליקציה שולחת דרכו.",
+    "viaGateway": "דרך Kilo Gateway",
     "gatewayWhy": "אימות זהות, ניתוב בקשות והתאמת חיובים.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "דוחות קריסה ושגיאות שתוכן האפליקציה הוסר מהם.",
@@ -2331,7 +2469,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "ההקלטה שלך בזמן שאתה מכתיב.",
     "voiceTranscriptionWhy": "כדי להפוך דיבור לטקסט.",
-    "voiceTranscriptionWho": "במכשיר בלבד, או אצל Apple או Google כשהמכשיר אינו יכול לתמלל ללא חיבור לאינטרנט.",
+    "voiceTranscriptionWho": "המכשיר שלך, Kilo Gateway עם מודל התמלול שבחרת, או Apple או Google לזיהוי מקוון.",
     "what": "אילו נתונים",
     "why": "לאיזו מטרה",
     "who": "למי נשלח",
@@ -2343,6 +2481,9 @@
     "checkConnection": "בדיקת החיבור",
     "checks": {
       "checksCount": "{{displayCount}} בדיקות",
+      "checksCount_one": "{{displayCount}} בדיקה",
+      "checksCount_two": "{{displayCount}} בדיקות",
+      "checksCount_other": "{{displayCount}} בדיקות",
       "couldNotLoad": "לא ניתן היה לטעון את הבדיקות.",
       "failed": "{{displayCount}} נכשלו",
       "noAccess": "אין לך גישה לבדיקות של המאגר הזה.",
@@ -2378,11 +2519,17 @@
       "tapDiffLineToSuggest": "הקש על שורה בהשוואת השינויים כדי להוסיף הצעה."
     },
     "connect": {
-      "checkFailedMessage": "מצב ההתחברות אינו זמין עד לסיום הטעינה.",
       "checkFailedTitle": "לא ניתן היה לבדוק את החיבור ל-GitHub.",
-      "description": "חבר את חשבון ה-GitHub שלך כדי לסקור בקשות משיכה בנייד.",
+      "checkFailedMessage": "מצב ההתחברות אינו זמין עד לסיום הטעינה.",
+      "checkFailedTitleGitLab": "לא ניתן היה לבדוק את החיבור ל-GitLab.",
+      "checkFailedTitleBitbucket": "לא ניתן היה לבדוק את החיבור ל-Bitbucket.",
+      "providerCheckFailedMessage": "מצב החיבור אינו זמין עד לסיום הטעימה.",
+      "reconnectTitle": "חיבור מחדש ל-GitHub",
       "reconnectDescription": "החיבור שלך ל-GitHub בוטל. התחבר מחדש כדי להמשיך לסקור בקשות משיכה בנייד.",
-      "reconnectTitle": "חיבור מחדש ל-GitHub"
+      "description": "חבר את חשבון ה-GitHub שלך כדי לסקור בקשות משיכה בנייד.",
+      "gitlabDescription": "חברו את חשבון GitLab שלכם כדי לסקור בקשות מיזוג בנייד.",
+      "bitbucketDescription": "חברו את Bitbucket לארגון הזה כדי לסקור בקשות משיכה בנייד.",
+      "bitbucketOrgOnlyDescription": "בחרו ארגון בפרופיל שלכם כדי לסקור את בקשות המשיכה של Bitbucket שלו."
     },
     "connectionExpired": "פג תוקף החיבור ל-GitHub.",
     "couldNotLoadPullRequest": "לא ניתן היה לטעון את בקשת המשיכה.",
@@ -2436,6 +2583,8 @@
       "replyBody": "תוכן התשובה",
       "replyForbidden": "אין לך הרשאה להשיב לבקשת המשיכה הזו.",
       "addCommentCta": "הגב על בקשת המשיכה הזו",
+      "fixWithKilo": "תקן עם Kilo",
+      "fixWithKiloPrompt": "נא לטפל בתגובה הבאה על בקשת המשיכה: {{link}}",
       "commentBadRequest": "לא ניתן לפרסם את התגובה הזו. ייתכן שבקשת המשיכה השתנתה.",
       "commentForbidden": "אין לך הרשאה להגיב על בקשת המשיכה הזו.",
       "replyPlaceholder": "תשובה…",
@@ -2477,21 +2626,27 @@
         "outdatedOnLines": "לא עדכני: {{lines}}",
         "outdatedOnPath": "לא עדכני: {{path}}"
       },
-      "deletedUser": "משתמש שנמחק"
+      "deletedUser": "משתמש שנמחק",
+      "replyForbiddenTerm": "אין לך הרשאה להשיב ל-{{term}} הזה.",
+      "moreLinesAbove_one": "… עוד {{displayCount}} שורה למעלה.",
+      "moreLinesAbove_other": "… עוד {{displayCount}} שורות למעלה.",
+      "moreLinesAbove_two": "… עוד {{displayCount}} שורות למעלה."
     },
     "entry": {
-      "clearLink": "ניקוי הקישור לבקשת המשיכה",
+      "eyebrow": "אפשר לפתוח בקשת משיכה או בקשת מיזוג באמצעות כתובת URL.",
+      "pastePrLink": "הדבקת קישור לבקשת משיכה או מיזוג",
+      "noRecentPrs": "אין סקירות לאחרונה",
+      "noRecentPrsDescription": "הדבקו קישור למעלה כדי להתחיל סקירה — הוא יופיע כאן בפעם הבאה.",
       "couldNotLoad": "לא ניתן היה לטעון את הנתונים.",
-      "eyebrow": "אפשר לפתוח בקשת משיכה באמצעות כתובת URL.",
-      "noRecentPrs": "אין פריטי PR אחרונים",
-      "noRecentPrsDescription": "הדבק למעלה קישור ל-PR כדי להתחיל סקירה — הוא יופיע כאן בפעם הבאה.",
-      "open": "פתוח",
-      "pasteLink": "הדבקת קישור לבקשת משיכה",
-      "pastePrLink": "הדבקת קישור ל-PR",
-      "removeFromRecentsMessage": "בקשת המשיכה הזו תוסר מרשימת הבקשות האחרונות שלך.",
       "removeFromRecentsTitle": "להסיר מהבקשות האחרונות?",
+      "removeFromRecentsMessage": "הסקירה הזו תוסר מרשימת האחרונות שלך.",
       "removeRecentAccessibility": "הסרת {{repo}} מרשימת הבקשות האחרונות",
-      "urlAccessibility": "כתובת URL של בקשת משיכה ב-GitHub"
+      "urlAccessibility": "הזנת כתובת URL של בקשת משיכה או מיזוג",
+      "urlPlaceholder": "כתובת URL של בקשת משיכה או בקשת מיזוג",
+      "openAccessibility": "פתיחת בקשת משיכה או בקשת מיזוג",
+      "clearLink": "ניקוי הקישור",
+      "pasteLink": "הדבקת קישור לבקשת משיכה או מיזוג",
+      "open": "פתוח"
     },
     "eventChips": {
       "comment": "תגובה",
@@ -2575,7 +2730,22 @@
       "retryLoadingContext": "ניסיון נוסף לטעינת שורות ההקשר",
       "retryLoadingNextPage": "ניסיון נוסף לטעינת העמוד הבא",
       "fileLoadedCount_two": "נטענו {{displayCount}} קבצים",
-      "fileLoadedOfTotalCount_two": "נטענו {{displayCount}} קבצים מתוך {{total}}"
+      "fileLoadedOfTotalCount_two": "נטענו {{displayCount}} קבצים מתוך {{total}}",
+      "expandAllLines_one": "הצגת כל {{displayCount}} שורה",
+      "expandAllLines_other": "הצגת כל {{displayCount}} השורות",
+      "expandAllLines_two": "הצגת כל {{displayCount}} השורות",
+      "expandLines_one": "הצגת {{displayCount}} שורה ({{start}}–{{end}})",
+      "expandLines_other": "הצגת {{displayCount}} שורות ({{start}}–{{end}})",
+      "expandLines_two": "הצגת {{displayCount}} שורות ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "הצגת {{displayCount}} שורה הקשר",
+      "expandLinesOfContext_other": "הצגת {{displayCount}} שורות הקשר",
+      "expandLinesOfContext_two": "הצגת {{displayCount}} שורות הקשר",
+      "expandMoreLines_one": "הצגת עוד {{displayCount}} שורה ({{start}}–{{end}})",
+      "expandMoreLines_other": "הצגת עוד {{displayCount}} שורות ({{start}}–{{end}})",
+      "expandMoreLines_two": "הצגת עוד {{displayCount}} שורות ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "נטענו {{loaded}} מתוך {{total}} קבצים",
+      "loadedOfTotalFiles_other": "נטענו {{loaded}} מתוך {{total}} קבצים",
+      "loadedOfTotalFiles_two": "נטענו {{loaded}} מתוך {{total}} קבצים"
     },
     "inbox": {
       "couldNotLoad": "לא ניתן היה לטעון את הבקשות הנכנסות.",
@@ -2586,47 +2756,52 @@
     },
     "installKiloGitHubApp": "התקנת אפליקציית Kilo ל-GitHub",
     "merge": {
-      "autoMergeDescription": "GitHub ימזג את בקשת המשיכה הזו אוטומטית כשכל הבדיקות הנדרשות יעברו (שיטה: {{method}}).",
-      "autoMergeOn": "מיזוג אוטומטי מופעל",
-      "blockedTitle": "למה עדיין אי אפשר למזג",
-      "cannotMerge": "לא ניתן למזג את בקשת המשיכה הזו כפי שהיא.",
-      "checking": "בודקים אם אפשר למזג…",
-      "commitMessage": "הודעת הקומיט",
-      "commitMessagePlaceholder": "תיאור לקומיט המיזוג (לא חובה)",
-      "commitTitle": "כותרת הקומיט",
-      "confirmMessage": "פעולה זו תמזג את השינויים שלך לענף הבסיס.",
-      "confirmTitle": "למזג את בקשת המשיכה?",
-      "couldNotDetermine": "לא ניתן היה לקבוע אם אפשר למזג.",
-      "couldNotMerge": "לא ניתן היה למזג את בקשת המשיכה.",
-      "deleteBranch": "מחיקת הענף",
-      "deleteBranchAfterMerge": "מחיקת הענף לאחר המיזוג",
-      "disableAutoMerge": "השבתת מיזוג אוטומטי",
-      "enableAutoMerge": "הפעלת מיזוג אוטומטי",
-      "enableAutoMergeConfirmMessage": "GitHub ימזג את בקשת המשיכה הזו אוטומטית כשכל הבדיקות הנדרשות יעברו.",
-      "enableAutoMergeConfirmTitle": "להפעיל מיזוג אוטומטי?",
-      "forbidden": "אין לך הרשאה למזג את בקשת המשיכה הזו.",
-      "loadFailedTitle": "לא ניתן היה לטעון את אפשרויות המיזוג.",
       "merge": "מיזוג",
       "mergeNow": "מיזוג עכשיו",
       "mergePullRequest": "מיזוג בקשת משיכה",
+      "mergeTermTitle": "מיזוג {{term}}",
+      "enableAutoMerge": "הפעלת מיזוג אוטומטי",
+      "disableAutoMerge": "השבתת מיזוג אוטומטי",
+      "autoMergeOn": "מיזוג אוטומטי מופעל",
+      "autoMergeDescription": "GitHub ימזג את בקשת המשיכה הזו אוטומטית כשכל הבדיקות הנדרשות יעברו (שיטה: {{method}}).",
+      "checking": "בודקים אם אפשר למזג…",
+      "couldNotDetermine": "לא ניתן היה לקבוע אם אפשר למזג.",
+      "refreshMergeability": "בדיקה חוזרת אם אפשר למזג",
+      "blockedTitle": "למה עדיין אי אפשר למזג",
+      "updateBranch": "עדכון הענף",
+      "updateBranchFromBase": "עדכון הענף מענף הבסיס",
       "methodLabel": "שיטה",
+      "commitTitle": "כותרת הקומיט",
+      "commitMessage": "הודעת הקומיט",
+      "commitMessagePlaceholder": "תיאור לקומיט המיזוג (לא חובה)",
+      "deleteBranch": "מחיקת הענף",
+      "deleteBranchAfterMerge": "מחיקת הענף לאחר המיזוג",
+      "noEnabledMethods": "אין שיטות מיזוג פעילות במאגר הזה. בקש ממנהל המאגר להפעיל מיזוג רגיל, מיזוג עם איחוד קומיטים או מיזוג עם ריבייס.",
+      "confirmTitle": "למזג את בקשת המשיכה?",
+      "confirmTitleTerm": "למזג את ה-{{term}}?",
+      "confirmMessage": "פעולה זו תמזג את השינויים שלך לענף הבסיס.",
+      "enableAutoMergeConfirmTitle": "להפעיל מיזוג אוטומטי?",
+      "enableAutoMergeConfirmMessage": "GitHub ימזג את בקשת המשיכה הזו אוטומטית כשכל הבדיקות הנדרשות יעברו.",
+      "enableAutoMergeConfirmMessageTerm": "ה-{{term}} ימוזג אוטומטית לאחר שהצנרת תעבור בהצלחה.",
+      "enableAutoMergeDescriptionTerm": "GitLab ימזג את ה-{{term}} הזה אוטומטית לאחר שהצנרת תעבור בהצלחה.",
+      "forbidden": "אין לך הרשאה למזג את בקשת המשיכה הזו.",
+      "cannotMerge": "לא ניתן למזג את בקשת המשיכה הזו כפי שהיא.",
+      "couldNotMerge": "לא ניתן היה למזג את בקשת המשיכה.",
       "methods": {
         "merge": "מיזוג",
         "rebase": "ריבייס",
         "squash": "איחוד קומיטים"
       },
-      "noEnabledMethods": "אין שיטות מיזוג פעילות במאגר הזה. בקש ממנהל המאגר להפעיל מיזוג רגיל, מיזוג עם איחוד קומיטים או מיזוג עם ריבייס.",
+      "terminal": {
+        "alreadyMerged": "כבר מוזגה",
+        "closed": "בקשת המשיכה הזו סגורה",
+        "closedMergeRequest": "בקשת המיזוג הזו סגורה"
+      },
       "partialSuccessBanner": {
         "accessibility": "המיזוג הושלם. לא ניתן היה למחוק את הענף: {{reason}}",
         "body": "לא ניתן היה למחוק את הענף: {{reason}}."
       },
-      "refreshMergeability": "בדיקה חוזרת אם אפשר למזג",
-      "terminal": {
-        "alreadyMerged": "כבר מוזגה",
-        "closed": "בקשת המשיכה הזו סגורה"
-      },
-      "updateBranch": "עדכון הענף",
-      "updateBranchFromBase": "עדכון הענף מענף הבסיס",
+      "loadFailedTitle": "לא ניתן היה לטעון את אפשרויות המיזוג.",
       "blocked": {
         "unknownStateTitle": "GitHub עדיין לא דיווח שאפשר למזג",
         "unknownStateDetail": "נסה לרענן את הסקירה הכללית בעוד רגע.",
@@ -2645,6 +2820,19 @@
         "behindDetail": "בענף המקור חסרים עדכונים מענף הבסיס. בצע ריבייס או עדכן את הענף לפני המיזוג.",
         "notMergeableTitle": "עדיין לא ניתן למזג את בקשת המשיכה הזו",
         "notMergeableDetail": "מצב אפשרות המיזוג שדווח על ידי GitHub: {{state}}."
+      },
+      "restrictions": {
+        "title": "הגבלות מיזוג",
+        "approvalsRequired_one": "נדרש אישור {{displayCount}}",
+        "approvalsRequired_other": "נדרשים {{displayCount}} אישורים",
+        "pipelineMustSucceed": "יש צורך שהצנרת תעבור בהצלחה לפני המיזוג.",
+        "approvalsRequired_two": "נדרשים {{displayCount}} אישורים"
+      },
+      "providerBlocked": {
+        "failingPipeline": "הצנרת נכשלת בקומיט האחרון.",
+        "pendingPipeline": "הצנרת עדיין פועלת בקומיט האחרון.",
+        "permission": "אין לך הרשאה למזג את ה-{{term}} הזה.",
+        "draft": "סמן את ה-{{term}} כמוכן לסקירה לפני המיזוג."
       },
       "methodLabels": {
         "merge": "יצירת קומיט מיזוג",
@@ -2705,8 +2893,11 @@
     "pullRequestUnavailable": "בקשת המשיכה אינה זמינה",
     "pullRequestUnavailableDescription": "לא ניתן לפתוח את ה-PR הזה. ייתכן שהוא נמחק, שהמאגר פרטי או שאפליקציית Kilo ל-GitHub אינה מותקנת במאגר.",
     "reconnectNotice": {
+      "title": "פג תוקף החיבור ל-GitHub.",
       "message": "החיבור שלך ל-GitHub אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
-      "title": "פג תוקף החיבור ל-GitHub."
+      "gitlabTitle": "פג תוקף החיבור ל-GitLab.",
+      "bitbucketTitle": "פג תוקף החיבור ל-Bitbucket.",
+      "providerMessage": "החיבור שלך ל-{{provider}} אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך."
     },
     "review": "סקירה",
     "reviewPullRequest": "סקירת בקשת המשיכה",
@@ -2755,10 +2946,13 @@
       "statusContext": "הקשר",
       "lineLabel": "שורה {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(ריק)"
+      "emptyLine": "(ריק)",
+      "truncationBanner_one": "מוצגים {{limit}} הקבצים הראשונים מתוך {{total}} קבצים ששונו — בגלל מגבלת ה-API של GitHub.",
+      "truncationBanner_other": "מוצגים {{limit}} הקבצים הראשונים מתוך {{total}} קבצים ששונו — בגלל מגבלת ה-API של GitHub.",
+      "truncationBanner_two": "מוצגים {{limit}} הקבצים הראשונים מתוך {{total}} קבצים ששונו — בגלל מגבלת ה-API של GitHub."
     },
     "linkPasteClipboardEmpty": "לוח ההעתקה ריק.",
-    "linkPasteNotAPullRequest": "זה לא קישור לבקשת משיכה ב-GitHub.",
+    "linkPasteNotAPullRequest": "זה לא קישור לבקשת משיכה או מיזוג",
     "announce": {
       "commentPosted": "התגובה פורסמה",
       "reviewSubmitted": "הסקירה נשלחה",
@@ -2767,6 +2961,7 @@
     "mutationError": {
       "commentNotPosted": "לא ניתן לפרסם את התגובה הזו. ייתכן שהשורה שנבחרה השתנתה או שה-PR עודכן.",
       "reviewNotSubmitted": "לא ניתן לשלוח את הסקירה הזו כפי שהיא. ייתכן שה-PR השתנה, או שזו בקשת משיכה שלך ואינך יכול לסקור אותה.",
+      "reviewNotSubmittedTerm": "לא ניתן לשלוח את הסקירה הזו כמות שהיא. ייתכן שה-{{term}} השתנה, או שלא ניתן לסקור את ה-{{term}} שלך בעצמך.",
       "couldNotPostComment": "לא ניתן היה לפרסם תגובה.",
       "couldNotSubmitReview": "לא ניתן היה לשלוח את הסקירה. בדוק את החיבור ונסה שוב."
     },
@@ -2774,9 +2969,31 @@
       "couldNotReply": "לא הצלחנו לשלוח את התשובה.",
       "couldNotCompleteAction": "לא ניתן היה להשלים פעולה זו.",
       "mergeResultDefaultError": "GitHub לא השלים את המיזוג.",
+      "mergeResultNotCompleted": "ה-{{term}} לא מוזג. בדקו את המצב שלו ונסו שוב.",
       "ambiguous": "לא ניתן היה לוודא שהפעולה הושלמה — בדוק את ה-PR לפני שתנסה שוב.",
       "persistenceFailed": "לא הצלחנו לתעד את הפעולה הזו. נסה שוב מאוחר יותר.",
       "forbidden": "אין הרשאה לפעולה הזו."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "לא זמין אצל הספק הזה",
+        "accessibility": "לא זמין אצל הספק הזה: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "בקשת מיזוג",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "שיתוף בקשת המיזוג",
+      "viewOnProvider": "הצגה ב-{{provider}}",
+      "mergeRequestUnavailable": "בקשת המיזוג אינה זמינה",
+      "unavailableDescription": "ייתכן שנמחק, או שייתכן שאין לך גישה אליו.",
+      "accessDeniedMergeRequest": "אין לך הרשאה לצפות בבקשת המיזוג הזו.",
+      "couldNotLoadMergeRequest": "לא ניתן היה לטעון את בקשת המיזוג.",
+      "discussionAccessDenied": "אין לך הרשאה לצפות בדיון של בקשת המיזוג הזו.",
+      "discussionUnavailableMessage": "ייתכן שבקשת המיזוג הזו הוסרה.",
+      "noDiscussionDescription": "אין שרשורי סקירה או תגובות בדיון של בקשת המיזוג הזו.",
+      "noFilesChangedDescription": "אין שינויים בקבצים בבקשת המיזוג הזו."
     }
   },
   "organization": {
@@ -2945,6 +3162,14 @@
     "tooManySignInAttempts": "יותר מדי ניסיונות התחברות. המתן ונסה שוב."
   },
   "models": {
+    "auto": {
+      "frontier": "אוטומטי מתקדם",
+      "balanced": "אוטומטי מאוזן",
+      "efficient": "אוטומטי יעיל",
+      "small": "אוטומטי קטן",
+      "free": "אוטומטי חינם",
+      "organization": "אוטומטי של הארגון"
+    },
     "dataCollected": "אוסף נתונים",
     "free": "חינם",
     "couldNotUpdateFavorites": "לא ניתן היה לעדכן את המועדפים.",
@@ -2983,8 +3208,17 @@
     "privacy": "פתיחת Kilo להצגת הסוכנים",
     "openAgents": "הצגת הסוכנים",
     "needsInput": "נדרש קלט",
+    "newestSession": "החדש ביותר: {{title}}",
+    "noneWaiting": "אין סוכנים בהמתנה",
+    "newAgent": "סוכן חדש",
+    "approving": "מאשר...",
+    "couldNotApprove": "לא ניתן לאשר",
+    "couldNotStart": "לא ניתן להתחיל",
     "channelName": "סוכנים פעילים",
-    "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
+    "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה.",
+    "openSession": "פתח",
+    "approveFailed": "לא ניתן היה לאשר. הקש על $t(common.approve) כדי לנסות שוב.",
+    "newestResult": "התוצאה החדשה ביותר"
   },
   "transcriptionModel": {
     "title": "מודל תמלול",
@@ -2992,5 +3226,56 @@
     "emptyTitle": "אין מודלי תמלול",
     "emptyDescription": "Kilo Gateway לא מציע כרגע מודלי תמלול.",
     "loadFailed": "לא הצלחנו לטעון את מודלי התמלול."
+  },
+  "voiceLanguage": {
+    "title": "שפת ההכתבה",
+    "automatic": "אוטומטי",
+    "loadFailed": "לא ניתן היה לטעון את השפות שהמכשיר הזה תומך בהן.",
+    "emptyTitle": "אין שפות נתמכות",
+    "emptyDescription": "זיהוי הדיבור של המכשיר הזה אינו מדווח על שפות נתמכות."
+  },
+  "tour": {
+    "eyebrow": "סיור מהיר",
+    "forkTitle": "היכן תרצה להריץ את Kilo?",
+    "forkSubtitle": "בחר היכן Kilo יריץ את הסשן הראשון שלך.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "הרץ את Kilo בסביבת ענן מבודדת, בלי להתקין כלום.",
+    "remoteOptionTitle": "המחשב שלך",
+    "remoteOptionBody": "הרץ את Kilo על המחשב שלך באמצעות ה-CLI של `kilo remote`.",
+    "skip": "דלג על הסיור",
+    "tutorialLabel": "מדריך"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "כדי להפעיל סוכן נדרשת הנחיה. הוסף הנחיה והפעל שוב.",
+      "repositoryUnknown": "Kilo לא מזהה את {{repository}} כמאגר GitHub או GitLab. בחר מאגר אחר ב-Kilo.",
+      "repositoryUnsupported": "{{repository}} הוא מאגר Bitbucket — הפעל סוכן עדיין לא יכול להשתמש בו. בחר מאגר אחר ב-Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "פתיחת הסשן האחרון"
+  },
+  "spendAlerts": {
+    "subtitle": "שלח התראה בדוא״ל או בהתראת push לאנשי הקשר לחיוב כאשר ההוצאות של תחום זה חוצות מגבלה או מזנקות מעל הקצב השעתי הרגיל.",
+    "enable": "הפעל התראות הוצאות",
+    "thresholdTitle": "חציית סף",
+    "thresholdSubtitle": "ההוצאה המצטברת חוצה את המגבלה שלך",
+    "anomalyTitle": "זינוק שעתי",
+    "anomalySubtitle": "שעה אחת גבוהה בהרבה מהקצב הרגיל של תחום זה",
+    "limitLabel": "מגבלה (USD)",
+    "windowLabel": "חלון",
+    "window24h": "24 שעות",
+    "window7d": "7 ימים",
+    "window30d": "30 ימים",
+    "multiplierLabel": "מכפיל הזינוק",
+    "saved": "הגדרות התראות ההוצאות נשמרו",
+    "loadError": "לא ניתן לטעון את התראות ההוצאות.",
+    "saveError": "לא ניתן לשמור את התראות ההוצאות.",
+    "empty": "התראות ההוצאות כבויות. הפעל אותן כדי ליידע את אנשי הקשר לחיוב של תחום זה.",
+    "noSpend": "עדיין לא נרשמה הוצאה",
+    "spend24h": "הוצאה ב־24 השעות האחרונות",
+    "multiplierError": "הזן מכפיל של 1 או יותר",
+    "permissionDenied": "אין לך הרשאה לנהל התראות הוצאות.",
+    "pushOffByCategory": "כבוי בהתראות"
   }
 }

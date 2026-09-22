@@ -15,7 +15,7 @@
  * - Execution-level: passed via POST /job/prompt body (per-turn)
  */
 
-import { createKilo } from '@kilocode/sdk';
+import { createKilo, type KiloClient as SDKClient } from '@kilocode/sdk';
 import {
   SESSION_ID_RE,
   type PreparingEventDataV2,
@@ -24,6 +24,7 @@ import {
 import { WRAPPER_VERSION } from '../../src/shared/wrapper-version.js';
 import { WrapperState } from './state.js';
 import { createWrapperKiloClient, type WrapperKiloClient } from './kilo-api.js';
+import { createKiloRuntimeLifecycle, type KiloRuntimeLifecycle } from './kilo-runtime-lifecycle.js';
 import { createConnectionManager, openIngestProgressChannel } from './connection.js';
 import { createLifecycleManager } from './lifecycle.js';
 import { bindSessionContext, createServer } from './server.js';
@@ -32,11 +33,7 @@ import { createGlobalFeedManager, type SessionBoundFeedPolicy } from './global-f
 import { logToFile } from './utils.js';
 import { startToolCgroup } from './tool-cgroup.js';
 import { abortKiloSessionForShutdown } from './shutdown.js';
-import {
-  kiloServerBootstrapError,
-  kiloServerStartupError,
-  WrapperBootstrapError,
-} from './bootstrap-error.js';
+import { kiloServerBootstrapError, WrapperBootstrapError } from './bootstrap-error.js';
 import type { WrapperCommand } from '../../src/shared/protocol.js';
 import type {
   WrapperSessionReadyRequest,
@@ -51,19 +48,11 @@ import {
   RestoredWorkspaceReconciliationError,
 } from './session-bootstrap.js';
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 /** Grace period before force exit during shutdown (110 seconds) */
 const SHUTDOWN_TIMEOUT_MS = 110_000;
 
 /** Timeout for createKilo() server startup */
 const KILO_STARTUP_TIMEOUT_MS = 30_000;
-
-// ---------------------------------------------------------------------------
-// Environment Variable Parsing
-// ---------------------------------------------------------------------------
 
 function getOptionalEnvInt(name: string, defaultValue: number): number {
   const value = process.env[name];
@@ -168,10 +157,6 @@ function parseStartupArgs(argv: string[]): StartupArgs {
   return { agentSessionId, userId, sessionId, wrapperInstanceId, wrapperInstanceGeneration };
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
 async function main() {
   logToFile(`wrapper starting (long-running mode) bun=${Bun.version}`);
 
@@ -220,7 +205,6 @@ async function main() {
     failStartup(`Invalid agent session ID: ${agentSessionId}`);
   }
 
-  // Set log path if not already set
   if (!process.env.WRAPPER_LOG_PATH) {
     process.env.WRAPPER_LOG_PATH = `/tmp/kilocode-wrapper-${Date.now()}.log`;
   }
@@ -237,20 +221,14 @@ async function main() {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Wire up components
-  // ---------------------------------------------------------------------------
   // Confine tool subprocesses to a memory-capped cgroup (best-effort; null
   // when the cgroup fs is unavailable, e.g. in devcontainers).
   const toolCgroup = startToolCgroup(process.env);
 
   const state = new WrapperState();
-  let kiloClient: WrapperKiloClient | undefined;
   let kiloSessionId = configuredSessionId ?? '';
-  let closeKiloServer: (() => void) | undefined;
   let connectionManager: ReturnType<typeof createConnectionManager> | undefined;
   let lifecycleManager: ReturnType<typeof createLifecycleManager> | undefined;
-  let runtimeWorkspacePath = initialWorkspacePath;
   let isShuttingDown = false;
   const workspaceBootstrapController = new AbortController();
   const activeWorkspaceBootstraps = new Set<ReturnType<typeof prepareWrapperBootstrapWorkspace>>();
@@ -278,6 +256,11 @@ async function main() {
     platform: process.env.KILO_PLATFORM,
   };
 
+  // Assigned below, after the feed manager and server deps that its callbacks
+  // read at call time; those closures need the binding to exist first.
+  // oxlint-disable-next-line eslint/prefer-const -- assigned once after the closures above capture it
+  let runtime: KiloRuntimeLifecycle;
+
   const serverDeps = {
     state,
     kiloClient: unavailableKiloClient,
@@ -291,19 +274,19 @@ async function main() {
     onDeliveryAcknowledged: (kind: 'async-prompt' | 'sync-command' | 'failed') =>
       lifecycleManager?.onDeliveryAcknowledged(kind),
     readySession: readySession,
-    updateRuntimeEnvironment: updateRuntimeEnvironment,
+    updateRuntimeEnvironment: (env: Record<string, string>) => runtime.updateEnvironment(env),
     materializePromptAttachments,
     onSessionBound: (feedPolicy: SessionBoundFeedPolicy) =>
       globalFeedManager.onSessionBound(feedPolicy),
     toolCgroupHealth: () => toolCgroup?.health() ?? null,
     // Deduped: concurrent failed requests must share one restart rather than each
-    // respawning the kilo server and racing to mutate closeKiloServer/kiloClient.
+    // respawning the kilo server and racing to mutate the runtime bindings.
     // No restarts during shutdown — a server spawned after handleShutdown snapshots
     // activeRuntimeStartups would never be closed and leak past the wrapper's exit.
     restartKiloRuntime: (): Promise<void> => {
-      if (isShuttingDown || !runtimeWorkspacePath) return Promise.resolve();
+      if (isShuttingDown || !runtime.runtimeWorkspacePath) return Promise.resolve();
       if (inFlightRuntimeRestart) return inFlightRuntimeRestart;
-      const restart = startKiloRuntime(runtimeWorkspacePath, kiloSessionId || undefined, true);
+      const restart = runtime.restart();
       inFlightRuntimeRestart = restart;
       activeRuntimeStartups.add(restart);
       // Rejection is surfaced via the returned `restart` (awaited by callers);
@@ -321,29 +304,30 @@ async function main() {
   async function verifyExistingKiloSession(
     client: WrapperKiloClient,
     expectedSessionId: string,
-    runtime: 'reused' | 'new',
+    runtimeKind: 'reused' | 'new',
     workspacePath: string
   ): Promise<void> {
     const lookupStartedAt = Date.now();
     logToFile(
-      `post-bootstrap kilo session lookup begin runtime=${runtime} expectedSessionId=${expectedSessionId} currentSessionId=${kiloSessionId || '(unset)'} workspacePath=${workspacePath} runtimeWorkspacePath=${runtimeWorkspacePath ?? '(unset)'} home=${process.env.HOME ?? '(unset)'}`
+      `post-bootstrap kilo session lookup begin runtime=${runtimeKind} expectedSessionId=${expectedSessionId} currentSessionId=${kiloSessionId || '(unset)'} workspacePath=${workspacePath} runtimeWorkspacePath=${runtime.runtimeWorkspacePath ?? '(unset)'} home=${process.env.HOME ?? '(unset)'}`
     );
     try {
       const session = await client.getSession(expectedSessionId);
       logToFile(
-        `post-bootstrap kilo session lookup end runtime=${runtime} outcome=ok expectedSessionId=${expectedSessionId} returnedSessionId=${session.id} elapsedMs=${Date.now() - lookupStartedAt}`
+        `post-bootstrap kilo session lookup end runtime=${runtimeKind} outcome=ok expectedSessionId=${expectedSessionId} returnedSessionId=${session.id} elapsedMs=${Date.now() - lookupStartedAt}`
       );
     } catch (error) {
       logToFile(
-        `post-bootstrap kilo session lookup end runtime=${runtime} outcome=error expectedSessionId=${expectedSessionId} elapsedMs=${Date.now() - lookupStartedAt}`
+        `post-bootstrap kilo session lookup end runtime=${runtimeKind} outcome=error expectedSessionId=${expectedSessionId} elapsedMs=${Date.now() - lookupStartedAt}`
       );
       throw error;
     }
   }
 
   const globalFeedManager = createGlobalFeedManager({
-    canOpen: () => Boolean(kiloClient && state.currentSession),
+    canOpen: () => Boolean(runtime.kiloClient && state.currentSession),
     open: () => {
+      const kiloClient = runtime.kiloClient;
       if (!kiloClient) {
         throw new Error('Cannot open Kilo global feed: no Kilo client');
       }
@@ -359,222 +343,157 @@ async function main() {
 
   // Runtime transitions must not interleave: readySession, updateRuntimeEnvironment
   // and restartKiloRuntime can each request one concurrently, and two bodies racing
-  // through the awaits in doStartKiloRuntime would overwrite each other's
-  // closeKiloServer/kiloClient/connectionManager bindings, orphaning one of the
-  // freshly spawned kilo server processes.
-  let runtimeTransitionChain: Promise<unknown> = Promise.resolve();
+  // through the awaits in the runtime start would overwrite each other's
+  // connectionManager/lifecycleManager bindings, orphaning one of the freshly
+  // spawned kilo server processes.
+  runtime = createKiloRuntimeLifecycle({
+    createKilo,
+    bindClient: (result, workspacePath) =>
+      createWrapperKiloClient(result.client as SDKClient, result.server.url, workspacePath),
+    captureEnv: () => process.env,
+    getPlatform: () => serverConfig.platform,
+    log: logToFile,
+    chdir: workspacePath => process.chdir(workspacePath),
+    assignProcessEnv: env => {
+      Object.assign(process.env, env);
+    },
+    isShuttingDown: () => isShuttingDown,
+    getKiloSessionId: () => kiloSessionId,
+    applyKiloSessionId: sessionId => {
+      kiloSessionId = sessionId;
+      serverConfig.sessionId = sessionId;
+    },
+    verifyExistingKiloSession,
+    onBeforeSpawnTeardown: async () => {
+      globalFeedManager.close();
+      lifecycleManager?.stop();
+      await connectionManager?.close();
+      serverDeps.kiloClient = unavailableKiloClient;
+    },
+    onRuntimeStarted: ({ client, workspacePath, kiloSessionId: startedSessionId }) => {
+      serverDeps.kiloClient = client;
+      serverConfig.workspacePath = workspacePath;
+      serverConfig.sessionId = startedSessionId;
+      serverConfig.platform = process.env.KILO_PLATFORM;
 
-  function startKiloRuntime(
-    workspacePath: string,
-    expectedSessionId?: string,
-    forceRestart = false
-  ): Promise<void> {
-    const transition = runtimeTransitionChain.then(() =>
-      doStartKiloRuntime(workspacePath, expectedSessionId, forceRestart)
-    );
-    runtimeTransitionChain = transition.catch(() => {});
-    return transition;
-  }
-
-  async function doStartKiloRuntime(
-    workspacePath: string,
-    expectedSessionId?: string,
-    forceRestart = false
-  ): Promise<void> {
-    if (isShuttingDown) throw new Error('Wrapper is shutting down');
-    logToFile(
-      `startKiloRuntime requested workspacePath=${workspacePath} expectedSessionId=${expectedSessionId ?? '(none)'} currentSessionId=${kiloSessionId || '(unset)'} hasClient=${Boolean(kiloClient)} runtimeWorkspacePath=${runtimeWorkspacePath ?? '(unset)'} home=${process.env.HOME ?? '(unset)'}`
-    );
-    if (!forceRestart && kiloClient && runtimeWorkspacePath === workspacePath) {
-      if (expectedSessionId && expectedSessionId !== kiloSessionId) {
-        await verifyExistingKiloSession(kiloClient, expectedSessionId, 'reused', workspacePath);
-        kiloSessionId = expectedSessionId;
-        serverConfig.sessionId = expectedSessionId;
-        logToFile(`startKiloRuntime reused runtime session rebound sessionId=${expectedSessionId}`);
-      } else {
-        logToFile(
-          `startKiloRuntime reused existing runtime without session rebinding sessionId=${kiloSessionId || '(unset)'}`
-        );
-      }
-      globalFeedManager.onRuntimeReady();
-      return;
-    }
-
-    logToFile(
-      `startKiloRuntime preparing new runtime workspacePath=${workspacePath} previousWorkspacePath=${runtimeWorkspacePath ?? '(unset)'} hadLifecycle=${Boolean(lifecycleManager)} hadConnection=${Boolean(connectionManager)} hadServer=${Boolean(closeKiloServer)}`
-    );
-    globalFeedManager.close();
-    lifecycleManager?.stop();
-    await connectionManager?.close();
-    if (closeKiloServer) {
-      closeKiloServer();
-      closeKiloServer = undefined;
-    }
-    kiloClient = undefined;
-    serverDeps.kiloClient = unavailableKiloClient;
-
-    process.chdir(workspacePath);
-    logToFile('starting kilo server child process via @kilocode/sdk');
-    let nextKiloClient: WrapperKiloClient;
-    try {
-      const result = await createKilo({
-        hostname: '127.0.0.1',
-        port: 0,
-        timeout: KILO_STARTUP_TIMEOUT_MS,
-      });
-      const realKiloServer = result.server;
-      logToFile(`kilo server started at ${realKiloServer.url}`);
-      nextKiloClient = createWrapperKiloClient(result.client, realKiloServer.url, workspacePath);
-      closeKiloServer = () => realKiloServer.close();
-    } catch {
-      const startupError = kiloServerStartupError();
-      logToFile(`failed to start kilo server: ${startupError.message}`);
-      throw startupError;
-    }
-
-    if (expectedSessionId) {
-      await verifyExistingKiloSession(nextKiloClient, expectedSessionId, 'new', workspacePath);
-      kiloSessionId = expectedSessionId;
-      logToFile(`verified existing kilo session: ${kiloSessionId}`);
-    } else {
-      const session = await nextKiloClient.createSession();
-      kiloSessionId = session.id;
-      logToFile(`created kilo session: ${kiloSessionId}`);
-    }
-
-    kiloClient = nextKiloClient;
-    serverDeps.kiloClient = nextKiloClient;
-    serverConfig.workspacePath = workspacePath;
-    serverConfig.sessionId = kiloSessionId;
-    serverConfig.platform = process.env.KILO_PLATFORM;
-    runtimeWorkspacePath = workspacePath;
-    logToFile(
-      `startKiloRuntime runtime ready workspacePath=${workspacePath} kiloSessionId=${kiloSessionId} platform=${serverConfig.platform ?? '(unset)'} home=${process.env.HOME ?? '(unset)'}`
-    );
-
-    connectionManager = createConnectionManager(
-      state,
-      { kiloClient: nextKiloClient },
-      {
-        onTerminalError: failure => {
-          logToFile(`terminal error: ${failure.message}`);
-          state.sendToIngest({
-            streamEventType: 'error',
-            data: {
-              error: failure.message,
-              errorSource: failure.errorSource,
-              fatal: true,
-              ...(failure.code ? { failureCode: failure.code } : {}),
-              ...(failure.modelNotFoundRuntimeDiagnostics
-                ? { modelNotFoundRuntimeDiagnostics: failure.modelNotFoundRuntimeDiagnostics }
-                : {}),
-            },
-            timestamp: new Date().toISOString(),
-          });
-          const session = state.currentSession;
-          if (session) {
-            nextKiloClient.abortSession({ sessionId: session.kiloSessionId }).catch(() => {});
-          }
-          lifecycleManager?.setAborted();
-          state.clearAllMessages();
-          lifecycleManager?.triggerDrainAndClose();
-        },
-        onCommand: (cmd: WrapperCommand) => {
-          logToFile(`command received: ${cmd.type}`);
-          if (cmd.type === 'kill') {
+      connectionManager = createConnectionManager(
+        state,
+        { kiloClient: client },
+        {
+          onTerminalError: failure => {
+            logToFile(`terminal error: ${failure.message}`);
             state.sendToIngest({
-              streamEventType: 'interrupted',
-              data: { reason: 'Session stopped' },
+              streamEventType: 'error',
+              data: {
+                error: failure.message,
+                errorSource: failure.errorSource,
+                fatal: true,
+                ...(failure.code ? { failureCode: failure.code } : {}),
+                ...(failure.modelNotFoundRuntimeDiagnostics
+                  ? { modelNotFoundRuntimeDiagnostics: failure.modelNotFoundRuntimeDiagnostics }
+                  : {}),
+              },
               timestamp: new Date().toISOString(),
             });
             const session = state.currentSession;
             if (session) {
-              nextKiloClient.abortSession({ sessionId: session.kiloSessionId }).catch(() => {});
+              client.abortSession({ sessionId: session.kiloSessionId }).catch(() => {});
             }
             lifecycleManager?.setAborted();
             state.clearAllMessages();
             lifecycleManager?.triggerDrainAndClose();
-          }
-          if (cmd.type === 'ping') {
-            const session = state.currentSession;
-            state.sendToIngest({
-              streamEventType: 'pong',
-              data: {
-                kiloSessionId: session?.kiloSessionId,
-                wrapperGeneration: session?.wrapperGeneration,
-                wrapperConnectionId: session?.wrapperConnectionId,
-              },
-              timestamp: new Date().toISOString(),
+          },
+          onCommand: (cmd: WrapperCommand) => {
+            logToFile(`command received: ${cmd.type}`);
+            if (cmd.type === 'kill') {
+              state.sendToIngest({
+                streamEventType: 'interrupted',
+                data: { reason: 'Session stopped' },
+                timestamp: new Date().toISOString(),
+              });
+              const session = state.currentSession;
+              if (session) {
+                client.abortSession({ sessionId: session.kiloSessionId }).catch(() => {});
+              }
+              lifecycleManager?.setAborted();
+              state.clearAllMessages();
+              lifecycleManager?.triggerDrainAndClose();
+            }
+            if (cmd.type === 'ping') {
+              const session = state.currentSession;
+              state.sendToIngest({
+                streamEventType: 'pong',
+                data: {
+                  kiloSessionId: session?.kiloSessionId,
+                  wrapperGeneration: session?.wrapperGeneration,
+                  wrapperConnectionId: session?.wrapperConnectionId,
+                },
+                timestamp: new Date().toISOString(),
+              });
+            }
+            if (cmd.type === 'request_snapshot') {
+              void connectionManager?.sendKiloSnapshot();
+            }
+          },
+          onDisconnect: (reason: string) => {
+            logToFile(`disconnect: ${reason}`);
+            state.setLastError({
+              code: 'DISCONNECT',
+              message: reason,
+              timestamp: Date.now(),
             });
-          }
-          if (cmd.type === 'request_snapshot') {
-            void connectionManager?.sendKiloSnapshot();
-          }
-        },
-        onDisconnect: (reason: string) => {
-          logToFile(`disconnect: ${reason}`);
-          state.setLastError({
-            code: 'DISCONNECT',
-            message: reason,
-            timestamp: Date.now(),
-          });
-          const session = state.currentSession;
-          const targetSessionId = session?.kiloSessionId;
-          if (targetSessionId) {
-            nextKiloClient.abortSession({ sessionId: targetSessionId }).catch(() => {});
-          }
-          lifecycleManager?.setAborted();
-          lifecycleManager?.triggerDrainAndClose();
-        },
-        onCompletionSignal: () => {
-          lifecycleManager?.signalCompletion();
-        },
-        onSessionIdle: () => {
-          lifecycleManager?.onSessionIdle();
-        },
-        onRootSessionActivity: () => {
-          lifecycleManager?.onRootSessionActivity();
-        },
-        onReconnecting: (attempt: number) => {
-          logToFile(`ingest WS reconnecting: attempt ${attempt}`);
-        },
-        onReconnected: () => {
-          logToFile('ingest WS reconnected');
-          lifecycleManager?.onConnectionRestored();
-          const lastError = state.getLastError();
-          if (lastError?.code === 'DISCONNECT') {
-            state.clearLastError();
-          }
-        },
-        onSseEvent: () => {
-          lifecycleManager?.onSseEvent();
-        },
-      }
-    );
+            const session = state.currentSession;
+            const targetSessionId = session?.kiloSessionId;
+            if (targetSessionId) {
+              client.abortSession({ sessionId: targetSessionId }).catch(() => {});
+            }
+            lifecycleManager?.setAborted();
+            lifecycleManager?.triggerDrainAndClose();
+          },
+          onCompletionSignal: () => {
+            lifecycleManager?.signalCompletion();
+          },
+          onSessionIdle: () => {
+            lifecycleManager?.onSessionIdle();
+          },
+          onRootSessionActivity: () => {
+            lifecycleManager?.onRootSessionActivity();
+          },
+          onReconnecting: (attempt: number) => {
+            logToFile(`ingest WS reconnecting: attempt ${attempt}`);
+          },
+          onReconnected: () => {
+            logToFile('ingest WS reconnected');
+            lifecycleManager?.onConnectionRestored();
+            const lastError = state.getLastError();
+            if (lastError?.code === 'DISCONNECT') {
+              state.clearLastError();
+            }
+          },
+          onSseEvent: () => {
+            lifecycleManager?.onSseEvent();
+          },
+        }
+      );
 
-    lifecycleManager = createLifecycleManager(
-      { workspacePath },
-      {
-        state,
-        kiloClient: nextKiloClient,
-        closeConnections: () => connectionManager?.close() ?? Promise.resolve(),
-        isConnected: () => connectionManager?.isConnected() ?? false,
-        reconnectEventSubscription: () => connectionManager?.reconnectEventSubscription(),
-      }
-    );
-    lifecycleManager.start();
-    globalFeedManager.onRuntimeReady();
-  }
-
-  async function updateRuntimeEnvironment(env: Record<string, string>): Promise<void> {
-    const environmentChanged = Object.entries(env).some(
-      ([name, value]) => process.env[name] !== value
-    );
-    Object.assign(process.env, env);
-    if (runtimeWorkspacePath && (environmentChanged || !kiloClient)) {
-      await startKiloRuntime(runtimeWorkspacePath, kiloSessionId || undefined, true);
-    }
-  }
+      lifecycleManager = createLifecycleManager(
+        { workspacePath },
+        {
+          state,
+          kiloClient: client,
+          closeConnections: () => connectionManager?.close() ?? Promise.resolve(),
+          isConnected: () => connectionManager?.isConnected() ?? false,
+          reconnectEventSubscription: () => connectionManager?.reconnectEventSubscription(),
+        }
+      );
+      lifecycleManager.start();
+    },
+    onRuntimeReady: () => globalFeedManager.onRuntimeReady(),
+    hasLifecycle: () => Boolean(lifecycleManager),
+    hasConnection: () => Boolean(connectionManager),
+    startupTimeoutMs: KILO_STARTUP_TIMEOUT_MS,
+    initialWorkspacePath,
+  });
 
   function wrapperFinalizingResponse(): WrapperSessionReadyResponse {
     return {
@@ -809,17 +728,17 @@ async function main() {
       );
 
       if (isShuttingDown) return wrapperFinalizingResponse();
-      const runtimeStartup = startKiloRuntime(
-        request.workspace.workspacePath,
-        request.kiloSessionId
-      );
+      const runtimeStartup = runtime.start({
+        workspacePath: request.workspace.workspacePath,
+        expectedSessionId: request.kiloSessionId,
+      });
       activeRuntimeStartups.add(runtimeStartup);
       try {
         await runtimeStartup;
       } finally {
         activeRuntimeStartups.delete(runtimeStartup);
       }
-      if (!kiloClient) {
+      if (!runtime.kiloClient) {
         throw kiloServerBootstrapError('Kilo server did not start');
       }
       logToFile(
@@ -927,9 +846,11 @@ async function main() {
     }
   }
 
-  // Create HTTP server
   if (initialWorkspacePath) {
-    await startKiloRuntime(initialWorkspacePath, configuredSessionId);
+    await runtime.start({
+      workspacePath: initialWorkspacePath,
+      expectedSessionId: configuredSessionId,
+    });
   }
 
   const server = createServer(serverConfig, serverDeps, () =>
@@ -938,14 +859,12 @@ async function main() {
 
   logToFile(
     `wrapper ready on port ${wrapperPort}${
-      kiloClient ? ` (kilo server at ${kiloClient.serverUrl})` : ' (awaiting bootstrap)'
+      runtime.kiloClient
+        ? ` (kilo server at ${runtime.kiloClient.serverUrl})`
+        : ' (awaiting bootstrap)'
     }`
   );
   console.log(`Wrapper listening on port ${wrapperPort}`);
-
-  // ---------------------------------------------------------------------------
-  // Graceful shutdown
-  // ---------------------------------------------------------------------------
 
   async function handleShutdown(signal: string): Promise<void> {
     if (isShuttingDown) return;
@@ -956,7 +875,6 @@ async function main() {
     logToFile(`shutdown signal: ${signal}`);
     console.error(`Received ${signal}, shutting down...`);
 
-    // Force exit after timeout
     setTimeout(() => {
       logToFile('force exit after timeout');
       process.exit(1);
@@ -972,7 +890,7 @@ async function main() {
       },
       timestamp: new Date().toISOString(),
     });
-    await abortKiloSessionForShutdown({ activeKiloSessionId, kiloClient });
+    await abortKiloSessionForShutdown({ activeKiloSessionId, kiloClient: runtime.kiloClient });
 
     workspaceBootstrapController.abort();
     const workspaceBootstraps = [...activeWorkspaceBootstraps];
@@ -998,23 +916,18 @@ async function main() {
       await uploader.finalize();
     }
 
-    // Close connections
     void connectionManager?.close();
 
-    // Close kilo server (real or fake)
     try {
-      closeKiloServer?.();
-      if (closeKiloServer) {
+      if (runtime.closeServer()) {
         logToFile('kilo server closed');
       }
     } catch {
       logToFile('kilo server close failed');
     }
 
-    // Stop HTTP server
     await server.stop();
 
-    // Try graceful exit
     setTimeout(() => {
       logToFile('graceful exit');
       process.exit(0);
@@ -1024,9 +937,6 @@ async function main() {
   process.on('SIGTERM', () => void handleShutdown('SIGTERM'));
   process.on('SIGINT', () => void handleShutdown('SIGINT'));
 
-  // ---------------------------------------------------------------------------
-  // Crash handlers — best-effort log upload on unexpected crashes
-  // ---------------------------------------------------------------------------
   function handleCrash(label: string): void {
     if (isShuttingDown) return;
 

@@ -3,6 +3,7 @@
  * one remote CLI session into normalized transport events and commands.
  */
 import { normalizeCliEvent, isChatEvent } from './normalizer';
+import { partSettledAt } from './part-utils';
 import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
 import { parseCreateSessionResponse } from './create-session';
 import { cloudAgentSdkRuntime } from './runtime';
@@ -509,7 +510,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         sink.onChatEvent({ type: 'message.updated', info: msg.info });
 
         for (const part of msg.parts) {
-          sink.onChatEvent({ type: 'message.part.updated', part });
+          const settledAt = partSettledAt(part);
+          sink.onChatEvent({
+            type: 'message.part.updated',
+            part,
+            ...(settledAt === undefined ? {} : { time: settledAt }),
+          });
         }
       }
     }

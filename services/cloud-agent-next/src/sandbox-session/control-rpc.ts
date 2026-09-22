@@ -1,3 +1,7 @@
+import type {
+  CloudflareContainersInstance,
+  VercelSandboxResources,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { CredentialContainmentRequirements } from '../sandbox-control/physical-lifecycle.js';
 import {
@@ -15,7 +19,7 @@ import type {
   SandboxTerminalAccessResult,
 } from '../sandbox-control/terminal-billing.js';
 import type { SessionOperationAuthorization } from '../shared/sandbox-control-protocol.js';
-import type { Env } from '../types.js';
+import type { AgentSandboxProvider, Env } from '../types.js';
 import type {
   ControlRuntimeCredentialProxyFence,
   RuntimeQuarantineResult,
@@ -24,6 +28,7 @@ import type {
 import type { SandboxBillingInput } from '../container-usage-context.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { withDORetry } from '../utils/do-retry.js';
+import { reconstructControlRequestError } from './control-dispatch.js';
 
 type SandboxControlRpc = {
   prepareSessionCredentials(input: {
@@ -33,7 +38,9 @@ type SandboxControlRpc = {
   ensureReady(input: {
     ownerId: string;
     sessionId: string;
-    provider?: 'cloudflare' | 'vercel';
+    provider?: AgentSandboxProvider;
+    resources?: VercelSandboxResources;
+    instance?: CloudflareContainersInstance;
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;
     billing?: SandboxBillingInput;
@@ -76,6 +83,7 @@ type SandboxControlRpc = {
     handle: string;
   }): Promise<{ bound: true }>;
   detachSession(sessionId: string): Promise<{ existed: boolean }>;
+  forgetSessionReference(sessionId: string): Promise<void>;
   validateTerminalAccess(input: SandboxTerminalAccessInput): Promise<SandboxTerminalAccessResult>;
   recordTerminalActivity(input: SandboxTerminalAccessInput): Promise<SandboxTerminalAccessResult>;
   updateNetworkPolicy(input: {
@@ -128,6 +136,13 @@ export function sandboxControlRpc(
       ),
     detachSession: sessionId =>
       withDORetry(stub, control => control.detachSession(sessionId), 'detachSession'),
+    forgetSessionReference: sessionId =>
+      withDORetry(
+        stub,
+        control => control.forgetSessionReference(sessionId),
+        'forgetSessionReference',
+        config()
+      ),
     validateTerminalAccess: input =>
       withDORetry(stub, control => control.validateTerminalAccess(input), 'validateTerminalAccess'),
     recordTerminalActivity: input =>
@@ -154,12 +169,15 @@ export function sandboxControlRpc(
         (abort?.success === true &&
           abort.data.operationId !== undefined &&
           abort.data.messageId !== undefined);
-      return withDORetry(
+      const pending = withDORetry(
         stub,
         control => control.request(input),
         'controlRequest',
         config(deadlineAt, retrySafe)
-      );
+      ) as Promise<ResponseFrame>;
+      return pending.catch((error: unknown): never => {
+        throw reconstructControlRequestError(error);
+      });
     },
   };
 }

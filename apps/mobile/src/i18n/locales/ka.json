@@ -36,6 +36,7 @@
     "cost": "ღირებულება",
     "discard": "გაუქმება",
     "findings": "გამოვლენილი პრობლემები",
+    "mergeRequest": "შერწყმის მოთხოვნა",
     "notConnected": "არ არის დაკავშირებული",
     "notifications": "შეტყობინებები",
     "pullRequest": "PR",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "სხვა ელფოსტის გამოყენება",
     "signInWithApple": "Apple-ით შესვლა",
     "signInWithGoogle": "Google-ით შესვლა",
+    "signInWithPasskey": "წვდომის გასაღებით შესვლა",
     "emailAddress": "ელფოსტის მისამართი",
     "emailPlaceholder": "სახელი@example.com",
     "continueWithEmail": "ელფოსტით გაგრძელება",
@@ -174,6 +176,10 @@
     "termsConnector": " და ",
     "termsSuffix": ".",
     "moreSignInOptions": "შესვლის სხვა გზები",
+    "passkeyCancelled": "წვდომის გასაღებით შესვლა გაუქმდა. სცადეთ ხელახლა.",
+    "passkeyNotFound": "ამ მოწყობილობისთვის წვდომის გასაღები არ არის შენახული. სამაგიეროდ შედით Apple-ით, Google-ით ან ელფოსტით.",
+    "passkeyUnsupported": "წვდომის გასაღებები ამ მოწყობილობაზე მიუწვდომელია. სამაგიეროდ შედით Apple-ით, Google-ით ან ელფოსტით.",
+    "passkeyFailed": "წვდომის გასაღებით შესვლა ვერ მოხერხდა. სცადეთ ხელახლა.",
     "couldNotCompleteSignIn": "შესვლის დასრულება ვერ მოხერხდა. სცადე ხელახლა.",
     "sessionEnded": "შენი სესია დასრულდა. შედი ხელახლა.",
     "signInCodeExpired": "შესვლის კოდს ვადა გაუვიდა. სცადე ხელახლა.",
@@ -224,13 +230,36 @@
     "providerTestAccount": "სატესტო ანგარიში",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "კორპორაციული SSO"
+    "providerEnterpriseSso": "კორპორაციული SSO",
+    "passkeysTitle": "წვდომის გასაღებები",
+    "passkeysSubtitle": "შესვლა პაროლის გარეშე",
+    "passkeysEmpty": "წვდომის გასაღებები ჯერ არ არის",
+    "passkeysEmptyHint": "$t(profile.addPasskey) პაროლის გარეშე შესვლისთვის.",
+    "passkeysCouldNotLoad": "წვდომის გასაღებები ვერ ჩაიტვირთა",
+    "passkeysLoadFailed": "წვდომის გასაღებები მიუწვდომელია, სანამ ეს ჩაიტვირთება.",
+    "addPasskey": "წვდომის გასაღების დამატება",
+    "passkeyDefaultName": "წვდომის გასაღები",
+    "passkeyAddedOn": "დამატებულია {{date}}",
+    "passkeyAdded": "წვდომის გასაღები დაემატა.",
+    "passkeyAddFailed": "წვდომის გასაღების დამატება ვერ მოხერხდა. სცადეთ ხელახლა.",
+    "passkeyAddUnsupported": "ეს მოწყობილობა ვერ ქმნის წვდომის გასაღებებს.",
+    "passkeyAddCancelled": "წვდომის გასაღების შექმნა გაუქმდა.",
+    "passkeyRemoved": "წვდომის გასაღები წაიშალა.",
+    "passkeyRemoveFailed": "ამ წვდომის გასაღების წაშლა ვერ მოხერხდა. სცადეთ ხელახლა.",
+    "passkeyRenamed": "წვდომის გასაღებს სახელი შეეცვალა.",
+    "passkeyName": "წვდომის გასაღების სახელი",
+    "renamePasskey": "წვდომის გასაღების სახელის შეცვლა",
+    "removePasskey": "წვდომის გასაღების წაშლა",
+    "removePasskeyTitle": "წავშალო წვდომის გასაღები?",
+    "removePasskeyMessage": "ამ წვდომის გასაღებით ვეღარ შეძლებთ შესვლას."
   },
   "preferences": {
     "general": "ზოგადი",
     "voiceInput": "ხმოვანი შეყვანა",
     "autoExpandThinking": "მსჯელობის ავტომატურად გაშლა",
     "autoExpandThinkingSubtitle": "აგენტის მსჯელობა დასრულებისთანავე გაშლილად გამოჩნდება.",
+    "hideThinking": "მსჯელობის დეტალების დამალვა",
+    "hideThinkingSubtitle": "არ აჩვენო აგენტის მსჯელობა სესიის გვერდზე.",
     "keepScreenOn": "სესიის გვერდზე ეკრანის ჩართულად დატოვება",
     "keepScreenOnSubtitle": "სესიის მუშაობისას ეკრანი ჩართული დარჩება.",
     "appearance": "იერსახე",
@@ -253,7 +282,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "ტრანსკრიფცია Kilo Gateway-ით",
     "gatewayTranscriptionSubtitle": "ხმოვანი შეყვანა აქციეთ ტექსტად Kilo Gateway-ის მოდელით, მოწყობილობის მეტყველების ამოცნობის ნაცვლად. თქვენი ჩანაწერი იგზავნება Kilo Gateway-ში.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ინსტრუმენტის გამოძახებების შეკუმშვა",
+    "condenseToolCallsSubtitle": "დააჯგუფეთ ზედიზედ ინსტრუმენტის გამოძახებები ერთ რიგში, რომლის გახსნაც შეგიძლიათ.",
+    "toolSummaryTranslation": "ინსტრუმენტების შეჯამებების თარგმნა",
+    "toolSummaryTranslationSubtitle": "გაგზავნე ყოველი ინსტრუმენტის შეჯამება მოდელთან, რომ ის შენი აპის ენაზე ითარგმნოს. თარგმნის ვერ მოხერხდებისას ორიგინალი ჩანს.",
+    "toolSummaryTranslationModelUnavailableNotice": "ეს მოდელი აღარ არის ხელმისაწვდომი. სხვის ასარჩევად შეეხეთ $t(common.model)-ს."
   },
   "prReview": {
     "pullRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",
@@ -335,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "ჩატვირთულია {{displayCount}} ფაილი {{total}}-დან",
       "filesStillLoading": "ფაილები ჯერ კიდევ იტვირთება. გასაახლებლად ჩამოწიე.",
       "goToOverview": "მიმოხილვაზე გადასვლა",
-      "goToOverviewTab": "მიმოხილვის ჩანართზე გადასვლა"
+      "goToOverviewTab": "მიმოხილვის ჩანართზე გადასვლა",
+      "expandAllLines_one": "ყველა {{displayCount}} სტრიქონის გაშლა",
+      "expandAllLines_other": "ყველა {{displayCount}} სტრიქონის გაშლა",
+      "expandLines_one": "{{displayCount}} სტრიქონის გაშლა ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} სტრიქონის გაშლა ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "კონტექსტის {{displayCount}} სტრიქონის გაშლა",
+      "expandLinesOfContext_other": "კონტექსტის {{displayCount}} სტრიქონის გაშლა",
+      "expandMoreLines_one": "კიდევ {{displayCount}} სტრიქონის გაშლა ({{start}}–{{end}})",
+      "expandMoreLines_other": "კიდევ {{displayCount}} სტრიქონის გაშლა ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "ჩატვირთულია {{total}}-დან {{loaded}} ფაილი",
+      "loadedOfTotalFiles_other": "ჩატვირთულია {{total}}-დან {{loaded}} ფაილი"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ ფაილის ბოლოს ახალი სტრიქონი არ არის.",
@@ -350,6 +394,7 @@
       "merge": "შერწყმა",
       "mergeNow": "ახლავე შერწყმა",
       "mergePullRequest": "შერწყმის მოთხოვნის შერწყმა",
+      "mergeTermTitle": "{{term}}-ის შერწყმა",
       "enableAutoMerge": "ავტომატური შერწყმის ჩართვა",
       "disableAutoMerge": "ავტომატური შერწყმის გამორთვა",
       "autoMergeOn": "ავტომატური შერწყმა ჩართულია",
@@ -368,9 +413,12 @@
       "deleteBranchAfterMerge": "განშტოების წაშლა შერწყმის შემდეგ",
       "noEnabledMethods": "ამ საცავში შერწყმის არცერთი მეთოდი არ არის ჩართული. სთხოვე საცავის ადმინისტრატორს, ჩართოს ჩვეულებრივი შერწყმა, შეკუმშვით შერწყმა ან ბაზის შეცვლით შერწყმა.",
       "confirmTitle": "შერწყმის მოთხოვნა შეირწყას?",
+      "confirmTitleTerm": "{{term}} შეირწყას?",
       "confirmMessage": "შენი ცვლილებები საბაზო განშტოებაში შეირწყმება.",
       "enableAutoMergeConfirmTitle": "ჩაირთოს ავტომატური შერწყმა?",
       "enableAutoMergeConfirmMessage": "GitHub ამ შერწყმის მოთხოვნას ავტომატურად შეარწყამს, როცა ყველა სავალდებულო შემოწმება წარმატებით დასრულდება.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} ავტომატურად გაერთიანდება, როდესაც მისი მილი წარმატებით დასრულდება.",
+      "enableAutoMergeDescriptionTerm": "GitLab ავტომატურად გააერთიანებს ამ {{term}}-ს, როდესაც მისი მილი წარმატებით დასრულდება.",
       "forbidden": "ამ შერწყმის მოთხოვნის შერწყმის უფლება არ გაქვს.",
       "cannotMerge": "ამ შერწყმის მოთხოვნის არსებული სახით შერწყმა შეუძლებელია.",
       "couldNotMerge": "შერწყმის მოთხოვნის შერწყმა ვერ მოხერხდა.",
@@ -381,7 +429,8 @@
       },
       "terminal": {
         "alreadyMerged": "უკვე შერწყმულია",
-        "closed": "ეს შერწყმის მოთხოვნა დახურულია"
+        "closed": "ეს შერწყმის მოთხოვნა დახურულია",
+        "closedMergeRequest": "ეს შერწყმის მოთხოვნა დახურულია"
       },
       "partialSuccessBanner": {
         "body": "განშტოების წაშლა ვერ მოხერხდა: {{reason}}.",
@@ -406,6 +455,18 @@
         "behindDetail": "საწყისი განშტოება საბაზო განშტოებას ჩამორჩება. შერწყმამდე შეცვალე მისი ბაზა ან განაახლე განშტოება.",
         "notMergeableTitle": "ამ შერწყმის მოთხოვნის შერწყმა ჯერ შეუძლებელია",
         "notMergeableDetail": "GitHub-ის თანახმად, შერწყმის მდგომარეობაა: {{state}}."
+      },
+      "restrictions": {
+        "title": "შერწყმის შეზღუდვები",
+        "approvalsRequired_one": "საჭიროა {{displayCount}} დადასტურება",
+        "approvalsRequired_other": "საჭიროა {{displayCount}} დადასტურება",
+        "pipelineMustSucceed": "შერწყმამდე მილი წარმატებით უნდა დასრულდეს."
+      },
+      "providerBlocked": {
+        "failingPipeline": "მილი ვერ ასრულდება ბოლო კომიტზე.",
+        "pendingPipeline": "მილი ჯერ კიდევ მუშაობს ბოლო კომიტზე.",
+        "permission": "ამ {{term}}-ის შერწყმის უფლება არ გაქვს.",
+        "draft": "შერწყმამდე მონიშნე {{term}} განსახილველად მზადყოფნაში."
       },
       "methodLabels": {
         "merge": "შერწყმის კომიტის შექმნა",
@@ -455,6 +516,8 @@
       "replyBadRequest": "ამ პასუხის გამოქვეყნება შეუძლებელია. შესაძლოა, თემა შეიცვალა.",
       "replyForbidden": "ამ შერწყმის მოთხოვნაზე პასუხის გაცემის უფლება არ გაქვს.",
       "addCommentCta": "კომენტარი ამ შერწყმის მოთხოვნაზე",
+      "fixWithKilo": "შესწორება Kilo-ით",
+      "fixWithKiloPrompt": "გთხოვთ, მოაგვაროთ ამ შერწყმის მოთხოვნის შემდეგი კომენტარი: {{link}}",
       "commentBadRequest": "ამ კომენტარის გამოქვეყნება შეუძლებელია. შესაძლოა, შერწყმის მოთხოვნა შეიცვალა.",
       "commentForbidden": "ამ შერწყმის მოთხოვნაზე კომენტარის დამატების უფლება არ გაქვს.",
       "moderation": {
@@ -505,7 +568,10 @@
         "outdatedOnLines": "მოძველებული · {{lines}}",
         "outdatedOnPath": "მოძველებული · {{path}}"
       },
-      "deletedUser": "წაშლილი მომხმარებელი"
+      "deletedUser": "წაშლილი მომხმარებელი",
+      "replyForbiddenTerm": "ამ {{term}}-ზე პასუხის გაცემის უფლება არ გაქვს.",
+      "moreLinesAbove_one": "… ზემოთ კიდევ {{displayCount}} სტრიქონია.",
+      "moreLinesAbove_other": "… ზემოთ კიდევ {{displayCount}} სტრიქონია."
     },
     "couldNotOpenGitHubAppSettings": "GitHub-ის აპის პარამეტრები ვერ გაიხსნა.",
     "installKiloGitHubApp": "Kilo-ს GitHub აპის დაყენება",
@@ -517,17 +583,19 @@
     "reviewPullRequest": "შერწყმის მოთხოვნის განხილვა",
     "headLine": "{{counts}} · ბოლო კომიტი {{sha}}",
     "entry": {
-      "eyebrow": "გახსენი შერწყმის მოთხოვნა URL-ით.",
-      "pastePrLink": "PR-ის ბმულის ჩასმა",
-      "noRecentPrs": "ბოლოს ნანახი PR-ები არ არის",
-      "noRecentPrsDescription": "განხილვის დასაწყებად ზემოთ ჩასვი PR-ის ბმული — შემდეგ ჯერზე ის აქ გამოჩნდება.",
+      "eyebrow": "გახსენით PR ან შერწყმის მოთხოვნა URL-ით",
+      "pastePrLink": "ჩასვით PR-ის ან შერწყმის მოთხოვნის ბმული",
+      "noRecentPrs": "ბოლოს განხილული არ არის",
+      "noRecentPrsDescription": "განხილვის დასაწყებად ზემოთ ჩასვით ბმული — შემდეგ ჯერზე ის აქ გამოჩნდება.",
       "couldNotLoad": "ჩატვირთვა ვერ მოხერხდა.",
       "removeFromRecentsTitle": "წაიშალოს ბოლოს ნანახების სიიდან?",
-      "removeFromRecentsMessage": "ეს შერწყმის მოთხოვნა ბოლოს ნანახების სიიდან წაიშლება.",
+      "removeFromRecentsMessage": "ეს მიმოხილვა ბოლო ნანახების სიიდან წაიშლება.",
       "removeRecentAccessibility": "{{repo}}-ის წაშლა ბოლოს ნანახების სიიდან",
-      "urlAccessibility": "GitHub-ის შერწყმის მოთხოვნის URL",
-      "clearLink": "შერწყმის მოთხოვნის ბმულის გასუფთავება",
-      "pasteLink": "შერწყმის მოთხოვნის ბმულის ჩასმა",
+      "urlAccessibility": "ჩაწერეთ PR-ის ან შერწყმის მოთხოვნის URL",
+      "urlPlaceholder": "PR-ის ან შერწყმის მოთხოვნის URL",
+      "openAccessibility": "PR-ის ან შერწყმის მოთხოვნის გახსნა",
+      "clearLink": "ბმულის გასუფთავება",
+      "pasteLink": "ჩასვით PR-ის ან შერწყმის მოთხოვნის ბმული",
       "open": "ღია"
     },
     "checks": {
@@ -544,6 +612,8 @@
       "pending": "{{displayCount}} მოლოდინშია",
       "skipped": "{{displayCount}} გამოტოვებულია",
       "checksCount": "{{displayCount}} შემოწმება",
+      "checksCount_one": "{{displayCount}} შემოწმება",
+      "checksCount_other": "{{displayCount}} შემოწმება",
       "checkDetails": "შემოწმების დეტალები"
     },
     "inbox": {
@@ -576,9 +646,15 @@
     "connect": {
       "checkFailedTitle": "GitHub-თან კავშირის შემოწმება ვერ მოხერხდა.",
       "checkFailedMessage": "ჩატვირთვის დასრულებამდე შესვლის სტატუსი მიუწვდომელია.",
+      "checkFailedTitleGitLab": "GitLab-თან კავშირის შემოწმება ვერ მოხერხდა.",
+      "checkFailedTitleBitbucket": "Bitbucket-თან კავშირის შემოწმება ვერ მოხერხდა.",
+      "providerCheckFailedMessage": "კავშირის სტატუსი მიუწვდომელია ჩატვირთვამდე.",
       "reconnectTitle": "GitHub-თან ხელახლა დაკავშირება",
       "reconnectDescription": "GitHub-თან კავშირი გაუქმდა. მობილურზე შერწყმის მოთხოვნების განხილვის გასაგრძელებლად ხელახლა დაუკავშირდი.",
-      "description": "მობილურზე შერწყმის მოთხოვნების განსახილველად დააკავშირე შენი GitHub ანგარიში."
+      "description": "მობილურზე შერწყმის მოთხოვნების განსახილველად დააკავშირე შენი GitHub ანგარიში.",
+      "gitlabDescription": "დააკავშირეთ თქვენი GitLab ანგარიში, შერწყმის მოთხოვნების მობილურში განსახილველად.",
+      "bitbucketDescription": "დააკავშირეთ Bitbucket ამ ორგანიზაციას, PR-ების მობილურში განსახილველად.",
+      "bitbucketOrgOnlyDescription": "აირჩიეთ ორგანიზაცია თქვენს პროფილში, მისი Bitbucket PR-ების განსახილველად."
     },
     "screen": {
       "title": "#{{number}}",
@@ -600,7 +676,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub-თან კავშირს ვადა გაუვიდა.",
-      "message": "GitHub-თან კავშირი აღარ მოქმედებს. ხელახლა შეამოწმე კავშირი — საჭიროების შემთხვევაში აპი ხელახლა დაკავშირებას მოგთხოვს."
+      "message": "GitHub-თან კავშირი აღარ მოქმედებს. ხელახლა შეამოწმე კავშირი — საჭიროების შემთხვევაში აპი ხელახლა დაკავშირებას მოგთხოვს.",
+      "gitlabTitle": "GitLab-თან კავშირს ვადა გაუვიდა.",
+      "bitbucketTitle": "Bitbucket-თან კავშირს ვადა გაუვიდა.",
+      "providerMessage": "{{provider}}-თან კავშირი აღარ მოქმედებს. ხელახლა შეამოწმე კავშირი — საჭიროების შემთხვევაში აპი ხელახლა დაკავშირებას მოგთხოვს."
     },
     "eventChips": {
       "comment": "კომენტარი",
@@ -665,10 +744,12 @@
       "statusContext": "კონტექსტი",
       "lineLabel": "{{status}} სტრიქონი {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(ცარიელი)"
+      "emptyLine": "(ცარიელი)",
+      "truncationBanner_one": "ნაჩვენებია {{total}} შეცვლილი ფაილიდან პირველი {{limit}} — GitHub API-ის შეზღუდვა.",
+      "truncationBanner_other": "ნაჩვენებია {{total}} შეცვლილი ფაილიდან პირველი {{limit}} — GitHub API-ის შეზღუდვა."
     },
     "linkPasteClipboardEmpty": "გაცვლის ბუფერი ცარიელია.",
-    "linkPasteNotAPullRequest": "ეს GitHub-ის შერწყმის მოთხოვნის ბმული არ არის.",
+    "linkPasteNotAPullRequest": "ეს PR-ის ან შერწყმის მოთხოვნის ბმული არ არის",
     "announce": {
       "commentPosted": "კომენტარი გამოქვეყნდა",
       "reviewSubmitted": "განხილვა გაიგზავნა",
@@ -677,6 +758,7 @@
     "mutationError": {
       "commentNotPosted": "ამ კომენტარის გამოქვეყნება შეუძლებელია. შესაძლოა, მონიშნული სტრიქონი შეიცვალა ან PR განახლდა.",
       "reviewNotSubmitted": "ამ განხილვის არსებული სახით გაგზავნა შეუძლებელია. შესაძლოა, PR შეიცვალა ან საკუთარ შერწყმის მოთხოვნას განიხილავ, რაც დაუშვებელია.",
+      "reviewNotSubmittedTerm": "ეს მიმოხილვა უცვლელად ვერ გაიგზავნება. შესაძლოა {{term}} შეიცვალა, ან საკუთარ {{term}}-ს ვერ მიმოახილეთ.",
       "couldNotPostComment": "კომენტარის გამოქვეყნება ვერ მოხერხდა.",
       "couldNotSubmitReview": "განხილვის გაგზავნა ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე."
     },
@@ -684,9 +766,31 @@
       "couldNotReply": "პასუხის გაგზავნა ვერ მოხერხდა.",
       "couldNotCompleteAction": "ამ მოქმედების დასრულება ვერ მოხერხდა.",
       "mergeResultDefaultError": "GitHub-მა შერწყმა ვერ დაასრულა.",
+      "mergeResultNotCompleted": "{{term}} არ გაერთიანდა. შეამოწმეთ მისი მდგომარეობა და სცადეთ თავიდან.",
       "ambiguous": "დადასტურება ვერ მოხერხდა — ხელახლა ცდამდე შეამოწმე PR.",
       "persistenceFailed": "ამ მოქმედების დაფიქსირება ვერ მოხერხდა. მოგვიანებით სცადე.",
       "forbidden": "ეს მოქმედება აკრძალულია."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "ამ პროვაიდერისთვის მიუწვდომელია",
+        "accessibility": "ამ პროვაიდერისთვის მიუწვდომელია: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Შერწყმის მოთხოვნა",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "შერწყმის მოთხოვნის გაზიარება",
+      "viewOnProvider": "ნახვა {{provider}}-ში",
+      "mergeRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",
+      "unavailableDescription": "შესაძლოა წაიშალა, ან შესაძლოა მასზე წვდომა არ გაქვთ.",
+      "accessDeniedMergeRequest": "ამ შერწყმის მოთხოვნის ნახვის უფლება არ გაქვს.",
+      "couldNotLoadMergeRequest": "შერწყმის მოთხოვნის ჩატვირთვა ვერ მოხერხდა.",
+      "discussionAccessDenied": "ამ შერწყმის მოთხოვნის დისკუსიის ნახვის უფლება არ გაქვს.",
+      "discussionUnavailableMessage": "შესაძლოა, ეს შერწყმის მოთხოვნა წაიშალა.",
+      "noDiscussionDescription": "ამ შერწყმის მოთხოვნაში ჯერ არც განხილვის თემებია და არც ზოგადი კომენტარები.",
+      "noFilesChangedDescription": "ამ შერწყმის მოთხოვნაში ფაილები არ შეცვლილა."
     }
   },
   "notifications": {
@@ -719,11 +823,12 @@
     "previewFullDescription": "ჩაკეტილ ეკრანზე შეტყობინებების ტექსტი ჩანს.",
     "previewGenericDescription": "შეტყობინებები მხოლოდ ახალ მოვლენას აღნიშნავს. ტექსტის წასაკითხად გახსენით Kilo.",
     "channel": {
-      "agent": "აგენტის სესიები",
+      "agentProgress": "აგენტის პროგრესი",
       "chat": "ჩატის შეტყობინებები",
       "kiloclaw": "KiloClaw-ის აქტივობა",
       "balance": "ბალანსის შესახებ გაფრთხილებები",
-      "security": "უსაფრთხოების პრობლემები"
+      "security": "უსაფრთხოების პრობლემები",
+      "spend": "ხარჯვის შეტყობინებები"
     },
     "category": {
       "chatMessagesSubtitle": "პასუხები თქვენს საუბრებში",
@@ -734,8 +839,22 @@
       "sessionStatusTitle": "სესიის სტატუსი",
       "sessionStatusSubtitle": "დასრულდა / ჩაიშალა / სამართავად მზადაა",
       "kiloclawActivitySubtitle": "ინსტანცია მზადაა / ჩაიშალა, დაგეგმილი მოქმედებები",
+      "kiloclawActivityUnavailable": "გაუშვით KiloClaw ინსტანცია KiloClaw აქტივობის მისაღებად.",
       "balanceAlertsSubtitle": "ორგანიზაციის დაბალი ბალანსის გაფრთხილებები",
-      "securityFindingsSubtitle": "ახლად აღმოჩენილი პრობლემები და SLA-ის შეხსენებები"
+      "balanceAlertsUnavailable": "შეუერთდით ორგანიზაციას ბალანსის გაფრთხილებების მისაღებად.",
+      "securityFindingsSubtitle": "ახლად აღმოჩენილი პრობლემები და SLA-ის შეხსენებები",
+      "securityFindingsUnavailable": "ჩართეთ Kilo უსაფრთხოების აგენტი სფეროზე უსაფრთხოების პრობლემების მისაღებად.",
+      "spendAlertsSubtitle": "ზღვრების გადაცილება და საათობრივი ნახტომები",
+      "spendAlertsToggle": "ხარჯვის შეტყობინებების კატეგორია"
+    },
+    "action": {
+      "openSession": "სესიის გახსნა"
+    },
+    "needsInputAction": {
+      "approved": "მოთხოვნა დამტკიცდა",
+      "replied": "პასუხი გაიგზავნა",
+      "failed": "პასუხის გაცემა ვერ მოხერხდა. ხელახლა საცდელად ისევ შეეხეთ.",
+      "unavailable": "ეს მოთხოვნა აღარ ელოდება."
     }
   },
   "tabs": {
@@ -816,7 +935,9 @@
       "uploadFailed": "ატვირთვა ვერ მოხერხდა.",
       "failedToUploadFile": "ფაილის ატვირთვა ვერ მოხერხდა: {{reason}}.",
       "nothingToPaste": "ჩასასმელი არაფერია.",
-      "metadataStripFailed": "ფოტოს მეტამონაცემების წაშლა ვერ მოხერხდა."
+      "metadataStripFailed": "ფოტოს მეტამონაცემების წაშლა ვერ მოხერხდა.",
+      "limit_one": "შეგიძლია მაქსიმუმ {{displayCount}} ფაილი მიამაგრო.",
+      "limit_other": "შეგიძლია მაქსიმუმ {{displayCount}} ფაილი მიამაგრო."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1560,7 +1681,11 @@
       "syncFindings": "მიგნებების სინქრონიზაცია",
       "syncNow": "ახლავე სინქრონიზაცია",
       "syncQueued": "სინქრონიზაცია რიგშია",
-      "syncStatusUnavailable": "სინქრონიზაციის სტატუსი მიუწვდომელია."
+      "syncStatusUnavailable": "სინქრონიზაციის სტატუსი მიუწვდომელია.",
+      "daysOverdue_one": "ვადას გადაცილებულია {{displayCount}} დღით",
+      "daysOverdue_other": "ვადას გადაცილებულია {{displayCount}} დღით",
+      "findingsCount_one": "{{displayCount}} მიგნება",
+      "findingsCount_other": "{{displayCount}} მიგნება"
     },
     "dashboardMetrics": {
       "openFindings": "ღია მიგნებები",
@@ -1957,6 +2082,10 @@
       "couldNotLoad": "სესიის ჩატვირთვა ვერ მოხერხდა.",
       "failedToLoadDetails": "სესიის დეტალების ჩატვირთვა ვერ მოხერხდა.",
       "failedToStopExecution": "შესრულების შეჩერება ვერ მოხერხდა.",
+      "stopped": "სესია შეჩერდა",
+      "committing": "მიმდინარეობს კომიტი…",
+      "committed": "კომიტი შესრულდა",
+      "commitFailed": "კომიტი ვერ შესრულდა",
       "renameSession": "სესიის სახელის შეცვლა",
       "renamePlaceholder": "სესიის სახელი",
       "transcriptAccessibility": "სესიის ჩანაწერი",
@@ -1991,17 +2120,56 @@
       "exitNeedsNewerCli": "დისტანციური სლეშ-ბრძანებებისთვის საჭიროა Kilo CLI-ის უფრო ახალი ვერსია. განაახლეთ Kilo CLI და ხელახლა დაუკავშირდით."
     },
     "sessionConnection": {
+      "label": "კავშირი",
       "connecting": "დაკავშირება…",
       "reconnecting": "ხელახლა დაკავშირება…",
       "connectionLost": "კავშირი გაწყდა",
       "retryConnection": "ხელახლა დაკავშირება"
     },
+    "goal": {
+      "title": "მიზანი",
+      "statusActive": "აქტიური მიზანი",
+      "statusPaused": "შეჩერებული მიზანი",
+      "statusComplete": "მიზანი დასრულებულია",
+      "statusBlocked": "მიზანი დაბლოკილია",
+      "edit": "მიზნის რედაქტირება",
+      "remove": "მიზნის წაშლა",
+      "pause": "მიზნის შეჩერება",
+      "resume": "მიზნის გაგრძელება",
+      "editPlaceholder": "აღწერეთ მიზანი",
+      "removeConfirmTitle": "წავშალოთ მიზანი?",
+      "removeConfirmMessage": "CLI ასუფთავებს ამ სესიის მიზანს.",
+      "updateFailed": "მიზნის განახლება ვერ მოხერხდა.",
+      "sectionAccessibility": "{{status}}. მიზანი: {{text}}",
+      "collapse": "მიზნის ჩაკეცვა",
+      "expand": "მიზნის გაშლა"
+    },
     "newSession": {
+      "recentlyUsed": "ბოლოს გამოყენებული",
+      "couldNotLoadGithubRepositories": "GitHub-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
+      "couldNotLoadGitlabRepositories": "GitLab-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
       "connectGithubDescription": "ბრაუზერში დააკავშირეთ GitHub-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
+      "connectGitlabDescription": "ბრაუზერში დააკავშირეთ GitLab-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
+      "connectBitbucketDescription": "ბრაუზერში დააკავშირეთ Bitbucket-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
       "openGithub": "GitHub-ის გახსნა",
+      "openGitlab": "GitLab-ის გახსნა",
+      "openBitbucket": "Bitbucket-ის გახსნა",
       "refreshRepositories": "რეპოზიტორიების განახლება",
       "githubConnected": "GitHub დაკავშირებულია",
+      "gitlabConnected": "GitLab დაკავშირებულია",
       "noRepositoriesVisible": "რეპოზიტორიები არ ჩანს. შეამოწმეთ, აქვს თუ არა Kilo-ს GitHub აპს რეპოზიტორიებზე წვდომა, შემდეგ განაახლეთ სია.",
+      "noRepositoriesVisibleGitlab": "რეპოზიტორიები არ ჩანს. შეამოწმეთ GitLab-ის რეპოზიტორიებზე წვდომა, შემდეგ განაახლეთ სია.",
+      "noRepositoriesVisibleBitbucket": "რეპოზიტორიები არ ჩანს. შეამოწმეთ Bitbucket-ის რეპოზიტორიებზე წვდომა, შემდეგ განაახლეთ სია.",
+      "bitbucketOrganizationsOnly": "Bitbucket მხოლოდ ორგანიზაციებისთვისაა ხელმისაწვდომი.",
+      "branchPickerTitle": "განშტოების არჩევა",
+      "branchDefault": "ნაგულისხმები",
+      "branchAccessibility": "განშტოება: {{label}}",
+      "branchLoading": "განშტოებების ჩატვირთვა",
+      "branchLoadError": "განშტოებების ჩატვირთვა ვერ მოხერხდა",
+      "branchUnavailable": "ამ რეპოზიტორიისთვის განშტოებები მიუწვდომელია. შეამოწმეთ წვდომა პროვაიდერთან, შემდეგ აირჩიეთ სხვა რეპოზიტორია.",
+      "branchEmpty": "განშტოებები მიუწვდომელია",
+      "branchPlaceholder": "აირჩიეთ განშტოება",
       "runOnWithTarget": "გაშვების გარემო: {{target}}",
       "environment": "გარემო",
       "couldNotLoadEnvironment": "თქვენი გარემოს ჩატვირთვა ვერ მოხერხდა.",
@@ -2022,24 +2190,13 @@
       "couldNotRefreshRepositories": "რეპოზიტორიების განახლება ვერ მოხერხდა. სცადეთ ხელახლა.",
       "discardDraftTitle": "წაიშალოს მონახაზი?",
       "discardDraftMessage": "თქვენი მოთხოვნა დაიკარგება.",
+      "discardWithUploadsMessage": "თქვენი მოთხოვნა და ატვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება.",
       "discardFailed": "მონახაზის წაშლა ვერ მოხერხდა. სცადეთ ხელახლა.",
       "remoteHint": "ლოკალური kilo პროცესის სამართავად კომპიუტერზე გაუშვით `kilo remote`, ან მიმდინარე CLI სესიაში — `/remote`.",
-      "connectBitbucketDescription": "ბრაუზერში დააკავშირეთ Bitbucket-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
-      "connectGitlabDescription": "ბრაუზერში დააკავშირეთ GitLab-ის ანგარიში, შემდეგ აქ დაბრუნდით რეპოზიტორიის ასარჩევად.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
-      "couldNotLoadGithubRepositories": "GitHub-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
-      "couldNotLoadGitlabRepositories": "GitLab-ის რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
-      "gitlabConnected": "GitLab დაკავშირებულია",
-      "noRepositoriesVisibleBitbucket": "რეპოზიტორიები არ ჩანს. შეამოწმეთ Bitbucket-ის რეპოზიტორიებზე წვდომა, შემდეგ განაახლეთ სია.",
-      "noRepositoriesVisibleGitlab": "რეპოზიტორიები არ ჩანს. შეამოწმეთ GitLab-ის რეპოზიტორიებზე წვდომა, შემდეგ განაახლეთ სია.",
-      "openBitbucket": "Bitbucket-ის გახსნა",
-      "openGitlab": "GitLab-ის გახსნა",
-      "recentlyUsed": "ბოლოს გამოყენებული",
-      "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
       "continueFrom": "გრძელდება სესია: {{title}}.",
-      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა.",
       "importingSession": "სესიის იმპორტი მიმდინარეობს…",
-      "discardWithUploadsMessage": "თქვენი მოთხოვნა და ატვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება."
+      "cliCannotContinue": "ამ CLI-ს სესიის გაგრძელება არ შეუძლია. აირჩიეთ Cloud Agent ან სხვა CLI.",
+      "importFailed": "ამ სესიის იმპორტირება ვერ მოხერხდა."
     },
     "partRenderer": {
       "updatedFileCount_one": "განახლდა {{displayCount}} ფაილი.",
@@ -2063,7 +2220,14 @@
       "updateTodos": "დავალებების სიის განახლება",
       "linesBadge": "{{displayCount}} სტრიქონი",
       "filesBadge": "{{displayCount}} ფაილი",
-      "matchesBadge": "{{displayCount}} დამთხვევა"
+      "matchesBadge": "{{displayCount}} დამთხვევა",
+      "filesBadge_one": "{{displayCount}} ფაილი",
+      "filesBadge_other": "{{displayCount}} ფაილი",
+      "linesBadge_one": "{{displayCount}} სტრიქონი",
+      "linesBadge_other": "{{displayCount}} სტრიქონი",
+      "matchesBadge_one": "{{displayCount}} დამთხვევა",
+      "matchesBadge_other": "{{displayCount}} დამთხვევა",
+      "noOutput": "გამოსავალი არ არის."
     },
     "readToolMarkdown": {
       "linesTruncated": "სტრიქონები {{start}}–{{end}} (შემოკლებულია)",
@@ -2353,7 +2517,11 @@
       "files": "ფაილი",
       "couldNotOpenPhotoPicker": "ფოტოების არჩევის ფანჯრის გახსნა ვერ მოხერხდა. ხელახლა გაუშვით Kilo და სცადეთ კიდევ ერთხელ.",
       "maxFilesAllowed": "შეგიძლიათ დაამატოთ მაქსიმუმ {{displayCount}} ფაილი.",
-      "onlyAddingFiles": "{{total}} ფაილიდან ემატება მხოლოდ {{accepted}} (მაქსიმუმ {{max}})"
+      "onlyAddingFiles": "{{total}} ფაილიდან ემატება მხოლოდ {{accepted}} (მაქსიმუმ {{max}})",
+      "maxFilesAllowed_one": "შეგიძლიათ დაამატოთ მაქსიმუმ {{displayCount}} ფაილი.",
+      "maxFilesAllowed_other": "შეგიძლიათ დაამატოთ მაქსიმუმ {{displayCount}} ფაილი.",
+      "onlyAddingFiles_one": "{{total}} ფაილიდან ემატება მხოლოდ {{accepted}} (მაქსიმუმ {{max}})",
+      "onlyAddingFiles_other": "{{total}} ფაილიდან ემატება მხოლოდ {{accepted}} (მაქსიმუმ {{max}})"
     },
     "composer": {
       "addAttachment": "დანართის დამატება",
@@ -2371,7 +2539,9 @@
       "discardAttachmentsMessage": "ატვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება.",
       "discardAttachmentsTitle": "წაიშალოს დანართები?",
       "charactersRemaining": "დარჩენილია {{count}} სიმბოლო",
-      "insertNewline": "ახალი სტრიქონის ჩასმა"
+      "insertNewline": "ახალი სტრიქონის ჩასმა",
+      "charactersRemaining_one": "დარჩენილია {{count}} სიმბოლო",
+      "charactersRemaining_other": "დარჩენილია {{count}} სიმბოლო"
     },
     "chatLink": {
       "linkCopied": "ბმული დაკოპირდა",
@@ -2405,6 +2575,12 @@
       "startNewSession": "ახალი სესიის დაწყება",
       "exitSession": "სესიიდან გასვლა",
       "clearSession": "ამ სესიის დასრულება და ახლის დაწყება",
+      "compactDescription": "მიმდინარე სესიის კონტექსტის შეკუმშვა",
+      "goalDescription": "გააგრძელე მუშაობა სესიის მიზნისკენ. /goal <objective> ან pause, resume, clear",
+      "initDescription": "მართული AGENTS.md-ის დაყენება",
+      "resumeClaudeDescription": "Claude Code-ის სესიის ტრანსკრიპტის იმპორტი",
+      "resumeCodexDescription": "OpenAI Codex-ის სესიის ტრანსკრიპტის იმპორტი",
+      "reviewDescription": "ცვლილებების გადახედვა [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ბრძანების გამოყენება",
       "insert": "ჩასმა",
       "upgradeRequiredFallback": "ამ ბრძანების გამოსაყენებლად განაახლეთ CLI.",
@@ -2437,7 +2613,14 @@
       "stepsCount_one": "{{steps}} ნაბიჯი",
       "stepsCount": "{{steps}} ნაბიჯი",
       "stepsCount_other": "{{steps}} ნაბიჯი",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "მოდელი ({{displayCount}})",
+      "modelsCount_other": "მოდელები ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "ავტომატური დადასტურება",
+      "description": "ავტომატურად დაადასტურეთ ამ სესიის ნებართვის მოთხოვნები. შემდეგ ხელსაწყოები მუშაობს მოთხოვნის გარეშე.",
+      "unavailable": "ამ სესიას არ შეუძლია ნებართვის მოთხოვნების მიღება."
     },
     "prBadge": {
       "open": "ღია PR",
@@ -2469,6 +2652,12 @@
       "tapToListHint": "შიგთავსის სანახავად შეეხეთ საქაღალდეს.",
       "unsupportedDescription": "ამ CLI-ს საქაღალდეების სიის ჩვენება არ შეუძლია. ღილაკით „მზადაა“ გაშვების საქაღალდე შენარჩუნდება, ხოლო ღილაკით „სესიის დაწყება“ სესია ამ საქაღალდეში დაიწყება.",
       "unsupportedTitle": "საქაღალდეების სიის ჩვენება შეუძლებელია"
+    },
+    "toolRun": {
+      "sheetTitle": "ინსტრუმენტის გამოძახებები",
+      "condensedLabel": "{{itemCount}} ელემენტი; {{last}}",
+      "condensedLabel_one": "{{itemCount}} ელემენტი; {{last}}",
+      "condensedLabel_other": "{{itemCount}} ელემენტი; {{last}}"
     }
   },
   "bootstrap": {
@@ -2513,6 +2702,7 @@
     "couldNotLoadActiveSessions": "აქტიური სესიების ჩატვირთვა ვერ მოხერხდა.",
     "agentSessions": "ახლა აქტიურია",
     "newCodingTask": "კოდის წერის ახალი ამოცანა",
+    "newTaskFromPicture": "ახალი ამოცანა სურათიდან",
     "explore": "აღმოაჩინე მეტი",
     "seeAll": "ყველას ნახვა",
     "noLiveSessions": "ამჟამად არაფერი მიმდინარეობს"
@@ -2581,7 +2771,10 @@
     "gatewayModelUnavailable": "ტრანსკრიფციის ეს მოდელი მიუწვდომელია. აირჩიეთ სხვა პარამეტრებში.",
     "gatewayModelUnavailableNotice": "ეს მოდელი აღარ არის ხელმისაწვდომი. სხვის ასარჩევად შეეხეთ $t(transcriptionModel.title)-ს.",
     "gatewaySignInRequired": "შედით, რომ გამოიყენოთ ტრანსკრიფცია Kilo Gateway-ით.",
-    "gatewayNoModel": "ჯერ აირჩიეთ ტრანსკრიფციის მოდელი პარამეტრებში."
+    "gatewayNoModel": "ჯერ აირჩიეთ ტრანსკრიფციის მოდელი პარამეტრებში.",
+    "testTitle": "ხმოვანი შეყვანის ტესტი",
+    "testPlaceholder": "შეეხეთ მიკროფონს და დაიწყეთ საუბარი.",
+    "testClear": "ტექსტის გასუფთავება"
   },
   "share": {
     "title": "Kilo-ში გაზიარება",
@@ -2599,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "ამ სესიას ფაილების მიღება არ შეუძლია",
     "cliCantReceiveFilesMessage": "ამ სესიის Kilo CLI ფაილებს ვერ იღებს. იმ კომპიუტერზე განაახლე CLI ან შიგთავსი ახალ სესიაში გააზიარე.",
     "contentlessMessage": "გასაზიარებელი არაფერია — არც ტექსტია დამატებული და არც ფაილები.",
-    "couldNotReadContent": "გაზიარებული შიგთავსის წაკითხვა ვერ მოხერხდა."
+    "couldNotReadContent": "გაზიარებული შიგთავსის წაკითხვა ვერ მოხერხდა.",
+    "onlyFirstFilesAttached_one": "მხოლოდ პირველი {{displayCount}} ფაილი მიემაგრება.",
+    "onlyFirstFilesAttached_other": "მხოლოდ პირველი {{displayCount}} ფაილი მიემაგრება."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2731,7 +2926,8 @@
     "aiProvidersWhat": "თქვენი მოთხოვნები, საუბრის ისტორია და ნებისმიერი მიმაგრებული ფაილი.",
     "aiProvidersWhy": "AI-ის პასუხების შესაქმნელად.",
     "aiProvidersWho": "Anthropic, OpenAI, Google და სხვა პროვაიდერები, რომლებსაც თითოეული მოთხოვნისთვის ირჩევთ.",
-    "gatewayWhat": "ანგარიშის ID, მოთხოვნის მეტამონაცემები, ტოკენების გამოყენება.",
+    "gatewayWhat": "ანგარიშის ID, მოთხოვნის მეტამონაცემები, ტოკენების გამოყენება, ასევე აპის მიერ მისი მეშვეობით გაგზავნილი პრომპტები და ხმის ჩანაწერები.",
+    "viaGateway": "Kilo Gateway-ის მეშვეობით",
     "gatewayWhy": "ავთენტიფიკაცია, მოთხოვნების გადამისამართება, ანგარიშსწორების მონაცემების შეჯერება.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "ავარიული დახურვისა და შეცდომების ანგარიშები, რომლებიდანაც აპის შიგთავსი ამოღებულია.",
@@ -2751,7 +2947,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "თქვენი ჩანაწერი კარნახის დროს.",
     "voiceTranscriptionWhy": "მეტყველების ტექსტად გადასაყვანად.",
-    "voiceTranscriptionWho": "მხოლოდ მოწყობილობაზე მუშავდება. თუ მოწყობილობა მეტყველებას ტექსტად ინტერნეტის გარეშე ვერ გარდაქმნის, ჩანაწერი Apple-ს ან Google-ს ეგზავნება.",
+    "voiceTranscriptionWho": "თქვენი მოწყობილობა, Kilo Gateway თქვენ მიერ არჩეული ტრანსკრიფციის მოდელით, ან Apple ან Google ონლაინ ამოცნობისთვის.",
     "installAttributionPromptTitle": "დაშვებული იყოს ინსტალაციის წყაროს დადგენა?",
     "installAttributionPromptMessage": "Kilo Apple-ის თვალთვალის ნებართვას მხოლოდ იმის დასადგენად იყენებს, თუ რომელი არხიდან მოხვდით აქ. თქვენი მოთხოვნები და საუბრები ამ მიზნით არასდროს გამოიყენება.",
     "what": "რა",
@@ -2923,6 +3119,14 @@
     "tooManySignInAttempts": "შესვლის მცდელობების რაოდენობა გადაჭარბებულია. ცოტა მოიცადე და ხელახლა სცადე."
   },
   "models": {
+    "auto": {
+      "frontier": "ავტომატური მოწინავე",
+      "balanced": "ავტომატური დაბალანსებული",
+      "efficient": "ავტომატური ეფექტური",
+      "small": "ავტომატური პატარა",
+      "free": "ავტომატური უფასო",
+      "organization": "ორგანიზაციის ავტომატური"
+    },
     "dataCollected": "მონაცემები გროვდება",
     "free": "უფასო",
     "couldNotUpdateFavorites": "რჩეულების განახლება ვერ მოხერხდა.",
@@ -2961,8 +3165,17 @@
     "privacy": "აგენტების სანახავად გახსენი Kilo",
     "openAgents": "აგენტების გახსნა",
     "needsInput": "პასუხს ელის",
+    "newestSession": "უახლესი: {{title}}",
+    "noneWaiting": "მოლოდინში მყოფი აგენტი არ არის",
+    "newAgent": "ახალი აგენტი",
+    "approving": "მტკიცდება...",
+    "couldNotApprove": "დამტკიცება ვერ მოხერხდა",
+    "couldNotStart": "დაწყება ვერ მოხერხდა",
     "channelName": "აქტიური აგენტები",
-    "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები."
+    "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები.",
+    "openSession": "გახსენი",
+    "approveFailed": "დამტკიცება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ $t(common.approve)-ს.",
+    "newestResult": "უახლესი შედეგი"
   },
   "transcriptionModel": {
     "title": "ტრანსკრიფციის მოდელი",
@@ -2970,5 +3183,56 @@
     "emptyTitle": "ტრანსკრიფციის მოდელები არ არის",
     "emptyDescription": "Kilo Gateway ამჟამად არ სთავაზობს ტრანსკრიფციის მოდელებს.",
     "loadFailed": "ტრანსკრიფციის მოდელების ჩატვირთვა ვერ მოხერხდა."
+  },
+  "voiceLanguage": {
+    "title": "ხმოვანი შეყვანის ენა",
+    "automatic": "ავტომატური",
+    "loadFailed": "ამ მოწყობილობის მხარდაჭერილი ენები ვერ ჩაიტვირთა.",
+    "emptyTitle": "მხარდაჭერილი ენები არ არის",
+    "emptyDescription": "ამ მოწყობილობის მეტყველების ამოცნობა მხარდაჭერილ ენებს არ აცნობებს."
+  },
+  "tour": {
+    "eyebrow": "სწრაფი ტური",
+    "forkTitle": "სად გინდათ გაუშვათ Kilo?",
+    "forkSubtitle": "აირჩიეთ, სად გაუშვას Kilo-მ თქვენმა პირველმა სესიამ.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "გაუშვით Kilo იზოლირებულ ღრუბლოვან გარემოში, არაფრის დაყენების გარეშე.",
+    "remoteOptionTitle": "თქვენი კომპიუტერი",
+    "remoteOptionBody": "გაუშვით Kilo თქვენს საკუთარ მანქანაზე `kilo remote` CLI-ს საშუალებით.",
+    "skip": "ტურის გამოტოვება",
+    "tutorialLabel": "სასწავლო"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "აგენტის გაშვებას მოთხოვნა სჭირდება. დაამატე მოთხოვნა და კვლავ გაუშვი.",
+      "repositoryUnknown": "Kilo {{repository}}-ს GitHub-ის ან GitLab-ის რეპოზიტორიად არ ცნობს. აირჩიე სხვა რეპოზიტორია Kilo-ში.",
+      "repositoryUnsupported": "{{repository}} Bitbucket-ის რეპოზიტორიაა — აგენტის გაშვება ჯერ ვერ გამოიყენებს მას. აირჩიე სხვა რეპოზიტორია Kilo-ში."
+    }
+  },
+  "launcher": {
+    "openLastSession": "ბოლო სესიის გახსნა"
+  },
+  "spendAlerts": {
+    "subtitle": "გაუგზავნე შეტყობინება ელფოსტით ან push-ით ბილინგის კონტაქტებს, როცა ამ სფეროს ხარჯვა გადააჭარბებს ლიმიტს ან ავა მის ჩვეულ საათობრივ ტემპს.",
+    "enable": "ხარჯვის შეტყობინებების ჩართვა",
+    "thresholdTitle": "ზღვრის გადაცილება",
+    "thresholdSubtitle": "მიმდინარე ხარჯვა აჭარბებს შენს ლიმიტს",
+    "anomalyTitle": "საათობრივი ნახტომი",
+    "anomalySubtitle": "ერთი საათი ბევრად აღემატება ამ სფეროს ჩვეულ ტემპს",
+    "limitLabel": "ლიმიტი (USD)",
+    "windowLabel": "ფანჯარა",
+    "window24h": "24 საათი",
+    "window7d": "7 დღე",
+    "window30d": "30 დღე",
+    "multiplierLabel": "ნახტომის მამრავლი",
+    "saved": "ხარჯვის შეტყობინების პარამეტრები შენახულია",
+    "loadError": "ხარჯვის შეტყობინებები ვერ ჩაიტვირთა.",
+    "saveError": "ხარჯვის შეტყობინებები ვერ შეინახა.",
+    "empty": "ხარჯვის შეტყობინებები გამორთულია. ჩართე ისინი ამ სფეროს ბილინგის კონტაქტების გასაფრთხილებლად.",
+    "noSpend": "ხარჯვა ჯერ არ არის დაფიქსირებული",
+    "spend24h": "ხარჯვა ბოლო 24 საათში",
+    "multiplierError": "შეიყვანე 1 ან მეტი მამრავლი",
+    "permissionDenied": "ხარჯვის შეტყობინებების მართვის უფლება არ გაქვთ.",
+    "pushOffByCategory": "გამორთულია შეტყობინებებში"
   }
 }

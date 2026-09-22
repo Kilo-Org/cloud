@@ -22,6 +22,7 @@ import { codeReviewRouter } from '@/routers/code-reviews/code-reviews-router';
 import { reviewMemoryRouter } from '@/routers/code-reviews/review-memory-router';
 import { personalReviewAgentRouter } from '@/routers/code-reviews-router';
 import { byokRouter } from '@/routers/byok-router';
+import { openAiChatGptRouter } from '@/routers/openai-chatgpt-router';
 import { appBuilderRouter } from '@/routers/app-builder-router';
 import { securityAgentRouter } from '@/routers/security-agent-router';
 import { securityAuditLogRouter } from '@/routers/security-audit-log-router';
@@ -47,9 +48,11 @@ import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
 import { mcpGatewayAuthorizationsRouter } from '@/routers/mcp-gateway-authorizations-router';
 import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
+import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
 import { quickChatRouter } from '@/routers/quick-chat-router';
+import { spendAlertRouter } from '@/routers/spend-alert-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -73,6 +76,7 @@ export const rootRouter = createTRPCRouter({
   reviewMemory: reviewMemoryRouter,
   personalReviewAgent: personalReviewAgentRouter,
   byok: byokRouter,
+  openAiChatGpt: openAiChatGptRouter,
   appBuilder: appBuilderRouter,
   securityAgent: securityAgentRouter,
   securityAuditLog: securityAuditLogRouter,
@@ -98,9 +102,11 @@ export const rootRouter = createTRPCRouter({
   mcpGatewayAuthorizations: mcpGatewayAuthorizationsRouter,
   modelPreferences: modelPreferencesRouter,
   githubPrReview: githubPrReviewRouter,
+  providerReview: providerReviewRouter,
   moderation: moderationRouter,
   userExports: userExportsRouter,
   quickChat: quickChatRouter,
+  spendAlerts: spendAlertRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

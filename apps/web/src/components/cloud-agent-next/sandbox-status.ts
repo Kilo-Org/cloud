@@ -4,7 +4,12 @@ import {
   SANDBOX_STATUS_DETAIL_MESSAGES,
   type SandboxLifecycleStatus,
   type SandboxProviderLabel,
+  type SandboxStatusSnapshot,
 } from '@/routers/cloud-agent-next-schemas';
+import {
+  containerCapacityForService,
+  formatContainerCapacity,
+} from '@/lib/cloudflare/container-capacity';
 import type { FetchedSessionData, ResolvedSession } from '@kilocode/cloud-agent-sdk';
 
 export const SANDBOX_STATUS_POLL_INTERVAL_MS = 5_000;
@@ -60,6 +65,8 @@ const statusLabels = {
   unknown: 'Unknown',
 } satisfies Record<SandboxLifecycleStatus, string>;
 
+type SandboxType = NonNullable<NonNullable<SandboxStatusSnapshot['runtime']>['sandboxType']>;
+
 const sandboxTypes = {
   shared: 'Shared',
   'isolated-small': 'Small',
@@ -67,7 +74,32 @@ const sandboxTypes = {
   'code-review': 'Code review',
   devcontainer: 'Custom environment',
   unknown: 'Unknown',
+} satisfies Record<SandboxType, string>;
+
+/**
+ * The container class each observed sandbox type runs on, mirroring
+ * `expectedSandboxClassName` in the Worker. Containment variants share their base
+ * class's capacity, so the classification alone fixes the vCPU and memory.
+ *
+ * `sandbox-selection.ts` keys a similar map off a requested destination instead;
+ * the two stay separate because a request and an observed sandbox can disagree
+ * after a fallback. `sandbox-status.test.ts` locks the values they share.
+ */
+const sandboxTypeServices: Record<SandboxType, string | null> = {
+  shared: 'cloud-agent-next-sandbox',
+  'isolated-small': 'cloud-agent-next-sandbox-small',
+  'isolated-standard': 'cloud-agent-next-sandbox',
+  'code-review': 'cloud-agent-next-sandbox-code-review',
+  devcontainer: 'cloud-agent-next-sandbox-dind',
+  unknown: null,
 };
+
+/** The vCPU and memory an observed sandbox type runs with, or null when unknown. */
+export function sandboxTypeCapacity(sandboxType: SandboxType | null | undefined): string | null {
+  const service = sandboxTypeServices[sandboxType ?? 'unknown'];
+  const capacity = service ? containerCapacityForService(service) : null;
+  return capacity ? formatContainerCapacity(capacity) : null;
+}
 
 export type SandboxStatusPresentation = {
   status: SandboxLifecycleStatus | 'sleeping-soon';
@@ -75,6 +107,7 @@ export type SandboxStatusPresentation = {
   detail: string;
   provider: SandboxProviderLabel;
   sandboxType: string;
+  capacity: string | null;
   kiloCliVersion: string | null;
   wrapperVersion: string | null;
   startedAt: number | null;
@@ -109,6 +142,7 @@ export function sandboxStatusPresentation({
     detail: SANDBOX_STATUS_DETAIL_MESSAGES.status_unavailable,
     provider: 'Unknown',
     sandboxType: 'Unknown',
+    capacity: null,
     kiloCliVersion: null,
     wrapperVersion: null,
     startedAt: null,
@@ -193,6 +227,7 @@ export function sandboxStatusPresentation({
         : SANDBOX_STATUS_DETAIL_MESSAGES[snapshot.detailCode],
     provider: snapshot.provider,
     sandboxType: sandboxTypes[runtime?.sandboxType ?? 'unknown'],
+    capacity: sandboxTypeCapacity(runtime?.sandboxType),
     kiloCliVersion: runtime?.kiloCliVersion ?? null,
     wrapperVersion: runtime?.wrapperVersion ?? null,
     startedAt: runtime?.startedAt ?? null,

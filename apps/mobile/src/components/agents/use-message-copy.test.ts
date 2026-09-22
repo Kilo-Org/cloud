@@ -41,7 +41,11 @@ describe('performCopy', () => {
     await performCopy('hello');
     expect(setStringAsync).toHaveBeenCalledWith('hello');
     expect(notificationAsync).toHaveBeenCalledWith('success');
-    expect(toastSuccess).toHaveBeenCalledWith('Copied to clipboard');
+    // Longer than the default: on Android the system clipboard preview covers
+    // the toast for its full default life (see COPY_TOAST_DURATION_MS).
+    expect(toastSuccess).toHaveBeenCalledWith('Copied to clipboard', {
+      duration: expect.any(Number),
+    });
     expect(toastError).not.toHaveBeenCalled();
   });
 

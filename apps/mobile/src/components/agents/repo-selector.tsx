@@ -1,6 +1,6 @@
 import { type Href, useRouter } from 'expo-router';
 import { ChevronDown } from '@/components/ui/icons';
-import { Pressable } from 'react-native';
+import { Keyboard, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
@@ -29,6 +29,12 @@ type RepoSelectorProps = {
   /** Recently used rows, rendered under a "Recently used" section header in the picker. */
   recents: RepoOption[];
   isLoading: boolean;
+  /**
+   * The organization scope the rows were loaded under; `null` is personal.
+   * Published to the picker so its Bitbucket note can key on the LIST's scope
+   * rather than on the app's globally selected organization, which can differ.
+   */
+  organizationId: string | null;
   onChange: (repo: string) => void;
   disabled?: boolean;
 };
@@ -98,6 +104,7 @@ export function RepoSelector({
   repositories,
   recents,
   isLoading,
+  organizationId,
   onChange,
   disabled = false,
 }: Readonly<RepoSelectorProps>) {
@@ -134,8 +141,12 @@ export function RepoSelector({
       repositories: bridgeRepositories,
       sections: buildRepoSections({ repositories, recents }),
       currentValue: value,
+      organizationId,
       onSelect: onChange,
     });
+    // See ModelSelector: the sheet never re-anchors after the keyboard hides,
+    // so the keyboard must be down before this push.
+    Keyboard.dismiss();
     router.push('/(app)/agent-chat/repo-picker' as Href);
   }
 

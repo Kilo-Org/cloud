@@ -53,6 +53,7 @@ export function TodoToolCard({ part }: Readonly<{ part: ToolPart }>) {
     <FixedPartRow
       icon={ListTodo}
       label={display.subtitle ?? display.title}
+      translatable={display.translatable}
       status={part.state.status}
       accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
         name: display.subtitle ?? display.title,

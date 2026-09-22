@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- Use the repository's DOM-free mounted renderer. */
 import {
   announcements,
   catalogs,
@@ -20,7 +19,7 @@ import {
 } from '@/components/app-unlock-screen.test-helpers';
 import { GeneralSettingsScreen } from '@/components/general-settings-screen';
 import { type ElementType } from 'react';
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import fr from '@/i18n/locales/fr.json';
@@ -92,9 +91,9 @@ it.each([false, true])(
     native.authenticateAsync.mockResolvedValueOnce({ success: false, error: 'user_cancel' });
     const now = vi.spyOn(Date, 'now').mockReturnValue(0);
     await flush(() => {
-      lifecycle.change?.('background');
+      lifecycle.change('background');
       now.mockReturnValue(300_000);
-      lifecycle.change?.('active');
+      lifecycle.change('active');
     });
     expectHidden(root(), true);
     await flush(retry()?.props.onPress as () => void);
@@ -264,9 +263,9 @@ describe.each(['ios', 'android'])('%s shared unlock announcements', os => {
     if (locked) {
       const now = vi.spyOn(Date, 'now').mockReturnValue(0);
       await flush(() => {
-        lifecycle.change?.('background');
+        lifecycle.change('background');
         now.mockReturnValue(300_000);
-        lifecycle.change?.('active');
+        lifecycle.change('active');
       });
       expect(retry()?.props.disabled).toBe(true);
     }

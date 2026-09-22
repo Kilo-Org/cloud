@@ -1,6 +1,7 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, expect, it, vi } from 'vitest';
+import { waitFor } from './wait-for.js';
 import type { SandboxSession } from '../../src/sandbox-session/SandboxSession';
 import type { SessionMessageRecord } from '../../src/sandbox-session/session-message-queue';
 import type { ResponseFrame, SessionSyncResult } from '../../src/shared/sandbox-control-protocol';
@@ -97,11 +98,11 @@ describe('Session observation wiring', () => {
             pendingInteractions: { questions: cached.questions, permissions: [] },
           });
         }
-        await vi.waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(1));
         expect(state.storage.kv.get('session_messages')).toEqual([f.message]);
         const refresh = vi.spyOn(instance['interactionRefresh'], 'refresh');
         const alarm = instance.alarm();
-        await vi.waitFor(() =>
+        await waitFor(() =>
           expect(refresh).toHaveBeenCalledWith(expect.anything(), 'accepted_alarm')
         );
         expect(f.control.getStatus).toHaveBeenCalledTimes(1);
@@ -143,10 +144,10 @@ describe('Session observation wiring', () => {
         const f = await fixture(instance, state);
         try {
           instance['derivePendingInteractions']();
-          await vi.waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(1));
+          await waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(1));
           const refresh = vi.spyOn(instance['interactionRefresh'], 'refresh');
           const alarm = instance.alarm();
-          await vi.waitFor(() => expect(refresh).toHaveBeenCalled());
+          await waitFor(() => expect(refresh).toHaveBeenCalled());
           if (change === 'revision') {
             instance['recordPendingInteraction']({
               type: 'question.asked',
@@ -203,10 +204,10 @@ describe('Session observation wiring', () => {
       const f = await fixture(instance, state);
       try {
         instance['derivePendingInteractions']();
-        await vi.waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(1));
         const refresh = vi.spyOn(instance['interactionRefresh'], 'refresh');
         const alarm = instance.alarm();
-        await vi.waitFor(() => expect(refresh).toHaveBeenCalled());
+        await waitFor(() => expect(refresh).toHaveBeenCalled());
         f.pending.reject(new Error('native read failed'));
         await alarm;
         expect(f.control.request).toHaveBeenCalledTimes(1);
@@ -274,7 +275,7 @@ describe('Session observation wiring', () => {
           instance['captureInteractionScope'](),
           'pending_interactions'
         );
-        await vi.waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(1));
         instance['recordPendingInteraction']({
           type: 'question.asked',
           properties: { id: 'new_question', sessionID: root },
@@ -285,7 +286,7 @@ describe('Session observation wiring', () => {
           instance['captureInteractionScope'](),
           'pending_interactions'
         );
-        await vi.waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(2));
         const interactions = state.storage.kv.get('session_pending_interactions');
         f.pending.resolve(response(idle));
         expect(await first).toBeUndefined();
@@ -322,7 +323,7 @@ describe('Session observation wiring', () => {
           instance['captureInteractionScope'](),
           'pending_interactions'
         );
-        await vi.waitFor(() => expect(f.control.getStatus).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(f.control.getStatus).toHaveBeenCalledTimes(1));
         instance['recordPendingInteraction']({
           type: 'question.asked',
           properties: { id: 'new_question', sessionID: root },
@@ -346,31 +347,27 @@ describe('Session observation wiring', () => {
     });
   });
 
-  it('does not retarget a watchdog when the accepted message changes during alarm setup', async () => {
+  it('does not fail a replacement accepted message that changes during an overdue check', async () => {
     const stub = env.SANDBOX_SESSION.getByName(`user_observation:workspace_${crypto.randomUUID()}`);
     await runInDurableObject(stub, async (instance, state) => {
       const f = await fixture(instance, state);
-      const setup = Promise.withResolvers<void>();
-      const originalGetAlarm = state.storage.getAlarm.bind(state.storage);
-      let alarmSetupStarted = 0;
-      state.storage.getAlarm = async () => {
-        alarmSetupStarted += 1;
-        await setup.promise;
-        return originalGetAlarm();
-      };
+      const refresh = vi.spyOn(instance['interactionRefresh'], 'refresh');
       try {
         const alarm = instance.alarm();
-        await vi.waitFor(() => expect(alarmSetupStarted).toBeGreaterThan(0));
+        await waitFor(() =>
+          expect(refresh).toHaveBeenCalledWith(expect.anything(), 'accepted_alarm')
+        );
+        await waitFor(() => expect(f.control.request).toHaveBeenCalledTimes(1));
         const nextMessage = { ...f.message, messageId: 'msg_new' };
         state.storage.kv.put('session_messages', [nextMessage]);
-        setup.resolve();
+        f.pending.resolve(response(busy));
         await alarm;
-        expect(f.control.getStatus).not.toHaveBeenCalled();
-        expect(f.control.request).not.toHaveBeenCalled();
+        expect(f.control.getStatus).toHaveBeenCalledTimes(1);
+        expect(f.control.request).toHaveBeenCalledTimes(1);
         expect(state.storage.kv.get('session_messages')).toEqual([nextMessage]);
       } finally {
-        setup.resolve();
-        state.storage.getAlarm = originalGetAlarm;
+        f.pending.resolve(response(busy));
+        refresh.mockRestore();
         await f.cleanup();
       }
     });

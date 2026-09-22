@@ -291,7 +291,6 @@ export type UsageDetails = {
 export const TimePeriodSchema = z.enum(['week', 'month', 'year', 'all']);
 export type TimePeriod = z.infer<typeof TimePeriodSchema>;
 
-// OpenRouter API Types
 const OpenRouterProviderSchema = z.object({
   name: z.string(),
   displayName: z.string(),

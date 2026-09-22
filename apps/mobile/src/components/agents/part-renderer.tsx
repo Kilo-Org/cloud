@@ -33,6 +33,12 @@ type PartRendererProps = {
   defaultReasoningExpanded?: boolean;
   onOpenChildSession?: OpenChildSession;
   modelOptions?: SessionModelOption[];
+  /**
+   * Long-press handler forwarded into rendered code fences' copy trigger. The
+   * message bubble supplies its details long-press so a press-and-hold on a
+   * fence still opens message details. Omitted outside a bubble.
+   */
+  onLongPressCode?: () => void;
 };
 
 export function PartRenderer({
@@ -42,6 +48,7 @@ export function PartRenderer({
   defaultReasoningExpanded,
   onOpenChildSession,
   modelOptions,
+  onLongPressCode,
 }: Readonly<PartRendererProps>) {
   const { t } = useTranslation();
   if (!partRendersContent(part)) {
@@ -50,7 +57,7 @@ export function PartRenderer({
   if (isTextPart(part)) {
     return (
       <MessageErrorBoundary>
-        <TextPartRenderer text={part.text} />
+        <TextPartRenderer text={part.text} onLongPressCode={onLongPressCode} />
       </MessageErrorBoundary>
     );
   }
@@ -60,7 +67,7 @@ export function PartRenderer({
         <ToolPartRenderer
           part={part}
           getChildMessages={getChildMessages}
-          renderPart={props => <PartRenderer {...props} />}
+          renderPart={props => <PartRenderer {...props} onLongPressCode={onLongPressCode} />}
           onOpenChildSession={onOpenChildSession}
           modelOptions={modelOptions}
         />

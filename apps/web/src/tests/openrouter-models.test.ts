@@ -139,6 +139,10 @@ jest.mock('@/lib/ai-gateway/experiments/list-available-experiment-models', () =>
   listAvailableExperimentModels: jest.fn(async () => []),
 }));
 
+jest.mock('@/lib/ai-gateway/openai-chatgpt/routing', () => ({
+  tagOpenAiChatGptByokModels: jest.fn(async (_userId: string, models: unknown[]) => models),
+}));
+
 jest.mock('@/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getBenchmarkRoutingTable: jest.fn(async () => ({ status: 200, body: { table: null } })),
 }));
@@ -425,8 +429,12 @@ describe('GET /api/openrouter/models', () => {
 });
 
 describe('GET /api/gateway/v1/models', () => {
-  test('uses the OpenRouter models handler', () => {
-    expect(gatewayV1ModelsGET).toBe(GET);
+  test('re-wraps the OpenRouter models handler with its own timing pattern', () => {
+    // The alias wraps the already timed handler so a gateway pathname logs the
+    // gateway pattern; the inner `/api/openrouter/models` wrapper stays silent
+    // by prefix. A bare re-export would emit no `api_timing` line at all.
+    expect(typeof gatewayV1ModelsGET).toBe('function');
+    expect(gatewayV1ModelsGET).not.toBe(GET);
   });
 
   test('retains Enkrypt and Terminal Bench in the gateway catalog response', async () => {
@@ -499,7 +507,9 @@ describe('Enkrypt catalog publication boundaries', () => {
 
       const raw = await getRawOpenRouterModels();
       const catalog = await GET(createTestRequest('/api/openrouter/models'));
-      const transcription = await transcriptionModelsGET();
+      const transcription = await transcriptionModelsGET(
+        createTestRequest('/api/gateway/transcription-models')
+      );
       expect(catalog.status).toBe(200);
       expect(transcription.status).toBe(200);
       for (const response of [raw, await catalog.json(), await transcription.json()]) {
@@ -521,7 +531,9 @@ describe('Enkrypt catalog publication boundaries', () => {
     expect(await getRawOpenRouterModels()).toEqual({
       data: [{ id: 'provider/invalid', unrelated: 'retained' }],
     });
-    const transcription = await transcriptionModelsGET();
+    const transcription = await transcriptionModelsGET(
+      createTestRequest('/api/gateway/transcription-models')
+    );
     expect(transcription.status).toBe(200);
     expect(await transcription.json()).toEqual({
       data: [{ id: 'provider/invalid', unrelated: 'retained' }],

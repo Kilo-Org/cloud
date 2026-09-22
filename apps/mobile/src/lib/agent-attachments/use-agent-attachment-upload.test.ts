@@ -1,10 +1,11 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/lib/auth/auth-context.test.tsx) */
 /* eslint-disable max-lines -- the Row 3.3 hook FSM suite shares this single owned test file with the pure upload-contract helpers */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as ImageManipulator from 'expo-image-manipulator';
+import { type ImageResult } from 'expo-image-manipulator';
+import { toast } from 'sonner-native';
 
+import { i18n } from '@/i18n';
 import { AGENT_ATTACHMENT_MAX_BYTES } from './constants';
 import {
   type AgentAttachment,
@@ -34,6 +35,7 @@ const hoisted = vi.hoisted(() => {
     announceForA11y: vi.fn(),
     announcingToastError: vi.fn(),
     measureLocalSize: vi.fn(),
+    manipulateAsync: vi.fn<() => Promise<ImageResult>>(),
     cancel: vi.fn<() => void>(),
     fileDelete: vi.fn(),
     captureException: vi.fn(),
@@ -45,7 +47,7 @@ vi.mock('expo-crypto', () => ({ randomUUID: hoisted.randomUUID }));
 vi.mock('@sentry/react-native', () => ({ captureException: hoisted.captureException }));
 vi.mock('expo-image-manipulator', () => ({
   SaveFormat: { PNG: 'png', WEBP: 'webp', JPEG: 'jpeg' },
-  manipulateAsync: vi.fn(),
+  manipulateAsync: hoisted.manipulateAsync,
 }));
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
@@ -442,10 +444,10 @@ describe('addCandidates uploads documents at selection (Step 2)', () => {
   });
 
   it('never uploads a strip-failed image and marks it a terminal chip', async () => {
-    vi.mocked(ImageManipulator.manipulateAsync).mockReset();
+    hoisted.manipulateAsync.mockReset();
     // A strip failure returns the original URI, which the hook reads as
     // metadataStripFailed.
-    vi.mocked(ImageManipulator.manipulateAsync).mockResolvedValue({
+    hoisted.manipulateAsync.mockResolvedValue({
       uri: 'file:///cache/IMG_0001.HEIC',
       width: 100,
       height: 100,
@@ -461,6 +463,44 @@ describe('addCandidates uploads documents at selection (Step 2)', () => {
     expect(chip?.terminal).toBe(true);
     expect(chip?.metadataStripFailed).toBe(true);
     expect(hoisted.uploadOne).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  it('renders the limit warning with the plural noun for the total it names', async () => {
+    const renderer = await mountHook();
+    // Four chips already fill the composer (max 5), so a two-file selection
+    // admits one and the warning fires. English carries the plural noun in
+    // every category, so the sentence reads "1 of 2 files" — never "1 of 2
+    // file".
+    await act(async () => {
+      hookApi().restoreFileParts(
+        Array.from({ length: 4 }, (_, index) => ({
+          filename: `existing-${index}.pdf`,
+          mime: 'application/pdf',
+          url: `https://r2.example.com/attachments/user-1/cloud-agent/msg-uuid-1/existing-${index}.pdf`,
+        }))
+      );
+      await settle();
+    });
+    vi.mocked(toast.warning).mockClear();
+    const translate = vi.spyOn(i18n, 't');
+    await act(async () => {
+      await hookApi().addCandidates([
+        { name: 'a.pdf', uri: 'file:///cache/a.pdf' },
+        { name: 'b.pdf', uri: 'file:///cache/b.pdf' },
+      ]);
+    });
+    // The admitted count selects the plural category: it is the numeral a
+    // catalog's own grammar inflects the warning's noun on ("1 fichier"),
+    // while the total the user selected only fills the interpolation. Picking
+    // the category from the selected total would render a plural noun beside
+    // the singular numeral in those catalogs.
+    expect(translate).toHaveBeenCalledWith(
+      'agentChat.attachmentPicker.onlyAddingFiles',
+      expect.objectContaining({ count: 1 })
+    );
+    expect(toast.warning).toHaveBeenCalledWith('Only adding 1 of 2 files (max 5)');
+    translate.mockRestore();
     renderer.unmount();
   });
 });
@@ -912,8 +952,8 @@ describe('selection-time image upload (Step 2)', () => {
     hoisted.announcingToastError.mockReset();
     hoisted.measureLocalSize.mockReset();
     hoisted.measureLocalSize.mockResolvedValue(1024);
-    vi.mocked(ImageManipulator.manipulateAsync).mockReset();
-    vi.mocked(ImageManipulator.manipulateAsync).mockResolvedValue({
+    hoisted.manipulateAsync.mockReset();
+    hoisted.manipulateAsync.mockResolvedValue({
       uri: 'file:///cache/stripped.jpg',
       width: 100,
       height: 100,

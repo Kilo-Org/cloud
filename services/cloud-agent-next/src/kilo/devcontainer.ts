@@ -16,10 +16,6 @@ import { shellQuote, validShellEnvEntries } from './utils.js';
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser';
 import { posix as pathPosix } from 'node:path';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 /**
  * Result of dev container detection. We only return enough information to
  * surface in logs / progress events — `devcontainer up` discovers the config
@@ -81,10 +77,6 @@ export type BringUpOptions = {
 type DevContainerJson = Record<string, unknown>;
 
 type ExecOptions = NonNullable<Parameters<ExecutionSession['exec']>[1]>;
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
 
 /** Label that identifies the container as belonging to a given cloud-agent session. */
 export const KILO_AGENT_SESSION_LABEL = 'kilo.agentSession';
@@ -148,7 +140,7 @@ function buildDevContainerTrustEnv(sessionHome: string): Record<string, string> 
  * `wrangler.jsonc#image_vars` so the kilo running in the dev container
  * matches the one we use on the outer sandbox.
  */
-export const KILO_CLI_VERSION = '7.4.20';
+export const KILO_CLI_VERSION = '7.6.2';
 
 const DEVCONTAINER_RUNTIME_BUN_VERSION = '1.3.14';
 const DEVCONTAINER_RUNTIME_BOOTSTRAP_TIMEOUT_MS = 10 * 60 * 1000;
@@ -205,10 +197,6 @@ export function buildRestoreCommand(opts: {
   ].join(' ');
 }
 
-// ---------------------------------------------------------------------------
-// Detection
-// ---------------------------------------------------------------------------
-
 /**
  * Detect a dev container config inside the cloned workspace.
  *
@@ -241,10 +229,6 @@ export async function detectDevContainer(
   if (!path) return null;
   return { configPath: path };
 }
-
-// ---------------------------------------------------------------------------
-// Bring up
-// ---------------------------------------------------------------------------
 
 type DevContainerRuntimeCommandOptions = {
   workspacePath: string;
@@ -507,10 +491,6 @@ export async function bringUpDevContainer(
     throw error;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Build the override JSON merged on top of the user's `devcontainer.json`.
@@ -908,10 +888,6 @@ async function teardownDevContainer(
     // Stale override files are harmless.
   }
 }
-
-// ---------------------------------------------------------------------------
-// Errors
-// ---------------------------------------------------------------------------
 
 export class DevContainerUpError extends Error {
   constructor(

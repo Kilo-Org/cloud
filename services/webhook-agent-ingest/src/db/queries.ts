@@ -11,12 +11,14 @@ export { getWorkerDb, type WorkerDb };
 
 export type UserForToken = Pick<
   typeof kilocode_users.$inferSelect,
-  'id' | 'blocked_reason' | 'api_token_pepper'
+  'id' | 'blocked_at' | 'blocked_reason' | 'api_token_pepper'
 >;
 
 export type BotUserForToken = {
   id: string;
   api_token_pepper: string;
+  blocked_at: string | null;
+  blocked_reason: string | null;
 };
 
 // Bot user constants — must match kilocode-backend's src/lib/bot-users/types.ts
@@ -85,6 +87,7 @@ export async function findUserForToken(db: WorkerDb, userId: string): Promise<Us
   const rows = await db
     .select({
       id: kilocode_users.id,
+      blocked_at: kilocode_users.blocked_at,
       blocked_reason: kilocode_users.blocked_reason,
       api_token_pepper: kilocode_users.api_token_pepper,
     })
@@ -114,6 +117,8 @@ export async function ensureBotUserForOrg(db: WorkerDb, orgId: string): Promise<
     .select({
       id: kilocode_users.id,
       api_token_pepper: kilocode_users.api_token_pepper,
+      blocked_at: kilocode_users.blocked_at,
+      blocked_reason: kilocode_users.blocked_reason,
     })
     .from(kilocode_users)
     .where(and(eq(kilocode_users.id, botId), eq(kilocode_users.is_bot, true)))
@@ -125,7 +130,12 @@ export async function ensureBotUserForOrg(db: WorkerDb, orgId: string): Promise<
     await ensureBotIsOrgMember(db, existing.id, orgId);
 
     if (existing.api_token_pepper) {
-      return { id: existing.id, api_token_pepper: existing.api_token_pepper };
+      return {
+        id: existing.id,
+        api_token_pepper: existing.api_token_pepper,
+        blocked_at: existing.blocked_at,
+        blocked_reason: existing.blocked_reason,
+      };
     }
 
     // Edge case: existing bot has NULL api_token_pepper — generate one
@@ -135,7 +145,12 @@ export async function ensureBotUserForOrg(db: WorkerDb, orgId: string): Promise<
       .set({ api_token_pepper: newPepper })
       .where(eq(kilocode_users.id, existing.id));
 
-    return { id: existing.id, api_token_pepper: newPepper };
+    return {
+      id: existing.id,
+      api_token_pepper: newPepper,
+      blocked_at: existing.blocked_at,
+      blocked_reason: existing.blocked_reason,
+    };
   }
 
   // Create new bot user
@@ -154,7 +169,7 @@ export async function ensureBotUserForOrg(db: WorkerDb, orgId: string): Promise<
 
   await ensureBotIsOrgMember(db, botId, orgId);
 
-  return { id: botId, api_token_pepper: apiTokenPepper };
+  return { id: botId, api_token_pepper: apiTokenPepper, blocked_at: null, blocked_reason: null };
 }
 
 async function ensureBotIsOrgMember(db: WorkerDb, botUserId: string, orgId: string) {

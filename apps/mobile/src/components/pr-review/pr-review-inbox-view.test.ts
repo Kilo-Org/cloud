@@ -40,6 +40,19 @@ describe('selectPrInboxView', () => {
     ).toEqual({ kind: 'empty', showLoadMoreRetry: false });
   });
 
+  it('selects retryable when no rows loaded and a provider failed', () => {
+    // A GitLab/Bitbucket outage beside an empty GitHub inbox must not render
+    // "No review requests": the failure owns the surface and its retry CTA.
+    expect(
+      selectPrInboxView({
+        isLoading: false,
+        itemCount: 0,
+        firstPageErrorState: null,
+        laterPageError: true,
+      })
+    ).toEqual({ kind: 'retryable', showLoadMoreRetry: false });
+  });
+
   it('selects retryable for a transient first-page error', () => {
     expect(
       selectPrInboxView({

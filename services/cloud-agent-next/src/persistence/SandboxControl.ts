@@ -3,7 +3,19 @@ import {
   cloudAgentWorktreeIdSchema,
   WORKTREE_RUNTIME_HISTORY_UNAVAILABLE,
 } from '@kilocode/session-ingest-contracts';
-import { resolveSandboxExclusivity } from '../sandbox-control/worktree-ownership.js';
+import {
+  RECONCILIATION_LIMITS,
+  reconcileSandboxReferences,
+} from '../sandbox-control/worktree-ownership.js';
+import {
+  addSessionReference,
+  hasForeignReference,
+  markReferencesReconciled,
+  removeSessionReference,
+  removeWorktreeReferences,
+  worktreeIdFromDirectory,
+  type SessionReferenceState,
+} from '../sandbox-control/session-references.js';
 import { getWorktreeWorkspacePath } from '../workspace.js';
 import {
   cleanWorktreeRuntime,
@@ -18,6 +30,12 @@ import {
 } from '../sandbox-control/worktree-deletion.js';
 import { getSandbox } from '@cloudflare/sandbox';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
+import {
+  getSandboxAllocationInstance,
+  getSandboxAllocationResources,
+  type CloudflareContainersInstance,
+  type VercelSandboxResources,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
 import type { Env } from '../types.js';
 import { resolveSecret } from '../auth.js';
@@ -55,6 +73,7 @@ import {
 import {
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_AUTO_PONG,
+  SandboxAcquisitionLostError,
   sessionOperationAckSchema,
   sessionOperationAuthorizationSchema,
   sessionOperationExpiresAt,
@@ -65,8 +84,12 @@ import {
   sessionAbortResultSchema,
   sessionNativeRuntimeRetirementPayloadSchema,
   sessionRequestIdentitySchema,
+  sameSessionEventIdentity,
   wrapperInstanceIdSchema,
   type ResponseFrame,
+  type SandboxEventBatchItemOutcome,
+  type SandboxEventBatchPayload,
+  type SandboxEventBatchResult,
   type SessionAttachPayload,
   type SessionOperationAck,
   type SessionOperationAuthorization,
@@ -99,6 +122,8 @@ import {
   recordStopAttempt,
   sameAllocation,
   getWorktreeCredentialContainment,
+  sandboxProviderConfigurationSchema,
+  type SandboxProviderConfiguration,
   WORKTREE_CREDENTIAL_CONTAINMENT,
   type CredentialContainmentRequirements,
   type ObserveResult,
@@ -110,6 +135,7 @@ import {
   detachRoute,
   getRouteBySessionId,
   hasActiveWork,
+  hasEnvironmentPinningWork,
   resolveSessionEventRoute,
   type AttachRouteInput,
   type SessionRoute,
@@ -139,11 +165,14 @@ import {
   loadRuntimeMetadata,
   saveRuntimeMetadata,
   loadRouteTable,
+  loadRouteTableSync,
   loadTransitionLog,
   readSandboxControlState,
   saveDeadlines,
   savePhysicalRecord,
   saveRouteTable,
+  loadSessionReferences,
+  saveSessionReferences,
   saveTransitionLog,
   loadSessionCredentialGrants,
   saveSessionCredentialGrants,
@@ -163,6 +192,7 @@ import {
 } from '../sandbox-control/recovery-cleanup.js';
 import {
   createNativeRuntimeRetirementWorkflow,
+  holdsNativeRuntimeRetirementFence,
   matchesNativeRuntimeRetirementAllocation,
   releaseNativeRuntimeRetirement,
   sameNativeRuntimeRetirement,
@@ -180,6 +210,8 @@ import { adaptSessionAttachPayloadForWrapper } from '../sandbox-session/attach-p
 import { parseControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import { verifyRuntimeCredentialProxyHandle } from '../runtime-credential-proxy.js';
 import {
+  CONTROL_DIAGNOSTIC_STRING_CHARSET,
+  CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH,
   diagnosticCause,
   diagnosticConnection,
   diagnosticEventType,
@@ -193,6 +225,7 @@ import type {
   StopResult,
 } from '../sandbox-control/provider.js';
 import { nextEnsureReadyStep } from '../sandbox-control/ensure-ready.js';
+import { ControlRequestError } from '../sandbox-session/control-dispatch.js';
 import {
   planReconciliation,
   shouldRearmReconciliation,
@@ -201,6 +234,7 @@ import {
   createCloudflareProviderAdapter,
   decodeCloudflareProviderRef,
 } from '../sandbox-control/cloudflare-provider.js';
+import { createCloudflareContainersProviderAdapter } from '../sandbox-control/cloudflare-containers-provider.js';
 import {
   createVercelProviderAdapter,
   decodeVercelProviderRef,
@@ -230,7 +264,7 @@ import {
   type SandboxTerminalAccessInput,
   type SandboxTerminalAccessResult,
 } from '../sandbox-control/terminal-billing.js';
-import type { AgentSandboxProvider } from '../types.js';
+import { agentSandboxProviderSchema, type AgentSandboxProvider } from '../types.js';
 import {
   safeSandboxRuntimeVersion,
   type SandboxRuntimeMetadata,
@@ -240,10 +274,12 @@ import {
 const CREDENTIAL_HASH_KEY = 'wrapper_credential_hash';
 const OWNER_ID_KEY = 'owner_id';
 const WRAPPER_READY_AT_KEY = 'wrapper_ready_at';
+const WRAPPER_HEARTBEAT_OBSERVATION_KEY = 'wrapper_heartbeat_observation';
 const ACTIVE_WRAPPER_RUNTIME_KEY = 'active_wrapper_runtime';
 const DIAGNOSTIC_BUNDLE_KEY = 'diagnostic_bundle';
 const PROVIDER_KIND_KEY = 'provider_kind';
 const PROVIDER_LOCATOR_KEY = 'provider_locator';
+const PROVIDER_CONFIGURATION_KEY = 'provider_configuration';
 const BILLING_INPUT_KEY = 'billing_input';
 const ACQUISITION_RECEIPTS_KEY = 'acquisition_receipts';
 const CREDENTIAL_POLICY_DIRTY_KEY = 'credential_policy_dirty';
@@ -277,9 +313,51 @@ function allocationIdentity(physical: PhysicalRecord) {
     : allocationIdentitySchema.parse({ kind: 'provider', id: physical.providerRef });
 }
 
+function isLivePhysicalRecord(physical: PhysicalRecord): boolean {
+  return !physical.stopTombstone && (physical.state === 'creating' || physical.state === 'running');
+}
+
 type PersistedWrapperRuntime = SandboxControlConnectionIdentity & {
   readyConnectionId?: string;
 };
+
+type WrapperHeartbeatDecision =
+  | 'accepted'
+  | 'kilo_unhealthy'
+  | 'runtime_not_ready'
+  | 'stale_during_apply';
+
+// One observation belongs to the currently armed connection. `armedAt` is the
+// deadline basis time (`now` on accept, `readyAt` on ready/repair); it is not
+// `armedExpiryAt` (the scheduled expiry). This is report-only: the deadline
+// logic remains the single source of truth.
+type WrapperHeartbeatObservation = {
+  connectionId: string;
+  wrapperInstanceId?: string;
+  lastReceivedAt?: number;
+  lastAcceptedAt?: number;
+  armedAt?: number;
+  armedExpiryAt?: number;
+  armedBasis: 'wrapper_ready' | 'heartbeat_receipt';
+  lastDecision?: WrapperHeartbeatDecision;
+};
+
+// Per-session heartbeat evidence is report-only and bounded by the
+// `logControlDiagnostic` string shape (see diagnostics.ts). Entries are whole or
+// omitted: a `kiloSessionId` is never truncated.
+function packSessionReport(sessions: SandboxHeartbeatPayload['sessions']): string | undefined {
+  let report = '';
+  for (const session of sessions) {
+    // A field outside the diagnostic alphabet would redact the whole joined
+    // string, so omit that entry instead of losing every session.
+    if (!CONTROL_DIAGNOSTIC_STRING_CHARSET.test(session.kiloSessionId)) continue;
+    const entry = `${session.kiloSessionId}:${session.state}:${session.waitingOn ?? 'none'}`;
+    const candidate = report.length === 0 ? entry : `${report}.${entry}`;
+    if (candidate.length > CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH) continue;
+    report = candidate;
+  }
+  return report.length > 0 ? report : undefined;
+}
 
 type TerminalRuntimeSnapshot = {
   allowed: true;
@@ -297,6 +375,20 @@ type TerminalRuntimeRejection = {
 
 function sessionForwardFrameBytes(frame: unknown): number {
   return new TextEncoder().encode(JSON.stringify(frame)).byteLength;
+}
+
+function batchOutcomes(
+  payload: SandboxEventBatchPayload,
+  status: SandboxEventBatchItemOutcome['status'],
+  retryable?: boolean
+): SandboxEventBatchResult {
+  return {
+    outcomes: payload.items.map(item => ({
+      receiptId: item.receiptId,
+      status,
+      ...(retryable === undefined ? {} : { retryable }),
+    })),
+  };
 }
 
 export type AttachSessionInput = AttachRouteInput;
@@ -330,6 +422,8 @@ export class SandboxControl extends DurableObject<Env> {
   private activeConnection: SandboxControlConnectionIdentity | null = null;
   private readyConnectionId: string | null = null;
   private providerKind: AgentSandboxProvider = 'cloudflare';
+  private vercelResources: VercelSandboxResources | undefined;
+  private containersInstance: CloudflareContainersInstance | undefined;
   private readonly sessionForwarding = createSessionForwarding();
   private readonly forwarding = {
     enqueued: 0,
@@ -345,7 +439,6 @@ export class SandboxControl extends DurableObject<Env> {
     maxRpcWaitMs: 0,
     maxTotalForwardMs: 0,
   };
-  private lastAcceptedHeartbeat: { connectionId: string; at: number } | null = null;
   private credentialUpdates: Promise<void> = Promise.resolve();
   private provider: ProviderAdapter;
   private stopAttemptInFlight: {
@@ -394,6 +487,7 @@ export class SandboxControl extends DurableObject<Env> {
         this.nativeRetirementConnection(
           this.socketHandler.getConnectionIdentity() ?? this.activeConnection
         ),
+      isConnectionReady: () => this.readyWrapperRuntime() !== null,
       supportsTargetedRetirement: () => this.supportsNativeRuntimeRetirement(),
       persistPhysical: (from, to, reason) => this.persistPhysicalState(from, to, reason),
       onPhysicalStop: async (from, to, reason) => {
@@ -415,6 +509,7 @@ export class SandboxControl extends DurableObject<Env> {
         this.onSessionEvent(sessionIdentity, payload, identity, receiptId, sequence),
       onSessionPreparing: (sessionIdentity, payload, identity, receiptId, sequence) =>
         this.onSessionPreparing(sessionIdentity, payload, identity, receiptId, sequence),
+      onSessionEventBatch: (payload, identity) => this.onSessionEventBatch(payload, identity),
       onOperationResult: (session, delivery, identity) =>
         this.onOperationResult(session, delivery, identity),
       onNativeRuntimeRetired: (payload, identity) => this.onNativeRuntimeRetired(payload, identity),
@@ -449,17 +544,21 @@ export class SandboxControl extends DurableObject<Env> {
   private ensureOperationalInitialized(): Promise<void> {
     return (this.operationalInitialization ??= this.ctx.blockConcurrencyWhile(async () => {
       const ctx = this.ctx;
-      const [readyAt, runtime, kind, physical, recovery] = await Promise.all([
+      const [readyAt, runtime, configuration, physical, recovery] = await Promise.all([
         ctx.storage.get<number>(WRAPPER_READY_AT_KEY),
         ctx.storage.get<PersistedWrapperRuntime>(ACTIVE_WRAPPER_RUNTIME_KEY),
-        ctx.storage.get<AgentSandboxProvider>(PROVIDER_KIND_KEY),
+        this.readProviderConfiguration(),
         loadPhysicalRecord(ctx.storage),
         loadRecoveryDecisions(ctx.storage),
       ]);
       this.vercelLocator = vercelProviderLocatorSchema
         .optional()
         .parse(await ctx.storage.get(PROVIDER_LOCATOR_KEY));
-      this.providerKind = kind ?? 'cloudflare';
+      this.providerKind = configuration?.provider ?? 'cloudflare';
+      this.vercelResources =
+        configuration?.provider === 'vercel' ? configuration.resources : undefined;
+      this.containersInstance =
+        configuration?.provider === 'cloudflare-containers' ? configuration.instance : undefined;
       this.provider = this.createProviderAdapter(this.providerKind, physical);
       this.runtimeDeleted = (await ctx.storage.get(RUNTIME_DELETED_KEY)) === true;
       this.exclusiveDeletionWorktreeId = cloudAgentWorktreeIdSchema
@@ -552,20 +651,38 @@ export class SandboxControl extends DurableObject<Env> {
     for (const id of dueDeadlines(deadlines, now)) {
       const before = await loadDeadlines(this.ctx.storage);
       if (before[id] === undefined || before[id] > now) continue;
-      this.logDiagnostic('deadline_fired', {
-        deadlineId: id,
-        deadlineAt: before[id],
-        latenessMs: Math.max(0, now - before[id]),
-        heartbeatDeadlineAt: before.heartbeatExpiry,
-        idleDeadlineAt: before.idleStop,
-        connectionState: this.connectionState(),
-        lastAcceptedHeartbeatAt:
-          this.lastAcceptedHeartbeat?.connectionId === this.activeConnection?.connectionId
-            ? this.lastAcceptedHeartbeat?.at
-            : undefined,
-        ...diagnosticConnection(this.activeConnection),
-        ...this.forwarding,
-      });
+      // Report-only read: a failure degrades to "no observation" and must not
+      // block `handleDeadline`.
+      const heartbeatObservation = await this.readHeartbeatObservationBestEffort();
+      try {
+        this.logDiagnostic('deadline_fired', {
+          deadlineId: id,
+          deadlineAt: before[id],
+          latenessMs: Math.max(0, now - before[id]),
+          heartbeatDeadlineAt: before.heartbeatExpiry,
+          idleDeadlineAt: before.idleStop,
+          connectionState: this.connectionState(),
+          ...(id === 'heartbeatExpiry'
+            ? {
+                ...this.heartbeatLogFields(
+                  heartbeatObservation,
+                  this.activeConnection?.connectionId
+                ),
+                readyAt: await this.ctx.storage.get<number>(WRAPPER_READY_AT_KEY),
+                pendingControlRequests: this.socketHandler.pendingControlRequests(),
+              }
+            : {
+                lastAcceptedHeartbeatAt:
+                  heartbeatObservation?.connectionId === this.activeConnection?.connectionId
+                    ? heartbeatObservation?.lastAcceptedAt
+                    : undefined,
+              }),
+          ...diagnosticConnection(this.activeConnection),
+          ...this.forwarding,
+        });
+      } catch {
+        // Report-only: the deadline action must run even if diagnostics fail.
+      }
       await this.appendLog(deadlineTransition(now, id, 'fired'));
       await this.handleDeadline(id);
       await this.ctx.storage.transaction(async () => {
@@ -600,7 +717,11 @@ export class SandboxControl extends DurableObject<Env> {
         );
       }
       await this.ctx.storage.put(CREDENTIAL_HASH_KEY, hash);
-      await this.ctx.storage.delete([ACTIVE_WRAPPER_RUNTIME_KEY, WRAPPER_READY_AT_KEY]);
+      await this.ctx.storage.delete([
+        ACTIVE_WRAPPER_RUNTIME_KEY,
+        WRAPPER_READY_AT_KEY,
+        WRAPPER_HEARTBEAT_OBSERVATION_KEY,
+      ]);
       await saveDeadlines(this.ctx.storage, deadlines);
       await this.scheduleAlarm(deadlines);
       await this.appendLog(credentialTransition(Date.now(), 'rotated'));
@@ -680,7 +801,7 @@ export class SandboxControl extends DurableObject<Env> {
     ) {
       return null;
     }
-    const worktreeId = route?.worktreeId ?? this.worktreeIdFromDirectory(input.directory);
+    const worktreeId = route?.worktreeId ?? worktreeIdFromDirectory(input.directory);
     if (
       this.runtimeDeleted ||
       this.exclusiveDeletionWorktreeId ||
@@ -692,7 +813,7 @@ export class SandboxControl extends DurableObject<Env> {
     ) {
       return null;
     }
-    const runtime = this.readyWrapperRuntime();
+    const runtime = this.establishedWrapperForAllocation(physical);
     if (
       !runtime ||
       !runtime.wrapperInstanceId ||
@@ -779,7 +900,13 @@ export class SandboxControl extends DurableObject<Env> {
     const runtime = usesMaintenanceChannel
       ? this.socketHandler.getConnectionIdentity()
       : this.readyWrapperRuntime();
-    if (!runtime) throw new Error('Sandbox runtime is not ready');
+    if (!runtime)
+      throw new ControlRequestError({
+        code: 'not_ready',
+        message: 'Sandbox runtime is not ready',
+        retryable: true,
+        admission: 'not-admitted',
+      });
     if (
       expectedWrapperInstanceId !== undefined &&
       runtime.wrapperInstanceId !== expectedWrapperInstanceId
@@ -827,7 +954,12 @@ export class SandboxControl extends DurableObject<Env> {
       physical.providerRef !== runtime.providerInstanceId ||
       !isCurrent()
     ) {
-      throw new Error('Sandbox runtime is not ready');
+      throw new ControlRequestError({
+        code: 'not_ready',
+        message: 'Sandbox runtime is not ready',
+        retryable: true,
+        admission: 'not-admitted',
+      });
     }
     const scopedSession = scopedStop
       ? sessionRequestIdentitySchema.safeParse(input.session)
@@ -1128,7 +1260,7 @@ export class SandboxControl extends DurableObject<Env> {
       )
         throw new Error('Session interaction scope is stale');
       this.assertWorktreeAdmission(route.worktreeId);
-      this.assertWorktreeAdmission(this.worktreeIdFromDirectory(session.directory));
+      this.assertWorktreeAdmission(worktreeIdFromDirectory(session.directory));
     });
   }
 
@@ -1286,18 +1418,19 @@ export class SandboxControl extends DurableObject<Env> {
     if (wrapperInstanceId !== input.wrapperInstanceId)
       return { quarantined: false, disposition: 'unconfirmed' };
     const route = (await loadRouteTable(this.ctx.storage)).get(input.sessionId);
+    const routeIdentityMatches =
+      route !== undefined &&
+      (nativeRuntimeId?.success && authorization?.success
+        ? route.ownerId === input.ownerId &&
+          route.kiloSessionId === authorization.data.session.kiloSessionId &&
+          route.directory === authorization.data.session.directory
+        : true);
     const targetRoute =
       nativeRuntimeId?.success && authorization?.success
-        ? route &&
-          route.ownerId === input.ownerId &&
-          route.kiloSessionId === authorization.data.session.kiloSessionId &&
-          route.directory === authorization.data.session.directory &&
-          route.nativeRuntimeId === nativeRuntimeId.data
+        ? routeIdentityMatches && route?.nativeRuntimeId === nativeRuntimeId.data
           ? route
           : undefined
         : route;
-    if (nativeRuntimeId?.success && !targetRoute)
-      return { quarantined: false, disposition: 'unconfirmed' };
     if (
       targetRoute &&
       targetRoute.ownerId === input.ownerId &&
@@ -1315,7 +1448,37 @@ export class SandboxControl extends DurableObject<Env> {
       if (retirement === 'retired') return { quarantined: true, disposition: 'native_retired' };
       if (retirement === 'pending') return { quarantined: true, disposition: 'native_pending' };
     }
-    if (nativeRuntimeId?.success) return { quarantined: false, disposition: 'unconfirmed' };
+    if (nativeRuntimeId?.success) {
+      // An already-established stop tombstone keeps the cleanup gate armed even
+      // when the route no longer names the pending native. Do not re-observe.
+      if (physical.stopTombstone) {
+        await this.repairLifecycleScheduling(physical);
+        return { quarantined: true, disposition: 'physical_stopping' };
+      }
+      // A route whose identity matches but whose recorded native id is missing
+      // or different is not proof the native process is gone. Observe the bound
+      // allocation and release the gate only on a committed stop.
+      if (
+        !targetRoute &&
+        routeIdentityMatches &&
+        physical.state === 'running' &&
+        physical.providerRef !== null
+      ) {
+        await this.observeRunningAllocationLoss(physical, input.wrapperInstanceId);
+        const observed = await loadPhysicalRecord(this.ctx.storage);
+        if (!sameAllocation(observed, physical)) {
+          return { quarantined: false, disposition: 'unconfirmed' };
+        }
+        if (observed.stopTombstone) {
+          this.ctx.waitUntil(this.recordStopAttempt());
+          return { quarantined: true, disposition: 'physical_stopping' };
+        }
+        if (observed.state === 'stopped') {
+          return { quarantined: false, disposition: 'physical_stopped' };
+        }
+      }
+      return { quarantined: false, disposition: 'unconfirmed' };
+    }
     if (!physical.stopTombstone) {
       const next = beginStop(physical, input.reason, Date.now(), wrapperInstanceId);
       await this.persistPhysical(physical, next, input.reason);
@@ -1344,7 +1507,10 @@ export class SandboxControl extends DurableObject<Env> {
     }
     const metadata = await this.readCredentialMetadata(input);
     const provider = getSandboxProvider(metadata);
-    await this.pinProvider(provider);
+    await this.pinProvider(provider, {
+      resources: getSandboxAllocationResources(metadata.workspace?.sandboxAllocation),
+      instance: getSandboxAllocationInstance(metadata.workspace?.sandboxAllocation),
+    });
     const physical = await loadPhysicalRecord(this.ctx.storage);
     const requiredContainment = getWorktreeCredentialContainment(
       requiresContainmentSandbox(metadata)
@@ -1512,6 +1678,8 @@ export class SandboxControl extends DurableObject<Env> {
     ownerId: string;
     sessionId: string;
     provider?: AgentSandboxProvider;
+    resources?: VercelSandboxResources;
+    instance?: CloudflareContainersInstance;
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;
     billing?: SandboxBillingInput;
@@ -1553,7 +1721,10 @@ export class SandboxControl extends DurableObject<Env> {
       await this.ctx.storage.delete(RUNTIME_DELETED_KEY);
       this.runtimeDeleted = false;
     }
-    await this.pinProvider(input.provider);
+    await this.pinProvider(input.provider, {
+      resources: input.resources,
+      instance: input.instance,
+    });
     if (acquisition && this.providerKind !== 'cloudflare') {
       throw new Error('Sandbox acquisition is only supported for Cloudflare');
     }
@@ -1561,18 +1732,51 @@ export class SandboxControl extends DurableObject<Env> {
     let physical: PhysicalRecord;
     let creating = false;
     if (acquisition) {
-      let selected = await this.acquirePhysical(acquisition, requiredContainment, worktreeId);
+      let selected = await this.acquirePhysical(
+        acquisition,
+        requiredContainment,
+        worktreeId,
+        input.sessionId
+      );
+      if (
+        selected.action === 'reuse' &&
+        selected.physical.state === 'running' &&
+        selected.physical.stopTombstone === null &&
+        selected.physical.providerRef !== null &&
+        this.readyWrapperRuntime() === null
+      ) {
+        const established = this.establishedWrapperForAllocation(selected.physical);
+        if (established?.wrapperInstanceId) {
+          await this.observeRunningAllocationLoss(selected.physical, established.wrapperInstanceId);
+          selected = await this.acquirePhysical(
+            acquisition,
+            requiredContainment,
+            worktreeId,
+            input.sessionId
+          );
+        }
+      }
       if (selected.action === 'wait') {
         const step = nextEnsureReadyStep(selected.physical.state, true);
         if (step === 'release-failed') {
           await this.releaseIfAuthoritativelyDead(selected.physical);
-          selected = await this.acquirePhysical(acquisition, requiredContainment, worktreeId);
+          selected = await this.acquirePhysical(
+            acquisition,
+            requiredContainment,
+            worktreeId,
+            input.sessionId
+          );
         } else if (step === 'observe-unknown') {
           await this.observeCurrentProvider(selected.physical);
-          selected = await this.acquirePhysical(acquisition, requiredContainment, worktreeId);
+          selected = await this.acquirePhysical(
+            acquisition,
+            requiredContainment,
+            worktreeId,
+            input.sessionId
+          );
         }
       }
-      if (selected.action === 'wait') return this.statusForPhysical(selected.physical);
+      if (selected.action === 'wait') return this.waitingAcquisitionStatus(selected.physical);
       physical = selected.physical;
       creating = selected.action === 'create';
     } else {
@@ -1603,7 +1807,9 @@ export class SandboxControl extends DurableObject<Env> {
       }
     }
     const currentStatus = () =>
-      acquisition ? this.acquisitionStatus(acquisition, physical) : this.getStatus();
+      acquisition
+        ? this.acquisitionStatus(acquisition, physical, input.sessionId)
+        : this.getStatus();
     if (creating) this.provider = this.createProviderAdapter(this.providerKind, physical);
     if (physical.stopTombstone || (physical.state !== 'creating' && physical.state !== 'running')) {
       return currentStatus();
@@ -1623,13 +1829,14 @@ export class SandboxControl extends DurableObject<Env> {
         'Sandbox billing admission timed out'
       );
       const current = await loadPhysicalRecord(this.ctx.storage);
-      if (
+      const ownershipLost =
         !sameAllocation(current, physical) ||
         current.providerRef !== physical.providerRef ||
-        current.state !== 'running' ||
-        current.stopTombstone
-      ) {
-        throw new Error('Sandbox runtime changed during billing admission');
+        current.stopTombstone;
+      if (ownershipLost || current.state !== 'running') {
+        const error = 'Sandbox runtime changed during billing admission';
+        if (acquisition && ownershipLost) throw new SandboxAcquisitionLostError(error);
+        throw new Error(error);
       }
     }
     const preparationDeadline = Math.min(
@@ -1792,12 +1999,18 @@ export class SandboxControl extends DurableObject<Env> {
     }
     const status = await this.ctx.storage.transaction(async () => {
       const current = await loadPhysicalRecord(this.ctx.storage);
+      const allocationChanged = !sameAllocation(current, physical);
+      const providerChanged =
+        physical.providerRef !== null && current.providerRef !== physical.providerRef;
       if (
-        !sameAllocation(current, physical) ||
-        (physical.providerRef !== null && current.providerRef !== physical.providerRef) ||
-        (acquisition && !(await this.bindAcquisition(acquisition, current)))
+        allocationChanged ||
+        providerChanged ||
+        (acquisition && !(await this.bindAcquisition(acquisition, current, input.sessionId)))
       ) {
-        throw new Error('Sandbox allocation changed during readiness');
+        const error = 'Sandbox allocation changed during readiness';
+        if (acquisition && (allocationChanged || providerChanged))
+          throw new SandboxAcquisitionLostError(error);
+        throw new Error(error);
       }
       return this.statusForPhysical(current);
     });
@@ -1807,7 +2020,8 @@ export class SandboxControl extends DurableObject<Env> {
   private async acquirePhysical(
     acquisition: SandboxAcquisition,
     requiredContainment: CredentialContainmentRequirements,
-    worktreeId?: string
+    worktreeId?: string,
+    sessionId?: string
   ): Promise<{
     physical: PhysicalRecord;
     action: 'create' | 'reuse' | 'wait';
@@ -1823,20 +2037,25 @@ export class SandboxControl extends DurableObject<Env> {
       ) {
         throw new Error('Sandbox containment mode conflicts with the session');
       }
-      if (await this.bindAcquisition(acquisition, physical)) return { physical, action: 'reuse' };
+      if (
+        (await this.bindAcquisition(acquisition, physical, sessionId)) &&
+        isLivePhysicalRecord(physical)
+      )
+        return { physical, action: 'reuse' };
       if (physical.state !== 'stopped' || physical.stopTombstone) {
         return { physical, action: 'wait' };
       }
       const next = claimCreate(physical, intentId, Date.now(), allocationName, requiredContainment);
       await this.persistPhysicalState(physical, next, 'demand');
-      await this.bindAcquisition(acquisition, next);
+      await this.bindAcquisition(acquisition, next, sessionId);
       return { physical: next, action: 'create' };
     });
   }
 
   private async bindAcquisition(
     acquisition: SandboxAcquisition,
-    physical: PhysicalRecord
+    physical: PhysicalRecord,
+    sessionId?: string
   ): Promise<boolean> {
     const raw = await this.ctx.storage.get<unknown>(ACQUISITION_RECEIPTS_KEY);
     const stored = raw === undefined ? [] : acquisitionReceiptsSchema.parse(raw);
@@ -1853,11 +2072,22 @@ export class SandboxControl extends DurableObject<Env> {
         receipt.allocation.kind !== allocation.kind ||
         receipt.allocation.id !== allocation.id
       ) {
-        throw new Error('Sandbox acquisition no longer owns this allocation');
+        throw new SandboxAcquisitionLostError();
       }
     }
-    const available =
-      !physical.stopTombstone && (physical.state === 'creating' || physical.state === 'running');
+    // A directory-native retirement keeps the physical allocation alive while
+    // the session's route is still fenced to the retired native. Until that
+    // receipt is delivered or released, the allocation must not be bound: the
+    // wrapper creates a new native only after the containment fence clears.
+    // Completed+delivered (or released) receipts no longer fence, so a healthy
+    // running allocation is reused rather than refused forever.
+    if (
+      sessionId !== undefined &&
+      (await this.hasNativeRetirementFenceForSession(sessionId, physical))
+    ) {
+      return false;
+    }
+    const available = isLivePhysicalRecord(physical);
     if (!receipt && available) {
       if (!allocation) throw new Error('Sandbox allocation identity is unavailable');
       receipts.push({ ...acquisition, allocation });
@@ -1870,15 +2100,16 @@ export class SandboxControl extends DurableObject<Env> {
 
   private async acquisitionStatus(
     acquisition: SandboxAcquisition,
-    expected: PhysicalRecord
+    expected: PhysicalRecord,
+    sessionId?: string
   ): Promise<SandboxControlStatus> {
     return this.ctx.storage.transaction(async () => {
       const current = await loadPhysicalRecord(this.ctx.storage);
       if (
         !sameAllocation(expected, current) ||
-        !(await this.bindAcquisition(acquisition, current))
+        !(await this.bindAcquisition(acquisition, current, sessionId))
       ) {
-        throw new Error('Sandbox acquisition no longer owns this allocation');
+        throw new SandboxAcquisitionLostError();
       }
       return this.statusForPhysical(current);
     });
@@ -1961,10 +2192,20 @@ export class SandboxControl extends DurableObject<Env> {
       ) {
         throw new Error('Sandbox credential containment mismatch');
       }
-      const result = await this.mutateRoutes(table => {
+      const result = await this.mutateRoutesAndReferences((table, references) => {
         this.assertWorktreeAdmission(worktreeId);
         const attached = attachRoute(table, input, ownerId);
-        return { value: attached, changed: attached.changed };
+        const added = addSessionReference(references, {
+          sessionId: input.sessionId,
+          kiloSessionId: input.kiloSessionId,
+          directory: input.directory,
+          ...(worktreeId !== undefined ? { worktreeId } : {}),
+        });
+        return {
+          value: attached,
+          routesChanged: attached.changed,
+          referencesChanged: added.changed,
+        };
       });
       if (result.changed) {
         await this.appendLog(
@@ -2082,10 +2323,21 @@ export class SandboxControl extends DurableObject<Env> {
       const result = await this.withCredentialUpdate(() =>
         this.ctx.storage.transaction(async () => {
           const table = await loadRouteTable(this.ctx.storage);
+          const removing = runtimeDetached ? table.get(sessionId) : undefined;
           const detached = runtimeDetached
             ? detachRoute(table, sessionId)
             : { table, existed: false };
           await saveRouteTable(this.ctx.storage, detached.table);
+          if (detached.existed && removing) {
+            const references = await loadSessionReferences(this.ctx.storage);
+            const tombstoned = addSessionReference(references, {
+              sessionId: removing.sessionId,
+              kiloSessionId: removing.kiloSessionId,
+              directory: removing.directory,
+              ...(removing.worktreeId !== undefined ? { worktreeId: removing.worktreeId } : {}),
+            });
+            if (tombstoned.changed) await saveSessionReferences(this.ctx.storage, references);
+          }
           const grants = await loadSessionCredentialGrants(this.ctx.storage);
           if (grants.some(grant => grant.members.some(member => member.sessionId === sessionId))) {
             if (this.providerKind === 'vercel') {
@@ -2118,6 +2370,16 @@ export class SandboxControl extends DurableObject<Env> {
       }
     }
     return { existed };
+  }
+
+  async forgetSessionReference(sessionId: string): Promise<void> {
+    await this.ensureOperationalInitialized();
+    await this.ctx.storage.transaction(async () => {
+      const references = await loadSessionReferences(this.ctx.storage);
+      if (removeSessionReference(references, sessionId).changed) {
+        await saveSessionReferences(this.ctx.storage, references);
+      }
+    });
   }
 
   deleteWorktreeResources(
@@ -2195,7 +2457,7 @@ export class SandboxControl extends DurableObject<Env> {
       await this.revokeWorktreeCredentials(input.worktreeId);
     }
     const deletedIds = new Set(journal.sessionIds);
-    const detached = await this.mutateRoutes(table => {
+    const detached = await this.mutateRoutesAndReferences((table, references) => {
       const sessionIds: string[] = [];
       for (const [sessionId, route] of table) {
         if (
@@ -2206,7 +2468,12 @@ export class SandboxControl extends DurableObject<Env> {
           sessionIds.push(sessionId);
         }
       }
-      return { value: sessionIds, changed: sessionIds.length > 0 };
+      const removed = removeWorktreeReferences(references, input.worktreeId);
+      return {
+        value: sessionIds,
+        routesChanged: sessionIds.length > 0,
+        referencesChanged: removed.changed,
+      };
     });
     await Promise.allSettled(detached.flatMap(id => this.sessionForwarding.get(id) ?? []));
     for (const id of detached) this.sessionForwarding.delete(id);
@@ -2299,41 +2566,62 @@ export class SandboxControl extends DurableObject<Env> {
         )
       )
         return true;
-      const receipts = await loadWorktreeDeletionJournals(this.ctx.storage);
-      const releasedWorktreeIds = [...receipts]
-        .filter(([, receipt]) => receipt.resourcesCleaned)
-        .map(([id]) => id);
-      const released = new Set<string>(releasedWorktreeIds);
-      const requestedIds = new Set(input.sessionIds);
-      const otherRoutes = [...(await loadRouteTable(this.ctx.storage)).values()].some(route => {
-        const worktreeId = route.worktreeId ?? this.worktreeIdFromDirectory(route.directory);
-        if (worktreeId && released.has(worktreeId)) return false;
-        return (
-          route.directory !== directory ||
-          !requestedIds.has(route.kiloSessionId) ||
-          (worktreeId !== undefined && worktreeId !== input.worktreeId)
-        );
-      });
-      const exclusive =
-        !otherRoutes &&
-        (await withTimeout(
-          resolveSandboxExclusivity(this.env, {
+      const storage = this.ctx.storage;
+      const receipts = await loadWorktreeDeletionJournals(storage);
+      const released = new Set(
+        [...receipts].filter(([, receipt]) => receipt.resourcesCleaned).map(([id]) => id)
+      );
+      const target = {
+        worktreeId: input.worktreeId,
+        directory,
+        sessionIds: new Set(input.sessionIds),
+        releasedWorktreeIds: released,
+      };
+      const references = await loadSessionReferences(storage);
+      const foreignEvidence = async () => [
+        ...references.entries,
+        ...(await loadRouteTable(storage)).values(),
+      ];
+      if (hasForeignReference(references, await foreignEvidence(), target)) {
+        await this.releaseWorktreeAdmission(input.worktreeId);
+        return false;
+      }
+      if (!references.reconciled) {
+        const result = await reconcileSandboxReferences(
+          this.env,
+          {
             worktreeId: input.worktreeId,
             kiloUserId: input.kiloUserId,
             organizationId: input.organizationId,
             location: input.location,
-            releasedWorktreeIds,
-          }),
-          DEADLINE_MS.stopAttempt,
-          'Worktree ownership lookup timed out'
-        ));
-      if (exclusive) return true;
+            releasedWorktreeIds: [...released],
+          },
+          RECONCILIATION_LIMITS
+        );
+        if (!result.complete || result.foreign || result.unavailable) {
+          await this.releaseWorktreeAdmission(input.worktreeId);
+          return false;
+        }
+        const confirmed = await storage.transaction(async () => {
+          const current = await loadSessionReferences(storage);
+          if (current.reconciled) return true;
+          const routes = await loadRouteTable(storage);
+          if (hasForeignReference(current, [...current.entries, ...routes.values()], target)) {
+            return false;
+          }
+          await saveSessionReferences(storage, markReferencesReconciled(current));
+          return true;
+        });
+        if (!confirmed) {
+          await this.releaseWorktreeAdmission(input.worktreeId);
+          return false;
+        }
+      }
+      return true;
     } catch (error) {
       await this.releaseWorktreeAdmission(input.worktreeId);
       throw error;
     }
-    await this.releaseWorktreeAdmission(input.worktreeId);
-    return false;
   }
 
   private async releaseWorktreeAdmission(worktreeId: string): Promise<void> {
@@ -2343,17 +2631,12 @@ export class SandboxControl extends DurableObject<Env> {
     if (!this.runtimeDeleted) await this.scheduleAlarm(await loadDeadlines(this.ctx.storage));
   }
 
-  private worktreeIdFromDirectory(directory: string): string | undefined {
-    const parsed = cloudAgentWorktreeIdSchema.safeParse(directory.split('/').at(-1));
-    return parsed.success ? parsed.data : undefined;
-  }
-
   private async assertRequestWorktreeAdmission(
     input: SandboxControlOutboundRequest
   ): Promise<void> {
     const session = input.session;
     if (!session) return;
-    const worktreeId = this.worktreeIdFromDirectory(session.directory);
+    const worktreeId = worktreeIdFromDirectory(session.directory);
     if (input.operation === 'session.sync' && this.exclusiveDeletionWorktreeId) {
       const allowed = await this.ctx.storage.transaction(async () => {
         const exclusiveWorktreeId = this.exclusiveDeletionWorktreeId;
@@ -2551,6 +2834,26 @@ export class SandboxControl extends DurableObject<Env> {
     };
   }
 
+  /**
+   * An acquisition that could not bind is not sendable even when the shared
+   * wrapper is healthy. The physical projection stays intact, but the ready
+   * connection and wrapper identity are withheld from this acquisition result
+   * so the caller takes its bounded wait path instead of dispatching against an
+   * allocation this session is still fenced from. The wrapper itself stays
+   * healthy: only this result is downgraded.
+   */
+  private async waitingAcquisitionStatus(physical: PhysicalRecord): Promise<SandboxControlStatus> {
+    const status = await this.statusForPhysical(physical);
+    if (status.connection !== 'ready') return status;
+    const connection = 'connected' as const;
+    const { wrapperInstanceId: _withheld, ...rest } = status;
+    return {
+      ...rest,
+      connection,
+      reported: projectReportedStatus({ physical: status.physical, connection, work: status.work }),
+    };
+  }
+
   async getSandboxStatus(input: {
     ownerId: string;
     provider: AgentSandboxProvider;
@@ -2564,7 +2867,7 @@ export class SandboxControl extends DurableObject<Env> {
     const matches =
       ownerId !== null &&
       ownerId === input.ownerId &&
-      (provider === 'cloudflare' || provider === 'vercel') &&
+      agentSandboxProviderSchema.safeParse(provider).success &&
       provider === input.provider;
     return projectSandboxStatus({
       stored: matches ? stored : { physical: null, deadlines: null, routes: null },
@@ -2606,7 +2909,13 @@ export class SandboxControl extends DurableObject<Env> {
         const { projectId, snapshotId, runtimeBuildId, runtime } = vercel;
         next.createIntent = {
           ...next.createIntent,
-          vercel: { projectId, snapshotId, runtimeBuildId, runtime },
+          vercel: {
+            projectId,
+            snapshotId,
+            runtimeBuildId,
+            runtime,
+            ...(this.vercelResources === undefined ? {} : { resources: this.vercelResources }),
+          },
         };
         this.vercelLocator = vercelProviderLocatorSchema.parse({
           teamId: vercel.teamId,
@@ -2860,15 +3169,19 @@ export class SandboxControl extends DurableObject<Env> {
       OWNER_ID_KEY,
       CREDENTIAL_HASH_KEY,
       WRAPPER_READY_AT_KEY,
+      WRAPPER_HEARTBEAT_OBSERVATION_KEY,
       ACTIVE_WRAPPER_RUNTIME_KEY,
       DIAGNOSTIC_BUNDLE_KEY,
       PROVIDER_KIND_KEY,
+      PROVIDER_CONFIGURATION_KEY,
       BILLING_INPUT_KEY,
       CREDENTIAL_POLICY_DIRTY_KEY,
       PROVIDER_LOCATOR_KEY,
       ...(options?.preserveAcquisitionReceipts ? [] : [ACQUISITION_RECEIPTS_KEY]),
     ]);
     this.vercelLocator = undefined;
+    this.vercelResources = undefined;
+    this.containersInstance = undefined;
     this.activeConnection = null;
     this.readyConnectionId = null;
     this.kiloReady = false;
@@ -3003,6 +3316,14 @@ export class SandboxControl extends DurableObject<Env> {
         config: config && locator ? { ...config, teamId: locator.teamId } : config,
       });
     }
+    if (kind === 'cloudflare-containers') {
+      return createCloudflareContainersProviderAdapter({
+        logicalSandboxId: this.sandboxId,
+        allocationName,
+        instance: this.containersInstance,
+        getContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
+      });
+    }
     return createCloudflareProviderAdapter({
       sandboxId: allocationName,
       getSandbox: (id, options) =>
@@ -3019,20 +3340,81 @@ export class SandboxControl extends DurableObject<Env> {
     });
   }
 
-  private async pinProvider(requested?: AgentSandboxProvider): Promise<void> {
-    const stored = await this.ctx.storage.get<AgentSandboxProvider>(PROVIDER_KIND_KEY);
-    const kind = stored ?? requested ?? 'cloudflare';
-    if (stored !== undefined && requested !== undefined && stored !== requested) {
+  private async readProviderConfiguration(): Promise<SandboxProviderConfiguration | undefined> {
+    const [raw, legacyKind] = await Promise.all([
+      this.ctx.storage.get<unknown>(PROVIDER_CONFIGURATION_KEY),
+      this.ctx.storage.get<unknown>(PROVIDER_KIND_KEY),
+    ]);
+    const legacy =
+      legacyKind === undefined
+        ? undefined
+        : sandboxProviderConfigurationSchema.parse({ provider: legacyKind });
+    if (raw === undefined) return legacy;
+    const configuration = sandboxProviderConfigurationSchema.parse(raw);
+    if (legacy && legacy.provider !== configuration.provider) {
       throw new Error('Sandbox provider mismatch');
     }
-    if (kind === 'vercel' && parseVercelSandboxRuntimeConfig(this.env) === undefined) {
-      throw new Error('Vercel sandbox runtime configuration is unavailable');
-    }
-    if (stored === undefined) {
-      await this.ctx.storage.put(PROVIDER_KIND_KEY, kind);
-    }
-    this.providerKind = kind;
-    this.provider = this.createProviderAdapter(kind, await loadPhysicalRecord(this.ctx.storage));
+    return configuration;
+  }
+
+  private async pinProvider(
+    requested?: AgentSandboxProvider,
+    allocation?: { resources?: VercelSandboxResources; instance?: CloudflareContainersInstance }
+  ): Promise<void> {
+    const configuration = await this.ctx.storage.transaction(async () => {
+      const stored = await this.readProviderConfiguration();
+      const resources =
+        allocation !== undefined
+          ? allocation.resources
+          : stored?.provider === 'vercel'
+            ? stored.resources
+            : undefined;
+      const instance =
+        allocation?.instance ??
+        (stored?.provider === 'cloudflare-containers' ? stored.instance : undefined);
+      const provider = requested ?? stored?.provider ?? 'cloudflare';
+      if (stored && stored.provider !== provider) {
+        throw new Error('Sandbox provider mismatch');
+      }
+      const next = sandboxProviderConfigurationSchema.parse({
+        provider,
+        ...(resources === undefined ? {} : { resources }),
+        ...(instance === undefined ? {} : { instance }),
+      });
+      if (
+        stored?.provider === 'vercel' &&
+        next.provider === 'vercel' &&
+        (stored.resources?.vcpus !== next.resources?.vcpus ||
+          stored.resources?.memory !== next.resources?.memory)
+      ) {
+        throw new Error('Sandbox resources mismatch');
+      }
+      if (
+        stored?.provider === 'cloudflare-containers' &&
+        next.provider === 'cloudflare-containers' &&
+        next.instance !== undefined &&
+        stored.instance !== next.instance
+      ) {
+        throw new Error('Sandbox instance mismatch');
+      }
+      if (next.provider === 'vercel' && parseVercelSandboxRuntimeConfig(this.env) === undefined) {
+        throw new Error('Vercel sandbox runtime configuration is unavailable');
+      }
+      await this.ctx.storage.put({
+        [PROVIDER_KIND_KEY]: next.provider,
+        [PROVIDER_CONFIGURATION_KEY]: next,
+      });
+      return next;
+    });
+    this.providerKind = configuration.provider;
+    this.vercelResources =
+      configuration.provider === 'vercel' ? configuration.resources : undefined;
+    this.containersInstance =
+      configuration.provider === 'cloudflare-containers' ? configuration.instance : undefined;
+    this.provider = this.createProviderAdapter(
+      configuration.provider,
+      await loadPhysicalRecord(this.ctx.storage)
+    );
   }
 
   private async billingInput(
@@ -3335,7 +3717,7 @@ export class SandboxControl extends DurableObject<Env> {
             })()
           : recovery;
       await this.ctx.storage.put(ACTIVE_WRAPPER_RUNTIME_KEY, identity);
-      await this.ctx.storage.delete(WRAPPER_READY_AT_KEY);
+      await this.ctx.storage.delete([WRAPPER_READY_AT_KEY, WRAPPER_HEARTBEAT_OBSERVATION_KEY]);
       if (current.state === 'creating') {
         const providerRef =
           current.providerRef ??
@@ -3437,6 +3819,13 @@ export class SandboxControl extends DurableObject<Env> {
           readyConnectionId: identity.connectionId,
         } satisfies PersistedWrapperRuntime,
         [WRAPPER_READY_AT_KEY]: now,
+        [WRAPPER_HEARTBEAT_OBSERVATION_KEY]: {
+          connectionId: identity.connectionId,
+          ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
+          armedAt: now,
+          armedExpiryAt: now + DEADLINE_MS.heartbeatExpiry,
+          armedBasis: 'wrapper_ready',
+        } satisfies WrapperHeartbeatObservation,
       });
       let deadlines = cancelDeadline(await loadDeadlines(tx), 'wrapperReadiness');
       deadlines = armDeadline(deadlines, 'heartbeatExpiry', now + DEADLINE_MS.heartbeatExpiry);
@@ -3480,27 +3869,43 @@ export class SandboxControl extends DurableObject<Env> {
       reportedSessions: payload.sessions.length,
       pendingMessages: payload.pendingMessages,
       activeKiloSessions: payload.activeKiloSessions,
+      ...(await this.heartbeatSessionFields(payload.sessions)),
       ...this.forwarding,
     };
     if (!this.isCurrentConnection(identity)) {
+      // Log-only: a stale connection must not overwrite the armed connection's
+      // accept/arm history.
       this.logDiagnostic('heartbeat', { ...diagnostic, decision: 'stale_connection' });
       return;
     }
     if (!payload.kilo.ready) {
+      const now = Date.now();
+      const stored = await this.readHeartbeatObservationBestEffort();
       this.logDiagnostic(
         'heartbeat',
         {
           ...diagnostic,
           decision: 'kilo_unhealthy',
           reason: payload.kilo.reason ?? 'unknown',
+          ...this.heartbeatLogFields(stored, identity.connectionId),
+          lastReceivedHeartbeatAt: now,
         },
         'warn'
       );
+      await this.overlayHeartbeatObservation(identity, 'kilo_unhealthy', now);
       await this.quarantineConnection(identity, 'kilo_unhealthy');
       return;
     }
     if (!this.readyWrapperRuntime() && !identity.recoveryCapable) {
-      this.logDiagnostic('heartbeat', { ...diagnostic, decision: 'runtime_not_ready' });
+      const now = Date.now();
+      const stored = await this.readHeartbeatObservationBestEffort();
+      this.logDiagnostic('heartbeat', {
+        ...diagnostic,
+        decision: 'runtime_not_ready',
+        ...this.heartbeatLogFields(stored, identity.connectionId),
+        lastReceivedHeartbeatAt: now,
+      });
+      await this.overlayHeartbeatObservation(identity, 'runtime_not_ready', now);
       return;
     }
 
@@ -3554,11 +3959,7 @@ export class SandboxControl extends DurableObject<Env> {
           'heartbeatExpiry',
           now + DEADLINE_MS.heartbeatExpiry
         );
-        if (
-          payload.state !== 'idle' ||
-          (payload.pendingMessages ?? 0) > 0 ||
-          hasActiveWork(table)
-        ) {
+        if (hasEnvironmentPinningWork(table, payload)) {
           deadlines = cancelDeadline(deadlines, 'idleStop');
         } else {
           deadlines = armDeadline(
@@ -3568,6 +3969,16 @@ export class SandboxControl extends DurableObject<Env> {
           );
         }
         await saveDeadlines(this.ctx.storage, deadlines);
+        await this.ctx.storage.put(WRAPPER_HEARTBEAT_OBSERVATION_KEY, {
+          connectionId: identity.connectionId,
+          ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
+          lastReceivedAt: now,
+          lastAcceptedAt: now,
+          armedAt: now,
+          armedExpiryAt: now + DEADLINE_MS.heartbeatExpiry,
+          armedBasis: 'heartbeat_receipt',
+          lastDecision: 'accepted',
+        } satisfies WrapperHeartbeatObservation);
         await this.scheduleAlarm(deadlines);
         return {
           routeCount: table.size,
@@ -3589,7 +4000,6 @@ export class SandboxControl extends DurableObject<Env> {
         this.logDiagnostic('heartbeat', { ...diagnostic, decision: 'apply_failed' }, 'warn');
         throw error;
       });
-    if (applied) this.lastAcceptedHeartbeat = { connectionId: identity.connectionId, at: now };
     this.logDiagnostic('heartbeat', {
       ...diagnostic,
       ...applied,
@@ -3671,7 +4081,7 @@ export class SandboxControl extends DurableObject<Env> {
       payload.type,
       connection,
       { identity, payload, ...(receiptId ? { receiptId, sequence } : {}) },
-      (route, fields, physical) =>
+      (route, fields, physical, deadlineAt) =>
         this.forwardSessionFrame(
           route,
           physical,
@@ -3685,7 +4095,8 @@ export class SandboxControl extends DurableObject<Env> {
               wrapperInstanceId: connection.wrapperInstanceId,
               ...(receiptId ? { receiptId, sequence } : {}),
             }),
-          receiptId !== undefined
+          receiptId !== undefined,
+          deadlineAt
         )
     );
     if (!receiptId) {
@@ -3719,7 +4130,7 @@ export class SandboxControl extends DurableObject<Env> {
       'session.preparing',
       connection,
       { identity, payload, ...(receiptId ? { receiptId, sequence } : {}) },
-      (route, fields, physical) =>
+      (route, fields, physical, deadlineAt) =>
         this.forwardSessionFrame(
           route,
           physical,
@@ -3733,7 +4144,8 @@ export class SandboxControl extends DurableObject<Env> {
               wrapperInstanceId: connection.wrapperInstanceId,
               ...(receiptId ? { receiptId, sequence } : {}),
             }),
-          receiptId !== undefined
+          receiptId !== undefined,
+          deadlineAt
         )
     );
     if (!receiptId) {
@@ -3741,6 +4153,61 @@ export class SandboxControl extends DurableObject<Env> {
       return { applied: true };
     }
     return forwarded;
+  }
+
+  private async onSessionEventBatch(
+    payload: SandboxEventBatchPayload,
+    connection: SandboxControlConnectionIdentity
+  ): Promise<SandboxEventBatchResult> {
+    const diagnostic = {
+      ...diagnosticConnection(connection),
+      eventType: 'session.event.batch',
+    };
+    if (!this.isCurrentConnection(connection)) {
+      this.recordForwardDrop('stale_before_enqueue', diagnostic);
+      return batchOutcomes(payload, 'unattempted', true);
+    }
+    const identity = payload.items[0]?.session;
+    if (
+      !identity ||
+      !payload.items.every(item => sameSessionEventIdentity(item.session, identity))
+    ) {
+      return batchOutcomes(payload, 'rejected', false);
+    }
+    if (!connection.wrapperInstanceId) {
+      this.recordForwardDrop('missing_wrapper_identity', diagnostic);
+      return batchOutcomes(payload, 'rejected', false);
+    }
+    const wrapperInstanceId = connection.wrapperInstanceId;
+    let outcomes: SandboxEventBatchItemOutcome[] | undefined;
+    let attempted = false;
+    await this.forwardRoutedSessionFrame(
+      identity,
+      'session.event.batch',
+      connection,
+      { items: payload.items },
+      (route, fields, physical, deadlineAt) =>
+        this.forwardSessionFrame(
+          route,
+          physical,
+          connection,
+          fields,
+          'receiveSandboxControlEventBatch',
+          async stub => {
+            attempted = true;
+            const result = await stub.receiveSandboxControlEventBatch({
+              items: payload.items,
+              wrapperInstanceId,
+            });
+            outcomes = result.outcomes;
+            return { applied: outcomes.every(outcome => outcome.status === 'applied') };
+          },
+          true,
+          deadlineAt
+        )
+    );
+    if (outcomes) return { outcomes };
+    return batchOutcomes(payload, attempted ? 'unknown' : 'unattempted', true);
   }
 
   private async onNativeRuntimeRetired(
@@ -3948,6 +4415,17 @@ export class SandboxControl extends DurableObject<Env> {
     return delivered;
   }
 
+  private resolveForwardingAdmission(
+    identity: SessionEventIdentity
+  ): { sessionId: string; nativeRuntimeId?: string } | undefined {
+    const route = resolveSessionEventRoute(loadRouteTableSync(this.ctx.storage.kv), identity);
+    if (!route) return undefined;
+    return {
+      sessionId: route.sessionId,
+      ...(route.nativeRuntimeId !== undefined ? { nativeRuntimeId: route.nativeRuntimeId } : {}),
+    };
+  }
+
   private async forwardRoutedSessionFrame(
     identity: SessionEventIdentity,
     eventType: string,
@@ -3956,34 +4434,14 @@ export class SandboxControl extends DurableObject<Env> {
     forward: (
       route: SessionRoute,
       diagnostic: ControlDiagnosticFields,
-      physical: PhysicalRecord
+      physical: PhysicalRecord,
+      deadlineAt: number
     ) => Promise<SandboxControlEventResult>
   ): Promise<SandboxControlEventResult> {
     const diagnostic = {
       ...diagnosticConnection(connection),
       eventType: diagnosticEventType(eventType),
     };
-    const table = await loadRouteTable(this.ctx.storage);
-    if (!this.isCurrentConnection(connection)) {
-      this.recordForwardDrop('stale_before_enqueue', diagnostic);
-      return { applied: false };
-    }
-    const route = resolveSessionEventRoute(table, identity);
-    if (!route) {
-      this.recordForwardDrop('unroutable', { ...diagnostic, routeCount: table.size });
-      return { applied: false };
-    }
-    const physical = await loadPhysicalRecord(this.ctx.storage);
-    if (
-      physical.state !== 'running' ||
-      physical.stopTombstone ||
-      physical.providerRef !== connection.providerInstanceId ||
-      !this.matchesWorktreeContainment(physical) ||
-      !this.isCurrentConnection(connection)
-    ) {
-      this.recordForwardDrop('runtime_not_current', diagnostic);
-      return { applied: false };
-    }
     let frameBytes: number;
     try {
       frameBytes = sessionForwardFrameBytes(frame);
@@ -3992,18 +4450,23 @@ export class SandboxControl extends DurableObject<Env> {
       return { applied: false };
     }
     const queuedAt = Date.now();
+    const forwardDeadlineAt = queuedAt + DEADLINE_MS.stopAttempt;
+    const admission = this.resolveForwardingAdmission(identity);
+    if (!admission) {
+      this.recordForwardDrop('unroutable', diagnostic);
+      return { applied: false };
+    }
     this.forwarding.enqueued++;
     const fields = {
       ...diagnostic,
-      sessionId: route.sessionId,
       forwardSequence: this.forwarding.enqueued,
       queuedAt,
     };
     this.logDiagnostic('forward_enqueued', { ...fields, ...this.forwarding });
     const next = this.sessionForwarding.enqueueFenced({
-      sessionId: route.sessionId,
+      sessionId: admission.sessionId,
       bytes: frameBytes,
-      deadlineAt: Date.now() + DEADLINE_MS.stopAttempt,
+      deadlineAt: forwardDeadlineAt,
       fence: async () => this.isCurrentConnection(connection),
       forward: async () => {
         const queueWaitMs = Date.now() - queuedAt;
@@ -4014,9 +4477,54 @@ export class SandboxControl extends DurableObject<Env> {
           ...this.forwarding,
         });
         try {
-          if (this.isCurrentConnection(connection)) return forward(route, fields, physical);
-          this.recordForwardDrop('stale_before_send', fields);
-          return { applied: false, retryable: true };
+          const table = await loadRouteTable(this.ctx.storage);
+          if (!this.isCurrentConnection(connection)) {
+            this.recordForwardDrop('stale_before_enqueue', fields);
+            return { applied: false };
+          }
+          const route = resolveSessionEventRoute(table, identity);
+          if (!route) {
+            this.recordForwardDrop('unroutable', { ...fields, routeCount: table.size });
+            return { applied: false };
+          }
+          if (route.sessionId !== admission.sessionId) {
+            this.recordForwardDrop('admission_route_changed', {
+              ...fields,
+              sessionId: route.sessionId,
+              admittedSessionId: admission.sessionId,
+            });
+            return { applied: false };
+          }
+          if (
+            admission.nativeRuntimeId !== undefined &&
+            route.nativeRuntimeId !== admission.nativeRuntimeId
+          ) {
+            this.recordForwardDrop('runtime_not_current', {
+              ...fields,
+              sessionId: route.sessionId,
+            });
+            return { applied: false, retryable: true };
+          }
+          const physical = await loadPhysicalRecord(this.ctx.storage);
+          if (
+            physical.state !== 'running' ||
+            physical.stopTombstone ||
+            physical.providerRef !== connection.providerInstanceId ||
+            !this.matchesWorktreeContainment(physical) ||
+            !this.isCurrentConnection(connection)
+          ) {
+            this.recordForwardDrop('runtime_not_current', {
+              ...fields,
+              sessionId: route.sessionId,
+            });
+            return { applied: false };
+          }
+          return await forward(
+            route,
+            { ...fields, sessionId: route.sessionId },
+            physical,
+            forwardDeadlineAt
+          );
         } finally {
           this.forwarding.settled++;
           const totalForwardMs = Date.now() - queuedAt;
@@ -4084,11 +4592,15 @@ export class SandboxControl extends DurableObject<Env> {
     physical: PhysicalRecord,
     connection: SandboxControlConnectionIdentity,
     diagnostic: ControlDiagnosticFields,
-    operation: 'receiveSandboxControlEvent' | 'receiveSandboxControlPreparing',
+    operation:
+      | 'receiveSandboxControlEvent'
+      | 'receiveSandboxControlPreparing'
+      | 'receiveSandboxControlEventBatch',
     send: (
       stub: ReturnType<typeof getSandboxSessionStub>
     ) => Promise<{ applied: boolean; retryable?: boolean }>,
-    requireApplied: boolean
+    requireApplied: boolean,
+    forwardDeadlineAt: number
   ): Promise<SandboxControlEventResult> {
     if (!(await this.isCurrentSessionForward(route, connection, physical))) {
       this.recordForwardDrop('stale_before_send', diagnostic);
@@ -4098,35 +4610,71 @@ export class SandboxControl extends DurableObject<Env> {
     let timedOut = false;
     let skipped = false;
     let attempts = 0;
-    const delivered = await withTimeout(
-      withDORetry(
-        () => getSandboxSessionStub(this.env, route.ownerId, route.sessionId),
-        async (stub): Promise<{ applied: boolean; retryable?: boolean }> => {
-          skipped = !(await this.isCurrentSessionForward(route, connection, physical));
-          if (skipped) {
-            this.recordForwardDrop('stale_retry', diagnostic);
-            return Promise.resolve({ applied: true });
-          }
-          attempts++;
-          const result = await send(stub);
-          if (!(await this.isCurrentSessionForward(route, connection, physical))) {
-            skipped = true;
-            this.recordForwardDrop('stale_after_send', diagnostic);
-            return { applied: false };
-          }
-          return result;
-        },
-        operation
-      ),
-      DEADLINE_MS.stopAttempt,
-      operation === 'receiveSandboxControlEvent'
-        ? 'Sandbox event forwarding timed out'
-        : 'Sandbox preparation forwarding timed out',
+    const timeout = setTimeout(
       () => {
         timedOut = true;
-      }
+        this.logDiagnostic('forward_response_timeout', {
+          ...diagnostic,
+          operation,
+          attempts,
+        });
+      },
+      Math.max(1, forwardDeadlineAt - Date.now())
+    );
+    timeout.unref();
+    const delivered = await withDORetry(
+      () => {
+        if (Date.now() >= forwardDeadlineAt)
+          throw new SandboxControlConnectionError('Forwarding deadline expired', false);
+        return getSandboxSessionStub(this.env, route.ownerId, route.sessionId);
+      },
+      async (stub): Promise<{ applied: boolean; retryable?: boolean }> => {
+        if (Date.now() >= forwardDeadlineAt)
+          throw new SandboxControlConnectionError('Forwarding deadline expired', false);
+        let currentSession: boolean;
+        try {
+          currentSession = await this.isCurrentSessionForward(route, connection, physical);
+        } catch (error) {
+          if (Date.now() >= forwardDeadlineAt)
+            throw new SandboxControlConnectionError('Forwarding deadline expired', false);
+          throw error;
+        }
+        skipped = !currentSession;
+        if (skipped) {
+          this.recordForwardDrop('stale_retry', diagnostic);
+          return { applied: true };
+        }
+        if (Date.now() >= forwardDeadlineAt)
+          throw new SandboxControlConnectionError('Forwarding deadline expired', false);
+        attempts++;
+        let result: { applied: boolean; retryable?: boolean };
+        try {
+          result = await send(stub);
+        } catch (error) {
+          if (Date.now() >= forwardDeadlineAt)
+            throw new SandboxControlConnectionError('Forwarding deadline expired', false);
+          throw error;
+        }
+        let stillCurrent: boolean;
+        try {
+          stillCurrent = await this.isCurrentSessionForward(route, connection, physical);
+        } catch (error) {
+          if (Date.now() >= forwardDeadlineAt)
+            throw new SandboxControlConnectionError('Forwarding deadline expired', false);
+          throw error;
+        }
+        if (!stillCurrent) {
+          skipped = true;
+          this.recordForwardDrop('stale_after_send', diagnostic);
+          return { applied: false };
+        }
+        return result;
+      },
+      operation,
+      DEFAULT_DO_RETRY_CONFIG
     ).then(
       result => {
+        clearTimeout(timeout);
         const rpcWaitMs = Date.now() - startedAt;
         this.forwarding.maxRpcWaitMs = Math.max(this.forwarding.maxRpcWaitMs, rpcWaitMs);
         if (!skipped && result?.applied === false) this.forwarding.notApplied++;
@@ -4134,7 +4682,7 @@ export class SandboxControl extends DurableObject<Env> {
           ...diagnostic,
           operation,
           attempts,
-          result: skipped ? 'skipped' : 'delivered',
+          result: skipped ? 'skipped' : timedOut ? 'delivered_late' : 'delivered',
           applied: skipped ? undefined : result?.applied,
           rpcWaitMs,
           ...this.forwarding,
@@ -4147,6 +4695,7 @@ export class SandboxControl extends DurableObject<Env> {
         };
       },
       async () => {
+        clearTimeout(timeout);
         const rpcWaitMs = Date.now() - startedAt;
         this.forwarding.maxRpcWaitMs = Math.max(this.forwarding.maxRpcWaitMs, rpcWaitMs);
         this.forwarding.failed++;
@@ -4162,34 +4711,10 @@ export class SandboxControl extends DurableObject<Env> {
           },
           'warn'
         );
-        if (!requireApplied) await this.quarantineForwardingFailure(route, connection);
         return { applied: false, retryable: true };
       }
     );
     return delivered;
-  }
-
-  private async quarantineForwardingFailure(
-    route: SessionRoute,
-    connection: SandboxControlConnectionIdentity
-  ): Promise<void> {
-    const table = await loadRouteTable(this.ctx.storage);
-    const current = table.get(route.sessionId);
-    if (
-      !this.isCurrentConnection(connection) ||
-      !current ||
-      current.ownerId !== route.ownerId ||
-      current.directory !== route.directory ||
-      current.kiloSessionId !== route.kiloSessionId ||
-      current.nativeRuntimeId !== route.nativeRuntimeId
-    ) {
-      this.logDiagnostic('forward_quarantine_skipped', {
-        sessionId: route.sessionId,
-        ...diagnosticConnection(connection),
-      });
-      return;
-    }
-    await this.quarantineConnection(connection, 'session_delivery_failed');
   }
 
   private async onSocketClosed(
@@ -4215,10 +4740,15 @@ export class SandboxControl extends DurableObject<Env> {
     identity: SandboxControlConnectionIdentity,
     cause: 'control_disconnected' | 'heartbeat_expired'
   ): Promise<void> {
-    if (!identity.wrapperInstanceId || !this.isActiveConnection(identity)) return;
+    if (!identity.wrapperInstanceId || !this.isActiveConnection(identity)) {
+      this.emitRecoveryOutcome(identity, cause, 'skipped');
+      return;
+    }
     const wrapperInstanceId = identity.wrapperInstanceId;
+    let allocationId: string | undefined;
     const started = await this.ctx.storage.transaction(async tx => {
       const physical = await loadPhysicalRecord(tx);
+      allocationId = physical.createIntent?.intentId;
       if (
         physical.state !== 'running' ||
         physical.stopTombstone !== null ||
@@ -4242,7 +4772,7 @@ export class SandboxControl extends DurableObject<Env> {
       const nextRecovery = [...recovery.filter(item => item.episodeId !== next.episodeId), next];
       await saveRecoveryDecisions(tx, nextRecovery);
       await tx.put(ACTIVE_WRAPPER_RUNTIME_KEY, identity);
-      await tx.delete(WRAPPER_READY_AT_KEY);
+      await tx.delete([WRAPPER_READY_AT_KEY, WRAPPER_HEARTBEAT_OBSERVATION_KEY]);
       const deadlines = controlRecovery.recoveryDeadlines(
         cancelDeadline(await loadDeadlines(tx), 'heartbeatExpiry'),
         nextRecovery
@@ -4253,6 +4783,10 @@ export class SandboxControl extends DurableObject<Env> {
     });
     this.readyConnectionId = null;
     this.kiloReady = false;
+    // A returned decision means this call committed recovery storage, even when
+    // an authority or exhaustion was already present; only an undefined
+    // transaction result is a skip.
+    this.emitRecoveryOutcome(identity, cause, started ? 'started' : 'skipped', allocationId);
     if (!started || started.authority || started.exhaustedAt !== undefined) return;
     const authority = await this.recoveryAuthority.load(started);
     if (!authority) return;
@@ -4269,11 +4803,36 @@ export class SandboxControl extends DurableObject<Env> {
     });
   }
 
+  // Report-only F11 record. Emitted synchronously once the commit/skip is known
+  // by the existing recovery/quarantine owner; carries no decision authority and
+  // is never read back. A failing logger must not alter recovery.
+  private emitRecoveryOutcome(
+    identity: SandboxControlConnectionIdentity,
+    cause: string,
+    outcome: 'started' | 'skipped',
+    allocationId?: string
+  ): void {
+    const resolvedCause = diagnosticCause(cause);
+    try {
+      this.logDiagnostic('recovery_outcome', {
+        ...diagnosticConnection(identity),
+        cause: resolvedCause,
+        outcome,
+        ...(allocationId ? { allocationId } : {}),
+        ...(resolvedCause === 'heartbeat_expired' ? { deadlineId: 'heartbeatExpiry' } : {}),
+        committedAt: Date.now(),
+      });
+    } catch {
+      // Diagnostics must never block recovery.
+    }
+  }
+
   private async quarantineConnection(
     identity: SandboxControlConnectionIdentity,
     reason: string
   ): Promise<void> {
     const physical = await loadPhysicalRecord(this.ctx.storage);
+    const allocationId = physical.createIntent?.intentId;
     if (
       !this.isActiveConnection(identity) ||
       physical.state === 'stopped' ||
@@ -4285,10 +4844,12 @@ export class SandboxControl extends DurableObject<Env> {
         physicalState: physical.state,
         hasTombstone: physical.stopTombstone !== null,
       });
+      this.emitRecoveryOutcome(identity, reason, 'skipped', allocationId);
       return;
     }
     const next = beginStop(physical, reason, Date.now(), identity.wrapperInstanceId);
     await this.persistPhysical(physical, next, reason);
+    this.emitRecoveryOutcome(identity, reason, 'started', allocationId);
     this.ctx.waitUntil(this.recordStopAttempt());
   }
 
@@ -4334,6 +4895,81 @@ export class SandboxControl extends DurableObject<Env> {
       await savePhysicalRecord(this.ctx.storage, { ...current, providerRef: result.providerRef });
     }
     return this.observeProvider(result.status);
+  }
+
+  // Non-waking probe for a bound running allocation whose wrapper incarnation
+  // is established but not ready now. Omitting the create intent lets a
+  // container report `terminal` instead of `unknown` even inside create-settle
+  // (the warmed-runtime case). The apply is a separate transaction that
+  // re-checks the running allocation.
+  private async observeRunningAllocationLoss(
+    physical: PhysicalRecord,
+    wrapperInstanceId: string
+  ): Promise<void> {
+    const startedAt = Date.now();
+    let timedOut = false;
+    let failed = false;
+    let result: ProviderObservation;
+    try {
+      result = await withTimeout(
+        this.provider.observe(physical.providerRef),
+        DEADLINE_MS.stopAttempt,
+        'Sandbox loss observation timed out',
+        () => {
+          timedOut = true;
+        }
+      );
+    } catch {
+      failed = true;
+      result = { status: 'unknown' };
+    }
+    const current = await loadPhysicalRecord(this.ctx.storage);
+    const stale = !sameAllocation(current, physical) || current.state === 'stopped';
+    this.logDiagnostic('provider_observation', {
+      allocationId: physical.createIntent?.intentId,
+      physicalSandboxId: physical.createIntent?.allocationName,
+      physicalState: physical.state,
+      observation: result.status,
+      result: timedOut ? 'timed_out' : failed ? 'failed' : 'completed',
+      stale,
+      durationMs: Date.now() - startedAt,
+    });
+    if (result.status !== 'terminal') return;
+    await this.commitRunningAllocationLoss(physical, wrapperInstanceId);
+  }
+
+  // Atomic `running → failed` + failure tombstone for an observed terminal
+  // allocation. A concurrent or stale probe sees a non-running record or a
+  // different allocation and no-ops instead of skipping the stop ladder.
+  private async commitRunningAllocationLoss(
+    expected: PhysicalRecord,
+    wrapperInstanceId: string
+  ): Promise<void> {
+    const committed = await this.ctx.storage.transaction(async () => {
+      const current = await loadPhysicalRecord(this.ctx.storage);
+      if (
+        !sameAllocation(current, expected) ||
+        current.state !== 'running' ||
+        current.stopTombstone
+      ) {
+        return undefined;
+      }
+      const next = observe(current, 'terminal');
+      const tombstoned: PhysicalRecord = {
+        ...next,
+        stopTombstone: beginStop(next, 'environment_failed', Date.now(), wrapperInstanceId)
+          .stopTombstone,
+      };
+      await this.persistPhysicalState(current, tombstoned, 'observe:terminal');
+      return { from: current, to: tombstoned };
+    });
+    if (!committed) return;
+    await this.afterPhysicalPersistence(
+      committed.from,
+      committed.to,
+      'observe:terminal',
+      committed.to.stopTombstone?.wrapperInstanceId
+    );
   }
 
   private async rearmReconciliation(physical: PhysicalRecord): Promise<void> {
@@ -4386,6 +5022,108 @@ export class SandboxControl extends DurableObject<Env> {
     return current;
   }
 
+  // Matching evidence that this exact allocation ever established a wrapper
+  // incarnation. Recovery-capable close keeps the identity after the ready
+  // socket is gone, so it is the discriminator between a warmed runtime and a
+  // `running` record that only committed `confirmInstance` before launch.
+  private establishedWrapperForAllocation(
+    physical: PhysicalRecord
+  ): SandboxControlConnectionIdentity | null {
+    const connection = this.activeConnection;
+    if (
+      !connection ||
+      !connection.wrapperInstanceId ||
+      physical.providerRef === null ||
+      connection.providerInstanceId !== physical.providerRef
+    ) {
+      return null;
+    }
+    return connection;
+  }
+
+  private async readHeartbeatObservation(): Promise<WrapperHeartbeatObservation | undefined> {
+    return this.ctx.storage.get<WrapperHeartbeatObservation>(WRAPPER_HEARTBEAT_OBSERVATION_KEY);
+  }
+
+  // Report-only diagnostics must never block recovery: a failing read degrades
+  // to "no observation" and the caller proceeds with its lifecycle action.
+  private async readHeartbeatObservationBestEffort(): Promise<
+    WrapperHeartbeatObservation | undefined
+  > {
+    try {
+      return await this.readHeartbeatObservation();
+    } catch {
+      return undefined;
+    }
+  }
+
+  // Report-only view of the stored observation. Never the deadline authority.
+  // Stored fields are omitted unless the observation belongs to `connectionId`,
+  // so evidence for a stale connection cannot be reported as current.
+  private heartbeatLogFields(
+    observation: WrapperHeartbeatObservation | undefined,
+    connectionId: string | undefined
+  ): ControlDiagnosticFields {
+    if (!observation || connectionId === undefined || observation.connectionId !== connectionId) {
+      return {};
+    }
+    return {
+      lastReceivedHeartbeatAt: observation.lastReceivedAt,
+      lastAcceptedHeartbeatAt: observation.lastAcceptedAt,
+      armedAt: observation.armedAt,
+      armedExpiryAt: observation.armedExpiryAt,
+      heartbeatArmedBasis: observation.armedBasis,
+      lastDecision: observation.lastDecision,
+      observationConnectionId: observation.connectionId,
+      observationWrapperInstanceId: observation.wrapperInstanceId,
+    };
+  }
+
+  // Bounded report-only per-session heartbeat evidence. The single-route fields
+  // come from the payload row that exactly matches the DO's one route, never
+  // from route-table `lastState` and never from an implicit "only" row.
+  private async heartbeatSessionFields(
+    sessions: SandboxHeartbeatPayload['sessions']
+  ): Promise<ControlDiagnosticFields> {
+    const fields: ControlDiagnosticFields = {};
+    const report = packSessionReport(sessions);
+    if (report !== undefined) fields.sessionReport = report;
+    let routeKiloSessionIds: string[] = [];
+    try {
+      const table = await loadRouteTable(this.ctx.storage);
+      routeKiloSessionIds = [...table.values()].map(route => route.kiloSessionId);
+    } catch {
+      routeKiloSessionIds = [];
+    }
+    if (routeKiloSessionIds.length !== 1) return fields;
+    const target = sessions.find(session => session.kiloSessionId === routeKiloSessionIds[0]);
+    if (!target) return fields;
+    fields.kiloSessionId = target.kiloSessionId;
+    fields.sessionState = target.state;
+    fields.sessionWaitingOn = target.waitingOn ?? 'none';
+    return fields;
+  }
+
+  // Bounded matching-identity overlay: only the armed connection's observation
+  // is updated, and its accept/arm history is preserved.
+  private async overlayHeartbeatObservation(
+    identity: SandboxControlConnectionIdentity,
+    lastDecision: WrapperHeartbeatDecision,
+    lastReceivedAt: number
+  ): Promise<void> {
+    try {
+      const existing = await this.readHeartbeatObservation();
+      if (!existing || existing.connectionId !== identity.connectionId) return;
+      await this.ctx.storage.put(WRAPPER_HEARTBEAT_OBSERVATION_KEY, {
+        ...existing,
+        lastReceivedAt,
+        lastDecision,
+      } satisfies WrapperHeartbeatObservation);
+    } catch {
+      this.logDiagnostic('heartbeat_observation_failed', diagnosticConnection(identity));
+    }
+  }
+
   private supportsNativeRuntimeRetirement(): boolean {
     return (
       this.socketHandler.supportsOperationResults() &&
@@ -4402,6 +5140,42 @@ export class SandboxControl extends DurableObject<Env> {
       providerInstanceId: connection.providerInstanceId,
       wrapperInstanceId: connection.wrapperInstanceId,
     };
+  }
+
+  /**
+   * True while a directory-native retirement for `sessionId` still fences the
+   * current physical allocation and wrapper lifetime.
+   *
+   * A retirement keeps the physical allocation running so a healthy wrapper can
+   * create a new native in place. The session must not bind that allocation
+   * until the receipt is delivered (or released): a completed+delivered receipt
+   * releases the session route fence and must be reused rather than refused,
+   * and a pruned receipt leaves no fence at all. Pending, unconfirmed, and
+   * completed-but-undelivered receipts mean notifications have not reached the
+   * recipients yet, so the containment fence still holds.
+   *
+   * Matching the active wrapper lifetime keeps a receipt from an older wrapper
+   * incarnation from fencing a new wrapper on the same allocation.
+   */
+  private async hasNativeRetirementFenceForSession(
+    sessionId: string,
+    physical: PhysicalRecord
+  ): Promise<boolean> {
+    const receipts = await loadNativeRuntimeRetirements(this.ctx.storage);
+    if (receipts.length === 0) return false;
+    const connection = this.activeConnection ?? this.socketHandler.getConnectionIdentity();
+    return receipts.some(receipt => {
+      if (!receipt.recipients.some(recipient => recipient.sessionId === sessionId)) return false;
+      if (!matchesNativeRuntimeRetirementAllocation(receipt, physical)) return false;
+      if (
+        connection?.wrapperInstanceId !== undefined &&
+        (connection.wrapperInstanceId !== receipt.connection.wrapperInstanceId ||
+          connection.providerInstanceId !== receipt.connection.providerInstanceId)
+      ) {
+        return false;
+      }
+      return holdsNativeRuntimeRetirementFence(receipt);
+    });
   }
 
   private async abortNativeRuntime(input: {
@@ -4462,7 +5236,7 @@ export class SandboxControl extends DurableObject<Env> {
     if (!route || route.ownerId !== input.ownerId) {
       return { allowed: false, reason: 'session_not_attached' };
     }
-    const worktreeId = route.worktreeId ?? this.worktreeIdFromDirectory(route.directory);
+    const worktreeId = route.worktreeId ?? worktreeIdFromDirectory(route.directory);
     if (
       this.runtimeDeleted ||
       this.exclusiveDeletionWorktreeId ||
@@ -4558,6 +5332,31 @@ export class SandboxControl extends DurableObject<Env> {
             'heartbeatExpiry',
             readyAt + DEADLINE_MS.heartbeatExpiry
           );
+          // Re-arm from `readyAt` but keep any retained accept history for the
+          // same connection; do not rewrite `lastAcceptedAt`. The read is
+          // best-effort so a diagnostic failure cannot block the repair.
+          const existing = await this.readHeartbeatObservationBestEffort();
+          const observation: WrapperHeartbeatObservation = {
+            connectionId: runtime.connectionId,
+            ...(runtime.wrapperInstanceId ? { wrapperInstanceId: runtime.wrapperInstanceId } : {}),
+            ...(existing?.connectionId === runtime.connectionId
+              ? {
+                  ...(existing.lastReceivedAt !== undefined
+                    ? { lastReceivedAt: existing.lastReceivedAt }
+                    : {}),
+                  ...(existing.lastAcceptedAt !== undefined
+                    ? { lastAcceptedAt: existing.lastAcceptedAt }
+                    : {}),
+                  ...(existing.lastDecision !== undefined
+                    ? { lastDecision: existing.lastDecision }
+                    : {}),
+                }
+              : {}),
+            armedAt: readyAt,
+            armedExpiryAt: readyAt + DEADLINE_MS.heartbeatExpiry,
+            armedBasis: 'wrapper_ready',
+          };
+          await this.ctx.storage.put(WRAPPER_HEARTBEAT_OBSERVATION_KEY, observation);
         } else if (physical.state === 'creating') {
           deadlines = armDeadline(
             deadlines,
@@ -4738,6 +5537,7 @@ export class SandboxControl extends DurableObject<Env> {
           CREDENTIAL_HASH_KEY,
           ACTIVE_WRAPPER_RUNTIME_KEY,
           WRAPPER_READY_AT_KEY,
+          WRAPPER_HEARTBEAT_OBSERVATION_KEY,
         ]);
       }
       next = { startup: (to.createIntent?.createdAt ?? Date.now()) + DEADLINE_MS.startup };
@@ -4749,6 +5549,7 @@ export class SandboxControl extends DurableObject<Env> {
         CREDENTIAL_HASH_KEY,
         ACTIVE_WRAPPER_RUNTIME_KEY,
         WRAPPER_READY_AT_KEY,
+        WRAPPER_HEARTBEAT_OBSERVATION_KEY,
       ]);
       next = {};
       if (to.state !== 'stopped') {
@@ -4953,13 +5754,18 @@ export class SandboxControl extends DurableObject<Env> {
     return notified.every(Boolean);
   }
 
-  private mutateRoutes<T>(
-    mutation: (table: Map<string, SessionRoute>) => { value: T; changed: boolean }
+  private mutateRoutesAndReferences<T>(
+    mutation: (
+      table: Map<string, SessionRoute>,
+      references: SessionReferenceState
+    ) => { value: T; routesChanged: boolean; referencesChanged: boolean }
   ): Promise<T> {
     return this.ctx.storage.transaction(async () => {
       const table = await loadRouteTable(this.ctx.storage);
-      const updated = mutation(table);
-      if (updated.changed) await saveRouteTable(this.ctx.storage, table);
+      const references = await loadSessionReferences(this.ctx.storage);
+      const updated = mutation(table, references);
+      if (updated.routesChanged) await saveRouteTable(this.ctx.storage, table);
+      if (updated.referencesChanged) await saveSessionReferences(this.ctx.storage, references);
       return updated.value;
     });
   }

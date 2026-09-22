@@ -36,6 +36,7 @@
     "cost": "Кошт",
     "discard": "Адкінуць",
     "findings": "Выяўленыя праблемы",
+    "mergeRequest": "merge-запыт",
     "notConnected": "Не падключана",
     "notifications": "Апавяшчэнні",
     "pullRequest": "запыт на зліццё",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Выкарыстаць іншы адрас пошты",
     "signInWithApple": "Увайсці праз Apple",
     "signInWithGoogle": "Увайсці праз Google",
+    "signInWithPasskey": "Увайсці з ключом доступу",
     "emailAddress": "Адрас электроннай пошты",
     "emailPlaceholder": "імя@example.com",
     "continueWithEmail": "Працягнуць праз электронную пошту",
@@ -174,6 +176,10 @@
     "termsConnector": " і ",
     "termsSuffix": ".",
     "moreSignInOptions": "Іншыя спосабы ўваходу",
+    "passkeyCancelled": "Уваход з ключом доступу скасаваны. Паспрабуйце яшчэ раз.",
+    "passkeyNotFound": "Для гэтай прылады не захаваны ніводны ключ доступу. Увайдзіце праз Apple, Google або сваю электронную пошту.",
+    "passkeyUnsupported": "Ключы доступу недаступныя на гэтай прыладзе. Увайдзіце праз Apple, Google або сваю электронную пошту.",
+    "passkeyFailed": "Не ўдалося ўвайсці з ключом доступу. Паспрабуйце яшчэ раз.",
     "couldNotCompleteSignIn": "Не атрымалася завяршыць уваход. Паспрабуйце яшчэ раз.",
     "sessionEnded": "Ваш сеанс скончыўся. Увайдзіце яшчэ раз.",
     "signInCodeExpired": "Тэрмін дзеяння кода ўваходу скончыўся. Паспрабуйце яшчэ раз.",
@@ -224,13 +230,36 @@
     "providerTestAccount": "Тэставы ўліковы запіс",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Карпаратыўны SSO"
+    "providerEnterpriseSso": "Карпаратыўны SSO",
+    "passkeysTitle": "Ключы доступу",
+    "passkeysSubtitle": "Увайсці без пароля",
+    "passkeysEmpty": "Ключоў доступу пакуль няма",
+    "passkeysEmptyHint": "$t(profile.addPasskey), каб увайсці без пароля.",
+    "passkeysCouldNotLoad": "Не ўдалося загрузіць ключы доступу",
+    "passkeysLoadFailed": "Ключы доступу недаступныя, пакуль гэта не загрузіцца.",
+    "addPasskey": "Дадаць ключ доступу",
+    "passkeyDefaultName": "Ключ доступу",
+    "passkeyAddedOn": "Дададзены {{date}}",
+    "passkeyAdded": "Ключ доступу дададзены.",
+    "passkeyAddFailed": "Не ўдалося дадаць ключ доступу. Паспрабуйце яшчэ раз.",
+    "passkeyAddUnsupported": "Гэта прылада не можа ствараць ключы доступу.",
+    "passkeyAddCancelled": "Стварэнне ключа доступу скасавана.",
+    "passkeyRemoved": "Ключ доступу выдалены.",
+    "passkeyRemoveFailed": "Не ўдалося выдаліць гэты ключ доступу. Паспрабуйце яшчэ раз.",
+    "passkeyRenamed": "Ключ доступу перайменаваны.",
+    "passkeyName": "Назва ключа доступу",
+    "renamePasskey": "Перайменаваць ключ доступу",
+    "removePasskey": "Выдаліць ключ доступу",
+    "removePasskeyTitle": "Выдаліць ключ доступу?",
+    "removePasskeyMessage": "Вы больш не зможаце ўвайсці з гэтым ключом доступу."
   },
   "preferences": {
     "general": "Агульныя",
     "voiceInput": "Галасавы ўвод",
     "autoExpandThinking": "Аўтаматычна разгортваць развагі",
     "autoExpandThinkingSubtitle": "Паказваць развагі агента разгорнутымі пасля іх завяршэння.",
+    "hideThinking": "Хаваць падрабязнасці разваг",
+    "hideThinkingSubtitle": "Не паказваць развагі агента на старонцы сеанса.",
     "keepScreenOn": "Не выключаць экран на старонцы сеанса",
     "keepScreenOnSubtitle": "Не выключаць экран, пакуль сеанс актыўны.",
     "appearance": "Знешні выгляд",
@@ -253,7 +282,12 @@
     "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Распазнаванне маўлення праз Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Пераўтварайце галасавы ўвод у тэкст з дапамогай мадэлі Kilo Gateway замест распазнавання маўлення на самой прыладзе. Ваш запіс адпраўляецца ў Kilo Gateway.",
-    "transcriptionModel": "$t(transcriptionModel.title)"
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Сціскаць выклікі інструментаў",
+    "condenseToolCallsSubtitle": "Збірайце паслядоўныя выклікі інструментаў у адзін радок, які можна адкрыць.",
+    "toolSummaryTranslation": "Перакласці зводкі інструментаў",
+    "toolSummaryTranslationSubtitle": "Адпраўляйце кожную зводку інструмента мадэлі, каб перакласці яе на мову вашай праграмы. Калі пераклад не ўдасца, паказваецца арыгінал.",
+    "toolSummaryTranslationModelUnavailableNotice": "Гэта мадэль больш не прапануецца. Націсніце $t(common.model), каб выбраць іншую."
   },
   "prReview": {
     "pullRequestUnavailable": "Запыт на зліццё недаступны",
@@ -339,7 +373,27 @@
       "fileLoadedCount_few": "Загружаны {{displayCount}} файлы",
       "fileLoadedCount_many": "Загружана {{displayCount}} файлаў",
       "fileLoadedOfTotalCount_few": "Загружаны {{displayCount}} файлы з {{total}}",
-      "fileLoadedOfTotalCount_many": "Загружана {{displayCount}} файлаў з {{total}}"
+      "fileLoadedOfTotalCount_many": "Загружана {{displayCount}} файлаў з {{total}}",
+      "expandAllLines_one": "Разгарнуць усе радкі: {{displayCount}}",
+      "expandAllLines_other": "Разгарнуць усе радкі: {{displayCount}}",
+      "expandAllLines_few": "Разгарнуць усе радкі: {{displayCount}}",
+      "expandAllLines_many": "Разгарнуць усе радкі: {{displayCount}}",
+      "expandLines_one": "Разгарнуць радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandLines_other": "Разгарнуць радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandLines_few": "Разгарнуць радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandLines_many": "Разгарнуць радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandLinesOfContext_one": "Разгарнуць радкі кантэксту: {{displayCount}}",
+      "expandLinesOfContext_other": "Разгарнуць радкі кантэксту: {{displayCount}}",
+      "expandLinesOfContext_few": "Разгарнуць радкі кантэксту: {{displayCount}}",
+      "expandLinesOfContext_many": "Разгарнуць радкі кантэксту: {{displayCount}}",
+      "expandMoreLines_one": "Разгарнуць дадатковыя радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandMoreLines_other": "Разгарнуць дадатковыя радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandMoreLines_few": "Разгарнуць дадатковыя радкі ({{displayCount}}): {{start}}–{{end}}",
+      "expandMoreLines_many": "Разгарнуць дадатковыя радкі ({{displayCount}}): {{start}}–{{end}}",
+      "loadedOfTotalFiles_one": "загружана {{loaded}} з {{total}} файлаў",
+      "loadedOfTotalFiles_other": "загружана {{loaded}} з {{total}} файлаў",
+      "loadedOfTotalFiles_few": "загружана {{loaded}} з {{total}} файлаў",
+      "loadedOfTotalFiles_many": "загружана {{loaded}} з {{total}} файлаў"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ няма пераносу радка ў канцы файла",
@@ -354,6 +408,7 @@
       "merge": "Зліццё",
       "mergeNow": "Зліць зараз",
       "mergePullRequest": "Зліццё запыту",
+      "mergeTermTitle": "Зліць {{term}}",
       "enableAutoMerge": "Уключыць аўтазліццё",
       "disableAutoMerge": "Адключыць аўтазліццё",
       "autoMergeOn": "Аўтазліццё ўключана",
@@ -372,9 +427,12 @@
       "deleteBranchAfterMerge": "Выдаліць галіну пасля зліцця",
       "noEnabledMethods": "У гэтым рэпазіторыі не дазволены ніводны метад зліцця. Папрасі адміністратара дазволіць зліццё з асобным камітам, з аб'яднаннем камітаў або з перабазаваннем.",
       "confirmTitle": "Зліць запыт?",
+      "confirmTitleTerm": "Зліць {{term}}?",
       "confirmMessage": "Твае змены будуць уключаны ў базавую галіну.",
       "enableAutoMergeConfirmTitle": "Уключыць аўтазліццё?",
       "enableAutoMergeConfirmMessage": "GitHub аўтаматычна зліе гэты запыт, калі ўсе абавязковыя праверкі завершацца паспяхова.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} будзе аўтаматычна зліты пасля паспяховага выканання канвеера.",
+      "enableAutoMergeDescriptionTerm": "GitLab аўтаматычна злівае гэты {{term}} пасля паспяховага выканання канвеера.",
       "forbidden": "У цябе няма дазволу зліваць гэты запыт.",
       "cannotMerge": "Гэты запыт на зліццё немагчыма зліць у яго бягучым стане.",
       "couldNotMerge": "Не атрымалася зліць запыт.",
@@ -385,7 +443,8 @@
       },
       "terminal": {
         "alreadyMerged": "Ужо зліта",
-        "closed": "Гэты запыт на зліццё закрыты"
+        "closed": "Гэты запыт на зліццё закрыты",
+        "closedMergeRequest": "Гэты merge-запыт закрыты"
       },
       "partialSuccessBanner": {
         "body": "Не атрымалася выдаліць галіну: {{reason}}.",
@@ -410,6 +469,20 @@
         "behindDetail": "Зыходная галіна адстае ад базавай. Перад зліццём выканай перабазаванне або абнаві галіну.",
         "notMergeableTitle": "Гэты запыт пакуль немагчыма зліць",
         "notMergeableDetail": "GitHub паведаміў пра наступны стан магчымасці зліцця: {{state}}."
+      },
+      "restrictions": {
+        "title": "Абмежаванні на зліццё",
+        "approvalsRequired_one": "Патрабуецца {{displayCount}} зацвярджэнне",
+        "approvalsRequired_other": "Патрабуецца {{displayCount}} зацвярджэнняў",
+        "pipelineMustSucceed": "Перад зліццём канвеер павінен завяршыцца паспяхова.",
+        "approvalsRequired_many": "Патрабуецца {{displayCount}} зацвярджэнняў",
+        "approvalsRequired_few": "Патрабуецца {{displayCount}} зацвярджэння"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Канвеер завяршаецца памылкай на апошнім каміце.",
+        "pendingPipeline": "Канвеер яшчэ выконваецца на апошнім каміце.",
+        "permission": "У вас няма правоў на зліццё {{term}}.",
+        "draft": "Перад зліццём перавядзіце {{term}} у стан гатоўнасці да агляду."
       },
       "methodLabels": {
         "merge": "Стварыць каміт зліцця",
@@ -459,6 +532,8 @@
       "replyBadRequest": "Немагчыма апублікаваць гэты адказ. Магчыма, абмеркаванне змянілася.",
       "replyForbidden": "У цябе няма дазволу адказваць у гэтым запыце на зліццё.",
       "addCommentCta": "Каментаваць гэты запыт на зліццё",
+      "fixWithKilo": "Выправіць з Kilo",
+      "fixWithKiloPrompt": "Калі ласка, апрацуй наступны каментарый да запыту на зліццё: {{link}}",
       "commentBadRequest": "Немагчыма апублікаваць гэты каментарый. Магчыма, запыт на зліццё змяніўся.",
       "commentForbidden": "У цябе няма дазволу каментаваць гэты запыт на зліццё.",
       "moderation": {
@@ -513,7 +588,12 @@
         "outdatedOnLines": "Састарэлы каментар: {{lines}}",
         "outdatedOnPath": "Састарэлы каментар: {{path}}"
       },
-      "deletedUser": "выдалены карыстальнік"
+      "deletedUser": "выдалены карыстальнік",
+      "replyForbiddenTerm": "У вас няма правоў адказваць у {{term}}.",
+      "moreLinesAbove_one": "… дадатковыя радкі вышэй: {{displayCount}}",
+      "moreLinesAbove_other": "… дадатковыя радкі вышэй: {{displayCount}}",
+      "moreLinesAbove_few": "… дадатковыя радкі вышэй: {{displayCount}}",
+      "moreLinesAbove_many": "… дадатковыя радкі вышэй: {{displayCount}}"
     },
     "couldNotOpenGitHubAppSettings": "Не атрымалася адкрыць налады праграмы GitHub.",
     "installKiloGitHubApp": "Усталяваць праграму Kilo для GitHub",
@@ -525,17 +605,19 @@
     "reviewPullRequest": "Праверыць запыт на зліццё",
     "headLine": "{{counts}} · апошні каміт {{sha}}",
     "entry": {
-      "eyebrow": "Адкрый запыт на зліццё па URL.",
-      "pastePrLink": "Уставіць спасылку на PR",
-      "noRecentPrs": "Няма нядаўніх PR",
-      "noRecentPrsDescription": "Устаў вышэй спасылку на PR, каб пачаць праверку кода. У наступны раз гэты PR з'явіцца тут.",
+      "eyebrow": "Адкрыйце запыт на зліццё або merge-запыт па URL",
+      "pastePrLink": "Устаўце спасылку на запыт на зліццё або merge-запыт",
+      "noRecentPrs": "Няма нядаўніх аглядаў",
+      "noRecentPrsDescription": "Каб пачаць агляд, устаўце спасылку вышэй — наступным разам ён з'явіцца тут.",
       "couldNotLoad": "Не атрымалася загрузіць.",
       "removeFromRecentsTitle": "Выдаліць са спіса нядаўніх?",
-      "removeFromRecentsMessage": "Гэты запыт на зліццё знікне з твайго спіса нядаўніх.",
+      "removeFromRecentsMessage": "Гэты агляд будзе выдалены са спісу нядаўніх.",
       "removeRecentAccessibility": "Выдаліць {{repo}} са спіса нядаўніх",
-      "urlAccessibility": "URL запыту на зліццё на GitHub",
-      "clearLink": "Ачысціць спасылку на запыт на зліццё",
-      "pasteLink": "Уставіць спасылку на запыт на зліццё",
+      "urlAccessibility": "Увядзіце URL запыту на зліццё або merge-запыту",
+      "urlPlaceholder": "URL запыту на зліццё або merge-запыту",
+      "openAccessibility": "Адкрыць запыт на зліццё або merge-запыт",
+      "clearLink": "Ачысціць спасылку",
+      "pasteLink": "Уставіць спасылку на запыт на зліццё або merge-запыт",
       "open": "Адкрыць"
     },
     "checks": {
@@ -552,6 +634,10 @@
       "pending": "у чаканні: {{displayCount}}",
       "skipped": "прапушчана: {{displayCount}}",
       "checksCount": "праверак: {{displayCount}}",
+      "checksCount_one": "праверка: {{displayCount}}",
+      "checksCount_few": "праверкі: {{displayCount}}",
+      "checksCount_many": "праверак: {{displayCount}}",
+      "checksCount_other": "праверак: {{displayCount}}",
       "checkDetails": "падрабязнасці праверкі"
     },
     "inbox": {
@@ -584,9 +670,15 @@
     "connect": {
       "checkFailedTitle": "Не атрымалася праверыць падключэнне да GitHub.",
       "checkFailedMessage": "Стан уваходу недаступны, пакуль даныя не загрузяцца.",
+      "checkFailedTitleGitLab": "Не ўдалося праверыць падключэнне да GitLab",
+      "checkFailedTitleBitbucket": "Не ўдалося праверыць падключэнне да Bitbucket",
+      "providerCheckFailedMessage": "Стан падключэння недаступны, пакуль гэта не загрузіцца.",
       "reconnectTitle": "Падключыць GitHub зноў",
       "reconnectDescription": "Тваё падключэнне да GitHub адклікана. Падключыся зноў, каб працягнуць правяраць запыты на зліццё з мабільнай прылады.",
-      "description": "Падключы свой уліковы запіс GitHub, каб правяраць запыты на зліццё з мабільнай прылады."
+      "description": "Падключы свой уліковы запіс GitHub, каб правяраць запыты на зліццё з мабільнай прылады.",
+      "gitlabDescription": "Падключыце ўліковы запіс GitLab, каб разглядаць merge-запыты з мабільнай прылады.",
+      "bitbucketDescription": "Падключыце Bitbucket да гэтай арганізацыі, каб разглядаць запыты на зліццё з мабільнай прылады.",
+      "bitbucketOrgOnlyDescription": "Выберыце арганізацыю ў профілі, каб разглядаць яе запыты на зліццё Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -610,7 +702,10 @@
     },
     "reconnectNotice": {
       "title": "Тэрмін дзеяння падключэння да GitHub скончыўся.",
-      "message": "Тваё падключэнне да GitHub больш не дзейнічае. Правер яго яшчэ раз — пры патрэбе табе прапануюць падключыцца зноў."
+      "message": "Тваё падключэнне да GitHub больш не дзейнічае. Правер яго яшчэ раз — пры патрэбе табе прапануюць падключыцца зноў.",
+      "gitlabTitle": "Тэрмін дзеяння падключэння да GitLab скончыўся",
+      "bitbucketTitle": "Тэрмін дзеяння падключэння да Bitbucket скончыўся",
+      "providerMessage": "Вашае падключэнне да {{provider}} больш не сапраўднае. Праверце падключэнне яшчэ раз — пры неабходнасці вам прапануюць падключыцца зноў."
     },
     "eventChips": {
       "comment": "Каментаваць",
@@ -679,10 +774,14 @@
       "statusContext": "Кантэкст",
       "lineLabel": "{{status}}, радок {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(пуста)"
+      "emptyLine": "(пуста)",
+      "truncationBanner_one": "Паказаны першыя {{limit}} з {{total}} змененых файлаў праз абмежаванне API GitHub.",
+      "truncationBanner_other": "Паказаны першыя {{limit}} з {{total}} змененых файлаў праз абмежаванне API GitHub.",
+      "truncationBanner_few": "Паказаны першыя {{limit}} з {{total}} змененых файлаў праз абмежаванне API GitHub.",
+      "truncationBanner_many": "Паказаны першыя {{limit}} з {{total}} змененых файлаў праз абмежаванне API GitHub."
     },
     "linkPasteClipboardEmpty": "Буфер абмену пусты.",
-    "linkPasteNotAPullRequest": "Гэта не спасылка на запыт на зліццё на GitHub.",
+    "linkPasteNotAPullRequest": "Гэта не спасылка на запыт на зліццё або merge-запыт",
     "announce": {
       "commentPosted": "Каментар апублікаваны",
       "reviewSubmitted": "Праверка кода адпраўлена",
@@ -691,6 +790,7 @@
     "mutationError": {
       "commentNotPosted": "Немагчыма апублікаваць гэты каментар. Магчыма, вылучаны радок змяніўся або PR абнавілі.",
       "reviewNotSubmitted": "Немагчыма адправіць гэтую праверку кода ў яе бягучым выглядзе. Магчыма, PR змяніўся або ты спрабуеш праверыць уласны запыт на зліццё.",
+      "reviewNotSubmittedTerm": "Гэты агляд немагчыма адправіць як ёсць. {{term}} магчыма змяніўся, або вы не можаце разглядаць уласны {{term}}.",
       "couldNotPostComment": "Не атрымалася апублікаваць каментар.",
       "couldNotSubmitReview": "Не атрымалася адправіць праверку кода. Правер падключэнне да інтэрнэту і паспрабуй яшчэ раз."
     },
@@ -698,9 +798,31 @@
       "couldNotReply": "Не атрымалася адказаць.",
       "couldNotCompleteAction": "Не атрымалася выканаць гэтае дзеянне.",
       "mergeResultDefaultError": "GitHub не завяршыў зліццё.",
+      "mergeResultNotCompleted": "{{term}} не быў зліты. Праверце яго стан і паўтарыце спробу.",
       "ambiguous": "Не атрымалася пацвердзіць вынік — правер PR перад паўторнай спробай.",
       "persistenceFailed": "Не атрымалася запісаць гэтае дзеянне. Паспрабуй яшчэ раз пазней.",
       "forbidden": "Доступ забаронены."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Недаступна ў гэтага правайдара",
+        "accessibility": "Недаступна ў гэтага правайдара: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Запыт на зліццё",
+      "mergeRequest": "Merge-запыт",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Падзяліцца merge-запытам",
+      "viewOnProvider": "Адкрыць у {{provider}}",
+      "mergeRequestUnavailable": "Merge-запыт недаступны",
+      "unavailableDescription": "Магчыма, ён быў выдалены або ў вас няма да яго доступу.",
+      "accessDeniedMergeRequest": "У вас няма правоў на прагляд гэтага merge-запыту.",
+      "couldNotLoadMergeRequest": "Не ўдалося загрузіць merge-запыт",
+      "discussionAccessDenied": "У вас няма правоў на прагляд абмеркавання гэтага merge-запыту.",
+      "discussionUnavailableMessage": "Гэты merge-запыт магчыма, быў выдалены.",
+      "noDiscussionDescription": "У гэтым merge-запыце няма галін агляду ці каментароў размовы.",
+      "noFilesChangedDescription": "У гэтым merge-запыце няма змен файлаў."
     }
   },
   "notifications": {
@@ -733,11 +855,12 @@
     "previewFullDescription": "Апавяшчэнні паказваюць тэкст паведамлення на экране блакіроўкі.",
     "previewGenericDescription": "Апавяшчэнні толькі паведамляюць пра падзею. Адкрыйце Kilo, каб прачытаць паведамленне.",
     "channel": {
-      "agent": "Сеансы агента",
+      "agentProgress": "Ход выканання агента",
       "chat": "Паведамленні ў чаце",
       "kiloclaw": "Актыўнасць KiloClaw",
       "balance": "Апавяшчэнні аб балансе",
-      "security": "Выяўленыя праблемы бяспекі"
+      "security": "Выяўленыя праблемы бяспекі",
+      "spend": "Апавяшчэнні аб выдатаках"
     },
     "category": {
       "chatMessagesSubtitle": "адказы ў вашых размовах",
@@ -748,8 +871,22 @@
       "sessionStatusTitle": "Статус сеанса",
       "sessionStatusSubtitle": "завершаны / памылка / гатовы да кіравання",
       "kiloclawActivitySubtitle": "экзэмпляр гатовы або завяршыўся з памылкай, запланаваныя дзеянні",
+      "kiloclawActivityUnavailable": "Запусціце экзэмпляр KiloClaw, каб атрымліваць актыўнасць KiloClaw.",
       "balanceAlertsSubtitle": "папярэджанні аб нізкім балансе арганізацыі",
-      "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA"
+      "balanceAlertsUnavailable": "Далучыцеся да арганізацыі, каб атрымліваць папярэджанні аб балансе.",
+      "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA",
+      "securityFindingsUnavailable": "Уключыце Агента бяспекі Kilo у пэўным абсягу, каб атрымліваць праблемы бяспекі.",
+      "spendAlertsSubtitle": "перасячэнні парогаў і гадзінныя ўсплёскі",
+      "spendAlertsToggle": "Катэгорыя апавяшчэнняў аб выдатаках"
+    },
+    "action": {
+      "openSession": "Адкрыць сеанс"
+    },
+    "needsInputAction": {
+      "approved": "Запыт ухвалены",
+      "replied": "Адказ дасланы",
+      "failed": "Не ўдалося адказаць. Націсніце яшчэ раз, каб паўтарыць.",
+      "unavailable": "Гэты запыт больш не чакае."
     }
   },
   "tabs": {
@@ -830,7 +967,11 @@
       "uploadFailed": "Не атрымалася загрузіць далучэнне.",
       "failedToUploadFile": "Не атрымалася загрузіць файл: {{reason}}.",
       "nothingToPaste": "Няма чаго ўставіць.",
-      "metadataStripFailed": "Не атрымалася выдаліць метаданыя фота."
+      "metadataStripFailed": "Не атрымалася выдаліць метаданыя фота.",
+      "limit_one": "Вы можаце далучыць да {{displayCount}} файл.",
+      "limit_other": "Вы можаце далучыць да {{displayCount}} файлаў.",
+      "limit_few": "Вы можаце далучыць да {{displayCount}} файлы.",
+      "limit_many": "Вы можаце далучыць да {{displayCount}} файлаў."
     },
     "attachmentPreview": {
       "accessibility": "Файл: {{filename}}, {{status}}",
@@ -1580,7 +1721,15 @@
       "syncFindings": "Сінхранізаваць праблемы",
       "syncNow": "Сінхранізаваць зараз",
       "syncQueued": "Сінхранізацыя ў чарзе",
-      "syncStatusUnavailable": "Стан сінхранізацыі недаступны."
+      "syncStatusUnavailable": "Стан сінхранізацыі недаступны.",
+      "daysOverdue_one": "Дзень пратэрміноўкі: {{displayCount}}",
+      "daysOverdue_other": "Дзён пратэрміноўкі: {{displayCount}}",
+      "daysOverdue_few": "Дні пратэрміноўкі: {{displayCount}}",
+      "daysOverdue_many": "Дзён пратэрміноўкі: {{displayCount}}",
+      "findingsCount_one": "Праблема: {{displayCount}}",
+      "findingsCount_other": "Праблем: {{displayCount}}",
+      "findingsCount_few": "Праблемы: {{displayCount}}",
+      "findingsCount_many": "Праблем: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Адкрытыя праблемы",
@@ -1989,6 +2138,10 @@
       "couldNotLoad": "Не ўдалося загрузіць сеанс.",
       "failedToLoadDetails": "Не ўдалося загрузіць падрабязнасці сеанса.",
       "failedToStopExecution": "Не ўдалося спыніць выкананне.",
+      "stopped": "Сеанс спынены",
+      "committing": "Ствараецца каміт…",
+      "committed": "Каміт створаны",
+      "commitFailed": "Не ўдалося стварыць каміт",
       "renameSession": "Перайменаваць сеанс",
       "renamePlaceholder": "Назва сеанса",
       "transcriptAccessibility": "Гісторыя паведамленняў сеанса",
@@ -2023,17 +2176,56 @@
       "exitNeedsNewerCli": "Для аддаленага выканання каманд з касой рыскай патрэбна навейшая версія Kilo CLI. Абнавіце Kilo CLI і падключыцеся яшчэ раз."
     },
     "sessionConnection": {
+      "label": "Злучэнне",
       "connecting": "Падключэнне…",
       "reconnecting": "Паўторнае падключэнне…",
       "connectionLost": "Сувязь страчана",
       "retryConnection": "Паўтарыць падключэнне"
     },
+    "goal": {
+      "title": "Мэта",
+      "statusActive": "Актыўная мэта",
+      "statusPaused": "Прыпыненая мэта",
+      "statusComplete": "Мэта выканана",
+      "statusBlocked": "Мэта заблакавана",
+      "edit": "Рэдагаваць мэту",
+      "remove": "Выдаліць мэту",
+      "pause": "Прыпыніць мэту",
+      "resume": "Працягнуць мэту",
+      "editPlaceholder": "Апішыце мэту",
+      "removeConfirmTitle": "Выдаліць мэту?",
+      "removeConfirmMessage": "CLI ачышчае мэту гэтага сеансу.",
+      "updateFailed": "Не ўдалося абнавіць мэту.",
+      "sectionAccessibility": "{{status}}. Мэта: {{text}}",
+      "collapse": "Згарнуць мэту",
+      "expand": "Разгарнуць мэту"
+    },
     "newSession": {
+      "recentlyUsed": "Нядаўна выкарыстаныя",
+      "couldNotLoadGithubRepositories": "Не ўдалося загрузіць рэпазіторыі GitHub.",
+      "couldNotLoadGitlabRepositories": "Не ўдалося загрузіць рэпазіторыі GitLab.",
+      "couldNotLoadBitbucketRepositories": "Не ўдалося загрузіць рэпазіторыі Bitbucket.",
       "connectGithubDescription": "Падключыце GitHub у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
+      "connectGitlabDescription": "Падключыце GitLab у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
+      "connectBitbucketDescription": "Падключыце Bitbucket у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
       "openGithub": "Адкрыць GitHub",
+      "openGitlab": "Адкрыць GitLab",
+      "openBitbucket": "Адкрыць Bitbucket",
       "refreshRepositories": "Абнавіць рэпазіторыі",
       "githubConnected": "GitHub падключаны",
+      "gitlabConnected": "GitLab падключаны",
       "noRepositoriesVisible": "Рэпазіторыі не адлюстроўваюцца. Праверце, ці мае праграма Kilo для GitHub доступ да іх, і абнавіце спіс.",
+      "noRepositoriesVisibleGitlab": "Рэпазіторыі не адлюстроўваюцца. Праверце доступ да рэпазіторыяў GitLab і абнавіце спіс.",
+      "noRepositoriesVisibleBitbucket": "Рэпазіторыі не адлюстроўваюцца. Праверце доступ да рэпазіторыяў Bitbucket і абнавіце спіс.",
+      "bitbucketOrganizationsOnly": "Bitbucket даступны толькі для арганізацый.",
+      "branchPickerTitle": "Выбраць галіну",
+      "branchDefault": "Прадвызначаная",
+      "branchAccessibility": "Галіна: {{label}}",
+      "branchLoading": "Загрузка галін",
+      "branchLoadError": "Не ўдалося загрузіць галіны",
+      "branchUnavailable": "Галіны недаступныя для гэтага рэпазіторыя. Праверце доступ у правайдара, затым выберыце іншы рэпазіторый.",
+      "branchEmpty": "Няма даступных галін",
+      "branchPlaceholder": "Выберыце галіну",
       "runOnWithTarget": "Асяроддзе запуску: {{target}}",
       "environment": "Асяроддзе",
       "couldNotLoadEnvironment": "Не ўдалося загрузіць ваша асяроддзе.",
@@ -2054,24 +2246,13 @@
       "couldNotRefreshRepositories": "Не ўдалося абнавіць рэпазіторыі. Паспрабуйце яшчэ раз.",
       "discardDraftTitle": "Выдаліць чарнавік?",
       "discardDraftMessage": "Ваш запыт будзе страчаны.",
+      "discardWithUploadsMessage": "Ваш запыт і загружаныя файлы, не прымацаваныя да адпраўленых паведамленняў, будуць выдаленыя.",
       "discardFailed": "Не ўдалося выдаліць чарнавік. Паспрабуйце яшчэ раз.",
       "remoteHint": "Выканайце `kilo remote` на сваім камп'ютары або `/remote` у актыўным сеансе CLI, каб кіраваць лакальным працэсам kilo.",
-      "connectBitbucketDescription": "Падключыце Bitbucket у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
-      "connectGitlabDescription": "Падключыце GitLab у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
-      "couldNotLoadBitbucketRepositories": "Не ўдалося загрузіць рэпазіторыі Bitbucket.",
-      "couldNotLoadGithubRepositories": "Не ўдалося загрузіць рэпазіторыі GitHub.",
-      "couldNotLoadGitlabRepositories": "Не ўдалося загрузіць рэпазіторыі GitLab.",
-      "gitlabConnected": "GitLab падключаны",
-      "noRepositoriesVisibleBitbucket": "Рэпазіторыі не адлюстроўваюцца. Праверце доступ да рэпазіторыяў Bitbucket і абнавіце спіс.",
-      "noRepositoriesVisibleGitlab": "Рэпазіторыі не адлюстроўваюцца. Праверце доступ да рэпазіторыяў GitLab і абнавіце спіс.",
-      "openBitbucket": "Адкрыць Bitbucket",
-      "openGitlab": "Адкрыць GitLab",
-      "recentlyUsed": "Нядаўна выкарыстаныя",
       "continueFrom": "Працягваецца сеанс «{{title}}».",
       "importingSession": "Імпартаванне сеанса",
       "cliCannotContinue": "Гэты CLI не падтрымлівае працяг сеанса. Выберыце Cloud Agent або іншы CLI.",
-      "importFailed": "Не ўдалося імпартаваць гэты сеанс.",
-      "discardWithUploadsMessage": "Ваш запыт і загружаныя файлы, не прымацаваныя да адпраўленых паведамленняў, будуць выдаленыя."
+      "importFailed": "Не ўдалося імпартаваць гэты сеанс."
     },
     "partRenderer": {
       "updatedFileCount_one": "Абноўлены {{displayCount}} файл.",
@@ -2097,7 +2278,20 @@
       "updateTodos": "Абнавіць спіс задач",
       "linesBadge": "радкоў: {{displayCount}}",
       "filesBadge": "файлаў: {{displayCount}}",
-      "matchesBadge": "супадзенняў: {{displayCount}}"
+      "matchesBadge": "супадзенняў: {{displayCount}}",
+      "filesBadge_one": "файл: {{displayCount}}",
+      "filesBadge_other": "файлаў: {{displayCount}}",
+      "filesBadge_few": "файлы: {{displayCount}}",
+      "filesBadge_many": "файлаў: {{displayCount}}",
+      "linesBadge_one": "радок: {{displayCount}}",
+      "linesBadge_other": "радкоў: {{displayCount}}",
+      "linesBadge_few": "радкі: {{displayCount}}",
+      "linesBadge_many": "радкоў: {{displayCount}}",
+      "matchesBadge_one": "супадзенне: {{displayCount}}",
+      "matchesBadge_other": "супадзенняў: {{displayCount}}",
+      "matchesBadge_few": "супадзенні: {{displayCount}}",
+      "matchesBadge_many": "супадзенняў: {{displayCount}}",
+      "noOutput": "Няма вываду."
     },
     "readToolMarkdown": {
       "linesTruncated": "радкі {{start}}–{{end}} (скарочана)",
@@ -2393,7 +2587,15 @@
       "files": "Файлы",
       "couldNotOpenPhotoPicker": "Не ўдалося адкрыць акно выбару фота. Перазапусціце Kilo і паспрабуйце яшчэ раз.",
       "maxFilesAllowed": "Максімальная колькасць файлаў: {{displayCount}}.",
-      "onlyAddingFiles": "Дадаецца файлаў: {{accepted}} з {{total}} (макс. {{max}})"
+      "onlyAddingFiles": "Дадаецца файлаў: {{accepted}} з {{total}} (макс. {{max}})",
+      "maxFilesAllowed_one": "Максімальная колькасць файлаў: {{displayCount}}.",
+      "maxFilesAllowed_other": "Максімальная колькасць файлаў: {{displayCount}}.",
+      "maxFilesAllowed_few": "Максімальная колькасць файлаў: {{displayCount}}.",
+      "maxFilesAllowed_many": "Максімальная колькасць файлаў: {{displayCount}}.",
+      "onlyAddingFiles_one": "Дадаецца файлаў: {{accepted}} з {{total}} (макс. {{max}})",
+      "onlyAddingFiles_other": "Дадаецца файлаў: {{accepted}} з {{total}} (макс. {{max}})",
+      "onlyAddingFiles_few": "Дадаецца файлаў: {{accepted}} з {{total}} (макс. {{max}})",
+      "onlyAddingFiles_many": "Дадаецца файлаў: {{accepted}} з {{total}} (макс. {{max}})"
     },
     "composer": {
       "addAttachment": "Дадаць укладанне",
@@ -2411,7 +2613,11 @@
       "discardAttachmentsMessage": "Загружаныя файлы, не прымацаваныя да адпраўленых паведамленняў, будуць выдаленыя.",
       "discardAttachmentsTitle": "Выдаліць укладанні?",
       "charactersRemaining": "Засталося сімвалаў: {{count}}",
-      "insertNewline": "Уставіць новы радок"
+      "insertNewline": "Уставіць новы радок",
+      "charactersRemaining_one": "Засталося сімвал: {{count}}",
+      "charactersRemaining_other": "Засталося сімвалаў: {{count}}",
+      "charactersRemaining_few": "Засталося сімвалы: {{count}}",
+      "charactersRemaining_many": "Засталося сімвалаў: {{count}}"
     },
     "chatLink": {
       "linkCopied": "Спасылка скапіяваная",
@@ -2445,6 +2651,12 @@
       "startNewSession": "Пачаць новы сеанс",
       "exitSession": "Выйсці з сеанса",
       "clearSession": "Скончыць гэты сеанс і пачаць новы",
+      "compactDescription": "сціснуць кантэкст бягучага сеансу",
+      "goalDescription": "Працягвайце працу над мэтай сеансу. /goal <objective> або pause, resume, clear",
+      "initDescription": "кіраваная налада AGENTS.md",
+      "resumeClaudeDescription": "імпартаваць транскрыпт сеансу Claude Code",
+      "resumeCodexDescription": "імпартаваць транскрыпт сеансу OpenAI Codex",
+      "reviewDescription": "прагледзець змены [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Выкарыстаць /{{command}}",
       "insert": "Уставіць",
       "upgradeRequiredFallback": "Абнавіце CLI, каб выкарыстоўваць гэтую каманду.",
@@ -2479,7 +2691,16 @@
       "stepsCount_other": "{{steps}} кроку",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} крокі",
-      "stepsCount_many": "{{steps}} крокаў"
+      "stepsCount_many": "{{steps}} крокаў",
+      "modelsCount_one": "Мадэль ({{displayCount}})",
+      "modelsCount_other": "Мадэлі ({{displayCount}})",
+      "modelsCount_few": "Мадэлі ({{displayCount}})",
+      "modelsCount_many": "Мадэлі ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "Аўтаматычнае адабрэнне",
+      "description": "Аўтаматычна ўхваляць запыты на дазвол для гэтага сеансу. Пасля гэтага інструменты запускаюцца без запыту.",
+      "unavailable": "Гэты сеанс не можа атрымліваць запыты на дазвол."
     },
     "prBadge": {
       "open": "адкрыты запыт на зліццё",
@@ -2511,6 +2732,14 @@
       "tapToListHint": "Націсніце на папку, каб убачыць яе змесціва.",
       "unsupportedDescription": "Гэты CLI не падтрымлівае прагляд папак. Кнопка «Гатова» пакідае папку запуску, а «Пачаць сеанс» запускае ў ёй сеанс.",
       "unsupportedTitle": "Спіс папак недаступны"
+    },
+    "toolRun": {
+      "sheetTitle": "Выклікі інструментаў",
+      "condensedLabel": "{{itemCount}} элементаў; {{last}}",
+      "condensedLabel_one": "{{itemCount}} элемент; {{last}}",
+      "condensedLabel_other": "{{itemCount}} элементаў; {{last}}",
+      "condensedLabel_few": "{{itemCount}} элементы; {{last}}",
+      "condensedLabel_many": "{{itemCount}} элементаў; {{last}}"
     }
   },
   "bootstrap": {
@@ -2555,6 +2784,7 @@
     "couldNotLoadActiveSessions": "Не атрымалася загрузіць актыўныя сеансы.",
     "agentSessions": "Зараз выконваюцца",
     "newCodingTask": "Новая задача па праграмаванні",
+    "newTaskFromPicture": "Новая задача з малюнка",
     "explore": "Магчымасці",
     "seeAll": "Паказаць усё",
     "noLiveSessions": "Зараз нічога не выконваецца"
@@ -2623,7 +2853,10 @@
     "gatewayModelUnavailable": "Гэта мадэль распазнавання маўлення недаступная. Абярыце іншую ў наладах.",
     "gatewayModelUnavailableNotice": "Гэта мадэль больш не прапануецца. Націсніце $t(transcriptionModel.title), каб выбраць іншую.",
     "gatewaySignInRequired": "Увайдзіце, каб карыстацца распазнаваннем маўлення праз Kilo Gateway.",
-    "gatewayNoModel": "Спачатку абярыце мадэль распазнавання маўлення ў наладах."
+    "gatewayNoModel": "Спачатку абярыце мадэль распазнавання маўлення ў наладах.",
+    "testTitle": "Праверыць галасавы ўвод",
+    "testPlaceholder": "Дакраніцеся да мікрафона і пачніце гаварыць.",
+    "testClear": "Ачысціць тэкст"
   },
   "share": {
     "title": "Адпраўка ў Kilo",
@@ -2641,7 +2874,11 @@
     "cliCantReceiveFilesTitle": "Гэты сеанс не можа атрымліваць файлы",
     "cliCantReceiveFilesMessage": "Kilo CLI, у якім працуе гэты сеанс, не можа атрымліваць файлы. Абнаві CLI на тым камп'ютары або адпраў файлы ў новы сеанс.",
     "contentlessMessage": "Няма чаго адпраўляць — не дададзены ні тэкст, ні файлы.",
-    "couldNotReadContent": "Не атрымалася прачытаць змесціва для адпраўкі."
+    "couldNotReadContent": "Не атрымалася прачытаць змесціва для адпраўкі.",
+    "onlyFirstFilesAttached_one": "Будуць далучаны толькі першыя файлы ў колькасці {{displayCount}}.",
+    "onlyFirstFilesAttached_other": "Будуць далучаны толькі першыя файлы ў колькасці {{displayCount}}.",
+    "onlyFirstFilesAttached_few": "Будуць далучаны толькі першыя файлы ў колькасці {{displayCount}}.",
+    "onlyFirstFilesAttached_many": "Будуць далучаны толькі першыя файлы ў колькасці {{displayCount}}."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2773,7 +3010,8 @@
     "aiProvidersWhat": "Вашы запыты, гісторыя размоў і любыя прымацаваныя файлы.",
     "aiProvidersWhy": "Для стварэння адказаў AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google і іншыя пастаўшчыкі, якіх вы выбіраеце для кожнага запыту.",
-    "gatewayWhat": "Ідэнтыфікатар уліковага запісу, метаданыя запытаў, звесткі пра выкарыстанне токенаў.",
+    "gatewayWhat": "Ідэнтыфікатар уліковага запісу, метаданыя запытаў, звесткі пра выкарыстанне токенаў, а таксама промпты і гуказапісы, якія праграма перадае праз яго.",
+    "viaGateway": "Праз Kilo Gateway",
     "gatewayWhy": "Для аўтэнтыфікацыі, маршрутызацыі запытаў і зверкі плацяжоў.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Справаздачы аб збоях і памылках без змесціва праграмы.",
@@ -2793,7 +3031,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Запіс вашага голасу падчас дыктоўкі.",
     "voiceTranscriptionWhy": "Каб пераўтварыць маўленне ў тэкст.",
-    "voiceTranscriptionWho": "Апрацоўваецца толькі на прыладзе або перадаецца Apple ці Google, калі прылада не можа распазнаваць маўленне без інтэрнэту.",
+    "voiceTranscriptionWho": "Ваша прылада, Kilo Gateway з абранай вамі мадэллю распазнавання або Apple ці Google для анлайн-распазнавання.",
     "installAttributionPromptTitle": "Дазволіць вызначаць крыніцу ўсталявання?",
     "installAttributionPromptMessage": "Kilo выкарыстоўвае дазвол Apple на адсочванне толькі для вызначэння канала, праз які вы прыйшлі. Вашы запыты і размовы для гэтага ніколі не выкарыстоўваюцца.",
     "what": "Якія даныя",
@@ -2967,6 +3205,14 @@
     "tooManySignInAttempts": "Занадта шмат спроб уваходу. Пачакай і паспрабуй яшчэ раз."
   },
   "models": {
+    "auto": {
+      "frontier": "Аўта Перадавы",
+      "balanced": "Аўта Збалансаваны",
+      "efficient": "Аўта Эфектыўны",
+      "small": "Аўта Малы",
+      "free": "Аўта Бясплатны",
+      "organization": "Аўта арганізацыі"
+    },
     "dataCollected": "Збор даных",
     "free": "Бясплатна",
     "couldNotUpdateFavorites": "Не ўдалося абнавіць абранае.",
@@ -3005,8 +3251,17 @@
     "privacy": "Адкрый Kilo, каб убачыць агентаў",
     "openAgents": "Адкрыць агентаў",
     "needsInput": "Чакае адказу",
+    "newestSession": "Найноўшы: {{title}}",
+    "noneWaiting": "Няма агентаў, якія чакаюць",
+    "newAgent": "Новы агент",
+    "approving": "Ухваляецца...",
+    "couldNotApprove": "Не ўдалося ўхваліць",
+    "couldNotStart": "Не ўдалося запусціць",
     "channelName": "Актыўныя агенты",
-    "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі."
+    "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі.",
+    "openSession": "Адкрыць",
+    "approveFailed": "Не ўдалося ўхваліць. Націсніце $t(common.approve), каб паспрабаваць яшчэ раз.",
+    "newestResult": "Найноўшы вынік"
   },
   "transcriptionModel": {
     "title": "Мадэль распазнавання маўлення",
@@ -3014,5 +3269,56 @@
     "emptyTitle": "Няма мадэляў распазнавання маўлення",
     "emptyDescription": "Зараз Kilo Gateway не прапануе мадэляў распазнавання маўлення.",
     "loadFailed": "Не атрымалася загрузіць мадэлі распазнавання маўлення."
+  },
+  "voiceLanguage": {
+    "title": "Мова галасавога ўводу",
+    "automatic": "Аўтаматычна",
+    "loadFailed": "Не ўдалося загрузіць мовы, якія падтрымлівае гэта прылада.",
+    "emptyTitle": "Няма падтрымліваемых моў",
+    "emptyDescription": "Распазнаванне маўлення гэтай прылады не паведамляе ніводнай падтрымліваемай мовы."
+  },
+  "tour": {
+    "eyebrow": "Хуткі агляд",
+    "forkTitle": "Дзе вы хацелі б запускаць Kilo?",
+    "forkSubtitle": "Выберыце, дзе Kilo будзе працаваць у вашым першым сеансе.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Запускайце Kilo ў асобленым воблачным асяроддзі, не ўсталёўваючы нічога.",
+    "remoteOptionTitle": "Ваш камп'ютар",
+    "remoteOptionBody": "Запускайце Kilo на ўласнай машыне праз CLI `kilo remote`.",
+    "skip": "Прапусціць агляд",
+    "tutorialLabel": "Навучанне"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Каб запусціць агента, патрэбен запыт. Дадайце запыт і запусціце зноў.",
+      "repositoryUnknown": "Kilo не распазнае {{repository}} як рэпазіторый GitHub або GitLab. Выберыце іншы рэпазіторый у Kilo.",
+      "repositoryUnsupported": "{{repository}} — гэта рэпазіторый Bitbucket, і Запусціць агента пакуль не можа яго выкарыстоўваць. Выберыце іншы рэпазіторый у Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Адкрыць апошні сеанс"
+  },
+  "spendAlerts": {
+    "subtitle": "Дасылайце апавяшчэнне па электроннай пошце або пуш-паведамленнем кантактам па аплаце, калі выдатакі гэтай сферы перавышаюць ліміт або рэзка ўзрастаюць вышэй за звычайную гадзінную хуткасць.",
+    "enable": "Уключыць апавяшчэнні аб выдатаках",
+    "thresholdTitle": "Перасячэнне парога",
+    "thresholdSubtitle": "Бягучыя выдатакі перавышаюць ваш ліміт",
+    "anomalyTitle": "Гадзінны ўсплёск",
+    "anomalySubtitle": "Гадзіна значна вышэй за звычайную хуткасць гэтай сферы",
+    "limitLabel": "Ліміт (USD)",
+    "windowLabel": "Акно",
+    "window24h": "24 гадзіны",
+    "window7d": "7 дзён",
+    "window30d": "30 дзён",
+    "multiplierLabel": "Множнік усплёску",
+    "saved": "Налады апавяшчэнняў аб выдатаках захаваны",
+    "loadError": "Не ўдалося загрузіць апавяшчэнні аб выдатаках.",
+    "saveError": "Не ўдалося захаваць апавяшчэнні аб выдатаках.",
+    "empty": "Апавяшчэнні аб выдатаках выключаны. Уключыце іх, каб папярэджваць кантакты па аплаце гэтай сферы.",
+    "noSpend": "Выдаткі яшчэ не зафіксаваны",
+    "spend24h": "Выдаткі за апошнія 24 гадзіны",
+    "multiplierError": "Увядзіце множнік 1 або больш",
+    "permissionDenied": "У вас няма дазволу кіраваць апавяшчэннямі аб выдатаках.",
+    "pushOffByCategory": "Выключана ў апавяшчэннях"
   }
 }

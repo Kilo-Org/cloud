@@ -5,6 +5,12 @@ import {
   classifyKiloClawInvoiceLine,
   invoiceLooksLikeKiloClawByPriceId,
 } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
+import {
+  SERVICE_FEE_METADATA_TYPE,
+  SERVICE_FEE_RATE_BASIS_POINTS,
+  SERVICE_FEE_VERSION,
+} from '@/lib/service-fees/constants';
+import { buildServiceFeeLineMetadata } from '@/lib/service-fees/stripe-lines';
 
 function requiredEnv(key: string): string {
   const value = process.env[key];
@@ -88,5 +94,52 @@ describe('KiloClaw Stripe invoice classification', () => {
       )
     ).toBe(true);
     expect(invoiceLooksLikeKiloClawByPriceId(invoiceWithPrice('price_unrelated'))).toBe(false);
+  });
+
+  it('does not treat a service-fee line as KiloClaw', () => {
+    const feeInvoice = {
+      id: 'in_service_fee',
+      object: 'invoice',
+      lines: {
+        data: [
+          {
+            metadata: {
+              type: SERVICE_FEE_METADATA_TYPE,
+              serviceFeeVersion: SERVICE_FEE_VERSION,
+              serviceFeeAssessmentKey: 'checkout:fee',
+              serviceFeeRateBasisPoints: String(SERVICE_FEE_RATE_BASIS_POINTS),
+            },
+            pricing: {
+              price_details: { price: 'price_service_fee' },
+            },
+          },
+        ],
+      },
+    } as unknown as Stripe.Invoice;
+
+    expect(invoiceLooksLikeKiloClawByPriceId(feeInvoice)).toBe(false);
+    expect(classifyKiloClawInvoiceLine(feeInvoice)).toBeNull();
+    expect(
+      invoiceLooksLikeKiloClawByPriceId({
+        id: 'in_claw_plus_fee',
+        object: 'invoice',
+        lines: {
+          data: [
+            {
+              pricing: {
+                price_details: {
+                  price: requiredEnv('STRIPE_KILOCLAW_2026_05_10_STANDARD_PRICE_ID'),
+                },
+              },
+              period: { start: 1772323200, end: 1775001600 },
+            },
+            {
+              metadata: buildServiceFeeLineMetadata('checkout:fee'),
+              pricing: { price_details: { price: 'price_service_fee' } },
+            },
+          ],
+        },
+      } as unknown as Stripe.Invoice)
+    ).toBe(true);
   });
 });

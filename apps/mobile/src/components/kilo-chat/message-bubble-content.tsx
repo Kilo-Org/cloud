@@ -23,6 +23,12 @@ type Props = {
   pendingActionGroupId: string | null;
   replyToMessage?: ReplyPreviewSource | null;
   onExecuteAction: (message: Message, groupId: string, value: ExecApprovalDecision) => void;
+  /**
+   * Long-press handler forwarded into rendered code fences' copy trigger, so
+   * press-and-hold on a fence still opens the bubble's message actions instead
+   * of being swallowed by the trigger. Omitted when the bubble has no actions.
+   */
+  onLongPressCode?: () => void;
 };
 
 function actionStyleToVariant(
@@ -45,6 +51,7 @@ export function MessageBubbleContent({
   pendingActionGroupId,
   replyToMessage,
   onExecuteAction,
+  onLongPressCode,
 }: Props) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -79,7 +86,14 @@ export function MessageBubbleContent({
       )}
       {message.content.map((block, index) => {
         if (block.type === 'text') {
-          return <MessageMarkdown key={index} text={block.text} isFromMe={isFromMe} />;
+          return (
+            <MessageMarkdown
+              key={index}
+              text={block.text}
+              isFromMe={isFromMe}
+              onLongPressCode={onLongPressCode}
+            />
+          );
         }
 
         if (block.type === 'attachment') {

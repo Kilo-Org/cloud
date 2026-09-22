@@ -56,6 +56,13 @@ export function KvRow({
   valueClassName,
 }: Readonly<KvRowProps>) {
   const colors = useThemeColors();
+  // Android's `selectable` routes the value through ReactTextView, which
+  // re-applies selection when the view attaches and drops the `maxLines`
+  // clamp. A selectable value then wraps past the row's one-line height and
+  // paints a clipped second line (SPOT-DEFECT: the finding-details Repository
+  // row). Clamp the values that can hold it; a selectable value wraps inside
+  // the row and the row grows to fit it, so no glyph is cut off.
+  const valueLineLimit = selectable ? undefined : 1;
   return (
     <View
       className={cn(
@@ -74,8 +81,8 @@ export function KvRow({
       <Text
         variant="mono"
         selectable={selectable}
-        numberOfLines={1}
-        ellipsizeMode="middle"
+        numberOfLines={valueLineLimit}
+        ellipsizeMode={valueLineLimit ? 'middle' : undefined}
         className={cn(
           'min-w-0 shrink text-right text-[13px]',
           VALUE_TONE[valueTone],

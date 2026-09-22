@@ -2,7 +2,7 @@
 /* eslint-disable require-await, @typescript-eslint/require-await -- the binding's fakes resolve immediately, so they settle without await */
 import { setAudioModeAsync } from 'expo-audio';
 import * as SecureStore from 'expo-secure-store';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   gatewayVoiceInputNative,
@@ -153,6 +153,13 @@ describe('gatewayVoiceInputNative recorder construction', () => {
     recorderBox.calls.length = 0;
     recorderBox.instances.length = 0;
     platformMock.OS = 'ios';
+  });
+
+  afterEach(() => {
+    // These cases only start a session. The engine keeps a segment rotation
+    // armed until the session ends, so end it here; otherwise a rotation timer
+    // outlives the test.
+    gatewayVoiceInputNative.abort();
   });
 
   it('pairs allowsRecording with playsInSilentMode so expo-audio iOS accepts the recording mode', async () => {

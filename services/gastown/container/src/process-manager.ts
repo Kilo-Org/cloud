@@ -41,11 +41,8 @@ type SDKInstance = {
 const agents = new Map<string, ManagedAgent>();
 // One SDK server instance per workdir (shared by agents in the same worktree)
 const sdkInstances = new Map<string, SDKInstance>();
-// Tracks active event subscription abort controllers per agent
 const eventAbortControllers = new Map<string, AbortController>();
-// Event sinks for WebSocket forwarding
 const eventSinks = new Set<(agentId: string, event: string, data: unknown) => void>();
-// Per-agent idle timers — fires exit when no nudges arrive.
 // Stores both the timer handle and the onExit callback so drainAll()
 // can re-arm timers with a shorter timeout without duplicating exit logic.
 const idleTimers = new Map<string, { timer: ReturnType<typeof setTimeout>; onExit: () => void }>();
@@ -260,25 +257,22 @@ async function createSessionWithStaleDbFallback(
     `${MANAGER_LOG} session.create failed for ${agentId}, attempting stale DB recovery. Response: ${rawStr}`
   );
 
-  // 1. Delete local kilo.db so the CLI starts with a fresh schema.
   await deleteLocalDb(agentId);
 
-  // 2. Tear down the SDK server so ensureSDKServer creates a new one.
   const instance = sdkInstances.get(workdir);
   if (instance) {
     instance.server.close();
     sdkInstances.delete(workdir);
   }
 
-  // 3. Delete the stale KV snapshot (fire-and-forget) so future container
-  //    restarts don't re-hydrate the broken DB.
+  // Delete the stale KV snapshot (fire-and-forget) so future container
+  // restarts don't re-hydrate the broken DB.
   const apiUrl = agent.gastownApiUrl;
   const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
   if (apiUrl && token) {
     void deleteRemoteDbSnapshot(agentId, apiUrl, token, agent.rigId, agent.townId);
   }
 
-  // 4. Restart SDK server and retry session.create.
   const { client: freshClient, port } = await ensureSDKServer(workdir, env);
   agent.serverPort = port;
 
@@ -375,20 +369,6 @@ async function saveDbSnapshot(
     const dbPath = `${dbDir}/kilo.db`;
     await fs.access(dbPath);
 
-    // SQLite WAL mode stores recent writes in -wal/-shm files. We must
-    // checkpoint the WAL into the main DB file before snapshotting so the
-    // snapshot contains all data. Use bun's built-in SQLite to run PRAGMA
-    // wal_checkpoint(TRUNCATE) which merges the WAL and truncates it.
-    //
-    // `PRAGMA wal_checkpoint(TRUNCATE)` returns a row `(busy, log, checkpointed)`:
-    //   - busy=1 means another writer is holding the WAL and the checkpoint
-    //     was blocked. The main kilo.db is then stale relative to the WAL.
-    //   - log != checkpointed means the checkpoint only partially drained
-    //     the WAL, so again the main db file is missing recent writes.
-    //
-    // Either case means uploading kilo.db would overwrite the remote
-    // snapshot with a stale copy missing the messages this path is meant
-    // to preserve. Skip the upload in that case.
     const checkpointOk = await runWalCheckpoint(dbPath, agentId);
     if (!checkpointOk) {
       console.warn(
@@ -506,7 +486,6 @@ export function unregisterEventSink(
   eventSinks.delete(sink);
 }
 
-// ── Event buffer for HTTP polling ─────────────────────────────────────
 // The TownContainerDO polls GET /agents/:id/events?after=N to get events
 // because containerFetch doesn't support WebSocket upgrades.
 type BufferedEvent = {
@@ -546,7 +525,6 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
   // Buffer in-memory for WebSocket backfill of late-joining clients
   bufferAgentEvent(agentId, event, data);
 
-  // Send to WebSocket sinks (live streaming to browser)
   for (const sink of eventSinks) {
     try {
       sink(agentId, event, data);
@@ -574,7 +552,6 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
       headers['X-Gastown-Agent-Id'] = agentId;
       if (agent.rigId) headers['X-Gastown-Rig-Id'] = agent.rigId;
     }
-    // POST to the worker's agent-events endpoint for persistent storage
     fetch(
       `${agent.gastownApiUrl}/api/towns/${agent.townId ?? '_'}/rigs/${agent.rigId ?? '_'}/agent-events`,
       {
@@ -592,14 +569,6 @@ function broadcastEvent(agentId: string, event: string, data: unknown): void {
   }
 }
 
-/**
- * Get or create an SDK server instance for a workdir.
- *
- * createKilo() reads process.cwd() and process.env during startup, so
- * we must serialize server creation to prevent concurrent calls from
- * corrupting each other's globals. Once created, the SDK instance is
- * cached and returned without locking.
- */
 const PERSIST_ENV_KEYS = new Set([
   'KILO_CONFIG_CONTENT',
   'OPENCODE_CONFIG_CONTENT',
@@ -629,7 +598,6 @@ async function ensureSDKServer(
   workdir: string,
   env: Record<string, string>
 ): Promise<{ client: KiloClient; port: number }> {
-  // Fast path: reuse existing instance without locking.
   const existing = sdkInstances.get(workdir);
   if (existing) {
     const newConfig = env.KILO_CONFIG_CONTENT;
@@ -785,9 +753,6 @@ async function fetchPendingNudges(
   }
 }
 
-/**
- * Mark a nudge as delivered via the gastown worker.
- */
 async function markNudgeDelivered(agent: ManagedAgent, nudgeId: string): Promise<void> {
   const authToken =
     process.env.GASTOWN_CONTAINER_TOKEN ?? agent.gastownContainerToken ?? agent.gastownSessionToken;
@@ -855,9 +820,6 @@ async function writeEvictionCheckpoint(
   }
 }
 
-/**
- * Clear the idle timer for an agent (if any).
- */
 function clearIdleTimer(agentId: string): void {
   const entry = idleTimers.get(agentId);
   if (entry !== undefined) {
@@ -866,16 +828,6 @@ function clearIdleTimer(agentId: string): void {
   }
 }
 
-/**
- * Handle a session.idle event for a non-mayor agent.
- *
- * - Checks for pending nudges and injects the highest-priority one if found.
- * - If no nudges are pending, starts (or restarts) an idle timeout that will
- *   exit the agent after AGENT_IDLE_TIMEOUT_MS (default 2 min).
- *
- * Returns true if the agent should continue (nudge injected or timer started),
- * false if the agent should exit immediately (injection failed unrecoverably).
- */
 async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise<void> {
   const agentId = agent.agentId;
   console.log(`${MANAGER_LOG} handleIdleEvent: checking nudges for agent ${agentId}`);
@@ -886,17 +838,14 @@ async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise
   const nudges = _draining ? null : await fetchPendingNudges(agent);
 
   if (nudges === null) {
-    // Error fetching — treat as no nudges, start idle timer
     console.warn(
       `${MANAGER_LOG} handleIdleEvent: could not fetch nudges for ${agentId}, starting idle timer`
     );
   } else if (nudges.length > 0 && agent.status === 'running') {
-    // There is at least one pending nudge — inject the first (highest priority)
     const nudge = nudges[0];
     console.log(
       `${MANAGER_LOG} handleIdleEvent: injecting nudge ${nudge.nudge_id} (priority=${nudge.priority}) for agent ${agentId}`
     );
-    // Cancel any existing idle timer since the agent will keep working
     clearIdleTimer(agentId);
     try {
       await sendMessage(agentId, nudge.message);
@@ -912,7 +861,6 @@ async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise
     return;
   }
 
-  // No nudges (or fetch error) — (re)start the idle timeout.
   // During drain, use a short idle timeout. Agents aren't nudged — they
   // complete naturally — so this idle means the agent is done with its
   // current work and can exit promptly.
@@ -949,9 +897,6 @@ async function handleIdleEvent(agent: ManagedAgent, onExit: () => void): Promise
   });
 }
 
-/**
- * Subscribe to SDK events for an agent's session and forward them.
- */
 async function subscribeToEvents(
   client: KiloClient,
   agent: ManagedAgent,
@@ -985,7 +930,6 @@ async function subscribeToEvents(
       }
     }
 
-    // Save DB snapshot before completing exit
     const apiUrl = agent.gastownApiUrl;
     const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
     if (apiUrl && token) {
@@ -1016,7 +960,6 @@ async function subscribeToEvents(
       }
       if (controller.signal.aborted) break;
 
-      // Filter by session
       const sessionID =
         event.properties && 'sessionID' in event.properties
           ? String(event.properties.sessionID)
@@ -1027,7 +970,6 @@ async function subscribeToEvents(
       agent.lastEventType = event.type ?? 'unknown';
       agent.lastEventAt = new Date().toISOString();
 
-      // Track active tool calls
       if (event.properties && 'activeTools' in event.properties) {
         const tools = event.properties.activeTools;
         if (Array.isArray(tools)) {
@@ -1035,7 +977,6 @@ async function subscribeToEvents(
         }
       }
 
-      // Broadcast to WebSocket sinks
       broadcastEvent(agent.agentId, event.type ?? 'unknown', event.properties ?? {});
 
       if (event.type === 'session.idle') {
@@ -1053,9 +994,6 @@ async function subscribeToEvents(
         // loop continues. The exitAgent callback will abort the stream if needed.
         void handleIdleEvent(agent, exitAgent);
       } else if (!IDLE_TIMER_IGNORE_EVENTS.has(event.type ?? '')) {
-        // Non-idle event means the agent resumed work — cancel any pending
-        // idle timer. But skip server-level lifecycle events (heartbeats,
-        // connections) that don't represent actual agent activity.
         clearIdleTimer(agent.agentId);
       }
 
@@ -1076,7 +1014,6 @@ async function subscribeToEvents(
         });
         void reportAgentCompleted(agent, 'failed', 'Event stream error');
 
-        // Release SDK session on stream error (same cleanup as normal completion)
         const inst = sdkInstances.get(agent.workdir);
         if (inst) {
           inst.sessionCount--;
@@ -1180,7 +1117,6 @@ async function startAgentImpl(
   let sessionCounted = false;
   const t0 = Date.now();
   try {
-    // 0. Hydrate agent DB from KV snapshot before starting the SDK server
     const apiUrl = agent.gastownApiUrl;
     const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
     if (apiUrl && token) {
@@ -1199,7 +1135,6 @@ async function startAgentImpl(
       elapsedMs: tDbDone - t0,
     });
 
-    // 1. Ensure SDK server is running for this workdir
     const sdkExistedBefore = sdkInstances.has(workdir);
     const { client, port } = await ensureSDKServer(workdir, env);
     agent.serverPort = port;
@@ -1219,19 +1154,16 @@ async function startAgentImpl(
       phaseMs: sdkExistedBefore ? 0 : tSdkDone - tDbDone,
     });
 
-    // Check if startup was cancelled while waiting for the SDK server
     if (signal.aborted) {
       throw new StartupAbortedError(request.agentId);
     }
 
-    // Track session count on the SDK instance
     const instance = sdkInstances.get(workdir);
     if (instance) {
       instance.sessionCount++;
       sessionCounted = true;
     }
 
-    // 2. Resume an existing session or create a new one.
     // Only the mayor resumes — it's a persistent conversational agent whose
     // session history should survive container evictions. Non-mayor agents
     // (polecats, refineries, triage) always get fresh sessions since they
@@ -1287,7 +1219,6 @@ async function startAgentImpl(
       throw new StartupAbortedError(request.agentId);
     }
 
-    // 3. Subscribe to events (async, runs in background)
     void subscribeToEvents(client, agent, request);
 
     // Mark as running BEFORE the initial prompt. The event subscription
@@ -1302,7 +1233,6 @@ async function startAgentImpl(
       }
     }
 
-    // 4. Send the initial prompt
     // The model string is an OpenRouter-style ID like "anthropic/claude-sonnet-4.6".
     // The kilo provider (which wraps OpenRouter) takes the FULL model string as modelID.
     // providerID is always 'kilo' since we route through the Kilo gateway.
@@ -1311,7 +1241,6 @@ async function startAgentImpl(
       modelParam = { providerID: 'kilo', modelID: request.model };
     }
 
-    // Final abort check before sending the prompt
     if (signal.aborted) {
       throw new StartupAbortedError(request.agentId);
     }
@@ -1370,7 +1299,6 @@ async function startAgentImpl(
       if (sessionCounted) {
         const instance = sdkInstances.get(workdir);
         if (instance) {
-          // Abort the orphaned session if one was created before the abort
           if (agent.sessionId) {
             try {
               await instance.client.session.abort({ path: { id: agent.sessionId } });
@@ -1539,14 +1467,11 @@ export async function sendMessage(agentId: string, prompt: string): Promise<void
  * 3. KILO_CONFIG_CONTENT — legacy fallback, may be absent after env restore.
  */
 function extractOrganizationId(agent?: ManagedAgent): string | undefined {
-  // Primary source: durable field on the agent object
   if (agent?.organizationId) return agent.organizationId;
 
-  // Secondary: standalone env var
   const envOrgId = process.env.GASTOWN_ORGANIZATION_ID;
   if (envOrgId) return envOrgId;
 
-  // Fallback: extract from KILO_CONFIG_CONTENT (legacy path)
   const raw = process.env.KILO_CONFIG_CONTENT;
   if (!raw) return undefined;
   try {
@@ -1629,9 +1554,6 @@ function buildLiveHotSwapEnv(agent: ManagedAgent): Record<string, string> {
     if (live) env[key] = live;
   }
 
-  // Overlay custom env_vars from the town config so hot-swap picks up
-  // values that were added/changed after the initial dispatch. Infra
-  // keys in LIVE_ENV_KEYS and RESERVED_ENV_KEYS always take precedence.
   const freshConfig = getCurrentTownConfig();
   const freshEnvVars = freshConfig?.env_vars;
   const freshCustomKeySet = new Set<string>();
@@ -1647,15 +1569,12 @@ function buildLiveHotSwapEnv(agent: ManagedAgent): Record<string, string> {
       }
     }
   }
-  // Remove stale custom env vars that the town config no longer carries.
   for (const key of getLastAppliedEnvVarKeys()) {
     if (!freshCustomKeySet.has(key) && !LIVE_ENV_KEYS.has(key)) {
       delete env[key];
     }
   }
 
-  // Re-derive GH_TOKEN from live values using the same priority chain
-  // as buildAgentEnv: GITHUB_CLI_PAT > GIT_TOKEN > GITHUB_TOKEN.
   const liveGhToken =
     process.env.GITHUB_CLI_PAT ?? process.env.GIT_TOKEN ?? process.env.GITHUB_TOKEN;
   if (liveGhToken) {
@@ -1755,7 +1674,6 @@ export async function refreshTokenForAllAgents(): Promise<
         REFRESH_AGENT_TIMEOUT_MS,
         `ensureSDKServer for ${agent.agentId}`
       );
-      // Spawn completed within the timeout — no orphan to clean up.
       pendingEnsure = null;
       agent.serverPort = port;
 
@@ -1797,7 +1715,6 @@ export async function refreshTokenForAllAgents(): Promise<
       const newInstance = sdkInstances.get(agent.workdir);
       if (newInstance) newInstance.sessionCount++;
 
-      // New server is healthy — tear down the old one and its subscription.
       if (oldInstance) {
         const oldController = eventAbortControllers.get(agent.agentId);
         if (oldController) oldController.abort();
@@ -2121,7 +2038,6 @@ export async function updateAgentModel(
   const hotSwapEnv = buildLiveHotSwapEnv(agent);
 
   try {
-    // 4. Create a new SDK server (spawns a fresh kilo serve with updated env)
     const { client, port } = await ensureSDKServer(agent.workdir, hotSwapEnv);
     agent.serverPort = port;
 
@@ -2177,12 +2093,10 @@ export async function updateAgentModel(
     });
     agent.messageCount = 1;
 
-    // 6. New server is healthy — now tear down the old one.
     const oldController = eventAbortControllers.get(agentId);
     if (oldController) oldController.abort();
     oldInstance.server.close();
 
-    // 7. Re-subscribe to events on the new session
     void subscribeToEvents(client, agent, {
       agentId: agent.agentId,
       role: agent.role,
@@ -2202,7 +2116,6 @@ export async function updateAgentModel(
         `old session=${oldSessionId} new session=${agent.sessionId} model=${model}`
     );
   } catch (err) {
-    // Restore the old server so the mayor keeps running on the previous model
     console.warn(
       `${MANAGER_LOG} updateAgentModel: failed for ${agentId}, restoring old server:`,
       err
@@ -2237,7 +2150,6 @@ export function getAgentStatus(agentId: string): ManagedAgent | null {
   return agents.get(agentId) ?? null;
 }
 
-/** Return the SDK server port for an agent, or null if not running. */
 export function getAgentServerPort(agentId: string): number | null {
   const agent = agents.get(agentId);
   if (!agent || !agent.serverPort) return null;
@@ -2279,7 +2191,6 @@ export async function drainAll(): Promise<void> {
   const DRAIN_LOG = '[drain]';
   _draining = true;
 
-  // ── Phase 1: Notify TownDO ──────────────────────────────────────────
   try {
     const apiUrl = process.env.GASTOWN_API_URL;
     const token = process.env.GASTOWN_CONTAINER_TOKEN;
@@ -2308,7 +2219,6 @@ export async function drainAll(): Promise<void> {
     console.warn(`${DRAIN_LOG} Phase 1: TownDO notification failed, continuing:`, err);
   }
 
-  // ── Phase 1b: Shorten idle timers ──────────────────────────────────────
   // Agents that are already idle (have a pending idle timer from a
   // session.idle event before drain started) are sitting in 120s/600s
   // timers. Replace them with short 10s timers so they exit promptly.
@@ -2335,10 +2245,6 @@ export async function drainAll(): Promise<void> {
     }
   }
 
-  // ── Phase 2: Wait for agents to finish their current work ─────────────
-  // No nudging — agents complete naturally (call gt_done, go idle, etc.).
-  // The TownDO's draining flag blocks new dispatch so no new work starts.
-  // We just give them time to wrap up, then Phase 3 force-saves stragglers.
   const DRAIN_WAIT_MS = 120_000;
   const pollInterval = 5000;
   const start = Date.now();
@@ -2376,7 +2282,6 @@ export async function drainAll(): Promise<void> {
     await new Promise(r => setTimeout(r, pollInterval));
   }
 
-  // ── Phase 3: Force-save remaining agents ────────────────────────────
   // Two sub-steps: first freeze all stragglers (cancel idle timers,
   // abort event subscriptions and SDK sessions), then snapshot each
   // worktree. Freezing first prevents the normal completion path
@@ -2401,14 +2306,12 @@ export async function drainAll(): Promise<void> {
       // marking the agent as completed via onExit() while we abort.
       clearIdleTimer(agent.agentId);
 
-      // Abort event subscription
       const controller = eventAbortControllers.get(agent.agentId);
       if (controller) {
         controller.abort();
         eventAbortControllers.delete(agent.agentId);
       }
 
-      // Abort the SDK session
       const instance = sdkInstances.get(agent.workdir);
       if (instance) {
         await instance.client.session.abort({
@@ -2460,7 +2363,6 @@ export async function drainAll(): Promise<void> {
         );
       }
 
-      // Use the agent's startup env for git author/committer identity.
       const gitEnv: Record<string, string | undefined> = { ...process.env };
       const authorName =
         agent.startupEnv?.GIT_AUTHOR_NAME ?? process.env.GASTOWN_GIT_AUTHOR_NAME ?? 'Gastown';
@@ -2560,19 +2462,16 @@ export async function drainAll(): Promise<void> {
 }
 
 export async function stopAll(): Promise<void> {
-  // Cancel all idle timers
   for (const [, entry] of idleTimers) {
     clearTimeout(entry.timer);
   }
   idleTimers.clear();
 
-  // Abort all event subscriptions
   for (const [, controller] of eventAbortControllers) {
     controller.abort();
   }
   eventAbortControllers.clear();
 
-  // Abort all running sessions and save DB snapshots
   for (const agent of agents.values()) {
     if (agent.status === 'running' || agent.status === 'starting') {
       try {
@@ -2619,7 +2518,6 @@ export async function stopAll(): Promise<void> {
     }
   }
 
-  // Close all SDK servers
   for (const [, instance] of sdkInstances) {
     instance.server.close();
   }

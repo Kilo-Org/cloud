@@ -420,6 +420,14 @@ export const byokRouter = createTRPCRouter({
         }
       }
 
+      const providerId = UserByokProviderIdSchema.safeParse(existingKey.provider_id);
+      if (!providerId.success) {
+        return {
+          success: false,
+          message: `Provider ${existingKey.provider_id} is no longer supported.`,
+        };
+      }
+
       const decryptedKey = decryptByokRow(existingKey);
 
       // Codestral is deprecated and its key only authenticates against codestral.mistral.ai,

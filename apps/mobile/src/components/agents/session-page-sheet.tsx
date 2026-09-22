@@ -20,6 +20,14 @@ type SessionPageSheetProps = {
  * On Android the Modal fills the window, so the surface pads the top inset to
  * keep the content out of the system status bar. Android Back and Done both
  * route through `onClose`.
+ *
+ * On both platforms this surface owns the top of the window, so a header
+ * inside it would reserve a dead band above the title if it read the window
+ * top inset: the native iOS pageSheet presents below the status bar, and the
+ * Android Modal fills the window and this surface pads the top inset itself.
+ * Callers pass `topInset="ios-page-sheet"` to their SheetHeader to drop that
+ * inset on both platforms; nothing here overrides the safe-area context, so a
+ * full-screen Modal opened from sheet content keeps the window insets.
  */
 export function SessionPageSheet({
   visible,

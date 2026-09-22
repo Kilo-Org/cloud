@@ -14,6 +14,12 @@ const claude = {
   variants: ['thinking'],
   isPreferred: true,
 };
+const opus = {
+  id: 'anthropic/opus',
+  name: 'Opus',
+  variants: ['low', 'high'],
+  isPreferred: false,
+};
 const gpt = { id: 'openai/gpt', name: 'GPT', variants: [], isPreferred: false };
 
 const base: AutoSelectInput = {
@@ -60,22 +66,42 @@ describe('pickAutoSelectedModel', () => {
     ).toEqual({ model: 'kilo-auto/efficient', variant: '' });
   });
 
-  it('dev, efficient wins over server lastSelected', () => {
+  it('dev, persisted server combo wins over the efficient default', () => {
     expect(
       pickAutoSelectedModel({
         ...base,
         models: [claude, efficient],
         lastSelected: { model: 'anthropic/claude', variant: 'thinking' },
       })
-    ).toEqual({ model: 'kilo-auto/efficient', variant: '' });
+    ).toEqual({ model: 'anthropic/claude', variant: 'thinking' });
   });
 
-  it('dev, efficient wins over a local persisted preference', () => {
+  it('dev, server combo restores the selected effort', () => {
+    expect(
+      pickAutoSelectedModel({
+        ...base,
+        models: [opus, efficient],
+        lastSelected: { model: 'anthropic/opus', variant: 'high' },
+      })
+    ).toEqual({ model: 'anthropic/opus', variant: 'high' });
+  });
+
+  it('dev, local persisted combo wins over the efficient default', () => {
     expect(
       pickAutoSelectedModel({
         ...base,
         models: [gpt, efficient],
         stored: { personal: { model: 'openai/gpt', variant: '' } },
+      })
+    ).toEqual({ model: 'openai/gpt', variant: '' });
+  });
+
+  it('dev, persisted model gone from the catalog → falls back to efficient', () => {
+    expect(
+      pickAutoSelectedModel({
+        ...base,
+        models: [claude, efficient],
+        stored: { personal: { model: 'gone/model', variant: 'high' } },
       })
     ).toEqual({ model: 'kilo-auto/efficient', variant: '' });
   });

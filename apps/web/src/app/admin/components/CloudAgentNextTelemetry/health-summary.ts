@@ -13,6 +13,7 @@ type OperationalHealthSummary = {
 
 type ObservedHealthSummary = OperationalHealthSummary & {
   platformFailures: number;
+  providerFailures: number;
   userFailures: number;
   unknownFailures: number;
 };
@@ -89,6 +90,7 @@ export type ObservedHealthOutcomeKind =
   | 'interrupted'
   | 'user'
   | 'platform'
+  | 'provider'
   | 'unknown';
 
 export function getObservedHealthStats(summary: ObservedHealthSummary) {
@@ -98,6 +100,7 @@ export function getObservedHealthStats(summary: ObservedHealthSummary) {
     { kind: 'interrupted', count: summary.interruptedRuns },
     { kind: 'user', count: summary.userFailures },
     { kind: 'platform', count: summary.platformFailures },
+    { kind: 'provider', count: summary.providerFailures },
     { kind: 'unknown', count: summary.unknownFailures },
   ] satisfies Array<{ kind: ObservedHealthOutcomeKind; count: number }>;
   const observedOutcomes = outcomes.reduce((total, outcome) => total + outcome.count, 0);

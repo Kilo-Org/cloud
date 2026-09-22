@@ -19,6 +19,7 @@ import {
 import { Alert, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
+import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -30,7 +31,7 @@ import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
-import { useDestructiveConfirm } from '@/components/use-destructive-confirm';
+import { useSignOutConfirmation } from '@/components/use-sign-out-confirmation';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -78,9 +79,21 @@ export function ProfileScreen() {
   const trpc = useTRPC();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
+  // The account queries wait for the tab transition to settle, but the hook
+  // bounds that wait: an interaction queue that never reports idle (an
+  // automated UI session holds one open) must not hide the Linked accounts row,
+  // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
-  const signOutConfirm = useDestructiveConfirm();
+  // Android's native alert paints every button with the theme accent, so
+  // `Alert.alert`'s destructive style never shows the red affordance there.
+  // Android opens the in-app confirmation instead; iOS keeps the native alert,
+  // which already renders the destructive sign-out choice in red.
+  // The confirmation's platform split lives in the hook, keeping this screen's
+  // shared layout path free of platform forks (`screen-insets.test.ts`).
+  const { confirmVisible, requestSignOut, dismissConfirm, confirmSignOut } = useSignOutConfirmation(
+    () => void signOut()
+  );
   const {
     data,
     isLoading,
@@ -129,15 +142,6 @@ export function ProfileScreen() {
         onPress: beginDelete,
       },
     ]);
-  };
-
-  const confirmSignOut = () => {
-    signOutConfirm.request({
-      title: t('profile.signOutTitle'),
-      message: t('profile.signOutMessage'),
-      confirmLabel: t('common.signOut'),
-      onConfirm: () => void signOut(),
-    });
   };
 
   const showPrivacyChoices = () => {
@@ -343,7 +347,7 @@ export function ProfileScreen() {
             label={t('profile.privacyChoices')}
             onPress={showPrivacyChoices}
           />
-          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={confirmSignOut} />
+          <ActionTile icon={LogOut} label={t('common.signOut')} onPress={requestSignOut} />
           <ActionTile
             icon={Trash2}
             label={t('profile.deleteAccount')}
@@ -379,7 +383,15 @@ export function ProfileScreen() {
         </View>
       </TabScreenScrollView>
 
-      {signOutConfirm.dialog}
+      {confirmVisible && (
+        <DestructiveConfirmDialog
+          title={t('profile.signOutTitle')}
+          message={t('profile.signOutMessage')}
+          confirmLabel={t('common.signOut')}
+          onCancel={dismissConfirm}
+          onConfirm={confirmSignOut}
+        />
+      )}
     </View>
   );
 }

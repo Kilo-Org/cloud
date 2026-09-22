@@ -43,6 +43,7 @@ const channelCases = [
   [{ type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'status' }, 'agent-progress'],
   [{ type: 'cloud_agent_session', cliSessionId: 'cli1' }, 'agent-progress'],
   [{ type: 'low_balance', organizationId: 'org1' }, 'balance'],
+  [{ type: 'spend_alert', scope: 'organization', organizationId: 'org1' }, 'balance'],
   [{ type: 'security_finding', findingId: 'f1', scope: 'org' }, 'security'],
   [
     { type: 'security_lifecycle', event: 'analysis_completed', findingId: 'f1', scope: 'org' },
@@ -453,6 +454,19 @@ describe('genericPushContentForPushData', () => {
     expect(genericPushContentForPushData(parsed)).toEqual({
       title: 'Kilo',
       body: 'A security finding needs attention',
+    });
+  });
+
+  it('returns the spend alert copy for the spend_alert variant', () => {
+    const parsed = pushDataSchema.parse({
+      type: 'spend_alert',
+      scope: 'organization',
+      organizationId: 'org1',
+    });
+    expect(androidChannelIdForPushData(parsed)).toBe('balance');
+    expect(genericPushContentForPushData(parsed)).toEqual({
+      title: 'Kilo',
+      body: 'Your spend needs attention',
     });
   });
 

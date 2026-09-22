@@ -827,7 +827,8 @@
       "chat": "Vestlussõnumid",
       "kiloclaw": "KiloClaw'i tegevus",
       "balance": "Saldohoiatused",
-      "security": "Turvaleiud"
+      "security": "Turvaleiud",
+      "spend": "Kulutushoiatused"
     },
     "category": {
       "chatMessagesSubtitle": "vastused sinu vestlustes",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Seansi olek",
       "sessionStatusSubtitle": "lõppenud / ebaõnnestunud / juhtimiseks valmis",
       "kiloclawActivitySubtitle": "eksemplar valmis/ebaõnnestunud, ajastatud toimingud",
+      "kiloclawActivityUnavailable": "Käivita KiloClaw eksemplar, et saada KiloClaw tegevust.",
       "balanceAlertsSubtitle": "organisatsiooni madala saldo hoiatused",
-      "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused"
+      "balanceAlertsUnavailable": "Liitu organisatsiooniga, et saada madala saldo hoiatusi.",
+      "securityFindingsSubtitle": "uued leiud ja SLA meeldetuletused",
+      "securityFindingsUnavailable": "Lülita Kilo turvaagent kindlas ulatuses sisse, et saada turvaleide.",
+      "spendAlertsSubtitle": "lävendi ületamised ja tunnipõhised tõusud",
+      "spendAlertsToggle": "Kulutushoiatuste kategooria"
     },
     "action": {
       "openSession": "Ava seanss"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Seansi laadimine ebaõnnestus.",
       "failedToLoadDetails": "Seansi üksikasjade laadimine ebaõnnestus.",
       "failedToStopExecution": "Täitmise peatamine ebaõnnestus.",
+      "stopped": "Seanss peatati",
+      "committing": "Kinnitamine…",
+      "committed": "Kinnitatud",
+      "commitFailed": "Kinnitamine ebaõnnestus",
       "renameSession": "Nimeta seanss ümber",
       "renamePlaceholder": "Seansi nimi",
       "transcriptAccessibility": "Seansi vestlusajalugu",
@@ -3156,7 +3166,8 @@
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
     "openSession": "Ava",
-    "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve)."
+    "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve).",
+    "newestResult": "Uusim tulemus"
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",
@@ -3192,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Ava viimane seanss"
+  },
+  "spendAlerts": {
+    "subtitle": "Saada faktureerimiskontaktidele e-posti või push-teavitus, kui selle piirkonna kulutus ületab limiidi või tõuseb üle tavapärase tunnimäära.",
+    "enable": "Luba kulutushoiatused",
+    "thresholdTitle": "Lävendi ületamine",
+    "thresholdSubtitle": "Jooksev kulutus ületab sinu limiidi",
+    "anomalyTitle": "Tunnipõhine tõus",
+    "anomalySubtitle": "Üks tund on selle piirkonna tavapärasest määrast tunduvalt kõrgem",
+    "limitLabel": "Limiit (USD)",
+    "windowLabel": "Aken",
+    "window24h": "24 tundi",
+    "window7d": "7 päeva",
+    "window30d": "30 päeva",
+    "multiplierLabel": "Tõusu kordaja",
+    "saved": "Kulutushoiatuste seaded on salvestatud",
+    "loadError": "Kulutushoiatuste laadimine ebaõnnestus.",
+    "saveError": "Kulutushoiatuste salvestamine ebaõnnestus.",
+    "empty": "Kulutushoiatused on välja lülitatud. Lülita need sisse, et hoiatada selle piirkonna faktureerimiskontakte.",
+    "noSpend": "Kulutusi pole veel registreeritud",
+    "spend24h": "Viimase 24 tunni kulutus",
+    "multiplierError": "Sisesta kordaja 1 või suurem",
+    "permissionDenied": "Sul puudub õigus kulutushoiatusi hallata.",
+    "pushOffByCategory": "Teavitustes väljas"
   }
 }

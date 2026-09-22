@@ -45,10 +45,30 @@ const BLOCKED_PERMISSIONS = [
 const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+// One entry configures Expo's native splash on both platforms. Its internal
+// Android backing-surface adapter is a documented native capability exception,
+// not a separate launch lifecycle. The wrapper owns the mod ordering.
+const BRANDED_SPLASH_PLUGIN = './plugins/withBrandedSplash';
 const ARTIFACT_FILE_PROVIDER_PLUGIN = './plugins/withArtifactFileProvider';
 // The one writer of the app target's `<tag>.lproj/Localizable.strings`: the App
 // Intent copy plus the appended Focus-filter catalog.
 const APP_INTENT_LOCALIZATIONS_PLUGIN = './plugins/withAppIntentLocalizations';
+// The developer menu is not the product. On iOS `DevMenuManager` auto-shows it
+// over the app at launch while onboarding is unfinished or EXDevMenuShowsAtLaunch
+// is set, and its SwiftUI icons carry raw SF Symbol names as accessibility labels
+// (`chevron.left.chevron.right` on "Open DevTools", `gearshape.fill` on the
+// floating tool button), so a scene dump of the product screen under it reads
+// them aloud as-is. These options keep it off the product screens; a developer
+// still opens it with Ctrl + d or a shake. Mirrored from
+// src/lib/dev-client-plugin.js -- asserted on the EVALUATED config, because a
+// config that stopped handing the plugin the options would still evaluate to the
+// dev-menu defaults (auto-show on, onboarding on).
+const DEV_CLIENT_PLUGIN = 'expo-dev-client';
+const DEV_CLIENT_PLUGIN_OPTIONS = {
+  toolsButton: false,
+  showMenuAtLaunch: false,
+  skipOnboarding: true,
+};
 const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSMicrophoneUsageDescription',
   'NSSpeechRecognitionUsageDescription',
@@ -203,6 +223,26 @@ check(
   pluginNames.includes(ROTATION_SURFACE_PLUGIN),
   `plugins must include "${ROTATION_SURFACE_PLUGIN}"`
 );
+const splashEntries = (config.plugins ?? []).filter(
+  plugin => Array.isArray(plugin) && plugin[0] === BRANDED_SPLASH_PLUGIN
+);
+check(splashEntries.length === 1, `plugins must include exactly one "${BRANDED_SPLASH_PLUGIN}"`);
+check(
+  !pluginNames.includes('expo-splash-screen') &&
+    !pluginNames.includes('./plugins/withAndroidSplashWindowBackground'),
+  'the shared branded splash must own native splash registration and mod ordering'
+);
+const splashOptions = splashEntries[0]?.[1];
+check(
+  splashOptions?.image === './assets/images/logo-mark.png' &&
+    splashOptions.backgroundColor === '#FAF74F' &&
+    splashOptions.imageWidth === 100,
+  'the shared native splash must match AnimatedSplashOverlay: yellow with the 100dp Kilo mark'
+);
+check(
+  splashOptions?.ios === undefined && splashOptions?.android === undefined,
+  'the branded splash must not fork its options by platform'
+);
 // The iOS File Provider extension target and the Pods integration behind it are
 // created by this plugin alone; without it the Files-app location has no
 // extension to serve it.
@@ -225,6 +265,20 @@ check(
   pluginNames.includes(APP_INTENT_LOCALIZATIONS_PLUGIN),
   `plugins must include "${APP_INTENT_LOCALIZATIONS_PLUGIN}"`
 );
+
+// Asserted on the EVALUATED config, not on app.config.ts's source: options that
+// never reach the plugin still evaluate to the dev-menu defaults (auto-show on,
+// onboarding on), and the menu then sits over the product screen carrying the
+// raw SF Symbol names a scene dump reads aloud.
+const devClientPlugin = (config.plugins ?? []).find(
+  plugin => Array.isArray(plugin) && plugin[0] === DEV_CLIENT_PLUGIN
+);
+for (const [option, expected] of Object.entries(DEV_CLIENT_PLUGIN_OPTIONS)) {
+  check(
+    devClientPlugin?.[1]?.[option] === expected,
+    `plugins "${DEV_CLIENT_PLUGIN}" must set ${option}: ${JSON.stringify(expected)}`
+  );
+}
 
 const extra = config.extra ?? {};
 for (const key of Object.keys(ENV_KEYS)) {

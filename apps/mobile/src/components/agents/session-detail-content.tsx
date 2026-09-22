@@ -116,6 +116,7 @@ import { useInteractionHandlers } from '@/components/agents/use-interaction-hand
 import { useSessionAutoApprove } from '@/components/agents/use-session-auto-approve';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
   SESSION_SLOW_LOAD_MS,
   useSessionSlowLoadPhase,
@@ -1932,11 +1933,13 @@ export function SessionDetailContent({
           ) : null}
           <ScreenHeader
             title={rename.title}
-            // Two lines (the ScreenHeader detail default) are exactly the space
-            // `reserveTitleSpace` already holds, so a long title is shown in
-            // full at a word boundary instead of being cut to one tail-ellipsized
+            // The loaded header, the route's loading header and its error state
+            // all share one cap (`SESSION_HEADER_TITLE_LINES`), and
+            // `reserveTitleSpace` holds exactly that many lines, so a long title
+            // wraps at a word boundary instead of being cut to one tail-ellipsized
             // line ("Moving-average empty windo…").
             reserveTitleSpace
+            titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
             backFallback={'/(app)/(tabs)/(2_agents)' as Href}
             headerRight={headerRight}
             className="pb-1"
@@ -1968,7 +1971,9 @@ export function SessionDetailContent({
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
           {keyboardContainerKind === 'app-aware-padding' ? (
-            <AppAwareKeyboardPaddingView className="flex-1">
+            // The trailing bottom-chrome spacer below reserves the navigation-
+            // bar inset outside this view, so the view must not add it again.
+            <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
               {renderKeyboardBody()}
             </AppAwareKeyboardPaddingView>
           ) : (
@@ -2406,9 +2411,10 @@ export function SessionDetailContent({
       );
     }
     return (
-      // Fades in as the skeleton fades out, so the transcript resolves in
-      // place instead of replacing the placeholder in one frame.
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+      // No entrance animation: the transcript body must paint on its own, not
+      // after a `FadeIn` (which starts at `opacity: 0`) completes. The
+      // skeleton's `exiting` crossfade still carries the swap visually.
+      <View className="flex-1">
         <SessionMessageList
           sessionId={sessionId}
           items={transcript}
@@ -2429,7 +2435,7 @@ export function SessionDetailContent({
           resumeAt={resumeAnchor}
           followTailNonce={followTailNonce}
         />
-      </Animated.View>
+      </View>
     );
   }
 }

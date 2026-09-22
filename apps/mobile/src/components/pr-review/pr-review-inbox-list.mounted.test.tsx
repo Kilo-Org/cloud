@@ -240,6 +240,72 @@ describe('PrReviewInboxList side insets (landscape)', () => {
   });
 });
 
+// The row's meta line is a flex row: the ref · age text and the provider chip.
+// A long ref (a nested GitLab project path, or `Kilo-Org/cloud#6401` at 12px on
+// a 360dp screen) made the row overflow, so the chip ran past the px-6 right
+// edge and its rounded end was clipped by the screen. The text is the flexible
+// value, so it ellipsizes and the chip keeps its full rounded width inside the
+// row — the same fix as `PrRefsRow` in pr-review-overview-parts.tsx.
+describe('InboxRow meta line (a long ref keeps the chip inside the row)', () => {
+  beforeEach(() => {
+    insetsState.top = 0;
+    insetsState.bottom = 0;
+    insetsState.left = 0;
+    insetsState.right = 0;
+    inboxState.query.isPending = false;
+    inboxState.query.isFetching = false;
+    inboxState.query.hasNextPage = false;
+    inboxState.query.isFetchingNextPage = false;
+    inboxState.items = [
+      makeItem({ owner: 'Kilo-Org', repo: 'cloud', number: 6401, title: 'chore(kilo-app): bump' }),
+    ];
+    inboxState.firstPageErrorState = null;
+    inboxState.laterPageError = false;
+  });
+
+  it('shrinks the ref · age text and holds the provider chip at full width', () => {
+    const renderer = mountInboxList();
+
+    // The ref · age text is the row's only single-line muted Text.
+    const metaText = renderer.root.find(
+      node =>
+        String(node.type) === 'Text' &&
+        node.props.variant === 'muted' &&
+        node.props.numberOfLines === 1
+    );
+    const metaClassName = String(metaText.props.className);
+    expect(metaClassName).toContain('min-w-0');
+    expect(metaClassName).toContain('shrink');
+
+    // The provider chip keeps its own width so its rounded-full pill stays
+    // intact rather than being squeezed by the flexible text.
+    const chips = renderer.root.findAll(
+      node => String(node.type) === 'View' && String(node.props.className).includes('rounded-full')
+    );
+    expect(chips).toHaveLength(1);
+    expect(String(chips[0]?.props.className)).toContain('shrink-0');
+
+    renderer.unmount();
+  });
+
+  it('keeps the draft chip at full width beside the provider chip', () => {
+    inboxState.items = [
+      makeItem({ owner: 'Kilo-Org', repo: 'cloud', number: 6401, isDraft: true }),
+    ];
+    const renderer = mountInboxList();
+
+    const chips = renderer.root.findAll(
+      node => String(node.type) === 'View' && String(node.props.className).includes('rounded-full')
+    );
+    expect(chips).toHaveLength(2);
+    for (const chip of chips) {
+      expect(String(chip.props.className)).toContain('shrink-0');
+    }
+
+    renderer.unmount();
+  });
+});
+
 // The explorer found the `Conversation-only fixture` row pushing its provider
 // chip off the right edge ("Pull re") because the long repo/time metadata kept
 // its intrinsic width. The row must give that metadata up (single line, shrink)

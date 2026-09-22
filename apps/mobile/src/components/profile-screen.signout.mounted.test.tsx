@@ -11,6 +11,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 const signOutFn = vi.hoisted(() => vi.fn());
 const alertFn = vi.hoisted(() => vi.fn());
 const platform = vi.hoisted(() => ({ os: 'android' as 'android' | 'ios' }));
+const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
   Alert: { alert: alertFn },
@@ -31,11 +32,12 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
-// Without this mock the real externalized module loads and its CJS build
-// `require`s react-native, whose Flow source V8 cannot parse — the suite
-// fails to load.
+// The screen reads its landscape side insets through `@/lib/screen-insets`,
+// whose real module loads the native safe-area package; the node project cannot
+// transform that source, so the suite fails to load without this mock. The
+// sign-out confirmation does not depend on the inset values.
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => insets,
 }));
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));

@@ -827,7 +827,8 @@
       "chat": "Csevegőüzenetek",
       "kiloclaw": "KiloClaw-tevékenység",
       "balance": "Egyenlegértesítések",
-      "security": "Biztonsági találatok"
+      "security": "Biztonsági találatok",
+      "spend": "Költésfigyelmeztetések"
     },
     "category": {
       "chatMessagesSubtitle": "válaszok a beszélgetéseidben",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Munkamenet állapota",
       "sessionStatusSubtitle": "befejezett / sikertelen / vezérelhető",
       "kiloclawActivitySubtitle": "elkészült vagy meghibásodott példányok, ütemezett műveletek",
+      "kiloclawActivityUnavailable": "Indíts el egy KiloClaw-példányt, hogy KiloClaw-tevékenységet kapj.",
       "balanceAlertsSubtitle": "figyelmeztetések a szervezet alacsony egyenlegére",
-      "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők"
+      "balanceAlertsUnavailable": "Csatlakozz egy szervezethez, hogy figyelmeztetéseket kapj alacsony egyenlegről.",
+      "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők",
+      "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörben, hogy biztonsági találatokat kapj.",
+      "spendAlertsSubtitle": "küszöbátlépések és óránkénti kiugrások",
+      "spendAlertsToggle": "Költésfigyelmeztetések kategória"
     },
     "action": {
       "openSession": "Munkamenet megnyitása"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Nem sikerült betölteni a munkamenetet.",
       "failedToLoadDetails": "Nem sikerült betölteni a munkamenet részleteit.",
       "failedToStopExecution": "Nem sikerült leállítani a végrehajtást.",
+      "stopped": "A munkamenet leállt",
+      "committing": "Véglegesítés…",
+      "committed": "Véglegesítve",
+      "commitFailed": "A véglegesítés nem sikerült",
       "renameSession": "Munkamenet átnevezése",
       "renamePlaceholder": "Munkamenet neve",
       "transcriptAccessibility": "A munkamenet átirata",
@@ -3156,7 +3166,8 @@
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn.",
     "openSession": "Megnyitás",
-    "approveFailed": "Nem sikerült jóváhagyni. Az újrapróbáláshoz koppints a $t(common.approve) elemre."
+    "approveFailed": "Nem sikerült jóváhagyni. Az újrapróbáláshoz koppints a $t(common.approve) elemre.",
+    "newestResult": "Legújabb eredmény"
   },
   "transcriptionModel": {
     "title": "Átírási modell",
@@ -3192,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Utolsó munkamenet megnyitása"
+  },
+  "spendAlerts": {
+    "subtitle": "Küldj e-mailes vagy push értesítést a számlázási kapcsolatoknak, amikor ennek a hatókörnek a költése átlép egy limitet, vagy a szokásos óránkénti üteme fölé ugrik.",
+    "enable": "Költésfigyelmeztetések engedélyezése",
+    "thresholdTitle": "Küszöbátlépés",
+    "thresholdSubtitle": "A folyó költés átlépi a limited",
+    "anomalyTitle": "Óránkénti kiugrás",
+    "anomalySubtitle": "Egy óra messze a hatókör szokásos üteme felett van",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Ablak",
+    "window24h": "24 óra",
+    "window7d": "7 nap",
+    "window30d": "30 nap",
+    "multiplierLabel": "Kiugrási szorzó",
+    "saved": "A költésfigyelmeztetési beállítások elmentve",
+    "loadError": "A költésfigyelmeztetéseket nem sikerült betölteni.",
+    "saveError": "A költésfigyelmeztetéseket nem sikerült elmenteni.",
+    "empty": "A költésfigyelmeztetések ki vannak kapcsolva. Kapcsold be őket, hogy értesítsd a hatókör számlázási kapcsolatait.",
+    "noSpend": "Még nincs rögzített költés",
+    "spend24h": "Költés az elmúlt 24 órában",
+    "multiplierError": "Adj meg 1 vagy nagyobb szorzót",
+    "permissionDenied": "Nincs jogosultságod a költésfigyelmeztetések kezelésére.",
+    "pushOffByCategory": "Értesítésekben kikapcsolva"
   }
 }

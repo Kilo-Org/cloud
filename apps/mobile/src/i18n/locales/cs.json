@@ -859,7 +859,8 @@
       "chat": "Zprávy v konverzaci",
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornění na zůstatek",
-      "security": "Bezpečnostní zjištění"
+      "security": "Bezpečnostní zjištění",
+      "spend": "Upozornění na útratu"
     },
     "category": {
       "chatMessagesSubtitle": "odpovědi ve vašich konverzacích",
@@ -870,8 +871,13 @@
       "sessionStatusTitle": "Stav relace",
       "sessionStatusSubtitle": "dokončeno / selhalo / připraveno k ovládání",
       "kiloclawActivitySubtitle": "instance připravena/selhala, naplánované akce",
+      "kiloclawActivityUnavailable": "Spusťte instanci KiloClaw, abyste získali aktivitu KiloClaw.",
       "balanceAlertsSubtitle": "upozornění na nízký zůstatek organizace",
-      "securityFindingsSubtitle": "nové nálezy a připomenutí lhůt SLA"
+      "balanceAlertsUnavailable": "Přidejte se k organizaci, abyste dostávali upozornění na nízký zůstatek.",
+      "securityFindingsSubtitle": "nové nálezy a připomenutí lhůt SLA",
+      "securityFindingsUnavailable": "Zapněte bezpečnostního agenta Kilo v určitém rozsahu, abyste dostávali bezpečnostní zjištění.",
+      "spendAlertsSubtitle": "překročení prahů a hodinové špičky",
+      "spendAlertsToggle": "Kategorie upozornění na útratu"
     },
     "action": {
       "openSession": "Otevřít relaci"
@@ -2132,6 +2138,10 @@
       "couldNotLoad": "Relaci se nepodařilo načíst.",
       "failedToLoadDetails": "Podrobnosti relace se nepodařilo načíst.",
       "failedToStopExecution": "Běh se nepodařilo zastavit.",
+      "stopped": "Relace zastavena",
+      "committing": "Vytváří se commit…",
+      "committed": "Commit vytvořen",
+      "commitFailed": "Vytvoření commitu se nezdařilo",
       "renameSession": "Přejmenovat relaci",
       "renamePlaceholder": "Název relace",
       "transcriptAccessibility": "Přepis relace",
@@ -3242,7 +3252,8 @@
     "channelName": "Aktivní agenti",
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce.",
     "openSession": "Otevřít",
-    "approveFailed": "Schválení se nepodařilo. Klepnutím na $t(common.approve) to zkuste znovu."
+    "approveFailed": "Schválení se nepodařilo. Klepnutím na $t(common.approve) to zkuste znovu.",
+    "newestResult": "Nejnovější výsledek"
   },
   "transcriptionModel": {
     "title": "Model přepisu",
@@ -3278,5 +3289,28 @@
   },
   "launcher": {
     "openLastSession": "Otevřít poslední relaci"
+  },
+  "spendAlerts": {
+    "subtitle": "Pošli e-mailem nebo push oznámením upozornění fakturačním kontaktům, když útrata tohoto rozsahu překročí limit nebo vyskočí nad obvyklou hodinovou sazbu.",
+    "enable": "Povolit upozornění na útratu",
+    "thresholdTitle": "Překročení prahu",
+    "thresholdSubtitle": "Průběžná útrata překračuje tvůj limit",
+    "anomalyTitle": "Hodinová špička",
+    "anomalySubtitle": "Hodina je výrazně nad obvyklou sazbou tohoto rozsahu",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Okno",
+    "window24h": "24 hodin",
+    "window7d": "7 dní",
+    "window30d": "30 dní",
+    "multiplierLabel": "Násobitel špičky",
+    "saved": "Nastavení upozornění na útratu bylo uloženo",
+    "loadError": "Upozornění na útratu se nepodařilo načíst.",
+    "saveError": "Upozornění na útratu se nepodařilo uložit.",
+    "empty": "Upozornění na útratu jsou vypnutá. Zapni je, abys upozornil fakturační kontakty tohoto rozsahu.",
+    "noSpend": "Zatím není zaznamenána žádná útrata",
+    "spend24h": "Útrata za posledních 24 hodin",
+    "multiplierError": "Zadej násobitel 1 nebo větší",
+    "permissionDenied": "Nemáš oprávnění spravovat upozornění na útratu.",
+    "pushOffByCategory": "Vypnuto v Oznámeních"
   }
 }

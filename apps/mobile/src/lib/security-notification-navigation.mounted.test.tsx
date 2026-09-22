@@ -40,7 +40,16 @@ vi.mock('@/components/security-agent/security-agent-command-observer', () => ({
 vi.mock('@/components/app-unlock-screen', () => ({
   appUnlockScreenLayout: ({ children }: { children: ReactNode }): ReactNode => children,
 }));
-vi.mock('@/lib/form-sheet', () => ({ useFormSheetDetents: () => ({ fullSheetDetent: 1 }) }));
+vi.mock('@/lib/form-sheet', () => ({
+  useFormSheetDetents: () => ({ fullSheetDetent: 1 }),
+  useFormSheetScreenOptions: () => ({
+    presentation: 'formSheet',
+    sheetAllowedDetents: [0.5, 1],
+    sheetGrabberVisible: true,
+    headerShown: false,
+    sheetShouldOverflowTopInset: true,
+  }),
+}));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 

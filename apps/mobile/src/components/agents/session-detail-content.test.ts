@@ -62,6 +62,7 @@ import { type Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import { i18n } from '@/i18n';
 import { captureEvent, SESSION_VIEWED_EVENT } from '@/lib/analytics/posthog';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
@@ -856,11 +857,11 @@ describe('SessionDetailContent display scope', () => {
     });
     const header = renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 2,
+      numberOfLines: SESSION_HEADER_TITLE_LINES,
       ellipsizeMode: 'tail',
     });
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
-      'min-h-14'
+      'min-h-21'
     );
     expect(header.props.context).toBeUndefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
@@ -884,18 +885,19 @@ describe('SessionDetailContent display scope', () => {
 
 describe('SessionDetailContent header title', () => {
   // The title shares its row with a 44pt context pill and a copy action, so on
-  // a narrow phone the title column is a fraction of the row width. Clamping it
-  // to one line cut a long title to a tail ellipsis ("Moving-average empty
-  // windo…"), which the proof audit rejected: the full title has to be readable.
-  // The header already reserves two title lines (`reserveTitleSpace`), and the
-  // wrap lands on word boundaries, so the second line shows the rest of the
-  // title instead of dead space under a truncated first line.
-  it('shows a long session title in full across the two reserved lines', async () => {
+  // a narrow phone the title column is a fraction of the row width. The header
+  // and this screen share the three-line cap (`SESSION_HEADER_TITLE_LINES`), so
+  // a long name wraps onto the extra line instead of being cut short mid-word
+  // the way the previous one-line clamp did ("Moving-average empty windo…");
+  // the tail ellipsis only applies past the cap. The placeholder header keeps
+  // the same cap, so the reserved title box does not move the body when the
+  // loaded name replaces "Session".
+  it('shows a long session title across the shared reserved lines without clipping mid-word', async () => {
     sessionTitleOverride = 'Moving-average rage empty baseline';
     const { renderer } = await mountDetails();
     const header = renderer.root.findByType(ScreenHeader);
     const title = header.findByProps({ accessibilityRole: 'header' });
-    expect(title.props.numberOfLines).toBe(2);
+    expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
     expect(title.props.ellipsizeMode).toBe('tail');
   });
 
@@ -1555,11 +1557,11 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
 
     const header = view.renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 2,
+      numberOfLines: SESSION_HEADER_TITLE_LINES,
       ellipsizeMode: 'tail',
     });
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
-      'min-h-14'
+      'min-h-21'
     );
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
@@ -1755,7 +1757,7 @@ describe('child transcript requests', () => {
     const errorProps = view.renderer.root.findByType(QueryError).props as ComponentProps<
       typeof QueryError
     >;
-    expect(errorProps.message).toBe('Connection lost. Please retry in a moment.');
+    expect(errorProps.message).toBe(i18n.t('agentChat.session.connectionTrouble'));
     expect(renderedText(cardFor(view.renderer, SELECTED_ID))).toContain('Task ses-selected');
     expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
 
@@ -1780,7 +1782,7 @@ describe('child transcript requests', () => {
     const errorProps = view.renderer.root.findByType(QueryError).props as ComponentProps<
       typeof QueryError
     >;
-    expect(errorProps.message).toBe('You are not authorized to use the Cloud Agent.');
+    expect(errorProps.message).toBe(i18n.t('queryError.permissionDescription'));
     expect(view.requestedIds()).toEqual([ROOT_ID, SELECTED_ID]);
     act(() => {
       sheetProps(view.renderer).onClose();
@@ -2329,6 +2331,34 @@ describe('SessionDetailContent goal visibility', () => {
     motionPolicy.reducedMotion = true;
     const reduced = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
     expect(goalWrapperOf(reduced).props.layout).toBeUndefined();
+  });
+});
+
+describe('SessionDetailContent transcript entrance', () => {
+  beforeEach(() => {
+    motionPolicy.reducedMotion = false;
+  });
+
+  /** The wrapper the screen draws around the transcript list. */
+  function transcriptWrapperOf(view: Awaited<ReturnType<typeof mountDetails>>) {
+    const list = view.renderer.root.findAllByType(SessionMessageList)[0];
+    if (list === undefined) {
+      throw new Error('Missing SessionMessageList');
+    }
+    const wrapper = list.parent;
+    if (wrapper === null) {
+      throw new Error('Missing the transcript wrapper');
+    }
+    return wrapper;
+  }
+
+  it('paints the transcript without an entrance animation', async () => {
+    const animated = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    // The transcript body must never depend on an entrance animation to become
+    // visible: Reanimated's `FadeIn` carries `initialValues: { opacity: 0 }`, so
+    // a device that drops or never runs the entrance paints the whole body
+    // blank while the header already shows the loaded token count.
+    expect(transcriptWrapperOf(animated).props.entering).toBeUndefined();
   });
 });
 

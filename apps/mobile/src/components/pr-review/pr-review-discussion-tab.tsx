@@ -402,8 +402,11 @@ export function PrReviewDiscussionTab({
     );
   }
 
-  // ── Empty (neither threads nor conversation comments) ──────────────
-  if (view.kind === 'empty') {
+  // An empty normalized page can still have more discussion to load. Keep
+  // the list's empty message and pagination footer reachable in that case.
+  // The node is the same `emptyState` this tab owns and hands to the list, so
+  // the copy stays on one surface instead of being duplicated inline.
+  if (view.kind === 'empty' && !query.hasNextPage && !query.isFetchingNextPage && !laterPageError) {
     return withCommentCta(emptyState);
   }
 

@@ -8,6 +8,10 @@ import {
   type SessionMessageIntent,
   type TurnFinalization,
 } from '../execution/types.js';
+import type {
+  CloudAgentAssistantFailureReason,
+  CloudAgentProviderOwnership,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 import {
@@ -63,6 +67,8 @@ type SessionMessageLifecycle = {
   terminalSource?: SessionMessageTerminalSource;
   failedReason?: string;
   failedDetail?: string;
+  assistantReason?: CloudAgentAssistantFailureReason;
+  providerOwnership?: CloudAgentProviderOwnership;
   attachFailures?: number;
   promptFailures?: number;
   preparationAttemptId?: string;
@@ -528,6 +534,8 @@ export function applyMessageOutcome(
           terminalSource,
           ...(outcome.reason ? { failedReason: outcome.reason } : {}),
           ...(outcome.gateResult !== undefined ? { gateResult: outcome.gateResult } : {}),
+          ...(outcome.assistantReason ? { assistantReason: outcome.assistantReason } : {}),
+          ...(outcome.providerOwnership ? { providerOwnership: outcome.providerOwnership } : {}),
         }
       : item
   );

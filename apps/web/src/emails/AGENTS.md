@@ -71,6 +71,8 @@ Every template must include this branding footer below the content table:
 | `magicLink.html` | `magic_link_url`, `email`, `expires_in`, `year` | `14` |
 | `signInCode.html` | `code`, `email`, `expires_in`, `year` | — |
 | `balanceAlert.html` | `minimum_balance`, `organization_url`, `year` | `16` |
+| `monthlySpendingAlert.html` | `organization_name`, `threshold_usd`, `spend_usd`, `period_label`, `alerts_url`, `year` | — |
+| `organizationLowBalanceAlert.html` | `organization_name`, `threshold_usd`, `balance_usd`, `alerts_url`, `year` | — |
 | `autoTopUpFailed.html` | `reason`, `credits_url`, `year` | `17` |
 | `codeReviewDisabled.html` | `reason`, `recovery_url`, `recovery_label`, `year` | — |
 | `ossInviteNewUser.html` | `tier_name`, `seats`, `seat_value`, `credits_section`, `accept_invite_url`, `integrations_url`, `code_reviews_url`, `year` | `18` |

@@ -19,6 +19,8 @@ export const subjects = {
   signInCode: 'Your Kilo Code sign-in code',
   balanceAlert: 'Kilo: Low Balance Alert',
   spendAlert: 'Kilo: Spend alert',
+  monthlySpendingAlert: 'Kilo: Monthly Spending Alert',
+  organizationLowBalanceAlert: 'Kilo: Low Balance Alert',
   autoTopUpFailed: 'Kilo: Auto Top-Up Failed',
   codeReviewDisabled: 'Action Required: Code Reviewer Disabled',
   ossInviteNewUser: 'Kilo: OSS Sponsorship Offer',
@@ -452,6 +454,58 @@ export async function sendSpendAlertEmail(
     await Promise.all(to.slice(i, i + BATCH_SIZE).map(sendToRecipient));
   }
   return outcome;
+}
+
+/**
+ * Sends one monthly spending alert to one recipient. Unlike the low balance
+ * alert this deliberately takes a single address: the caller owns a durable
+ * per-recipient delivery claim and must record each recipient's outcome
+ * separately.
+ */
+export async function sendMonthlySpendingAlertEmail(props: {
+  to: string;
+  organizationId: Organization['id'];
+  organizationName: string;
+  thresholdUsd: string;
+  spendUsd: string;
+  periodLabel: string;
+}): Promise<SendResult> {
+  return send({
+    to: props.to,
+    templateName: 'monthlySpendingAlert',
+    templateVars: {
+      organization_name: props.organizationName,
+      threshold_usd: props.thresholdUsd,
+      spend_usd: props.spendUsd,
+      period_label: props.periodLabel,
+      alerts_url: `${NEXTAUTH_URL}/organizations/${props.organizationId}/alerts`,
+    },
+  });
+}
+
+/**
+ * Sends one collection-backed `low_balance` alert notification to one
+ * recipient. Distinct from `sendBalanceAlertEmail`, which is the legacy
+ * `organizations.settings`-backed low-balance setting and is unaffected by
+ * this alert type.
+ */
+export async function sendLowBalanceAlertEmail(props: {
+  to: string;
+  organizationId: Organization['id'];
+  organizationName: string;
+  thresholdUsd: string;
+  balanceUsd: string;
+}): Promise<SendResult> {
+  return send({
+    to: props.to,
+    templateName: 'organizationLowBalanceAlert',
+    templateVars: {
+      organization_name: props.organizationName,
+      threshold_usd: props.thresholdUsd,
+      balance_usd: props.balanceUsd,
+      alerts_url: `${NEXTAUTH_URL}/organizations/${props.organizationId}/alerts`,
+    },
+  });
 }
 
 const ossTierConfig = {

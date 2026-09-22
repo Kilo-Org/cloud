@@ -206,6 +206,8 @@ describe('Organization Usage Functions', () => {
         crossedMinimumBalance: true,
         recipients: ['billing@example.com'],
         minimumBalanceMicrodollars: 40_000,
+        previousBalanceMicrodollars: 50_000,
+        newBalanceMicrodollars: 30_000,
       });
       expect(jest.mocked(after)).not.toHaveBeenCalled();
       expect(jest.mocked(sendBalanceAlertEmail)).not.toHaveBeenCalled();
@@ -289,6 +291,8 @@ describe('Organization Usage Functions', () => {
         crossedMinimumBalance: true as const,
         recipients: [user.google_user_email],
         minimumBalanceMicrodollars: 40_000,
+        previousBalanceMicrodollars: 50_000,
+        newBalanceMicrodollars: 30_000,
       };
       await db.delete(organizations).where(eq(organizations.id, organization.id));
 
@@ -315,6 +319,8 @@ describe('Organization Usage Functions', () => {
         crossedMinimumBalance: true as const,
         recipients: [] as string[],
         minimumBalanceMicrodollars: 40_000,
+        previousBalanceMicrodollars: 50_000,
+        newBalanceMicrodollars: 30_000,
       };
 
       scheduleOrganizationLowBalanceAlert(organization.id, result);
@@ -339,6 +345,8 @@ describe('Organization Usage Functions', () => {
         crossedMinimumBalance: false,
         recipients: [],
         minimumBalanceMicrodollars: 40_000,
+        previousBalanceMicrodollars: 50_000,
+        newBalanceMicrodollars: 45_000,
       });
 
       scheduleOrganizationLowBalanceAlert(organization.id, result);
@@ -365,6 +373,8 @@ describe('Organization Usage Functions', () => {
         crossedMinimumBalance: false,
         recipients: [],
         minimumBalanceMicrodollars: null,
+        previousBalanceMicrodollars: null,
+        newBalanceMicrodollars: null,
       });
 
       const usageRows = await db

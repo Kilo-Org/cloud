@@ -28,6 +28,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from '../getRootSpan';
 import {
   mutateOrganizationUsage,
+  scheduleLowBalanceOrganizationAlerts,
   scheduleOrganizationLowBalanceAlert,
 } from '@/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@/lib/organizations/organization-usage';
@@ -568,7 +569,10 @@ function organizationUsageMutationTask(
   if (!organizationId || !organizationUsage) return null;
 
   return {
-    run: async () => scheduleOrganizationLowBalanceAlert(organizationId, organizationUsage),
+    run: async () => {
+      scheduleOrganizationLowBalanceAlert(organizationId, organizationUsage);
+      scheduleLowBalanceOrganizationAlerts(organizationId, organizationUsage);
+    },
     reportError: error => {
       reportPostCommitFailure(
         'post-commit organization usage mutation failed',

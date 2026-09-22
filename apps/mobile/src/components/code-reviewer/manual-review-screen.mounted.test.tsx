@@ -39,15 +39,9 @@ vi.mock('react-native', () => ({
     addListener: vi.fn(() => ({ remove: vi.fn() })),
   },
   Platform: { OS: 'android' },
-  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
-  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
-  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
-}));
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0, top: 0, left: 0, right: 0 }),
 }));
 // The screen wraps its form in the shared keyboard-lift view, whose real module
 // reads the platform and the safe-area insets (a react-native entry this node
@@ -60,10 +54,6 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-// The keyboard-lift view reads the device insets through
-// `react-native-safe-area-context`, whose CommonJS entry requires a Flow
-// react-native subpath this node project cannot load. Stub the two kilo-chat
-// modules the way the sibling node-only screen tests do.
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
   useAppAwareKeyboardPadding: () => 0,

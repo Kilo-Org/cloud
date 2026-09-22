@@ -45,10 +45,11 @@ export function SessionListSearchHeader({
     <View>
       {/* One `min-height` floor, not two: `min-h-[50px]` is the height the row
           must already hold for the clear control's 38pt box plus the field's
-          own 12pt vertical padding (`py-1.5`), so the first keystroke cannot
-          grow the row and shift the list below. A second `min-h-*` class would
-          set the same property, leaving which floor wins to the order Tailwind
-          emits its rules rather than to this intent. */}
+          own 10.5pt vertical padding (`py-1.5` is 0.375rem at the app's 14pt
+          rem), so the first keystroke cannot grow the row and shift the list
+          below. A second `min-h-*` class would set the same property, leaving
+          which floor wins to the order Tailwind emits its rules rather than to
+          this intent. */}
       <View
         style={fieldMargins}
         className="my-2 min-h-[50px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
@@ -89,7 +90,7 @@ export function SessionListSearchHeader({
             // One size, spelled as whole pixels the mounted test compiles: the
             // 38pt box clears the 28dp floor, and the 3pt slop carries it to
             // 38 + 2 * 3 = 44pt. The row's `min-h-[50px]` already holds this
-            // box plus the field's 12pt padding. A second `h-*`/`w-*` pair here
+            // box plus the field's 10.5pt padding. A second `h-*`/`w-*` pair here
             // would set the same properties and leave the real size to
             // Tailwind's emit order. `-mr-2` keeps the glyph near its old inset
             // and the frame's left edge inside the field's right padding.

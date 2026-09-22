@@ -144,7 +144,7 @@ type Insets = { top: number; right: number; bottom: number; left: number };
 /**
  * A control's hitSlop as per-side insets. Controls here use either shape: the
  * shared `IconButton` passes per-side insets, while `SessionFilterButton` keeps
- * the scalar `@/lib/a11y/touch-target` slop, where one number applies to every
+ * the scalar `@/lib/a11y/tap-target` slop, where one number applies to every
  * side.
  */
 function hitSlopInsets(hitSlop: unknown): Insets {

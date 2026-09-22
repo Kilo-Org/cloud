@@ -1,6 +1,6 @@
 import { createRef, type ElementType, type ReactElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { compiledDimensions } from '@/test/native-dimensions';
+import { compiledDimensions, compiledLengthDp } from '@/test/native-dimensions';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type TextInput } from 'react-native';
@@ -160,13 +160,16 @@ describe('SessionListSearchHeader clear control', () => {
 
   it('reserves the box height on the field, so typing cannot shift the list', async () => {
     const { renderer, box } = await mountWithClear();
-    const declarations = (await compiledDimensions(
-      fieldRow(renderer).props.className as string
-    )) as { minHeight?: number }[];
+    const rowClassName = fieldRow(renderer).props.className as string;
+    const declarations = (await compiledDimensions(rowClassName)) as { minHeight?: number }[];
     const field = Object.assign({}, ...declarations) as { minHeight?: number };
 
-    // The row's own `py-1.5` (12pt) plus the control's box is the height the
-    // field must already hold before the control renders.
-    expect(field.minHeight).toBeGreaterThanOrEqual(box.height + 12);
+    // The row's `py-1.5` compiles to a 5.25pt `paddingBlock` per side at the
+    // app's 14pt rem — 10.5pt, not the 12pt a 16pt rem would give — so the
+    // field must already hold the control's box plus it. Read the padding from
+    // the compiled row rather than a hand-written rem figure.
+    const rowVerticalPaddingDp = 2 * (await compiledLengthDp(rowClassName, 'paddingBlock'));
+    expect(rowVerticalPaddingDp).toBe(10.5);
+    expect(field.minHeight).toBeGreaterThanOrEqual(box.height + rowVerticalPaddingDp);
   });
 });

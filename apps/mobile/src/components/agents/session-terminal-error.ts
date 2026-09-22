@@ -273,11 +273,16 @@ export function statusIndicatorDuplicatesMessageFailure(input: {
   if (failure.detail !== null && copy === failure.detail) {
     return true;
   }
-  // An unclassified status error resolves to the generic assistant line, which
-  // is the same failure the row's own title states.
-  return (
-    failure.kind === 'assistant' && copy === i18n.t('agentChat.messageFailure.assistantFailed')
-  );
+  // An unclassified status error resolves to the generic assistant line. The
+  // last row already states a failure and carries its own action — a delivery
+  // row always does, and `lastVisibleMessageFailure` only returns an assistant
+  // row that does — so the footer would restate the same event, not add a
+  // reason. A delivery row counts too: the Durable Object attributes a failed
+  // assistant request to the sending row, which then shows the delivery block,
+  // and the footer's generic line is the same failure stated a second time
+  // (explorer finding: session-send-failed e2/e4 — the red line above the
+  // composer duplicated the retry/copy block).
+  return copy === i18n.t('agentChat.messageFailure.assistantFailed');
 }
 
 /**

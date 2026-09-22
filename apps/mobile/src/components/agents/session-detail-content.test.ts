@@ -2732,6 +2732,33 @@ describe('session detail duplicate failure state', () => {
       indicator: { message: 'simulated error' },
     });
   });
+
+  it('states a failed delivery once: the delivery row suppresses the generic footer line', async () => {
+    const view = await mountDetails([rootUserMessage('__fake__:error-terminal')]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          [USER_ID, { status: 'failed', error: 'raw provider text', reason: 'execution' }],
+        ])
+      );
+    });
+    act(() => {
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'error', message: 'simulated error', timestamp: 0 }
+      );
+    });
+    const text = renderedText(view.renderer.root);
+    expect(text).toContain(i18n.t('agentChat.messageFailure.deliveryTitle'));
+    expect(text).toContain(i18n.t('agentChat.messageFailure.deliveryExecution'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
+    expect(indicatorNodes(view)).toHaveLength(0);
+  });
 });
 
 function indicatorNodes(view: Awaited<ReturnType<typeof mountDetails>>) {

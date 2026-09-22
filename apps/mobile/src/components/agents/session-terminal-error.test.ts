@@ -288,6 +288,18 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
     ).toBe(true);
   });
 
+  // The DO attributes a failed assistant request to the sending row, so the
+  // last row shows the delivery block; an unclassified status error resolves to
+  // the generic assistant line, which restates that same failure (e2/e4).
+  it('suppresses the generic assistant line above a delivery row', () => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'simulated error' },
+        failure: deliveryFailure,
+      })
+    ).toBe(true);
+  });
+
   it('keeps a classified line the row does not carry', () => {
     expect(
       statusIndicatorDuplicatesMessageFailure({

@@ -124,12 +124,12 @@ describe('shared branded splash', () => {
   });
 
   it('generates both native splash surfaces from the same options', async () => {
-    // Compile against a clean project root. The introspection base mods merge
-    // the resources already on disk, so compiling against the real project root
-    // would fold a developer's generated, gitignored `android/` tree into the
-    // result — its `colors.xml` is absent in CI — and merge colors this test
-    // does not own into the mod results, making the exact assertion below
-    // machine-dependent.
+    // Compile and introspect against the throwaway project root the sibling
+    // cases use: `compileModsAsync` seeds the Android color/style mods from the
+    // resources already on disk, so compiling against this package's root would
+    // fold a developer's generated, gitignored `android/` tree into the result —
+    // its `colors.xml` is absent in CI — and merge colors this test does not own
+    // into the mod results, making the exact assertion below machine-dependent.
     const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
@@ -181,12 +181,17 @@ describe('shared branded splash', () => {
     // splash color. Assert the splash color the plugin owns, not the array.
     // `introspect` merges into the colors a local prebuild already generated, so
     // a worktree with a prebuilt `android/` directory carries that file's extra
-    // entries. Assert the generated entry among them, not as the only one.
-    expect(evaluated._internal?.modResults?.android?.colors?.resources.color).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
-      ])
-    );
+    // entries. Assert the plugin's entry among them, by containment, the same
+    // way the styles assertion below pins its theme: not the whole array and not
+    // its exact length, so a prebuild's other colors (iconBackground,
+    // colorPrimary, …) surviving here cannot fail the case.
+    expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
+      resources: {
+        color: expect.arrayContaining([
+          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+        ]),
+      },
+    });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {
         style: expect.arrayContaining([

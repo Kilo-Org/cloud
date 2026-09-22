@@ -102,18 +102,18 @@ describe('Text tracked labels in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
-    // The eyebrow variant's Latin display class is LTR-only (see `Text`'s
-    // eyebrow variant and `SectionHeader`), so in RTL the shared label carries
-    // no tracked class and the reset style is its whole treatment. The Eyebrow
-    // component wraps the eyebrow variant, which owns its Latin display
-    // classes: an RTL eyebrow drops the capitals and the tracked class instead
-    // of carrying a class the interface language never asked for
-    // (`text.mounted.test.tsx`, `section-header.mounted.test.tsx`). Assert on
-    // the class list and on the rendered string alike: the token list pins the
-    // exact classes, the substring check catches a `tracking` that shows up
-    // only inside another token, and the LTR-only class is pinned by name. No
-    // uppercase or tracked class is left for the shared RTL reset to
-    // neutralize, and the zero letter-spacing reset still lands.
+    // The eyebrow's Latin display treatment (uppercase + tracking) is LTR-only
+    // (see `Text`'s eyebrow variant and `SectionHeader`): the variant owns its
+    // display classes, so an RTL eyebrow drops the capitals and the tracked
+    // class instead of carrying a class the interface language never asked for
+    // (`text.mounted.test.tsx`, `section-header.mounted.test.tsx`) rather than
+    // keeping them like a caller-supplied tracked class. Assert on the class
+    // list and on the rendered string alike: the token list pins the exact
+    // classes, the substring check catches a `tracking` that shows up only
+    // inside another token, and the LTR-only class is pinned by name. No
+    // uppercase or tracked class is left for the shared RTL reset to neutralize
+    // on this label — the reset style is its whole treatment — and the zero
+    // letter-spacing reset still lands.
     const className = hostText(root).props.className as string;
     const classes = className.split(' ');
     expect(classes).not.toContain('uppercase');

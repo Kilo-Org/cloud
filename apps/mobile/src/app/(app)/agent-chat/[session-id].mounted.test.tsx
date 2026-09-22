@@ -17,15 +17,15 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { kiloId, stubTextPart, stubUserMessage } from '@kilocode/cloud-agent-sdk/test-helpers';
 
-import { i18n } from '@/i18n';
-import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import { AgentSessionProvider, useSessionManager } from '@/components/agents/session-provider';
-import { SessionCopyLinkAction } from '@/components/agents/session-copy-link-action';
+import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { i18n } from '@/i18n';
 import { clearActiveToken, setActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
@@ -33,6 +33,7 @@ import {
   beginAuthenticatedOwner,
   confirmAuthenticatedOwner,
   getAuthenticatedOwner,
+  markRestoredAuthenticatedOwner,
 } from '@/lib/context-scope';
 import SessionDetailScreen from './[session-id]';
 
@@ -79,8 +80,12 @@ const queryState = vi.hoisted(() => ({
   isPending: false,
   isError: false,
   isFetching: false,
+  // TanStack Query's `fetchStatus`: `fetching` while the read is in flight,
+  // `paused` when the online manager has taken the device offline so the read
+  // will not run. The route holds its skeleton only for the first.
+  fetchStatus: 'fetching' as 'fetching' | 'paused' | 'idle',
   error: null as { data?: { code?: string } } | null,
-  data: null as { organization_id?: string | null } | null,
+  data: null as { organization_id?: string | null; id?: string } | null,
   refetch: vi.fn(),
 }));
 
@@ -106,7 +111,12 @@ vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'ChevronRight',
 }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
-vi.mock('expo-secure-store', () => ({ getItemAsync: vi.fn() }));
+// The route's restored-scope hook reads the persisted account hint through
+// this mock; each test answers it for its own scope scenario.
+const secureStoreMock = vi.hoisted(() => ({
+  getItemAsync: vi.fn<(key: string) => Promise<string | null>>(),
+}));
+vi.mock('expo-secure-store', () => ({ getItemAsync: secureStoreMock.getItemAsync }));
 vi.mock('@/lib/config', () => ({ SESSION_INGEST_WS_URL: 'wss://ingest.example.com' }));
 vi.mock('@/lib/user-web-connection-lifecycle', () => ({
   createNativeUserWebConnectionLifecycleHooks: () => ({}),
@@ -165,6 +175,12 @@ vi.mock('@/lib/auth/auth-context', () => ({
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
+    user: {
+      // The route resolves the persisted account scope from this query. The
+      // shared `useQuery` mock above serves `queryState`, whose data carries no
+      // `id`, so the persisted scope stays absent unless a test sets one.
+      getMe: { queryOptions: () => ({ queryKey: ['user', 'getMe'] }) },
+    },
     organizations: {
       list: {
         queryOptions: () => ({
@@ -499,9 +515,12 @@ beforeEach(() => {
   queryState.isPending = false;
   queryState.isError = false;
   queryState.isFetching = false;
+  queryState.fetchStatus = 'fetching';
   queryState.error = null;
   queryState.data = {};
   queryState.refetch.mockReset();
+  secureStoreMock.getItemAsync.mockReset();
+  secureStoreMock.getItemAsync.mockResolvedValue(null);
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
 });
@@ -631,6 +650,221 @@ describe('SessionDetailScreen display scope', () => {
   });
 });
 
+describe('SessionDetailScreen metadata read that cannot settle', () => {
+  it('mounts the session when the offline metadata read is paused', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'paused';
+    const renderer = await mountRoute();
+
+    // The device is offline, so the read will not run until connectivity
+    // returns: the session must mount and paint the persisted transcript
+    // instead of holding a skeleton the person cannot use.
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(0);
+  });
+
+  it('keeps an offline session mounted while its metadata starts fetching on reconnect', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'paused';
+    const renderer = await mountRoute();
+    const manager = managers.at(-1)?.manager;
+
+    queryState.fetchStatus = 'fetching';
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(0);
+    expect(managers).toHaveLength(1);
+    expect(managers.at(-1)?.manager).toBe(manager);
+  });
+
+  it('does not reuse the mounted scope admission for a different session', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    const renderer = await mountRoute();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-2' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'fetching';
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+  });
+
+  it('mounts the session once an in-flight metadata read outlives the open grace', async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'fetching';
+    const renderer = await mountRoute();
+
+    expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+
+    // The same threshold the session body applies to a stalled transport.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SESSION_SLOW_LOAD_MS);
+    });
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(findByType(renderer.root, 'SessionComposerSkeleton')).toHaveLength(0);
+  });
+
+  it('keeps the mounted manager when the paused read later resolves an organization', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'paused';
+    const renderer = await mountRoute();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    const mountedManager = managers.at(-1)?.manager;
+    expect(mountedManager).toBeDefined();
+
+    // Connectivity returns and the read resolves the session's organization.
+    // The manager adopts that scope from its own metadata read, so the route
+    // must not re-key the provider for it: a re-key would remount the
+    // transcript and drop the composer text under it.
+    queryState.isPending = false;
+    queryState.fetchStatus = 'idle';
+    queryState.data = { organization_id: 'org-a' };
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(managers).toHaveLength(1);
+    expect(managers.at(-1)?.manager).toBe(mountedManager);
+    expect(propOf(renderer.root.findByType(AgentSessionProvider), 'organizationId')).toBe('org-a');
+  });
+});
+
+describe('SessionDetailScreen restored scope', () => {
+  /** Mounts the route on the restored identity: credentials committed, owner unconfirmed, hint persisted. */
+  async function mountRestoredScope(): Promise<TestRenderer.ReactTestRenderer> {
+    beginReplacement();
+    commitCredentials('A');
+    // Credentials restored from storage on a cold start, not freshly signed in:
+    // only this state may scope the session from the persisted hint.
+    markRestoredAuthenticatedOwner();
+    secureStoreMock.getItemAsync.mockResolvedValue('user-A');
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    queryState.data = null;
+    queryState.isPending = true;
+    queryState.fetchStatus = 'paused';
+    const renderer = await mountRoute();
+    // Let the persisted-hint read settle so the route mounts the session.
+    await act(async () => {
+      for (let round = 0; round < 3; round += 1) {
+        // eslint-disable-next-line no-await-in-loop -- one macrotask per round lets the keystore read and its state update settle
+        await new Promise<void>(resolve => {
+          setTimeout(resolve, 0);
+        });
+      }
+    });
+    return renderer;
+  }
+
+  it.each(['paused', 'fetching'] as const)(
+    'keeps the session mounted when the live confirmation matches with metadata %s',
+    async fetchStatus => {
+      const renderer = await mountRestoredScope();
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+      const restoredManager = managers.at(-1)?.manager;
+      expect(restoredManager).toBeDefined();
+
+      // The live getMe confirms the same account the hint restored: the resolved
+      // scope id is unchanged, so the provider key must not remount the session
+      // subtree — the painted transcript, the manager and the composer text all
+      // live below this key.
+      queryState.fetchStatus = fetchStatus;
+      await act(async () => {
+        confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-A');
+        await Promise.resolve();
+      });
+
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+      expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(0);
+      expect(managers).toHaveLength(1);
+      expect(managers.at(-1)?.manager).toBe(restoredManager);
+    }
+  );
+
+  it('remounts the session when the confirmation names a different account than the hint', async () => {
+    const renderer = await mountRestoredScope();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    const restoredManager = managers.at(-1)?.manager;
+
+    // A stale hint restored another account's scope; the confirmed account
+    // changes the resolved scope id, so the provider must remount.
+    await act(async () => {
+      confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-B');
+      await Promise.resolve();
+    });
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(managers).toHaveLength(2);
+    expect(managers.at(-1)?.manager).not.toBe(restoredManager);
+  });
+
+  it.each(['NOT_FOUND', 'FORBIDDEN', 'UNAUTHORIZED'])(
+    'retires a restored session when metadata returns %s after confirmation',
+    async code => {
+      const renderer = await mountRestoredScope();
+      queryState.fetchStatus = 'fetching';
+      act(() => {
+        confirmAuthenticatedOwner(getAuthenticatedOwner(), 'user-A');
+      });
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+
+      queryState.isPending = false;
+      queryState.isError = true;
+      queryState.error = { data: { code } };
+      await updateRoute(renderer);
+
+      expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+      expect(propOf(findByType(renderer.root, 'QueryError')[0], 'onRetry')).toBeUndefined();
+    }
+  );
+
+  it('does not mount the previous account restored scope during a direct credential switch', async () => {
+    const renderer = await mountRestoredScope();
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    const managersBeforeSwitch = managers.length;
+
+    // A direct switch signs in as B: the new credentials are committed but not
+    // yet confirmed, while A's persisted hint and cached transcript are still
+    // on the device. The hint must not mount A's scope under B.
+    act(() => {
+      beginReplacement();
+      commitCredentials('B');
+    });
+    await updateRoute(renderer);
+
+    // B is unconfirmed, so the route holds its pending state: no session
+    // subtree (and no manager reading A's scope) is created for the switch.
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
+    expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
+    expect(managers).toHaveLength(managersBeforeSwitch);
+
+    // B's getMe confirms: the session mounts in B's own scope.
+    act(() => {
+      commitAccount('B');
+    });
+    await updateRoute(renderer);
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    expect(transcriptText(renderer, 'RootText')).toBe('Account B root row');
+  });
+});
+
 describe('SessionDetailScreen valid session-id', () => {
   it('keeps the mounted transcript when a background metadata refresh fails', async () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
@@ -671,104 +905,32 @@ describe('SessionDetailScreen valid session-id', () => {
     expect(propOf(findByType(renderer.root, 'SessionDetailContent')[0], 'resumeAt')).toBeNull();
   });
 
-  it('keeps the route anchor on the loading header Copy-link action', async () => {
+  // Owner request item 4 moved the Copy link action off the conversation header
+  // and into the context details sheet. The loading header therefore reserves
+  // the loaded header's context pill only: it carries no copy control, because
+  // the sheet — the copy affordance's home — mounts with SessionDetailContent
+  // below. Rendering one here would resurrect the control the request removed
+  // and shift the pill at the loading -> loaded swap.
+  it('reserves the context pill without a copy control on the loading header', async () => {
     useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', at: 'msg_42' });
     queryState.data = null;
     queryState.isPending = true;
     const renderer = await mountRoute();
 
-    // The transcript has not loaded, so the skeleton header is mounted...
     expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
     expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
-    // ...and its Copy-link action must copy the position the route already
-    // holds, not an anchor-less session link.
-    const copyActions = renderer.root.findByType(ScreenHeader).findAllByType(SessionCopyLinkAction);
-    expect(copyActions).toHaveLength(1);
-    expect(propOf(copyActions[0], 'anchorMessageId')).toBe('msg_42');
-  });
-});
-
-// The session header's Copy-link action copies the same universal link the OS
-// handoff advertises, anchored at the position the transcript is showing.
-describe('SessionDetailScreen copy link action', () => {
-  beforeEach(() => {
-    clipboardSetStringAsync.mockReset();
-    hapticsSelection.mockReset();
-    toastSuccess.mockReset();
-    toastError.mockReset();
-  });
-
-  async function mountCopyAction(anchorMessageId: string | null) {
-    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-    await act(async () => {
-      ref.current = TestRenderer.create(
-        createElement(SessionCopyLinkAction, { sessionId: 'sess-1', anchorMessageId })
-      );
-      await Promise.resolve();
-    });
-    if (!ref.current) {
-      throw new Error('copy action did not render');
-    }
-    const renderer = ref.current;
-    onTestFinished(() => {
-      act(() => {
-        renderer.unmount();
-      });
-    });
-    return renderer;
-  }
-
-  function copyControl(renderer: TestRenderer.ReactTestRenderer) {
-    return renderer.root.findByProps({ accessibilityLabel: i18n.t('common.copyLink') });
-  }
-
-  it('copies the resume URL of the shown position and confirms it', async () => {
-    clipboardSetStringAsync.mockResolvedValue(true);
-    const renderer = await mountCopyAction('msg_42');
-
-    await act(async () => {
-      pressControl(copyControl(renderer));
-      await Promise.resolve();
-    });
-
-    expect(clipboardSetStringAsync).toHaveBeenCalledWith(
-      sessionResumeUrl({ sessionId: 'sess-1', anchorMessageId: 'msg_42' })
-    );
-    expect(toastSuccess).toHaveBeenCalledWith(i18n.t('agentChat.chatLink.linkCopied'), {
-      // Longer than the Sonner default: on Android the system clipboard preview
-      // covers the bottom-center toast region for its whole default life.
-      duration: expect.any(Number),
-    });
-    expect(hapticsSelection).toHaveBeenCalledTimes(1);
-  });
-
-  it('surfaces a retryable failure when the clipboard rejects', async () => {
-    clipboardSetStringAsync.mockRejectedValueOnce(new Error('clipboard unavailable'));
-    const renderer = await mountCopyAction('msg_42');
-
-    await act(async () => {
-      pressControl(copyControl(renderer));
-      await Promise.resolve();
-    });
-
-    expect(toastError).toHaveBeenCalledWith(i18n.t('agentChat.chatLink.couldNotCopyLink'), {
-      action: { label: i18n.t('common.tryAgain'), onClick: expect.any(Function) },
-    });
-    expect(toastSuccess).not.toHaveBeenCalled();
-  });
-
-  it('copies the session link without a position when the position is unknown', async () => {
-    clipboardSetStringAsync.mockResolvedValue(true);
-    const renderer = await mountCopyAction(null);
-
-    await act(async () => {
-      pressControl(copyControl(renderer));
-      await Promise.resolve();
-    });
-
-    expect(clipboardSetStringAsync).toHaveBeenCalledWith(
-      sessionResumeUrl({ sessionId: 'sess-1', anchorMessageId: null })
-    );
+    const header = renderer.root.findByType(ScreenHeader);
+    const metrics = findByType(header, 'SessionContextMetrics');
+    expect(metrics).toHaveLength(1);
+    expect(propOf(metrics[0], 'loading')).toBe(true);
+    // No `onPress`: the context sheet, which owns both copy rows, is not
+    // mounted until SessionDetailContent takes over.
+    expect(propOf(metrics[0], 'onPress')).toBeUndefined();
+    expect(
+      findByType(header, 'Pressable').filter(
+        node => propOf(node, 'accessibilityLabel') === i18n.t('common.copyLink')
+      )
+    ).toHaveLength(0);
   });
 });
 
@@ -1173,9 +1335,11 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     );
     const header = renderer.root.findByType(ScreenHeader);
     const title = header.findByProps({ accessibilityRole: 'header' });
-    expect(propOf(title, 'numberOfLines')).toBe(2);
+    // The loading header reserves the loaded header's line cap, so the title
+    // cannot re-wrap when the real session name swaps in.
+    expect(propOf(title, 'numberOfLines')).toBe(SESSION_HEADER_TITLE_LINES);
     expect(propOf(title, 'ellipsizeMode')).toBe('tail');
-    expect(title.parent?.props.className).toContain('min-h-14');
+    expect(title.parent?.props.className).toContain('min-h-21');
     const back = findByType(header, 'Pressable').find(
       node => propOf(node, 'accessibilityLabel') === 'Go back'
     );
@@ -1426,20 +1590,6 @@ describe.each([
       expect(findByType(renderer.root, 'SessionSkeletonMessages')).toHaveLength(1);
       expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(0);
       expect(transcriptText(renderer, 'RootText')).toBe('');
-      // The loading header reserves the loaded header's Copy-link action, so the
-      // 44pt control appearing at the swap cannot narrow and re-wrap the title.
-      const loadingHeader = renderer.root.findByType(ScreenHeader);
-      const loadingCopyActions = loadingHeader.findAllByType(SessionCopyLinkAction);
-      expect(loadingCopyActions).toHaveLength(1);
-      const loadingCopyAction = loadingCopyActions[0];
-      if (!loadingCopyAction) {
-        throw new Error('loading header did not render the copy-link action');
-      }
-      expect(propOf(loadingCopyAction, 'sessionId')).toBe('sess-1');
-      expect(propOf(loadingCopyAction, 'anchorMessageId')).toBeNull();
-      const loadingCopyPressable = loadingCopyAction.findAllByType('Pressable');
-      expect(loadingCopyPressable).toHaveLength(1);
-      expect(propOf(loadingCopyPressable[0], 'className')).toContain('h-11 w-11');
       await act(async () => {
         identity.resolve({ id: 'user-B' });
         await vi.advanceTimersByTimeAsync(0);

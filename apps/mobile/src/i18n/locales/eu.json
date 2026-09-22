@@ -827,7 +827,8 @@
       "chat": "Txat-mezuak",
       "kiloclaw": "KiloClaw-en jarduera",
       "balance": "Saldoari buruzko alertak",
-      "security": "Antzemandako segurtasun-arazoak"
+      "security": "Antzemandako segurtasun-arazoak",
+      "spend": "Gastu-alertak"
     },
     "category": {
       "chatMessagesSubtitle": "zure elkarrizketetako erantzunak",
@@ -838,8 +839,22 @@
       "sessionStatusTitle": "Saioaren egoera",
       "sessionStatusSubtitle": "amaituta / huts eginda / kontrolatzeko prest",
       "kiloclawActivitySubtitle": "instantzia prest edo huts eginda, programatutako ekintzak",
+      "kiloclawActivityUnavailable": "Abiarazi KiloClaw instantzia bat KiloClaw jarduera jasotzeko.",
       "balanceAlertsSubtitle": "erakundearen saldo baxuaren abisuak",
-      "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak"
+      "balanceAlertsUnavailable": "Egin bat erakunde batekin saldo baxuko abisuak jasotzeko.",
+      "securityFindingsSubtitle": "aurkikuntza berriak eta SLAren gogorarazpenak",
+      "securityFindingsUnavailable": "Gaitu Kilo segurtasun-agentea esparru batean segurtasun-arazoak jasotzeko.",
+      "spendAlertsSubtitle": "atalaseen gainditzeak eta orduko gorakadak",
+      "spendAlertsToggle": "Gastu-alerten kategoria"
+    },
+    "action": {
+      "openSession": "Ireki saioa"
+    },
+    "needsInputAction": {
+      "approved": "Eskaera onartu da",
+      "replied": "Erantzuna bidali da",
+      "failed": "Ezin izan da erantzun. Ukitu berriro saiatzeko.",
+      "unavailable": "Eskaera honek jada ez du itxaroten."
     }
   },
   "tabs": {
@@ -2067,6 +2082,10 @@
       "couldNotLoad": "Ezin izan da saioa kargatu.",
       "failedToLoadDetails": "Ezin izan dira saioaren xehetasunak kargatu.",
       "failedToStopExecution": "Ezin izan da exekuzioa gelditu.",
+      "stopped": "Saioa gelditu da",
+      "committing": "Commita egiten…",
+      "committed": "Commita egina",
+      "commitFailed": "Commitak huts egin du",
       "renameSession": "Berrizendatu saioa",
       "renamePlaceholder": "Saioaren izena",
       "transcriptAccessibility": "Saioaren transkripzioa",
@@ -2177,20 +2196,7 @@
       "continueFrom": "Saio honekin jarraitzen ari zara: {{title}}.",
       "importingSession": "Saioa inportatzen",
       "cliCannotContinue": "CLI honek ezin dio saio bati jarraitu. Aukeratu Cloud Agent edo beste CLI bat.",
-      "importFailed": "Ezin izan da saio hau inportatu.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Lehenetsia · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Txikia",
-      "sandboxInstanceShared": "Partekatua",
-      "sandboxInstanceLarge": "Handia",
-      "sandboxInstanceDevcontainer": "Dev edukiontzia",
-      "sandboxInstanceProviderDefault": "Hornitzailearen lehenetsia",
-      "sandboxCouldNotLoad": "Ezin izan dira sandbox-aukerak kargatu",
-      "sandboxUnavailable": "Sandbox hau ez dago erabilgarri. Aukeratu beste sandbox bat edo Lehenetsia.",
-      "sandboxUseDefault": "Erabili Lehenetsia"
+      "importFailed": "Ezin izan da saio hau inportatu."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxategi eguneratu da.",
@@ -2220,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} lerro",
       "linesBadge_other": "{{displayCount}} lerro",
       "matchesBadge_one": "{{displayCount}} bat etortze",
-      "matchesBadge_other": "{{displayCount}} bat etortze"
+      "matchesBadge_other": "{{displayCount}} bat etortze",
+      "noOutput": "Irteerarik ez."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} lerroak (moztuta)",
@@ -3157,7 +3164,10 @@
     "couldNotApprove": "Ezin izan da onartu",
     "couldNotStart": "Ezin izan da hasi",
     "channelName": "Agente aktiboak",
-    "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko."
+    "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko.",
+    "openSession": "Ireki",
+    "approveFailed": "Ezin izan da onartu. Sakatu $t(common.approve) berriro saiatzeko.",
+    "newestResult": "Emaitza berriena"
   },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",
@@ -3182,15 +3192,7 @@
     "remoteOptionTitle": "Zure ordenagailua",
     "remoteOptionBody": "Exekutatu Kilo zure makinean `kilo remote` CLIaren bidez.",
     "skip": "Baztertu bira",
-    "tutorialLabel": "Tutorial-a",
-    "remoteTitle": "Hasi zure lehen urruneko saioa",
-    "remoteBody": "Konektatu zure ordenagailua, eta gero hasi saioa hemendik.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Oraindik ez dago ordenagailurik konektatuta",
-    "remoteEmptyBody": "Konektatzeko, exekutatu `kilo remote` zure ordenagailuan.",
-    "remoteFound": "Ordenagailua konektatuta",
-    "checkAgain": "Egiaztatu berriro",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial-a"
   },
   "appActions": {
     "start": {
@@ -3201,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Ireki azken saioa"
+  },
+  "spendAlerts": {
+    "subtitle": "Bidali alerta bat posta elektronikoz edo push bidez fakturatze-kontaktuei, eremu honen gastuak muga bat gainditzen duenean edo bere ohiko ordu-tasaren gainetik igotzen denean.",
+    "enable": "Gaitu gastu-alertak",
+    "thresholdTitle": "Atalasaren gainditzea",
+    "thresholdSubtitle": "Metatutako gastuak zure muga gainditzen du",
+    "anomalyTitle": "Orduko gorakada",
+    "anomalySubtitle": "Ordu bat eremu honen ohiko tasatik oso gainetik dago",
+    "limitLabel": "Muga (USD)",
+    "windowLabel": "Leihoa",
+    "window24h": "24 ordu",
+    "window7d": "7 egun",
+    "window30d": "30 egun",
+    "multiplierLabel": "Gorakadaren biderkatzailea",
+    "saved": "Gastu-alerten ezarpenak gorde dira",
+    "loadError": "Ezin izan dira gastu-alertak kargatu.",
+    "saveError": "Ezin izan dira gastu-alertak gorde.",
+    "empty": "Gastu-alertak itzalita daude. Piztu itzazu eremu honetako fakturatze-kontaktuei abisatzeko.",
+    "noSpend": "Oraindik ez da gasturik erregistratu",
+    "spend24h": "Azken 24 orduetako gastua",
+    "multiplierError": "Sartu 1 edo handiagoa den biderkatzaile bat",
+    "permissionDenied": "Ez duzu gastu-alertak kudeatzeko baimenik.",
+    "pushOffByCategory": "Jakinarazpenetan itzalita"
   }
 }

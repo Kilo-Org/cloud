@@ -1,5 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
+import { DEV_CLIENT_PLUGIN_OPTIONS } from './src/lib/dev-client-plugin';
 import { SUPPORTED_LANGUAGES } from './src/i18n/languages.ts';
 import { buildFocusFilterStringsFiles } from './src/i18n/focus-filter-locales.ts';
 import { buildPermissionPromptLocales } from './src/i18n/permission-prompt-locales.ts';
@@ -93,7 +94,10 @@ const config: ExpoConfig = {
   name: 'Kilo',
   owner: 'kilocode',
   slug: 'kilo-app',
-  version: '1.0.11',
+  // Keep in lockstep with AGENT_CHANNEL_SPLIT_APP_VERSION in
+  // @kilocode/notifications: this is the first build that creates the split
+  // agent channels, so older tokens stay on the legacy `agent` channel.
+  version: '1.0.12',
   // Rotation is supported on iOS and Android: `default` resolves to portrait +
   // both landscapes in UISupportedInterfaceOrientations on iOS and all
   // orientations in the Android manifest, satisfying WCAG 1.3.4 (Orientation)
@@ -223,14 +227,14 @@ const config: ExpoConfig = {
     ],
   },
   plugins: [
-    ['expo-dev-client', { toolsButton: false }],
+    ['expo-dev-client', DEV_CLIENT_PLUGIN_OPTIONS],
     [
       'expo-build-properties',
       {
         android: {
           enableMinifyInReleaseBuilds: true,
           // Old release AABs shipped without resource shrinking. Keep this on so
-          // the unused kilo_shrink_sentinel_unused raw resource is stripped and
+          // the unused zz_unused_shrink_sentinel raw resource is stripped and
           // the inspector contract can catch a shrink regression before it lands.
           enableShrinkResourcesInReleaseBuilds: true,
           usePrecompiledHeaders: true,
@@ -306,8 +310,11 @@ const config: ExpoConfig = {
         options: SENTRY_NATIVE_OPTIONS,
       },
     ],
+    // One native splash configuration and shared AnimatedSplashOverlay lifecycle
+    // for iOS and Android. The wrapper documents the native backing-surface
+    // capability exception and owns its mod ordering with expo-splash-screen.
     [
-      'expo-splash-screen',
+      './plugins/withBrandedSplash',
       {
         image: './assets/images/logo-mark.png',
         backgroundColor: '#FAF74F',
@@ -361,6 +368,11 @@ const config: ExpoConfig = {
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
+    // Alert dialogs (Alert.alert) follow the app theme too: AppCompat's
+    // DayNight defaults are #424242 / teal, not the app's surfaces. Android-only
+    // by capability — iOS's UIAlertController already follows the system
+    // appearance and takes no app-token override (see the plugin's doc comment).
+    './plugins/withAndroidAlertDialogTheme',
     './plugins/withAndroidExpoModuleRepos',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their
@@ -398,13 +410,14 @@ const config: ExpoConfig = {
             displayName: WIDGET_GALLERY_COPY.en.displayName,
             description: WIDGET_GALLERY_COPY.en.description,
             contentMarginsDisabled: false,
-            // Home Screen: the small square and the medium row. `systemLarge`
-            // is deliberately absent — three counts cannot fill a card that
-            // tall, and the whitespace read as an unfinished widget. Add it
-            // back only with a layout that earns the extra area.
+            // Home Screen: the small square, the medium row, and the large
+            // StandBy card. The large family carries the three counts plus the
+            // newest result below them, so its extra height is used rather
+            // than left as the whitespace that read as unfinished.
             supportedFamilies: [
               'systemSmall',
               'systemMedium',
+              'systemLarge',
               'accessoryCircular',
               'accessoryRectangular',
               'accessoryInline',
@@ -413,6 +426,9 @@ const config: ExpoConfig = {
         ],
       },
     ],
+    // The iOS File Provider extension that shows the artifact mirror in the
+    // Files app: its Xcode target, Pods integration and EAS app-extension entry.
+    './plugins/withArtifactFileProvider',
     // The iOS notification service extension that drops an agent-progress push
     // the active Focus excluded. The foreground handler in
     // src/lib/notifications.ts cannot see a background delivery, so this

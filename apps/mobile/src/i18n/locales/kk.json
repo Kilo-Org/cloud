@@ -827,7 +827,8 @@
       "chat": "Чат хабарламалары",
       "kiloclaw": "KiloClaw белсенділігі",
       "balance": "Баланс туралы ескертулер",
-      "security": "Анықталған қауіпсіздік мәселелері"
+      "security": "Анықталған қауіпсіздік мәселелері",
+      "spend": "Шығыс ескертулері"
     },
     "category": {
       "chatMessagesSubtitle": "сөйлесулеріңіздегі жауаптар",
@@ -838,8 +839,22 @@
       "sessionStatusTitle": "Сессия күйі",
       "sessionStatusSubtitle": "аяқталды / сәтсіз аяқталды / басқаруға дайын",
       "kiloclawActivitySubtitle": "дана дайын / істен шықты, жоспарланған әрекеттер",
+      "kiloclawActivityUnavailable": "KiloClaw белсенділігін алу үшін KiloClaw данасын іске қосыңыз.",
       "balanceAlertsSubtitle": "ұйым балансының азайғаны туралы ескертулер",
-      "securityFindingsSubtitle": "жаңа осалдықтар және SLA туралы еске салулар"
+      "balanceAlertsUnavailable": "Баланс ескертулерін алу үшін ұйымға қосылыңыз.",
+      "securityFindingsSubtitle": "жаңа осалдықтар және SLA туралы еске салулар",
+      "securityFindingsUnavailable": "Қауіпсіздік мәселелерін алу үшін Kilo Қауіпсіздік агентін ауқымда қосыңыз.",
+      "spendAlertsSubtitle": "шектерден асу және сағаттық секірістер",
+      "spendAlertsToggle": "Шығыс ескертулері санаты"
+    },
+    "action": {
+      "openSession": "Сессияны ашу"
+    },
+    "needsInputAction": {
+      "approved": "Сұрау мақұлданды",
+      "replied": "Жауап жіберілді",
+      "failed": "Жауап беру мүмкін болмады. Қайталап көру үшін қайта түртіңіз.",
+      "unavailable": "Бұл сұрау енді күтпейді."
     }
   },
   "tabs": {
@@ -2067,6 +2082,10 @@
       "couldNotLoad": "Сессияны жүктеу мүмкін болмады.",
       "failedToLoadDetails": "Сессия мәліметтерін жүктеу мүмкін болмады.",
       "failedToStopExecution": "Орындалуды тоқтату мүмкін болмады.",
+      "stopped": "Сессия тоқтатылды",
+      "committing": "Коммит жасалуда…",
+      "committed": "Коммит жасалды",
+      "commitFailed": "Коммит жасау сәтсіз аяқталды",
       "renameSession": "Сессия атауын өзгерту",
       "renamePlaceholder": "Сессия атауы",
       "transcriptAccessibility": "Сессия жазбасы",
@@ -2177,20 +2196,7 @@
       "continueFrom": "«{{title}}» сессиясы жалғасуда.",
       "importingSession": "Сессия импортталуда",
       "cliCannotContinue": "Бұл CLI сессияны жалғастыра алмайды. Cloud Agent қызметін немесе басқа CLI құралын таңдаңыз.",
-      "importFailed": "Бұл сессияны импорттау мүмкін болмады.",
-      "sandbox": "Сандбокс",
-      "sandboxAccessibility": "Сандбокс: {{label}}",
-      "sandboxDefaultWithDestination": "Әдепкі · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Кішкене",
-      "sandboxInstanceShared": "Ортақ",
-      "sandboxInstanceLarge": "Үлкен",
-      "sandboxInstanceDevcontainer": "Dev контейнері",
-      "sandboxInstanceProviderDefault": "Жеткізушінің әдепкісі",
-      "sandboxCouldNotLoad": "Сандбокс параметрлерін жүктей алмады",
-      "sandboxUnavailable": "Бұл сандбокс қолжетімсіз. Басқа сандбоксты немесе Әдепкіні таңдаңыз.",
-      "sandboxUseDefault": "Әдепкіні пайдалану"
+      "importFailed": "Бұл сессияны импорттау мүмкін болмады."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} файл жаңартылды.",
@@ -2220,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} жол",
       "linesBadge_other": "{{displayCount}} жол",
       "matchesBadge_one": "{{displayCount}} сәйкестік",
-      "matchesBadge_other": "{{displayCount}} сәйкестік"
+      "matchesBadge_other": "{{displayCount}} сәйкестік",
+      "noOutput": "Шығыс жоқ."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} жолдары (қысқартылған)",
@@ -3157,7 +3164,10 @@
     "couldNotApprove": "Мақұлдау сәтсіз аяқталды",
     "couldNotStart": "Бастау сәтсіз аяқталды",
     "channelName": "Белсенді агенттер",
-    "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз."
+    "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз.",
+    "openSession": "Ашыңыз",
+    "approveFailed": "Мақұлдау мүмкін болмады. Қайталап көру үшін $t(common.approve) түртіңіз.",
+    "newestResult": "Ең жаңа нәтиже"
   },
   "transcriptionModel": {
     "title": "Дауысты мәтінге айналдыру моделі",
@@ -3182,15 +3192,7 @@
     "remoteOptionTitle": "Сіздің компьютеріңіз",
     "remoteOptionBody": "Kilo-ны өз машинаңызда `kilo remote` CLI арқылы іске қосыңыз.",
     "skip": "Турды өткізу",
-    "tutorialLabel": "Оқу",
-    "remoteTitle": "Бірінші қашық сессияңызды бастаңыз",
-    "remoteBody": "Компьютеріңізді қосып, сессияны осы жерден бастаңыз.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Әлі компьютер қосылмаған",
-    "remoteEmptyBody": "Оны қосу үшін компьютеріңізде `kilo remote` пәрменін орындаңыз.",
-    "remoteFound": "Компьютер қосылды",
-    "checkAgain": "Қайта тексеру",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Оқу"
   },
   "appActions": {
     "start": {
@@ -3201,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Соңғы сессияны ашу"
+  },
+  "spendAlerts": {
+    "subtitle": "Осы ауқымның шығысы шектен асып кеткенде немесе әдеттегі сағаттық қарқынынан жоғары көтерілгенде, төлем бойынша байланыстарға электрондық пошта немесе push арқылы ескерту жібер.",
+    "enable": "Шығыс ескертулерін қосу",
+    "thresholdTitle": "Шектен асу",
+    "thresholdSubtitle": "Ағымдағы шығыс шегіңізден асады",
+    "anomalyTitle": "Сағаттық секіріс",
+    "anomalySubtitle": "Бір сағат осы ауқымның әдеттегі қарқынынан әлдеқайда жоғары",
+    "limitLabel": "Шек (USD)",
+    "windowLabel": "Терезе",
+    "window24h": "24 сағат",
+    "window7d": "7 күн",
+    "window30d": "30 күн",
+    "multiplierLabel": "Секіріс көбейткіші",
+    "saved": "Шығыс ескертуінің параметрлері сақталды",
+    "loadError": "Шығыс ескертулері жүктелмеді.",
+    "saveError": "Шығыс ескертулері сақталмады.",
+    "empty": "Шығыс ескертулері өшірулі. Осы ауқымның төлем бойынша байланыстарын ескерту үшін оларды қос.",
+    "noSpend": "Әзірге шығыс тіркелмеген",
+    "spend24h": "Соңғы 24 сағаттағы шығыс",
+    "multiplierError": "1 немесе одан үлкен көбейткіш енгіз",
+    "permissionDenied": "Шығыс ескертулерін басқаруға рұқсатыңыз жоқ.",
+    "pushOffByCategory": "Хабарландыруларда өшірулі"
   }
 }

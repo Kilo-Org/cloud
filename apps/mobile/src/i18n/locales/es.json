@@ -295,7 +295,8 @@
       "chat": "Mensajes de chat",
       "kiloclaw": "Actividad de KiloClaw",
       "balance": "Alertas de saldo",
-      "security": "Hallazgos de seguridad"
+      "security": "Hallazgos de seguridad",
+      "spend": "Alertas de gasto"
     },
     "category": {
       "chatMessagesSubtitle": "respuestas en tus conversaciones",
@@ -306,8 +307,13 @@
       "sessionStatusTitle": "Estado de la sesión",
       "sessionStatusSubtitle": "terminada / fallida / lista para controlar",
       "kiloclawActivitySubtitle": "instancia lista/fallida, acciones programadas",
+      "kiloclawActivityUnavailable": "Inicia una instancia de KiloClaw para recibir actividad de KiloClaw.",
       "balanceAlertsSubtitle": "avisos de saldo bajo de la organización",
-      "securityFindingsSubtitle": "nuevos hallazgos y recordatorios de SLA"
+      "balanceAlertsUnavailable": "Únete a una organización para recibir alertas de saldo bajo.",
+      "securityFindingsSubtitle": "nuevos hallazgos y recordatorios de SLA",
+      "securityFindingsUnavailable": "Activa el agente de seguridad de Kilo en un ámbito para recibir hallazgos de seguridad.",
+      "spendAlertsSubtitle": "superaciones de umbrales y picos por hora",
+      "spendAlertsToggle": "Categoría de alertas de gasto"
     },
     "liveActivities": "Actividades en directo",
     "liveActivitySubtitle": "Mostrar los agentes activos en la pantalla de bloqueo",
@@ -336,7 +342,16 @@
     "previewAlways": "Siempre",
     "previewWhenUnlocked": "Cuando esté desbloqueado",
     "previewFullDescription": "Las notificaciones muestran el texto del mensaje en tu pantalla de bloqueo.",
-    "previewGenericDescription": "Las notificaciones indican que hay novedades, sin mostrar su contenido. Abre Kilo para leerlo."
+    "previewGenericDescription": "Las notificaciones indican que hay novedades, sin mostrar su contenido. Abre Kilo para leerlo.",
+    "action": {
+      "openSession": "Abrir sesión"
+    },
+    "needsInputAction": {
+      "approved": "Solicitud aprobada",
+      "replied": "Respuesta enviada",
+      "failed": "No se pudo responder. Toca de nuevo para reintentarlo.",
+      "unavailable": "Esta solicitud ya no está en espera."
+    }
   },
   "tabs": {
     "home": "Inicio",
@@ -1575,6 +1590,10 @@
       "couldNotLoad": "No se pudo cargar la sesión.",
       "failedToLoadDetails": "No se pudieron cargar los detalles de la sesión.",
       "failedToStopExecution": "No se pudo detener la ejecución.",
+      "stopped": "Sesión detenida",
+      "committing": "Confirmando…",
+      "committed": "Confirmado",
+      "commitFailed": "No se pudo confirmar",
       "renameSession": "Cambiar nombre de la sesión",
       "renamePlaceholder": "Nombre de la sesión",
       "transcriptAccessibility": "Transcripción de la sesión",
@@ -1685,20 +1704,7 @@
       "continueFrom": "Se está continuando la sesión {{title}}.",
       "importingSession": "Importando sesión",
       "cliCannotContinue": "Esta CLI no puede continuar una sesión. Elige Cloud Agent u otra CLI.",
-      "importFailed": "No se pudo importar esta sesión.",
-      "sandbox": "Entorno aislado",
-      "sandboxAccessibility": "Entorno aislado: {{label}}",
-      "sandboxDefaultWithDestination": "Predeterminado · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Pequeño",
-      "sandboxInstanceShared": "Compartido",
-      "sandboxInstanceLarge": "Grande",
-      "sandboxInstanceDevcontainer": "Contenedor de desarrollo",
-      "sandboxInstanceProviderDefault": "Predeterminado del proveedor",
-      "sandboxCouldNotLoad": "No se pudieron cargar las opciones del entorno aislado",
-      "sandboxUnavailable": "Este entorno aislado no está disponible. Elige otro entorno aislado o Predeterminado.",
-      "sandboxUseDefault": "Usar Predeterminado"
+      "importFailed": "No se pudo importar esta sesión."
     },
     "partRenderer": {
       "updatedFileCount_one": "Se ha actualizado {{displayCount}} archivo.",
@@ -1732,7 +1738,8 @@
       "linesBadge_many": "{{displayCount}} líneas",
       "matchesBadge_one": "{{displayCount}} coincidencia",
       "matchesBadge_other": "{{displayCount}} coincidencias",
-      "matchesBadge_many": "{{displayCount}} coincidencias"
+      "matchesBadge_many": "{{displayCount}} coincidencias",
+      "noOutput": "No hay salida."
     },
     "readToolMarkdown": {
       "linesTruncated": "líneas {{start}}–{{end}} (truncadas)",
@@ -3200,7 +3207,10 @@
     "couldNotApprove": "No se pudo aprobar",
     "couldNotStart": "No se pudo iniciar",
     "channelName": "Agentes activos",
-    "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo."
+    "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo.",
+    "openSession": "Abrir",
+    "approveFailed": "No se pudo aprobar. Toca $t(common.approve) para intentarlo de nuevo.",
+    "newestResult": "Resultado más reciente"
   },
   "transcriptionModel": {
     "title": "Modelo de transcripción",
@@ -3225,15 +3235,7 @@
     "remoteOptionTitle": "Tu ordenador",
     "remoteOptionBody": "Ejecuta Kilo en tu propia máquina mediante la CLI `kilo remote`.",
     "skip": "Omitir tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Inicia tu primera sesión remota",
-    "remoteBody": "Conecta tu ordenador y después inicia la sesión desde aquí.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Ningún ordenador conectado todavía",
-    "remoteEmptyBody": "Ejecuta `kilo remote` en tu ordenador para conectarlo.",
-    "remoteFound": "Ordenador conectado",
-    "checkAgain": "Volver a comprobar",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {
@@ -3244,5 +3246,28 @@
   },
   "launcher": {
     "openLastSession": "Abrir última sesión"
+  },
+  "spendAlerts": {
+    "subtitle": "Envía un aviso por correo o notificación push a los contactos de facturación cuando el gasto de este ámbito supere un límite o se dispare por encima de su ritmo horario habitual.",
+    "enable": "Activar las alertas de gasto",
+    "thresholdTitle": "Superación del umbral",
+    "thresholdSubtitle": "El gasto acumulado supera tu límite",
+    "anomalyTitle": "Pico por hora",
+    "anomalySubtitle": "Una hora está muy por encima del ritmo habitual de este ámbito",
+    "limitLabel": "Límite (USD)",
+    "windowLabel": "Ventana",
+    "window24h": "24 horas",
+    "window7d": "7 días",
+    "window30d": "30 días",
+    "multiplierLabel": "Multiplicador del pico",
+    "saved": "Ajustes de alertas de gasto guardados",
+    "loadError": "No se pudieron cargar las alertas de gasto.",
+    "saveError": "No se pudieron guardar las alertas de gasto.",
+    "empty": "Las alertas de gasto están desactivadas. Actívalas para avisar a los contactos de facturación de este ámbito.",
+    "noSpend": "Aún no se ha registrado ningún gasto",
+    "spend24h": "Gasto en las últimas 24 horas",
+    "multiplierError": "Introduce un multiplicador de 1 o más",
+    "permissionDenied": "No tienes permiso para gestionar las alertas de gasto.",
+    "pushOffByCategory": "Desactivado en Notificaciones"
   }
 }

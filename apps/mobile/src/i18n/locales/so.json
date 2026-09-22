@@ -827,7 +827,8 @@
       "chat": "Fariimaha sheekaysiga",
       "kiloclaw": "Hawlaha KiloClaw",
       "balance": "Digniinaha haraaga",
-      "security": "Natiijooyinka amniga"
+      "security": "Natiijooyinka amniga",
+      "spend": "Digniinaha kharashka"
     },
     "category": {
       "chatMessagesSubtitle": "jawaabaha wadahadalladaada",
@@ -838,8 +839,22 @@
       "sessionStatusTitle": "Xaaladda kalfadhiga",
       "sessionStatusSubtitle": "dhammaaday / fashilmay / diyaar u ah in la xakameeyo",
       "kiloclawActivitySubtitle": "nuqul diyaar ah ama fashilmay, ficillo la jadwaleeyay",
+      "kiloclawActivityUnavailable": "Bilow nuqul KiloClaw si aad u hesho hawlaha KiloClaw.",
       "balanceAlertsSubtitle": "digniinaha hadhaaga yar ee ururka",
-      "securityFindingsSubtitle": "natiijooyin cusub iyo xusuusinno SLA"
+      "balanceAlertsUnavailable": "Ku biir urur si aad u hesho digniinaha hadhaaga yar.",
+      "securityFindingsSubtitle": "natiijooyin cusub iyo xusuusinno SLA",
+      "securityFindingsUnavailable": "Shid wakiilka amniga Kilo baaxad si aad u hesho natiijooyinka amniga.",
+      "spendAlertsSubtitle": "dhaafitaanka xadka iyo kor u kaca saacadlaha",
+      "spendAlertsToggle": "Qaybta digniinaha kharashka"
+    },
+    "action": {
+      "openSession": "Fur kalfadhi"
+    },
+    "needsInputAction": {
+      "approved": "Codsiga waa la oggolaaday",
+      "replied": "Jawaabta waa la diray",
+      "failed": "Ma jawaabin karo. Guji mar kale si aad isku daydo.",
+      "unavailable": "Codsigaan hadda ma sugayo."
     }
   },
   "tabs": {
@@ -2067,6 +2082,10 @@
       "couldNotLoad": "Kalfadhiga lama soo shubi karin.",
       "failedToLoadDetails": "Faahfaahinta kalfadhiga lama soo shubi karin.",
       "failedToStopExecution": "Fulinta lama joojin karin.",
+      "stopped": "Kalfadhiga waa la joojiyay",
+      "committing": "Waa la diiwaangelinayaa…",
+      "committed": "Waa la diiwaangeliyay",
+      "commitFailed": "Diiwaangelinta waa fashilantay",
       "renameSession": "Beddel magaca kalfadhiga",
       "renamePlaceholder": "Magaca kalfadhiga",
       "transcriptAccessibility": "Qoraalka kalfadhiga",
@@ -2177,20 +2196,7 @@
       "continueFrom": "Waxaa la sii wadaa {{title}}.",
       "importingSession": "Kalfadhiga waa la soo gelinayaa",
       "cliCannotContinue": "CLI-kan ma sii wadi karo kalfadhi. Dooro Cloud Agent ama CLI kale.",
-      "importFailed": "Kalfadhigan lama soo gelin karin.",
-      "sandbox": "Sandbox",
-      "sandboxAccessibility": "Sandbox: {{label}}",
-      "sandboxDefaultWithDestination": "Caadi · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Yar",
-      "sandboxInstanceShared": "La wadaago",
-      "sandboxInstanceLarge": "Weyn",
-      "sandboxInstanceDevcontainer": "Weelka Dev",
-      "sandboxInstanceProviderDefault": "Caadiga bixiyaha",
-      "sandboxCouldNotLoad": "Lama soo dejin karin xulashooyinka sandbox-ka",
-      "sandboxUnavailable": "Sandbox-kan lama heli karo. Dooro sandbox kale ama Caadi.",
-      "sandboxUseDefault": "Isticmaal Caadi"
+      "importFailed": "Kalfadhigan lama soo gelin karin."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay.",
@@ -2220,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} sadar",
       "linesBadge_other": "{{displayCount}} sadar",
       "matchesBadge_one": "{{displayCount}} natiijo",
-      "matchesBadge_other": "{{displayCount}} natiijo"
+      "matchesBadge_other": "{{displayCount}} natiijo",
+      "noOutput": "Wax soo saar ma jiro."
     },
     "readToolMarkdown": {
       "linesTruncated": "sadarrada {{start}}–{{end}} (la soo gaabiyay)",
@@ -3157,7 +3164,10 @@
     "couldNotApprove": "Lama oggolaan karin",
     "couldNotStart": "Lama bilaabin karin",
     "channelName": "Wakiillada firfircoon",
-    "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka."
+    "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka.",
+    "openSession": "Fur",
+    "approveFailed": "Lama oggolaan karin. Taabo $t(common.approve) si aad mar kale isku daydo.",
+    "newestResult": "Natiijada ugu cusub"
   },
   "transcriptionModel": {
     "title": "Moodeelka qoraal u beddelidda",
@@ -3182,15 +3192,7 @@
     "remoteOptionTitle": "Kombiyuutarkaaga",
     "remoteOptionBody": "Ku socodsii Kilo kombiyuutarkaaga adigoo isticmaalaya CLI-da `kilo remote`.",
     "skip": "Ka bood safarka",
-    "tutorialLabel": "Barasho",
-    "remoteTitle": "Bilow kalfadhigaaga koowaad ee fog",
-    "remoteBody": "Xirir kombiyuutarkaaga, kadibna kalfadhiga ka bilow halkan.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Wali kombiyuutar aan la xidhirin ma jiro",
-    "remoteEmptyBody": "Si aad u xirirto, ku socodsii `kilo remote` kombiyuutarkaaga.",
-    "remoteFound": "Kombiyuutarka la xidhay",
-    "checkAgain": "Mar kale hubi",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Barasho"
   },
   "appActions": {
     "start": {
@@ -3201,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Fur kalfadhigii ugu dambeeyay"
+  },
+  "spendAlerts": {
+    "subtitle": "U dir digniin iimayl ama push xiriirka biilasha marka kharashka goobtan uu dhaafo xad ama uu ka sarreeyo heerka saacadlaha caadiga ah.",
+    "enable": "Daar digniinaha kharashka",
+    "thresholdTitle": "Dhaafitaanka xadka",
+    "thresholdSubtitle": "Kharashka socda ayaa dhaafaya xadkaaga",
+    "anomalyTitle": "Kor u kaca saacadlaha",
+    "anomalySubtitle": "Hal saac aad ayuu uga sarreeyaa heerka caadiga ah ee goobtan",
+    "limitLabel": "Xad (USD)",
+    "windowLabel": "Muddo",
+    "window24h": "24 saac",
+    "window7d": "7 maalmood",
+    "window30d": "30 maalmood",
+    "multiplierLabel": "Isku-dhufashada kor u kaca",
+    "saved": "Dejinta digniinaha kharashka waa la kaydiyay",
+    "loadError": "Digniinaha kharashka lama soo dejin karin.",
+    "saveError": "Digniinaha kharashka lama kaydin karin.",
+    "empty": "Digniinaha kharashka waa damman yihiin. Daar si aad uga digniiso xiriirka biilasha goobtan.",
+    "noSpend": "Weli lama diiwaangelin kharash",
+    "spend24h": "Kharashka 24-kii saacadood ee ugu dambeeyay",
+    "multiplierError": "Geli isku-dhufasho 1 ama ka badan",
+    "permissionDenied": "Ma lihid oggolaansho aad ku maamusho digniinaha kharashka.",
+    "pushOffByCategory": "Waa damman Ogeysiisyada"
   }
 }

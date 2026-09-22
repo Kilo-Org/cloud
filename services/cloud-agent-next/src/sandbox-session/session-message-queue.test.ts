@@ -867,6 +867,33 @@ describe('applyMessageOutcome', () => {
       applyMessageOutcome(next ?? [], { messageId: 'a', status: 'failed' }, 'runtime', 40)
     ).toBeUndefined();
   });
+
+  it('persists a gate result on the terminal record when the outcome carries one', () => {
+    const before = [{ ...msg('a', 'accepted'), wrapperInstanceId: 'runtime' }];
+    const next = applyMessageOutcome(
+      before,
+      { messageId: 'a', status: 'completed', gateResult: 'fail' },
+      'runtime',
+      30
+    );
+    expect(next?.find(message => message.messageId === 'a')).toMatchObject({
+      state: 'completed',
+      gateResult: 'fail',
+    });
+  });
+
+  it('leaves the gate result key absent when the outcome carries none', () => {
+    const before = [{ ...msg('a', 'accepted'), wrapperInstanceId: 'runtime' }];
+    const next = applyMessageOutcome(
+      before,
+      { messageId: 'a', status: 'completed' },
+      'runtime',
+      30
+    );
+    const record = next?.find(message => message.messageId === 'a');
+    expect(record).toBeDefined();
+    expect(record && 'gateResult' in record).toBe(false);
+  });
 });
 
 describe('failQueuedMessage', () => {
@@ -1247,6 +1274,29 @@ function controlDiagnostics(
   return fields.mock.calls
     .map(call => call[0] as Record<string, unknown>)
     .filter(call => call.diagnosticEvent === diagnosticEvent);
+}
+
+function captureCloudAgentReports(
+  fixture: ReturnType<typeof sessionFixture>
+): CloudAgentQueueReport[] {
+  const reports: CloudAgentQueueReport[] = [];
+  (
+    fixture.env as unknown as { CLOUD_AGENT_REPORT_QUEUE: { send: unknown } }
+  ).CLOUD_AGENT_REPORT_QUEUE = {
+    send: async (report: CloudAgentQueueReport) => {
+      reports.push(report);
+    },
+  };
+  return reports;
+}
+
+function failedRunReport(
+  reports: readonly CloudAgentQueueReport[],
+  messageId: string
+): CloudAgentQueueReport['run'] | undefined {
+  return reports.find(
+    report => report.run.messageId === messageId && report.run.status === 'failed'
+  )?.run;
 }
 
 function installModernRuntimeAuthorization(fixture: ReturnType<typeof sessionFixture>) {
@@ -5515,7 +5565,7 @@ describe('SandboxSession orchestration', () => {
           expect(writer.record('writer')?.state).toBe('accepted');
           expect(writer.record('writer')?.lastActivityAt).toBe(progressAt);
           expect(writer.alarmAt()).not.toBeNull();
-          expect(writer.alarmAt()!).toBeLessThanOrEqual(progressAt + DEADLINE_MS.idleStop);
+          expect(writer.alarmAt()!).toBeLessThanOrEqual(progressAt + DEADLINE_MS.kiloInactivity);
           expect(writer.control.quarantineRuntime).not.toHaveBeenCalled();
           expect(writer.terminalEvents()).toHaveLength(0);
           await writer.outcome('writer', 'completed');
@@ -6918,7 +6968,7 @@ describe('SandboxSession orchestration', () => {
     ).toBe(true);
   });
 
-  it('fails a retrying prompt at five minutes without real events and fences the abort', async () => {
+  it('fails a retrying prompt at seven minutes without real events and fences the abort', async () => {
     const fixture = sessionFixture();
     const reports: CloudAgentQueueReport[] = [];
     (
@@ -6950,14 +7000,14 @@ describe('SandboxSession orchestration', () => {
     await fixture.admit('b');
     await fixture.flush();
 
-    vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop - 1);
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity - 1);
     await fixture.fireAlarm();
     expect(fixture.record('a')?.state).toBe('accepted');
     // The next wake must be at or before the due bound, not a past 90s
     // threshold that already elapsed.
-    expect(fixture.alarmAt()).toBe(acceptedAt + DEADLINE_MS.idleStop);
+    expect(fixture.alarmAt()).toBe(acceptedAt + DEADLINE_MS.kiloInactivity);
 
-    vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop);
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
     await fixture.fireAlarm();
     await fixture.flush();
 
@@ -6986,6 +7036,178 @@ describe('SandboxSession orchestration', () => {
     });
   });
 
+  it('classifies a live wrapper outcome carrying bounded assistant facts', async () => {
+    const fixture = sessionFixture();
+    const reports = captureCloudAgentReports(fixture);
+    await fixture.admit('a');
+    await fixture.flush();
+    // The default fixture has no operation-results capability, so the prompt is
+    // dispatched without an operation proof and the live outcome is accepted.
+    expect(fixture.record('a')?.operations?.prompt).toBeUndefined();
+
+    await fixture.rawEvent('session.message.outcome', {
+      messageId: 'a',
+      status: 'failed',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'unknown',
+    });
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      terminalSource: 'wrapper_outcome',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'unknown',
+    });
+    expect(failedRunReport(reports, 'a')).toMatchObject({
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      failureResponsibility: 'provider',
+      failureReason: 'rate_limited',
+    });
+  });
+
+  it('attributes a live wrapper outcome to the user for insufficient credits', async () => {
+    const fixture = sessionFixture();
+    const reports = captureCloudAgentReports(fixture);
+    await fixture.admit('a');
+    await fixture.flush();
+    // The default fixture has no operation-results capability, so the prompt is
+    // dispatched without an operation proof and the live outcome is accepted.
+    expect(fixture.record('a')?.operations?.prompt).toBeUndefined();
+
+    await fixture.rawEvent('session.message.outcome', {
+      messageId: 'a',
+      status: 'failed',
+      assistantReason: 'insufficient_credits',
+      providerOwnership: 'unknown',
+    });
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      terminalSource: 'wrapper_outcome',
+      assistantReason: 'insufficient_credits',
+      providerOwnership: 'unknown',
+    });
+    expect(failedRunReport(reports, 'a')).toMatchObject({
+      failureStage: 'agent_activity',
+      failureCode: 'payment_required',
+      failureResponsibility: 'user',
+      failureReason: 'insufficient_credits',
+    });
+  });
+
+  it('classifies a nested operation-result outcome carrying bounded assistant facts', async () => {
+    const fixture = sessionFixture();
+    const reports = captureCloudAgentReports(fixture);
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    const authorization = fixture.record('a')?.operations?.prompt?.authorization;
+    if (!authorization) throw new Error('Missing prompt operation authorization');
+    const completedAt = authorization.dispatchDeadlineAt + 1;
+    const delivery: SessionOperationDelivery = {
+      version: 2,
+      authorization,
+      completedAt,
+      result: { ok: true, result: { messageId: 'a', status: 'accepted' } },
+      outcome: {
+        messageId: 'a',
+        status: 'failed',
+        assistantReason: 'rate_limited',
+        providerOwnership: 'unknown',
+      },
+      events: [],
+      preparing: [],
+    };
+    delegateRequest(fixture, 'session.operation.get', async input => {
+      expect(input).toMatchObject({
+        expectedWrapperInstanceId: RUNTIME_ID,
+        payload: authorization,
+      });
+      return controlResponse({ state: 'completed', delivery });
+    });
+    delegateRequest(fixture, 'session.operation.ack', async () =>
+      controlResponse({ acknowledged: true })
+    );
+
+    vi.setSystemTime(authorization.dispatchDeadlineAt + 1);
+    fixture.reload();
+    await fixture.fireAlarm();
+    await fixture.flush();
+    // The report obligation recorded by the operation-result commit is enqueued
+    // after this alarm's repair pass, so a second wake delivers it.
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      terminalSource: 'operation_result',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'unknown',
+    });
+    expect(failedRunReport(reports, 'a')).toMatchObject({
+      failureStage: 'agent_activity',
+      failureCode: 'assistant_error',
+      failureResponsibility: 'provider',
+      failureReason: 'rate_limited',
+    });
+  });
+
+  it('does not treat a coordinator token sent as wrapper text as a coordinator cause', async () => {
+    const fixture = sessionFixture();
+    const reports = captureCloudAgentReports(fixture);
+    await fixture.admit('a');
+    await fixture.flush();
+
+    await fixture.rawEvent('session.message.outcome', {
+      messageId: 'a',
+      status: 'failed',
+      reason: 'kilo_unhealthy',
+    });
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')?.terminalSource).toBe('wrapper_outcome');
+    expect(failedRunReport(reports, 'a')).toMatchObject({
+      failureStage: 'unknown',
+      failureCode: 'unclassified',
+      failureResponsibility: 'unknown',
+      failureReason: 'unclassified',
+    });
+  });
+
+  it('keeps arbitrary wrapper text unclassified', async () => {
+    const fixture = sessionFixture();
+    const reports = captureCloudAgentReports(fixture);
+    await fixture.admit('a');
+    await fixture.flush();
+
+    await fixture.rawEvent('session.message.outcome', {
+      messageId: 'a',
+      status: 'failed',
+      reason: 'some wrapper text',
+    });
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.record('a')?.terminalSource).toBe('wrapper_outcome');
+    expect(failedRunReport(reports, 'a')).toMatchObject({
+      failureStage: 'unknown',
+      failureCode: 'unclassified',
+      failureResponsibility: 'unknown',
+      failureReason: 'unclassified',
+    });
+  });
+
   it('keeps the turn alive when a real event lands during a deferred sync', async () => {
     const fixture = sessionFixture();
     const sync = deferred<ResponseFrame>();
@@ -6995,7 +7217,7 @@ describe('SandboxSession orchestration', () => {
     const acceptedAt = fixture.record('a')?.acceptedAt;
     if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
 
-    vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop);
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
     const alarm = fixture.fireAlarm();
     await vi.advanceTimersByTimeAsync(0);
     // Real progress arrives while the health check is awaiting its sync.
@@ -7047,9 +7269,9 @@ describe('SandboxSession orchestration', () => {
       // The watchdog must survive for the still-accepted turn.
       expect(fixture.record('a')?.state).toBe('accepted');
       expect(fixture.alarmAt()).not.toBeNull();
-      expect(fixture.alarmAt()!).toBeLessThanOrEqual(acceptedAt + DEADLINE_MS.idleStop);
+      expect(fixture.alarmAt()!).toBeLessThanOrEqual(acceptedAt + DEADLINE_MS.kiloInactivity);
 
-      vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop);
+      vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
       await fixture.fireAlarm();
       await fixture.flush();
       expect(fixture.record('a')).toMatchObject({
@@ -7077,7 +7299,7 @@ describe('SandboxSession orchestration', () => {
       return null;
     });
 
-    vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop);
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
     const alarm = fixture.fireAlarm();
     await entered.promise;
     // The failure is already persisted and the follow-up arm is in flight.
@@ -7115,7 +7337,7 @@ describe('SandboxSession orchestration', () => {
     const acceptedAt = fixture.record('a')?.acceptedAt;
     if (acceptedAt === undefined) throw new Error('Missing accepted timestamp');
 
-    vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop);
+    vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
     await fixture.fireAlarm();
     expect(fixture.record('a')).toMatchObject({
       state: 'failed',
@@ -7175,12 +7397,12 @@ describe('SandboxSession orchestration', () => {
       expect(fixture.record('a')?.state).toBe('accepted');
       expect(fixture.record('b')?.state).toBe('queued');
       expect(fixture.alarmAt()).toBe(
-        Math.min(Date.now() + DEADLINE_MS.acceptedAlarmCap, acceptedAt + DEADLINE_MS.idleStop)
+        Math.min(Date.now() + DEADLINE_MS.acceptedAlarmCap, acceptedAt + DEADLINE_MS.kiloInactivity)
       );
       expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
 
-      // Five minutes with no real event: the snapshot cannot keep it alive.
-      vi.setSystemTime(acceptedAt + DEADLINE_MS.idleStop);
+      // Seven minutes with no real event: the snapshot cannot keep it alive.
+      vi.setSystemTime(acceptedAt + DEADLINE_MS.kiloInactivity);
       await fixture.fireAlarm();
       expect(fixture.record('a')).toMatchObject({
         state: 'failed',

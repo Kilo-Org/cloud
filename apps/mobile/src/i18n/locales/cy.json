@@ -891,7 +891,8 @@
       "chat": "Negeseuon sgwrs",
       "kiloclaw": "Gweithgaredd KiloClaw",
       "balance": "Rhybuddion balans",
-      "security": "Canfyddiadau diogelwch"
+      "security": "Canfyddiadau diogelwch",
+      "spend": "Rhybuddion gwariant"
     },
     "category": {
       "chatMessagesSubtitle": "atebion yn eich sgyrsiau",
@@ -902,8 +903,22 @@
       "sessionStatusTitle": "Statws sesiwn",
       "sessionStatusSubtitle": "wedi gorffen / wedi methu / yn barod i'w reoli",
       "kiloclawActivitySubtitle": "enghraifft yn barod neu wedi methu, gweithredoedd wedi'u hamserlennu",
+      "kiloclawActivityUnavailable": "Dechreuwch enghraifft KiloClaw i gael gweithgaredd KiloClaw.",
       "balanceAlertsSubtitle": "rhybuddion am falans isel y sefydliad",
-      "securityFindingsSubtitle": "canfyddiadau newydd a nodiadau atgoffa SLA"
+      "balanceAlertsUnavailable": "Ymunwch â sefydliad i gael rhybuddion balans isel.",
+      "securityFindingsSubtitle": "canfyddiadau newydd a nodiadau atgoffa SLA",
+      "securityFindingsUnavailable": "Galluogwch asiant diogelwch Kilo ar gwmpas i gael canfyddiadau diogelwch.",
+      "spendAlertsSubtitle": "croesi trothwyon a sbigau bob awr",
+      "spendAlertsToggle": "Categori rhybuddion gwariant"
+    },
+    "action": {
+      "openSession": "Agor y sesiwn"
+    },
+    "needsInputAction": {
+      "approved": "Cais wedi’i gymeradwyo",
+      "replied": "Anfonwyd yr ymateb",
+      "failed": "Methwyd ag ateb. Tapwch eto i roi cynnig arall.",
+      "unavailable": "Nid yw’r cais hwn yn aros mwyach."
     }
   },
   "tabs": {
@@ -2179,6 +2194,10 @@
       "couldNotLoad": "Methu llwytho'r sesiwn.",
       "failedToLoadDetails": "Methu llwytho manylion y sesiwn.",
       "failedToStopExecution": "Methu atal y gweithrediad.",
+      "stopped": "Atalwyd y sesiwn",
+      "committing": "Yn cyflwyno…",
+      "committed": "Wedi cyflwyno",
+      "commitFailed": "Methodd cyflwyno",
       "renameSession": "Ailenwi sesiwn",
       "renamePlaceholder": "Enw sesiwn",
       "transcriptAccessibility": "Trawsgrifiad sesiwn",
@@ -2289,20 +2308,7 @@
       "continueFrom": "Yn parhau â {{title}}.",
       "importingSession": "Yn mewnforio sesiwn",
       "cliCannotContinue": "Ni all y CLI hwn barhau â sesiwn. Dewiswch Cloud Agent neu CLI arall.",
-      "importFailed": "Methu mewnforio'r sesiwn hon.",
-      "sandbox": "Bocs tywod",
-      "sandboxAccessibility": "Bocs tywod: {{label}}",
-      "sandboxDefaultWithDestination": "Rhagosodedig · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Bach",
-      "sandboxInstanceShared": "Rhannu",
-      "sandboxInstanceLarge": "Mawr",
-      "sandboxInstanceDevcontainer": "Cynhwysydd datblygu",
-      "sandboxInstanceProviderDefault": "Rhagosodedig y darparwr",
-      "sandboxCouldNotLoad": "Methwyd â llwytho opsiynau'r bocs tywod",
-      "sandboxUnavailable": "Nid yw'r bocs tywod hwn ar gael. Dewiswch focs tywod arall neu Rhagosodedig.",
-      "sandboxUseDefault": "Defnyddio Rhagosodedig"
+      "importFailed": "Methu mewnforio'r sesiwn hon."
     },
     "partRenderer": {
       "updatedFileCount_one": "Diweddarwyd {{displayCount}} ffeil.",
@@ -2348,7 +2354,8 @@
       "matchesBadge_zero": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_two": "{{displayCount}} cyfatebiaeth",
       "matchesBadge_few": "{{displayCount}} cyfatebiaeth",
-      "matchesBadge_many": "{{displayCount}} cyfatebiaeth"
+      "matchesBadge_many": "{{displayCount}} cyfatebiaeth",
+      "noOutput": "Dim allbwn."
     },
     "readToolMarkdown": {
       "linesTruncated": "llinellau {{start}}–{{end}} (wedi'u cwtogi)",
@@ -3329,7 +3336,10 @@
     "couldNotApprove": "Methwyd cymeradwyo",
     "couldNotStart": "Methwyd dechrau",
     "channelName": "Asiantau gweithredol",
-    "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo."
+    "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo.",
+    "openSession": "Agor",
+    "approveFailed": "Methu cymeradwyo. Tapiwch $t(common.approve) i geisio eto.",
+    "newestResult": "Canlyniad diweddaraf"
   },
   "transcriptionModel": {
     "title": "Model trawsgrifio",
@@ -3354,15 +3364,7 @@
     "remoteOptionTitle": "Eich cyfrifiadur",
     "remoteOptionBody": "Rhedwch Kilo ar eich peiriant eich hun drwy'r CLI `kilo remote`.",
     "skip": "Hepgor y daith",
-    "tutorialLabel": "Tiwtorial",
-    "remoteTitle": "Dechreuwch eich sesiwn hirhoedlog gyntaf",
-    "remoteBody": "Cysylltwch eich cyfrifiadur, yna dechreuwch y sesiwn o'r fan hon.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Dim cyfrifiadur wedi'i gysylltu eto",
-    "remoteEmptyBody": "I'w gysylltu, rhedwch `kilo remote` ar eich cyfrifiadur.",
-    "remoteFound": "Cyfrifiadur wedi'i gysylltu",
-    "checkAgain": "Gwirio eto",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tiwtorial"
   },
   "appActions": {
     "start": {
@@ -3373,5 +3375,28 @@
   },
   "launcher": {
     "openLastSession": "Agor y sesiwn ddiwethaf"
+  },
+  "spendAlerts": {
+    "subtitle": "Anfon rhybudd drwy e-bost neu wthiad at y cysylltiadau bilio pan fo gwariant y cwmpas hwn yn croesi terfyn neu'n codi uwchlaw ei gyfradd awr arferol.",
+    "enable": "Galluogi rhybuddion gwariant",
+    "thresholdTitle": "Croesi trothwy",
+    "thresholdSubtitle": "Mae gwariant crynodedig yn croesi dy derfyn",
+    "anomalyTitle": "Sbig awr",
+    "anomalySubtitle": "Mae awr ymhell uwchlaw cyfradd arferol y cwmpas hwn",
+    "limitLabel": "Terfyn (USD)",
+    "windowLabel": "Ffenestr",
+    "window24h": "24 awr",
+    "window7d": "7 diwrnod",
+    "window30d": "30 diwrnod",
+    "multiplierLabel": "Lluosydd y sbig",
+    "saved": "Wedi cadw gosodiadau rhybuddion gwariant",
+    "loadError": "Methwyd llwytho rhybuddion gwariant.",
+    "saveError": "Methwyd cadw rhybuddion gwariant.",
+    "empty": "Mae rhybuddion gwariant i ffwrdd. Tro nhw ymlaen i rybuddio cysylltiadau bilio'r cwmpas hwn.",
+    "noSpend": "Dim gwariant wedi'i gofnodi eto",
+    "spend24h": "Gwariant yn y 24 awr diwethaf",
+    "multiplierError": "Nodwch luosydd o 1 neu fwy",
+    "permissionDenied": "Nid oes gennyt ganiatâd i reoli rhybuddion gwariant.",
+    "pushOffByCategory": "I ffwrdd yn Hysbysiadau"
   }
 }

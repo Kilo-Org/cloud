@@ -130,15 +130,15 @@ const errorFieldsSchema = z.object({
 export function classifyPasskeyError(error: unknown): PasskeyFailure {
   const fields = errorFieldsSchema.safeParse(error);
   const text = fields.success
-    ? [fields.data.name, fields.data.message, fields.data.code].join(' ').toLocaleLowerCase()
+    ? [fields.data.name, fields.data.message, fields.data.code].join(' ')
     : '';
-  if (text.includes('cancel')) {
+  if (/cancel/i.test(text)) {
     return 'cancelled';
   }
-  if (text.includes('nocredential') || text.includes('notallowed')) {
+  if (/nocredential|notallowed/i.test(text)) {
     return 'no-passkey';
   }
-  if (text.includes('notsupported') || text.includes('notconfigured')) {
+  if (/notsupported|notconfigured/i.test(text)) {
     return 'unsupported';
   }
   return 'failed';

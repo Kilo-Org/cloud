@@ -1,4 +1,6 @@
+/* eslint-disable max-lines -- DOM-free React Native hook integration; the combined/live refresh matrix exceeds the default line limit */
 import { act } from '@/test/renderer';
+import { onlineManager } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
@@ -136,6 +138,7 @@ afterEach(async () => {
   latest = undefined;
   live = undefined;
   setSignOutActive(false);
+  onlineManager.setOnline(true);
 });
 async function refreshLive() {
   let accepted = false;
@@ -169,6 +172,18 @@ describe('combined and live refresh callers', () => {
     expect(await refreshLive()).toBe(true);
     expect(live?.activeSessions).toEqual([]);
     expect(client.getQueryData(otherKey)).toEqual(other);
+  });
+
+  it('exposes a paused active query so callers can treat liveness as unresolved', async () => {
+    // Offline with no active rows: React Query pauses the live lookup, so it is
+    // neither loading nor errored. The gate needs this flag to offer a retry
+    // instead of a settled empty state.
+    client.removeQueries({ queryKey: QUERY_KEY });
+    onlineManager.setOnline(false);
+    await render();
+    expect(combined().activeIsPaused).toBe(true);
+    expect(combined().activeIsError).toBe(false);
+    expect(combined().activeSessions).toEqual([]);
   });
 
   it('uses the live fallback after a handled owner failure', async () => {

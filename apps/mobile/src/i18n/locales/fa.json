@@ -827,7 +827,8 @@
       "chat": "پیام‌های گفت‌وگو",
       "kiloclaw": "فعالیت KiloClaw",
       "balance": "هشدارهای موجودی",
-      "security": "یافته‌های امنیتی"
+      "security": "یافته‌های امنیتی",
+      "spend": "هشدارهای هزینه"
     },
     "category": {
       "chatMessagesSubtitle": "پاسخ‌های گفت‌وگوهای شما",
@@ -838,8 +839,22 @@
       "sessionStatusTitle": "وضعیت نشست",
       "sessionStatusSubtitle": "تمام‌شده / ناموفق / آمادهٔ کنترل",
       "kiloclawActivitySubtitle": "نمونه آماده/ناموفق، اقدامات زمان‌بندی‌شده",
+      "kiloclawActivityUnavailable": "برای دریافت فعالیت KiloClaw، یک نمونه KiloClaw راه‌اندازی کنید.",
       "balanceAlertsSubtitle": "هشدارهای موجودی کم سازمان",
-      "securityFindingsSubtitle": "یافته‌های جدید و یادآوری‌های SLA"
+      "balanceAlertsUnavailable": "برای دریافت هشدارهای موجودی کم، به یک سازمان بپیوندید.",
+      "securityFindingsSubtitle": "یافته‌های جدید و یادآوری‌های SLA",
+      "securityFindingsUnavailable": "برای دریافت یافته‌های امنیتی، عامل امنیتی Kilo را در یک محدوده فعال کنید.",
+      "spendAlertsSubtitle": "عبور از آستانه‌ها و جهش‌های ساعتی",
+      "spendAlertsToggle": "دستهٔ هشدارهای هزینه"
+    },
+    "action": {
+      "openSession": "باز کردن نشست"
+    },
+    "needsInputAction": {
+      "approved": "درخواست تأیید شد",
+      "replied": "پاسخ ارسال شد",
+      "failed": "پاسخ دادن ممکن نشد. برای تلاش دوباره دوباره ضربه بزنید.",
+      "unavailable": "این درخواست دیگر در انتظار نیست."
     }
   },
   "tabs": {
@@ -2067,6 +2082,10 @@
       "couldNotLoad": "بارگذاری نشست ممکن نشد.",
       "failedToLoadDetails": "بارگذاری جزئیات نشست ممکن نشد.",
       "failedToStopExecution": "توقف اجرا ممکن نشد.",
+      "stopped": "نشست متوقف شد",
+      "committing": "در حال کامیت…",
+      "committed": "کامیت شد",
+      "commitFailed": "کامیت ناموفق بود",
       "renameSession": "تغییر نام نشست",
       "renamePlaceholder": "نام نشست",
       "transcriptAccessibility": "متن گفت‌وگوی نشست",
@@ -2177,20 +2196,7 @@
       "continueFrom": "نشست {{title}} را ادامه می‌دهید.",
       "importingSession": "در حال وارد کردن نشست",
       "cliCannotContinue": "این CLI نمی‌تواند یک نشست را ادامه دهد. Cloud Agent یا CLI دیگری را انتخاب کنید.",
-      "importFailed": "وارد کردن این نشست ممکن نشد.",
-      "sandbox": "سندباکس",
-      "sandboxAccessibility": "سندباکس: {{label}}",
-      "sandboxDefaultWithDestination": "پیش‌فرض · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "کوچک",
-      "sandboxInstanceShared": "اشتراکی",
-      "sandboxInstanceLarge": "بزرگ",
-      "sandboxInstanceDevcontainer": "کانتینر توسعه",
-      "sandboxInstanceProviderDefault": "پیش‌فرض ارائه‌دهنده",
-      "sandboxCouldNotLoad": "بارگیری گزینه‌های سندباکس ممکن نشد",
-      "sandboxUnavailable": "این سندباکس در دسترس نیست. سندباکس دیگری یا پیش‌فرض را انتخاب کنید.",
-      "sandboxUseDefault": "استفاده از پیش‌فرض"
+      "importFailed": "وارد کردن این نشست ممکن نشد."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل به‌روزرسانی شد.",
@@ -2220,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} خط",
       "linesBadge_other": "{{displayCount}} خط",
       "matchesBadge_one": "{{displayCount}} تطابق",
-      "matchesBadge_other": "{{displayCount}} تطابق"
+      "matchesBadge_other": "{{displayCount}} تطابق",
+      "noOutput": "هیچ خروجی وجود ندارد."
     },
     "readToolMarkdown": {
       "linesTruncated": "خطوط {{start}}–{{end}} (نمایش ناقص)",
@@ -3157,7 +3164,10 @@
     "couldNotApprove": "تأیید نشد",
     "couldNotStart": "شروع نشد",
     "channelName": "عامل‌های فعال",
-    "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید."
+    "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید.",
+    "openSession": "باز کن",
+    "approveFailed": "تأیید ممکن نشد. برای تلاش دوباره روی $t(common.approve) ضربه بزنید.",
+    "newestResult": "جدیدترین نتیجه"
   },
   "transcriptionModel": {
     "title": "مدل تبدیل گفتار به متن",
@@ -3182,15 +3192,7 @@
     "remoteOptionTitle": "رایانهٔ شما",
     "remoteOptionBody": "Kilo را با دستور `kilo remote` روی ماشین خودتان اجرا کنید.",
     "skip": "رد کردن تور",
-    "tutorialLabel": "آموزش",
-    "remoteTitle": "نخستین نشست راه دور خود را شروع کنید",
-    "remoteBody": "رایانهٔ خود را متصل کنید، سپس نشست را از همین‌جا شروع کنید.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "هنوز رایانه‌ای متصل نشده است",
-    "remoteEmptyBody": "برای اتصال آن، دستور `kilo remote` را روی رایانهٔ خود اجرا کنید.",
-    "remoteFound": "رایانه متصل شد",
-    "checkAgain": "دوباره بررسی کنید",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "آموزش"
   },
   "appActions": {
     "start": {
@@ -3201,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "باز کردن آخرین نشست"
+  },
+  "spendAlerts": {
+    "subtitle": "وقتی هزینهٔ این حوزه از حدی فراتر می‌رود یا از نرخ ساعتی معمول آن بالاتر می‌جهد، هشداری را با ایمیل یا نوتیفیکیشن برای مخاطبان صورتحساب بفرست.",
+    "enable": "فعال‌سازی هشدارهای هزینه",
+    "thresholdTitle": "عبور از آستانه",
+    "thresholdSubtitle": "هزینهٔ جاری از حد شما فراتر می‌رود",
+    "anomalyTitle": "جهش ساعتی",
+    "anomalySubtitle": "یک ساعت بسیار بالاتر از نرخ معمول این حوزه است",
+    "limitLabel": "حد (USD)",
+    "windowLabel": "بازهٔ زمانی",
+    "window24h": "۲۴ ساعت",
+    "window7d": "۷ روز",
+    "window30d": "۳۰ روز",
+    "multiplierLabel": "ضریب جهش",
+    "saved": "تنظیمات هشدار هزینه ذخیره شد",
+    "loadError": "هشدارهای هزینه بارگذاری نشد.",
+    "saveError": "هشدارهای هزینه ذخیره نشد.",
+    "empty": "هشدارهای هزینه خاموش است. برای هشدار دادن به مخاطبان صورتحساب این حوزه آن‌ها را روشن کن.",
+    "noSpend": "هنوز هیچ هزینه‌ای ثبت نشده است",
+    "spend24h": "هزینه در ۲۴ ساعت گذشته",
+    "multiplierError": "ضریبی برابر ۱ یا بیشتر وارد کن",
+    "permissionDenied": "شما اجازهٔ مدیریت هشدارهای هزینه را ندارید.",
+    "pushOffByCategory": "در اعلان‌ها خاموش"
   }
 }

@@ -18,13 +18,17 @@ import {
   type GlanceableSink,
   type GlanceableSinkContext,
 } from '@/lib/glanceable/sink-registry';
-import type * as NotificationsModule from '@/lib/notifications';
+import { getWaitingAsk } from '@/lib/glanceable/waiting-ask';
 
+import { getActionNotice, pruneActionNotice, setGlanceableActionNotice } from './action-notice';
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
-import { formatGlanceableCount, isWidgetRtl } from './count-format';
+import { formatGlanceableAgo, formatGlanceableCount, isWidgetRtl } from './count-format';
+import { ensureAndroidNotificationChannels } from './ensure-notification-channels';
 import {
+  buildNotificationActions,
   end as endLiveUpdate,
   getPostedNotificationChannel,
+  getStoredWidgetSnapshot,
   setWidgetSnapshot,
   start as startLiveUpdate,
   update as updateLiveUpdate,
@@ -33,11 +37,14 @@ import { isNotificationPermissionGranted } from './permission';
 import { showAndroidPermissionAlertOnce } from './permission-alert';
 import {
   type AndroidWidgetProps,
-  buildApproveLabel,
   buildCompactNotificationText,
   buildCurrentWidgetProps,
   buildOngoingNotificationText,
 } from './widget-props';
+
+// Re-exported because the approve task and the widget suite import it from the
+// sink; the notice state itself now lives in `./action-notice`.
+export { setGlanceableActionNotice };
 
 /**
  * Android owns the widget expiry and notification timeout. The sink supplies
@@ -45,29 +52,9 @@ import {
  * Ending the ongoing notification never cancels a still-eligible widget expiry.
  */
 const NOTIFICATION_TITLE_KEY = 'glanceable.channelName';
-const OPEN_AGENTS_LABEL_KEY = 'glanceable.openAgents';
 
 function translate(key: string): string {
   return i18n.t(key);
-}
-
-/**
- * Create the Android channels before the first post, lazily. `@/lib/notifications`
- * pulls the native notifications graph (expo-notifications → expo-constants),
- * and the importers of this module — the widget / Live-Update headless entry and
- * the pure widget suite — must not load it. The reverse direction already
- * lazy-requires the platform sink registrations (see
- * `ensureGlanceableSinksLoaded`), so this keeps one rule.
- *
- * The dynamic import is memoized so concurrent starts share one load, matching
- * the drafts / encrypted-kv pattern.
- */
-let notificationsModule: Promise<typeof NotificationsModule> | null = null;
-
-async function ensureAndroidNotificationChannels(): Promise<void> {
-  notificationsModule ??= import('@/lib/notifications');
-  const { ensureAndroidNotificationChannels: ensureChannels } = await notificationsModule;
-  await ensureChannels();
 }
 
 let lastWidgetSnapshot: GlanceableAgentsSnapshot | null = null;
@@ -91,6 +78,18 @@ let pending: {
 let startEpoch = 0;
 let terminalExpiresAt: number | null = null;
 
+/** The ongoing notification line, carrying the pending notice when one waits. */
+function notificationText(snapshot: GlanceableAgentsSnapshot): string {
+  pruneActionNotice(snapshot);
+  return buildOngoingNotificationText(
+    snapshot,
+    {},
+    translate,
+    formatGlanceableCount,
+    getActionNotice()
+  );
+}
+
 /**
  * A needs-input card is the kind that asks the user a question, so its first
  * entry alerts; a progress card is a silent status update, and a later update
@@ -100,11 +99,51 @@ function shouldAlert(kind: AgentNotificationKind): boolean {
   return kind === 'needs-input' && notificationKind !== 'needs-input';
 }
 
+/** Keep action fields and kind bookkeeping identical on every native post path. */
+function postNotification(
+  snapshot: GlanceableAgentsSnapshot,
+  method: 'start' | 'update',
+  terminalText?: string
+): void {
+  const actions = buildNotificationActions(getWaitingAsk(), translate);
+  const kind = agentNotificationKindForGlanceableSnapshot(snapshot);
+  const args = [
+    translate(NOTIFICATION_TITLE_KEY),
+    terminalText ?? notificationText(snapshot),
+    actions.openLabel,
+    actions.openUrl,
+    // A terminal card has nothing to answer, even if a background delivery left
+    // an ask recorded. Open remains the route back; Approve must disappear.
+    terminalText === undefined ? actions.approveLabel : null,
+    terminalText === undefined
+      ? buildCompactNotificationText(snapshot, {}, formatGlanceableCount)
+      : null,
+    androidChannelIdForAgentKind(kind),
+    shouldAlert(kind),
+  ] as const;
+  if (method === 'start') {
+    startLiveUpdate(...args);
+  } else {
+    const timeoutMs =
+      terminalText === undefined || terminalExpiresAt === null
+        ? 0
+        : Math.max(1, terminalExpiresAt - Date.now());
+    updateLiveUpdate(...args, timeoutMs);
+  }
+  notificationKind = kind;
+  revision = snapshot.revision;
+}
+
 /** A delayed render must check the current snapshot and its deadline, not cached props. */
 export function getCurrentWidgetProps(): AndroidWidgetProps | null {
   return lastWidgetSnapshot === null
     ? null
-    : buildCurrentWidgetProps(lastWidgetSnapshot, translate, formatGlanceableCount);
+    : buildCurrentWidgetProps(
+        lastWidgetSnapshot,
+        translate,
+        formatGlanceableCount,
+        formatGlanceableAgo
+      );
 }
 
 function renderWidgetNow(props: AndroidWidgetProps): void {
@@ -130,11 +169,6 @@ function hasCurrentWork(snapshot: GlanceableAgentsSnapshot): boolean {
   );
 }
 
-/** The Approve action label for this snapshot, or null when there is none. */
-function approveLabelFor(snapshot: GlanceableAgentsSnapshot): string | null {
-  return buildApproveLabel(snapshot, translate);
-}
-
 function endNotification(): void {
   endLiveUpdate();
   notificationActive = false;
@@ -148,95 +182,91 @@ function endNotification(): void {
 /**
  * Start the ongoing notification once permission is granted. Permission-denied
  * emits record the latest eligible snapshot so a later gesture can restart it.
+ *
+ * `carryNotice` marks the stored-notice render (`renderStoredSnapshotWithNotice`),
+ * which must reach a card still in the shade even after the snapshot's
+ * `expiresAt`: an eligible card is posted ongoing with no native deadline, so its
+ * Approve can be tapped past the expiry, and the failure line that tap draws must
+ * not be gated on `hasCurrentWork`.
  */
 async function tryStartOrUpdate(
   snapshot: GlanceableAgentsSnapshot,
-  ctx: GlanceableSinkContext
+  ctx: GlanceableSinkContext,
+  options: { carryNotice?: boolean } = {}
 ): Promise<void> {
+  const carryNotice = options.carryNotice === true;
   // The in-app switch is checked first: it is the one the user set here, and
   // honoring it costs no native call. The notification permission still decides
   // the rest. The widget is deliberately not gated — placing one is the opt-in.
-  if (!getLiveActivityEnabled() || !hasCurrentWork(snapshot)) {
+  if (!getLiveActivityEnabled() || (!carryNotice && !hasCurrentWork(snapshot))) {
     pending = null;
     return;
   }
-  if (notificationActive && snapshot.revision <= revision) {
+  // A pending notice must reach the surface even when the counts did not
+  // change: it is the only carrier of the retryable failure, and the republish
+  // that carries it can arrive with the same counts (or not arrive at all).
+  if (notificationActive && snapshot.revision <= revision && getActionNotice() === null) {
     return;
   }
-  const title = translate(NOTIFICATION_TITLE_KEY);
-  const text = buildOngoingNotificationText(snapshot, {}, translate, formatGlanceableCount);
-  const openAgentsLabel = translate(OPEN_AGENTS_LABEL_KEY);
-  const approveLabel = approveLabelFor(snapshot);
-  const compactText = buildCompactNotificationText(snapshot, {}, formatGlanceableCount);
-  // The card's kind decides the channel the user can silence and whether this
-  // entry alerts; progress stays on the silent status channel.
-  const kind = agentNotificationKindForGlanceableSnapshot(snapshot);
-  const channelId = androidChannelIdForAgentKind(kind);
-
   if (notificationActive) {
-    updateLiveUpdate(
-      title,
-      text,
-      openAgentsLabel,
-      approveLabel,
-      compactText,
-      channelId,
-      shouldAlert(kind)
-    );
-    notificationKind = kind;
+    postNotification(snapshot, 'update');
     terminalExpiresAt = null;
-    revision = snapshot.revision;
     return;
   }
 
   const epoch = startEpoch;
   const granted = await isNotificationPermissionGranted();
-  if (epoch !== startEpoch || !hasCurrentWork(snapshot)) {
+  if (epoch !== startEpoch || (!carryNotice && !hasCurrentWork(snapshot))) {
     return;
   }
   if (granted) {
     // Android 8+ drops a post whose channel does not exist yet, and the JS side
     // owns channel creation, so the channel is ensured before the first start.
     await ensureAndroidNotificationChannels();
-    if (epoch !== startEpoch || !hasCurrentWork(snapshot)) {
+    if (epoch !== startEpoch || (!carryNotice && !hasCurrentWork(snapshot))) {
       return;
     }
     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- a concurrent start/retry can set notificationActive while awaiting permission
     if (notificationActive) {
       if (snapshot.revision > revision) {
-        updateLiveUpdate(
-          title,
-          text,
-          openAgentsLabel,
-          approveLabel,
-          compactText,
-          channelId,
-          shouldAlert(kind)
-        );
-        notificationKind = kind;
+        postNotification(snapshot, 'update');
         terminalExpiresAt = null;
-        revision = snapshot.revision;
       }
       return;
     }
-    startLiveUpdate(
-      title,
-      text,
-      openAgentsLabel,
-      approveLabel,
-      compactText,
-      channelId,
-      shouldAlert(kind)
-    );
-    notificationKind = kind;
+    postNotification(snapshot, 'start');
     notificationActive = true;
     terminalExpiresAt = null;
-    revision = snapshot.revision;
     pending = null;
     getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId);
     return;
   }
   pending = { snapshot, ctx };
+}
+
+/**
+ * Re-render the surface the app last published, read back from Android's own
+ * storage, so a headless tap that cannot reach the backend still shows its
+ * pending notice. Reusing `tryStartOrUpdate` keeps the one render path: the
+ * in-app switch, the permission gate, the revision bookkeeping, and the
+ * notification actions; its start branch re-posts the fixed native id, so the
+ * counts stay and only the text gains the notice.
+ *
+ * The card is posted ongoing with no native deadline, so it can still be in the
+ * shade with its Approve action after the stored snapshot's `expiresAt`; the
+ * `carryNotice` render therefore ignores that deadline and draws the notice on
+ * the card the user tapped.
+ *
+ * Returns when the render is on the notification: the headless task finishes
+ * with this promise, so a fire-and-forget update would be lost with the process
+ * and the failure line the user's tap produced would never be shown.
+ */
+export async function renderStoredSnapshotWithNotice(ctx: GlanceableSinkContext): Promise<void> {
+  const snapshot = getStoredWidgetSnapshot();
+  if (snapshot === null) {
+    return;
+  }
+  await tryStartOrUpdate(snapshot, ctx, { carryNotice: true });
 }
 
 /** Retry a pending start after permission turns granted. Caller owns the check. */
@@ -250,7 +280,6 @@ async function retryPendingStart(): Promise<void> {
   ) {
     return;
   }
-  const kind = agentNotificationKindForGlanceableSnapshot(p.snapshot);
   // Same fence as the first start: the channel must exist before the post.
   const epoch = startEpoch;
   await ensureAndroidNotificationChannels();
@@ -266,19 +295,9 @@ async function retryPendingStart(): Promise<void> {
   if (notificationActive) {
     return;
   }
-  startLiveUpdate(
-    translate(NOTIFICATION_TITLE_KEY),
-    buildOngoingNotificationText(p.snapshot, {}, translate, formatGlanceableCount),
-    translate(OPEN_AGENTS_LABEL_KEY),
-    approveLabelFor(p.snapshot),
-    buildCompactNotificationText(p.snapshot, {}, formatGlanceableCount),
-    androidChannelIdForAgentKind(kind),
-    shouldAlert(kind)
-  );
-  notificationKind = kind;
+  postNotification(p.snapshot, 'start');
   notificationActive = true;
   terminalExpiresAt = null;
-  revision = p.snapshot.revision;
   pending = null;
   getGlanceableDelivery().registerTokens(p.snapshot, p.ctx.organizationId, p.ctx.userId);
 }
@@ -301,6 +320,8 @@ export async function handleAppStateActive(): Promise<void> {
 
 export const androidSink: GlanceableSink = {
   publish(snapshot) {
+    // A zero needs-input snapshot ends the ask the notice belongs to.
+    pruneActionNotice(snapshot);
     lastWidgetSnapshot = snapshot;
     // The native card survives a JS restart. Read the durable posted-channel
     // marker before it is overwritten and adopt the kind it recorded, so a
@@ -319,7 +340,12 @@ export const androidSink: GlanceableSink = {
       }
     }
     setWidgetSnapshot(snapshot);
-    const props = buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount);
+    const props = buildCurrentWidgetProps(
+      snapshot,
+      translate,
+      formatGlanceableCount,
+      formatGlanceableAgo
+    );
     renderWidgetNow(props);
     const eligible = hasCurrentWork(snapshot);
     if (eligible) {
@@ -343,21 +369,11 @@ export const androidSink: GlanceableSink = {
       }
     }
     if (notificationActive && snapshot.revision > revision) {
-      const kind = agentNotificationKindForGlanceableSnapshot(snapshot);
-      updateLiveUpdate(
-        translate(NOTIFICATION_TITLE_KEY),
-        eligible
-          ? buildOngoingNotificationText(snapshot, {}, translate, formatGlanceableCount)
-          : (props.statusLine ?? translate('glanceable.empty')),
-        translate(OPEN_AGENTS_LABEL_KEY),
-        eligible ? approveLabelFor(snapshot) : null,
-        eligible ? buildCompactNotificationText(snapshot, {}, formatGlanceableCount) : null,
-        androidChannelIdForAgentKind(kind),
-        shouldAlert(kind),
-        terminalExpiresAt === null ? 0 : Math.max(1, terminalExpiresAt - Date.now())
+      postNotification(
+        snapshot,
+        'update',
+        eligible ? undefined : (props.statusLine ?? translate('glanceable.empty'))
       );
-      notificationKind = kind;
-      revision = snapshot.revision;
     }
   },
 
@@ -381,4 +397,5 @@ export function _resetAndroidSinkForTests(): void {
   pending = null;
   startEpoch += 1;
   terminalExpiresAt = null;
+  setGlanceableActionNotice(null);
 }

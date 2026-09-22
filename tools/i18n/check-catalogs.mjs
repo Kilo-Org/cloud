@@ -107,10 +107,6 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'agentChat.sessionFilter.platformLinear',
   'agentChat.repoPicker.platformBitbucket',
   'agentChat.prBadge.label',
-  // Sandbox provider names on the new-session picker: brand proper nouns that
-  // every catalog keeps as "Cloudflare" and "Vercel".
-  'agentChat.newSession.sandboxProviderCloudflare',
-  'agentChat.newSession.sandboxProviderVercel',
   'share.reviewPrSubtitle',
   // Format-only strings with no translatable words: a placeholder-only screen
   // title, a placeholder-plus-UTC time-range label, the GitLab merge request
@@ -123,8 +119,6 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // Pure $t() references in the tour: they name another key's label, so every
   // locale resolves them to its own translation through i18next nesting.
   'tour.cloudOptionTitle',
-  'tour.remoteRunHint',
-  'tour.networkError',
 ]);
 
 /** The supported tags, read from the one source of truth. */

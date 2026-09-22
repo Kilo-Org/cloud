@@ -127,10 +127,6 @@ vi.mock('@/lib/kilo-pass/navigation', () => ({
   ensureProfileAfterKiloPassPurchase: vi.fn(),
 }));
 
-vi.mock('@/lib/kilo-pass/subscription-page-copy', () => ({
-  formatKiloPassTierDescription: () => 'description',
-}));
-
 vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
   useInlinePurchaseErrorOwnership: () => undefined,
 }));

@@ -170,6 +170,10 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // This case introspects the real project root, so a worktree that carries a
+    // prebuilt `android/` tree contributes its own colors alongside the ones
+    // Expo generates. Assert the splash background this plugin owns is
+    // present, not that it is the only color.
     // Introspection reads the project's own native resources, so the colors
     // modResults carry whatever the worktree's generated `android/` project
     // declares (adaptive-icon, notification, app background) next to the

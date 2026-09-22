@@ -339,7 +339,7 @@
       "balanceAlertsSubtitle": "تحذيرات انخفاض رصيد المؤسسة",
       "balanceAlertsUnavailable": "انضم إلى مؤسسة للحصول على تنبيهات الرصيد.",
       "securityFindingsSubtitle": "نتائج جديدة وتذكيرات SLA",
-      "securityFindingsUnavailable": "فعّل وكيل أمان Kilo على نطاق للحصول على ملاحظات الأمان.",
+      "securityFindingsUnavailable": "فعِّل وكيل الأمان من Kilo على نطاق للحصول على النتائج الأمنية.",
       "spendAlertsSubtitle": "تجاوزات الحدود والارتفاعات الساعية",
       "spendAlertsToggle": "فئة تنبيهات الإنفاق"
     },

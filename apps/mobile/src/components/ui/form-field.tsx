@@ -5,6 +5,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { withRtlInputAlignment } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 type FormFieldProps = Omit<TextInputProps, 'value'> &
@@ -46,6 +47,7 @@ function FormField({
   ref,
   validate,
   defaultValue,
+  style,
   onChangeText,
   onBlur,
   ...props
@@ -63,6 +65,11 @@ function FormField({
         {...props}
         defaultValue={defaultValue}
         editable={!disabled}
+        // A field's content follows the interface direction, not the script of
+        // its own value, so an email address stays on the same side as its
+        // label in an RTL catalog (`textAlign: 'auto'` aligns to the value's
+        // first strong character instead).
+        style={withRtlInputAlignment(style)}
         placeholderTextColor={colors.mutedForeground}
         accessibilityLabel={formFieldA11y({ label, required, error: displayedError })}
         accessibilityState={{ disabled }}

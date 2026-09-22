@@ -15,22 +15,27 @@ export function buildDirectProvider(
     id,
     apiUrl: upstream.base_url,
     apiUrlOverrides: {},
+    disableUrlSuffix: upstream.disable_url_suffix ?? false,
     apiKey: upstream.api_key,
     apiKeyHeader,
     supportedChatApis,
     responseTransforms: upstream.reasoning_details_transform ?? null,
     async transformRequest(context) {
+      const body = context.request.body as Record<string, unknown>;
       if (upstream.remove_from_body) {
-        const body = context.request.body as Record<string, unknown>;
         for (const key of upstream.remove_from_body) {
           delete body[key];
         }
       }
-      Object.assign(context.request.body, upstream.extra_body ?? {});
+      Object.assign(body, upstream.extra_body ?? {});
       if (upstream.extra_headers) {
         Object.assign(context.extraHeaders, upstream.extra_headers);
       }
-      context.request.body.model = upstream.internal_id;
+      if (upstream.internal_id === undefined) {
+        delete body.model;
+      } else {
+        body.model = upstream.internal_id;
+      }
       if (upstream.add_cache_breakpoints) {
         addCacheBreakpoints(context.request);
       }

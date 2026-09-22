@@ -6,6 +6,7 @@ export const VERCEL_AI_GATEWAY = {
   id: 'vercel',
   apiUrl: 'https://ai-gateway.vercel.sh/v1',
   apiUrlOverrides: {},
+  disableUrlSuffix: false,
   apiKey: getEnvVariable('VERCEL_AI_GATEWAY_API_KEY'),
   apiKeyHeader: null,
   supportedChatApis: ['chat_completions', 'messages', 'responses'],

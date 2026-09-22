@@ -25,6 +25,7 @@ import {
   serializedReferenceBytes,
 } from './session-references.js';
 import { createControlPlaneCredential } from './managed-credential.js';
+import { CONTROL_ALARM_ANCHORS_KEY, LEGACY_CONTROL_DEADLINES_KEY } from './control-alarm.js';
 import { allocationFixture } from '../sandbox-state/model/allocation-fixtures.js';
 import { WORKTREE_CREDENTIAL_CONTAINMENT } from '../sandbox-state/model/allocation.js';
 import type { SessionCredentialGrant } from './session-credentials.js';
@@ -300,6 +301,23 @@ describe('sandbox control durable state', () => {
     expect(await loadSessionReferences(storage)).toEqual(emptySessionReferenceState());
     expect(await loadTransitionLog(storage)).toEqual([]);
     expect(await storage.get('owner')).toBe(grant.userId);
+  });
+
+  it('erases infrastructure alarm anchors so a deleted runtime cannot re-arm them', async () => {
+    const storage = memoryStorage();
+    await storage.put(CONTROL_ALARM_ANCHORS_KEY, {
+      credentialExpiryAt: 5_000,
+      socketHandshakeAt: 6_000,
+    });
+    await storage.put(LEGACY_CONTROL_DEADLINES_KEY, {
+      credentialExpiry: 5_000,
+      socketHandshake: 6_000,
+    });
+
+    await eraseSandboxRecord(storage);
+
+    expect(await storage.get(CONTROL_ALARM_ANCHORS_KEY)).toBeUndefined();
+    expect(await storage.get(LEGACY_CONTROL_DEADLINES_KEY)).toBeUndefined();
   });
 
   it('defaults absent session references to the empty state and round-trips a reconciled index', async () => {

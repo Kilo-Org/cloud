@@ -16,7 +16,7 @@ import { allocationAlarmAt } from '../sandbox-state/schedule.js';
 
 export const CONTROL_ALARM_ANCHORS_KEY = 'control_alarm_anchors';
 
-const LEGACY_DEADLINES_KEY = 'deadlines';
+export const LEGACY_CONTROL_DEADLINES_KEY = 'deadlines';
 
 /**
  * The legacy pre-cutover anchor fields. The legacy writer stored numbers only;
@@ -91,7 +91,9 @@ export async function importLegacyControlAlarmAnchors(
   now: number
 ): Promise<void> {
   if ((await storage.get(CONTROL_ALARM_ANCHORS_KEY)) !== undefined) return;
-  const legacy = (await storage.get(LEGACY_DEADLINES_KEY)) as LegacyDeadlineAnchors | undefined;
+  const legacy = (await storage.get(LEGACY_CONTROL_DEADLINES_KEY)) as
+    | LegacyDeadlineAnchors
+    | undefined;
   const anchors: ControlAlarmAnchorState = {
     socketHandshakeAt:
       legacy?.socketHandshake !== undefined && legacy.socketHandshake > now

@@ -17,6 +17,7 @@ import {
   type SessionCredentialGrant,
 } from './session-credentials.js';
 import { emptyTransitionLog, type TransitionRow } from './transition-log.js';
+import { CONTROL_ALARM_ANCHORS_KEY, LEGACY_CONTROL_DEADLINES_KEY } from './control-alarm.js';
 import { eraseAllocationRecord } from '../sandbox-state/persist/access.js';
 import { loadAllocation as loadCanonicalAllocation } from '../sandbox-state/persist/load.js';
 import { storeAllocation as storeCanonicalAllocation } from '../sandbox-state/persist/store.js';
@@ -167,5 +168,7 @@ export async function eraseSandboxRecord(storage: ControlStorage): Promise<void>
     LOG_KEY,
     CREDENTIAL_GRANTS_KEY,
     RUNTIME_METADATA_KEY,
+    CONTROL_ALARM_ANCHORS_KEY,
+    LEGACY_CONTROL_DEADLINES_KEY,
   ]);
 }

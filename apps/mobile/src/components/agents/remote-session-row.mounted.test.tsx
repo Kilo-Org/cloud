@@ -20,6 +20,7 @@ import {
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setSignOutActive } from '@/lib/auth/sign-out-state';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
+import { i18n } from '@/i18n';
 import { createKiloAppQueryClient, getActiveSessionsQueryMetadata } from '@/lib/query-client';
 
 const state = vi.hoisted(() => ({
@@ -97,12 +98,12 @@ const otherKey = [
 ];
 const session: ActiveSession = makeCached({ createdOnPlatform: 'cli' });
 
-async function render() {
+async function render(row: ActiveSession = session) {
   await act(async () => {
     const tree = createElement(
       QueryClientProvider,
       { client },
-      createElement(RemoteSessionRow, { session, onPress: vi.fn<() => void>() })
+      createElement(RemoteSessionRow, { session: row, onPress: vi.fn<() => void>() })
     );
     if (renderer) {
       renderer.update(tree);
@@ -262,5 +263,23 @@ describe('row exit refresh caller', () => {
     });
     expect(client.getQueryData(QUERY_KEY)).toEqual(current);
     expect(state.request.mock.calls).toHaveLength(0);
+  });
+});
+
+describe('RemoteSessionRow placeholder title', () => {
+  it('shows the untitled fallback instead of the creation placeholder', async () => {
+    await render(
+      makeCached({
+        id: 'a1',
+        title: 'New session - 2026-09-22T17:26:31.465Z',
+        createdOnPlatform: 'cli',
+      })
+    );
+    if (!renderer) {
+      throw new Error('Missing row');
+    }
+    const props = renderer.root.findByType(Pressable).props as { accessibilityLabel: string };
+    expect(props.accessibilityLabel).toContain(i18n.t('agents.sessionRow.untitled'));
+    expect(props.accessibilityLabel).not.toContain('2026-09-22');
   });
 });

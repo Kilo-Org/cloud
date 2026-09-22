@@ -37,6 +37,7 @@ import {
   remoteMeta,
   remoteSessionEyebrowLabel,
   selectRemoteRowSpokenMeta,
+  sessionDisplayTitle,
 } from './session-list-helpers';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { type RowVariant } from './session-row';
@@ -90,7 +91,9 @@ export function RemoteSessionRow({
     };
   }, [refreshScope]);
   const exitingRef = useRef(false);
-  const title = session.title.length > 0 ? session.title : t('agents.sessionRow.untitled');
+  // One derivation for the visible label, the spoken label and the rename
+  // prompt: a creation placeholder title reads as "Untitled session".
+  const title = sessionDisplayTitle(session.title, t('agents.sessionRow.untitled'));
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
   const agentLabel = remoteSessionEyebrowLabel(session);

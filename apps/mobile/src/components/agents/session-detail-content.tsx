@@ -78,7 +78,10 @@ import {
   useSessionAutoApproveEnabled,
 } from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
-import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
+import {
+  selectSessionCostInputs,
+  sessionDisplayTitle,
+} from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
 import { firstHumanText, isFilePart, withoutReasoningParts } from './part-types';
@@ -1585,8 +1588,9 @@ export function SessionDetailContent({
     isLoaded: isSessionLoaded,
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
-    // title it opened with instead of blinking back to "Session".
-    fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
+    // title it opened with instead of blinking back to "Session". A creation
+    // placeholder cached in the list is not a title: fall back to "Session".
+    fallbackTitle: sessionDisplayTitle(cachedTitle, t('agentChat.session.title')),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;

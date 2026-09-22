@@ -1,3 +1,5 @@
+import { sessionDisplayTitle } from './session-list-helpers';
+
 export type RenameState = {
   isModalOpen: boolean;
   optimisticTitle: string | null;
@@ -54,6 +56,12 @@ type SessionDetailRenameState = {
 /**
  * Pure helper that derives the session-detail header display state from the
  * authoritative server title and the reducer state.
+ *
+ * Both title inputs pass through `sessionDisplayTitle`, so the creation
+ * placeholder (`New session - <ISO instant>`) can never reach the header:
+ * neither as the fetched server title, as a live `session.updated` title
+ * (which the hook folds into `serverTitle`), nor as the cached list title the
+ * route seeds the fallback with.
  */
 export function getSessionDetailRenameState(input: {
   fallbackTitle: string;
@@ -61,9 +69,10 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
+  const fallbackTitle = sessionDisplayTitle(input.fallbackTitle, input.fallbackTitle);
   const baseTitle = input.isLoaded
-    ? (input.serverTitle ?? input.fallbackTitle)
-    : input.fallbackTitle;
+    ? sessionDisplayTitle(input.serverTitle ?? fallbackTitle, fallbackTitle)
+    : fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
     title,

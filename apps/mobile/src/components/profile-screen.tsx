@@ -133,6 +133,11 @@ export function ProfileScreen() {
     ]);
   };
 
+  // The sign-out confirmation is the shared native alert on both platforms:
+  // Android's AppCompat dialog takes its panel and action accent from the
+  // activity theme, which plugins/withAndroidAlertDialogTheme points at the app
+  // tokens, and iOS renders the same call as a `UIAlertController` that already
+  // follows the device appearance.
   const confirmSignOut = () => {
     Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
       { text: t('common.cancel'), style: 'cancel' },

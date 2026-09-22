@@ -1,4 +1,7 @@
-import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
+import type {
+  CloudflareContainersInstance,
+  VercelSandboxResources,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { CredentialContainmentRequirements } from '../sandbox-control/physical-lifecycle.js';
 import {
@@ -16,7 +19,7 @@ import type {
   SandboxTerminalAccessResult,
 } from '../sandbox-control/terminal-billing.js';
 import type { SessionOperationAuthorization } from '../shared/sandbox-control-protocol.js';
-import type { Env } from '../types.js';
+import type { AgentSandboxProvider, Env } from '../types.js';
 import type {
   ControlRuntimeCredentialProxyFence,
   RuntimeQuarantineResult,
@@ -35,8 +38,9 @@ type SandboxControlRpc = {
   ensureReady(input: {
     ownerId: string;
     sessionId: string;
-    provider?: 'cloudflare' | 'vercel';
+    provider?: AgentSandboxProvider;
     resources?: VercelSandboxResources;
+    instance?: CloudflareContainersInstance;
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;
     billing?: SandboxBillingInput;

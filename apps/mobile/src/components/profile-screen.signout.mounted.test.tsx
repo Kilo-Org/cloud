@@ -15,7 +15,6 @@ const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
   Alert: { alert: alertFn },
-  Modal: 'Modal',
   Platform: {
     get OS() {
       return platform.os;
@@ -23,6 +22,10 @@ vi.mock('react-native', () => ({
   },
   Pressable: 'Pressable',
   View: 'View',
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
 vi.mock('react-native-reanimated', () => ({
@@ -157,6 +160,11 @@ function isType(node: TestRenderer.ReactTestInstance, type: string): boolean {
   return typeof node.type === 'string' && node.type === type;
 }
 
+function alertButtons(call: unknown): { style?: string; onPress?: () => void }[] {
+  const buttons = (call as unknown[] | undefined)?.[2];
+  return Array.isArray(buttons) ? (buttons as { style?: string; onPress?: () => void }[]) : [];
+}
+
 describe('ProfileScreen sign-out confirmation', () => {
   beforeEach(() => {
     signOutFn.mockReset();
@@ -177,6 +185,12 @@ describe('ProfileScreen sign-out confirmation', () => {
   // (`apps/mobile/AGENTS.md`: "Confirm destructive actions with `Alert.alert()`").
   // Both platforms run the same code path — Android's alert ignores the
   // destructive style, so the affordance there is the label, not red.
+  //
+  // The confirmation is the one shared native alert on both platforms:
+  // plugins/withAndroidAlertDialogTheme repaints Android's AppCompat dialog with
+  // the app tokens, and iOS's `UIAlertController` already follows the device
+  // appearance. No platform mounts an in-app confirmation of its own, so the
+  // same tap takes the same path whichever value the device reports.
   for (const os of ['android', 'ios'] as const) {
     it(`shows the native confirmation whose destructive button signs out on ${os}`, async () => {
       platform.os = os;
@@ -191,6 +205,14 @@ describe('ProfileScreen sign-out confirmation', () => {
         'You will need to sign in again to access your workspace.',
         expect.any(Array)
       );
+      expect(alertFn).toHaveBeenCalledTimes(1);
+      expect(alertFn.mock.calls[0]?.[0]).toBe('Sign out?');
+      // Opening the confirmation signs nobody out; only its own choices act.
+      expect(signOutFn).not.toHaveBeenCalled();
+      const buttons = alertButtons(alertFn.mock.calls[0]);
+      expect(buttons.find(button => button.style === 'cancel')?.onPress).toBeUndefined();
+      expect(buttons.some(button => button.style === 'destructive')).toBe(true);
+      // The alert is the whole confirmation: no in-app dialog renders beside it.
       expect(
         renderer.root.findAll(
           node => isType(node, 'Button') && node.props.variant === 'destructive'
@@ -198,10 +220,7 @@ describe('ProfileScreen sign-out confirmation', () => {
       ).toHaveLength(0);
       // Opening the confirmation signs nobody out; only its destructive button does.
       expect(signOutFn).not.toHaveBeenCalled();
-      const buttons = alertFn.mock.calls[0]?.[2] as
-        | { style?: string; onPress?: () => void }[]
-        | undefined;
-      const destructive = buttons?.find(button => button.style === 'destructive');
+      const destructive = buttons.find(button => button.style === 'destructive');
       act(() => {
         destructive?.onPress?.();
       });
@@ -210,4 +229,20 @@ describe('ProfileScreen sign-out confirmation', () => {
       unmount();
     });
   }
+
+  it("signs out only when the alert's destructive choice is pressed", async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
+
+    pressSignOutTile(renderer);
+
+    const destructive = alertButtons(alertFn.mock.calls[0]).find(
+      button => button.style === 'destructive'
+    );
+    act(() => {
+      destructive?.onPress?.();
+    });
+    expect(signOutFn).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
 });

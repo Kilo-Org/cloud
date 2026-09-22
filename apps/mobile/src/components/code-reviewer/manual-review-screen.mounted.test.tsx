@@ -32,9 +32,6 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('react-native', () => ({
-  AppState: { addEventListener: () => ({ remove: vi.fn() }) },
-  Keyboard: { addListener: () => ({ remove: vi.fn() }) },
-  Platform: { OS: 'android' },
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: 'android' },

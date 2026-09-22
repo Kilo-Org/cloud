@@ -22,6 +22,7 @@ import type {
 import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-environment.js';
 import { isWrapperSessionReadyRequest } from '../../src/shared/wrapper-bootstrap.js';
+import { runProcess, type ExecResult } from './utils';
 
 function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyRequest> = {}) {
   const request: WrapperSessionReadyRequest = {
@@ -992,6 +993,76 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(progress.mock.calls.flat().join(' ')).not.toContain('gh-token');
   });
 
+  it('bounds a progressing clone with its own hard timeout below the preparation deadline', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    let cloneResult: ExecResult | undefined;
+    const progressScript =
+      'for i in $(seq 1 50); do printf \'Receiving objects: %s%%\\n\' "$i"; sleep 0.05; done';
+
+    const preparation = prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async (args, opts) => {
+        if (args[0] === 'clone') {
+          expect(opts?.hardTimeoutMs).toBe(300_000);
+          cloneResult = await runProcess('sh', ['-c', progressScript], {
+            ...opts,
+            inactivityTimeoutMs: 400,
+            hardTimeoutMs: 400,
+          });
+          return cloneResult;
+        }
+        if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => {
+        throw new Error('restore should not run after clone timeout');
+      },
+    });
+    const preparationError = await preparation.catch(caught => caught);
+
+    // A progressing clone is still bounded by the clone's own wall clock, so it
+    // is attributed as git_clone_timeout rather than the preparation deadline.
+    expect(preparationError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'git_clone_timeout',
+      retryable: true,
+    });
+    expect(cloneResult?.terminationReason).toBe('hard_timeout');
+  });
+
+  it('fails a silent clone with the inactivity bound', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    let cloneResult: ExecResult | undefined;
+
+    const preparation = prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async (args, opts) => {
+        if (args[0] === 'clone') {
+          expect(opts?.hardTimeoutMs).toBe(300_000);
+          cloneResult = await runProcess('sh', ['-c', 'sleep 3'], {
+            ...opts,
+            inactivityTimeoutMs: 400,
+          });
+          return cloneResult;
+        }
+        if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => {
+        throw new Error('restore should not run after clone timeout');
+      },
+    });
+    const preparationError = await preparation.catch(caught => caught);
+    expect(preparationError).toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      subtype: 'git_clone_timeout',
+      retryable: true,
+    });
+
+    expect(cloneResult?.exitCode).toBe(124);
+    expect(cloneResult?.terminationReason).toBe('inactivity_timeout');
+  });
+
   it('fails and cleans up when a repository fetch reaches its hard limit', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.setupCommands = [];
@@ -1647,6 +1718,17 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       name: 'clone timeout',
       stage: 'clone',
       result: { stdout: '', stderr: '', exitCode: 124, terminationReason: 'timeout' as const },
+      subtype: 'git_clone_timeout',
+    },
+    {
+      name: 'clone inactivity timeout',
+      stage: 'clone',
+      result: {
+        stdout: '',
+        stderr: '',
+        exitCode: 124,
+        terminationReason: 'inactivity_timeout' as const,
+      },
       subtype: 'git_clone_timeout',
     },
     {

@@ -241,6 +241,11 @@ describe('buildDeployedConfig', () => {
     expect(config.internalApiSecret).toBe('e2e-internal-secret-0123456789');
   });
 
+  it('skips the balance check so the deployed user needs no funding', () => {
+    const config = buildDeployedConfig(env, auth);
+    expect(config.skipBalanceCheck).toBe(true);
+  });
+
   it('omits email when the deployed identity does not carry one', () => {
     const config = buildDeployedConfig(env, {
       token: 'deployed-token-value',

@@ -66,6 +66,7 @@ import {
 import {
   createSessionEventReplayQueue,
   SESSION_EVENT_REPLAY_TTL_MS,
+  type SessionEventReplayEntry,
 } from '../sandbox-control/session-event-replay.js';
 import { errorResponse, parseOperationPayload } from '../sandbox-control/frames.js';
 import {
@@ -443,8 +444,22 @@ type PendingSessionReplay = {
     deadlineAt: number,
     wrapperInstanceId: string | undefined,
     connection: SandboxControlConnectionIdentity
-  ) => Promise<SandboxControlEventResult>;
+  ) => Promise<ForwardedSessionFrame>;
 };
+
+// The result a forward callback returns. `attempted` is true only when the
+// session-DO RPC for the frame actually ran: a forward that bailed before its
+// send (`stale_before_send` and the pre-send guards) never reached the
+// destination, so its frame must stay retainable for replay.
+type ForwardedSessionFrame = SandboxControlEventResult & { attempted?: boolean };
+
+// The outcome of one forward attempt as `forwardRoutedSessionFrame` reports it.
+// `forwarded` distinguishes a fence rejection that happened before the frame
+// reached the session DO from one that happened after its RPC had run. A
+// forwarded frame must not be retained or restored for replay: the legacy
+// `session.event` path carries no receipt for the session DO to deduplicate, so
+// re-driving it would apply the event twice.
+type RoutedSessionFrameResult = SandboxControlEventResult & { forwarded?: boolean };
 
 type SessionEventReplayFrame = { items: unknown[] };
 
@@ -459,6 +474,10 @@ export class SandboxControl extends DurableObject<Env> {
   private containersInstance: CloudflareContainersInstance | undefined;
   private readonly sessionForwarding = createSessionForwarding();
   private readonly sessionEventReplay = createSessionEventReplayQueue<PendingSessionReplay>();
+  // Guards the retained-event replay: one drain pass at a time, with a request
+  // that arrives during a pass folded into one follow-up pass.
+  private replayRunning = false;
+  private replayRequested = false;
   private readonly forwarding = {
     enqueued: 0,
     settled: 0,
@@ -3792,7 +3811,7 @@ export class SandboxControl extends DurableObject<Env> {
     this.kiloReady = false;
     this.logDiagnostic('handshake_committed', diagnosticConnection(identity));
     this.socketHandler.closeProvisionalSockets();
-    this.ctx.waitUntil(this.replayPendingSessionEvents(identity));
+    this.scheduleSessionEventReplay(identity);
   }
 
   private async onWrapperReady(identity: SandboxControlConnectionIdentity): Promise<void> {
@@ -3892,7 +3911,7 @@ export class SandboxControl extends DurableObject<Env> {
       ...diagnosticConnection(identity),
       heartbeatDeadlineAt: now + DEADLINE_MS.heartbeatExpiry,
     });
-    this.ctx.waitUntil(this.replayPendingSessionEvents(identity));
+    this.scheduleSessionEventReplay(identity);
   }
 
   private async onHeartbeat(
@@ -4469,8 +4488,17 @@ export class SandboxControl extends DurableObject<Env> {
     frame: unknown,
     forward: PendingSessionReplay['forward'],
     wrapperInstanceId: string | undefined = connection.wrapperInstanceId,
-    bufferOnDrop = true
-  ): Promise<SandboxControlEventResult> {
+    // A replayed frame is re-driven through the same chain as a live frame, but it
+    // is already bounded by the retained-event queue: it keeps its retention to the
+    // replay pass instead of the live drop path, starts its deadline when the chain
+    // reaches it instead of at enqueue time (it waits behind every other frame
+    // retained for its session), does not consume the shared admission budget, and
+    // is routed over the connection that is current when it runs. The last point is
+    // what keeps the replayed prefix ahead of live frames: it was enqueued before
+    // them, and a fence change during the pass routes it in place instead of
+    // failing, restoring it, and re-driving it behind a newer live frame.
+    replay = false
+  ): Promise<RoutedSessionFrameResult> {
     const diagnostic = {
       ...diagnosticConnection(connection),
       eventType: diagnosticEventType(eventType),
@@ -4483,7 +4511,7 @@ export class SandboxControl extends DurableObject<Env> {
       return { applied: false };
     }
     const queuedAt = Date.now();
-    const forwardDeadlineAt = queuedAt + DEADLINE_MS.stopAttempt;
+    const enqueueDeadlineAt = queuedAt + DEADLINE_MS.stopAttempt;
     const admission = this.resolveForwardingAdmission(identity);
     if (!admission) {
       this.recordForwardDrop('unroutable', diagnostic);
@@ -4499,9 +4527,27 @@ export class SandboxControl extends DurableObject<Env> {
     const next = this.sessionForwarding.enqueueFenced({
       sessionId: admission.sessionId,
       bytes: frameBytes,
-      deadlineAt: forwardDeadlineAt,
-      fence: async () => this.isCurrentConnection(connection),
+      deadlineAt: replay ? Number.POSITIVE_INFINITY : enqueueDeadlineAt,
+      // A live frame is bound to the connection it was accepted on. A replayed frame
+      // stays valid across a hand-off, so it is fenced on any current connection and
+      // resolves the exact one when its turn comes.
+      fence: replay
+        ? async () => this.currentReplayConnection() !== null
+        : async () => this.isCurrentConnection(connection),
+      admissionExempt: replay,
+      // Only the forward result that actually invoked the session-DO RPC carries
+      // `attempted: true`; every guard below returns without attempting the send,
+      // so its frame stays retainable when the fence changes after it resolves.
+      delivered: result => result.attempted === true,
       forward: async () => {
+        const forwardDeadlineAt = replay ? Date.now() + DEADLINE_MS.stopAttempt : enqueueDeadlineAt;
+        // A replayed frame is routed over the connection that is current when it
+        // runs, so it re-resolves after every storage read: a hand-off that lands
+        // during a read must not make it bail and drop out of its session's chain,
+        // which is what keeps older retained frames ahead of newer ones.
+        const resolveForwardConnection = (): SandboxControlConnectionIdentity =>
+          replay ? (this.currentReplayConnection() ?? connection) : connection;
+        let forwardConnection = resolveForwardConnection();
         const queueWaitMs = Date.now() - queuedAt;
         this.forwarding.maxQueueWaitMs = Math.max(this.forwarding.maxQueueWaitMs, queueWaitMs);
         this.logDiagnostic('forward_started', {
@@ -4511,14 +4557,15 @@ export class SandboxControl extends DurableObject<Env> {
         });
         try {
           const table = await loadRouteTable(this.ctx.storage);
-          if (!this.isCurrentConnection(connection)) {
+          forwardConnection = resolveForwardConnection();
+          if (!this.isCurrentConnection(forwardConnection)) {
             this.recordForwardDrop('stale_before_enqueue', fields);
-            return { applied: false };
+            return { applied: false, attempted: false };
           }
           const route = resolveSessionEventRoute(table, identity);
           if (!route) {
             this.recordForwardDrop('unroutable', { ...fields, routeCount: table.size });
-            return { applied: false };
+            return { applied: false, attempted: false };
           }
           if (route.sessionId !== admission.sessionId) {
             this.recordForwardDrop('admission_route_changed', {
@@ -4526,7 +4573,7 @@ export class SandboxControl extends DurableObject<Env> {
               sessionId: route.sessionId,
               admittedSessionId: admission.sessionId,
             });
-            return { applied: false };
+            return { applied: false, attempted: false };
           }
           if (
             admission.nativeRuntimeId !== undefined &&
@@ -4536,21 +4583,22 @@ export class SandboxControl extends DurableObject<Env> {
               ...fields,
               sessionId: route.sessionId,
             });
-            return { applied: false, retryable: true };
+            return { applied: false, retryable: true, attempted: false };
           }
           const physical = await loadPhysicalRecord(this.ctx.storage);
+          forwardConnection = resolveForwardConnection();
           if (
             physical.state !== 'running' ||
             physical.stopTombstone ||
-            physical.providerRef !== connection.providerInstanceId ||
+            physical.providerRef !== forwardConnection.providerInstanceId ||
             !this.matchesWorktreeContainment(physical) ||
-            !this.isCurrentConnection(connection)
+            !this.isCurrentConnection(forwardConnection)
           ) {
             this.recordForwardDrop('runtime_not_current', {
               ...fields,
               sessionId: route.sessionId,
             });
-            return { applied: false };
+            return { applied: false, attempted: false };
           }
           return await forward(
             route,
@@ -4558,7 +4606,7 @@ export class SandboxControl extends DurableObject<Env> {
             physical,
             forwardDeadlineAt,
             wrapperInstanceId,
-            connection
+            forwardConnection
           );
         } finally {
           this.forwarding.settled++;
@@ -4579,7 +4627,12 @@ export class SandboxControl extends DurableObject<Env> {
       next.catch(error => {
         if (error instanceof SessionForwardingError && !error.retryable) {
           this.recordForwardDrop('forwarding_frame_rejected', fields);
-          if (bufferOnDrop) {
+          // A fence that changed after the session-DO RPC ran already delivered the
+          // frame. Replaying it would double-apply events for the legacy
+          // `session.event` path, which carries no receipt for the session DO to
+          // deduplicate. A forward that bailed before its send is not delivered, so
+          // its frame stays retained for the next handshake instead of being lost.
+          if (!replay && !error.forwarded) {
             const retained = this.sessionEventReplay.push({
               sessionId: admission.sessionId,
               bytes: frameBytes,
@@ -4587,28 +4640,92 @@ export class SandboxControl extends DurableObject<Env> {
               value: { identity, eventType, frame, wrapperInstanceId, forward },
             });
             if (retained === 'overflow') this.recordForwardDrop('replay_overflow', fields);
-            else
-              this.ctx.waitUntil(
-                this.replayPendingSessionEvents(this.socketHandler.getConnectionIdentity())
-              );
+            else this.scheduleSessionEventReplay(this.socketHandler.getConnectionIdentity());
           }
           return;
         }
         this.recordForwardDrop('forwarding_capacity_exhausted', fields);
       })
     );
-    return next.catch(() => ({ applied: false, retryable: true }));
+    return next.then(
+      // `attempted` is routing state for the delivered predicate above; it is not
+      // part of the frame result the session-event callers see.
+      ({ applied, retryable }) => ({
+        applied,
+        ...(retryable === undefined ? {} : { retryable }),
+      }),
+      error => ({
+        applied: false,
+        retryable: true,
+        forwarded: error instanceof SessionForwardingError && error.forwarded,
+      })
+    );
+  }
+
+  // The connection a replayed frame routes over. A replay outlives the connection
+  // its pass started on, so it resolves whatever connection is current when the
+  // frame's turn on the forwarding chain comes. A replayed frame never requires a
+  // specific connection: it is bounded by the retained-event queue and fenced on
+  // any current connection, so it keeps its place ahead of live frames instead of
+  // being restored and re-driven behind one.
+  private currentReplayConnection(): SandboxControlConnectionIdentity | null {
+    const current = this.socketHandler.getConnectionIdentity();
+    return current !== null && this.isCurrentConnection(current) ? current : null;
+  }
+
+  // Coalesces replay triggers: at most one pass drains the retained queue at a
+  // time, and a trigger that arrives while a pass is in flight folds into a single
+  // follow-up pass instead of stacking another pass over the same retained prefix.
+  private scheduleSessionEventReplay(connection: SandboxControlConnectionIdentity | null): void {
+    if (!connection || !this.isCurrentConnection(connection)) return;
+    if (this.replayRunning) {
+      this.replayRequested = true;
+      return;
+    }
+    this.ctx.waitUntil(this.drainSessionEventReplay(connection));
+  }
+
+  private async drainSessionEventReplay(
+    connection: SandboxControlConnectionIdentity
+  ): Promise<void> {
+    this.replayRunning = true;
+    try {
+      let current = connection;
+      do {
+        this.replayRequested = false;
+        // A pass that could not finish under its own connection (a fence change
+        // mid-replay) hands the untouched tail to whichever connection is current
+        // now instead of waiting for its next handshake. A pass that finished under
+        // a still-current connection keeps the tail queued, so a frame that cannot
+        // be applied does not spin.
+        const stable = await this.replayPendingSessionEvents(current);
+        if (!stable) this.replayRequested = true;
+        const next = this.socketHandler.getConnectionIdentity();
+        if (!next || !this.isCurrentConnection(next)) return;
+        current = next;
+      } while (this.replayRequested);
+    } finally {
+      this.replayRunning = false;
+    }
   }
 
   // Re-drives retained session frames through the existing forward chain once a
-  // wrapper connection is current again. One entry is shifted at a time and
-  // `bufferOnDrop` is false for a replay, so a flip-flopping fence cannot retain
-  // an entry indefinitely. A fence change mid-replay leaves the untouched tail
-  // queued for the next handshake instead of discarding it.
+  // wrapper connection is current again. Every frame retained for every session in
+  // the snapshot is shifted and enqueued before the first await, so a live frame
+  // that arrives while the replay is in flight queues behind the whole replayed
+  // prefix for its session instead of being delivered between two older frames or
+  // ahead of them (a per-session forwarding chain only orders frames enqueued
+  // before the live one). A frame the replay never reached the destination with is
+  // restored to the front of the queue with its original expiry, so a fence change
+  // mid-replay leaves the untouched tail queued instead of discarding it and a
+  // flip-flopping fence still cannot retain an entry indefinitely. A frame whose
+  // forward already reached the session DO is not restored, so a non-receipted
+  // event is never applied twice. Returns whether the pass ran to completion under
+  // its own connection.
   private async replayPendingSessionEvents(
     connection: SandboxControlConnectionIdentity | null
-  ): Promise<void> {
-    if (!connection || !this.isCurrentConnection(connection)) return;
+  ): Promise<boolean> {
+    if (!connection || !this.isCurrentConnection(connection)) return false;
     const now = Date.now();
     for (const entry of this.sessionEventReplay.expire(now)) {
       this.recordForwardDrop('replay_expired', {
@@ -4616,27 +4733,76 @@ export class SandboxControl extends DurableObject<Env> {
         eventType: entry.eventType,
       });
     }
-    for (const sessionId of this.sessionEventReplay.sessions()) {
-      while (this.isCurrentConnection(connection)) {
+    // Build the whole snapshot's replay list before awaiting anything. The
+    // forwarding chain is per session, so if a later session's entries were
+    // enqueued only when the loop reached it, a live frame for that session could
+    // be admitted during an earlier session's await and delivered before its
+    // retained prefix, applying an older frame after a newer one.
+    const passes = this.sessionEventReplay.sessions().map(sessionId => {
+      const entries: Array<SessionEventReplayEntry<PendingSessionReplay>> = [];
+      while (true) {
         const entry = this.sessionEventReplay.shift(sessionId, Date.now());
         if (!entry) break;
-        if (entry.expiresAt <= Date.now()) {
+        if (entry.expiresAt > Date.now()) entries.push(entry);
+        else
           this.recordForwardDrop('replay_expired', {
             ...diagnosticConnection(connection),
             eventType: entry.value.eventType,
           });
+      }
+      return {
+        sessionId,
+        replays: entries.map(entry => {
+          // Observe whether this frame's forward actually invoked the session-DO RPC.
+          // A resolved forward that never sent and a fence rejection before its send
+          // both left the frame undelivered, so it stays retained for the next
+          // handshake. A frame that did send must not be replayed: the legacy
+          // `session.event` path has no receipt for the session DO to deduplicate, so
+          // re-driving it would apply the event twice.
+          const reached = { current: false };
+          const forward: PendingSessionReplay['forward'] = async (
+            route,
+            fields,
+            physical,
+            deadlineAt,
+            frameWrapperInstanceId,
+            forwardConnection
+          ) => {
+            const outcome = await entry.value.forward(
+              route,
+              fields,
+              physical,
+              deadlineAt,
+              frameWrapperInstanceId,
+              forwardConnection
+            );
+            if (outcome.attempted === true) reached.current = true;
+            return outcome;
+          };
+          return {
+            entry,
+            reached,
+            result: this.forwardRoutedSessionFrame(
+              entry.value.identity,
+              entry.value.eventType,
+              connection,
+              entry.value.frame,
+              forward,
+              entry.value.wrapperInstanceId,
+              true
+            ),
+          };
+        }),
+      };
+    });
+    for (const { sessionId, replays } of passes) {
+      const unapplied: Array<SessionEventReplayEntry<PendingSessionReplay>> = [];
+      for (const { entry, reached, result } of replays) {
+        const outcome = await result;
+        if (outcome.applied !== true) {
+          if (!reached.current) unapplied.push(entry);
           continue;
         }
-        const result = await this.forwardRoutedSessionFrame(
-          entry.value.identity,
-          entry.value.eventType,
-          connection,
-          entry.value.frame,
-          entry.value.forward,
-          entry.value.wrapperInstanceId,
-          false
-        );
-        if (result.applied !== true) continue;
         this.forwarding.recovered += isSessionEventReplayFrame(entry.value.frame)
           ? entry.value.frame.items.length
           : 1;
@@ -4647,8 +4813,19 @@ export class SandboxControl extends DurableObject<Env> {
           ...this.forwarding,
         });
       }
-      if (!this.isCurrentConnection(connection)) return;
+      if (unapplied.length === 0) continue;
+      // Restore newest first so the front of the queue keeps FIFO order.
+      for (let index = unapplied.length - 1; index >= 0; index -= 1) {
+        const entry = unapplied[index];
+        const retained = this.sessionEventReplay.restore(sessionId, entry);
+        if (retained === 'overflow')
+          this.recordForwardDrop('replay_overflow', {
+            ...diagnosticConnection(connection),
+            eventType: entry.value.eventType,
+          });
+      }
     }
+    return this.isCurrentConnection(connection);
   }
 
   private recordForwardDrop(reason: string, fields: ControlDiagnosticFields): void {
@@ -4699,10 +4876,10 @@ export class SandboxControl extends DurableObject<Env> {
     ) => Promise<{ applied: boolean; retryable?: boolean }>,
     requireApplied: boolean,
     forwardDeadlineAt: number
-  ): Promise<SandboxControlEventResult> {
+  ): Promise<ForwardedSessionFrame> {
     if (!(await this.isCurrentSessionForward(route, connection, physical))) {
       this.recordForwardDrop('stale_before_send', diagnostic);
-      return { applied: false, retryable: true };
+      return { applied: false, retryable: true, attempted: false };
     }
     const startedAt = Date.now();
     let timedOut = false;
@@ -4785,11 +4962,13 @@ export class SandboxControl extends DurableObject<Env> {
           rpcWaitMs,
           ...this.forwarding,
         });
-        if (skipped) return { applied: false, retryable: true };
-        if (!requireApplied || result?.applied === true) return { applied: true };
+        if (skipped) return { applied: false, retryable: true, attempted: attempts > 0 };
+        if (!requireApplied || result?.applied === true)
+          return { applied: true, attempted: attempts > 0 };
         return {
           applied: false,
           retryable: result?.retryable === true || operation === 'receiveSandboxControlPreparing',
+          attempted: attempts > 0,
         };
       },
       async () => {
@@ -4809,7 +4988,7 @@ export class SandboxControl extends DurableObject<Env> {
           },
           'warn'
         );
-        return { applied: false, retryable: true };
+        return { applied: false, retryable: true, attempted: attempts > 0 };
       }
     );
     return delivered;

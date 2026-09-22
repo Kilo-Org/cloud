@@ -20,12 +20,16 @@ export type SessionEventReplayStats = {
   sessions: number;
 };
 
+export type SessionEventReplayEntry<T> = {
+  value: T;
+  bytes: number;
+  expiresAt: number;
+};
+
 export type SessionEventReplayQueue<T> = {
   push: (entry: SessionEventReplayPush<T>) => 'queued' | 'overflow';
-  shift: (
-    sessionId: string,
-    now: number
-  ) => { value: T; bytes: number; expiresAt: number } | undefined;
+  shift: (sessionId: string, now: number) => SessionEventReplayEntry<T> | undefined;
+  restore: (sessionId: string, entry: SessionEventReplayEntry<T>) => 'queued' | 'overflow';
   sessions: () => string[];
   expire: (now: number) => T[];
   stats: () => SessionEventReplayStats;
@@ -71,6 +75,26 @@ export function createSessionEventReplayQueue<T>(): SessionEventReplayQueue<T> {
       release(entry);
       if (queue.length === 0) queues.delete(sessionId);
       return { value: entry.value, bytes: entry.bytes, expiresAt: entry.expiresAt };
+    },
+    restore(sessionId, entry) {
+      // Return an unapplied entry to the front of its session queue. It keeps its
+      // original expiry, so a fence that keeps changing cannot retain it forever.
+      if (
+        events >= MAX_SESSION_EVENT_REPLAY_EVENTS ||
+        bytes + entry.bytes > MAX_SESSION_EVENT_REPLAY_BYTES
+      )
+        return 'overflow';
+      const restored: RetainedEntry<T> = {
+        bytes: entry.bytes,
+        expiresAt: entry.expiresAt,
+        value: entry.value,
+      };
+      const queue = queues.get(sessionId);
+      if (queue) queue.unshift(restored);
+      else queues.set(sessionId, [restored]);
+      events += 1;
+      bytes += entry.bytes;
+      return 'queued';
     },
     sessions() {
       return [...queues.keys()];

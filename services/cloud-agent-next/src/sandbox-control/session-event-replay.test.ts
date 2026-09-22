@@ -144,4 +144,43 @@ describe('createSessionEventReplayQueue', () => {
     expect(queue.sessions()).toEqual([]);
     expect(queue.stats()).toEqual({ events: 0, bytes: 0, sessions: 0 });
   });
+
+  it('restores an unapplied entry to the front of its session queue', () => {
+    const queue = createSessionEventReplayQueue<string>();
+    push(queue, 'workspace_a', 'a1', 16, NOW + TTL);
+    push(queue, 'workspace_a', 'a2', 8, NOW + TTL);
+
+    const first = queue.shift('workspace_a', NOW);
+    expect(queue.restore('workspace_a', first!)).toBe('queued');
+    expect(queue.stats()).toEqual({ events: 2, bytes: 24, sessions: 1 });
+
+    expect(queue.shift('workspace_a', NOW)?.value).toBe('a1');
+    expect(queue.shift('workspace_a', NOW)?.value).toBe('a2');
+    expect(queue.stats()).toEqual({ events: 0, bytes: 0, sessions: 0 });
+  });
+
+  it('keeps the original expiry of a restored entry', () => {
+    const queue = createSessionEventReplayQueue<string>();
+    push(queue, 'workspace_a', 'a1', 16, NOW + 500);
+
+    const first = queue.shift('workspace_a', NOW);
+    expect(first).toEqual({ value: 'a1', bytes: 16, expiresAt: NOW + 500 });
+    expect(queue.restore('workspace_a', first!)).toBe('queued');
+    expect(queue.expire(NOW + 500)).toEqual(['a1']);
+    expect(queue.stats()).toEqual({ events: 0, bytes: 0, sessions: 0 });
+  });
+
+  it('rejects a restore that would exceed the byte cap', () => {
+    const queue = createSessionEventReplayQueue<string>();
+    push(queue, 'workspace_a', 'large', MAX_SESSION_EVENT_REPLAY_BYTES, NOW + TTL);
+    const head = queue.shift('workspace_a', NOW);
+    expect(head).toEqual({
+      value: 'large',
+      bytes: MAX_SESSION_EVENT_REPLAY_BYTES,
+      expiresAt: NOW + TTL,
+    });
+    push(queue, 'workspace_a', 'other', 1, NOW + TTL);
+    expect(queue.restore('workspace_a', head!)).toBe('overflow');
+    expect(queue.stats()).toEqual({ events: 1, bytes: 1, sessions: 1 });
+  });
 });

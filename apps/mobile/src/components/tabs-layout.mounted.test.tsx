@@ -1,3 +1,9 @@
+// Lives here, not next to `src/app/(app)/(tabs)/_layout.tsx`: Expo Router treats
+// any `_layout.*` file in the route tree as the layout for its directory, so a
+// `_layout.mounted.test.tsx` beside it shadowed the real `_layout.tsx` and the
+// typed-routes generator then dropped every `(tabs)` route. A `.mounted.test`
+// file directly under `(tabs)` would also be hoisted into the `Tabs` navigator
+// as a sixth tab, which the sibling layout tests here avoid the same way.
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

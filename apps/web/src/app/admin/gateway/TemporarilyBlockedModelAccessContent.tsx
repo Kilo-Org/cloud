@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -17,25 +17,34 @@ export function TemporarilyBlockedModelAccessContent() {
   );
   const [organizationIdsText, setOrganizationIdsText] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const appliedUpdatedAtRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
-    if (!data) return;
+    if (!data || hasChanges || appliedUpdatedAtRef.current === data.updated_at) return;
     setOrganizationIdsText(data.organization_ids.join('\n'));
     setHasChanges(false);
-  }, [data]);
+    appliedUpdatedAtRef.current = data.updated_at;
+  }, [data, hasChanges]);
 
   const organizationIds = [
     ...new Set(
       organizationIdsText
         .split(/[\n,]/)
-        .map(id => id.trim())
+        .map(id => id.trim().toLowerCase())
         .filter(Boolean)
     ),
   ];
 
   const mutation = useMutation(
     trpc.admin.temporarilyBlockedModelAccess.set.mutationOptions({
-      onSuccess: () => {
+      onSuccess: updatedConfig => {
+        appliedUpdatedAtRef.current = updatedConfig.updated_at;
+        setOrganizationIdsText(updatedConfig.organization_ids.join('\n'));
+        setHasChanges(false);
+        queryClient.setQueryData(
+          trpc.admin.temporarilyBlockedModelAccess.get.queryKey(),
+          updatedConfig
+        );
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.temporarilyBlockedModelAccess.get.queryKey(),
         });

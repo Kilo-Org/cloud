@@ -3,8 +3,10 @@ import * as z from 'zod';
 import { redisClient } from '@/lib/redis';
 import { TEMPORARILY_BLOCKED_MODEL_ACCESS_REDIS_KEY } from '@/lib/redis-keys';
 
+const OrganizationIdSchema = z.string().trim().toLowerCase().uuid();
+
 export const TemporarilyBlockedModelAccessConfigSchema = z.object({
-  organization_ids: z.array(z.string().trim().min(1).max(255)).max(1000),
+  organization_ids: z.array(OrganizationIdSchema).max(1000),
   updated_at: z.string().datetime().nullable(),
   updated_by: z.string().nullable(),
   updated_by_email: z.string().email().nullable(),
@@ -23,7 +25,7 @@ export const DEFAULT_TEMPORARILY_BLOCKED_MODEL_ACCESS_CONFIG: TemporarilyBlocked
   };
 
 export const TemporarilyBlockedModelAccessInputSchema = z.object({
-  organization_ids: z.array(z.string().trim().min(1).max(255)).max(1000),
+  organization_ids: z.array(OrganizationIdSchema).max(1000),
 });
 
 export async function getTemporarilyBlockedModelAccessConfig() {
@@ -39,7 +41,7 @@ export async function isTemporarilyBlockedModelAllowedForOrganization(
 
   try {
     const config = await getTemporarilyBlockedModelAccessConfig();
-    return config.organization_ids.includes(organizationId);
+    return config.organization_ids.includes(organizationId.toLowerCase());
   } catch {
     return false;
   }

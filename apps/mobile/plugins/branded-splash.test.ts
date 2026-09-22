@@ -164,8 +164,14 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // This case introspects the real project root, so a worktree that carries a
+    // prebuilt `android/` tree contributes its own colors alongside the ones
+    // Expo generates. Assert the splash background this plugin owns is
+    // present, not that it is the only color.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

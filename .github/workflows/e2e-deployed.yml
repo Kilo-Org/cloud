@@ -7,10 +7,12 @@ on:
         description: 'HTTPS URL of the deployed cloud-agent-next Worker'
         required: true
         type: string
+        default: 'https://cloud-agent-e2e-test.engineering-e11.workers.dev'
       fake_llm_url:
         description: 'HTTPS URL of the deployed fake-LLM Worker'
         required: true
         type: string
+        default: 'https://fake-llm.engineering-e11.workers.dev'
       backend_url:
         description: 'HTTPS URL of the Kilo backend that issues stream tickets'
         required: true

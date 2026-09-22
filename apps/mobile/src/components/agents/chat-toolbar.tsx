@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { type LayoutChangeEvent, View } from 'react-native';
 
 import { ComposerPasteButton } from '@/components/agents/composer-paste-button';
 import { type AgentMode, ModeSelector } from '@/components/agents/mode-selector';
@@ -32,6 +32,14 @@ type ChatToolbarProps = {
   /** Agent name shown in the locked model chip's accessibility label. */
   modelLockLabel?: string;
   className?: string;
+  /**
+   * Accepted for the new-session and clone callers that used to allow a second
+   * chip row (#6349); superseded. The toolbar now stays on one row everywhere —
+   * a long model name truncates inside its chip — so this prop has no effect.
+   */
+  wrap?: boolean;
+  /** Forwards the row's layout, e.g. to measure the toolbar height. */
+  onLayout?: (event: LayoutChangeEvent) => void;
 };
 
 export function ChatToolbar({
@@ -50,6 +58,7 @@ export function ChatToolbar({
   modelLocked = false,
   modelLockLabel,
   className,
+  onLayout,
 }: Readonly<ChatToolbarProps>) {
   const modeSelector = (
     <ModeSelector
@@ -99,6 +108,7 @@ export function ChatToolbar({
     // long model name ("DeepSeek V4.1 Flash") with its own `numberOfLines={1}`,
     // while the paste button keeps the trailing edge of the same line.
     <View
+      onLayout={onLayout}
       className={cn('flex-row items-center gap-2 px-3 py-2.5', disabled && 'opacity-50', className)}
     >
       {order === 'model-first' ? modelSelectorWithPaste : modeSelector}

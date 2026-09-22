@@ -56,6 +56,12 @@ const state = vi.hoisted(() => ({
   sessionId: '',
   liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
 }));
+// The app-aware padding container follows the keyboard through the platform
+// events; the holder keeps the registered listener so a case can raise the IME.
+const keyboardSubscribers = vi.hoisted(() => ({
+  show: null as ((event: { endCoordinates: { height: number } }) => void) | null,
+  hide: null as (() => void) | null,
+}));
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 vi.mock('expo-secure-store', () => ({
   getItemAsync: readFilterRecord,
@@ -83,6 +89,20 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
+  Keyboard: {
+    addListener: (event: string, listener: (event?: unknown) => void) => {
+      if (event === 'keyboardDidShow' || event === 'keyboardWillShow') {
+        keyboardSubscribers.show = listener as (event: {
+          endCoordinates: { height: number };
+        }) => void;
+      }
+      if (event === 'keyboardDidHide' || event === 'keyboardWillHide') {
+        keyboardSubscribers.hide = listener as () => void;
+      }
+      return { remove: vi.fn() };
+    },
+  },
   useWindowDimensions: () => ({ fontScale: state.fontScale, height: 844 }),
   AppState: {
     addEventListener: (_event: string, listener: (next: string) => void) => {
@@ -291,6 +311,19 @@ function action(label: string) {
 function press(label: string) {
   (action(label).props.onPress as () => void)();
 }
+function showKeyboard(height: number) {
+  const listener = keyboardSubscribers.show;
+  if (!listener) {
+    throw new Error('Missing keyboardDidShow listener');
+  }
+  listener({ endCoordinates: { height } });
+}
+function descendantsOf(instance: TestRenderer.ReactTestInstance, type: string) {
+  return instance.findAll(node => typeof node.type === 'string' && node.type === type);
+}
+function fab() {
+  return nodes('Pressable').find(node => node.props.testID === 'agents-new-session-fab');
+}
 type HeaderElement = {
   type: string;
   props: {
@@ -386,6 +419,8 @@ beforeEach(() => {
   state.socketRetry.mockReset();
   state.invalidate.mockReset();
   state.liveQuery.mockReset();
+  keyboardSubscribers.show = null;
+  keyboardSubscribers.hide = null;
   readFilterRecord.mockReset().mockResolvedValue(null);
 });
 afterEach(async () => {
@@ -462,9 +497,13 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(nodes('CenteredState')).toHaveLength(test.empty || (test.error && !test.rows) ? 1 : 0);
-    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(
-      state.tabBarHeight + (test.empty ? 0 : 64)
-    );
+    // The band a centered body lays out in ends at the tab bar, on every body.
+    // The FAB is a corner control: its band rides the rows list's own frame
+    // inset (`marginBottom`, asserted below) so no row sits under the button,
+    // and reserving it here as well shrank the band below the tab bar's top
+    // edge in a short landscape window, parking the no-match state's second
+    // line and action behind the bar (landscape spot defect e8).
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
@@ -966,8 +1005,6 @@ describe('AgentSessionListScreen live presentation', () => {
   it('offsets the FAB by the landscape right inset and keeps its vertical position', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
-    const fab = () =>
-      nodes('Pressable').find(node => node.props.testID === 'agents-new-session-fab');
     expect(fab()?.props.style).toEqual({
       bottom: state.tabBarHeight + 16,
       right: 20,
@@ -1292,6 +1329,11 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(emptyState.props.description).toBe('Try a different search term.');
     expect(nodes('CenteredState')).toHaveLength(1);
     expect(nodes('FlatList')).toHaveLength(0);
+    // The no-match body owns the band the tab bar leaves (the FAB's band is no
+    // longer reserved in it, see `StateSurfaceInsets` above), so the creation
+    // FAB yields instead of floating over the state's description and Clear
+    // action.
+    expect(fab()).toBeUndefined();
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     act(() => {
       (emptyState.props.action as { props: { onPress: () => void } }).props.onPress();
@@ -1299,8 +1341,47 @@ describe('AgentSessionListScreen live filtering', () => {
 
     expect(nodes('FlatList')).toHaveLength(1);
     expect(nodes('CenteredState')).toHaveLength(0);
+    expect(fab()).toBeDefined();
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
+  });
+
+  it('lifts the no-match body above the keyboard inside the platform container', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const searchHeader = requireNode('SessionListSearchHeader');
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+
+    // iOS: the native container owns the lift, so the centered no-match body is
+    // inside it and re-measures against the viewport it shrinks.
+    const container = requireNode('KeyboardAvoidingView');
+    expect(container.props.behavior).toBe('padding');
+    expect(descendantsOf(container, 'CenteredState')).toHaveLength(1);
+    expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
+
+    // Android: edge-to-edge never resizes the window for the IME, so the
+    // app-aware container follows the keyboard events and pads its frame; the
+    // body re-centers inside the shrunken viewport.
+    state.platform.OS = 'android';
+    await renderScreen();
+    act(() => {
+      showKeyboard(320);
+    });
+    const padded = nodes('View').find(
+      node =>
+        Array.isArray(node.props.style) &&
+        node.props.style.some(
+          (part: { paddingBottom?: number } | undefined) => part?.paddingBottom === 320
+        )
+    );
+    expect(padded).toBeDefined();
+    if (!padded) {
+      throw new Error('Missing app-aware padding container');
+    }
+    expect(descendantsOf(padded, 'CenteredState')).toHaveLength(1);
+    expect(nodes('KeyboardAvoidingView')).toHaveLength(0);
   });
 
   it('narrows the live list to the search text', async () => {
@@ -1404,8 +1485,9 @@ describe('AgentSessionListScreen live filtering', () => {
       expect(header().parent?.children[0]).toBe(header());
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
-        tree.children.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
-      ).toEqual(['View', 'SessionListSearchHeader', 'View', 'FlatList']);
+        tree.children.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
+      ).toEqual(['View', 'SessionListSearchHeader', 'KeyboardAvoidingView']);
+      expect(descendantsOf(requireNode('KeyboardAvoidingView'), 'FlatList')).toHaveLength(1);
     }
   });
 

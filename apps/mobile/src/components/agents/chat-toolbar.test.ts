@@ -133,6 +133,48 @@ describe('ChatToolbar', () => {
     expect(pasteButtonProps.className).toContain('shrink-0');
   });
 
+  it('pins the chips to one row when the host turns wrap off', () => {
+    const onPaste = vi.fn(() => undefined);
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({ ...defaultProps(), onPaste, wrap: false }) as Node;
+
+    const className =
+      element !== null &&
+      typeof element === 'object' &&
+      typeof element.props?.className === 'string'
+        ? element.props.className
+        : '';
+    expect(className).toContain('flex-row');
+    expect(className).not.toContain('flex-wrap');
+
+    const pasteButtonProps = findElementByType(element, 'ComposerPasteButton') ?? {};
+    expect(pasteButtonProps.className).toContain('shrink-0');
+  });
+
+  it('keeps the chips on one row even when a caller passes the superseded wrap flag', () => {
+    // `wrap` opted into #6349's second row. The toolbar never wraps now, and the
+    // new-session and clone callers still pass the flag, so it must stay inert.
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({ ...defaultProps(), wrap: true }) as Node;
+
+    const className =
+      element !== null &&
+      typeof element === 'object' &&
+      typeof element.props?.className === 'string'
+        ? element.props.className
+        : '';
+    expect(className).toContain('flex-row');
+    expect(className).not.toContain('flex-wrap');
+  });
+
+  it('forwards onLayout to the row', () => {
+    const onLayout = vi.fn(() => undefined);
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = ChatToolbar({ ...defaultProps(), onLayout }) as Node;
+
+    expect(element).toMatchObject({ props: { onLayout } });
+  });
+
   it('packs the paste button with the model chip so it never leaves the chip line', () => {
     const onPaste = vi.fn(() => undefined);
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention

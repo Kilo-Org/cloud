@@ -32,19 +32,46 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('react-native', () => ({
+  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
 }));
-vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+// The keyboard-padding leaf the screen renders reads the native side insets
+// through `react-native-safe-area-context`, whose module resolves to its
+// untransformed `react-native` entry (`src/index.tsx`) and breaks the mounted
+// project; every mounted suite mocks it.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+// The screen wraps its form in the shared keyboard-lift view, whose real module
+// reads the platform and the safe-area insets (a react-native entry this node
+// project cannot load). Sibling mounted specs stub the view for the same
+// reason; the reveal hook stays inert with no keyboard padding.
+// The screen reserves the keyboard's height and reveals its submit button via
+// `useRevealEndOnKeyboard`, so those hooks run on every render. Mock the native
+// safe-area context like the sibling app-aware-keyboard-padding.mounted.test.tsx
+// so the real package's TS source is never resolved by the test transform.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 // The keyboard-lift view reads the device insets through
 // `react-native-safe-area-context`, whose CommonJS entry requires a Flow
 // react-native subpath this node project cannot load. Stub the two kilo-chat
 // modules the way the sibling node-only screen tests do.
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
+  useAppAwareKeyboardPadding: () => 0,
 }));
+vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+// The screen reads `useRevealEndOnKeyboard()` on every render, before the
+// provider-status branches, and that hook reaches the keyboard-padding module
+// (whose safe-area import is not resolvable under this project's Node
+// environment). Sibling mounted tests of a screen that reserves keyboard
+// height mock the module the same way.
 vi.mock('@/components/kilo-chat/use-reveal-end-on-keyboard', () => ({
   useRevealEndOnKeyboard: () => ({ current: null }),
 }));

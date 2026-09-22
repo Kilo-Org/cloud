@@ -149,7 +149,7 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.openai]: 'openai/gpt-5-nano',
   [VercelUserByokInferenceProviderIdSchema.enum.perplexity]: 'perplexity/sonar',
   [VercelUserByokInferenceProviderIdSchema.enum.vertex]: 'google/gemini-2.5-flash-lite',
-  [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'xai/grok-4.1-fast-non-reasoning',
+  [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'spacexai/grok-4.7',
   [VercelUserByokInferenceProviderIdSchema.enum.xiaomi]: 'xiaomi/mimo-v2-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['alibaba-token-plan']]: 'deepseek-v3.2',

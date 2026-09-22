@@ -55,10 +55,12 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
 }));
-vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 18 }) }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 24, bottom: 18 }),
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check', ChevronDown: 'ChevronDown' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => theme.colors,
 }));
@@ -118,7 +120,10 @@ function nativePicker() {
           options: string[];
           cancelButtonIndex: number;
           title: string;
-          containerStyle: { paddingBottom: number; backgroundColor: string };
+          showSeparators: boolean;
+          icons: ReactTestInstance[];
+          separatorStyle: { backgroundColor: string };
+          containerStyle: { paddingTop: number; paddingBottom: number; backgroundColor: string };
           textStyle: { color: string };
           titleTextStyle: { color: string };
         },
@@ -209,6 +214,7 @@ describe('ContextControl', () => {
     const dark = nativePicker();
     expect(dark.options.title).toBe('Select account');
     expect(dark.options.containerStyle).toEqual({
+      paddingTop: 24,
       paddingBottom: 18,
       backgroundColor: DARK_COLORS.card,
     });
@@ -224,11 +230,40 @@ describe('ContextControl', () => {
     await press(picker(ui));
     const light = nativePicker();
     expect(light.options.containerStyle).toEqual({
+      paddingTop: 24,
       paddingBottom: 18,
       backgroundColor: LIGHT_COLORS.card,
     });
     expect(light.options.textStyle).toEqual({ color: LIGHT_COLORS.foreground });
     expect(light.options.titleTextStyle).toEqual({ color: LIGHT_COLORS.mutedForeground });
+  });
+
+  // The explorer finding: the switcher was a bare list — no separators, and
+  // nothing saying which account it was switching away from.
+  it('separates the scope rows and marks the current scope', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const ui = await mount();
+    await waitFor(() => texts(ui).includes(name));
+    await press(picker(ui));
+    const sheet = nativePicker();
+
+    expect(sheet.options.showSeparators).toBe(true);
+    expect(sheet.options.separatorStyle).toEqual({ backgroundColor: DARK_COLORS.border });
+    // The library draws `icons[i]` before row `i` of the one group it builds
+    // from every option — the trailing Cancel included — so the slot count must
+    // match the option count or the later rows lose their column. The org is
+    // row 1 (Personal is row 0), and only it draws the check.
+    expect(sheet.options.icons).toHaveLength(sheet.options.options.length);
+    expect(sheet.options.icons.map(icon => icon.type)).toEqual(['View', 'Check', 'View']);
+    expect(sheet.options.icons[0]?.props.className).toBe('h-[18px] w-[18px]');
+
+    // Switching to Personal moves the check to its own row on the next open.
+    await act(() => {
+      sheet.choose(0);
+    });
+    await waitFor(() => texts(ui).includes('Personal'));
+    await press(picker(ui));
+    expect(nativePicker().options.icons.map(icon => icon.type)).toEqual(['Check', 'View', 'View']);
   });
 
   it('keeps the mocked palettes mirroring the generated theme tokens', () => {

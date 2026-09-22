@@ -242,6 +242,33 @@ describe('feedback store-review write', () => {
     expect(alertMock.alert).toHaveBeenCalledOnce();
   });
 
+  // The post-submit prompt presents through the platform surface its caller
+  // renders (the in-app dialog on Android), never through the native alert.
+  it('presents through the caller-supplied surface when the marker is claimed', async () => {
+    const { maybeAskAfterSuccessfulOutcome } = await import('./feedback');
+    secureStoreMock.getItemAsync.mockResolvedValue(null);
+    const present = vi.fn<(userId: string | undefined) => void>();
+
+    await maybeAskAfterSuccessfulOutcome('user-1', present);
+
+    expect(secureStoreMock.setItemAsync).toHaveBeenCalledWith(
+      'feedback-last-asked-at',
+      expect.any(String)
+    );
+    expect(present).toHaveBeenCalledWith('user-1');
+    expect(alertMock.alert).not.toHaveBeenCalled();
+  });
+
+  it('does not present through the caller-supplied surface when the marker is set', async () => {
+    const { maybeAskAfterSuccessfulOutcome } = await import('./feedback');
+    secureStoreMock.getItemAsync.mockResolvedValue('2024-01-01T00:00:00.000Z');
+    const present = vi.fn<(userId: string | undefined) => void>();
+
+    await maybeAskAfterSuccessfulOutcome('user-1', present);
+
+    expect(present).not.toHaveBeenCalled();
+  });
+
   it('showFeedbackPrompt still alerts when the last-asked marker is set', async () => {
     const { showFeedbackPrompt } = await import('./feedback');
     secureStoreMock.getItemAsync.mockResolvedValue('2024-01-01T00:00:00.000Z');

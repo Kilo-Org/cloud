@@ -36,7 +36,7 @@ import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { needsInAppDestructiveConfirm } from '@/lib/destructive-confirm-platform';
-import { showFeedbackPrompt } from '@/lib/feedback';
+import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganization } from '@/lib/organization-context';
@@ -118,6 +118,9 @@ export function ProfileScreen() {
   const orgName = selectedOrg?.organizationName;
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
+  // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);
+  // the tile requests it and the screen renders whichever one applies.
+  const feedbackPrompt = useFeedbackPrompt();
 
   const { t } = useTranslation();
 
@@ -351,7 +354,7 @@ export function ProfileScreen() {
             icon={MessageSquare}
             label={t('profile.feedback')}
             onPress={() => {
-              showFeedbackPrompt(userId);
+              feedbackPrompt.requestPrompt(userId);
             }}
           />
           <ActionTile
@@ -409,6 +412,8 @@ export function ProfileScreen() {
           }}
         />
       )}
+
+      {feedbackPrompt.promptDialog}
     </View>
   );
 }

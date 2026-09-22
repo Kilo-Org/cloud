@@ -69,21 +69,29 @@ async function rateApp() {
   }
 }
 
+/** The prompt's positive answer: record it and open the store review flow. */
+export function requestAppRating() {
+  captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'positive' });
+  void rateApp();
+}
+
+/** The prompt's negative answer: record it and open the support email draft. */
+export function sendAppFeedback(userId: string | undefined) {
+  captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'negative' });
+  void openSupportEmail(userId);
+}
+
 export function showFeedbackPrompt(userId: string | undefined) {
   Alert.alert(i18n.t('feedback.neutralTitle'), undefined, [
     { text: i18n.t('common.notNow'), style: 'cancel' },
     {
       text: i18n.t('feedback.rateTheApp'),
-      onPress: () => {
-        captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'positive' });
-        void rateApp();
-      },
+      onPress: requestAppRating,
     },
     {
       text: i18n.t('feedback.sendFeedback'),
       onPress: () => {
-        captureEvent(FEEDBACK_SUBMITTED_EVENT, { sentiment: 'negative' });
-        void openSupportEmail(userId);
+        sendAppFeedback(userId);
       },
     },
   ]);
@@ -93,13 +101,20 @@ export function showFeedbackPrompt(userId: string | undefined) {
 // PR review submit). The last-asked marker absent-check and write run inside
 // one per-key chain, so concurrent calls observe the marker atomically: only
 // the first call shows the prompt and later calls skip it.
-export async function maybeAskAfterSuccessfulOutcome(userId: string | undefined): Promise<void> {
+//
+// `present` is where the prompt appears — the native alert by default, or the
+// caller's in-app surface on Android (`feedback-prompt-platform.ts`). It is
+// invoked inside the claim, so only the call that wins the marker presents.
+export async function maybeAskAfterSuccessfulOutcome(
+  userId: string | undefined,
+  present: (userId: string | undefined) => void = showFeedbackPrompt
+): Promise<void> {
   await writeAccountMetadata(FEEDBACK_LAST_ASKED_AT_KEY, async () => {
     const alreadyAsked = await SecureStore.getItemAsync(FEEDBACK_LAST_ASKED_AT_KEY);
     if (alreadyAsked != null) {
       return;
     }
     await SecureStore.setItemAsync(FEEDBACK_LAST_ASKED_AT_KEY, new Date().toISOString());
-    showFeedbackPrompt(userId);
+    present(userId);
   });
 }

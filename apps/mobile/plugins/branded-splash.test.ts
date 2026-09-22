@@ -164,8 +164,14 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // The introspection compiles against the real project root (that is what
+    // resolves the workspace's plugins), so `modResults` carries every color the
+    // committed colors.xml holds, not just the splash color. Match the splash
+    // resource as a subset instead of pinning the array's length.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

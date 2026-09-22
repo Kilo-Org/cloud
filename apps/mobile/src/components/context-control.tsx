@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { ChevronDown } from '@/components/ui/icons';
+import { Check, ChevronDown } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -21,26 +21,57 @@ export type ContextDisplayScope = { organizationId: string | null; isResolved: b
 export function useContextPicker(orgs: OrgListEntry[] | undefined) {
   const { showActionSheetWithOptions } = useActionSheet();
   const colors = useThemeColors();
-  const { bottom } = useSafeAreaInsets();
+  const { top, bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
-  const { setOrganizationId } = useOrganization();
+  const { organizationId, setOrganizationId } = useOrganization();
 
   return () => {
     if (!orgs) {
       return;
     }
-    const options = [
-      t('common.personal'),
-      ...orgs.map(org => org.organizationName),
-      t('common.cancel'),
-    ];
+    const scopeLabels = [t('common.personal'), ...orgs.map(org => org.organizationName)];
+    const options = [...scopeLabels, t('common.cancel')];
     const cancelButtonIndex = options.length - 1;
+    // The current scope is marked, so the sheet says which account it is
+    // switching away from. The library draws `icons[i]` before every row's
+    // label — including Cancel, which is an option row on this surface — so
+    // every row gets the same slot and only the current scope fills it with a
+    // check; the labels then stay on one column instead of shifting. Personal
+    // is row 0, so an organization sits one row past its index in `orgs`; a
+    // scope that is not among the rows marks nothing.
+    let currentIndex: number | null = null;
+    if (organizationId === null) {
+      currentIndex = 0;
+    } else {
+      const orgIndex = orgs.findIndex(org => org.organizationId === organizationId);
+      if (orgIndex !== -1) {
+        currentIndex = orgIndex + 1;
+      }
+    }
+    const icons = options.map((_, index) =>
+      index === currentIndex ? (
+        <Check key={index} size={18} color={colors.foreground} />
+      ) : (
+        <View key={index} className="h-[18px] w-[18px]" />
+      )
+    );
     showActionSheetWithOptions(
       {
         options,
         cancelButtonIndex,
         title: t('profile.selectAccount'),
-        containerStyle: { paddingBottom: bottom, backgroundColor: colors.card },
+        // The sheet is only an option list on the library's Android surface:
+        // without separators the rows read as one block, and when the list is
+        // taller than the window the sheet starts at the very top edge, so the
+        // status-bar inset keeps the title off the system bar.
+        showSeparators: true,
+        icons,
+        containerStyle: {
+          paddingTop: top,
+          paddingBottom: bottom,
+          backgroundColor: colors.card,
+        },
+        separatorStyle: { backgroundColor: colors.border },
         textStyle: { color: colors.foreground },
         titleTextStyle: { color: colors.mutedForeground },
       },

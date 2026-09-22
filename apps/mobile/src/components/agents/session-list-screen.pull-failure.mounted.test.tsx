@@ -89,6 +89,7 @@ vi.mock('react-native', () => ({
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   useWindowDimensions: () => ({ fontScale: 1 }),
   AppState: appState,
+  Keyboard: { addListener: () => ({ remove: () => undefined }) },
   FlatList: (props: {
     data: { id: string }[];
     renderItem: (entry: { item: { id: string } }) => ReactNode;

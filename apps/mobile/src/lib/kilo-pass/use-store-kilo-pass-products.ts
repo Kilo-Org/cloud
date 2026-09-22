@@ -6,7 +6,10 @@ import { i18n } from '@/i18n';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useTRPC } from '@/lib/trpc';
 import { type StoreKiloPassProduct } from './store-products';
-import { getStoreKiloPassProductsState } from './store-products-state';
+import {
+  getStoreKiloPassProductsState,
+  isStoreKiloPassProductsLoading,
+} from './store-products-state';
 import {
   getAuthoredProductsErrorMessage,
   loadAppStoreKiloPassProducts,
@@ -31,6 +34,22 @@ export type StoreKiloPassProductsOptions = {
   fetchStoreProducts: (productSkus: string[]) => Promise<readonly StoreKiloPassProduct[]>;
 };
 
+type KiloPassTrpc = ReturnType<typeof useTRPC>;
+
+/**
+ * Query options for the backend store-product catalog, carrying the same
+ * lifetime as the joined entry this module keeps. Every reader (this hook's
+ * `loadBackendProducts` and the IAP owner's server-backed fallback) shares one
+ * cache entry, so leaving Kilo Pass and returning inside the window reads the
+ * catalog instead of issuing `getMobileStoreProducts` again.
+ */
+export function backendStoreKiloPassProductsQueryOptions(trpc: KiloPassTrpc) {
+  return {
+    ...trpc.kiloPass.getMobileStoreProducts.queryOptions(),
+    staleTime: STORE_KILO_PASS_PRODUCTS_STALE_TIME_MS,
+  };
+}
+
 export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -52,6 +71,19 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
     };
   }, [options.connected, connectionAttempt]);
 
+  // The bound above is a fallback for a store that never answers. A store that
+  // connects after it fired — a slow but successful re-entry — makes that
+  // message stale: the cached tier tiles are already painted, and the product
+  // query is already successful from cache, so nothing else clears it and the
+  // false "Could not connect" retry card would stay over the tiles. Drop it as
+  // soon as the store connection lands; a later product failure still surfaces
+  // through the query's own error below.
+  useEffect(() => {
+    if (options.connected) {
+      setStoreErrorMessage(null);
+    }
+  }, [options.connected]);
+
   const productsQuery = useQuery({
     queryKey: ['kilo-pass', 'app-store-products', userId],
     queryFn: async () => {
@@ -59,7 +91,7 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
         fetchStoreProducts: options.fetchStoreProducts,
         loadBackendProducts: async () => {
           const backendResponse = await queryClient.fetchQuery(
-            trpc.kiloPass.getMobileStoreProducts.queryOptions()
+            backendStoreKiloPassProductsQueryOptions(trpc)
           );
           return backendResponse;
         },
@@ -95,9 +127,13 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
 
   return {
     products: productsState.products,
-    isLoading:
-      storeErrorMessage === null &&
-      (productsQuery.isLoading || (isIapPlatform && !options.connected)),
+    isLoading: isStoreKiloPassProductsLoading({
+      data: productsQuery.data,
+      queryIsLoading: productsQuery.isLoading,
+      isIapPlatform,
+      isStoreConnected: options.connected,
+      storeErrorMessage,
+    }),
     isRefetching: productsQuery.isRefetching,
     isError: productsState.isError,
     errorMessage: productsState.errorMessage,

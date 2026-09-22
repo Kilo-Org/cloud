@@ -16,6 +16,7 @@ import { z } from 'zod';
 
 import { collectUnfilteredPages } from '@/lib/agent-session-pages';
 import { getRecentPrs } from '@/lib/pr-review/recent-prs';
+import { dedupeBy } from '@/lib/query/dedupe-by-id';
 import {
   activeSessionSearchDocument,
   findingSearchDocument,
@@ -156,7 +157,7 @@ export async function collectSystemSearchDocuments(
   for (const source of recents.observedSources) {
     observedSources.add(source);
   }
-  return { documents: dedupeById(documents), observedSources };
+  return { documents: dedupeBy(documents, document => document.id), observedSources };
 }
 
 /**
@@ -499,16 +500,4 @@ async function recentPrDocuments(): Promise<{
 
 function presentOrEmpty(document: SystemSearchDocument | null): SystemSearchDocument[] {
   return document === null ? [] : [document];
-}
-
-function dedupeById(documents: readonly SystemSearchDocument[]): SystemSearchDocument[] {
-  const seen = new Set<string>();
-  const result: SystemSearchDocument[] = [];
-  for (const document of documents) {
-    if (!seen.has(document.id)) {
-      seen.add(document.id);
-      result.push(document);
-    }
-  }
-  return result;
 }

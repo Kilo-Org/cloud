@@ -710,6 +710,29 @@ describe('SandboxContainers stop', () => {
   });
 });
 
+describe('SandboxContainers force destroy', () => {
+  it('clears the record to idle so a same-ref launch starts instead of reusing a destroyed container', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+    });
+    container.running = true;
+
+    await instance.forceDestroyForControlPlane();
+
+    expect(container.destroyCalls).toBe(1);
+    expect(container.running).toBe(false);
+    await expect(instance.observe(REF_A)).resolves.toEqual({
+      running: false,
+      state: 'idle',
+      currentAllocationRef: null,
+    });
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null, stopOpId: null });
+
+    await expect(launch(instance, REF_A)).resolves.toEqual({ started: true });
+    expect(container.startCalls).toHaveLength(1);
+  });
+});
+
 describe('SandboxContainers lease and log', () => {
   it('ensures the container lease only for the current allocation', async () => {
     const { instance, container } = setup({

@@ -241,7 +241,7 @@ export class ContainersBilling {
         await host.container.schedule(delaySeconds, callback, payload);
       },
       deleteSchedules: callback => host.container.deleteSchedules(callback),
-      getState: () => this.observedState(),
+      getState: () => this.host.container.getState(),
       isContainerRunning: host.isContainerRunning,
       stopContainer: host.stopContainer,
       destroyContainer: host.destroyContainer,
@@ -283,19 +283,6 @@ export class ContainersBilling {
    */
   initiateSettlement(): Promise<void> {
     return this.onContainerStopped({ reason: 'runtime_signal' });
-  }
-
-  /**
-   * Report the observed physical stop as `lastChange` once a heartbeat has
-   * persisted it. The lifecycle derives the final usage boundary from this
-   * observation, so settlement cannot bill past the persisted physical stop.
-   */
-  private async observedState(): Promise<{ status: string; lastChange?: number }> {
-    const state = await this.host.container.getState();
-    if (state.status !== 'stopped') return state;
-    const context = await getBillingContext(this.host.storage);
-    if (context?.stoppedObservedAtMs === undefined) return state;
-    return { ...state, lastChange: context.stoppedObservedAtMs };
   }
 
   isBillingBlocked(): Promise<boolean> {

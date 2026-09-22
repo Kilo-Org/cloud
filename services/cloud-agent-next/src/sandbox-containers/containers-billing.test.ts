@@ -456,6 +456,105 @@ describe('ContainersBilling physical lifecycle', () => {
   });
 });
 
+describe('ContainersBilling stop boundary', () => {
+  it('reports the last-known-running measurement, not the observation time, for a self-stop', async () => {
+    const { instance, container, storage } = setup();
+    await admit(instance, 'standard-4');
+    const usageMeasuredAtMs = (
+      storage.map.get(BILLING_CONTEXT_KEY) as { usageMeasuredAtMs: number }
+    ).usageMeasuredAtMs;
+
+    container.running = false;
+    vi.setSystemTime(T0 + 300_000);
+
+    const state = await instance.getState();
+
+    expect(state).toEqual({ status: 'stopped', lastChange: usageMeasuredAtMs });
+    expect(state.lastChange).toBeLessThan(Date.now());
+  });
+
+  it('prefers a persisted stopped boundary over the last running measurement', async () => {
+    const { instance, container, storage } = setup();
+    await admit(instance, 'standard-4');
+    const context = storage.map.get(BILLING_CONTEXT_KEY) as Record<string, unknown>;
+    const stoppedObservedAtMs = (context.usageMeasuredAtMs as number) - 60_000;
+    storage.map.set(BILLING_CONTEXT_KEY, { ...context, stoppedObservedAtMs });
+
+    container.running = false;
+    vi.setSystemTime(T0 + 300_000);
+
+    await expect(instance.getState()).resolves.toEqual({
+      status: 'stopped',
+      lastChange: stoppedObservedAtMs,
+    });
+  });
+
+  it('reports a finite boundary without a billing context', async () => {
+    const { instance } = setup();
+
+    const state = await instance.getState();
+
+    expect(state.status).toBe('stopped');
+    expect(Number.isFinite(state.lastChange)).toBe(true);
+    expect(state.lastChange).toBeLessThanOrEqual(Date.now());
+  });
+
+  it('persists the getState boundary when a heartbeat observes a self-stop and settles there', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    const heartbeatDue = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs as number;
+
+    container.running = false;
+    vi.setSystemTime(heartbeatDue);
+    const observed = await instance.getState();
+
+    await instance.alarm();
+    await flushPending(pendingTasks);
+
+    const context = storage.map.get(BILLING_CONTEXT_KEY) as {
+      stoppedObservedAtMs?: number;
+      usageMeasuredAtMs: number;
+    };
+    expect(context.stoppedObservedAtMs).toBe(observed.lastChange);
+    expect(context.stoppedObservedAtMs).toBeLessThan(heartbeatDue);
+    expect(meter.recordStopInputs).toHaveLength(0);
+
+    await instance.stop(REF_A);
+    await flushPending(pendingTasks);
+
+    expect(meter.recordStopInputs).toHaveLength(1);
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(
+      ((context.stoppedObservedAtMs as number) - context.usageMeasuredAtMs) / 1_000
+    );
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(0);
+  });
+});
+
+describe('ContainersBilling force destroy', () => {
+  it('settles through the persisted identity after a control-plane destroy and leaves an idle record', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    container.running = false;
+
+    await instance.forceDestroyForControlPlane();
+    await flushPending(pendingTasks);
+
+    expect(container.destroyCalls).toBe(1);
+    expect(readRecord(storage)).toMatchObject({
+      state: 'idle',
+      allocationRef: null,
+      instance: 'standard-4',
+      billingConfigured: true,
+    });
+    expect(meter.recordStopInputs).toHaveLength(1);
+    expect(meter.recordStopInputs[0].service).toBe('cloud-agent-next-sandbox-containers-standard4');
+  });
+});
+
 describe('ContainersBilling inert without persisted attribution', () => {
   it('keeps launch, same-ref reuse, stop, and pre-change records unchanged for standard-2 and lite', async () => {
     for (const instanceSize of ['standard-2', 'lite'] as const) {
@@ -774,7 +873,8 @@ describe('ContainersBilling identity replacement', () => {
       stoppedObservedAtMs?: number;
       usageMeasuredAtMs: number;
     };
-    expect(stoppedContext.stoppedObservedAtMs).toBe(heartbeatDue);
+    expect(stoppedContext.stoppedObservedAtMs).toBe(stoppedContext.usageMeasuredAtMs);
+    expect(stoppedContext.stoppedObservedAtMs).not.toBe(heartbeatDue);
 
     const replacementAt = heartbeatDue + 60_000;
     vi.setSystemTime(replacementAt);
@@ -793,10 +893,9 @@ describe('ContainersBilling identity replacement', () => {
     expect(first.meter.recordStopInputs[0].service).toBe(
       'cloud-agent-next-sandbox-containers-standard3'
     );
-    // The final segment ends at the observed physical stop, not the replacement request.
-    expect(first.meter.recordStopInputs[0].usageSinceLast).toBe(
-      (heartbeatDue - stoppedContext.usageMeasuredAtMs) / 1_000
-    );
+    // The final segment ends at the last observed running measurement, not the
+    // later replacement request.
+    expect(first.meter.recordStopInputs[0].usageSinceLast).toBe(0);
     expect(first.meter.recordStopInputs[0].usageSinceLast).not.toBe(
       (replacementAt - stoppedContext.usageMeasuredAtMs) / 1_000
     );
@@ -984,6 +1083,21 @@ describe('ContainersBilling identity replacement', () => {
     expect(readRecord(storage).instance).toBe('standard-4');
     const starts = meter.recordStartInputs;
     expect(starts[starts.length - 1].service).toBe('cloud-agent-next-sandbox-containers-standard4');
+  });
+  it('clears a stale billing flag when the identity is replaced with a non-billable instance', async () => {
+    const { instance, storage, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+
+    // The switch is refused until the old generation settles, so retry after it lands.
+    await expect(instance.configureBilling(BILLING_INPUT, 'standard-2')).rejects.toThrow(
+      'Container billing identity change refused'
+    );
+    await flushPending(pendingTasks);
+
+    await instance.configureBilling(BILLING_INPUT, 'standard-2');
+
+    expect(readRecord(storage).instance).toBe('standard-2');
+    expect(readRecord(storage).billingConfigured).toBeUndefined();
   });
 });
 

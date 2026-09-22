@@ -1,3 +1,4 @@
+import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
 import { billingHeartbeatSeconds } from '../container-usage.js';
@@ -162,10 +163,17 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   async getState(): Promise<{ status: 'running' | 'stopped'; lastChange: number }> {
-    return {
-      status: this.ctx.container?.running === true ? 'running' : 'stopped',
-      lastChange: Date.now(),
-    };
+    const status = this.ctx.container?.running === true ? 'running' : 'stopped';
+    if (status === 'running') return { status, lastChange: Date.now() };
+    // A self-stop carries no exit timestamp, so the boundary is the last observed
+    // running measurement, never the observation time: residual error is under one
+    // heartbeat interval and settlement can never bill past the physical stop.
+    const context = await getBillingContext(this.ctx.storage);
+    const lastChange =
+      context === undefined
+        ? Date.now()
+        : (context.stoppedObservedAtMs ?? context.usageMeasuredAtMs);
+    return { status, lastChange };
   }
 
   async alarm(): Promise<void> {
@@ -234,7 +242,9 @@ export class SandboxContainers extends DurableObject<Env> {
       throw new Error('Native container destruction is unavailable');
     }
     await container.destroy();
-    await this.settleBillingAtStop(await this.readRecord());
+    const record = await this.readRecord();
+    await this.writeRecord(this.terminalRecord(record));
+    await this.settleBillingAtStop(record);
   }
 
   async getBillingRuntimeStatus() {
@@ -391,6 +401,17 @@ export class SandboxContainers extends DurableObject<Env> {
     return image;
   }
 
+  private terminalRecord(record: ContainersRecord): ContainersRecord {
+    return {
+      state: 'idle',
+      allocationRef: null,
+      stopOpId: null,
+      lastSnapshot: record.lastSnapshot,
+      ...(record.instance !== undefined ? { instance: record.instance } : {}),
+      ...(record.billingConfigured ? { billingConfigured: true } : {}),
+    };
+  }
+
   private async finishStop(
     record: ContainersRecord,
     ref: string,
@@ -398,14 +419,7 @@ export class SandboxContainers extends DurableObject<Env> {
   ): Promise<'terminal' | 'retryable'> {
     const container = this.ctx.container;
     if (!container) {
-      await this.writeRecord({
-        state: 'idle',
-        allocationRef: null,
-        stopOpId: null,
-        lastSnapshot: record.lastSnapshot,
-        ...(record.instance !== undefined ? { instance: record.instance } : {}),
-        ...(record.billingConfigured ? { billingConfigured: true } : {}),
-      });
+      await this.writeRecord(this.terminalRecord(record));
       await this.settleBillingAtStop(record);
       return 'terminal';
     }
@@ -416,14 +430,7 @@ export class SandboxContainers extends DurableObject<Env> {
       return 'retryable';
     }
     const current = await this.readRecord();
-    await this.writeRecord({
-      state: 'idle',
-      allocationRef: null,
-      stopOpId: null,
-      lastSnapshot: current.lastSnapshot,
-      ...(current.instance !== undefined ? { instance: current.instance } : {}),
-      ...(current.billingConfigured ? { billingConfigured: true } : {}),
-    });
+    await this.writeRecord(this.terminalRecord(current));
     await this.settleBillingAtStop(current);
     return 'terminal';
   }
@@ -556,11 +563,12 @@ export class SandboxContainers extends DurableObject<Env> {
       ) {
         return { record };
       }
-      const updated: ContainersRecord = {
-        ...record,
-        instance: resolved,
-        ...(billingConfigured ? { billingConfigured: true } : {}),
-      };
+      const updated: ContainersRecord = { ...record, instance: resolved };
+      if (billingConfigured) {
+        updated.billingConfigured = true;
+      } else {
+        delete updated.billingConfigured;
+      }
       await this.writeRecord(updated);
       return { record: updated };
     });

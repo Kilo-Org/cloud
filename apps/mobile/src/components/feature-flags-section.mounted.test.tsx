@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -39,6 +39,25 @@ function textLines(tree: ReactTestRenderer): string[] {
   return tree.root
     .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
     .map(node => [node.props.children].flat().join(''));
+}
+
+/** The text a rendered child holds, flattened (composed lines arrive as arrays). */
+function childText(node: unknown): string {
+  if (typeof node !== 'object' || node === null) {
+    return '';
+  }
+  return [(node as { props?: { children?: unknown } }).props?.children].flat().join('');
+}
+
+/** The Views whose className carries `token`, e.g. the flag heading row. */
+function viewsWithClass(tree: ReactTestRenderer, token: string): ReactTestInstance[] {
+  return tree.root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      node.props.className.split(' ').includes(token)
+  );
 }
 
 beforeEach(() => {
@@ -95,6 +114,20 @@ describe('FeatureFlagsSection', () => {
     expect(lines).toContain('mobile-quick-chat');
     expect(lines).toContain('Off · default · < 1.0.6');
     expect(lines).toContain('v1.0.5');
+  });
+
+  it('hangs the build version off the Feature flags heading row, above the cards', async () => {
+    posthog.statuses = [applied];
+    const tree = await mount();
+
+    // The version belongs to the heading row: one flex-row View holding both
+    // the header Text and the version Text, not a stray sibling after the cards.
+    const headingRows = viewsWithClass(tree, 'flex-row');
+    expect(headingRows).toHaveLength(1);
+    expect([headingRows[0]?.props.children].flat().map(child => childText(child))).toEqual([
+      'Feature flags',
+      'v1.0.5',
+    ]);
   });
 
   it('marks a flag the build skips as default in use with the minimum version', async () => {

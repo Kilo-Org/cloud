@@ -841,7 +841,11 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
-  it('allows a direct temporarily blocked model request through user BYOK', async () => {
+  it.each([
+    'anthropic/claude-opus-5',
+    CLAUDE_OPUS_LATEST_MODEL_ALIAS,
+    'anthropic/claude-fable-5.1',
+  ])('allows a direct temporarily blocked model request through user BYOK: %s', async modelId => {
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
       provider,
@@ -850,7 +854,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     });
 
     const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeBody('anthropic/claude-opus-5')) as never);
+    const response = await POST(makeRequest(makeBody(modelId)) as never);
 
     expect(response.status).toBe(200);
     expect(mockedIsTemporarilyBlockedModelAllowedForOrganization).not.toHaveBeenCalled();

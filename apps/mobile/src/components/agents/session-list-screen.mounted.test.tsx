@@ -1282,7 +1282,7 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
   });
 
-  it('clears the tab bar for the no-match body without waiting on a surface measurement', async () => {
+  it('clears the tab bar for the no-match body through the surface reservation alone', async () => {
     state.live.activeSessions = [row];
     const renderer = await renderScreen();
     const searchHeader = requireNode('SessionListSearchHeader');
@@ -1291,11 +1291,15 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(nodes('CenteredState')).toHaveLength(1);
     expect(nodes('FlatList')).toHaveLength(0);
-    // The no-match body owns the same frame clearance as the rows list, so the
-    // fixed tab bar clips neither its secondary line nor its CTA even while the
-    // measured surface layout is still pending.
+    // The fixed tab bar is reserved once, by the surface inset this screen sets
+    // (tab bar + FAB band) and which CenteredState's pending-layout fallback
+    // pads by. Letting the no-match body shrink its own frame by the same band
+    // cleared the band a second time and pushed the centered copy about half
+    // the band above the centre of the area above the bar, so the body must not
+    // carry a clearance of its own.
     const body = nodes('CenteredState')[0];
-    expect(body?.props.frameStyle).toEqual({ marginBottom: state.tabBarHeight + 64 });
+    expect(body?.props.frameStyle).toBeUndefined();
+    expect(body?.props.style).toBeUndefined();
     expect(renderer.root.findByType(EmptyState).props.description).toBe(
       'Try a different search term.'
     );

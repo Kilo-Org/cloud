@@ -265,15 +265,17 @@ export function AgentSessionListScreen() {
     // over it (device defect uxs1). That body is centered, so it draws the
     // pull's own progress while reduced motion is on, and the band then
     // yields its spinner to it (`progressInBody` on the reserved line).
-    // The body's frame carries the same band clearance as the rows list, so
-    // the centered copy and its CTA clear the fixed tab bar even before the
-    // surface geometry lands (a measured layout can only tighten it).
+    // The centered body clears the fixed tab bar through the surface
+    // reservation this screen already sets: `CenteredState`'s pending-layout
+    // fallback pads by `surface.bottomReservation` (the tab bar plus the FAB
+    // band) and its measured layout clamps by the same inset. Adding that band
+    // as a frame clearance here too reserved it twice and pushed the centered
+    // copy roughly half the band above the centre of the area above the bar.
     body = (
       <EmptyState
         icon={Bot}
         title={t('agents.sessionList.noMatches')}
         refreshControl={rowsControl}
-        frameStyle={listInsets.frame}
         description={
           isSearching
             ? t('agents.sessionList.tryDifferentSearch')

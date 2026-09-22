@@ -22,9 +22,6 @@ type EmptyStateProps = {
    *  depend on a measured surface (the root runtime-error screen). */
   placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
-  /** Frame clearance for the centered scroller, e.g. the fixed tab-bar band
-   *  the caller's rows list also clears (see `CenteredState.frameStyle`). */
-  frameStyle?: ScrollViewProps['style'];
   /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
   iconContainerClassName?: string;
   iconSize?: number;
@@ -41,7 +38,6 @@ export function EmptyState({
   action,
   placement = 'center',
   refreshControl,
-  frameStyle,
   iconContainerClassName = DEFAULT_ICON_CONTAINER_CLASS,
   iconSize = 24,
   iconStrokeWidth = 1.5,
@@ -74,9 +70,7 @@ export function EmptyState({
   );
 
   return placement === 'center' ? (
-    <CenteredState refreshControl={refreshControl} frameStyle={frameStyle}>
-      {content}
-    </CenteredState>
+    <CenteredState refreshControl={refreshControl}>{content}</CenteredState>
   ) : (
     content
   );

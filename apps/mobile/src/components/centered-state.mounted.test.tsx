@@ -324,20 +324,24 @@ describe('CenteredState measurement fallback', () => {
     }
   });
 
-  it('reserves the surface bottom band while the layout measurement is pending', async () => {
+  it('reserves the surface bottom band once while the layout measurement is pending', async () => {
     // The tab bar is an absolute overlay: its band is known from the surface
     // reservation before any geometry lands. The fallback placement must keep
-    // the content clear of it instead of centering the body under the bar.
+    // the content clear of it instead of centering the body under the bar — and
+    // it must clear the band exactly once, so it pads by the reservation and
+    // shrinks no frame (clearing it twice pushed the body half the band above
+    // the centre of the visible area).
     native.surface.bottomInset = 96;
     native.surface.bottomReservation = 96;
     const mounted = await mount();
     expect(mounted.content().accessibilityElementsHidden).toBe(true);
-    const style = mounted.scroll().contentContainerStyle as {
-      paddingVertical?: number;
-      paddingBottom?: number;
-    };
-    const bottomPadding = style.paddingBottom ?? style.paddingVertical ?? 0;
-    expect(bottomPadding).toBeGreaterThanOrEqual(96);
+    expect(mounted.scroll().contentContainerStyle).toEqual({
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingTop: 16,
+      paddingBottom: 112,
+    });
+    expect(mounted.scroll().style).toBeUndefined();
     mounted.unmount();
   });
 });

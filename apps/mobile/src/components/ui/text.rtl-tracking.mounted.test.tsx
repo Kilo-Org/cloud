@@ -102,7 +102,14 @@ describe('Text tracked labels in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
-    expect(hostText(root).props.className as string).toContain('tracking-[1.5px]');
+    // The eyebrow variant drops the Latin-only `uppercase tracking-[1.5px]`
+    // in RTL (and with it the caller-visible class), keeping the mono family,
+    // size and color; the shared RTL style array still carries the reset that
+    // any tracked class left on the element would need.
+    const className = hostText(root).props.className as string;
+    expect(className).not.toContain('tracking-[1.5px]');
+    expect(className).not.toContain('uppercase');
+    expect(className).toContain('font-mono-medium');
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
   });
 });

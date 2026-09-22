@@ -5,25 +5,44 @@ const TAB_BAR_BASE_HEIGHT = 50;
 const ANDROID_TAB_BAR_EXTRA_PADDING = 4;
 export const TAB_LABEL_WRAP_FONT_SCALE = 1.8;
 /**
- * Above this font scale the tab bar drops visible labels and switches to an
- * icon-forward presentation. The label height (which scales with fontScale) is
+ * At or above this font scale the tab bar drops visible labels and switches to
+ * an icon-forward presentation. The label height (which scales with fontScale) is
  * removed from the overlay height calculation, so the bar stays at the base
  * 50pt instead of ballooning. Labels remain available to assistive tech via
  * `tabBarAccessibilityLabel`. Picked above the label-wrap threshold so
  * moderate-to-large text still keeps a visible word label.
  */
 export const TAB_ICON_FORWARD_FONT_SCALE = 2;
+/**
+ * Floor for a tab label's shrink-to-fit. A label wider than its tab (a narrow
+ * window, a long translation) shrinks to fit the one line the bar reserves;
+ * below this scale the text stops being legible, so it ellipsizes instead. The
+ * widest stock label at 160 dp needs about 0.9, well above this floor.
+ */
+export const TAB_LABEL_MINIMUM_FONT_SCALE = 0.75;
 const TAB_ICON_BASE_SIZE = 22;
 const TAB_ICON_MAX_SIZE = 26;
 
 type TabBarPlatform = 'android' | 'ios' | 'macos' | 'windows' | 'web';
+
+/**
+ * Number of label lines the bar reserves and the label may use. Below the wrap
+ * threshold the bar is sized for one line, so the label must stay on one line
+ * and shrink to fit it: a word wider than its tab would otherwise wrap into a
+ * second line the bar has no room for, and be clipped at the bar's edge
+ * ("PROFIL E", 480x1000 @ 480 = 160 dp, e1, 2026-09-21). Above the threshold the
+ * bar grows the second line for the two-line `tabs.kiloclawWrapped` label.
+ */
+export function tabLabelLineCount(fontScale = 1): 1 | 2 {
+  return fontScale > TAB_LABEL_WRAP_FONT_SCALE ? 2 : 1;
+}
 
 export function getTabBarOverlayHeight(
   bottomInset: number,
   platform: TabBarPlatform,
   fontScale = 1
 ): number {
-  const labelLines = fontScale > TAB_LABEL_WRAP_FONT_SCALE ? 2 : 1;
+  const labelLines = tabLabelLineCount(fontScale);
   const tabContentHeight = 34 + 16 * fontScale * labelLines;
   return (
     Math.max(TAB_BAR_BASE_HEIGHT, tabContentHeight) +

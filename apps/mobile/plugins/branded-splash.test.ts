@@ -164,8 +164,13 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // Introspection merges into the native project it finds at `projectRoot`,
+    // so an already-prebuild tree contributes its own colors here. Assert the
+    // entry this plugin generates instead of the whole array.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

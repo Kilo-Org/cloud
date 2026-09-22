@@ -65,7 +65,7 @@ export function usageServiceForSandboxClass(sandboxClassName: SandboxClassName):
 export function isContainersBillingClassName(
   sandboxClassName: SandboxClassName
 ): sandboxClassName is ContainersBillingClassName {
-  return sandboxClassName in CONTAINERS_BILLING_CAPACITIES;
+  return Object.hasOwn(CONTAINERS_BILLING_CAPACITIES, sandboxClassName);
 }
 
 export function billingCapacityForSandboxClass(

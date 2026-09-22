@@ -3,13 +3,16 @@ import type { SandboxId, SandboxInstance } from './types.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import {
   assertSandboxBillingAllocation,
+  billingCapacityForSandboxClass,
   buildSandboxBillingInput,
   configureSandboxBillingInput,
   containersBillingIdentity,
   forceDestroyControlPlaneSandbox,
   getSandboxBillingRuntimeStatus,
+  isContainersBillingClassName,
   SANDBOX_CAPACITIES,
   SANDBOX_USAGE_SKUS,
+  type SandboxClassName,
 } from './container-usage-context.js';
 
 function metadata(identity: SessionMetadata['identity']): SessionMetadata {
@@ -142,6 +145,45 @@ describe('container usage context', () => {
     for (const instance of ['constructor', 'toString', '__proto__', 'standard-5']) {
       expect(() => containersBillingIdentity(instance)).toThrow(
         `Containers billing is unsupported for instance size: ${instance}`
+      );
+    }
+  });
+
+  it('does not classify inherited object keys as containers billing classes', () => {
+    for (const className of ['toString', 'constructor', 'valueOf', '__proto__'] as const) {
+      expect(isContainersBillingClassName(className as SandboxClassName)).toBe(false);
+    }
+  });
+
+  it('classifies exactly the own containers billing classes', () => {
+    for (const className of ['SandboxContainersStandard3', 'SandboxContainersStandard4'] as const) {
+      expect(isContainersBillingClassName(className)).toBe(true);
+    }
+    for (const className of [
+      'Sandbox',
+      'SandboxContainment',
+      'SandboxSmall',
+      'SandboxSmallContainment',
+      'SandboxDIND',
+      'SandboxCodeReview',
+      'SandboxCodeReviewContainment',
+    ] as const) {
+      expect(isContainersBillingClassName(className)).toBe(false);
+    }
+  });
+
+  it('agrees with containers identity resolution for every resolved class name', () => {
+    for (const instance of ['standard-3', 'standard-4'] as const) {
+      const { className } = containersBillingIdentity(instance);
+      expect(isContainersBillingClassName(className)).toBe(true);
+    }
+  });
+
+  it('never resolves an inherited object key as a sandbox billing capacity', () => {
+    for (const className of ['toString', 'constructor', 'valueOf'] as const) {
+      expect(isContainersBillingClassName(className as SandboxClassName)).toBe(false);
+      expect(billingCapacityForSandboxClass(className as SandboxClassName)).not.toHaveProperty(
+        'vcpu'
       );
     }
   });

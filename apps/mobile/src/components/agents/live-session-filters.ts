@@ -1,6 +1,7 @@
 import {
   formatGitUrlProject,
   knownPlatformBucket,
+  normalisePlatformSelection,
   PLATFORM_FILTERS,
   type ProjectFilterOption,
   projectOptionKey,
@@ -103,6 +104,10 @@ export function filterLiveSessions<T extends LiveFilterSession>(
   if (platformFilter.length === 0 && projectFilter.length === 0 && needle.length === 0) {
     return sessions;
   }
+  // Collapse each persisted platform through its bucket (the same vocabulary
+  // the sheet and the badge use), so a legacy stored variant still matches the
+  // single row it renders.
+  const platformBuckets = new Set(normalisePlatformSelection(platformFilter));
   // Match by visible-label identity, not by the raw stored URL, so one stored
   // URL still matches every row the merged option covers (https vs ssh, a
   // `.git` suffix, host case).
@@ -110,7 +115,7 @@ export function filterLiveSessions<T extends LiveFilterSession>(
   return sessions.filter(session => {
     const bucket = liveSessionPlatformBucket(session.createdOnPlatform);
     const platformMatches =
-      platformFilter.length === 0 || (bucket !== null && platformFilter.includes(bucket));
+      platformBuckets.size === 0 || (bucket !== null && platformBuckets.has(bucket));
     const projectMatches =
       projectFilter.length === 0 ||
       (session.gitUrl != null && projectKeys.has(projectOptionKey(session.gitUrl)));

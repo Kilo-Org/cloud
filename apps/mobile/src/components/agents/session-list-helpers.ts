@@ -70,6 +70,22 @@ export function knownPlatformBucket(platform: string): string | null {
   return BUCKET_BY_PLATFORM.get(platform) ?? null;
 }
 
+/**
+ * Collapse a persisted platform selection into the bucket rows the filter sheet
+ * renders: a stored variant maps to its bucket (`cloud-agent-web` ->
+ * `cloud-agent`, `vscode` and `agent-manager` -> `extension`), a bucket maps to
+ * itself, and an unknown platform keeps its own value. Deduplicated, so a
+ * bucket saved alongside one of its variants is one entry.
+ *
+ * The badge count and the sheet already speak this vocabulary; the live-list
+ * comparison and the history query use this so a legacy selection behaves the
+ * same way everywhere: one checked row means one active filter that covers each
+ * of that row's raw platforms.
+ */
+export function normalisePlatformSelection(filter: readonly string[]): string[] {
+  return [...new Set(filter.map(platform => knownPlatformBucket(platform) ?? platform))];
+}
+
 export function formatGitUrlProject(gitUrl: string): string {
   const sshMatch = /^git@[^:]+:(.+?)(?:\.git)?$/.exec(gitUrl);
   const sshPath = sshMatch?.[1];

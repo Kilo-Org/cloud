@@ -119,6 +119,17 @@ describe('filterLiveSessions', () => {
     ).toEqual(['vscode']);
   });
 
+  it('matches a persisted variant selection as the bucket row the sheet checks', () => {
+    // A legacy record can hold `cloud-agent-web`; the badge and the sheet
+    // collapse it to the single `cloud-agent` row, so the list must too.
+    expect(
+      filterLiveSessions(sessions, query({ platformFilter: ['cloud-agent-web'] })).map(s => s.id)
+    ).toEqual(['cloud']);
+    expect(
+      filterLiveSessions(sessions, query({ platformFilter: ['agent-manager'] })).map(s => s.id)
+    ).toEqual(['vscode']);
+  });
+
   it('matches every alias of a merged repository from one stored URL', () => {
     const aliases = [
       { id: 'ssh', gitUrl: 'git@github.com:kilo/cloud.git', createdOnPlatform: 'cli' },

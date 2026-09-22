@@ -1,13 +1,16 @@
 import { z } from 'zod';
 
-import { knownPlatformBucket, projectOptionKey } from '@/components/agents/session-list-helpers';
+import {
+  normalisePlatformSelection,
+  projectOptionKey,
+} from '@/components/agents/session-list-helpers';
 
 /**
  * Pure contract for the persisted session filter set. Intentionally free of
  * any Expo / SecureStore / native-bridge imports so it can be unit-tested in
  * node and re-used by tests/mocks without touching the native bridge. It
  * imports the visible-label project key (`projectOptionKey`) and the
- * platform-bucket collapse (`knownPlatformBucket`) from the session-list
+ * platform-bucket collapse (`normalisePlatformSelection`) from the session-list
  * helpers so the badge counts each row the filter sheet renders once; that
  * module is native-free too, so the node test still runs.
  *
@@ -88,8 +91,6 @@ export function countActiveSessionFilters(filters: AgentSessionFilters): number 
   // bucket and one of its variants (`cloud-agent` + `cloud-agent-web`) renders
   // one checked row and must count once. An unknown platform keeps its own row,
   // so it counts as itself.
-  const platformCount = new Set(
-    filters.platformFilter.map(platform => knownPlatformBucket(platform) ?? platform)
-  ).size;
+  const platformCount = normalisePlatformSelection(filters.platformFilter).length;
   return platformCount + projectCount;
 }

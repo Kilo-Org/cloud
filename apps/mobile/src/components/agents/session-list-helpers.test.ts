@@ -15,6 +15,7 @@ import {
   expandPlatformFilter,
   formatMeta,
   knownPlatformBucket,
+  normalisePlatformSelection,
   PLATFORM_FILTERS,
   projectOptionKey,
   remoteAgentLabel,
@@ -213,6 +214,29 @@ describe('knownPlatformBucket (inverse of expandPlatformFilter)', () => {
         expect(knownPlatformBucket(platform)).toBe(bucket);
       }
     }
+  });
+});
+
+describe('normalisePlatformSelection (persisted selection → sheet rows)', () => {
+  it('collapses a stored variant into its bucket and keeps an unknown platform', () => {
+    expect(normalisePlatformSelection(['cloud-agent-web', 'vscode'])).toEqual([
+      'cloud-agent',
+      'extension',
+    ]);
+    expect(normalisePlatformSelection(['jetbrains'])).toEqual(['jetbrains']);
+  });
+
+  it('dedupes a bucket saved alongside one of its variants', () => {
+    expect(normalisePlatformSelection(['cloud-agent', 'cloud-agent-web'])).toEqual(['cloud-agent']);
+    expect(normalisePlatformSelection(['extension', 'vscode', 'agent-manager'])).toEqual([
+      'extension',
+    ]);
+  });
+
+  it('expands to every raw platform of the checked row, so the history query covers the bucket', () => {
+    expect(
+      expandPlatformFilter(normalisePlatformSelection(['cloud-agent-web'])).toSorted()
+    ).toEqual(['cloud-agent', 'cloud-agent-web'].toSorted());
   });
 });
 

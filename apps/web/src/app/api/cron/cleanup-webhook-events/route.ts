@@ -10,8 +10,8 @@ import { asc, inArray, lt } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 
-const RETENTION_DAYS = 7;
-const BATCH_SIZE = 1_000;
+const RETENTION_DAYS = 60;
+const BATCH_SIZE = 500;
 
 export async function GET(request: Request) {
   if (!CRON_SECRET || request.headers.get('authorization') !== `Bearer ${CRON_SECRET}`) {

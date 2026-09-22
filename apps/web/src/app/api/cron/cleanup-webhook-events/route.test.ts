@@ -19,7 +19,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { GET } from './route';
 
 const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
-const BATCH_SIZE = 1_000;
+const BATCH_SIZE = 500;
 
 function daysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1_000).toISOString();
@@ -59,7 +59,7 @@ describe('GET /api/cron/cleanup-webhook-events', () => {
   it('deletes expired events and preserves recent events', async () => {
     const user = await insertTestUser();
     await db.insert(webhook_events).values(
-      [8, 6].map((age, index) => ({
+      [61, 59].map((age, index) => ({
         owned_by_user_id: user.id,
         platform: 'github',
         event_type: 'push',
@@ -94,7 +94,7 @@ describe('GET /api/cron/cleanup-webhook-events', () => {
         payload: {},
         headers: {},
         event_signature: `cleanup-batch-${index}`,
-        created_at: daysAgo(8),
+        created_at: daysAgo(61),
       }))
     );
 

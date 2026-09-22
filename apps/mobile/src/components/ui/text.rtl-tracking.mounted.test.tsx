@@ -102,6 +102,9 @@ describe('Text tracked labels in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
+    // The eyebrow variant's Latin display class is LTR-only (see `Text`'s
+    // eyebrow variant and `SectionHeader`), so in RTL the shared label carries
+    // no tracked class and the reset style is its whole treatment.
     // The eyebrow variant owns its Latin display classes and drops them in
     // RTL (the rule `text.mounted.test.tsx` pins), rather than keeping them
     // like a caller-supplied tracked class; no uppercase/tracked class is left

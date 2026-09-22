@@ -35,10 +35,6 @@ import {
   type DockerCommandExecutor,
 } from '../e2e/sandbox-control.js';
 
-// ---------------------------------------------------------------------------
-// Pure-helper tests
-// ---------------------------------------------------------------------------
-
 describe('parseDirective', () => {
   it('returns null when the prefix is absent', () => {
     expect(parseDirective('hello')).toBeNull();
@@ -300,10 +296,6 @@ describe('buildSeedFixture', () => {
     expect(() => buildSeedFixture(3, 'nonce')).toThrow(/smaller than/);
   });
 });
-
-// ---------------------------------------------------------------------------
-// End-to-end HTTP tests against an ephemeral server
-// ---------------------------------------------------------------------------
 
 let handle: FakeLlmServerHandle | null = null;
 
@@ -2317,10 +2309,6 @@ describe('strict harness stream events', () => {
     expect(streamEventSchema.safeParse(invalid).success).toBe(false);
   });
 });
-
-// ---------------------------------------------------------------------------
-// /test/* admin guard
-// ---------------------------------------------------------------------------
 
 const CONTROL_ROUTES: Array<{ label: string; path: string; init?: RequestInit }> = [
   { label: 'POST /test/release', path: '/test/release?tag=guard', init: { method: 'POST' } },

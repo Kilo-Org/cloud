@@ -261,10 +261,6 @@ export async function startFakeLlmServer(opts?: {
   return { url, port, adminToken, adminFetch, close };
 }
 
-// ---------------------------------------------------------------------------
-// CLI entry — `tsx fake-llm-server.ts` started by the dev service launcher.
-// ---------------------------------------------------------------------------
-
 const isMain = (() => {
   // import.meta.url → file:// path; process.argv[1] → executed script path
   try {

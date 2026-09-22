@@ -113,10 +113,6 @@ const MIN_CAP_BYTES = 1024 * 1024 * 1024;
 /** §2.2 budget check: server cap + this headroom must fit under the tool reserve. */
 const SERVER_BUDGET_HEADROOM_BYTES = 512 * 1024 * 1024;
 
-// ---------------------------------------------------------------------------
-// Configuration
-// ---------------------------------------------------------------------------
-
 function parseEnvInt(
   env: Record<string, string | undefined>,
   name: string,
@@ -191,10 +187,6 @@ export function readMemTotalBytes(procRoot: string): number | undefined {
     return undefined;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Process table
-// ---------------------------------------------------------------------------
 
 export type ProcessEntry = { pid: number; ppid: number; argv: string[] };
 
@@ -301,10 +293,6 @@ export function classifyProcesses(
   }
   return { toolPids, serverPids };
 }
-
-// ---------------------------------------------------------------------------
-// Cgroup slice — a single cgroup v2 directory (kilo-tools or kilo-server)
-// ---------------------------------------------------------------------------
 
 /**
  * One cgroup v2 memory slice: creation, limit, membership, OOM-event
@@ -506,10 +494,6 @@ function resetStaleControl(
     // Dir doesn't exist or unreadable — nothing to reset.
   }
 }
-
-// ---------------------------------------------------------------------------
-// Manager — owns both slices, runs the sweeper
-// ---------------------------------------------------------------------------
 
 export class ToolCgroupManager {
   private readonly config: ToolCgroupConfig;

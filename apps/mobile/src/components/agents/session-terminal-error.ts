@@ -320,11 +320,11 @@ export function statusIndicatorDuplicatesMessageFailure(input: {
   if (failure.detail !== null && copy === failure.detail) {
     return true;
   }
-  // An unclassified status error resolves to the generic assistant line, which
-  // is the same failure the row's own title states.
-  return (
-    failure.kind === 'assistant' && copy === i18n.t('agentChat.messageFailure.assistantFailed')
-  );
+  // An unclassified status error resolves to the generic assistant line. Any
+  // last row that states a failure owns that statement — an assistant row's
+  // title says it, and a failed delivery row says it with Retry/Copy — so the
+  // footer must not restate it.
+  return copy === i18n.t('agentChat.messageFailure.assistantFailed');
 }
 
 /**

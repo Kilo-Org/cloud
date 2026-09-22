@@ -1044,9 +1044,9 @@ export function SessionDetailContent({
           buildRemoteAttachmentParts
         );
         if (!result.ok) {
-          // Retryable presign failure: the manager never reached send(), so
-          // its onSendFailed toast does not fire. Surface the retryable message
-          // through the same toast channel and throw so the composer keeps the
+          // Retryable presign failure: the manager never reached send(), so the
+          // SDK set no error status indicator. Surface the retryable message
+          // through the toast channel and throw so the composer keeps the
           // draft/attachments for a retry.
           toast.error(result.message);
           throw new Error(result.message);
@@ -1069,10 +1069,10 @@ export function SessionDetailContent({
           sendModel ? { model: sendModel, ...(sendVariant ? { variant: sendVariant } : {}) } : null
         );
       }
-      // manager.send() reports failures via its own return value (and toasts
-      // through the manager's onSendFailed hook) rather than rejecting — it
-      // is the single toast owner for send failures. Throw here, without a
-      // second toast, purely so the composer's `await onSend(...)` sees the
+      // manager.send() reports failures via its own return value rather than
+      // rejecting; the SDK sets the translated error status indicator above the
+      // composer, which is the single failed-send surface. Throw here, without
+      // a toast, purely so the composer's `await onSend(...)` sees the
       // rejection and preserves the draft.
       takeOverTranscriptPositionForSend();
       const sent = await manager.send({
@@ -1635,10 +1635,11 @@ export function SessionDetailContent({
   const handleSendCommand = useCallback(
     async (command: string, argumentsText: string) => {
       // Slash commands ride the same manager.send() pipeline. The manager
-      // resolves the active remoteModelOverride from its own store and is
-      // the sole transport-toast owner; we throw a stable error on a
-      // false return purely so the composer preserves the draft, and never
-      // emit a duplicate toast of our own.
+      // resolves the active remoteModelOverride from its own store; a failed
+      // send is stated once by the SDK's translated status indicator above the
+      // composer, so we throw a stable error on a false return purely so the
+      // composer preserves the draft, and never emit a duplicate toast of our
+      // own.
       takeOverTranscriptPositionForSend();
       const sent = await manager.send({
         payload: { type: 'command', command, arguments: argumentsText },
@@ -1652,11 +1653,11 @@ export function SessionDetailContent({
   );
 
   // Goal controls ride the same `manager.send()` command pipeline as the
-  // composer's slash commands. The manager is the sole transport-toast owner,
-  // so a failed send surfaces exactly one error toast from `onSendFailed` and
-  // this helper never adds a second. Edit throws instead, so the RenameModal
-  // shows the failure inline and the user can correct the objective. One
-  // helper keeps the `/goal` payload shape in one place.
+  // composer's slash commands. A failed send is stated once by the SDK's
+  // translated status indicator above the composer, so this helper never adds a
+  // toast of its own. Edit throws instead, so the RenameModal shows the failure
+  // inline and the user can correct the objective. One helper keeps the `/goal`
+  // payload shape in one place.
   const sendGoalAction = useCallback(
     async (action: GoalAction, objective = ''): Promise<boolean> => {
       const sent = await manager.send({

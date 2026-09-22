@@ -98,7 +98,11 @@ describe('custom LLM endpoint configuration', () => {
     ).toBe(false);
   });
 
-  it.each([undefined, false, true])('forwards disable_url_suffix=%s', disable_url_suffix => {
+  it.each([
+    [undefined, false],
+    [false, false],
+    [true, true],
+  ])('resolves disable_url_suffix=%s to %s', (disable_url_suffix, expected) => {
     const provider = buildDirectProvider(
       'custom',
       ['messages'],
@@ -110,7 +114,7 @@ describe('custom LLM endpoint configuration', () => {
       null
     );
 
-    expect(provider.disableUrlSuffix).toBe(disable_url_suffix);
+    expect(provider.disableUrlSuffix).toBe(expected);
   });
 });
 

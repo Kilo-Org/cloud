@@ -35,7 +35,7 @@ export function buildDirectProvider(
     id,
     apiUrl: upstream.base_url,
     apiUrlOverrides: {},
-    disableUrlSuffix: upstream.disable_url_suffix,
+    disableUrlSuffix: upstream.disable_url_suffix ?? false,
     apiKey: upstream.api_key,
     apiKeyHeader,
     supportedChatApis,

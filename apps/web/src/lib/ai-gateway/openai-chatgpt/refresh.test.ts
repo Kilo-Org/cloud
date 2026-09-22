@@ -21,7 +21,11 @@ import { db } from '@/lib/drizzle';
 import { encryptApiKey, decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY, OPENAI_CLIENT_ID, OPENAI_CLIENT_SECRET } from '@/lib/config.server';
 import { OPENAI_TOKEN_ENDPOINT, OPENAI_RESOURCE } from '@/lib/auth/openai/config';
-import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
+import {
+  OPENAI_CHATGPT_RECONNECT_MESSAGE,
+  OPENAI_CHATGPT_REFRESH_MAX_BACKOFF_MS,
+  resolveOpenAiChatGptAccessToken,
+} from './refresh';
 import type { OpenAiChatGptOwner } from './store';
 import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './types';
 
@@ -66,10 +70,11 @@ function encryptedRow(connection: OpenAiChatGptConnection): StoredRow {
   };
 }
 
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers: new Headers(headers),
     json: async () => body,
   } as unknown as Response;
 }
@@ -85,6 +90,23 @@ function expectedBasicAuth(): string {
   return `Basic ${Buffer.from(
     `${encodeURIComponent(OPENAI_CLIENT_ID)}:${encodeURIComponent(OPENAI_CLIENT_SECRET)}`
   ).toString('base64')}`;
+}
+
+/**
+ * Records the delays passed to `setTimeout` and fires each timer immediately,
+ * so a test can assert the backoff without waiting for it.
+ */
+function captureRetryDelays(): { values: number[]; restore: () => void } {
+  const values: number[] = [];
+  const spy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+    callback: () => void,
+    delay?: number
+  ) => {
+    if (typeof delay === 'number') values.push(delay);
+    callback();
+    return 0 as unknown as ReturnType<typeof setTimeout>;
+  }) as unknown as typeof setTimeout);
+  return { values, restore: () => spy.mockRestore() };
 }
 
 describe('resolveOpenAiChatGptAccessToken', () => {
@@ -161,6 +183,50 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     expect(mockDb.transaction).not.toHaveBeenCalled();
   });
 
+  it('serves a still-valid token without refreshing before earliest_refresh_at', async () => {
+    storedRow = encryptedRow(
+      buildConnection({
+        expires_at: nowSeconds() + 30,
+        earliest_refresh_at: nowSeconds() + 300,
+      })
+    );
+
+    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
+      kind: 'access_token',
+      accessToken: 'stored-access-token',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refreshes an expired token even when earliest_refresh_at is in the past', async () => {
+    storedRow = encryptedRow(buildConnection({ earliest_refresh_at: nowSeconds() - 1 }));
+    fetchMock.mockResolvedValue(
+      jsonResponse({ access_token: 'new-access-token', expires_in: 3600 })
+    );
+
+    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
+      kind: 'access_token',
+      accessToken: 'new-access-token',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('stores earliest_refresh_at returned by the refresh response', async () => {
+    storedRow = encryptedRow(buildConnection());
+    const earliestRefreshAt = nowSeconds() + 600;
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        access_token: 'new-access-token',
+        expires_in: 3600,
+        earliest_refresh_at: earliestRefreshAt,
+      })
+    );
+
+    await resolveOpenAiChatGptAccessToken(USER_OWNER);
+
+    expect(decodeStored(txUpdateSetCalls[0]).earliest_refresh_at).toBe(earliestRefreshAt);
+  });
+
   it('reports no connection when no row is stored', async () => {
     storedRow = null;
 
@@ -234,6 +300,41 @@ describe('resolveOpenAiChatGptAccessToken', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(txUpdateSetCalls).toHaveLength(1);
+  });
+
+  it('waits for Retry-After before retrying a throttled refresh', async () => {
+    storedRow = encryptedRow(buildConnection());
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ error: 'rate_limited' }, 429, { 'retry-after': '7' }))
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'new-access-token', expires_in: 3600 }));
+
+    const delays = captureRetryDelays();
+    try {
+      await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
+        kind: 'access_token',
+        accessToken: 'new-access-token',
+      });
+    } finally {
+      delays.restore();
+    }
+
+    expect(delays.values).toContain(7000);
+  });
+
+  it('caps a Retry-After longer than the retry budget', async () => {
+    storedRow = encryptedRow(buildConnection());
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ error: 'rate_limited' }, 429, { 'retry-after': '600' }))
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'new-access-token', expires_in: 3600 }));
+
+    const delays = captureRetryDelays();
+    try {
+      await resolveOpenAiChatGptAccessToken(USER_OWNER);
+    } finally {
+      delays.restore();
+    }
+
+    expect(delays.values).toContain(OPENAI_CHATGPT_REFRESH_MAX_BACKOFF_MS);
   });
 
   it('fails the request without clearing the tokens after the retries are exhausted', async () => {

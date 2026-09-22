@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
@@ -314,7 +315,9 @@ export default function InstancePickerScreen() {
               icon={Server}
               placement="top"
               title={t('agentChat.instancePicker.noCliInstances')}
-              description={t('agentChat.instancePicker.noCliInstancesDescription')}
+              description={stripInlineCodeMarkers(
+                t('agentChat.instancePicker.noCliInstancesDescription')
+              )}
               action={
                 <Button
                   variant="outline"

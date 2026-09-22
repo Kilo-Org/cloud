@@ -176,23 +176,23 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
           <CardTitle>Authorize Device</CardTitle>
           <CardDescription>A device is requesting access to your Kilo account</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 max-[22rem]:px-2">
           <Alert>
             <AlertDescription className="text-center">
               <div className="text-muted-foreground mb-2 text-sm font-medium">
                 Verification Code
               </div>
-              <div className="text-2xl font-bold tracking-wider">{code}</div>
+              <div className="text-2xl font-bold tracking-wider break-all">{code}</div>
             </AlertDescription>
           </Alert>
 
-          <div className="bg-muted/40 flex items-center justify-between gap-3 rounded-lg border p-3">
-            <div className="flex min-w-0 items-center gap-3">
+          <div className="bg-muted/40 flex items-center justify-between gap-3 rounded-lg border p-3 max-[22rem]:flex-col max-[22rem]:items-stretch max-[22rem]:p-2">
+            <div className="flex min-w-0 flex-1 items-center gap-3 max-[22rem]:flex-col max-[22rem]:items-stretch">
               <Avatar className="h-9 w-9">
                 <AvatarImage src={user.imageUrl} alt={displayName} />
                 <AvatarFallback className="text-xs">{getUserInitials(displayName)}</AvatarFallback>
               </Avatar>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-muted-foreground text-xs font-medium">Signed in as</p>
                 <p className="truncate text-sm font-medium">{displayName}</p>
                 {user.email !== displayName ? (
@@ -203,7 +203,7 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
             <Button
               variant="ghost"
               size="sm"
-              className="shrink-0"
+              className="shrink-0 max-[22rem]:w-full pointer-coarse:min-h-11"
               onClick={handleSignOut}
               disabled={isSigningOut || status === 'loading'}
             >
@@ -216,7 +216,7 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
             </Button>
           </div>
 
-          <div className="space-y-2 rounded-lg border p-4">
+          <div className="space-y-2 rounded-lg border p-4 max-[22rem]:p-2">
             <p className="text-sm font-medium">This will allow the device to:</p>
             <ul className="text-muted-foreground space-y-1 text-sm">
               <li>• Access your organizations</li>
@@ -225,17 +225,17 @@ export function DeviceAuthClient({ code, viewerToken, isAppMode, user }: DeviceA
             </ul>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 max-[22rem]:flex-col">
             <Button
               variant="outline"
-              className="flex-1"
+              className="flex-1 max-[22rem]:w-full max-[22rem]:px-2 pointer-coarse:min-h-11"
               onClick={() => handleAuthorize(false)}
               disabled={status === 'loading'}
             >
               Deny
             </Button>
             <Button
-              className="flex-1"
+              className="flex-1 max-[22rem]:w-full max-[22rem]:px-2 pointer-coarse:min-h-11"
               onClick={() => handleAuthorize(true)}
               disabled={status === 'loading'}
             >

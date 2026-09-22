@@ -59,6 +59,10 @@ export type GetProviderProviderResult = {
    *  by direct-byok and custom_llm2 because both already require explicit
    *  admin opt-in. */
   bypassAccessCheck: boolean;
+  /** Skip only the zero-balance paid-model block. Set when a user credential
+   *  outside Kilo credits pays for the request, such as the ChatGPT
+   *  subscription, while abuse and organization policy checks still apply. */
+  skipBalanceCheck?: boolean;
   /** Present when this provider was resolved through a model experiment. */
   experiment?: ExperimentRouting;
 };
@@ -97,6 +101,7 @@ async function checkDirectBYOK(
       id: 'direct-byok',
       apiUrl: directByok.base_url,
       apiUrlOverrides: directByok.base_url_overrides,
+      disableUrlSuffix: false,
       apiKey: userByok[0].decryptedAPIKey,
       apiKeyHeader: null,
       supportedChatApis: directByok.supported_chat_apis,
@@ -253,6 +258,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     request,
     requestedModel,
     userId: isAnonymousContext(user) ? null : user.id,
+    organizationId,
   });
   if (openAiChatGptByok?.kind === 'reconnect') {
     return { kind: 'chatgpt-reconnect', message: openAiChatGptByok.message };

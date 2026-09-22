@@ -9,15 +9,15 @@
  * artifact, and authors edit its summaries by hand. See dump.ts for the CLI
  * entry point.
  *
- * Queries are published wholesale; mutations only when their exact path is in
- * `MCP_MUTATION_ALLOWLIST` (mutations.ts).
+ * Queries and mutations are published wholesale; paths with an internal-only
+ * segment (`admin`, `dev`, `test`) and subscriptions stay internal. `debug`
+ * paths are published too, marked with `debug: true` for the guard.
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
-import { MCP_MUTATION_ALLOWLIST, isAllowedMutation } from './mutations';
 
 /** Repository root: five levels above apps/web/src/scripts/mcp-catalog. */
 const REPO_ROOT = join(__dirname, '..', '..', '..', '..', '..');
@@ -38,12 +38,33 @@ export const CATALOG_JSON_DISPLAY_PATH = relative(REPO_ROOT, CATALOG_JSON_PATH);
 export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-router.ts');
 
 /**
- * Top-level router segments that stay internal-only. This is a denylist:
- * every other query procedure is exported, allowlisted mutations are exported
- * as well, and this filter applies on top of the mutation allowlist. Individual
- * procedures cannot opt back in, and subscriptions are never exported.
+ * Whether a procedure path is internal-only. A path is internal when any
+ * segment is `test` or starts with `admin` or `dev` — the routers name admin
+ * and dev-only procedures `adminX` and `devX` (for example
+ * `organizations.admin.grantCredit` and `slack.devRemoveDbRowOnly`). `test`
+ * stays exact-only so user-facing calls such as `slack.testConnection` remain
+ * published, and `debug` stays published too: its rows carry a `debug: true`
+ * marker and are guarded wherever they are offered or called. Subscriptions
+ * are never exported regardless of this check.
  */
-export const DENYLISTED_TOP_LEVEL_SEGMENTS = ['admin', 'debug', 'test'] as const;
+export function isDenylistedPath(path: string): boolean {
+  return path.split('.').some(segment => {
+    const lower = segment.toLowerCase();
+    return lower === 'test' || lower.startsWith('admin') || lower.startsWith('dev');
+  });
+}
+
+/**
+ * Procedure builders that reject non-admin users. `apps/web/src/lib/trpc/init.ts`
+ * builds every admin-only procedure from `adminProcedure`, and the other three
+ * variants chain on it, so a chain whose head is any of these is admin-guarded.
+ */
+export const ADMIN_GUARD_PROCEDURES = [
+  'adminProcedure',
+  'creditManagerProcedure',
+  'superadminProcedure',
+  'sessionViewerProcedure',
+] as const;
 
 /** Instruction every generated summary must follow. */
 export const SUMMARY_INSTRUCTION =
@@ -64,8 +85,11 @@ const SUMMARY_RUN_TIMEOUT_MS = 10 * 60 * 1000;
 export type CatalogLeaf = {
   path: string;
   type: string;
-  /** First Zod input schema of the procedure, or undefined when it takes none. */
-  firstInput: unknown;
+  /**
+   * Zod input schemas in `.input()` order. A chained procedure has more than
+   * one; the list is empty when the procedure takes no input.
+   */
+  inputs: unknown[];
 };
 
 export type CatalogRow = {
@@ -75,6 +99,17 @@ export type CatalogRow = {
   inputSchema: Record<string, unknown>;
   tags: string[];
   searchBlob: string;
+  /**
+   * Emitted only on rows whose procedure sits behind an admin guard;
+   * absent means every grant may use the row.
+   */
+  admin?: true;
+  /**
+   * Emitted only on rows whose procedure's top-level segment is `debug`;
+   * absent means the row is not a debug endpoint. A debug row behind an admin
+   * guard carries both marks.
+   */
+  debug?: true;
 };
 
 /** Failure while generating summaries. `retryable` failures name the failed batch. */
@@ -110,7 +145,7 @@ export function collectCatalogLeaves(router: { _def?: unknown }): CatalogLeaf[] 
     leaves.push({
       path,
       type: typeof def.type === 'string' ? def.type : '',
-      firstInput: inputs[0],
+      inputs,
     });
   }
   if (leaves.length === 0) {
@@ -119,22 +154,106 @@ export function collectCatalogLeaves(router: { _def?: unknown }): CatalogLeaf[] 
   return leaves;
 }
 
-function toInputSchema(firstInput: unknown): Record<string, unknown> {
-  if (!firstInput) return {};
+function singleInputSchema(input: unknown): Record<string, unknown> {
   // `io: 'input'` keeps the schema faithful for callers that build a request;
   // `unrepresentable: 'any'` keeps rare schemas (z.any(), z.date(), …) from
   // failing the whole dump.
-  return z.toJSONSchema(firstInput as z.ZodType, {
+  return z.toJSONSchema(input as z.ZodType, {
     io: 'input',
     unrepresentable: 'any',
   }) as Record<string, unknown>;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Keywords a merged object schema can carry without changing the runtime
+ * contract. `additionalProperties` is deliberately absent: a `.strict()`
+ * subschema rejects keys another subschema contributes, so flattening it into
+ * the union would advertise a more permissive schema than tRPC enforces.
+ */
+const MERGEABLE_OBJECT_KEYWORDS = new Set(['$schema', 'type', 'properties', 'required']);
+
+function isMergeableObjectSchema(schema: Record<string, unknown>): boolean {
+  return (
+    schema.type === 'object' &&
+    isRecord(schema.properties) &&
+    Object.keys(schema).every(key => MERGEABLE_OBJECT_KEYWORDS.has(key))
+  );
+}
+
+/**
+ * Composes every chained `.input()` schema into one JSON Schema. tRPC runs each
+ * `.input()` validator against the same raw input, so a caller must satisfy all
+ * of them: using only the first schema (the old behavior) under-advertised
+ * chained procedures such as `workspaceFolders.create`, whose second input
+ * requires `name` and `color`.
+ *
+ * Plain object schemas merge into a single object: properties are unioned,
+ * required keys are unioned, and a key declared by more than one schema keeps
+ * every constraint through `allOf`. Any other chain — a non-object schema, or
+ * an object carrying extra keywords such as `.strict()`'s
+ * `additionalProperties: false` — falls back to a top-level `allOf`, the
+ * faithful intersection that preserves each schema's own keywords.
+ */
+function toInputSchema(inputs: unknown[]): Record<string, unknown> {
+  const schemas = inputs.map(singleInputSchema);
+  const [first] = schemas;
+  if (first === undefined) return {};
+  if (schemas.length === 1) return first;
+
+  if (schemas.every(isMergeableObjectSchema)) {
+    const properties: Record<string, unknown> = {};
+    const required: string[] = [];
+    for (const schema of schemas) {
+      for (const [key, value] of Object.entries(schema.properties as Record<string, unknown>)) {
+        if (!(key in properties)) properties[key] = value;
+        else if (JSON.stringify(properties[key]) !== JSON.stringify(value)) {
+          properties[key] = { allOf: [properties[key], value] };
+        }
+      }
+      if (Array.isArray(schema.required)) {
+        for (const key of schema.required) {
+          if (typeof key === 'string' && !required.includes(key)) required.push(key);
+        }
+      }
+    }
+    const composed: Record<string, unknown> = {};
+    if (typeof first.$schema === 'string') composed.$schema = first.$schema;
+    composed.type = 'object';
+    composed.properties = properties;
+    if (required.length > 0) composed.required = required;
+    return composed;
+  }
+
+  return {
+    ...(typeof first.$schema === 'string' ? { $schema: first.$schema } : {}),
+    allOf: schemas.map(schema => {
+      const copy = { ...schema };
+      delete copy.$schema;
+      return copy;
+    }),
+  };
+}
+
 function topSchemaKeys(inputSchema: Record<string, unknown>): string[] {
+  const keys: string[] = [];
   const properties = inputSchema.properties;
-  return properties && typeof properties === 'object' && !Array.isArray(properties)
-    ? Object.keys(properties)
-    : [];
+  if (isRecord(properties)) {
+    for (const key of Object.keys(properties)) if (!keys.includes(key)) keys.push(key);
+  }
+  // A chain that falls back to a top-level `allOf` keeps its field keys in the
+  // subschemas; surface them so tags and the search blob stay complete.
+  if (Array.isArray(inputSchema.allOf)) {
+    for (const sub of inputSchema.allOf) {
+      if (isRecord(sub)) {
+        for (const key of topSchemaKeys(sub)) if (!keys.includes(key)) keys.push(key);
+      }
+    }
+  }
+  return keys;
 }
 
 /**
@@ -150,9 +269,9 @@ function deriveTags(segments: string[], schemaKeys: string[]): string[] {
   return tags;
 }
 
-function shapeRow(leaf: CatalogLeaf, summary: string): CatalogRow {
+function shapeRow(leaf: CatalogLeaf, summary: string, admin: boolean, debug: boolean): CatalogRow {
   const segments = leaf.path.split('.');
-  const inputSchema = toInputSchema(leaf.firstInput);
+  const inputSchema = toInputSchema(leaf.inputs);
   const schemaKeys = topSchemaKeys(inputSchema);
   const tags = deriveTags(segments, schemaKeys);
   return {
@@ -162,45 +281,51 @@ function shapeRow(leaf: CatalogLeaf, summary: string): CatalogRow {
     inputSchema,
     tags,
     searchBlob: [leaf.path, summary, ...tags, ...schemaKeys].filter(Boolean).join(' '),
+    // Emitted at the tail and only when true, in a fixed order, so the dump's
+    // byte-for-byte check stays deterministic for every other row.
+    ...(admin ? { admin: true } : {}),
+    ...(debug ? { debug: true } : {}),
   };
 }
 
 /**
- * Filters the leaves down to the exported catalog: every query, plus a mutation
- * only when its exact path is in {@link MCP_MUTATION_ALLOWLIST}. The top-level
- * denylist drops both kinds and subscriptions stay excluded. Rows whose summary
- * is provided keep it byte-for-byte; the rest come back as `missing` for LLM
- * generation.
+ * Filters the leaves down to the exported catalog: every query and mutation
+ * whose path is not internal-only (see {@link isDenylistedPath}). Subscriptions
+ * are never exported. Rows whose summary is provided keep it byte-for-byte; the
+ * rest come back as `missing` for LLM generation.
  *
- * Rot guard: an allowlisted path that does not reach the catalog as a mutation
- * throws (naming the offending paths) instead of vanishing from the catalog —
- * whether it was renamed or deleted, its top-level segment is withheld by the
- * denylist, or its procedure was demoted to a query. The guard therefore
- * compares the allowlist against the paths that survived the denylist *and*
- * published with kind `mutation`. The comparison is unconditional: a query-only
- * enumeration (a wholesale router drift) has nothing to satisfy it, so it
- * throws too, rather than publishing a mutation-free catalog in silence.
+ * Drift guard: an enumeration that exposes no mutation procedure throws instead
+ * of emitting a query-only catalog in silence. Mutations without a committed
+ * summary are legitimate `missing` entries that the dump generates before it
+ * writes, so the guard counts exposed mutation leaves, not emitted rows. A
+ * router refactor that stops exposing mutations, or a top-level segment renamed
+ * into an internal prefix, must fail the dump rather than quietly remove write
+ * support from every MCP client.
  */
 export function buildCatalogRows(
   leaves: CatalogLeaf[],
   summaries: Map<string, string> = new Map()
 ): { rows: CatalogRow[]; missing: CatalogLeaf[] } {
-  const denylisted = new Set<string>(DENYLISTED_TOP_LEVEL_SEGMENTS);
-  /** Every allowlisted path the catalog will publish with kind `mutation`. */
-  const publishedMutationPaths = new Set<string>();
+  let exposedMutations = 0;
+  // Resolved once for the whole catalog: the guard marker is decided from each
+  // procedure's own extracted source, never the whole router file.
+  const topLevelFiles = extractTopLevelRouterFiles();
   const rows: CatalogRow[] = [];
   const missing: CatalogLeaf[] = [];
   for (const leaf of leaves) {
-    const kept =
-      leaf.type === 'query' || (leaf.type === 'mutation' && isAllowedMutation(leaf.path));
-    if (!kept) continue;
-    if (denylisted.has(leaf.path.split('.')[0] ?? '')) continue;
-    // Only a mutation leaf counts: a demoted query leaf must not satisfy the
-    // guard, or an allowlisted path could stop being a mutation unnoticed.
-    if (leaf.type === 'mutation') publishedMutationPaths.add(leaf.path);
+    if (leaf.type !== 'query' && leaf.type !== 'mutation') continue;
+    if (isDenylistedPath(leaf.path)) continue;
+    if (leaf.type === 'mutation') exposedMutations += 1;
     const summary = summaries.get(leaf.path);
     if (typeof summary === 'string' && summary !== '') {
-      rows.push(shapeRow(leaf, summary));
+      // An extraction miss counts as non-admin: never hide an endpoint by accident.
+      const admin = procedureRequiresAdmin(
+        extractProcedureSource(leaf.path, topLevelFiles)?.source ?? null
+      );
+      // The debug mark comes from the leaf's own top-level segment, so it never
+      // depends on static extraction succeeding.
+      const debug = leaf.path.split('.')[0] === 'debug';
+      rows.push(shapeRow(leaf, summary, admin, debug));
     } else {
       missing.push(leaf);
     }
@@ -210,15 +335,11 @@ export function buildCatalogRows(
       'Catalog enumeration produced zero catalog rows — refusing to emit an empty catalog'
     );
   }
-  // Compare unconditionally: a leaf set with no mutation leaf at all has nothing
-  // to satisfy the allowlist, so deletion or wholesale router drift cannot
-  // silently publish a query-only catalog.
-  const stale = MCP_MUTATION_ALLOWLIST.filter(path => !publishedMutationPaths.has(path));
-  if (stale.length > 0) {
+  if (exposedMutations === 0) {
     throw new Error(
-      `MCP mutation allowlist entries are not published as mutations: ${stale.join(', ')}. ` +
-        'A renamed, deleted, denylisted, or demoted procedure must never silently vanish from the catalog — ' +
-        'update MCP_MUTATION_ALLOWLIST in apps/web/src/scripts/mcp-catalog/mutations.ts.'
+      'Catalog enumeration exposed zero mutation procedures — refusing to emit a query-only catalog. ' +
+        'Every mutation is either missing from the router or withheld as internal; ' +
+        'check isDenylistedPath in apps/web/src/scripts/mcp-catalog/catalog.ts.'
     );
   }
   return { rows, missing };
@@ -508,6 +629,18 @@ export function extractProcedureSource(
   const block = extractValueAfterKey(source, segments[segments.length - 1] ?? '');
   if (!block) return null;
   return { file: currentFile, source: block };
+}
+
+/**
+ * True when a procedure's extracted value expression is guarded by an admin
+ * procedure builder. The guard must head the chain (`adminProcedure.input(…)`),
+ * so a base procedure that merely mentions a guard in its body is not marked;
+ * a null source (extraction failure) is not admin, because hiding a non-admin
+ * endpoint would be the worse mistake.
+ */
+export function procedureRequiresAdmin(source: string | null): boolean {
+  if (source === null) return false;
+  return ADMIN_GUARD_PROCEDURES.some(guard => new RegExp(`^\\s*${guard}\\b`).test(source));
 }
 
 function capContext(text: string, limit: number): string {

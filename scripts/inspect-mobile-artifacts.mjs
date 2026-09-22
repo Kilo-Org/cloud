@@ -35,7 +35,7 @@ const INTENT_FILTER_HOST = 'app.kilo.ai';
 const BUNDLETOOL_URL =
   'https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar';
 const DEBUGSYMBOLS_PREFIX = 'BUNDLE-METADATA/com.android.tools.build.debugsymbols/';
-const SHRINK_SENTINEL = 'kilo_shrink_sentinel_unused';
+const SHRINK_SENTINEL = 'zz_unused_shrink_sentinel';
 const REQUIRED_USAGE_DESCRIPTIONS = [
   'NSMicrophoneUsageDescription',
   'NSSpeechRecognitionUsageDescription',
@@ -295,7 +295,7 @@ function checkSymbols(aabPath) {
 }
 
 /**
- * Returns true when the AAB zip has no kilo_shrink_sentinel_unused entry
+ * Returns true when the AAB zip has no zz_unused_shrink_sentinel entry
  * (resource shrinking stripped the unused raw resource) and false when it does.
  * Kept side-effect free so tests can import it without touching `failures`.
  */

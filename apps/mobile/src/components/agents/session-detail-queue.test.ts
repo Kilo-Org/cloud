@@ -1,6 +1,12 @@
 /* eslint-disable max-lines -- the session test renders the full SessionDetailContent and mocks its RN/expo/SDK surface, so the wiring is long. */
 /* eslint-disable require-await, @typescript-eslint/require-await -- mock factories settle without await because they resolve immediately */
-import { createElement, type ElementType, type ReactElement } from 'react';
+import {
+  createElement,
+  type ElementType,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { Modal, Pressable } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,6 +17,7 @@ import type * as ReactI18next from 'react-i18next';
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
+import { MessageBubble } from '@/components/agents/message-bubble';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
 import { assistantMessage } from './message-bubble-test-utils';
@@ -52,12 +59,22 @@ vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurf
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useOfflineBannerState: () => false,
 }));
+// `credentials.ts` reads `WHEN_UNLOCKED_THIS_DEVICE_ONLY` at module scope via
+// the manager -> approve-ask import; the real expo-secure-store entry imports
+// react-native, so this suite only needs the import to resolve.
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'whenUnlockedThisDeviceOnly',
 }));
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
+// The session header's copy-link action reaches the native clipboard and the
+// browser helper; neither native module loads in the DOM-free node suite. The
+// handoff advertiser is a platform boundary with its own mounted suites.
+vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/session-handoff', () => ({ SessionHandoffAdvertiser: () => null }));
 vi.mock('@kilocode/cloud-agent-sdk', () => ({
   createSessionManager: vi.fn(),
 }));
@@ -77,10 +94,13 @@ vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
   fetchMobileSessionSnapshotPage: vi.fn(),
 }));
-// Keep the real queue-error classifier without loading the native encrypted KV.
-vi.mock('@/lib/persist/session-transcript-cache', () => ({
-  readSessionTranscriptPage: vi.fn(async () => null),
-  writeSessionTranscriptPage: vi.fn(async () => undefined),
+// Keep the real queue-error classifier without loading the native encrypted KV:
+// `mobile-session-manager.ts`'s resolved-delivery-failure memory shares that
+// chain, so without this mock it pulls the native encrypted KV (and its
+// `react-native` promise shim) into this node suite.
+vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
+  readResolvedDeliveryFailures: vi.fn(async () => []),
+  persistResolvedDeliveryFailure: vi.fn(async () => undefined),
 }));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
@@ -147,7 +167,7 @@ vi.mock('@/components/agents/message-text-select-sheet', () => ({
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), setParams: vi.fn() }),
 }));
 
 // `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
@@ -163,6 +183,7 @@ vi.mock('expo-keep-awake', () => ({
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(async () => undefined),
   notificationAsync: vi.fn(async () => undefined),
+  selectionAsync: vi.fn(async () => undefined),
   NotificationFeedbackType: { Error: 'error', Success: 'success' },
 }));
 vi.mock('react-native-reanimated', () => ({
@@ -379,6 +400,7 @@ vi.mock('@/components/agents/use-message-copy', () => ({
 }));
 vi.mock('@/components/agents/session-detail-content-helpers', () => ({
   countInFlightMessages: () => 0,
+  lastVisibleMessageFailure: () => null,
   resolveRetryPrompt: () => null,
   retryFailedMessage: vi.fn(),
 }));
@@ -495,6 +517,7 @@ vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
 vi.mock('@/components/ui/icons', () => ({
+  Link2: 'Link2',
   MessageSquare: 'MessageSquare',
 }));
 
@@ -628,7 +651,9 @@ function readBubble(
   const listProps = lists[0]?.props as
     | {
         items?: SessionTranscriptItem[];
-        renderItem?: (args: { item: SessionTranscriptItem }) => ReactElement;
+        renderItem?: (args: {
+          item: SessionTranscriptItem;
+        }) => ReactElement<{ children: ReactNode[] }>;
       }
     | undefined;
   const item = listProps?.items?.find(
@@ -637,7 +662,10 @@ function readBubble(
   if (!item || !listProps?.renderItem) {
     return undefined;
   }
-  return listProps.renderItem({ item });
+  const row = listProps.renderItem({ item });
+  return row.props.children.find(
+    (child): child is ReactElement => isValidElement(child) && child.type === MessageBubble
+  );
 }
 
 function bubbleProps(

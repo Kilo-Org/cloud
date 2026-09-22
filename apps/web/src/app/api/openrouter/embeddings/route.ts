@@ -18,6 +18,7 @@ import {
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   invalidRequestResponse,
+  invalidTokenResponse,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
   temporarilyUnavailableResponse,
@@ -32,8 +33,6 @@ import {
   isAnonymousContext,
   type AnonymousUserContext,
 } from '@/lib/anonymous';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
   type EmbeddingProxyRequest,
@@ -124,6 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const {
     user: maybeUser,
     authFailedResponse,
+    credentialsRejected,
     organizationId: authOrganizationId,
     botId: authBotId,
     tokenSource: authTokenSource,
@@ -139,6 +139,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
+    // A credential we could not verify is not the absence of one. Fail the
+    // request rather than answering as anonymous; see `invalidTokenResponse`.
+    if (credentialsRejected) {
+      return invalidTokenResponse();
+    }
+
     if (!(await isFreeModel(requestedModelLowerCased))) {
       return NextResponse.json(
         {
@@ -304,25 +310,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;
-
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: isAnonymousContext(user),
-      isStreaming: false,
-      userByok: !!userByok,
-      provider: provider.id,
-      requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(requestedModelLowerCased),
-      toolsAvailable: [],
-      toolsUsed: [],
-      ttfbMs,
-      statusCode: response.status,
-    },
-    response.clone(),
-    requestStartedAt
-  );
 
   usageContext.status_code = response.status;
 

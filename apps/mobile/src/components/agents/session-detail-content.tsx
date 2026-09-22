@@ -98,6 +98,7 @@ import {
 } from '@/components/agents/session-working-state';
 import {
   countInFlightMessages,
+  lastVisibleMessageFailure,
   resolveRetryPrompt,
   retryFailedMessage,
 } from '@/components/agents/session-detail-content-helpers';
@@ -115,17 +116,20 @@ import { useInteractionHandlers } from '@/components/agents/use-interaction-hand
 import { useSessionAutoApprove } from '@/components/agents/use-session-auto-approve';
 import { useSessionConfigSync } from '@/components/agents/use-session-config-sync';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import {
   SESSION_SLOW_LOAD_MS,
   useSessionSlowLoadPhase,
 } from '@/components/agents/session-slow-load';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import {
+  collectTranscriptItemKeysByPart,
   condenseTranscriptToolRuns,
   getSessionTranscriptItemKey,
   getSessionTranscriptItemType,
   mergeSessionTranscript,
   type SessionTranscriptItem,
+  type TranscriptItemKeysByPart,
 } from '@/components/agents/session-transcript';
 import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
@@ -145,6 +149,7 @@ import { ToolRunSheetHost } from '@/components/agents/tool-run-sheet-host';
 import {
   buildTerminalErrorCopyText,
   resolveSessionTerminalError,
+  statusIndicatorDuplicatesMessageFailure,
 } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { QueryError } from '@/components/query-error';
@@ -183,6 +188,7 @@ import {
   buildContinueHref,
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
+import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
 import {
   areModelPickerSelectionScopesEqual,
@@ -191,6 +197,7 @@ import {
 } from '@/lib/picker-bridge';
 import { trpcClient } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
+import { SessionHandoffAdvertiser } from '@/lib/session-handoff';
 
 const GOAL_ACTION_LABEL_KEY = {
   edit: 'agentChat.goal.edit',
@@ -198,6 +205,13 @@ const GOAL_ACTION_LABEL_KEY = {
   resume: 'agentChat.goal.resume',
   remove: 'agentChat.goal.remove',
 } as const satisfies Record<GoalAction, string>;
+
+/**
+ * How long the live viewport has to settle before it is written to the route's
+ * search params. The transcript list already reports at most once a second; the
+ * debounce keeps a burst of reports from issuing several navigations.
+ */
+const ANCHOR_PUBLISH_DEBOUNCE_MS = 500;
 
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
@@ -213,6 +227,8 @@ type SessionDetailContentProps = {
   cachedTitle?: string;
   /** Epoch ms the route mounted this open; anchors the slow-load threshold. */
   openStartedAt?: number;
+  /** Message id the opening `?at=` deep link named; the list scrolls to it. */
+  resumeAt?: string | null;
 };
 
 type CancelQueuedStatus = {
@@ -232,6 +248,7 @@ export function SessionDetailContent({
   spawnedMode,
   cachedTitle,
   openStartedAt,
+  resumeAt,
 }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
   const { t } = useTranslation();
@@ -314,6 +331,65 @@ export function SessionDetailContent({
   const [detailsMessageId, setDetailsMessageId] = useState<string | null>(null);
   const detailsMessageIdRef = useRef<string | null>(null);
   const [isGoalEditOpen, setIsGoalEditOpen] = useState(false);
+  // The live viewport position (the topmost visible message), reported by the
+  // transcript list. It feeds the OS handoff advertiser and the route's search
+  // params so another device resumes the session where the user left it.
+  const [anchor, setAnchor] = useState<string | null>(null);
+  const handleAnchorChange = useCallback((messageId: string) => {
+    setAnchor(messageId);
+  }, []);
+  // The route's `at` is the position this screen resumes at. A resume link
+  // dedupes onto an already-mounted route and updates its params instead of
+  // remounting, so the position is adopted when the live param changes — unless
+  // the change is the route echoing back the anchor this screen just published.
+  const [resumeAnchor, setResumeAnchor] = useState<string | null>(resumeAt ?? null);
+  const publishedAnchorRef = useRef<string | null>(resumeAnchor);
+  const incomingAnchorRef = useRef<string | null>(resumeAt ?? null);
+  useEffect(() => {
+    const incoming = resumeAt ?? null;
+    if (incoming === incomingAnchorRef.current) {
+      return;
+    }
+    incomingAnchorRef.current = incoming;
+    // The route already carries the position this screen believes in; the
+    // publish below wrote it before `router.setParams`, so no re-arm.
+    if (incoming === publishedAnchorRef.current) {
+      return;
+    }
+    setResumeAnchor(incoming);
+    publishedAnchorRef.current = incoming;
+    // A newer link supersedes the live position this screen was about to
+    // publish. Drop it: the publish effect's cleanup then clears its pending
+    // debounce timer, so the pre-link position can never fire afterwards and
+    // write itself back over the position the reader just navigated to. The
+    // list reports the new top once it lands the incoming anchor, re-arming the
+    // publish from the real viewport.
+    setAnchor(null);
+  }, [resumeAt]);
+  useEffect(() => {
+    if (anchor === null || anchor === publishedAnchorRef.current) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      publishedAnchorRef.current = anchor;
+      router.setParams({ at: anchor });
+    }, ANCHOR_PUBLISH_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [anchor, router]);
+
+  // A send takes the transcript position over: the sent message and its reply
+  // must be on screen, even when a `?at=` resume left the transcript parked on
+  // an older row with follow off. Bumping this counter is the transcript list's
+  // signal for it; both composer sends (prompt and slash command) bump it
+  // before their transport call, so a resume retry chain still in flight is
+  // cancelled by the take-over instead of yanking the viewport back to the
+  // recorded anchor.
+  const [followTailNonce, setFollowTailNonce] = useState(0);
+  const takeOverTranscriptPositionForSend = useCallback(() => {
+    setFollowTailNonce(count => count + 1);
+  }, []);
 
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
@@ -548,13 +624,26 @@ export function SessionDetailContent({
   );
 
   const viewTrackedRef = useRef<string | null>(null);
+  const recordedLastOpenedRef = useRef<{ sessionId: string; userId: string } | null>(null);
   useEffect(() => {
-    if (fetchedData?.kiloSessionId !== sessionId || viewTrackedRef.current === sessionId) {
+    if (fetchedData?.kiloSessionId !== sessionId) {
       return;
     }
-    viewTrackedRef.current = sessionId;
-    captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
-  }, [fetchedData, sessionId, analyticsSurface, openedVia]);
+    if (viewTrackedRef.current !== sessionId) {
+      viewTrackedRef.current = sessionId;
+      captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface, via: openedVia });
+    }
+    // Record the session the person actually viewed (not one merely fetched) so
+    // the launcher's 'Open last session' reopens it. Its latch is separate from
+    // the analytics one above: `userId` resolves after the first render, so the
+    // analytics event still fires once per session while the record waits for
+    // the identity and lands on the render that has it.
+    const recorded = recordedLastOpenedRef.current;
+    if (userId !== undefined && (recorded?.sessionId !== sessionId || recorded.userId !== userId)) {
+      recordedLastOpenedRef.current = { sessionId, userId };
+      recordLastOpenedSession(sessionId, userId);
+    }
+  }, [fetchedData, sessionId, analyticsSurface, openedVia, userId]);
 
   useEffect(
     () => () => {
@@ -873,10 +962,33 @@ export function SessionDetailContent({
   );
   // Condensing is opt-in: with the preference off the derived transcript is the
   // same array identity, so nothing below re-renders differently.
+  //
+  // The previous build's part→item-key map. A later build that folds new parts
+  // into an existing run — an older page prepending, or a tool part streaming
+  // into the run — reuses the key the row was already on screen under, so
+  // FlashList's viewport anchor survives. The effect refreshes the map after the
+  // commit, so the render that first shows the change still reads the old one.
+  const carriedTranscriptKeysByPartRef = useRef<TranscriptItemKeysByPart | null>(null);
   const transcript = useMemo(
-    () => (condenseToolCalls ? condenseTranscriptToolRuns(baseTranscript) : baseTranscript),
+    () =>
+      condenseToolCalls
+        ? condenseTranscriptToolRuns(
+            baseTranscript,
+            carriedTranscriptKeysByPartRef.current ?? undefined
+          )
+        : baseTranscript,
     [condenseToolCalls, baseTranscript]
   );
+  // Only the condensed build reads the map back, so while condensing is off the
+  // walk over every content-rendering part and its `Map` allocation would be
+  // dead work on every streaming update. The guard skips both; the map is
+  // refreshed again on the commit after condensing turns back on.
+  useEffect(() => {
+    if (!condenseToolCalls) {
+      return;
+    }
+    carriedTranscriptKeysByPartRef.current = collectTranscriptItemKeysByPart(transcript);
+  }, [condenseToolCalls, transcript]);
 
   // The list branch must never mount with zero items: a zero-item FlashList
   // paints blank dead space with no loading and no empty state (mobile-app
@@ -987,6 +1099,7 @@ export function SessionDetailContent({
       // is the single toast owner for send failures. Throw here, without a
       // second toast, purely so the composer's `await onSend(...)` sees the
       // rejection and preserves the draft.
+      takeOverTranscriptPositionForSend();
       const sent = await manager.send({
         payload: {
           type: 'prompt',
@@ -1015,6 +1128,7 @@ export function SessionDetailContent({
       activeSessionType,
       supportsAttachments,
       analyticsSurface,
+      takeOverTranscriptPositionForSend,
       t,
     ]
   );
@@ -1035,11 +1149,24 @@ export function SessionDetailContent({
         void handleSend(prompt);
         return;
       }
-      void retryFailedMessage(async () => {
-        await handleSend(prompt);
+      // The re-send is a new submission; `retryFailedMessage` clears the
+      // original delivery failure once it is accepted so the row stops showing
+      // as failed. It is cleared against this screen's session — the one that
+      // owns the row and that the manager opened — because the await above can
+      // outlive it: switching sessions while the re-send is in flight must not
+      // record this resolution under the session the user switched to.
+      const ownerSessionId = sessionId;
+      void retryFailedMessage({
+        message,
+        send: async () => {
+          await handleSend(prompt);
+        },
+        clearFailedMessage: messageId => {
+          manager.clearFailedMessage(messageId, ownerSessionId);
+        },
       });
     },
-    [messages, requiresModel, pinned.model, currentModel, handleSend]
+    [messages, requiresModel, pinned.model, currentModel, handleSend, manager, sessionId]
   );
 
   const handleCancelQueued = useCallback(
@@ -1171,17 +1298,27 @@ export function SessionDetailContent({
       if (item.type === 'preparation') {
         return <PreparationGroup attempt={item.attempt} />;
       }
-      if (item.type === 'time') {
-        return <TranscriptTimeMarker created={item.created} dayChanged={item.dayChanged} />;
-      }
       if (item.type === 'tool-run') {
         // Match the inset and row rhythm of a message row so the condensed row
         // sits flush with its neighbours rather than full-bleed.
-        return (
+        const run = (
           <View className="px-4 py-1">
             <MessageErrorBoundary>
               <CondensedToolRunRow parts={item.parts} />
             </MessageErrorBoundary>
+          </View>
+        );
+        // A condensed run can open a burst: its message's marker rides here so
+        // marker and row share one FlashList key and one measured height.
+        return (
+          <View>
+            {item.timeMarker && (
+              <TranscriptTimeMarker
+                created={item.timeMarker.created}
+                dayChanged={item.timeMarker.dayChanged}
+              />
+            )}
+            {run}
           </View>
         );
       }
@@ -1192,7 +1329,7 @@ export function SessionDetailContent({
           : undefined;
       // Suppress Retry on an assistant failure with no preceding user row.
       const retryPrompt = resolveRetryPrompt(item.message, messages);
-      return (
+      const bubble = (
         <MessageBubble
           message={item.message}
           {...(item.parts ? { partsOverride: item.parts } : {})}
@@ -1217,6 +1354,21 @@ export function SessionDetailContent({
           }
           condenseToolCalls={condenseToolCalls}
         />
+      );
+      // The burst marker rides on its message row so the row keeps one FlashList
+      // key and one measured height: a prepend that moves the marker to an older
+      // message changes no key that is already on screen. Keep the wrapper and
+      // bubble's child slot stable so moving the marker does not remount it.
+      return (
+        <View>
+          {item.timeMarker && (
+            <TranscriptTimeMarker
+              created={item.timeMarker.created}
+              dayChanged={item.timeMarker.dayChanged}
+            />
+          )}
+          {bubble}
+        </View>
       );
     },
     [
@@ -1382,8 +1534,30 @@ export function SessionDetailContent({
     isStreaming,
     pendingMessageCount: inFlightMessageCount,
   });
+  // A failed last row states its own failure and carries the action. The fixed
+  // footer's error line must not state the same failure a second time (explorer
+  // finding: the same failure stated three times), so a status error the row
+  // already carries is dropped — a classified one the row does not carry stays.
+  const footerMessageFailure = useMemo(
+    () =>
+      lastVisibleMessageFailure({
+        displayedMessages,
+        messages,
+        pendingMessages,
+        canceledQueuedMessages,
+      }),
+    [displayedMessages, messages, pendingMessages, canceledQueuedMessages]
+  );
+  const footerStatusIndicator =
+    statusIndicator !== null &&
+    !statusIndicatorDuplicatesMessageFailure({
+      indicator: statusIndicator,
+      failure: footerMessageFailure,
+    })
+      ? statusIndicator
+      : null;
   const hasFooterStatusIndicator =
-    (!cachedMetadataRefresh && statusIndicator !== null) ||
+    (!cachedMetadataRefresh && footerStatusIndicator !== null) ||
     (cloudStatus !== null && cloudStatus.type !== 'ready');
   const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
     isAgentWorking: shouldShowWorkingIndicator,
@@ -1400,7 +1574,7 @@ export function SessionDetailContent({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
-    hasStatusIndicator: !cachedMetadataRefresh && statusIndicator !== null,
+    hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
     messageCount: messages.length,
   });
 
@@ -1417,7 +1591,7 @@ export function SessionDetailContent({
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;
   const headerRight = (
-    <View className="flex-row items-center gap-2">
+    <View className="min-w-0 shrink flex-row items-center gap-2">
       <SessionPrBadge pr={fetchedData?.associatedPr ?? null} loading={shouldShowLoading} />
       <SessionContextMetrics
         info={contextInfo}
@@ -1515,6 +1689,7 @@ export function SessionDetailContent({
       // the sole transport-toast owner; we throw a stable error on a
       // false return purely so the composer preserves the draft, and never
       // emit a duplicate toast of our own.
+      takeOverTranscriptPositionForSend();
       const sent = await manager.send({
         payload: { type: 'command', command, arguments: argumentsText },
       });
@@ -1523,7 +1698,7 @@ export function SessionDetailContent({
       }
       return true;
     },
-    [manager]
+    [manager, takeOverTranscriptPositionForSend]
   );
 
   // Goal controls ride the same `manager.send()` command pipeline as the
@@ -1788,11 +1963,24 @@ export function SessionDetailContent({
     <PartDetailSheetHost messages={messages}>
       <ToolRunSheetHost messages={messages}>
         <View className="flex-1 bg-background">
+          {/* Advertise the session and its position to the OS (iOS Handoff,
+              Android launcher entry point). Only once the session is loaded:
+              before that there is no title to advertise and the route is still
+              the skeleton. */}
+          {isSessionLoaded ? (
+            <SessionHandoffAdvertiser
+              sessionId={sessionId}
+              anchorMessageId={anchor ?? resumeAnchor}
+              title={rename.title}
+            />
+          ) : null}
           <ScreenHeader
             title={rename.title}
             reserveTitleSpace
+            titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
             backFallback="/(app)/(tabs)/(2_agents)"
             headerRight={headerRight}
+            className="pb-1"
             {...(rename.isTitleInteractive
               ? {
                   onTitlePress: rename.openModal,
@@ -1821,7 +2009,9 @@ export function SessionDetailContent({
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
           {keyboardContainerKind === 'app-aware-padding' ? (
-            <AppAwareKeyboardPaddingView className="flex-1">
+            // The trailing bottom-chrome spacer below reserves the navigation-
+            // bar inset outside this view, so the view must not add it again.
+            <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
               {renderKeyboardBody()}
             </AppAwareKeyboardPaddingView>
           ) : (
@@ -1843,6 +2033,7 @@ export function SessionDetailContent({
               visible={sheetMountState.visible}
               info={sheetMountState.info}
               sessionId={sessionId}
+              anchorMessageId={anchor ?? resumeAnchor}
               sessionTitle={rename.title}
               activeSessionType={activeSessionType}
               ownerConnectionId={remoteModelState.ownerConnectionId}
@@ -1977,15 +2168,20 @@ export function SessionDetailContent({
 
         {/* Fixed indicator row — lives outside the FlashList so per-token
             content-size changes during streaming cannot reposition it.
-            Gated on has-messages so the empty/connecting path (which
-            renders the centered status indicator inside `renderContent`)
-            does not double-render. While preparing, suppressed when the
-            transcript already shows PreparationGroup (no duplicate). */}
+            It carries no position layout transition: while the list resizes it
+            would animate this row's position lag and paint it over the
+            transcript rows it passes (profile-screen.tsx:275-277). It snaps in
+            the same frame and stays opaque via `bg-background`, so a future
+            layout change covers a transcript row instead of overprinting it.
+            Gated on has-messages so the empty/connecting path (which renders
+            the centered status indicator inside `renderContent`) does not
+            double-render. While preparing, suppressed when the transcript
+            already shows PreparationGroup (no duplicate). */}
         {showSessionFooterRow ? (
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
-            layout={LinearTransition.duration(150)}
+            className="bg-background"
           >
             {/* Raw list on purpose: working-indicator.tsx:50-59 derives the
                 label from the last assistant part, and compute-status.ts:33-35
@@ -1993,7 +2189,9 @@ export function SessionDetailContent({
                 spinner reads Thinking during a reasoning stream in both modes.
                 Feeding it displayedMessages would drop that label. */}
             <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
-            {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
+            {footerStatusIndicator ? (
+              <SessionStatusIndicator indicator={footerStatusIndicator} />
+            ) : null}
           </Animated.View>
         ) : null}
 
@@ -2247,9 +2445,10 @@ export function SessionDetailContent({
       );
     }
     return (
-      // Fades in as the skeleton fades out, so the transcript resolves in
-      // place instead of replacing the placeholder in one frame.
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+      // No entrance animation: the transcript body must paint on its own, not
+      // after a `FadeIn` (which starts at `opacity: 0`) completes. The
+      // skeleton's `exiting` crossfade still carries the swap visually.
+      <View className="flex-1">
         <SessionMessageList
           sessionId={sessionId}
           items={transcript}
@@ -2265,9 +2464,12 @@ export function SessionDetailContent({
           onReachedBottom={() => {
             manager.trimRetainedHistory();
           }}
+          onAnchorChange={handleAnchorChange}
           renderItem={renderItem}
+          resumeAt={resumeAnchor}
+          followTailNonce={followTailNonce}
         />
-      </Animated.View>
+      </View>
     );
   }
 }

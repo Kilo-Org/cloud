@@ -1,20 +1,32 @@
 import { createCachedFetch } from '@/lib/cached-fetch';
+import { OPENAI_CHATGPT_API_URL } from './upstream';
 
 /**
  * Which models the partner project can actually serve.
  *
  * The gateway addresses OpenAI models as `openai/<id>`, and the delegated route
- * sends the bare `<id>` to api.openai.com. Not every id the catalog lists is
- * served there: OpenRouter advertises models such as `openai/gpt-5.6-luna-pro`
- * that the plain API answers with `404 The model does not exist or you do not
- * have access to it`. Routing one of those to the delegated upstream fails the
- * request instead of leaving it on its existing route, so eligibility asks
- * OpenAI for the served list first.
+ * sends the bare `<id>` to the delegated upstream. Not every id the catalog
+ * lists is served there. A `-pro` slug such as `openai/gpt-5.6-luna-pro` is a
+ * reasoning mode on the base model, not an API model id, and the plain API
+ * answers it with `404 The model does not exist or you do not have access to
+ * it`. Routing one of those to the delegated upstream fails the request instead
+ * of leaving it on its existing route, so eligibility asks the project for the
+ * served list first.
+ *
+ * The lookup uses the same base URL as the inference request, so a stub or an
+ * alternate host answers both.
  */
-const MODELS_URL = 'https://api.openai.com/v1/models';
+const MODELS_URL = `${OPENAI_CHATGPT_API_URL}/models`;
 
 /** How long a fetched list is reused. Model access changes slowly. */
-const CACHE_TTL_MS = 60 * 60 * 1000;
+const CACHE_TTL_SECONDS = 60 * 60;
+const CACHE_TTL_MS = CACHE_TTL_SECONDS * 1000;
+
+/**
+ * How long a failed lookup is remembered. Without this, an outage re-issues the
+ * request and waits up to `REQUEST_TIMEOUT_MS` on every eligible model check.
+ */
+const FAILURE_TTL_MS = 30 * 1000;
 
 /** A slow list must not hold up a request. */
 const REQUEST_TIMEOUT_MS = 2_000;
@@ -23,7 +35,9 @@ const servedModelIdsFetchers = new Map<string, () => Promise<ReadonlySet<string>
 
 async function fetchServedModelIds(apiKey: string): Promise<ReadonlySet<string>> {
   const response = await fetch(MODELS_URL, {
+    cache: 'force-cache',
     headers: { authorization: `Bearer ${apiKey}` },
+    next: { revalidate: CACHE_TTL_SECONDS },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`OpenAI models request failed with status ${response.status}`);
@@ -38,7 +52,12 @@ async function fetchServedModelIds(apiKey: string): Promise<ReadonlySet<string>>
 function getServedModelIds(apiKey: string): Promise<ReadonlySet<string> | null> {
   let getCachedModelIds = servedModelIdsFetchers.get(apiKey);
   if (!getCachedModelIds) {
-    getCachedModelIds = createCachedFetch(() => fetchServedModelIds(apiKey), CACHE_TTL_MS, null);
+    getCachedModelIds = createCachedFetch(
+      () => fetchServedModelIds(apiKey),
+      CACHE_TTL_MS,
+      null,
+      FAILURE_TTL_MS
+    );
     servedModelIdsFetchers.set(apiKey, getCachedModelIds);
   }
   return getCachedModelIds();
@@ -47,8 +66,10 @@ function getServedModelIds(apiKey: string): Promise<ReadonlySet<string> | null> 
 /**
  * True when the project behind `apiKey` can serve `modelId`.
  *
- * A missing key or failed initial request returns true. After a successful
- * request, transient failures reuse the last-known-good served list.
+ * A missing key, a failed request, or an unreadable body returns true: a
+ * transient problem must not hide the route, and the upstream then answers
+ * exactly as it does today. A failure is remembered for `FAILURE_TTL_MS` so a
+ * burst of eligible requests does not each pay the lookup and its timeout.
  */
 export async function isOpenAiModelServed(apiKey: string, modelId: string): Promise<boolean> {
   if (apiKey.trim().length === 0) return true;

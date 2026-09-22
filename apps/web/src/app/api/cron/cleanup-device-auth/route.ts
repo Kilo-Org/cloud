@@ -7,6 +7,10 @@ import {
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { cleanupExpiredDeviceAuthRequests } from '@/lib/device-auth/device-auth';
 import { cleanupExpiredAdmissionChallenges } from '@/lib/auth/native-admission';
+import {
+  cleanupExpiredPasskeyChallenges,
+  cleanupExpiredPasskeySignInTickets,
+} from '@/lib/auth/passkey';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
 import { cleanupExpiredInstallStates } from '@/lib/integrations/github/install-state';
 import { sentryLogger } from '@/lib/utils.server';
@@ -46,6 +50,18 @@ export async function GET(request: Request) {
     const challengesDeleted = await cleanupExpiredAdmissionChallenges();
     sentryLogger('cron', 'info')(`Cleaned up ${challengesDeleted} expired admission challenges`);
 
+    const passkeyChallengesDeleted = await cleanupExpiredPasskeyChallenges();
+    sentryLogger(
+      'cron',
+      'info'
+    )(`Cleaned up ${passkeyChallengesDeleted} expired passkey challenges`);
+
+    const passkeySignInTicketsDeleted = await cleanupExpiredPasskeySignInTickets();
+    sentryLogger(
+      'cron',
+      'info'
+    )(`Cleaned up ${passkeySignInTicketsDeleted} expired passkey sign-in tickets`);
+
     const accessCodesDeleted = await cleanupExpiredAccessCodes();
     sentryLogger('cron', 'info')(`Cleaned up ${accessCodesDeleted} expired access codes`);
 
@@ -56,6 +72,8 @@ export async function GET(request: Request) {
       buildScheduledJobSuccessEvent(run, {
         deleted_device_auth_request_count: deletedCount,
         deleted_admission_challenge_count: challengesDeleted,
+        deleted_passkey_challenge_count: passkeyChallengesDeleted,
+        deleted_passkey_sign_in_ticket_count: passkeySignInTicketsDeleted,
         deleted_access_code_count: accessCodesDeleted,
         deleted_install_state_count: installStatesDeleted,
       })
@@ -65,6 +83,8 @@ export async function GET(request: Request) {
       success: true,
       deletedCount,
       challengesDeleted,
+      passkeyChallengesDeleted,
+      passkeySignInTicketsDeleted,
       accessCodesDeleted,
       installStatesDeleted,
       timestamp: new Date().toISOString(),

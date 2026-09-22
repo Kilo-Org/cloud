@@ -163,6 +163,7 @@
     "useDifferentEmail": "دوسرا ای میل پتہ استعمال کریں",
     "signInWithApple": "Apple سے سائن ان کریں",
     "signInWithGoogle": "Google سے سائن ان کریں",
+    "signInWithPasskey": "رسائی کلید سے سائن ان کریں",
     "emailAddress": "ای میل پتہ",
     "emailPlaceholder": "صارف@example.com",
     "continueWithEmail": "ای میل کے ساتھ جاری رکھیں",
@@ -175,6 +176,10 @@
     "termsConnector": " اور ",
     "termsSuffix": "۔",
     "moreSignInOptions": "سائن ان کے مزید اختیارات",
+    "passkeyCancelled": "رسائی کلید سے سائن ان منسوخ ہو گیا۔ براہ کرم دوبارہ کوشش کریں۔",
+    "passkeyNotFound": "اس ڈیوائس کے لیے کوئی رسائی کلید محفوظ نہیں ہے۔ اس کے بجائے Apple، Google یا اپنے ای میل سے سائن ان کریں۔",
+    "passkeyUnsupported": "رسائی کلیدیں اس ڈیوائس پر دستیاب نہیں ہیں۔ اس کے بجائے Apple، Google یا اپنے ای میل سے سائن ان کریں۔",
+    "passkeyFailed": "رسائی کلید سے سائن ان نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
     "couldNotCompleteSignIn": "سائن ان مکمل نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
     "sessionEnded": "آپ کا سیشن ختم ہو گیا۔ براہ کرم دوبارہ سائن ان کریں۔",
     "signInCodeExpired": "آپ کے سائن ان کوڈ کی میعاد ختم ہو گئی ہے۔ براہ کرم دوبارہ کوشش کریں۔",
@@ -225,7 +230,28 @@
     "providerTestAccount": "آزمائشی اکاؤنٹ",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "انٹرپرائز SSO"
+    "providerEnterpriseSso": "انٹرپرائز SSO",
+    "passkeysTitle": "رسائی کلیدیں",
+    "passkeysSubtitle": "بغیر پاس ورڈ سائن ان کریں",
+    "passkeysEmpty": "ابھی تک کوئی رسائی کلید نہیں",
+    "passkeysEmptyHint": "$t(profile.addPasskey) تاکہ بغیر پاس ورڈ سائن ان کر سکیں۔",
+    "passkeysCouldNotLoad": "رسائی کلیدیں لوڈ نہیں ہو سکیں",
+    "passkeysLoadFailed": "رسائی کلیدیں اس وقت تک دستیاب نہیں جب تک یہ لوڈ نہ ہو جائے۔",
+    "addPasskey": "رسائی کلید شامل کریں",
+    "passkeyDefaultName": "رسائی کلید",
+    "passkeyAddedOn": "{{date}} کو شامل کی گئی",
+    "passkeyAdded": "رسائی کلید شامل کر دی گئی۔",
+    "passkeyAddFailed": "رسائی کلید شامل نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
+    "passkeyAddUnsupported": "یہ ڈیوائس رسائی کلیدیں نہیں بنا سکتی۔",
+    "passkeyAddCancelled": "رسائی کلید بنانا منسوخ ہو گیا۔",
+    "passkeyRemoved": "رسائی کلید ہٹا دی گئی۔",
+    "passkeyRemoveFailed": "وہ رسائی کلید ہٹائی نہیں جا سکی۔ دوبارہ کوشش کریں۔",
+    "passkeyRenamed": "رسائی کلید کا نام تبدیل کر دیا گیا۔",
+    "passkeyName": "رسائی کلید کا نام",
+    "renamePasskey": "رسائی کلید کا نام تبدیل کریں",
+    "removePasskey": "رسائی کلید ہٹائیں",
+    "removePasskeyTitle": "رسائی کلید ہٹائیں؟",
+    "removePasskeyMessage": "اب آپ اس رسائی کلید سے سائن ان نہیں کر سکیں گے۔"
   },
   "preferences": {
     "general": "عمومی",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} میں سے {{displayCount}} فائلیں لوڈ ہوئیں",
       "filesStillLoading": "فائلیں ابھی لوڈ ہو رہی ہیں۔ تازہ کرنے کے لیے نیچے کھینچیں۔",
       "goToOverview": "خلاصے پر جائیں",
-      "goToOverviewTab": "خلاصے کے ٹیب پر جائیں"
+      "goToOverviewTab": "خلاصے کے ٹیب پر جائیں",
+      "expandAllLines_one": "تمام {{displayCount}} سطر دکھائیں",
+      "expandAllLines_other": "تمام {{displayCount}} سطریں دکھائیں",
+      "expandLines_one": "{{displayCount}} سطر دکھائیں ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} سطریں دکھائیں ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "آس پاس کی {{displayCount}} سطر دکھائیں",
+      "expandLinesOfContext_other": "آس پاس کی {{displayCount}} سطریں دکھائیں",
+      "expandMoreLines_one": "مزید {{displayCount}} سطر دکھائیں ({{start}}–{{end}})",
+      "expandMoreLines_other": "مزید {{displayCount}} سطریں دکھائیں ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{total}} میں سے {{loaded}} فائلیں لوڈ ہوئیں",
+      "loadedOfTotalFiles_other": "{{total}} میں سے {{loaded}} فائلیں لوڈ ہوئیں"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ فائل کے آخر میں نیو لائن نہیں",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "{{path}} پر پرانا"
       },
       "deletedUser": "حذف شدہ صارف",
-      "replyForbiddenTerm": "آپ کو اس {{term}} پر جواب دینے کی اجازت نہیں ہے۔"
+      "replyForbiddenTerm": "آپ کو اس {{term}} پر جواب دینے کی اجازت نہیں ہے۔",
+      "moreLinesAbove_one": "اوپر مزید {{displayCount}} سطر ہے…",
+      "moreLinesAbove_other": "اوپر مزید {{displayCount}} سطریں ہیں…"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ایپ کی ترتیبات نہیں کھل سکیں۔",
     "installKiloGitHubApp": "Kilo GitHub ایپ انسٹال کریں",
@@ -706,7 +744,9 @@
       "statusContext": "آس پاس کی",
       "lineLabel": "{{status}} سطر {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} سطر: {{text}}",
-      "emptyLine": "(خالی)"
+      "emptyLine": "(خالی)",
+      "truncationBanner_one": "GitHub API کی حد کے باعث کل {{total}} تبدیل شدہ فائلوں میں سے پہلی {{limit}} دکھائی جا رہی ہیں۔",
+      "truncationBanner_other": "GitHub API کی حد کے باعث کل {{total}} تبدیل شدہ فائلوں میں سے پہلی {{limit}} دکھائی جا رہی ہیں۔"
     },
     "linkPasteClipboardEmpty": "کلپ بورڈ خالی ہے۔",
     "linkPasteNotAPullRequest": "یہ پل ریکویسٹ یا مرج ریکویسٹ کا لنک نہیں ہے۔",
@@ -783,11 +823,12 @@
     "previewFullDescription": "اطلاعات آپ کی لاک اسکرین پر پیغام کا متن دکھاتی ہیں۔",
     "previewGenericDescription": "اطلاعات صرف کسی سرگرمی کی خبر دیتی ہیں۔ تفصیلات پڑھنے کے لیے Kilo کھولیں۔",
     "channel": {
-      "agent": "ایجنٹ کے سیشنز",
+      "agentProgress": "ایجنٹ کی پیش رفت",
       "chat": "چیٹ کے پیغامات",
       "kiloclaw": "KiloClaw کی سرگرمی",
       "balance": "بیلنس کی تنبیہات",
-      "security": "شناخت شدہ سیکیورٹی مسائل"
+      "security": "شناخت شدہ سیکیورٹی مسائل",
+      "spend": "اخراجات کی تنبیہات"
     },
     "category": {
       "chatMessagesSubtitle": "آپ کی گفتگو میں جوابات",
@@ -798,8 +839,22 @@
       "sessionStatusTitle": "سیشن کی حالت",
       "sessionStatusSubtitle": "مکمل / ناکام / کنٹرول کے لیے تیار",
       "kiloclawActivitySubtitle": "انسٹینس تیار یا ناکام، مقررہ وقت کے کام",
+      "kiloclawActivityUnavailable": "KiloClaw کی سرگرمی حاصل کرنے کے لیے ایک KiloClaw انسٹینس شروع کریں۔",
       "balanceAlertsSubtitle": "تنظیم کا بیلنس کم ہونے کے انتباہات",
-      "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں"
+      "balanceAlertsUnavailable": "بیلنس کے انتباہات حاصل کرنے کے لیے کسی تنظیم میں شامل ہوں۔",
+      "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں",
+      "securityFindingsUnavailable": "سیکیورٹی مسائل حاصل کرنے کے لیے ایک دائرہ کار میں Kilo سیکیورٹی ایجنٹ فعال کریں۔",
+      "spendAlertsSubtitle": "حدوں سے تجاوز اور فی گھنٹہ اضافہ",
+      "spendAlertsToggle": "اخراجات کی تنبیہات کی قسم"
+    },
+    "action": {
+      "openSession": "سیشن کھولیں"
+    },
+    "needsInputAction": {
+      "approved": "درخواست منظور ہو گئی",
+      "replied": "جواب بھیج دیا گیا",
+      "failed": "جواب دینا ممکن نہیں ہو سکا۔ دوبارہ کوشش کے لیے دوبارہ ٹیپ کریں۔",
+      "unavailable": "یہ درخواست اب انتظار نہیں کر رہی۔"
     }
   },
   "tabs": {
@@ -880,7 +935,9 @@
       "uploadFailed": "اپ لوڈ ناکام ہو گیا۔",
       "failedToUploadFile": "فائل اپ لوڈ نہیں ہو سکی: {{reason}}۔",
       "nothingToPaste": "چسپاں کرنے کے لیے کچھ نہیں ہے۔",
-      "metadataStripFailed": "تصویر کا میٹاڈیٹا نہیں ہٹایا جا سکا۔"
+      "metadataStripFailed": "تصویر کا میٹاڈیٹا نہیں ہٹایا جا سکا۔",
+      "limit_one": "آپ زیادہ سے زیادہ {{displayCount}} فائل منسلک کر سکتے ہیں۔",
+      "limit_other": "آپ زیادہ سے زیادہ {{displayCount}} فائلیں منسلک کر سکتے ہیں۔"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1624,7 +1681,11 @@
       "syncFindings": "مسائل ہم آہنگ کریں",
       "syncNow": "ابھی ہم آہنگ کریں",
       "syncQueued": "ہم آہنگی کی درخواست قطار میں شامل کر دی گئی",
-      "syncStatusUnavailable": "ہم آہنگی کی حالت دستیاب نہیں ہے۔"
+      "syncStatusUnavailable": "ہم آہنگی کی حالت دستیاب نہیں ہے۔",
+      "daysOverdue_one": "{{displayCount}} دن کی تاخیر",
+      "daysOverdue_other": "{{displayCount}} دن کی تاخیر",
+      "findingsCount_one": "{{displayCount}} مسئلہ",
+      "findingsCount_other": "{{displayCount}} مسائل"
     },
     "dashboardMetrics": {
       "openFindings": "غیر حل شدہ مسائل",
@@ -2021,6 +2082,10 @@
       "couldNotLoad": "سیشن لوڈ نہیں ہو سکا۔",
       "failedToLoadDetails": "سیشن کی تفصیلات لوڈ نہیں ہو سکیں۔",
       "failedToStopExecution": "کام کو روکا نہیں جا سکا۔",
+      "stopped": "سیشن روک دیا گیا",
+      "committing": "کمٹ کیا جا رہا ہے…",
+      "committed": "کمٹ ہو گیا",
+      "commitFailed": "کمٹ ناکام ہو گیا",
       "renameSession": "سیشن کا نام تبدیل کریں",
       "renamePlaceholder": "سیشن کا نام",
       "transcriptAccessibility": "سیشن کی گفتگو کا متن",
@@ -2131,20 +2196,7 @@
       "continueFrom": "{{title}} جاری رکھا جا رہا ہے۔",
       "importingSession": "سیشن درآمد ہو رہا ہے",
       "cliCannotContinue": "یہ CLI سیشن جاری نہیں رکھ سکتا۔ Cloud Agent یا کوئی اور CLI منتخب کریں۔",
-      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔",
-      "sandbox": "سینڈ باکس",
-      "sandboxAccessibility": "سینڈ باکس: {{label}}",
-      "sandboxDefaultWithDestination": "پہلے سے طے شدہ · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "چھوٹا",
-      "sandboxInstanceShared": "مشترکہ",
-      "sandboxInstanceLarge": "بڑا",
-      "sandboxInstanceDevcontainer": "ڈیو کنٹینر",
-      "sandboxInstanceProviderDefault": "فراہم کنندہ کا پہلے سے طے شدہ",
-      "sandboxCouldNotLoad": "سینڈ باکس کے اختیارات لوڈ نہیں ہو سکے",
-      "sandboxUnavailable": "یہ سینڈ باکس دستیاب نہیں ہے۔ کوئی اور سینڈ باکس یا پہلے سے طے شدہ منتخب کریں۔",
-      "sandboxUseDefault": "پہلے سے طے شدہ استعمال کریں"
+      "importFailed": "یہ سیشن درآمد نہیں ہو سکا۔"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فائل اپ ڈیٹ ہو گئی ہے۔",
@@ -2168,7 +2220,14 @@
       "updateTodos": "کاموں کی فہرست اپ ڈیٹ کریں",
       "linesBadge": "{{displayCount}} سطریں",
       "filesBadge": "{{displayCount}} فائلیں",
-      "matchesBadge": "{{displayCount}} مماثلتیں"
+      "matchesBadge": "{{displayCount}} مماثلتیں",
+      "filesBadge_one": "{{displayCount}} فائل",
+      "filesBadge_other": "{{displayCount}} فائلیں",
+      "linesBadge_one": "{{displayCount}} سطر",
+      "linesBadge_other": "{{displayCount}} سطریں",
+      "matchesBadge_one": "{{displayCount}} مماثلت",
+      "matchesBadge_other": "{{displayCount}} مماثلتیں",
+      "noOutput": "کوئی آؤٹ پٹ نہیں ہے۔"
     },
     "readToolMarkdown": {
       "linesTruncated": "سطریں {{start}}–{{end}} (نامکمل متن)",
@@ -2458,7 +2517,11 @@
       "files": "فائلیں",
       "couldNotOpenPhotoPicker": "تصویر منتخب کرنے کا خانہ نہیں کھل سکا۔ Kilo دوبارہ شروع کریں اور پھر کوشش کریں۔",
       "maxFilesAllowed": "زیادہ سے زیادہ {{displayCount}} فائلیں شامل کی جا سکتی ہیں۔",
-      "onlyAddingFiles": "{{total}} میں سے صرف {{accepted}} فائلیں شامل ہو رہی ہیں (زیادہ سے زیادہ {{max}})"
+      "onlyAddingFiles": "{{total}} میں سے صرف {{accepted}} فائلیں شامل ہو رہی ہیں (زیادہ سے زیادہ {{max}})",
+      "maxFilesAllowed_one": "زیادہ سے زیادہ {{displayCount}} فائل شامل کی جا سکتی ہیں۔",
+      "maxFilesAllowed_other": "زیادہ سے زیادہ {{displayCount}} فائلیں شامل کی جا سکتی ہیں۔",
+      "onlyAddingFiles_one": "{{total}} میں سے صرف {{accepted}} فائلیں شامل ہو رہی ہیں (زیادہ سے زیادہ {{max}})",
+      "onlyAddingFiles_other": "{{total}} میں سے صرف {{accepted}} فائلیں شامل ہو رہی ہیں (زیادہ سے زیادہ {{max}})"
     },
     "composer": {
       "addAttachment": "فائل منسلک کریں",
@@ -2476,7 +2539,9 @@
       "discardAttachmentsMessage": "اپ لوڈ کی گئی وہ فائلیں حذف ہو جائیں گی جو کسی بھیجے گئے پیغام سے منسلک نہیں ہیں۔",
       "discardAttachmentsTitle": "منسلک فائلیں حذف کریں؟",
       "charactersRemaining": "{{count}} حروف باقی ہیں",
-      "insertNewline": "نئی سطر داخل کریں"
+      "insertNewline": "نئی سطر داخل کریں",
+      "charactersRemaining_one": "{{count}} حرف باقی ہے",
+      "charactersRemaining_other": "{{count}} حروف باقی ہیں"
     },
     "chatLink": {
       "linkCopied": "لنک کاپی ہو گیا",
@@ -2548,7 +2613,9 @@
       "stepsCount_one": "{{steps}} مرحلہ",
       "stepsCount": "{{steps}} مراحل",
       "stepsCount_other": "{{steps}} مراحل",
-      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
+      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
+      "modelsCount_one": "ماڈل ({{displayCount}})",
+      "modelsCount_other": "ماڈلز ({{displayCount}})"
     },
     "autoApprove": {
       "title": "خودکار منظوری",
@@ -2588,7 +2655,9 @@
     },
     "toolRun": {
       "sheetTitle": "ٹول کالز",
-      "condensedLabel": "{{itemCount}} اندراجات; {{last}}"
+      "condensedLabel": "{{itemCount}} اندراجات; {{last}}",
+      "condensedLabel_one": "{{itemCount}} اندراج; {{last}}",
+      "condensedLabel_other": "{{itemCount}} اندراجات; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "یہ سیشن فائلیں وصول نہیں کر سکتا",
     "cliCantReceiveFilesMessage": "اس سیشن کو چلانے والا Kilo CLI فائلیں وصول نہیں کر سکتا۔ اس مشین پر CLI اپ ڈیٹ کریں، یا اس کے بجائے نئے سیشن میں شیئر کریں۔",
     "contentlessMessage": "شیئر کرنے کے لیے کچھ نہیں ہے — کوئی متن یا فائل شامل نہیں کی گئی۔",
-    "couldNotReadContent": "شیئر کیا گیا مواد پڑھا نہیں جا سکا۔"
+    "couldNotReadContent": "شیئر کیا گیا مواد پڑھا نہیں جا سکا۔",
+    "onlyFirstFilesAttached_one": "صرف پہلی {{displayCount}} فائل منسلک ہوں گی۔",
+    "onlyFirstFilesAttached_other": "صرف پہلی {{displayCount}} فائلیں منسلک ہوں گی۔"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3164,10 @@
     "couldNotApprove": "منظور نہیں کیا جا سکا",
     "couldNotStart": "شروع نہیں کیا جا سکا",
     "channelName": "فعال ایجنٹس",
-    "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔"
+    "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
+    "openSession": "کھولیں",
+    "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔",
+    "newestResult": "تازہ ترین نتیجہ"
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",
@@ -3118,15 +3192,7 @@
     "remoteOptionTitle": "آپ کا کمپیوٹر",
     "remoteOptionBody": "اپنے کمپیوٹر پر `kilo remote` CLI کے ذریعے Kilo چلائیں۔",
     "skip": "ٹور چھوڑیں",
-    "tutorialLabel": "ٹیوٹوریل",
-    "remoteTitle": "اپنا پہلا ریموٹ سیشن شروع کریں",
-    "remoteBody": "اپنا کمپیوٹر منسلک کریں، پھر یہاں سے سیشن شروع کریں۔",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ابھی کوئی کمپیوٹر منسلک نہیں ہوا",
-    "remoteEmptyBody": "اسے منسلک کرنے کے لیے اپنے کمپیوٹر پر `kilo remote` چلائیں۔",
-    "remoteFound": "کمپیوٹر منسلک ہو گیا",
-    "checkAgain": "دوبارہ جانچیں",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ٹیوٹوریل"
   },
   "appActions": {
     "start": {
@@ -3134,5 +3200,31 @@
       "repositoryUnknown": "Kilo، {{repository}} کو GitHub یا GitLab ریپوزٹری کے طور پر نہیں پہچانتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔",
       "repositoryUnsupported": "{{repository}} ایک Bitbucket ریپوزٹری ہے — ایجنٹ شروع کریں ابھی اسے استعمال نہیں کر سکتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔"
     }
+  },
+  "launcher": {
+    "openLastSession": "آخری سیشن کھولیں"
+  },
+  "spendAlerts": {
+    "subtitle": "جب اس دائرے کا خرچ کسی حد سے تجاوز کرے یا اپنی معمول کی فی گھنٹہ شرح سے بڑھ جائے تو بلنگ رابطوں کو ای میل یا پش کے ذریعے تنبیہ بھیجیں۔",
+    "enable": "اخراجات کی تنبیہات فعال کریں",
+    "thresholdTitle": "حد سے تجاوز",
+    "thresholdSubtitle": "جاری خرچ آپ کی حد سے تجاوز کر رہا ہے",
+    "anomalyTitle": "فی گھنٹہ اضافہ",
+    "anomalySubtitle": "ایک گھنٹہ اس دائرے کی معمول کی شرح سے بہت زیادہ ہے",
+    "limitLabel": "حد (USD)",
+    "windowLabel": "وقت کی حد",
+    "window24h": "24 گھنٹے",
+    "window7d": "7 دن",
+    "window30d": "30 دن",
+    "multiplierLabel": "اضافے کا ضرب",
+    "saved": "اخراجات کی تنبیہ کی ترتیبات محفوظ ہو گئیں",
+    "loadError": "اخراجات کی تنبیہات لوڈ نہیں ہو سکیں۔",
+    "saveError": "اخراجات کی تنبیہات محفوظ نہیں ہو سکیں۔",
+    "empty": "اخراجات کی تنبیہات بند ہیں۔ اس دائرے کے بلنگ رابطوں کو آگاہ کرنے کے لیے انہیں آن کریں۔",
+    "noSpend": "ابھی تک کوئی خرچ درج نہیں ہوا",
+    "spend24h": "گزشتہ 24 گھنٹوں کا خرچ",
+    "multiplierError": "1 یا اس سے زیادہ کا ضرب درج کریں",
+    "permissionDenied": "آپ کو اخراجات کی تنبیہات کا انتظام کرنے کی اجازت نہیں ہے۔",
+    "pushOffByCategory": "اطلاعات میں بند"
   }
 }

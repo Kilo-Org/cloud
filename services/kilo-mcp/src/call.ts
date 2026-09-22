@@ -1,6 +1,13 @@
 import { Validator, type OutputUnit, type Schema, type SchemaDraft } from '@cfworker/json-schema';
 import { ORGANIZATION_ID_HEADER } from './auth';
-import { JsonRpcFailure, type Catalog, type ForwardedAuth } from './types';
+import { isGuardedRow } from './search';
+import {
+  JsonRpcFailure,
+  type Catalog,
+  type CatalogRow,
+  type ForwardedAuth,
+  type ProtectedRequestsApi,
+} from './types';
 
 /** JSON-RPC error codes (see https://www.jsonrpc.org/specification). */
 const INVALID_PARAMS = -32602;
@@ -170,58 +177,43 @@ function ambiguousMutationAppError(path: string, status: number): JsonRpcFailure
 }
 
 /**
- * Validate `input` against the endpoint's published schema and forward the
- * call to apps/web over its public tRPC transport, chosen by the catalog row's
- * `kind`:
- *
- * - `query`: `GET {WEB_BASE_URL}/api/trpc/{path}` with `?input=<JSON>` only when
- *   input is sent. A network failure is retryable: a GET changed nothing.
- * - `mutation`: `POST` to the same URL with no `input` query parameter,
- *   `Content-Type: application/json`, and a JSON body (`{}` for a procedure
- *   that takes no input). tRPC accepts a mutation only on POST and its
- *   json content-type handler reads `req.json()`, so an empty body is a 400 —
- *   a body is always sent. A network failure leaves the outcome unknown, so it
- *   is reported as ambiguous, never as a blind retry. A gateway/function
- *   failure (a non-2xx with no tRPC error message, like app.kilo.ai's
- *   FUNCTION_INVOCATION_TIMEOUT 504) and a 2xx whose result cannot be read are
- *   the same unknown-outcome case: the POST reached the platform, so a
- *   mutation reports them as ambiguous too. An app-level tRPC error does not
- *   settle it either: tRPC raises a 5xx-class error after the resolver returned
- *   (output validation, post-resolver middleware), so a committed write can
- *   come back as an error envelope — a mutation reports a 5xx-class tRPC error
- *   as ambiguous as well. A 4xx-class tRPC error is raised before the write
- *   (validation, authorization, not-found, precondition) and keeps the ordinary
- *   mapping. A query keeps its plain upstream error: a GET changed nothing.
- *
- * apps/web resolves identity from the forwarded bearer and the organization
- * header — both come from the verified grant props (see
- * `forwardedAuthFromProps`): the bearer is the Kilo credential bound to the
- * grant, and the organization header is the grant's organization (never a
- * caller-supplied header). Either transport keeps the same `Accept`,
- * `Authorization`, and organization headers and the same `fetchImpl ?? fetch`
- * injection.
- *
- * Every rejection that can be decided locally (unknown path, schema-invalid
- * input) throws a JsonRpcFailure BEFORE any upstream request is made.
+ * Resolve a catalog row by exact key. `hasOwnProperty` keeps the catalog an
+ * allowlist: a prototype name (`__proto__`) is never a row.
  */
-export async function callCatalogEndpoint(options: {
-  catalog: Catalog;
-  path: string;
-  input: unknown;
-  auth: ForwardedAuth;
-  webBaseUrl: string;
-  fetchImpl?: typeof fetch;
-}): Promise<{ text: string; truncated: boolean }> {
-  const { catalog, path, input, auth, webBaseUrl } = options;
-  const row = Object.prototype.hasOwnProperty.call(catalog, path) ? catalog[path] : undefined;
-  if (!row) {
-    throw new JsonRpcFailure(
-      INVALID_PARAMS,
-      `Unknown path "${path}". The call tool only accepts paths published in the Kilo catalog — run the search tool first and call one of the paths it returns.`,
-      { path }
-    );
-  }
+function catalogRowFor(catalog: Catalog, path: string): CatalogRow | undefined {
+  return Object.prototype.hasOwnProperty.call(catalog, path) ? catalog[path] : undefined;
+}
 
+/** The unknown-path refusal shared by `call` and `call_protected`. */
+function unknownPath(path: string): JsonRpcFailure {
+  return new JsonRpcFailure(
+    INVALID_PARAMS,
+    `Unknown path "${path}". The call tool only accepts paths published in the Kilo catalog — run the search tool first and call one of the paths it returns.`,
+    { path }
+  );
+}
+
+/**
+ * Fail-closed refusal for a protected call that cannot be recorded and later
+ * claimed: the pending-request store is unbound, or the grant carries no
+ * connection id. A guarded call is never run without a recorded, approved
+ * request, and no store message reaches the caller.
+ */
+function protectedRequestsUnavailable(path: string): JsonRpcFailure {
+  return new JsonRpcFailure(
+    INTERNAL_ERROR,
+    `Could not record this admin or debug request for "${path}". Retry the call; if it keeps failing, reconnect the Kilo MCP server.`,
+    { path, retryable: true }
+  );
+}
+
+/**
+ * Validate `input` against the endpoint's published schema and answer whether it
+ * is forwarded as the tRPC `input` value. `call`, `call_protected` and
+ * `submit_otp`'s recorded-payload re-check all run these exact checks, so the
+ * payload the user approves is exactly the payload the upstream receives.
+ */
+function assertInputMatchesSchema(row: CatalogRow, path: string, input: unknown): boolean {
   const schemaIsEmpty = isNoInputSchema(row.inputSchema);
   const sendInput = input !== undefined && input !== null;
   if (schemaIsEmpty && sendInput) {
@@ -254,7 +246,56 @@ export async function callCatalogEndpoint(options: {
       );
     }
   }
+  return sendInput;
+}
 
+/**
+ * The one upstream path `call` and `submit_otp` share: forward an
+ * already-validated call to apps/web over its public tRPC transport, chosen by
+ * the catalog row's `kind`:
+ *
+ * - `query`: `GET {WEB_BASE_URL}/api/trpc/{path}` with `?input=<JSON>` only when
+ *   input is sent. A network failure is retryable: a GET changed nothing.
+ * - `mutation`: `POST` to the same URL with no `input` query parameter,
+ *   `Content-Type: application/json`, and a JSON body (`{}` for a procedure
+ *   that takes no input). tRPC accepts a mutation only on POST and its
+ *   json content-type handler reads `req.json()`, so an empty body is a 400 —
+ *   a body is always sent. A network failure leaves the outcome unknown, so it
+ *   is reported as ambiguous, never as a blind retry. A gateway/function
+ *   failure (a non-2xx with no tRPC error message, like app.kilo.ai's
+ *   FUNCTION_INVOCATION_TIMEOUT 504) and a 2xx whose result cannot be read are
+ *   the same unknown-outcome case: the POST reached the platform, so a
+ *   mutation reports them as ambiguous too. An app-level tRPC error does not
+ *   settle it either: tRPC raises a 5xx-class error after the resolver returned
+ *   (output validation, post-resolver middleware), so a committed write can
+ *   come back as an error envelope — a mutation reports a 5xx-class tRPC error
+ *   as ambiguous as well. A 4xx-class tRPC error is raised before the write
+ *   (validation, authorization, not-found, precondition) and keeps the ordinary
+ *   mapping. A query keeps its plain upstream error: a GET changed nothing.
+ *
+ * apps/web resolves identity from the forwarded bearer and the organization
+ * header — both come from the verified grant props (see
+ * `forwardedAuthFromProps`): the bearer is the Kilo credential bound to the
+ * grant, and the organization header is the grant's organization (never a
+ * caller-supplied header). Either transport keeps the same `Accept`,
+ * `Authorization`, and organization headers and the same `fetchImpl ?? fetch`
+ * injection.
+ *
+ * The caller has already validated `input` against the published schema and,
+ * for a guarded row, obtained the user's approval; every rejection decidable
+ * locally is thrown before any upstream request, and this helper never
+ * re-decides access.
+ */
+export async function forwardCatalogCall(options: {
+  row: CatalogRow;
+  input: unknown;
+  auth: ForwardedAuth;
+  webBaseUrl: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{ text: string; truncated: boolean }> {
+  const { row, input, auth, webBaseUrl } = options;
+  const path = row.path;
+  const sendInput = input !== undefined && input !== null;
   const url = new URL(`/api/trpc/${row.path}`, webBaseUrl);
   if (row.kind === 'query' && sendInput) {
     url.searchParams.set('input', JSON.stringify(input));
@@ -349,4 +390,167 @@ export async function callCatalogEndpoint(options: {
   // success result instead of a false error for a write that landed.
   const data = Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : null;
   return serializeWithCap(data);
+}
+
+/**
+ * The `call` tool: validate `input` against the endpoint's published schema and
+ * forward a non-guarded endpoint to apps/web over its public tRPC GET transport.
+ *
+ * A guarded row (admin or debug) is refused locally before any upstream
+ * request: `call` never runs one. Without the opt-in the refusal names the
+ * checkbox to tick; with it, the refusal points at the OTP-protected tools.
+ * apps/web enforces the admin rule again via `adminProcedure`.
+ */
+export async function callCatalogEndpoint(options: {
+  catalog: Catalog;
+  path: string;
+  input: unknown;
+  auth: ForwardedAuth;
+  webBaseUrl: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{ text: string; truncated: boolean }> {
+  const { catalog, path, input } = options;
+  const row = catalogRowFor(catalog, path);
+  if (!row) {
+    throw unknownPath(path);
+  }
+  if (isGuardedRow(row)) {
+    throw new JsonRpcFailure(
+      INVALID_PARAMS,
+      options.auth.adminEnabled === true
+        ? `"${path}" is an admin or debug endpoint. Use the call_protected tool, then submit_otp with the code from your authenticator app, to run it.`
+        : `"${path}" is an admin or debug endpoint. Reconnect the Kilo MCP server and tick "Enable admin and debug actions" at sign-in to allow admin and debug actions.`,
+      { path }
+    );
+  }
+  assertInputMatchesSchema(row, path, input);
+  return forwardCatalogCall({
+    row,
+    input,
+    auth: options.auth,
+    webBaseUrl: options.webBaseUrl,
+    ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+  });
+}
+
+/**
+ * The `call_protected` tool: record a reviewed admin or debug call and answer
+ * the `otp_required` result. No upstream request is made here — the recorded
+ * request is claimed by `submit_otp` after the user's authenticator code
+ * verifies, and only then does `executeProtectedCall` run it.
+ */
+export async function requestProtectedCall(options: {
+  catalog: Catalog;
+  path: string;
+  input: unknown;
+  auth: ForwardedAuth;
+  requests?: ProtectedRequestsApi;
+  webBaseUrl: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{ text: string; truncated: boolean }> {
+  const { catalog, path, input, auth, requests } = options;
+  const row = catalogRowFor(catalog, path);
+  if (!row) {
+    throw unknownPath(path);
+  }
+  if (!isGuardedRow(row)) {
+    throw new JsonRpcFailure(
+      INVALID_PARAMS,
+      `"${path}" is not an admin or debug endpoint. Use the call tool for it.`,
+      { path }
+    );
+  }
+  // Validate before recording anything: the payload the user approves is
+  // exactly the payload the schema describes.
+  const sendInput = assertInputMatchesSchema(row, path, input);
+
+  const sessionId = auth.sessionId;
+  if (!requests || typeof sessionId !== 'string' || sessionId.length === 0) {
+    // Fail-closed: without a store (or a connection id to bind the request to)
+    // the call can never be approved, and skipping the request would let a
+    // guarded call run unapproved.
+    throw protectedRequestsUnavailable(path);
+  }
+
+  let created: Awaited<ReturnType<ProtectedRequestsApi['createProtectedRequest']>>;
+  try {
+    created = await requests.createProtectedRequest({
+      sessionId,
+      kiloUserId: auth.kiloUserId,
+      clientId: auth.clientId,
+      path,
+      kind: row.debug === true ? 'debug' : 'admin',
+      inputJson: sendInput ? JSON.stringify(input) : null,
+      nowIso: new Date().toISOString(),
+    });
+  } catch {
+    // A store that throws must not surface its own message (it may embed a
+    // credential) and must never let the call run unapproved.
+    throw protectedRequestsUnavailable(path);
+  }
+  const { id, expiresAt } = created;
+
+  return {
+    text: JSON.stringify({
+      status: 'otp_required',
+      request_id: id,
+      expires_at: expiresAt,
+      message:
+        'Approval required: ask the user to read the current code from their authenticator app, then call submit_otp with this request_id and that code. The request expires at ' +
+        expiresAt +
+        '.',
+    }),
+    truncated: false,
+  };
+}
+
+/**
+ * The `submit_otp` execution step: run the payload a claimed request recorded.
+ *
+ * The recorded path must still be a guarded catalog row and the recorded
+ * `inputJson` must still satisfy that row's published schema — a mismatch is a
+ * local refusal, never a silent rewrite of what the user approved. Only then is
+ * the single upstream request made.
+ */
+export async function executeProtectedCall(options: {
+  catalog: Catalog;
+  path: string;
+  inputJson: string | null;
+  auth: ForwardedAuth;
+  webBaseUrl: string;
+  fetchImpl?: typeof fetch;
+}): Promise<{ text: string; truncated: boolean }> {
+  const { catalog, path, inputJson } = options;
+  const row = catalogRowFor(catalog, path);
+  if (!row || !isGuardedRow(row)) {
+    // The catalog changed under a pending request (the row was demoted or
+    // removed); the recorded call can no longer run.
+    throw new JsonRpcFailure(
+      INVALID_PARAMS,
+      `The recorded admin or debug call for "${path}" is no longer available. Start a new admin or debug call with call_protected.`,
+      { path }
+    );
+  }
+
+  let input: unknown;
+  if (inputJson !== null) {
+    try {
+      input = JSON.parse(inputJson);
+    } catch {
+      throw new JsonRpcFailure(
+        INVALID_PARAMS,
+        `The recorded input for "${path}" is not valid JSON. Start a new admin or debug call with call_protected.`,
+        { path }
+      );
+    }
+  }
+  assertInputMatchesSchema(row, path, input);
+
+  return forwardCatalogCall({
+    row,
+    input,
+    auth: options.auth,
+    webBaseUrl: options.webBaseUrl,
+    ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+  });
 }

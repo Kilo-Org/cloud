@@ -86,6 +86,22 @@ describe('createCachedFetch', () => {
     expect(result).toBe('default');
   });
 
+  test('waits for the failure TTL before retrying', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    const fetcher = jest
+      .fn<() => Promise<string>>()
+      .mockRejectedValue(new Error('connection refused'));
+    const get = createCachedFetch(fetcher, 10_000, 'default', 500);
+
+    await expect(get()).resolves.toBe('default');
+    await expect(get()).resolves.toBe('default');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(1_500);
+    await expect(get()).resolves.toBe('default');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   test('updates cached value after stale fallback when fetcher recovers', async () => {
     const fetcher = jest
       .fn<() => Promise<number>>()

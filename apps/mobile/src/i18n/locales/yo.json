@@ -3035,6 +3035,23 @@
       "openHint": "Ṣí ìjíròrò náà. Tẹ̀ mọ́lẹ̀ láti pa á rẹ́.",
       "deleteTitle": "Pa ìjíròrò yìí rẹ́?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Àwọn irinṣẹ́ Kilo",
+      "use": "Lo àwọn irinṣẹ́ Kilo",
+      "useDescription": "Jẹ́ kí ìjíròrò yìí lo àwọn irinṣẹ́ tí sáfà Kilo ń pèsè.",
+      "off": "Àwọn irinṣẹ́ Kilo ti pa",
+      "offDescription": "Ìjíròrò yìí kò fi irinṣẹ́ Kilo kankan ránṣẹ́ sí awoṣe.",
+      "connecting": "Ń sopọ̀ mọ́ àwọn irinṣẹ́ Kilo…",
+      "available": "Àwọn irinṣẹ́ tó wà: {{count}}",
+      "none": "Kò sí irinṣẹ́ kankan",
+      "noneDescription": "Sáfà Kilo kò dá irinṣẹ́ kankan padà.",
+      "unreachable": "A kò lè dé àwọn irinṣẹ́ Kilo",
+      "unreachableDescription": "Sáfà kò dáhùn. Ṣàyẹ̀wò ìsopọ̀ rẹ, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i.",
+      "unauthorized": "Àwọn irinṣẹ́ Kilo kọ̀ ìpàdé yìí",
+      "unauthorizedDescription": "Tún wọlé láti lo àwọn irinṣẹ́ Kilo nínú ìjíròrò yìí.",
+      "unavailable": "Àwọn irinṣẹ́ Kilo kò sí",
+      "unavailableDescription": "Sáfà Kilo kò sí fún àkọsílẹ̀ yìí."
+    }
   }
 }

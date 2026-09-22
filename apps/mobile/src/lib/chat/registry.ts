@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the registry owns the live chats: opening one, answering in it, moving it onto another model or tool set, and releasing it all share one map of running sessions, so the operations stay together. */
 import { Cause, Effect, Exit, Fiber, ManagedRuntime, Option, Scope, Stream } from 'effect';
 import {
   cloneSession,
@@ -5,15 +6,23 @@ import {
   type ModelEvent,
   openSession,
   type SessionHandle,
+  ToolMissingError,
 } from '@kilocode/harness-sdk';
 import { type SQLiteDatabase } from 'expo-sqlite';
 
+import { KILO_MCP_URL } from '@/lib/config';
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 import { change, forgetState, moveState, NOTHING, snapshotOf } from './state';
 import { chatLayers, type ChatOrg } from './layers';
+import {
+  ensureKiloMcp,
+  mcpEnabledFor,
+  moveMcpEnabled,
+  setMcpEnabled as persistMcpEnabled,
+} from './kilo-mcp';
 import { type ChatPlace } from './scope';
 import { askedIn, forgetAsked, moveAsked, rememberAsked } from './pending';
-import { CHAT_TOOL_NAMES } from './tools';
+import { chatToolNames } from './tools';
 import { forgetSession, modelOfSession, moveChat, rememberChat, touchChat } from './store';
 
 /**
@@ -53,6 +62,12 @@ type Chat = {
   answering: Fiber.RuntimeFiber<void, unknown> | undefined;
   /** What was typed while `answering` was running. Drained when it ends well. */
   readonly waiting: Waiting[];
+  /**
+   * A Kilo MCP choice made while an answer was arriving, applied when it
+   * settles. The tool set is frozen for the life of a session, so it is never
+   * changed under an answer that is still coming.
+   */
+  pendingMcp: boolean | undefined;
   readonly chatScope: string;
   readonly org: ChatOrg;
 };
@@ -135,15 +150,43 @@ export async function prepareChats(place: ChatPlace): Promise<void> {
   await runtime.runPromise(Effect.void);
 }
 
-/** Starts a chat: a session of its own, and a row so the list has it. */
-export async function startChat(place: ChatPlace, model: string): Promise<string> {
+/**
+ * Starts a chat: a session of its own, and a row so the list has it.
+ *
+ * A new chat has the Kilo MCP on unless the caller says otherwise, because the
+ * server is available to any signed-in account and there is no setting yet for
+ * a chat that does not exist. When it is on, the tools are discovered before
+ * the session opens so it can name them — bounded at four seconds, and a
+ * failure still opens the chat on the base tools rather than holding the send
+ * on the server.
+ */
+export async function startChat(
+  place: ChatPlace,
+  model: string,
+  mcpEnabled = true
+): Promise<string> {
   const runtime = await runtimeFor(place);
+  if (mcpEnabled && KILO_MCP_URL !== undefined) {
+    await ensureKiloMcp(place, 'automatic');
+  }
   const { handle, scope } = await inOwnScope(
     runtime,
-    openSession({ system: SYSTEM, model, tools: CHAT_TOOL_NAMES })
+    openSession({ system: SYSTEM, model, tools: chatToolNames(mcpEnabled) })
   );
   rememberChat(await open(), { sessionId: handle.id, scope: place.chatScope, at: Date.now() });
-  chats.set(handle.id, { handle, scope, answering: undefined, waiting: [], ...place });
+  if (!mcpEnabled) {
+    /* The chat was opened without the tools, so its setting says so: a chat
+       that never had them is still a chat a person can turn them on for. */
+    await persistMcpEnabled(handle.id, false);
+  }
+  chats.set(handle.id, {
+    handle,
+    scope,
+    answering: undefined,
+    waiting: [],
+    pendingMcp: undefined,
+    ...place,
+  });
   change(handle.id, { ...NOTHING, model, status: 'idle' });
   return handle.id;
 }
@@ -189,14 +232,79 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
   await work;
 }
 
+/** A session that opened, or nothing when the names it was opened with no longer resolve. */
+type Opened =
+  | { readonly opened: false }
+  | {
+      readonly opened: true;
+      readonly handle: SessionHandle;
+      readonly scope: Scope.CloseableScope;
+    };
+
+/**
+ * Opens a session in a scope of its own, answering nothing rather than throwing
+ * when the names it was opened with no longer resolve.
+ *
+ * A session that names a tool the registry no longer holds fails here rather
+ * than opening: the names are frozen for the life of a session, so the caller
+ * moves the chat onto the names it holds now instead. Reading the failure out
+ * of the exit is what tells that case from every other way an open can fail —
+ * a thrown failure is wrapped by the runtime and loses its type.
+ */
+async function openOrMissing<E>(
+  runtime: ChatRuntime,
+  opened: Effect.Effect<SessionHandle, E, ChatContext | Scope.Scope>
+): Promise<Opened> {
+  const scope = await runtime.runPromise(Scope.make());
+  const exit = await runtime.runPromise(Effect.exit(Scope.extend(opened, scope)));
+  if (Exit.isSuccess(exit)) {
+    return { opened: true, handle: exit.value, scope };
+  }
+  /* Opening failed after the scope was made; with nothing holding it, only
+     closing it runs the finalizers the half-open session registered. */
+  await runtime.runPromise(Scope.close(scope, Exit.void));
+  const failure = Option.getOrUndefined(Cause.failureOption(exit.cause));
+  if (failure instanceof ToolMissingError) {
+    return { opened: false };
+  }
+  throw failure instanceof Error ? failure : new Error(Cause.pretty(exit.cause).slice(0, 300));
+}
+
 async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   const runtime = await runtimeFor(place);
-  const { handle, scope } = await inOwnScope(runtime, continueSession(sessionId));
+  const enabled = await mcpEnabledFor(sessionId);
+  if (enabled && KILO_MCP_URL !== undefined) {
+    /* An open, so the four-second bound: a server that is slow or down leaves
+       the chat opening on the base tools rather than holding it here. */
+    await ensureKiloMcp(place, 'automatic');
+  }
+  /* The stored names are what the session was opened with, and a continued
+     session may not change them. Discovering the server first is what makes
+     them resolve again after a restart. */
+  const opened = await openOrMissing(runtime, continueSession(sessionId));
+  if (!opened.opened) {
+    /* The stored names no longer resolve: the server's tool list moved on, or
+       the server is down while the session was stored with its tools. The chat
+       opens either way, on the names the registry holds now. */
+    const current = await onto(place, sessionId, { tools: chatToolNames(enabled) });
+    const model = modelOfSession(await open(), current) ?? '';
+    const asked = await askedIn(current);
+    change(current, { model, asked, status: 'idle' });
+    return;
+  }
+  const { handle, scope } = opened;
   try {
     const turns = await runtime.runPromise(handle.history);
     const asked = await askedIn(sessionId);
     const model = modelOfSession(await open(), sessionId) ?? '';
-    chats.set(sessionId, { handle, scope, answering: undefined, waiting: [], ...place });
+    chats.set(sessionId, {
+      handle,
+      scope,
+      answering: undefined,
+      waiting: [],
+      pendingMcp: undefined,
+      ...place,
+    });
     change(sessionId, {
       ...NOTHING,
       model,
@@ -354,51 +462,87 @@ async function settle(
   });
   /* The line moves only when the answer landed. A question that failed keeps
      its Retry, and asking the next one would take the place that Retry hangs
-     off — so what is waiting stays waiting until the person deals with it. */
-  if (failed === null) {
-    await drain(sessionId, chat);
-  }
+     off — so what is waiting stays waiting until the person deals with it. A
+     Kilo MCP choice made while the answer was arriving is different: it is
+     applied either way, because the answer is no longer arriving. */
+  await drain(sessionId, chat, failed !== null);
 }
 
 /**
- * Asks the next question the person left, if they left one.
+ * Applies what was left while the answer was arriving: a Kilo MCP choice, then
+ * the next question the person asked.
  *
- * They typed it while the last answer was arriving, so it was never a draft
- * they could go back and change: it is a question they asked, and it is asked
- * as soon as the session is free.
+ * They typed the question while the last answer was arriving, so it was never a
+ * draft they could go back and change: it is a question they asked, and it is
+ * asked as soon as the session is free. A question that failed keeps its Retry,
+ * so only a question whose answer landed is asked here.
  */
-async function drain(sessionId: string, chat: Chat): Promise<void> {
+async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<void> {
+  let current = sessionId;
+  if (chat.pendingMcp !== undefined) {
+    chat.pendingMcp = undefined;
+    current = await ontoTools(current, chat);
+  }
+  if (failed) {
+    return;
+  }
   const next = chat.waiting.shift();
   if (next === undefined) {
     return;
   }
-  change(sessionId, { waiting: chat.waiting.map(one => one.text) });
-  await say(sessionId, next.text, next.model);
+  change(current, { waiting: chat.waiting.map(one => one.text) });
+  await say(current, next.text, next.model);
 }
 
+/** What a chat can be moved onto: another model, another tool set, or both. */
+type Onto = {
+  readonly model?: string;
+  readonly tools?: readonly string[];
+};
+
 /**
- * Moves the chat onto the model the person picked, and answers with the session
- * to carry on with.
+ * Moves the chat onto another model or another tool set, and answers with the
+ * session to carry on with.
  *
  * The old session goes: the copy holds every turn of it, and two rows for one
  * conversation is a list that lies. What a copy cannot carry is the thinking,
  * which is signed by the model that made it — that rule is the SDK's, and this
- * only asks for the move.
+ * only asks for the move. A tool set is not a model, so moving onto other tools
+ * keeps the thinking.
+ *
+ * The chat may not be open yet: a stored session whose names no longer resolve
+ * is moved by reopening it, and there is no live session to close or record.
+ *
+ * A move onto another model keeps the tools the session was stored with, and
+ * those can be names the registry has since dropped — a Kilo MCP call that did
+ * not reach the server clears them — so the copy falls back to the names it
+ * holds now rather than reporting the send as failed.
  */
-async function ontoModel(sessionId: string, model: string): Promise<string> {
+async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<string> {
   const chat = chats.get(sessionId);
   const held = snapshotOf(sessionId);
-  if (chat === undefined || model === '' || model === held.model) {
+  const model = move.model === undefined || move.model === '' ? held.model : move.model;
+  const wanted: Onto = {
+    ...(model === held.model ? {} : { model }),
+    ...(move.tools === undefined ? {} : { tools: move.tools }),
+  };
+  if (wanted.model === undefined && wanted.tools === undefined) {
     return sessionId;
   }
-  const runtime = await runtimeFor(chat);
-  const { handle, scope } = await inOwnScope(runtime, cloneSession(sessionId, { model }));
+  const runtime = await runtimeFor(chat ?? place);
+  const { handle, scope } = await cloneOnto(runtime, sessionId, wanted);
   const database = await open();
   moveChat(database, { from: sessionId, to: handle.id, at: Date.now() });
   await moveAsked(sessionId, handle.id);
+  await moveMcpEnabled(sessionId, handle.id);
   const turns = await runtime.runPromise(handle.history);
   chats.delete(sessionId);
-  chats.set(handle.id, { ...chat, handle, scope, answering: undefined });
+  chats.set(
+    handle.id,
+    chat === undefined
+      ? { handle, scope, answering: undefined, waiting: [], pendingMcp: undefined, ...place }
+      : { ...chat, handle, scope, answering: undefined }
+  );
   change(handle.id, { ...held, sessionId: handle.id, model, turns });
   /* The chat it moved off is left pointing at the one it became, rather than
      forgotten. Whoever asked for the move is not always the screen — a question
@@ -407,9 +551,135 @@ async function ontoModel(sessionId: string, model: string): Promise<string> {
      screen reading the old id resolves to the session that carried on, so the
      transcript is never cleared and no second copy is kept. */
   moveState(sessionId, handle.id);
-  await runtime.runPromise(Scope.close(chat.scope, Exit.void));
+  if (chat !== undefined) {
+    await runtime.runPromise(Scope.close(chat.scope, Exit.void));
+  }
   forgetSession(database, sessionId);
   return handle.id;
+}
+
+/**
+ * Copies the session onto another model or tool set, on names the registry can
+ * still resolve.
+ *
+ * A copy the caller gives no tools to keeps the ones the session was stored
+ * with, and those can be the Kilo MCP tools the registry has since dropped: a
+ * call that did not reach the server clears them, so the next move onto another
+ * model would fail with `ToolMissingError` and the question would be reported
+ * as failed rather than asked. The copy then names what the registry holds now,
+ * which is the same fallback an open takes for a stored session whose names no
+ * longer resolve.
+ */
+async function cloneOnto(
+  runtime: ChatRuntime,
+  sessionId: string,
+  wanted: Onto
+): Promise<{ readonly handle: SessionHandle; readonly scope: Scope.CloseableScope }> {
+  const cloned = await openOrMissing(runtime, cloneSession(sessionId, wanted));
+  if (cloned.opened) {
+    return cloned;
+  }
+  if (wanted.tools !== undefined) {
+    /* The caller named the tools, so a name nothing holds is its own mistake
+       rather than a stored set that moved on. */
+    throw new Error('the chat was moved onto a tool the registry does not hold');
+  }
+  const tools = chatToolNames(await mcpEnabledFor(sessionId));
+  const again = await openOrMissing(runtime, cloneSession(sessionId, { ...wanted, tools }));
+  if (!again.opened) {
+    throw new Error('the chat names a tool the registry does not hold');
+  }
+  return again;
+}
+
+/**
+ * Moves the chat onto the model the person picked, and answers with the session
+ * to carry on with.
+ */
+async function ontoModel(sessionId: string, model: string): Promise<string> {
+  const chat = chats.get(sessionId);
+  if (chat === undefined) {
+    return sessionId;
+  }
+  const carried = await onto(chat, sessionId, { model });
+  return carried;
+}
+
+/**
+ * Moves the chat onto the tool set its Kilo MCP setting names now.
+ *
+ * A session freezes the tools it offers, so turning the server off is a move
+ * onto a session without its tools, and turning it on is a move onto one with
+ * them.
+ */
+async function ontoTools(sessionId: string, place: ChatPlace): Promise<string> {
+  return onto(place, sessionId, { tools: chatToolNames(await mcpEnabledFor(sessionId)) });
+}
+
+/**
+ * Turns the Kilo MCP tools on or off for one chat.
+ *
+ * The setting is written first, so it survives whatever happens to the session.
+ * Turning it on reaches the server, because a chat that had the feature off
+ * never ran a discovery: without asking, the session would be moved onto the
+ * base tools alone, the sheet would still say the server is not available, and
+ * the switch the person just turned on would snap back off. A chat that is
+ * answering is not moved under the answer — the tool set would change between
+ * two rounds of one question — so the choice is remembered and applied when the
+ * answer settles.
+ */
+export async function setMcpEnabled(sessionId: string, enabled: boolean): Promise<void> {
+  const current = snapshotOf(sessionId).sessionId;
+  if ((await mcpEnabledFor(current)) === enabled) {
+    return;
+  }
+  await persistMcpEnabled(current, enabled);
+  const chat = chats.get(current);
+  if (chat === undefined) {
+    return;
+  }
+  if (enabled && KILO_MCP_URL !== undefined) {
+    /* An open, so the four-second bound: a server that is slow or down leaves
+       the chat to be moved onto what is known rather than holding the switch. */
+    await ensureKiloMcp(chat, 'automatic');
+  }
+  if (chat.answering !== undefined) {
+    chat.pendingMcp = enabled;
+    return;
+  }
+  await ontoTools(current, chat);
+}
+
+/**
+ * Asks the Kilo server again, and moves the chat onto the tools that answered.
+ *
+ * A Retry is a person asking, so it gets the longer deadline the module keeps
+ * for one. The tool set is frozen for the life of a session, so tools that were
+ * not there when the chat opened need a session that names them: the chat is
+ * moved onto one, the way turning the setting on moves it. A server that still
+ * refuses leaves the chat where it is, because the failure is already on screen
+ * and a move onto the same tools would only churn the session.
+ *
+ * A chat that is answering is not moved under the answer, for the same reason
+ * the setting is not: the tool set would change between two rounds of one
+ * question. The recovered tools are applied when the answer settles, unless the
+ * person turned the setting off while it was arriving.
+ */
+export async function retryKiloMcp(sessionId: string): Promise<void> {
+  const current = snapshotOf(sessionId).sessionId;
+  const chat = chats.get(current);
+  if (chat === undefined) {
+    return;
+  }
+  const state = await ensureKiloMcp(chat, 'retry');
+  if (state.status !== 'ready' || state.tools.length === 0) {
+    return;
+  }
+  if (chat.answering !== undefined) {
+    chat.pendingMcp ??= true;
+    return;
+  }
+  await ontoTools(current, chat);
 }
 
 /**
@@ -427,7 +697,7 @@ export async function stopChat(sessionId: string): Promise<void> {
   }
   const stopped = await halt(sessionId, chat);
   if (stopped) {
-    await drain(sessionId, chat);
+    await drain(sessionId, chat, false);
   }
 }
 

@@ -15,6 +15,11 @@ export const ENV_KEYS = {
 
 /** Optional config keys — absent values are tolerated (dependent features hide themselves). */
 export const OPTIONAL_ENV_KEYS = {
+  // The Kilo MCP server the chat reaches with the signed-in session's own
+  // token. An override: a production build resolves the public server in
+  // lib/config.ts, and a build that is neither production nor given a value
+  // hides the whole feature, as with every optional key.
+  kiloMcpUrl: 'KILO_MCP_URL',
   googleWebClientId: 'GOOGLE_WEB_CLIENT_ID',
   googleIosClientId: 'GOOGLE_IOS_CLIENT_ID',
   // Google Cloud project number for Play Integrity. Absent → Android skips

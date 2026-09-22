@@ -3035,6 +3035,23 @@
       "openHint": "Ivula ingxoxo. Cindezela isikhathi eside ukuze usule.",
       "deleteTitle": "Susa le ngxoxo?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Amathuluzi e-Kilo",
+      "use": "Sebenzisa amathuluzi e-Kilo",
+      "useDescription": "Vumela le ngxoxo ukuthi isebenzise amathuluzi anikezwa iseva ye-Kilo.",
+      "off": "Amathuluzi e-Kilo avaliwe",
+      "offDescription": "Le ngxoxo ayithumeli noma yiliphi ithuluzi le-Kilo kumodeli.",
+      "connecting": "Ixhumeka kumathuluzi e-Kilo…",
+      "available": "Amathuluzi atholakalayo: {{count}}",
+      "none": "Awekho amathuluzi atholakalayo",
+      "noneDescription": "Iseva ye-Kilo ayibuyisanga lithuluzi.",
+      "unreachable": "Ayikwazanga ukufinyelela kumathuluzi e-Kilo",
+      "unreachableDescription": "Iseva ayiphendulanga. Hlola ukuxhumana kwakho, bese uzama futhi.",
+      "unauthorized": "Amathuluzi e-Kilo enqabile le seshini",
+      "unauthorizedDescription": "Ngena futhi ukuze usebenzise amathuluzi e-Kilo kule ngxoxo.",
+      "unavailable": "Amathuluzi e-Kilo awatholakali",
+      "unavailableDescription": "Iseva ye-Kilo ayitholakali kule akhawunti."
+    }
   }
 }

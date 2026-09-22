@@ -3035,6 +3035,23 @@
       "openHint": "Binubuksan ang chat. Pindutin nang matagal para burahin.",
       "deleteTitle": "Burahin ang chat na ito?"
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "mcp": {
+      "title": "Mga tool ng Kilo",
+      "use": "Gamitin ang mga tool ng Kilo",
+      "useDescription": "Payagan ang chat na ito na gamitin ang mga tool na iniaalok ng Kilo server.",
+      "off": "Naka-off ang mga tool ng Kilo",
+      "offDescription": "Hindi nagpapadala ang chat na ito ng anumang tool ng Kilo sa modelo.",
+      "connecting": "Kumokonekta sa mga tool ng Kilo…",
+      "available": "Mga available na tool: {{count}}",
+      "none": "Walang available na tool",
+      "noneDescription": "Walang ibinalik na tool ang Kilo server.",
+      "unreachable": "Hindi maabot ang mga tool ng Kilo",
+      "unreachableDescription": "Hindi tumugon ang server. Suriin ang koneksyon mo, pagkatapos ay subukan muli.",
+      "unauthorized": "Tinanggihan ng mga tool ng Kilo ang session na ito",
+      "unauthorizedDescription": "Mag-sign in muli para magamit ang mga tool ng Kilo sa chat na ito.",
+      "unavailable": "Hindi available ang mga tool ng Kilo",
+      "unavailableDescription": "Walang Kilo server para sa account na ito."
+    }
   }
 }

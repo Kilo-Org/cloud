@@ -3035,6 +3035,23 @@
       "openHint": "चॅट उघडते. हटवण्यासाठी दाबून धरा.",
       "deleteTitle": "ही चॅट हटवायची?"
     },
-    "beta": "बीटा"
+    "beta": "बीटा",
+    "mcp": {
+      "title": "Kilo साधने",
+      "use": "Kilo साधने वापरा",
+      "useDescription": "Kilo सर्व्हर देते ती साधने या चॅटला वापरू द्या.",
+      "off": "Kilo साधने बंद आहेत",
+      "offDescription": "ही चॅट मॉडेलला कोणतेही Kilo साधन पाठवत नाही.",
+      "connecting": "Kilo साधनांशी कनेक्ट होत आहे…",
+      "available": "उपलब्ध साधने: {{count}}",
+      "none": "कोणतीही साधने उपलब्ध नाहीत",
+      "noneDescription": "Kilo सर्व्हरने कोणतेही साधन परत दिले नाही.",
+      "unreachable": "Kilo साधनांपर्यंत पोहोचता आले नाही",
+      "unreachableDescription": "सर्व्हरने प्रतिसाद दिला नाही. तुमचे कनेक्शन तपासा, नंतर पुन्हा प्रयत्न करा.",
+      "unauthorized": "Kilo साधनांनी हे सत्र नाकारले",
+      "unauthorizedDescription": "या चॅटमध्ये Kilo साधने वापरण्यासाठी पुन्हा साइन इन करा.",
+      "unavailable": "Kilo साधने उपलब्ध नाहीत",
+      "unavailableDescription": "या खात्यासाठी Kilo सर्व्हर उपलब्ध नाही."
+    }
   }
 }

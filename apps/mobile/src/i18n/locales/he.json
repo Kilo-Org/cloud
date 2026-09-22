@@ -3057,6 +3057,23 @@
       "openHint": "פותח את הצ'אט. לחיצה ארוכה למחיקה.",
       "deleteTitle": "למחוק את הצ'אט הזה?"
     },
-    "beta": "בטא"
+    "beta": "בטא",
+    "mcp": {
+      "title": "כלי Kilo",
+      "use": "שימוש בכלי Kilo",
+      "useDescription": "אפשר לשיחה הזו להשתמש בכלים שהשרת של Kilo מציע.",
+      "off": "כלי Kilo כבויים",
+      "offDescription": "השיחה הזו לא שולחת שום כלי של Kilo למודל.",
+      "connecting": "מתחבר לכלי Kilo…",
+      "available": "כלים זמינים: {{count}}",
+      "none": "אין כלים זמינים",
+      "noneDescription": "השרת של Kilo לא החזיר כלים.",
+      "unreachable": "לא ניתן היה להגיע לכלי Kilo",
+      "unreachableDescription": "השרת לא הגיב. בדוק את החיבור שלך ונסה שוב.",
+      "unauthorized": "כלי Kilo דחו את ההפעלה הזו",
+      "unauthorizedDescription": "היכנס שוב כדי להשתמש בכלי Kilo בשיחה הזו.",
+      "unavailable": "כלי Kilo אינם זמינים",
+      "unavailableDescription": "השרת של Kilo אינו זמין לחשבון הזה."
+    }
   }
 }

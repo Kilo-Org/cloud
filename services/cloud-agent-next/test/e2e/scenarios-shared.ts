@@ -617,10 +617,6 @@ async function runUnknownModel(
   }
 }
 
-// ---------------------------------------------------------------------------
-// auth-reject: direct HTTPS probes against the deployed fake Worker
-// ---------------------------------------------------------------------------
-
 export type AuthProbeMethod = 'GET' | 'POST';
 
 export type AuthProbe = {

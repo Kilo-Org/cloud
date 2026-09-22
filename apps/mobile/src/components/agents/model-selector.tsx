@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { i18n } from '@/i18n';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
 import {
   BYOK_MODEL_LABEL,
@@ -139,8 +140,14 @@ export function ModelSelector({
   const providerAware = pickerOptions.some(
     option => option.modelRef !== undefined || !option.showGatewayMetadata
   );
+  // A matched option can be one of Kilo's own Auto models, whose backend name no
+  // catalog translates, so resolve its label first and let the helper fall back
+  // to the short name (or the generic label) for a stored reference the catalog
+  // does not carry.
   const label = resolveModelSelectorLabel({
-    selectedName: selectedModel?.name,
+    selectedName: selectedModel
+      ? autoModelLabel(selectedModel.displayId, selectedModel.name)
+      : undefined,
     value,
     providerAware,
     fallbackLabel: t('common.model'),
@@ -234,10 +241,11 @@ export function ModelPickerOptionRow({
   const { t } = useTranslation();
   const { free, byok, collectsData } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
+  const name = autoModelLabel(option.displayId, option.name);
   const accessibilityLabel = formatList(
     [
       option.provider?.name,
-      option.name,
+      name,
       option.displayId,
       byok ? BYOK_MODEL_LABEL : undefined,
       free && !byok ? freeModelFreeLabel() : undefined,
@@ -270,7 +278,7 @@ export function ModelPickerOptionRow({
           accessibilityState={{ disabled: option.unavailable, selected }}
         >
           <View className="flex-1">
-            <Text className="text-base text-foreground">{option.name}</Text>
+            <Text className="text-base text-foreground">{name}</Text>
             {option.modelRef ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
                 {t('agentChat.modelSelector.provider', { id: option.modelRef.providerID })}
@@ -326,8 +334,8 @@ export function ModelPickerOptionRow({
           accessibilityRole="button"
           accessibilityLabel={
             isFavorite
-              ? t('agentChat.modelSelector.removeFromFavorites', { name: option.name })
-              : t('agentChat.modelSelector.addToFavorites', { name: option.name })
+              ? t('agentChat.modelSelector.removeFromFavorites', { name })
+              : t('agentChat.modelSelector.addToFavorites', { name })
           }
           accessibilityState={{ selected: isFavorite }}
         >

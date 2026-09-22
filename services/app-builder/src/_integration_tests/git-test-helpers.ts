@@ -10,12 +10,8 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, readdirSyn
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-// --- Configuration ---
-
 export const APP_BUILDER_URL = process.env.APP_BUILDER_URL || 'http://localhost:8790';
 export const AUTH_TOKEN = process.env.AUTH_TOKEN || 'dev-token-change-this-in-production';
-
-// --- Types ---
 
 export type TokenPermission = 'full' | 'ro';
 
@@ -32,8 +28,6 @@ export type TokenResponse = {
   permission: TokenPermission;
 };
 
-// --- Logging ---
-
 export function log(message: string, data?: unknown) {
   console.log(`[TEST] ${message}`, data ? JSON.stringify(data, null, 2) : '');
 }
@@ -49,8 +43,6 @@ export function logSuccess(message: string) {
 export function logFailure(message: string) {
   console.error(`[✗] ${message}`);
 }
-
-// --- API helpers ---
 
 export async function initProject(projectId: string): Promise<InitSuccessResponse> {
   const endpoint = `${APP_BUILDER_URL}/apps/${encodeURIComponent(projectId)}/init`;
@@ -93,8 +85,6 @@ export async function generateGitToken(
 
   return response.json();
 }
-
-// --- Git CLI helpers ---
 
 export function buildGitUrlWithToken(gitUrl: string, token: string): string {
   const url = new URL(gitUrl);
@@ -172,8 +162,6 @@ export function runGitCommandSafe(
   }
 }
 
-// --- High-level helpers ---
-
 /**
  * Clone a repository into a subdirectory of `parentDir`.
  * Returns the absolute path to the cloned directory.
@@ -212,8 +200,6 @@ export function push(dir: string, branch = 'main') {
   runGitCommand(dir, `git push origin ${branch}`);
 }
 
-// --- Temp dir management ---
-
 export function createTempDir(prefix = 'app-builder-test-'): string {
   return mkdtempSync(join(tmpdir(), prefix));
 }
@@ -225,8 +211,6 @@ export function removeTempDir(dir: string) {
     logError('Failed to cleanup temp directory', e);
   }
 }
-
-// --- Assertions ---
 
 export class AssertionError extends Error {
   constructor(message: string) {
@@ -274,20 +258,16 @@ export function assertFileExists(dir: string, relativePath: string, label: strin
  * Runs multiple independent checks.
  */
 export function assertNotDetachedHead(dir: string, expectedBranch = 'main') {
-  // Check 1: git branch --show-current (empty in detached HEAD)
   const branchShowCurrent = runGitCommandSafe(dir, 'git branch --show-current');
   assertEqual(branchShowCurrent.stdout, expectedBranch, 'git branch --show-current');
 
-  // Check 2: git symbolic-ref HEAD (errors in detached HEAD)
   const symbolicRef = runGitCommandSafe(dir, 'git symbolic-ref HEAD');
   assertEqual(symbolicRef.exitCode, 0, 'git symbolic-ref HEAD exit code');
   assertEqual(symbolicRef.stdout, `refs/heads/${expectedBranch}`, 'git symbolic-ref HEAD');
 
-  // Check 3: git rev-parse --abbrev-ref HEAD (returns "HEAD" if detached)
   const abbrevRef = runGitCommandSafe(dir, 'git rev-parse --abbrev-ref HEAD');
   assertEqual(abbrevRef.stdout, expectedBranch, 'git rev-parse --abbrev-ref HEAD');
 
-  // Check 4: git status should say "On branch main", not "HEAD detached"
   const status = runGitCommandSafe(dir, 'git status');
   assertIncludes(status.stdout, `On branch ${expectedBranch}`, 'git status branch line');
 }
@@ -310,8 +290,6 @@ export function getCommitMessages(dir: string): string[] {
     .split('\n')
     .filter(line => line.length > 0);
 }
-
-// --- Test runner ---
 
 export type TestFn = () => Promise<void>;
 
@@ -342,7 +320,6 @@ export async function runTestSuite(
     }
   }
 
-  // Summary
   console.log(`\n${'='.repeat(60)}`);
   console.log(`  Results: ${suiteName}`);
   console.log('='.repeat(60));

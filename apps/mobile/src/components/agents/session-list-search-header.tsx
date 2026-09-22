@@ -68,6 +68,9 @@ export function SessionListSearchHeader({
           // Height comes from `min-h`, never `py`: iOS insets the already-centered
           // text rect by the padding and draws the placeholder low.
           className="min-h-[26px] flex-1 text-[15px] leading-[normal] text-foreground"
+          // One line, always: at a narrow width with a large font scale the
+          // placeholder wrapped inside the field and the field grew with it.
+          numberOfLines={1}
           placeholder={t('agents.search.searchSessionsPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           onChangeText={onChangeText}

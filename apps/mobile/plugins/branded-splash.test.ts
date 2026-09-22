@@ -124,6 +124,13 @@ describe('shared branded splash', () => {
   });
 
   it('generates both native splash surfaces from the same options', async () => {
+    // Compile and introspect against a throwaway project root like the sibling
+    // cases: `compileModsAsync` seeds the Android color/style mods from the
+    // resources already on disk, so pointing it at this package's root would
+    // read a developer's prebuilt `android/` tree — its generated `colors.xml`
+    // is absent in CI — and merge colors this test does not own into the mod
+    // results, making the assertions depend on the developer's machine.
+    const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
       { image: './assets/images/logo-mark.png', backgroundColor: '#FAF74F', imageWidth: 100 }
@@ -135,12 +142,6 @@ describe('shared branded splash', () => {
     ).toBeTypeOf('function');
     expect(config.mods?.android?.styles).toBeTypeOf('function');
 
-    // Introspect against a fresh project root: `compileModsAsync` seeds the
-    // Android color/style mods from the resources already on disk, so pointing
-    // it at this package's root would read a developer's prebuilt `android/`
-    // tree — its `colors.xml` is absent in CI — and merge colors this test does
-    // not own into the mod results, making the assertion machine-dependent.
-    const { root } = createAndroidProject();
     const evaluated = await compileModsAsync(config, {
       projectRoot: root,
       platforms: ['ios', 'android'],
@@ -170,11 +171,21 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // Introspection reads the project's own native resources, so the colors
+    // modResults carry whatever the worktree's generated `android/` project
+    // declares (adaptive-icon, notification, app background) next to the
+    // splash color. Assert the splash color the plugin owns, not the array.
     // `introspect` merges into the colors a local prebuild already generated, so
-    // assert the plugin's entry instead of the whole array.
+    // a worktree with a prebuilt `android/` directory carries that file's extra
+    // entries. Assert the plugin's entry among them, by containment, the same
+    // way the styles assertion below pins its theme: not the whole array and not
+    // its exact length, so a prebuild's other colors (iconBackground,
+    // colorPrimary, …) surviving here cannot fail the case.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
-        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+        color: expect.arrayContaining([
+          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+        ]),
       },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({

@@ -53,16 +53,27 @@ function boxDp(className: string): { width: number; height: number } {
   return { width: size('w'), height: size('h') };
 }
 
-/** The smallest per-side reach a hitSlop expresses, in dp. */
-function slopDp(hitSlop: unknown): number {
+/** The per-side reach a `hitSlop` prop expresses; a bare number covers every side. */
+function slopInsets(hitSlop: unknown): Insets {
   if (typeof hitSlop === 'number') {
-    return hitSlop;
+    return { top: hitSlop, right: hitSlop, bottom: hitSlop, left: hitSlop };
   }
   if (hitSlop && typeof hitSlop === 'object') {
-    const sides = Object.values(hitSlop as Record<string, number | undefined>);
-    return Math.min(...sides.map(side => side ?? 0));
+    const sides = hitSlop as Partial<Insets>;
+    return {
+      top: sides.top ?? 0,
+      right: sides.right ?? 0,
+      bottom: sides.bottom ?? 0,
+      left: sides.left ?? 0,
+    };
   }
-  return 0;
+  return { top: 0, right: 0, bottom: 0, left: 0 };
+}
+
+/** The smallest per-side reach a hitSlop expresses, in dp. */
+function slopDp(hitSlop: unknown): number {
+  const sides = slopInsets(hitSlop);
+  return Math.min(sides.top, sides.right, sides.bottom, sides.left);
 }
 
 /** One side's reach, from a hitSlop that is one number for every side or per-side insets. */
@@ -237,9 +248,12 @@ describe('SessionListHeaderActions new-session control', () => {
     // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
     expect(gapDp).toBe(14);
 
-    // `hitSlopInsets` (inside `slopSideDp`) validates and normalizes either
-    // shape, because the filter expresses its slop as one dp value for every
-    // side while the new-session control caps its right side.
+    // The new-session control carries per-side insets; the filter control
+    // carries one slop value for every side rather than an insets object, so
+    // its facing reach comes from the shape-agnostic helper: `hitSlopInsets`
+    // (inside `slopSideDp`) validates and normalizes either shape, because the
+    // filter expresses its slop as one dp value for every side while the
+    // new-session control caps its right side.
     // The new-session control sits left of the filter, so the gap has to fit
     // both facing slops; more than the gap means the two regions overlap. Either
     // control may express hitSlop as one number or as per-side insets: the

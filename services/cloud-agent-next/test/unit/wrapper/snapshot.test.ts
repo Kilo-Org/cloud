@@ -13,10 +13,6 @@ import {
 import { WrapperState, type SessionContext } from '../../../wrapper/src/state.js';
 import type { WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
 
-// ---------------------------------------------------------------------------
-// Polyfills for Node.js test environment
-// ---------------------------------------------------------------------------
-
 if (typeof CloseEvent === 'undefined') {
   const g = globalThis as Record<string, unknown>;
   g.CloseEvent = class extends Event {
@@ -42,10 +38,6 @@ if (typeof MessageEvent === 'undefined') {
     }
   };
 }
-
-// ---------------------------------------------------------------------------
-// MockWebSocket
-// ---------------------------------------------------------------------------
 
 class MockWebSocket {
   static CONNECTING = 0;
@@ -98,10 +90,6 @@ class MockWebSocket {
     return MockWebSocket.instances[MockWebSocket.instances.length - 1];
   }
 }
-
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
 
 const createSessionContext = (overrides: Partial<SessionContext> = {}): SessionContext => ({
   kiloSessionId: 'kilo_sess_456',
@@ -184,10 +172,6 @@ function parseSentMessages(ws: MockWebSocket): ParsedEvent[] {
   return ws.sent.map(msg => JSON.parse(msg) as ParsedEvent);
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe('sendKiloSnapshot → sendKiloState', () => {
   let state: WrapperState;
   let callbacks: ConnectionCallbacks;
@@ -206,10 +190,6 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
-
-  // -----------------------------------------------------------------------
-  // 1. session.status sent as kilocode event (not kilo_snapshot)
-  // -----------------------------------------------------------------------
 
   it('sends session.status as kilocode event (not kilo_snapshot)', async () => {
     const kiloClient = createMockKiloClient({
@@ -238,10 +218,6 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // 2. session.status with busy status from kilo server
-  // -----------------------------------------------------------------------
-
   it('sends session.status with busy status from kilo server', async () => {
     const kiloClient = createMockKiloClient({
       getSessionStatuses: vi.fn().mockResolvedValue({
@@ -266,10 +242,6 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // 3. defaults session status to idle when not present
-  // -----------------------------------------------------------------------
-
   it('defaults session status to idle when not present', async () => {
     const kiloClient = createMockKiloClient({
       getSessionStatuses: vi.fn().mockResolvedValue({}),
@@ -291,10 +263,6 @@ describe('sendKiloSnapshot → sendKiloState', () => {
       status: { type: 'idle' },
     });
   });
-
-  // -----------------------------------------------------------------------
-  // 4. replays pending question as kilocode event for interactive sessions
-  // -----------------------------------------------------------------------
 
   it('replays pending question as kilocode event for interactive sessions', async () => {
     const pendingQuestion = {
@@ -427,10 +395,6 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     expect(callbacks.onTerminalError).not.toHaveBeenCalled();
   });
 
-  // -----------------------------------------------------------------------
-  // 5. replays pending permission as kilocode event
-  // -----------------------------------------------------------------------
-
   it('replays pending permission as kilocode event', async () => {
     const pendingPermission = {
       id: 'p_456',
@@ -512,10 +476,6 @@ describe('sendKiloSnapshot → sendKiloState', () => {
     ).toHaveLength(0);
   });
 
-  // -----------------------------------------------------------------------
-  // 6. does not send question event when no question is pending
-  // -----------------------------------------------------------------------
-
   it('does not send question event when no question is pending', async () => {
     const kiloClient = createMockKiloClient({
       getQuestions: vi.fn().mockResolvedValue([]),
@@ -532,10 +492,6 @@ describe('sendKiloSnapshot → sendKiloState', () => {
 
     expect(questionEvents).toHaveLength(0);
   });
-
-  // -----------------------------------------------------------------------
-  // 7. does not send permission event when no permission is pending
-  // -----------------------------------------------------------------------
 
   it('does not send permission event when no permission is pending', async () => {
     const kiloClient = createMockKiloClient({
@@ -574,10 +530,6 @@ describe('sendKiloSnapshot → sendKiloState', () => {
 
     expect(resumeNetworkWait).not.toHaveBeenCalled();
   });
-
-  // -----------------------------------------------------------------------
-  // 8. skips when no kiloSessionId is available
-  // -----------------------------------------------------------------------
 
   it('skips when no kiloSessionId is available', async () => {
     const kiloClient = createMockKiloClient();

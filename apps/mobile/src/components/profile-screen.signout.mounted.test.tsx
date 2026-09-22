@@ -36,6 +36,9 @@ vi.mock('react-native-reanimated', () => ({
 // without this mock the real module pulls React Native's Flow-typed source,
 // which the vitest (rolldown) transform cannot parse. The `safeArea` value
 // above stands in for the device's insets.
+// The Profile screen reads its landscape side insets through `@/lib/screen-insets`,
+// whose real module loads the native safe-area package. The node project cannot
+// load that native module, so the screen's own tests stub the hook.
 // The screen reads its side insets through `@/lib/screen-insets`, which imports
 // this native module; its untransformed source breaks the mounted project.
 vi.mock('react-native-safe-area-context', () => ({

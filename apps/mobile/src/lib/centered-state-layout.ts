@@ -59,6 +59,27 @@ export function getCenteredStateBand({
   return { top, bottom, band: Math.max(0, bottom - top) };
 }
 
+/**
+ * The bottom reserve a nested surface resolves. `replace` sets the given inset
+ * as the surface's own reserve; otherwise the inset only raises the inherited
+ * one, so a nested reservation can never shrink a surface's clearance. A screen
+ * whose centered state must use the whole room above a hard overlay replaces:
+ * the tab layout reserves the tab bar plus a content gap for scrolled content,
+ * and a centered state that lost that gap could no longer show its hint and
+ * action above the bar.
+ */
+export function resolveBottomReservation({
+  inherited,
+  bottomInset,
+  replace,
+}: {
+  inherited: number;
+  bottomInset: number;
+  replace: boolean;
+}) {
+  return replace ? bottomInset : Math.max(inherited, bottomInset);
+}
+
 export function getCenteredStateLayout({
   surface,
   viewport,

@@ -189,11 +189,15 @@ export function CreditPurchaseScreen() {
               const priceLabel = rowCompleting
                 ? t('kiloPass.completingPurchase')
                 : (pack.displayPrice ?? t('credits.priceUnavailable'));
+              // The row is one accessible element: the explicit label replaces
+              // its children, so the charge and the disabled reason must be in
+              // the label itself (the canonical Kilo Pass row does the same).
+              const rowAccessibilityLabel = [packLabel, priceLabel].join(', ');
 
               return (
                 <Pressable
                   key={pack.backend.appleProductId}
-                  accessibilityLabel={packLabel}
+                  accessibilityLabel={rowAccessibilityLabel}
                   accessibilityRole="button"
                   accessibilityState={{ busy: rowCompleting, disabled }}
                   className={cn(

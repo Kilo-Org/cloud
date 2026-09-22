@@ -192,6 +192,16 @@ describe('CreditPurchaseScreen', () => {
 
     const rows = packRows(renderer);
     expect(rows).toHaveLength(4);
+    // The row is one accessible element, so the label carries the charge the
+    // store sheet will show, not only the credit amount.
+    expect(
+      rows.map(row => (row.props as { accessibilityLabel: string }).accessibilityLabel)
+    ).toEqual([
+      'Add $10.00 of credits, $10.99',
+      'Add $50.00 of credits, $54.99',
+      'Add $100.00 of credits, $109.99',
+      'Add $500.00 of credits, $549.99',
+    ]);
     expect(allText(renderer)).toContain('Add $10.00 of credits');
     expect(allText(renderer)).toContain('Add $500.00 of credits');
     expect(allText(renderer)).toContain('$10.99');
@@ -330,6 +340,10 @@ describe('CreditPurchaseScreen', () => {
     expect(
       rows.filter(row => (row.props as { disabled?: boolean }).disabled === true)
     ).toHaveLength(1);
+    // A user who cannot hear the price also hears why the row is unavailable.
+    expect(
+      rows.map(row => (row.props as { accessibilityLabel: string }).accessibilityLabel)
+    ).toContain('Add $500.00 of credits, Price unavailable');
     expect(allText(renderer)).toContain('Price unavailable');
     unmount();
   });
@@ -369,6 +383,14 @@ describe('CreditPurchaseScreen', () => {
 
     expect(allText(renderer)).toContain('Completing purchase');
     const rows = packRows(renderer);
+    // The in-flight row announces its state in the label too.
+    const busyRow = rows.find(
+      row =>
+        (row.props as { accessibilityState?: { busy?: boolean } }).accessibilityState?.busy === true
+    );
+    expect(
+      (busyRow?.props as { accessibilityLabel?: string } | undefined)?.accessibilityLabel
+    ).toBe('Add $10.00 of credits, Completing purchase');
     expect(
       rows.every(
         row =>

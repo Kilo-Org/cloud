@@ -1688,7 +1688,7 @@
       "discardDraftMessage": "你输入的提示词将丢失。",
       "discardWithUploadsMessage": "你输入的提示词和已上传但尚未用于发送消息的文件将被删除。",
       "discardFailed": "无法丢弃草稿。请重试。",
-      "remoteHint": "在电脑上运行 `kilo remote`，或在正在运行的 CLI 会话中执行 `/remote`，即可控制本地 kilo 进程。",
+      "remoteHint": "在电脑上的项目中运行 kilo remote，即可在那里启动会话。",
       "continueFrom": "正在继续会话“{{title}}”。",
       "importingSession": "正在导入会话",
       "cliCannotContinue": "此 CLI 无法继续会话。请选择 Cloud Agent 或其他 CLI。",

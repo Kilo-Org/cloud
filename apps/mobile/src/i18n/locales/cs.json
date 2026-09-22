@@ -2248,7 +2248,7 @@
       "discardDraftMessage": "Vaše zadání se smaže.",
       "discardWithUploadsMessage": "Vaše zadání a všechny nahrané soubory nepřipojené k odeslaným zprávám se smažou.",
       "discardFailed": "Koncept se nepodařilo zahodit. Zkuste to znovu.",
-      "remoteHint": "Chcete-li ovládat místní proces kilo, spusťte na počítači `kilo remote` nebo v běžící relaci CLI zadejte `/remote`.",
+      "remoteHint": "Chceš-li tam spustit relace, spusť kilo remote v projektu na svém počítači.",
       "continueFrom": "Pokračujete v relaci {{title}}.",
       "importingSession": "Import relace",
       "cliCannotContinue": "Toto CLI nepodporuje pokračování v relaci. Vyberte službu Cloud Agent nebo jiné CLI.",

@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "तपाईंको प्रम्प्ट मेटिनेछ।",
       "discardWithUploadsMessage": "तपाईंको प्रम्प्ट र कुनै सन्देशमा संलग्न नभएका अपलोड गरिएका फाइलहरू मेटिनेछन्।",
       "discardFailed": "मस्यौदा मेट्न सकिएन। फेरि प्रयास गर्नुहोस्।",
-      "remoteHint": "स्थानीय kilo प्रक्रिया नियन्त्रण गर्न आफ्नो कम्प्युटरमा `kilo remote` वा चलिरहेको CLI सत्रमा `/remote` चलाउनुहोस्।",
+      "remoteHint": "त्यहाँ सत्रहरू सुरु गर्न आफ्नो कम्प्युटरको प्रोजेक्टमा kilo remote चलाउनुहोस्।",
       "continueFrom": "{{title}} जारी राखिँदैछ।",
       "importingSession": "सत्र आयात गर्दै",
       "cliCannotContinue": "यो CLI ले सत्र जारी राख्न सक्दैन। Cloud Agent वा अर्को CLI छान्नुहोस्।",

@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Kërkesa jote do të humbasë.",
       "discardWithUploadsMessage": "Kërkesa jote dhe skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
       "discardFailed": "Nuk u fshi drafti. Provo përsëri.",
-      "remoteHint": "Ekzekuto `kilo remote` në kompjuterin tënd ose `/remote` në një seancë aktive CLI për të kontrolluar një proces lokal kilo.",
+      "remoteHint": "Ekzekuto kilo remote në një projekt në kompjuterin tënd për të nisur sesione atje.",
       "continueFrom": "Po vazhdon seanca {{title}}.",
       "importingSession": "Duke importuar seancën",
       "cliCannotContinue": "Ky CLI nuk mund të vazhdojë një seancë. Zgjidh Cloud Agent ose një CLI tjetër.",

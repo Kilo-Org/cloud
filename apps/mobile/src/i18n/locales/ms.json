@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Gesaan anda akan hilang.",
       "discardWithUploadsMessage": "Gesaan anda dan fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam.",
       "discardFailed": "Tidak dapat membuang draf. Sila cuba semula.",
-      "remoteHint": "Jalankan `kilo remote` pada komputer anda, atau `/remote` dalam sesi CLI yang berjalan, untuk mengawal proses kilo tempatan.",
+      "remoteHint": "Jalankan kilo remote dalam projek pada komputer anda untuk memulakan sesi di sana.",
       "continueFrom": "Sesi {{title}} diteruskan.",
       "importingSession": "Mengimport sesi",
       "cliCannotContinue": "CLI ini tidak dapat meneruskan sesi. Pilih Cloud Agent atau CLI lain.",

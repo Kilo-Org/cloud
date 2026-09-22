@@ -1700,7 +1700,7 @@
       "discardDraftMessage": "Se perderán tus instrucciones.",
       "discardWithUploadsMessage": "Se eliminarán tus instrucciones y los archivos subidos que no estén adjuntos a mensajes enviados.",
       "discardFailed": "No se pudo descartar el borrador. Inténtalo de nuevo.",
-      "remoteHint": "Ejecuta `kilo remote` en tu ordenador o `/remote` en una sesión activa de la CLI para controlar un proceso local de kilo.",
+      "remoteHint": "Ejecuta kilo remote en un proyecto de tu ordenador para iniciar sesiones allí.",
       "continueFrom": "Se está continuando la sesión {{title}}.",
       "importingSession": "Importando sesión",
       "cliCannotContinue": "Esta CLI no puede continuar una sesión. Elige Cloud Agent u otra CLI.",

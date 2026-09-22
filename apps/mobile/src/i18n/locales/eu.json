@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Zure eskaera galduko da.",
       "discardWithUploadsMessage": "Zure eskaera eta igotako fitxategietatik mezuei erantsi gabe geratu direnak ezabatuko dira.",
       "discardFailed": "Ezin izan da zirriborroa baztertu. Saiatu berriro.",
-      "remoteHint": "Exekutatu `kilo remote` zure ordenagailuan, edo `/remote` exekutatzen ari den CLI saio batean, tokiko kilo prozesu bat kontrolatzeko.",
+      "remoteHint": "Exekutatu kilo remote zure ordenagailuko proiektu batean, han saioak hasteko.",
       "continueFrom": "Saio honekin jarraitzen ari zara: {{title}}.",
       "importingSession": "Saioa inportatzen",
       "cliCannotContinue": "CLI honek ezin dio saio bati jarraitu. Aukeratu Cloud Agent edo beste CLI bat.",

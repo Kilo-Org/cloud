@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Ou ap pèdi enstriksyon ou yo.",
       "discardWithUploadsMessage": "Enstriksyon ou yo ak tout fichye ou voye ki poko atache ak yon mesaj ap efase.",
       "discardFailed": "Nou pa t ka jete bouyon an. Tanpri eseye ankò.",
-      "remoteHint": "Egzekite `kilo remote` sou òdinatè ou a, oswa `/remote` nan yon sesyon CLI ki aktif, pou kontwole yon pwosesis kilo lokal.",
+      "remoteHint": "Egzekite kilo remote nan yon pwojè sou òdinatè ou pou kòmanse sesyon la.",
       "continueFrom": "Nou ap kontinye {{title}}.",
       "importingSession": "Ap enpòte sesyon an",
       "cliCannotContinue": "CLI sa a pa ka kontinye yon sesyon. Chwazi Cloud Agent oswa yon lòt CLI.",

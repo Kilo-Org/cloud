@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Skilaboðin þín glatast.",
       "discardWithUploadsMessage": "Skilaboðunum þínum og upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt.",
       "discardFailed": "Ekki tókst að farga drögunum. Reyndu aftur.",
-      "remoteHint": "Keyrðu `kilo remote` á tölvunni þinni eða `/remote` í CLI-lotu sem er í gangi til að stjórna staðbundnu kilo-ferli.",
+      "remoteHint": "Keyrðu kilo remote í verkefni á tölvunni þinni til að hefja lotur þar.",
       "continueFrom": "Haldið er áfram með {{title}}.",
       "importingSession": "Flytur lotuna inn",
       "cliCannotContinue": "Þetta CLI getur ekki haldið áfram með lotu. Veldu Cloud Agent eða annað CLI.",

@@ -2220,7 +2220,7 @@
       "discardDraftMessage": "Tava uzvedne tiks dzēsta.",
       "discardWithUploadsMessage": "Tava uzvedne un augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti.",
       "discardFailed": "Neizdevās atmest melnrakstu. Lūdzu, mēģini vēlreiz.",
-      "remoteHint": "Palaid `kilo remote` savā datorā vai `/remote` aktīvā CLI sesijā, lai vadītu lokālu kilo procesu.",
+      "remoteHint": "Palaid kilo remote projektā savā datorā, lai tur sāktu sesijas.",
       "continueFrom": "Tiek turpināta sesija: {{title}}.",
       "importingSession": "Importē sesiju…",
       "cliCannotContinue": "Šis CLI nevar turpināt sesiju. Izvēlies Cloud Agent vai citu CLI.",

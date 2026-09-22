@@ -2220,7 +2220,7 @@
       "discardDraftMessage": "Es perdrà el teu missatge.",
       "discardWithUploadsMessage": "S'eliminaran el teu missatge i els fitxers penjats que no s'hagin adjuntat a missatges enviats.",
       "discardFailed": "No s'ha pogut descartar l'esborrany. Torna-ho a provar.",
-      "remoteHint": "Executa `kilo remote` a l'ordinador, o `/remote` en una sessió activa del CLI, per controlar un procés local de kilo.",
+      "remoteHint": "Executa kilo remote en un projecte del teu ordinador per iniciar-hi sessions.",
       "continueFrom": "S'està continuant la sessió {{title}}.",
       "importingSession": "Important la sessió…",
       "cliCannotContinue": "Aquest CLI no pot continuar una sessió. Tria Cloud Agent o un altre CLI.",

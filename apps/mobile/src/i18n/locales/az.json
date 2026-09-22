@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Sorğun silinəcək.",
       "discardWithUploadsMessage": "Sorğun və heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək.",
       "discardFailed": "Qaralamanı silmək mümkün olmadı. Yenidən cəhd et.",
-      "remoteHint": "Kompüterindəki kilo prosesini idarə etmək üçün kompüterdə `kilo remote` əmrini və ya işləyən CLI sessiyasında `/remote` əmrini işə sal.",
+      "remoteHint": "Orada sessiyalar başlatmaq üçün kompüterindəki bir layihədə kilo remote əmrini işə sal.",
       "continueFrom": "{{title}} davam etdirilir.",
       "importingSession": "Sessiya idxal olunur",
       "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seç.",

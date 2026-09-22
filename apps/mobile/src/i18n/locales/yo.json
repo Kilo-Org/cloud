@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Ọ̀rọ̀ ìtọ́ni rẹ yóò sọnù.",
       "discardWithUploadsMessage": "A ó pa ọ̀rọ̀ ìtọ́ni rẹ àti àwọn fáìlì tí o ti gbé sókè tí kò tíì ní ìfiránṣẹ́ tí a so wọ́n mọ́ rẹ́.",
       "discardFailed": "A kò lè pa àkọ́kọ́ ìkọ̀wé náà rẹ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
-      "remoteHint": "Ṣiṣẹ́ `kilo remote` lórí kọ̀ǹpútà rẹ, tàbí `/remote` nínú ìgbà iṣẹ́ CLI tó ń lọ, láti ṣàkóso ìṣiṣẹ́ kilo lórí kọ̀ǹpútà rẹ.",
+      "remoteHint": "Ṣiṣẹ́ kilo remote nínú iṣẹ́ kan lórí kọ̀ǹpútà rẹ láti bẹ̀rẹ̀ àwọn ìgbà iṣẹ́ níbẹ̀.",
       "continueFrom": "A ń tẹ̀síwájú pẹ̀lú {{title}}.",
       "importingSession": "Ń gbé ìgbà iṣẹ́ wọlé",
       "cliCannotContinue": "CLI yìí kò lè tẹ̀síwájú pẹ̀lú ìgbà iṣẹ́ kan. Yan Cloud Agent tàbí CLI mìíràn.",

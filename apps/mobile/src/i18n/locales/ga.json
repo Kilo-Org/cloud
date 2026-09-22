@@ -2276,7 +2276,7 @@
       "discardDraftMessage": "Caillfear do leid.",
       "discardWithUploadsMessage": "Scriosfar do leid agus aon chomhad uaslódáilte nach bhfuil ceangailte le teachtaireacht sheolta.",
       "discardFailed": "Níorbh fhéidir an dréacht a chaitheamh ar lár. Bain triail as arís le do thoil.",
-      "remoteHint": "Rith `kilo remote` ar do ríomhaire, nó `/remote` i seisiún CLI atá ar siúl, chun próiseas áitiúil kilo a rialú.",
+      "remoteHint": "Rith kilo remote i dtionscadal ar do ríomhaire chun seisiúin a thosú ansin.",
       "continueFrom": "Táthar ag leanúint ar aghaidh le {{title}}.",
       "importingSession": "Ag iompórtáil an tseisiúin",
       "cliCannotContinue": "Ní féidir leis an CLI seo leanúint ar aghaidh le seisiún. Roghnaigh Cloud Agent nó CLI eile.",

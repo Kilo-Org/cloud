@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Instruksjonen din går tapt.",
       "discardWithUploadsMessage": "Instruksjonen din og opplastede filer som ikke er vedlagt sendte meldinger, blir slettet.",
       "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen.",
-      "remoteHint": "Kjør `kilo remote` på datamaskinen din, eller `/remote` i en aktiv CLI-økt, for å styre en lokal kilo-prosess.",
+      "remoteHint": "Kjør kilo remote i et prosjekt på datamaskinen din for å starte økter der.",
       "continueFrom": "Fortsetter økten {{title}}.",
       "importingSession": "Importerer økten",
       "cliCannotContinue": "Denne CLI-en kan ikke fortsette en økt. Velg Cloud Agent eller en annen CLI.",

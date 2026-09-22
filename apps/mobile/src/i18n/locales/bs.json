@@ -2220,7 +2220,7 @@
       "discardDraftMessage": "Tvoj upit će biti izgubljen.",
       "discardWithUploadsMessage": "Tvoj upit i sve otpremljene datoteke koje nisu priložene poslanim porukama bit će obrisani.",
       "discardFailed": "Nije moguće odbaciti nacrt. Pokušaj ponovo.",
-      "remoteHint": "Pokreni `kilo remote` na računaru ili `/remote` u aktivnoj CLI sesiji da upravljaš lokalnim procesom kilo.",
+      "remoteHint": "Pokreni kilo remote u projektu na svom računaru da tamo započneš sesije.",
       "continueFrom": "Nastavlja se sesija {{title}}.",
       "importingSession": "Uvoz sesije",
       "cliCannotContinue": "Ovaj CLI ne može nastaviti sesiju. Odaberi Cloud Agent ili drugi CLI.",

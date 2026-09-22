@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Ho very ny toromarikanao.",
       "discardWithUploadsMessage": "Hofafana ny toromarikanao sy ny rakitra nampakarina nefa mbola tsy nampiarahina tamin'ny hafatra nalefa.",
       "discardFailed": "Tsy nahomby ny fanariana ny volavola. Andramo indray azafady.",
-      "remoteHint": "Alefaso ny `kilo remote` amin'ny solosainao, na ny `/remote` ao amin'ny fotoam-piasana CLI mandeha, mba hifehezana ny kilo mandeha eo an-toerana.",
+      "remoteHint": "Alefaso ny kilo remote ao anatin'ny tetikasa iray amin'ny solosainao mba hanombohana fotoam-piasana any.",
       "continueFrom": "Mitohy ny {{title}}.",
       "importingSession": "Manafatra fotoam-piasana",
       "cliCannotContinue": "Tsy afaka manohy fotoam-piasana ity CLI ity. Safidio ny Cloud Agent na CLI hafa.",

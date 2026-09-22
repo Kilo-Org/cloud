@@ -1688,7 +1688,7 @@
       "discardDraftMessage": "入力したプロンプトが削除されます。",
       "discardWithUploadsMessage": "プロンプトと、送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
       "discardFailed": "下書きを破棄できませんでした。もう一度お試しください。",
-      "remoteHint": "ローカルのkiloプロセスを操作するには、コンピューターで`kilo remote`を実行するか、実行中のCLIセッションで`/remote`を実行してください。",
+      "remoteHint": "コンピューター上のプロジェクトでkilo remoteを実行すると、そこでセッションを開始できます。",
       "continueFrom": "{{title}}を続行しています。",
       "importingSession": "セッションをインポート中",
       "cliCannotContinue": "このCLIではセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",

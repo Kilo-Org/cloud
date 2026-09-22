@@ -2248,7 +2248,7 @@
       "discardDraftMessage": "Jūsų užklausa bus prarasta.",
       "discardWithUploadsMessage": "Jūsų užklausa ir visi prie išsiųstų žinučių nepridėti įkelti failai bus ištrinti.",
       "discardFailed": "Nepavyko atmesti juodraščio. Bandykite dar kartą.",
-      "remoteHint": "Norėdami valdyti vietinį kilo procesą, kompiuteryje vykdykite `kilo remote` arba veikiančioje CLI sesijoje vykdykite `/remote`.",
+      "remoteHint": "Vykdykite kilo remote projekte savo kompiuteryje, kad ten pradėtumėte sesijas.",
       "continueFrom": "Tęsiama sesija „{{title}}“.",
       "importingSession": "Importuojama sesija",
       "cliCannotContinue": "Šioje CLI sesijos tęsti negalima. Pasirinkite „Cloud Agent“ arba kitą CLI.",

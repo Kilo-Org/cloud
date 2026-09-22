@@ -62,4 +62,16 @@ describe('run-location help copy', () => {
       expect(visible, `${tag} ${path.join('.')}`).toContain('kilo remote');
     }
   });
+
+  it.each(SUPPORTED_LANGUAGES)(
+    '%s renders the new-session run-location hint in plain mobile language',
+    tag => {
+      const value = valueAt(CATALOG_LOADERS[tag](), ['agentChat', 'newSession', 'remoteHint']);
+      expect(typeof value, tag).toBe('string');
+      const visible = stripInlineCodeMarkers(value as string);
+      expect(visible, tag).not.toContain('/remote');
+      expect(visible, tag).not.toContain('CLI');
+      expect(visible, tag).toContain('kilo remote');
+    }
+  );
 });

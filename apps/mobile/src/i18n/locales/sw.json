@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "Maagizo yako yatapotea.",
       "discardWithUploadsMessage": "Maagizo yako na faili zozote zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa.",
       "discardFailed": "Imeshindikana kufuta rasimu. Tafadhali jaribu tena.",
-      "remoteHint": "Endesha `kilo remote` kwenye kompyuta yako, au `/remote` kwenye kikao cha CLI kinachoendelea, ili kudhibiti mchakato wa kilo kwenye kompyuta yako.",
+      "remoteHint": "Endesha kilo remote kwenye mradi kwenye kompyuta yako ili kuanzisha vikao huko.",
       "continueFrom": "Kikao {{title}} kinaendelea.",
       "importingSession": "Inaingiza kikao",
       "cliCannotContinue": "CLI hii haiwezi kuendelea na kikao. Chagua Cloud Agent au CLI nyingine.",

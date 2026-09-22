@@ -2192,7 +2192,7 @@
       "discardDraftMessage": "آپ کا پرامپٹ ضائع ہو جائے گا۔",
       "discardWithUploadsMessage": "آپ کا پرامپٹ اور اپ لوڈ کی گئی وہ فائلیں حذف ہو جائیں گی جو کسی بھیجے گئے پیغام سے منسلک نہیں ہیں۔",
       "discardFailed": "مسودہ حذف نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
-      "remoteHint": "مقامی kilo پراسیس کو کنٹرول کرنے کے لیے اپنے کمپیوٹر پر `kilo remote` یا چلتے ہوئے CLI سیشن میں `/remote` چلائیں۔",
+      "remoteHint": "وہاں سیشن شروع کرنے کے لیے اپنے کمپیوٹر پر کسی پروجیکٹ میں kilo remote چلائیں۔",
       "continueFrom": "{{title}} جاری رکھا جا رہا ہے۔",
       "importingSession": "سیشن درآمد ہو رہا ہے",
       "cliCannotContinue": "یہ CLI سیشن جاری نہیں رکھ سکتا۔ Cloud Agent یا کوئی اور CLI منتخب کریں۔",

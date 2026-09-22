@@ -2220,7 +2220,7 @@
       "discardDraftMessage": "O seu pedido será eliminado.",
       "discardWithUploadsMessage": "O seu pedido e os ficheiros carregados que não estejam associados a mensagens enviadas serão eliminados.",
       "discardFailed": "Não foi possível eliminar o rascunho. Tente novamente.",
-      "remoteHint": "Execute `kilo remote` no seu computador ou `/remote` numa sessão CLI em execução para controlar um processo local do kilo.",
+      "remoteHint": "Execute kilo remote num projeto do seu computador para iniciar sessões aí.",
       "continueFrom": "A sessão {{title}} está a ser retomada.",
       "importingSession": "A importar a sessão",
       "cliCannotContinue": "Esta CLI não permite continuar uma sessão. Escolha o Cloud Agent ou outra CLI.",

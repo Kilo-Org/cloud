@@ -1688,7 +1688,7 @@
       "discardDraftMessage": "Je prompt gaat verloren.",
       "discardWithUploadsMessage": "Je prompt en alle uploads die nog niet zijn gebruikt, worden verwijderd.",
       "discardFailed": "Het concept kon niet worden verwijderd. Probeer het opnieuw.",
-      "remoteHint": "Voer `kilo remote` uit op je computer, of `/remote` in een actieve CLI-sessie, om een lokaal kilo-proces te besturen.",
+      "remoteHint": "Voer kilo remote uit in een project op je computer om daar sessies te starten.",
       "continueFrom": "Je gaat verder met {{title}}.",
       "importingSession": "Sessie importeren…",
       "cliCannotContinue": "Deze CLI kan geen sessie voortzetten. Kies Cloud Agent of een andere CLI.",

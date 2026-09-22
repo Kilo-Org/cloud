@@ -1700,7 +1700,7 @@
       "discardDraftMessage": "ההנחיה שלך תימחק.",
       "discardWithUploadsMessage": "ההנחיה שלך וכל הקבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
       "discardFailed": "לא ניתן היה למחוק את הטיוטה. נסה שוב.",
-      "remoteHint": "הרץ `kilo remote` במחשב שלך, או `/remote` בסשן CLI פעיל, כדי לשלוט בתהליך kilo מקומי.",
+      "remoteHint": "הרץ kilo remote בפרויקט במחשב שלך כדי להתחיל סשנים שם.",
       "continueFrom": "ממשיך את הסשן {{title}}.",
       "importingSession": "מייבא סשן…",
       "cliCannotContinue": "ה-CLI הזה אינו יכול להמשיך סשן. בחר ב-Cloud Agent או ב-CLI אחר.",

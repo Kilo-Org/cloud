@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 
 import type { AppleStoreDecodedTransaction } from '@/lib/kilo-pass/apple-store-verifier';
+import type * as AppleStoreVerifier from '@/lib/kilo-pass/apple-store-verifier';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 import type * as StoreVerifier from './store-verifier';
 
@@ -27,7 +28,7 @@ jest.mock('@/lib/kilo-pass/google-play-sdk', () => ({
 }));
 
 jest.mock('@/lib/kilo-pass/apple-store-verifier', () => {
-  const actual = jest.requireActual<typeof import('@/lib/kilo-pass/apple-store-verifier')>(
+  const actual = jest.requireActual<typeof AppleStoreVerifier>(
     '@/lib/kilo-pass/apple-store-verifier'
   );
   return {

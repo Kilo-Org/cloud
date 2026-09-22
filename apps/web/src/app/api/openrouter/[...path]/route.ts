@@ -77,7 +77,6 @@ import {
   checkPromotionLimit,
 } from '@/lib/free-model-rate-limiter';
 import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
@@ -932,7 +931,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   }
   if (attempt.type === 'error') return attempt.response;
 
-  const { response, toolsAvailable, toolsUsed, experimentPromptCapture } = attempt;
+  const { response, experimentPromptCapture } = attempt;
   if (experimentPromptCapture) usageContext.experimentPromptCapture = experimentPromptCapture;
   const finalUpstreamModel = requestBodyParsed.body.model ?? effectiveModelIdLowerCased;
   logExceptInTest(
@@ -945,25 +944,6 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
   usageContext.ttfb_ms = ttfbMs;
 
-  emitApiMetricsForResponse(
-    {
-      kiloUserId: user.id,
-      organizationId,
-      isAnonymous: isAnonymousContext(user),
-      isStreaming: requestBodyParsed.body.stream === true,
-      userByok: !!effectiveProviderContext.userByok,
-      mode: modeHeader || undefined,
-      provider: effectiveProviderContext.provider.id,
-      requestedModel: requestedModelLowerCased,
-      resolvedModel: normalizeModelId(effectiveModelIdLowerCased),
-      toolsAvailable,
-      toolsUsed,
-      ttfbMs,
-      statusCode: response.status,
-    },
-    response.clone(),
-    requestStartedAt
-  );
   usageContext.status_code = response.status;
 
   // Handle OpenRouter 402 errors - don't pass them through to the client. We need to pay, not them.

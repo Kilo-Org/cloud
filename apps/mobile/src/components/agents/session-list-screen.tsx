@@ -21,6 +21,7 @@ import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { Button } from '@/components/ui/button';
+import { Eyebrow } from '@/components/ui/eyebrow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
@@ -165,8 +166,13 @@ export function AgentSessionListScreen() {
   // control keeps the header's full width at every display size, and the
   // reserved row height keeps the header from moving when the filter button
   // appears with the loaded sessions.
+  // The controls row is a section header, not a bare action: its label owns the
+  // row start and grows, so the controls keep the row end — the same shape the
+  // Home live-sessions header uses. A row holding only the trailing 'See all'
+  // read as a section header whose label was missing (e2, agents).
   const headerActions = (
     <View className="min-h-11 min-w-0 flex-row items-center justify-end gap-4">
+      <Eyebrow className="min-w-0 grow">{t('home.agentSessions')}</Eyebrow>
       <Pressable
         onPress={() => {
           router.push('/(app)/(tabs)/(2_agents)/history' as Href);
@@ -178,9 +184,7 @@ export function AgentSessionListScreen() {
         testID="agents-view-history"
         className="min-w-0 shrink justify-center active:opacity-70"
       >
-        <Text className="shrink text-center font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
-          {seeAllLabel}
-        </Text>
+        <Eyebrow className="shrink text-center text-[11px] text-primary">{seeAllLabel}</Eyebrow>
       </Pressable>
       {query.canFilter ? (
         <SessionFilterButton

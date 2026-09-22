@@ -66,10 +66,6 @@ function buildValidPackfile(blobContent: string): { packBytes: Uint8Array; blobO
   return { packBytes, blobOid };
 }
 
-// ---------------------------------------------------------------------------
-// Push helper: uses GitReceivePackService to populate a MemFS with real objects
-// ---------------------------------------------------------------------------
-
 async function pushToRepo(
   fs: MemFS,
   refs: Array<{ oldOid: string; newOid: string; refName: string }>,
@@ -82,10 +78,6 @@ async function pushToRepo(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Parsing helpers for smart HTTP info/refs responses
-// ---------------------------------------------------------------------------
-
 type ParsedInfoRefs = {
   service: string;
   headOid: string;
@@ -97,13 +89,11 @@ type ParsedInfoRefs = {
 function parseInfoRefsResponse(response: string): ParsedInfoRefs {
   let offset = 0;
 
-  // Read service announcement pkt-line
   const serviceHex = response.substring(offset, offset + 4);
   const serviceLen = parseInt(serviceHex, 16);
   const serviceLine = response.substring(offset + 4, offset + serviceLen);
   offset += serviceLen;
 
-  // Skip flush packet
   if (response.substring(offset, offset + 4) === '0000') {
     offset += 4;
   }
@@ -161,7 +151,6 @@ function verifyPktLineLengths(response: string): void {
       throw new Error(`Invalid pkt-line hex at offset ${offset}: "${hex}"`);
     }
 
-    // The content after the hex prefix up to declaredLen bytes total
     const lineContent = response.substring(offset + 4, offset + declaredLen);
     const byteLen = encoder.encode(lineContent).length + 4;
 
@@ -170,10 +159,6 @@ function verifyPktLineLengths(response: string): void {
     offset += declaredLen;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('GitCloneService', () => {
   describe('handleInfoRefs', () => {
@@ -203,7 +188,6 @@ describe('GitCloneService', () => {
         packBytes
       );
 
-      // Read the OID that refs/heads/main points to
       const mainOid = String(
         await fs.readFile('.git/refs/heads/main', { encoding: 'utf8' })
       ).trim();
@@ -227,7 +211,6 @@ describe('GitCloneService', () => {
         packBytes
       );
 
-      // Overwrite HEAD with an OID that doesn't match any branch
       await fs.writeFile('.git/HEAD', 'b'.repeat(40));
 
       const response = await GitCloneService.handleInfoRefs(fs);
@@ -270,7 +253,6 @@ describe('GitCloneService', () => {
       const response = await GitCloneService.handleInfoRefs(fs);
       const parsed = parseInfoRefsResponse(response);
 
-      // Read the OID from refs/heads/main
       const mainOid = String(
         await fs.readFile('.git/refs/heads/main', { encoding: 'utf8' })
       ).trim();
@@ -292,7 +274,6 @@ describe('GitCloneService', () => {
 
       const response = await GitCloneService.handleInfoRefs(fs);
 
-      // Verify every pkt-line in the response has correct hex lengths
       verifyPktLineLengths(response);
     });
   });
@@ -310,7 +291,6 @@ describe('GitCloneService', () => {
 
       const result = await GitCloneService.handleUploadPack(fs);
 
-      // First 8 bytes should be "0008NAK\n"
       const first8 = new TextDecoder().decode(result.slice(0, 8));
       expect(first8).toBe('0008NAK\n');
     });

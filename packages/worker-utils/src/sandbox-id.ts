@@ -11,21 +11,9 @@
  * No prefix -- the full 63-char sandboxId limit is available.
  */
 
+import { bytesToBase64url, base64urlToBytes } from './base64url';
+
 const MAX_SANDBOX_ID_LENGTH = 63;
-
-function bytesToBase64url(bytes: Uint8Array): string {
-  const binString = Array.from(bytes, b => String.fromCodePoint(b)).join('');
-  return btoa(binString).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64urlToBytes(encoded: string): Uint8Array {
-  let b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
-  while (b64.length % 4 !== 0) {
-    b64 += '=';
-  }
-  const binString = atob(b64);
-  return Uint8Array.from(binString, c => c.codePointAt(0) ?? 0);
-}
 
 export function sandboxIdFromUserId(userId: string): string {
   const bytes = new TextEncoder().encode(userId);

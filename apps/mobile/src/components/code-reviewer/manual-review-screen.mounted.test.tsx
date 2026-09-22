@@ -32,6 +32,9 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('react-native', () => ({
+  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
@@ -40,9 +43,13 @@ vi.mock('react-native', () => ({
 // provider-status branches, and wraps its form in the shared keyboard-lift
 // view. Both kilo-chat modules reach the safe-area insets through
 // `react-native-safe-area-context`, whose CommonJS entry requires a Flow
-// react-native subpath this node project cannot load, so stub both the way the
-// sibling node-only screen tests do; the reveal hook stays inert with no
-// keyboard padding.
+// react-native subpath this node project cannot load, so mock the native
+// safe-area context and stub both kilo-chat modules the way the sibling
+// node-only screen tests do; the reveal hook stays inert with no keyboard
+// padding.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
   useAppAwareKeyboardPadding: () => 0,

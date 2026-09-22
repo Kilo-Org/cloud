@@ -35,6 +35,33 @@ export type StoreCreditProductsOptions = {
   fetchStoreProducts: (productSkus: string[]) => Promise<readonly StoreCreditProductListing[]>;
 };
 
+/**
+ * What the screen has settled on: the packs it renders, whether the store is
+ * unavailable, and the message key for it. Kept across a retry so the screen
+ * keeps showing this view instead of blanking back to the loading placeholders.
+ */
+type SettledStoreCreditProductsView = {
+  products: readonly StoreCreditProduct[];
+  isError: boolean;
+  storeUnavailable: boolean;
+  errorMessageKey: string | null;
+};
+
+/** One shared empty catalog, so an empty settled view keeps a stable reference. */
+const EMPTY_STORE_PRODUCTS: StoreCreditProduct[] = [];
+
+function sameSettledView(
+  left: SettledStoreCreditProductsView,
+  right: SettledStoreCreditProductsView
+): boolean {
+  return (
+    left.products === right.products &&
+    left.isError === right.isError &&
+    left.storeUnavailable === right.storeUnavailable &&
+    left.errorMessageKey === right.errorMessageKey
+  );
+}
+
 export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -85,7 +112,9 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
 
   const { refetch: refetchProducts } = productsQuery;
   const refetch = useCallback(async () => {
-    setStoreErrorMessage(null);
+    // Keep `storeErrorMessage` until the retry answers: clearing it here drops
+    // the banner while the store is still unreachable. The success effect below
+    // clears it once the retry succeeds.
     setConnectionAttempt(attempt => attempt + 1);
     await refetchProducts();
   }, [refetchProducts]);
@@ -128,23 +157,65 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
     [backendProductsQuery.data]
   );
   let products = productsState.products;
-  if (products.length === 0 && storeUnavailable) {
-    products = unpricedBackendProducts;
+  if (products.length === 0) {
+    // A store failure must not blank the rows: fall back to the backend packs
+    // with no store price, so the amounts stay on screen and each row shows the
+    // price-unavailable note. An empty result keeps one shared reference, so the
+    // settled-view comparison below is not restarted on every render.
+    products = storeUnavailable ? unpricedBackendProducts : EMPTY_STORE_PRODUCTS;
   }
 
+  const liveView = useMemo<SettledStoreCreditProductsView>(
+    () => ({
+      products,
+      isError: productsState.isError,
+      storeUnavailable,
+      errorMessageKey:
+        productsState.errorMessageKey ??
+        // The loader authored no key because the failure was the backend catalog
+        // itself, not the store; say so instead of blaming the store.
+        (backendProductsQuery.isError ? 'common.somethingWentWrong' : null),
+    }),
+    [
+      products,
+      productsState.isError,
+      productsState.errorMessageKey,
+      storeUnavailable,
+      backendProductsQuery.isError,
+    ]
+  );
+
+  // A retry returns the store query to `pending` and drops the error it held, so
+  // the live view has no products and no store-unavailable flag while the retry
+  // runs. Keep the last settled view and render it until the retry answers; a
+  // first load has settled nothing yet, so it still renders the placeholders.
+  const settled = productsQuery.isSuccess || productsQuery.isError || storeErrorMessage !== null;
+  const [settledView, setSettledView] = useState<SettledStoreCreditProductsView | null>(null);
+  useEffect(() => {
+    if (!settled) {
+      return;
+    }
+    setSettledView(previous =>
+      previous !== null && sameSettledView(previous, liveView) ? previous : liveView
+    );
+  }, [settled, liveView]);
+
+  const view = !settled && settledView !== null ? settledView : liveView;
+  const isLoading =
+    settledView === null &&
+    storeErrorMessage === null &&
+    (productsQuery.isLoading || (isIapPlatform && !options.connected));
+
   return {
-    products,
-    isLoading:
-      storeErrorMessage === null &&
-      (productsQuery.isLoading || (isIapPlatform && !options.connected)),
-    isRefetching: productsQuery.isRefetching,
-    isError: productsState.isError,
-    errorMessageKey:
-      productsState.errorMessageKey ??
-      // The loader authored no key because the failure was the backend catalog
-      // itself, not the store; say so instead of blaming the store.
-      (backendProductsQuery.isError ? 'common.somethingWentWrong' : null),
-    storeUnavailable,
+    products: view.products,
+    isLoading,
+    // A retry reports busy even though React Query's own `isRefetching` is
+    // false while the query is back to `pending` with no data. A first load is
+    // still loading, so it is never a refetch.
+    isRefetching: productsQuery.isFetching && !isLoading,
+    isError: view.isError,
+    errorMessageKey: view.errorMessageKey,
+    storeUnavailable: view.storeUnavailable,
     refetch,
   };
 }

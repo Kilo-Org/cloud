@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The Buy credits screen's state and retry-path tests share the same screen, query client and IAP-owner mocks; splitting them would duplicate that harness. */
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -255,6 +256,67 @@ describe('CreditPurchaseScreen', () => {
 
     expect(packRows(renderer)).toHaveLength(4);
     expect(allText(renderer)).toContain('Price unavailable');
+    unmount();
+  });
+
+  it('retry stays settled: the rows and banner survive while the retry is still pending', async () => {
+    // The first store fetch fails, the second never answers: the retry stays in
+    // flight, so the screen must keep the settled rows and banner instead of
+    // dropping to the loading placeholders.
+    owner.fetchStoreProducts.mockRejectedValueOnce(new Error('Failed to query product for sku'));
+    owner.fetchStoreProducts.mockImplementationOnce(
+      // eslint-disable-next-line @typescript-eslint/promise-function-async -- the retry never settles, which is the scenario under test
+      () => new Promise<void>(() => undefined)
+    );
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('App Store products unavailable'));
+    expect(packRows(renderer)).toHaveLength(4);
+
+    const retry = tryAgainButton(renderer);
+    if (!retry) {
+      throw new Error('expected a Try again button');
+    }
+    await act(async () => {
+      (retry.props as { onPress?: () => void }).onPress?.();
+      await Promise.resolve();
+    });
+
+    expect(owner.fetchStoreProducts.mock.calls.length).toBe(2);
+    expect(packRows(renderer)).toHaveLength(4);
+    expect(allText(renderer)).toContain('App Store products unavailable');
+    expect(allText(renderer)).toContain('No matching credit packs were returned by App Store.');
+    expect(allText(renderer)).toContain('Price unavailable');
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
+    // The button that started the retry stays on screen, busy and disabled.
+    const pendingRetry = tryAgainButton(renderer);
+    if (!pendingRetry) {
+      throw new Error('expected the Try again button to stay on screen');
+    }
+    expect((pendingRetry.props as { disabled?: boolean }).disabled).toBe(true);
+    unmount();
+  });
+
+  it('retry success: the rows gain their store prices and the banner clears', async () => {
+    owner.fetchStoreProducts
+      .mockRejectedValueOnce(new Error('Failed to query product for sku'))
+      .mockResolvedValueOnce(STORE_LISTINGS);
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('App Store products unavailable'));
+
+    const retry = tryAgainButton(renderer);
+    if (!retry) {
+      throw new Error('expected a Try again button');
+    }
+    await act(async () => {
+      (retry.props as { onPress?: () => void }).onPress?.();
+      await Promise.resolve();
+    });
+    await waitFor(() => allText(renderer).includes('$10.99'));
+
+    expect(allText(renderer)).not.toContain('App Store products unavailable');
+    expect(packRows(renderer)).toHaveLength(4);
     unmount();
   });
 

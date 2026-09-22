@@ -1,3 +1,5 @@
+import { readableSessionTitle } from '@/lib/session-title';
+
 export type RenameState = {
   isModalOpen: boolean;
   optimisticTitle: string | null;
@@ -61,9 +63,12 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
-  const baseTitle = input.isLoaded
-    ? (input.serverTitle ?? input.fallbackTitle)
-    : input.fallbackTitle;
+  // Callers pass a human title as the fallback; see
+  // session-detail-content.tsx:1539.
+  const baseTitle =
+    readableSessionTitle(input.isLoaded ? input.serverTitle : undefined) ??
+    readableSessionTitle(input.fallbackTitle) ??
+    input.fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
     title,

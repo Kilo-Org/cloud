@@ -286,6 +286,17 @@ describe('StoredSessionRow live speech', () => {
     expect(texts(renderer)).not.toContain('feature/live · #42');
   });
 
+  it('shows the untitled fallback when the stored title is the worker placeholder', () => {
+    const placeholder = mount(
+      row({ session: { ...session, title: 'New session - 2026-09-22T01:09:45.623Z' } })
+    );
+    expect(texts(placeholder)).toContain('Untitled session');
+    expect(texts(placeholder)).not.toContain('New session - 2026-09-22T01:09:45.623Z');
+
+    const named = mount(row());
+    expect(texts(named)).toContain('Fix login bug');
+  });
+
   it.each([false, true])(
     'covers the actual Share live opt-in with disabled=%s',
     destinationsDisabled => {
@@ -430,5 +441,11 @@ describe('RemoteSessionRow live speech', () => {
     expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
       'Live work, Idle, feature/live, LIVE-REPO, and 5 minutes ago'
     );
+  });
+
+  it('shows the untitled fallback when the live row title is the worker placeholder', () => {
+    const renderer = mountRemote({ title: 'New session - 2026-09-22T01:09:45.623Z' });
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(texts(renderer)).not.toContain('New session - 2026-09-22T01:09:45.623Z');
   });
 });

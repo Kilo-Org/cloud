@@ -43,6 +43,33 @@ describe('getSessionDetailRenameState', () => {
     });
   });
 
+  it('shows the fallback when the stored title is still the worker placeholder', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T01:09:45.623Z',
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: 'Session',
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+
+  it('keeps the caller fallback when both the server title and the fallback are placeholders', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle: 'New session - 2026-09-22T01:09:45.623Z',
+        isLoaded: true,
+        serverTitle: 'Child session - 2026-09-22T01:09:45.623Z',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe('New session - 2026-09-22T01:09:45.623Z');
+  });
+
   it('hides interactivity when fetched data belongs to a different session', () => {
     expect(
       getSessionDetailRenameState({

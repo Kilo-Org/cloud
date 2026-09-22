@@ -263,12 +263,17 @@ function isStableSeparator(token: Token | undefined): boolean {
  * - A list or blockquote that only a stable separator separates from that run
  *   is not frozen either, for the same reason: it absorbs the run once the run's
  *   text becomes a list item or a quoted paragraph.
+ * - An absorbing block pulled into the tail brings its whole run with it: a
+ *   block earlier in that run (a paragraph a list item merges into) can absorb
+ *   the block too, so the boundary walks back to the run's first token and then
+ *   repeats the previous rule.
  * - A provisional separator carries its run back with it: the scan walks past it
  *   to the last separator the next append cannot eat.
  *
  * The last non-space token always stays in the tail so the next publish has a
  * non-empty suffix to re-lex; a head that ends at `value.length` would disable
- * reuse.
+ * reuse. The returned boundary is always 0 or directly preceded by a stable
+ * separator.
  */
 function tailBoundaryIndex(tokens: readonly Token[]): number {
   let lastNonSpace = -1;
@@ -288,12 +293,26 @@ function tailBoundaryIndex(tokens: readonly Token[]): number {
       break;
     }
   }
-  while (
-    start >= 2 &&
-    isStableSeparator(tokens[start - 1]) &&
-    ABSORBING_BLOCK_TYPES.has(tokens[start - 2]?.type ?? '')
-  ) {
-    start -= 2;
+  // The boundary must never land inside a block run. Pulling an absorbing list
+  // or blockquote into the tail is not enough on its own: the run that holds it
+  // can start earlier, and a block earlier in that run (a paragraph a list item
+  // merges into, as in `<b>x</b>\n2. b \n-`) can absorb the absorbing block and
+  // everything after it. Walk back to the run's first token every time the
+  // boundary moves, then repeat the absorbing-block check, because that run can
+  // itself begin with an absorbing block behind a stable separator. The result
+  // is always 0 or a boundary directly preceded by a stable separator.
+  let backedUp = true;
+  while (backedUp) {
+    while (start > 0 && !isStableSeparator(tokens[start - 1])) {
+      start -= 1;
+    }
+    backedUp =
+      start >= 2 &&
+      isStableSeparator(tokens[start - 1]) &&
+      ABSORBING_BLOCK_TYPES.has(tokens[start - 2]?.type ?? '');
+    if (backedUp) {
+      start -= 2;
+    }
   }
   return Math.min(start, lastNonSpace);
 }

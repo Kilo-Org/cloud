@@ -637,6 +637,11 @@ const INCREMENTAL_CORPUS = [
   // A paragraph lazily continues over a line that does not interrupt it, so a
   // later list line can pull an earlier line back into the paragraph.
   '<b>x</b>\n2. b\n- x\n\n',
+  // A paragraph directly abutting a list item: `<b>x</b>\n2. b \n-` lexes as a
+  // paragraph, a list, a space, and a list with no stable separator between the
+  // paragraph and the first list. Completing the bullet merges `2. b ` back into
+  // the paragraph, so the boundary must back up over the paragraph's whole run.
+  '<b>x</b>\n2. b \n- i\n\n',
   // A line holding only a tab does not end a paragraph in marked's GFM
   // paragraph tokenizer: `…\n\t\n` lexes as a paragraph plus a `space` token
   // while the next line does not interrupt the paragraph, but as one paragraph
@@ -761,6 +766,31 @@ describe('splitMarkdownHtmlIncremental', () => {
     expect(segments[0]?.type).toBe('html');
     expect(segments[0]?.raw).toContain('<li><p>Click <b>Save</b></p>');
     expect(segments[0]?.raw).toContain('Restart the app');
+  });
+
+  it('keeps a paragraph a later list item merges into out of the frozen head', () => {
+    // `<b>x</b>\n2. b \n-` lexes as a paragraph, a list, a space, and a list; the
+    // paragraph directly abuts the first list with no stable separator between
+    // them, so the paragraph's whole run is still in play. Completing the bullet
+    // (`- i`) merges `2. b ` back into the paragraph: a boundary that stopped on
+    // the list would freeze the truncated paragraph and the stream would keep
+    // the wrong split for the rest of the message.
+    const value = '<b>x</b>\n2. b \n- i';
+    let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
+    for (let index = 1; index <= value.length; index += 1) {
+      const prefix = value.slice(0, index);
+      const incremental = splitMarkdownHtmlIncremental(prefix, snapshot);
+      snapshot = incremental.snapshot;
+      expect(incremental.segments, `prefix ${index} (${JSON.stringify(prefix)})`).toEqual(
+        splitMarkdownHtml(prefix)
+      );
+    }
+
+    const segments = splitMarkdownHtml(value);
+    expect(segments).toHaveLength(2);
+    expect(segments[0]?.type).toBe('html');
+    expect(segments[0]?.raw).toContain('2. b ');
+    expect(segments[1]).toEqual({ type: 'markdown', raw: '- i' });
   });
 
   it('re-lexes the streaming tail, far less than the full prefix length', () => {

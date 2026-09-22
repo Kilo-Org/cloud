@@ -37,9 +37,14 @@ vi.mock('ws', () => ({
 }));
 
 import {
+  fetchFakeRequests,
+  fetchFakeScenarioStatus,
+  fetchFakeWaiters,
   isMessageCompleted,
   openStream,
+  releaseGate,
   startSession,
+  waitForGateEngaged,
   type StreamEvent,
 } from '../../e2e/client.js';
 
@@ -162,7 +167,7 @@ describe('stream cancellation', () => {
 
       let result: StreamEvent | null | undefined;
       const pending = stream.waitFor(() => false, 30_000);
-      pending.then(value => {
+      void pending.then(value => {
         result = value;
       });
 
@@ -179,6 +184,51 @@ describe('stream cancellation', () => {
       expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
+    }
+  });
+});
+
+describe('fake LLM control helpers', () => {
+  const config = {
+    workerUrl: 'http://worker.test',
+    user: { id: 'user_1', email: 'user@example.test', api_token_pepper: 'pepper' },
+    nextAuthSecret: 'test-secret',
+    gitUrl: 'https://example.test/repo.git',
+    model: 'kilo/fake-deterministic',
+    fakeLlmUrl: 'http://fake.test',
+  };
+
+  it('sends the resolved admin bearer on every /test/* side channel', async () => {
+    const previous = process.env.FAKE_LLM_ADMIN_TOKEN;
+    process.env.FAKE_LLM_ADMIN_TOKEN = 'configured-control-token';
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(new Response('{}', { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      await releaseGate(config.fakeLlmUrl, 'tag with space');
+      await fetchFakeWaiters(config.fakeLlmUrl);
+      await fetchFakeRequests(config.fakeLlmUrl);
+      await fetchFakeScenarioStatus(config.fakeLlmUrl, 'tag with space');
+      const engaged = await waitForGateEngaged(config, 'tag with space', 20, 1);
+
+      expect(engaged).toBe(false);
+      expect(fetchMock.mock.calls.map(([url]) => String(url)).slice(0, 4)).toEqual([
+        'http://fake.test/test/release?tag=tag%20with%20space',
+        'http://fake.test/test/waiters',
+        'http://fake.test/test/requests',
+        'http://fake.test/test/scenario-status?tag=tag%20with%20space',
+      ]);
+
+      for (const [url, init] of fetchMock.mock.calls) {
+        const headers = new Headers((init as RequestInit | undefined)?.headers);
+        expect(headers.get('Authorization'), String(url)).toBe('Bearer configured-control-token');
+      }
+      expect(fetchMock.mock.calls.length).toBeGreaterThan(4);
+    } finally {
+      if (previous === undefined) delete process.env.FAKE_LLM_ADMIN_TOKEN;
+      else process.env.FAKE_LLM_ADMIN_TOKEN = previous;
     }
   });
 });

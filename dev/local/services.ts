@@ -2,6 +2,8 @@ import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import { resolveFakeAdminToken } from '../../services/cloud-agent-next/test/e2e/fake-llm-admin';
+
 type ServiceType = 'infra' | 'nextjs' | 'worker' | 'process';
 
 type ServiceGroup = {
@@ -442,6 +444,18 @@ export function resolveDeletionMockSessionEnv(args: {
     sessionEnv.POSTHOG_ENVIRONMENT_ID = DELETION_MOCK_DUMMY;
   }
   return sessionEnv;
+}
+
+// The E2E driver resolves `FAKE_LLM_ADMIN_TOKEN` from its own process
+// environment and the spawned fake server must agree, but a tmux pane only
+// receives the curated session environment. Publish the token here rather than
+// in the service command string, which tmux mirrors into `dev/logs/*`.
+export function resolveFakeLlmSessionEnv(args: {
+  serviceNames: string[];
+  env?: NodeJS.ProcessEnv;
+}): Record<string, string> | undefined {
+  if (!args.serviceNames.includes('fake-llm')) return undefined;
+  return { FAKE_LLM_ADMIN_TOKEN: resolveFakeAdminToken(args.env) };
 }
 
 // ---------------------------------------------------------------------------

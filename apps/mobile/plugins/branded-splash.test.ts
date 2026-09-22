@@ -173,6 +173,12 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // Introspection runs against the real project root, so `withAndroidColors`
+    // also reads whatever the project's own prebuild has already written to
+    // `android/app/src/main/res/values/colors.xml` (that directory is
+    // gitignored, so CI sees only the splash color while a worktree with a
+    // prebuild sees the app's colors too). The plugin's contract is that its
+    // own color is present, not that it is the only one.
     // Introspection reads the project's own native resources, so the colors
     // modResults carry whatever the worktree's generated `android/` project
     // declares (adaptive-icon, notification, app background) next to the

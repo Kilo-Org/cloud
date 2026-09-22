@@ -12,7 +12,11 @@ import { i18n } from '@/i18n';
 
 import { ModelPickerOptionRow, ModelSelector } from './model-selector';
 
+const keyboardDismiss = vi.hoisted(() => vi.fn());
+const routerPush = vi.hoisted(() => vi.fn());
+
 vi.mock('react-native', () => ({
+  Keyboard: { dismiss: keyboardDismiss },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -21,7 +25,7 @@ vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
 }));
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: routerPush }),
 }));
 vi.mock('@/components/ui/icons', () => ({
   BookOpenCheck: 'BookOpenCheck',
@@ -239,5 +243,93 @@ describe('ModelPickerOptionRow trailing accessory slot', () => {
     expect(checkAccessories(renderRow(option, { selected: true }))).toEqual([
       { color: '#4F5A10', size: 18 },
     ]);
+  });
+});
+
+// Kilo's auto models arrive from the gateway with an English product name
+// ("Auto Efficient"), which was the one English word left on the Arabic
+// new-session screen. The name must come from the catalogs instead, in both
+// places the composer renders it: the picker row and the chip that opens it.
+describe('Kilo auto model names', () => {
+  const autoOption = cliCatalogOption({
+    name: 'gateway-spelled auto name',
+    displayId: 'kilo-auto/efficient',
+    modelRef: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
+  });
+
+  it('names a Kilo auto model from the catalog in the picker row', () => {
+    const texts = textStrings(renderRow(autoOption).root);
+    expect(texts).toContain('Auto Efficient');
+    expect(texts).not.toContain('gateway-spelled auto name');
+  });
+
+  it('keeps the gateway name for a vendor model', () => {
+    const texts = textStrings(renderRow(cliCatalogOption({ name: 'DeepSeek V4.1 Flash' })).root);
+    expect(texts).toContain('DeepSeek V4.1 Flash');
+  });
+
+  it('names a Kilo auto model from the catalog in the chip', () => {
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    TestRenderer.act(() => {
+      ref.current = TestRenderer.create(
+        createElement(ModelSelector, {
+          value: 'kilo-auto/efficient',
+          variant: '',
+          options: [{ ...autoOption, id: 'kilo-auto/efficient', showGatewayMetadata: true }],
+          onSelect: vi.fn<(modelId: string, variant: string) => void>(),
+        })
+      );
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    const texts = textStrings(renderer.root);
+    expect(texts).toContain('Auto Efficient');
+    expect(texts).not.toContain('gateway-spelled auto name');
+  });
+});
+
+// The model sheet anchors over the keyboard only at its first layout and never
+// re-anchors when the keyboard hides, so opening it while the composer holds
+// the IME up keeps the keyboard-height bottom inset and exposes a strip of the
+// screen behind the sheet. The picker must drop the keyboard before it pushes
+// the route (the model-picker bleed along the bottom edge).
+describe('openModelPicker sheet anchoring', () => {
+  it('dismisses the keyboard before opening the sheet', () => {
+    keyboardDismiss.mockClear();
+    routerPush.mockClear();
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    TestRenderer.act(() => {
+      ref.current = TestRenderer.create(
+        createElement(ModelSelector, {
+          value: '',
+          variant: '',
+          options: [cliCatalogOption()],
+          onSelect: vi.fn<(modelId: string, variant: string) => void>(),
+        })
+      );
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    const [chip] = renderer.root.findAllByType('Pressable');
+    if (!chip) {
+      throw new Error('model chip not found');
+    }
+    const chipProps = chip.props as { onPress?: () => void };
+
+    TestRenderer.act(() => {
+      chipProps.onPress?.();
+    });
+
+    // Dismissed before the route push: the sheet reads the window's bottom
+    // inset at first layout, so the keyboard must already be down.
+    expect(keyboardDismiss).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    expect(keyboardDismiss.mock.invocationCallOrder[0]).toBeLessThan(
+      routerPush.mock.invocationCallOrder[0] ?? 0
+    );
   });
 });

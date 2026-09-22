@@ -81,7 +81,7 @@ describe('extractResponsesPromptInfo', () => {
       extractResponsesPromptInfo({
         model: 'openai/gpt-5.4',
         input: { invalid: true },
-      } as GatewayResponsesRequest)
+      } as unknown as GatewayResponsesRequest)
     ).toEqual({
       system_prompt_prefix: '',
       system_prompt_length: 0,

@@ -179,12 +179,17 @@ describe('shared branded splash', () => {
     // splash color. Assert the splash color the plugin owns, not the array.
     // `introspect` merges into the colors a local prebuild already generated, so
     // a worktree with a prebuilt `android/` directory carries that file's extra
-    // entries. Assert the generated entry among them, not as the only one.
-    expect(evaluated._internal?.modResults?.android?.colors?.resources.color).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
-      ])
-    );
+    // entries. Assert the plugin's entry among them, by containment, the same
+    // way the styles assertion below pins its theme: not the whole array and not
+    // its exact length, so a prebuild's other colors (iconBackground,
+    // colorPrimary, …) surviving here cannot fail the case.
+    expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
+      resources: {
+        color: expect.arrayContaining([
+          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+        ]),
+      },
+    });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {
         style: expect.arrayContaining([

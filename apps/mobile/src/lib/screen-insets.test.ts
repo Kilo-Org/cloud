@@ -36,6 +36,16 @@ const ENTRY_POINT = 'screen-insets.ts';
 const PROFILE_SCREEN = '../components/profile-screen.tsx';
 
 /**
+ * The sign-out confirmation renders an in-app `DestructiveConfirmDialog` whose
+ * platform split lives in the `useSignOutConfirmation` hook (see
+ * `profile-screen.signout.mounted.test.tsx`). That fork sits outside the
+ * alignment path scanned below, so the confirmation is held to its feature
+ * here: losing either the hook or the dialog must not pass silently.
+ */
+const SIGN_OUT_CONFIRMATION =
+  /^(?=[\s\S]*useSignOutConfirmation\()(?=[\s\S]*<DestructiveConfirmDialog)/;
+
+/**
  * The Profile screen's alignment path: from the line that reads
  * `useScreenSideInsets` through the line that first applies a side inset. Only
  * this path must stay free of per-platform branches. A fork elsewhere in the
@@ -73,6 +83,9 @@ describe('screen side insets: one implementation for both platforms', () => {
     expect(profile).toMatch(/from '@\/lib\/screen-insets'/);
     expect(profile, `${PROFILE_SCREEN} imports the native safe-area module again`).not.toMatch(
       SAFE_AREA_MODULE
+    );
+    expect(profile, `${PROFILE_SCREEN} lost its sign-out confirmation`).toMatch(
+      SIGN_OUT_CONFIRMATION
     );
     // The screen forks once on purpose: Android's native alert cannot show a
     // red destructive button, so sign-out opens the in-app confirmation there.

@@ -247,6 +247,9 @@ describe('SessionListHeaderActions new-session control', () => {
     // reads the facing side, because the filter expresses its slop as one dp
     // value for every side while the new-session control caps its right side.
     const newSessionSlop = hitSlopInsets(newSession.props.hitSlop);
+    // The filter control carries a uniform numeric slop (`touch-target.ts`), so
+    // its facing left side is that number; either control may express hitSlop as
+    // one number or as per-side insets, so the side helper reads both shapes.
     const filterSlop = hitSlopInsets(filter.props.hitSlop);
     // The new-session control sits left of the filter, so the gap has to fit
     // both facing slops; more than the gap means the two regions overlap. Either

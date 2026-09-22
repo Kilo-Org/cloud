@@ -164,8 +164,14 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // arrayContaining, not an exact array: introspection seeds android.colors
+    // from the checked-out prebuild, which also carries the app's other colors
+    // (colorPrimary, app_background, notification_icon_color). Asserting the
+    // exact length made this pass only on a tree with no prebuilt android/.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

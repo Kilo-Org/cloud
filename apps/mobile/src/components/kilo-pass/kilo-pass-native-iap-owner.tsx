@@ -394,7 +394,17 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     setIsRestoringPurchases(true);
     setErrorMessage(null);
     try {
-      return await actions.restorePurchases();
+      const result = await actions.restorePurchases();
+      if (result !== 'failed') {
+        // A restore that answered proves the store is reachable, so the
+        // ownership lookup is no longer in doubt. Clear the failure or the
+        // screen keeps claiming the store is unreachable over its own
+        // "restored"/"no purchases" feedback and offers a retry that cannot
+        // fix anything.
+        setOwnershipChecked(true);
+        setOwnershipCheckFailed(false);
+      }
+      return result;
     } finally {
       setIsRestoringPurchases(false);
     }
@@ -425,6 +435,12 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         // must not start a purchase: a device subscription owned by another Kilo
         // account would otherwise charge the user before any check can see it.
         setOwnershipChecked(true);
+        setOwnershipCheckFailed(false);
+        // The lookup that failed before has now answered, so the store-connection
+        // message it raised no longer describes this screen.
+        setErrorMessage(current =>
+          current === i18n.t(STORE_CONNECTION_ERROR_MESSAGE_KEY) ? null : current
+        );
       } catch {
         // A failed lookup answers nothing, so purchasing stays blocked and the
         // screen offers a retry instead of charging the user blind.

@@ -87,6 +87,13 @@ vi.mock('@/components/ui/radio-group', () => ({
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+// The screen reserves the keyboard's height through this wrapper. Its module
+// pulls `react-native-safe-area-context`, whose CommonJS entry loads the real
+// React Native outside this suite's partial `react-native` mock, so stub it.
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
+  AppAwareKeyboardPaddingView: 'View',
+  useAppAwareKeyboardPadding: () => 0,
+}));
 vi.mock('@/lib/code-reviewer-config', () => ({
   PLATFORM_CAPABILITIES: { github: { label: 'GitHub' }, gitlab: { label: 'GitLab' } },
 }));

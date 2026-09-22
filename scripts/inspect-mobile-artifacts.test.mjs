@@ -13,7 +13,7 @@ import {
   inspectJsBundles,
 } from './inspect-mobile-artifacts.mjs';
 
-const SENTINEL_ENTRY = 'base/res/raw/kilo_shrink_sentinel_unused';
+const SENTINEL_ENTRY = 'base/res/raw/zz_unused_shrink_sentinel';
 // Every needle plus the debug-id marker, joined into one ASCII fixture.
 const BUNDLE_CONTENT = [...INSPECT_JS_NEEDLES, 'debugId'].join(' ');
 

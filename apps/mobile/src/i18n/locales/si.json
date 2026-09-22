@@ -827,7 +827,8 @@
       "chat": "කතාබස් පණිවිඩ",
       "kiloclaw": "KiloClaw ක්‍රියාකාරකම්",
       "balance": "ශේෂය පිළිබඳ ඇඟවීම්",
-      "security": "හඳුනාගත් ආරක්ෂක ගැටලු"
+      "security": "හඳුනාගත් ආරක්ෂක ගැටලු",
+      "spend": "වියදම් දැනුම්දීම්"
     },
     "category": {
       "chatMessagesSubtitle": "ඔබේ සංවාදවල පිළිතුරු",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "සැසි තත්ත්වය",
       "sessionStatusSubtitle": "අවසන් / අසාර්ථක / පාලනයට සූදානම්",
       "kiloclawActivitySubtitle": "පිටපත සූදානම් හෝ අසාර්ථක වීම, කාලසටහන්ගත ක්‍රියා",
+      "kiloclawActivityUnavailable": "KiloClaw ක්‍රියාකාරකම් ලබා ගැනීමට KiloClaw පිටපතක් අරඹන්න.",
       "balanceAlertsSubtitle": "සංවිධානයේ ශේෂය අඩු වීමේ දැනුම්දීම්",
-      "securityFindingsSubtitle": "නව සොයාගැනීම් සහ SLA මතක් කිරීම්"
+      "balanceAlertsUnavailable": "ශේෂය අඩු වීමේ දැනුම්දීම් ලබා ගැනීමට සංවිධානයකට සම්බන්ධ වන්න.",
+      "securityFindingsSubtitle": "නව සොයාගැනීම් සහ SLA මතක් කිරීම්",
+      "securityFindingsUnavailable": "ආරක්ෂක ගැටලු ලබා ගැනීමට විෂය පථයක Kilo ආරක්ෂක නියෝජිතයා සක්‍රීය කරන්න.",
+      "spendAlertsSubtitle": "සීමා ඉක්මවීම් සහ පැයකට ඇති උච්චතා",
+      "spendAlertsToggle": "වියදම් දැනුම්දීම් ප්‍රවර්ගය"
     },
     "action": {
       "openSession": "සැසිය විවෘත කරන්න"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "සැසිය පූරණය කළ නොහැකි විය.",
       "failedToLoadDetails": "සැසියේ විස්තර පූරණය කළ නොහැකි විය.",
       "failedToStopExecution": "ක්‍රියාත්මක කිරීම නතර කළ නොහැකි විය.",
+      "stopped": "සැසිය නතර කරන ලදී",
+      "committing": "කමිට් කරමින්…",
+      "committed": "කමිට් කරන ලදී",
+      "commitFailed": "කමිට් කිරීම අසාර්ථක විය",
       "renameSession": "සැසියේ නම වෙනස් කරන්න",
       "renamePlaceholder": "සැසියේ නම",
       "transcriptAccessibility": "සැසියේ සංවාද පිටපත",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "පේළි {{displayCount}}",
       "linesBadge_other": "පේළි {{displayCount}}",
       "matchesBadge_one": "ගැළපීම් {{displayCount}}",
-      "matchesBadge_other": "ගැළපීම් {{displayCount}}"
+      "matchesBadge_other": "ගැළපීම් {{displayCount}}",
+      "noOutput": "ප්රතිදානයක් නැත."
     },
     "readToolMarkdown": {
       "linesTruncated": "පේළි {{start}}–{{end}} (කෙටි කර ඇත)",
@@ -3155,7 +3166,8 @@
     "channelName": "සක්‍රීය නියෝජිතයන්",
     "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න.",
     "openSession": "විවෘත කරන්න",
-    "approveFailed": "අනුමත කිරීමට නොහැකි විය. නැවත උත්සාහ කිරීමට $t(common.approve) තට්ටු කරන්න."
+    "approveFailed": "අනුමත කිරීමට නොහැකි විය. නැවත උත්සාහ කිරීමට $t(common.approve) තට්ටු කරන්න.",
+    "newestResult": "නවතම ප්‍රතිඵලය"
   },
   "transcriptionModel": {
     "title": "හඬ පෙළට හරවන ආකෘතිය",
@@ -3180,15 +3192,7 @@
     "remoteOptionTitle": "ඔබේ පරිගණකය",
     "remoteOptionBody": "ඔබේම යන්ත්‍රයේ `kilo remote` CLI මගින් Kilo ධාවනය කරන්න.",
     "skip": "සංචාරය මඟහරින්න",
-    "tutorialLabel": "ඉගෙනුම් මාර්ගෝපදේශය",
-    "remoteTitle": "ඔබේ පළමු දුරස්ථ සැසිය අරඹන්න",
-    "remoteBody": "ඔබේ පරිගණකය සම්බන්ධ කර, පසුව සැසිය මෙතැනින් අරඹන්න.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "තවම පරිගණකයක් සම්බන්ධ වී නැත",
-    "remoteEmptyBody": "එය සම්බන්ධ කිරීමට ඔබේ පරිගණකයේ `kilo remote` ධාවනය කරන්න.",
-    "remoteFound": "පරිගණකය සම්බන්ධ විය",
-    "checkAgain": "නැවත පරීක්ෂා කරන්න",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ඉගෙනුම් මාර්ගෝපදේශය"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "අවසන් සැසිය විවෘත කරන්න"
+  },
+  "spendAlerts": {
+    "subtitle": "මෙම පරාසයේ වියදම සීමාවක් ඉක්මවන විට හෝ එහි සාමාන්‍ය පැයක අනුපාතයට වඩා ඉහළ ගිය විට බිල්පත් සම්බන්ධතාවලට ඊමේල් හෝ push මගින් දැනුම්දීමක් යවන්න.",
+    "enable": "වියදම් දැනුම්දීම් සක්‍රීය කරන්න",
+    "thresholdTitle": "සීමාව ඉක්මවීම",
+    "thresholdSubtitle": "වත්මන් වියදම ඔබේ සීමාව ඉක්මවයි",
+    "anomalyTitle": "පැයකට උච්චතාව",
+    "anomalySubtitle": "එක් පැයක් මෙම පරාසයේ සාමාන්‍ය අනුපාතයට වඩා බෙහෙවින් ඉහළ ය",
+    "limitLabel": "සීමාව (USD)",
+    "windowLabel": "කාල පරාසය",
+    "window24h": "පැය 24",
+    "window7d": "දින 7",
+    "window30d": "දින 30",
+    "multiplierLabel": "උච්චතා ගුණකය",
+    "saved": "වියදම් දැනුම්දීම් සැකසුම් සුරාගත්තා",
+    "loadError": "වියදම් දැනුම්දීම් පූරණය කළ නොහැකි විය.",
+    "saveError": "වියදම් දැනුම්දීම් සුරැකිය නොහැකි විය.",
+    "empty": "වියදම් දැනුම්දීම් ක්‍රියා විරහිතයි. මෙම පරාසයේ බිල්පත් සම්බන්ධතාවලට දැනුම් දීමට ඒවා ක්‍රියාත්මක කරන්න.",
+    "noSpend": "තවම වියදමක් වාර්තා වී නැත",
+    "spend24h": "පසුගිය පැය 24 තුළ වියදම",
+    "multiplierError": "1 හෝ ඊට වැඩි ගුණකයක් ඇතුළත් කරන්න",
+    "permissionDenied": "වියදම් දැනුම්දීම් කළමනාකරණය කිරීමට ඔබට අවසර නැත.",
+    "pushOffByCategory": "දැනුම්දීම් තුළ ක්‍රියා විරහිතයි"
   }
 }

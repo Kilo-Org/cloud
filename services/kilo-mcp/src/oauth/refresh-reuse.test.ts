@@ -19,8 +19,46 @@ function makeDeps() {
       }
       tokens.set(hash, { ...parts, current: true });
     },
+    forgetRefreshTokens: async parts => {
+      for (const [hash, token] of tokens) {
+        if (token.userId === parts.userId && token.grantId === parts.grantId) tokens.delete(hash);
+      }
+    },
   };
   return { tokens, store, revokeGrant: vi.fn(async (_grantId: string, _userId: string) => {}) };
+}
+
+/**
+ * The same store as `makeDeps`, but it honours the `expiresAt` the guard
+ * passes and the `nowIso` it reads with: a row is returned only while the
+ * clock has not passed it. `makeDeps` ignores both forever, so it cannot show
+ * whether the history outlives the grant.
+ */
+function makeTtlDeps() {
+  const rows = new Map<string, IssuedRefreshToken & { expiresAt: string }>();
+  const store: RefreshReuseStore = {
+    getRefreshToken: async (hash, nowIso) => {
+      const row = rows.get(hash);
+      if (!row || row.expiresAt <= nowIso) return null;
+      return { userId: row.userId, grantId: row.grantId, current: row.current };
+    },
+    rememberRefreshToken: async (hash, parts, expiresAt) => {
+      for (const row of rows.values()) {
+        if (row.userId === parts.userId && row.grantId === parts.grantId) row.current = false;
+      }
+      rows.set(hash, { ...parts, current: true, expiresAt });
+    },
+    forgetRefreshTokens: async parts => {
+      for (const [hash, row] of rows) {
+        if (row.userId === parts.userId && row.grantId === parts.grantId) rows.delete(hash);
+      }
+    },
+  };
+  return {
+    rows,
+    store,
+    revokeGrant: vi.fn(async (_grantId: string, _userId: string) => {}),
+  };
 }
 
 function refreshRequest(refreshToken: string, origin?: string): Request {
@@ -87,6 +125,21 @@ describe('detectRefreshTokenReuse', () => {
     expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('g', 'u');
   });
 
+  it('forgets the revoked grant’s hashes and leaves a live grant’s alone', async () => {
+    const deps = makeDeps();
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
+    await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:other:live' }), deps);
+
+    expect(await detectRefreshTokenReuse(refreshRequest('u:g:first'), deps)).not.toBeNull();
+
+    // A revoked grant's hashes can never authenticate another replay, so they
+    // are dropped with the revocation instead of waiting for the history TTL.
+    expect(deps.tokens.has(await hashRefreshToken('u:g:first'))).toBe(false);
+    expect(deps.tokens.has(await hashRefreshToken('u:g:second'))).toBe(false);
+    expect([...deps.tokens.values()].map(token => token.grantId)).toEqual(['other']);
+  });
+
   it('uses the stored identity rather than parsing the presented token for revocation', async () => {
     const deps = makeDeps();
     deps.tokens.set(await hashRefreshToken('not:trusted:parts'), {
@@ -96,6 +149,32 @@ describe('detectRefreshTokenReuse', () => {
     });
     await detectRefreshTokenReuse(refreshRequest('not:trusted:parts'), deps);
     expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('stored-grant', 'stored-user');
+  });
+
+  it('still detects a superseded token late in the one-month session', async () => {
+    vi.useFakeTimers();
+    try {
+      // Day 0: the code exchange issues the first token, then one rotation.
+      vi.setSystemTime(Date.UTC(2026, 0, 1, 12));
+      const deps = makeTtlDeps();
+      await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:first' }), deps);
+      await rememberIssuedRefreshToken(Response.json({ refresh_token: 'u:g:second' }), deps);
+
+      // Day 29: the last full day of the session. With a history shorter than
+      // the session this superseded row would be gone, the guard would forward
+      // the replay to the provider, and the provider would answer it. The
+      // history must cover the whole session the provider serves.
+      vi.setSystemTime(Date.UTC(2026, 0, 30, 12));
+      const response = await detectRefreshTokenReuse(refreshRequest('u:g:first'), deps);
+      expect(response?.status).toBe(400);
+      expect(await response?.json()).toEqual({
+        error: 'invalid_grant',
+        error_description: 'Refresh token reuse detected; the grant has been revoked.',
+      });
+      expect(deps.revokeGrant).toHaveBeenCalledExactlyOnceWith('g', 'u');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('leaves wrong media types, ambiguous parameters and non-refresh requests to the library', async () => {

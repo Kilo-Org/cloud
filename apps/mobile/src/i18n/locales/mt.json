@@ -875,7 +875,8 @@
       "chat": "Messaġġi tat-taħdit",
       "kiloclaw": "Attività ta' KiloClaw",
       "balance": "Twissijiet tal-bilanċ",
-      "security": "Sejbiet tas-sigurtà"
+      "security": "Sejbiet tas-sigurtà",
+      "spend": "Twissijiet tal-infiq"
     },
     "category": {
       "chatMessagesSubtitle": "tweġibiet fil-konversazzjonijiet tiegħek",
@@ -886,8 +887,13 @@
       "sessionStatusTitle": "Status tas-sessjoni",
       "sessionStatusSubtitle": "tlestiet / falliet / lesta biex tikkontrollaha",
       "kiloclawActivitySubtitle": "istanza lesta jew falliet, azzjonijiet skedati",
+      "kiloclawActivityUnavailable": "Ibda istanza ta' KiloClaw biex tikseb l-attività ta' KiloClaw.",
       "balanceAlertsSubtitle": "twissijiet ta' bilanċ baxx tal-organizzazzjoni",
-      "securityFindingsSubtitle": "sejbiet ġodda u tfakkiriet tal-SLA"
+      "balanceAlertsUnavailable": "Ingħaqad ma' organizzazzjoni biex tikseb twissijiet ta' bilanċ baxx.",
+      "securityFindingsSubtitle": "sejbiet ġodda u tfakkiriet tal-SLA",
+      "securityFindingsUnavailable": "Attiva l-aġent tas-sigurtà ta' Kilo fuq ambitu biex tikseb sejbiet tas-sigurtà.",
+      "spendAlertsSubtitle": "qbiż ta' limiti u żidiet fis-siegħa",
+      "spendAlertsToggle": "Kategorija tat-twissijiet tal-infiq"
     },
     "action": {
       "openSession": "Iftaħ is-sessjoni"
@@ -2160,6 +2166,10 @@
       "couldNotLoad": "Ma setgħetx titgħabba s-sessjoni.",
       "failedToLoadDetails": "Ma setgħux jitgħabbew id-dettalji tas-sessjoni.",
       "failedToStopExecution": "Ma setgħetx titwaqqaf l-eżekuzzjoni.",
+      "stopped": "Is-sessjoni twaqqfet",
+      "committing": "Qed jiġi rreġistrat…",
+      "committed": "Irreġistrat",
+      "commitFailed": "Ir-reġistrazzjoni falliet",
       "renameSession": "Ibdel l-isem tas-sessjoni",
       "renamePlaceholder": "Isem is-sessjoni",
       "transcriptAccessibility": "Traskrizzjoni tas-sessjoni",
@@ -2312,7 +2322,8 @@
       "matchesBadge_other": "{{displayCount}} riżultati",
       "matchesBadge_two": "{{displayCount}} riżultati",
       "matchesBadge_few": "{{displayCount}} riżultati",
-      "matchesBadge_many": "{{displayCount}} riżultati"
+      "matchesBadge_many": "{{displayCount}} riżultati",
+      "noOutput": "M'hemm l-ebda ħruġ."
     },
     "readToolMarkdown": {
       "linesTruncated": "linji {{start}}–{{end}} (maqtugħa)",
@@ -3284,7 +3295,8 @@
     "channelName": "Aġenti attivi",
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar.",
     "openSession": "Iftaħ",
-    "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova."
+    "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova.",
+    "newestResult": "L-aħħar riżultat"
   },
   "transcriptionModel": {
     "title": "Mudell ta' traskrizzjoni",
@@ -3309,15 +3321,7 @@
     "remoteOptionTitle": "Il-kompjuter tiegħek",
     "remoteOptionBody": "Ħaddem Kilo fuq il-magna tiegħek permezz tal-CLI `kilo remote`.",
     "skip": "Aqbeż it-tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Ibda l-ewwel sessjoni remota tiegħek",
-    "remoteBody": "Ikkonetta l-kompjuter tiegħek, imbagħad ibda s-sessjoni minn hawn.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Għad m'hemmx kompjuter konness",
-    "remoteEmptyBody": "Biex tikkonnettjah, ħaddem `kilo remote` fuq il-kompjuter tiegħek.",
-    "remoteFound": "Kompjuter konness",
-    "checkAgain": "Iċċekkja mill-ġdid",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {
@@ -3328,5 +3332,28 @@
   },
   "launcher": {
     "openLastSession": "Iftaħ l-aħħar sessjoni"
+  },
+  "spendAlerts": {
+    "subtitle": "Ibgħat twissija bil-posta elettronika jew push lill-kuntatti tal-ħlasijiet meta l-infiq ta' dan il-kamp jinqabeż limitu jew jogħla 'l fuq mir-rata tas-siegħa tas-soltu.",
+    "enable": "Attiva t-twissijiet tal-infiq",
+    "thresholdTitle": "Qbiż tal-limitu",
+    "thresholdSubtitle": "L-infiq attwali jaqbeż il-limitu tiegħek",
+    "anomalyTitle": "Żieda fis-siegħa",
+    "anomalySubtitle": "Siegħa hija 'l fuq ħafna mir-rata tas-soltu ta' dan il-kamp",
+    "limitLabel": "Limitu (USD)",
+    "windowLabel": "Tieqa",
+    "window24h": "24 siegħa",
+    "window7d": "7 ijiem",
+    "window30d": "30 jum",
+    "multiplierLabel": "Multiplikatur taż-żieda",
+    "saved": "Is-settings tat-twissijiet tal-infiq ġew salvati",
+    "loadError": "It-twissijiet tal-infiq ma setgħux jitgħabbew.",
+    "saveError": "It-twissijiet tal-infiq ma setgħux jiġu salvati.",
+    "empty": "It-twissijiet tal-infiq huma mitfija. Xegħelhom biex tavża lill-kuntatti tal-ħlasijiet ta' dan il-kamp.",
+    "noSpend": "Għadu ma ġie rreġistrat l-ebda infiq",
+    "spend24h": "Infiq fl-aħħar 24 siegħa",
+    "multiplierError": "Daħħal multiplikatur ta' 1 jew aktar",
+    "permissionDenied": "M'għandekx permess biex timmaniġġja t-twissijiet tal-infiq.",
+    "pushOffByCategory": "Mitfi fin-Notifiki"
   }
 }

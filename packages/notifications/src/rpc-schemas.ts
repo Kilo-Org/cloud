@@ -176,6 +176,17 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
 export const refreshGlanceableSessionsInputSchema = z.object({
   userId: z.string().min(1),
   cliSessionIds: z.array(z.string().min(1)).min(1),
+  /**
+   * The subset of `cliSessionIds` whose change moved a session into or out of
+   * the `permission` status. `needsApproval` gates the Approve control on the
+   * locked/background surfaces, so the delivery window may not defer those
+   * scopes. The caller is the one that saw the previous status; the server
+   * cannot read a past status. Naming the sessions lets the server exempt only
+   * the scope that actually moved: one batch can span the personal scope and
+   * several organizations, and exempting all of them would wake devices that
+   * had no approval change.
+   */
+  approvalChangedSessionIds: z.array(z.string().min(1)).optional(),
 });
 export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSessionsInputSchema>;
 
@@ -293,6 +304,29 @@ export type InternalDispatchLowBalanceRequest = z.infer<
   typeof internalDispatchLowBalanceRequestSchema
 >;
 
+/**
+ * Spend-alert dispatch. `organizationId` is present only for an
+ * `organization` scope; a `personal` scope carries the user's own spend and
+ * nothing else. `dedupeKey` is the outbox row's identity, which carries the
+ * firing episode: it joins the idempotency key alongside the alert kind and
+ * threshold, so a condition that clears and crosses again inside the channel's
+ * idempotency window is a new alert rather than a collapsed duplicate.
+ */
+export const internalDispatchSpendAlertRequestSchema = z.object({
+  kind: z.literal('spend_alert'),
+  recipientUserIds: z.array(z.string().min(1)).min(1),
+  scope: z.enum(['personal', 'organization']),
+  organizationId: z.string().min(1).optional(),
+  alertKind: z.enum(['threshold', 'anomaly']),
+  scopeName: z.string().min(1),
+  amountUsd: z.number().nonnegative(),
+  thresholdUsd: z.number().nonnegative(),
+  dedupeKey: z.string().min(1),
+});
+export type InternalDispatchSpendAlertRequest = z.infer<
+  typeof internalDispatchSpendAlertRequestSchema
+>;
+
 export const internalDispatchSecurityFindingRequestSchema = z.object({
   kind: z.literal('security_finding'),
   recipientUserId: z.string().min(1),
@@ -340,6 +374,7 @@ export type InternalDispatchSecurityLifecycleRequest = z.infer<
 
 export const internalDispatchRequestSchema = z.discriminatedUnion('kind', [
   internalDispatchLowBalanceRequestSchema,
+  internalDispatchSpendAlertRequestSchema,
   internalDispatchSecurityFindingRequestSchema,
   internalDispatchSecurityLifecycleRequestSchema,
 ]);

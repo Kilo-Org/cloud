@@ -1,10 +1,19 @@
+/* eslint-disable max-lines -- one suite pins every terminal class's copy, retryability, and code mapping. */
 import { describe, expect, it } from 'vitest';
 
+import { type SdkStatusMessageCode } from '@kilocode/cloud-agent-sdk';
+
+import { i18n } from '@/i18n';
+
+import { type MessageFailure } from './message-failure-state';
 import {
   buildTerminalErrorCopyText,
   classifyTerminalError,
+  describeSessionRuntimeFailure,
+  describeTerminalFailure,
   resolveSessionTerminalError,
   sessionStatusErrorMessage,
+  statusIndicatorDuplicatesMessageFailure,
 } from './session-terminal-error';
 
 describe('classifyTerminalError', () => {
@@ -32,9 +41,112 @@ describe('classifyTerminalError', () => {
   });
 });
 
+describe('describeTerminalFailure', () => {
+  // One case per class. Each raw string is what the session manager's
+  // `formatError` (or the Durable Object's projection) writes into the child
+  // sheet's hydration state and error atom, so the sheet renders catalog copy
+  // and a Retry only where one can help.
+  it.each([
+    {
+      message: 'Connection lost. Please retry in a moment.',
+      variant: 'server',
+      key: 'agentChat.session.connectionTrouble',
+      retryable: true,
+    },
+    {
+      message: 'Service is unavailable right now. Please try again.',
+      variant: 'server',
+      key: 'agentChat.session.serviceUnavailable',
+      retryable: true,
+    },
+    {
+      message: 'Previous task is still finishing up. Please wait a moment.',
+      variant: 'server',
+      key: 'agentChat.session.previousTaskFinishing',
+      retryable: true,
+    },
+    {
+      message: 'This session is no longer available.',
+      variant: 'not-found',
+      key: 'queryError.notFoundDescription',
+      retryable: false,
+    },
+    {
+      message: 'You are not authorized to use the Cloud Agent.',
+      variant: 'permission',
+      key: 'queryError.permissionDescription',
+      retryable: false,
+    },
+    {
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      variant: 'server',
+      key: 'agentChat.session.notEnoughCredits',
+      retryable: false,
+    },
+    {
+      message: 'Selected model is unavailable for Cloud Agent.',
+      variant: 'server',
+      key: 'agentChat.session.modelUnavailable',
+      retryable: false,
+    },
+    {
+      message: 'some unexpected failure',
+      variant: 'server',
+      key: 'agentChat.session.failedToLoadDetails',
+      retryable: false,
+    },
+  ] as const)('describes $message', ({ message, variant, key, retryable }) => {
+    expect(describeTerminalFailure(message)).toEqual({
+      variant,
+      message: i18n.t(key),
+      retryable,
+      detail: message,
+      title: expect.any(String),
+    });
+  });
+
+  it('keeps the untranslated original in detail', () => {
+    const raw = 'Connection lost. Please retry in a moment.';
+    expect(describeTerminalFailure(raw).detail).toBe(raw);
+  });
+});
+
+describe('describeSessionRuntimeFailure', () => {
+  // The child sheet's `sessionError` is a failed agent run, not a failed page
+  // load: every copy here must match what the sheet's transcript banner shows
+  // for the same value through `sessionStatusErrorMessage`.
+  it.each([
+    ['Runtime failure', 'agentChat.messageFailure.assistantFailed'],
+    ['This session is no longer available.', 'queryError.notFoundDescription'],
+    ['Connection lost. Please retry in a moment.', 'agentChat.session.connectionTrouble'],
+  ] as const)('describes %s', (message, key) => {
+    expect(describeSessionRuntimeFailure(message)).toEqual({
+      message: i18n.t(key),
+      detail: message,
+    });
+  });
+
+  it('never names a page-load failure for an unrecognized runtime error', () => {
+    expect(describeSessionRuntimeFailure('Runtime failure').message).not.toBe(
+      i18n.t('agentChat.session.failedToLoadDetails')
+    );
+  });
+
+  it('passes the Durable Object safety projection through unchanged', () => {
+    const raw = 'Assistant request failed: model not found';
+    expect(describeSessionRuntimeFailure(raw)).toEqual({ message: raw, detail: raw });
+  });
+});
+
 const indicatorFor = (message: string) => ({
   error: null,
   statusIndicator: { type: 'error' as const, message },
+  messageCount: 0,
+});
+
+const codedIndicatorFor = (message: string, code: SdkStatusMessageCode) => ({
+  error: null,
+  statusIndicator: { type: 'error' as const, message, code },
   messageCount: 0,
 });
 
@@ -99,6 +211,34 @@ describe('resolveSessionTerminalError', () => {
       message: "You don't have permission to view this.",
       retryable: false,
       detail: 'You are not authorized to use the Cloud Agent.',
+    });
+  });
+
+  // The code names the failure on its own; the transport's English detail still
+  // reaches Copy untouched.
+  it('classifies a coded disconnect as retryable and preserves the detail', () => {
+    expect(
+      resolveSessionTerminalError(
+        codedIndicatorFor('Connection lost. Please retry in a moment.', 'connection-lost')
+      )
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Connection trouble. Please retry in a moment.',
+      retryable: true,
+      detail: 'Connection lost. Please retry in a moment.',
+    });
+  });
+
+  it('classifies a coded session termination as non-retryable', () => {
+    expect(
+      resolveSessionTerminalError(codedIndicatorFor('Session terminated', 'session-terminated'))
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Failed to load session details',
+      retryable: false,
+      detail: 'Session terminated',
     });
   });
 
@@ -204,17 +344,70 @@ describe('sessionStatusErrorMessage', () => {
     ['Message failed to deliver', 'Failed to deliver'],
     ['Message delivery failed', 'Failed to deliver'],
   ] as const)('maps %s to typed copy', (raw, expected) => {
-    expect(sessionStatusErrorMessage(raw)).toBe(expected);
+    expect(sessionStatusErrorMessage({ message: raw })).toBe(expected);
   });
 
-  // The SDK writes these strings itself, so they are already the reader's copy
-  // and must not be replaced by the generic failure line.
+  // The SDK codes the fixed copy it writes itself, so the app renders its own
+  // catalog line for the code instead of the SDK's English message. Every code
+  // is covered so a new code cannot silently lose its copy.
   it.each([
-    ['Agent connection lost'],
-    ['Session terminated'],
-    ['Failed to stop execution'],
-  ] as const)('shows the SDK fixed copy for %s', raw => {
-    expect(sessionStatusErrorMessage(raw)).toBe(raw);
+    ['agent-connection-lost', 'Agent connection lost', 'Connection lost'],
+    ['session-stopped', 'Session stopped', 'Session stopped'],
+    ['session-terminated', 'Session terminated', 'The response failed.'],
+    ['failed-to-stop-execution', 'Failed to stop execution', 'Failed to stop execution'],
+    ['message-delivery-failed', 'Message failed to deliver', 'Failed to deliver'],
+    ['commit-failed', 'Commit failed', 'Commit failed'],
+    [
+      'not-authorized',
+      'You are not authorized to use the Cloud Agent.',
+      "You don't have permission to view this.",
+    ],
+    [
+      'insufficient-credits',
+      'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      'Not enough credits to run Cloud Agent. Add credits and try again.',
+    ],
+    [
+      'previous-task-in-progress',
+      'Previous task is still finishing up. Please wait a moment.',
+      'The previous task is still finishing. Please wait a moment.',
+    ],
+    [
+      'selected-model-unavailable',
+      'Selected model is unavailable for Cloud Agent.',
+      "This model isn't available for Cloud Agent. Choose another model and try again.",
+    ],
+    [
+      'service-unavailable',
+      'Service is unavailable right now.',
+      'The service is unavailable right now. Please try again.',
+    ],
+    [
+      'service-temporarily-unavailable',
+      'Service is temporarily unavailable.',
+      'The service is unavailable right now. Please try again.',
+    ],
+    ['connection-lost', 'Connection lost.', 'Connection trouble. Please retry in a moment.'],
+    ['connection-failed', 'Connection failed.', 'Connection trouble. Please retry in a moment.'],
+    ['generic-error', 'Something went wrong.', 'Connection trouble. Please retry in a moment.'],
+    [
+      'child-session-not-found',
+      'This session is no longer available.',
+      'This item may have been removed or is no longer available.',
+    ],
+  ] as const)('renders catalog copy for the %s code', (code, message, expected) => {
+    expect(sessionStatusErrorMessage({ message, code })).toBe(expected);
+  });
+
+  // A message the SDK forwards without a code keeps the classifier's answer:
+  // the same strings the SDK used to write itself are no longer special-cased.
+  it.each([
+    ['Agent connection lost', 'The response failed.'],
+    ['Session terminated', 'The response failed.'],
+    ['Failed to stop execution', 'The response failed.'],
+    ['Message failed to deliver', 'Failed to deliver'],
+  ] as const)('keeps the code-less fallback for %s', (raw, expected) => {
+    expect(sessionStatusErrorMessage({ message: raw })).toBe(expected);
   });
 
   // The Durable Object's safe failure projection is the reader's copy too
@@ -238,11 +431,81 @@ describe('sessionStatusErrorMessage', () => {
     // A bounded workspace failure appends its own detail to the projection.
     ['Workspace setup failed: Devcontainer workspace preparation failed'],
   ] as const)('shows the safe projection copy for %s', raw => {
-    expect(sessionStatusErrorMessage(raw)).toBe(raw);
+    expect(sessionStatusErrorMessage({ message: raw })).toBe(raw);
   });
 
   it('never returns the raw provider text', () => {
     const raw = 'Service Unavailable: The service is temporarily unavailable.';
-    expect(sessionStatusErrorMessage(raw)).not.toContain('Service Unavailable');
+    expect(sessionStatusErrorMessage({ message: raw })).not.toContain('Service Unavailable');
+  });
+});
+
+function assistantFailure(detail: string | null): MessageFailure {
+  return {
+    kind: 'assistant',
+    title: 'Response failed',
+    detail,
+    copyDetail: '',
+    canRetry: true,
+    canCopy: false,
+  };
+}
+
+describe('statusIndicatorDuplicatesMessageFailure', () => {
+  const deliveryFailure: MessageFailure = {
+    kind: 'delivery',
+    title: 'Failed to deliver',
+    detail: 'We could not deliver this message after several attempts.',
+    copyDetail: 'Unauthorized: Unauthorized',
+    canRetry: true,
+    canCopy: true,
+  };
+
+  it('suppresses an unclassified session error the last row already states', () => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'simulated error' },
+        failure: assistantFailure(null),
+      })
+    ).toBe(true);
+  });
+
+  it('suppresses the delivery line the last row already states', () => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'Message failed to deliver' },
+        failure: deliveryFailure,
+      })
+    ).toBe(true);
+  });
+
+  it('keeps a classified line the row does not carry', () => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: {
+          type: 'error',
+          message: 'Assistant request failed: insufficient credits',
+        },
+        failure: assistantFailure(null),
+      })
+    ).toBe(false);
+  });
+
+  it('keeps the line when the row renders no failure footer', () => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'simulated error' },
+        failure: null,
+      })
+    ).toBe(false);
+  });
+
+  it('keeps a non-error indicator', () => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'progress', message: 'Setting up environment…' },
+        failure: assistantFailure(null),
+      })
+    ).toBe(false);
   });
 });

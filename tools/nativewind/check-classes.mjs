@@ -52,6 +52,19 @@ const RULES = [
     advice: 'compiles to an unparseable #NaN colour; use a concrete value, e.g. bg-[#00000066]',
   },
   {
+    // A `/opacity` modifier on a theme colour compiles to
+    // `color-mix(in oklab, var(--color-…) n%, transparent)`. NativeWind v5
+    // cannot decompose the variable, so the runtime drops the declaration and
+    // the element paints nothing, with no build error. The `*-tile-bg` /
+    // `*-tile-border` pairs pre-bake the alpha instead.
+    pattern: new RegExp(
+      `\\b(?:${COLOR_UTILITIES})-(?:background|foreground|card|popover|primary|secondary|muted-soft|muted|accent-soft|accent|destructive|border|input|ring|ink2|good|warn|info|danger|agent-[a-z]+)(?:-foreground)?/\\d+\\b`,
+      'g'
+    ),
+    advice:
+      'the /opacity modifier is dropped on CSS-variable theme colours; use the paired *-tile-bg / *-tile-border token or a concrete colour',
+  },
+  {
     // `text-align` only accepts auto/left/right/center/justify, so the
     // logical keywords are dropped and the text keeps its default alignment.
     pattern: /\btext-(?:start|end)\b/g,
@@ -225,6 +238,21 @@ function checkCompilerStillDropsThese() {
   const alignment = compile('.x { text-align: start; }').warnings();
   if (!JSON.stringify(alignment).includes('text-align')) {
     fail('check-classes: text-align: start is no longer dropped — drop the text-start/end rule');
+  }
+
+  // A `/opacity` modifier on an `@theme inline` variable is emitted as a
+  // deferred colorMix over the variable; the runtime cannot decompose it and
+  // drops the declaration. When the compiler resolves it instead, this stops
+  // matching and the rule above can go.
+  const themeOpacity = firstValue(
+    '@theme inline { --color-destructive: var(--destructive); }\n' +
+      ':root { --destructive: #b0483a; }\n' +
+      '.x { background-color: color-mix(in oklab, var(--color-destructive) 10%, transparent); }'
+  );
+  if (!themeOpacity.includes('colorMix')) {
+    fail(
+      `check-classes: color-mix over an @theme inline variable now compiles to ${themeOpacity} instead of a deferred colorMix — drop the theme-token opacity rule`
+    );
   }
 }
 

@@ -827,7 +827,8 @@
       "chat": "نامەکانی گفتوگۆ",
       "kiloclaw": "چالاکییەکانی KiloClaw",
       "balance": "ئاگادارکردنەوەکانی باڵانس",
-      "security": "دۆزینەوەکانی ئاسایش"
+      "security": "دۆزینەوەکانی ئاسایش",
+      "spend": "ئاگادارکردنەوەکانی خەرجی"
     },
     "category": {
       "chatMessagesSubtitle": "وەڵامەکان لە گفتوگۆکانتدا",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "دۆخی سێشن",
       "sessionStatusSubtitle": "تەواوبوو / سەرنەکەوتوو / ئامادە بۆ کۆنترۆڵکردن",
       "kiloclawActivitySubtitle": "نموونەی ئامادە یان سەرنەکەوتوو، کردارە کاتدیاریکراوەکان",
+      "kiloclawActivityUnavailable": "نموونەیەکی KiloClaw دەستپێبکە بۆ وەرگرتنی چالاکیی KiloClaw.",
       "balanceAlertsSubtitle": "ئاگادارکردنەوەکانی کەمی باڵانسی ڕێکخراوە",
-      "securityFindingsSubtitle": "دۆزینەوە نوێکان و بیرخستنەوەکانی SLA"
+      "balanceAlertsUnavailable": "بەشداری ڕێکخراوێک بکە بۆ وەرگرتنی ئاگادارکردنەوەکانی باڵانس.",
+      "securityFindingsSubtitle": "دۆزینەوە نوێکان و بیرخستنەوەکانی SLA",
+      "securityFindingsUnavailable": "بریکاری ئاسایشی Kilo لە مەودایەکدا چالاک بکە بۆ وەرگرتنی دۆزینەوەکانی ئاسایش.",
+      "spendAlertsSubtitle": "تێپەڕینی سنوورەکان و بەرزبوونەوەکانی کاتژمێری",
+      "spendAlertsToggle": "پۆلی ئاگادارکردنەوەکانی خەرجی"
     },
     "action": {
       "openSession": "کردنەوەی سێشن"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "نەتوانرا سێشنەکە بار بکرێت.",
       "failedToLoadDetails": "نەتوانرا وردەکارییەکانی سێشنەکە بار بکرێن.",
       "failedToStopExecution": "نەتوانرا جێبەجێکردن بوەستێنرێت.",
+      "stopped": "سێشنەکە وەستێنرا",
+      "committing": "کۆمیت دەکرێت…",
+      "committed": "کۆمیت کرا",
+      "commitFailed": "کۆمیتکردن سەرنەکەوت",
       "renameSession": "گۆڕینی ناوی سێشن",
       "renamePlaceholder": "ناوی سێشن",
       "transcriptAccessibility": "تۆماری سێشن",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} دێڕ",
       "linesBadge_other": "{{displayCount}} دێڕ",
       "matchesBadge_one": "{{displayCount}} ئەنجام",
-      "matchesBadge_other": "{{displayCount}} ئەنجام"
+      "matchesBadge_other": "{{displayCount}} ئەنجام",
+      "noOutput": "هیچ دەرچووێک نییە."
     },
     "readToolMarkdown": {
       "linesTruncated": "دێڕەکانی {{start}}–{{end}} (کورتکراوە)",
@@ -3155,7 +3166,8 @@
     "channelName": "ئەجێنتە چالاکەکان",
     "activityKitDisabledBody": "بۆ بینینی ئەجێنتە چالاکەکان لە شاشەی قوفڵدا، چالاکییە ڕاستەوخۆکان لە ڕێکخستنەکاندا چالاک بکە.",
     "openSession": "بیکەرەوە",
-    "approveFailed": "نەتوانرا پەسند بکرێت. بۆ دووبارە هەوڵدانەوە، لە $t(common.approve) بدە."
+    "approveFailed": "نەتوانرا پەسند بکرێت. بۆ دووبارە هەوڵدانەوە، لە $t(common.approve) بدە.",
+    "newestResult": "نوێترین ئەنجام"
   },
   "transcriptionModel": {
     "title": "مۆدێلی گۆڕینی دەنگ بۆ دەق",
@@ -3180,15 +3192,7 @@
     "remoteOptionTitle": "کۆمپیوتەرەکەت",
     "remoteOptionBody": "Kilo لەسەر ئامێری خۆتدا بە ڕێگای CLI ی `kilo remote` جێبەجێ بکە.",
     "skip": "گەشتەکە دەربپەڕێ",
-    "tutorialLabel": "فێربوون",
-    "remoteTitle": "یەکەم دانیشتنی دوورەکەت دەست پێبکە",
-    "remoteBody": "کۆمپیوتەرەکەت پەیوەست بکە، پاشان دانیشتنەکە لێرەوە دەست پێبکە.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "هێشتا کۆمپیوتەرێک پەیوەست نەبووە",
-    "remoteEmptyBody": "بۆ پەیوەستکردنی، `kilo remote` لە کۆمپیوتەرەکەتدا جێبەجێ بکە.",
-    "remoteFound": "کۆمپیوتەر پەیوەست بوو",
-    "checkAgain": "دووبارە پشکنین بکە",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "فێربوون"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "کردنەوەی دوایین دانیشتن"
+  },
+  "spendAlerts": {
+    "subtitle": "کاتێک خەرجی ئەم بووارە تێپەڕی سنوورێک بکات یان لە ڕێژەی کاتژمێری ئاساییدا بەرز ببێتەوە، ئاگادارکردنەوەیەک بە ئیمەیڵ یان پاڵنەر بۆ پەیوەندییەکانی پارەدان بنێرە.",
+    "enable": "چالاککردنی ئاگادارکردنەوەکانی خەرجی",
+    "thresholdTitle": "تێپەڕینی سنوور",
+    "thresholdSubtitle": "خەرجی جاری لە سنوورەکەت تێدەپەڕێت",
+    "anomalyTitle": "بەرزبوونەوەی کاتژمێری",
+    "anomalySubtitle": "یەک کاتژمێر زۆر لە ڕێژەی ئاسایی ئەم بووارە بەرزترە",
+    "limitLabel": "سنوور (USD)",
+    "windowLabel": "ماوە",
+    "window24h": "24 کاتژمێر",
+    "window7d": "7 ڕۆژ",
+    "window30d": "30 ڕۆژ",
+    "multiplierLabel": "لێکدەری بەرزبوونەوە",
+    "saved": "ڕێکخستنەکانی ئاگادارکردنەوەی خەرجی پاشەکەوتکران",
+    "loadError": "ئاگادارکردنەوەکانی خەرجی بار نەکران.",
+    "saveError": "ئاگادارکردنەوەکانی خەرجی پاشەکەوت نەکران.",
+    "empty": "ئاگادارکردنەوەکانی خەرجی ناچالاکن. چالاکیان بکە بۆ ئاگادارکردنی پەیوەندییەکانی پارەدانی ئەم بووارە.",
+    "noSpend": "هێشتا هیچ خەرجییەک تۆمار نەکراوە",
+    "spend24h": "خەرجی لە 24 کاتژمێری ڕابردوودا",
+    "multiplierError": "لێکدەرێکی 1 یان زیاتر بنووسە",
+    "permissionDenied": "مۆڵەتی بەڕێوەبردنی ئاگادارکردنەوەکانی خەرجیت نییە.",
+    "pushOffByCategory": "لە ئاگادارکردنەوەکاندا ناچالاکە"
   }
 }

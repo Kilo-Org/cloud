@@ -37,11 +37,9 @@ export function ModelPickerContent() {
   // The input stays urgent; the list derivation and its rows trail behind so a
   // typing burst on a large catalog does not filter/reconcile on every key.
   const deferredSearch = useDeferredValue(search);
-  // The TextInput stays uncontrolled (iOS text rules), so the visible text is
-  // cleared imperatively and `search` alone drives the in-field control's
-  // visibility.
+  // The input remains uncontrolled (iOS TextInput rules), so the in-field X
+  // clears the native text imperatively and `search` stays the rows' source.
   const searchInputRef = useRef<TextInput>(null);
-  const hasSearchText = search.length > 0;
   const [bridge, setBridge] = useState(() => modelPickerSlot.get(routeKey));
   const [selectedModel, setSelectedModel] = useState(bridge?.currentValue ?? '');
   const [selectedVariant, setSelectedVariant] = useState(bridge?.currentVariant ?? '');
@@ -69,6 +67,7 @@ export function ModelPickerContent() {
       setSelectedModel(nextModel);
       setSelectedVariant(nextVariant);
       setSearch('');
+      searchInputRef.current?.clear();
 
       return () => {
         if (closePickerTimerRef.current) {
@@ -192,7 +191,9 @@ export function ModelPickerContent() {
               className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
               onChangeText={setSearch}
             />
-            {hasSearchText ? (
+            {/* In-field clear, on every platform: `clearButtonMode` is iOS
+                only, so Android rendered the query with no way to reset it. */}
+            {search.length > 0 ? (
               <Pressable
                 onPress={handleClearSearch}
                 accessibilityLabel={t('common.clearSearch')}

@@ -137,6 +137,39 @@ describe('FixedPartRow mounted', () => {
     expect(findHost(renderer.root, 'ActivityIndicator')).toHaveLength(1);
   });
 
+  it('pins the loading spinner to the status-icon square so the row height is status-independent', async () => {
+    const renderer = await renderRow({
+      icon: Eye,
+      label: 'bash',
+      status: 'running',
+      accessibilityLabel: 'bash tool, running',
+    });
+
+    const spinner = findHost(renderer.root, 'ActivityIndicator')[0];
+    expect(spinner).toBeDefined();
+    if (!spinner) {
+      throw new Error('activity indicator not found');
+    }
+    // RN's small spinner is 20x20 while the status icons are 16x16. Without the
+    // fixed square the spinner sizes the row and the transcript row is ~2.5dp
+    // taller while a tool runs than after it resolves. The spinner must render
+    // inside the same 16x16 slot the completed/error icons occupy.
+    const slot = spinner.parent;
+    expect(slot?.type).toBe('View');
+    expect(slot?.props.className).toContain('size-[16px]');
+    expect(slot?.props.className).toContain('items-center');
+    expect(slot?.props.className).toContain('justify-center');
+
+    const completed = await renderRow({
+      icon: Eye,
+      label: 'bash',
+      status: 'completed',
+      accessibilityLabel: 'bash tool, completed',
+    });
+    const completedIcon = findHost(completed.root, 'Eye')[0];
+    expect(completedIcon?.props.size).toBe(16);
+  });
+
   it('renders the completed icon when status is completed and an icon is provided', async () => {
     const renderer = await renderRow({
       icon: Eye,

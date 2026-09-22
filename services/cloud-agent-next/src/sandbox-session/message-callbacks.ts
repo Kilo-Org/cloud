@@ -203,6 +203,7 @@ export function createMessageCallbacks(
         lastSeenBranch: metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName,
         kiloSessionId,
         lastAssistantMessageText,
+        ...(message.gateResult !== undefined ? { gateResult: message.gateResult } : {}),
         idempotencyKey: message.messageId,
       },
     };

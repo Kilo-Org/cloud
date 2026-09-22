@@ -43,10 +43,36 @@ vi.mock('react', async () => {
 
 // ── react-native ───────────────────────────────────────────────────
 const platformState = vi.hoisted(() => ({ OS: 'android' }));
+// The composer-reveal hook arms the did-events through Keyboard.addListener;
+// the captured subscribers let the repro fire `keyboardDidShow` directly.
+const keyboardSubscribers = vi.hoisted(() => ({
+  show: null as (() => void) | null,
+  hide: null as (() => void) | null,
+}));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  Keyboard: {
+    addListener: vi.fn((event: string, listener: () => void) => {
+      const remove = (): void => {
+        if (event === 'keyboardDidShow') {
+          keyboardSubscribers.show = null;
+        }
+        if (event === 'keyboardDidHide') {
+          keyboardSubscribers.hide = null;
+        }
+      };
+      if (event === 'keyboardDidShow') {
+        keyboardSubscribers.show = listener;
+      }
+      if (event === 'keyboardDidHide') {
+        keyboardSubscribers.hide = listener;
+      }
+      return { remove };
+    }),
+  },
   Platform: platformState,
   ScrollView: 'ScrollView',
   View: 'View',
@@ -95,9 +121,22 @@ vi.mock('@/components/ui/button', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
+// `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
+// import cannot resolve in the pure project; every sibling pure spec mocks it.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+
 vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
+
+// The profile row and the environment row both render a loading `Skeleton`,
+// whose module imports `react-native-reanimated`: this pure suite does not set
+// Reanimated up, and this project runs in plain Node, where the
+// Reanimated/worklets native entry cannot resolve (the published worklets
+// build uses bundler-style extensionless imports). The stub is the type the
+// pending-environment case asserts by name; its own rendering is not under test
+// here.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({
   Text: ({ children }: { children?: unknown }) => children,
@@ -154,20 +193,43 @@ function findElementByType(node: Node, typeName: string): Record<string, unknown
   return null;
 }
 
-/** Height of the first node carrying an explicit `style.height` (the clearance spacer). */
-function findElementHeight(node: Node): number | null {
+function findElement(node: Node, typeName: string): Record<string, unknown> | null {
   if (node === null || typeof node !== 'object') {
     return null;
   }
   const props = node.props ?? {};
-  const style = props.style as { height?: unknown } | undefined;
-  if (typeof style?.height === 'number') {
-    return style.height;
+  const children = props.children;
+  const type = (node as { type?: unknown }).type;
+  if (type === typeName) {
+    return node;
+  }
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const found = findElement(child as Node, typeName);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+/** The first node below the ScrollView carrying an `onLayout` (the composer wrapper). */
+function findOnLayoutHandler(
+  node: Node
+): ((event: { nativeEvent: { layout: { y: number; height: number } } }) => void) | null {
+  if (node === null || typeof node !== 'object') {
+    return null;
+  }
+  const props = node.props ?? {};
+  const type = (node as { type?: unknown }).type;
+  if (type !== 'ScrollView' && typeof props.onLayout === 'function') {
+    return props.onLayout as (event: {
+      nativeEvent: { layout: { y: number; height: number } };
+    }) => void;
   }
   const children = props.children;
   for (const child of Array.isArray(children) ? children : [children]) {
-    const found = findElementHeight(child as Node);
-    if (found !== null) {
+    const found = findOnLayoutHandler(child as Node);
+    if (found) {
       return found;
     }
   }
@@ -280,7 +342,7 @@ describe('NewSessionConfigureForm', () => {
   });
 
   it.each(['android', 'ios'] as const)(
-    'floors the scroll body at the safe-area bottom and lifts it above the IME on %s',
+    'clears the navigation bar at the screen root and lifts the body above the IME on %s',
     async os => {
       platformState.OS = os;
       insetsState.bottom = 42;
@@ -290,6 +352,8 @@ describe('NewSessionConfigureForm', () => {
         // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
         const element = NewSessionConfigureForm({ ...defaultProps() }) as Node;
 
+        // The root pads by the safe-area inset, so the pinned Start footer
+        // (its child) can never render inside the navigation bar's region.
         expect(findElementByType(element, 'View')?.style).toEqual({ paddingBottom: 42 });
         // Neither platform resizes the window for the IME, so the body sits
         // inside a keyboard-lift view that adds the IME height on top of the
@@ -301,6 +365,61 @@ describe('NewSessionConfigureForm', () => {
       }
     }
   );
+
+  // ── The primary action is pinned below the scroll body, never inside it ──
+  it('keeps the Start action out of the scroll body so the bottom bar cannot clip it', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    insetsState.bottom = 44;
+    try {
+      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+      const element = NewSessionConfigureForm({ ...defaultProps() }) as Node;
+
+      // The form is taller than a short screen: a Start button in this content
+      // sits below the visible viewport, leaving only the top of the control
+      // showing above the navigation bar (the device capture).
+      const scrollBody = findElement(element, 'ScrollView');
+      expect(scrollBody).not.toBeNull();
+      expect(findElementByType(scrollBody, 'NewSessionStartButton')).toBeNull();
+
+      // It renders in the footer instead: a sibling of the body inside the
+      // keyboard-lift view, so it is always on screen and the IME lifts it.
+      const liftView = findElement(element, 'AppAwareKeyboardPaddingView');
+      expect(liftView).not.toBeNull();
+      expect(findElementByType(liftView, 'ScrollView')).not.toBeNull();
+      expect(findElementByType(liftView, 'NewSessionStartButton')).not.toBeNull();
+
+      // Below the body, not above it: the pinned bottom bar.
+      const liftChildren = (liftView?.props as { children?: Node[] } | undefined)?.children ?? [];
+      const bodyIndex = liftChildren.findIndex(
+        child => (child as { type?: unknown } | undefined)?.type === 'ScrollView'
+      );
+      const footerIndex = liftChildren.findIndex(
+        child => findElementByType(child, 'NewSessionStartButton') !== null
+      );
+      expect(bodyIndex).toBeGreaterThanOrEqual(0);
+      expect(footerIndex).toBeGreaterThan(bodyIndex);
+    } finally {
+      insetsState.bottom = 0;
+    }
+  });
+
+  it('keeps the cloud-create failure with the Start action it answers', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      cloudCreateError: { retryable: true, message: 'prepare failed' },
+    }) as Node;
+
+    const scrollBody = findElement(element, 'ScrollView');
+    expect(scrollBody).not.toBeNull();
+    // A failure the user answers at the pinned Start must not end up scrolled
+    // off screen above it.
+    expect(findElementByType(scrollBody, 'NewSessionCloudCreateError')).toBeNull();
+    expect(findElementByType(element, 'NewSessionCloudCreateError')).not.toBeNull();
+  });
 
   // ── Case 1: Cloud, selector shown ──
   it('renders prompt, repo, and the run-target block when cloud target with selector shown', async () => {
@@ -616,7 +735,7 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Retry')).toBe(true);
   });
 
-  it('hides the environment row while the profile query is loading', async () => {
+  it('explains the pending environment request without hiding the form or showing a default', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -624,10 +743,15 @@ describe('NewSessionConfigureForm', () => {
       ...defaultProps(),
       runOnInstance: null,
       isProfileLoading: true,
+      isStartDisabled: true,
     }) as Node;
 
-    expect(findTextContent(element, t => t === 'Environment')).toBe(false);
+    expect(findTextContent(element, t => t === 'Environment')).toBe(true);
+    expect(findTextContent(element, t => t === 'Loading…')).toBe(true);
     expect(findTextContent(element, t => t === 'Default environment')).toBe(false);
+    expect(findElementByType(element, 'Skeleton')).not.toBeNull();
+    expect(findElementByType(element, 'NewSessionPrompt')?.isCreating).toBe(false);
+    expect(findElementByType(element, 'NewSessionStartButton')?.isStartDisabled).toBe(true);
   });
 
   it('does not render the environment row for a remote target', async () => {
@@ -711,6 +835,9 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(cloud, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    // The help draws the commands as prose: the authoring markers must not
+    // reach the screen.
+    expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const remote = NewSessionConfigureForm({
@@ -721,25 +848,10 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(remote, t => t.includes('kilo remote') && t.includes('/remote'))).toBe(
       true
     );
+    expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 
-  // ── Case 14: bottom navigation-bar clearance ──
-  it('reserves the bottom safe-area inset so the Start action clears the navigation bar', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    insetsState.bottom = 44;
-    try {
-      // The inset is 44; the helper floors at 16 and adds 16.
-      // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-      const element = NewSessionConfigureForm(defaultProps()) as Node;
-
-      expect(findElementHeight(element)).toBe(60);
-    } finally {
-      insetsState.bottom = 0;
-    }
-  });
-
-  // ── Case 13: reorder wiring lock ──
+  // ── Case 14: reorder wiring lock ──
   it('wires onMoveAttachment and onReorderAttachments through to NewSessionPrompt', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
@@ -781,5 +893,64 @@ describe('NewSessionConfigureForm', () => {
       cloudCreateError,
     }) as Node;
     expect(findElementByType(remote, 'NewSessionCloudCreateError')).toBeNull();
+  });
+
+  // ── Case 16: reveal the composer card's bottom row above the IME ──
+  it('scrolls the composer card bottom above the keyboard once it opens', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm(defaultProps()) as Node;
+
+    const scrollView = findElementByType(element, 'ScrollView');
+    if (!scrollView) {
+      throw new Error('expected the form to render a ScrollView');
+    }
+    const scrollTo = vi.fn();
+    // The hook's ScrollView ref is the reveal's target; the plain-function
+    // mount leaves it on the element props (ref is a regular prop in React 19).
+    (scrollView.ref as { current: unknown }).current = { scrollTo };
+
+    // The keyboard-lift view shrinks the scroll viewport once the IME is up.
+    (scrollView.onLayout as (event: unknown) => void)({
+      nativeEvent: { layout: { height: 380 } },
+    });
+
+    // The composer card sits 16pt below the content top and is 420pt tall, so
+    // its bottom edge is 56pt below the lifted viewport bottom.
+    const onComposerLayout = findOnLayoutHandler(element);
+    if (!onComposerLayout) {
+      throw new Error('expected the composer wrapper to carry an onLayout');
+    }
+    onComposerLayout({ nativeEvent: { layout: { y: 16, height: 420 } } });
+
+    // Nothing moves while the keyboard is down — the keyboard-down state is untouched.
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    keyboardSubscribers.show?.();
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenCalledWith({ y: 56, animated: false });
+  });
+
+  // ── Case 17: the restore needs the user's live offset ──
+  it('feeds the ScrollView onScroll into the composer reveal', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm(defaultProps()) as Node;
+
+    const scrollView = findElementByType(element, 'ScrollView');
+    if (!scrollView) {
+      throw new Error('expected the form to render a ScrollView');
+    }
+    // Dropping either wiring would silently disable the keyboard-hide restore.
+    expect(typeof scrollView.onScroll).toBe('function');
+    expect(scrollView.scrollEventThrottle).toBe(16);
+
+    // The handler is the hook's `onScroll`: it must forward the native offset.
+    const onScroll = scrollView.onScroll as (event: unknown) => void;
+    expect(() => {
+      onScroll({ nativeEvent: { contentOffset: { y: 120 } } });
+    }).not.toThrow();
   });
 });

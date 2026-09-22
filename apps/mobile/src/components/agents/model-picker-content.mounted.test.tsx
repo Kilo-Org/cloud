@@ -85,8 +85,8 @@ const flatListMock = vi.hoisted(
 
 vi.mock('react-native', () => ({
   FlatList: flatListMock,
-  TextInput: 'TextInput',
   Pressable: 'Pressable',
+  TextInput: 'TextInput',
   View: 'View',
 }));
 vi.mock('expo-router', () => ({
@@ -191,6 +191,17 @@ function searchInput(renderer: TestRenderer.ReactTestRenderer): TestRenderer.Rea
     throw new Error('search input not found');
   }
   return input;
+}
+
+/**
+ * The in-field clear affordance, found by the label the Agents search field
+ * also uses. It must exist on both platforms: `clearButtonMode` is iOS-only,
+ * so Android previously rendered the query with no way to clear it.
+ */
+function clearSearchButtons(
+  renderer: TestRenderer.ReactTestRenderer
+): TestRenderer.ReactTestInstance[] {
+  return renderer.root.findAll(node => node.props.accessibilityLabel === 'Clear search');
 }
 
 /** Drive the uncontrolled TextInput's handler the way a keystroke would. */
@@ -327,37 +338,6 @@ describe('ModelPickerContent deferred search', () => {
     });
   });
 
-  it('shows an in-field clear control while a query is typed, and clears it', async () => {
-    const renderer = await mount();
-
-    // Nothing typed: no clear control, and no clear CTA on the catalog body.
-    expect(findByType(renderer.root, 'Pressable')).toHaveLength(0);
-
-    await act(async () => {
-      typeSearch(renderer, 'no-such-model-xyz');
-      await Promise.resolve();
-    });
-
-    const clearControls = findByType(renderer.root, 'Pressable');
-    expect(clearControls).toHaveLength(1);
-
-    await act(async () => {
-      /* eslint-disable typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
-      expect(clearControls[0]?.props.accessibilityLabel).toBe('Clear search');
-      clearControls[0]?.props.onPress();
-      /* eslint-enable typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access */
-      await Promise.resolve();
-    });
-
-    // The control disappears with the query and the full list is back.
-    expect(findByType(renderer.root, 'Pressable')).toHaveLength(0);
-    expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
-
-    act(() => {
-      renderer.unmount();
-    });
-  });
-
   it('does not offer a clear action when the catalog itself is empty', async () => {
     slotState.bridge = { ...makeBridge(), options: [] };
     const renderer = await mount();
@@ -368,6 +348,37 @@ describe('ModelPickerContent deferred search', () => {
     expect(emptyState[0]?.props.action).toBeUndefined();
     /* eslint-enable typescript-eslint/no-unsafe-member-access */
     expect(findByType(renderer.root, 'Button')).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('offers an in-field clear affordance that resets the query', async () => {
+    const renderer = await mount();
+
+    // Nothing typed: no clear affordance, matching the Agents search field.
+    expect(clearSearchButtons(renderer)).toHaveLength(0);
+
+    await act(async () => {
+      typeSearch(renderer, FINAL_QUERY);
+      await Promise.resolve();
+    });
+
+    expect(listedDisplayIds(renderer)).toHaveLength(FINAL_MATCH_COUNT);
+    const [clear] = clearSearchButtons(renderer);
+    if (!clear) {
+      throw new Error('clear affordance not found');
+    }
+
+    await act(async () => {
+      (clear.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    // Clearing drops the query the rows derive from and hides the affordance.
+    expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
+    expect(clearSearchButtons(renderer)).toHaveLength(0);
 
     act(() => {
       renderer.unmount();

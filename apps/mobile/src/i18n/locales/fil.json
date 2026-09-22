@@ -827,7 +827,8 @@
       "chat": "Mga mensahe sa usapan",
       "kiloclaw": "Aktibidad ng KiloClaw",
       "balance": "Mga babala sa balanse",
-      "security": "Mga natukoy na isyu sa seguridad"
+      "security": "Mga natukoy na isyu sa seguridad",
+      "spend": "Mga babala sa gastos"
     },
     "category": {
       "chatMessagesSubtitle": "mga tugon sa iyong mga pag-uusap",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Status ng sesyon",
       "sessionStatusSubtitle": "tapos / nabigo / handa nang kontrolin",
       "kiloclawActivitySubtitle": "handa o nabigo ang instance, mga nakaiskedyul na aksyon",
+      "kiloclawActivityUnavailable": "Magsimula ng instance ng KiloClaw para makakuha ng aktibidad ng KiloClaw.",
       "balanceAlertsSubtitle": "mga babala sa mababang balanse ng organisasyon",
-      "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA"
+      "balanceAlertsUnavailable": "Sumali sa isang organisasyon para makakuha ng mga babala sa mababang balanse.",
+      "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA",
+      "securityFindingsUnavailable": "Paganahin ang Kilo security agent sa isang saklaw para makakuha ng mga natukoy na isyu sa seguridad.",
+      "spendAlertsSubtitle": "mga paglampas sa hangganan at pagtaas bawat oras",
+      "spendAlertsToggle": "Kategorya ng mga babala sa gastos"
     },
     "action": {
       "openSession": "Buksan ang sesyon"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Hindi ma-load ang sesyon.",
       "failedToLoadDetails": "Hindi ma-load ang mga detalye ng sesyon.",
       "failedToStopExecution": "Hindi maihinto ang pagpapatakbo.",
+      "stopped": "Huminto ang sesyon",
+      "committing": "Nagko-commit…",
+      "committed": "Na-commit",
+      "commitFailed": "Nabigo ang pag-commit",
       "renameSession": "Palitan ang pangalan ng sesyon",
       "renamePlaceholder": "Pangalan ng sesyon",
       "transcriptAccessibility": "Tala ng pag-uusap sa sesyon",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} na linya",
       "linesBadge_other": "{{displayCount}} na linya",
       "matchesBadge_one": "{{displayCount}} tugma",
-      "matchesBadge_other": "{{displayCount}} tugma"
+      "matchesBadge_other": "{{displayCount}} tugma",
+      "noOutput": "Walang output."
     },
     "readToolMarkdown": {
       "linesTruncated": "mga linyang {{start}}–{{end}} (pinaikli)",
@@ -3155,7 +3166,8 @@
     "channelName": "Mga aktibong agent",
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
     "openSession": "Buksan",
-    "approveFailed": "Hindi maaprubahan. I-tap ang $t(common.approve) para subukang muli."
+    "approveFailed": "Hindi maaprubahan. I-tap ang $t(common.approve) para subukang muli.",
+    "newestResult": "Pinakabagong resulta"
   },
   "transcriptionModel": {
     "title": "Modelo para sa pagsasalin ng boses sa teksto",
@@ -3180,15 +3192,7 @@
     "remoteOptionTitle": "Iyong computer",
     "remoteOptionBody": "Patakbuhin ang Kilo sa iyong sariling machine gamit ang `kilo remote` CLI.",
     "skip": "Laktawan ang tour",
-    "tutorialLabel": "Tutorial",
-    "remoteTitle": "Simulan ang iyong unang remote session",
-    "remoteBody": "Ikonekta ang iyong computer, pagkatapos simulan ang sesyon mula rito.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Walang konektadong computer pa",
-    "remoteEmptyBody": "Para ikonekta ito, patakbuhin ang `kilo remote` sa iyong computer.",
-    "remoteFound": "Konektado ang computer",
-    "checkAgain": "Tingnan muli",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Tutorial"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Buksan ang huling sesyon"
+  },
+  "spendAlerts": {
+    "subtitle": "Magpadala ng babala sa email o push sa mga contact sa pagsingil kapag ang gastos ng saklaw na ito ay lumampas sa limitasyon o tumaas nang higit sa karaniwang rate bawat oras.",
+    "enable": "Paganahin ang mga babala sa gastos",
+    "thresholdTitle": "Paglampas sa hangganan",
+    "thresholdSubtitle": "Ang kasalukuyang gastos ay lumampas sa iyong limitasyon",
+    "anomalyTitle": "Pagtaas bawat oras",
+    "anomalySubtitle": "Ang isang oras ay malayo sa itaas ng karaniwang rate ng saklaw na ito",
+    "limitLabel": "Limitasyon (USD)",
+    "windowLabel": "Panahon",
+    "window24h": "24 na oras",
+    "window7d": "7 araw",
+    "window30d": "30 araw",
+    "multiplierLabel": "Multiplier ng pagtaas",
+    "saved": "Nai-save ang mga setting ng babala sa gastos",
+    "loadError": "Hindi ma-load ang mga babala sa gastos.",
+    "saveError": "Hindi mai-save ang mga babala sa gastos.",
+    "empty": "Naka-off ang mga babala sa gastos. I-on ang mga ito para abisuhan ang mga contact sa pagsingil ng saklaw na ito.",
+    "noSpend": "Wala pang naitalang gastos",
+    "spend24h": "Gastos sa nakalipas na 24 na oras",
+    "multiplierError": "Maglagay ng multiplier na 1 o higit pa",
+    "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa gastos.",
+    "pushOffByCategory": "Naka-off sa Mga abiso"
   }
 }

@@ -40,6 +40,7 @@ import {
   invalidPathResponse,
   invalidRequestResponse,
   malformedJsonResponse,
+  invalidTokenResponse,
   makeErrorReadable,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
@@ -112,8 +113,19 @@ import {
 } from '@/lib/organizations/effective-model-access.server';
 import { isFableModel, isOpus5Model } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { CLAUDE_OPUS_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 export const maxDuration = 800;
+
+/**
+ * The shared gateway/openrouter handler, wrapped so each call emits one
+ * `api_timing` line. The gateway catch-all imports this wrapped handler and
+ * wraps it again with the gateway pattern; the prefix check in
+ * `withRestTiming` keeps this inner line silent for a gateway pathname.
+ */
+export const POST = withRestTiming('/api/openrouter/[...path]', (request: Request) =>
+  openRouterPost(request as NextRequest)
+);
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -171,7 +183,7 @@ async function resolveRateLimit(
   };
 }
 
-export async function POST(request: NextRequest): Promise<NextResponseType<unknown>> {
+async function openRouterPost(request: NextRequest): Promise<NextResponseType<unknown>> {
   const requestStartedAt = performance.now();
 
   const url = new URL(request.url);
@@ -458,6 +470,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   const {
     user: maybeUser,
     authFailedResponse,
+    credentialsRejected,
     organizationId: authOrganizationId,
     botId: authBotId,
     tokenSource: authTokenSource,
@@ -470,6 +483,15 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let tokenSource: string | undefined = authTokenSource;
 
   if (authFailedResponse) {
+    // A caller that presented a credential we could not verify is not the same
+    // as a caller that presented none. Answering for it as anonymous would
+    // silently drop its account, organization, BYOK keys and credits, and would
+    // hide from the client that its stored token is broken. Fail the request so
+    // the client re-authenticates.
+    if (credentialsRejected) {
+      return invalidTokenResponse();
+    }
+
     // No valid auth
     if (!(await isFreeModel(effectiveModelIdLowerCased))) {
       // Paid model requires authentication

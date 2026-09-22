@@ -827,7 +827,8 @@
       "chat": "ჩატის შეტყობინებები",
       "kiloclaw": "KiloClaw-ის აქტივობა",
       "balance": "ბალანსის შესახებ გაფრთხილებები",
-      "security": "უსაფრთხოების პრობლემები"
+      "security": "უსაფრთხოების პრობლემები",
+      "spend": "ხარჯვის შეტყობინებები"
     },
     "category": {
       "chatMessagesSubtitle": "პასუხები თქვენს საუბრებში",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "სესიის სტატუსი",
       "sessionStatusSubtitle": "დასრულდა / ჩაიშალა / სამართავად მზადაა",
       "kiloclawActivitySubtitle": "ინსტანცია მზადაა / ჩაიშალა, დაგეგმილი მოქმედებები",
+      "kiloclawActivityUnavailable": "გაუშვი KiloClaw-ის ინსტანცია, რომ მიიღო KiloClaw-ის აქტივობა.",
       "balanceAlertsSubtitle": "ორგანიზაციის დაბალი ბალანსის გაფრთხილებები",
-      "securityFindingsSubtitle": "ახლად აღმოჩენილი პრობლემები და SLA-ის შეხსენებები"
+      "balanceAlertsUnavailable": "შეუერთდი ორგანიზაციას, რომ მიიღო დაბალი ბალანსის გაფრთხილებები.",
+      "securityFindingsSubtitle": "ახლად აღმოჩენილი პრობლემები და SLA-ის შეხსენებები",
+      "securityFindingsUnavailable": "ჩართე Kilo-ს უსაფრთხოების აგენტი სფეროში, რომ მიიღო უსაფრთხოების პრობლემები.",
+      "spendAlertsSubtitle": "ზღვრების გადაცილება და საათობრივი ნახტომები",
+      "spendAlertsToggle": "ხარჯვის შეტყობინებების კატეგორია"
     },
     "action": {
       "openSession": "სესიის გახსნა"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "სესიის ჩატვირთვა ვერ მოხერხდა.",
       "failedToLoadDetails": "სესიის დეტალების ჩატვირთვა ვერ მოხერხდა.",
       "failedToStopExecution": "შესრულების შეჩერება ვერ მოხერხდა.",
+      "stopped": "სესია შეჩერდა",
+      "committing": "მიმდინარეობს კომიტი…",
+      "committed": "კომიტი შესრულდა",
+      "commitFailed": "კომიტი ვერ შესრულდა",
       "renameSession": "სესიის სახელის შეცვლა",
       "renamePlaceholder": "სესიის სახელი",
       "transcriptAccessibility": "სესიის ჩანაწერი",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} სტრიქონი",
       "linesBadge_other": "{{displayCount}} სტრიქონი",
       "matchesBadge_one": "{{displayCount}} დამთხვევა",
-      "matchesBadge_other": "{{displayCount}} დამთხვევა"
+      "matchesBadge_other": "{{displayCount}} დამთხვევა",
+      "noOutput": "გამოსავალი არ არის."
     },
     "readToolMarkdown": {
       "linesTruncated": "სტრიქონები {{start}}–{{end}} (შემოკლებულია)",
@@ -3155,7 +3166,8 @@
     "channelName": "აქტიური აგენტები",
     "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები.",
     "openSession": "გახსენი",
-    "approveFailed": "დამტკიცება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ $t(common.approve)-ს."
+    "approveFailed": "დამტკიცება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ $t(common.approve)-ს.",
+    "newestResult": "უახლესი შედეგი"
   },
   "transcriptionModel": {
     "title": "ტრანსკრიფციის მოდელი",
@@ -3180,15 +3192,7 @@
     "remoteOptionTitle": "თქვენი კომპიუტერი",
     "remoteOptionBody": "გაუშვით Kilo თქვენს საკუთარ მანქანაზე `kilo remote` CLI-ს საშუალებით.",
     "skip": "ტურის გამოტოვება",
-    "tutorialLabel": "სასწავლო",
-    "remoteTitle": "დაიწყეთ თქვენი პირველი დაშორებული სესია",
-    "remoteBody": "მიავლეთ თქვენს კომპიუტერს და შემდეგ აქედან დაიწყეთ სესია.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "ჯერ კომპიუტერი არ არის მიერთებული",
-    "remoteEmptyBody": "დასამაგრებლად, გაუშვით `kilo remote` თქვენს კომპიუტერზე.",
-    "remoteFound": "კომპიუტერი მიერთებულია",
-    "checkAgain": "ხელახლა შემოწმება",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "სასწავლო"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "ბოლო სესიის გახსნა"
+  },
+  "spendAlerts": {
+    "subtitle": "გაუგზავნე შეტყობინება ელფოსტით ან push-ით ბილინგის კონტაქტებს, როცა ამ სფეროს ხარჯვა გადააჭარბებს ლიმიტს ან ავა მის ჩვეულ საათობრივ ტემპს.",
+    "enable": "ხარჯვის შეტყობინებების ჩართვა",
+    "thresholdTitle": "ზღვრის გადაცილება",
+    "thresholdSubtitle": "მიმდინარე ხარჯვა აჭარბებს შენს ლიმიტს",
+    "anomalyTitle": "საათობრივი ნახტომი",
+    "anomalySubtitle": "ერთი საათი ბევრად აღემატება ამ სფეროს ჩვეულ ტემპს",
+    "limitLabel": "ლიმიტი (USD)",
+    "windowLabel": "ფანჯარა",
+    "window24h": "24 საათი",
+    "window7d": "7 დღე",
+    "window30d": "30 დღე",
+    "multiplierLabel": "ნახტომის მამრავლი",
+    "saved": "ხარჯვის შეტყობინების პარამეტრები შენახულია",
+    "loadError": "ხარჯვის შეტყობინებები ვერ ჩაიტვირთა.",
+    "saveError": "ხარჯვის შეტყობინებები ვერ შეინახა.",
+    "empty": "ხარჯვის შეტყობინებები გამორთულია. ჩართე ისინი ამ სფეროს ბილინგის კონტაქტების გასაფრთხილებლად.",
+    "noSpend": "ხარჯვა ჯერ არ არის დაფიქსირებული",
+    "spend24h": "ხარჯვა ბოლო 24 საათში",
+    "multiplierError": "შეიყვანე 1 ან მეტი მამრავლი",
+    "permissionDenied": "ხარჯვის შეტყობინებების მართვის უფლება არ გაქვთ.",
+    "pushOffByCategory": "გამორთულია შეტყობინებებში"
   }
 }

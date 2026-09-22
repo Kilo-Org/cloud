@@ -29,20 +29,19 @@ export const TemporarilyBlockedModelAccessInputSchema = z.object({
 });
 
 export async function getTemporarilyBlockedModelAccessConfig() {
-  const raw = await redisClient.get<string>(TEMPORARILY_BLOCKED_MODEL_ACCESS_REDIS_KEY);
-  if (!raw) return DEFAULT_TEMPORARILY_BLOCKED_MODEL_ACCESS_CONFIG;
-  return TemporarilyBlockedModelAccessConfigSchema.parse(JSON.parse(raw));
+  try {
+    const raw = await redisClient.get<string>(TEMPORARILY_BLOCKED_MODEL_ACCESS_REDIS_KEY);
+    if (!raw) return DEFAULT_TEMPORARILY_BLOCKED_MODEL_ACCESS_CONFIG;
+    return TemporarilyBlockedModelAccessConfigSchema.parse(JSON.parse(raw));
+  } catch {
+    return DEFAULT_TEMPORARILY_BLOCKED_MODEL_ACCESS_CONFIG;
+  }
 }
 
 export async function isTemporarilyBlockedModelAllowedForOrganization(
   organizationId: string | undefined
 ) {
   if (!organizationId) return false;
-
-  try {
-    const config = await getTemporarilyBlockedModelAccessConfig();
-    return config.organization_ids.includes(organizationId.toLowerCase());
-  } catch {
-    return false;
-  }
+  const config = await getTemporarilyBlockedModelAccessConfig();
+  return config.organization_ids.includes(organizationId.toLowerCase());
 }

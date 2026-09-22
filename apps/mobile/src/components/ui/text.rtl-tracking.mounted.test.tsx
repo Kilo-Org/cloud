@@ -100,7 +100,10 @@ describe('Text tracked labels in RTL', () => {
 
   it('applies the same reset to the shared Eyebrow label', () => {
     i18nManager.isRTL = true;
-    const root = mount(createElement(Eyebrow, null, 'استكشف'));
+    // The eyebrow variant drops its own Latin display classes in RTL
+    // (text.mounted.test.tsx), so the tracked class here is the caller's: a
+    // tracked eyebrow label must keep it and still get the reset.
+    const root = mount(createElement(Eyebrow, { className: 'tracking-[1.5px]' }, 'استكشف'));
 
     expect(hostText(root).props.className as string).toContain('tracking-[1.5px]');
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);

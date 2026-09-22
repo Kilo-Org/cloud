@@ -53,6 +53,27 @@ describe('buildLiveFilterOptions', () => {
     ]);
   });
 
+  it('merges repositories that render to one label into a single option', () => {
+    const ssh = {
+      id: 'ssh',
+      title: 'ssh clone',
+      gitUrl: 'git@github.com:kilo/cloud.git',
+      createdOnPlatform: 'cli',
+    };
+    const https = {
+      id: 'https',
+      title: 'https clone',
+      gitUrl: 'https://github.com/kilo/cloud.git',
+      createdOnPlatform: 'cli',
+    };
+    const { projectOptions } = buildLiveFilterOptions([ssh, https]);
+
+    // First-seen git URL wins, so the option stays stable across renders.
+    expect(projectOptions).toEqual([
+      { gitUrl: 'git@github.com:kilo/cloud.git', displayName: 'kilo/cloud' },
+    ]);
+  });
+
   it('offers only the platform buckets that are live, in canonical order', () => {
     expect(buildLiveFilterOptions([CLI, VSCODE, CLOUD, BARE]).platformOptions).toEqual([
       'cloud-agent',
@@ -96,6 +117,24 @@ describe('filterLiveSessions', () => {
     expect(
       filterLiveSessions(sessions, query({ platformFilter: ['extension'] })).map(s => s.id)
     ).toEqual(['vscode']);
+  });
+
+  it('matches every alias of a merged repository from one stored URL', () => {
+    const aliases = [
+      { id: 'ssh', gitUrl: 'git@github.com:kilo/cloud.git', createdOnPlatform: 'cli' },
+      { id: 'https', gitUrl: 'https://github.com/kilo/cloud.git', createdOnPlatform: 'cli' },
+    ];
+    expect(
+      filterLiveSessions(
+        aliases,
+        query({ projectFilter: ['https://github.com/kilo/cloud.git'] })
+      ).map(s => s.id)
+    ).toEqual(['ssh', 'https']);
+    expect(
+      filterLiveSessions(aliases, query({ projectFilter: ['git@github.com:kilo/cloud.git'] })).map(
+        s => s.id
+      )
+    ).toEqual(['ssh', 'https']);
   });
 
   it('combines every dimension with AND', () => {

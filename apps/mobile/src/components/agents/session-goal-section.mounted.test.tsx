@@ -5,8 +5,11 @@
 // exposes a sibling disclosure pressable whose label and accessibility state
 // follow the state, keeps the tuned top padding, and rotates the chevron with
 // a 200ms timing that the reduced-motion policy turns into an instant jump.
+// The same row carries the trailing control (the PR link) between the goal and
+// the chevron, and renders it alone in the same shell when the goal is absent.
 
 import { type ComponentProps, type ElementType } from 'react';
+import { Pressable } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, type ReactTestInstance, type ReactTestRenderer, TestRenderer } from '@/test/renderer';
@@ -56,12 +59,18 @@ const STATUS_TEXT = 'agentChat.goal.statusPaused';
 const ROW_LABEL = 'agentChat.goal.sectionAccessibility';
 const COLLAPSE_LABEL = 'agentChat.goal.collapse';
 const EXPAND_LABEL = 'agentChat.goal.expand';
+const TRAILING_LABEL = 'pull request';
 
 let mounted: ReactTestRenderer | undefined = undefined;
 const onToggleCollapsed = vi.fn<() => void>();
 
+/** The shared row's trailing control: the PR link the screen passes in. */
+function trailingControl() {
+  return <Pressable accessibilityLabel={TRAILING_LABEL} />;
+}
+
 function mountSection(
-  props: Partial<Omit<ComponentProps<typeof SessionGoalSection>, 'goal'>> = {}
+  props: Partial<ComponentProps<typeof SessionGoalSection>> = {}
 ): ReactTestRenderer {
   act(() => {
     mounted = TestRenderer.create(
@@ -190,6 +199,55 @@ describe('SessionGoalSection disclosure', () => {
     // from assistive technology inside an accessible parent.
     expect(hostAncestor(disclosure(renderer))).toBe(rowContainer(renderer));
     expect(hostAncestor(rowAction(renderer))).toBe(rowContainer(renderer));
+  });
+
+  it('renders the trailing control between the goal and the chevron', () => {
+    const renderer = mountSection({ trailing: trailingControl() });
+
+    const pressables = renderer.root.findAll(node => node.type === ('Pressable' as ElementType));
+    // The goal action, the trailing control, and the disclosure chevron.
+    expect(pressables).toHaveLength(3);
+    expect(pressables.map(node => node.props.accessibilityLabel)).toEqual([
+      ROW_LABEL,
+      TRAILING_LABEL,
+      COLLAPSE_LABEL,
+    ]);
+
+    // The trailing control keeps its own box at the row end, top-aligned.
+    const slot = hostAncestor(renderer.root.findByProps({ accessibilityLabel: TRAILING_LABEL }));
+    expect(String(slot?.props.className)).toContain('shrink-0');
+    expect(String(slot?.props.className)).toContain('self-start');
+    expect(String(slot?.props.className)).toContain('pt-0.5');
+    // `ml-auto` keeps the PR link at the row's trailing edge here too, so the
+    // control does not move between a goal session and a PR-only one.
+    expect(String(slot?.props.className)).toContain('ml-auto');
+    // The goal pressable still owns the tap target for the whole row.
+    expect(
+      String(renderer.root.findByProps({ accessibilityLabel: ROW_LABEL }).props.className)
+    ).toContain('self-stretch');
+  });
+
+  it('renders only the trailing control in the same shell when the goal is absent', () => {
+    const renderer = mountSection({ goal: null, trailing: trailingControl() });
+
+    const pressables = renderer.root.findAll(node => node.type === ('Pressable' as ElementType));
+    expect(pressables).toHaveLength(1);
+    expect(pressables[0]?.props.accessibilityLabel).toBe(TRAILING_LABEL);
+    // No goal text, no chevron, and no goal accessibility state.
+    expect(renderedText(renderer)).toEqual([]);
+    expect(renderer.root.findAll(node => node.props.accessibilityState !== undefined)).toHaveLength(
+      0
+    );
+
+    const row = rowContainer(renderer);
+    expect(row.props.className).toContain('min-h-12');
+    expect(row.props.className).toContain('pt-0.5');
+    expect(row.props.className).toContain('pb-2');
+
+    // The lone PR link takes the same trailing edge it has beside a goal, so
+    // the control does not jump to the row's leading edge on a PR-only session.
+    const slot = hostAncestor(renderer.root.findByProps({ accessibilityLabel: TRAILING_LABEL }));
+    expect(String(slot?.props.className)).toContain('ml-auto');
   });
 
   it('calls onToggleCollapsed from the disclosure pressable', () => {

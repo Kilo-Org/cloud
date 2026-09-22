@@ -1,4 +1,5 @@
 import { type SessionGoal, type SessionGoalStatus } from '@kilocode/cloud-agent-sdk';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -19,11 +20,17 @@ const STATUS_LABEL_KEY = {
 } as const satisfies Record<SessionGoalStatus, string>;
 
 type SessionGoalSectionProps = {
-  goal: SessionGoal;
+  goal: SessionGoal | null;
   /** Collapsed shows the icon and the status only; the parent owns the value. */
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onPress: () => void;
+  /**
+   * Sits at the row end, between the goal pressable and the chevron. The PR
+   * link rides here so the goal status and the pull request share one row;
+   * with no goal the row renders the trailing control alone.
+   */
+  trailing?: ReactNode;
 };
 
 /**
@@ -44,15 +51,36 @@ type SessionGoalSectionProps = {
  * The carat rotation and the height transition are the app's shared disclosure
  * primitives (Reanimated, one implementation on iOS and Android), not a
  * second copy of the animation.
+ *
+ * The row is shared with the pull-request link (`trailing`), which keeps the
+ * header to two rows. With no goal it renders the trailing control in the same
+ * shell without the chevron or the goal accessibility state, so a PR-only
+ * session still reserves the same row height.
  */
 export function SessionGoalSection({
   goal,
   collapsed,
   onToggleCollapsed,
   onPress,
+  trailing,
 }: Readonly<SessionGoalSectionProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+
+  const trailingSlot = trailing ? (
+    <View className="ml-auto shrink-0 self-start pt-0.5">{trailing}</View>
+  ) : null;
+
+  if (!goal) {
+    return (
+      <DisclosureLayout>
+        <View className="min-h-12 flex-row items-start gap-2 border-b border-hair-soft px-4 pt-0.5 pb-2">
+          {trailingSlot}
+        </View>
+      </DisclosureLayout>
+    );
+  }
+
   const isActive = goal.status === 'active';
   const status = t(STATUS_LABEL_KEY[goal.status]);
 
@@ -90,6 +118,7 @@ export function SessionGoalSection({
             )}
           </View>
         </Pressable>
+        {trailingSlot}
         <DisclosureChevron
           expanded={!collapsed}
           label={collapsed ? t('agentChat.goal.expand') : t('agentChat.goal.collapse')}

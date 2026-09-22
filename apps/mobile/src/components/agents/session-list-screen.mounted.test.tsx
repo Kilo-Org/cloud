@@ -1550,6 +1550,21 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(listStyle()).toEqual({ marginBottom: fabBand });
   });
 
+  it('subscribes to the keyboard once for the bands, not once per band consumer', async () => {
+    // Review finding (session-list-screen.tsx:101): the screen called
+    // `useKeyboardOcclusion` directly while `useAgentsBottomBands` already
+    // subscribes to the same events, so every band consumer added a third
+    // listener beside the app-aware container's own. Both bands — including the
+    // rows frame band — now come out of that one hook call.
+    state.platform.OS = 'android';
+    state.live.activeSessions = [row];
+    await renderScreen();
+
+    // The band hook's own subscription plus the app-aware container's.
+    expect(keyboardListeners('keyboardDidShow').size).toBe(2);
+    expect(keyboardListeners('keyboardDidHide').size).toBe(2);
+  });
+
   it('narrows the live list to the search text', async () => {
     state.live.activeSessions = [
       { ...row, id: 'a1', organizationId: null, title: 'Fix the login redirect' },

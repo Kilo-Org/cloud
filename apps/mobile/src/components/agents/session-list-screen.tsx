@@ -30,10 +30,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
-import {
-  AppAwareKeyboardPaddingView,
-  useKeyboardOcclusion,
-} from '@/components/kilo-chat/app-aware-keyboard-padding';
+import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
@@ -93,24 +90,19 @@ export function AgentSessionListScreen() {
   // the IME, so the centered empty states must reserve the keyboard's own
   // height or their copy and Clear search action draw behind it (explorer
   // finding, agents-list / agents-search-empty). The rows list's total band is
-  // `listBand`, floored at the FAB's own overlay band, because the button keeps
-  // its screen-bottom-anchored position while the keyboard is up (device defect
-  // uxs1); the frame carries only the part the keyboard container leaves
+  // floored at the FAB's own overlay band inside the hook, because the button
+  // keeps its screen-bottom-anchored position while the keyboard is up (device
+  // defect uxs1); the frame carries only the part the keyboard container leaves
   // (`rowsFrameBand`).
-  const { surfaceBand, listBand } = useAgentsBottomBands(tabBarHeight, showFab);
-  const { keyboardOcclusion } = useKeyboardOcclusion();
   // The centered states reserve the hook's own band in both keyboard positions,
-  // so the keyboard-down rule lives in `useAgentsBottomBands` alone rather than
-  // being re-resolved here (review finding, session-list-chrome.ts:48).
-  // The keyboard container below already pads the region by the IME's occlusion,
-  // so the rows frame adds only the part of `listBand` that container does not
-  // cover: `listBand` is the band the viewport must clear from the screen
-  // bottom, and the container has moved the viewport's bottom edge up by
-  // `keyboardOcclusion` already. Handing `listBand` to the frame as well
-  // reserved the keyboard twice and ended the list a whole IME height above the
-  // keyboard's top edge instead of at it (review finding,
-  // session-list-screen.tsx:418).
-  const rowsFrameBand = Math.max(0, listBand - keyboardOcclusion);
+  // so the keyboard-down rule — and the rows frame band above, which hands the
+  // container's own padding its share — lives in `useAgentsBottomBands` alone
+  // rather than being re-resolved here (review findings,
+  // session-list-chrome.ts:48 and session-list-screen.tsx:418). That one call is
+  // also the screen's only keyboard subscription beside the container below:
+  // calling the occlusion hook here as well subscribed to the same events a
+  // second time (review finding, session-list-screen.tsx:101).
+  const { surfaceBand, rowsFrameBand } = useAgentsBottomBands(tabBarHeight, showFab);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   const refetchRef = useRef(refetch);

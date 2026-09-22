@@ -38,19 +38,30 @@ const FAB_BAND = FAB_SIZE + FAB_MARGIN;
  * is shorter than the button's own band the IME's occlusion alone parks the last
  * rows' right-aligned timestamps under the button with no way to scroll them
  * clear (device defect uxs1, e1-kbup.png). The list's band is therefore the
- * larger of the two.
+ * larger of the two, and the rows frame's own band (`rowsFrameBand`) is what is
+ * left of it after the keyboard container's padding: the caller hands the frame
+ * that remainder, so the frame and the container together end the viewport at
+ * the band's edge instead of a whole IME height above it (review finding,
+ * session-list-screen.tsx:418).
  */
 export function useAgentsBottomBands(
   tabBarHeight: number,
   showFab: boolean
-): { surfaceBand: number; listBand: number } {
+): { surfaceBand: number; rowsFrameBand: number } {
   const { keyboardOcclusion } = useKeyboardOcclusion();
   return useMemo(() => {
     const surfaceBand = keyboardOcclusion > 0 ? keyboardOcclusion : tabBarHeight;
     // The band the button's overlay covers from the screen bottom, `0` while the
     // button is not admitted.
     const fabBand = showFab ? tabBarHeight + FAB_BAND : 0;
-    return { surfaceBand, listBand: Math.max(surfaceBand, fabBand) };
+    const listBand = Math.max(surfaceBand, fabBand);
+    // The frame carries only the part of the total band the keyboard container
+    // does not already cover: the container has moved the viewport's bottom
+    // edge up by `keyboardOcclusion`. Deriving it here, beside the one
+    // subscription that measures the occlusion, keeps the caller from adding a
+    // second `useKeyboardOcclusion` of its own (review finding,
+    // session-list-screen.tsx:101).
+    return { surfaceBand, rowsFrameBand: Math.max(0, listBand - keyboardOcclusion) };
   }, [keyboardOcclusion, tabBarHeight, showFab]);
 }
 
@@ -64,9 +75,8 @@ export function useAgentsBottomBands(
  * scroll view's padding is not part of its scrollable content on iOS, so padding
  * on the frame clipped the last rows under the bar with no way to scroll them
  * clear. The band (`bottomBand`) is the caller's rows frame band
- * (`rowsFrameBand` in `session-list-screen.tsx`): the part of the rows list's
- * total band (`listBand` from `useAgentsBottomBands`, itself floored at the
- * FAB's own overlay band) that the keyboard container does not already cover.
+ * (`rowsFrameBand` from `useAgentsBottomBands`): the part of the rows list's
+ * total band that the keyboard container does not already cover.
  * The centered states reserve `surfaceBand` instead. Android's edge-to-edge
  * window does not resize for the IME, so a keyboard-blind frame parked the last
  * rows of a search behind the keyboard with no way to scroll them clear (review

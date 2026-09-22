@@ -753,6 +753,33 @@ describe('allocation reducer — design §5 transitions', () => {
     expect(decision?.deadlineAt).toBe(at + POLICY.observeDeadlineMs);
   });
 
+  it('unbound legacy unknown observes under the same fence OBSERVED accepts', () => {
+    const record: AllocationRecord = {
+      v: 2,
+      resumable: true,
+      state: {
+        kind: 'unknown',
+        target: UNRESOLVED_TARGET,
+        createIntent: null,
+        stopIntent: null,
+        attempts: 0,
+        reason: 'legacy_failed',
+        deadlineAt: NOW,
+      },
+    };
+    const deadline = decideAllocation(record, { type: 'DEADLINE' }, NOW);
+    const observe = deadline?.commands.find(command => command.kind === 'Observe');
+    const observeFence = operationId('observe', 'unknown');
+    expect(observe?.kind === 'Observe' ? observe.operationId : undefined).toBe(observeFence);
+    expect(
+      decideAllocation(
+        record,
+        { type: 'OBSERVED', fence: fence(observeFence), result: 'absent' },
+        NOW
+      )?.state.state.kind
+    ).toBe('stopped');
+  });
+
   it('persistent providers take Stop, not Destroy', () => {
     const record: AllocationRecord = {
       v: 2,

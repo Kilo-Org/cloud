@@ -353,6 +353,13 @@ function effectFor(target: AllocationTarget): 'stop' | 'destroy' {
   return allocationEffect(target.capabilities);
 }
 
+function observeIdentity(
+  providerRef: string | null | undefined,
+  intentId: string | undefined
+): string {
+  return providerRef ?? intentId ?? 'unknown';
+}
+
 function fenceMatches(
   fence: ResultFence | undefined,
   expectedOperationId: string,
@@ -903,7 +910,7 @@ export function decideAllocation(
           const target = state.target;
           const expected = operationId(
             'observe',
-            target?.providerRef ?? state.createIntent?.intentId ?? 'unknown'
+            observeIdentity(target?.providerRef, state.createIntent?.intentId)
           );
           // A target that never bound a reference is observed by name, and the
           // provider may discover the reference; adopt it as the allocation
@@ -980,7 +987,7 @@ export function decideAllocation(
                 kind: 'Observe',
                 operationId: operationId(
                   'observe',
-                  state.target.providerRef ?? state.createIntent?.intentId ?? state.reason
+                  observeIdentity(state.target.providerRef, state.createIntent?.intentId)
                 ),
                 target: state.target,
               },
@@ -1033,7 +1040,7 @@ function toUnknown(
             kind: 'Observe',
             operationId: operationId(
               'observe',
-              target.providerRef ?? createIntent?.intentId ?? 'unknown'
+              observeIdentity(target.providerRef, createIntent?.intentId)
             ),
             target,
           },

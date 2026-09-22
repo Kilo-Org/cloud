@@ -41,7 +41,7 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
   {
     model: 'poolside/laguna-s-2.1:free',
     weight: 1,
-    reasoning: { enabled: false, effort: 'none' },
+    reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,
   {
     model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
@@ -51,7 +51,7 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
   {
     model: 'dots-studio/dots-3-note-preview:free',
     weight: 1,
-    reasoning: { enabled: false, effort: 'none' },
+    reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,
   {
     model: 'nex-agi/nex-n2.5-pro:free',
@@ -61,7 +61,7 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
   {
     model: 'inclusionai/ling-3.0-flash-vl:free',
     weight: 1,
-    reasoning: { enabled: false, effort: 'none' },
+    reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,
 ];
 

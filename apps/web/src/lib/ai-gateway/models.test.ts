@@ -241,11 +241,11 @@ describe('isFreeModel', () => {
       expect(
         Object.fromEntries(autoFreeModels.map(({ model, reasoning }) => [model, reasoning]))
       ).toEqual({
-        'poolside/laguna-s-2.1:free': { enabled: false, effort: 'none' },
+        'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
         'nvidia/nemotron-3-ultra-550b-a55b:free': { enabled: true, effort: 'medium' },
-        'dots-studio/dots-3-note-preview:free': { enabled: false, effort: 'none' },
+        'dots-studio/dots-3-note-preview:free': { enabled: true, effort: 'high' },
         'nex-agi/nex-n2.5-pro:free': { enabled: true, effort: 'medium' },
-        'inclusionai/ling-3.0-flash-vl:free': { enabled: false, effort: 'none' },
+        'inclusionai/ling-3.0-flash-vl:free': { enabled: true, effort: 'high' },
       });
     });
 

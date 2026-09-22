@@ -439,7 +439,7 @@ describe('resolveAutoModel — kilo-auto/free branch', () => {
       kind: 'ok',
       resolved: {
         model: 'poolside/laguna-s-2.1:free',
-        reasoning: { enabled: false, effort: 'none' },
+        reasoning: { enabled: true, effort: 'high' },
       },
     });
     expect(isAutoFreeCandidateAllowed).toHaveBeenCalledWith('poolside/laguna-s-2.1:free');

@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { ChatToolbar } from './chat-toolbar';
@@ -68,7 +68,9 @@ const MODEL_OPTIONS: SessionModelOption[] = [
   },
 ];
 
-function renderToolbar(): TestRenderer.ReactTestRenderer {
+function renderToolbar(
+  overrides: Partial<Parameters<typeof ChatToolbar>[0]> = {}
+): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   TestRenderer.act(() => {
     ref.current = TestRenderer.create(
@@ -80,6 +82,7 @@ function renderToolbar(): TestRenderer.ReactTestRenderer {
         modelOptions: MODEL_OPTIONS,
         onModelSelect: vi.fn<(modelId: string, variant: string) => void>(),
         onPaste: vi.fn<() => void>(),
+        ...overrides,
       })
     );
   });
@@ -163,5 +166,29 @@ describe('ChatToolbar long model name', () => {
 
     // The button still ends the chip's line at its trailing edge.
     expect(pasteButton?.props.className).toContain('ml-auto');
+  });
+});
+
+describe('ChatToolbar model chip while the model list loads', () => {
+  it('keeps the chip shell, its loading label and its chevron instead of a bare skeleton', () => {
+    const renderer = renderToolbar({ isLoadingModels: true });
+
+    // The chip reads as the control it will become: one loading label, clipped
+    // to the single line the chip holds for a model name.
+    const loadingLabels = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === i18n.t('common.loading')
+    );
+    expect(loadingLabels).toHaveLength(1);
+    expect(loadingLabels[0]?.props.numberOfLines).toBe(1);
+
+    // The skeleton replaced the label slot and left the pill blank. Now the
+    // chip renders its own shell, so no skeleton mounts at all.
+    const skeletons = renderer.root.findAll(
+      node => typeof node.type === 'string' && (node.type as string) === 'Skeleton'
+    );
+    expect(skeletons).toHaveLength(0);
   });
 });

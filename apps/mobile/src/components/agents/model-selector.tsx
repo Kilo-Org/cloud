@@ -7,7 +7,6 @@ import { Keyboard, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { formatList } from '@/lib/format';
 import {
@@ -129,7 +128,25 @@ export function ModelSelector({
   const selectionContext = useContext(ModelPickerSelectionScopeContext);
 
   if (isLoading) {
-    return <Skeleton className="h-8 w-28 rounded-full" />;
+    // The chip keeps its shell while the model list loads: the same box the
+    // skeleton occupied (`min-w-[7rem]`, the old `w-28` 112 px footprint),
+    // dimmed like a disabled chip, with the loading copy the sibling
+    // selectors show and the chevron affordance the loaded chip carries. A
+    // bare skeleton left the pill unlabelled and moved the composer row when
+    // the model name arrived.
+    return (
+      <View
+        className="min-w-0 min-w-[7rem] shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 opacity-50"
+        accessibilityRole="button"
+        accessibilityLabel={t('common.loading')}
+        accessibilityState={{ busy: true, disabled: true }}
+      >
+        <Text className="shrink text-sm font-medium text-muted-foreground" numberOfLines={1}>
+          {t('common.loading')}
+        </Text>
+        <ChevronDown size={14} color={colors.mutedForeground} />
+      </View>
+    );
   }
 
   const pickerOptions = options.map(option => toSessionModelOption(option));

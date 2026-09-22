@@ -39,6 +39,10 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   View: 'View',
 }));
+// The keyboard-padding leaf the screen renders reads the native side insets
+// through `react-native-safe-area-context`, whose module resolves to its
+// untransformed `react-native` entry (`src/index.tsx`) and breaks the mounted
+// project; every mounted suite mocks it.
 // The screen renders the shared keyboard-lift view, which reads the platform
 // and the safe-area insets through a `react-native` entry this node project
 // cannot load, so stub it like the sibling node-only screen tests do. The

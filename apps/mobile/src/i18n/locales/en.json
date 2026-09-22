@@ -827,7 +827,8 @@
       "chat": "Chat messages",
       "kiloclaw": "KiloClaw activity",
       "balance": "Balance alerts",
-      "security": "Security findings"
+      "security": "Security findings",
+      "spend": "Spend alerts"
     },
     "category": {
       "chatMessagesSubtitle": "replies in your conversations",
@@ -842,7 +843,9 @@
       "balanceAlertsSubtitle": "low organization balance warnings",
       "balanceAlertsUnavailable": "Join an organization to get balance alerts.",
       "securityFindingsSubtitle": "new findings and SLA reminders",
-      "securityFindingsUnavailable": "Enable Kilo Security Agent on a scope to get security findings."
+      "securityFindingsUnavailable": "Enable Kilo Security Agent on a scope to get security findings.",
+      "spendAlertsSubtitle": "threshold crossings and hourly spikes",
+      "spendAlertsToggle": "Spend alerts category"
     },
     "action": {
       "openSession": "Open session"
@@ -3200,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Open last session"
+  },
+  "spendAlerts": {
+    "subtitle": "Email or push an alert to the billing contacts when this scope's spend crosses a limit or spikes above its usual hourly rate.",
+    "enable": "Enable spend alerts",
+    "thresholdTitle": "Threshold crossing",
+    "thresholdSubtitle": "Rolling spend crosses your limit",
+    "anomalyTitle": "Hourly spike",
+    "anomalySubtitle": "An hour is far above this scope's usual rate",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Window",
+    "window24h": "24 hours",
+    "window7d": "7 days",
+    "window30d": "30 days",
+    "multiplierLabel": "Spike multiplier",
+    "saved": "Spend alert settings saved",
+    "loadError": "Couldn't load spend alerts.",
+    "saveError": "Couldn't save spend alerts.",
+    "empty": "Spend alerts are off. Turn them on to alert this scope's billing contacts.",
+    "noSpend": "No spend recorded yet",
+    "spend24h": "Spend in the last 24 hours",
+    "multiplierError": "Enter a multiplier of 1 or more",
+    "permissionDenied": "You don't have permission to manage spend alerts.",
+    "pushOffByCategory": "Off in Notifications"
   }
 }

@@ -134,6 +134,16 @@ describe('classifyPasskeyError', () => {
   );
 
   it.each(['name', 'message', 'code'])(
+    'classifies ASCII identifiers in %s without changing the localized copy key',
+    field => {
+      const failure = classifyPasskeyError({ [field]: 'NOTCONFIGURED' });
+
+      expect(failure).toBe('unsupported');
+      expect(passkeyFailureKey(failure)).toBe('login.passkeyUnsupported');
+    }
+  );
+
+  it.each(['name', 'message', 'code'])(
     'classifies uppercase protocol errors in %s without locale-dependent casing',
     field => {
       expect(classifyPasskeyError({ [field]: 'NOCREDENTIALS' })).toBe('no-passkey');

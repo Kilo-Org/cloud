@@ -380,8 +380,23 @@ function showKeyboard(height: number) {
     listener({ endCoordinates: { height } });
   }
 }
+function hideKeyboard() {
+  for (const listener of keyboardListeners('keyboardDidHide')) {
+    listener({ endCoordinates: { height: 0 } });
+  }
+}
 function surfaceBottomInset() {
   return root().findByType(StateSurfaceInsets).props.bottomInset as number;
+}
+/**
+ * The band the composed app observes. The real `StateSurfaceInsets` resolves
+ * `Math.max(parentReservation, bottomInset)` (`centered-state-surface.tsx:238`)
+ * and the enclosing tabs layout reserves `tabBarHeight + 16` while the list is
+ * shown (`(tabs)/_layout.tsx:124`), so a band below that floor is not an
+ * outcome the screen can produce on its own.
+ */
+function composedSurfaceBottomInset() {
+  return Math.max(state.tabBarHeight + 16, surfaceBottomInset());
 }
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -1361,11 +1376,39 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(surfaceBottomInset()).toBe(state.tabBarHeight + FAB_SIZE + FAB_MARGIN);
 
     act(() => {
-      showKeyboard(40);
+      showKeyboard(100);
     });
-    // A band shorter than the tab bar's own still wins: the bar is not on
-    // screen, so its height is not a band the body must clear.
-    expect(surfaceBottomInset()).toBe(40);
+    // A band shorter than the tab-bar/FAB band still wins: the bar is not on
+    // screen, so its height is not a band the body must clear. The composed
+    // tree floors the reserve at the enclosing tabs layout's `tabBarHeight +
+    // 16`, so 100 is the reachable band that distinguishes the replace rule
+    // from the max rule (which would have kept the 124px FAB band).
+    expect(composedSurfaceBottomInset()).toBe(100);
+  });
+
+  it('insets the rows viewport by the IME band so a search never parks rows behind the keyboard', async () => {
+    // Android's edge-to-edge window does not resize for the IME, so a
+    // keyboard-blind frame left the last rows of a search behind the keyboard
+    // with no way to scroll them clear (review finding,
+    // session-list-chrome.ts).
+    state.platform.OS = 'android';
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const listStyle = () => nodes('FlatList')[0]?.props.style as Record<string, number>;
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight + FAB_SIZE + FAB_MARGIN });
+
+    act(() => {
+      showKeyboard(320);
+    });
+    // The frame band follows the surface's reservation: the IME's occlusion
+    // replaces the tab-bar/FAB band, whose bar is hidden while the keyboard is
+    // up.
+    expect(listStyle()).toEqual({ marginBottom: 320 });
+
+    act(() => {
+      hideKeyboard();
+    });
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight + FAB_SIZE + FAB_MARGIN });
   });
 
   it('narrows the live list to the search text', async () => {

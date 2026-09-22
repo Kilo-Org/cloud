@@ -214,9 +214,11 @@ export function AgentSessionListScreen() {
   // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
   // content must clear them: the band rides on the list's frame as a
   // `marginBottom` (the viewport ends above it), never on the content and never
-  // as `style` padding, which only cleared the end of the list. The landscape
-  // side insets keep row text clear of the sensor housing.
-  const listInsets = useSessionListInsets({ tabBarHeight, showFab, left, right });
+  // as `style` padding, which only cleared the end of the list. The band is the
+  // same one the centered states reserve (`bottomReservation`), so while the
+  // keyboard is up the rows also end above the IME instead of behind it. The
+  // landscape side insets keep row text clear of the sensor housing.
+  const listInsets = useSessionListInsets({ bottomBand: bottomReservation, left, right });
 
   // The fixed 20pt margin gains the landscape right inset so the FAB clears the
   // sensor area; portrait insets are 0, keeping the geometry unchanged.

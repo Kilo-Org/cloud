@@ -36,32 +36,35 @@ export function useAgentsBottomBand(tabBarHeight: number, showFab: boolean): num
 /**
  * The rows list's frame and content insets.
  *
- * The FAB band shrinks the list's frame (`marginBottom`) so no row can scroll
- * under the button. It rides on the frame rather than the content: a content
- * inset only cleared the end of the list, so every row the user scrolled into
- * the button's band had its right-aligned timestamp and chevron covered, and a
+ * The band shrinks the list's frame (`marginBottom`) so no row can scroll under
+ * the button. It rides on the frame rather than the content: a content inset
+ * only cleared the end of the list, so every row the user scrolled into the
+ * button's band had its right-aligned timestamp and chevron covered, and a
  * scroll view's padding is not part of its scrollable content on iOS, so padding
  * on the frame clipped the last rows under the bar with no way to scroll them
- * clear. The vertical value matches the screen's `StateSurfaceInsets`. The
+ * clear. The vertical value is the band the screen also reserves through
+ * `StateSurfaceInsets` (`useAgentsBottomBand`), so the rows list ends above the
+ * same overlay the centered states do: the tab-bar/FAB band while the keyboard
+ * is down, the raised IME's occlusion while it is up. Android's edge-to-edge
+ * window does not resize for the IME, so a keyboard-blind frame parked the last
+ * rows of a search behind the keyboard with no way to scroll them clear. The
  * landscape side insets keep row text clear of the sensor housing; portrait
  * insets are 0, keeping the geometry unchanged.
  */
 export function useSessionListInsets({
-  tabBarHeight,
-  showFab,
+  bottomBand,
   left,
   right,
 }: {
-  tabBarHeight: number;
-  showFab: boolean;
+  bottomBand: number;
   left: number;
   right: number;
 }) {
   return useMemo(
     () => ({
-      frame: { marginBottom: tabBarBand(tabBarHeight, showFab) },
+      frame: { marginBottom: bottomBand },
       content: { paddingTop: 0, paddingBottom: 0, paddingLeft: left, paddingRight: right },
     }),
-    [showFab, tabBarHeight, left, right]
+    [bottomBand, left, right]
   );
 }

@@ -120,6 +120,11 @@ export function NewSessionConfigureForm({
   // parent; the prompt yields its minimum height to it so the whole composer
   // card renders above the bottom system bar.
   const [frameHeight, setFrameHeight] = useState(0);
+  // The composer card's top offset inside the scroll content, reported by the
+  // wrapper below and threaded to the prompt. The prompt's own `onLayout` reads
+  // `0` against that padding-free wrapper, dropping the content container's
+  // `pt-4` gap and overstating the room the frame leaves for the input.
+  const [composerTop, setComposerTop] = useState(0);
   const isRemote = runOnInstance !== null;
   const isStarting = isRemote ? isSpawningRemote : isCreating;
   const runOnNote =
@@ -157,6 +162,8 @@ export function NewSessionConfigureForm({
             y: event.nativeEvent.layout.y,
             height: event.nativeEvent.layout.height,
           });
+          const nextTop = Math.max(Math.round(event.nativeEvent.layout.y), 0);
+          setComposerTop(current => (current === nextTop ? current : nextTop));
         }}
       >
         <NewSessionPrompt
@@ -186,6 +193,7 @@ export function NewSessionConfigureForm({
           voiceInputSettlerRef={voiceInputSettlerRef}
           initialPrompt={initialPrompt}
           frameHeight={frameHeight}
+          cardTop={composerTop}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
         />

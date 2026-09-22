@@ -42,6 +42,24 @@ describe('resolveNewSessionPromptMinHeight', () => {
     );
   });
 
+  it('yields one line less once the card top gap crosses a whole-line boundary', () => {
+    // 195 - 0 - 103 = 92 available: three lines fit, so this frame keeps the
+    // preferred floor only because the card top gap is zero. The card really
+    // starts ~14pt below the frame top, which leaves 78 -> two lines. Reading
+    // the gap as 0 overstates the room by exactly that line.
+    const frameHeight = 195;
+    const withoutGap = resolveNewSessionPromptMinHeight({
+      ...PREFERRED,
+      ...EXPLORER,
+      frameHeight,
+      cardTop: 0,
+    });
+    const withGap = resolveNewSessionPromptMinHeight({ ...PREFERRED, ...EXPLORER, frameHeight });
+
+    expect(withoutGap).toBe(PREFERRED_MIN_HEIGHT);
+    expect(withGap).toBe(PREFERRED_MIN_HEIGHT - LINE_HEIGHT);
+  });
+
   it('always returns a whole number of lines plus the preferred padding', () => {
     const padding = PREFERRED_MIN_HEIGHT - LINE_HEIGHT * PREFERRED_LINES;
 

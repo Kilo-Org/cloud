@@ -122,6 +122,7 @@ export function NewSessionPrompt({
   voiceInputSettlerRef,
   initialPrompt,
   frameHeight,
+  cardTop = 0,
   onStartSession,
   isCloneEntry = false,
 }: Readonly<NewSessionPromptComponentProps>) {
@@ -151,10 +152,9 @@ export function NewSessionPrompt({
   const isComposingRef = useRef(false);
   const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
-  // The card's own top offset and the chrome it renders around the input,
-  // measured by the card's `onLayout` below. Together they size the space the
-  // frame leaves for the input.
-  const [cardTop, setCardTop] = useState(0);
+  // The chrome the card renders around the input, measured by the card's
+  // `onLayout` below. With the host-measured `cardTop` prop it sizes the space
+  // the frame leaves for the input.
   const [cardChromeHeight, setCardChromeHeight] = useState(0);
   const promptLineHeight = NEW_SESSION_PROMPT_LINE_HEIGHT * fontScale;
   const promptMinHeight = resolveNewSessionPromptMinHeight({
@@ -320,11 +320,12 @@ export function NewSessionPrompt({
   }
 
   function handleCardLayout(event: LayoutChangeEvent) {
-    const { y, height } = event.nativeEvent.layout;
-    setCardTop(current => (current === y ? current : y));
+    const { height } = event.nativeEvent.layout;
     // Everything the card renders other than the input itself. The input's
     // height changes when the fit yields and the card's height changes with it,
-    // so this is stable across the yielding re-render.
+    // so this is stable across the yielding re-render. The card's `y` is not
+    // read here: it is relative to the padding-free host wrapper, so the host
+    // passes the frame-relative offset as `cardTop` instead.
     const nextChromeHeight = height - promptMeasure.height;
     setCardChromeHeight(current => (current === nextChromeHeight ? current : nextChromeHeight));
   }

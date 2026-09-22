@@ -97,7 +97,7 @@ describe('Android native alert title', () => {
         readFileSync(join(projectRoot, 'plugins/backup', name), 'utf8')
       );
     }
-    expect(readFileSync(join(resDir, 'raw/kilo_shrink_sentinel_unused'), 'utf8')).toBe(
+    expect(readFileSync(join(resDir, 'raw/zz_unused_shrink_sentinel'), 'utf8')).toBe(
       'resource shrink sentinel'
     );
   });

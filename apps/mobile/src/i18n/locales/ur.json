@@ -827,7 +827,8 @@
       "chat": "چیٹ کے پیغامات",
       "kiloclaw": "KiloClaw کی سرگرمی",
       "balance": "بیلنس کی تنبیہات",
-      "security": "شناخت شدہ سیکیورٹی مسائل"
+      "security": "شناخت شدہ سیکیورٹی مسائل",
+      "spend": "اخراجات کی تنبیہات"
     },
     "category": {
       "chatMessagesSubtitle": "آپ کی گفتگو میں جوابات",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "سیشن کی حالت",
       "sessionStatusSubtitle": "مکمل / ناکام / کنٹرول کے لیے تیار",
       "kiloclawActivitySubtitle": "انسٹینس تیار یا ناکام، مقررہ وقت کے کام",
+      "kiloclawActivityUnavailable": "KiloClaw کی سرگرمی حاصل کرنے کے لیے ایک KiloClaw انسٹینس شروع کریں۔",
       "balanceAlertsSubtitle": "تنظیم کا بیلنس کم ہونے کے انتباہات",
-      "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں"
+      "balanceAlertsUnavailable": "بیلنس کے انتباہات حاصل کرنے کے لیے کسی تنظیم میں شامل ہوں۔",
+      "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں",
+      "securityFindingsUnavailable": "سیکیورٹی مسائل حاصل کرنے کے لیے ایک دائرہ کار میں Kilo سیکیورٹی ایجنٹ فعال کریں۔",
+      "spendAlertsSubtitle": "حدوں سے تجاوز اور فی گھنٹہ اضافہ",
+      "spendAlertsToggle": "اخراجات کی تنبیہات کی قسم"
     },
     "action": {
       "openSession": "سیشن کھولیں"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "سیشن لوڈ نہیں ہو سکا۔",
       "failedToLoadDetails": "سیشن کی تفصیلات لوڈ نہیں ہو سکیں۔",
       "failedToStopExecution": "کام کو روکا نہیں جا سکا۔",
+      "stopped": "سیشن روک دیا گیا",
+      "committing": "کمٹ کیا جا رہا ہے…",
+      "committed": "کمٹ ہو گیا",
+      "commitFailed": "کمٹ ناکام ہو گیا",
       "renameSession": "سیشن کا نام تبدیل کریں",
       "renamePlaceholder": "سیشن کا نام",
       "transcriptAccessibility": "سیشن کی گفتگو کا متن",
@@ -3156,7 +3166,8 @@
     "channelName": "فعال ایجنٹس",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
     "openSession": "کھولیں",
-    "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔"
+    "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔",
+    "newestResult": "تازہ ترین نتیجہ"
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",
@@ -3192,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "آخری سیشن کھولیں"
+  },
+  "spendAlerts": {
+    "subtitle": "جب اس دائرے کا خرچ کسی حد سے تجاوز کرے یا اپنی معمول کی فی گھنٹہ شرح سے بڑھ جائے تو بلنگ رابطوں کو ای میل یا پش کے ذریعے تنبیہ بھیجیں۔",
+    "enable": "اخراجات کی تنبیہات فعال کریں",
+    "thresholdTitle": "حد سے تجاوز",
+    "thresholdSubtitle": "جاری خرچ آپ کی حد سے تجاوز کر رہا ہے",
+    "anomalyTitle": "فی گھنٹہ اضافہ",
+    "anomalySubtitle": "ایک گھنٹہ اس دائرے کی معمول کی شرح سے بہت زیادہ ہے",
+    "limitLabel": "حد (USD)",
+    "windowLabel": "وقت کی حد",
+    "window24h": "24 گھنٹے",
+    "window7d": "7 دن",
+    "window30d": "30 دن",
+    "multiplierLabel": "اضافے کا ضرب",
+    "saved": "اخراجات کی تنبیہ کی ترتیبات محفوظ ہو گئیں",
+    "loadError": "اخراجات کی تنبیہات لوڈ نہیں ہو سکیں۔",
+    "saveError": "اخراجات کی تنبیہات محفوظ نہیں ہو سکیں۔",
+    "empty": "اخراجات کی تنبیہات بند ہیں۔ اس دائرے کے بلنگ رابطوں کو آگاہ کرنے کے لیے انہیں آن کریں۔",
+    "noSpend": "ابھی تک کوئی خرچ درج نہیں ہوا",
+    "spend24h": "گزشتہ 24 گھنٹوں کا خرچ",
+    "multiplierError": "1 یا اس سے زیادہ کا ضرب درج کریں",
+    "permissionDenied": "آپ کو اخراجات کی تنبیہات کا انتظام کرنے کی اجازت نہیں ہے۔",
+    "pushOffByCategory": "اطلاعات میں بند"
   }
 }

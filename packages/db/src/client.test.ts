@@ -1,4 +1,11 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
+import type { jest as JestGlobal } from '@jest/globals';
+
+// `jest.mock` is hoisted above the compiled `require`s only when it is called on
+// the global `jest`. Calling it on the `@jest/globals` import binding compiles to
+// `_globals.jest.mock(...)`, which the transform leaves below the imports, so the
+// mocks registered after `pg` was first required and never applied.
+declare const jest: typeof JestGlobal;
 
 jest.mock('pg', () => {
   const Pool = jest.fn(function Pool(this: object) {

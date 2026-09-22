@@ -13,6 +13,7 @@ import {
   normalizeProviderThreadsPage,
   normalizePrThreadsPages,
   providerCapabilitiesIdentity,
+  type PrThreadsPageModel,
 } from './provider-pr-queries';
 import { githubPrRef, isProviderScopeReady, type ProviderPrScope } from './provider-pr-ref';
 
@@ -366,6 +367,44 @@ describe('normalizeProviderThreadsPage', () => {
     ] as never);
     expect(first(first(mapped).threads).threadId).toBe('disc-1');
     expect(normalizePrThreadsPages('gitlab', undefined)).toEqual([]);
+  });
+
+  it('drops a GitHub discussion whose comment list is empty', () => {
+    // GitHub can hand back a review thread with no comments, the same shape the
+    // GitLab arm drops above. It is not discussion content: counted as content
+    // it keeps the tab out of its empty state, and the list's visible-comment
+    // filter then drops it, so the tab renders a blank body with no comments,
+    // no empty state and no error (spot check e7).
+    const githubThread: PrThreadsPageModel['threads'][number] = {
+      threadId: 't-1',
+      isResolved: false,
+      isOutdated: false,
+      subjectType: 'LINE',
+      path: 'src/a.ts',
+      line: 12,
+      startLine: null,
+      originalLine: null,
+      originalStartLine: null,
+      diffSide: 'RIGHT',
+      diffHunk: null,
+      comments: [
+        {
+          commentId: 1,
+          nodeId: 'c1',
+          author: { login: 'ada', avatarUrl: null },
+          bodyMarkdown: 'nit',
+          createdAt: '2026-01-01T00:00:00Z',
+          reactions: [],
+        },
+      ],
+    };
+    const page = {
+      threads: [githubThread, { ...githubThread, threadId: 't-empty', comments: [] }],
+      conversation: [],
+      nextCursor: null,
+    };
+    const [normalized] = normalizePrThreadsPages('github', [page]);
+    expect(normalized?.threads.map(entry => entry.threadId)).toEqual(['t-1']);
   });
 
   it('drops a discussion whose notes are all system events', () => {

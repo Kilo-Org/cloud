@@ -17,6 +17,7 @@ import { assertKiloModelAvailable } from '../model-validation.js';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
+  getSandboxAllocationProvider,
   getSandboxAllocationRequest,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
@@ -391,6 +392,7 @@ describe('explicit sandbox session creation', () => {
       SANDBOX_SELECTION_IDS: orgId,
       PER_SESSION_SANDBOX_ORG_IDS: '*',
       VERCEL_SANDBOX_ORG_IDS: '*',
+      CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
     });
     return ctx;
   }
@@ -457,9 +459,7 @@ describe('explicit sandbox session creation', () => {
         lifecycle: { version: 1, timestamp: 1 },
       });
       expect(metadata.workspace?.sandboxAllocation).toBe(preset);
-      expect(metadata.workspace?.sandboxProvider).toBe(
-        preset.startsWith('vercel-') ? 'vercel' : 'cloudflare'
-      );
+      expect(metadata.workspace?.sandboxProvider).toBe(getSandboxAllocationProvider(preset));
       expect(metadata.workspace).not.toHaveProperty('resources');
       if (preset === 'cloudflare-shared') {
         expect(resolveSharedSandboxAssignment).toHaveBeenCalledOnce();
@@ -766,6 +766,47 @@ describe('explicit sandbox session creation', () => {
       );
     }
   );
+
+  it('rebuilds a recorded containers worktree allocation without a preset', async () => {
+    const request = makeRequest({
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+    });
+    request.finalization = { autoCommit: true };
+    const row = makeLedgerRow({
+      organization_id: orgId,
+      status: 'reconcile_pending',
+      canonical_result: {
+        cloudAgentSessionId: WORKSPACE_SESSION_ID,
+        kiloSessionId: KILO_SESSION_ID,
+        initialMessageId: INITIAL_MESSAGE_ID,
+        sandboxId: `ses-${'a'.repeat(48)}`,
+        sandboxProvider: 'cloudflare-containers',
+        [SESSION_CREATE_WORKTREE_ENABLED_KEY]: true,
+        [SESSION_CREATE_FINALIZATION_VERSION_KEY]: 2,
+        [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(request),
+      },
+    });
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    ctx.env.SANDBOX_SELECTION_IDS = '';
+    ctx.env.CONTROL_PLANE_IDS = '';
+    ctx.env.WORKTREE_CREATION_ENABLED_IDS = '';
+    getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
+    admitOperationMock.mockResolvedValue({ admission: 'duplicate_reconcile_pending', row });
+    createCliSessionMock.mockResolvedValueOnce({ status: 'ready' });
+    await expect(runCreate(ctx, request)).resolves.toMatchObject({
+      cloudAgentSessionId: WORKSPACE_SESSION_ID,
+      replayed: true,
+    });
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({
+          sandboxProvider: 'cloudflare-containers',
+          worktreeId: WORKTREE_ID,
+        }),
+      })
+    );
+  });
 
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
     'replays a structured %s request against a legacy stored fingerprint',

@@ -625,6 +625,13 @@ test(
     // the shell — the marker file records any such swallowed input.
     const script = path.join(os.tmpdir(), `kilo-tmux-test-slow-${process.pid}.js`);
     const swallowedMarker = path.join(os.tmpdir(), `kilo-tmux-test-swallowed-${process.pid}`);
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-tmux-test-slow-'));
+    // The relaunch must be observed by what it DOES, not by what the pane
+    // echoes: a login shell that does not echo typed input (e.g. a harness
+    // wrapper as $SHELL) leaves capture-pane silent while the command still
+    // ran. A fake `tsx` on PATH records the relaunch command's execution.
+    const relaunchMarker = path.join(tempDir, 'relaunched');
+    const fakeTsx = path.join(tempDir, 'tsx');
     fs.writeFileSync(
       script,
       `const fs = require('node:fs');
@@ -634,6 +641,8 @@ process.stdin.on('data', d => {
   fs.appendFileSync(${JSON.stringify(swallowedMarker)}, d);
 });`
     );
+    fs.writeFileSync(fakeTsx, `#!/bin/sh\ntouch "${relaunchMarker}"\n`);
+    fs.chmodSync(fakeTsx, 0o755);
 
     try {
       tmux('new-session', '-d', '-s', sessionName, '-n', 'dashboard', 'sleep 120');
@@ -680,42 +689,36 @@ process.stdin.on('data', d => {
       // otherwise both would relaunch, and the slower one would interrupt
       // the freshly started service partway through its own poll.
       const supersededRestart = restartServiceInTmux(sessionName, serviceName);
-      const outcome = await restartServiceInTmux(sessionName, serviceName);
+      const outcome = await restartServiceInTmux(sessionName, serviceName, {
+        PATH: `${tempDir}:${process.env.PATH ?? ''}`,
+      });
       assert.equal(await supersededRestart, 'superseded');
       assert.ok(
         outcome === 'relaunched' || outcome === 'recreated',
         `restart should settle with a relaunch, got '${outcome}'`
       );
 
-      await sleep(500); // let the relaunch keystrokes echo before capturing
       // Depending on the wrapper shell's SIGINT semantics the pane either
       // survives (relaunch typed into its shell) or closes with the process
       // (service window recreated). Both count as a restart; the old fixed
       // 1s delay produced neither — the keystrokes vanished into the dying
-      // process and the service stayed stopped.
-      const windowRecreated = listWindows(sessionName).some(window => window.name === serviceName);
-      let paneEchoedCommand = false;
-      try {
-        const paneContent = execFileSync(
-          'tmux',
-          ['capture-pane', '-p', '-J', '-t', `${sessionName}:0.1`],
-          { encoding: 'utf-8' }
-        );
-        paneEchoedCommand = paneContent.includes(buildStartCommand(serviceName));
-      } catch {
-        // Pane closed with the process — the recreate branch applies.
-      }
+      // process and the service stayed stopped. Whichever branch ran, the
+      // relaunch command must have executed: poll for the marker the fake
+      // `tsx` writes (the recreated window inherits the same PATH).
       assert.ok(
         !fs.existsSync(swallowedMarker),
         'relaunch keystrokes must not be fed to the still-running process'
       );
-      assert.ok(
-        windowRecreated || paneEchoedCommand,
-        'service should be relaunched after the slow shutdown completes'
-      );
+      let relaunchRan = false;
+      for (let i = 0; i < 40 && !relaunchRan; i++) {
+        relaunchRan = fs.existsSync(relaunchMarker);
+        if (!relaunchRan) await sleep(250);
+      }
+      assert.ok(relaunchRan, 'service should be relaunched after the slow shutdown completes');
     } finally {
       fs.rmSync(script, { force: true });
       fs.rmSync(swallowedMarker, { force: true });
+      fs.rmSync(tempDir, { force: true, recursive: true });
       try {
         tmux('kill-session', '-t', sessionName);
       } catch {

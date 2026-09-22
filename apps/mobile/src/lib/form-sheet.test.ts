@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useFormSheetDetents } from '@/lib/form-sheet';
+import { useFormSheetDetents, useFormSheetScreenOptions } from '@/lib/form-sheet';
 
 const mocks = vi.hoisted(() => {
   const platform = { OS: 'android' as string };
@@ -58,5 +58,43 @@ describe('useFormSheetDetents', () => {
     mocks.insets.top = 47;
 
     expect(useFormSheetDetents()).toEqual({ fullSheetDetent: 1 });
+  });
+});
+
+describe('useFormSheetScreenOptions', () => {
+  beforeEach(() => {
+    mocks.platform.OS = 'android';
+    mocks.insets.top = 0;
+    mocks.statusBar.currentHeight = null;
+    mocks.dimensions.height = 800;
+    vi.clearAllMocks();
+  });
+
+  // Without this the Android sheet is measured against the top-inset-reduced
+  // height and then lifted again by the bottom gesture inset, so its surface
+  // stops above the window bottom and the screen behind it shows through.
+  it('overflows the top inset on Android so the detent fills the window bottom', () => {
+    mocks.insets.top = 47;
+
+    expect(useFormSheetScreenOptions()).toEqual({
+      presentation: 'formSheet',
+      sheetAllowedDetents: [0.5, (800 - 47) / 800],
+      sheetGrabberVisible: true,
+      headerShown: false,
+      sheetShouldOverflowTopInset: true,
+    });
+  });
+
+  it('keeps the overflow flag on iOS, where the native sheet ignores it', () => {
+    mocks.platform.OS = 'ios';
+    mocks.insets.top = 47;
+
+    expect(useFormSheetScreenOptions()).toEqual({
+      presentation: 'formSheet',
+      sheetAllowedDetents: [0.5, 1],
+      sheetGrabberVisible: true,
+      headerShown: false,
+      sheetShouldOverflowTopInset: true,
+    });
   });
 });

@@ -1,3 +1,9 @@
+// Tests the `(tabs)` layout's screen options, so it lives beside the
+// `CountSurfaces` harness instead of next to the layout. A file in
+// `src/app/(app)/(tabs)/` whose name starts with `_layout` is parsed by
+// expo-router as the layout for that directory: it then collides with the real
+// `_layout.tsx` (a route-tree error) and drops every `(tabs)` route from the
+// generated typed routes.
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

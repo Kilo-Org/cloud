@@ -35,25 +35,12 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
-// ProfileScreen reads the landscape side insets, so the real native module
-// would load here. Its build requires `react-native` itself, whose Flow source
-// the vitest transform cannot parse (see `test/render-with-providers.tsx`), so
-// the harness mocks it exactly as `profile-screen.queries.mounted.test.tsx` does.
-// ProfileScreen reads the landscape side insets, so the real native module
-// would load here. Its build requires `react-native` itself, whose Flow source
-// the vitest transform cannot parse (see `test/render-with-providers.tsx`), so
-// the harness mocks it exactly as `profile-screen.queries.mounted.test.tsx` does.
-// The screen reads its side insets through `@/lib/screen-insets`, whose real
-// `react-native-safe-area-context` entry is a Flow source this pipeline cannot
-// transform; the insets are irrelevant to the sign-out flow.
-// The screen reads its side insets through `@/lib/screen-insets`; the native
-// module's source is not parseable by this project's transform, and the
-// sign-out confirmation does not depend on the values.
-// The Profile screen reads its landscape side insets through `@/lib/screen-insets`,
-// whose real module loads the native safe-area package. The node project cannot
-// load that native module, so the screen's own tests stub the hook.
-// The screen reads its side insets through `@/lib/screen-insets`, which imports
-// this native module; its untransformed source breaks the mounted project.
+// ProfileScreen reads its landscape side insets through `@/lib/screen-insets`,
+// whose real `react-native-safe-area-context` entry is a Flow source this
+// transform cannot parse (see `test/render-with-providers.tsx`), so the harness
+// mocks it exactly as `profile-screen.queries.mounted.test.tsx` does. The
+// insets are irrelevant to the sign-out flow, so stub the hook with the hoisted
+// `insets` above.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));

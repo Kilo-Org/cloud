@@ -38,9 +38,11 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-// The keyboard machinery is native-only: the real modules pull the platform's
-// safe-area package (and with it the real, Flow-typed react-native) into this
-// node test graph, which cannot parse it.
+// The keyboard machinery is native-only: the keyboard-lift view reads the
+// device insets through `react-native-safe-area-context`, whose CommonJS entry
+// pulls the real, Flow-typed react-native (or a Flow subpath of it) into this
+// node test graph, which cannot parse it. Stub the two kilo-chat modules the
+// way the sibling node-only screen tests do.
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));

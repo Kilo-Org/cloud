@@ -316,6 +316,7 @@ describe('getSandboxProviderLabel', () => {
   it.each([
     ['cloudflare', 'Cloudflare'],
     ['vercel', 'Vercel'],
+    ['cloudflare-containers', 'Cloudflare'],
   ])('maps the stored provider %s to %s', (provider, label) => {
     expect(getSandboxProviderLabel(provider)).toBe(label);
   });

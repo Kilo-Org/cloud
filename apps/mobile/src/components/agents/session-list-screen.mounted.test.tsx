@@ -87,6 +87,7 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
   useWindowDimensions: () => ({ fontScale: state.fontScale, height: 844 }),
   AppState: {
     addEventListener: (_event: string, listener: (next: string) => void) => {
@@ -310,6 +311,12 @@ function action(label: string) {
 function press(label: string) {
   (action(label).props.onPress as () => void)();
 }
+function descendantsOf(instance: TestRenderer.ReactTestInstance, type: string) {
+  return instance.findAll(node => typeof node.type === 'string' && node.type === type);
+}
+function fab() {
+  return nodes('Pressable').find(node => node.props.testID === 'agents-new-session-fab');
+}
 type HeaderElement = {
   type: string;
   props: {
@@ -389,14 +396,33 @@ function surfaceBottomInset() {
   return root().findByType(StateSurfaceInsets).props.bottomInset as number;
 }
 /**
+ * The padding the keyboard container applies to the region. The container
+ * (`AppAwareKeyboardPaddingView` on Android, `KeyboardAvoidingView` on iOS)
+ * already clears the IME, so the rows frame adds only the part of the rows band
+ * the container does not cover; a case that asserts the rows viewport reads both
+ * halves of that composition rather than the frame alone.
+ */
+function keyboardContainerPadding() {
+  let padding = 0;
+  for (const node of nodes('View')) {
+    const styles = node.props.style as unknown;
+    if (Array.isArray(styles)) {
+      for (const style of styles as ({ paddingBottom?: number } | undefined)[]) {
+        padding = Math.max(padding, style?.paddingBottom ?? 0);
+      }
+    }
+  }
+  return padding;
+}
+/**
  * The band the composed app observes. The real `StateSurfaceInsets` resolves
  * `Math.max(parentReservation, bottomInset)` (`centered-state-surface.tsx:238`)
- * and the enclosing tabs layout reserves `tabBarHeight + 16` while the list is
- * shown (`(tabs)/_layout.tsx:124`), so a band below that floor is not an
- * outcome the screen can produce on its own.
+ * and the enclosing tabs layout reserves the bar's own height while the list is
+ * shown (`(tabs)/_layout.tsx:130`), so a band below that floor is not an outcome
+ * the screen can produce on its own.
  */
 function composedSurfaceBottomInset() {
-  return Math.max(state.tabBarHeight + 16, surfaceBottomInset());
+  return Math.max(state.tabBarHeight, surfaceBottomInset());
 }
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -509,9 +535,13 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(nodes('CenteredState')).toHaveLength(test.empty || (test.error && !test.rows) ? 1 : 0);
-    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(
-      state.tabBarHeight + (test.empty ? 0 : 64)
-    );
+    // The band a centered body lays out in ends at the tab bar, on every body.
+    // The FAB is a corner control: its band rides the rows list's own frame
+    // inset (`marginBottom`, asserted below) so no row sits under the button,
+    // and reserving it here as well shrank the band below the tab bar's top
+    // edge in a short landscape window, parking the no-match state's second
+    // line and action behind the bar (landscape spot defect e8).
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
@@ -1010,8 +1040,6 @@ describe('AgentSessionListScreen live presentation', () => {
   it('offsets the FAB by the landscape right inset and keeps its vertical position', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
-    const fab = () =>
-      nodes('Pressable').find(node => node.props.testID === 'agents-new-session-fab');
     expect(fab()?.props.style).toEqual({
       bottom: state.tabBarHeight + 16,
       right: 20,
@@ -1062,7 +1090,7 @@ describe('AgentSessionListScreen live presentation', () => {
     // shrinks the list, where a content or frame padding would let iOS rows
     // park under the bar (and a content inset only cleared the row under the
     // button once the user scrolled).
-    const listStyle = () => nodes('FlatList')[0]?.props.style as Record<string, number>;
+    const listStyle = () => nodes('FlatList')[0]?.props.style as { marginBottom: number };
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight + 64 });
   });
 
@@ -1318,6 +1346,11 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(emptyState.props.description).toBe('Try a different search term.');
     expect(nodes('CenteredState')).toHaveLength(1);
     expect(nodes('FlatList')).toHaveLength(0);
+    // The no-match body owns the band the tab bar leaves (the FAB's band is no
+    // longer reserved in it, see `StateSurfaceInsets` above), so the creation
+    // FAB yields instead of floating over the state's description and Clear
+    // action.
+    expect(fab()).toBeUndefined();
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     act(() => {
       (emptyState.props.action as { props: { onPress: () => void } }).props.onPress();
@@ -1325,8 +1358,47 @@ describe('AgentSessionListScreen live filtering', () => {
 
     expect(nodes('FlatList')).toHaveLength(1);
     expect(nodes('CenteredState')).toHaveLength(0);
+    expect(fab()).toBeDefined();
     expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
+  });
+
+  it('lifts the no-match body above the keyboard inside the platform container', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const searchHeader = requireNode('SessionListSearchHeader');
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+
+    // iOS: the native container owns the lift, so the centered no-match body is
+    // inside it and re-measures against the viewport it shrinks.
+    const container = requireNode('KeyboardAvoidingView');
+    expect(container.props.behavior).toBe('padding');
+    expect(descendantsOf(container, 'CenteredState')).toHaveLength(1);
+    expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
+
+    // Android: edge-to-edge never resizes the window for the IME, so the
+    // app-aware container follows the keyboard events and pads its frame; the
+    // body re-centers inside the shrunken viewport.
+    state.platform.OS = 'android';
+    await renderScreen();
+    act(() => {
+      showKeyboard(320);
+    });
+    const padded = nodes('View').find(
+      node =>
+        Array.isArray(node.props.style) &&
+        node.props.style.some(
+          (part: { paddingBottom?: number } | undefined) => part?.paddingBottom === 320
+        )
+    );
+    expect(padded).toBeDefined();
+    if (!padded) {
+      throw new Error('Missing app-aware padding container');
+    }
+    expect(descendantsOf(padded, 'CenteredState')).toHaveLength(1);
+    expect(nodes('KeyboardAvoidingView')).toHaveLength(0);
   });
 
   it('reserves the keyboard height for the no-match body so its second line stays readable', async () => {
@@ -1344,8 +1416,10 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(renderer.root.findByType(EmptyState).props.description).toBe(
       'Try a different search term.'
     );
-    // Keyboard down: the surface reserves only the tab-bar / FAB band.
-    expect(surfaceBottomInset()).toBe(state.tabBarHeight + FAB_SIZE + FAB_MARGIN);
+    // Keyboard down: the band ends at the tab bar. The FAB's band is not
+    // reserved here — the no-match body owns the band and the FAB yields to it —
+    // so the state does not pay for the button's clearance.
+    expect(surfaceBottomInset()).toBe(state.tabBarHeight);
 
     act(() => {
       showKeyboard(320);
@@ -1361,7 +1435,7 @@ describe('AgentSessionListScreen live filtering', () => {
         listener({ endCoordinates: { height: 0 } });
       }
     });
-    expect(surfaceBottomInset()).toBe(state.tabBarHeight + FAB_SIZE + FAB_MARGIN);
+    expect(surfaceBottomInset()).toBe(state.tabBarHeight);
   });
 
   it('replaces the tab-bar band with the IME band while the keyboard is up', async () => {
@@ -1373,16 +1447,18 @@ describe('AgentSessionListScreen live filtering', () => {
     state.platform.OS = 'android';
     state.live.activeSessions = [{ ...row, id: 'a1', organizationId: null, title: 'Ship it' }];
     await renderScreen();
-    expect(surfaceBottomInset()).toBe(state.tabBarHeight + FAB_SIZE + FAB_MARGIN);
+    // Keyboard down: the band ends at the tab bar (the FAB yields to the
+    // no-match body), so the raise starts from the bar's own height.
+    expect(surfaceBottomInset()).toBe(state.tabBarHeight);
 
     act(() => {
       showKeyboard(100);
     });
     // A band shorter than the tab-bar/FAB band still wins: the bar is not on
-    // screen, so its height is not a band the body must clear. The composed
-    // tree floors the reserve at the enclosing tabs layout's `tabBarHeight +
-    // 16`, so 100 is the reachable band that distinguishes the replace rule
-    // from the max rule (which would have kept the 124px FAB band).
+    // screen, so its height is not a band the body must clear. The composed tree
+    // floors the reserve at the enclosing tabs layout's own reservation (the tab
+    // bar's height), so 100 is the reachable band that distinguishes the replace
+    // rule from the max rule (which would have kept the 124px FAB band).
     expect(composedSurfaceBottomInset()).toBe(100);
   });
 
@@ -1394,21 +1470,29 @@ describe('AgentSessionListScreen live filtering', () => {
     state.platform.OS = 'android';
     state.live.activeSessions = [row];
     await renderScreen();
-    const listStyle = () => nodes('FlatList')[0]?.props.style as Record<string, number>;
-    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight + FAB_SIZE + FAB_MARGIN });
+    const listStyle = () => nodes('FlatList')[0]?.props.style as { marginBottom: number };
+    const fabBand = state.tabBarHeight + FAB_SIZE + FAB_MARGIN;
+    // Keyboard down the container pads nothing, so the frame carries the whole
+    // band.
+    expect(listStyle()).toEqual({ marginBottom: fabBand });
+    expect(keyboardContainerPadding()).toBe(0);
 
     act(() => {
       showKeyboard(320);
     });
-    // The frame band follows the surface's reservation — the IME's occlusion
-    // replaces the tab-bar band, whose bar is hidden while the keyboard is up —
-    // floored at the FAB's own overlay band.
-    expect(listStyle()).toEqual({ marginBottom: 320 });
+    // The container already pads the IME's occlusion and the frame adds only the
+    // part it does not cover, so the two together end the viewport at the IME's
+    // top edge instead of a whole keyboard height above it. The IME is taller
+    // than the FAB band, so the frame contributes nothing.
+    expect(keyboardContainerPadding()).toBe(320);
+    expect(listStyle()).toEqual({ marginBottom: 0 });
+    expect(keyboardContainerPadding() + listStyle().marginBottom).toBe(320);
 
     act(() => {
       hideKeyboard();
     });
-    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight + FAB_SIZE + FAB_MARGIN });
+    expect(keyboardContainerPadding()).toBe(0);
+    expect(listStyle()).toEqual({ marginBottom: fabBand });
   });
 
   it('keeps the rows viewport clear of the FAB when a raised IME is shorter than the button', async () => {
@@ -1420,7 +1504,7 @@ describe('AgentSessionListScreen live filtering', () => {
     state.platform.OS = 'android';
     state.live.activeSessions = [row];
     await renderScreen();
-    const listStyle = () => nodes('FlatList')[0]?.props.style as Record<string, number>;
+    const listStyle = () => nodes('FlatList')[0]?.props.style as { marginBottom: number };
     const fabBand = state.tabBarHeight + FAB_SIZE + FAB_MARGIN;
 
     act(() => {
@@ -1429,8 +1513,11 @@ describe('AgentSessionListScreen live filtering', () => {
     // The centered states still take the shorter IME band, so their copy clears
     // the keyboard rather than a phantom tab-bar band.
     expect(surfaceBottomInset()).toBe(100);
-    // The rows list cannot: a shorter frame parks rows under the button.
-    expect(listStyle()).toEqual({ marginBottom: fabBand });
+    // The rows list cannot: the container covers the IME and the frame adds the
+    // rest of the FAB band, so a shorter frame never parks rows under the button.
+    expect(keyboardContainerPadding()).toBe(100);
+    expect(listStyle()).toEqual({ marginBottom: fabBand - 100 });
+    expect(keyboardContainerPadding() + listStyle().marginBottom).toBe(fabBand);
 
     act(() => {
       hideKeyboard();
@@ -1539,8 +1626,9 @@ describe('AgentSessionListScreen live filtering', () => {
       expect(header().parent?.children[0]).toBe(header());
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
-        tree.children.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
-      ).toEqual(['View', 'SessionListSearchHeader', 'View', 'FlatList']);
+        tree.children.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
+      ).toEqual(['View', 'SessionListSearchHeader', 'KeyboardAvoidingView']);
+      expect(descendantsOf(requireNode('KeyboardAvoidingView'), 'FlatList')).toHaveLength(1);
     }
   });
 

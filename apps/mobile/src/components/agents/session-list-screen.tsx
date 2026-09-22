@@ -1,5 +1,14 @@
+/* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, FlatList, Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import {
+  AppState,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +23,7 @@ import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
+import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
@@ -28,6 +38,10 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
+import {
+  AppAwareKeyboardPaddingView,
+  useKeyboardOcclusion,
+} from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
@@ -49,6 +63,10 @@ export function AgentSessionListScreen() {
     () => getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }),
     [bottom, fontScale]
   );
+  // Android runs edge-to-edge and never resizes the window for the IME, so the
+  // native KeyboardAvoidingView is inert there; the app-aware container follows
+  // the keyboard events instead (the repo's one platform fork for this).
+  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const context = useLiveSessionContext();
   const { organizationId, isError: isContextError, refetch: refetchContext } = context;
@@ -56,13 +74,6 @@ export function AgentSessionListScreen() {
   const { activeSessions, refetch } = sessions;
   const content = liveSessionContent(context, sessions);
   const hasLiveRows = content === 'rows';
-  const showFab = context.isReady && content !== 'empty';
-  // Android's edge-to-edge window does not resize for the IME, so the centered
-  // empty states reserve the keyboard's own height or their copy and Clear
-  // search action draw behind it (explorer finding, agents-list). The rows list
-  // reserves the larger of that band and the FAB's own band, because the button
-  // does not move with the keyboard (device defect uxs1).
-  const { surfaceBand, listBand } = useAgentsBottomBands(tabBarHeight, showFab);
   // A failed foreground refresh keeps the cached rows on screen. That failure
   // must speak through the reserved status line (one inline "Couldn't refresh"
   // with Retry) instead of the load-failure block, which would push the kept
@@ -71,6 +82,44 @@ export function AgentSessionListScreen() {
 
   const query = useLiveSessionQuery(activeSessions);
   const { visibleSessions, isSearching } = query;
+  // The no-match body is the state the tab bar's band was reopened for, and its
+  // compact form fills that band down to the corner the FAB floats in. Since
+  // reserving the FAB's band here is what parked the state's second line and
+  // action behind the tab bar in a short landscape window (landscape spot
+  // defect e8), a state that fills the band owns it and the FAB yields: it
+  // must not sit over the description or the Clear action at a large text
+  // scale. The list bodies keep it — they clear it with their own frame inset —
+  // and so does the load-failure body, whose FAB is the only creation
+  // affordance while the list is failing.
+  const noMatchBody = hasLiveRows && visibleSessions.length === 0;
+  const showFab = context.isReady && content !== 'empty' && !noMatchBody;
+  // The screen's bottom bands. The centered states' band ends at the tab bar
+  // while the keyboard is down: the FAB's band rides the rows list's own frame
+  // inset and the no-match body owns the band, so reserving it here as well
+  // shrank the band below the tab bar's top edge in a short landscape window
+  // and parked the state's second line and action behind the bar (landscape
+  // spot defect e8). While the keyboard is up the IME's occlusion replaces the
+  // tab-bar band, because the bar hides with the keyboard
+  // (`tabBarHideOnKeyboard`): Android's edge-to-edge window does not resize for
+  // the IME, so the centered empty states must reserve the keyboard's own
+  // height or their copy and Clear search action draw behind it (explorer
+  // finding, agents-list / agents-search-empty). The rows list's total band is
+  // `listBand`, floored at the FAB's own overlay band, because the button keeps
+  // its screen-bottom-anchored position while the keyboard is up (device defect
+  // uxs1); the frame carries only the part the keyboard container leaves
+  // (`rowsFrameBand`).
+  const { surfaceBand, listBand } = useAgentsBottomBands(tabBarHeight, showFab);
+  const { keyboardOcclusion } = useKeyboardOcclusion();
+  const centeredBand = keyboardOcclusion > 0 ? surfaceBand : tabBarHeight;
+  // The keyboard container below already pads the region by the IME's occlusion,
+  // so the rows frame adds only the part of `listBand` that container does not
+  // cover: `listBand` is the band the viewport must clear from the screen
+  // bottom, and the container has moved the viewport's bottom edge up by
+  // `keyboardOcclusion` already. Handing `listBand` to the frame as well
+  // reserved the keyboard twice and ended the list a whole IME height above the
+  // keyboard's top edge instead of at it (review finding,
+  // session-list-screen.tsx:418).
+  const rowsFrameBand = Math.max(0, listBand - keyboardOcclusion);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   const refetchRef = useRef(refetch);
@@ -219,10 +268,12 @@ export function AgentSessionListScreen() {
   // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
   // content must clear them: the band rides on the list's frame as a
   // `marginBottom` (the viewport ends above it), never on the content and never
-  // as `style` padding, which only cleared the end of the list. The band is the
-  // rows list's own (`listBand`), so no row parks behind the keyboard or the
-  // button. The landscape side insets keep row text clear of the sensor housing.
-  const listInsets = useSessionListInsets({ bottomBand: listBand, left, right });
+  // as `style` padding, which only cleared the end of the list. The frame band is
+  // the rows list's own (`rowsFrameBand`): the part of the total `listBand` the
+  // keyboard container does not already cover, so no row parks behind the
+  // keyboard or the button. The landscape side insets keep row text clear of the
+  // sensor housing.
+  const listInsets = useSessionListInsets({ bottomBand: rowsFrameBand, left, right });
 
   // The fixed 20pt margin gains the landscape right inset so the FAB clears the
   // sensor area; portrait insets are 0, keeping the geometry unchanged.
@@ -306,8 +357,46 @@ export function AgentSessionListScreen() {
     );
   }
 
+  // The feedback band and the body share one keyboard container so every
+  // centered state (no-match, live-empty, skeletons, load failure) re-measures
+  // against the viewport the keyboard leaves, not the full window. The header
+  // and search field stay outside it and never move.
+  const region = (
+    <>
+      <View
+        className={query.hasLoaded && content === 'error' ? 'flex-1' : undefined}
+        style={query.hasLoaded && content === 'error' ? undefined : sidePadding}
+      >
+        <LiveSessionFeedback
+          context={context}
+          sessions={sessions}
+          failureLabel={t('agents.sessionList.couldNotLoadActive')}
+          centered={query.hasLoaded && content === 'error'}
+          refresh={{
+            busy: pull.refreshing || pull.busy,
+            failed: pull.failed || retryableRowsFailure,
+            onRetry: handleRefreshRetry,
+            // The pull's progress belongs to the centered no-match body (the
+            // same state that mounts it), so the band does not draw a second
+            // spinner while that body shows one.
+            progressInBody: hasLiveRows && visibleSessions.length === 0 && pull.refreshing,
+          }}
+          refreshControl={refreshControl}
+        />
+      </View>
+      {body}
+    </>
+  );
+
   return (
-    <StateSurfaceInsets bottomInset={surfaceBand}>
+    // The band the centered states are laid out in. The FAB is a corner control
+    // with its own frame inset on the rows list and it yields to the no-match
+    // body, so the band ends at the tab bar while the keyboard is down (a band
+    // shrank to the FAB's top pushed the empty state's second line and action
+    // behind the bar in a short landscape window, landscape spot defect e8);
+    // while the keyboard is up the band is the IME's occlusion instead
+    // (`centeredBand`).
+    <StateSurfaceInsets bottomInset={centeredBand}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}
@@ -337,29 +426,14 @@ export function AgentSessionListScreen() {
             onClearSearch={query.handleClearSearch}
           />
         ) : null}
-        <View
-          className={query.hasLoaded && content === 'error' ? 'flex-1' : undefined}
-          style={query.hasLoaded && content === 'error' ? undefined : sidePadding}
-        >
-          <LiveSessionFeedback
-            context={context}
-            sessions={sessions}
-            failureLabel={t('agents.sessionList.couldNotLoadActive')}
-            centered={query.hasLoaded && content === 'error'}
-            refresh={{
-              busy: pull.refreshing || pull.busy,
-              failed: pull.failed || retryableRowsFailure,
-              onRetry: handleRefreshRetry,
-              // The pull's progress belongs to the centered no-match body (the
-              // same state that mounts it), so the band does not draw a second
-              // spinner while that body shows one.
-              progressInBody: hasLiveRows && visibleSessions.length === 0 && pull.refreshing,
-            }}
-            refreshControl={refreshControl}
-          />
-        </View>
-        {body}
-        {/* Empty content owns its creation action; other admitted states keep the FAB. */}
+        {keyboardContainerKind === 'app-aware-padding' ? (
+          <AppAwareKeyboardPaddingView className="flex-1">{region}</AppAwareKeyboardPaddingView>
+        ) : (
+          <KeyboardAvoidingView className="flex-1" behavior="padding">
+            {region}
+          </KeyboardAvoidingView>
+        )}
+        {/* Empty content owns its creation action; the no-match body owns the band. */}
         {showFab && (
           <Pressable
             accessibilityRole="button"

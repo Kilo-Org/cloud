@@ -100,10 +100,6 @@ export const DEFAULT_CONFIG: Omit<DriverConfig, 'user' | 'nextAuthSecret'> = {
   fakeLlmUrl: process.env.FAKE_LLM_URL ?? 'http://localhost:8811',
 };
 
-// ---------------------------------------------------------------------------
-// tRPC helpers
-// ---------------------------------------------------------------------------
-
 /**
  * Minimal tRPC HTTP-link client. The cloud-agent-next server mounts tRPC
  * without a superjson transformer, so un-batched requests use raw shapes:
@@ -196,10 +192,6 @@ export async function trpcCall<T>(
   const envelope = z.object({ result: z.object({ data: z.unknown() }) }).parse(parsed);
   return envelope.result.data as T;
 }
-
-// ---------------------------------------------------------------------------
-// High-level session operations
-// ---------------------------------------------------------------------------
 
 export type StartSessionResult = {
   cloudAgentSessionId: string;
@@ -520,10 +512,6 @@ export async function sendMessage(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Control-plane helpers
-// ---------------------------------------------------------------------------
-
 const messageResultSchema = z.object({
   cloudAgentSessionId: z.string(),
   messageId: z.string(),
@@ -599,10 +587,6 @@ export async function deleteSession(
 ): Promise<{ success: boolean }> {
   return trpcCall<{ success: boolean }>(config, 'deleteSession', { sessionId }, { signal });
 }
-
-// ---------------------------------------------------------------------------
-// Fake-LLM gate helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Headers for the fake LLM `/test/*` side channel.
@@ -748,10 +732,6 @@ export async function waitForGateEngaged(
   }
   return false;
 }
-
-// ---------------------------------------------------------------------------
-// WebSocket stream
-// ---------------------------------------------------------------------------
 
 export const streamEventSchema = z.object({
   eventId: z.number(),
@@ -1142,10 +1122,6 @@ export async function openConnectedStream(
   return requireConnected(stream, sessionId);
 }
 
-// ---------------------------------------------------------------------------
-// Scenario helpers
-// ---------------------------------------------------------------------------
-
 export function fakeDirective(conversation: string): string {
   return `__fake__:${conversation}`;
 }
@@ -1180,10 +1156,6 @@ export function waitForOpen(ws: WebSocket, timeoutMs = 5_000): Promise<void> {
     });
   });
 }
-
-// ---------------------------------------------------------------------------
-// Assertions
-// ---------------------------------------------------------------------------
 
 export type AssertionResult = { ok: boolean; message: string };
 

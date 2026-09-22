@@ -17,10 +17,6 @@ import { createHash } from 'node:crypto';
 
 import { isAdminAuthorized } from './fake-llm-admin.js';
 
-// ---------------------------------------------------------------------------
-// Adapter interfaces
-// ---------------------------------------------------------------------------
-
 /** Runtime-neutral view of one inbound request. `url` is path + query. */
 export type FakeLlmRequest = {
   method: string;
@@ -83,10 +79,6 @@ export type FileDirective =
 export type FileDirectiveParse =
   | { ok: true; directive: FileDirective }
   | { ok: false; message: string };
-
-// ---------------------------------------------------------------------------
-// State
-// ---------------------------------------------------------------------------
 
 type ToolKind = 'write' | 'read' | 'edit' | 'question';
 
@@ -268,10 +260,6 @@ export function hydrateFakeLlmState(
   return state;
 }
 
-// ---------------------------------------------------------------------------
-// Logging
-// ---------------------------------------------------------------------------
-
 type LogFields = Record<string, string | number | boolean | undefined>;
 
 function logEvent(event: string, fields: LogFields): void {
@@ -282,10 +270,6 @@ function logEvent(event: string, fields: LogFields): void {
   }
   console.log(parts.join(' '));
 }
-
-// ---------------------------------------------------------------------------
-// Pure helpers (unit-testable without a socket)
-// ---------------------------------------------------------------------------
 
 const DIRECTIVE_PREFIX = '__fake__:';
 
@@ -844,10 +828,6 @@ function readFileContents(result: string): string {
     .trimEnd();
 }
 
-// ---------------------------------------------------------------------------
-// Model catalogue
-// ---------------------------------------------------------------------------
-
 /**
  * One model, shaped to satisfy kilo's `openRouterModelSchema`
  * (see `packages/kilo-gateway/src/api/models.ts` in the kilocode repo).
@@ -906,10 +886,6 @@ const TRANSCRIPTION_MODELS = [
     pricing: { prompt: '0', completion: '0' },
   },
 ];
-
-// ---------------------------------------------------------------------------
-// SSE chunk shaping
-// ---------------------------------------------------------------------------
 
 type ToolCallDelta = {
   index: number;
@@ -997,10 +973,6 @@ function writeJsonError(emit: FakeLlmEmit, status: number, message: string, type
     },
   });
 }
-
-// ---------------------------------------------------------------------------
-// Scenario registry
-// ---------------------------------------------------------------------------
 
 export type ScenarioContext = {
   emit: FakeLlmEmit;
@@ -1583,10 +1555,6 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     writeAssistantResponse(ctx, `done-${tag}`);
   },
 };
-
-// ---------------------------------------------------------------------------
-// Request handling
-// ---------------------------------------------------------------------------
 
 function randomId(): string {
   return `chatcmpl-fake-${Math.random().toString(36).slice(2, 12)}`;

@@ -959,22 +959,23 @@ describe('SandboxControl lifecycle boundaries', () => {
     };
     vi.spyOn(h.ctx, 'getWebSockets').mockReturnValue([socket as unknown as WebSocket]);
     h.records.set('provider_kind', 'cloudflare-containers');
-    h.records.set('physical_record', {
-      state: 'running',
-      providerRef,
-      createIntent: null,
-      stopTombstone: null,
-      resumable: false,
-    });
+    seedCanonicalAllocationRecord(
+      h.records,
+      allocationFixture({
+        state: 'running',
+        providerRef,
+        createIntent: { intentId: 'intent-1', createdAt: now - 1_000 },
+        health: 'healthy',
+        heartbeatAt: now,
+        idleAt: now + DEADLINE_MS.idleStop,
+        resumable: false,
+      })
+    );
     h.records.set('active_wrapper_runtime', {
       ...identity,
       readyConnectionId: identity.connectionId,
     });
     h.records.set('session_routes', [first, sibling]);
-    h.records.set('deadlines', {
-      idleStop: now + DEADLINE_MS.idleStop,
-      heartbeatExpiry: now + DEADLINE_MS.heartbeatExpiry,
-    });
     await expect(
       h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare-containers' })
     ).resolves.toMatchObject({

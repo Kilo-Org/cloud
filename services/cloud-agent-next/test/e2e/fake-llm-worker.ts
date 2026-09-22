@@ -47,10 +47,6 @@ function modelAuthError(status: number, message: string): Response {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Worker emit
-// ---------------------------------------------------------------------------
-
 const SSE_HEADERS = {
   'Content-Type': 'text/event-stream',
   'Cache-Control': 'no-cache',
@@ -270,10 +266,6 @@ function logPersistError(error: unknown): void {
   console.error('[fake-llm] failed to persist state:', error);
 }
 
-// ---------------------------------------------------------------------------
-// Durable Object
-// ---------------------------------------------------------------------------
-
 export class FakeLlmState extends DurableObject<FakeLlmWorkerEnv> {
   private core: FakeLlmCoreState;
 
@@ -309,10 +301,6 @@ export class FakeLlmState extends DurableObject<FakeLlmWorkerEnv> {
     await this.ctx.storage.put(FAKE_LLM_STATE_STORAGE_KEY, serializeFakeLlmState(this.core));
   }
 }
-
-// ---------------------------------------------------------------------------
-// Worker entry
-// ---------------------------------------------------------------------------
 
 export default {
   async fetch(request: Request, env: FakeLlmWorkerEnv): Promise<Response> {

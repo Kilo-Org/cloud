@@ -829,6 +829,25 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'anthropic/claude-opus-5',
+    CLAUDE_OPUS_LATEST_MODEL_ALIAS,
+    'anthropic/claude-fable-5.1',
+  ])('allows a direct user BYOK request for %s', async modelId => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: [{ decryptedAPIKey: 'byok-key', providerId: 'anthropic' }],
+      bypassAccessCheck: false,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody(modelId)) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
   it('applies free-model rate limiting to flagged Kilo-exclusive models', async () => {
     mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: false, requestCount: 200 });
 

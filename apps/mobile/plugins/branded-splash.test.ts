@@ -170,6 +170,9 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // The shared app config carries the other `colors.xml` entries (icon and
+    // notification colors, the app background) through the same mod chain, so
+    // assert this plugin's surface is present rather than the array length.
     // `introspect` merges into the colors a local prebuild already generated, so
     // assert the plugin's entry instead of the whole array.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({

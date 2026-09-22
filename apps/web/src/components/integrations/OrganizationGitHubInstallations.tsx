@@ -300,6 +300,9 @@ export function OrganizationGitHubInstallations({
         ) : (
           <div className="divide-border border-border divide-y border-t">
             {installations.map(installation => {
+              const hasConnectionRole =
+                installation.connectionRole === 'workflow' ||
+                installation.connectionRole === 'agent_only';
               const selectedCount = installation.repositories.length;
               const repositoryScope =
                 installation.repositorySelection === 'all'
@@ -327,6 +330,9 @@ export function OrganizationGitHubInstallations({
                           )}
                           {installation.connectionRole === 'agent_only' && (
                             <Badge variant="outline">Agent access</Badge>
+                          )}
+                          {installation.status === 'connected' && !hasConnectionRole && (
+                            <Badge variant="outline">Access unavailable</Badge>
                           )}
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">{repositoryScope}</p>
@@ -444,8 +450,10 @@ export function OrganizationGitHubInstallations({
                           label="AI Model"
                           helperText={
                             installation.connectionRole === 'agent_only'
-                              ? 'Select the AI model for Slack agent sessions'
-                              : 'Select the AI model to use when responding to GitHub bot mentions'
+                              ? 'This saves a GitHub connection preference. Choose the Slack model in Slack integration settings and the Cloud Agent model in the session.'
+                              : installation.connectionRole === 'workflow'
+                                ? 'Select the AI model to use when responding to GitHub bot mentions'
+                                : 'This connection needs role reconciliation before agent or workflow access is available.'
                           }
                           models={modelOptions}
                           value={installation.modelSlug ?? undefined}
@@ -457,7 +465,7 @@ export function OrganizationGitHubInstallations({
                             })
                           }
                           isLoading={isLoadingModels}
-                          disabled={!installation.canManageModel}
+                          disabled={!installation.canManageModel || !hasConnectionRole}
                           placeholder="Select a model"
                           triggerAriaLabel={`AI model for ${accountName}`}
                         />

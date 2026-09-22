@@ -1412,7 +1412,7 @@ function repositoryCreateIntent(repository: SessionRepositoryRequest): Record<st
         type: 'github',
         repo: repository.repo,
         githubIntegrationId: repository.githubIntegrationId,
-        githubAccessPurpose: repository.githubAccessPurpose ?? 'workflow',
+        githubAccessPurpose: repository.githubAccessPurpose === 'agent' ? 'agent' : undefined,
         branch: repository.branch,
       };
     case 'gitlab':

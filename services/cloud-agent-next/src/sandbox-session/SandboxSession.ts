@@ -4,6 +4,7 @@ import {
 } from '../session/runtime-authorization-diagnostics.js';
 import jwt from 'jsonwebtoken';
 import { DurableObject } from 'cloudflare:workers';
+import { normalizeGitUrl } from '@kilocode/worker-utils';
 import type {
   GetWorktreeChangesOutput,
   GetWorktreeFileOutput,
@@ -2580,7 +2581,17 @@ export class SandboxSession extends DurableObject<Env> {
             existing.repository.repo !== input.repository.repo ||
             existing.repository.githubIntegrationId !== input.repository.githubIntegrationId ||
             (existing.repository.githubAccessPurpose ?? 'workflow') !==
-              (input.repository.githubAccessPurpose ?? 'workflow')))
+              (input.repository.githubAccessPurpose ?? 'workflow'))) ||
+        (existing.repository &&
+          input.repository &&
+          existing.repository.type !== 'github' &&
+          input.repository.type !== 'github' &&
+          normalizeGitUrl(existing.repository.url) !== normalizeGitUrl(input.repository.url)) ||
+        (existing.repository?.type === 'bitbucket' &&
+          input.repository?.type === 'bitbucket' &&
+          (existing.repository.workspaceUuid !== input.repository.workspaceUuid ||
+            existing.repository.repositoryUuid !== input.repository.repositoryUuid ||
+            existing.repository.bitbucketIntegrationId !== input.repository.bitbucketIntegrationId))
       )
         return {
           success: false,

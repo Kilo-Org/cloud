@@ -7,7 +7,7 @@ import {
 } from '@/lib/integrations/db/github-installations-backfill';
 import { closeAllDrizzleConnections } from '@/lib/drizzle';
 
-const Args = z.object({
+const Args = z.strictObject({
   reportRoles: z.enum(['true']).optional(),
   cursor: z.uuid().optional(),
   limit: z.coerce.number().int().min(1).max(500).default(100),
@@ -16,7 +16,7 @@ const Args = z.object({
 const rawArgs = Object.fromEntries(
   process.argv.slice(2).map(argument => {
     const [key, value] = argument.replace(/^--/, '').split('=', 2);
-    return [key, value];
+    return [key, key === 'reportRoles' && value === undefined ? 'true' : value];
   })
 );
 async function main() {

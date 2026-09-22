@@ -587,6 +587,7 @@ async function refreshScmCapability(
   const repository = grant.repository;
   if (!repository || repository.type === 'git') return grant;
   if (repository.type === 'github' && repository.expectedIntegrationId) {
+    // Cached capabilities still require current association authorization; older brokers fail closed.
     const authorized = await authorizeCloudAgentGitHubRepo(env, {
       githubRepo: repository.repo,
       userId: grant.userId,

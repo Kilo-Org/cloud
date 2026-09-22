@@ -1173,7 +1173,8 @@ async function credentialFixture(
   provider: AgentSandboxProvider = 'cloudflare',
   id: SandboxId = `${provider === 'vercel' ? 'ses' : 'usr'}-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`,
   sandboxAllocation?: SandboxAllocation,
-  githubAccessPurpose?: 'workflow' | 'agent'
+  githubAccessPurpose?: 'workflow' | 'agent',
+  repository?: SessionMetadata['repository']
 ) {
   const control = env.SANDBOX_CONTROL.getByName(id);
   const broker = fakeCredentialBroker(githubAccessPurpose);
@@ -1215,7 +1216,7 @@ async function credentialFixture(
     },
     auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
     agent: { mode: 'code', model: 'test' },
-    repository: {
+    repository: repository ?? {
       type: 'github',
       repo: 'acme/repo',
       githubIntegrationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -3295,6 +3296,77 @@ describe('SandboxControl contained Vercel lifecycle', () => {
 });
 
 describe('SandboxControl mandatory worktree credentials', () => {
+  it.each([
+    { type: 'git' as const, url: 'https://example.com/acme/repo.git' },
+    { type: 'gitlab' as const, url: 'https://gitlab.com/acme/repo.git' },
+    {
+      type: 'bitbucket' as const,
+      url: 'https://bitbucket.org/acme/repo.git',
+      workspaceUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      repositoryUuid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      bitbucketIntegrationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    },
+  ])(
+    'rejects a different $type repository on re-registration without changing stored state',
+    async repository => {
+      const { session, registration } = await credentialFixture(
+        'cloudflare',
+        undefined,
+        undefined,
+        undefined,
+        repository
+      );
+      const before = await session.getCredentialMetadata();
+      await expect(
+        session.registerSession({
+          ...registration,
+          repository: { ...repository, url: repository.url.replace('/repo.git', '/other.git') },
+        })
+      ).resolves.toMatchObject({
+        success: false,
+        error: 'Repository authorization does not match registered session',
+      });
+      expect(await session.getCredentialMetadata()).toEqual(before);
+      await expect(
+        session.registerSession({
+          ...registration,
+          repository: { ...repository, url: repository.url.replace('.git', '') },
+        })
+      ).resolves.toEqual({ success: true });
+    }
+  );
+
+  it.each(['workspaceUuid', 'repositoryUuid', 'bitbucketIntegrationId'] as const)(
+    'rejects Bitbucket %s substitution during registration replay',
+    async field => {
+      const repository = {
+        type: 'bitbucket' as const,
+        url: 'https://bitbucket.org/acme/repo.git',
+        workspaceUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        repositoryUuid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        bitbucketIntegrationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      };
+      const { session, registration } = await credentialFixture(
+        'cloudflare',
+        undefined,
+        undefined,
+        undefined,
+        repository
+      );
+      const before = await session.getCredentialMetadata();
+      await expect(
+        session.registerSession({
+          ...registration,
+          repository: { ...repository, [field]: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' },
+        })
+      ).resolves.toMatchObject({
+        success: false,
+        error: 'Repository authorization does not match registered session',
+      });
+      expect(await session.getCredentialMetadata()).toEqual(before);
+    }
+  );
+
   it.each(['cloudflare', 'vercel'] as const)(
     'preserves exact managed agent authorization in %s Workers RPCs',
     async provider => {

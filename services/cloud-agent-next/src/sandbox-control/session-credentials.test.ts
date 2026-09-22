@@ -255,6 +255,31 @@ function vercelMetadata(
 }
 
 describe('trusted worktree credential preparation', () => {
+  it.each([undefined, 'workflow', 'agent'] as const)(
+    'does not reuse a cached capability when current association authorization is unavailable (%s)',
+    async githubAccessPurpose => {
+      const { broker } = createBroker();
+      const data = metadata({
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId: INTEGRATION_ID,
+          githubAccessPurpose,
+        },
+      });
+      const { grant } = await prepare(environment(broker), data);
+      const oldBroker: GitTokenService = { ...broker };
+      delete oldBroker.authorizeCloudAgentGitHubRepo;
+      broker.issueGitHubSessionCapability.mockClear();
+      await expect(prepare(environment(oldBroker), data, grant, NOW + 1000)).rejects.toThrow(
+        'GitHub credential is unavailable'
+      );
+      expect(broker.issueGitHubSessionCapability).not.toHaveBeenCalled();
+      expect(broker.getTokenForRepo).not.toHaveBeenCalled();
+      expect(broker.getCloudAgentAuthForRepo).not.toHaveBeenCalled();
+    }
+  );
+
   it.each(['cloudflare', 'vercel'] as const)(
     'preserves agent purpose and exact association through %s credentials and renewal',
     async provider => {

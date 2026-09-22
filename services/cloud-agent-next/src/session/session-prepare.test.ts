@@ -9,6 +9,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
+import { createHash } from 'node:crypto';
 import {
   createRuntimeAuthorization,
   sealRuntimeAuthorization,
@@ -3695,6 +3696,45 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
 });
 
 describe('createSessionWithLedger changed-intent rejection', () => {
+  it.each([undefined, 'workflow', 'agent'] as const)(
+    'preserves the pre-purpose ledger fingerprint without allowing purpose elevation (%s)',
+    async githubAccessPurpose => {
+      const request = originalRequest();
+      request.repository = { type: 'github', repo: 'acme/repo', githubAccessPurpose };
+      const legacyFingerprint = createHash('sha256')
+        .update(
+          '{"agent":{"mode":"code","model":"claude-3"},"initialTurn":{"prompt":"Build the feature","type":"prompt"},"options":{"kilocodeOrganizationId":"org-abc"},"repository":{"repo":"acme/repo","type":"github"}}'
+        )
+        .digest('hex');
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: makeLedgerRow({
+          status: 'completed',
+          organization_id: 'org-abc',
+          canonical_result: {
+            cloudAgentSessionId: CLOUD_AGENT_SESSION_ID,
+            kiloSessionId: KILO_SESSION_ID,
+            initialMessageId: INITIAL_MESSAGE_ID,
+            [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: legacyFingerprint,
+          },
+        }),
+      });
+      const stub = makeDoStub();
+      if (githubAccessPurpose === 'agent') {
+        await expect(runCreate(makeContext(stub), request)).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: 'session_creation_failed',
+        });
+      } else {
+        expect(await sessionCreateIntentFingerprint(request)).toBe(legacyFingerprint);
+        await expect(runCreate(makeContext(stub), request)).resolves.toMatchObject({
+          replayed: true,
+        });
+      }
+      expect(stub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    }
+  );
+
   beforeEach(() => {
     vi.clearAllMocks();
     getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));

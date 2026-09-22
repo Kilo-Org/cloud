@@ -15,6 +15,11 @@ import {
   type TNode,
 } from 'react-native-render-html';
 
+import {
+  type MarkdownHtmlSnapshot,
+  splitMarkdownHtml,
+  splitMarkdownHtmlIncremental,
+} from './markdown-html';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { MarkdownRenderer } from './markdown-renderer';
 import { MarkdownText } from './markdown-text';
@@ -192,13 +197,15 @@ describe('MarkdownText HTML routing', () => {
     expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
     expect(renderer.root.findAllByType(ViewType)).toHaveLength(3);
     expect(vi.mocked(useMarkdown)).toHaveBeenCalledWith(value, expect.any(Object));
-    expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(2);
+    // One lex for the html/value split; the table split is skipped because the
+    // fenced-HTML fixture has no GFM delimiter row.
+    expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await Promise.resolve();
       renderer.update(<MarkdownText value={value} selectable={false} />);
     });
-    expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the markdown prefix mounted when the first HTML token arrives', async () => {
@@ -592,5 +599,299 @@ describe('MarkdownText HTML links and images', () => {
     });
     expect(empty.root.findByType(TextType).props.children).toBe('');
     expect(empty.root.findAllByType(MarkdownImageType)).toHaveLength(0);
+  });
+});
+
+// Paragraphs, headings, lists, blockquotes, a fenced code block holding
+// `<div>`, inline `<span>` HTML, a list whose item carries inline HTML, a loose
+// list (blank line between items) whose first item carries inline HTML, an
+// ordered loose list whose second item arrives as a bare number first, a list
+// continuation line, a tab-only separator, a CRLF document, a GFM table, and
+// links. Streamed one character at a time to cover every prefix.
+const INCREMENTAL_CORPUS = [
+  'A plain opening paragraph with ordinary prose.\n\n',
+  '# A heading with a plain line\n\n',
+  'A paragraph with a [link](https://example.com/page) and **emphasis**.\n\n',
+  '- first item\n- second item\n- third item\n\n',
+  '> a blockquote line\n> continued on a second line\n\n',
+  '```html\n<div>fenced code only</div>\n```\n\n',
+  'Inline <span>HTML</span> inside a paragraph.\n\n',
+  '| Name | Note |\n| ---- | ---- |\n| Kilo | a/b |\n\n',
+  // Duplicate link reference definitions: marked drops the later
+  // definition's raw text, so the value's tokens no longer tile the source
+  // and a raw-length offset is not a source offset. The head must not be
+  // reused for such a value.
+  '[ref]: https://example.com\n\n[ref]: https://other.example\n\nSee [ref].\n\n',
+  '- a list with an <a href="https://example.com/page">inline HTML link</a>\n- and a plain item\n\n',
+  // A loose list is one token whose `loose` flag flips on when the blank line
+  // between items arrives; the head must not freeze the list before that.
+  '- a loose list starting with an <a href="https://example.com/page">inline HTML link</a>\n\n- and a plain second item\n\n',
+  // An ordered loose list whose second item arrives as a bare number first:
+  // `1. Click <b>Save</b>\n\n2.` lexes as a list plus a paragraph, and the
+  // trailing `.` turns that paragraph into the list's second item, growing the
+  // list token retroactively. The head must not have frozen the list.
+  '1. Click <b>Save</b>\n\n2. Restart the app\n\n',
+  // The same shape without the marker: `2` after a blank line stays a paragraph
+  // until a `.` arrives, then joins the list above it.
+  '- ordered items follow\n\n2\n\n2. and the second one\n\n',
+  // A paragraph lazily continues over a line that does not interrupt it, so a
+  // later list line can pull an earlier line back into the paragraph.
+  '<b>x</b>\n2. b\n- x\n\n',
+  // A line holding only a tab does not end a paragraph in marked's GFM
+  // paragraph tokenizer: `…\n\t\n` lexes as a paragraph plus a `space` token
+  // while the next line does not interrupt the paragraph, but as one paragraph
+  // once that line becomes a list item. A boundary drawn after that `space`
+  // token would freeze a paragraph the next append pulls the tab line back
+  // into.
+  'Paragraph <b>bold</b> before a tab separator\n\t\n- item after the tab separator\n\n',
+  // marked normalizes `\r\n` to `\n` inside token raws, so a raw-length offset
+  // is no longer a source offset. A value with a carriage return must never
+  // reuse a head.
+  'Paragraph <b>bold</b> before a CRLF\r\n\r\n- item after the CRLF\r\n\r\n',
+  'Closing paragraph with [Docs](https://example.com/docs).\n\n',
+].join('');
+
+const STREAM_STEPS = 40;
+
+// Block fragments whose token boundaries move when an append arrives: an item
+// marker that only becomes a list item once its dot lands (`2.`), a loose list
+// that flips tight→loose, a paragraph a later line can interrupt or extend, a
+// fence that swallows the rest, and a table whose delimiter row has not
+// arrived. Every ordered pair is streamed prefix by prefix, adjacent and after
+// a blank line, so the adjacency that froze a streamed ordered list is always
+// generated. The corpus above is hand-picked; the boundary bug that froze that
+// list was found by a fuzz, not by a corpus.
+const FUZZ_FRAGMENTS = [
+  'plain paragraph text',
+  '- plain list item',
+  '1. Click <b>Save</b>',
+  '2. Restart the app',
+  '3. <b>third</b>',
+  '2.',
+  '2',
+  '1. first',
+  '<b>bold</b> text',
+  '- item with <b>html</b>',
+  '- <a href="https://example.com/page">link item</a>',
+  '- a loose list with <b>html</b>',
+  '> quoted',
+  '> more quote',
+  '# heading',
+  '---',
+  '```',
+  '<div>code</div>',
+  '```',
+  '<span>inline HTML</span>',
+  '| a | b |',
+  '| --- | --- |',
+  ':-',
+  'continuation line',
+  '  inset continuation',
+  'a | b',
+  '[ref]: https://example.com',
+  '[ref]: https://other.example',
+];
+
+function lexedCharacterCount(): number {
+  return vi.mocked(MarkedLexer).mock.calls.reduce((total, [source]) => total + source.length, 0);
+}
+
+/** The first prefix of `value` whose incremental split differs from the whole-value split. */
+function firstDivergence(value: string): string {
+  let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
+  for (let index = 1; index <= value.length; index += 1) {
+    const prefix = value.slice(0, index);
+    const incremental = splitMarkdownHtmlIncremental(prefix, snapshot);
+    snapshot = incremental.snapshot;
+    const whole = splitMarkdownHtml(prefix);
+    if (JSON.stringify(incremental.segments) !== JSON.stringify(whole)) {
+      return `${JSON.stringify(value)} at ${index}: ${JSON.stringify(incremental.segments)} != ${JSON.stringify(whole)}`;
+    }
+  }
+  return '';
+}
+
+describe('splitMarkdownHtmlIncremental', () => {
+  it('matches the whole-value split for every prefix of the corpus', () => {
+    let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
+    for (let index = 1; index <= INCREMENTAL_CORPUS.length; index += 1) {
+      const value = INCREMENTAL_CORPUS.slice(0, index);
+      const incremental = splitMarkdownHtmlIncremental(value, snapshot);
+      snapshot = incremental.snapshot;
+      expect(incremental.segments, `prefix ${index} (${JSON.stringify(value.slice(-20))})`).toEqual(
+        splitMarkdownHtml(value)
+      );
+    }
+  });
+
+  it('keeps a streamed loose list with an inline-HTML first item in one html segment', () => {
+    // A trailing blank line does not close the list: the new item joins it and
+    // flips it from tight to loose, so the frozen head must not hold the list.
+    const opening = '- <a href="https://example.com/page">inline HTML link</a>\n\n';
+    const completed = `${opening}- a plain second item`;
+
+    const first = splitMarkdownHtmlIncremental(opening);
+    const second = splitMarkdownHtmlIncremental(completed, first.snapshot);
+
+    expect(second.segments).toEqual(splitMarkdownHtml(completed));
+    expect(second.segments).toHaveLength(1);
+    expect(second.segments[0]?.type).toBe('html');
+    // The loose list wraps each item in a paragraph; a frozen tight head would
+    // render `<li>inline HTML link</li>` plus a separate second list.
+    expect(second.segments[0]?.raw).toContain('<li><p>');
+    expect(second.segments[0]?.raw).toContain('a plain second item');
+  });
+
+  it('keeps a streamed ordered loose list in one html segment when the next item starts as a bare number', () => {
+    // `1. Click <b>Save</b>\n\n2.` lexes as a list plus a paragraph; the next
+    // `.` turns that paragraph into the list's second item, so the list token
+    // grows retroactively. A head that froze the tight one-item list would
+    // render `<li>Click <b>Save</b></li>` plus a separate `\n\n2.` markdown
+    // segment instead of the loose two-item list a whole-value lex produces.
+    const opening = '1. Click <b>Save</b>\n\n';
+    let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
+    for (const value of [opening, `${opening}2.`, `${opening}2. Restart the app`]) {
+      const result = splitMarkdownHtmlIncremental(value, snapshot);
+      snapshot = result.snapshot;
+      expect(result.segments, value).toEqual(splitMarkdownHtml(value));
+    }
+
+    const segments = splitMarkdownHtml(`${opening}2. Restart the app`);
+    expect(segments).toHaveLength(1);
+    expect(segments[0]?.type).toBe('html');
+    expect(segments[0]?.raw).toContain('<li><p>Click <b>Save</b></p>');
+    expect(segments[0]?.raw).toContain('Restart the app');
+  });
+
+  it('re-lexes the streaming tail, far less than the full prefix length', () => {
+    let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
+    let value = '<span>start</span>\n\n';
+    let fullPrefixCharacters = 0;
+    for (let index = 1; index <= STREAM_STEPS; index += 1) {
+      value += `## Heading ${index}\n\nParagraph body ${index} with a few words.\n\n- item ${index}\n- item ${index} again\n\n`;
+      snapshot = splitMarkdownHtmlIncremental(value, snapshot).snapshot;
+      fullPrefixCharacters += value.length;
+    }
+    const lexedCharacters = lexedCharacterCount();
+
+    // eslint-disable-next-line no-console -- the request asks the PR to quote these totals
+    console.log(
+      `splitMarkdownHtmlIncremental lexed ${lexedCharacters} chars in ${vi.mocked(MarkedLexer).mock.calls.length} lexes; the full prefixes total ${fullPrefixCharacters} chars`
+    );
+    expect(lexedCharacters).toBeLessThan(fullPrefixCharacters / 4);
+  });
+
+  it('never lexes a `<`-free stream (whole-value fast path)', () => {
+    let snapshot: MarkdownHtmlSnapshot | undefined = undefined;
+    let value = '';
+    let fullPrefixCharacters = 0;
+    for (let index = 1; index <= STREAM_STEPS; index += 1) {
+      value += `Paragraph ${index} with a few words.\n\n`;
+      snapshot = splitMarkdownHtmlIncremental(value, snapshot).snapshot;
+      fullPrefixCharacters += value.length;
+    }
+
+    // eslint-disable-next-line no-console -- the request asks the PR to quote these totals
+    console.log(
+      `splitMarkdownHtmlIncremental lexed ${lexedCharacterCount()} chars for a ${fullPrefixCharacters}-char \`<\`-free stream`
+    );
+    expect(vi.mocked(MarkedLexer)).not.toHaveBeenCalled();
+    expect(lexedCharacterCount()).toBe(0);
+  });
+
+  it('extracts a table chip when the body has a GFM delimiter row', async () => {
+    const renderer = await mount(<MarkdownText value={'| Name |\n| --- |\n| Kilo |'} />);
+
+    expect(renderer.root.findAllByType(MarkdownTableType)).toHaveLength(1);
+    // No `<` in the value, so only the table extraction lexes.
+    expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the table lex when a stray pipe has no delimiter row', async () => {
+    const renderer = await mount(
+      <MarkdownText value={'a | b\n\n```\n<div>code only</div>\n```'} />
+    );
+
+    expect(renderer.root.findAllByType(MarkdownTableType)).toHaveLength(0);
+    // One lex for the html/value split; the table split is skipped.
+    expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a pipe-less single-column table on the table path', async () => {
+    // marked lexes `a\n:-\nb` as a table with no pipe in either row, so the
+    // delimiter-row test must accept a colon without a pipe.
+    const renderer = await mount(<MarkdownText value={'a\n:-\nb'} />);
+
+    expect(renderer.root.findAllByType(MarkdownTableType)).toHaveLength(1);
+    // No `<` in the value, so only the table extraction lexes.
+    expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the table lex for a thematic break or a stray pipe without a delimiter row', async () => {
+    const renderer = await mount(<MarkdownText value={'before\n\n---\n\na | b\n\nafter'} />);
+
+    expect(renderer.root.findAllByType(MarkdownTableType)).toHaveLength(0);
+    // `---` underlines nothing (the blank line makes it a thematic break) and
+    // `a | b` is prose, so neither the `html`/value split (no `<`) nor the
+    // table split lexes the value.
+    expect(vi.mocked(MarkedLexer)).not.toHaveBeenCalled();
+  });
+
+  it('matches the whole-value split for every ordered pair of block fragments', () => {
+    const documents = FUZZ_FRAGMENTS.flatMap(first =>
+      FUZZ_FRAGMENTS.flatMap(second =>
+        (['\n', '\n\n'] as const).map(separator => `${first}${separator}${second}\n`)
+      )
+    );
+    let mismatch = '';
+    for (const document of documents) {
+      mismatch = firstDivergence(document);
+      if (mismatch !== '') {
+        break;
+      }
+    }
+
+    expect(mismatch).toBe('');
+  });
+
+  it('matches the whole-value split across separators marked treats as provisional', () => {
+    // A seeded walk over the same fragments, joined with separators whose
+    // stability differs: a single newline (no separator token), a blank line,
+    // a tab-only line (marked keeps the preceding paragraph open for it), and
+    // CRLF (marked strips the carriage return out of token raws). Every prefix
+    // is checked against the whole-value split, so a boundary drawn after a
+    // provisional separator or a CRLF offset drift shows up here. The LCG is
+    // hand-rolled to keep the walk deterministic without a dependency.
+    const separators = ['\n', '\n\n', '\n\t\n', '\r\n'];
+    let state = 20_260_922;
+    const next = () => {
+      state = (state * 1_664_525 + 1_013_904_223) % 4_294_967_296;
+      return state / 4_294_967_296;
+    };
+    for (let iteration = 0; iteration < 1200; iteration += 1) {
+      const parts = 2 + Math.floor(next() * 3);
+      let document = '';
+      for (let part = 0; part < parts; part += 1) {
+        document += FUZZ_FRAGMENTS[Math.floor(next() * FUZZ_FRAGMENTS.length)] ?? '';
+        document += separators[Math.floor(next() * separators.length)] ?? '\n';
+      }
+      expect(firstDivergence(document), document).toBe('');
+    }
+  });
+
+  it('matches the whole-value split for duplicate link reference definitions', () => {
+    // marked drops a duplicate definition's raw text, so its block tokens do
+    // not tile the source and a raw-length offset is not a source offset. The
+    // head must not be reused for a value whose definitions can collide, and
+    // the value still has to segment exactly like the whole-value split.
+    const documents = [
+      '[ref]: https://a.example\n\n[ref]: https://b.example\n\n- <a href="https://x.example">item</a>',
+      '[ref]: https://a.example\n\n- <a href="https://x.example">item</a>\n\n[ref]: https://b.example',
+      'text\n\n[ref]: https://a.example\n\n[ref]: https://b.example\n\n> <a href="https://x.example">quote</a>',
+      '[ref]: https://a.example\n\n[ref]: https://b.example\n\n[ref]: https://c.example\n\n| a | b |\n| --- | --- |\n| <a href="https://x.example">c</a> | d |',
+    ];
+    for (const document of documents) {
+      expect(firstDivergence(document), document).toBe('');
+    }
   });
 });

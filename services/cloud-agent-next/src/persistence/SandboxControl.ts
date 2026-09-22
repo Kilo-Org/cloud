@@ -192,7 +192,7 @@ import {
 } from '../sandbox-control/recovery-cleanup.js';
 import {
   createNativeRuntimeRetirementWorkflow,
-  holdsNativeRuntimeRetirementFence,
+  holdsNativeRetirementFenceForSession,
   matchesNativeRuntimeRetirementAllocation,
   releaseNativeRuntimeRetirement,
   sameNativeRuntimeRetirement,
@@ -401,6 +401,7 @@ export type SandboxControlStatus = {
   wrapperInstanceId?: string;
   operationResults?: true;
   runtimeRecovery?: true;
+  runtimeReplacementInFlight?: true;
 };
 
 export type ControlRuntimeCredentialProxyFence = {
@@ -1776,7 +1777,8 @@ export class SandboxControl extends DurableObject<Env> {
           );
         }
       }
-      if (selected.action === 'wait') return this.waitingAcquisitionStatus(selected.physical);
+      if (selected.action === 'wait')
+        return this.waitingAcquisitionStatus(selected.physical, input.sessionId);
       physical = selected.physical;
       creating = selected.action === 'create';
     } else {
@@ -1809,7 +1811,7 @@ export class SandboxControl extends DurableObject<Env> {
     const currentStatus = () =>
       acquisition
         ? this.acquisitionStatus(acquisition, physical, input.sessionId)
-        : this.getStatus();
+        : this.getStatus({ sessionId: input.sessionId });
     if (creating) this.provider = this.createProviderAdapter(this.providerKind, physical);
     if (physical.stopTombstone || (physical.state !== 'creating' && physical.state !== 'running')) {
       return currentStatus();
@@ -2111,7 +2113,7 @@ export class SandboxControl extends DurableObject<Env> {
       ) {
         throw new SandboxAcquisitionLostError();
       }
-      return this.statusForPhysical(current);
+      return this.statusForPhysical(current, sessionId);
     });
   }
 
@@ -2809,15 +2811,21 @@ export class SandboxControl extends DurableObject<Env> {
     return { allowed: true };
   }
 
-  async getStatus(): Promise<SandboxControlStatus> {
+  async getStatus(input?: { sessionId?: string }): Promise<SandboxControlStatus> {
     await this.ensureOperationalInitialized();
-    return this.statusForPhysical(await loadPhysicalRecord(this.ctx.storage));
+    return this.statusForPhysical(await loadPhysicalRecord(this.ctx.storage), input?.sessionId);
   }
 
-  private async statusForPhysical(physical: PhysicalRecord): Promise<SandboxControlStatus> {
+  private async statusForPhysical(
+    physical: PhysicalRecord,
+    sessionId?: string
+  ): Promise<SandboxControlStatus> {
     const connection = this.connectionState();
     const work = await this.workState();
     const runtime = this.readyWrapperRuntime();
+    const runtimeReplacementInFlight =
+      sessionId !== undefined &&
+      (await this.hasNativeRetirementFenceForSession(sessionId, physical));
     return {
       reported: projectReportedStatus({ physical: physical.state, connection, work }),
       physical: physical.state,
@@ -2831,6 +2839,7 @@ export class SandboxControl extends DurableObject<Env> {
         ? { operationResults: true as const }
         : {}),
       ...(runtime?.runtimeRecovery ? { runtimeRecovery: true as const } : {}),
+      ...(runtimeReplacementInFlight ? { runtimeReplacementInFlight: true as const } : {}),
     };
   }
 
@@ -2842,8 +2851,11 @@ export class SandboxControl extends DurableObject<Env> {
    * allocation this session is still fenced from. The wrapper itself stays
    * healthy: only this result is downgraded.
    */
-  private async waitingAcquisitionStatus(physical: PhysicalRecord): Promise<SandboxControlStatus> {
-    const status = await this.statusForPhysical(physical);
+  private async waitingAcquisitionStatus(
+    physical: PhysicalRecord,
+    sessionId?: string
+  ): Promise<SandboxControlStatus> {
+    const status = await this.statusForPhysical(physical, sessionId);
     if (status.connection !== 'ready') return status;
     const connection = 'connected' as const;
     const { wrapperInstanceId: _withheld, ...rest } = status;
@@ -5164,18 +5176,7 @@ export class SandboxControl extends DurableObject<Env> {
     const receipts = await loadNativeRuntimeRetirements(this.ctx.storage);
     if (receipts.length === 0) return false;
     const connection = this.activeConnection ?? this.socketHandler.getConnectionIdentity();
-    return receipts.some(receipt => {
-      if (!receipt.recipients.some(recipient => recipient.sessionId === sessionId)) return false;
-      if (!matchesNativeRuntimeRetirementAllocation(receipt, physical)) return false;
-      if (
-        connection?.wrapperInstanceId !== undefined &&
-        (connection.wrapperInstanceId !== receipt.connection.wrapperInstanceId ||
-          connection.providerInstanceId !== receipt.connection.providerInstanceId)
-      ) {
-        return false;
-      }
-      return holdsNativeRuntimeRetirementFence(receipt);
-    });
+    return holdsNativeRetirementFenceForSession(receipts, physical, connection, sessionId);
   }
 
   private async abortNativeRuntime(input: {

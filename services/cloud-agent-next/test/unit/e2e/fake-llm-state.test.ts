@@ -339,11 +339,25 @@ describe('extractPromptScope', () => {
     expect(extractPromptScope(text)).toEqual({ scope: undefined, text });
   });
 
-  it('strips a marker with no following newline', () => {
+  it('only strips a leading marker that ends at a line break or the end', () => {
     expect(extractPromptScope(`${FAKE_SCOPE_MARKER_PREFIX}b plain text`)).toEqual({
-      scope: 'b',
-      text: ' plain text',
+      scope: undefined,
+      text: `${FAKE_SCOPE_MARKER_PREFIX}b plain text`,
     });
+    expect(extractPromptScope(`${FAKE_SCOPE_MARKER_PREFIX}b`)).toEqual({
+      scope: 'b',
+      text: '',
+    });
+  });
+
+  it('leaves a marker embedded in the payload untouched', () => {
+    const text = `__fake__:echo:hi ${FAKE_SCOPE_MARKER_PREFIX}b\n`;
+    expect(extractPromptScope(text)).toEqual({ scope: undefined, text });
+  });
+
+  it('does not absorb a following directive when the separator is missing', () => {
+    const text = `${FAKE_SCOPE_MARKER_PREFIX}abc__fake__:echo:hi`;
+    expect(extractPromptScope(text)).toEqual({ scope: undefined, text });
   });
 });
 

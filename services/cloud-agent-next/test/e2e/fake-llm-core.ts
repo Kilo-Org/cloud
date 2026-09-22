@@ -353,21 +353,22 @@ export function isFakeScopeToken(value: string): boolean {
 /**
  * Split an optional leading `__e2e_scope__:<token>` marker from a prompt.
  * Returns the scope (undefined when absent or malformed) and the prompt text
- * with the marker and its trailing newline removed.
+ * with the marker and its trailing newline removed. Only a leading marker
+ * followed by a line break or end-of-text is recognized, so a marker that
+ * appears inside a literal payload is left untouched.
  */
 export function extractPromptScope(text: string): { scope: string | undefined; text: string } {
-  const idx = text.indexOf(FAKE_SCOPE_MARKER_PREFIX);
-  if (idx < 0) return { scope: undefined, text };
-  const afterMarker = text.slice(idx + FAKE_SCOPE_MARKER_PREFIX.length);
-  const token = afterMarker.match(/^[A-Za-z0-9_-]{1,64}(?![A-Za-z0-9_-])/)?.[0];
-  if (token === undefined || !isFakeScopeToken(token)) return { scope: undefined, text };
+  if (!text.startsWith(FAKE_SCOPE_MARKER_PREFIX)) return { scope: undefined, text };
+  const afterMarker = text.slice(FAKE_SCOPE_MARKER_PREFIX.length);
+  const token = afterMarker.match(/^([A-Za-z0-9_-]{1,64})(?=\r?\n|$)/)?.[1];
+  if (token === undefined) return { scope: undefined, text };
   const remainder = afterMarker.slice(token.length);
   const stripped = remainder.startsWith('\r\n')
     ? remainder.slice(2)
     : remainder.startsWith('\n')
       ? remainder.slice(1)
       : remainder;
-  return { scope: token, text: text.slice(0, idx) + stripped };
+  return { scope: token, text: stripped };
 }
 
 const FILE_TAG = '[A-Za-z0-9_-]+';
@@ -1676,10 +1677,16 @@ async function handleChatCompletions(
   const tag = directiveTag(directive);
   if (tag) scenarioStatus(state, tag).requests += 1;
   if (scope !== undefined) {
-    state.scopedChatCompletionRequests.set(
-      scope,
-      (state.scopedChatCompletionRequests.get(scope) ?? 0) + 1
-    );
+    const scoped = state.scopedChatCompletionRequests;
+    scoped.set(scope, (scoped.get(scope) ?? 0) + 1);
+    // A long-lived warm Durable Object would otherwise accumulate one entry per
+    // scope token forever. Scopes are first-touch FIFO, so the oldest are the
+    // finished runs; a live run's scope is the newest and stays within the bound.
+    while (scoped.size > MAX_PERSISTED_SCOPES) {
+      const oldest = scoped.keys().next().value;
+      if (oldest === undefined) break;
+      scoped.delete(oldest);
+    }
   }
 
   logEvent('request.start', {

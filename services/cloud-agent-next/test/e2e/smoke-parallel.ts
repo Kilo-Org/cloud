@@ -12,17 +12,17 @@
  *   E2E_PARALLEL=all pnpm --filter cloud-agent-next run e2e:parallel
  *
  * `E2E_PARALLEL` accepts a positive integer or `all` (every supported scenario
- * at once); it defaults to 4. Exit policy: `1` if any scenario failed, else `2`
- * if any scenario was unsupported that the deployed profile did not already
- * report as a capability gap, else `0`. Capability-gated scenarios are filtered
- * out up front and are not spawned.
+ * at once); it defaults to 4. Capability-gated scenarios are filtered out up
+ * front and are not spawned, so a child's non-zero exit is a failure: exit `1`
+ * when any scenario failed, else `0`. A child that does not exit within its
+ * watchdog deadline is killed and reported as a failure.
  *
  * Cold boots contend on container provisioning, so `all` maximises the chance
  * of a container cold-start timeout (240 s/turn budget) showing up as a false
  * failure. A modest default (4) trades wall time for stability.
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -36,6 +36,10 @@ import { requireScenarioApi } from './run.js';
 const SERVICE_PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 const DEFAULT_PARALLEL = 4;
+/** Fallback child budget when the scenario declares no `defaultTimeoutMs`. */
+const DEFAULT_CHILD_TIMEOUT_MS = 30 * 60_000;
+/** Extra time over the scenario budget for child startup, cleanup and exit. */
+const CHILD_WATCHDOG_SLACK_MS = 10 * 60_000;
 
 type Job = {
   name: string;
@@ -44,7 +48,7 @@ type Job = {
   timeoutMs: number | undefined;
 };
 
-type Outcome = 'pass' | 'failure' | 'unsupported';
+type Outcome = 'pass' | 'failure';
 
 type JobResult = {
   job: Job;
@@ -56,13 +60,29 @@ type JobResult = {
 function resolveParallelism(total: number): number {
   const raw = process.env.E2E_PARALLEL;
   if (raw === undefined || raw === '') return Math.min(DEFAULT_PARALLEL, total);
-  if (raw.trim().toLowerCase() === 'all') return total;
-  const parsed = Number.parseInt(raw, 10);
+  const trimmed = raw.trim();
+  if (trimmed.toLowerCase() === 'all') return total;
+  const parsed = /^\d+$/.test(trimmed) ? Number.parseInt(trimmed, 10) : Number.NaN;
   if (!Number.isInteger(parsed) || parsed < 1) {
     console.error(`E2E_PARALLEL must be a positive integer or "all"; got ${JSON.stringify(raw)}`);
     process.exit(2);
   }
   return Math.min(parsed, total);
+}
+
+/** Kill the child's process group so `pnpm` and its `tsx`/`node` tree all stop. */
+function killTree(child: ChildProcess): void {
+  const pid = child.pid;
+  if (pid === undefined) return;
+  try {
+    process.kill(-pid, 'SIGKILL');
+  } catch {
+    try {
+      child.kill('SIGKILL');
+    } catch {
+      // Already gone.
+    }
+  }
 }
 
 function buildJobs(): Job[] {
@@ -108,6 +128,8 @@ function runScenario(job: Job, scope: string, total: number, index: number): Pro
       cwd: SERVICE_PACKAGE_DIR,
       env: { ...process.env, E2E_PROFILE: 'deployed', E2E_FAKE_SCOPE: scope },
       stdio: ['ignore', 'pipe', 'pipe'],
+      // Own process group so the watchdog can kill the whole `pnpm`/`tsx` tree.
+      detached: true,
     });
 
     const prefix = `[${job.name}] `;
@@ -127,9 +149,22 @@ function runScenario(job: Job, scope: string, total: number, index: number): Pro
     forward(child.stdout);
     forward(child.stderr);
 
+    let settled = false;
+    const watchdogMs = (job.timeoutMs ?? DEFAULT_CHILD_TIMEOUT_MS) + CHILD_WATCHDOG_SLACK_MS;
+    const watchdog = setTimeout(() => {
+      console.error(
+        `${prefix}watchdog: no exit after ${Math.round(watchdogMs / 1000)}s; killing child`
+      );
+      killTree(child);
+    }, watchdogMs);
+    watchdog.unref();
+
     const settle = (exitCode: number): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(watchdog);
       const durationMs = Date.now() - startedAt;
-      const outcome: Outcome = exitCode === 0 ? 'pass' : exitCode === 2 ? 'unsupported' : 'failure';
+      const outcome: Outcome = exitCode === 0 ? 'pass' : 'failure';
       console.log(
         `--- ${job.name} ${outcome} (exit=${exitCode}, ${Math.round(durationMs / 1000)}s) ---`
       );
@@ -170,18 +205,14 @@ async function main(): Promise<void> {
   const wallSeconds = Math.round((Date.now() - startedAt) / 1000);
 
   const pass = results.filter(result => result.outcome === 'pass');
-  const unsupported = results.filter(result => result.outcome === 'unsupported');
   const failures = results.filter(result => result.outcome === 'failure');
   console.log(
-    `\nSummary: ${pass.length} passed, ${failures.length} failed, ${unsupported.length} unsupported (wall time ${wallSeconds}s)`
+    `\nSummary: ${pass.length} passed, ${failures.length} failed (wall time ${wallSeconds}s)`
   );
   for (const result of failures)
     console.log(`failed: ${result.job.name} (exit=${result.exitCode})`);
-  for (const result of unsupported) console.log(`unsupported: ${result.job.name}`);
 
-  if (failures.length > 0) process.exit(1);
-  if (unsupported.length > 0) process.exit(2);
-  process.exit(0);
+  process.exit(failures.length > 0 ? 1 : 0);
 }
 
 main().catch(error => {

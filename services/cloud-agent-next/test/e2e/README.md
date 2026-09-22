@@ -486,8 +486,11 @@ once) and defaults to `4`. Each child gets a unique `E2E_FAKE_SCOPE`, so its
 completions are counted separately on the shared fake and its
 `fetchFakeRequests` "unchanged"/"increased" assertions stay meaningful while
 other shards dispatch. Capability-gated scenarios are filtered out up front and
-never spawned. Passes the same deployed-profile env as `e2e:deployed`; exit
-policy matches it (`1` failure, else `2` unexpected unsupported, else `0`).
+never spawned. Passes the same deployed-profile env as `e2e:deployed`. Because
+unsupported scenarios are filtered before spawn, a non-zero child exit is a
+failure: exit `1` if any scenario failed, else `0`. A child that exceeds its
+watchdog deadline (its scenario budget plus ten minutes) is killed and reported
+as a failure.
 
 Cold boots contend on container provisioning, so `all` maximises the chance of a
 container cold-start timeout showing up as a false failure; the default `4`

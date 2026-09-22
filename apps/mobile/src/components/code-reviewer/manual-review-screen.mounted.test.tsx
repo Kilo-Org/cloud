@@ -32,22 +32,36 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('react-native', () => ({
+  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
 }));
-vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-// The keyboard-lift view reads the device insets through
-// `react-native-safe-area-context`, whose CommonJS entry requires a Flow
-// react-native subpath this node project cannot load. Stub the two kilo-chat
-// modules the way the sibling node-only screen tests do.
+// The screen reads `useRevealEndOnKeyboard()` on every render, before the
+// provider-status branches, and wraps its form in the shared keyboard-lift
+// view. Both kilo-chat modules reach the safe-area insets through
+// `react-native-safe-area-context`, whose module resolves to its untransformed
+// `react-native` entry (`src/index.tsx`): the CommonJS entry requires a Flow
+// react-native subpath this node project cannot load, and every mounted suite
+// mocks it. So mock the native safe-area context and stub both kilo-chat
+// modules the way the sibling node-only screen tests do (the real
+// keyboard-lift view reads the platform and the safe-area insets, as
+// app-aware-keyboard-padding.mounted.test.tsx covers); the reveal hook stays
+// inert with no keyboard padding.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
+  useAppAwareKeyboardPadding: () => 0,
 }));
 vi.mock('@/components/kilo-chat/use-reveal-end-on-keyboard', () => ({
   useRevealEndOnKeyboard: () => ({ current: null }),
 }));
+vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));

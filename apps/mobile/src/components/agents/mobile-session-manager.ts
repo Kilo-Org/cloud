@@ -452,10 +452,13 @@ export function createMobileAgentSessionManager({
     },
     // The SDK states a failed send itself: `send` calls this hook and then
     // sets an error status indicator (packages/cloud-agent-sdk/src/
-    // session-manager.ts:2606-2614) that mobile renders translated above the
-    // composer. A toast here would restate the same failure as raw developer
-    // text (HTTP status plus the server message), so the hook stays silent —
-    // the SDK's indicator is the single failed-send surface.
+    // session-manager.ts:2606-2623) that mobile renders translated above the
+    // composer. That indicator is written for every failure except a
+    // connection-level one while the agent is already disconnected, where the
+    // preserved "Agent connection lost" line is the failure — so no failed send
+    // is left without a surface. A toast here would restate the failure as raw
+    // developer text (HTTP status plus the server message), so the hook stays
+    // silent — the SDK's indicator is the single failed-send surface.
     // oxlint-disable-next-line no-empty-function -- the SDK's status indicator owns the failed-send surface
     onSendFailed: () => {},
     fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {

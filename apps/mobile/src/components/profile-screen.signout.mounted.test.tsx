@@ -35,10 +35,12 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 
-// The screen reads its landscape side insets through `@/lib/screen-insets`,
+// ProfileScreen reads its landscape side insets through `@/lib/screen-insets`,
 // whose real `react-native-safe-area-context` entry is a Flow source this
-// transform cannot parse; the insets are irrelevant to the sign-out flow, so
-// stub the hook with the hoisted `insets` above.
+// transform cannot parse (see `test/render-with-providers.tsx`), so the harness
+// mocks it exactly as `profile-screen.queries.mounted.test.tsx` does. The
+// insets are irrelevant to the sign-out flow, so stub the hook with the hoisted
+// `insets` above.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));

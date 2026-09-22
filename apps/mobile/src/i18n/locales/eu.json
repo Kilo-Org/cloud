@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Saioa hasteko saiakera gehiegi egin dira. Itxaron eta saiatu berriro."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatiko Puntakoa",
+      "balanced": "Automatiko Orekatua",
+      "efficient": "Automatiko Eraginkorra",
+      "small": "Automatiko Txikia",
+      "free": "Automatiko Doan",
+      "organization": "Erakunde-automatikoa"
+    },
     "dataCollected": "Datuak biltzen dira",
     "free": "Doan",
     "couldNotUpdateFavorites": "Ezin izan dira gogokoak eguneratu.",

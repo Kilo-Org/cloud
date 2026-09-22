@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cloud-agent-e2e-workers-test",
+  "main": "src/e2e-entry.ts",
+  "compatibility_date": "2026-06-03",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
+  "vars": {
+    "NEXTAUTH_SECRET": "cloud-agent-e2e-workers-test-secret",
+    "INTERNAL_API_SECRET": "cloud-agent-e2e-workers-test-internal-secret",
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "00000000000000000000000000000000",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "class_name": "CloudAgentSession", "name": "CLOUD_AGENT_SESSION" },
+      { "class_name": "SandboxControl", "name": "SANDBOX_CONTROL" },
+      { "class_name": "SandboxSession", "name": "SANDBOX_SESSION" },
+      { "class_name": "E2eCallbackSink", "name": "E2E_CALLBACK_SINK" },
+    ],
+  },
+  "migrations": [
+    { "new_sqlite_classes": ["CloudAgentSession"], "tag": "v2" },
+    { "new_sqlite_classes": ["SandboxControl"], "tag": "v9" },
+    { "new_sqlite_classes": ["SandboxSession"], "tag": "v10" },
+    { "new_sqlite_classes": ["E2eCallbackSink"], "tag": "v10-e2e" },
+  ],
+  "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],
+}

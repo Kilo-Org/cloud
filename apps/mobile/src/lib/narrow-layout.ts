@@ -1,6 +1,6 @@
 /**
- * Window width (dp) at or below which the shell drops a fixed side-by-side row
- * for a stacked one.
+ * Window width (dp) below which the shell drops a fixed side-by-side row for a
+ * stacked one.
  *
  * The design targets the narrowest common phone (320 dp), where a row's fixed
  * icon tile and trailing chevron still leave the flexible text column room for

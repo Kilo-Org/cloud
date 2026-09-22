@@ -5,8 +5,8 @@ const TAB_BAR_BASE_HEIGHT = 50;
 const ANDROID_TAB_BAR_EXTRA_PADDING = 4;
 export const TAB_LABEL_WRAP_FONT_SCALE = 1.8;
 /**
- * Above this font scale the tab bar drops visible labels and switches to an
- * icon-forward presentation. The label height (which scales with fontScale) is
+ * At or above this font scale the tab bar drops visible labels and switches to
+ * an icon-forward presentation. The label height (which scales with fontScale) is
  * removed from the overlay height calculation, so the bar stays at the base
  * 50pt instead of ballooning. Labels remain available to assistive tech via
  * `tabBarAccessibilityLabel`. Picked above the label-wrap threshold so
@@ -30,8 +30,8 @@ type TabBarPlatform = 'android' | 'ios' | 'macos' | 'windows' | 'web';
  * threshold the bar is sized for one line, so the label must stay on one line
  * and shrink to fit it: a word wider than its tab would otherwise wrap into a
  * second line the bar has no room for, and be clipped at the bar's edge
- * ("PROFIL E", 480x1000 @ 480 = 160 dp, e1, 2026-09-21). At/above the threshold
- * the bar grows the second line for the two-line `tabs.kiloclawWrapped` label.
+ * ("PROFIL E", 480x1000 @ 480 = 160 dp, e1, 2026-09-21). Above the threshold the
+ * bar grows the second line for the two-line `tabs.kiloclawWrapped` label.
  */
 export function tabLabelLineCount(fontScale = 1): 1 | 2 {
   return fontScale > TAB_LABEL_WRAP_FONT_SCALE ? 2 : 1;

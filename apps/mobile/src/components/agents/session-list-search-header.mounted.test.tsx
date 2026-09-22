@@ -165,11 +165,17 @@ describe('SessionListSearchHeader clear control', () => {
     const field = Object.assign({}, ...declarations) as { minHeight?: number };
 
     // The row's `py-1.5` compiles to a 5.25pt `paddingBlock` per side at the
-    // app's 14pt rem — 10.5pt, not the 12pt a 16pt rem would give — so the
-    // field must already hold the control's box plus it. Read the padding from
-    // the compiled row rather than a hand-written rem figure.
+    // app's 14pt rem — 10.5pt, not the 12pt a 16pt rem would give — and its
+    // `border` adds 1pt per side, 2pt vertically. React Native lays the row out
+    // as a border box, so the field's floor must already hold the control's box
+    // plus both. Read the padding and the border from the compiled row rather
+    // than a hand-written rem figure.
     const rowVerticalPaddingDp = 2 * (await compiledLengthDp(rowClassName, 'paddingBlock'));
+    const rowVerticalBorderDp = 2 * (await compiledLengthDp(rowClassName, 'borderWidth'));
     expect(rowVerticalPaddingDp).toBe(10.5);
-    expect(field.minHeight).toBeGreaterThanOrEqual(box.height + rowVerticalPaddingDp);
+    expect(rowVerticalBorderDp).toBe(2);
+    expect(field.minHeight).toBeGreaterThanOrEqual(
+      box.height + rowVerticalPaddingDp + rowVerticalBorderDp
+    );
   });
 });

@@ -52,7 +52,7 @@ function fieldOf(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTe
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'View' &&
-      String(node.props.className).includes('min-h-[50px]')
+      String(node.props.className).includes('min-h-[51px]')
   );
 }
 
@@ -95,10 +95,12 @@ describe('SessionListSearchHeader clear button touch target', () => {
 
     // Same field height in both states: the X appears on the first keystroke
     // and must not move the list below it. A single `min-h` class, so the
-    // effective floor cannot depend on Tailwind's emit order.
+    // effective floor cannot depend on Tailwind's emit order. The floor covers
+    // the 38pt control plus the row's padding and border; the compiled guard in
+    // `session-list-search-header.mounted.test.tsx` holds the arithmetic.
     const fieldWithText = fieldOf(withText);
     const fieldWithoutText = fieldOf(withoutText);
-    expect(fieldWithText.props.className).toContain('min-h-[50px]');
+    expect(fieldWithText.props.className).toContain('min-h-[51px]');
     expect(fieldWithText.props.className).not.toContain('min-h-[44px]');
     expect(fieldWithoutText.props.className).toBe(fieldWithText.props.className);
 

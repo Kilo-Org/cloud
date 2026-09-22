@@ -43,16 +43,17 @@ export function SessionListSearchHeader({
   );
   return (
     <View>
-      {/* One `min-height` floor, not two: `min-h-[50px]` is the height the row
+      {/* One `min-height` floor, not two: `min-h-[51px]` is the height the row
           must already hold for the clear control's 38pt box plus the field's
           own 10.5pt vertical padding (`py-1.5` is 0.375rem at the app's 14pt
-          rem), so the first keystroke cannot grow the row and shift the list
-          below. A second `min-h-*` class would set the same property, leaving
-          which floor wins to the order Tailwind emits its rules rather than to
-          this intent. */}
+          rem) and its 2pt vertical `border` (1pt a side, inside the border box
+          React Native lays out), so the first keystroke cannot grow the row and
+          shift the list below. A second `min-h-*` class would set the same
+          property, leaving which floor wins to the order Tailwind emits its
+          rules rather than to this intent. */}
       <View
         style={fieldMargins}
-        className="my-2 min-h-[50px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
+        className="my-2 min-h-[51px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
       >
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
         <View className="h-[18px] w-[18px] items-center justify-center">
@@ -89,9 +90,9 @@ export function SessionListSearchHeader({
             // The frame, not the 16pt glyph, is what the size audit measures.
             // One size, spelled as whole pixels the mounted test compiles: the
             // 38pt box clears the 28dp floor, and the 3pt slop carries it to
-            // 38 + 2 * 3 = 44pt. The row's `min-h-[50px]` already holds this
-            // box plus the field's 10.5pt padding. A second `h-*`/`w-*` pair here
-            // would set the same properties and leave the real size to
+            // 38 + 2 * 3 = 44pt. The row's `min-h-[51px]` already holds this box
+            // plus the field's 10.5pt padding and 2pt border. A second `h-*`/`w-*`
+            // pair here would set the same properties and leave the real size to
             // Tailwind's emit order. `-mr-2` keeps the glyph near its old inset
             // and the frame's left edge inside the field's right padding.
             hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}

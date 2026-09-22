@@ -142,10 +142,11 @@ async function compiledGapDp(rowClassName: string): Promise<number> {
 type Insets = { top: number; right: number; bottom: number; left: number };
 
 /**
- * A control's hitSlop as per-side insets. Controls here use either shape: the
- * shared `IconButton` passes per-side insets, while `SessionFilterButton` keeps
- * the scalar `@/lib/a11y/tap-target` slop, where one number applies to every
- * side.
+ * A control's hitSlop as per-side insets. Both controls in this header pass
+ * per-side insets: the shared `IconButton` takes a per-side object, and
+ * `SessionFilterButton` spells out four equal sides (`FILTER_HIT_SLOP`). The
+ * scalar branch mirrors React Native's own `number | Rect` hitSlop type, where
+ * one number applies to every side.
  */
 function hitSlopInsets(hitSlop: unknown): Insets {
   if (typeof hitSlop === 'number') {
@@ -238,13 +239,10 @@ describe('SessionListHeaderActions new-session control', () => {
     expect(gapDp).toBe(14);
 
     // `hitSlopInsets` (inside `slopSideDp`) validates and normalizes either
-    // shape, because the filter expresses its slop as one dp value for every
-    // side while the new-session control caps its right side.
-    // The new-session control sits left of the filter, so the gap has to fit
-    // both facing slops; more than the gap means the two regions overlap. Either
-    // control may express hitSlop as one number or as per-side insets: the
-    // filter writes its slop as one number for every side, the new-session
-    // control as a per-side object.
+    // shape of React Native's `number | Rect` hitSlop: the filter spells out
+    // four equal per-side insets, while the new-session control caps its right
+    // side. The new-session control sits left of the filter, so the gap has to
+    // fit both facing slops; more than the gap means the two regions overlap.
     expect(
       slopSideDp(newSession.props.hitSlop, 'right') + slopSideDp(filter.props.hitSlop, 'left')
     ).toBeLessThanOrEqual(gapDp);

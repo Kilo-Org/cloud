@@ -124,9 +124,15 @@ vi.mock('@/components/ui/button', () => ({
   Button: 'Button',
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
+// The loading profile row renders the reanimated `Skeleton`; stub it so this
+// node suite neither loads reanimated nor loses the `findElementByType`
+// assertion for the loading placeholder.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
-// `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
-// import cannot resolve in the pure project; every sibling pure spec mocks it.
+// The real Skeleton imports `react-native-reanimated`, whose worklets module
+// cannot load in this node project; the body only needs the node to exist.
+// `renderProfileRow` reaches this shimmed Skeleton, which every sibling pure
+// spec mocks for the same reason.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/segmented-control', () => ({

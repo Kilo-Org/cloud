@@ -5,16 +5,29 @@
  * already exist (created via `app:create-user`). Used to test that removing a
  * member closes their socket.
  *
+ * The fixture is idempotent: a rerun removes the organizations it created for
+ * the same owner and inserts the pair again, so the mobile account sheet lists
+ * one row per account instead of one row per seed run.
+ *
  * Usage: pnpm dev:seed app:w4c-org-pair <owner-email> <member-email>
  */
 
 import { randomUUID } from 'node:crypto';
 
 import { kilocode_users, organizations, organization_memberships } from '@kilocode/db/schema';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, like, or, sql } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import {
+  FIXTURE_SETTINGS_KEY,
+  fixtureSettingsMarkerJson,
+  LEGACY_ORGANIZATION_NAME_PREFIX,
+  membershipsToPrune,
+  SEEDED_ORGANIZATION_NAME,
+  selectSeededOrganization,
+} from '../lib/w4c-org-pair';
+import type { FixturePair } from '../lib/w4c-org-pair';
 import type { SeedResult } from '../index';
 
 export const usage = '<owner-email> <member-email>';
@@ -25,7 +38,7 @@ export const usage = '<owner-email> <member-email>';
  * The mobile account sheet renders an organization's name verbatim, so the
  * name must stay user-facing and never carry a `[seed:...]` developer marker.
  */
-export const SEEDED_ORGANIZATION_NAME = 'Acme Corp';
+export { SEEDED_ORGANIZATION_NAME };
 
 /**
  * The developer marker an earlier revision of this fixture put in the
@@ -85,6 +98,9 @@ function printUsage(): void {
   console.log('');
   console.log('Creates one organization with an owner and a member. Both users must');
   console.log('already exist (create them first with app:create-user).');
+  console.log('');
+  console.log('Rerunning for the same owner replaces the organization created');
+  console.log('before, so the fixture stays one organization per account.');
   console.log('');
   console.log('Examples:');
   console.log('  pnpm dev:seed app:w4c-org-pair owner@example.com member@example.com');
@@ -149,6 +165,47 @@ async function resetSeededOrganizations(ownerUserId: string): Promise<number> {
   return organizationIds.length;
 }
 
+/**
+ * Every organization this fixture may have created, whatever name it carried:
+ * the settings marker, the legacy `[seed:w4c-org-pair] ` prefix, or the name
+ * written since #6332. Which of them belong to this pair's run is decided by
+ * `isPairOrganization`.
+ */
+async function listFixtureOrganizations() {
+  const db = getSeedDb();
+  return db
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      created_at: organizations.created_at,
+      settings: organizations.settings,
+    })
+    .from(organizations)
+    .where(
+      or(
+        eq(organizations.name, SEEDED_ORGANIZATION_NAME),
+        like(organizations.name, `${LEGACY_ORGANIZATION_NAME_PREFIX}%`),
+        sql`${organizations.settings} ->> ${FIXTURE_SETTINGS_KEY} IS NOT NULL`
+      )
+    );
+}
+
+/** The two users' memberships, with the joined organization's name/settings. */
+async function listMemberships(userIds: readonly string[]) {
+  const db = getSeedDb();
+  return db
+    .select({
+      id: organization_memberships.id,
+      organization_id: organization_memberships.organization_id,
+      kilo_user_id: organization_memberships.kilo_user_id,
+      organizationName: organizations.name,
+      organizationSettings: organizations.settings,
+    })
+    .from(organization_memberships)
+    .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
+    .where(inArray(organization_memberships.kilo_user_id, userIds));
+}
+
 export async function run(...args: string[]): Promise<SeedResult | void> {
   if (args.includes('--help') || args.includes('-h')) {
     printUsage();
@@ -176,28 +233,81 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('owner-email and member-email must refer to different users');
   }
 
+  // Reset this fixture's own organizations for the owner first, so a rerun
+  // replaces the pair instead of accumulating another row in the account sheet.
   const replaced = await resetSeededOrganizations(ownerUserId);
 
-  const organizationId = randomUUID();
+  const userIds = [ownerUserId, memberUserId];
 
-  await db.insert(organizations).values({
-    id: organizationId,
-    name: SEEDED_ORGANIZATION_NAME,
-    created_by_kilo_user_id: ownerUserId,
-  });
+  // Recognition is scoped to this pair's owner: the marker names the owner a
+  // row was created for, so a row belonging to another pair is never claimed.
+  // Rows created before the marker named an owner carry none, and the pair's
+  // existing memberships are the only evidence the fixture created them, so
+  // they are read first and passed in. The fixture therefore converges on the
+  // oldest organization it created for this owner and prunes only this pair's
+  // memberships elsewhere, so each of the two users ends with one fixture
+  // organization membership and the account sheet lists that organization once.
+  const membershipRows = await listMemberships(userIds);
+  const pair: FixturePair = {
+    ownerEmail: normalizeSeedEmail(trimmedOwnerEmail),
+    organizationIds: new Set(membershipRows.map(row => row.organization_id)),
+  };
 
-  await db.insert(organization_memberships).values([
-    {
-      organization_id: organizationId,
-      kilo_user_id: ownerUserId,
-      role: 'owner',
-    },
-    {
-      organization_id: organizationId,
-      kilo_user_id: memberUserId,
-      role: 'member',
-    },
-  ]);
+  const fixtureOrganizations = await listFixtureOrganizations();
+  const keptOrganization = selectSeededOrganization(fixtureOrganizations, pair);
+  const organizationId = keptOrganization?.id ?? randomUUID();
+
+  if (!keptOrganization) {
+    await db.insert(organizations).values({
+      id: organizationId,
+      name: SEEDED_ORGANIZATION_NAME,
+      created_by_kilo_user_id: ownerUserId,
+    });
+  }
+
+  // Merge the marker into `settings` without dropping the other keys, and drop
+  // the legacy `[seed:w4c-org-pair] ` name so the app shows a user-facing name.
+  const renamesFromLegacyMarker =
+    keptOrganization !== undefined &&
+    keptOrganization.name.startsWith(LEGACY_ORGANIZATION_NAME_PREFIX);
+  await db
+    .update(organizations)
+    .set({
+      settings: sql`${organizations.settings} || ${fixtureSettingsMarkerJson(pair.ownerEmail)}::jsonb`,
+      ...(renamesFromLegacyMarker ? { name: SEEDED_ORGANIZATION_NAME } : {}),
+    })
+    .where(eq(organizations.id, organizationId));
+
+  // The pair must end up with exactly one membership each: the kept
+  // organization's. Membership rows in the other organizations this fixture
+  // created for the pair are pruned; this step never deletes an organization.
+  const pruneMembershipIds = membershipsToPrune(membershipRows, organizationId, userIds, pair).map(
+    row => row.id
+  );
+  if (pruneMembershipIds.length > 0) {
+    await db
+      .delete(organization_memberships)
+      .where(inArray(organization_memberships.id, pruneMembershipIds));
+  }
+
+  await db
+    .insert(organization_memberships)
+    .values([
+      {
+        organization_id: organizationId,
+        kilo_user_id: ownerUserId,
+        role: 'owner',
+      },
+      {
+        organization_id: organizationId,
+        kilo_user_id: memberUserId,
+        role: 'member',
+      },
+    ])
+    .onConflictDoUpdate({
+      target: [organization_memberships.organization_id, organization_memberships.kilo_user_id],
+      set: { role: sql`excluded.role` },
+    });
 
   if (replaced > 0) {
     console.log(
@@ -209,5 +319,6 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     organizationId,
     ownerUserId,
     memberUserId,
+    prunedMembershipCount: pruneMembershipIds.length,
   };
 }

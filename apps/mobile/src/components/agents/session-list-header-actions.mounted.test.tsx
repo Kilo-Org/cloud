@@ -53,25 +53,27 @@ function boxDp(className: string): { width: number; height: number } {
   return { width: size('w'), height: size('h') };
 }
 
-/** The reach a hitSlop expresses on one side, in dp; a number reaches every side. */
-function sideSlopDp(hitSlop: unknown, side: 'top' | 'right' | 'bottom' | 'left'): number {
+/** The per-side reach a `hitSlop` prop expresses; a bare number covers every side. */
+function slopInsets(hitSlop: unknown): Insets {
   if (typeof hitSlop === 'number') {
-    return hitSlop;
+    return { top: hitSlop, right: hitSlop, bottom: hitSlop, left: hitSlop };
   }
   if (hitSlop && typeof hitSlop === 'object') {
-    return (hitSlop as Record<string, number | undefined>)[side] ?? 0;
+    const sides = hitSlop as Partial<Insets>;
+    return {
+      top: sides.top ?? 0,
+      right: sides.right ?? 0,
+      bottom: sides.bottom ?? 0,
+      left: sides.left ?? 0,
+    };
   }
-  return 0;
+  return { top: 0, right: 0, bottom: 0, left: 0 };
 }
 
 /** The smallest per-side reach a hitSlop expresses, in dp. */
 function slopDp(hitSlop: unknown): number {
-  return Math.min(
-    sideSlopDp(hitSlop, 'top'),
-    sideSlopDp(hitSlop, 'right'),
-    sideSlopDp(hitSlop, 'bottom'),
-    sideSlopDp(hitSlop, 'left')
-  );
+  const sides = slopInsets(hitSlop);
+  return Math.min(sides.top, sides.right, sides.bottom, sides.left);
 }
 
 /** One side's reach, from a hitSlop that is one number for every side or per-side insets. */

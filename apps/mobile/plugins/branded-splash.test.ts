@@ -164,9 +164,18 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
-    });
+    // A machine with a prebuilt android/ tree carries the app's other colors
+    // (`withAndroidColors` reads the project's colors.xml), so assert the
+    // splash entry is present rather than the array's only entry.
+    expect(evaluated._internal?.modResults?.android?.colors).toEqual(
+      expect.objectContaining({
+        resources: expect.objectContaining({
+          color: expect.arrayContaining([
+            expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+          ]),
+        }),
+      })
+    );
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {
         style: expect.arrayContaining([

@@ -5,6 +5,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RemoteSessionRow } from './remote-session-row';
+import { SessionRow } from '@/components/ui/session-row';
 import {
   buildActiveSessionsTrayInput,
   type CachedActiveSessionsData,
@@ -25,6 +26,8 @@ import { createKiloAppQueryClient, getActiveSessionsQueryMetadata } from '@/lib/
 const state = vi.hoisted(() => ({
   organizationId: null as string | null,
   exit: undefined as (() => void) | undefined,
+  menuRename: undefined as (() => void) | undefined,
+  renamePrompt: vi.fn(),
   request: vi.fn<() => Promise<CachedActiveSessionsData>>(),
   send: vi.fn(),
 }));
@@ -64,11 +67,12 @@ vi.mock('@/components/agents/session-platform-icon', () => ({
   SessionPlatformIcon: () => null,
 }));
 vi.mock('@/components/agents/session-row-actions', () => ({
-  showSessionActionMenu: (options: { onExit?: () => void }) => {
+  showSessionActionMenu: (options: { onExit?: () => void; onRename?: () => void }) => {
     state.exit = options.onExit;
+    state.menuRename = options.onRename;
   },
   copySessionId: vi.fn(),
-  showRenamePrompt: vi.fn(),
+  showRenamePrompt: state.renamePrompt,
 }));
 vi.mock('@/components/agents/remote-session-exit-alert', () => ({
   showRemoteSessionExitConfirmation: vi.fn().mockResolvedValue(true),
@@ -97,12 +101,12 @@ const otherKey = [
 ];
 const session: ActiveSession = makeCached({ createdOnPlatform: 'cli' });
 
-async function render() {
+async function render(sessionOverride: ActiveSession = session) {
   await act(async () => {
     const tree = createElement(
       QueryClientProvider,
       { client },
-      createElement(RemoteSessionRow, { session, onPress: vi.fn<() => void>() })
+      createElement(RemoteSessionRow, { session: sessionOverride, onPress: vi.fn<() => void>() })
     );
     if (renderer) {
       renderer.update(tree);
@@ -140,6 +144,8 @@ beforeEach(() => {
   setSignOutActive(false);
   state.organizationId = null;
   state.exit = undefined;
+  state.menuRename = undefined;
+  state.renamePrompt.mockReset();
   state.request.mockReset().mockResolvedValue({ sessions: [] });
   state.send.mockReset().mockResolvedValue(undefined);
   client = createKiloAppQueryClient();
@@ -262,5 +268,33 @@ describe('row exit refresh caller', () => {
     });
     expect(client.getQueryData(QUERY_KEY)).toEqual(current);
     expect(state.request.mock.calls).toHaveLength(0);
+  });
+});
+
+describe('RemoteSessionRow machine title', () => {
+  const machineTitle = 'New session - 2026-09-22T01:09:45.623Z';
+
+  function machineSession() {
+    return makeCached({ id: 'remote-machine', status: 'busy', title: machineTitle });
+  }
+
+  it('paints and speaks the fallback for a machine-titled session', async () => {
+    await render(machineSession());
+    const row = renderer?.root.findByType(SessionRow);
+    expect(row?.props.title).toBe('Untitled session');
+    const button = renderer?.root.findByType(Pressable);
+    expect(button?.props.accessibilityLabel).toContain('Untitled session');
+  });
+
+  it('seeds the rename control empty for a machine-titled session', async () => {
+    await render(machineSession());
+    act(() => {
+      const props = renderer?.root.findByType(Pressable).props as { onLongPress: () => void };
+      props.onLongPress();
+    });
+    act(() => {
+      state.menuRename?.();
+    });
+    expect(state.renamePrompt).toHaveBeenCalledWith('', expect.any(Function));
   });
 });

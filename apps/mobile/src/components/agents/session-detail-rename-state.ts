@@ -1,3 +1,5 @@
+import { isDefaultSessionTitle } from '@kilocode/app-shared/session-title';
+
 export type RenameState = {
   isModalOpen: boolean;
   optimisticTitle: string | null;
@@ -61,14 +63,19 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
-  const baseTitle = input.isLoaded
-    ? (input.serverTitle ?? input.fallbackTitle)
-    : input.fallbackTitle;
+  const chosenTitle =
+    input.isLoaded && !isDefaultSessionTitle(input.serverTitle) ? input.serverTitle : undefined;
+  const baseTitle = chosenTitle ?? input.fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
     title,
     isTitleInteractive: input.isLoaded,
-    modalInitialValue: input.renameState.isModalOpen ? title : null,
+    // Seed from a chosen name only. A machine or blank title must not
+    // pre-fill the field, and `''` (not null) is what opens it empty: the
+    // hook's `modalInitialValue ?? state.title` falls back on null.
+    modalInitialValue: input.renameState.isModalOpen
+      ? (input.renameState.optimisticTitle ?? chosenTitle ?? '')
+      : null,
     isModalOpen: input.renameState.isModalOpen,
   };
 }

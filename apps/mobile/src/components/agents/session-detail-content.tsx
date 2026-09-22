@@ -4,6 +4,7 @@ import {
   type MessageDeliveryState,
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
+import { displaySessionTitle } from '@kilocode/app-shared/session-title';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
@@ -1535,8 +1536,10 @@ export function SessionDetailContent({
     isLoaded: isSessionLoaded,
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
-    // title it opened with instead of blinking back to "Session".
-    fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
+    // title it opened with instead of blinking back to "Session". The list
+    // row still carries the backend's machine title, so paint the app's
+    // fallback rather than the raw "New session - <ISO>".
+    fallbackTitle: displaySessionTitle(cachedTitle, t('agentChat.session.title')),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;

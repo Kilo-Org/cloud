@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { displaySessionTitle, sessionTitleRenameSeed } from '@kilocode/app-shared/session-title';
 
 import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
@@ -105,8 +106,9 @@ export function StoredSessionRow({
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
-  const title =
-    session.title && session.title.length > 0 ? session.title : t('agents.sessionRow.untitled');
+  const title = displaySessionTitle(session.title, t('agents.sessionRow.untitled'));
+  // The rename field never opens pre-filled with the backend's machine title.
+  const renameSeed = sessionTitleRenameSeed(session.title);
   const [renameVisible, setRenameVisible] = useState(false);
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
@@ -134,7 +136,7 @@ export function StoredSessionRow({
       onRename: onRename
         ? () => {
             if (Platform.OS === 'ios') {
-              showRenamePrompt(title, newTitle => {
+              showRenamePrompt(renameSeed, newTitle => {
                 onRename(newTitle);
               });
             } else {
@@ -238,7 +240,7 @@ export function StoredSessionRow({
         <RenameModal
           title={t('agentChat.session.renameSession')}
           placeholder={t('agentChat.session.renamePlaceholder')}
-          initialValue={title}
+          initialValue={renameSeed}
           onClose={() => {
             setRenameVisible(false);
           }}

@@ -52,6 +52,29 @@ describe('newestSessionTitle', () => {
     expect(newestSessionTitle(rows)).toBeNull();
   });
 
+  it('returns null for the backend machine title', () => {
+    // The widget line names a session; the machine title has no name to show,
+    // so the surface shows nothing rather than the raw ISO string.
+    expect(
+      newestSessionTitle([{ title: 'New session - 2026-09-22T01:09:45.623Z', status: 'busy' }])
+    ).toBeNull();
+    expect(
+      newestSessionTitle([{ title: 'Child session - 2026-09-22T01:09:45.623Z', status: 'busy' }])
+    ).toBeNull();
+  });
+
+  it('still returns a chosen name beside a machine-titled row', () => {
+    const rows = [
+      { title: 'Named row', status: 'busy', updatedAt: '2026-01-06T00:00:00.000Z' },
+      {
+        title: 'New session - 2026-09-22T01:09:45.623Z',
+        status: 'busy',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ];
+    expect(newestSessionTitle(rows)).toBe('Named row');
+  });
+
   it('accepts the minimal shared row, which carries no title', () => {
     // The snapshot contract's own row type: the publisher may be handed rows
     // that were never enriched, and the line then shows nothing.

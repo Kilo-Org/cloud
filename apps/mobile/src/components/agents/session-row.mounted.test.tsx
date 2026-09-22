@@ -78,11 +78,17 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
   SessionListSectionHeader: 'SessionListSectionHeader',
 }));
+const rowActions = vi.hoisted(() => ({
+  renamePrompt: vi.fn(),
+  runRename: undefined as (() => void) | undefined,
+}));
 vi.mock('./session-row-actions', () => ({
   copySessionId: vi.fn(),
   showDeleteConfirm: vi.fn(),
-  showRenamePrompt: vi.fn(),
-  showSessionActionMenu: vi.fn(),
+  showRenamePrompt: rowActions.renamePrompt,
+  showSessionActionMenu: (options: { onRename?: () => void }) => {
+    rowActions.runRename = options.onRename;
+  },
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null, isLoaded: true }),
@@ -325,6 +331,75 @@ describe('StoredSessionRow live speech', () => {
       expect(selectedId).toBe(destinationsDisabled ? null : 'stored-1');
     }
   );
+});
+
+describe('StoredSessionRow machine title', () => {
+  const machineTitle = 'New session - 2026-09-22T01:09:45.623Z';
+
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    __resetSessionAttentionForTests();
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-28T12:00:00.000Z'));
+    rowActions.runRename = undefined;
+    rowActions.renamePrompt.mockClear();
+  });
+  afterEach(async () => {
+    act(() => {
+      for (const renderer of mounted) {
+        renderer.unmount();
+      }
+    });
+    mounted.length = 0;
+    vi.restoreAllMocks();
+    await i18n.changeLanguage('en');
+  });
+
+  it('paints and speaks the fallback for a machine-titled session', () => {
+    const renderer = mount(row({ session: { ...session, title: machineTitle } }));
+    expect(texts(renderer)).toContain('Untitled session');
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toContain('Untitled session');
+    expect(JSON.stringify(texts(renderer))).not.toContain(machineTitle);
+  });
+
+  it('seeds the rename control empty for a machine-titled session', () => {
+    const renderer = mount(
+      row({
+        session: { ...session, title: machineTitle },
+        onRename: () => undefined,
+        onDelete: () => undefined,
+      })
+    );
+    const onLongPress = hosts(renderer, 'Pressable')[0]?.props.onLongPress as
+      | (() => void)
+      | undefined;
+    act(() => {
+      onLongPress?.();
+    });
+    act(() => {
+      rowActions.runRename?.();
+    });
+    expect(rowActions.renamePrompt).toHaveBeenCalledWith('', expect.any(Function));
+  });
+
+  it('seeds the rename control with a chosen name', () => {
+    const renderer = mount(
+      row({
+        session: { ...session, title: 'Fix login bug' },
+        onRename: () => undefined,
+        onDelete: () => undefined,
+      })
+    );
+    const onLongPress = hosts(renderer, 'Pressable')[0]?.props.onLongPress as
+      | (() => void)
+      | undefined;
+    act(() => {
+      onLongPress?.();
+    });
+    act(() => {
+      rowActions.runRename?.();
+    });
+    expect(rowActions.renamePrompt).toHaveBeenCalledWith('Fix login bug', expect.any(Function));
+  });
 });
 
 describe('RemoteSessionRow live speech', () => {

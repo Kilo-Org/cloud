@@ -16,6 +16,8 @@
 
 import { z } from 'zod';
 
+import { isDefaultSessionTitle } from '@kilocode/app-shared/session-title';
+
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
 import {
   githubPrRef,
@@ -193,7 +195,10 @@ function sessionSearchDocument(input: {
   gitBranch?: string | null;
 }): SystemSearchDocument | null {
   const title = (input.title ?? '').trim();
-  if (title.length === 0) {
+  // A title-less session is not indexed; neither is the backend's machine
+  // title, which the app paints as `agents.sessionRow.untitled`. Indexing it
+  // would add one identical translated label per untitled row.
+  if (isDefaultSessionTitle(title)) {
     return null;
   }
   return buildDocument({

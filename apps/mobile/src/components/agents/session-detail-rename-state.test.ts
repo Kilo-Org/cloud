@@ -43,6 +43,47 @@ describe('getSessionDetailRenameState', () => {
     });
   });
 
+  it('paints the fallback, not the machine string, for a default server title', () => {
+    const machine = 'New session - 2026-09-22T01:09:45.623Z';
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: machine,
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+
+  it('opens the rename field empty for a default server title', () => {
+    // `''`, not null: use-session-detail-rename falls back from null to the
+    // displayed title, which would pre-fill the machine string.
+    const open = getSessionDetailRenameState({
+      fallbackTitle,
+      isLoaded: true,
+      serverTitle: 'New session - 2026-09-22T01:09:45.623Z',
+      renameState: { ...initialRenameState(), isModalOpen: true },
+    });
+    expect(open.title).toBe(fallbackTitle);
+    expect(open.modalInitialValue).toBe('');
+  });
+
+  it('seeds the modal with a chosen title while it is open', () => {
+    const open = getSessionDetailRenameState({
+      fallbackTitle,
+      isLoaded: true,
+      serverTitle: 'Fix login bug',
+      renameState: { ...initialRenameState(), isModalOpen: true },
+    });
+    expect(open.title).toBe('Fix login bug');
+    expect(open.modalInitialValue).toBe('Fix login bug');
+  });
+
   it('hides interactivity when fetched data belongs to a different session', () => {
     expect(
       getSessionDetailRenameState({

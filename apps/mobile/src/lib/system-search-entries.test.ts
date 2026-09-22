@@ -73,6 +73,32 @@ describe('session documents', () => {
     expect(storedSessionSearchDocument({ session_id: 'c', title: null })).toBeNull();
   });
 
+  it('skips a session with the backend machine title', () => {
+    // The app paints `agents.sessionRow.untitled` for such a row, so indexing
+    // it would add one identical translated label per untitled session.
+    expect(
+      storedSessionSearchDocument({
+        session_id: 'machine-1',
+        title: 'New session - 2026-09-22T01:09:45.623Z',
+      })
+    ).toBeNull();
+    expect(
+      activeSessionSearchDocument({
+        id: 'machine-2',
+        title: 'Child session - 2026-09-22T01:09:45.623Z',
+        organizationId: null,
+      })
+    ).toBeNull();
+  });
+
+  it('still indexes a session whose chosen name starts with the machine phrase', () => {
+    const document = storedSessionSearchDocument({
+      session_id: 'chosen-1',
+      title: 'New session - implementation plan',
+    });
+    expect(document?.title).toBe('New session - implementation plan');
+  });
+
   it('builds the live-session document from the camelCase active row', () => {
     const document = activeSessionSearchDocument({
       id: 'live-1',

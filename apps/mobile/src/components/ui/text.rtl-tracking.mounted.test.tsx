@@ -103,8 +103,10 @@ describe('Text tracked labels in RTL', () => {
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
     // The eyebrow variant's Latin display treatment is LTR-only (#6435), so an
-    // RTL eyebrow carries none of it; the shared reset still lands on the host
-    // style, and any caller-supplied tracked class is neutralized the same way.
+    // RTL eyebrow drops it (see text.mounted.test.tsx) rather than keeping it
+    // like a caller-supplied tracked class; the shared reset still lands on the
+    // host style, and any caller-supplied tracked class is neutralized the same
+    // way.
     const classes = (hostText(root).props.className as string).split(' ');
     expect(classes).not.toContain('uppercase');
     expect(classes.some(name => name.startsWith('tracking'))).toBe(false);

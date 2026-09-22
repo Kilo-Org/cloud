@@ -1,12 +1,12 @@
 import { Check } from '@/components/ui/icons';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
+import { buildProjectRows, mergePlatformOptions } from '@/components/agents/platform-filter-rows';
 import {
-  formatGitUrlProject,
   PLATFORM_FILTERS,
   type ProjectFilterOption,
 } from '@/components/agents/session-list-helpers';
@@ -114,13 +114,18 @@ export function SessionFilterModal({
   );
   const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
   const [draftProjects, setDraftProjects] = useState<string[]>(selectedProjects);
-  const platforms = [...new Set([...platformOptions, ...selectedPlatforms])];
-  const projectsByUrl = new Map(projectOptions.map(project => [project.gitUrl, project]));
-  for (const gitUrl of selectedProjects) {
-    if (!projectsByUrl.has(gitUrl)) {
-      projectsByUrl.set(gitUrl, { gitUrl, displayName: formatGitUrlProject(gitUrl) });
-    }
-  }
+  // The sheet re-renders on every checkbox toggle, so the merged platform rows
+  // and the project lookup derive from the props only. Keying the memos on those
+  // props keeps the derived values stable while the draft selection changes, so
+  // a toggle never rebuilds the recent-repository map.
+  const platforms = useMemo(
+    () => mergePlatformOptions(platformOptions, selectedPlatforms),
+    [platformOptions, selectedPlatforms]
+  );
+  const projectsByUrl = useMemo(
+    () => buildProjectRows(projectOptions, selectedProjects),
+    [projectOptions, selectedProjects]
+  );
 
   const togglePlatform = (platform: string) => {
     setDraftPlatforms(prev =>

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { Sparkles, X } from '@/components/ui/icons';
@@ -65,78 +65,57 @@ export function SuggestionCard({
     }
   }
 
-  function handleShowDetails() {
-    Alert.alert(
-      t('agentChat.suggestion.title'),
-      [
-        text,
-        ...actions.map(action =>
-          action.description ? `${action.label}\n${action.description}` : action.label
-        ),
-      ].join('\n\n'),
-      [{ text: t('common.done') }]
-    );
-  }
-
   const isPending = pending !== null;
 
   return (
     <View className="px-3 py-2.5">
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerClassName="items-center gap-2"
-      >
-        <Pressable
-          onPress={handleShowDetails}
-          accessibilityRole="button"
-          accessibilityLabel={text}
-          accessibilityHint={t('agentChat.partDetail.showDetails')}
-          hitSlop={4}
-          className="max-w-[240px] flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 active:opacity-70"
-        >
+      <View className="gap-2 rounded-xl bg-secondary p-3">
+        <View className="flex-row items-center gap-2">
           <Sparkles size={15} color={colors.mutedForeground} />
-          <Text className="shrink text-sm text-foreground" numberOfLines={1}>
-            {text}
+          <Text className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {t('agentChat.suggestion.title')}
           </Text>
-        </Pressable>
+        </View>
 
-        {actions.map((action: SuggestionAction, index: number) => (
+        <Text className="text-sm text-foreground">{text}</Text>
+
+        <View className="flex-row flex-wrap items-center gap-2">
+          {actions.map((action: SuggestionAction, index: number) => (
+            <Button
+              key={`${action.label}-${index}`}
+              variant={index === 0 ? 'default' : 'outline'}
+              size="sm"
+              onPress={() => {
+                void handleAccept(index);
+              }}
+              disabled={isPending}
+              loading={pending?.kind === 'accept' && pending.index === index}
+              accessibilityRole="button"
+              accessibilityLabel={action.label}
+              accessibilityHint={action.description}
+            >
+              <Text className="text-sm" numberOfLines={1}>
+                {action.label}
+              </Text>
+            </Button>
+          ))}
+
           <Button
-            key={`${action.label}-${index}`}
-            variant={index === 0 ? 'default' : 'outline'}
+            variant="ghost"
             size="sm"
             onPress={() => {
-              void handleAccept(index);
+              void handleDismiss();
             }}
             disabled={isPending}
-            loading={pending?.kind === 'accept' && pending.index === index}
+            loading={pending?.kind === 'dismiss'}
             accessibilityRole="button"
-            accessibilityLabel={action.label}
-            accessibilityHint={action.description}
+            accessibilityLabel={t('agentChat.suggestion.dismiss')}
+            className="px-2"
           >
-            <Text className="text-sm" numberOfLines={1}>
-              {action.label}
-            </Text>
+            <X size={16} color={colors.mutedForeground} />
           </Button>
-        ))}
-
-        <Button
-          variant="ghost"
-          size="sm"
-          onPress={() => {
-            void handleDismiss();
-          }}
-          disabled={isPending}
-          loading={pending?.kind === 'dismiss'}
-          accessibilityRole="button"
-          accessibilityLabel={t('agentChat.suggestion.dismiss')}
-          className="px-2"
-        >
-          <X size={16} color={colors.mutedForeground} />
-        </Button>
-      </ScrollView>
+        </View>
+      </View>
       {error ? <AccessibleStatus message={error} className="pt-1 text-xs" /> : null}
     </View>
   );

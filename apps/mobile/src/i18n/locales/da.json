@@ -72,11 +72,6 @@
     "agents": "Agenter",
     "all": "Alle",
     "allModels": "Alle modeller",
-    "autoModelBalanced": "Auto Afbalanceret",
-    "autoModelEfficient": "Auto Effektiv",
-    "autoModelFree": "Auto Gratis",
-    "autoModelFrontier": "Auto Avanceret",
-    "autoModelSmall": "Auto Lille",
     "balanced": "Afbalanceret",
     "bitbucketConnected": "Bitbucket tilknyttet",
     "branch": "Gren",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "For mange loginforsøg. Vent lidt, og prøv igen."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Avanceret",
+      "balanced": "Auto Afbalanceret",
+      "efficient": "Auto Effektiv",
+      "small": "Auto Lille",
+      "free": "Auto Gratis",
+      "organization": "Organisation-Auto"
+    },
     "dataCollected": "Data indsamles",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Kunne ikke opdatere favoritterne.",

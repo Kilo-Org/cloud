@@ -72,11 +72,6 @@
     "agents": "Агенты",
     "all": "Все",
     "allModels": "Все модели",
-    "autoModelBalanced": "Авто Сбалансированный",
-    "autoModelEfficient": "Авто Эффективный",
-    "autoModelFree": "Авто Бесплатный",
-    "autoModelFrontier": "Авто Передовой",
-    "autoModelSmall": "Авто Малый",
     "balanced": "Сбалансированный режим",
     "bitbucketConnected": "Bitbucket подключён",
     "branch": "Ветка",
@@ -3210,6 +3205,14 @@
     "tooManySignInAttempts": "Слишком много попыток входа. Подождите и попробуйте снова."
   },
   "models": {
+    "auto": {
+      "frontier": "Авто Передовой",
+      "balanced": "Авто Сбалансированный",
+      "efficient": "Авто Эффективный",
+      "small": "Авто Малый",
+      "free": "Авто Бесплатный",
+      "organization": "Авто организации"
+    },
     "dataCollected": "Сбор данных",
     "free": "Бесплатно",
     "couldNotUpdateFavorites": "Не удалось обновить избранное.",

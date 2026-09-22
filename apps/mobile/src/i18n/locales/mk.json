@@ -72,11 +72,6 @@
     "agents": "Агенти",
     "all": "Сите",
     "allModels": "Сите модели",
-    "autoModelBalanced": "Автоматски Балансирано",
-    "autoModelEfficient": "Автоматски Ефикасен",
-    "autoModelFree": "Автоматски Бесплатно",
-    "autoModelFrontier": "Автоматски Најнапредни",
-    "autoModelSmall": "Автоматски Мал",
     "balanced": "Балансирано",
     "bitbucketConnected": "Bitbucket е поврзан",
     "branch": "Гранка",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "Премногу обиди за најава. Почекај и обиди се повторно."
   },
   "models": {
+    "auto": {
+      "frontier": "Автоматски Напреден",
+      "balanced": "Автоматски Балансиран",
+      "efficient": "Автоматски Ефикасен",
+      "small": "Автоматски Мал",
+      "free": "Автоматски Бесплатен",
+      "organization": "Автоматски на организацијата"
+    },
     "dataCollected": "Се собираат податоци",
     "free": "Бесплатно",
     "couldNotUpdateFavorites": "Не успеа ажурирањето на омилените.",

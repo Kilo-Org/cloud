@@ -72,11 +72,6 @@
     "agents": "ഏജന്റുകൾ",
     "all": "എല്ലാം",
     "allModels": "എല്ലാ മോഡലുകളും",
-    "autoModelBalanced": "ഓട്ടോ സമതുലിതം",
-    "autoModelEfficient": "ഓട്ടോ കാര്യക്ഷമം",
-    "autoModelFree": "ഓട്ടോ സൗജന്യം",
-    "autoModelFrontier": "ഓട്ടോ ഫ്രന്റിയർ",
-    "autoModelSmall": "ഓട്ടോ ചെറുത്",
     "balanced": "സമതുലിതം",
     "bitbucketConnected": "Bitbucket ബന്ധിപ്പിച്ചു",
     "branch": "ബ്രാഞ്ച്",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "വളരെയധികം തവണ സൈൻ ഇൻ ചെയ്യാൻ ശ്രമിച്ചു. അൽപ്പം കാത്തിരുന്ന് വീണ്ടും ശ്രമിക്കുക."
   },
   "models": {
+    "auto": {
+      "frontier": "ഓട്ടോ ഫ്രന്റിയർ",
+      "balanced": "ഓട്ടോ സമതുലിതം",
+      "efficient": "ഓട്ടോ കാര്യക്ഷമം",
+      "small": "ഓട്ടോ ചെറുത്",
+      "free": "ഓട്ടോ സൗജന്യം",
+      "organization": "സംഘടന ഓട്ടോ"
+    },
     "dataCollected": "ഡാറ്റ ശേഖരിക്കുന്നു",
     "free": "സൗജന്യം",
     "couldNotUpdateFavorites": "പ്രിയപ്പെട്ടവ പുതുക്കാൻ കഴിഞ്ഞില്ല.",

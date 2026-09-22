@@ -72,11 +72,6 @@
     "agents": "Agenter",
     "all": "Alle",
     "allModels": "Alle modeller",
-    "autoModelBalanced": "Automatisk Balansert",
-    "autoModelEfficient": "Automatisk Effektiv",
-    "autoModelFree": "Automatisk Gratis",
-    "autoModelFrontier": "Automatisk Toppytelse",
-    "autoModelSmall": "Automatisk Liten",
     "balanced": "Balansert",
     "bitbucketConnected": "Bitbucket tilkoblet",
     "branch": "Gren",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "For mange påloggingsforsøk. Vent og prøv igjen."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatisk Avansert",
+      "balanced": "Automatisk Balansert",
+      "efficient": "Automatisk Effektiv",
+      "small": "Automatisk Liten",
+      "free": "Automatisk Gratis",
+      "organization": "Organisasjons-Auto"
+    },
     "dataCollected": "Data samles inn",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Kunne ikke oppdatere favorittene.",

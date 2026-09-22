@@ -72,11 +72,6 @@
     "agents": "Mga ahente",
     "all": "Lahat",
     "allModels": "Lahat ng modelo",
-    "autoModelBalanced": "Awtomatiko Balanse",
-    "autoModelEfficient": "Awtomatiko Mahusay",
-    "autoModelFree": "Awtomatiko Libre",
-    "autoModelFrontier": "Awtomatiko Pinakamaunlad",
-    "autoModelSmall": "Awtomatiko Maliit",
     "balanced": "Balanse",
     "bitbucketConnected": "Nakakonekta ang Bitbucket",
     "branch": "Sangay",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "Masyadong maraming pagtatangkang mag-sign in. Pakihintay at subukan muli."
   },
   "models": {
+    "auto": {
+      "frontier": "Awtomatikong Pinakamaunlad",
+      "balanced": "Awtomatikong Balanse",
+      "efficient": "Awtomatikong Mabisa",
+      "small": "Awtomatikong Maliit",
+      "free": "Awtomatikong Libre",
+      "organization": "Awtomatikong Organisasyon"
+    },
     "dataCollected": "Kinokolekta ang datos",
     "free": "Libre",
     "couldNotUpdateFavorites": "Hindi ma-update ang mga paborito.",

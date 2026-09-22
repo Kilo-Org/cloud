@@ -72,11 +72,6 @@
     "agents": "Wakilai",
     "all": "Duka",
     "allModels": "Dukkan samfura",
-    "autoModelBalanced": "Na atomatik Daidaitacce",
-    "autoModelEfficient": "Na atomatik Mai inganci",
-    "autoModelFree": "Na atomatik Kyauta",
-    "autoModelFrontier": "Na atomatik Mafi ƙarfi",
-    "autoModelSmall": "Na atomatik Ƙarami",
     "balanced": "Daidaitacce",
     "bitbucketConnected": "An haɗa Bitbucket",
     "branch": "Reshe",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "An yi ƙoƙarin shiga da yawa. Jira ɗan lokaci ka sake gwadawa."
   },
   "models": {
+    "auto": {
+      "frontier": "Na atomatik Mafi ƙarfi",
+      "balanced": "Na atomatik Daidaitacce",
+      "efficient": "Na atomatik Mai inganci",
+      "small": "Na atomatik Ƙarami",
+      "free": "Na atomatik Kyauta",
+      "organization": "Na atomatik na ƙungiya"
+    },
     "dataCollected": "Ana tattara bayanai",
     "free": "Kyauta",
     "couldNotUpdateFavorites": "An kasa sabunta waɗanda ka fi so.",

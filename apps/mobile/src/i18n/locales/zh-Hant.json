@@ -72,11 +72,6 @@
     "agents": "代理程式",
     "all": "全部",
     "allModels": "所有模型",
-    "autoModelBalanced": "自動均衡",
-    "autoModelEfficient": "自動高效",
-    "autoModelFree": "自動免費",
-    "autoModelFrontier": "自動頂尖",
-    "autoModelSmall": "自動小型",
     "balanced": "均衡",
     "bitbucketConnected": "已連結 Bitbucket",
     "branch": "分支",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "登入嘗試次數過多。請稍候再試。"
   },
   "models": {
+    "auto": {
+      "frontier": "自動頂尖",
+      "balanced": "自動均衡",
+      "efficient": "自動高效",
+      "small": "自動小型",
+      "free": "自動免費",
+      "organization": "組織自動"
+    },
     "dataCollected": "會收集資料",
     "free": "免費",
     "couldNotUpdateFavorites": "無法更新我的最愛。",

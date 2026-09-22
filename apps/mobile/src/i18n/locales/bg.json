@@ -72,11 +72,6 @@
     "agents": "Агенти",
     "all": "Всички",
     "allModels": "Всички модели",
-    "autoModelBalanced": "Авто Балансиран",
-    "autoModelEfficient": "Авто Ефективен",
-    "autoModelFree": "Авто Безплатно",
-    "autoModelFrontier": "Авто Напреднал",
-    "autoModelSmall": "Авто Малък",
     "balanced": "Балансиран",
     "bitbucketConnected": "Bitbucket е свързан",
     "branch": "Клон",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "Твърде много опити за влизане. Изчакай и опитай отново."
   },
   "models": {
+    "auto": {
+      "frontier": "Автоматичен Водещ",
+      "balanced": "Автоматичен Балансиран",
+      "efficient": "Автоматичен Ефективен",
+      "small": "Автоматичен Малък",
+      "free": "Автоматичен Безплатен",
+      "organization": "Автоматичен на организацията"
+    },
     "dataCollected": "Събира данни",
     "free": "Безплатно",
     "couldNotUpdateFavorites": "Не успяхме да актуализираме любимите модели.",

@@ -72,11 +72,6 @@
     "agents": "Agenti",
     "all": "Vse",
     "allModels": "Vsi modeli",
-    "autoModelBalanced": "Samodejno Uravnoteženo",
-    "autoModelEfficient": "Samodejno Učinkovit",
-    "autoModelFree": "Samodejno Brezplačno",
-    "autoModelFrontier": "Samodejno Vrhunski",
-    "autoModelSmall": "Samodejno Majhen",
     "balanced": "Uravnoteženo",
     "bitbucketConnected": "Bitbucket je povezan",
     "branch": "Veja",
@@ -3210,6 +3205,14 @@
     "tooManySignInAttempts": "Preveč poskusov prijave. Počakaj in poskusi znova."
   },
   "models": {
+    "auto": {
+      "frontier": "Samodejno Vrhunski",
+      "balanced": "Samodejno Uravnoteženo",
+      "efficient": "Samodejno Učinkovito",
+      "small": "Samodejno Malo",
+      "free": "Samodejno Brezplačno",
+      "organization": "Samodejno organizacije"
+    },
     "dataCollected": "Zbiranje podatkov",
     "free": "Brezplačno",
     "couldNotUpdateFavorites": "Priljubljenih ni bilo mogoče posodobiti.",

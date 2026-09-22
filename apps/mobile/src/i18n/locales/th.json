@@ -72,11 +72,6 @@
     "agents": "เอเจนต์",
     "all": "ทั้งหมด",
     "allModels": "โมเดลทั้งหมด",
-    "autoModelBalanced": "อัตโนมัติสมดุล",
-    "autoModelEfficient": "อัตโนมัติประสิทธิภาพ",
-    "autoModelFree": "อัตโนมัติฟรี",
-    "autoModelFrontier": "อัตโนมัติล้ำหน้า",
-    "autoModelSmall": "อัตโนมัติน้อย",
     "balanced": "สมดุล",
     "bitbucketConnected": "เชื่อมต่อ Bitbucket แล้ว",
     "branch": "บรานช์",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "ลองเข้าสู่ระบบหลายครั้งเกินไป โปรดรอสักครู่แล้วลองอีกครั้ง"
   },
   "models": {
+    "auto": {
+      "frontier": "อัตโนมัติ ล้ำหน้า",
+      "balanced": "อัตโนมัติ สมดุล",
+      "efficient": "อัตโนมัติ มีประสิทธิภาพ",
+      "small": "อัตโนมัติ เล็ก",
+      "free": "อัตโนมัติ ฟรี",
+      "organization": "อัตโนมัติ องค์กร"
+    },
     "dataCollected": "มีการเก็บข้อมูล",
     "free": "ฟรี",
     "couldNotUpdateFavorites": "ไม่สามารถอัปเดตรายการโปรดได้",

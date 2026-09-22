@@ -72,11 +72,6 @@
     "agents": "Agenti",
     "all": "Sve",
     "allModels": "Svi modeli",
-    "autoModelBalanced": "Automatski Uravnoteženo",
-    "autoModelEfficient": "Automatski Efikasan",
-    "autoModelFree": "Automatski Besplatno",
-    "autoModelFrontier": "Automatski Najnapredniji",
-    "autoModelSmall": "Automatski Mali",
     "balanced": "Uravnoteženo",
     "bitbucketConnected": "Bitbucket povezan",
     "branch": "Grana",
@@ -3167,6 +3162,14 @@
     "tooManySignInAttempts": "Previše pokušaja prijave. Sačekaj i pokušaj ponovo."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatski Napredni",
+      "balanced": "Automatski Uravnotežen",
+      "efficient": "Automatski Efikasan",
+      "small": "Automatski Mali",
+      "free": "Automatski Besplatan",
+      "organization": "Automatski organizacije"
+    },
     "dataCollected": "Prikuplja podatke",
     "free": "Besplatno",
     "couldNotUpdateFavorites": "Ažuriranje omiljenih modela nije uspelo.",

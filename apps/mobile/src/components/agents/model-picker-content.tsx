@@ -95,6 +95,15 @@ export function ModelPickerContent() {
     [bridge, deferredSearch, favoriteIds]
   );
 
+  // Shared by the in-field X and the "No matches" empty state's CTA: drops the
+  // query and the input's visible text in one step, so the full list returns
+  // without backspacing. The field carries its own control because Android has
+  // no native `clearButtonMode` counterpart.
+  const handleClearSearch = useCallback(() => {
+    searchInputRef.current?.clear();
+    setSearch('');
+  }, []);
+
   // The favorite star button in ModelPickerOptionRow already fires its own
   // selection haptic on press — this callback must not fire a second one.
   const handleToggleFavorite = useCallback(
@@ -151,14 +160,6 @@ export function ModelPickerContent() {
     },
     [bridge, closePicker]
   );
-
-  // In-field X: `clearButtonMode` only ever drew a control on iOS, so on
-  // Android the query had no way back. This empties the native text and drops
-  // the query the rows derive from, leaving the keyboard up to retype.
-  const handleClearSearch = useCallback(() => {
-    searchInputRef.current?.clear();
-    setSearch('');
-  }, []);
 
   if (!bridge) {
     return (

@@ -114,7 +114,7 @@ describe('buildModelPickerRows', () => {
   });
 
   it('matches an auto model by the translated name its row renders', async () => {
-    // The row renders `common.autoModelEfficient` ("Auto Efficiente" in
+    // The row renders `models.auto.efficient` ("Auto Efficiente" in
     // Italian) instead of the gateway's English "Auto Efficient", so the
     // search must match the translated name the user can see.
     await i18n.changeLanguage('it');
@@ -137,6 +137,70 @@ describe('buildModelPickerRows', () => {
       { key: 'recommended', title: i18n.t('common.recommended'), type: 'header' },
       { key: 'model:kilo-auto/efficient', model: autoEfficient, isFavorite: false, type: 'model' },
     ]);
+  });
+
+  it.each([
+    ['frontier', 'frontier'],
+    ['balanced', 'balanced'],
+    ['efficient', 'efficient'],
+    ['small', 'small'],
+    ['free', 'free'],
+    ['org', 'organization'],
+  ])('finds the %s Auto tier by its visible Arabic label', async (tier, key) => {
+    await i18n.changeLanguage('ar');
+    const search = i18n.t(`models.auto.${key}`);
+    for (const prefix of ['', 'kilocode/']) {
+      const model: SessionModelOption = {
+        ...remoteKiloClaude,
+        name: `Auto ${tier}`,
+        displayId: `${prefix}kilo-auto/${tier}`,
+        modelRef: { providerID: 'kilo', modelID: `${prefix}kilo-auto/${tier}` },
+      };
+      expect(search).not.toBe(model.name);
+      expect(
+        buildModelPickerRows({
+          models: [model, gatewayGpt5],
+          search,
+          favoriteIds: noFavorites,
+        }).filter(row => row.type === 'model')
+      ).toEqual([{ key: `model:${model.id}`, model, isFavorite: false, type: 'model' }]);
+    }
+  });
+
+  it('keeps the catalog name, id, provider and favorite identity searchable in Arabic', async () => {
+    await i18n.changeLanguage('ar');
+    const model: SessionModelOption = {
+      ...remoteKiloClaude,
+      name: 'Auto Efficient',
+      displayId: 'kilo-auto/efficient',
+      modelRef: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
+      provider: { id: 'kilo', name: 'Kilo Gateway' },
+    };
+    const favoriteIds = new Set(['kilo-auto/efficient']);
+    for (const search of [
+      i18n.t('models.auto.efficient'),
+      '  AUTO EFFICIENT  ',
+      'kilo-auto/efficient',
+      'Kilo Gateway',
+      'kilo',
+    ]) {
+      expect(buildModelPickerRows({ models: [model], search, favoriteIds })).toEqual([
+        { key: 'favorites', title: i18n.t('agentChat.modelPicker.favorites'), type: 'header' },
+        { key: `model:${model.id}`, model, isFavorite: true, type: 'model' },
+      ]);
+    }
+  });
+
+  it('keeps no matches empty and restores the catalog when the query is cleared', () => {
+    expect(
+      buildModelPickerRows({ models: gatewayModels, search: 'no-match', favoriteIds: noFavorites })
+    ).toEqual([]);
+    expect(
+      buildModelPickerRows({ models: gatewayModels, search: '   ', favoriteIds: noFavorites })
+        .filter(row => row.type === 'model')
+        .map(row => row.model)
+    ).toEqual(gatewayModels);
+    expect(buildModelPickerRows({ models: [], search: '', favoriteIds: noFavorites })).toEqual([]);
   });
 
   it('pulls a favorited model into its own FAVORITES group ahead of everything else', () => {

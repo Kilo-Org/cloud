@@ -72,11 +72,6 @@
     "agents": "ወኪሎች",
     "all": "ሁሉም",
     "allModels": "ሁሉም ሞዴሎች",
-    "autoModelBalanced": "ራስ-ሰር ሚዛናዊ",
-    "autoModelEfficient": "ራስ-ሰር ቀልጣፋ",
-    "autoModelFree": "ራስ-ሰር ነፃ",
-    "autoModelFrontier": "ራስ-ሰር ግንባር ቀደም",
-    "autoModelSmall": "ራስ-ሰር ትንሽ",
     "balanced": "ሚዛናዊ",
     "bitbucketConnected": "Bitbucket ተገናኝቷል",
     "branch": "ቅርንጫፍ",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "በጣም ብዙ የመግቢያ ሙከራዎች ተደርገዋል። ትንሽ ጠብቅና እንደገና ሞክር።"
   },
   "models": {
+    "auto": {
+      "frontier": "ራስ-ሰር ግንባር ቀደም",
+      "balanced": "ራስ-ሰር ሚዛናዊ",
+      "efficient": "ራስ-ሰር ቀልጣፋ",
+      "small": "ራስ-ሰር ትንሽ",
+      "free": "ራስ-ሰር ነፃ",
+      "organization": "ድርጅት ራስ-ሰር"
+    },
     "dataCollected": "ውሂብ ይሰበስባል",
     "free": "ነፃ",
     "couldNotUpdateFavorites": "ተወዳጆችን ማዘመን አልተቻለም።",

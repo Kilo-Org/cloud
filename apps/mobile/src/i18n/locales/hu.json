@@ -72,11 +72,6 @@
     "agents": "Ügynökök",
     "all": "Összes",
     "allModels": "Összes modell",
-    "autoModelBalanced": "Automatikus Kiegyensúlyozott",
-    "autoModelEfficient": "Automatikus Hatékony",
-    "autoModelFree": "Automatikus Ingyenes",
-    "autoModelFrontier": "Automatikus Csúcsteljesítmény",
-    "autoModelSmall": "Automatikus Kicsi",
     "balanced": "Kiegyensúlyozott",
     "bitbucketConnected": "Bitbucket csatlakoztatva",
     "branch": "Ág",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "Túl sok bejelentkezési kísérlet történt. Várj egy kicsit, majd próbáld újra."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatikus Csúcskategóriás",
+      "balanced": "Automatikus Kiegyensúlyozott",
+      "efficient": "Automatikus Hatékony",
+      "small": "Automatikus Kicsi",
+      "free": "Automatikus Ingyenes",
+      "organization": "Szervezeti automatikus"
+    },
     "dataCollected": "Adatgyűjtés",
     "free": "Ingyenes",
     "couldNotUpdateFavorites": "Nem sikerült frissíteni a kedvenceket.",

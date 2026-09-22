@@ -72,11 +72,6 @@
     "agents": "Aġenti",
     "all": "Kollha",
     "allModels": "Il-mudelli kollha",
-    "autoModelBalanced": "Awtomatika Bilanċjat",
-    "autoModelEfficient": "Awtomatika Effiċjenti",
-    "autoModelFree": "Awtomatika B'xejn",
-    "autoModelFrontier": "Awtomatika L-aktar avvanzat",
-    "autoModelSmall": "Awtomatika Żgħir",
     "balanced": "Bilanċjat",
     "bitbucketConnected": "Bitbucket imqabbad",
     "branch": "Fergħa",
@@ -3253,6 +3248,14 @@
     "tooManySignInAttempts": "Wisq tentattivi ta' dħul. Jekk jogħġbok stenna u erġa' pprova."
   },
   "models": {
+    "auto": {
+      "frontier": "Awtomatika Avvanzat",
+      "balanced": "Awtomatika Bilanċjat",
+      "efficient": "Awtomatika Effiċjenti",
+      "small": "Awtomatika Żgħir",
+      "free": "Awtomatika B'xejn",
+      "organization": "Awtomatika Organizzazzjoni"
+    },
     "dataCollected": "Dejta miġbura",
     "free": "B'xejn",
     "couldNotUpdateFavorites": "Ma setgħux jiġu aġġornati l-favoriti.",

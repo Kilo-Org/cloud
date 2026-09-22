@@ -72,11 +72,6 @@
     "agents": "Agenci",
     "all": "Wszystkie",
     "allModels": "Wszystkie modele",
-    "autoModelBalanced": "Automatyczny Zrównoważony",
-    "autoModelEfficient": "Automatyczny Wydajny",
-    "autoModelFree": "Automatyczny Bezpłatny",
-    "autoModelFrontier": "Automatyczny Najwyższej klasy",
-    "autoModelSmall": "Automatyczny Mały",
     "balanced": "Zrównoważony",
     "bitbucketConnected": "Połączono z serwisem Bitbucket",
     "branch": "Gałąź",
@@ -3210,6 +3205,14 @@
     "tooManySignInAttempts": "Zbyt wiele prób logowania. Poczekaj i spróbuj ponownie."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatyczny Najlepszy",
+      "balanced": "Automatyczny Zrównoważony",
+      "efficient": "Automatyczny Wydajny",
+      "small": "Automatyczny Mały",
+      "free": "Automatyczny Bezpłatny",
+      "organization": "Automatyczny organizacji"
+    },
     "dataCollected": "Zbieranie danych",
     "free": "Bezpłatny",
     "couldNotUpdateFavorites": "Nie udało się zaktualizować ulubionych.",

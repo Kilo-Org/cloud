@@ -72,11 +72,6 @@
     "agents": "Agenti",
     "all": "Vše",
     "allModels": "Všechny modely",
-    "autoModelBalanced": "Automaticky Vyvážený",
-    "autoModelEfficient": "Automaticky Efektivní",
-    "autoModelFree": "Automaticky Zdarma",
-    "autoModelFrontier": "Automaticky Špičkový",
-    "autoModelSmall": "Automaticky Malý",
     "balanced": "Vyvážený",
     "bitbucketConnected": "Bitbucket připojen",
     "branch": "Větev",
@@ -3210,6 +3205,14 @@
     "tooManySignInAttempts": "Proběhlo příliš mnoho pokusů o přihlášení. Chvíli počkej a zkus to znovu."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatický Špičkový",
+      "balanced": "Automatický Vyvážený",
+      "efficient": "Automatický Efektivní",
+      "small": "Automatický Malý",
+      "free": "Automatický Zdarma",
+      "organization": "Automatický organizace"
+    },
     "dataCollected": "Sběr dat",
     "free": "Zdarma",
     "couldNotUpdateFavorites": "Oblíbené se nepodařilo aktualizovat.",

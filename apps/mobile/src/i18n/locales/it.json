@@ -72,11 +72,6 @@
     "agents": "Agenti",
     "all": "Tutti",
     "allModels": "Tutti i modelli",
-    "autoModelBalanced": "Auto Bilanciato",
-    "autoModelEfficient": "Auto Efficiente",
-    "autoModelFree": "Auto Gratuito",
-    "autoModelFrontier": "Auto Avanzato",
-    "autoModelSmall": "Auto Piccolo",
     "balanced": "Bilanciato",
     "bitbucketConnected": "Bitbucket collegato",
     "branch": "Ramo",
@@ -3167,6 +3162,14 @@
     "tooManySignInAttempts": "Troppi tentativi di accesso. Attendi e riprova."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Avanzato",
+      "balanced": "Auto Bilanciato",
+      "efficient": "Auto Efficiente",
+      "small": "Auto Piccolo",
+      "free": "Auto Gratuito",
+      "organization": "Auto Organizzazione"
+    },
     "dataCollected": "Dati raccolti",
     "free": "Gratuito",
     "couldNotUpdateFavorites": "Impossibile aggiornare i preferiti.",

@@ -72,11 +72,6 @@
     "agents": "Agente",
     "all": "Alles",
     "allModels": "Alle modelle",
-    "autoModelBalanced": "Outo Gebalanseerd",
-    "autoModelEfficient": "Outo Doeltreffend",
-    "autoModelFree": "Outo Gratis",
-    "autoModelFrontier": "Outo Toonaangewend",
-    "autoModelSmall": "Outo Klein",
     "balanced": "Gebalanseerd",
     "bitbucketConnected": "Bitbucket gekoppel",
     "branch": "Tak",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "Te veel aanmeldpogings. Wag asseblief en probeer weer."
   },
   "models": {
+    "auto": {
+      "frontier": "Outo Toonaangewend",
+      "balanced": "Outo Gebalanseerd",
+      "efficient": "Outo Doeltreffend",
+      "small": "Outo Klein",
+      "free": "Outo Gratis",
+      "organization": "Organisasie-outo"
+    },
     "dataCollected": "Data ingesamel",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Die gunstelinge kon nie bygewerk word nie.",

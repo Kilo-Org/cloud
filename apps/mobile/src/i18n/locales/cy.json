@@ -72,11 +72,6 @@
     "agents": "Asiantau",
     "all": "Popeth",
     "allModels": "Pob model AI",
-    "autoModelBalanced": "Awtomatig Cytbwys",
-    "autoModelEfficient": "Awtomatig Effeithlon",
-    "autoModelFree": "Awtomatig Am ddim",
-    "autoModelFrontier": "Awtomatig Blaengar",
-    "autoModelSmall": "Awtomatig Bach",
     "balanced": "Cytbwys",
     "bitbucketConnected": "Wedi cysylltu â Bitbucket",
     "branch": "Cangen",
@@ -3296,6 +3291,14 @@
     "tooManySignInAttempts": "Rydych wedi ceisio mewngofnodi gormod o weithiau. Arhoswch a rhowch gynnig eto."
   },
   "models": {
+    "auto": {
+      "frontier": "Awtomatig Blaengar",
+      "balanced": "Awtomatig Cytbwys",
+      "efficient": "Awtomatig Effeithlon",
+      "small": "Awtomatig Bach",
+      "free": "Awtomatig Am ddim",
+      "organization": "Sefydliad Awtomatig"
+    },
     "dataCollected": "Cesglir data",
     "free": "Am ddim",
     "couldNotUpdateFavorites": "Methu diweddaru'r ffefrynnau.",

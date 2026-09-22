@@ -72,11 +72,6 @@
     "agents": "အေးဂျင့်များ",
     "all": "အားလုံး",
     "allModels": "မော်ဒယ်အားလုံး",
-    "autoModelBalanced": "အလိုအလျောက်မျှတ",
-    "autoModelEfficient": "အလိုအလျောက်ထိရောက်သော",
-    "autoModelFree": "အလိုအလျောက်အခမဲ့",
-    "autoModelFrontier": "အလိုအလျောက်ထိပ်တန်း",
-    "autoModelSmall": "အလိုအလျောက်သေးငယ်သော",
     "balanced": "မျှတ",
     "bitbucketConnected": "Bitbucket ချိတ်ဆက်ပြီး",
     "branch": "ဘရန်ချ်",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "အကောင့်ဝင်ရန် ကြိုးစားသည့်အကြိမ်ရေ များလွန်းပါသည်။ ခဏစောင့်ပြီး ထပ်စမ်းကြည့်ပါ။"
   },
   "models": {
+    "auto": {
+      "frontier": "အလိုအလျောက် ထိပ်တန်း",
+      "balanced": "အလိုအလျောက် မျှတ",
+      "efficient": "အလိုအလျောက် ထိရောက်",
+      "small": "အလိုအလျောက် သေး",
+      "free": "အလိုအလျောက် အခမဲ့",
+      "organization": "အဖွဲ့အစည်း အလိုအလျောက်"
+    },
     "dataCollected": "ဒေတာစုဆောင်းသည်",
     "free": "အခမဲ့",
     "couldNotUpdateFavorites": "စိတ်ကြိုက်များကို ပြင်ဆင်၍မရပါ။",

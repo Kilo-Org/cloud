@@ -72,11 +72,6 @@
     "agents": "Agents IA",
     "all": "Tout",
     "allModels": "Tous les modèles",
-    "autoModelBalanced": "Auto Équilibré",
-    "autoModelEfficient": "Auto Efficace",
-    "autoModelFree": "Auto Gratuit",
-    "autoModelFrontier": "Auto de pointe",
-    "autoModelSmall": "Auto Petit",
     "balanced": "Équilibré",
     "bitbucketConnected": "Bitbucket connecté",
     "branch": "Branche",
@@ -3167,6 +3162,14 @@
     "tooManySignInAttempts": "Trop de tentatives de connexion. Veuillez patienter et réessayer."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Avancé",
+      "balanced": "Auto Équilibré",
+      "efficient": "Auto Efficace",
+      "small": "Auto Petit",
+      "free": "Auto Gratuit",
+      "organization": "Auto d'organisation"
+    },
     "dataCollected": "Données collectées",
     "free": "Gratuit",
     "couldNotUpdateFavorites": "Impossible de mettre à jour les favoris.",

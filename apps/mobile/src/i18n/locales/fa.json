@@ -72,11 +72,6 @@
     "agents": "عامل‌ها",
     "all": "همه",
     "allModels": "همه مدل‌ها",
-    "autoModelBalanced": "خودکار متعادل",
-    "autoModelEfficient": "خودکار کارآمد",
-    "autoModelFree": "خودکار رایگان",
-    "autoModelFrontier": "خودکار پیشرفته",
-    "autoModelSmall": "خودکار کوچک",
     "balanced": "متعادل",
     "bitbucketConnected": "Bitbucket متصل شد",
     "branch": "شاخه",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "تعداد تلاش‌های ورود بیش از حد مجاز است. لطفاً کمی صبر کنید و دوباره تلاش کنید."
   },
   "models": {
+    "auto": {
+      "frontier": "خودکار پیشرفته",
+      "balanced": "خودکار متعادل",
+      "efficient": "خودکار کارآمد",
+      "small": "خودکار کوچک",
+      "free": "خودکار رایگان",
+      "organization": "خودکار سازمان"
+    },
     "dataCollected": "جمع‌آوری داده",
     "free": "رایگان",
     "couldNotUpdateFavorites": "به‌روزرسانی موارد دلخواه ممکن نشد.",

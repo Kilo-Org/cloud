@@ -72,11 +72,6 @@
     "agents": "Agentlər",
     "all": "Hamısı",
     "allModels": "Bütün modellər",
-    "autoModelBalanced": "Avtomatik Balanslı",
-    "autoModelEfficient": "Avtomatik Səmərəli",
-    "autoModelFree": "Avtomatik Pulsuz",
-    "autoModelFrontier": "Avtomatik Ən qabaqcıl",
-    "autoModelSmall": "Avtomatik Kiçik",
     "balanced": "Balanslı",
     "bitbucketConnected": "Bitbucket qoşulub",
     "branch": "Budaq",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "Həddindən çox giriş cəhdi edilib. Bir az gözlə və yenidən cəhd et."
   },
   "models": {
+    "auto": {
+      "frontier": "Avtomatik Qabaqcıl",
+      "balanced": "Avtomatik Balanslı",
+      "efficient": "Avtomatik Səmərəli",
+      "small": "Avtomatik Kiçik",
+      "free": "Avtomatik Pulsuz",
+      "organization": "Təşkilat Avtomatik"
+    },
     "dataCollected": "Məlumat toplanır",
     "free": "Pulsuz",
     "couldNotUpdateFavorites": "Sevimliləri yeniləmək mümkün olmadı.",

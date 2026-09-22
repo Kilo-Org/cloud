@@ -72,11 +72,6 @@
     "agents": "Agen",
     "all": "Semua",
     "allModels": "Semua model",
-    "autoModelBalanced": "Otomatis Seimbang",
-    "autoModelEfficient": "Otomatis Efisien",
-    "autoModelFree": "Otomatis Gratis",
-    "autoModelFrontier": "Otomatis Tercanggih",
-    "autoModelSmall": "Otomatis Kecil",
     "balanced": "Seimbang",
     "bitbucketConnected": "Bitbucket terhubung",
     "branch": "Cabang",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "Terlalu banyak percobaan masuk. Tunggu sebentar dan coba lagi."
   },
   "models": {
+    "auto": {
+      "frontier": "Otomatis Tercanggih",
+      "balanced": "Otomatis Seimbang",
+      "efficient": "Otomatis Efisien",
+      "small": "Otomatis Kecil",
+      "free": "Otomatis Gratis",
+      "organization": "Otomatis Organisasi"
+    },
     "dataCollected": "Data dikumpulkan",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Tidak dapat memperbarui favorit.",

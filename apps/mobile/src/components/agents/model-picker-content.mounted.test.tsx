@@ -117,7 +117,13 @@ vi.mock('@/components/picker-sheet', () => ({
   PickerSheet: (props: { children?: ReactNode; headerContent?: ReactNode }) =>
     createElement('PickerSheet', null, props.headerContent, props.children),
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+// EmptyState renders its `action` node (as the real component does) so the
+// empty state's clear CTA is reachable from the tree; `title` stays a prop for
+// the existing assertions.
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { title: string; action?: ReactNode }) =>
+    createElement('EmptyState', { title: props.title }, props.action),
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -352,7 +358,7 @@ describe('ModelPickerContent deferred search', () => {
     });
   });
 
-  it('offers a Clear search action in the no-matches state that restores the catalog', async () => {
+  it('offers a Clear search action in the No matches empty state that returns the full list', async () => {
     const renderer = await mount();
 
     await act(async () => {
@@ -360,31 +366,41 @@ describe('ModelPickerContent deferred search', () => {
       await Promise.resolve();
     });
 
-    const [emptyState] = findByType(renderer.root, 'EmptyState');
-    if (!emptyState) {
-      throw new Error('empty state not found');
-    }
+    // The "No matches" body offers exactly one clear CTA, carrying the same
+    // copy the Agents search empty state uses, so both searches recover the
+    // same way.
+    const clearActions = findByType(renderer.root, 'Button');
+    expect(clearActions).toHaveLength(1);
     /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
-    const action = emptyState.props.action as
-      | { props: { onPress?: () => void; children?: { props: { children?: string } } } }
-      | undefined;
+    expect(clearActions[0]?.props.children?.props.children).toBe('Clear search');
     /* eslint-enable typescript-eslint/no-unsafe-member-access */
-    expect(action).toBeTruthy();
-    // The same label and copy the Agents search empty state offers, so both
-    // searches recover the same way.
-    expect(action?.props.children?.props.children).toBe('Clear search');
 
     await act(async () => {
-      action?.props.onPress?.();
+      /* eslint-disable typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+      clearActions[0]?.props.onPress();
+      /* eslint-enable typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access */
       await Promise.resolve();
     });
 
-    // Clearing drops the query the rows derive from and the whole catalog
-    // returns, so the empty state (and its action) is gone.
-    expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
-    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    // The empty state is gone and the unfiltered catalog is listed again.
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
-    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+    expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('does not offer a clear action when the catalog itself is empty', async () => {
+    slotState.bridge = { ...makeBridge(), options: [] };
+    const renderer = await mount();
+
+    const emptyState = findByType(renderer.root, 'EmptyState');
+    expect(emptyState).toHaveLength(1);
+    // The mock renders `action` as a child (as the real EmptyState does), so
+    // assert on the rendered children: no action node reaches the empty state.
+    expect(emptyState[0]?.children).toHaveLength(0);
+    expect(findByType(renderer.root, 'Button')).toHaveLength(0);
 
     act(() => {
       renderer.unmount();

@@ -72,11 +72,6 @@
     "agents": "Agents d'IA",
     "all": "Tots",
     "allModels": "Tots els models",
-    "autoModelBalanced": "Automàtic Equilibrat",
-    "autoModelEfficient": "Automàtic Eficient",
-    "autoModelFree": "Automàtic Gratuït",
-    "autoModelFrontier": "Automàtic Avantguarda",
-    "autoModelSmall": "Automàtic Petit",
     "balanced": "Equilibrat",
     "bitbucketConnected": "Bitbucket connectat",
     "branch": "Branca",
@@ -3167,6 +3162,14 @@
     "tooManySignInAttempts": "Has fet massa intents d'inici de sessió. Espera un moment i torna-ho a provar."
   },
   "models": {
+    "auto": {
+      "frontier": "Automàtic Avançat",
+      "balanced": "Automàtic Equilibrat",
+      "efficient": "Automàtic Eficient",
+      "small": "Automàtic Petit",
+      "free": "Automàtic Gratuït",
+      "organization": "Automàtic d'organització"
+    },
     "dataCollected": "Recull dades",
     "free": "Gratuït",
     "couldNotUpdateFavorites": "No s'han pogut actualitzar els preferits.",

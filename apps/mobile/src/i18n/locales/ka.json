@@ -72,11 +72,6 @@
     "agents": "აგენტები",
     "all": "ყველა",
     "allModels": "ყველა მოდელი",
-    "autoModelBalanced": "ავტომატური დაბალანსებული",
-    "autoModelEfficient": "ავტომატური ეფექტური",
-    "autoModelFree": "ავტომატური უფასო",
-    "autoModelFrontier": "ავტომატური მოწინავე",
-    "autoModelSmall": "ავტომატური მცირე",
     "balanced": "დაბალანსებული",
     "bitbucketConnected": "Bitbucket-თან კავშირი დამყარებულია",
     "branch": "განშტოება",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "შესვლის მცდელობების რაოდენობა გადაჭარბებულია. ცოტა მოიცადე და ხელახლა სცადე."
   },
   "models": {
+    "auto": {
+      "frontier": "ავტომატური მოწინავე",
+      "balanced": "ავტომატური დაბალანსებული",
+      "efficient": "ავტომატური ეფექტური",
+      "small": "ავტომატური პატარა",
+      "free": "ავტომატური უფასო",
+      "organization": "ორგანიზაციის ავტომატური"
+    },
     "dataCollected": "მონაცემები გროვდება",
     "free": "უფასო",
     "couldNotUpdateFavorites": "რჩეულების განახლება ვერ მოხერხდა.",

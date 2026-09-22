@@ -72,11 +72,6 @@
     "agents": "ఏజెంట్లు",
     "all": "అన్నీ",
     "allModels": "అన్ని మోడళ్లు",
-    "autoModelBalanced": "ఆటో సమతుల్యం",
-    "autoModelEfficient": "ఆటో సమర్థవంతం",
-    "autoModelFree": "ఆటో ఉచితం",
-    "autoModelFrontier": "ఆటో అత్యాధునికం",
-    "autoModelSmall": "ఆటో చిన్నది",
     "balanced": "సమతుల్యం",
     "bitbucketConnected": "Bitbucket కనెక్ట్ అయింది",
     "branch": "బ్రాంచ్",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "సైన్ ఇన్ చేయడానికి చాలా సార్లు ప్రయత్నించారు. కాసేపు ఆగి మళ్లీ ప్రయత్నించండి."
   },
   "models": {
+    "auto": {
+      "frontier": "ఆటో అత్యాధునికం",
+      "balanced": "ఆటో సమతుల్యం",
+      "efficient": "ఆటో సమర్థవంతమైన",
+      "small": "ఆటో చిన్న",
+      "free": "ఆటో ఉచితం",
+      "organization": "సంస్థ ఆటో"
+    },
     "dataCollected": "డేటా సేకరణ ఉంది",
     "free": "ఉచితం",
     "couldNotUpdateFavorites": "ఇష్టమైనవాటిని నవీకరించలేకపోయాము.",

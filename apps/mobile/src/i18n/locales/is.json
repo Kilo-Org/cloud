@@ -72,11 +72,6 @@
     "agents": "Erindrekar",
     "all": "Allt",
     "allModels": "Öll líkön",
-    "autoModelBalanced": "Sjálfvirkt Í jafnvægi",
-    "autoModelEfficient": "Sjálfvirkt Skilvirkt",
-    "autoModelFree": "Sjálfvirkt Ókeypis",
-    "autoModelFrontier": "Sjálfvirkt Fremst",
-    "autoModelSmall": "Sjálfvirkt Lítið",
     "balanced": "Í jafnvægi",
     "bitbucketConnected": "Bitbucket tengt",
     "branch": "Kvistur",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "Of margar innskráningartilraunir. Bíddu og reyndu aftur."
   },
   "models": {
+    "auto": {
+      "frontier": "Sjálfvirkt Fremst",
+      "balanced": "Sjálfvirkt Jafnvægis",
+      "efficient": "Sjálfvirkt Skilvirkt",
+      "small": "Sjálfvirkt Lítið",
+      "free": "Sjálfvirkt Ókeypis",
+      "organization": "Sjálfvirkt Stofnunar"
+    },
     "dataCollected": "Gögnum safnað",
     "free": "Ókeypis",
     "couldNotUpdateFavorites": "Ekki tókst að uppfæra eftirlæti.",

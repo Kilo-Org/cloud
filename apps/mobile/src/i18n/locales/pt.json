@@ -72,11 +72,6 @@
     "agents": "Agentes",
     "all": "Todos",
     "allModels": "Todos os modelos",
-    "autoModelBalanced": "Automático Equilibrado",
-    "autoModelEfficient": "Automático Eficiente",
-    "autoModelFree": "Automático Gratuito",
-    "autoModelFrontier": "Automático Avançado",
-    "autoModelSmall": "Automático Pequeno",
     "balanced": "Equilibrado",
     "bitbucketConnected": "Bitbucket ligado",
     "branch": "Ramo",
@@ -3167,6 +3162,14 @@
     "tooManySignInAttempts": "Demasiadas tentativas de início de sessão. Aguarda um momento e tenta novamente."
   },
   "models": {
+    "auto": {
+      "frontier": "Automático Avançado",
+      "balanced": "Automático Equilibrado",
+      "efficient": "Automático Eficiente",
+      "small": "Automático Pequeno",
+      "free": "Automático Gratuito",
+      "organization": "Automático de organização"
+    },
     "dataCollected": "Dados recolhidos",
     "free": "Gratuito",
     "couldNotUpdateFavorites": "Não foi possível atualizar os favoritos.",

@@ -72,11 +72,6 @@
     "agents": "Mpanampy",
     "all": "Rehetra",
     "allModels": "Modely rehetra",
-    "autoModelBalanced": "Ho azy Voalanjalanja",
-    "autoModelEfficient": "Ho azy Mahomby",
-    "autoModelFree": "Ho azy Maimaimpoana",
-    "autoModelFrontier": "Ho azy Lohalaharana",
-    "autoModelSmall": "Ho azy Kely",
     "balanced": "Voalanjalanja",
     "bitbucketConnected": "Mifandray ny Bitbucket",
     "branch": "Sampana",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "Betsaka loatra ny andrana fidirana. Miandrasa kely ary andramo indray azafady."
   },
   "models": {
+    "auto": {
+      "frontier": "Ho azy Lohalaharana",
+      "balanced": "Ho azy Voalanjalanja",
+      "efficient": "Ho azy Mahomby",
+      "small": "Ho azy Kely",
+      "free": "Ho azy Maimaimpoana",
+      "organization": "Ho azy Fikambanana"
+    },
     "dataCollected": "Angona voaangona",
     "free": "Maimaimpoana",
     "couldNotUpdateFavorites": "Tsy nahomby ny fanavaozana ny ankafizinao.",

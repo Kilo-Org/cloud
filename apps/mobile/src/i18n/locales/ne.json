@@ -72,11 +72,6 @@
     "agents": "एजेन्टहरू",
     "all": "सबै",
     "allModels": "सबै मोडेलहरू",
-    "autoModelBalanced": "स्वचालित सन्तुलित",
-    "autoModelEfficient": "स्वचालित कुशल",
-    "autoModelFree": "स्वचालित निःशुल्क",
-    "autoModelFrontier": "स्वचालित अग्रणी",
-    "autoModelSmall": "स्वचालित सानो",
     "balanced": "सन्तुलित",
     "bitbucketConnected": "Bitbucket जडान भयो",
     "branch": "ब्रान्च",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "साइन इन गर्न धेरै पटक प्रयास गरियो। कृपया केही बेर पर्खेर फेरि प्रयास गर्नुहोस्।"
   },
   "models": {
+    "auto": {
+      "frontier": "स्वचालित अग्रणी",
+      "balanced": "स्वचालित सन्तुलित",
+      "efficient": "स्वचालित कुशल",
+      "small": "स्वचालित सानो",
+      "free": "स्वचालित निःशुल्क",
+      "organization": "संस्था स्वचालित"
+    },
     "dataCollected": "डेटा सङ्कलन हुन्छ",
     "free": "निःशुल्क",
     "couldNotUpdateFavorites": "मनपर्ने सूची अद्यावधिक गर्न सकिएन।",

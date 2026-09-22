@@ -72,11 +72,6 @@
     "agents": "முகவர்கள்",
     "all": "அனைத்தும்",
     "allModels": "அனைத்து மாதிரிகளும்",
-    "autoModelBalanced": "தானியங்கி சமநிலையானது",
-    "autoModelEfficient": "தானியங்கி திறன்மிக்க",
-    "autoModelFree": "தானியங்கி இலவசம்",
-    "autoModelFrontier": "தானியங்கி முன்னணி",
-    "autoModelSmall": "தானியங்கி சிறியது",
     "balanced": "சமநிலையானது",
     "bitbucketConnected": "Bitbucket இணைக்கப்பட்டது",
     "branch": "கிளை",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "உள்நுழைவு முயற்சிகளின் வரம்பை மீறிவிட்டீர்கள். சிறிது நேரம் காத்திருந்து மீண்டும் முயற்சிக்கவும்."
   },
   "models": {
+    "auto": {
+      "frontier": "தானியங்கி முன்னணி",
+      "balanced": "தானியங்கி சமநிலை",
+      "efficient": "தானியங்கி திறன்மிக்க",
+      "small": "தானியங்கி சிறிய",
+      "free": "தானியங்கி இலவச",
+      "organization": "நிறுவன தானியங்கி"
+    },
     "dataCollected": "தரவு சேகரிக்கப்படும்",
     "free": "இலவசம்",
     "couldNotUpdateFavorites": "பிடித்தவற்றைப் புதுப்பிக்க முடியவில்லை.",

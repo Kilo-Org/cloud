@@ -72,11 +72,6 @@
     "agents": "Агенты",
     "all": "Усё",
     "allModels": "Усе мадэлі",
-    "autoModelBalanced": "Аўта Збалансаваны",
-    "autoModelEfficient": "Аўта Эфектыўны",
-    "autoModelFree": "Аўта Бясплатна",
-    "autoModelFrontier": "Аўта Перадавы",
-    "autoModelSmall": "Аўта Малы",
     "balanced": "Збалансаваны",
     "bitbucketConnected": "Bitbucket падключаны",
     "branch": "Галіна",
@@ -3210,6 +3205,14 @@
     "tooManySignInAttempts": "Занадта шмат спроб уваходу. Пачакай і паспрабуй яшчэ раз."
   },
   "models": {
+    "auto": {
+      "frontier": "Аўта Перадавы",
+      "balanced": "Аўта Збалансаваны",
+      "efficient": "Аўта Эфектыўны",
+      "small": "Аўта Малы",
+      "free": "Аўта Бясплатны",
+      "organization": "Аўта арганізацыі"
+    },
     "dataCollected": "Збор даных",
     "free": "Бясплатна",
     "couldNotUpdateFavorites": "Не ўдалося абнавіць абранае.",

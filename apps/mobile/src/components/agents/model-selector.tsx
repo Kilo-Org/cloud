@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { i18n } from '@/i18n';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { autoModelLabel } from '@/lib/auto-model-name';
 import { formatList } from '@/lib/format';
 import {
   BYOK_MODEL_LABEL,
@@ -19,7 +20,6 @@ import {
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { modelPickerCostLabel } from '@/lib/model-cost';
-import { localizedModelName } from '@/lib/model-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ModelPickerSelection, type ModelPickerSelectionScope } from '@/lib/picker-bridge';
 import { modelPickerSlot } from '@/lib/route-registry';
@@ -139,8 +139,10 @@ export function ModelSelector({
   const providerAware = pickerOptions.some(
     option => option.modelRef !== undefined || !option.showGatewayMetadata
   );
-  const selectedModelName = selectedModel ? localizedModelName(selectedModel, t) : undefined;
-  const label = selectedModelName ?? (!providerAware && value ? value : t('common.model'));
+  const fallbackLabel = !providerAware && value ? value : t('common.model');
+  const label = selectedModel
+    ? autoModelLabel(selectedModel.displayId, selectedModel.name)
+    : fallbackLabel;
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
@@ -230,11 +232,11 @@ export function ModelPickerOptionRow({
   const { t } = useTranslation();
   const { free, byok, collectsData } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
-  const displayName = localizedModelName(option, t);
+  const name = autoModelLabel(option.displayId, option.name);
   const accessibilityLabel = formatList(
     [
       option.provider?.name,
-      displayName,
+      name,
       option.displayId,
       byok ? BYOK_MODEL_LABEL : undefined,
       free && !byok ? freeModelFreeLabel() : undefined,
@@ -267,7 +269,7 @@ export function ModelPickerOptionRow({
           accessibilityState={{ disabled: option.unavailable, selected }}
         >
           <View className="flex-1">
-            <Text className="text-base text-foreground">{displayName}</Text>
+            <Text className="text-base text-foreground">{name}</Text>
             {option.modelRef ? (
               <Text selectable className="font-mono text-xs text-muted-foreground">
                 {t('agentChat.modelSelector.provider', { id: option.modelRef.providerID })}
@@ -323,8 +325,8 @@ export function ModelPickerOptionRow({
           accessibilityRole="button"
           accessibilityLabel={
             isFavorite
-              ? t('agentChat.modelSelector.removeFromFavorites', { name: displayName })
-              : t('agentChat.modelSelector.addToFavorites', { name: displayName })
+              ? t('agentChat.modelSelector.removeFromFavorites', { name })
+              : t('agentChat.modelSelector.addToFavorites', { name })
           }
           accessibilityState={{ selected: isFavorite }}
         >

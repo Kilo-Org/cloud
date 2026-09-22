@@ -72,11 +72,6 @@
     "agents": "Agendid",
     "all": "Kõik",
     "allModels": "Kõik mudelid",
-    "autoModelBalanced": "Automaatne Tasakaalustatud",
-    "autoModelEfficient": "Automaatne Tõhus",
-    "autoModelFree": "Automaatne Tasuta",
-    "autoModelFrontier": "Automaatne Tipptase",
-    "autoModelSmall": "Automaatne Väike",
     "balanced": "Tasakaalustatud",
     "bitbucketConnected": "Bitbucket on ühendatud",
     "branch": "Haru",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "Liiga palju sisselogimiskatseid. Oota hetk ja proovi uuesti."
   },
   "models": {
+    "auto": {
+      "frontier": "Automaatne Tipptasemel",
+      "balanced": "Automaatne Tasakaalustatud",
+      "efficient": "Automaatne Tõhus",
+      "small": "Automaatne Väike",
+      "free": "Automaatne Tasuta",
+      "organization": "Organisatsiooni automaatne"
+    },
     "dataCollected": "Andmeid kogutakse",
     "free": "Tasuta",
     "couldNotUpdateFavorites": "Lemmikute uuendamine ebaõnnestus.",

@@ -72,11 +72,6 @@
     "agents": "Mawakala",
     "all": "Zote",
     "allModels": "Modeli zote",
-    "autoModelBalanced": "Kiotomatiki Ya wastani",
-    "autoModelEfficient": "Kiotomatiki Bora",
-    "autoModelFree": "Kiotomatiki Bure",
-    "autoModelFrontier": "Kiotomatiki Ya juu",
-    "autoModelSmall": "Kiotomatiki Ndogo",
     "balanced": "Ya wastani",
     "bitbucketConnected": "Bitbucket imeunganishwa",
     "branch": "Tawi",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "Majaribio ya kuingia ni mengi mno. Tafadhali subiri kisha ujaribu tena."
   },
   "models": {
+    "auto": {
+      "frontier": "Kiotomatiki Ya hali ya juu",
+      "balanced": "Kiotomatiki Wastani",
+      "efficient": "Kiotomatiki Ufanisi",
+      "small": "Kiotomatiki Ndogo",
+      "free": "Kiotomatiki Bure",
+      "organization": "Kiotomatiki ya Shirika"
+    },
     "dataCollected": "Data hukusanywa",
     "free": "Bure",
     "couldNotUpdateFavorites": "Imeshindikana kusasisha vipendwa.",

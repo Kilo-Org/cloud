@@ -72,11 +72,6 @@
     "agents": "ເອເຈນ",
     "all": "ທັງໝົດ",
     "allModels": "ໂມເດວທັງໝົດ",
-    "autoModelBalanced": "ອັດຕະໂນມັດສົມດຸນ",
-    "autoModelEfficient": "ອັດຕະໂນມັດປະສິດທິພາບ",
-    "autoModelFree": "ອັດຕະໂນມັດຟຣີ",
-    "autoModelFrontier": "ອັດຕະໂນມັດລ້ຳໜ້າ",
-    "autoModelSmall": "ອັດຕະໂນມັດນ້ອຍ",
     "balanced": "ສົມດຸນ",
     "bitbucketConnected": "ເຊື່ອມຕໍ່ Bitbucket ແລ້ວ",
     "branch": "ສາຂາໂຄ້ດ",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "ທ່ານລອງເຂົ້າສູ່ລະບົບຫຼາຍຄັ້ງເກີນໄປແລ້ວ. ກະລຸນາລໍຖ້າຈັກໜ້ອຍແລ້ວລອງອີກຄັ້ງ."
   },
   "models": {
+    "auto": {
+      "frontier": "ອັດຕະໂນມັດ ລ້ຳໜ້າ",
+      "balanced": "ອັດຕະໂນມັດ ສົມດຸນ",
+      "efficient": "ອັດຕະໂນມັດ ປະສິດທິພາບ",
+      "small": "ອັດຕະໂນມັດ ນ້ອຍ",
+      "free": "ອັດຕະໂນມັດ ຟຣີ",
+      "organization": "ອົງກອນ ອັດຕະໂນມັດ"
+    },
     "dataCollected": "ມີການເກັບຂໍ້ມູນ",
     "free": "ຟຣີ",
     "couldNotUpdateFavorites": "ບໍ່ສາມາດອັບເດດລາຍການທີ່ມັກໄດ້.",

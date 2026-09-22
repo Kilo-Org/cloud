@@ -72,11 +72,6 @@
     "agents": "Ajan",
     "all": "Tout",
     "allModels": "Tout modèl yo",
-    "autoModelBalanced": "Otomatik Ekilibre",
-    "autoModelEfficient": "Otomatik Efikas",
-    "autoModelFree": "Otomatik Gratis",
-    "autoModelFrontier": "Otomatik Pi avanse",
-    "autoModelSmall": "Otomatik Piti",
     "balanced": "Ekilibre",
     "bitbucketConnected": "Bitbucket konekte",
     "branch": "Branch kòd",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "Twòp tantativ koneksyon. Tanpri tann epi eseye ankò."
   },
   "models": {
+    "auto": {
+      "frontier": "Otomatik Pi avanse",
+      "balanced": "Otomatik Ekilibre",
+      "efficient": "Otomatik Efikas",
+      "small": "Otomatik Piti",
+      "free": "Otomatik Gratis",
+      "organization": "Otomatik Òganizasyon"
+    },
     "dataCollected": "Done kolekte",
     "free": "Gratis",
     "couldNotUpdateFavorites": "Nou pa t ka mete favori yo ajou.",

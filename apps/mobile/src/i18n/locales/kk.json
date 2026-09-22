@@ -72,11 +72,6 @@
     "agents": "Агенттер",
     "all": "Барлығы",
     "allModels": "Барлық модельдер",
-    "autoModelBalanced": "Авто Теңгерімді",
-    "autoModelEfficient": "Авто Тиімді",
-    "autoModelFree": "Авто Тегін",
-    "autoModelFrontier": "Авто Озық",
-    "autoModelSmall": "Авто Кіші",
     "balanced": "Теңгерімді",
     "bitbucketConnected": "Bitbucket қосылды",
     "branch": "Тармақ",
@@ -3124,6 +3119,14 @@
     "tooManySignInAttempts": "Жүйеге кіру әрекеттері тым көп. Сәл күтіп, қайталап көріңіз."
   },
   "models": {
+    "auto": {
+      "frontier": "Авто Озық",
+      "balanced": "Авто Теңгерімді",
+      "efficient": "Авто Тиімді",
+      "small": "Авто Кішкене",
+      "free": "Авто Тегін",
+      "organization": "Ұйымдық авто"
+    },
     "dataCollected": "Деректер жиналады",
     "free": "Тегін",
     "couldNotUpdateFavorites": "Таңдаулыларды жаңарту мүмкін болмады.",

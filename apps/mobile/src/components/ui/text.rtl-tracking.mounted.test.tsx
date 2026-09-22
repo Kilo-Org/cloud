@@ -102,14 +102,13 @@ describe('Text tracked labels in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
-    // The eyebrow variant renders its own tracked class in LTR only, so an RTL
-    // eyebrow carries none of its own (`text.mounted.test.tsx`); the RTL style
-    // reset is what keeps any tracked class a caller passes in harmless.
-    expect(
-      String(hostText(root).props.className)
-        .split(' ')
-        .some(name => name.startsWith('tracking'))
-    ).toBe(false);
+    // The eyebrow variant renders its own Latin display classes in LTR only, so
+    // an RTL eyebrow carries none of them (`text.mounted.test.tsx`) rather than
+    // keeping them like a caller-supplied tracked class; the zero letter-spacing
+    // reset still lands.
+    const classes = (hostText(root).props.className as string).split(' ');
+    expect(classes).not.toContain('uppercase');
+    expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
   });
 });

@@ -46,6 +46,16 @@ vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
 }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+// The keyboard-lift view reads the device insets through
+// `react-native-safe-area-context`, whose CommonJS entry requires a Flow
+// react-native subpath this node project cannot load. Stub the two kilo-chat
+// modules the way the sibling node-only screen tests do.
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
+  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
+}));
+vi.mock('@/components/kilo-chat/use-reveal-end-on-keyboard', () => ({
+  useRevealEndOnKeyboard: () => ({ current: null }),
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));

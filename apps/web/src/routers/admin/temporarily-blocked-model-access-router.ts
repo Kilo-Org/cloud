@@ -11,6 +11,8 @@ import {
   type TemporarilyBlockedModelAccessConfig,
 } from '@/lib/ai-gateway/temporarily-blocked-model-access';
 
+const TEMPORARILY_BLOCKED_MODEL_ACCESS_TTL_SECONDS = 30 * 24 * 60 * 60;
+
 export const adminTemporarilyBlockedModelAccessRouter = createTRPCRouter({
   get: adminProcedure.query(() => getTemporarilyBlockedModelAccessConfig()),
 
@@ -45,7 +47,8 @@ export const adminTemporarilyBlockedModelAccessRouter = createTRPCRouter({
       };
       const written = await redisClient.set(
         TEMPORARILY_BLOCKED_MODEL_ACCESS_REDIS_KEY,
-        JSON.stringify(config)
+        JSON.stringify(config),
+        { ex: TEMPORARILY_BLOCKED_MODEL_ACCESS_TTL_SECONDS }
       );
       if (!written) {
         throw new TRPCError({

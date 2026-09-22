@@ -105,7 +105,7 @@ export function TemporarilyBlockedModelAccessContent() {
               className="text-muted-foreground text-sm"
             >
               {organizationIds.length} organization{organizationIds.length === 1 ? '' : 's'} will
-              bypass the direct-request block. The allowlist is stored in Redis.
+              bypass the direct-request block. The Redis allowlist expires 30 days after each save.
             </p>
           </div>
 

@@ -7,7 +7,14 @@ import Module from 'node:module';
 
 import { moveA11yFocus } from '@/lib/a11y/announce';
 
-import { MarkdownTable, MarkdownTableBodyRenderer, TableRow } from './markdown-table';
+import {
+  MarkdownTable,
+  MarkdownTableBodyRenderer,
+  MemoTableRow,
+  TABLE_ROW_MOUNT_LIMIT,
+  TABLE_ROW_MOUNT_STEP,
+  TableRow,
+} from './markdown-table';
 
 import { type MarkdownPalette } from './markdown-palette';
 import { useMarkdown } from 'react-native-marked';
@@ -233,6 +240,51 @@ function accessibilityLabelOf(node: RenderedElement | null | undefined): string 
     return '';
   }
   return typeof node.props.accessibilityLabel === 'string' ? node.props.accessibilityLabel : '';
+}
+
+/**
+ * Mount the element tree a `MarkdownTableBodyRenderer.table()` call returns.
+ * A direct call does not descend into the components the tree contains, so the
+ * capped body rows are only observable once that element is rendered.
+ */
+function renderTableElement(element: React.ReactNode): TestRenderer.ReactTestRenderer {
+  let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+  act(() => {
+    renderer = TestRenderer.create(element as React.ReactElement);
+  });
+  // oxlint-disable-next-line @typescript-eslint/no-unnecessary-condition -- act callback assignment, not statically guaranteed
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+/**
+ * A mounted row is `MemoTableRow`; the renderer exposes the memo wrapper's
+ * inner function as the fiber type, so match either identity.
+ */
+function isRenderedTableRow(node: { type: unknown }): boolean {
+  return node.type === MemoTableRow || node.type === TableRow;
+}
+
+/** Every mounted row of a rendered table body, in tree order. */
+function memoTableRows(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
+  return renderer.root.findAll(isRenderedTableRow);
+}
+
+/** The Load more footer Pressable, present while rows remain unmounted. */
+function loadMoreNode(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  const nodes = renderer.root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Pressable' &&
+      node.props.accessibilityLabel === 'Load more'
+  );
+  const first = nodes[0];
+  if (!first) {
+    throw new Error('Load more Pressable missing');
+  }
+  return first;
 }
 
 /** The one accessible element per row that carries the linear reading label. */
@@ -533,16 +585,52 @@ describe('MarkdownTableBodyRenderer table()', () => {
   });
 
   it('builds the header and body TableRow tree with headerTexts from extractNodeText', () => {
-    const renderer = new MarkdownTableBodyRenderer(mockPalette, 200, 1, true, {});
-    const element = renderer.table([['Column 1']], [[['Row 1']]], undefined, undefined, undefined);
+    const bodyRenderer = new MarkdownTableBodyRenderer(mockPalette, 200, 1, true, {});
+    const element = bodyRenderer.table(
+      [['Column 1']],
+      [[['Row 1']]],
+      undefined,
+      undefined,
+      undefined
+    );
 
-    const tableRows = findAll(element, node => node.type === TableRow);
+    const renderer = renderTableElement(element);
+    const tableRows = memoTableRows(renderer);
     expect(tableRows).toHaveLength(2);
     expect(tableRows[0]?.props.headerTexts).toEqual(['Column 1']);
     expect(tableRows[0]?.props.isHeader).toBe(true);
     expect(tableRows[0]?.props.columnWidth).toBe(200);
     expect(tableRows[1]?.props.isHeader).toBeUndefined();
     expect(tableRows[1]?.props.cells).toEqual([['Row 1']]);
+    expect(tableRows[1]?.props.isLastRow).toBe(true);
+  });
+
+  it('caps the mounted rows at the limit and reveals one step per Load more press', () => {
+    const bodyRenderer = new MarkdownTableBodyRenderer(mockPalette, 200, 1, true, {});
+    const rows = Array.from(
+      { length: TABLE_ROW_MOUNT_LIMIT + TABLE_ROW_MOUNT_STEP + 5 },
+      (_, index) => [[`Row ${index}`]]
+    );
+    const renderer = renderTableElement(
+      bodyRenderer.table([['Column 1']], rows, undefined, undefined, undefined)
+    );
+
+    // Header plus exactly the mount limit; every other row stays unmounted.
+    const mounted = memoTableRows(renderer);
+    expect(mounted).toHaveLength(1 + TABLE_ROW_MOUNT_LIMIT);
+    expect(mounted[0]?.props.isHeader).toBe(true);
+    // A capped table marks no body row as last, so the Load more footer keeps
+    // its separating border and the box bottom is drawn after it.
+    expect(mounted[TABLE_ROW_MOUNT_LIMIT]?.props.isLastRow).toBe(false);
+    expect(loadMoreNode(renderer)).toBeTruthy();
+
+    act(() => {
+      (loadMoreNode(renderer).props.onPress as (() => void) | undefined)?.();
+    });
+
+    expect(memoTableRows(renderer)).toHaveLength(1 + TABLE_ROW_MOUNT_LIMIT + TABLE_ROW_MOUNT_STEP);
+    // Rows still remain, so the footer stays mounted.
+    expect(loadMoreNode(renderer)).toBeTruthy();
   });
 });
 
@@ -712,7 +800,7 @@ describe('MarkdownTable eager body (nested table fallback)', () => {
     openTable(renderer);
     // The eager path renders TableRow directly; it never calls useMarkdown.
     expect(useMarkdown).not.toHaveBeenCalled();
-    expect(renderer.root.findAll(node => node.type === TableRow)).toHaveLength(2);
+    expect(renderer.root.findAll(isRenderedTableRow)).toHaveLength(2);
   });
 });
 

@@ -4,6 +4,7 @@ import {
   type ComponentRef,
   type ComponentType,
   Fragment,
+  memo,
   type ReactElement,
   type ReactNode,
   type RefObject,
@@ -60,6 +61,13 @@ const MODAL_HORIZONTAL_PADDING = 16;
 const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
 const ZOOM_DEFAULT = 1;
+
+// A table mounts at most TABLE_ROW_MOUNT_LIMIT rows; the footer row reveals
+// TABLE_ROW_MOUNT_STEP more on each tap. The body cannot be virtualized: it
+// lives inside the pinch-zoom gesture and the natural-size sizer, so a capped
+// mount is the bound that keeps the modal's open animation cheap.
+export const TABLE_ROW_MOUNT_LIMIT = 40;
+export const TABLE_ROW_MOUNT_STEP = 40;
 
 type MarkdownTableProps = {
   palette: MarkdownPalette;
@@ -367,7 +375,7 @@ function MarkdownTableCells({
     MODAL_COLUMN_MIN_WIDTH,
     Math.floor((windowWidth - MODAL_HORIZONTAL_PADDING * 2) / Math.max(columnCount, 1))
   );
-  const headerTexts = header.map(node => extractNodeText(node));
+  const headerTexts = useMemo(() => header.map(node => extractNodeText(node)), [header]);
   return (
     <View
       className="self-start overflow-hidden rounded-md border"
@@ -377,7 +385,7 @@ function MarkdownTableCells({
         backgroundColor: palette.surfaceColor,
       }}
     >
-      <TableRow
+      <MemoTableRow
         palette={palette}
         cells={header}
         columnCount={columnCount}
@@ -386,17 +394,13 @@ function MarkdownTableCells({
         isLastRow={rows.length === 0}
         headerTexts={headerTexts}
       />
-      {rows.map((row, rowIdx) => (
-        <TableRow
-          key={rowIdx}
-          palette={palette}
-          cells={row}
-          columnCount={columnCount}
-          columnWidth={columnWidth}
-          isLastRow={rows.length - 1 === rowIdx}
-          headerTexts={headerTexts}
-        />
-      ))}
+      <CappedTableRows
+        palette={palette}
+        rows={rows}
+        columnCount={columnCount}
+        columnWidth={columnWidth}
+        headerTexts={headerTexts}
+      />
     </View>
   );
 }
@@ -544,7 +548,7 @@ export class MarkdownTableBodyRenderer extends MarkdownRenderer {
           backgroundColor: this.tablePalette.surfaceColor,
         }}
       >
-        <TableRow
+        <MemoTableRow
           palette={this.tablePalette}
           cells={header}
           columnCount={this.columnCount}
@@ -553,17 +557,13 @@ export class MarkdownTableBodyRenderer extends MarkdownRenderer {
           isLastRow={rows.length === 0}
           headerTexts={headerTexts}
         />
-        {rows.map((row, rowIdx) => (
-          <TableRow
-            key={rowIdx}
-            palette={this.tablePalette}
-            cells={row}
-            columnCount={this.columnCount}
-            columnWidth={this.columnWidth}
-            isLastRow={rows.length - 1 === rowIdx}
-            headerTexts={headerTexts}
-          />
-        ))}
+        <CappedTableRows
+          palette={this.tablePalette}
+          rows={rows}
+          columnCount={this.columnCount}
+          columnWidth={this.columnWidth}
+          headerTexts={headerTexts}
+        />
       </View>
     );
   }
@@ -628,6 +628,69 @@ export function TableRow({
         </TableCell>
       ))}
     </View>
+  );
+}
+
+// `TableRow` stays a plain function so the direct-call semantics tests can
+// invoke it; `MemoTableRow` is what both table paths render, so a parent
+// re-render (every zoom/pan state change) skips `cells.map(extractNodeText)`
+// and `linearRowLabel` for every mounted row.
+export const MemoTableRow = memo(TableRow);
+
+type CappedTableRowsProps = {
+  palette: MarkdownPalette;
+  rows: ReactNode[][][];
+  columnCount: number;
+  columnWidth: number;
+  headerTexts: string[];
+};
+
+// Body rows mount only up to the cap; the footer row reveals one more step per
+// tap. The header row is rendered by the caller and is never capped. A capped
+// table marks no body row as last, so the final visible row keeps its bottom
+// border and the box bottom is drawn after the footer.
+function CappedTableRows({
+  palette,
+  rows,
+  columnCount,
+  columnWidth,
+  headerTexts,
+}: Readonly<CappedTableRowsProps>) {
+  const { t } = useTranslation();
+  const [limit, setLimit] = useState(TABLE_ROW_MOUNT_LIMIT);
+  const visible = rows.slice(0, limit);
+  return (
+    <>
+      {visible.map((row, rowIdx) => (
+        <MemoTableRow
+          key={rowIdx}
+          palette={palette}
+          cells={row}
+          columnCount={columnCount}
+          columnWidth={columnWidth}
+          isLastRow={rowIdx === visible.length - 1 && rows.length <= limit}
+          headerTexts={headerTexts}
+        />
+      ))}
+      {rows.length > limit ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('common.loadMore')}
+          onPress={() => {
+            setLimit(current => current + TABLE_ROW_MOUNT_STEP);
+          }}
+          className="items-center self-stretch py-3 active:opacity-70"
+        >
+          {/* eslint-disable-next-line react-native/no-inline-styles -- dynamic per-variant text color */}
+          <Text
+            className="text-sm font-medium"
+            style={withRtlWritingDirection({ color: palette.textColor })}
+          >
+            {t('common.loadMore')}
+          </Text>
+        </Pressable>
+      ) : null}
+    </>
   );
 }
 

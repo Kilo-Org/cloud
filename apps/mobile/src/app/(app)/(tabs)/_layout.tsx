@@ -146,11 +146,18 @@ export default function TabsLayout() {
     }
   }, [showQuickChatTab, onChatTab, router]);
 
+  // The centered-state band ends at the tab bar's top edge, the region the bar
+  // does not cover. The 16pt scroll-content gap (`TAB_SCREEN_BOTTOM_GAP`) is
+  // breathing room for the last row of a scrolling list, not part of the
+  // overlay; reserving it here shrank the band below the empty state's height
+  // in a short landscape window and parked its second line and action behind
+  // the bar (landscape spot defect e8).
+  //
   // The label decision is published to the tab screens, whose content
   // clearance must match the height this layout renders (the width rule can
   // drop the labels without the callers seeing the window width).
   const tabsLayout = (
-    <StateSurfaceInsets bottomInset={hideTabs ? 0 : tabBarHeight + 16}>
+    <StateSurfaceInsets bottomInset={hideTabs ? 0 : tabBarHeight}>
       <Tabs
         screenOptions={{
           headerShown: false,

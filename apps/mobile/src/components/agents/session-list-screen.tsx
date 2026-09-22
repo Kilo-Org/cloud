@@ -49,7 +49,6 @@ export function AgentSessionListScreen() {
   const { activeSessions, refetch } = sessions;
   const content = liveSessionContent(context, sessions);
   const hasLiveRows = content === 'rows';
-  const showFab = context.isReady && content !== 'empty';
   // A failed foreground refresh keeps the cached rows on screen. That failure
   // must speak through the reserved status line (one inline "Couldn't refresh"
   // with Retry) instead of the load-failure block, which would push the kept
@@ -58,6 +57,17 @@ export function AgentSessionListScreen() {
 
   const query = useLiveSessionQuery(activeSessions);
   const { visibleSessions, isSearching } = query;
+  // The no-match body is the state the tab bar's band was reopened for, and its
+  // compact form fills that band down to the corner the FAB floats in. Since
+  // reserving the FAB's band here is what parked the state's second line and
+  // action behind the tab bar in a short landscape window (landscape spot
+  // defect e8), a state that fills the band owns it and the FAB yields: it
+  // must not sit over the description or the Clear action at a large text
+  // scale. The list bodies keep it — they clear it with their own frame inset —
+  // and so does the load-failure body, whose FAB is the only creation
+  // affordance while the list is failing.
+  const noMatchBody = hasLiveRows && visibleSessions.length === 0;
+  const showFab = context.isReady && content !== 'empty' && !noMatchBody;
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   const refetchRef = useRef(refetch);
@@ -306,7 +316,14 @@ export function AgentSessionListScreen() {
   }
 
   return (
-    <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
+    // The band the no-match body is laid out in ends at the tab bar. The FAB is
+    // a corner control with its own frame inset on the rows list, and reserving
+    // its band here as well shrank the band to the FAB's top: in a short
+    // landscape window that is below the empty state's height, so the state fell
+    // to the scroll anchor and its second line and action were parked behind the
+    // tab bar (landscape spot defect e8). The no-match body therefore keeps the
+    // whole band and the FAB yields to it (`showFab`).
+    <StateSurfaceInsets bottomInset={tabBarHeight}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}
@@ -358,7 +375,7 @@ export function AgentSessionListScreen() {
           />
         </View>
         {body}
-        {/* Empty content owns its creation action; other admitted states keep the FAB. */}
+        {/* Empty content owns its creation action; the no-match body owns the band. */}
         {showFab && (
           <Pressable
             accessibilityRole="button"

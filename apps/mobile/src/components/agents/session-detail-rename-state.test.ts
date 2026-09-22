@@ -75,6 +75,53 @@ describe('getSessionDetailRenameState', () => {
     });
   });
 
+  it('never paints the server placeholder title, showing the fallback instead', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T04:17:22.503Z',
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'Child session - 2026-09-22T04:17:22.503Z',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe(fallbackTitle);
+  });
+
+  it('seeds the modal with the fallback, not the server placeholder title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T04:17:22.503Z',
+        renameState: { ...initialRenameState(), isModalOpen: true },
+      }).modalInitialValue
+    ).toBe(fallbackTitle);
+  });
+
+  it('paints a real title that begins like a placeholder verbatim', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - my plan',
+        renameState: initialRenameState(),
+      }).title
+    ).toBe('New session - my plan');
+  });
+
   it('seeds the modal with the current title only while it is open', () => {
     const open = getSessionDetailRenameState({
       fallbackTitle,
@@ -230,5 +277,29 @@ describe('titleFromSessionUpdatedEvent', () => {
     expect(
       titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ title: '  ' }))
     ).toBeUndefined();
+  });
+
+  it('ignores a server placeholder title so it cannot replace the friendly header', () => {
+    expect(
+      titleFromSessionUpdatedEvent(
+        'ses-1',
+        sessionUpdatedPayload({ title: 'New session - 2026-09-22T04:17:22.503Z' })
+      )
+    ).toBeUndefined();
+    expect(
+      titleFromSessionUpdatedEvent(
+        'ses-1',
+        sessionUpdatedPayload({ title: 'Child session - 2026-09-22T04:17:22.503Z' })
+      )
+    ).toBeUndefined();
+  });
+
+  it('passes through a generated title that begins like a placeholder', () => {
+    expect(
+      titleFromSessionUpdatedEvent(
+        'ses-1',
+        sessionUpdatedPayload({ title: 'New session - my plan' })
+      )
+    ).toBe('New session - my plan');
   });
 });

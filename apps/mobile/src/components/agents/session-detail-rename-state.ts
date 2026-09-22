@@ -1,3 +1,5 @@
+import { isPlaceholderSessionTitle, resolveSessionDisplayTitle } from '@/lib/session-display-title';
+
 export type RenameState = {
   isModalOpen: boolean;
   optimisticTitle: string | null;
@@ -61,9 +63,8 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
-  const baseTitle = input.isLoaded
-    ? (input.serverTitle ?? input.fallbackTitle)
-    : input.fallbackTitle;
+  const serverTitle = resolveSessionDisplayTitle(input.serverTitle, input.fallbackTitle);
+  const baseTitle = input.isLoaded ? serverTitle : input.fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
     title,
@@ -75,7 +76,9 @@ export function getSessionDetailRenameState(input: {
 
 /**
  * Title from a v2 `session.updated` event for this session, or undefined
- * when the event is for another session or carries no usable title.
+ * when the event is for another session or carries no usable title. A
+ * placeholder title is not usable: painting it would replace the friendly
+ * header with the backend's machine placeholder.
  */
 export function titleFromSessionUpdatedEvent(
   sessionId: string,
@@ -88,7 +91,7 @@ export function titleFromSessionUpdatedEvent(
     return undefined;
   }
   const title = payload.session.title;
-  if (title == null || title.trim().length === 0) {
+  if (title == null || isPlaceholderSessionTitle(title)) {
     return undefined;
   }
   return title;

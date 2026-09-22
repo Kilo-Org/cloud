@@ -1,8 +1,15 @@
-import { createElement } from 'react';
-import { act, TestRenderer } from '@/test/renderer';
+import { type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ChatComposerInputRow } from './chat-composer-input-row';
+import {
+  findAllByType,
+  findByAccessibilityLabel,
+  findTextInput,
+  makeProps,
+  type RenderProps,
+  renderRow,
+} from './chat-composer-input-row.mounted.test-helpers';
+import { COMPOSER_CONTROL_GAP_CLASS } from './chat-composer-input-row';
 
 const platformOS = vi.hoisted(() => ({ os: 'ios' }));
 
@@ -43,84 +50,6 @@ vi.mock('@/components/agents/chat-composer-input-height', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6b7280' }),
 }));
-
-type RenderProps = {
-  canSend?: boolean;
-  hasSendableContent?: boolean;
-  inputEditable: boolean;
-  isStreaming?: boolean;
-  onSubmit?: () => void;
-  returnSendsMessage?: boolean;
-  voiceInputAvailable?: boolean;
-};
-
-function makeProps(overrides: Partial<RenderProps> = {}) {
-  return {
-    attachmentsEnabled: false,
-    canSend: false,
-    disabled: false,
-    hasSendableContent: false,
-    inputAccessibilityDisabled: false,
-    inputEditable: false,
-    inputRef: { current: null },
-    isSending: false,
-    isStreaming: false,
-    maxInputHeight: 120,
-    measureHeight: 40,
-    onAddAttachment: () => undefined,
-    onChangeText: () => undefined,
-    onInputBlur: () => undefined,
-    onInputFocus: () => undefined,
-    onInputLayout: () => undefined,
-    onInsertNewline: () => undefined,
-    onSelectionChange: () => undefined,
-    onStop: () => undefined,
-    onSubmit: () => undefined,
-    onToggleVoice: () => undefined,
-    paperclipDisabled: false,
-    placeholder: 'Message the agent',
-    returnSendsMessage: false,
-    textInputStyle: {},
-    voiceDisabled: false,
-    voiceInputAvailable: false,
-    voiceInputStatus: 'idle' as const,
-    ...overrides,
-  };
-}
-
-function findTextInput(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
-  return root.find(node => typeof node.type === 'string' && (node.type as string) === 'TextInput');
-}
-
-function findAllByType(
-  root: TestRenderer.ReactTestInstance,
-  type: string
-): TestRenderer.ReactTestInstance[] {
-  return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
-}
-
-function findByAccessibilityLabel(
-  root: TestRenderer.ReactTestInstance,
-  label: string
-): TestRenderer.ReactTestInstance | null {
-  const matches = root.findAll(
-    node => typeof node.type === 'string' && node.props.accessibilityLabel === label
-  );
-  return matches[0] ?? null;
-}
-
-async function renderRow(props: RenderProps): Promise<TestRenderer.ReactTestRenderer> {
-  const holder: { current?: TestRenderer.ReactTestRenderer } = {};
-  await act(async () => {
-    await Promise.resolve();
-    holder.current = TestRenderer.create(createElement(ChatComposerInputRow, makeProps(props)));
-  });
-  const renderer = holder.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
 
 describe('ChatComposerInputRow mounted — iOS writing-tools lock', () => {
   beforeEach(() => {
@@ -301,6 +230,82 @@ describe('ChatComposerInputRow mounted — iOS writing-tools lock', () => {
 
     const [mic] = findAllByType(renderer.root, 'VoiceInputButton');
     expect(mic?.props.size).toBe('lg');
+
+    renderer.unmount();
+  });
+});
+
+describe('ChatComposerInputRow mounted — control separation', () => {
+  /**
+   * Whether the nearest ancestor carrying the row's control gap has it as one
+   * of its class tokens. The input's wrapper spells the same gap beside its
+   * own layout classes, so the token is what has to match, not the whole
+   * className.
+   */
+  function hasGapWrapper(control: TestRenderer.ReactTestInstance | null): boolean {
+    let current = control?.parent ?? null;
+    while (current !== null) {
+      const className = current.props.className;
+      if (
+        typeof className === 'string' &&
+        className.split(/\s+/).includes(COMPOSER_CONTROL_GAP_CLASS)
+      ) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  // The reported defect: the send/stop control carried no gap at all, so it
+  // rendered flush against the microphone as a single shape with overlapping
+  // tap areas (spot check e1 / e1-en-two-msg). Every control in the row —
+  // including the input, which the trailing cluster is measured against — must
+  // carry the same gap class.
+  it('wraps the input, the send, the voice toggle and the newline control in the row gap', async () => {
+    const renderer = await renderRow({
+      inputEditable: true,
+      returnSendsMessage: true,
+      voiceInputAvailable: true,
+    });
+
+    const [mic] = findAllByType(renderer.root, 'VoiceInputButton');
+    expect(findByAccessibilityLabel(renderer.root, 'Send message')).not.toBeNull();
+    expect(findByAccessibilityLabel(renderer.root, 'Insert newline')).not.toBeNull();
+    for (const control of [
+      findTextInput(renderer.root),
+      mic ?? null,
+      findByAccessibilityLabel(renderer.root, 'Insert newline'),
+      findByAccessibilityLabel(renderer.root, 'Send message'),
+    ]) {
+      expect(hasGapWrapper(control)).toBe(true);
+    }
+
+    renderer.unmount();
+  });
+
+  // The row mirrors under RTL, so the gap has to be a start-side margin: a
+  // physical `ml-`/`mr-` gap would land on the wrong side of the mirrored
+  // control and leave it flush against its neighbour (spot check
+  // e1-rtl-session showed the mirrored microphone and send circle merged).
+  it('gaps the controls with a logical start margin so the row stays spaced under RTL', () => {
+    expect(COMPOSER_CONTROL_GAP_CLASS).toMatch(/^ms-\d/);
+  });
+
+  it('wraps the stop control in the row gap while streaming', async () => {
+    const renderer = await renderRow({
+      inputEditable: true,
+      isStreaming: true,
+      canSend: false,
+      hasSendableContent: false,
+      voiceInputAvailable: true,
+    });
+
+    const [mic] = findAllByType(renderer.root, 'VoiceInputButton');
+    const stop = findByAccessibilityLabel(renderer.root, 'Stop generating');
+    expect(stop).not.toBeNull();
+    expect(hasGapWrapper(mic ?? null)).toBe(true);
+    expect(hasGapWrapper(stop)).toBe(true);
 
     renderer.unmount();
   });

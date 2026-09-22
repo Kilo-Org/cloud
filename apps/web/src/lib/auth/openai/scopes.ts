@@ -20,10 +20,17 @@ export const OPENAI_RESOURCE = 'https://api.openai.com/v1';
 /**
  * The scopes that make a grant a delegated BYOK credential rather than an
  * identity-only sign-in. `resource.invoke` is what permits calling the API
- * resource on the person's behalf, and `offline_access` is what makes the token
- * renewable without another sign-in. An identity-only sign-in grants neither.
+ * resource on the person's behalf, `chatpass.enable.request` is the consent to
+ * spend the person's ChatGPT allowance, and `offline_access` is what makes the
+ * token renewable without another sign-in. An identity-only sign-in grants
+ * none of them, and a person can decline token sharing while still granting
+ * identity, so the allowance consent must be checked on its own.
  */
-const OPENAI_DELEGATED_GRANT_SCOPES = ['resource.invoke', 'offline_access'] as const;
+const OPENAI_DELEGATED_GRANT_SCOPES = [
+  'resource.invoke',
+  'chatpass.enable.request',
+  'offline_access',
+] as const;
 
 /**
  * True when a completed authorization granted the delegated-access scopes.

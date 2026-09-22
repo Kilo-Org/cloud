@@ -291,7 +291,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
         type: 'oauth',
         access_token: 'access-token',
         refresh_token: 'refresh-token',
-        scope: 'openid profile email offline_access resource.invoke',
+        scope: 'openid profile email offline_access resource.invoke chatpass.enable.request',
       },
       profile: { sub: 'openai-sub', email: 'sso-link@example.com' },
     } as never);
@@ -326,7 +326,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
         type: 'oauth',
         access_token: 'access-token',
         refresh_token: 'refresh-token',
-        scope: 'openid profile email offline_access resource.invoke',
+        scope: 'openid profile email offline_access resource.invoke chatpass.enable.request',
       },
       profile,
     } as never);

@@ -169,10 +169,10 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    // This test compiles against the real project root so the relative image
-    // path resolves, and the base colors mod merges into whatever colors.xml
-    // that root already has (a prebuilt `android/` holds the app's own colors).
-    // Assert the color this plugin generates, not the host's whole palette.
+    // Assert the color this plugin generates, not the host's palette: the
+    // compile above inspects the fresh root `createAndroidProject()` created
+    // (no prebuilt `colors.xml`), and `arrayContaining` leaves any other
+    // entries in `resources.color` unpinned.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),

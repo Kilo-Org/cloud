@@ -164,8 +164,14 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // The introspective android colors start from the project's
+    // `values/colors.xml` when one exists (a prebuild in the worktree leaves
+    // one), so every plugin's color accumulates. Assert the splash background
+    // this config owns is among them, matching the style assertion below.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

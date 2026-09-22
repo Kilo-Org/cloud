@@ -30,6 +30,9 @@ import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from './git-review-r
 import { boundedUtf8Tail, cleanTerminalOutput, gitOperationError } from './git-errors.js';
 
 const LONG_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
+// Kept below WORKSPACE_PREPARATION_TIMEOUT_MS so a stuck long command (notably
+// the clone) fails as its own timeout with its own attribution and redelivery
+// budget, not as the generic preparation-deadline failure.
 const LONG_COMMAND_HARD_TIMEOUT_MS = 300_000;
 // Setup commands may legitimately stay silent for minutes (piped tools often
 // buffer), unlike git commands which run with --progress, so they get a more

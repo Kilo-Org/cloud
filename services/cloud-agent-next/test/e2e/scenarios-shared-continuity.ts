@@ -318,10 +318,6 @@ export async function runInterruptThenContinue(
   return interruptThenContinueBody(args, env);
 }
 
-// ---------------------------------------------------------------------------
-// question-idle-resume
-// ---------------------------------------------------------------------------
-
 const QUESTION_IDLE_TIMEOUT_MS = 30 * 60_000;
 /** The plan's 15-minute idle window in which the allocation must disappear. */
 const QUESTION_IDLE_WINDOW_MS = 15 * 60_000;

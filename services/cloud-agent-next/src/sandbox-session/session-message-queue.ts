@@ -8,6 +8,10 @@ import {
   type SessionMessageIntent,
   type TurnFinalization,
 } from '../execution/types.js';
+import type {
+  CloudAgentAssistantFailureReason,
+  CloudAgentProviderOwnership,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 import {
@@ -63,6 +67,8 @@ type SessionMessageLifecycle = {
   terminalSource?: SessionMessageTerminalSource;
   failedReason?: string;
   failedDetail?: string;
+  assistantReason?: CloudAgentAssistantFailureReason;
+  providerOwnership?: CloudAgentProviderOwnership;
   attachFailures?: number;
   promptFailures?: number;
   preparationAttemptId?: string;
@@ -76,6 +82,11 @@ type SessionMessageLifecycle = {
   retryNotBefore?: number;
   executionDeadlineAt?: number;
   cancellation?: { operationId: string; deadlineAt: number };
+  /**
+   * PR gate verdict reported by a code-review turn. Present only on a completed
+   * terminal record whose wrapper observed a gate result; absent otherwise.
+   */
+  gateResult?: 'pass' | 'fail';
   operations?: {
     attach?: SessionOperationProof;
     retiredAttach?: SessionOperationProof;
@@ -522,6 +533,9 @@ export function applyMessageOutcome(
           terminalAt: now,
           terminalSource,
           ...(outcome.reason ? { failedReason: outcome.reason } : {}),
+          ...(outcome.gateResult !== undefined ? { gateResult: outcome.gateResult } : {}),
+          ...(outcome.assistantReason ? { assistantReason: outcome.assistantReason } : {}),
+          ...(outcome.providerOwnership ? { providerOwnership: outcome.providerOwnership } : {}),
         }
       : item
   );

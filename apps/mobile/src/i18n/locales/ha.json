@@ -827,7 +827,8 @@
       "chat": "Saƙonnin tattaunawa",
       "kiloclaw": "Ayyukan KiloClaw",
       "balance": "Faɗakarwar ragowar kuɗi",
-      "security": "Sakamakon binciken tsaro"
+      "security": "Sakamakon binciken tsaro",
+      "spend": "Faɗakarwar kashe kuɗi"
     },
     "category": {
       "chatMessagesSubtitle": "amsoshi a cikin tattaunawarka",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Halin zaman",
       "sessionStatusSubtitle": "an gama / an kasa / a shirye don sarrafawa",
       "kiloclawActivitySubtitle": "kwafin shirin ya shirya ko ya gaza, ayyukan da aka tsara",
+      "kiloclawActivityUnavailable": "Fara kwafin KiloClaw don samun ayyukan KiloClaw.",
       "balanceAlertsSubtitle": "gargaɗin ƙarancin kuɗin ƙungiya",
-      "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA"
+      "balanceAlertsUnavailable": "Shiga ƙungiya don samun gargaɗin ƙarancin kuɗi.",
+      "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA",
+      "securityFindingsUnavailable": "Kunna wakilin tsaro na Kilo a wani yanki don samun sakamakon binciken tsaro.",
+      "spendAlertsSubtitle": "wucewar iyaka da hauhawar sa'a",
+      "spendAlertsToggle": "Rukunin faɗakarwar kashe kuɗi"
     },
     "action": {
       "openSession": "Buɗe zaman"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "An kasa loda zaman.",
       "failedToLoadDetails": "An kasa loda cikakkun bayanan zaman.",
       "failedToStopExecution": "An kasa dakatar da aikin.",
+      "stopped": "An dakatar da zama",
+      "committing": "Ana adanawa…",
+      "committed": "An adana",
+      "commitFailed": "Adanawa ta kasa",
       "renameSession": "Canza sunan zaman",
       "renamePlaceholder": "Sunan zaman",
       "transcriptAccessibility": "Tarihin tattaunawar zaman",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "layuka {{displayCount}}",
       "linesBadge_other": "layuka {{displayCount}}",
       "matchesBadge_one": "sakamako {{displayCount}}",
-      "matchesBadge_other": "sakamako {{displayCount}}"
+      "matchesBadge_other": "sakamako {{displayCount}}",
+      "noOutput": "Babu fitarwa."
     },
     "readToolMarkdown": {
       "linesTruncated": "layuka {{start}}–{{end}} (an rage)",
@@ -3155,7 +3166,8 @@
     "channelName": "Wakilai da ke aiki",
     "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle.",
     "openSession": "Buɗe",
-    "approveFailed": "An kasa amincewa. Danna $t(common.approve) don sake gwadawa."
+    "approveFailed": "An kasa amincewa. Danna $t(common.approve) don sake gwadawa.",
+    "newestResult": "Sabon sakamako"
   },
   "transcriptionModel": {
     "title": "Samfurin mayar da magana zuwa rubutu",
@@ -3180,15 +3192,7 @@
     "remoteOptionTitle": "Kwamfutarka",
     "remoteOptionBody": "Gudanar da Kilo a na'urarka ta hanyar CLI na `kilo remote`.",
     "skip": "Tsallake kaita",
-    "tutorialLabel": "Koyarwa",
-    "remoteTitle": "Fara zaman nesa na farko",
-    "remoteBody": "Haɗa kwamfutarka, sai ka fara zaman daga nan.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Babu kwamfuta da aka haɗa tukuna",
-    "remoteEmptyBody": "Don haɗa shi, gudanar da `kilo remote` a kwamfutarka.",
-    "remoteFound": "An haɗa kwamfuta",
-    "checkAgain": "Sake dubawa",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Koyarwa"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Buɗe zaman ƙarshe"
+  },
+  "spendAlerts": {
+    "subtitle": "Aika faɗakarwa ta imel ko turawa zuwa ga abokan hulɗar biyan kuɗi lokacin da kashe kuɗin wannan yanki ya wuce iyaka ko ya haura fiye da yawan sa'ar da ya saba.",
+    "enable": "Kunna faɗakarwar kashe kuɗi",
+    "thresholdTitle": "Wucewar iyaka",
+    "thresholdSubtitle": "Kashe kuɗin da ake yi ya wuce iyakarka",
+    "anomalyTitle": "Hauhawar sa'a",
+    "anomalySubtitle": "Sa'a ɗaya ta fi yawan da wannan yanki ya saba nisa",
+    "limitLabel": "Iyaka (USD)",
+    "windowLabel": "Taga",
+    "window24h": "Sa'o'i 24",
+    "window7d": "Kwanaki 7",
+    "window30d": "Kwanaki 30",
+    "multiplierLabel": "Mai ninka hauhawa",
+    "saved": "An adana saitunan faɗakarwar kashe kuɗi",
+    "loadError": "An kasa loda faɗakarwar kashe kuɗi.",
+    "saveError": "An kasa adana faɗakarwar kashe kuɗi.",
+    "empty": "Faɗakarwar kashe kuɗi a kashe take. Kunna ta domin faɗakar da abokan hulɗar biyan kuɗi na wannan yanki.",
+    "noSpend": "Ba a rubuta wani kashe kuɗi ba tukuna",
+    "spend24h": "Kashe kuɗi a cikin sa'o'i 24 da suka gabata",
+    "multiplierError": "Shigar da mai ninka 1 ko fiye",
+    "permissionDenied": "Ba ka da izinin sarrafa faɗakarwar kashe kuɗi.",
+    "pushOffByCategory": "A kashe a cikin Sanarwa"
   }
 }

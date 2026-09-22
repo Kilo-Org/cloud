@@ -827,7 +827,8 @@
       "chat": "Mesaj diskisyon",
       "kiloclaw": "Aktivite KiloClaw",
       "balance": "Alèt balans",
-      "security": "Pwoblèm sekirite detekte"
+      "security": "Pwoblèm sekirite detekte",
+      "spend": "Alèt depans"
     },
     "category": {
       "chatMessagesSubtitle": "repons nan konvèsasyon ou yo",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Estati sesyon",
       "sessionStatusSubtitle": "fini / echwe / pare pou kontwole",
       "kiloclawActivitySubtitle": "enstans pare/echwe, aksyon pwograme",
+      "kiloclawActivityUnavailable": "Kòmanse yon enstans KiloClaw pou jwenn aktivite KiloClaw.",
       "balanceAlertsSubtitle": "avètisman lè balans òganizasyon an ba",
-      "securityFindingsSubtitle": "nouvo rezilta ak rapèl SLA"
+      "balanceAlertsUnavailable": "Antre nan yon òganizasyon pou jwenn alèt sou balans ki ba.",
+      "securityFindingsSubtitle": "nouvo rezilta ak rapèl SLA",
+      "securityFindingsUnavailable": "Aktive ajan sekirite Kilo sou yon domèn pou jwenn pwoblèm sekirite detekte.",
+      "spendAlertsSubtitle": "depasman papòt ak ogmantasyon chak èdtan",
+      "spendAlertsToggle": "Kategori alèt depans"
     },
     "action": {
       "openSession": "Louvri sesyon an"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Nou pa t ka chaje sesyon an.",
       "failedToLoadDetails": "Nou pa t ka chaje detay sesyon an.",
       "failedToStopExecution": "Nou pa t ka sispann egzekisyon an.",
+      "stopped": "Sesyon an sispann",
+      "committing": "N ap anrejistre…",
+      "committed": "Anrejistre",
+      "commitFailed": "Anrejistreman an echwe",
       "renameSession": "Chanje non sesyon an",
       "renamePlaceholder": "Non sesyon",
       "transcriptAccessibility": "Transkripsyon sesyon an",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} liy",
       "linesBadge_other": "{{displayCount}} liy",
       "matchesBadge_one": "{{displayCount}} rezilta",
-      "matchesBadge_other": "{{displayCount}} rezilta"
+      "matchesBadge_other": "{{displayCount}} rezilta",
+      "noOutput": "Pa gen rezilta."
     },
     "readToolMarkdown": {
       "linesTruncated": "liy {{start}}–{{end}} (koupe)",
@@ -3155,7 +3166,8 @@
     "channelName": "Ajan aktif",
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an.",
     "openSession": "Louvri",
-    "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò."
+    "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò.",
+    "newestResult": "Dènye rezilta"
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",
@@ -3180,15 +3192,7 @@
     "remoteOptionTitle": "Òdinatè ou",
     "remoteOptionBody": "Egzekite Kilo sou pwòp machin ou a nan atravè CLI `kilo remote` la.",
     "skip": "Pase vizit la",
-    "tutorialLabel": "Gid",
-    "remoteTitle": "Kòmanse premye sesyon distans ou a",
-    "remoteBody": "Konekte òdinatè ou a, epi kòmanse sesyon an soti isit la.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Okenn òdinatè konekte pou kounye a",
-    "remoteEmptyBody": "Pou konekte l, egzekite `kilo remote` sou òdinatè ou a.",
-    "remoteFound": "Òdinatè konekte",
-    "checkAgain": "Tcheke ankò",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Gid"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Louvri dènye sesyon an"
+  },
+  "spendAlerts": {
+    "subtitle": "Voye yon alèt pa imèl oswa push bay kontak fakti yo lè depans sektè sa a depase yon limit oswa monte pi wo pase vitès èdtan abityèl li.",
+    "enable": "Aktive alèt depans yo",
+    "thresholdTitle": "Depasman papòt",
+    "thresholdSubtitle": "Depans aktyèl la depase limit ou",
+    "anomalyTitle": "Ogmantasyon chak èdtan",
+    "anomalySubtitle": "Yon èdtan byen pi wo pase vitès abityèl sektè sa a",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Fenèt",
+    "window24h": "24 èdtan",
+    "window7d": "7 jou",
+    "window30d": "30 jou",
+    "multiplierLabel": "Miltiplikatè ogmantasyon",
+    "saved": "Paramèt alèt depans yo anrejistre",
+    "loadError": "Pa t kapab chaje alèt depans yo.",
+    "saveError": "Pa t kapab anrejistre alèt depans yo.",
+    "empty": "Alèt depans yo fèmen. Limen yo pou avèti kontak fakti sektè sa a.",
+    "noSpend": "Poko gen depans ki anrejistre",
+    "spend24h": "Depans nan 24 èdtan ki sot pase yo",
+    "multiplierError": "Antre yon miltiplikatè 1 oswa plis",
+    "permissionDenied": "Ou pa gen pèmisyon pou jere alèt depans yo.",
+    "pushOffByCategory": "Fèmen nan Notifikasyon"
   }
 }

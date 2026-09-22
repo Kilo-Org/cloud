@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { filterButtonAccessibilityLabel } from '@/components/agents/session-filter-button-label';
 import { Text } from '@/components/ui/text';
+import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type SessionFilterButtonProps = {
@@ -30,8 +31,11 @@ export function SessionFilterButton({
   return (
     <Pressable
       onPress={onPress}
-      // left slop capped against the 16px gap, right slop reaches 44pt wide
-      hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
+      // The frame is the tap target the size audit measures, not the 20pt
+      // glyph: `h-11 w-11` is 38.5pt on device, and the 3pt slop carries it to
+      // the 44pt minimum. It fits the header's own `min-h-11` row, so the
+      // header keeps its height.
+      hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
       accessibilityRole="button"
       // The count is spoken as part of the name, so no new translated string is
       // needed to announce "Filter sessions, 2".
@@ -40,24 +44,30 @@ export function SessionFilterButton({
         activeCount
       )}
       testID={testID}
-      className="active:opacity-70"
+      className="h-11 w-11 shrink-0 items-center justify-center active:opacity-70"
     >
-      <SlidersHorizontal size={20} color={isActive ? colors.foreground : colors.mutedForeground} />
-      {isActive ? (
-        // Overlaps the icon's top-right corner; `pointer-events-none` keeps the
-        // whole 44pt target on the Pressable underneath.
-        <View
-          pointerEvents="none"
-          className="absolute -right-1.5 -top-1.5 h-[15px] min-w-[15px] items-center justify-center rounded-full bg-primary px-1"
-        >
-          <Text
-            className="font-mono-medium text-[10px] leading-[normal] text-primary-foreground"
-            testID="session-filter-badge"
+      {/* The badge stays pinned to the glyph's corner, not the frame's. */}
+      <View>
+        <SlidersHorizontal
+          size={20}
+          color={isActive ? colors.foreground : colors.mutedForeground}
+        />
+        {isActive ? (
+          // Overlaps the icon's top-right corner; `pointer-events-none` keeps the
+          // whole 44pt target on the Pressable underneath.
+          <View
+            pointerEvents="none"
+            className="absolute -right-1.5 -top-1.5 h-[15px] min-w-[15px] items-center justify-center rounded-full bg-primary px-1"
           >
-            {activeCount}
-          </Text>
-        </View>
-      ) : null}
+            <Text
+              className="font-mono-medium text-[10px] leading-[normal] text-primary-foreground"
+              testID="session-filter-badge"
+            >
+              {activeCount}
+            </Text>
+          </View>
+        ) : null}
+      </View>
     </Pressable>
   );
 }

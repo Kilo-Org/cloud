@@ -827,7 +827,8 @@
       "chat": "Съобщения в чата",
       "kiloclaw": "Активност на KiloClaw",
       "balance": "Известия за салдото",
-      "security": "Проблеми със сигурността"
+      "security": "Проблеми със сигурността",
+      "spend": "Известия за разходи"
     },
     "category": {
       "chatMessagesSubtitle": "отговори в разговорите ти",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Статус на сесията",
       "sessionStatusSubtitle": "завършена / неуспешна / готова за управление",
       "kiloclawActivitySubtitle": "готова инстанция или грешка, планирани действия",
+      "kiloclawActivityUnavailable": "Стартирай инстанция на KiloClaw, за да получаваш активност от KiloClaw.",
       "balanceAlertsSubtitle": "предупреждения за ниска наличност на организацията",
-      "securityFindingsSubtitle": "нови открити проблеми и напомняния за SLA"
+      "balanceAlertsUnavailable": "Присъедини се към организация, за да получаваш предупреждения за нисък баланс.",
+      "securityFindingsSubtitle": "нови открити проблеми и напомняния за SLA",
+      "securityFindingsUnavailable": "Активирай агента по сигурността на Kilo за даден обхват, за да получаваш проблеми със сигурността.",
+      "spendAlertsSubtitle": "преминаване на прагове и часови скокове",
+      "spendAlertsToggle": "Категория известия за разходи"
     },
     "action": {
       "openSession": "Отваряне на сесия"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Не успяхме да заредим сесията.",
       "failedToLoadDetails": "Не успяхме да заредим подробностите за сесията.",
       "failedToStopExecution": "Не успяхме да спрем изпълнението.",
+      "stopped": "Сесията е спряна",
+      "committing": "Създава се комит…",
+      "committed": "Комитът е създаден",
+      "commitFailed": "Неуспешно създаване на комит",
       "renameSession": "Преименуване на сесията",
       "renamePlaceholder": "Име на сесията",
       "transcriptAccessibility": "Запис на разговора",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "{{displayCount}} ред",
       "linesBadge_other": "{{displayCount}} реда",
       "matchesBadge_one": "{{displayCount}} съвпадение",
-      "matchesBadge_other": "{{displayCount}} съвпадения"
+      "matchesBadge_other": "{{displayCount}} съвпадения",
+      "noOutput": "Няма изход."
     },
     "readToolMarkdown": {
       "linesTruncated": "редове {{start}}–{{end}} (съкратено)",
@@ -3155,7 +3166,8 @@
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран.",
     "openSession": "Отвори",
-    "approveFailed": "Не успяхме да одобрим. Докосни $t(common.approve), за да опиташ отново."
+    "approveFailed": "Не успяхме да одобрим. Докосни $t(common.approve), за да опиташ отново.",
+    "newestResult": "Най-нов резултат"
   },
   "transcriptionModel": {
     "title": "Модел за транскрипция",
@@ -3180,15 +3192,7 @@
     "remoteOptionTitle": "Компютърът ти",
     "remoteOptionBody": "Стартирай Kilo на собствената си машина през `kilo remote` CLI.",
     "skip": "Пропусни тура",
-    "tutorialLabel": "Ръководство",
-    "remoteTitle": "Стартирай първата си отдалечена сесия",
-    "remoteBody": "Свържи компютъра си, после стартирай сесията оттук.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Все още няма свързан компютър",
-    "remoteEmptyBody": "За да го свържеш, изпълни `kilo remote` на компютъра си.",
-    "remoteFound": "Компютърът е свързан",
-    "checkAgain": "Провери отново",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Ръководство"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Отвори последната сесия"
+  },
+  "spendAlerts": {
+    "subtitle": "Изпращай известие по имейл или push до контактите за фактуриране, когато разходите на този обхват надхвърлят лимит или скочат над обичайната си часова норма.",
+    "enable": "Включи известията за разходи",
+    "thresholdTitle": "Преминаване на праг",
+    "thresholdSubtitle": "Текущите разходи надхвърлят лимита ти",
+    "anomalyTitle": "Часов скок",
+    "anomalySubtitle": "Един час е далеч над обичайната норма за този обхват",
+    "limitLabel": "Лимит (USD)",
+    "windowLabel": "Прозорец",
+    "window24h": "24 часа",
+    "window7d": "7 дни",
+    "window30d": "30 дни",
+    "multiplierLabel": "Множител на скока",
+    "saved": "Настройките за известия за разходи са запазени",
+    "loadError": "Известията за разходи не можаха да се заредят.",
+    "saveError": "Известията за разходи не можаха да се запазят.",
+    "empty": "Известията за разходи са изключени. Включи ги, за да предупреждаваш контактите за фактуриране на този обхват.",
+    "noSpend": "Още няма записани разходи",
+    "spend24h": "Разходи през последните 24 часа",
+    "multiplierError": "Въведи множител 1 или повече",
+    "permissionDenied": "Нямаш разрешение да управляваш известията за разходи.",
+    "pushOffByCategory": "Изключено в „Известия“"
   }
 }

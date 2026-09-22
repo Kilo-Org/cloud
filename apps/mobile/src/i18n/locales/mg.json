@@ -827,7 +827,8 @@
       "chat": "Hafatra amin'ny resaka",
       "kiloclaw": "Hetsika ao amin'ny KiloClaw",
       "balance": "Fampitandremana momba ny vola sisa",
-      "security": "Olana hita amin'ny fiarovana"
+      "security": "Olana hita amin'ny fiarovana",
+      "spend": "Fampitandremana momba ny fandaniana"
     },
     "category": {
       "chatMessagesSubtitle": "valiny amin'ny resakao",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Satan'ny fotoam-piasana",
       "sessionStatusSubtitle": "vita / tsy nahomby / vonona hofehezina",
       "kiloclawActivitySubtitle": "dika mandeha vonona na tsy nahomby, hetsika voalahatra",
+      "kiloclawActivityUnavailable": "Alefaso ny instance KiloClaw hahazoana ny hetsika KiloClaw.",
       "balanceAlertsSubtitle": "fampitandremana rehefa kely ny ambim-bolan'ny fikambanana",
-      "securityFindingsSubtitle": "olana vaovao hita sy fampahatsiahivana SLA"
+      "balanceAlertsUnavailable": "Midira ao amin'ny fikambanana hahazoana fampitandremana momba ny ambim-bola kely.",
+      "securityFindingsSubtitle": "olana vaovao hita sy fampahatsiahivana SLA",
+      "securityFindingsUnavailable": "Alefaso ny mpanampy amin'ny fiarovana Kilo ao amin'ny faritra iray hahazoana ny olana hita amin'ny fiarovana.",
+      "spendAlertsSubtitle": "fihoaram-bidy sy fitsambikinana isan'ora",
+      "spendAlertsToggle": "Sokajin'ny fampitandremana momba ny fandaniana"
     },
     "action": {
       "openSession": "Sokafy ny fotoam-piasana"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Tsy voaray ny fotoam-piasana.",
       "failedToLoadDetails": "Tsy voaray ny antsipirian'ny fotoam-piasana.",
       "failedToStopExecution": "Tsy nahomby ny fampijanonana ny fampandehanana.",
+      "stopped": "Najanona ny fotoam-piasana",
+      "committing": "Mandraketra…",
+      "committed": "Voarakitra",
+      "commitFailed": "Tsy nahomby ny fandraketana",
       "renameSession": "Ovao ny anaran'ny fotoam-piasana",
       "renamePlaceholder": "Anaran'ny fotoam-piasana",
       "transcriptAccessibility": "Rakitsoratry ny fotoam-piasana",
@@ -2216,7 +2226,8 @@
       "linesBadge_one": "Andalana {{displayCount}}",
       "linesBadge_other": "Andalana {{displayCount}}",
       "matchesBadge_one": "Valiny mifanaraka {{displayCount}}",
-      "matchesBadge_other": "Valiny mifanaraka {{displayCount}}"
+      "matchesBadge_other": "Valiny mifanaraka {{displayCount}}",
+      "noOutput": "Tsy misy vokatra."
     },
     "readToolMarkdown": {
       "linesTruncated": "andalana {{start}}–{{end}} (nohafohezina)",
@@ -3155,7 +3166,8 @@
     "channelName": "Mpanatanteraka mandeha",
     "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy.",
     "openSession": "Sokafy",
-    "approveFailed": "Tsy nahomby ny fanekena. Tsindrio $t(common.approve) hanandramana indray."
+    "approveFailed": "Tsy nahomby ny fanekena. Tsindrio $t(common.approve) hanandramana indray.",
+    "newestResult": "Vokatra vaovao indrindra"
   },
   "transcriptionModel": {
     "title": "Modely fanovana feo ho soratra",
@@ -3180,15 +3192,7 @@
     "remoteOptionTitle": "Ny solosainao",
     "remoteOptionBody": "Alefaso amin'ny solosainao manokana ny Kilo amin'ny alalan'ny CLI `kilo remote`.",
     "skip": "Ahalavala ny fitetezana",
-    "tutorialLabel": "Torolàlana",
-    "remoteTitle": "Atombohy ny fotoam-piasana lava vahany voalohananao",
-    "remoteBody": "Aampakao ny solosainao, dia atomboho eto ny fotoam-piasana.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Tsy mbola misy solosaina mifandray",
-    "remoteEmptyBody": "Mba hampifandray azy dia alefaso `kilo remote` amin'ny solosainao.",
-    "remoteFound": "Mifandray ny solosaina",
-    "checkAgain": "Hamarino indray",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Torolàlana"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Sokafy ny fotoam-piasana farany"
+  },
+  "spendAlerts": {
+    "subtitle": "Alefaso fampitandremana amin'ny mailaka na push ho an'ny mpifandray amin'ny faktiora rehefa mihoatra fetra ny fandaniana amin'ity faritra ity na miakatra ambonin'ny taha isan'ora mahazatra.",
+    "enable": "Velomy ny fampitandremana momba ny fandaniana",
+    "thresholdTitle": "Fihoaram-bidy",
+    "thresholdSubtitle": "Mihoatra ny fetranao ny fandaniana mitohy",
+    "anomalyTitle": "Fitsambikinana isan'ora",
+    "anomalySubtitle": "Ny adiny iray dia ambony lavitra noho ny taha mahazatra amin'ity faritra ity",
+    "limitLabel": "Fetra (USD)",
+    "windowLabel": "Fe-potoana",
+    "window24h": "Adiny 24",
+    "window7d": "7 andro",
+    "window30d": "30 andro",
+    "multiplierLabel": "Mpamaro ny fitsambikinana",
+    "saved": "Voatahiry ny fikirakirana ny fampitandremana momba ny fandaniana",
+    "loadError": "Tsy afaka nampiditra ny fampitandremana momba ny fandaniana.",
+    "saveError": "Tsy afaka nitahiry ny fampitandremana momba ny fandaniana.",
+    "empty": "Mihidy ny fampitandremana momba ny fandaniana. Velomy izy ireo hampandre ny mpifandray amin'ny faktiora amin'ity faritra ity.",
+    "noSpend": "Mbola tsy misy fandaniana voarakitra",
+    "spend24h": "Fandaniana tao anatin'ny 24 ora farany",
+    "multiplierError": "Ampidiro mpamaro 1 na mihoatra",
+    "permissionDenied": "Tsy manana alalana hitantana ny fampitandremana momba ny fandaniana ianao.",
+    "pushOffByCategory": "Mihidy ao amin'ny Fampandrenesana"
   }
 }

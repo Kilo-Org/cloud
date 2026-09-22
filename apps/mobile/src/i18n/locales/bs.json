@@ -843,7 +843,8 @@
       "chat": "Poruke u razgovoru",
       "kiloclaw": "Aktivnost u KiloClawu",
       "balance": "Upozorenja o stanju",
-      "security": "Sigurnosni nalazi"
+      "security": "Sigurnosni nalazi",
+      "spend": "Upozorenja o potrošnji"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori u tvojim razgovorima",
@@ -854,8 +855,13 @@
       "sessionStatusTitle": "Status sesije",
       "sessionStatusSubtitle": "završeno / neuspjelo / spremno za upravljanje",
       "kiloclawActivitySubtitle": "instance spremne/neuspjele, zakazane radnje",
+      "kiloclawActivityUnavailable": "Pokreni instancu KiloClaw da bi dobio aktivnost KiloClaw.",
       "balanceAlertsSubtitle": "upozorenja o niskom saldu organizacije",
-      "securityFindingsSubtitle": "novi nalazi i SLA podsjetnici"
+      "balanceAlertsUnavailable": "Pridruži se organizaciji da bi dobio upozorenja o niskom saldu.",
+      "securityFindingsSubtitle": "novi nalazi i SLA podsjetnici",
+      "securityFindingsUnavailable": "Uključi Kilo sigurnosnog agenta na opsegu da bi dobio sigurnosne nalaze.",
+      "spendAlertsSubtitle": "prekoračenja pragova i skokovi na sat",
+      "spendAlertsToggle": "Kategorija upozorenja o potrošnji"
     },
     "action": {
       "openSession": "Otvori sesiju"
@@ -2104,6 +2110,10 @@
       "couldNotLoad": "Nije moguće učitati sesiju.",
       "failedToLoadDetails": "Nije moguće učitati detalje sesije.",
       "failedToStopExecution": "Nije moguće zaustaviti izvršavanje.",
+      "stopped": "Sesija je zaustavljena",
+      "committing": "Potvrđuje se…",
+      "committed": "Potvrđeno",
+      "commitFailed": "Potvrda nije uspjela",
       "renameSession": "Preimenuj sesiju",
       "renamePlaceholder": "Naziv sesije",
       "transcriptAccessibility": "Transkript sesije",
@@ -2248,7 +2258,8 @@
       "linesBadge_few": "{{displayCount}} reda",
       "matchesBadge_one": "{{displayCount}} podudaranje",
       "matchesBadge_other": "{{displayCount}} podudaranja",
-      "matchesBadge_few": "{{displayCount}} podudaranja"
+      "matchesBadge_few": "{{displayCount}} podudaranja",
+      "noOutput": "Nema izlaza."
     },
     "readToolMarkdown": {
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",
@@ -3198,7 +3209,8 @@
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama da vidiš aktivne agente na zaključanom ekranu.",
     "openSession": "Otvori",
-    "approveFailed": "Odobravanje nije uspjelo. Dodirni $t(common.approve) da pokušaš ponovo."
+    "approveFailed": "Odobravanje nije uspjelo. Dodirni $t(common.approve) da pokušaš ponovo.",
+    "newestResult": "Najnoviji rezultat"
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",
@@ -3223,15 +3235,7 @@
     "remoteOptionTitle": "Tvoj računar",
     "remoteOptionBody": "Pokreni Kilo na vlastitoj mašini putem `kilo remote` CLI-ja.",
     "skip": "Preskoči obilazak",
-    "tutorialLabel": "Vodič",
-    "remoteTitle": "Pokreni svoju prvu udaljenu sesiju",
-    "remoteBody": "Poveži svoj računar, zatim pokreni sesiju odavde.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Još nema povezanog računara",
-    "remoteEmptyBody": "Da ga povežeš, pokreni `kilo remote` na računaru.",
-    "remoteFound": "Računar povezan",
-    "checkAgain": "Provjeri ponovo",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Vodič"
   },
   "appActions": {
     "start": {
@@ -3242,5 +3246,28 @@
   },
   "launcher": {
     "openLastSession": "Otvori posljednju sesiju"
+  },
+  "spendAlerts": {
+    "subtitle": "Pošalji upozorenje e-poštom ili push porukom kontaktima za naplatu kada potrošnja ovog obuhvata pređe limit ili skoči iznad uobičajene satne stope.",
+    "enable": "Omogući upozorenja o potrošnji",
+    "thresholdTitle": "Prekoračenje praga",
+    "thresholdSubtitle": "Tekuća potrošnja prelazi tvoj limit",
+    "anomalyTitle": "Satni skok",
+    "anomalySubtitle": "Jedan sat je daleko iznad uobičajene stope ovog obuhvata",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Prozor",
+    "window24h": "24 sata",
+    "window7d": "7 dana",
+    "window30d": "30 dana",
+    "multiplierLabel": "Množilac skoka",
+    "saved": "Postavke upozorenja o potrošnji su sačuvane",
+    "loadError": "Upozorenja o potrošnji nisu učitana.",
+    "saveError": "Upozorenja o potrošnji nisu sačuvana.",
+    "empty": "Upozorenja o potrošnji su isključena. Uključi ih da upozoriš kontakte za naplatu ovog obuhvata.",
+    "noSpend": "Još nema zabilježene potrošnje",
+    "spend24h": "Potrošnja u posljednja 24 sata",
+    "multiplierError": "Unesi množilac 1 ili veći",
+    "permissionDenied": "Nemaš dozvolu za upravljanje upozorenjima o potrošnji.",
+    "pushOffByCategory": "Isključeno u Obavijestima"
   }
 }

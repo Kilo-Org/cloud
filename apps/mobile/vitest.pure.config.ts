@@ -17,6 +17,9 @@ export default defineProject({
   test: {
     name: 'mobile-pure',
     environment: 'node',
+    // The app build's config module cannot load in this project; the setup
+    // file stubs the exports its importers read.
+    setupFiles: ['./vitest.setup.ts'],
     // Project configs do not inherit the root test options, and this suite
     // runs both projects in parallel: on a loaded host (dev stack, simulator,
     // Appium) workers starve and real-timer tests exceed the 5s default. One
@@ -30,6 +33,7 @@ export default defineProject({
     // class down to the workers so the suite prints no warnings.
     execArgv: ['--disable-warning=ExperimentalWarning'],
     include: [
+      'plugins/**/*.test.ts',
       'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',
       'src/lib/a11y/**/*.test.ts',
@@ -39,6 +43,7 @@ export default defineProject({
       'src/lib/auth/**/*.test.tsx',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',
+      'src/lib/artifacts/**/*.test.ts',
       'src/lib/glanceable/**/*.test.ts',
       'src/lib/kiloclaw/**/*.test.ts',
       'src/glanceable-ios/**/*.test.ts',

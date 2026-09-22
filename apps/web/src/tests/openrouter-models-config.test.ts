@@ -12,7 +12,6 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
-import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 import {
   gpt_5_6_sol_discounted_model,
   gpt_6_astra_flex_model,
@@ -30,7 +29,7 @@ describe('OpenRouter Models Config', () => {
 
     const expectedModels = [
       CLAUDE_OPUS_CURRENT_MODEL_ID,
-      GPT_CURRENT_MODEL_ID,
+      'openai/gpt-6-sol',
       DEEPSEEK_V4_1_FLASH_MODEL_ID,
       GLM_FLASH_CURRENT_MODEL_ID,
     ];
@@ -45,6 +44,7 @@ describe('OpenRouter Models Config', () => {
     });
 
     const supersededModels = [
+      'openai/gpt-5.6-sol',
       'openai/gpt-5.6-terra',
       'stealth/claude-opus-4.8',
       'stealth/qwen3.6-plus',
@@ -66,7 +66,7 @@ describe('OpenRouter Models Config', () => {
 
     if (gpt_5_6_sol_discounted_model.status === 'public') {
       expect(preferredModels).toContain(gpt_5_6_sol_discounted_model.public_id);
-      expect(preferredModels.indexOf(GPT_CURRENT_MODEL_ID)).toBeLessThan(
+      expect(preferredModels.indexOf('openai/gpt-6-sol')).toBeLessThan(
         preferredModels.indexOf(gpt_5_6_sol_discounted_model.public_id)
       );
     } else {

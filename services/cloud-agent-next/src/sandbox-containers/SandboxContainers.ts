@@ -165,9 +165,10 @@ export class SandboxContainers extends DurableObject<Env> {
   async getState(): Promise<{ status: 'running' | 'stopped'; lastChange: number }> {
     const status = this.ctx.container?.running === true ? 'running' : 'stopped';
     if (status === 'running') return { status, lastChange: Date.now() };
-    // A self-stop carries no exit timestamp, so the boundary is the last observed
-    // running measurement, never the observation time: residual error is under one
-    // heartbeat interval and settlement can never bill past the physical stop.
+    // A self-stop carries no exit timestamp, so the boundary is the last delivered
+    // running measurement, never the observation time. Settlement cannot bill past the
+    // physical stop; the omitted span is up to the last successful measurement, under one
+    // heartbeat only at normal cadence and more if a heartbeat is delayed or undelivered.
     const context = await getBillingContext(this.ctx.storage);
     const lastChange =
       context === undefined

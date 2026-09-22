@@ -530,6 +530,29 @@ describe('ContainersBilling stop boundary', () => {
     );
     expect(meter.recordStopInputs[0].usageSinceLast).toBe(0);
   });
+
+  it('settles a same-instance readmission at the physical stop, not the readmission time', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    await launch(instance, REF_A, 'standard-4');
+    await flushPending(pendingTasks);
+    const usageMeasuredAtMs = (
+      storage.map.get(BILLING_CONTEXT_KEY) as { usageMeasuredAtMs: number }
+    ).usageMeasuredAtMs;
+
+    vi.setSystemTime(T0 + 60_000);
+    container.running = false;
+    vi.setSystemTime(T0 + 120_000);
+
+    await expect(admit(instance, 'standard-4')).resolves.toEqual({ success: true });
+    await flushPending(pendingTasks);
+
+    expect(meter.recordStopInputs).toHaveLength(1);
+    expect(meter.recordStopInputs[0].usageSinceLast).toBe(0);
+    expect(meter.recordStopInputs[0].usageSinceLast).not.toBe(
+      (Date.now() - usageMeasuredAtMs) / 1_000
+    );
+  });
 });
 
 describe('ContainersBilling force destroy', () => {

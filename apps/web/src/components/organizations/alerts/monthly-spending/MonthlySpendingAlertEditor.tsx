@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, Info, X } from 'lucide-react';
 import { useState } from 'react';
 import { AlertEditorFooter } from '@/components/organizations/alerts/AlertEditorFooter';
+import { OrganizationMemberEmailSuggestions } from '@/components/organizations/alerts/OrganizationMemberEmailSuggestions';
 import type { OrganizationAlertEditorProps } from '@/components/organizations/alerts/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ const THRESHOLD_ID = 'monthly-spending-threshold';
 const SCOPE_ID = 'monthly-spending-scope';
 const GROUP_ID = 'monthly-spending-group';
 const RECIPIENT_ID = 'monthly-spending-recipient';
+const RECIPIENT_OPTIONS_ID = 'monthly-spending-recipient-options';
 const DISCLOSURE_ID = 'monthly-spending-disclosure';
 
 /**
@@ -254,6 +256,7 @@ export function MonthlySpendingAlertEditor({
               id={RECIPIENT_ID}
               type="email"
               autoComplete="email"
+              list={RECIPIENT_OPTIONS_ID}
               placeholder="finance@example.com"
               value={state.pendingRecipient}
               disabled={!canExpand || state.recipients.length >= MAX_ORGANIZATION_ALERT_RECIPIENTS}
@@ -283,6 +286,11 @@ export function MonthlySpendingAlertEditor({
               Add
             </Button>
           </div>
+          <OrganizationMemberEmailSuggestions
+            id={RECIPIENT_OPTIONS_ID}
+            organizationId={context.organizationId}
+            configuredRecipients={state.recipients}
+          />
           <p id={`${RECIPIENT_ID}-help`} className="type-label text-muted-foreground">
             Up to {MAX_ORGANIZATION_ALERT_RECIPIENTS} addresses, which do not have to be Kilo
             members. Addresses are lowercased and deduplicated. Links in the email still require

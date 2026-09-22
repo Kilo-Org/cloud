@@ -3,6 +3,7 @@
 import { AlertCircle, Info, X } from 'lucide-react';
 import { useState } from 'react';
 import { AlertEditorFooter } from '@/components/organizations/alerts/AlertEditorFooter';
+import { OrganizationMemberEmailSuggestions } from '@/components/organizations/alerts/OrganizationMemberEmailSuggestions';
 import type { OrganizationAlertEditorProps } from '@/components/organizations/alerts/types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ import {
 
 const THRESHOLD_ID = 'low-balance-threshold';
 const RECIPIENT_ID = 'low-balance-recipient';
+const RECIPIENT_OPTIONS_ID = 'low-balance-recipient-options';
 const DISCLOSURE_ID = 'low-balance-disclosure';
 
 function FieldError({ id, message }: { id: string; message: string | undefined }) {
@@ -171,6 +173,7 @@ export function LowBalanceAlertEditor({
               id={RECIPIENT_ID}
               type="email"
               autoComplete="email"
+              list={RECIPIENT_OPTIONS_ID}
               placeholder="finance@example.com"
               value={state.pendingRecipient}
               disabled={!canExpand || state.recipients.length >= MAX_ORGANIZATION_ALERT_RECIPIENTS}
@@ -200,6 +203,11 @@ export function LowBalanceAlertEditor({
               Add
             </Button>
           </div>
+          <OrganizationMemberEmailSuggestions
+            id={RECIPIENT_OPTIONS_ID}
+            organizationId={context.organizationId}
+            configuredRecipients={state.recipients}
+          />
           <p id={`${RECIPIENT_ID}-help`} className="type-label text-muted-foreground">
             Up to {MAX_ORGANIZATION_ALERT_RECIPIENTS} addresses, which do not have to be Kilo
             members. Addresses are lowercased and deduplicated. Links in the email still require

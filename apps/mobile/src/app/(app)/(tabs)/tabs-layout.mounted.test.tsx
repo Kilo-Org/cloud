@@ -1,3 +1,8 @@
+// Named without the `_layout` prefix on purpose: Expo Router's typed-route
+// generator reads the file system (not Metro's test blockList) and treats any
+// file whose first dot-segment is `_layout` as a layout. A colocated
+// `_layout.mounted.test.tsx` becomes the `(tabs)` layout node and the generator
+// then drops the group's whole subtree from `.expo/types/router.d.ts`.
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

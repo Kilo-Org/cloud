@@ -71,6 +71,19 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
     };
   }, [options.connected, connectionAttempt]);
 
+  // The bound above is a fallback for a store that never answers. A store that
+  // connects after it fired — a slow but successful re-entry — makes that
+  // message stale: the cached tier tiles are already painted, and the product
+  // query is already successful from cache, so nothing else clears it and the
+  // false "Could not connect" retry card would stay over the tiles. Drop it as
+  // soon as the store connection lands; a later product failure still surfaces
+  // through the query's own error below.
+  useEffect(() => {
+    if (options.connected) {
+      setStoreErrorMessage(null);
+    }
+  }, [options.connected]);
+
   const productsQuery = useQuery({
     queryKey: ['kilo-pass', 'app-store-products', userId],
     queryFn: async () => {

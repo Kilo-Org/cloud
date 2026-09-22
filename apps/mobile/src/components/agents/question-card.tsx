@@ -207,7 +207,7 @@ export function QuestionCard({
       </View>
 
       {presentation.errorMessage ? (
-        <View className="border-b border-border bg-danger-tile-bg px-4 py-2">
+        <View className="border-b border-border bg-destructive/10 px-4 py-2">
           <Text className="text-xs text-destructive">{presentation.errorMessage}</Text>
         </View>
       ) : null}

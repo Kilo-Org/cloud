@@ -130,7 +130,8 @@ vi.mock('@/components/ui/segmented-control', () => ({
 // Reanimated up, and it runs in plain Node, where the Reanimated/worklets
 // native entry cannot resolve (the published worklets build uses
 // bundler-style extensionless imports). The primitive is a stub like every
-// other UI element above; its own rendering is not under test here.
+// other UI element above, and the stub is the type the pending-environment
+// case asserts by name; its own rendering is not under test here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({

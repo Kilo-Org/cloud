@@ -222,6 +222,9 @@ export function NewSessionRepositorySection({
         contentClassName="gap-3"
         titleClassName="font-semibold"
         title={t(copy.connectTitle)}
+        // The branch row mounts above this card once a repository is chosen; a
+        // layout transition would paint the card over it, hiding the row.
+        animateLayout={false}
         expanded={!collapsedCtas.includes(platform)}
         onToggle={() => {
           setConnectCtaCollapsed(platform, !collapsedCtas.includes(platform));

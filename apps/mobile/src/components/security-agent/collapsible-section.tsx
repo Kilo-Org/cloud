@@ -22,6 +22,15 @@ type CollapsibleSectionProps = {
   expanded?: boolean;
   /** Called on every header press, before the uncontrolled fallback toggles. */
   onToggle?: () => void;
+  /**
+   * Whether siblings above this section may mount or resize asynchronously.
+   * A layout transition animates this box's position, and Reanimated keeps the
+   * box painted at its pre-change position until the transition ends, so
+   * siblings that shifted are covered. Pass `false` for such a section: opacity
+   * fades stay safe and the position snap does not lag. `profile-screen.tsx`
+   * names the same hazard on a sibling section.
+   */
+  animateLayout?: boolean;
   className?: string;
   titleClassName?: string;
   contentClassName?: string;
@@ -53,16 +62,20 @@ function useDisclosureRotation(targetAngle: 0 | 180) {
  * Height transition for a block that grows or shrinks — the same Reanimated
  * layout transition on iOS and Android, so one implementation covers both and
  * the change animates instead of snapping. Reduced motion drops the transition.
+ * `animateLayout={false}` drops it too, for a section whose siblings above it
+ * mount or resize asynchronously: the transition would paint the section at its
+ * pre-change position and cover the sibling that moved.
  */
 export function DisclosureLayout({
   className,
+  animateLayout = true,
   children,
-}: Readonly<{ className?: string; children: ReactNode }>) {
+}: Readonly<{ className?: string; animateLayout?: boolean; children: ReactNode }>) {
   const { reducedMotion } = useMotionPolicy();
 
   return (
     <Animated.View
-      layout={reducedMotion ? undefined : LinearTransition.duration(200)}
+      layout={reducedMotion || !animateLayout ? undefined : LinearTransition.duration(200)}
       className={className}
     >
       {children}
@@ -115,6 +128,7 @@ export function CollapsibleSection({
   defaultExpanded = false,
   expanded,
   onToggle,
+  animateLayout = true,
   className,
   titleClassName,
   contentClassName,
@@ -130,7 +144,10 @@ export function CollapsibleSection({
   const chevronStyle = useDisclosureRotation(resolvedExpanded ? 180 : 0);
 
   return (
-    <DisclosureLayout className={cn('gap-2 rounded-lg bg-secondary p-3', className)}>
+    <DisclosureLayout
+      className={cn('gap-2 rounded-lg bg-secondary p-3', className)}
+      animateLayout={animateLayout}
+    >
       <Pressable
         className="flex-row items-center justify-between gap-2"
         hitSlop={12}

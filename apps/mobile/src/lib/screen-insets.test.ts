@@ -36,6 +36,14 @@ const ENTRY_POINT = 'screen-insets.ts';
 const PROFILE_SCREEN = '../components/profile-screen.tsx';
 
 /**
+ * The Android sign-out confirmation deliberately renders an in-app dialog
+ * instead of the native alert (see `profile-screen.signout.mounted.test.tsx`).
+ * Its `Platform.OS` fork sits outside the alignment path scanned below, so the
+ * confirmation is held to its feature here: losing it must not pass silently.
+ */
+const SIGN_OUT_CONFIRMATION = /const confirmSignOut = \(\) => \{[\s\S]*?\n {2}\};/;
+
+/**
  * The Profile screen's alignment path: from the line that reads
  * `useScreenSideInsets` through the line that first applies a side inset. Only
  * this path must stay free of per-platform branches. A fork elsewhere in the
@@ -73,6 +81,9 @@ describe('screen side insets: one implementation for both platforms', () => {
     expect(profile).toMatch(/from '@\/lib\/screen-insets'/);
     expect(profile, `${PROFILE_SCREEN} imports the native safe-area module again`).not.toMatch(
       SAFE_AREA_MODULE
+    );
+    expect(profile, `${PROFILE_SCREEN} lost its sign-out confirmation`).toMatch(
+      SIGN_OUT_CONFIRMATION
     );
     expect(
       alignmentPath(profile),

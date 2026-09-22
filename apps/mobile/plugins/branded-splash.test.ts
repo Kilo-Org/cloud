@@ -164,8 +164,14 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // The Android colors mod merges into the project's existing `colors.xml`,
+    // so assert the generated splash color among whatever the project already
+    // carries (a prebuilt `android/` tree has its own entries) instead of
+    // demanding it be the file's only color.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

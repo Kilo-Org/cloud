@@ -98,11 +98,17 @@ describe('Text tracked labels in RTL', () => {
     expect(hostText(root).props.style).toBeUndefined();
   });
 
-  it('applies the same reset to the shared Eyebrow label', () => {
+  it('keeps the Latin display treatment on the shared Eyebrow label in LTR', () => {
+    const root = mount(createElement(Eyebrow, null, 'Explore'));
+
+    expect(hostText(root).props.className as string).toContain('tracking-[1.5px]');
+  });
+
+  it('drops the Latin display treatment from the shared Eyebrow label in RTL', () => {
     i18nManager.isRTL = true;
     const root = mount(createElement(Eyebrow, null, 'استكشف'));
 
-    expect(hostText(root).props.className as string).toContain('tracking-[1.5px]');
+    expect(hostText(root).props.className as string).not.toContain('tracking-[1.5px]');
     expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
   });
 });

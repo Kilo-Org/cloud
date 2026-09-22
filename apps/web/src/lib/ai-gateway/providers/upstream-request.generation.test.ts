@@ -19,6 +19,7 @@ const provider: Provider = {
   id: 'openrouter',
   apiUrl: 'https://openrouter.example/api/v1',
   apiUrlOverrides: {},
+  disableUrlSuffix: false,
   apiKey: 'test-api-key',
   apiKeyHeader: null,
   supportedChatApis: [],

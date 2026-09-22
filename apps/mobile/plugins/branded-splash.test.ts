@@ -135,8 +135,14 @@ describe('shared branded splash', () => {
     ).toBeTypeOf('function');
     expect(config.mods?.android?.styles).toBeTypeOf('function');
 
+    // Introspect against a fresh project root: `compileModsAsync` seeds the
+    // Android color/style mods from the resources already on disk, so pointing
+    // it at this package's root would read a developer's prebuilt `android/`
+    // tree — its `colors.xml` is absent in CI — and merge colors this test does
+    // not own into the mod results, making the assertion machine-dependent.
+    const { root } = createAndroidProject();
     const evaluated = await compileModsAsync(config, {
-      projectRoot,
+      projectRoot: root,
       platforms: ['ios', 'android'],
       introspect: true,
     });
@@ -164,10 +170,11 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    // arrayContaining, like the styles assertion below: introspection reads the
-    // project's existing colors.xml, so a prebuilt `android/` tree carries the
-    // app's other colors beside the splash one. A fixed-length array made this
-    // pass only on a clean checkout.
+    // `introspect` merges the plugin's colors into whatever a local prebuild
+    // already generated, so a prebuilt `android/` tree carries the app's other
+    // colors beside the splash one — a fixed-length array passed only on a clean
+    // checkout. Assert the plugin's entry instead of the whole array, matching
+    // the styles assertion below.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([

@@ -19,6 +19,10 @@ import {
   type VercelSandboxEnrollmentEnv,
   type VercelSandboxRuntimeConfigEnv,
 } from './agent-sandbox/vercel/vercel-runtime-config.js';
+import {
+  parseCloudflareContainersEnrollment,
+  type CloudflareContainersEnrollmentEnv,
+} from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
 
 export const MANAGED_SCM_OUTBOUND_HANDLER = 'managedScm';
 
@@ -221,7 +225,8 @@ export type SandboxSelection = {
 export type SandboxSelectionEnv = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
 } & VercelSandboxEnrollmentEnv &
-  VercelSandboxRuntimeConfigEnv;
+  VercelSandboxRuntimeConfigEnv &
+  CloudflareContainersEnrollmentEnv;
 
 type SelectSandboxForNewSessionInput = {
   env: SandboxSelectionEnv;
@@ -293,7 +298,21 @@ function selectDefaultSandboxProvider(input: {
     enrolled &&
     runtimeConfig !== undefined;
 
-  return useVercel ? 'vercel' : 'cloudflare';
+  if (useVercel) return 'vercel';
+
+  const containersEnrollment = parseCloudflareContainersEnrollment(input.env);
+  const containersEnrolled =
+    input.orgId !== undefined
+      ? containersEnrollment.orgIds.has('*') || containersEnrollment.orgIds.has(input.orgId)
+      : containersEnrollment.allowPersonal;
+  const useContainers =
+    input.plane === 'control' &&
+    !input.devcontainer &&
+    input.isolated &&
+    containersEnrollment.enabled &&
+    containersEnrolled;
+
+  return useContainers ? 'cloudflare-containers' : 'cloudflare';
 }
 
 export function getDefaultSandboxDestination(

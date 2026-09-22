@@ -18,6 +18,7 @@ import {
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { getSandboxProvider } from '../persistence/session-metadata.js';
 import type { ResponseFrame, SessionRequestIdentity } from '../shared/sandbox-control-protocol.js';
+import type { AgentSandboxProvider } from '../types.js';
 import { WORKTREE_CHANGED_EVENT } from '../shared/worktree-changes-wire.js';
 
 export const WORKTREE_CHANGES_KEY = 'worktree_changes';
@@ -29,7 +30,7 @@ export type WorktreeChangesContext = {
   orgId?: string;
   sandboxId: string;
   worktreeId?: NonNullable<SessionMetadata['workspace']>['worktreeId'];
-  provider: 'cloudflare' | 'vercel';
+  provider: AgentSandboxProvider;
   providerRuntime?: NonNullable<SessionMetadata['workspace']>['providerRuntime'];
   repository: { type: string; source: string };
   baseRef?: string;

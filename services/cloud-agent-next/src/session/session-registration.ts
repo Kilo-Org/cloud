@@ -51,7 +51,7 @@ import {
 } from '@kilocode/worker-utils/runtime-authorization';
 import jwt from 'jsonwebtoken';
 
-import type { Env, SandboxId } from '../types.js';
+import { agentSandboxProviderSchema, type Env, type SandboxId } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import {
   getControlPlaneCredentialContainment,
@@ -925,6 +925,7 @@ function rebuildRecordedSessionAllocation(
     .optional()
     .safeParse(canonical.reportingCreatedAt);
   const worktreeCreate = worktreeEnabledForCreate(input, ctx, row);
+  const recordedProvider = agentSandboxProviderSchema.safeParse(sandboxProvider);
 
   if (
     !reportingCreatedAt.success ||
@@ -934,7 +935,7 @@ function rebuildRecordedSessionAllocation(
     kiloSessionId.length === 0 ||
     typeof sandboxId !== 'string' ||
     sandboxId.length === 0 ||
-    (sandboxProvider !== 'cloudflare' && sandboxProvider !== 'vercel')
+    !recordedProvider.success
   ) {
     throw creationInProgressError();
   }
@@ -983,7 +984,7 @@ function rebuildRecordedSessionAllocation(
     kiloSessionId,
     sandboxId: sandboxId as SandboxId,
     sandboxRoute: route,
-    sandboxProvider,
+    sandboxProvider: recordedProvider.data,
     ...(worktreeId ? { worktreeId } : {}),
     ...(recorded.data ? { sandboxAllocation: recorded.data } : {}),
     initialTurn,

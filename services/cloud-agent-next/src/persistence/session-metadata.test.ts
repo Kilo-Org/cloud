@@ -701,6 +701,70 @@ describe('session metadata boundary', () => {
     ).toThrow('Invalid current session metadata');
   });
 
+  it('round-trips cloudflare-containers metadata on the control plane', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'workspace_containers_provider',
+        userId: 'user_containers_provider',
+      },
+      auth: {},
+      workspace: {
+        sandboxId: 'ses-abcdef' as const,
+        sandboxProvider: 'cloudflare-containers' as const,
+      },
+      lifecycle: {
+        version: 1,
+        timestamp: 1,
+      },
+    };
+
+    const parsed = parseSessionMetadata(current);
+    expect(parsed).toEqual(current);
+    expect(getSandboxProvider(parsed)).toBe('cloudflare-containers');
+    expect(parseSessionMetadata(serializeSessionMetadata(parsed))).toEqual(current);
+  });
+
+  it('rejects cloudflare-containers metadata on a legacy session', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_containers_legacy', userId: 'user_containers_legacy' },
+        auth: {},
+        workspace: { sandboxId: 'ses-abcdef', sandboxProvider: 'cloudflare-containers' },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('rejects cloudflare-containers metadata pinned to a shared sandbox identity', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_containers_shared', userId: 'user_containers_shared' },
+        auth: {},
+        workspace: { sandboxId: 'org-abcdef', sandboxProvider: 'cloudflare-containers' },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
+  it('rejects cloudflare-containers metadata requesting a devcontainer runtime', () => {
+    expect(() =>
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_containers_dind', userId: 'user_containers_dind' },
+        auth: {},
+        workspace: {
+          sandboxId: 'ses-abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          devcontainerRequested: true,
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      })
+    ).toThrow('Invalid current session metadata');
+  });
+
   it('parses and serializes current grouped DIND workspace metadata', () => {
     const current = {
       metadataSchemaVersion: 2 as const,

@@ -827,7 +827,8 @@
       "chat": "Ngā karere kōrerorero",
       "kiloclaw": "Ngā mahi KiloClaw",
       "balance": "Ngā matohi mō te toenga pūtea",
-      "security": "Ngā kitenga haumarutanga"
+      "security": "Ngā kitenga haumarutanga",
+      "spend": "Ngā matohi whakapaunga"
     },
     "category": {
       "chatMessagesSubtitle": "ngā whakautu i ō kōrerorero",
@@ -842,7 +843,9 @@
       "balanceAlertsSubtitle": "ngā whakatūpato mō te toenga iti o te rōpū",
       "balanceAlertsUnavailable": "Whakaurua ki tētahi whakahaerenga kia whiwhi ai i ngā whakatūpato toenga iti.",
       "securityFindingsSubtitle": "ngā kitenga hōu me ngā whakamaumahara SLA",
-      "securityFindingsUnavailable": "Whakahohea te kaiāwhina haumarutanga Kilo i runga i tētahi whānuitanga kia whiwhi ai i ngā kitenga haumarutanga."
+      "securityFindingsUnavailable": "Whakahohea te kaiāwhina haumarutanga Kilo i runga i tētahi whānuitanga kia whiwhi ai i ngā kitenga haumarutanga.",
+      "spendAlertsSubtitle": "ngā whitinga paepae me ngā pikinga ia hāora",
+      "spendAlertsToggle": "Kāwai matohi whakapaunga"
     },
     "action": {
       "openSession": "Whakatuwheratia te wātū"
@@ -3163,7 +3166,8 @@
     "channelName": "Ngā māngai e mahi ana",
     "activityKitDisabledBody": "Whakakāngia ngā mahi wā-tūturu i ngā tautuhinga kia kite ai i ngā māngai e mahi ana i te mata maukati.",
     "openSession": "Tuwhera",
-    "approveFailed": "Kāore i taea te whakaae. Pāwhiria $t(common.approve) hei whakamātau anō."
+    "approveFailed": "Kāore i taea te whakaae. Pāwhiria $t(common.approve) hei whakamātau anō.",
+    "newestResult": "Te hua hou rawa"
   },
   "transcriptionModel": {
     "title": "Tauira tuhi ā-reo",
@@ -3199,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Whakatuwheratia te wātū whakamutunga"
+  },
+  "spendAlerts": {
+    "subtitle": "Tukuna he matohi mā te īmēra, mā te push rānei ki ngā hoapā nama ina whiti te whakapaunga o tēnei rohe i tētahi paepae, ina piki rānei ki runga ake i tōna tere ia hāora.",
+    "enable": "Whakahohea ngā matohi whakapaunga",
+    "thresholdTitle": "Whitinga paepae",
+    "thresholdSubtitle": "Kei te whiti te whakapaunga haere tonu i tō paepae",
+    "anomalyTitle": "Pikinga ia hāora",
+    "anomalySubtitle": "Kei runga rawa tētahi hāora i te tere noa o tēnei rohe",
+    "limitLabel": "Paepae (USD)",
+    "windowLabel": "Matapihi",
+    "window24h": "24 hāora",
+    "window7d": "7 rā",
+    "window30d": "30 rā",
+    "multiplierLabel": "Whakarea pikinga",
+    "saved": "Kua tiakina ngā tautuhinga matohi whakapaunga",
+    "loadError": "Kāore i taea ngā matohi whakapaunga te uta.",
+    "saveError": "Kāore i taea ngā matohi whakapaunga te tiaki.",
+    "empty": "Kua weto ngā matohi whakapaunga. Whakahohea kia mōhio ai ngā hoapā nama o tēnei rohe.",
+    "noSpend": "Kāore anō kia tuhia he whakapaunga",
+    "spend24h": "Whakapaunga i ngā 24 hāora kua hipa",
+    "multiplierError": "Whakaurua he whakarea 1, nui ake rānei",
+    "permissionDenied": "Kāore ō whakaaetanga ki te whakahaere i ngā matohi whakapaunga.",
+    "pushOffByCategory": "Weto i roto i Ngā whakamōhiotanga"
   }
 }

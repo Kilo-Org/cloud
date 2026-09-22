@@ -120,8 +120,10 @@ vi.mock('@/components/ui/button', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({ RefreshCw: 'RefreshCw' }));
 
-// `renderProfileRow` reaches the shimmed Skeleton, whose react-native-reanimated
-// import cannot resolve in the pure project; every sibling pure spec mocks it.
+// Skeleton imports react-native-reanimated (and its react-native-worklets
+// entry), which the node-environment pure project cannot load: `renderProfileRow`
+// reaches the shimmed Skeleton while the environment query is pending, and every
+// sibling pure spec stubs it the same way.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/segmented-control', () => ({
@@ -891,6 +893,19 @@ describe('NewSessionConfigureForm', () => {
       cloudCreateError,
     }) as Node;
     expect(findElementByType(remote, 'NewSessionCloudCreateError')).toBeNull();
+  });
+
+  // ── Case 15: the scroll frame is measured and handed to the prompt ──
+  it('measures the scroll frame and threads it to NewSessionPrompt', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm(defaultProps()) as Node;
+
+    // The ScrollView reports its height so the prompt can yield its floor to it.
+    expect(findElementByType(element, 'ScrollView')?.onLayout).toEqual(expect.any(Function));
+    // The mocked useState holds the initial measurement (0) and never setStates.
+    expect(findElementByType(element, 'NewSessionPrompt')?.frameHeight).toBe(0);
   });
 
   // ── Case 16: reveal the composer card's bottom row above the IME ──

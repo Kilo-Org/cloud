@@ -112,7 +112,7 @@ vi.mock('@/components/ui/accessible-status', () => ({
 }));
 
 vi.mock('@/components/agents/chat-toolbar', () => ({
-  ChatToolbar: () => null,
+  ChatToolbar: 'ChatToolbar',
 }));
 
 vi.mock('@/components/agents/use-text-height', () => ({
@@ -127,7 +127,7 @@ vi.mock('@/components/agents/use-text-height', () => ({
 const voiceInputAvailable = vi.hoisted(() => ({ current: false }));
 
 vi.mock('@/components/query-error', () => ({
-  QueryError: () => null,
+  QueryError: 'QueryError',
 }));
 
 vi.mock('@/components/voice-input-control', () => ({
@@ -228,6 +228,46 @@ function findElementByType(
     }
   }
   return null;
+}
+
+/**
+ * Index of the first `target` node in a pre-order walk, or null when absent.
+ * Follows the same descent convention as `findElementByType` (through the
+ * `Text` and `NewSessionPromptControls` function components) so the returned
+ * order matches how the tree renders, and siblings' subtrees are visited
+ * left-to-right.
+ */
+function findFirstIndexByType(node: Node, target: ElementType): number | null {
+  let order = 0;
+  const visit = (current: Node): number | null => {
+    if (current === null || typeof current !== 'object') {
+      return null;
+    }
+    const props = current.props ?? {};
+    const children = props.children;
+    const currentOrder = order;
+    order += 1;
+    const nodeType = (current as { type?: unknown }).type;
+    if (nodeType === target) {
+      return currentOrder;
+    }
+    if (nodeType === renderText) {
+      return visit(renderText(props as React.ComponentProps<typeof renderText>));
+    }
+    if (nodeType === renderPromptControls) {
+      return visit(
+        renderPromptControls(props as React.ComponentProps<typeof renderPromptControls>)
+      );
+    }
+    for (const child of Array.isArray(children) ? children : [children]) {
+      const found = visit(child as Node);
+      if (found !== null) {
+        return found;
+      }
+    }
+    return null;
+  };
+  return visit(node);
 }
 
 function defaultProps() {
@@ -453,5 +493,36 @@ describe('NewSessionPrompt initialPrompt seed', () => {
 
     expect(findElementByType(element, 'TextInput')).toBeNull();
     expect(findElementByType(element, renderPromptControls)).toBeNull();
+  });
+
+  it.each([{ isLoadingModels: false }, { isLoadingModels: true }])(
+    'renders the mode/model row above the input (isLoadingModels: $isLoadingModels)',
+    async ({ isLoadingModels }) => {
+      const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+      const element = renderPrompt({ ...defaultProps(), isLoadingModels }) as Node;
+
+      const toolbarIndex = findFirstIndexByType(element, 'ChatToolbar') ?? -1;
+      const inputIndex = findFirstIndexByType(element, 'TextInput') ?? -1;
+
+      expect(toolbarIndex).toBeGreaterThanOrEqual(0);
+      expect(inputIndex).toBeGreaterThanOrEqual(0);
+      expect(toolbarIndex).toBeLessThan(inputIndex);
+    }
+  );
+
+  it('renders the models error above the input', async () => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    const element = renderPrompt({
+      ...defaultProps(),
+      isModelsError: true,
+      modelOptions: [],
+    }) as Node;
+
+    const errorIndex = findFirstIndexByType(element, 'QueryError') ?? -1;
+    const inputIndex = findFirstIndexByType(element, 'TextInput') ?? -1;
+
+    expect(errorIndex).toBeGreaterThanOrEqual(0);
+    expect(inputIndex).toBeGreaterThanOrEqual(0);
+    expect(errorIndex).toBeLessThan(inputIndex);
   });
 });

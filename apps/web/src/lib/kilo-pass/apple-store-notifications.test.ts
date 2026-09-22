@@ -31,6 +31,7 @@ import type * as AppleStoreNotifications from './apple-store-notifications';
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
 import { toMicrodollars } from '@/lib/utils';
+import { storeCreditPaymentId } from '@/lib/credits/store-products';
 
 // SWC + static ESM imports do not see jest.mock replacements on the same module id.
 // Dynamic-import the SUT after the mock (same pattern as stripe-handlers-invoice-paid.test.ts).
@@ -1403,6 +1404,75 @@ describe('processAppStoreKiloPassNotification', () => {
       where: eq(kilocode_users.id, user.id),
     });
     expect(updatedUser?.total_microdollars_acquired).toBe(0);
+  });
+
+  it('reverses a refunded store credit pack and still records the event', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0 });
+    const transactionId = `tx-${crypto.randomUUID()}`;
+    const amountMicrodollars = toMicrodollars(10);
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: amountMicrodollars,
+      is_free: false,
+      description: 'Credit purchase via App Store',
+      stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.AppStore, transactionId),
+    });
+    await db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: amountMicrodollars })
+      .where(eq(kilocode_users.id, user.id));
+
+    const result = await processAppStoreKiloPassNotification({
+      signedPayload: 'credit-pack-refund',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: 'credit-pack-refund',
+          notificationType: NotificationTypeV2.REFUND,
+          signedTransactionInfo: 'credit-pack-refund-transaction',
+        }),
+      decodeTransaction: async () =>
+        transaction({
+          transactionId,
+          productId: 'credits.usd10.v1',
+          appAccountToken: user.app_store_account_token,
+          revocationDate: Date.parse('2026-05-16T00:00:00.000Z'),
+        }),
+    });
+
+    expect(result).toEqual({ processed: true });
+
+    const after = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(after?.total_microdollars_acquired).toBe(0);
+
+    const reversal = await db.query.credit_transactions.findFirst({
+      where: eq(
+        credit_transactions.credit_category,
+        `store-credit-refund:${KiloPassPaymentProvider.AppStore}:${transactionId}`
+      ),
+    });
+    expect(reversal).toMatchObject({
+      kilo_user_id: user.id,
+      amount_microdollars: -amountMicrodollars,
+      is_free: false,
+    });
+
+    // The refund is still recorded as a processed store event, exactly like a
+    // Kilo Pass refund, so a replay cannot reverse the pack twice.
+    const event = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, 'credit-pack-refund'),
+    });
+    expect(event?.processed_at).not.toBeNull();
+
+    const audit = await db.query.kilo_pass_audit_log.findFirst({
+      where: sql`${kilo_pass_audit_log.payload_json}->>'notificationUUID' = 'credit-pack-refund'`,
+    });
+    expect(audit?.payload_json).toMatchObject({
+      notificationUUID: 'credit-pack-refund',
+      providerTransactionId: transactionId,
+      storeCreditReversal: { reversed: true, amountMicrodollars },
+    });
   });
 
   it('scopes App Store refund reversals to the refunded transaction after a same-month upgrade', async () => {

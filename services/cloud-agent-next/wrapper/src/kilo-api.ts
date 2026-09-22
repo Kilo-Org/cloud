@@ -173,10 +173,6 @@ function requireSdkData<T>(
   return result.data;
 }
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type KiloServerHandle = {
   url: string;
   close: () => void;
@@ -231,7 +227,6 @@ type PromptOptions = {
   model?: { providerID?: string; modelID: string };
   system?: string;
   tools?: Record<string, boolean>;
-  snapshotInitialization?: 'wait';
   directory?: string;
   signal?: AbortSignal;
 };
@@ -271,7 +266,6 @@ export type WrapperKiloClient = {
     agent?: string;
     model?: { providerID?: string; modelID: string };
     variant?: string;
-    snapshotInitialization?: 'wait';
     directory?: string;
     signal?: AbortSignal;
   }) => Promise<SessionCommandResponse>;
@@ -328,10 +322,6 @@ export type WrapperKiloClient = {
   readonly serverUrl: string;
 };
 
-// ---------------------------------------------------------------------------
-// Implementation
-// ---------------------------------------------------------------------------
-
 export function createWrapperKiloClient(
   sdkClient: SDKClient,
   serverUrl: string,
@@ -364,9 +354,6 @@ export function createWrapperKiloClient(
       ...(opts.system ? { system: opts.system } : {}),
       ...(opts.tools ? { tools: opts.tools } : {}),
       ...(opts.agent ? { agent: opts.agent } : {}),
-      ...(opts.snapshotInitialization
-        ? { snapshotInitialization: opts.snapshotInitialization }
-        : {}),
     };
   }
 
@@ -439,7 +426,7 @@ export function createWrapperKiloClient(
           projectID: project.id,
           slug: sessionId.slice(0, 24),
           title: 'New session - ' + new Date(now).toISOString(),
-          version: '7.4.20',
+          version: '7.6.2',
           timeCreated: now,
           timeUpdated: now,
         },
@@ -513,9 +500,6 @@ export function createWrapperKiloClient(
             ? { model: `${opts.model.providerID ?? 'kilo'}/${opts.model.modelID}` }
             : {}),
           ...(opts.variant ? { variant: opts.variant } : {}),
-          ...(opts.snapshotInitialization
-            ? { snapshotInitialization: opts.snapshotInitialization }
-            : {}),
         },
         { signal: opts.signal }
       );

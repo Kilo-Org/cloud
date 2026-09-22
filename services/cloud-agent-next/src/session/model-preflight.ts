@@ -2,6 +2,9 @@ import { TRPCError } from '@trpc/server';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import type { CloudAgentSessionState, PersistenceEnv } from '../persistence/types.js';
 import { fetchSessionMetadata } from '../session-service.js';
+import { resolveSessionStub } from '../sandbox-session/session-stub.js';
+import { withDORetry } from '../utils/do-retry.js';
+import { hasModernRuntimeAuthorization } from './runtime-authorization-persistence.js';
 
 type StoredSessionPreflightInput = {
   env: PersistenceEnv;
@@ -29,10 +32,26 @@ async function assertModelFromStoredContext(
   metadata: CloudAgentSessionState,
   submittedModel: string | undefined
 ): Promise<void> {
+  let token = metadata.auth.kilocodeToken;
+  if (hasModernRuntimeAuthorization(metadata)) {
+    // The owning DO renews short-lived backing tokens within the existing delegation.
+    const runtimeToken = await withDORetry(
+      () => resolveSessionStub(input.env, input.userId, input.cloudAgentSessionId),
+      stub => stub.getRuntimeToken(),
+      'getRuntimeTokenForModelPreflight'
+    );
+    if (!runtimeToken) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Model catalog authentication unavailable',
+      });
+    }
+    token = runtimeToken;
+  }
   await assertKiloModelAvailable({
     env: input.env,
     submittedModel,
-    originalToken: metadata.auth.kilocodeToken,
+    originalToken: token,
     originalOrganizationId: metadata.identity.orgId,
     createdOnPlatform: metadata.identity.createdOnPlatform,
     procedure: input.procedure,

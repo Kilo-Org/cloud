@@ -1054,6 +1054,7 @@ describe('admin.users.updateKiloClawTrialEndAt', () => {
 
     expect(result).toEqual({ success: true });
     expect(mockKiloclawStart).toHaveBeenCalledWith(targetUser.id, instance.id, {
+      skipCooldown: true,
       reason: 'admin_request',
     });
 

@@ -4,6 +4,9 @@
   "main": "test/test-worker.ts",
   "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "NEXTAUTH_SECRET": "cloud-agent-integration-test-secret",
+  },
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
   "durable_objects": {
     "bindings": [

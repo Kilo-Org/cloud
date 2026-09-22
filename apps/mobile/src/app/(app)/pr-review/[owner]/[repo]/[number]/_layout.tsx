@@ -9,7 +9,7 @@ import {
   pendingReviewDraftKey,
   PendingReviewProvider,
 } from '@/lib/pr-review/pending-review-provider';
-import { useFormSheetDetents } from '@/lib/form-sheet';
+import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { parseParam, parsePositiveIntParam } from '@/lib/route-params';
 
 type Params = {
@@ -38,7 +38,7 @@ export default function PrReviewNumberLayout() {
   const owner = parseParam(params.owner);
   const repo = parseParam(params.repo);
   const number = parsePositiveIntParam(params.number);
-  const { fullSheetDetent } = useFormSheetDetents();
+  const sheetOptions = { ...useFormSheetScreenOptions(), sheetInitialDetentIndex: 'last' as const };
   const { userId } = useCurrentUserId();
   useRouteForegroundRefresh([[['githubPrReview']]]);
 
@@ -49,14 +49,6 @@ export default function PrReviewNumberLayout() {
   // Lowercased inside the helper, like the recent-PR and viewed-file stores,
   // so the same PR reached with different owner/repo casing keeps one queue.
   const draftEntityKey = pendingReviewDraftKey(owner, repo, number);
-
-  const sheetOptions = {
-    presentation: 'formSheet' as const,
-    sheetAllowedDetents: [0.5, fullSheetDetent] as [number, number],
-    sheetInitialDetentIndex: 'last' as const,
-    sheetGrabberVisible: true,
-    headerShown: false,
-  };
 
   // The connect gate wraps every PR-review surface, including this nested
   // route reached directly by deep link / chat tap, so a disconnected or
@@ -74,6 +66,7 @@ export default function PrReviewNumberLayout() {
               comment-composer formSheet instead of the PR overview. */}
           <Stack.Screen name="index" />
           <Stack.Screen name="comment-composer" options={sheetOptions} />
+          <Stack.Screen name="conversation-comment" options={sheetOptions} />
           <Stack.Screen name="review-submit" options={sheetOptions} />
           <Stack.Screen name="merge" options={sheetOptions} />
           <Stack.Screen name="file-navigator" options={sheetOptions} />

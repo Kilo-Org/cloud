@@ -70,18 +70,21 @@ describe('workflow service control tokens', () => {
     expect(claims.exp! - claims.iat!).toBe(60 * 60);
   });
 
-  test('requires an authorization pepper for modern workflow admission', () => {
-    const user = defineTestUser({ api_token_pepper: 'workflow-pepper' });
-    const authorizationUser = defineTestUser({ api_token_pepper: null });
+  test.each([undefined, ''])(
+    'rejects an absent or empty authorization pepper: %s',
+    api_token_pepper => {
+      const user = defineTestUser({ api_token_pepper: 'workflow-pepper' });
+      const authorizationUser = defineTestUser({ api_token_pepper });
 
-    expect(() =>
-      generateCloudAgentWorkflowToken(user, {
-        expiresIn: 300,
-        tokenSource: 'reviewer',
-        authorizationUser,
-      })
-    ).toThrow('current authorization pepper');
-  });
+      expect(() =>
+        generateCloudAgentWorkflowToken(user, {
+          expiresIn: 300,
+          tokenSource: 'reviewer',
+          authorizationUser,
+        })
+      ).toThrow('current authorization pepper');
+    }
+  );
 
   test('preserves the legacy workflow token shape when shared issuance is disabled', () => {
     shared.enabled = false;
@@ -124,5 +127,18 @@ test.each(['cloud-agent-next', 'workflow-gateway'])(
     );
     expect(cloud.exp! - cloud.iat!).toBe(300);
     if (family === 'cloud-agent-next') expect(gateway).not.toHaveProperty('aud');
+  }
+);
+
+test.each([undefined, ''])(
+  'rejects absent or empty workflow user peppers: %s',
+  api_token_pepper => {
+    const user = defineTestUser({ api_token_pepper });
+    expect(() => generateWorkflowGatewayToken(user, { tokenSource: 'reviewer' })).toThrow(
+      'current user pepper'
+    );
+    expect(() =>
+      generateCloudAgentWorkflowToken(user, { tokenSource: 'reviewer', expiresIn: 300 })
+    ).toThrow('current user pepper');
   }
 );

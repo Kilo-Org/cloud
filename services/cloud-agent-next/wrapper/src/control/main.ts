@@ -5,6 +5,7 @@ import {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
 import { logToFile } from '../utils.js';
+import { rootForSession } from './session-directories';
 import {
   KILO_CONTROL_REQUEST_TIMEOUT_MS,
   maybeStartSandboxControlClient,
@@ -19,7 +20,13 @@ import {
 } from './sandbox-control-handlers';
 import { eventKiloSessionId, sessionEventIdentity, updateSessionSnapshots } from './feed';
 import { createControlTerminalRuntime } from './terminal-runtime';
-import { createWorktreeKiloRuntimes } from './worktree-runtime';
+import {
+  createWorktreeKiloRuntimes,
+  type RootRuntimeDisappearance,
+  type RootRuntimeRetirement,
+  type RootRuntimeRetirementStarted,
+  isRetirementReportCurrent,
+} from './worktree-runtime';
 import { createControlDiagnostics, type ControlDiagnostics } from './diagnostics';
 import { createControlFileLogUploader, type ControlFileLogUploader } from './file-log-uploader';
 import {
@@ -29,6 +36,7 @@ import {
 } from '../../../src/shared/control-diagnostics.js';
 import { createWorktreeMutationNotifications } from './worktree-mutation-notifications';
 import { createControlEventFailureHandler } from './control-event-transport';
+
 import type { ControlEventOutboxFailure } from './control-event-outbox';
 
 function main(
@@ -49,16 +57,82 @@ function main(
   let control: ReturnType<typeof maybeStartSandboxControlClient> = null;
   let shuttingDown = false;
   let heartbeatReason: SandboxHeartbeatPayload['kilo']['reason'];
+  const reportedRuntimeRetirements = new Set<string>();
+  const settleRootRetirement = (retirement: RootRuntimeRetirement): void => {
+    deps.operations.settleRootPublication(retirement);
+    if (!retirement.reportToService || retirement.result !== 'retired' || !retirement.retirementId)
+      return;
+    const current = kiloRuntimes.getRetained?.(retirement.directory, retirement.nativeRuntimeId);
+    if (
+      !isRetirementReportCurrent(
+        kiloRuntimes.getEntryRuntimeId?.(retirement.directory, retirement.root),
+        retirement.nativeRuntimeId
+      ) ||
+      (current &&
+        (current.runtimeId !== retirement.nativeRuntimeId ||
+          (retirement.target.client !== undefined &&
+            current.kiloClient !== retirement.target.client)))
+    )
+      return;
+    if (reportedRuntimeRetirements.has(retirement.retirementId)) return;
+    const client = control;
+    if (!client?.reportNativeRuntimeRetirement) return;
+    reportedRuntimeRetirements.add(retirement.retirementId);
+    const reason = retirement.reason ?? 'Native runtime retirement completed';
+    void client
+      .reportNativeRuntimeRetirement({
+        retirementId: retirement.retirementId,
+        directory: retirement.directory,
+        nativeRuntimeId: retirement.nativeRuntimeId,
+        reason,
+        cleanupDeadlineAt: retirement.cleanupDeadlineAt ?? Date.now(),
+      })
+      .then(
+        reported => {
+          if (
+            !reported &&
+            isRetirementReportCurrent(
+              kiloRuntimes.getEntryRuntimeId?.(retirement.directory, retirement.root),
+              retirement.nativeRuntimeId
+            )
+          )
+            shutdown(1, reason);
+        },
+        () => {
+          if (
+            isRetirementReportCurrent(
+              kiloRuntimes.getEntryRuntimeId?.(retirement.directory, retirement.root),
+              retirement.nativeRuntimeId
+            )
+          )
+            shutdown(1, reason);
+        }
+      );
+  };
+  const markRootRetirementStarted = (retirement: RootRuntimeRetirementStarted): void => {
+    deps.operations.markRootRetirementStarted(retirement);
+  };
+  const notifyRootDisappeared = (disappearance: RootRuntimeDisappearance): void => {
+    deps.operations.notifyRootDisappeared(disappearance);
+  };
   const kiloRuntimes = createWorktreeKiloRuntimes({
     onDiagnostic: diagnostics.onDiagnostic,
-    onEvent: async (runtime, event) => {
+    onRootRetirementStarted: markRootRetirementStarted,
+    onRootDisappeared: notifyRootDisappeared,
+    onRootRetirement: settleRootRetirement,
+    onEvent: (runtime, event) => {
       mutationNotifications.observe(runtime, event);
       const identity = sessionEventIdentity({
         ...event,
         sessionId: eventKiloSessionId(event.properties),
         runtimeDirectory: runtime.directory,
       });
-      if (!identity?.rootKiloSessionId) return;
+      if (
+        !identity?.rootKiloSessionId ||
+        (runtime.isolation === 'per-session' &&
+          identity.rootKiloSessionId !== runtime.identity?.kiloSessionId)
+      )
+        return;
       updateSessionSnapshots(event, deps.sessions);
       deps.activity?.observeEvent(
         event.type,
@@ -66,33 +140,26 @@ function main(
         identity.rootKiloSessionId,
         event.properties
       );
-      if (
-        !control?.publishSessionEvent ||
-        !(await control.publishSessionEvent(
-          { type: event.type, properties: event.properties },
-          identity
-        ))
-      ) {
-        try {
-          await deps.operations.retireDirectory(
-            runtime.directory,
-            'Session event delivery failed',
-            Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS,
-            { runtimeId: runtime.runtimeId, client: runtime.kiloClient }
-          );
-        } catch {
-          diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'failed' });
-        }
-        return;
+      try {
+        void Promise.resolve(
+          control?.publishSessionEvent?.(
+            { type: event.type, properties: event.properties },
+            identity
+          ) ?? false
+        ).catch(() => undefined);
+      } catch {
+        // Publication failures are diagnostic-only.
       }
     },
     onUnexpectedClose: failure => {
-      logToFile(`Kilo worktree retired reason=${failure.reason} directory=${failure.directory}`);
+      logToFile(
+        `Kilo worktree retired reason=${failure.reason} directory=${failure.directory} runtimeId=${failure.runtimeId}`
+      );
       const stillCurrent = () => {
-        const current = kiloRuntimes.get(failure.directory);
+        const current = kiloRuntimes.get(failure.identity);
         return current === undefined || current.runtimeId === failure.runtimeId;
       };
-      if (failure.cleanup === 'unconfirmed' || !control?.reportNativeRuntimeRetirement) {
+      if (!control?.reportNativeRuntimeRetirement) {
         if (stillCurrent()) shutdown(1, failure.reason, heartbeatReasonFrom(failure.reason));
         return;
       }
@@ -115,11 +182,16 @@ function main(
         );
     },
   });
+  diagnostics.setSnapshot(() => {
+    kiloRuntimes.snapshotRootPublicationDiagnostics?.();
+    control?.snapshotEventDiagnostics?.();
+  });
   const terminalRuntime = controlConfig.SANDBOX_CONTROL_URL
     ? createControlTerminalRuntime({
         controlUrl: controlConfig.SANDBOX_CONTROL_URL,
         wrapperInstanceId: controlConfig.wrapperInstanceId,
-        getKiloRuntime: directory => kiloRuntimes.get(directory),
+        getKiloRuntime: identity => kiloRuntimes.get(identity),
+        getRetainedKiloRuntime: identity => kiloRuntimes.getRetained?.(identity),
       })
     : undefined;
   const deps = createControlHandlerDeps({
@@ -133,32 +205,48 @@ function main(
     activity: createSessionActivityRegistry(),
     signal: abort.signal,
     ...(terminalRuntime ? { terminalRuntime } : {}),
+    scopedCleanupResult: () => control?.supportsScopedCleanupResult?.() === true,
     sendOperationResult: (session, delivery, signal, deadlineAt) => {
       if (!control?.sendOperationResult)
         throw new Error('Sandbox control operation result delivery unavailable');
       return control.sendOperationResult(session, delivery, signal, deadlineAt);
     },
-    emitSessionEvent: (session, payload, options) =>
-      control?.sendEvent?.(
-        'session.event',
-        payload,
-        {
-          directory: session.directory,
-          kiloSessionId: session.kiloSessionId,
-          rootKiloSessionId: session.kiloSessionId,
-          ...(options?.nativeRuntimeId ? { nativeRuntimeId: options.nativeRuntimeId } : {}),
-        },
-        options?.retained ? { preserveConnectionOnFailure: true } : undefined
-      ) === true,
+    emitSessionEvent: (session, payload, options) => {
+      const identity = {
+        directory: session.directory,
+        kiloSessionId: session.kiloSessionId,
+        rootKiloSessionId:
+          rootForSession(session.kiloSessionId, session.directory) ?? session.kiloSessionId,
+        ...(options?.nativeRuntimeId ? { nativeRuntimeId: options.nativeRuntimeId } : {}),
+      };
+      try {
+        const delivered =
+          control?.sendEvent?.(
+            'session.event',
+            payload,
+            identity,
+            options?.retained ? { preserveConnectionOnFailure: true } : undefined
+          ) === true;
+        return delivered;
+      } catch {
+        return false;
+      }
+    },
     retireRuntime: reason => shutdown(1, reason, heartbeatReasonFrom(reason)),
     onShutdown: () => shutdown(0, 'Sandbox shutting down'),
   });
 
   const mutationNotifications = createWorktreeMutationNotifications({
     sessions: deps.sessions,
-    kiloRuntimes,
+    kiloRuntimes: {
+      get: identity => kiloRuntimes.get(identity),
+      isCurrent: runtime =>
+        kiloRuntimes.isCurrent?.(runtime) ?? kiloRuntimes.get(runtime.directory) === runtime,
+    },
     signal: abort.signal,
-    sendEvent: (event, payload, identity) => control?.sendEvent?.(event, payload, identity),
+    sendEvent: (event, payload, identity) => {
+      return control?.sendEvent?.(event, payload, identity) === true;
+    },
   });
 
   function withHeartbeatReason(payload: SandboxHeartbeatPayload): SandboxHeartbeatPayload {
@@ -166,35 +254,45 @@ function main(
     return payload;
   }
 
-  function reportOutboxRetirement(
+  function reportOutboxPublication(
     failure: ControlEventOutboxFailure,
-    nativeRuntimeId: string,
-    phase: 'started' | 'retired' | 'failed',
-    ok?: boolean
+    nativeRuntimeId: string
   ): void {
     const fields = {
-      phase,
+      phase: 'publication_failed' as const,
       category:
         failure.publication.event === 'session.preparing'
           ? ('preparing' as const)
           : ('session_event' as const),
       sessionId: failure.publication.session.kiloSessionId,
+      requestId: failure.requestId,
+      connectionState: failure.connectionState,
+      connectionId: failure.connectionId,
+      preparedAt: failure.preparedAt,
+      eventType:
+        typeof failure.publication.payload === 'object' &&
+        failure.publication.payload !== null &&
+        'type' in failure.publication.payload &&
+        typeof failure.publication.payload.type === 'string'
+          ? failure.publication.payload.type.slice(0, 128)
+          : undefined,
       receiptId: failure.publication.receiptId,
       sequence: failure.publication.sequence,
       wrapperInstanceId,
       nativeRuntimeId,
       failureReason: failure.reason,
-      outboxExpiryRetirement: failure.reason === 'expired',
-      ...(ok === undefined ? {} : { ok }),
+      neverSent: !failure.sent,
+      sentWithoutResponse: failure.sent,
+      queueWaitMs: failure.queueAgeMs,
+      attemptCount: failure.attempts,
+      pendingCount: failure.pendingCount,
+      pendingBytes: failure.pendingBytes,
+      ...(failure.socketBufferedBytes === undefined
+        ? {}
+        : { socketBufferedBytes: failure.socketBufferedBytes }),
+      ...(failure.detail ? { detail: failure.detail } : {}),
     };
-    diagnostics.onDiagnostic('control.event', fields);
-    logToFile(
-      `control diagnostic ${JSON.stringify({
-        event: 'outbox_retirement',
-        publicationEvent: failure.publication.event,
-        ...fields,
-      })}`
-    );
+    kiloRuntimes.recordRootPublicationDiagnostic?.(failure.publication.session, fields);
   }
 
   type SessionAttachResult =
@@ -335,25 +433,58 @@ function main(
     isReady: () => deps.kiloReady,
     onConnected: () => diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true }),
     onEventReceiptFailure: createControlEventFailureHandler({
-      getRuntime: directory => kiloRuntimes.get(directory),
+      getRuntime: (directory, nativeRuntimeId) => {
+        const runtime = kiloRuntimes.getRetained?.(directory, nativeRuntimeId);
+        return runtime && !runtime.signal.aborted ? runtime : undefined;
+      },
       onFailure: (failure, runtime) => {
-        reportOutboxRetirement(failure, runtime.runtimeId, 'started');
-        void deps.operations
-          .retireDirectory(
-            failure.publication.session.directory,
-            `Session event delivery ${failure.reason}`,
-            Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS,
-            { runtimeId: runtime.runtimeId, client: runtime.kiloClient }
-          )
-          .then(() => {
-            reportOutboxRetirement(failure, runtime.runtimeId, 'retired', true);
-          })
-          .catch(() => {
-            reportOutboxRetirement(failure, runtime.runtimeId, 'failed', false);
-            diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'failed' });
-          });
+        reportOutboxPublication(failure, runtime.runtimeId);
       },
     }),
+    onEventPublication: observation => {
+      const fields = {
+        phase: 'publication_receipt' as const,
+        category:
+          observation.event === 'session.preparing'
+            ? ('preparing' as const)
+            : ('session_event' as const),
+        requestId: observation.requestId,
+        receiptId: observation.receiptId,
+        sequence: observation.sequence,
+        eventType: observation.eventType,
+        wrapperInstanceId,
+        nativeRuntimeId: observation.nativeRuntimeId,
+        rootKiloSessionId: observation.rootKiloSessionId,
+        connectionState: observation.connectionState,
+        connectionId: observation.connectionId,
+        outcome: observation.outcome,
+        reason: observation.reason,
+        neverSent: observation.neverSent ?? false,
+        sentWithoutResponse:
+          observation.sentWithoutResponse ??
+          ['timed_out', 'connection_closed', 'tracking_evicted'].includes(observation.outcome),
+        requestWaitMs: observation.waitMs,
+        sentAt: observation.sentAt,
+        preparedAt: observation.preparedAt,
+        queueWaitMs: observation.queueWaitMs,
+        attemptCount: observation.attemptCount,
+        outstandingEventAcks: observation.pendingCount,
+        outstandingEventAckBytes: observation.pendingBytes,
+        socketBufferedBytes: observation.socketBufferedBytes,
+      };
+      if (!observation.directory) return;
+      kiloRuntimes.recordRootPublicationDiagnostic?.(
+        {
+          directory: observation.directory,
+          ...(observation.kiloSessionId ? { kiloSessionId: observation.kiloSessionId } : {}),
+          ...(observation.rootKiloSessionId
+            ? { rootKiloSessionId: observation.rootKiloSessionId }
+            : {}),
+          ...(observation.nativeRuntimeId ? { nativeRuntimeId: observation.nativeRuntimeId } : {}),
+        },
+        fields
+      );
+    },
     onDisconnected: () => shutdown(1, 'Sandbox control connection lost', 'control_disconnected'),
     onReconcile: async (_phase, deadlineAt) => {
       if (Date.now() >= deadlineAt) throw new Error('Control recovery deadline expired');
@@ -369,8 +500,8 @@ function main(
             ...deps,
             emitPreparing: (event, options) => {
               if (!session) return;
-              if (
-                !control?.sendEvent?.(
+              try {
+                control?.sendEvent?.(
                   'session.preparing',
                   event,
                   {
@@ -382,9 +513,10 @@ function main(
                       : {}),
                   },
                   options?.retained ? { preserveConnectionOnFailure: true } : undefined
-                )
-              )
-                throw new Error('Preparation event delivery failed');
+                );
+              } catch {
+                // Publication failures are diagnostic-only.
+              }
             },
           },
           authorization

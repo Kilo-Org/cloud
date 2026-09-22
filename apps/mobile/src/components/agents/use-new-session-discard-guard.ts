@@ -7,10 +7,26 @@ import { i18n } from '@/i18n';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 
 /**
+ * Navigation action types that mean "the user is leaving this screen": the
+ * header back button and Android hardware back (`GO_BACK`), the iOS swipe-back
+ * gesture and programmatic `router.back()` (`POP`). Every other action that
+ * can remove this screen — a `NAVIGATE`/`PUSH` to another route (e.g. tapping
+ * Preferences from the tab bar behind this screen), a `RESET` — is forward
+ * navigation: the user is going somewhere else, not abandoning the prompt.
+ * The draft is durable (saved on every change), so a forward leave loses
+ * nothing and must not be blocked by a discard confirm (spot check
+ * e12-tap-prefs: the confirm hijacked a Preferences push and the screen never
+ * opened).
+ */
+const LEAVE_ACTION_TYPES: ReadonlySet<string> = new Set(['GO_BACK', 'POP', 'POP_TO', 'POP_TO_TOP']);
+
+/**
  * New-session discard confirm. Registers a predictive-Back-safe guard via
  * `usePreventRemove`, which fires for every way the screen can be removed —
  * header back, Android hardware back, and the iOS swipe-back gesture — so all
  * three paths get the same confirmation instead of only the header button.
+ * Forward navigation (any other action type) is replayed unconfirmed: the
+ * durable draft survives the leave.
  *
  * Mirrors the `usePreventRemove` + `Alert.alert` pattern of
  * `useSettingsBackGuard` without any Security-specific helpers: when the
@@ -54,6 +70,12 @@ export function useNewSessionDiscardGuard({
       return;
     }
     const action = data.action;
+    if (!LEAVE_ACTION_TYPES.has(action.type)) {
+      // Forward navigation (push/navigate/reset): replay it now. The durable
+      // draft keeps the prompt, so there is nothing to confirm away.
+      navigation.dispatch(data.action);
+      return;
+    }
     Alert.alert(
       i18n.t('agentChat.newSession.discardDraftTitle'),
       i18n.t(

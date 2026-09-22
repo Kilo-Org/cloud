@@ -23,6 +23,7 @@ const serviceMocks = vi.hoisted(() => ({
   listBitbucketRepositories: vi.fn(),
   resolveBitbucketToken: vi.fn(),
   resolveBitbucketCapabilitySubject: vi.fn(),
+  getBitbucketWorkspaceAuthorization: vi.fn(),
 }));
 
 vi.mock('cloudflare:workers', () => ({
@@ -101,6 +102,12 @@ vi.mock('./bitbucket-runtime-token-resolver.js', () => ({
   listBitbucketRepositories: serviceMocks.listBitbucketRepositories,
   resolveBitbucketToken: serviceMocks.resolveBitbucketToken,
   resolveBitbucketCapabilitySubject: serviceMocks.resolveBitbucketCapabilitySubject,
+}));
+
+vi.mock('./bitbucket-workspace-access-token-authorization-service.js', () => ({
+  BitbucketWorkspaceAccessTokenAuthorizationService: class BitbucketWorkspaceAccessTokenAuthorizationService {
+    getAuthorization = serviceMocks.getBitbucketWorkspaceAuthorization;
+  },
 }));
 
 import gitTokenServiceWorker, { GitTokenRPCEntrypoint } from './index.js';
@@ -243,6 +250,184 @@ describe('Bitbucket repository-list HTTP authorization', () => {
 
     expect(response.status).toBe(401);
     expect(serviceMocks.listBitbucketRepositories).not.toHaveBeenCalled();
+  });
+});
+
+describe('Bitbucket workspace access-token release HTTP authorization', () => {
+  const jwtSecret = 'test-secret-that-is-at-least-32-characters';
+  const organizationId = '123e4567-e89b-12d3-a456-426614174030';
+  const integrationId = '123e4567-e89b-12d3-a456-426614174012';
+  const workspaceUuid = '123e4567-e89b-12d3-a456-426614174044';
+  const env = { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv;
+  const RELEASE_AUDIENCE = 'git-token-service:bitbucket-workspace-access-token';
+
+  type ReleaseBody = {
+    integrationId: string;
+    workspaceUuid: string;
+    workspaceSlug: string;
+  };
+
+  function releaseBody(overrides: Partial<ReleaseBody> = {}) {
+    return { integrationId, workspaceUuid, workspaceSlug: 'acme', ...overrides };
+  }
+
+  async function postRelease(
+    body: unknown,
+    options: { audience?: string | null; extraClaims?: { organizationId?: string } } = {}
+  ): Promise<Response> {
+    const { token } = await signKiloToken({
+      userId: 'member-1',
+      pepper: null,
+      secret: jwtSecret,
+      expiresInSeconds: 5 * 60,
+      audience: options.audience === null ? undefined : (options.audience ?? RELEASE_AUDIENCE),
+      extra: {
+        organizationId: options.extraClaims?.organizationId ?? organizationId,
+      },
+    });
+    return gitTokenServiceWorker.fetch(
+      new Request('https://git-token-service.test/internal/bitbucket/workspace-access-token', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }),
+      env
+    );
+  }
+
+  function availableAuthorization(
+    overrides: Partial<{
+      integrationId: string;
+      workspace: { uuid: string; slug: string };
+    }> = {}
+  ) {
+    return {
+      status: 'available',
+      token: 'at-released-token',
+      organizationId,
+      integrationId,
+      credentialId: '123e4567-e89b-12d3-a456-426614174055',
+      credentialVersion: 1,
+      providerScopes: ['repository', 'pullrequest'],
+      workspace: { uuid: workspaceUuid, slug: 'acme' },
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    serviceMocks.getBitbucketWorkspaceAuthorization.mockReset();
+  });
+
+  it('releases the decrypted workspace token for the claimed organization', async () => {
+    serviceMocks.getBitbucketWorkspaceAuthorization.mockResolvedValue(availableAuthorization());
+    const response = await postRelease(releaseBody());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({
+      status: 'available',
+      token: 'at-released-token',
+      workspace: { uuid: workspaceUuid, slug: 'acme' },
+    });
+    expect(serviceMocks.getBitbucketWorkspaceAuthorization).toHaveBeenCalledWith({
+      userId: 'member-1',
+      orgId: organizationId,
+    });
+  });
+
+  it('derives the workspace identity echo from the integration, not from the request', async () => {
+    serviceMocks.getBitbucketWorkspaceAuthorization.mockResolvedValue(availableAuthorization());
+    const response = await postRelease(releaseBody({ workspaceSlug: 'spoofed' }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ status: 'reconnect_required' });
+  });
+
+  it('refuses a release when the integration identity does not match', async () => {
+    serviceMocks.getBitbucketWorkspaceAuthorization.mockResolvedValue(
+      availableAuthorization({ integrationId: '123e4567-e89b-12d3-a456-426614174099' })
+    );
+    const response = await postRelease(releaseBody());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ status: 'reconnect_required' });
+  });
+
+  it('refuses a release when the workspace uuid does not match', async () => {
+    serviceMocks.getBitbucketWorkspaceAuthorization.mockResolvedValue(
+      availableAuthorization({
+        workspace: { uuid: '999e4567-e89b-12d3-a456-426614174099', slug: 'acme' },
+      })
+    );
+    const response = await postRelease(releaseBody());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ status: 'reconnect_required' });
+  });
+
+  it('passes the structured authorization failures through', async () => {
+    for (const status of [
+      'not_connected',
+      'reconnect_required',
+      'invalid_request',
+      'temporarily_unavailable',
+    ] as const) {
+      serviceMocks.getBitbucketWorkspaceAuthorization.mockResolvedValue({ status });
+      const response = await postRelease(releaseBody());
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      await expect(response.json()).resolves.toEqual({ status });
+    }
+    expect(serviceMocks.getBitbucketWorkspaceAuthorization).toHaveBeenCalledTimes(4);
+  });
+
+  it('requires an organization claim before release', async () => {
+    const response = await postRelease(releaseBody(), { extraClaims: { organizationId: '' } });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: 'organization_required' });
+    expect(serviceMocks.getBitbucketWorkspaceAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('rejects a generic Kilo token without the release audience', async () => {
+    const response = await postRelease(releaseBody(), { audience: null });
+
+    expect(response.status).toBe(401);
+    expect(serviceMocks.getBitbucketWorkspaceAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('rejects a release body without the workspace target fields', async () => {
+    const response = await postRelease({ integrationId });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ status: 'invalid_request' });
+    expect(serviceMocks.getBitbucketWorkspaceAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('answers 405 for non-POST requests without releasing', async () => {
+    const { token } = await signKiloToken({
+      userId: 'member-1',
+      pepper: null,
+      secret: jwtSecret,
+      expiresInSeconds: 5 * 60,
+      audience: RELEASE_AUDIENCE,
+      extra: { organizationId },
+    });
+    const response = await gitTokenServiceWorker.fetch(
+      new Request('https://git-token-service.test/internal/bitbucket/workspace-access-token', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(405);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(serviceMocks.getBitbucketWorkspaceAuthorization).not.toHaveBeenCalled();
   });
 });
 
@@ -666,6 +851,140 @@ describe('GitTokenRPCEntrypoint Bitbucket session capability', () => {
         requestUrl,
       })
     ).resolves.toEqual({ success: false, reason: 'invalid_upstream_url' });
+  });
+
+  it('redeems a REST API request into a Bearer header', async () => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'GET',
+        requestUrl: 'https://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests/42',
+      })
+    ).resolves.toEqual({
+      success: true,
+      headers: { authorization: 'Bearer ATCT-runtime-token' },
+    });
+  });
+
+  it('redeems a REST API sub-resource request into a Bearer header', async () => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'POST',
+        requestUrl:
+          'https://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests/42/comments',
+      })
+    ).resolves.toEqual({
+      success: true,
+      headers: { authorization: 'Bearer ATCT-runtime-token' },
+    });
+  });
+
+  it.each([
+    [
+      'a different repository',
+      'https://api.bitbucket.org/2.0/repositories/acme/other/pullrequests/42',
+    ],
+    [
+      'a different workspace',
+      'https://api.bitbucket.org/2.0/repositories/other/widgets/pullrequests/42',
+    ],
+    [
+      'a repository name that is only a prefix of a path segment',
+      'https://api.bitbucket.org/2.0/repositories/acme/widgetsextra/pullrequests/42',
+    ],
+  ] as const)('rejects a REST API request for %s', async (_description, requestUrl) => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'GET',
+        requestUrl,
+      })
+    ).resolves.toEqual({ success: false, reason: 'repository_mismatch' });
+  });
+
+  it.each([
+    ['http scheme', 'http://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests/42'],
+    [
+      'credentials in URL',
+      'https://user:pass@api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests/42',
+    ],
+    ['fragment', 'https://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests/42#frag'],
+    [
+      'path traversal',
+      'https://api.bitbucket.org/2.0/repositories/acme/widgets/../other/pullrequests/42',
+    ],
+    ['encoded slash', 'https://api.bitbucket.org/2.0/repositories/acme%2fwidgets/pullrequests/42'],
+    [
+      'encoded traversal',
+      'https://api.bitbucket.org/2.0/repositories/acme/widgets/%2e%2e/pullrequests/42',
+    ],
+  ] as const)('rejects a malformed REST API request URL (%s)', async (_description, requestUrl) => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'GET',
+        requestUrl,
+      })
+    ).resolves.toEqual({ success: false, reason: 'invalid_upstream_url' });
+  });
+
+  it('rejects a REST API request to an unapproved origin', async () => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'GET',
+        requestUrl: 'https://evil.example.com/2.0/repositories/acme/widgets/pullrequests/42',
+      })
+    ).resolves.toEqual({ success: false, reason: 'upstream_origin_not_allowed' });
+  });
+
+  it('still redeems a git smart-HTTP request into Basic auth', async () => {
+    const capability = await issueCapability();
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'GET',
+        requestUrl: 'https://bitbucket.org/acme/widgets.git/info/refs?service=git-upload-pack',
+      })
+    ).resolves.toEqual({
+      success: true,
+      headers: {
+        authorization: `Basic ${Buffer.from('x-token-auth:ATCT-runtime-token').toString('base64')}`,
+      },
+    });
+  });
+
+  it('allows an encoded slash in a REST API query string', async () => {
+    const capability = await issueCapability();
+    // Mirrors bb pr current: the branch name lives in the q= filter, so a branch
+    // with a slash arrives percent-encoded in the query, never in the path.
+    const params = new URLSearchParams({
+      q: 'source.branch.name = "feature/widgets" AND state = "OPEN"',
+      pagelen: '50',
+    });
+    await expect(
+      createService().redeemBitbucketSessionCapability({
+        capability,
+        outboundContainerId: 'outbound-container-1',
+        requestMethod: 'GET',
+        requestUrl: `https://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests?${params.toString()}`,
+      })
+    ).resolves.toEqual({
+      success: true,
+      headers: { authorization: 'Bearer ATCT-runtime-token' },
+    });
   });
 });
 

@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import { normalizeSeedEmail } from '../lib/email';
+import { isValidEmail } from '../lib/users';
 import { createSeedStripeCustomer, deleteSeedStripeCustomer } from '../lib/stripe';
 import type { SeedResult } from '../index';
 
@@ -26,11 +27,6 @@ function printUsage(): void {
   console.log('Examples:');
   console.log('  pnpm dev:seed app:create-user "Ada Lovelace" ada@example.com');
   console.log('  pnpm dev:seed app:create-user "Evgeny" evgeny@kilocode.ai --admin');
-}
-
-function isValidEmail(email: string): boolean {
-  // Intentionally permissive; we only guard against obvious nonsense in dev.
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 export async function run(...args: string[]): Promise<SeedResult | void> {

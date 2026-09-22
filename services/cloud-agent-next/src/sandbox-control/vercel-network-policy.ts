@@ -4,6 +4,7 @@ import type {
   VercelSandboxNetworkPolicy,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { deriveKiloSandboxTargets, type KiloSandboxTargets } from '../kilo/kilo-targets.js';
+import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 
 export type VercelCredentialPolicyInput = {
   kilo?: {
@@ -12,6 +13,10 @@ export type VercelCredentialPolicyInput = {
     targets: KiloSandboxTargets;
     rootSessionIds: string[];
     organizationId?: string;
+    runtimeProxy?: {
+      members?: Array<{ sessionId: string; kiloSessionId: string; handle: string }>;
+      targets: { backendBaseUrl: string; providerBaseUrl: string; sessionIngestBaseUrl: string };
+    };
   };
   github?: {
     token: string;
@@ -200,6 +205,109 @@ export function buildKiloCredentialInjectionRules(
   return rules;
 }
 
+function runtimeProxyInjectionRules(
+  kilo: NonNullable<VercelCredentialPolicyInput['kilo']>,
+  organizationId: string | undefined
+): VercelSandboxInjectionRule[] {
+  const input = kilo.runtimeProxy;
+  if (!input) return [];
+  const targets = [
+    new URL(input.targets.backendBaseUrl),
+    new URL(input.targets.providerBaseUrl),
+    new URL(input.targets.sessionIngestBaseUrl),
+  ];
+  if (
+    targets.some(
+      target =>
+        target.protocol !== 'https:' ||
+        target.port !== '' ||
+        target.username ||
+        target.password ||
+        target.search ||
+        target.hash
+    )
+  ) {
+    invalidPolicy();
+  }
+  const [backend, provider, ingest] = targets;
+  if (
+    backend.toString().replace(/\/+$/, '') !== provider.toString().replace(/\/+$/, '') ||
+    backend.toString().replace(/\/+$/, '') !== ingest.toString().replace(/\/+$/, '') ||
+    runtimeCredentialProxyFacadeBaseUrl(backend.toString()) !==
+      backend.toString().replace(/\/+$/, '')
+  ) {
+    invalidPolicy();
+  }
+  const rules: VercelSandboxInjectionRule[] = [];
+  const add = (target: URL, path: string, methods: string[], authorization: string) =>
+    rules.push(
+      createCredentialRule({
+        target,
+        path: { exact: path },
+        methods,
+        expectedAuthorization: authorization,
+        injectedAuthorization: authorization,
+      })
+    );
+  for (const member of input.members ?? []) {
+    const authorization = `Bearer ${member.handle}`;
+    for (const path of [
+      '/api/user',
+      '/api/profile',
+      '/api/profile/balance',
+      '/api/defaults',
+      '/api/users/notifications',
+    ])
+      add(backend, `${basePath(backend)}${path}`, ['GET'], authorization);
+    if (organizationId !== undefined) {
+      for (const path of ['models', 'defaults', 'modes']) {
+        add(
+          backend,
+          `${basePath(backend)}/api/organizations/${organizationId}/${path}`,
+          ['GET'],
+          authorization
+        );
+      }
+      add(
+        backend,
+        `${basePath(backend)}/api/organizations/${organizationId}/models/validate`,
+        ['POST'],
+        authorization
+      );
+    }
+    for (const [path, methods] of [
+      ['/models', ['GET']],
+      ['/models/validate', ['POST']],
+      ['/chat/completions', ['POST']],
+      ['/messages', ['POST']],
+      ['/responses', ['POST']],
+      ['/embeddings', ['POST']],
+    ] as const) {
+      for (const prefix of ['/api/openrouter', '/api/gateway']) {
+        add(provider, `${basePath(provider)}${prefix}${path}`, [...methods], authorization);
+      }
+    }
+    for (const path of ['/v1/chat/completions', '/v1/responses']) {
+      add(provider, `${basePath(provider)}/api/gateway${path}`, ['POST'], authorization);
+    }
+    add(ingest, `${basePath(ingest)}/api/session`, ['POST'], authorization);
+    const sessionId = member.kiloSessionId;
+    for (const [suffix, methods] of [
+      ['export', ['GET']],
+      ['ingest', ['POST']],
+      ['title', ['POST']],
+    ] as const) {
+      add(
+        ingest,
+        `${basePath(ingest)}/api/session/${sessionId}/${suffix}`,
+        [...methods],
+        authorization
+      );
+    }
+  }
+  return rules;
+}
+
 function githubInjectionRules(
   input: NonNullable<VercelCredentialPolicyInput['github']>
 ): VercelSandboxInjectionRule[] {
@@ -299,13 +407,25 @@ export function buildVercelCredentialNetworkPolicy(
   }
 
   const injectionRules = [
-    ...(input.kilo === undefined ? [] : buildKiloCredentialInjectionRules(input.kilo)),
+    ...(input.kilo === undefined
+      ? []
+      : input.kilo.runtimeProxy
+        ? runtimeProxyInjectionRules(input.kilo, input.kilo.organizationId)
+        : buildKiloCredentialInjectionRules(input.kilo)),
     ...(input.github === undefined ? [] : githubInjectionRules(input.github)),
   ];
 
   return {
     mode: 'custom',
-    allowedDomains: [...new Set(injectionRules.map(rule => rule.domain)), '*'],
+    allowedDomains: [
+      ...new Set([
+        ...injectionRules.map(rule => rule.domain),
+        ...(input.kilo?.runtimeProxy
+          ? [new URL(input.kilo.runtimeProxy.targets.backendBaseUrl).hostname]
+          : []),
+      ]),
+      '*',
+    ],
     injectionRules,
   };
 }

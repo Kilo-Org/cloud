@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { hasInFlightReview, isInFlightReviewStatus } from '@kilocode/app-shared/code-review';
 import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
@@ -11,31 +11,62 @@ function isPersonal(scope: string) {
   return scope === PERSONAL_SCOPE;
 }
 
+export const REVIEW_PAGE_SIZE = 50;
+
+type ReviewListPage = Awaited<ReturnType<typeof trpcClient.codeReviews.listForUser.query>>;
+
+/**
+ * Build the review-list infinite-query options. Kept as a pure builder so the
+ * offset paging is testable without mounting the hook. The query key is exactly
+ * the key `useInvalidateReviews` invalidates, so cancel/retrigger/foreground
+ * invalidation keeps matching (invalidation is prefix-based).
+ *
+ * Deliberately not tRPC's `infiniteQueryOptions`: it injects `{ cursor }`, which
+ * this offset-based schema does not read.
+ */
+export function buildReviewListQueryOptions(trpc: ReturnType<typeof useTRPC>, scope: string) {
+  const personal = isPersonal(scope);
+  return {
+    queryKey: personal
+      ? trpc.codeReviews.listForUser.queryKey()
+      : trpc.codeReviews.listForOrganization.queryKey({ organizationId: scope }),
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }: { pageParam: number }): Promise<ReviewListPage> => {
+      const page = personal
+        ? await trpcClient.codeReviews.listForUser.query({
+            limit: REVIEW_PAGE_SIZE,
+            offset: pageParam,
+          })
+        : await trpcClient.codeReviews.listForOrganization.query({
+            organizationId: scope,
+            limit: REVIEW_PAGE_SIZE,
+            offset: pageParam,
+          });
+      // The list endpoints resolve handler errors as `{ success: false, error }`
+      // instead of throwing (no tRPC client link converts them). Reject here so
+      // React Query marks the page as an error: a failed first page drives the
+      // screen's transient QueryError, and a failed next page drives the retry
+      // footer via `isFetchNextPageError` while keeping the loaded rows.
+      if (!page.success) {
+        throw new Error(page.error);
+      }
+      return page;
+    },
+    getNextPageParam: (lastPage: ReviewListPage, _pages: ReviewListPage[], lastPageParam: number) =>
+      lastPage.success && lastPage.hasMore ? lastPageParam + lastPage.reviews.length : undefined,
+    refetchInterval: (query: { state: { data?: { pages: ReviewListPage[] } } }) => {
+      const firstPage = query.state.data?.pages[0];
+      if (!firstPage?.success) {
+        return false;
+      }
+      return hasInFlightReview(firstPage.reviews) ? 5000 : false;
+    },
+  };
+}
+
 export function useReviewList(scope: string) {
   const trpc = useTRPC();
-  const personal = useQuery({
-    ...trpc.codeReviews.listForUser.queryOptions({ limit: 50 }),
-    enabled: isPersonal(scope),
-    refetchInterval: query => {
-      const data = query.state.data;
-      if (!data?.success) {
-        return false;
-      }
-      return hasInFlightReview(data.reviews) ? 5000 : false;
-    },
-  });
-  const org = useQuery({
-    ...trpc.codeReviews.listForOrganization.queryOptions({ organizationId: scope, limit: 50 }),
-    enabled: !isPersonal(scope),
-    refetchInterval: query => {
-      const data = query.state.data;
-      if (!data?.success) {
-        return false;
-      }
-      return hasInFlightReview(data.reviews) ? 5000 : false;
-    },
-  });
-  return isPersonal(scope) ? personal : org;
+  return useInfiniteQuery(buildReviewListQueryOptions(trpc, scope));
 }
 
 export function useReviewDetail(reviewId: string) {

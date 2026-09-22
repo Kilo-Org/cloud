@@ -36,10 +36,6 @@ import { KILO_SERVER_ENV_KEYS, type KiloServerEnv } from '../shared/kilo-server-
 import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../shared/tool-cgroup-env.js';
 import { parseWrapperSessionReadyErrorResponse } from './wrapper-ready-error.js';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type WrapperClientOptions =
   | {
       /** Sandbox session for exec/writeFile operations */
@@ -182,10 +178,6 @@ export type WrapperTransport = {
   request(method: 'GET' | 'POST', path: string, body?: unknown): Promise<Response>;
 };
 
-// ---------------------------------------------------------------------------
-// Error Classes
-// ---------------------------------------------------------------------------
-
 export type WrapperErrorOptions = ErrorOptions & {
   workspaceFailureSubtype?: WorkspaceFailureSubtype;
   safeDetail?: string;
@@ -255,10 +247,6 @@ const ERROR_STATUS_CODES: Record<string, number> = {
   WRAPPER_FINALIZING: 409,
 };
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 /** Max attempts for port allocation in ensureWrapper (retry with new random port on failure) */
 const MAX_PORT_ATTEMPTS = 3;
 const TOOL_CGROUP_ENV_KEY_SET = new Set<string>(TOOL_CGROUP_ENV_KEYS);
@@ -322,10 +310,6 @@ function mergeEnvRecords(...envs: Array<Record<string, string | undefined> | und
   return Object.assign({}, ...envs.filter(Boolean)) as Record<string, string | undefined>;
 }
 
-// ---------------------------------------------------------------------------
-// Transports
-// ---------------------------------------------------------------------------
-
 class ExecCurlWrapperTransport implements WrapperTransport {
   private readonly session: ExecutionSession;
   private readonly baseUrl: string;
@@ -383,10 +367,6 @@ export class ContainerFetchWrapperTransport implements WrapperTransport {
     return this.sandbox.containerFetch(request, this.port);
   }
 }
-
-// ---------------------------------------------------------------------------
-// WrapperClient Implementation
-// ---------------------------------------------------------------------------
 
 export class WrapperClient {
   private readonly cloudflareRuntime?: { session: ExecutionSession; port: number };
@@ -554,7 +534,6 @@ export class WrapperClient {
         wrapperRunId?: string;
       };
 
-      // Check for error response
       if (parsed.error || !response.ok) {
         const readyError =
           path === '/session/ready' ? parseWrapperSessionReadyErrorResponse(parsed) : undefined;
@@ -614,10 +593,6 @@ export class WrapperClient {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Lifecycle Methods
-  // ---------------------------------------------------------------------------
-
   /**
    * Ensure the wrapper is running and healthy.
    * Starts the wrapper if needed and waits for it to be ready.
@@ -641,13 +616,11 @@ export class WrapperClient {
       kiloServerEnv,
     } = options;
 
-    // First, try to check health
     try {
       await this.health();
       logger.debug('WrapperClient: wrapper already running');
       return { started: false };
     } catch {
-      // Not running, need to start
       logger.debug('WrapperClient: wrapper not running, starting...');
     }
 
@@ -836,7 +809,6 @@ export class WrapperClient {
 
     logger.withFields({ agentSessionId, workspacePath }).info('Ensuring wrapper is running');
 
-    // 1. Check for existing wrapper (sandbox-wide search)
     const existing = await findWrapperForSession(sandbox, agentSessionId);
 
     if (existing) {
@@ -844,7 +816,6 @@ export class WrapperClient {
       logger.withFields({ agentSessionId, port }).info('Found existing wrapper');
       const client = new WrapperClient({ session, port });
 
-      // Verify it's healthy. If so, reuse it.
       try {
         const healthResponse = await client.health();
         if (healthResponse.version === WRAPPER_VERSION) {
@@ -1095,10 +1066,6 @@ export class WrapperClient {
     throw lastError ?? new WrapperNotReadyError('Failed to start bootstrap wrapper');
   }
 
-  // ---------------------------------------------------------------------------
-  // Action Methods (tracked in inflight)
-  // ---------------------------------------------------------------------------
-
   /**
    * Send a prompt to the wrapper.
    * Opens connection if idle, tracks in inflight.
@@ -1155,10 +1122,6 @@ export class WrapperClient {
     await this.request<{ status: 'updated' }>('POST', '/session/environment', { env });
   }
 
-  // ---------------------------------------------------------------------------
-  // Action Methods (synchronous, no inflight tracking)
-  // ---------------------------------------------------------------------------
-
   /** Send a command (slash command) to the wrapper. */
   async command(options: WrapperCommandOptions): Promise<WrapperSessionCommandResponse> {
     const response = await this.request<{
@@ -1168,10 +1131,6 @@ export class WrapperClient {
 
     return response.result;
   }
-
-  // ---------------------------------------------------------------------------
-  // Action Methods (fire-and-forget)
-  // ---------------------------------------------------------------------------
 
   /**
    * Answer a permission request.
@@ -1220,10 +1179,6 @@ export class WrapperClient {
     await this.request<{ status: string }>('POST', '/job/abort', {});
   }
 
-  // ---------------------------------------------------------------------------
-  // Status Methods
-  // ---------------------------------------------------------------------------
-
   /**
    * Check wrapper health.
    */
@@ -1231,11 +1186,28 @@ export class WrapperClient {
     return this.request<WrapperHealthResponse>('GET', '/health');
   }
 
+  async listTerminals(): Promise<WrapperPty[]> {
+    return this.request<WrapperPty[]>('GET', '/pty');
+  }
+
   /**
    * Get current job status.
    */
   async status(): Promise<JobStatus> {
     return this.request<JobStatus>('GET', '/job/status');
+  }
+
+  /**
+   * The interactions this session currently waits on. A legacy `agent_*` Cloud
+   * Agent session stores no pending set in its Durable Object, so this read —
+   * the same Kilo state the wrapper's `connected` snapshot replays — is the one
+   * its `getPendingInteractions` handler has.
+   */
+  async getPendingInteractions(): Promise<{ questions: unknown[]; permissions: unknown[] }> {
+    return this.request<{ questions: unknown[]; permissions: unknown[] }>(
+      'GET',
+      '/job/pending-interactions'
+    );
   }
 }
 
@@ -1289,6 +1261,10 @@ export class WrapperContainerClient {
 
   async health(): Promise<WrapperHealthResponse> {
     return this.request<WrapperHealthResponse>('GET', '/health');
+  }
+
+  async listTerminals(): Promise<WrapperPty[]> {
+    return this.request<WrapperPty[]>('GET', '/pty');
   }
 
   async createTerminal(size?: { cols: number; rows: number }): Promise<WrapperPty> {

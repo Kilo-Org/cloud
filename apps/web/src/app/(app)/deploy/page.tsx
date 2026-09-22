@@ -1,12 +1,15 @@
 import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { DeployPageClient } from './DeployPageClient';
 import { notFound } from 'next/navigation';
-import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
+import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 
 export default async function DeployPage() {
-  await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/deploy');
+  const user = await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/deploy');
 
-  if (!ENABLE_DEPLOY_FEATURE) {
+  const isDeployEnabled = await isFeatureFlagEnabled('deploy-feature', user.id);
+  const isDevelopment = process.env.NODE_ENV === 'development';
+
+  if (!isDeployEnabled && !isDevelopment) {
     return notFound();
   }
 

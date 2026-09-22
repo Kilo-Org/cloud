@@ -1,3 +1,5 @@
+import type { SessionEventIdentity } from '../../../src/shared/sandbox-control-protocol.js';
+
 const directories = new Map<string, string>();
 const rootBySessionId = new Map<string, string>();
 const rootsByDirectory = new Map<string, Set<string>>();
@@ -118,4 +120,14 @@ export function resetSessionDirectoryState(): void {
 
 export function directoryForSession(kiloSessionId: string | undefined): string | undefined {
   return kiloSessionId ? directories.get(kiloSessionId) : undefined;
+}
+
+export function ownerDirectoryForSession(
+  identity: Pick<SessionEventIdentity, 'kiloSessionId' | 'rootKiloSessionId' | 'directory'>
+): string | undefined {
+  const mappedRoot = rootForSession(identity.kiloSessionId, identity.directory);
+  const root = identity.rootKiloSessionId ?? mappedRoot;
+  if (!root || (mappedRoot !== undefined && mappedRoot !== root)) return undefined;
+  if (identity.kiloSessionId !== root && mappedRoot !== root) return undefined;
+  return directoryForSession(root);
 }

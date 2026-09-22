@@ -35,7 +35,6 @@ import OrganizationSwitcher from './OrganizationSwitcher';
 import SidebarMenuList from './SidebarMenuList';
 import SidebarPromoBanner from './SidebarPromoBanner';
 import SidebarUserFooter from './SidebarUserFooter';
-import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { usePathname } from 'next/navigation';
@@ -59,6 +58,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isGastownEnabled = useFeatureFlagEnabled('gastown-access');
   const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
+  const isDeployEnabled = useFeatureFlagEnabled('deploy-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Dashboard group
@@ -173,7 +173,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
           { title: 'Auto Fix', icon: Wrench, url: '/auto-fix' },
         ]
       : []),
-    ...(ENABLE_DEPLOY_FEATURE
+    ...(isDeployEnabled || isDevelopment
       ? [
           {
             title: 'Deploy',
@@ -223,15 +223,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: CreditCard,
       url: '/subscriptions',
     },
-    ...(ENABLE_DEPLOY_FEATURE
-      ? [
-          {
-            title: 'Integrations',
-            icon: Cable,
-            url: '/integrations',
-          },
-        ]
-      : []),
+    {
+      title: 'Integrations',
+      icon: Cable,
+      url: '/integrations',
+    },
     {
       title: 'Invoices',
       icon: Receipt,

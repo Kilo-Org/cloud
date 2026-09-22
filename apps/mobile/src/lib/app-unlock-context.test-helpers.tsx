@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- Use the repository's DOM-free mounted renderer. */
 import { createElement, type ElementType } from 'react';
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { afterEach, beforeEach, expect, vi } from 'vitest';
 import { AppUnlockProvider, useAppUnlock } from '@/lib/app-unlock-context';
 import { renderWithProviders } from '@/test/render-with-providers';

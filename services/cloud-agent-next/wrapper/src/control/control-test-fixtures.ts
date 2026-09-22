@@ -91,6 +91,7 @@ export function createHandlerFixture(
   const nativeLifetime = new AbortController();
   const runtime: WorktreeKiloRuntime | undefined = client
     ? {
+        identity: { ...identity },
         scopeId: kilo.scopeId,
         runtimeId: 'native_1',
         directory: identity.directory,
@@ -119,8 +120,10 @@ export function createHandlerFixture(
             };
           },
           detach: () => true,
+          retireForRecovery: async () => 'retired',
           deleteDirectory: async () => {},
-          getRetained: directory => (directory === runtime.directory ? runtime : undefined),
+          getRetained: directory =>
+            directory === runtime.directory && !nativeLifetime.signal.aborted ? runtime : undefined,
           retireRuntime: async (directory, _deadlineAt, target) => {
             if (
               directory !== runtime.directory ||
@@ -137,8 +140,15 @@ export function createHandlerFixture(
             target.client === runtime.kiloClient &&
             !nativeLifetime.signal.aborted &&
             Date.now() < deadlineAt,
-          get: directory =>
-            directory === runtime.directory && !nativeLifetime.signal.aborted ? runtime : undefined,
+          get: request =>
+            (typeof request === 'string'
+              ? request === runtime.directory
+              : request.directory === runtime.directory) && !nativeLifetime.signal.aborted
+              ? runtime
+              : undefined,
+          getAll: directory =>
+            directory === runtime.directory && !nativeLifetime.signal.aborted ? [runtime] : [],
+          isCurrent: candidate => candidate === runtime && !nativeLifetime.signal.aborted,
           isHealthy: () => true,
           shutdown: () => {},
         }

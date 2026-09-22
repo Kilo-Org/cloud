@@ -36,6 +36,7 @@
     "cost": "Náklady",
     "discard": "Zahodit",
     "findings": "Zjištění",
+    "mergeRequest": "merge request",
     "notConnected": "Nepřipojeno",
     "notifications": "Oznámení",
     "pullRequest": "pR",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Použít jiný e-mail",
     "signInWithApple": "Přihlásit se přes Apple",
     "signInWithGoogle": "Přihlásit se přes Google",
+    "signInWithPasskey": "Přihlásit se přístupovým klíčem",
     "emailAddress": "E-mailová adresa",
     "emailPlaceholder": "vy@example.com",
     "continueWithEmail": "Pokračovat pomocí e-mailu",
@@ -174,6 +176,10 @@
     "termsConnector": " a ",
     "termsSuffix": ".",
     "moreSignInOptions": "Další možnosti přihlášení",
+    "passkeyCancelled": "Přihlášení přístupovým klíčem bylo zrušeno. Zkuste to znovu.",
+    "passkeyNotFound": "Pro toto zařízení není uložen žádný přístupový klíč. Přihlaste se místo toho přes Apple, Google nebo svým e-mailem.",
+    "passkeyUnsupported": "Přístupové klíče nejsou na tomto zařízení dostupné. Přihlaste se místo toho přes Apple, Google nebo svým e-mailem.",
+    "passkeyFailed": "Přihlášení přístupovým klíčem se nezdařilo. Zkuste to znovu.",
     "couldNotCompleteSignIn": "Přihlášení se nepodařilo dokončit. Zkuste to prosím znovu.",
     "sessionEnded": "Vaše relace skončila. Přihlaste se prosím znovu.",
     "signInCodeExpired": "Platnost vašeho přihlašovacího kódu vypršela. Zkuste to prosím znovu.",
@@ -224,11 +230,36 @@
     "providerTestAccount": "Testovací účet",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Podnikové SSO"
+    "providerEnterpriseSso": "Podnikové SSO",
+    "passkeysTitle": "Přístupové klíče",
+    "passkeysSubtitle": "Přihlaste se bez hesla",
+    "passkeysEmpty": "Zatím žádné přístupové klíče",
+    "passkeysEmptyHint": "$t(profile.addPasskey) a přihlaste se bez hesla.",
+    "passkeysCouldNotLoad": "Přístupové klíče se nepodařilo načíst",
+    "passkeysLoadFailed": "Přístupové klíče nejsou dostupné, dokud se toto nenačte.",
+    "addPasskey": "Přidat přístupový klíč",
+    "passkeyDefaultName": "Přístupový klíč",
+    "passkeyAddedOn": "Přidán {{date}}",
+    "passkeyAdded": "Přístupový klíč přidán.",
+    "passkeyAddFailed": "Přístupový klíč se nepodařilo přidat. Zkuste to znovu.",
+    "passkeyAddUnsupported": "Toto zařízení nemůže vytvářet přístupové klíče.",
+    "passkeyAddCancelled": "Vytvoření přístupového klíče bylo zrušeno.",
+    "passkeyRemoved": "Přístupový klíč odebrán.",
+    "passkeyRemoveFailed": "Tento přístupový klíč se nepodařilo odebrat. Zkuste to znovu.",
+    "passkeyRenamed": "Přístupový klíč přejmenován.",
+    "passkeyName": "Název přístupového klíče",
+    "renamePasskey": "Přejmenovat přístupový klíč",
+    "removePasskey": "Odebrat přístupový klíč",
+    "removePasskeyTitle": "Odebrat přístupový klíč?",
+    "removePasskeyMessage": "Tímto přístupovým klíčem se už nebudete moci přihlásit."
   },
   "preferences": {
+    "general": "Obecné",
+    "voiceInput": "Hlasový vstup",
     "autoExpandThinking": "Automaticky rozbalovat uvažování",
     "autoExpandThinkingSubtitle": "Po dokončení uvažování agenta zobrazí jeho obsah rozbalený.",
+    "hideThinking": "Skrýt podrobnosti uvažování",
+    "hideThinkingSubtitle": "Nezobrazovat uvažování agenta na stránce relace.",
     "keepScreenOn": "Nezhasínat obrazovku v relaci",
     "keepScreenOnSubtitle": "Obrazovka zůstane zapnutá, dokud relace běží.",
     "appearance": "Vzhled",
@@ -237,6 +268,7 @@
     "appearanceLight": "Světlý",
     "appearanceDark": "Tmavý",
     "account": "Účet",
+    "accountSubtitle": "Jazyk, důvěryhodné domény a přihlášená zařízení",
     "prReviewAttribution": "Přidávat zmínku o aplikaci ke kontrolám PR",
     "prReviewAttributionSubtitle": "Při odeslání kontroly přidá do zápatí informaci, že kontrola proběhla přes Kilo.",
     "returnSendsMessage": "Klávesa Enter odesílá zprávu",
@@ -247,7 +279,15 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Přepis přes Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Přepisujte diktování pomocí modelu Kilo Gateway místo rozpoznávání řeči ve vašem zařízení. Nahraný zvuk se odešle do Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Sbalit volání nástrojů",
+    "condenseToolCallsSubtitle": "Seskupte po sobě jdoucí volání nástrojů do jednoho řádku, který můžete otevřít.",
+    "toolSummaryTranslation": "Přeložit souhrny nástrojů",
+    "toolSummaryTranslationSubtitle": "Pošli každý souhrn nástroje modelu, aby jej přeložil do jazyka tvé aplikace. Pokud překlad selže, zobrazí se originál.",
+    "toolSummaryTranslationModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(common.model) vyberte jiný."
   },
   "prReview": {
     "pullRequestUnavailable": "PR není dostupný",
@@ -333,7 +373,27 @@
       "fileLoadedCount_few": "Načteny {{displayCount}} soubory",
       "fileLoadedCount_many": "Načteno {{displayCount}} souboru",
       "fileLoadedOfTotalCount_few": "Načteny {{displayCount}} soubory z {{total}}",
-      "fileLoadedOfTotalCount_many": "Načteno {{displayCount}} souboru z {{total}}"
+      "fileLoadedOfTotalCount_many": "Načteno {{displayCount}} souboru z {{total}}",
+      "expandAllLines_one": "Rozbalit všechny řádky ({{displayCount}})",
+      "expandAllLines_other": "Rozbalit všechny řádky ({{displayCount}})",
+      "expandAllLines_few": "Rozbalit všechny řádky ({{displayCount}})",
+      "expandAllLines_many": "Rozbalit všechny řádky ({{displayCount}})",
+      "expandLines_one": "Rozbalit řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandLines_other": "Rozbalit řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandLines_few": "Rozbalit řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandLines_many": "Rozbalit řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandLinesOfContext_one": "Rozbalit řádky kontextu ({{displayCount}})",
+      "expandLinesOfContext_other": "Rozbalit řádky kontextu ({{displayCount}})",
+      "expandLinesOfContext_few": "Rozbalit řádky kontextu ({{displayCount}})",
+      "expandLinesOfContext_many": "Rozbalit řádky kontextu ({{displayCount}})",
+      "expandMoreLines_one": "Rozbalit další řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandMoreLines_other": "Rozbalit další řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandMoreLines_few": "Rozbalit další řádky {{start}}–{{end}} ({{displayCount}})",
+      "expandMoreLines_many": "Rozbalit další řádky {{start}}–{{end}} ({{displayCount}})",
+      "loadedOfTotalFiles_one": "Načteno {{loaded}} z {{total}} souborů",
+      "loadedOfTotalFiles_other": "Načteno {{loaded}} z {{total}} souborů",
+      "loadedOfTotalFiles_few": "Načteno {{loaded}} z {{total}} souborů",
+      "loadedOfTotalFiles_many": "Načteno {{loaded}} z {{total}} souborů"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "na konci souboru chybí nový řádek.",
@@ -348,6 +408,7 @@
       "merge": "Sloučení",
       "mergeNow": "Sloučit nyní",
       "mergePullRequest": "Sloučení PR",
+      "mergeTermTitle": "Sloučení {{term}}",
       "enableAutoMerge": "Zapnout automatické sloučení",
       "disableAutoMerge": "Vypnout automatické sloučení",
       "autoMergeOn": "Automatické sloučení je zapnuté",
@@ -366,9 +427,12 @@
       "deleteBranchAfterMerge": "Smazat větev po sloučení",
       "noEnabledMethods": "V tomto repozitáři není povolená žádná metoda sloučení. Požádej správce repozitáře, aby povolil slučovací commit, sjednocení commitů nebo přesazení větve.",
       "confirmTitle": "Sloučit PR?",
+      "confirmTitleTerm": "Sloučit {{term}}?",
       "confirmMessage": "Tím se tvé změny sloučí do cílové větve.",
       "enableAutoMergeConfirmTitle": "Zapnout automatické sloučení?",
       "enableAutoMergeConfirmMessage": "GitHub tento PR automaticky sloučí, jakmile úspěšně proběhnou všechny povinné kontroly.",
+      "enableAutoMergeConfirmMessageTerm": "Až pipeline proběhne úspěšně, {{term}} se automaticky sloučí.",
+      "enableAutoMergeDescriptionTerm": "GitLab tento {{term}} sloučí automaticky, jakmile pipeline proběhne úspěšně.",
       "forbidden": "Nemáš oprávnění sloučit tento PR.",
       "cannotMerge": "Tento PR nelze v aktuálním stavu sloučit.",
       "couldNotMerge": "PR se nepodařilo sloučit.",
@@ -379,7 +443,8 @@
       },
       "terminal": {
         "alreadyMerged": "Již sloučeno",
-        "closed": "Tento PR je uzavřen"
+        "closed": "Tento PR je uzavřen",
+        "closedMergeRequest": "Tento merge request je uzavřen"
       },
       "partialSuccessBanner": {
         "body": "Větev se nepodařilo smazat: {{reason}}.",
@@ -404,6 +469,20 @@
         "behindDetail": "Zdrojové větvi chybí změny z cílové větve. Před sloučením ji aktualizuj nebo přesaď na cílovou větev.",
         "notMergeableTitle": "Tento PR zatím nelze sloučit",
         "notMergeableDetail": "GitHub nahlásil stav sloučení {{state}}."
+      },
+      "restrictions": {
+        "title": "Omezení slučování",
+        "approvalsRequired_one": "Vyžaduje se {{displayCount}} schválení",
+        "approvalsRequired_other": "Vyžaduje se {{displayCount}} schválení",
+        "pipelineMustSucceed": "Aby bylo možné slučovat, musí pipeline proběhnout úspěšně.",
+        "approvalsRequired_many": "Vyžaduje se {{displayCount}} schválení",
+        "approvalsRequired_few": "Vyžadují se {{displayCount}} schválení"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline u posledního commitu selhává.",
+        "pendingPipeline": "Pipeline u posledního commitu ještě běží.",
+        "permission": "Nemáš oprávnění sloučit tento {{term}}.",
+        "draft": "Před sloučením označ {{term}} jako připravený k revizi."
       },
       "methodLabels": {
         "merge": "Vytvořit slučovací commit",
@@ -452,6 +531,11 @@
       "acceptTerms": "Přijmout",
       "replyBadRequest": "Tuto odpověď nelze odeslat. Vlákno se možná změnilo.",
       "replyForbidden": "Nemáš oprávnění odpovídat v tomto PR.",
+      "addCommentCta": "Okomentovat tento PR",
+      "fixWithKilo": "Opravit s Kilo",
+      "fixWithKiloPrompt": "Vyřeš prosím následující komentář k PR: {{link}}",
+      "commentBadRequest": "Tento komentář nelze odeslat. PR se možná změnil.",
+      "commentForbidden": "Nemáš oprávnění komentovat tento PR.",
       "moderation": {
         "reportContent": {
           "terminal": "Tento komentář nelze nahlásit.",
@@ -504,7 +588,12 @@
         "outdatedOnLines": "Zastaralé: {{lines}}",
         "outdatedOnPath": "Zastaralé: {{path}}"
       },
-      "deletedUser": "smazaný uživatel"
+      "deletedUser": "smazaný uživatel",
+      "replyForbiddenTerm": "Nemáš oprávnění odpovídat v tomto {{term}}.",
+      "moreLinesAbove_one": "… další řádky výše: {{displayCount}}",
+      "moreLinesAbove_other": "… další řádky výše: {{displayCount}}",
+      "moreLinesAbove_few": "… další řádky výše: {{displayCount}}",
+      "moreLinesAbove_many": "… další řádky výše: {{displayCount}}"
     },
     "couldNotOpenGitHubAppSettings": "Nepodařilo se otevřít nastavení aplikace GitHub.",
     "installKiloGitHubApp": "Nainstalovat aplikaci Kilo pro GitHub",
@@ -516,17 +605,19 @@
     "reviewPullRequest": "Zkontrolovat PR",
     "headLine": "{{counts}} · poslední commit {{sha}}",
     "entry": {
-      "eyebrow": "Otevři PR pomocí URL.",
-      "pastePrLink": "Vložit odkaz na PR",
-      "noRecentPrs": "Žádné nedávné PR",
-      "noRecentPrsDescription": "Vlož odkaz na PR do pole výše a začni revizi. Příště se PR zobrazí tady.",
+      "eyebrow": "Otevři PR nebo merge request pomocí URL",
+      "pastePrLink": "Vložit odkaz na PR nebo merge request",
+      "noRecentPrs": "Žádné nedávné revize",
+      "noRecentPrsDescription": "Pro spuštění revize vlož nahoře odkaz — příště se zobrazí tady.",
       "couldNotLoad": "Načítání se nezdařilo.",
       "removeFromRecentsTitle": "Odebrat z nedávných PR?",
-      "removeFromRecentsMessage": "Tento PR se odebere ze seznamu nedávných PR.",
+      "removeFromRecentsMessage": "Tahle revize se odstraní z nedávných.",
       "removeRecentAccessibility": "Odebrat {{repo}} ze seznamu nedávných PR",
-      "urlAccessibility": "URL PR na GitHubu",
-      "clearLink": "Vymazat odkaz na PR",
-      "pasteLink": "Vložit odkaz na PR",
+      "urlAccessibility": "Zadej URL PR nebo merge requestu",
+      "urlPlaceholder": "URL PR nebo merge requestu",
+      "openAccessibility": "Otevřít PR nebo merge request",
+      "clearLink": "Vymazat odkaz",
+      "pasteLink": "Vložit odkaz na PR nebo merge request",
       "open": "Otevřít"
     },
     "checks": {
@@ -543,6 +634,10 @@
       "pending": "čekající: {{displayCount}}",
       "skipped": "přeskočené: {{displayCount}}",
       "checksCount": "kontroly: {{displayCount}}",
+      "checksCount_one": "kontrola: {{displayCount}}",
+      "checksCount_few": "kontroly: {{displayCount}}",
+      "checksCount_many": "kontrol: {{displayCount}}",
+      "checksCount_other": "kontroly: {{displayCount}}",
       "checkDetails": "podrobnosti kontroly"
     },
     "inbox": {
@@ -575,9 +670,15 @@
     "connect": {
       "checkFailedTitle": "Připojení ke GitHubu se nepodařilo ověřit.",
       "checkFailedMessage": "Stav přihlášení bude dostupný až po načtení údajů o připojení.",
+      "checkFailedTitleGitLab": "Připojení ke GitLabu se nepodařilo ověřit.",
+      "checkFailedTitleBitbucket": "Připojení ke Bitbucketu se nepodařilo ověřit.",
+      "providerCheckFailedMessage": "Stav připojení bude dostupný až po načtení.",
       "reconnectTitle": "Znovu připojit GitHub",
       "reconnectDescription": "Oprávnění pro připojení ke GitHubu bylo zrušeno. Znovu se připoj a pokračuj v revizích PR na mobilu.",
-      "description": "Připoj svůj účet GitHub a kontroluj PR na mobilu."
+      "description": "Připoj svůj účet GitHub a kontroluj PR na mobilu.",
+      "gitlabDescription": "Připoj svůj účet GitLab a kontroluj merge requesty na mobilu.",
+      "bitbucketDescription": "Připoj Bitbucket k této organizaci a kontroluj PR na mobilu.",
+      "bitbucketOrgOnlyDescription": "Vyber organizaci ve svém profilu a kontroluj její Bitbucket PR."
     },
     "screen": {
       "title": "#{{number}}",
@@ -601,7 +702,10 @@
     },
     "reconnectNotice": {
       "title": "Platnost připojení ke službě GitHub vypršela.",
-      "message": "Tvé připojení ke GitHubu už není platné. Znovu ho ověř. V případě potřeby tě aplikace vyzve k opětovnému připojení."
+      "message": "Tvé připojení ke GitHubu už není platné. Znovu ho ověř. V případě potřeby tě aplikace vyzve k opětovnému připojení.",
+      "gitlabTitle": "Platnost připojení ke službě GitLab vypršela.",
+      "bitbucketTitle": "Platnost připojení ke službě Bitbucket vypršela.",
+      "providerMessage": "Tvé připojení ke {{provider}}u už není platné. Znovu ho ověř. V případě potřeby tě aplikace vyzve k opětovnému připojení."
     },
     "eventChips": {
       "comment": "Komentovat",
@@ -670,10 +774,14 @@
       "statusContext": "Kontext",
       "lineLabel": "{{status}}, řádek {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} – {{text}}",
-      "emptyLine": "(prázdné)"
+      "emptyLine": "(prázdné)",
+      "truncationBanner_one": "Kvůli limitu GitHub API se zobrazuje jen část změněných souborů: {{limit}} z {{total}}.",
+      "truncationBanner_other": "Kvůli limitu GitHub API se zobrazuje jen část změněných souborů: {{limit}} z {{total}}.",
+      "truncationBanner_few": "Kvůli limitu GitHub API se zobrazuje jen část změněných souborů: {{limit}} z {{total}}.",
+      "truncationBanner_many": "Kvůli limitu GitHub API se zobrazuje jen část změněných souborů: {{limit}} z {{total}}."
     },
     "linkPasteClipboardEmpty": "Schránka je prázdná.",
-    "linkPasteNotAPullRequest": "Toto není odkaz na PR na GitHubu.",
+    "linkPasteNotAPullRequest": "Tohle není odkaz na PR ani merge request",
     "announce": {
       "commentPosted": "Komentář odeslán",
       "reviewSubmitted": "Revize odeslána",
@@ -682,6 +790,7 @@
     "mutationError": {
       "commentNotPosted": "Tento komentář nelze odeslat. Vybraný řádek se možná změnil nebo byl PR aktualizován.",
       "reviewNotSubmitted": "Tuto revizi nelze v aktuálním stavu odeslat. PR se možná změnil nebo se pokoušíš o revizi vlastního PR, což není povolené.",
+      "reviewNotSubmittedTerm": "Tuto revizi nelze v aktuálním stavu odeslat. {{term}} se možná změnil nebo nemůžeš revidovat vlastní {{term}}.",
       "couldNotPostComment": "Komentář se nepodařilo odeslat.",
       "couldNotSubmitReview": "Revizi se nepodařilo odeslat. Zkontroluj připojení a zkus to znovu."
     },
@@ -689,9 +798,31 @@
       "couldNotReply": "Odpověď se nepodařilo odeslat.",
       "couldNotCompleteAction": "Tuto akci se nepodařilo dokončit.",
       "mergeResultDefaultError": "GitHub nedokončil sloučení.",
+      "mergeResultNotCompleted": "{{term}} nebyl sloučen. Zkontroluj jeho stav a zkus to znovu.",
       "ambiguous": "Výsledek se nepodařilo potvrdit. Před dalším pokusem zkontroluj PR.",
       "persistenceFailed": "Tuto akci se nepodařilo zaznamenat. Zkus to později.",
       "forbidden": "K této akci nemáš oprávnění."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Není dostupné u tohoto poskytovatele",
+        "accessibility": "Není dostupné u tohoto poskytovatele: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Sdílet merge request",
+      "viewOnProvider": "Zobrazit na {{provider}}",
+      "mergeRequestUnavailable": "Merge request není dostupný",
+      "unavailableDescription": "Byl možná odstraněn, nebo k němu nemáš přístup.",
+      "accessDeniedMergeRequest": "Nemáš oprávnění zobrazit tento merge request.",
+      "couldNotLoadMergeRequest": "Merge request se nepodařilo načíst.",
+      "discussionAccessDenied": "Nemáš oprávnění zobrazit diskusi k tomuto merge request.",
+      "discussionUnavailableMessage": "Tento merge request byl možná smazán.",
+      "noDiscussionDescription": "Tento merge request zatím neobsahuje žádná vlákna revize ani komentáře v diskusi.",
+      "noFilesChangedDescription": "Tento merge request neobsahuje žádné změny souborů."
     }
   },
   "notifications": {
@@ -724,11 +855,12 @@
     "previewFullDescription": "Oznámení zobrazují text zprávy na uzamčené obrazovce.",
     "previewGenericDescription": "Oznámení pouze upozorní na novou událost. Podrobnosti si přečtete v aplikaci Kilo.",
     "channel": {
-      "agent": "Relace agentů",
+      "agentProgress": "Průběh agenta",
       "chat": "Zprávy v konverzaci",
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornění na zůstatek",
-      "security": "Bezpečnostní zjištění"
+      "security": "Bezpečnostní zjištění",
+      "spend": "Upozornění na útratu"
     },
     "category": {
       "chatMessagesSubtitle": "odpovědi ve vašich konverzacích",
@@ -739,8 +871,22 @@
       "sessionStatusTitle": "Stav relace",
       "sessionStatusSubtitle": "dokončeno / selhalo / připraveno k ovládání",
       "kiloclawActivitySubtitle": "instance připravena/selhala, naplánované akce",
+      "kiloclawActivityUnavailable": "Spusťte instanci KiloClaw, abyste získali aktivitu KiloClaw.",
       "balanceAlertsSubtitle": "upozornění na nízký zůstatek organizace",
-      "securityFindingsSubtitle": "nové nálezy a připomenutí lhůt SLA"
+      "balanceAlertsUnavailable": "Připojte se k organizaci, abyste získali upozornění na zůstatek.",
+      "securityFindingsSubtitle": "nové nálezy a připomenutí lhůt SLA",
+      "securityFindingsUnavailable": "Zapněte Bezpečnostního agenta Kilo v rozsahu, abyste získali bezpečnostní nálezy.",
+      "spendAlertsSubtitle": "překročení prahů a hodinové špičky",
+      "spendAlertsToggle": "Kategorie upozornění na útratu"
+    },
+    "action": {
+      "openSession": "Otevřít relaci"
+    },
+    "needsInputAction": {
+      "approved": "Žádost schválena",
+      "replied": "Odpověď odeslána",
+      "failed": "Odpovědět se nepodařilo. Klepnutím to zkuste znovu.",
+      "unavailable": "Tato žádost už nečeká."
     }
   },
   "tabs": {
@@ -821,7 +967,11 @@
       "uploadFailed": "Nahrání se nezdařilo.",
       "failedToUploadFile": "Soubor se nepodařilo nahrát: {{reason}}.",
       "nothingToPaste": "Není co vložit.",
-      "metadataStripFailed": "Metadata fotografie se nepodařilo odstranit."
+      "metadataStripFailed": "Metadata fotografie se nepodařilo odstranit.",
+      "limit_one": "Maximální počet příloha je {{displayCount}}.",
+      "limit_other": "Maximální počet příloh je {{displayCount}}.",
+      "limit_few": "Maximální počet přílohy je {{displayCount}}.",
+      "limit_many": "Maximální počet příloh je {{displayCount}}."
     },
     "attachmentPreview": {
       "accessibility": "Soubor {{filename}}, {{status}}",
@@ -1571,7 +1721,15 @@
       "syncFindings": "Synchronizovat nálezy",
       "syncNow": "Synchronizovat nyní",
       "syncQueued": "Synchronizace zařazena do fronty",
-      "syncStatusUnavailable": "Stav synchronizace není k dispozici."
+      "syncStatusUnavailable": "Stav synchronizace není k dispozici.",
+      "daysOverdue_one": "Počet dní po termínu: {{displayCount}}",
+      "daysOverdue_other": "Počet dní po termínu: {{displayCount}}",
+      "daysOverdue_few": "Počet dní po termínu: {{displayCount}}",
+      "daysOverdue_many": "Počet dní po termínu: {{displayCount}}",
+      "findingsCount_one": "Počet nálezů: {{displayCount}}",
+      "findingsCount_other": "Počet nálezů: {{displayCount}}",
+      "findingsCount_few": "Počet nálezů: {{displayCount}}",
+      "findingsCount_many": "Počet nálezů: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Otevřené nálezy",
@@ -1980,6 +2138,10 @@
       "couldNotLoad": "Relaci se nepodařilo načíst.",
       "failedToLoadDetails": "Podrobnosti relace se nepodařilo načíst.",
       "failedToStopExecution": "Běh se nepodařilo zastavit.",
+      "stopped": "Relace zastavena",
+      "committing": "Vytváří se commit…",
+      "committed": "Commit vytvořen",
+      "commitFailed": "Vytvoření commitu se nezdařilo",
       "renameSession": "Přejmenovat relaci",
       "renamePlaceholder": "Název relace",
       "transcriptAccessibility": "Přepis relace",
@@ -2014,17 +2176,56 @@
       "exitNeedsNewerCli": "Vzdálené příkazy s lomítkem vyžadují novější verzi Kilo CLI. Aktualizujte Kilo CLI a připojte se znovu."
     },
     "sessionConnection": {
+      "label": "Připojení",
       "connecting": "Připojování…",
       "reconnecting": "Opětovné připojování…",
       "connectionLost": "Připojení přerušeno",
       "retryConnection": "Znovu se připojit"
     },
+    "goal": {
+      "title": "Cíl",
+      "statusActive": "Aktivní cíl",
+      "statusPaused": "Pozastavený cíl",
+      "statusComplete": "Cíl dokončen",
+      "statusBlocked": "Cíl zablokován",
+      "edit": "Upravit cíl",
+      "remove": "Odebrat cíl",
+      "pause": "Pozastavit cíl",
+      "resume": "Obnovit cíl",
+      "editPlaceholder": "Popište cíl",
+      "removeConfirmTitle": "Odebrat cíl?",
+      "removeConfirmMessage": "CLI vymaže cíl této relace.",
+      "updateFailed": "Cíl se nepodařilo aktualizovat.",
+      "sectionAccessibility": "{{status}}. Cíl: {{text}}",
+      "collapse": "Sbalit cíl",
+      "expand": "Rozbalit cíl"
+    },
     "newSession": {
+      "recentlyUsed": "Nedávno použité",
+      "couldNotLoadGithubRepositories": "Repozitáře ze služby GitHub se nepodařilo načíst.",
+      "couldNotLoadGitlabRepositories": "Repozitáře ze služby GitLab se nepodařilo načíst.",
+      "couldNotLoadBitbucketRepositories": "Repozitáře ze služby Bitbucket se nepodařilo načíst.",
       "connectGithubDescription": "Připojte GitHub v prohlížeči. Pak se sem vraťte a vyberte repozitář.",
+      "connectGitlabDescription": "Připojte GitLab v prohlížeči. Pak se sem vraťte a vyberte repozitář.",
+      "connectBitbucketDescription": "Připojte Bitbucket v prohlížeči. Pak se sem vraťte a vyberte repozitář.",
       "openGithub": "Otevřít GitHub",
+      "openGitlab": "Otevřít GitLab",
+      "openBitbucket": "Otevřít Bitbucket",
       "refreshRepositories": "Obnovit seznam repozitářů",
       "githubConnected": "GitHub připojen",
+      "gitlabConnected": "GitLab připojen",
       "noRepositoriesVisible": "Nezobrazují se žádné repozitáře. Zkontrolujte přístup aplikace Kilo k repozitářům ve službě GitHub a obnovte seznam.",
+      "noRepositoriesVisibleGitlab": "Nezobrazují se žádné repozitáře. Zkontrolujte přístup k repozitářům ve službě GitLab a obnovte seznam.",
+      "noRepositoriesVisibleBitbucket": "Nezobrazují se žádné repozitáře. Zkontrolujte přístup k repozitářům ve službě Bitbucket a obnovte seznam.",
+      "bitbucketOrganizationsOnly": "Bitbucket je dostupný jen pro organizace.",
+      "branchPickerTitle": "Vybrat větev",
+      "branchDefault": "Výchozí",
+      "branchAccessibility": "Větev: {{label}}",
+      "branchLoading": "Načítání větví",
+      "branchLoadError": "Větve se nepodařilo načíst",
+      "branchUnavailable": "Pro tento repozitář nejsou větve dostupné. Zkontroluj svůj přístup u poskytovatele a vyber jiný repozitář.",
+      "branchEmpty": "Žádné dostupné větve",
+      "branchPlaceholder": "Vybrat větev",
       "runOnWithTarget": "Spustit na: {{target}}",
       "environment": "Prostředí",
       "couldNotLoadEnvironment": "Vaše prostředí se nepodařilo načíst.",
@@ -2045,24 +2246,13 @@
       "couldNotRefreshRepositories": "Seznam repozitářů se nepodařilo obnovit. Zkuste to znovu.",
       "discardDraftTitle": "Zahodit koncept?",
       "discardDraftMessage": "Vaše zadání se smaže.",
+      "discardWithUploadsMessage": "Vaše zadání a všechny nahrané soubory nepřipojené k odeslaným zprávám se smažou.",
       "discardFailed": "Koncept se nepodařilo zahodit. Zkuste to znovu.",
       "remoteHint": "Chcete-li ovládat místní proces kilo, spusťte na počítači `kilo remote` nebo v běžící relaci CLI zadejte `/remote`.",
-      "connectBitbucketDescription": "Připojte Bitbucket v prohlížeči. Pak se sem vraťte a vyberte repozitář.",
-      "connectGitlabDescription": "Připojte GitLab v prohlížeči. Pak se sem vraťte a vyberte repozitář.",
-      "couldNotLoadBitbucketRepositories": "Repozitáře ze služby Bitbucket se nepodařilo načíst.",
-      "couldNotLoadGithubRepositories": "Repozitáře ze služby GitHub se nepodařilo načíst.",
-      "couldNotLoadGitlabRepositories": "Repozitáře ze služby GitLab se nepodařilo načíst.",
-      "gitlabConnected": "GitLab připojen",
-      "noRepositoriesVisibleBitbucket": "Nezobrazují se žádné repozitáře. Zkontrolujte přístup k repozitářům ve službě Bitbucket a obnovte seznam.",
-      "noRepositoriesVisibleGitlab": "Nezobrazují se žádné repozitáře. Zkontrolujte přístup k repozitářům ve službě GitLab a obnovte seznam.",
-      "openBitbucket": "Otevřít Bitbucket",
-      "openGitlab": "Otevřít GitLab",
-      "recentlyUsed": "Nedávno použité",
-      "cliCannotContinue": "Toto CLI nepodporuje pokračování v relaci. Vyberte službu Cloud Agent nebo jiné CLI.",
       "continueFrom": "Pokračujete v relaci {{title}}.",
-      "importFailed": "Tuto relaci se nepodařilo importovat.",
       "importingSession": "Import relace",
-      "discardWithUploadsMessage": "Vaše zadání a všechny nahrané soubory nepřipojené k odeslaným zprávám se smažou."
+      "cliCannotContinue": "Toto CLI nepodporuje pokračování v relaci. Vyberte službu Cloud Agent nebo jiné CLI.",
+      "importFailed": "Tuto relaci se nepodařilo importovat."
     },
     "partRenderer": {
       "updatedFileCount_one": "Byl aktualizován {{displayCount}} soubor.",
@@ -2088,7 +2278,20 @@
       "updateTodos": "Aktualizovat úkoly",
       "linesBadge": "řádky: {{displayCount}}",
       "filesBadge": "soubory: {{displayCount}}",
-      "matchesBadge": "shody: {{displayCount}}"
+      "matchesBadge": "shody: {{displayCount}}",
+      "filesBadge_one": "soubor: {{displayCount}}",
+      "filesBadge_other": "soubory: {{displayCount}}",
+      "filesBadge_few": "soubory: {{displayCount}}",
+      "filesBadge_many": "souborů: {{displayCount}}",
+      "linesBadge_one": "řádek: {{displayCount}}",
+      "linesBadge_other": "řádky: {{displayCount}}",
+      "linesBadge_few": "řádky: {{displayCount}}",
+      "linesBadge_many": "řádků: {{displayCount}}",
+      "matchesBadge_one": "shoda: {{displayCount}}",
+      "matchesBadge_other": "shody: {{displayCount}}",
+      "matchesBadge_few": "shody: {{displayCount}}",
+      "matchesBadge_many": "shod: {{displayCount}}",
+      "noOutput": "Žádný výstup."
     },
     "readToolMarkdown": {
       "linesTruncated": "řádky {{start}}–{{end}} (zkráceno)",
@@ -2384,7 +2587,15 @@
       "files": "Soubory",
       "couldNotOpenPhotoPicker": "Výběr fotek se nepodařilo otevřít. Restartujte Kilo a zkuste to znovu.",
       "maxFilesAllowed": "Maximální počet souborů je {{displayCount}}.",
-      "onlyAddingFiles": "Přidává se jen část souborů: {{accepted}} z {{total}} (maximum: {{max}})"
+      "onlyAddingFiles": "Přidává se jen část souborů: {{accepted}} z {{total}} (maximum: {{max}})",
+      "maxFilesAllowed_one": "Maximální počet souborů je {{displayCount}}.",
+      "maxFilesAllowed_other": "Maximální počet souborů je {{displayCount}}.",
+      "maxFilesAllowed_few": "Maximální počet souborů je {{displayCount}}.",
+      "maxFilesAllowed_many": "Maximální počet souborů je {{displayCount}}.",
+      "onlyAddingFiles_one": "Přidává se jen část souborů: {{accepted}} z {{total}} (maximum: {{max}})",
+      "onlyAddingFiles_other": "Přidává se jen část souborů: {{accepted}} z {{total}} (maximum: {{max}})",
+      "onlyAddingFiles_few": "Přidává se jen část souborů: {{accepted}} z {{total}} (maximum: {{max}})",
+      "onlyAddingFiles_many": "Přidává se jen část souborů: {{accepted}} z {{total}} (maximum: {{max}})"
     },
     "composer": {
       "addAttachment": "Přidat přílohu",
@@ -2402,7 +2613,11 @@
       "discardAttachmentsMessage": "Nahrané soubory nepřipojené k odeslaným zprávám budou smazány.",
       "discardAttachmentsTitle": "Zahodit přílohy?",
       "charactersRemaining": "Zbývající počet znaků: {{count}}",
-      "insertNewline": "Vložit nový řádek"
+      "insertNewline": "Vložit nový řádek",
+      "charactersRemaining_one": "Zbývající počet znaků: {{count}}",
+      "charactersRemaining_other": "Zbývající počet znaků: {{count}}",
+      "charactersRemaining_few": "Zbývající počet znaků: {{count}}",
+      "charactersRemaining_many": "Zbývající počet znaků: {{count}}"
     },
     "chatLink": {
       "linkCopied": "Odkaz zkopírován",
@@ -2436,6 +2651,12 @@
       "startNewSession": "Spustit novou relaci",
       "exitSession": "Ukončit relaci",
       "clearSession": "Ukončit tuto relaci a spustit novou",
+      "compactDescription": "zhušť kontext aktuální relace",
+      "goalDescription": "Pokračuj v práci na cíli relace. /goal <objective> nebo pause, resume, clear",
+      "initDescription": "řízené nastavení AGENTS.md",
+      "resumeClaudeDescription": "importuj transkript relace Claude Code",
+      "resumeCodexDescription": "importuj transkript relace OpenAI Codex",
+      "reviewDescription": "zkontroluj změny [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Použít /{{command}}",
       "insert": "Vložit",
       "upgradeRequiredFallback": "Pro použití tohoto příkazu aktualizujte své CLI.",
@@ -2470,7 +2691,16 @@
       "stepsCount_other": "{{steps}} kroků",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
       "stepsCount_few": "{{steps}} kroky",
-      "stepsCount_many": "{{steps}} kroku"
+      "stepsCount_many": "{{steps}} kroku",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modely ({{displayCount}})",
+      "modelsCount_few": "Modely ({{displayCount}})",
+      "modelsCount_many": "Modely ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "Automatické schvalování",
+      "description": "Automaticky schvalovat žádosti o oprávnění pro tuto relaci. Nástroje se pak spustí bez výzvy.",
+      "unavailable": "Tato relace nemůže přijímat žádosti o oprávnění."
     },
     "prBadge": {
       "open": "otevřený PR",
@@ -2502,6 +2732,14 @@
       "tapToListHint": "Klepnutím na složku zobrazíte její obsah.",
       "unsupportedDescription": "Toto CLI neumí zobrazit seznam složek. Tlačítkem Hotovo ponecháte složku, ze které bylo CLI spuštěno. Relace se spustí v této složce.",
       "unsupportedTitle": "Složky nelze zobrazit"
+    },
+    "toolRun": {
+      "sheetTitle": "Volání nástrojů",
+      "condensedLabel": "{{itemCount}} položek; {{last}}",
+      "condensedLabel_one": "{{itemCount}} položka; {{last}}",
+      "condensedLabel_other": "{{itemCount}} položek; {{last}}",
+      "condensedLabel_few": "{{itemCount}} položky; {{last}}",
+      "condensedLabel_many": "{{itemCount}} položek; {{last}}"
     }
   },
   "bootstrap": {
@@ -2546,6 +2784,7 @@
     "couldNotLoadActiveSessions": "Aktivní relace se nepodařilo načíst.",
     "agentSessions": "Právě běží",
     "newCodingTask": "Nový programovací úkol",
+    "newTaskFromPicture": "Nový úkol z obrázku",
     "explore": "Prozkoumat",
     "seeAll": "Zobrazit vše",
     "noLiveSessions": "Právě nic neběží"
@@ -2607,7 +2846,17 @@
     "languageNotInstalledMessage": "Offline soubory řeči pro {{language}} nejsou v tomto telefonu nainstalovány. Stáhněte je a poté zkuste diktování znovu.",
     "downloadOfflineModel": "Stáhnout",
     "offlineModelDownloadScheduled": "Offline soubory řeči se stáhnou na pozadí. Zkuste diktování znovu později.",
-    "listeningStopped": "Poslech zastaven."
+    "listeningStopped": "Poslech zastaven.",
+    "transcribing": "Přepisuji…",
+    "gatewayUnreachable": "Kilo Gateway se nepodařilo kontaktovat. Zkontrolujte připojení a zkuste to znovu.",
+    "gatewayTimeout": "Přepis trval příliš dlouho. Zkuste to znovu.",
+    "gatewayModelUnavailable": "Tento model přepisu není dostupný. Vyberte jiný v Předvolbách.",
+    "gatewayModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(transcriptionModel.title) vyberte jiný.",
+    "gatewaySignInRequired": "Pro použití přepisu přes Kilo Gateway se přihlaste.",
+    "gatewayNoModel": "Nejprve vyberte model přepisu v Předvolbách.",
+    "testTitle": "Otestovat diktování",
+    "testPlaceholder": "Klepněte na mikrofon a začněte mluvit.",
+    "testClear": "Vymazat text"
   },
   "share": {
     "title": "Sdílení do Kilo",
@@ -2625,7 +2874,11 @@
     "cliCantReceiveFilesTitle": "Tato relace nemůže přijímat soubory",
     "cliCantReceiveFilesMessage": "Kilo CLI, ve kterém tato relace běží, nemůže přijímat soubory. Aktualizuj CLI na daném počítači nebo obsah sdílej do nové relace.",
     "contentlessMessage": "Není co sdílet. Obsah neobsahuje žádný text ani soubory.",
-    "couldNotReadContent": "Sdílený obsah se nepodařilo přečíst."
+    "couldNotReadContent": "Sdílený obsah se nepodařilo přečíst.",
+    "onlyFirstFilesAttached_one": "Připojí se jen soubory ze začátku seznamu ({{displayCount}}).",
+    "onlyFirstFilesAttached_other": "Připojí se jen soubory ze začátku seznamu ({{displayCount}}).",
+    "onlyFirstFilesAttached_few": "Připojí se jen soubory ze začátku seznamu ({{displayCount}}).",
+    "onlyFirstFilesAttached_many": "Připojí se jen soubory ze začátku seznamu ({{displayCount}})."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2757,7 +3010,8 @@
     "aiProvidersWhat": "Vaše zadání, historie konverzací a všechny připojené soubory.",
     "aiProvidersWhy": "Pro generování odpovědí AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google a další poskytovatelé podle vašeho výběru u jednotlivých požadavků.",
-    "gatewayWhat": "ID účtu, metadata požadavků, využití tokenů.",
+    "gatewayWhat": "ID účtu, metadata požadavků, využití tokenů a také prompty a hlasové nahrávky, které aplikace posílá přes něj.",
+    "viaGateway": "Přes Kilo Gateway",
     "gatewayWhy": "Ověřování identity, směrování požadavků a kontrola vyúčtování.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Hlášení o pádech a chybách, ze kterých byl odstraněn obsah aplikace.",
@@ -2777,7 +3031,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Nahrávka vaší řeči při diktování.",
     "voiceTranscriptionWhy": "Pro převod řeči na text.",
-    "voiceTranscriptionWho": "Přepis probíhá pouze v zařízení. Pokud zařízení neumí přepisovat offline, provádí ho Apple nebo Google.",
+    "voiceTranscriptionWho": "Tvoje zařízení, Kilo Gateway s tebou zvoleným modelem přepisu, nebo Apple či Google pro online rozpoznávání.",
     "installAttributionPromptTitle": "Povolit zjištění zdroje instalace?",
     "installAttributionPromptMessage": "Kilo používá oprávnění ke sledování od Apple pouze ke zjištění, odkud k nám přicházíte. Vaše zadání ani konverzace k tomu nikdy nepoužívá.",
     "what": "Co",
@@ -2951,6 +3205,14 @@
     "tooManySignInAttempts": "Proběhlo příliš mnoho pokusů o přihlášení. Chvíli počkej a zkus to znovu."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatický Špičkový",
+      "balanced": "Automatický Vyvážený",
+      "efficient": "Automatický Efektivní",
+      "small": "Automatický Malý",
+      "free": "Automatický Zdarma",
+      "organization": "Automatický organizace"
+    },
     "dataCollected": "Sběr dat",
     "free": "Zdarma",
     "couldNotUpdateFavorites": "Oblíbené se nepodařilo aktualizovat.",
@@ -2989,7 +3251,74 @@
     "privacy": "Otevři Kilo a zobraz agenty",
     "openAgents": "Otevřít agenty",
     "needsInput": "Čeká na reakci",
+    "newestSession": "Nejnovější: {{title}}",
+    "noneWaiting": "Žádný agent nečeká",
+    "newAgent": "Nový agent",
+    "approving": "Schvaluje se...",
+    "couldNotApprove": "Schválení se nezdařilo",
+    "couldNotStart": "Spuštění se nezdařilo",
     "channelName": "Aktivní agenti",
-    "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce."
+    "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce.",
+    "openSession": "Otevřít",
+    "approveFailed": "Schválení se nepodařilo. Klepnutím na $t(common.approve) to zkuste znovu.",
+    "newestResult": "Nejnovější výsledek"
+  },
+  "transcriptionModel": {
+    "title": "Model přepisu",
+    "noneChosen": "Není vybrán žádný",
+    "emptyTitle": "Žádné modely přepisu",
+    "emptyDescription": "Kilo Gateway nyní nenabízí žádné modely přepisu.",
+    "loadFailed": "Modely přepisu se nepodařilo načíst."
+  },
+  "voiceLanguage": {
+    "title": "Jazyk diktování",
+    "automatic": "Automaticky",
+    "loadFailed": "Nepodařilo se načíst jazyky, které toto zařízení podporuje.",
+    "emptyTitle": "Žádné podporované jazyky",
+    "emptyDescription": "Rozpoznávání řeči tohoto zařízení nehlásí žádné podporované jazyky."
+  },
+  "tour": {
+    "eyebrow": "Rychlá prohlídka",
+    "forkTitle": "Kde chcete Kilo spustit?",
+    "forkSubtitle": "Vyberte, kde bude Kilo běžet pro vaši první relaci.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Spusťte Kilo v izolovaném cloudovém prostředí, aniž byste něco instalovali.",
+    "remoteOptionTitle": "Váš počítač",
+    "remoteOptionBody": "Spusťte Kilo na vlastním stroji prostřednictvím CLI `kilo remote`.",
+    "skip": "Přeskočit prohlídku",
+    "tutorialLabel": "Návod"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Ke spuštění agenta je potřeba zadání. Přidej zadání a spusť ho znovu.",
+      "repositoryUnknown": "Kilo nerozpoznává {{repository}} jako repozitář na GitHubu nebo GitLabu. Vyber jiný repozitář v Kilu.",
+      "repositoryUnsupported": "{{repository}} je repozitář na Bitbucketu — Spustit agenta ho zatím nemůže použít. Vyber jiný repozitář v Kilu."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Otevřít poslední relaci"
+  },
+  "spendAlerts": {
+    "subtitle": "Pošli e-mailem nebo push oznámením upozornění fakturačním kontaktům, když útrata tohoto rozsahu překročí limit nebo vyskočí nad obvyklou hodinovou sazbu.",
+    "enable": "Povolit upozornění na útratu",
+    "thresholdTitle": "Překročení prahu",
+    "thresholdSubtitle": "Průběžná útrata překračuje tvůj limit",
+    "anomalyTitle": "Hodinová špička",
+    "anomalySubtitle": "Hodina je výrazně nad obvyklou sazbou tohoto rozsahu",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Okno",
+    "window24h": "24 hodin",
+    "window7d": "7 dní",
+    "window30d": "30 dní",
+    "multiplierLabel": "Násobitel špičky",
+    "saved": "Nastavení upozornění na útratu bylo uloženo",
+    "loadError": "Upozornění na útratu se nepodařilo načíst.",
+    "saveError": "Upozornění na útratu se nepodařilo uložit.",
+    "empty": "Upozornění na útratu jsou vypnutá. Zapni je, abys upozornil fakturační kontakty tohoto rozsahu.",
+    "noSpend": "Zatím není zaznamenána žádná útrata",
+    "spend24h": "Útrata za posledních 24 hodin",
+    "multiplierError": "Zadej násobitel 1 nebo větší",
+    "permissionDenied": "Nemáš oprávnění spravovat upozornění na útratu.",
+    "pushOffByCategory": "Vypnuto v Oznámeních"
   }
 }

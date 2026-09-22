@@ -181,6 +181,57 @@ describe('useInteractionHandlers attention ack', () => {
     });
   });
 
+  it('reports ok after a successful permission response', async () => {
+    const manager = {
+      answerQuestion: vi.fn(),
+      rejectQuestion: vi.fn(),
+      respondToPermission: vi.fn().mockResolvedValue(undefined),
+    };
+    const { render } = renderInteractionHandlers({
+      manager: manager as never,
+      kiloSessionId: 'kilo-session-1',
+      activeQuestion: null,
+      activePermission: { requestId: 'p1' },
+      surface: 'remote-session',
+    });
+
+    await expect(render().handleRespondToPermission('once')).resolves.toBe('ok');
+  });
+
+  it('reports retryable when a permission response fails transiently', async () => {
+    const manager = {
+      answerQuestion: vi.fn(),
+      rejectQuestion: vi.fn(),
+      respondToPermission: vi.fn().mockRejectedValue(new Error('network')),
+    };
+    const { render } = renderInteractionHandlers({
+      manager: manager as never,
+      kiloSessionId: 'kilo-session-1',
+      activeQuestion: null,
+      activePermission: { requestId: 'p1' },
+      surface: 'remote-session',
+    });
+
+    await expect(render().handleRespondToPermission('once')).resolves.toBe('retryable');
+  });
+
+  it('reports terminal when the permission is no longer available', async () => {
+    const manager = {
+      answerQuestion: vi.fn(),
+      rejectQuestion: vi.fn(),
+      respondToPermission: vi.fn().mockRejectedValue({ data: { code: 'NOT_FOUND' } }),
+    };
+    const { render } = renderInteractionHandlers({
+      manager: manager as never,
+      kiloSessionId: 'kilo-session-1',
+      activeQuestion: null,
+      activePermission: { requestId: 'p1' },
+      surface: 'remote-session',
+    });
+
+    await expect(render().handleRespondToPermission('once')).resolves.toBe('terminal');
+  });
+
   it('does not ack when answer submit fails', async () => {
     const manager = {
       answerQuestion: vi.fn().mockRejectedValue(new Error('network')),

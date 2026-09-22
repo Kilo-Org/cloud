@@ -53,3 +53,14 @@ export function useOfflineBannerState(): boolean {
 export function useCommittedConnectivityStatus(): BannerState {
   return useSyncExternalStore(getStore().subscribe, getStore().state);
 }
+
+/**
+ * Non-hook snapshot of the committed connectivity state, for submit gates
+ * that must not start a network write while the app has CONFIRMED offline:
+ * a blocked request would pin the composer on a spinner until the UI
+ * deadline (uxs3 spot check, e6-offline-hang). `unknown` never blocks —
+ * only the same confirmed-offline state the banner paints does.
+ */
+export function getCommittedConnectivityStatus(): BannerState {
+  return getStore().state();
+}

@@ -1,9 +1,14 @@
 /* eslint-disable max-lines -- the session test renders the full SessionDetailContent and mocks its RN/expo/SDK surface, so the wiring is long. */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/app/(app)/agent-chat/[session-id].mounted.test.tsx. */
 /* eslint-disable require-await, @typescript-eslint/require-await -- mock factories settle without await because they resolve immediately */
-import { createElement, type ElementType, type ReactElement } from 'react';
+import {
+  createElement,
+  type ElementType,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { Modal, Pressable } from 'react-native';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sdk';
@@ -12,6 +17,7 @@ import type * as ReactI18next from 'react-i18next';
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
+import { MessageBubble } from '@/components/agents/message-bubble';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
 import { assistantMessage } from './message-bubble-test-utils';
@@ -42,14 +48,33 @@ const hoisted = vi.hoisted(() => {
 // Mock every RN / Expo / SDK side-effect import that `mobile-session-manager.ts`
 // and `session-detail-content.tsx` pull in transitively before loading either
 // module.
+vi.mock('@expo/react-native-action-sheet', () => ({
+  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
+// The header's offline-banner reservation reads the committed connectivity
+// hook; these states are online, and the hook module pulls NetInfo (unmocked
+// in the pure project).
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useOfflineBannerState: () => false,
+}));
+// `credentials.ts` reads `WHEN_UNLOCKED_THIS_DEVICE_ONLY` at module scope via
+// the manager -> approve-ask import; the real expo-secure-store entry imports
+// react-native, so this suite only needs the import to resolve.
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'whenUnlockedThisDeviceOnly',
 }));
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }));
+// The session header's copy-link action reaches the native clipboard and the
+// browser helper; neither native module loads in the DOM-free node suite. The
+// handoff advertiser is a platform boundary with its own mounted suites.
+vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn() }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/session-handoff', () => ({ SessionHandoffAdvertiser: () => null }));
 vi.mock('@kilocode/cloud-agent-sdk', () => ({
   createSessionManager: vi.fn(),
 }));
@@ -68,6 +93,14 @@ vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
 }));
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
   fetchMobileSessionSnapshotPage: vi.fn(),
+}));
+// Keep the real queue-error classifier without loading the native encrypted KV:
+// `mobile-session-manager.ts`'s resolved-delivery-failure memory shares that
+// chain, so without this mock it pulls the native encrypted KV (and its
+// `react-native` promise shim) into this node suite.
+vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
+  readResolvedDeliveryFailures: vi.fn(async () => []),
+  persistResolvedDeliveryFailure: vi.fn(async () => undefined),
 }));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
@@ -134,7 +167,7 @@ vi.mock('@/components/agents/message-text-select-sheet', () => ({
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => ({ replace: vi.fn(), setParams: vi.fn() }),
 }));
 
 // `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
@@ -150,6 +183,7 @@ vi.mock('expo-keep-awake', () => ({
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(async () => undefined),
   notificationAsync: vi.fn(async () => undefined),
+  selectionAsync: vi.fn(async () => undefined),
   NotificationFeedbackType: { Error: 'error', Success: 'success' },
 }));
 vi.mock('react-native-reanimated', () => ({
@@ -157,6 +191,21 @@ vi.mock('react-native-reanimated', () => ({
   FadeIn: { duration: () => ({}) },
   FadeOut: { duration: () => ({}) },
   LinearTransition: { duration: () => ({}) },
+  // The goal row's chevron rotation; the disclosure animation itself is
+  // covered by session-goal-section.mounted.test.tsx.
+  useSharedValue: (value: unknown) => ({ value }),
+  useAnimatedStyle: () => ({}),
+  withTiming: (value: number) => value,
+}));
+// `session-detail-content` renders the goal row, which pulls the shared
+// disclosure primitive (`security-agent/collapsible-section`) and then the
+// motion policy; the policy reaches `expo-battery`, whose `expo-modules-core`
+// entry needs React Native's `__DEV__` global the pure node project does not
+// define. The same mock stands in for the sibling `session-detail-content`
+// pure harness.
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+  selectReducedMotionEntrance: <T>(_reducedMotion: boolean, entrance: T) => entrance,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
@@ -216,6 +265,19 @@ vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
 }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   useKeepScreenOnPreference: () => ({ hasLoaded: true, keepScreenOn: false }),
+}));
+vi.mock('@/lib/hooks/use-condense-tool-calls-preference', () => ({
+  useCondenseToolCallsPreference: () => ({
+    condenseToolCalls: false,
+    hasLoaded: true,
+    setCondenseToolCalls: vi.fn(),
+  }),
+}));
+// The real hook reaches SecureStore via `@sentry/react-native`, which imports
+// the native react-native entry; mock the preference the way the other
+// preference hooks above are mocked so the suite stays DOM/native-free.
+vi.mock('@/lib/hooks/use-hide-thinking-preference', () => ({
+  useHideThinkingPreference: () => ({ hideThinking: false, hasLoaded: true }),
 }));
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({
   useReasoningPreference: () => ({ defaultExpanded: false }),
@@ -338,8 +400,9 @@ vi.mock('@/components/agents/use-message-copy', () => ({
 }));
 vi.mock('@/components/agents/session-detail-content-helpers', () => ({
   countInFlightMessages: () => 0,
+  lastVisibleMessageFailure: () => null,
   resolveRetryPrompt: () => null,
-  retryMessageAndClear: vi.fn(),
+  retryFailedMessage: vi.fn(),
 }));
 vi.mock('@/components/agents/create-and-navigate-agent-session', () => ({
   createAndNavigateAgentSession: vi.fn(),
@@ -382,8 +445,12 @@ vi.mock('@/components/agents/permission-card', () => ({
 vi.mock('@/components/agents/question-card', () => ({
   QuestionCard: 'QuestionCard',
 }));
-vi.mock('@/components/agents/session-connection-indicator', () => ({
-  SessionConnectionIndicator: 'SessionConnectionIndicator',
+vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
+  useUserWebConnectionState: () => true,
+  useUserWebConnectionHealth: () => ({ isConnected: true, reconnectExhausted: false }),
+}));
+vi.mock('@/components/agents/user-web-connection-provider', () => ({
+  useUserWebConnection: () => ({ retryConnection: vi.fn() }),
 }));
 vi.mock('@/components/agents/session-context-metrics', () => ({
   SessionContextMetrics: 'SessionContextMetrics',
@@ -415,6 +482,12 @@ vi.mock('@/components/agents/child-session-sheet', () => ({
 vi.mock('@/components/agents/part-detail-sheet-host', () => ({
   PartDetailSheetHost: 'PartDetailSheetHost',
 }));
+vi.mock('@/components/agents/tool-run-sheet-host', () => ({
+  ToolRunSheetHost: 'ToolRunSheetHost',
+}));
+vi.mock('@/components/agents/tool-run-rows', () => ({
+  CondensedToolRunRow: 'CondensedToolRunRow',
+}));
 vi.mock('@/components/agents/part-renderer', () => ({
   PartRenderer: 'PartRenderer',
 }));
@@ -444,6 +517,7 @@ vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
 vi.mock('@/components/ui/icons', () => ({
+  Link2: 'Link2',
   MessageSquare: 'MessageSquare',
 }));
 
@@ -457,6 +531,7 @@ function makeManager() {
     atoms: {
       messagesList: { value: [] as StoredMessage[] },
       isLoading: { value: false },
+      isRefreshingCachedTranscript: { value: false },
       error: { value: null },
       fetchedSessionData: {
         value: {
@@ -497,6 +572,7 @@ function makeManager() {
       remoteModelOverride: { value: null },
       cloudAgentModelOverride: { value: null },
       availableCommands: { value: [] },
+      sessionInfo: { value: null },
       remoteCommandState: { value: null },
       contextUsage: { value: null },
       hasOlderMessages: { value: false },
@@ -575,7 +651,9 @@ function readBubble(
   const listProps = lists[0]?.props as
     | {
         items?: SessionTranscriptItem[];
-        renderItem?: (args: { item: SessionTranscriptItem }) => ReactElement;
+        renderItem?: (args: {
+          item: SessionTranscriptItem;
+        }) => ReactElement<{ children: ReactNode[] }>;
       }
     | undefined;
   const item = listProps?.items?.find(
@@ -584,7 +662,10 @@ function readBubble(
   if (!item || !listProps?.renderItem) {
     return undefined;
   }
-  return listProps.renderItem({ item });
+  const row = listProps.renderItem({ item });
+  return row.props.children.find(
+    (child): child is ReactElement => isValidElement(child) && child.type === MessageBubble
+  );
 }
 
 function bubbleProps(

@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.js';
 import {
   diagnosticDetail,
   emitControlDiagnostic,
@@ -37,6 +38,7 @@ import {
   type NativeCleanupEvidence,
   type NativeOperationTarget,
   type NativeRetirement,
+  type RootScopedCleanupResult,
 } from './session-operation-cleanup.js';
 import { operationIntent } from './operation-intent.js';
 import {
@@ -112,6 +114,7 @@ export type SessionOperationDependencies = {
     options?: { retained?: true; nativeRuntimeId?: string }
   ) => unknown;
   sendOperationResult?: OperationResultSender;
+  consumeGateResult?: () => 'pass' | 'fail' | undefined;
   onLocalCompletion: (retain: boolean) => void;
   onCleanupConfirmed: () => void;
   onDiagnostic?: ControlDiagnosticReporter;
@@ -127,12 +130,25 @@ class ControlTaskCancellation extends Error {
   }
 }
 
+type PublicationScope = Readonly<{
+  reason: string;
+  deadlineAt: number;
+  claim?: symbol;
+}>;
+
 function fail(message: string, retryable: boolean): ControlHandlerResult {
   return { ok: false, error: { code: 'not_ready', message, retryable } };
 }
 
 function kiloFailure(error: unknown): ControlHandlerResult {
   return fail('Kilo request failed', isKiloServerUnreachableError(error));
+}
+
+function assistantFailureFacts(
+  source: unknown
+): Pick<SessionMessageOutcome, 'assistantReason' | 'providerOwnership'> {
+  const failure = classifyAssistantFailure(source);
+  return { assistantReason: failure.reason, providerOwnership: failure.providerOwnership };
 }
 
 export class SessionOperation {
@@ -145,6 +161,7 @@ export class SessionOperation {
   readonly processes: OwnedProcessScope;
   private readonly controller = new AbortController();
   private readonly completion = Promise.withResolvers<ControlHandlerResult>();
+  private readonly publicationScopeChanged = Promise.withResolvers<PublicationScope>();
   private readonly intent: ReturnType<typeof operationIntent>;
   private readonly startedAt = Date.now();
   private readonly timeout: ReturnType<typeof setTimeout>;
@@ -160,6 +177,8 @@ export class SessionOperation {
   private delivery?: OperationResultDelivery;
   private readonly cleanupOwner: SessionOperationCleanup;
   private deadlineCleanup?: Promise<boolean>;
+  private publicationScoped?: PublicationScope;
+  private publicationScopeNotified = false;
 
   constructor(
     session: SessionRequestIdentity,
@@ -263,6 +282,10 @@ export class SessionOperation {
     reason = 'Session aborted',
     status: 'failed' | 'cancelled' = 'cancelled'
   ): Promise<boolean> {
+    if (this.publicationScoped) {
+      await this.runRootScopedCleanup();
+      return false;
+    }
     return this.cleanupOwner.cleanup({
       deadlineAt,
       target: this.target,
@@ -270,6 +293,52 @@ export class SessionOperation {
       completionEvidence: this.cleanupEvidence(),
       cancel: () => this.cancel(reason, status, deadlineAt),
     });
+  }
+
+  markPublicationScoped(reason: string, deadlineAt: number, claim?: symbol): void {
+    const captured = this.captureCleanupDeadline(deadlineAt);
+    this.publicationScoped = this.publicationScoped
+      ? {
+          reason: this.publicationScoped.reason,
+          deadlineAt: Math.min(this.publicationScoped.deadlineAt, captured),
+          ...(claim === undefined && this.publicationScoped.claim === undefined
+            ? {}
+            : { claim: claim ?? this.publicationScoped.claim }),
+        }
+      : { reason, deadlineAt: captured, ...(claim === undefined ? {} : { claim }) };
+    if (!this.publicationScopeNotified && this.publicationScoped) {
+      this.publicationScopeNotified = true;
+      this.publicationScopeChanged.resolve(this.publicationScoped);
+    }
+  }
+
+  publicationScope(): Readonly<{ reason: string; deadlineAt: number; claim?: symbol }> | undefined {
+    return this.publicationScoped;
+  }
+
+  waitForPublicationScope(): Promise<PublicationScope> {
+    return this.publicationScoped
+      ? Promise.resolve(this.publicationScoped)
+      : this.publicationScopeChanged.promise;
+  }
+
+  runRootScopedCleanup(
+    reason = 'Session event delivery failed',
+    deadlineAt = Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS
+  ): Promise<RootScopedCleanupResult> {
+    if (!this.publicationScoped) this.markPublicationScoped(reason, deadlineAt);
+    const scoped = this.publicationScoped;
+    if (!scoped) return Promise.resolve('unconfirmed');
+    return this.cleanupOwner.cleanupRootScoped({
+      deadlineAt: scoped.deadlineAt,
+      target: this.target,
+      completionEvidence: this.cleanupEvidence(),
+      cancel: () => this.cancel(scoped.reason, 'failed', scoped.deadlineAt),
+    });
+  }
+
+  waitForRootScopedCleanup(): Promise<RootScopedCleanupResult> {
+    return this.cleanupOwner.waitForRootScopedCleanup();
   }
 
   snapshot() {
@@ -327,12 +396,19 @@ export class SessionOperation {
   }
 
   cancel(reason: string, status: 'failed' | 'cancelled', cleanupDeadlineAt?: number): void {
-    if (cleanupDeadlineAt !== undefined) this.captureCleanupDeadline(cleanupDeadlineAt);
+    if (cleanupDeadlineAt !== undefined) {
+      const captured = this.captureCleanupDeadline(cleanupDeadlineAt);
+      if (this.publicationScoped)
+        this.publicationScoped = {
+          ...this.publicationScoped,
+          deadlineAt: Math.min(this.publicationScoped.deadlineAt, captured),
+        };
+    }
     if (!this.local) this.controller.abort(new ControlTaskCancellation(status, reason));
   }
 
   requestRetirement(reason: string, deadlineAt: number): void {
-    if (this.cleanupOwner.cleanupState === 'confirmed') return;
+    if (this.publicationScoped || this.cleanupOwner.cleanupState === 'confirmed') return;
     this.deps.retireRuntime(reason, this.captureCleanupDeadline(deadlineAt), this.nativeTarget());
   }
 
@@ -454,7 +530,7 @@ export class SessionOperation {
         try {
           work.emitPreparing?.(retained ?? event, this.eventOptions());
         } catch {
-          if (!this.authorization) throw new Error('Preparation event delivery failed');
+          this.diagnostic('send_failed');
         }
       },
     });
@@ -504,10 +580,9 @@ export class SessionOperation {
     if (this.authorization && requiresRetention && !retained) return;
     try {
       const delivered = this.deps.emitSessionEvent(retained ?? payload.data, this.eventOptions());
-      if (delivered === false && !this.authorization)
-        throw new Error('Finalization event delivery failed');
+      if (delivered === false) this.diagnostic('send_failed');
     } catch {
-      if (!this.authorization) throw new Error('Finalization event delivery failed');
+      this.diagnostic('send_failed');
     }
   }
 
@@ -580,6 +655,7 @@ export class SessionOperation {
     const { runtime } = work;
     const { kiloClient, env } = runtime;
     this.captureRuntime(runtime);
+    this.deps.consumeGateResult?.();
     const assertCurrent = (submitting = false) => {
       signal.throwIfAborted();
       if (
@@ -701,6 +777,7 @@ export class SessionOperation {
             kiloClient,
             env,
             messageId: completion?.info.id ?? messageId,
+            userMessageId: messageId,
             signal,
             onEvent: event => this.emitFinalizationEvent(event),
           });
@@ -731,6 +808,7 @@ export class SessionOperation {
             messageId,
             status: error.name === 'MessageAbortedError' ? 'cancelled' : 'failed',
             reason: `Kilo execution ended with ${error.name}`,
+            ...(error.name === 'MessageAbortedError' ? {} : assistantFailureFacts(error)),
           }
         : { messageId, status: 'completed' };
     } catch (error) {
@@ -777,6 +855,9 @@ export class SessionOperation {
           messageId,
           status: original.error.name === 'MessageAbortedError' ? 'cancelled' : 'failed',
           reason: `Kilo execution ended with ${original.error.name}`,
+          ...(original.error.name === 'MessageAbortedError'
+            ? {}
+            : assistantFailureFacts(original.error)),
         };
       else if (
         this.native.state === 'unknown' &&
@@ -800,25 +881,25 @@ export class SessionOperation {
       )
         outcome = { messageId, status: 'completed' };
     }
+    const gateResult = this.deps.consumeGateResult?.();
+    if (outcome.status === 'completed' && gateResult !== undefined) {
+      outcome = { ...outcome, gateResult };
+    }
     this.outcome = sessionMessageOutcomeSchema.parse(outcome);
     if (!this.authorization) {
       try {
         diagnostic('outcome_sending', outcome.status);
-        if (
-          this.deps.emitSessionEvent(
-            {
-              type: 'session.message.outcome',
-              properties: this.outcome,
-            },
-            this.eventOptions()
-          ) === false
-        )
-          throw new Error('Session outcome delivery failed');
-        diagnostic('outcome_sent', outcome.status);
+        const delivered = this.deps.emitSessionEvent(
+          {
+            type: 'session.message.outcome',
+            properties: this.outcome,
+          },
+          this.eventOptions()
+        );
+        if (delivered === false) diagnostic('send_failed', outcome.status);
+        else diagnostic('outcome_sent', outcome.status);
       } catch {
         diagnostic('outcome_failed', outcome.status);
-        this.requestRetirement('Session outcome delivery failed', this.captureCleanupDeadline());
-        return fail('Session outcome delivery failed', false);
       }
     }
     return result;

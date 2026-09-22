@@ -9,7 +9,10 @@ import {
   type OpenCodeSettings,
   type Verbosity,
 } from '@kilocode/db/schema-types';
-import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
+import {
+  gemma_4_26b_a4b_it_free_model,
+  GEMMA_4_26B_A4B_IT_ID,
+} from '@/lib/ai-gateway/providers/google';
 
 export type AutoModelPricing = {
   prompt: string;
@@ -81,17 +84,6 @@ export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
   code: SONNET_FRONTIER,
 };
 
-// INVARIANT: the efficient static fallback must remain image-capable.
-// The capability-aware routing filter relies on this guarantee to make
-// image requests succeed even when no benchmark candidate is capable.
-// Whoever changes this model constant must re-verify image support
-// (via live OpenRouter data or the `model_stats` table) before
-// swapping it — do not assume parity with the prior value.
-export const BALANCED_FALLBACK_MODEL: ResolvedAutoModel = {
-  model: KIMI_CURRENT_MODEL_ID,
-  reasoning: { enabled: true },
-};
-
 const UNKNOWN_PRICING: AutoModelPricing = {
   prompt: '-1',
   completion: '-1',
@@ -158,6 +150,11 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   supports_pdf: false,
   opencode_settings: undefined,
 };
+
+export const AUTO_SMALL_TARGET_MODELS = {
+  paid: GEMMA_4_26B_A4B_IT_ID,
+  free: gemma_4_26b_a4b_it_free_model.public_id,
+} as const;
 
 export const KILO_AUTO_EFFICIENT_MODEL: AutoModel = {
   ...KILO_AUTO_BALANCED_MODEL,

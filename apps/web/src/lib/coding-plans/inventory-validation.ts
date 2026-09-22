@@ -19,7 +19,7 @@ import {
 } from '@/lib/coding-plans/byteplus-control-plane';
 import type { CodingPlanId, CodingPlanProviderId } from '@/lib/coding-plans/pricing';
 import { getCodingPlanPrice } from '@/lib/coding-plans/pricing';
-import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { sentryLogger } from '@/lib/utils.server';
 
 const logWarning = sentryLogger('coding-plans-inventory-validation', 'warning');

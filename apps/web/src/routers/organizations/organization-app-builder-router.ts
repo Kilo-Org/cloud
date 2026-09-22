@@ -1,6 +1,6 @@
 import 'server-only';
 import { createTRPCRouter } from '@/lib/trpc/init';
-import { generateApiToken } from '@/lib/tokens';
+import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
@@ -39,7 +39,15 @@ export const organizationAppBuilderRouter = createTRPCRouter({
     .input(createProjectSchema)
     .mutation(async ({ ctx, input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
-      const authToken = generateApiToken(ctx.user, { tokenSource: 'app-builder' });
+      const { token: authToken } = await createControlTokenForRequest(
+        ctx.user,
+        'cloud-agent-next',
+        {
+          headers: ctx.headersList,
+          organizationId: input.organizationId,
+          tokenSource: 'app-builder',
+        }
+      );
 
       return appBuilderService.createProject({
         owner,
@@ -81,7 +89,15 @@ export const organizationAppBuilderRouter = createTRPCRouter({
     .input(projectWithOrgIdSchema)
     .query(async ({ ctx, input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
-      const authToken = generateApiToken(ctx.user, { tokenSource: 'app-builder' });
+      const { token: authToken } = await createControlTokenForRequest(
+        ctx.user,
+        'cloud-agent-next',
+        {
+          headers: ctx.headersList,
+          organizationId: input.organizationId,
+          tokenSource: 'app-builder',
+        }
+      );
       return appBuilderService.getProject(input.projectId, owner, authToken);
     }),
 
@@ -173,7 +189,15 @@ export const organizationAppBuilderRouter = createTRPCRouter({
     .input(projectWithOrgIdSchema)
     .mutation(async ({ ctx, input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
-      const authToken = generateApiToken(ctx.user, { tokenSource: 'app-builder' });
+      const { token: authToken } = await createControlTokenForRequest(
+        ctx.user,
+        'cloud-agent-next',
+        {
+          headers: ctx.headersList,
+          organizationId: input.organizationId,
+          tokenSource: 'app-builder',
+        }
+      );
       const result = await appBuilderService.interruptSession(input.projectId, owner, authToken);
       return { success: result.success };
     }),
@@ -212,7 +236,15 @@ export const organizationAppBuilderRouter = createTRPCRouter({
     .input(projectWithOrgIdSchema)
     .mutation(async ({ ctx, input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
-      const authToken = generateApiToken(ctx.user, { tokenSource: 'app-builder' });
+      const { token: authToken } = await createControlTokenForRequest(
+        ctx.user,
+        'cloud-agent-next',
+        {
+          headers: ctx.headersList,
+          organizationId: input.organizationId,
+          tokenSource: 'app-builder',
+        }
+      );
 
       const result = await appBuilderService.startSessionForProject({
         projectId: input.projectId,
@@ -236,7 +268,15 @@ export const organizationAppBuilderRouter = createTRPCRouter({
     .input(sendMessageSchema)
     .mutation(async ({ ctx, input }) => {
       const owner = { type: 'org' as const, id: input.organizationId };
-      const authToken = generateApiToken(ctx.user, { tokenSource: 'app-builder' });
+      const { token: authToken } = await createControlTokenForRequest(
+        ctx.user,
+        'cloud-agent-next',
+        {
+          headers: ctx.headersList,
+          organizationId: input.organizationId,
+          tokenSource: 'app-builder',
+        }
+      );
 
       const result = await appBuilderService.sendMessage({
         projectId: input.projectId,

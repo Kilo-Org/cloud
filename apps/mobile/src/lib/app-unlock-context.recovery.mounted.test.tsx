@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import { expect, it, vi } from 'vitest';
 
 // The recovery fixtures share the mounted provider environment (mocks, state

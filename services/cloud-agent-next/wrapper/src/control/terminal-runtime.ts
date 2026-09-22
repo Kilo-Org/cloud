@@ -19,7 +19,6 @@ import type { WorktreeKiloRuntime } from './worktree-runtime.js';
 
 type AttachedTerminalSession = SessionRequestIdentity & {
   wrapperInstanceId: string;
-  kiloRuntime: WorktreeKiloRuntime;
 };
 
 type OwnedTerminal = AttachedTerminalSession & {
@@ -72,6 +71,9 @@ export type ControlTerminalRuntime = {
   rememberAttachedSession(identity: SessionRequestIdentity): void;
   detachSession(identity: SessionRequestIdentity): Promise<void>;
   detachDirectory(directory: string): Promise<void>;
+  hasActivePty(identity: SessionRequestIdentity): boolean;
+  beginRecoveryRetirement(identity: SessionRequestIdentity): void;
+  endRecoveryRetirement(identity: SessionRequestIdentity): void;
   create(
     identity: SessionRequestIdentity,
     payload: SessionTerminalCreatePayload
@@ -150,7 +152,8 @@ function waitForSocketOpen(socket: WebSocket): Promise<void> {
 export function createControlTerminalRuntime(options: {
   controlUrl: string;
   wrapperInstanceId: string;
-  getKiloRuntime: (directory: string) => WorktreeKiloRuntime | undefined;
+  getKiloRuntime: (identity: SessionRequestIdentity) => WorktreeKiloRuntime | undefined;
+  getRetainedKiloRuntime?: (identity: SessionRequestIdentity) => WorktreeKiloRuntime | undefined;
 }): ControlTerminalRuntime {
   const { wrapperInstanceId } = options;
   const controlOrigin = new URL(options.controlUrl).origin;
@@ -158,11 +161,20 @@ export function createControlTerminalRuntime(options: {
   const terminals = new Map<string, OwnedTerminal>();
   const operations = new Map<string, TerminalCreationOperation>();
   const bridges = new Map<string, TerminalBridge>();
+  const recoveringSessions = new Set<string>();
   let shutDown = false;
+
+  function currentKiloRuntime(identity: SessionRequestIdentity): WorktreeKiloRuntime {
+    const kiloRuntime = options.getKiloRuntime(identity);
+    if (!kiloRuntime) {
+      throw new ControlTerminalRuntimeError('not_ready', 'Kilo worktree is not available', true);
+    }
+    return kiloRuntime;
+  }
 
   function requireAttached(identity: SessionRequestIdentity): AttachedTerminalSession {
     const attached = attachedSessions.get(identity.sessionId);
-    if (!attached || shutDown) {
+    if (!attached || shutDown || recoveringSessions.has(identity.sessionId)) {
       throw new ControlTerminalRuntimeError('not_ready', 'Terminal session is not attached', true);
     }
     if (
@@ -177,7 +189,12 @@ export function createControlTerminalRuntime(options: {
         false
       );
     }
-    if (options.getKiloRuntime(identity.directory) !== attached.kiloRuntime) {
+    const runtime = options.getKiloRuntime(identity);
+    if (
+      !runtime ||
+      (runtime.isolation === 'per-session' &&
+        (!runtime.identity || !sameSession(runtime.identity, identity)))
+    ) {
       throw new ControlTerminalRuntimeError('not_ready', 'Kilo worktree is not available', true);
     }
     return attached;
@@ -259,7 +276,7 @@ export function createControlTerminalRuntime(options: {
     payload: SessionTerminalCreatePayload
   ): Promise<SessionTerminalCreateResult> {
     let createdPtyId: string | undefined;
-    const { kiloClient, env } = attached.kiloRuntime;
+    const { kiloClient, env } = currentKiloRuntime(attached);
     try {
       const created = await kiloClient.createPty({
         cwd: attached.directory,
@@ -331,7 +348,7 @@ export function createControlTerminalRuntime(options: {
 
       const localUrl = new URL(
         `/pty/${encodeURIComponent(bridge.terminal.ptyId)}/connect`,
-        bridge.terminal.kiloRuntime.kiloClient.serverUrl
+        currentKiloRuntime(bridge.terminal).kiloClient.serverUrl
       );
       localUrl.protocol = localUrl.protocol === 'https:' ? 'wss:' : 'ws:';
       localUrl.search = '';
@@ -396,20 +413,64 @@ export function createControlTerminalRuntime(options: {
       const bridge = bridges.get(ptyId);
       if (bridge) closeBridge(bridge, 1000, 'PTY session ended');
       terminals.delete(ptyId);
-      pending.push(terminal.kiloRuntime.kiloClient.deletePty(ptyId, terminal.directory));
+      // Best-effort cleanup. A runtime that is merely starting (for example a
+      // credential-refresh idle probe) is absent from the current lookup while
+      // its server and PTYs are still live, so fall back to the retained
+      // runtime. Skip only when both are gone (truly retired).
+      const kiloRuntime =
+        options.getKiloRuntime(terminal) ?? options.getRetainedKiloRuntime?.(terminal);
+      if (kiloRuntime) {
+        pending.push(kiloRuntime.kiloClient.deletePty(ptyId, terminal.directory));
+      }
     }
 
     await Promise.allSettled(pending);
   }
 
+  function hasActivePty(identity: SessionRequestIdentity): boolean {
+    const attached = attachedSessions.get(identity.sessionId);
+    if (!attached || !sameSession(attached, identity)) return false;
+    for (const operation of operations.values()) {
+      if (sameSession(operation, attached)) return true;
+    }
+    for (const terminal of terminals.values()) {
+      if (sameSession(terminal, attached) && terminal.state === 'running') return true;
+    }
+    return false;
+  }
+
+  function beginRecoveryRetirement(identity: SessionRequestIdentity): void {
+    const attached = attachedSessions.get(identity.sessionId);
+    if (attached && !sameSession(attached, identity)) {
+      throw new ControlTerminalRuntimeError(
+        'unauthorized',
+        'Terminal session ownership mismatch',
+        false
+      );
+    }
+    if (hasActivePty(identity)) {
+      throw new ControlTerminalRuntimeError('session_busy', 'Session has an active PTY', true);
+    }
+    recoveringSessions.add(identity.sessionId);
+  }
+
+  function endRecoveryRetirement(identity: SessionRequestIdentity): void {
+    recoveringSessions.delete(identity.sessionId);
+  }
+
   return {
     rememberAttachedSession(identity) {
-      const kiloRuntime = options.getKiloRuntime(identity.directory);
+      const kiloRuntime = options.getKiloRuntime(identity);
+      if (shutDown || !kiloRuntime) {
+        throw new ControlTerminalRuntimeError(
+          'unauthorized',
+          'Terminal session runtime unavailable',
+          false
+        );
+      }
       if (
-        shutDown ||
-        !kiloRuntime ||
-        directoryForSession(identity.kiloSessionId) !== identity.directory ||
-        rootForSession(identity.kiloSessionId) !== identity.kiloSessionId
+        kiloRuntime.isolation === 'per-session' &&
+        (!kiloRuntime.identity || !sameSession(kiloRuntime.identity, identity))
       ) {
         throw new ControlTerminalRuntimeError(
           'unauthorized',
@@ -417,15 +478,28 @@ export function createControlTerminalRuntime(options: {
           false
         );
       }
+      if (
+        directoryForSession(identity.kiloSessionId) !== identity.directory ||
+        rootForSession(identity.kiloSessionId) !== identity.kiloSessionId
+      ) {
+        throw new ControlTerminalRuntimeError(
+          'unauthorized',
+          'Terminal session belongs to another session',
+          false
+        );
+      }
 
       const existing = attachedSessions.get(identity.sessionId);
       if (existing) {
-        if (!sameSession(existing, identity) || existing.kiloRuntime !== kiloRuntime) {
+        if (!sameSession(existing, identity)) {
           throw new ControlTerminalRuntimeError(
             'unauthorized',
-            'Terminal session ownership mismatch',
+            'Terminal session belongs to another session',
             false
           );
+        }
+        if (existing.wrapperInstanceId !== wrapperInstanceId) {
+          existing.wrapperInstanceId = wrapperInstanceId;
         }
         return;
       }
@@ -434,13 +508,13 @@ export function createControlTerminalRuntime(options: {
         if (attached.kiloSessionId === identity.kiloSessionId) {
           throw new ControlTerminalRuntimeError(
             'unauthorized',
-            'Terminal session ownership mismatch',
+            'Terminal session belongs to another session',
             false
           );
         }
       }
 
-      attachedSessions.set(identity.sessionId, { ...identity, wrapperInstanceId, kiloRuntime });
+      attachedSessions.set(identity.sessionId, { ...identity, wrapperInstanceId });
     },
 
     detachSession,
@@ -491,7 +565,7 @@ export function createControlTerminalRuntime(options: {
     async resize(identity, payload) {
       const terminal = requireTerminal(identity, payload.ptyId);
       try {
-        const pty = await terminal.kiloRuntime.kiloClient.resizePty(
+        const pty = await currentKiloRuntime(terminal).kiloClient.resizePty(
           payload.ptyId,
           { cols: payload.cols, rows: payload.rows },
           terminal.directory
@@ -524,7 +598,7 @@ export function createControlTerminalRuntime(options: {
     async close(identity, payload) {
       const terminal = requireTerminal(identity, payload.ptyId, true);
       try {
-        const success = await terminal.kiloRuntime.kiloClient.deletePty(
+        const success = await currentKiloRuntime(terminal).kiloClient.deletePty(
           payload.ptyId,
           terminal.directory
         );
@@ -603,6 +677,9 @@ export function createControlTerminalRuntime(options: {
       return connection;
     },
 
+    hasActivePty,
+    beginRecoveryRetirement,
+    endRecoveryRetirement,
     shutdown() {
       if (shutDown) return;
       shutDown = true;
@@ -616,6 +693,7 @@ export function createControlTerminalRuntime(options: {
       terminals.clear();
       operations.clear();
       attachedSessions.clear();
+      recoveringSessions.clear();
     },
   };
 }

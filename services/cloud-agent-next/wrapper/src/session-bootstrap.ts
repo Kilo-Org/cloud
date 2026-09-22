@@ -26,8 +26,13 @@ import { createOutputRedactor, createSecretRedactor, redactSecrets } from './red
 import { restoreSession } from './restore-session.js';
 import { stripAnsi } from './event-parser.js';
 import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-error.js';
+import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from './git-review-ref.js';
+import { boundedUtf8Tail, cleanTerminalOutput, gitOperationError } from './git-errors.js';
 
 const LONG_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
+// Kept below WORKSPACE_PREPARATION_TIMEOUT_MS so a stuck long command (notably
+// the clone) fails as its own timeout with its own attribution and redelivery
+// budget, not as the generic preparation-deadline failure.
 const LONG_COMMAND_HARD_TIMEOUT_MS = 300_000;
 // Setup commands may legitimately stay silent for minutes (piped tools often
 // buffer), unlike git commands which run with --progress, so they get a more
@@ -42,34 +47,12 @@ const SETUP_COMMAND_DIAGNOSTIC_MAX_BYTES = 1_024;
 const GIT_BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 const MAX_ATTACHMENT_DOWNLOAD_BYTES = MAX_ATTACHMENT_BYTES + 1;
-
-function cleanTerminalOutput(text: string): string {
-  return stripAnsi(text)
-    .replace(/\r\n/g, '\n')
-    .split('\n')
-    .map(line => line.split('\r').at(-1) ?? '')
-    .map(line =>
-      Array.from(line)
-        .filter(character => {
-          const codePoint = character.codePointAt(0) ?? 0;
-          return (
-            codePoint === 9 ||
-            (codePoint >= 32 && codePoint !== 127 && (codePoint < 128 || codePoint > 159))
-          );
-        })
-        .join('')
-    )
-    .join('\n');
-}
-
-function boundedUtf8Tail(text: string, maxBytes: number): string {
-  const bytes = Buffer.from(text);
-  if (bytes.length <= maxBytes) return text;
-  return bytes
-    .subarray(bytes.length - maxBytes)
-    .toString('utf8')
-    .replace(/^\uFFFD/, '');
-}
+const ATTACHMENT_DOWNLOAD_TIMEOUT_MS = 120_000;
+const ATTACHMENT_DOWNLOAD_DEADLINE_MS = 130_000;
+const MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS = 3;
+// Backoff before attempt N (attempt 1 is the initial try): attempt 2 waits
+// 250ms and attempt 3 waits 750ms.
+const ATTACHMENT_RETRY_BACKOFF_MS = [250, 750];
 
 /**
  * True for MIME classes that the prompt must surface as a `file://` part. Any
@@ -157,56 +140,6 @@ export type WrapperBootstrapDeps = {
   beforeFailureCleanup?: () => Promise<void>;
   workspacePreparationTimeoutMs?: number;
 };
-
-const GIT_FAILURE_PATTERNS = [
-  { subtype: 'sandbox_storage_full', pattern: /no space left on device|disk quota exceeded/i },
-  {
-    subtype: 'git_authentication_failed',
-    pattern: /authentication failed|could not read username|http 401|http 403/i,
-  },
-  {
-    subtype: 'git_rate_limited',
-    // Anchor 429 to an HTTP-error context: clones run with --progress, so a bare
-    // 429 also matches object counts (e.g. "remote: Total 429 (delta 12)").
-    pattern: /(?:error|http|status(?:\s+code)?)\s*:?\s*429\b|too many requests|rate limit(?:ed)?/i,
-  },
-  {
-    subtype: 'git_network_failed',
-    pattern:
-      /remote end hung up|connection (?:reset|timed out)|could not resolve host|failed to connect/i,
-  },
-  {
-    subtype: 'git_pack_corrupt',
-    pattern: /bad object|pack.*corrupt|invalid index-pack output|early eof/i,
-  },
-] as const;
-
-function classifyGitFailure(result: ExecResult, operation: 'clone' | 'checkout') {
-  if (isTimeoutTermination(result)) {
-    return operation === 'clone' ? 'git_clone_timeout' : 'git_checkout_timeout';
-  }
-  const output = `${result.stderr}\n${result.stdout}`;
-  if (
-    operation === 'checkout' &&
-    /would be overwritten|index\.lock.*exists|unable to create.*index\.lock/i.test(output)
-  ) {
-    return 'git_checkout_conflict';
-  }
-  return (
-    GIT_FAILURE_PATTERNS.find(entry => entry.pattern.test(output))?.subtype ??
-    'workspace_setup_unknown'
-  );
-}
-
-function gitOperationError(
-  result: ExecResult,
-  operation: 'clone' | 'checkout'
-): WrapperBootstrapError {
-  const label = operation === 'clone' ? 'Repository clone' : 'Repository checkout';
-  const subtype = classifyGitFailure(result, operation);
-  const message = isTimeoutTermination(result) ? `${label} timed out` : `${label} failed`;
-  return workspaceBootstrapError(subtype, message, createSafeProcessDiagnostic(result));
-}
 
 const GIT_PROGRESS_PATTERN =
   /\b(Receiving objects|Resolving deltas|Updating files|Checking out files|Compressing objects):\s+(\d+)%/g;
@@ -612,44 +545,30 @@ async function branchExists(
   return false;
 }
 
-const GITHUB_PULL_REF_PATTERN = /^refs\/pull\/\d+\/head$/;
-const GITLAB_MR_REF_PATTERN = /^refs\/merge-requests\/\d+\/head$/;
-
-function isSyntheticReviewRef(branchName: string): boolean {
-  return GITHUB_PULL_REF_PATTERN.test(branchName) || GITLAB_MR_REF_PATTERN.test(branchName);
-}
-
-async function fetchSyntheticReviewRef(
-  runGit: GitRunner,
-  workspacePath: string,
-  branchName: string,
-  progress: BootstrapProgress | undefined
-): Promise<void> {
-  const fetchResult = await runGit(
-    ['fetch', '--progress', 'origin', branchName],
-    longGitOptions(progress, 'branch', 'Fetching review branch...', workspacePath)
-  );
-  if (fetchResult.exitCode !== 0) {
-    throw gitOperationError(fetchResult, 'checkout');
-  }
-
-  const checkoutResult = await runGit(
-    ['checkout', '--progress', '-B', branchName, 'FETCH_HEAD'],
-    longGitOptions(progress, 'branch', 'Checking out review branch...', workspacePath)
-  );
-  if (checkoutResult.exitCode !== 0) {
-    throw gitOperationError(checkoutResult, 'checkout');
-  }
+function gitOutputRedactor(request: WrapperSessionReadyRequest): (text: string) => string {
+  return createSecretRedactor(process.env, request.materialized.env, {
+    ...(request.repo?.kind === 'git' && request.repo.token
+      ? { GIT_TOKEN: request.repo.token }
+      : {}),
+  });
 }
 
 async function prepareBranch(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner,
-  progress: BootstrapProgress | undefined
+  progress: BootstrapProgress | undefined,
+  signal?: AbortSignal
 ): Promise<void> {
   const { workspacePath, branchName, strictBranch } = request.workspace;
   if (strictBranch && isSyntheticReviewRef(branchName)) {
-    await fetchSyntheticReviewRef(runGit, workspacePath, branchName, progress);
+    await checkoutSyntheticReviewRef({
+      runGit,
+      workspacePath,
+      branchName,
+      ...(signal ? { signal } : {}),
+      onProgress: message => progress?.('branch', message),
+      redact: gitOutputRedactor(request),
+    });
     return;
   }
 
@@ -892,11 +811,19 @@ async function restoreOrBootstrapKiloSession(
 async function reconcileRestoredWorkspace(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner,
-  progress: BootstrapProgress | undefined
+  progress: BootstrapProgress | undefined,
+  signal?: AbortSignal
 ): Promise<void> {
   const { workspacePath, branchName, upstreamBranch, strictBranch } = request.workspace;
   if (strictBranch && isSyntheticReviewRef(branchName)) {
-    await fetchSyntheticReviewRef(runGit, workspacePath, branchName, progress);
+    await checkoutSyntheticReviewRef({
+      runGit,
+      workspacePath,
+      branchName,
+      ...(signal ? { signal } : {}),
+      onProgress: message => progress?.('branch', message),
+      redact: gitOutputRedactor(request),
+    });
     return;
   }
 
@@ -1024,6 +951,17 @@ async function safeUnlink(filePath: string): Promise<void> {
 }
 
 /**
+ * Permanent per-attachment failure: the body exceeded the size cap. Unlike
+ * transient network/stream errors it must never be retried.
+ */
+class AttachmentTooLargeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AttachmentTooLargeError';
+  }
+}
+
+/**
  * Bounded streaming read. We never trust the server's `content-length` header
  * alone: the response body is pulled at most `MAX_ATTACHMENT_DOWNLOAD_BYTES`
  * bytes. If the producer keeps producing after the cap, the read is aborted,
@@ -1083,7 +1021,7 @@ async function downloadBounded(
 
   if (overflowed) {
     await safeUnlink(filePath);
-    throw new Error(
+    throw new AttachmentTooLargeError(
       `Attachment too large: bytes exceeded the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MiB cap`
     );
   }
@@ -1093,18 +1031,79 @@ async function downloadBounded(
 
 export type DownloadResult =
   | { kind: 'ok'; part: WrapperPromptPart; bytesWritten: number }
-  | { kind: 'failed'; part: WrapperPromptPart };
+  | { kind: 'failed'; message: string; retryable: boolean };
+
+type AttachmentReadStrategy = 'stream' | 'buffer';
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Buffered read used when retrying a failed attachment download. The retry
+ * always re-fetches over a fresh connection: the failure being worked around
+ * is Bun's Web Streams reader intermittently throwing
+ * (`TypeError: undefined is not a function`) mid-read, so reusing the failed
+ * response's stream is not an option. The whole replacement body is pulled
+ * with `response.arrayBuffer()` instead of a `getReader()` loop.
+ *
+ * Memory stays bounded by checking the `content-length` gate before buffering:
+ * only responses advertising within the cap take this path, and the materialized
+ * bytes are re-checked afterwards for a lying header. `content-length` is a
+ * server-supplied hint for our own R2 presigned URLs, not the size enforcement
+ * itself (the post-read check is). Responses with a missing, invalid, or
+ * over-cap header fall back to the bounded streaming read, which enforces the
+ * cap incrementally without trusting the header.
+ */
+async function downloadBuffered(
+  filePath: string,
+  response: Response,
+  signal: AbortSignal
+): Promise<{ bytesWritten: number }> {
+  signal.throwIfAborted();
+  const contentLengthHeader = response.headers.get('content-length');
+  const contentLength = contentLengthHeader === null ? undefined : Number(contentLengthHeader);
+  if (
+    contentLength === undefined ||
+    Number.isNaN(contentLength) ||
+    contentLength > MAX_ATTACHMENT_BYTES
+  ) {
+    return downloadBounded(filePath, response, signal);
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  signal.throwIfAborted();
+  if (bytes.byteLength > MAX_ATTACHMENT_BYTES) {
+    throw new AttachmentTooLargeError(
+      `Attachment too large: bytes exceeded the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MiB cap`
+    );
+  }
+
+  const handle = await fs.open(
+    filePath,
+    fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW,
+    0o600
+  );
+  try {
+    await handle.write(bytes);
+  } finally {
+    await handle.close();
+  }
+  return { bytesWritten: bytes.byteLength };
+}
 
 /**
  * Download a single attachment. Per-file failure (non-2xx response,
- * read/timeout error, overflow) is converted to an explanatory text part so
- * the rest of the prompt can still proceed; the whole-message abort path is
+ * read/timeout error, overflow) is converted to a structured failure so the
+ * caller can retry transient errors or surface an explanatory text part and
+ * let the rest of the prompt proceed; the whole-message abort path is
  * reserved for non-attachment failures.
  */
 async function downloadAndMaterializeAttachment(
   attachment: WrapperBootstrapAttachment,
   fetchImpl: typeof fetch,
-  signal: AbortSignal
+  signal: AbortSignal,
+  strategy: AttachmentReadStrategy = 'stream'
 ): Promise<DownloadResult> {
   signal.throwIfAborted();
   await fs.mkdir(path.dirname(attachment.localPath), { recursive: true });
@@ -1115,39 +1114,27 @@ async function downloadAndMaterializeAttachment(
     response = await fetchImpl(attachment.signedUrl, { signal });
   } catch (error) {
     const message = redactSecrets(error instanceof Error ? error.message : String(error));
-    return {
-      kind: 'failed',
-      part: {
-        type: 'text',
-        text: `attachment ${attachment.filename} could not be retrieved (${message})`,
-      },
-    };
+    return { kind: 'failed', message, retryable: true };
   }
 
   if (!response.ok) {
     void response.body?.cancel().catch(() => {});
-    return {
-      kind: 'failed',
-      part: {
-        type: 'text',
-        text: `attachment ${attachment.filename} could not be retrieved (HTTP ${response.status})`,
-      },
-    };
+    const retryable = response.status === 429 || response.status >= 500;
+    return { kind: 'failed', message: `HTTP ${response.status}`, retryable };
   }
 
   let result: { bytesWritten: number };
   try {
-    result = await downloadBounded(attachment.localPath, response, signal);
+    result =
+      strategy === 'buffer'
+        ? await downloadBuffered(attachment.localPath, response, signal)
+        : await downloadBounded(attachment.localPath, response, signal);
   } catch (error) {
     void response.body?.cancel().catch(() => {});
-    const message = redactSecrets(error instanceof Error ? error.message : String(error));
-    return {
-      kind: 'failed',
-      part: {
-        type: 'text',
-        text: `attachment ${attachment.filename} could not be retrieved (${message})`,
-      },
-    };
+    if (error instanceof AttachmentTooLargeError) {
+      return { kind: 'failed', message: error.message, retryable: false };
+    }
+    throw error;
   }
 
   if (isPromptFileMime(attachment.mime)) {
@@ -1176,6 +1163,81 @@ async function downloadAndMaterializeAttachment(
   };
 }
 
+/**
+ * Download and materialize a single attachment, retrying transient failures.
+ * The first attempt uses the bounded streaming read; later attempts re-fetch
+ * and use the buffered read, which bypasses the flaky Web Streams reader.
+ * One overall deadline bounds the whole attachment (retries included): each
+ * attempt's timeout is clamped to the remaining budget, so an in-flight
+ * attempt started just under the deadline cannot run a full extra timeout.
+ * Filesystem failures during directory/file creation throw into the same
+ * bounded retry loop as transient network failures. Returns the prompt part:
+ * a `file://` part on success, or an explanatory text part when retries are
+ * exhausted or the failure is permanent.
+ */
+async function materializeAttachment(
+  attachment: WrapperBootstrapAttachment,
+  fetchImpl: typeof fetch,
+  externalSignal?: AbortSignal
+): Promise<WrapperPromptPart> {
+  const deadline = Date.now() + ATTACHMENT_DOWNLOAD_DEADLINE_MS;
+  let attemptsMade = 0;
+  for (let attempt = 1; attempt <= MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS; attempt++) {
+    if (Date.now() >= deadline) break;
+    attemptsMade = attempt;
+    const timeoutMs = Math.min(ATTACHMENT_DOWNLOAD_TIMEOUT_MS, Math.max(1, deadline - Date.now()));
+    const abortController = new AbortController();
+    const timeout = setTimeout(
+      () => abortController.abort(new Error('attachment download timeout')),
+      timeoutMs
+    );
+    const signal = externalSignal
+      ? AbortSignal.any([abortController.signal, externalSignal])
+      : abortController.signal;
+    try {
+      const result = await downloadAndMaterializeAttachment(
+        attachment,
+        fetchImpl,
+        signal,
+        attempt === 1 ? 'stream' : 'buffer'
+      );
+      if (result.kind === 'ok') return result.part;
+      if (!result.retryable) {
+        return {
+          type: 'text',
+          text: `attachment ${attachment.filename} could not be retrieved (${result.message})`,
+        };
+      }
+      logToFile(
+        `attachment download attempt ${attempt}/${MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS} failed filename=${attachment.filename} reason=${result.message}`
+      );
+    } catch (error) {
+      externalSignal?.throwIfAborted();
+      if (error instanceof AttachmentTooLargeError) {
+        return {
+          type: 'text',
+          text: `attachment ${attachment.filename} could not be retrieved (${error.message})`,
+        };
+      }
+      const message = redactSecrets(error instanceof Error ? error.message : String(error));
+      logToFile(
+        `attachment download attempt ${attempt}/${MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS} failed filename=${attachment.filename} reason=${message}`
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+    externalSignal?.throwIfAborted();
+    if (attempt < MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS) {
+      if (Date.now() >= deadline) break;
+      await sleep(ATTACHMENT_RETRY_BACKOFF_MS[attempt - 1] ?? 0);
+    }
+  }
+  return {
+    type: 'text',
+    text: `attachment ${attachment.filename} could not be retrieved (download failed after ${attemptsMade} ${attemptsMade === 1 ? 'attempt' : 'attempts'})`,
+  };
+}
+
 export type MaterializeDeps = {
   fetch?: typeof fetch;
   signal?: AbortSignal;
@@ -1192,22 +1254,7 @@ export async function materializeMessageAttachments(
   const parts: WrapperPromptPart[] = [];
   for (const attachment of message.attachments) {
     deps.signal?.throwIfAborted();
-    const abortController = new AbortController();
-    const timeout = setTimeout(
-      () => abortController.abort(new Error('attachment download timeout')),
-      120_000
-    );
-    const signal = deps.signal
-      ? AbortSignal.any([abortController.signal, deps.signal])
-      : abortController.signal;
-    let result: DownloadResult;
-    try {
-      result = await downloadAndMaterializeAttachment(attachment, fetchImpl, signal);
-      deps.signal?.throwIfAborted();
-    } finally {
-      clearTimeout(timeout);
-    }
-    parts.push(result.part);
+    parts.push(await materializeAttachment(attachment, fetchImpl, deps.signal));
   }
 
   return {
@@ -1295,13 +1342,18 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       );
       if (restoredFromBackup) {
         try {
-          await reconcileRestoredWorkspace(request, runGit, progress);
+          await reconcileRestoredWorkspace(request, runGit, progress, signal);
         } catch (error) {
+          // A missing synthetic ref is an explicit, non-retryable request
+          // failure. Other typed Git failures are transient workspace
+          // reconciliation failures so the caller can fall back to a clean
+          // workspace before retrying.
+          if (error instanceof WrapperBootstrapError && !error.retryable) throw error;
           const message = error instanceof Error ? error.message : String(error);
           throw new RestoredWorkspaceReconciliationError(message, { cause: error });
         }
       } else {
-        await prepareBranch(request, runGit, progress);
+        await prepareBranch(request, runGit, progress, signal);
       }
       logToFile(
         `bootstrap branch preparation ready kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName}`

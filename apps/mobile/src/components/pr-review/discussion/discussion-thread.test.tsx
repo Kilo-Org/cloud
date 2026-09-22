@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to test React/RN structure under vitest */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DiscussionThread } from './discussion-thread';
@@ -260,6 +259,28 @@ describe('DiscussionThread expanded card', () => {
         node => typeof node.type === 'string' && (node.type as string) === 'ReplyInput'
       )
     ).toHaveLength(1);
+
+    renderer.unmount();
+  });
+});
+
+describe('DiscussionThread comment row CTA scope (s2)', () => {
+  it('passes the provider triple and the review kind to each comment row', async () => {
+    const thread = makeThread();
+    const renderer = await render(
+      createElement(DiscussionThread, { ...baseProps, thread, expanded: true })
+    );
+
+    const row = renderer.root.find(
+      node => typeof node.type === 'string' && (node.type as string) === 'CommentRow'
+    );
+    expect(row.props).toMatchObject({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentKind: 'review',
+      comment: { commentId: 1 },
+    });
 
     renderer.unmount();
   });

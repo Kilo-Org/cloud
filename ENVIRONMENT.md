@@ -26,6 +26,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `NEXTAUTH_SECRET` - Secret key for NextAuth.js session encryption and five-minute, audience-bound user assertions verified by internal Workers such as user data export. `[SECRET]`
 - `DEBUG_SHOW_DEV_UI` - Enables dev-only UI elements (debug panels, admin buttons); checked in `apps/web/src/lib/constants.ts` and `apps/web/src/app/(app)/profile/page.tsx`. [SERVER]
 - `TRPC_TIMING_LOGGING` - Enables tRPC timing logs in development; checked in `apps/web/src/lib/trpc/init.ts`. [SERVER]
+- `TRPC_TIMING_SAMPLE_RATE` - Sample rate (`0`-`1`) for non-mobile request timing lines; mobile clients are always logged. Defaults to `0.01` when unset or malformed; read in `apps/web/src/lib/observability/request-timing.ts`. [SERVER]
 - `JEST_MAX_WORKERS` - Limits max worker threads for Jest; read in `apps/web/jest.config.ts`. [SERVER]
 - `JEST_SILENT` - When `false`, shows verbose Jest output; read in `apps/web/jest.config.ts` and `apps/web/.env.test`. [SERVER]
 - `JEST_WORKER_ID` - Set by Jest to identify the current worker thread; used by db connection pooling and libraries to handle worker-specific state. [SERVER]
@@ -90,7 +91,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `DELEGATED_RESOURCE_TOKENS_ENABLED` - Default-off family gate for explicit API, gateway, attribution, and HTML-deploy delegation, including the organization user-token resource route; requires the master and exact `true`. Disabled explicit delegation remains unavailable. [SERVER]
 - `WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED` - Default-off family gate for server workflow gateway tokens; requires the master and exact `true`. [SERVER]
 - `BENCHMARK_RESOURCE_TOKENS_ENABLED` - Default-off family gate for benchmark resource tokens; requires the master and exact `true`. [SERVER]
-- `RUNTIME_ISOLATION_ENABLED` - Cloud Agent Worker rollout control for new modern control-plane sessions and worktree destinations. Exact `true` permits adoption; default/unset/other values reject it before durable work. Legacy attachments keep directory-shared Kilo runtimes. Persisted modern runtime authorization continues selecting per-session isolation after rollback, and the connected wrapper must advertise the isolation capability. Keep off during the automatic deployment wave and enable only after compatible Worker and wrapper versions are healthy. Foreground expiry recovery retains the same session identity and requires acknowledged idle transport retirement; this flag does not establish complete real-provider smoke coverage. See `docs/token-issuance-policy.md`, Phase 5.2 merge, automatic deployment, and activation. [SERVER]
+- `RUNTIME_ISOLATION_ENABLED` - Cloud Agent Worker rollout control for new modern control-plane sessions and worktree destinations. Production and dev Worker configs set this to `true`; exact `true` permits adoption, while unset/other values reject it before durable work. Legacy attachments keep directory-shared Kilo runtimes. Persisted modern runtime authorization continues selecting per-session isolation after rollback, and the connected wrapper must advertise the isolation capability. Actual web issuance remains off behind its separate issuance gates. Outstanding smoke failures must be resolved before merge; enabling this Worker admission gate does not remove that merge prerequisite. Foreground expiry recovery retains the same session identity and requires acknowledged idle transport retirement; this flag does not establish complete real-provider smoke coverage. See `docs/token-issuance-policy.md`, Phase 5.2 merge, automatic deployment, and activation. [SERVER]
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
 
@@ -98,6 +99,11 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 - `ANACONDA_CLIENT_ID` - Anaconda OAuth app client ID. `[PUBLIC]`
 - `ANACONDA_CLIENT_SECRET` - Anaconda OAuth app client secret. `[SECRET]`
+- `OPENAI_CLIENT_ID` - OpenAI (Sign in with ChatGPT) OAuth client ID. Read only from the environment; the literal must never appear in source. `[SECRET]`
+- `OPENAI_CLIENT_SECRET` - OpenAI (Sign in with ChatGPT) OAuth client secret; server-side only, sent only in the token endpoint's HTTP Basic authorization header. `[SECRET]`
+- `OPENAI_DISCOVERY_URL` - Optional override for the OpenAI OpenID Connect discovery document; defaults to the production issuer's document. [SERVER]
+- `OPENAI_TOKEN_ENDPOINT` - Optional override for the OpenAI token endpoint; defaults to the production issuer's endpoint. [SERVER]
+- `OPENAI_CHATGPT_API_URL` - Optional override for the base URL that token-sharing requests use with a "Sign in with ChatGPT" connection; defaults to `https://api.openai.com/v1`. Set it wherever `OPENAI_DISCOVERY_URL`/`OPENAI_TOKEN_ENDPOINT` are overridden, so delegated inference stays in the same environment as the token issuer. [SERVER]
 - `GITHUB_CLIENT_ID` - GitHub OAuth app client ID. `[PUBLIC]`
 - `GITHUB_CLIENT_SECRET` - GitHub OAuth app client secret. `[SECRET]`
 - `GITHUB_APP_ID` - GitHub App ID; used in integration adapter and tests. `[SECRET]`
@@ -107,8 +113,10 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `GITHUB_LITE_APP_PRIVATE_KEY` - Private key for the lite GitHub App. `[SECRET]`
 - `GITHUB_LITE_APP_CLIENT_ID` - OAuth Client ID for the lite GitHub App install/login flow. [PUBLIC]
 - `GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS` - Comma-separated Kilo organization UUIDs allowed to connect multiple GitHub App installations. Unset or empty disables multiple installations for all organizations. [SERVER]
+- `GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS` - Comma-separated destination Kilo organization UUIDs allowed to create an association to a GitHub App installation already associated elsewhere. Unset or empty disables new shared associations without revoking existing ones. [SERVER]
 - `GITHUB_CONNECTION_MANAGEMENT_ENABLED` - Set to exact `true` to admit new existing-installation connection management and local disconnect. Unset or any other value keeps new management admission disabled without changing incumbent GitHub integration workflows. [SERVER]
-- `PER_REPO_SETTINGS` - Set to exactly `true` to reveal the Repository Customizations UI (per-installation default AI model / PR review mode, plus per-repository overrides) on the GitHub integration settings pages, for both personal accounts and organizations. Defaults to disabled so the feature can ship dark. [SERVER]
+  - Keep disabled for at least one OAuth state TTL (10 minutes) after deploying reservation-aware callbacks so purpose-less states issued by the previous version can complete.
+  - During the migration-to-app promotion window, old pending-install callbacks may fail against the replaced pending indexes. Keep the window brief, monitor deploy health, and retry the GitHub connection after promotion completes.
 - `GITHUB_ADMIN_STATS_TOKEN` - Token for admin GitHub API stats lookups; used in `apps/web/src/scripts/backfill-pr-author-github-ids.ts`. `[SECRET]`
 - `GITHUB_CLI_PAT` - GitHub personal access token for `gh` CLI operations inside contractors; used in `services/gastown/container/src/process-manager.ts`. `[SECRET]`
 - `GITHUB_TOKEN` - Generic GitHub token for API calls used as fallback when `GIT_TOKEN` or `GITHUB_CLI_PAT` is absent; used in `services/gastown/container/src/process-manager.ts`. `[SECRET]`
@@ -218,7 +226,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `USER_DELETION_ENCRYPTION_KEY` - Base64 32-byte AES key for user-deletion effect checkpoints and provider credentials. `[SECRET]`
 - `BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID` - Server-only BytePlus access key ID for Coding Plan seat resolution and quota usage APIs. Optional at startup; install with `pnpm web:env set BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID`. `[SECRET]`
 - `BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY` - Server-only BytePlus secret access key for Coding Plan seat resolution and quota usage APIs. Optional at startup; install with `pnpm web:env set BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY`. `[SECRET]`
-- `CREDIT_CATEGORIES_ENCRYPTION_KEY` - Encryption key for credit category labels/values. `[SECRET]`
+- `CREDIT_CATEGORIES_ENCRYPTION_KEY` - Legacy encryption key for credit category labels/values, retained during key rotation for deployments running older source. `[SECRET]`
+- `CREDIT_CATEGORIES_ENCRYPTION_KEY_V2` - Active encryption key for credit category labels/values. Falls back to `CREDIT_CATEGORIES_ENCRYPTION_KEY` when unset. `[SECRET]`
 - `AGENT_ENV_VARS_PUBLIC_KEY` - RSA public key (base64) used to encrypt agent environment variables. [SERVER]
 - `AGENT_ENV_VARS_PRIVATE_KEY` - Legacy alias for the above — the actual private key used to decrypt agent env vars (kept server-side). `[SECRET]`
 
@@ -264,12 +273,12 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 ### AI Providers
 
-- `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
+- `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/definitions/openrouter.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
 - `OPENAI_API_KEY` - OpenAI API key supplied as a managed BYOK credential when managed inference requests route through the Vercel AI Gateway and permit the OpenAI provider. `[SECRET]`
+- `OPENAI_CHATGPT_API_KEY` - Partner project key for the delegated "Sign in with ChatGPT" route (`apps/web/src/lib/ai-gateway/openai-chatgpt/routing.ts`); sent as `Authorization: Bearer` alongside the user's `OpenAI-On-Behalf-Of-Token`. OpenAI requires this key to come from the project that owns the OAuth client (`oaiapp_Abz1xcqSQAvvIwtxyemZbXBJ`); a key from another project makes every delegated call fail with an opaque `400 Bad Request`. `[SECRET]`
 - `MISTRAL_API_KEY` - Mistral API key; used in `apps/web/src/lib/ai-gateway/embeddings/embedding-providers.ts` for `codestral-embed-2505` and `mistral-embed` embeddings, in the FIM completions proxy at `apps/web/src/app/api/fim/completions/route.ts` (routes Mistral Codestral vs. La Plateforme keys), and as a provider config in `apps/web/src/lib/config.server.ts`. `[SECRET]`
-- `LONGCAT_API_KEY` - LongCat API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
-- `STREAMLAKE_API_KEY` - StreamLake API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
-- `PERPLEXITY_API_KEY` - Perplexity API key for percentage-routed Kimi K3 inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/partner/providers.ts`. `[SECRET]`
+- `LONGCAT_API_KEY` - LongCat API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/definitions/longcat.ts`. `[SECRET]`
+- `STREAMLAKE_API_KEY` - StreamLake API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/definitions/streamlake.ts`. `[SECRET]`
 - `INCEPTION_API_KEY` - Inception Labs API key; used in `apps/web/src/app/api/fim/completions/route.ts` and `apps/web/src/app/api/edit/completions/route.ts` as a fill-in-the-middle (FIM) provider, with endpoint `https://api.inceptionlabs.ai/v1/fim/completions`. Defined in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `AI_ATTRIBUTION_ADMIN_SECRET` - Admin secret for the AI Attribution service (`apps/web/src/lib/ai-attribution-service.ts`); sent as `X-Admin-Secret` header. `[SECRET]`
 - `ARTIFICIAL_ANALYSIS_API_KEY` - API key for Artificial Analysis (`apps/web/src/lib/model-stats/sync-artificial-analysis.ts`); sent as `x-api-key` header for model benchmarking data sync. `[SECRET]`
@@ -392,8 +401,9 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `KILO_BIN_PATH` - Path or name of the `kilo` CLI binary; used by `services/cloud-agent-next/scripts/update-default-slash-commands.mjs`. [SERVER]
 - `WORKSPACE_PATH` - Filesystem path of the agent workspace. [SERVER]
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]
-- `CONTROL_PLANE_IDS` - Comma-separated user or org IDs admitted to the call-home control plane at interactive web (`cloud-agent-web`) session creation. Empty admits nobody. `*` includes personal accounts. Production defaults to empty. Wrangler `dev` defaults to `*`. Non-interactive origins (Slack, scheduled, code review, and similar) keep legacy `agent_` sessions even when enrolled. Does not enable new worktree creation by itself; that also requires `WORKTREE_CREATION_ENABLED_IDS` enrollment. [SERVER]
-- `WORKTREE_CREATION_ENABLED_IDS` - Comma-separated user or org IDs allowed to create new worktrees, or `*` for all, including personal accounts. Production defaults to empty/off. Wrangler `dev` defaults to `*`. Also requires enrollment in `CONTROL_PLANE_IDS`. Disabling it does not block existing worktrees or sibling chats in them. [SERVER]
+- `CONTROL_PLANE_IDS` - Comma-separated user or org IDs admitted to the call-home control plane at interactive web (`cloud-agent-web`) session creation. Empty admits nobody. `*` includes personal accounts. Omitted from production `wrangler.jsonc` so the Cloudflare dashboard value survives deploy; unset admits nobody. Wrangler `dev` and `.dev.vars.example` default to `*`. Non-interactive origins (Slack, scheduled, code review, and similar) keep legacy `agent_` sessions even when enrolled. Does not enable new worktree creation by itself; that also requires `WORKTREE_CREATION_ENABLED_IDS` enrollment. [SERVER]
+- `WORKTREE_CREATION_ENABLED_IDS` - Comma-separated user or org IDs allowed to create new worktrees, or `*` for all, including personal accounts. Omitted from production `wrangler.jsonc` so the Cloudflare dashboard value survives deploy; unset is off. Wrangler `dev` and `.dev.vars.example` default to `*`. Also requires enrollment in `CONTROL_PLANE_IDS`. Disabling it does not block existing worktrees or sibling chats in them. [SERVER]
+- `SANDBOX_SELECTION_IDS` - Comma-separated user or org IDs allowed to pick a Cloud Agent sandbox destination on the new-session page. Empty admits nobody. `*` includes personal accounts. Omitted from production `wrangler.jsonc` so the Cloudflare dashboard value survives deploy; unset admits nobody. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
 - `VERCEL_SANDBOX_ORG_IDS` - Comma-separated org IDs routed to Vercel sandboxes. Empty is off. `*` includes personal accounts. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
 

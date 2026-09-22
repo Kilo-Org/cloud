@@ -46,6 +46,15 @@ export function installVoiceInputListeners(
     controller.notify();
   };
 
+  const onTranscribing: (event: VoiceInputNativeEvent['transcribing']) => void = () => {
+    const current = controller.getSession();
+    if (!current || current.terminalized || current.expectedAbort) {
+      return;
+    }
+    controller.setStatus('transcribing');
+    controller.notify();
+  };
+
   const onResult: (event: VoiceInputNativeEvent['result']) => void = event => {
     const current = controller.getSession();
     if (!current || current.terminalized || current.expectedAbort) {
@@ -101,6 +110,7 @@ export function installVoiceInputListeners(
 
   return [
     native.addListener('start', onStart),
+    native.addListener('transcribing', onTranscribing),
     native.addListener('result', onResult),
     native.addListener('nomatch', onNomatch),
     native.addListener('error', onError),

@@ -9,8 +9,12 @@ import { toast } from 'sonner-native';
 import { type KiloSessionId, type RemoteModelOverride } from '@kilocode/cloud-agent-sdk';
 
 import { NewSessionConfigureForm } from '@/components/agents/new-session-configure-form';
+import { resetSelectedBranchOverrides } from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
-import { useNewSessionCreator } from '@/components/agents/use-new-session-creator';
+import {
+  type CloudCreateFailure,
+  useNewSessionCreator,
+} from '@/components/agents/use-new-session-creator';
 import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { lockedModelOption, resolvePinnedAgentModel } from '@/components/agents/mode-normalize';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
@@ -55,7 +59,12 @@ import {
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
-import { resolvePersistedRunOn } from '@/lib/run-on-destination';
+import {
+  PRESELECT_CLOUD_RUN_ON,
+  readPreselectRunOn,
+  resolvePersistedRunOn,
+  shouldRestorePersistedRunOn,
+} from '@/lib/run-on-destination';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { peekSharePayload } from '@/lib/share-payload';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
@@ -92,6 +101,7 @@ export function NewSessionScreenBody() {
     shareId?: string;
     cloneFromKiloSessionId?: string;
     cloneSourceTitle?: string;
+    preselectRunOn?: string;
   }>();
   const organizationId = searchParams.organizationId;
   const shareIdParam = searchParams.shareId;
@@ -99,11 +109,19 @@ export function NewSessionScreenBody() {
   const cloneFromKiloSessionId = readCloneFromKiloSessionId(searchParams);
   const cloneSourceTitle = readCloneSourceTitle(searchParams);
   const isCloneEntry = cloneFromKiloSessionId !== '';
+  // The route's explicit Run-on preselection: the tour's cloud path names the
+  // Cloud Agent sentinel, the computer path names the tapped connection id.
+  const preselectRunOn = readPreselectRunOn(searchParams.preselectRunOn);
+  const preselectConnectionId =
+    preselectRunOn !== null && preselectRunOn !== PRESELECT_CLOUD_RUN_ON ? preselectRunOn : null;
 
   const [runOnInstance, setRunOnInstance] = useState<InstancePickerInstance | null>(null);
   const [remoteOverride, setRemoteOverride] = useState<RemoteModelOverride | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // The last cloud-create rejection. The form renders it inline so a failed
+  // Start is never a silent no-op; a retryable one keeps the Retry control.
+  const [cloudCreateError, setCloudCreateError] = useState<CloudCreateFailure | null>(null);
   const [hasPrompt, setHasPrompt] = useState(false);
   // Commit choice for the cloud session: Leave changes (false) is the default.
   const [autoCommit, setAutoCommit] = useState(false);
@@ -229,6 +247,16 @@ export function NewSessionScreenBody() {
     modelsSettled: !isLoadingModels && !isModelsError && models.length > 0,
   });
 
+  // The branch pick belongs to THIS screen, not to the repository section: the
+  // section unmounts when the run target becomes a remote instance, and
+  // clearing there would silently drop the user's pick while the repository
+  // selection (owned by this screen) survives the toggle. Clear on the
+  // screen's mount and unmount instead, so a branch never outlives the draft.
+  useEffect(() => {
+    resetSelectedBranchOverrides();
+    return resetSelectedBranchOverrides;
+  }, []);
+
   // The picker reports a `platform:fullName` key; resolve it to the full row so
   // the creator can send the platform-specific repository field. The prefill
   // seeds the same platform-qualified key, so no bare-fullName fallback is
@@ -274,12 +302,39 @@ export function NewSessionScreenBody() {
     if (runOnRestoredRef.current || runOnUserPickedRef.current) {
       return;
     }
+    // The tour's computer path names a connection id: wait for the live
+    // instance list, then bind the real row (a disconnected id falls back to
+    // Cloud Agent, exactly like the stored-preference path). The stored
+    // preference is never consulted — the tour must not touch it.
+    if (preselectConnectionId !== null) {
+      if (instancesData === undefined) {
+        return;
+      }
+      runOnRestoredRef.current = true;
+      setRunOnInstance(resolvePersistedRunOn(preselectConnectionId, instanceList));
+      return;
+    }
+    // The tour's cloud path asks for the Cloud Agent target explicitly: start
+    // with no remote target so the form opens on Cloud Agent, and never restore
+    // the stored preference (which the tour must not touch). `runOnUserPickedRef`
+    // still lets a deliberate in-form choice persist normally.
+    if (!shouldRestorePersistedRunOn(preselectRunOn ?? undefined)) {
+      runOnRestoredRef.current = true;
+      return;
+    }
     if (!hasLoadedRunOn || instancesData === undefined) {
       return;
     }
     runOnRestoredRef.current = true;
     setRunOnInstance(resolvePersistedRunOn(storedConnectionId, instanceList));
-  }, [hasLoadedRunOn, instanceList, instancesData, storedConnectionId]);
+  }, [
+    hasLoadedRunOn,
+    instanceList,
+    instancesData,
+    storedConnectionId,
+    preselectConnectionId,
+    preselectRunOn,
+  ]);
 
   // A successful session creation owns clearing the new-session draft; a
   // failure must preserve it for the retry. The success path navigates via
@@ -292,6 +347,12 @@ export function NewSessionScreenBody() {
     }
     skipDiscardGuardRef.current = true;
   }, [userId]);
+
+  // The form owns the cloud-create failure feedback (a persistent inline
+  // error), so the creator hook does not also toast the same rejection.
+  const handleCloudCreateError = useCallback((failure: CloudCreateFailure) => {
+    setCloudCreateError(failure);
+  }, []);
 
   // Remote spawn success lives inside the spawn dispatch (it replaces the
   // screen). The route arms the attempt marker only after the dispatch
@@ -333,6 +394,7 @@ export function NewSessionScreenBody() {
     model: displayModel,
     organizationId,
     onCreated: handleCreated,
+    onCreateError: handleCloudCreateError,
     selectedRepository,
     setIsCreating,
     variant: displayVariant,
@@ -434,6 +496,10 @@ export function NewSessionScreenBody() {
       saveRunOn(next?.connectionId ?? null);
       setRemoteOverride(null);
       setCloneImportFailureKey(null);
+      // The inline cloud-create failure belongs to the previous target: it
+      // would render stale above Start after switching to a computer. A fresh
+      // cloud attempt clears it again at press time.
+      setCloudCreateError(null);
       handleRunOnInstanceChange(next);
     },
     [handleRunOnInstanceChange, saveRunOn]
@@ -622,6 +688,9 @@ export function NewSessionScreenBody() {
       });
       return;
     }
+    // A fresh attempt replaces the previous failure with either the new
+    // session or the new inline error.
+    setCloudCreateError(null);
     void submitWithVoiceSettled(createSessionFromDraft);
   }, [
     isCloneEntry,
@@ -697,6 +766,7 @@ export function NewSessionScreenBody() {
         repositories={repositories}
         recents={recents}
         selectedRepo={selectedRepo}
+        organizationId={organizationId}
         profile={profile}
         isProfileLoading={isProfileLoading}
         isProfileError={isProfileError}
@@ -706,6 +776,8 @@ export function NewSessionScreenBody() {
         isStartDisabled={isStartDisabled}
         isSpawningRemote={remoteSpawn.isSpawningRemote}
         onStartSession={handleStartSession}
+        cloudCreateError={cloudCreateError}
+        onRetryCloudCreate={handleStartSession}
       />
     </View>
   );

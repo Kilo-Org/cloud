@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["KiloAppActionsModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.kiloappactions.KiloAppActionsModule"]
+  }
+}

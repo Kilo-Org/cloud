@@ -1,9 +1,8 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import { createElement, type ReactElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { type MonoScrollTextMode } from './mono-scroll-block-model';
+import { DEFAULT_MONO_SCROLL_MAX_LENGTH, type MonoScrollTextMode } from './mono-scroll-block-model';
 import { MonoScrollBlock, MonoScrollSheetProvider } from './mono-scroll-block';
 
 // RNGH ships Flow source that the node project cannot parse, so the horizontal
@@ -31,6 +30,9 @@ vi.mock('./bubble-text-selection-context', () => ({
 /** 300+ char single-line payload, like a long tool output line. */
 const LONG_LINE = `${'x'.repeat(300)} tail`;
 
+/** A completed tool output larger than any block may lay out. */
+const OVERSIZED = 'y'.repeat(DEFAULT_MONO_SCROLL_MAX_LENGTH + 500);
+
 const NOOP_TRACK: () => () => void = () => () => {
   // Presence is asserted through spies in the registration tests.
 };
@@ -48,7 +50,7 @@ function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: strin
   if (!instance) {
     return undefined;
   }
-  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
   return instance.props[key];
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
 }
@@ -214,6 +216,43 @@ describe('MonoScrollBlock mounted', () => {
 
     expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
     expect(truncatedMarkers(renderer.root)).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+
+  // A completed tool output can be multiple megabytes (fixture
+  // prtVerifyHugeOut0001 is 2 182 790 characters). Laying all of it out in one
+  // Text/TextInput hung the sheet and killed the Android app process, so a
+  // block with no explicit budget still caps itself.
+  it('caps an uncapped wrap block at the default and marks it truncated', async () => {
+    const renderer = await mount(
+      withSheet('wrap', NOOP_TRACK, blockElement({ content: OVERSIZED }))
+    );
+
+    const text = findMonoText(renderer.root, 'SelectableText');
+    expect(propOf(text, 'children')).toHaveLength(DEFAULT_MONO_SCROLL_MAX_LENGTH);
+    expect(truncatedMarkers(renderer.root)).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+
+  it('caps an uncapped scroll block at the default and marks it truncated', async () => {
+    const renderer = await mount(blockElement({ content: OVERSIZED }));
+
+    const text = findMonoText(renderer.root, 'SelectableText');
+    expect(propOf(text, 'children')).toHaveLength(DEFAULT_MONO_SCROLL_MAX_LENGTH);
+    expect(truncatedMarkers(renderer.root)).toHaveLength(1);
+
+    await unmount(renderer);
+  });
+
+  it('keeps a caller budget below the default', async () => {
+    const renderer = await mount(
+      withSheet('wrap', NOOP_TRACK, blockElement({ content: OVERSIZED, maxLength: 500 }))
+    );
+
+    const text = findMonoText(renderer.root, 'SelectableText');
+    expect(propOf(text, 'children')).toHaveLength(500);
 
     await unmount(renderer);
   });

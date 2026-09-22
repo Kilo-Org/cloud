@@ -98,6 +98,11 @@ export function prReplyDraftKey(
   return `pr-reply:${owner}/${repo}#${number}:${commentId}`;
 }
 
+/** Regular PR conversation (issue) comment draft entity key, unique per pull request. */
+export function prConversationCommentDraftKey(owner: string, repo: string, number: number): string {
+  return `pr-conversation-comment:${owner}/${repo}#${number}`;
+}
+
 /** Inline review-comment draft entity key, unique per diff position. */
 // eslint-disable-next-line eslint/max-params -- the key encodes the full diff position
 export function prCommentDraftKey(

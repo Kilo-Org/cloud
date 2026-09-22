@@ -53,8 +53,8 @@ jest.mock('./direct-byok-definitions', () => ({
       transformRequest: jest.fn(),
     },
     {
-      id: 'crofai',
-      base_url: 'https://crofai.example.com/v1',
+      id: 'orcarouter',
+      base_url: 'https://orcarouter.example.com/v1',
       base_url_overrides: {},
       models: jest.fn(async () => [
         {

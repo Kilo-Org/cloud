@@ -66,6 +66,10 @@ type OctokitMock = {
     get: jest.Mock;
   };
   git: { deleteRef: jest.Mock };
+  issues: {
+    createComment: jest.Mock;
+    getComment: jest.Mock;
+  };
   repos: {
     get: jest.Mock;
     listCommitStatusesForRef: jest.Mock;
@@ -117,6 +121,10 @@ function buildOctokit(token: string): OctokitMock {
       get: jest.fn(),
     },
     git: { deleteRef: jest.fn() },
+    issues: {
+      createComment: jest.fn(),
+      getComment: jest.fn(),
+    },
     repos: {
       get: jest.fn(),
       listCommitStatusesForRef: jest.fn(),
@@ -494,6 +502,24 @@ describe('githubPrReviewRouter infinite-query inputs accept the tRPC direction f
     await expect(
       caller.listFiles({ owner: 'octocat', repo: 'hello', number: 1, direction: 'forward' })
     ).resolves.toMatchObject({ files: [] });
+  });
+
+  it('listFiles pages on when the REST response carries Link: rel="next"', async () => {
+    // GitHub's own pagination signal decides, so a first page holding fewer
+    // files than the page size still has a next cursor. The Files tab's
+    // partial-load row depends on that cursor.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    buildOctokit('t1').pulls.listFiles.mockResolvedValueOnce({
+      data: [{ filename: 'src/a.ts', status: 'modified', additions: 1, deletions: 0 }],
+      headers: {
+        link: '<https://api.github.com/repos/octocat/hello/pulls/1/files?per_page=50&page=2>; rel="next"',
+      },
+    });
+
+    await expect(
+      caller.listFiles({ owner: 'octocat', repo: 'hello', number: 1, direction: 'forward' })
+    ).resolves.toMatchObject({ nextCursor: 2 });
   });
 
   it('listReviewThreads accepts direction: "forward"', async () => {
@@ -1585,6 +1611,15 @@ const reviewResourceKey = prLedgerResourceKey('submit_review', {
   comments: [{ path: 'src/foo.ts', line: 5, side: 'RIGHT', body: 'fix me' }],
 });
 
+const ledgerAddCommentInput = {
+  owner: 'octocat',
+  repo: 'hello',
+  number: 1,
+  body: 'conversation comment body',
+  operationKey: 'key-add-comment-1',
+};
+const addCommentResourceKey = prLedgerResourceKey('add_pr_comment', ledgerAddCommentInput);
+
 // The stored `resource_key` is the dedupe identity for up to 30 days. Every
 // other ledger test builds both sides with `prLedgerResourceKey`, so a change
 // to the fingerprint would pass unnoticed while rotating every in-flight key.
@@ -1694,6 +1729,101 @@ describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
         canonicalResult: { commentId: 9, nodeId: 'N_9' },
       })
     );
+  });
+
+  it('admits addIssueComment under domain pr, posts an issue comment, and settles completed', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({
+      admission: 'admitted',
+      row: ledgerRow({ intent: 'add_pr_comment', resource_key: addCommentResourceKey }),
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.issues.createComment.mockResolvedValueOnce({
+      data: { id: 77, node_id: 'N_77' },
+    });
+
+    const result = await caller.addIssueComment(ledgerAddCommentInput);
+
+    expect(result).toEqual({ commentId: 77, nodeId: 'N_77' });
+    // A REGULAR PR conversation comment targets the issue endpoint, not the
+    // review-comment endpoints.
+    expect(t1Octokit.issues.createComment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'octocat',
+        repo: 'hello',
+        issue_number: 1,
+        body: 'conversation comment body',
+      })
+    );
+    expect(mockAdmitOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 'user-1',
+        domain: 'pr',
+        intent: 'add_pr_comment',
+        operationKey: 'key-add-comment-1',
+        resourceKey: addCommentResourceKey,
+        taxonomy: 'reconcile-first',
+        leaseSeconds: 120,
+      })
+    );
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-1',
+        status: 'completed',
+        outcomeCode: 'ok',
+        canonicalResult: { commentId: 77, nodeId: 'N_77' },
+      })
+    );
+    // The comment body never enters the outbox event (enum-only properties).
+    const settleCall = mockSettleOperation.mock.calls[0][1] as {
+      outboxEvent: { eventName: string; properties: Record<string, unknown> };
+    };
+    expect(settleCall.outboxEvent.eventName).toBe('pr_operation_settled');
+    expect(settleCall.outboxEvent.properties).toEqual(
+      expect.objectContaining({
+        intent: 'add_pr_comment',
+        outcome: 'completed',
+      })
+    );
+    expect(JSON.stringify(settleCall.outboxEvent.properties)).not.toContain(
+      'conversation comment body'
+    );
+  });
+
+  it('replays the canonical addIssueComment result on a same-key retry with a single GitHub write', async () => {
+    // Two submissions under one operationKey = one GitHub write: the retry is
+    // served from the ledger's canonical result, not by posting again.
+    getGitHubUserAccessToken.mockResolvedValue(connected('t1', 'auth_1', 1));
+    mockAdmitOperation
+      .mockResolvedValueOnce({
+        admission: 'admitted',
+        row: ledgerRow({ intent: 'add_pr_comment', resource_key: addCommentResourceKey }),
+      })
+      .mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: ledgerRow({
+          intent: 'add_pr_comment',
+          resource_key: addCommentResourceKey,
+          status: 'completed',
+          canonical_result: { commentId: 77, nodeId: 'N_77' },
+        }),
+      });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.issues.createComment.mockResolvedValueOnce({
+      data: { id: 77, node_id: 'N_77' },
+    });
+
+    const first = await caller.addIssueComment(ledgerAddCommentInput);
+    const second = await caller.addIssueComment(ledgerAddCommentInput);
+
+    expect(first).toEqual({ commentId: 77, nodeId: 'N_77' });
+    expect(second).toEqual({ commentId: 77, nodeId: 'N_77', replayed: true });
+    expect(t1Octokit.issues.createComment).toHaveBeenCalledTimes(1);
+    expect(mockSettleOperation).toHaveBeenCalledTimes(1);
   });
 
   it('admits and settles submitReview and keeps free text out of the canonical result', async () => {
@@ -2469,5 +2599,19 @@ describe('githubPrReviewRouter UGC terms gate', () => {
     });
     expect(mockAdmitOperation).not.toHaveBeenCalled();
     expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('rejects addIssueComment with PRECONDITION_FAILED terms_required before any ledger row or GitHub write', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockTermsLookup.mockResolvedValueOnce([]);
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(caller.addIssueComment(ledgerAddCommentInput)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'terms_required',
+    });
+    expect(mockAdmitOperation).not.toHaveBeenCalled();
+    expect(t1Octokit.issues.createComment).not.toHaveBeenCalled();
   });
 });

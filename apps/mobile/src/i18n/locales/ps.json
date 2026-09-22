@@ -36,6 +36,7 @@
     "cost": "لګښت",
     "discard": "لغوه کړئ",
     "findings": "موندنې",
+    "mergeRequest": "د یوځای کولو غوښتنه",
     "notConnected": "نه دی نښلول شوی",
     "notifications": "خبرتیاوې",
     "pullRequest": "پل ریکویسټ",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "بل برېښنالیک وکاروئ",
     "signInWithApple": "د Apple له لارې ننوځئ",
     "signInWithGoogle": "د Google له لارې ننوځئ",
+    "signInWithPasskey": "د ننوتلو کیلي سره ننوځئ",
     "emailAddress": "د برېښنالیک پته",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "د برېښنالیک له لارې دوام ورکړئ",
@@ -174,6 +176,10 @@
     "termsConnector": " او ",
     "termsSuffix": ".",
     "moreSignInOptions": "د ننوتلو نور غوراوي",
+    "passkeyCancelled": "د ننوتلو کیلي سره ننوتل لغوه شول. بیا هڅه وکړئ.",
+    "passkeyNotFound": "د دې وسیلې لپاره د ننوتلو کیلي خوندي نه ده. پرځای یې د Apple، Google یا خپل بریښنالیک سره ننوځئ.",
+    "passkeyUnsupported": "د ننوتلو کیلي په دې وسیله کې شتون نلري. پرځای یې د Apple، Google یا خپل بریښنالیک سره ننوځئ.",
+    "passkeyFailed": "د ننوتلو کیلي سره ننوتل ونشول. بیا هڅه وکړئ.",
     "couldNotCompleteSignIn": "ننوتل بشپړ نه شول. مهرباني وکړئ بیا هڅه وکړئ.",
     "sessionEnded": "ستاسو ناسته پای ته ورسېده. مهرباني وکړئ بیا ننوځئ.",
     "signInCodeExpired": "ستاسو د ننوتلو د کوډ موده پای ته رسېدلې ده. مهرباني وکړئ بیا هڅه وکړئ.",
@@ -224,11 +230,36 @@
     "providerTestAccount": "د ازموینې حساب",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "سازماني SSO"
+    "providerEnterpriseSso": "سازماني SSO",
+    "passkeysTitle": "د ننوتلو کیلي",
+    "passkeysSubtitle": "پرته له پټنوم ننوځئ",
+    "passkeysEmpty": "تر اوسه د ننوتلو کیلي نشته",
+    "passkeysEmptyHint": "$t(profile.addPasskey) ترڅو پرته له پټنوم ننوځئ.",
+    "passkeysCouldNotLoad": "د ننوتلو کیلي پورته نشو",
+    "passkeysLoadFailed": "د ننوتلو کیلي شتون نلري ترڅو دا پورته شي.",
+    "addPasskey": "د ننوتلو کیلي اضافه کړئ",
+    "passkeyDefaultName": "د ننوتلو کیلي",
+    "passkeyAddedOn": "{{date}} اضافه شوه",
+    "passkeyAdded": "د ننوتلو کیلي اضافه شوه.",
+    "passkeyAddFailed": "د ننوتلو کیلي اضافه نشو. بیا هڅه وکړئ.",
+    "passkeyAddUnsupported": "دا وسیله د ننوتلو کیلي جوړولی نشي.",
+    "passkeyAddCancelled": "د ننوتلو کیلي جوړول لغوه شول.",
+    "passkeyRemoved": "د ننوتلو کیلي لیرې شوه.",
+    "passkeyRemoveFailed": "هغه د ننوتلو کیلي لیرې نشوه. بیا هڅه وکړئ.",
+    "passkeyRenamed": "د ننوتلو کیلي نوم بدل شو.",
+    "passkeyName": "د ننوتلو کیلي نوم",
+    "renamePasskey": "د ننوتلو کیلي نوم بدل کړئ",
+    "removePasskey": "د ننوتلو کیلي لیرې کړئ",
+    "removePasskeyTitle": "د ننوتلو کیلي لیرې شي؟",
+    "removePasskeyMessage": "تاسو به نور د دې ننوتلو کیلي سره ونشئ کولای."
   },
   "preferences": {
+    "general": "عمومي",
+    "voiceInput": "غږیز ننوتل",
     "autoExpandThinking": "د فکر برخه په اوتومات ډول پرانیزئ",
     "autoExpandThinkingSubtitle": "کله چې د ایجنټ فکر بشپړ شي، د فکر برخه پرانیستې وښیئ.",
+    "hideThinking": "د فکر جزئیات پټ کړئ",
+    "hideThinkingSubtitle": "د ایجنټ فکر د ناستې په پاڼه کې ونه ښیئ.",
     "keepScreenOn": "د ناستې پر پاڼه سکرین روښانه وساتئ",
     "keepScreenOnSubtitle": "تر هغه چې ناسته روانه وي، سکرین روښانه وساتئ.",
     "appearance": "بڼه",
@@ -237,6 +268,7 @@
     "appearanceLight": "روښانه",
     "appearanceDark": "تیاره",
     "account": "حساب",
+    "accountSubtitle": "ژبه، باوري کوربه‌ګان او د وسیلو ناستې",
     "prReviewAttribution": "د PR په بیاکتنو کې د اپلیکیشن نوم زیات کړئ",
     "prReviewAttributionSubtitle": "کله چې بیاکتنه لېږئ، په پای کې یې «د Kilo له لارې بیاکتل شوی» ورزیات کړئ.",
     "returnSendsMessage": "د انټر کیلي پیغام لېږي",
@@ -247,7 +279,15 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "د Kilo Gateway له لارې د غږ متن ته بدلول",
+    "gatewayTranscriptionSubtitle": "غږیز لیکل د وسیلې د ویې پېژندنې پر ځای د Kilo Gateway ماډل سره متن ته واړوئ. غږیز ریکارډ مو د Kilo Gateway ته لیږل کېږي.",
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "د وسیلې غوښتنې یوځای کړئ",
+    "condenseToolCallsSubtitle": "پرله‌پسې د وسیلې غوښتنې په یوه کرښه کې یوځای کړئ چې تاسو یې خلاصولی شئ.",
+    "toolSummaryTranslation": "د وسایلو لنډیزونه وژباړه",
+    "toolSummaryTranslationSubtitle": "هر د وسیلې لنډیز یو ماډل ته واستوه ترڅو یې ستاسو د اپلیکیشن ژبې ته وژباړي. که ژباړه ناکامه شي، اصلي نسخه ښودل کیږي.",
+    "toolSummaryTranslationModelUnavailableNotice": "دا ماډل نور وړاندې نه کېږي. د بل غوره کولو لپاره $t(common.model) ته ټک ووهئ."
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسټ نشته",
@@ -329,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "له {{total}} څخه {{displayCount}} فایلونه بار شول",
       "filesStillLoading": "فایلونه لا هم بارېږي. د تازه کولو لپاره ښکته راکش کړئ.",
       "goToOverview": "عمومي کتنې ته لاړ شئ",
-      "goToOverviewTab": "د عمومي کتنې ټب ته لاړ شئ"
+      "goToOverviewTab": "د عمومي کتنې ټب ته لاړ شئ",
+      "expandAllLines_one": "ټولې {{displayCount}} کرښې ښکاره کړئ",
+      "expandAllLines_other": "ټولې {{displayCount}} کرښې ښکاره کړئ",
+      "expandLines_one": "{{displayCount}} کرښې ښکاره کړئ ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} کرښې ښکاره کړئ ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "{{displayCount}} شاوخوا کرښې ښکاره کړئ",
+      "expandLinesOfContext_other": "{{displayCount}} شاوخوا کرښې ښکاره کړئ",
+      "expandMoreLines_one": "{{displayCount}} نورې کرښې ښکاره کړئ ({{start}}–{{end}})",
+      "expandMoreLines_other": "{{displayCount}} نورې کرښې ښکاره کړئ ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "له {{total}} فایلونو څخه {{loaded}} بار شوي",
+      "loadedOfTotalFiles_other": "له {{total}} فایلونو څخه {{loaded}} بار شوي"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ د فایل په پای کې نوې کرښه نشته.",
@@ -344,6 +394,7 @@
       "merge": "یوځای کول",
       "mergeNow": "همدا اوس یوځای کړئ",
       "mergePullRequest": "د پل ریکویسټ یوځای کول",
+      "mergeTermTitle": "د {{term}} یوځای کول",
       "enableAutoMerge": "خپلکار یوځای کول فعال کړئ",
       "disableAutoMerge": "خپلکار یوځای کول غیر فعال کړئ",
       "autoMergeOn": "خپلکار یوځای کول فعال دي",
@@ -362,9 +413,12 @@
       "deleteBranchAfterMerge": "له یوځای کولو وروسته څانګه ړنګ کړئ",
       "noEnabledMethods": "په دې زېرمتون کې د یوځای کولو هېڅ طریقه فعاله نه ده. د زېرمتون له مدیر څخه وغواړئ چې عادي یوځای کول، د کمېټونو یو کول، یا بیا بنسټول فعال کړي.",
       "confirmTitle": "پل ریکویسټ یوځای شي؟",
+      "confirmTitleTerm": "{{term}} یوځای شي؟",
       "confirmMessage": "دا به ستاسو بدلونونه په بنسټیزه څانګه کې یوځای کړي.",
       "enableAutoMergeConfirmTitle": "خپلکار یوځای کول فعال شي؟",
       "enableAutoMergeConfirmMessage": "کله چې ټولې اړینې ازموینې بریالۍ شي، GitHub به دا پل ریکویسټ په خپلکار ډول یوځای کړي.",
+      "enableAutoMergeConfirmMessageTerm": "کله چې پایپ‌لاین بریالی شي، {{term}} به په اتوماتیک ډول یوځای شي.",
+      "enableAutoMergeDescriptionTerm": "کله چې پایپ‌لاین بریالی شي، GitLab به دا {{term}} په اتوماتیک ډول یوځای کړي.",
       "forbidden": "تاسو د دې پل ریکویسټ د یوځای کولو اجازه نه لرئ.",
       "cannotMerge": "دا پل ریکویسټ په اوسني حالت کې نه شي یوځای کېدای.",
       "couldNotMerge": "پل ریکویسټ یوځای نه شو.",
@@ -375,7 +429,8 @@
       },
       "terminal": {
         "alreadyMerged": "مخکې یوځای شوی",
-        "closed": "دا پل ریکویسټ تړل شوی"
+        "closed": "دا پل ریکویسټ تړل شوی",
+        "closedMergeRequest": "دا د یوځای کولو غوښتنه تړل شوی"
       },
       "partialSuccessBanner": {
         "body": "څانګه ړنګه نه شوه: {{reason}}.",
@@ -400,6 +455,18 @@
         "behindDetail": "د بدلونونو څانګه له بنسټیزې څانګې وروسته پاتې ده. له یوځای کولو مخکې یې بیا بنسټ یا تازه کړئ.",
         "notMergeableTitle": "دا پل ریکویسټ لا نه شي یوځای کېدای",
         "notMergeableDetail": "GitHub د یوځای کولو حالت {{state}} ښودلی دی."
+      },
+      "restrictions": {
+        "title": "د یوځای کولو محدودیتونه",
+        "approvalsRequired_one": "{{displayCount}} تایید اړین دی",
+        "approvalsRequired_other": "{{displayCount}} تاییدونه اړین دي",
+        "pipelineMustSucceed": "له یوځای کولو مخکې باید پایپ‌لاین بریالی وي."
+      },
+      "providerBlocked": {
+        "failingPipeline": "په وروستي کمېټ کې پایپ‌لاین ناکامېږي.",
+        "pendingPipeline": "په وروستي کمېټ کې پایپ‌لاین لا هم روان دی.",
+        "permission": "تاسو د دې {{term}} د یوځای کولو اجازه نه لرئ.",
+        "draft": "له یوځای کولو مخکې {{term}} د بیاکتنې لپاره د چمتو په توګه په نښه کړئ."
       },
       "methodLabels": {
         "merge": "د یوځای کولو کمېټ جوړ کړئ",
@@ -448,6 +515,11 @@
       "acceptTerms": "ومنئ",
       "replyBadRequest": "دا ځواب نه شي خپرېدای. کېدای شي د بحث لړۍ بدله شوې وي.",
       "replyForbidden": "تاسو دې پل ریکویسټ ته د ځواب ورکولو اجازه نه لرئ.",
+      "addCommentCta": "په دې پل ریکویسټ باندې تبصره وکړئ",
+      "fixWithKilo": "له Kilo سره حل کړئ",
+      "fixWithKiloPrompt": "مهرباني وکړئ لاندې پل ریکویسټ تبصره حل کړئ: {{link}}",
+      "commentBadRequest": "دا تبصره نه شي خپرېدای. کېدای شي پل ریکویسټ بدل شوی وي.",
+      "commentForbidden": "تاسو دې پل ریکویسټ ته د تبصرې کولو اجازه نه لرئ.",
       "moderation": {
         "reportContent": {
           "terminal": "د دې تبصرې راپور نه شي ورکول کېدای.",
@@ -496,7 +568,10 @@
         "outdatedOnLines": "په {{lines}} کې پخوانۍ تبصره",
         "outdatedOnPath": "په {{path}} کې پخوانۍ تبصره"
       },
-      "deletedUser": "ړنګ شوی کارن"
+      "deletedUser": "ړنګ شوی کارن",
+      "replyForbiddenTerm": "تاسو دې {{term}} ته د ځواب ورکولو اجازه نه لرئ.",
+      "moreLinesAbove_one": "… پورته {{displayCount}} نورې کرښې شته.",
+      "moreLinesAbove_other": "… پورته {{displayCount}} نورې کرښې شته."
     },
     "couldNotOpenGitHubAppSettings": "د GitHub اپ امستنې پرانیستل نه شوې.",
     "installKiloGitHubApp": "د Kilo د GitHub اپلیکیشن نصب کړئ",
@@ -508,17 +583,19 @@
     "reviewPullRequest": "د پل ریکویسټ بیاکتنه وکړئ",
     "headLine": "{{counts}} · وروستی کمېټ {{sha}}",
     "entry": {
-      "eyebrow": "د URL له لارې پل ریکویسټ پرانیزئ.",
-      "pastePrLink": "د PR لینک ونښلوئ",
-      "noRecentPrs": "وروستي PR نشته",
-      "noRecentPrsDescription": "د بیاکتنې د پیلولو لپاره پورته د PR لینک ونښلوئ — بل ځل به دلته ښکاره شي.",
+      "eyebrow": "د URL له لارې پول ریکویسټ یا د یوځای کولو غوښتنه پرانیزئ",
+      "pastePrLink": "د پول ریکویسټ یا د یوځای کولو غوښتنې لینک ونښلوئ",
+      "noRecentPrs": "وروستۍ بیاکتنې نشته",
+      "noRecentPrsDescription": "د بیاکتنې پیلولو لپاره پورته لینک ونښلوئ — بل ځل به دلته ښکاره شي.",
       "couldNotLoad": "بار نه شو.",
       "removeFromRecentsTitle": "له وروستي لړلیک څخه لرې شي؟",
-      "removeFromRecentsMessage": "دا پل ریکویسټ به ستاسو له وروستي لړلیک څخه لرې شي.",
+      "removeFromRecentsMessage": "دا بیاکتنه به ستاسو له وروستي لړلیک څخه لرې شي.",
       "removeRecentAccessibility": "{{repo}} له وروستي لړلیک څخه لرې کړئ",
-      "urlAccessibility": "د GitHub پل ریکویسټ URL",
-      "clearLink": "د پل ریکویسټ لینک پاک کړئ",
-      "pasteLink": "د پل ریکویسټ لینک ونښلوئ",
+      "urlAccessibility": "د پول ریکویسټ یا د یوځای کولو غوښتنې URL ولیکئ",
+      "urlPlaceholder": "د پول ریکویسټ یا د یوځای کولو غوښتنې URL",
+      "openAccessibility": "پول ریکویسټ یا د یوځای کولو غوښتنه پرانیزئ",
+      "clearLink": "لینک پاک کړئ",
+      "pasteLink": "د پول ریکویسټ یا د یوځای کولو غوښتنې لینک ونښلوئ",
       "open": "خلاص"
     },
     "checks": {
@@ -535,6 +612,8 @@
       "pending": "{{displayCount}} په تمه",
       "skipped": "{{displayCount}} پرېښودل شوې",
       "checksCount": "{{displayCount}} ازموینې",
+      "checksCount_one": "{{displayCount}} ازموینې",
+      "checksCount_other": "{{displayCount}} ازموینې",
       "checkDetails": "د ازموینې جزئیات"
     },
     "inbox": {
@@ -567,9 +646,15 @@
     "connect": {
       "checkFailedTitle": "د GitHub اړیکه ونه کتل شوه.",
       "checkFailedMessage": "تر هغه چې دا بار نه شي، د ننوتلو حالت نه څرګندېږي.",
+      "checkFailedTitleGitLab": "د GitLab اړیکه ونه کتل شوه.",
+      "checkFailedTitleBitbucket": "د Bitbucket اړیکه ونه کتل شوه.",
+      "providerCheckFailedMessage": "تر څو چې دا نه وي بار شوی، د اړیکې حالت شتون نلري.",
       "reconnectTitle": "GitHub بیا ونښلئ",
       "reconnectDescription": "ستاسو د GitHub اړیکه لغوه شوې ده. په موبایل کې د پل ریکویسټونو د بیاکتنې د دوام لپاره بیا ونښلئ.",
-      "description": "په موبایل کې د پل ریکویسټونو د بیاکتنې لپاره خپل GitHub حساب ونښلوئ."
+      "description": "په موبایل کې د پل ریکویسټونو د بیاکتنې لپاره خپل GitHub حساب ونښلوئ.",
+      "gitlabDescription": "په موبایل کې د یوځای کولو د غوښتنو د بیاکتنې لپاره خپل GitLab حساب ونښلوئ.",
+      "bitbucketDescription": "په موبایل کې د پول ریکویسټونو د بیاکتنې لپاره Bitbucket له دې بنسټ سره ونښلوئ.",
+      "bitbucketOrgOnlyDescription": "خپل پروفایل کې یو بنسټ وټاکئ ترڅو د هغه Bitbucket پول ریکویسټونه وبیایۍ."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +676,10 @@
     },
     "reconnectNotice": {
       "title": "له GitHub سره د اړیکې موده پای ته ورسېده.",
-      "message": "ستاسو د GitHub اړیکه نور اعتبار نه لري. خپله اړیکه بیا وګورئ — که اړتیا وي، د بیا نښلولو غوښتنه به درڅخه وشي."
+      "message": "ستاسو د GitHub اړیکه نور اعتبار نه لري. خپله اړیکه بیا وګورئ — که اړتیا وي، د بیا نښلولو غوښتنه به درڅخه وشي.",
+      "gitlabTitle": "له GitLab سره د اړیکې موده پای ته ورسېده.",
+      "bitbucketTitle": "له Bitbucket سره د اړیکې موده پای ته ورسېده.",
+      "providerMessage": "ستاسو د {{provider}} اړیکه نور اعتبار نه لري. خپله اړیکه بیا وګورئ — که اړتیا وي، د بیا نښلولو غوښتنه به درڅخه وشي."
     },
     "eventChips": {
       "comment": "تبصره",
@@ -656,10 +744,12 @@
       "statusContext": "شاوخوا کرښه",
       "lineLabel": "{{status}} کرښه {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} کرښه: {{text}}",
-      "emptyLine": "(خالي)"
+      "emptyLine": "(خالي)",
+      "truncationBanner_one": "له {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کېږي — دا د GitHub API حد دی.",
+      "truncationBanner_other": "له {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کېږي — دا د GitHub API حد دی."
     },
     "linkPasteClipboardEmpty": "کلیپبورډ تش دی.",
-    "linkPasteNotAPullRequest": "دا د GitHub د پل ریکویسټ لینک نه دی.",
+    "linkPasteNotAPullRequest": "د پول ریکویسټ یا د یوځای کولو غوښتنې لینک نه دی",
     "announce": {
       "commentPosted": "تبصره خپره شوه",
       "reviewSubmitted": "بیاکتنه وسپارل شوه",
@@ -668,6 +758,7 @@
     "mutationError": {
       "commentNotPosted": "دا تبصره نه شي خپرېدای. کېدای شي ټاکل شوې کرښه بدله شوې وي، یا PR تازه شوی وي.",
       "reviewNotSubmitted": "دا بیاکتنه په اوسني حالت کې نه شي سپارل کېدای. کېدای شي PR بدل شوی وي، یا تاسو د خپل پل ریکویسټ د بیاکتنې اجازه نه لرئ.",
+      "reviewNotSubmittedTerm": "دا بیاکتنه په همدې بڼه نه شي کولای وسپارل شي. کېدای شي {{term}} بدل شوی وي، یا تاسو خپله {{term}} نشئ کولای وبيایۍ.",
       "couldNotPostComment": "تبصره خپره نه شوه.",
       "couldNotSubmitReview": "بیاکتنه ونه سپارل شوه. خپله اړیکه وګورئ او بیا هڅه وکړئ."
     },
@@ -675,9 +766,31 @@
       "couldNotReply": "ځواب ونه لېږل شو.",
       "couldNotCompleteAction": "دا کړنه بشپړه نه شوه.",
       "mergeResultDefaultError": "GitHub یوځای کول بشپړ نه کړل.",
+      "mergeResultNotCompleted": "{{term}} و نه یوځای شو. حالت یې وګورئ او بیا هڅه وکړئ.",
       "ambiguous": "تایید نه شو — له بیا هڅې مخکې PR وګورئ.",
       "persistenceFailed": "موږ ونه شو کړای دا کړنه ثبت کړو. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
       "forbidden": "اجازه نشته."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "پدې چمتو کوونکي کې شتون نلري",
+        "accessibility": "پدې چمتو کوونکي کې شتون نلري: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "پل ریکویسټ",
+      "mergeRequest": "د یوځای کولو غوښتنه",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "د یوځای کولو غوښتنه شریک کړئ",
+      "viewOnProvider": "په {{provider}} کې وګورئ",
+      "mergeRequestUnavailable": "د یوځای کولو غوښتنه نشته",
+      "unavailableDescription": "کېدای شي لرې شوی وي، یا تاسو ورسره لاسرسی نه لرئ.",
+      "accessDeniedMergeRequest": "تاسو د دې د یوځای کولو غوښتنه د لیدلو اجازه نه لرئ.",
+      "couldNotLoadMergeRequest": "د یوځای کولو غوښتنه بار نه شو.",
+      "discussionAccessDenied": "تاسو د دې د یوځای کولو غوښتنه د بحث د لیدلو اجازه نه لرئ.",
+      "discussionUnavailableMessage": "کېدای شي دا د یوځای کولو غوښتنه لرې شوی وي.",
+      "noDiscussionDescription": "په دې د یوځای کولو غوښتنه کې نه د بیاکتنې د بحث لړۍ شته او نه د خبرو تبصرې.",
+      "noFilesChangedDescription": "په دې د یوځای کولو غوښتنه کې هېڅ فایل نه دی بدل شوی."
     }
   },
   "notifications": {
@@ -710,11 +823,12 @@
     "previewFullDescription": "خبرتیاوې د قلف پر سکرین د پیغام متن ښیي.",
     "previewGenericDescription": "خبرتیاوې یوازې د یوې پېښې خبر درکوي. د پیغام د لوستلو لپاره Kilo پرانیزئ.",
     "channel": {
-      "agent": "د ایجنټ ناستې",
+      "agentProgress": "د ایجنټ پرمختګ",
       "chat": "د خبرو اترو پیغامونه",
       "kiloclaw": "د KiloClaw فعالیت",
       "balance": "د بیلانس خبرتیاوې",
-      "security": "امنیتي موندنې"
+      "security": "امنیتي موندنې",
+      "spend": "د لګښت خبرتیاوې"
     },
     "category": {
       "chatMessagesSubtitle": "ستاسو په خبرو اترو کې ځوابونه",
@@ -725,8 +839,22 @@
       "sessionStatusTitle": "د ناستې حالت",
       "sessionStatusSubtitle": "بشپړ شوی / ناکام شوی / د کنټرول لپاره چمتو",
       "kiloclawActivitySubtitle": "چمتو یا ناکام انسټانس، مهالویش شوې کړنې",
+      "kiloclawActivityUnavailable": "د KiloClaw فعالیت ترلاسه کولو لپاره یو KiloClaw انسټانس پیل کړئ.",
       "balanceAlertsSubtitle": "د سازمان د کم بیلانس خبرداري",
-      "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې"
+      "balanceAlertsUnavailable": "د بیلانس خبرداریو ترلاسه کولو لپاره یو سازمان ته ورسئ.",
+      "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې",
+      "securityFindingsUnavailable": "د امنیتي موندنو ترلاسه کولو لپاره په یوه ساحه کې Kilo امنیتي اجنټ فعال کړئ.",
+      "spendAlertsSubtitle": "د حدونو تېرېدل او ساعتي زیاتوالی",
+      "spendAlertsToggle": "د لګښت خبرتیاوو کټګوري"
+    },
+    "action": {
+      "openSession": "ناسته پرانیزئ"
+    },
+    "needsInputAction": {
+      "approved": "غوښتنه منظور شوه",
+      "replied": "ځواب ولېږل شو",
+      "failed": "ځواب ورکړل نه شو. بیا هڅه کولو لپاره بیا ټک ورکړئ.",
+      "unavailable": "دا غوښتنه نور انتظار نه کوي."
     }
   },
   "tabs": {
@@ -807,7 +935,9 @@
       "uploadFailed": "پورته کول ناکام شول.",
       "failedToUploadFile": "فایل پورته نه شو: {{reason}}.",
       "nothingToPaste": "د پیسټ کولو لپاره څه نشته.",
-      "metadataStripFailed": "د انځور میټاډاټا لرې نه شوه."
+      "metadataStripFailed": "د انځور میټاډاټا لرې نه شوه.",
+      "limit_one": "تاسو کولی شئ تر {{displayCount}} پورې فایلونه ونښلوئ.",
+      "limit_other": "تاسو کولی شئ تر {{displayCount}} پورې فایلونه ونښلوئ."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}، {{status}}",
@@ -1551,7 +1681,11 @@
       "syncFindings": "موندنې هممهاله کړئ",
       "syncNow": "اوس هممهاله کړئ",
       "syncQueued": "هممهاله کول په کتار کې واچول شول",
-      "syncStatusUnavailable": "د هممهاله کېدو حالت نه دی معلوم."
+      "syncStatusUnavailable": "د هممهاله کېدو حالت نه دی معلوم.",
+      "daysOverdue_one": "{{displayCount}} ورځې له مهلته تېرې",
+      "daysOverdue_other": "{{displayCount}} ورځې له مهلته تېرې",
+      "findingsCount_one": "{{displayCount}} موندنې",
+      "findingsCount_other": "{{displayCount}} موندنې"
     },
     "dashboardMetrics": {
       "openFindings": "پرانیستې موندنې",
@@ -1948,6 +2082,10 @@
       "couldNotLoad": "ناسته بار نه شوه.",
       "failedToLoadDetails": "د ناستې جزیات بار نه شول.",
       "failedToStopExecution": "اجرا ونه درول شوه.",
+      "stopped": "ناسته ودرول شوه",
+      "committing": "کمیټ کیږي…",
+      "committed": "کمیټ شو",
+      "commitFailed": "کمیټ ناکام شو",
       "renameSession": "د ناستې نوم بدل کړئ",
       "renamePlaceholder": "د ناستې نوم",
       "transcriptAccessibility": "د ناستې متن",
@@ -1982,17 +2120,56 @@
       "exitNeedsNewerCli": "له لرې د سلیش کمانډونو کارول د Kilo CLI نوې نسخې ته اړتیا لري. Kilo CLI تازه کړئ او بیا ونښلئ."
     },
     "sessionConnection": {
+      "label": "اړیکه",
       "connecting": "نښلېږي…",
       "reconnecting": "بیا نښلېږي…",
       "connectionLost": "اړیکه پرې شوه",
       "retryConnection": "بیا د نښلېدو هڅه وکړئ"
     },
+    "goal": {
+      "title": "هدف",
+      "statusActive": "فعال هدف",
+      "statusPaused": "ځنډول شوی هدف",
+      "statusComplete": "هدف بشپړ شو",
+      "statusBlocked": "هدف بند شو",
+      "edit": "هدف سمول",
+      "remove": "هدف لرې کول",
+      "pause": "هدف ځنډول",
+      "resume": "هدف بیا پیلول",
+      "editPlaceholder": "هدف تشریح کړئ",
+      "removeConfirmTitle": "هدف لرې کړو؟",
+      "removeConfirmMessage": "CLI د دې غونډې هدف پاکوي.",
+      "updateFailed": "هدف نشو کولای تازه شي.",
+      "sectionAccessibility": "{{status}}. هدف: {{text}}",
+      "collapse": "هدف پټ کړئ",
+      "expand": "هدف ښکاره کړئ"
+    },
     "newSession": {
+      "recentlyUsed": "په دې وروستیو کې کارول شوي",
+      "couldNotLoadGithubRepositories": "د GitHub زېرمتونونه بار نه شول.",
+      "couldNotLoadGitlabRepositories": "د GitLab زېرمتونونه بار نه شول.",
+      "couldNotLoadBitbucketRepositories": "د Bitbucket زېرمتونونه بار نه شول.",
       "connectGithubDescription": "په خپل براوزر کې GitHub ونښلوئ، بیا دلته راشئ او یو زېرمتون غوره کړئ.",
+      "connectGitlabDescription": "په خپل براوزر کې GitLab ونښلوئ، بیا دلته راشئ او یو زېرمتون غوره کړئ.",
+      "connectBitbucketDescription": "په خپل براوزر کې Bitbucket ونښلوئ، بیا دلته راشئ او یو زېرمتون غوره کړئ.",
       "openGithub": "GitHub پرانیزئ",
+      "openGitlab": "GitLab پرانیزئ",
+      "openBitbucket": "Bitbucket پرانیزئ",
       "refreshRepositories": "زېرمتونونه تازه کړئ",
       "githubConnected": "GitHub نښلول شوی",
+      "gitlabConnected": "GitLab نښلول شوی",
       "noRepositoriesVisible": "هېڅ زېرمتون نه ښکاري. وګورئ چې د Kilo GitHub اپلیکیشن زېرمتونونو ته لاسرسی لري، بیا لېست تازه کړئ.",
+      "noRepositoriesVisibleGitlab": "هېڅ زېرمتون نه ښکاري. د GitLab زېرمتونونو ته د لاسرسي اجازې وګورئ، بیا لېست تازه کړئ.",
+      "noRepositoriesVisibleBitbucket": "هېڅ زېرمتون نه ښکاري. د Bitbucket زېرمتونونو ته د لاسرسي اجازې وګورئ، بیا لېست تازه کړئ.",
+      "bitbucketOrganizationsOnly": "Bitbucket یوازې د بنسټونو لپاره شتون لري.",
+      "branchPickerTitle": "څانګه وټاکئ",
+      "branchDefault": "ډیفالټ",
+      "branchAccessibility": "څانګه: {{label}}",
+      "branchLoading": "څانګې بارېږي",
+      "branchLoadError": "څانګې بار نه شوې",
+      "branchUnavailable": "د دې زېرمتون لپاره څانګې شتون نلري. له چمتو کوونکي سره خپل لاسرسی وګورئ، بیا بل زېرمتون وټاکئ.",
+      "branchEmpty": "هېڅ څانګه شتون نلري",
+      "branchPlaceholder": "یوه څانګه وټاکئ",
       "runOnWithTarget": "د چلولو ځای: {{target}}",
       "environment": "چاپېریال",
       "couldNotLoadEnvironment": "ستاسو چاپېریال بار نه شو.",
@@ -2013,24 +2190,13 @@
       "couldNotRefreshRepositories": "زېرمتونونه تازه نه شول. بیا هڅه وکړئ.",
       "discardDraftTitle": "مسوده ړنګه کړم؟",
       "discardDraftMessage": "ستاسو پرامپټ به له منځه ولاړ شي.",
+      "discardWithUploadsMessage": "ستاسو پرامپټ او هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي.",
       "discardFailed": "مسوده ړنګه نه شوه. بیا هڅه وکړئ.",
       "remoteHint": "د kilo د یوې ځايي پروسې د کنټرول لپاره په خپل کمپیوټر کې `kilo remote`، یا د CLI په روانه ناسته کې `/remote` وچلوئ.",
-      "connectBitbucketDescription": "په خپل براوزر کې Bitbucket ونښلوئ، بیا دلته راشئ او یو زېرمتون غوره کړئ.",
-      "connectGitlabDescription": "په خپل براوزر کې GitLab ونښلوئ، بیا دلته راشئ او یو زېرمتون غوره کړئ.",
-      "couldNotLoadBitbucketRepositories": "د Bitbucket زېرمتونونه بار نه شول.",
-      "couldNotLoadGithubRepositories": "د GitHub زېرمتونونه بار نه شول.",
-      "couldNotLoadGitlabRepositories": "د GitLab زېرمتونونه بار نه شول.",
-      "gitlabConnected": "GitLab نښلول شوی",
-      "noRepositoriesVisibleBitbucket": "هېڅ زېرمتون نه ښکاري. د Bitbucket زېرمتونونو ته د لاسرسي اجازې وګورئ، بیا لېست تازه کړئ.",
-      "noRepositoriesVisibleGitlab": "هېڅ زېرمتون نه ښکاري. د GitLab زېرمتونونو ته د لاسرسي اجازې وګورئ، بیا لېست تازه کړئ.",
-      "openBitbucket": "Bitbucket پرانیزئ",
-      "openGitlab": "GitLab پرانیزئ",
-      "recentlyUsed": "په دې وروستیو کې کارول شوي",
       "continueFrom": "د {{title}} ناستې دوام روان دی.",
       "importingSession": "ناسته واردېږي",
       "cliCannotContinue": "دا CLI ناستې ته دوام نه شي ورکولی. Cloud Agent یا بل CLI غوره کړئ.",
-      "importFailed": "دا ناسته وارده نه شوه.",
-      "discardWithUploadsMessage": "ستاسو پرامپټ او هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي."
+      "importFailed": "دا ناسته وارده نه شوه."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل تازه شو.",
@@ -2054,7 +2220,14 @@
       "updateTodos": "د دندو لېست تازه کړئ",
       "linesBadge": "{{displayCount}} کرښې",
       "filesBadge": "{{displayCount}} فایلونه",
-      "matchesBadge": "{{displayCount}} پایلې"
+      "matchesBadge": "{{displayCount}} پایلې",
+      "filesBadge_one": "{{displayCount}} فایلونه",
+      "filesBadge_other": "{{displayCount}} فایلونه",
+      "linesBadge_one": "{{displayCount}} کرښې",
+      "linesBadge_other": "{{displayCount}} کرښې",
+      "matchesBadge_one": "{{displayCount}} پایلې",
+      "matchesBadge_other": "{{displayCount}} پایلې",
+      "noOutput": "هېڅ پایلې نشته."
     },
     "readToolMarkdown": {
       "linesTruncated": "کرښې {{start}}–{{end}} (لنډې شوې)",
@@ -2344,7 +2517,11 @@
       "files": "فایلونه",
       "couldNotOpenPhotoPicker": "د انځور غوره کولو کړکۍ پرانیستل نه شوه. Kilo بیا پیل کړئ او بیا هڅه وکړئ.",
       "maxFilesAllowed": "تر {{displayCount}} فایلونو پورې اجازه شته.",
-      "onlyAddingFiles": "له {{total}} فایلونو څخه یوازې {{accepted}} زیاتېږي (حد: {{max}})"
+      "onlyAddingFiles": "له {{total}} فایلونو څخه یوازې {{accepted}} زیاتېږي (حد: {{max}})",
+      "maxFilesAllowed_one": "تر {{displayCount}} فایلونو پورې اجازه شته.",
+      "maxFilesAllowed_other": "تر {{displayCount}} فایلونو پورې اجازه شته.",
+      "onlyAddingFiles_one": "له {{total}} فایلونو څخه یوازې {{accepted}} زیاتېږي (حد: {{max}})",
+      "onlyAddingFiles_other": "له {{total}} فایلونو څخه یوازې {{accepted}} زیاتېږي (حد: {{max}})"
     },
     "composer": {
       "addAttachment": "ضمیمه ورزیاته کړئ",
@@ -2362,7 +2539,9 @@
       "discardAttachmentsMessage": "هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي.",
       "discardAttachmentsTitle": "ضمیمې ړنګې کړم؟",
       "charactersRemaining": "{{count}} توري پاتې دي",
-      "insertNewline": "نوې کرښه دننه کړئ"
+      "insertNewline": "نوې کرښه دننه کړئ",
+      "charactersRemaining_one": "{{count}} توري پاتې دي",
+      "charactersRemaining_other": "{{count}} توري پاتې دي"
     },
     "chatLink": {
       "linkCopied": "لینک کاپي شو",
@@ -2396,6 +2575,12 @@
       "startNewSession": "نوې ناسته پیل کړئ",
       "exitSession": "له ناستې ووځئ",
       "clearSession": "دا ناسته پای ته ورسوئ او نوې پیل کړئ",
+      "compactDescription": "د اوسني سیشن متن لنډ کړه",
+      "goalDescription": "د سیشن هدف په لور کار ته دوام ورکړه. /goal <objective> یا pause, resume, clear",
+      "initDescription": "لارښود شوی AGENTS.md تنظیم",
+      "resumeClaudeDescription": "د Claude Code سیشن رونوشت وارد کړه",
+      "resumeCodexDescription": "د OpenAI Codex سیشن رونوشت وارد کړه",
+      "reviewDescription": "بدلونونه وګوره [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} وکاروئ",
       "insert": "دننه کړئ",
       "upgradeRequiredFallback": "د دې کمانډ کارولو لپاره مهرباني وکړئ خپل CLI تازه کړئ.",
@@ -2428,7 +2613,14 @@
       "stepsCount_one": "{{steps}} ګام",
       "stepsCount": "{{steps}} ګامونه",
       "stepsCount_other": "{{steps}} ګامونه",
-      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}"
+      "modelAccessibilityLabel": "{{name}}، {{provider}}، {{steps}}، {{cost}}",
+      "modelsCount_one": "ماډل ({{displayCount}})",
+      "modelsCount_other": "ماډلونه ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "اتوماتیک تصویب",
+      "description": "د دې غونډې لپاره د اجازې غوښتنې په اتوماتیک ډول تصویب کړئ. بیا وسیلې پرته له غوښتنې چلیږي.",
+      "unavailable": "دا غونډه د اجازې غوښتنې ترلاسه کولی نشي."
     },
     "prBadge": {
       "open": "پل ریکویسټ پرانیزئ",
@@ -2460,6 +2652,12 @@
       "tapToListHint": "د فولډر د منځپانګې د لیدلو لپاره پرې ټک وکړئ.",
       "unsupportedDescription": "دا CLI د فولډرونو لېست نه شي ښودلی. د «بشپړ شو» تڼۍ د پیل فولډر ساتي او د «ناسته پیل کړئ» تڼۍ ناسته هلته پیلوي.",
       "unsupportedTitle": "د فولډرونو لېست نه شي ښودل کېدای"
+    },
+    "toolRun": {
+      "sheetTitle": "د وسیلې غوښتنې",
+      "condensedLabel": "{{itemCount}} توکي; {{last}}",
+      "condensedLabel_one": "{{itemCount}} توکي; {{last}}",
+      "condensedLabel_other": "{{itemCount}} توکي; {{last}}"
     }
   },
   "bootstrap": {
@@ -2504,6 +2702,7 @@
     "couldNotLoadActiveSessions": "فعالې ناستې بار نه شوې.",
     "agentSessions": "اوس روانې",
     "newCodingTask": "د کوډ کولو نوې دنده",
+    "newTaskFromPicture": "له انځور څخه نوې دنده",
     "explore": "وپلټئ",
     "seeAll": "ټول وګورئ",
     "noLiveSessions": "اوس هېڅ شی نه چلېږي"
@@ -2565,7 +2764,17 @@
     "languageNotInstalledMessage": "د {{language}} آفلاین وینا فایلونه پر دې تلیفون نصب شوي نه دي. هغوی ښکته کړئ، بیا د غږیز لیکلو هڅه وکړئ.",
     "downloadOfflineModel": "ښکته کول",
     "offlineModelDownloadScheduled": "آفلاین وینا فایلونه به شالید کې ښکته شي. وروسته بیا د غږیز لیکلو هڅه وکړئ.",
-    "listeningStopped": "اورېدل ودرېدل."
+    "listeningStopped": "اورېدل ودرېدل.",
+    "transcribing": "متن ته اړول کېږي...",
+    "gatewayUnreachable": "له Kilo Gateway سره اړیکه نشو ټینګېدلی. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
+    "gatewayTimeout": "د غږ بدلول ډېر وخت ونیو. بیا هڅه وکړئ.",
+    "gatewayModelUnavailable": "دا ماډل شتون نلري. په غوره توبونو کې بل وټاکئ.",
+    "gatewayModelUnavailableNotice": "دا ماډل نور وړاندې نه کېږي. د بل غوره کولو لپاره $t(transcriptionModel.title) ته ټک ووهئ.",
+    "gatewaySignInRequired": "د Kilo Gateway بدلولو کارولو لپاره ننوځئ.",
+    "gatewayNoModel": "لومړی په غوره توبونو کې یو ماډل وټاکئ.",
+    "testTitle": "د غږیز لیکل ازموینه",
+    "testPlaceholder": "مایکروفون ته ټېپ وکړئ او خبرې پیل کړئ.",
+    "testClear": "متن پاک کړئ"
   },
   "share": {
     "title": "له Kilo سره شریکول",
@@ -2583,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "دا ناسته فایلونه نه شي ترلاسه کولی",
     "cliCantReceiveFilesMessage": "هغه Kilo CLI چې دا ناسته چلوي، فایلونه نه شي ترلاسه کولی. په هغه ماشین کې CLI تازه کړئ، یا منځپانګه له نوې ناستې سره شریکه کړئ.",
     "contentlessMessage": "د شریکولو لپاره هېڅ نشته — هېڅ متن یا فایل نه و شامل شوی.",
-    "couldNotReadContent": "شریکه شوې منځپانګه ونه لوستل شوه."
+    "couldNotReadContent": "شریکه شوې منځپانګه ونه لوستل شوه.",
+    "onlyFirstFilesAttached_one": "یوازې لومړني {{displayCount}} فایلونه به ضمیمه شي.",
+    "onlyFirstFilesAttached_other": "یوازې لومړني {{displayCount}} فایلونه به ضمیمه شي."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2715,7 +2926,8 @@
     "aiProvidersWhat": "ستاسو پرامپټونه، د خبرو اترو تاریخچه او ټول هغه فایلونه چې ضمیمه کوئ.",
     "aiProvidersWhy": "د AI ځوابونو رامنځته کولو لپاره.",
     "aiProvidersWho": "Anthropic، OpenAI، Google او نور چمتو کوونکي چې د هرې غوښتنې لپاره یې غوره کوئ.",
-    "gatewayWhat": "د حساب ID، د غوښتنې میټاډاټا او د ټوکنونو کارونه.",
+    "gatewayWhat": "د حساب ID، د غوښتنې میټاډاټا، د ټوکنونو کارونه، او همدارنګه هغه پرومپټونه او غږیز ثبتونه چې اپلیکیشن د دې له لارې لیږي.",
+    "viaGateway": "د Kilo Gateway له لارې",
     "gatewayWhy": "د هویت تایید، د غوښتنو سم ځای ته لېږل او د بلونو حسابي سمون.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "د ناڅاپي بندېدو او تېروتنو راپورونه چې د اپلیکیشن منځپانګه ترې لرې شوې وي.",
@@ -2735,7 +2947,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "ستاسو ثبت شوی غږ، کله چې د متن د لیکلو لپاره خبرې کوئ.",
     "voiceTranscriptionWhy": "متن ته د وینا د بدلولو لپاره.",
-    "voiceTranscriptionWho": "یوازې ستاسو وسیله؛ که وسیله له انټرنېټ پرته غږ په متن نه شي بدلولی، Apple یا Google.",
+    "voiceTranscriptionWho": "ستاسو وسیله، Kilo Gateway د هغه د متن د بدلون ماډل سره چې تاسو ټاکلی، یا Apple یا Google د آنلاین پېژندنې لپاره.",
     "installAttributionPromptTitle": "د نصب د سرچینې پېژندلو ته اجازه ورکړم؟",
     "installAttributionPromptMessage": "Kilo د Apple د تعقیب اجازه یوازې د دې معلومولو لپاره کاروي چې تاسو له کومې لارې دلته راغلي یاست. ستاسو پرامپټونه او خبرې اترې هېڅکله د دې لپاره نه کارول کېږي.",
     "what": "څه",
@@ -2907,6 +3119,14 @@
     "tooManySignInAttempts": "د ننوتلو ډېرې هڅې وشوې. مهرباني وکړئ انتظار وکړئ او بیا هڅه وکړئ."
   },
   "models": {
+    "auto": {
+      "frontier": "اتومات مخکښ",
+      "balanced": "اتومات متوازن",
+      "efficient": "اتومات اغیزمن",
+      "small": "اتومات کوچنی",
+      "free": "اتومات وړیا",
+      "organization": "اتومات اداره"
+    },
     "dataCollected": "معلومات راټولېږي",
     "free": "وړیا",
     "couldNotUpdateFavorites": "د خوښې ماډلونه تازه نه شول.",
@@ -2945,7 +3165,74 @@
     "privacy": "د اجنټانو د لیدلو لپاره Kilo پرانیزئ",
     "openAgents": "اجنټان پرانیزئ",
     "needsInput": "ځواب ته اړتیا لري",
+    "newestSession": "تر ټولو نوې: {{title}}",
+    "noneWaiting": "هیڅ اجنټ انتظار نه کوي",
+    "newAgent": "نوی اجنټ",
+    "approving": "منظور کېږي...",
+    "couldNotApprove": "منظور نه شو",
+    "couldNotStart": "پیل نه شو",
     "channelName": "فعال اجنټان",
-    "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ."
+    "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ.",
+    "openSession": "پرانیستل",
+    "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ.",
+    "newestResult": "تر ټولو نوې پایله"
+  },
+  "transcriptionModel": {
+    "title": "د غږ د متن ته بدلولو ماډل",
+    "noneChosen": "هیڅ نه دی ټاکل شوی",
+    "emptyTitle": "د غږ د متن ته بدلولو هیڅ ماډل نشته",
+    "emptyDescription": "Kilo Gateway اوس مهال د غږ د متن ته بدلولو هیڅ ماډل نه وړاندې کوي.",
+    "loadFailed": "د غږ د متن ته بدلولو ماډلونه بار نه شول."
+  },
+  "voiceLanguage": {
+    "title": "د غږیز لیکل ژبه",
+    "automatic": "اتومات",
+    "loadFailed": "د دې وسیلې ملاتړ شوې ژبې بار نشوې.",
+    "emptyTitle": "ملاتړ شوې ژبې نشته",
+    "emptyDescription": "د دې وسیلې د وینا پېژندنه کومه ملاتړ شوې ژبه نه ښیې."
+  },
+  "tour": {
+    "eyebrow": "چټک سفر",
+    "forkTitle": "Kilo په چیرې چلول غواړئ?",
+    "forkSubtitle": "خپل لومړۍ ناستې لپاره وټاکئ چې Kilo چیرې چلیږي.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Kilo په یوه جلا شوي کلاوډ چاپېریال کې وچلوه، پرته له دې چې څه نصب کړئ.",
+    "remoteOptionTitle": "ستاسو کمپیوټر",
+    "remoteOptionBody": "Kilo په خپل کمپیوټر کې د `kilo remote` CLI له لارې وچلوه.",
+    "skip": "سفر پرېږدئ",
+    "tutorialLabel": "زده کړه"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "د اجنټ پیل کولو لپاره پرامپټ ته اړتیا ده. پرامپټ اضافه کړئ او بیا یې وچلوئ.",
+      "repositoryUnknown": "Kilo {{repository}} د GitHub یا GitLab زېرمتون په توګه نه پېژني. په Kilo کې بل زېرمتون وټاکئ.",
+      "repositoryUnsupported": "{{repository}} د Bitbucket زېرمتون دی — اجنټ پیل کړئ لاهم نشي کولی ترې وکار اخلي. په Kilo کې بل زېرمتون وټاکئ."
+    }
+  },
+  "launcher": {
+    "openLastSession": "وروستۍ ناسته پرانیزئ"
+  },
+  "spendAlerts": {
+    "subtitle": "کله چې د دې ساحې لګښت له یو حد څخه تېر شي یا له خپل عادي ساعتي کچه پورته ووځي، د بلونو اړیکو ته د بریښنالیک یا push له لارې خبرتیا ولېږه.",
+    "enable": "د لګښت خبرتیاوې فعاله کړه",
+    "thresholdTitle": "د حد تېرېدل",
+    "thresholdSubtitle": "روان لګښت ستاسو حد تېروي",
+    "anomalyTitle": "ساعتي زیاتوالی",
+    "anomalySubtitle": "یوه ساعته د دې ساحې له عادي کچې ډېره لوړه ده",
+    "limitLabel": "حد (USD)",
+    "windowLabel": "کړکۍ",
+    "window24h": "24 ساعته",
+    "window7d": "7 ورځې",
+    "window30d": "30 ورځې",
+    "multiplierLabel": "د زیاتوالي ضریب",
+    "saved": "د لګښت خبرتیاوو تنظیمات خوندي شول",
+    "loadError": "د لګښت خبرتیاوې پورته نه شوې.",
+    "saveError": "د لګښت خبرتیاوې خوندي نه شوې.",
+    "empty": "د لګښت خبرتیاوې بندې دي. د دې ساحې د بلونو اړیکو ته د خبر ورکولو لپاره یې فعاله کړه.",
+    "noSpend": "تر دې دمه هیڅ لګښت ثبت شوی نه دی",
+    "spend24h": "د تېرو 24 ساعتونو لګښت",
+    "multiplierError": "د 1 یا ډېر ضریب ولیکه",
+    "permissionDenied": "تاسو د لګښت خبرتیاوو د اداره کولو اجازه نه لرئ.",
+    "pushOffByCategory": "په خبرتیاوو کې بند"
   }
 }

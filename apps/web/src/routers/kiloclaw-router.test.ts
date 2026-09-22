@@ -717,6 +717,7 @@ describe('kiloclawRouter start', () => {
       startedAt: 1_776_885_000_000,
     });
     expect(kiloclawClientMock.__startMock).toHaveBeenCalledWith(user.id, instanceId, {
+      skipCooldown: true,
       reason: 'manual_user_request',
     });
 

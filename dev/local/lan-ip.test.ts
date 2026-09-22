@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import type os from 'node:os';
 import test from 'node:test';
-import { detectLanIp, isUsableIpv4, type LanIpDeps } from './lan-ip';
+import { detectLanIp, isUsableDevHost, isUsableIpv4, type LanIpDeps } from './lan-ip';
 
 type ExecCall = { command: string; args: string[] };
 
@@ -64,4 +64,14 @@ test('rejects IPv4-looking strings with out-of-range octets', () => {
   assert.equal(isUsableIpv4('256.0.0.1'), false);
   assert.equal(isUsableIpv4('localhost'), false);
   assert.equal(isUsableIpv4(undefined), false);
+});
+
+test('accepts loopback hostnames and IPv4 literals as dev hosts', () => {
+  assert.equal(isUsableDevHost('localhost'), true);
+  assert.equal(isUsableDevHost('127.0.0.1'), true);
+  assert.equal(isUsableDevHost('192.168.1.10'), true);
+  assert.equal(isUsableDevHost('999.999.999.999'), false);
+  assert.equal(isUsableDevHost('example.com'), false);
+  assert.equal(isUsableDevHost(''), false);
+  assert.equal(isUsableDevHost(undefined), false);
 });

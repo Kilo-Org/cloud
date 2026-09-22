@@ -27,6 +27,7 @@ vi.mock('expo-router', () => ({
   },
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
@@ -36,6 +37,7 @@ vi.mock('@/components/ui/icons', () => ({
   Search: 'Search',
   SearchX: 'SearchX',
   Unlock: 'Unlock',
+  X: 'X',
 }));
 vi.mock('@/components/agents/model-selector', () => ({
   ModelPickerOptionRow: 'ModelPickerOptionRow',
@@ -73,8 +75,106 @@ beforeEach(() => {
   repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
     repositories: [repo],
     sections: [{ key: 'github', titleKey: 'common.github', repos: [repo] }],
+    // The picker keys its Bitbucket note on the scope the ROWS were loaded
+    // under, not on the app's global organization selection.
+    organizationId: null,
     currentValue: '',
     onSelect: vi.fn<() => void>(),
+  });
+});
+
+describe('repository picker Bitbucket scope note', () => {
+  const note = 'Bitbucket is available for organizations only.';
+
+  it('explains the Personal limitation without a retry action', async () => {
+    const renderer = await mount(RepoPickerScreen);
+    expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(true);
+    expect(hosts(renderer, 'Pressable')).toHaveLength(1);
+  });
+
+  it.each(['recents', 'no-bitbucket-rows'] as const)(
+    'does not claim Bitbucket is unavailable to an organization with %s',
+    async kind => {
+      const onSelect = vi.fn<() => void>();
+      const repositories: RepoOption[] =
+        kind === 'recents'
+          ? [{ platform: 'bitbucket', fullName: 'workspace/repo', isPrivate: true }]
+          : [repo];
+      const sections =
+        kind === 'recents'
+          ? [
+              {
+                key: 'recents' as const,
+                titleKey: 'agentChat.newSession.recentlyUsed',
+                repos: repositories,
+              },
+            ]
+          : [{ key: 'github' as const, titleKey: 'common.github', repos: repositories }];
+      repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
+        repositories,
+        sections,
+        organizationId: 'org-1',
+        currentValue: '',
+        onSelect,
+      });
+      const renderer = await mount(RepoPickerScreen);
+      expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(false);
+      expect(hosts(renderer, 'Pressable')).toHaveLength(1);
+      if (kind === 'recents') {
+        const row = renderer.root.findByProps({ accessibilityLabel: 'Bitbucket workspace/repo' });
+        act(() => {
+          (row.props.onPress as () => void)();
+        });
+        expect(onSelect).toHaveBeenCalledWith('bitbucket:workspace/repo');
+      }
+    }
+  );
+
+  it('hides the Personal note while searching, even when repositories match', async () => {
+    const renderer = await mount(RepoPickerScreen);
+    const input = hosts(renderer, 'TextInput')[0];
+    if (!input) {
+      throw new Error('Picker search input did not mount');
+    }
+    const changeSearch = input.props.onChangeText as (text: string) => void;
+    act(() => {
+      changeSearch('org/repo');
+    });
+    expect(hosts(renderer, 'Pressable')).toHaveLength(1);
+    expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(false);
+    act(() => {
+      changeSearch('');
+    });
+    expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(true);
+  });
+});
+
+describe('repository picker search placeholder', () => {
+  const copy = 'Search repositories...';
+
+  it('renders a single tail-ellipsized line instead of a wrapping native hint', async () => {
+    const renderer = await mount(RepoPickerScreen);
+    const input = hosts(renderer, 'TextInput')[0];
+    if (!input) {
+      throw new Error('Picker search input did not mount');
+    }
+    // The native hint is what Android lays out at the field width with no line
+    // cap, wrapping onto a second line the fixed-height field then clips.
+    expect(input.props.placeholder).toBeUndefined();
+
+    const placeholder = hosts(renderer, 'Text').find(node => node.props.children === copy);
+    if (!placeholder) {
+      throw new Error('Search placeholder overlay did not mount');
+    }
+    expect(placeholder.props.numberOfLines).toBe(1);
+    expect(placeholder.props.ellipsizeMode).toBe('tail');
+    expect(placeholder.parent?.props.pointerEvents).toBe('none');
+
+    const changeSearch = input.props.onChangeText as (text: string) => void;
+    act(() => {
+      changeSearch('org/repo');
+    });
+    expect(hosts(renderer, 'Text').some(node => node.props.children === copy)).toBe(false);
   });
 });
 
@@ -88,10 +188,18 @@ function hosts(renderer: Awaited<ReturnType<typeof mount>>, type: string) {
   return renderer.root.findAll(node => node.type === type);
 }
 
+// The model picker hosts its rows in a FlatList and manages its own scrolling
+// (PickerSheet scrollable=false); the repository picker renders mapped rows
+// inside the shell ScrollView and so always keeps that ScrollView mounted.
 describe.each([
-  { name: 'model', Component: ModelPickerContent },
-  { name: 'repository', Component: RepoPickerScreen },
-])('$name picker centering', ({ Component }) => {
+  { name: 'model', Component: ModelPickerContent, rowHost: 'FlatList', hasShellScrollView: false },
+  {
+    name: 'repository',
+    Component: RepoPickerScreen,
+    rowHost: 'Pressable',
+    hasShellScrollView: true,
+  },
+])('$name picker centering', ({ Component, rowHost, hasShellScrollView }) => {
   it('keeps the search input and native header mounted when replacing the list', async () => {
     const renderer = await mount(Component);
     const input = hosts(renderer, 'TextInput')[0];
@@ -102,15 +210,17 @@ describe.each([
     const group = header.parent;
     expect(group?.props.collapsable).toBe(false);
     expect(group?.findAll(node => node === input)).toHaveLength(1);
-    expect(hosts(renderer, 'FlatList')).toHaveLength(1);
+    expect(hosts(renderer, rowHost).length).toBeGreaterThan(0);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);
 
     const changeSearch = input.props.onChangeText as (text: string) => void;
     act(() => {
       changeSearch('no matching choice');
     });
-    expect(hosts(renderer, 'FlatList')).toHaveLength(0);
-    expect(hosts(renderer, 'ScrollView')).toHaveLength(0);
+    expect(hosts(renderer, rowHost)).toHaveLength(0);
+    if (!hasShellScrollView) {
+      expect(hosts(renderer, 'ScrollView')).toHaveLength(0);
+    }
     expect(hosts(renderer, 'CenteredState')).toHaveLength(1);
     expect(hosts(renderer, 'TextInput')[0]).toBe(input);
     expect(hosts(renderer, 'SheetHeader')[0]).toBe(header);
@@ -119,7 +229,7 @@ describe.each([
     act(() => {
       changeSearch('');
     });
-    expect(hosts(renderer, 'FlatList')).toHaveLength(1);
+    expect(hosts(renderer, rowHost).length).toBeGreaterThan(0);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);
     expect(hosts(renderer, 'TextInput')[0]).toBe(input);
     expect(header.parent).toBe(group);
@@ -136,7 +246,9 @@ describe.each([
     const renderer = await mount(Component);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(1);
     expect(hosts(renderer, 'FlatList')).toHaveLength(0);
-    expect(hosts(renderer, 'ScrollView')).toHaveLength(0);
+    if (!hasShellScrollView) {
+      expect(hosts(renderer, 'ScrollView')).toHaveLength(0);
+    }
     expect(hosts(renderer, 'TextInput')).toHaveLength(1);
   });
 });

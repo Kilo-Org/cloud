@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx), and this suite's per-state spawn wiring cases exceed the line cap (same carve-out as share-gate-sheet.tsx) */
+/* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx), and this suite's per-state spawn wiring cases exceed the line cap (same carve-out as share-gate-sheet.tsx) */
 // P1-A-08b: the share gate must attach one hoisted `operationKey` per
 // share-spawn intent (share + instance) to the `spawn` call, keep it across
 // retryable outcomes (the relay dedupes the same-key retry), and rotate it
@@ -8,7 +8,7 @@
 // the spawn via the list's captured `onSpawnInstance` prop.
 
 import { createElement, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -108,7 +108,9 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
     activeSessions: [],
     storedIsError: false,
     storedIsSuccess: true,
+    storedIsPaused: false,
     activeIsError: false,
+    activeIsPaused: false,
     isLoading: false,
     refetch: vi.fn(),
   }),
@@ -133,15 +135,10 @@ vi.mock('expo-crypto', () => {
     },
   };
 });
-vi.mock('expo-file-system/legacy', () => ({
-  cacheDirectory: null,
-  copyAsync: vi.fn().mockResolvedValue('/tmp/copy'),
-  deleteAsync: vi.fn().mockResolvedValue(undefined),
-}));
 // The real `share-payload.ts` pulls `registerTempFile` from
-// `@/lib/temp-file-registry`, which imports the new `expo-file-system` API.
-// Mock the main entry (not only `expo-file-system/legacy`) so the
-// `importOriginal()` chain in the `@/lib/share-payload` mock stays harmless.
+// `@/lib/temp-file-registry`, which imports the modern `expo-file-system` API.
+// Mock the main entry so the `importOriginal()` chain in the
+// `@/lib/share-payload` mock stays harmless.
 vi.mock('expo-file-system', () => {
   const File = vi.fn(function FileMock(_base: unknown, ..._rest: unknown[]) {
     return {
@@ -405,6 +402,26 @@ describe('ShareGateSheet spawn operationKey wiring', () => {
     // A non-retryable rejection must not refetch or navigate.
     expect(refetchInstancesMock).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('numbers a staged GitLab merge request with the provider separator', async () => {
+    const shareId = putSharePayload({
+      text: 'https://gitlab.com/group/sub/repo/-/merge_requests/7',
+      files: [],
+      failedFiles: [],
+    });
+    const renderer = await mountGate(shareId);
+
+    // The Review PR row is the row whose subtitle is the destination identity.
+    const subtitles = renderer.root
+      .findAllByType('Text')
+      .filter(node => node.props.className === 'text-sm text-muted-foreground')
+      .map(node => node.children.filter(child => typeof child === 'string').join(''));
+    expect(subtitles).toEqual(['group/sub/repo!7']);
 
     act(() => {
       renderer.unmount();

@@ -11,16 +11,17 @@ import {
   deliveryErrorLogFields,
   isRetryableDeliveryError,
   observeControlAfterStopping,
+  reconstructControlRequestError,
   SESSION_DELIVERY_TIMEOUT_MS,
   withDeliveryDeadline,
 } from './control-dispatch.js';
 
 describe('controlDispatchDisposition', () => {
   it.each([
-    ['failed', 'disconnected', { action: 'fail', reason: 'environment_failed' }],
-    ['failed', 'ready', { action: 'fail', reason: 'environment_failed' }],
+    ['failed', 'disconnected', { action: 'wait' }],
+    ['failed', 'ready', { action: 'wait' }],
     ['unknown', 'disconnected', { action: 'fail', reason: 'provider_unknown' }],
-    ['stopped', 'disconnected', { action: 'fail', reason: 'environment_failed' }],
+    ['stopped', 'disconnected', { action: 'wait' }],
     ['running', 'ready', { action: 'send' }],
     ['running', 'disconnected', { action: 'wait' }],
     ['creating', 'connected', { action: 'wait' }],
@@ -28,6 +29,19 @@ describe('controlDispatchDisposition', () => {
     ['stopping', 'disconnected', { action: 'wait' }],
   ] as const)('classifies %s/%s with its failure reason', (physical, connection, expected) => {
     expect(controlDispatchDisposition({ physical, connection })).toEqual(expected);
+  });
+
+  it('keeps provider_unknown fail-closed and stopped/failed waiting', () => {
+    expect(controlDispatchDisposition({ physical: 'unknown', connection: 'ready' })).toEqual({
+      action: 'fail',
+      reason: 'provider_unknown',
+    });
+    expect(controlDispatchDisposition({ physical: 'stopped', connection: 'ready' })).toEqual({
+      action: 'wait',
+    });
+    expect(controlDispatchDisposition({ physical: 'failed', connection: 'ready' })).toEqual({
+      action: 'wait',
+    });
   });
 });
 
@@ -46,9 +60,10 @@ describe('controlRequestResult', () => {
       failure = error;
     }
     expect(failure).toBeInstanceOf(ControlRequestError);
-    expect(failure).toMatchObject(error);
+    expect(failure).toMatchObject({ ...error, rejectionReceived: true });
     expect(isRetryableDeliveryError(failure)).toBe(true);
     expect(Object.assign(new Error(error.message), error)).not.toBeInstanceOf(ControlRequestError);
+    expect(new ControlRequestError(error).rejectionReceived).toBeUndefined();
   });
 
   it.each([undefined, { retryable: true }, { code: '', message: 'Invalid', retryable: true }])(
@@ -68,6 +83,70 @@ describe('controlRequestResult', () => {
       }
       expect(failure).toBeInstanceOf(Error);
       expect(isRetryableDeliveryError(failure)).toBe(false);
+    }
+  );
+});
+
+describe('reconstructControlRequestError', () => {
+  it('rebuilds a local ControlRequestError from serialized RPC fields only', () => {
+    // Own fields only: no ControlRequestError prototype, no rejectionReceived.
+    const wire = {
+      name: 'ControlRequestError',
+      code: 'not_ready',
+      message: 'Sandbox runtime is not ready',
+      retryable: true,
+      admission: 'not-admitted' as const,
+    };
+
+    const reconstructed = reconstructControlRequestError(wire);
+
+    expect(reconstructed).toBeInstanceOf(ControlRequestError);
+    expect(reconstructed).toMatchObject({
+      code: 'not_ready',
+      message: 'Sandbox runtime is not ready',
+      retryable: true,
+      admission: 'not-admitted',
+    });
+    expect(reconstructed).not.toBe(wire);
+    expect((reconstructed as ControlRequestError).rejectionReceived).toBeUndefined();
+  });
+
+  it('does not reconstruct a rejection whose fields are only inherited', () => {
+    const inherited = Object.create({
+      code: 'not_ready',
+      message: 'Sandbox runtime is not ready',
+      retryable: true,
+      admission: 'not-admitted' as const,
+    });
+
+    expect(reconstructControlRequestError(inherited)).toBe(inherited);
+  });
+
+  it('does not copy a wire rejection flag from a serialized wrapper-style rejection', () => {
+    const wire = Object.assign(new Error('Sandbox runtime is not ready'), {
+      name: 'ControlRequestError',
+      code: 'not_ready',
+      retryable: true,
+      admission: 'not-admitted',
+      rejectionReceived: true,
+    });
+
+    const reconstructed = reconstructControlRequestError(wire) as ControlRequestError;
+
+    expect(reconstructed).toBeInstanceOf(ControlRequestError);
+    expect(reconstructed).toMatchObject({ code: 'not_ready', admission: 'not-admitted' });
+    expect(reconstructed.rejectionReceived).toBeUndefined();
+  });
+
+  it('returns an already-local ControlRequestError unchanged', () => {
+    const local = new ControlRequestError({ code: 'not_ready', message: 'x', retryable: true });
+    expect(reconstructControlRequestError(local)).toBe(local);
+  });
+
+  it.each([new Error('boom'), { retryable: true }, undefined, null, 'not_ready'])(
+    'passes a malformed rejection %j through unchanged',
+    malformed => {
+      expect(reconstructControlRequestError(malformed)).toBe(malformed);
     }
   );
 });
@@ -109,10 +188,90 @@ describe('deliveryErrorLogFields', () => {
     });
   });
 
+  it('logs the detail for an unclassified transport or internal error', () => {
+    expect(deliveryErrorLogFields(new Error('some transport detail'))).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: 'some transport detail',
+      retryable: false,
+    });
+  });
+
+  it('stringifies a non-Error thrown value for an unclassified error', () => {
+    expect(deliveryErrorLogFields('boom')).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: 'boom',
+      retryable: false,
+    });
+  });
+
+  it('logs the message of a passed-through malformed rejection', () => {
+    const malformed = { code: '', message: 'Invalid rejection', retryable: true };
+    expect(deliveryErrorLogFields(malformed)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: 'Invalid rejection',
+      retryable: true,
+    });
+  });
+
+  it('falls back for a non-Error object whose message is not a string', () => {
+    const error = { message: { nested: true } };
+    expect(deliveryErrorLogFields(error)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[object Object]',
+      retryable: false,
+    });
+  });
+
+  it('refuses an inherited message for a non-Error value', () => {
+    const error = Object.create({ message: 'inherited' });
+    expect(deliveryErrorLogFields(error)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[object Object]',
+      retryable: false,
+    });
+  });
+
+  it('falls back for a non-Error object whose message read throws', () => {
+    const error = {
+      get message(): string {
+        throw new Error('message exploded');
+      },
+    };
+    expect(() => deliveryErrorLogFields(error)).not.toThrow();
+    expect(deliveryErrorLogFields(error)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[unserializable error]',
+      retryable: false,
+    });
+  });
+
+  it('falls back for a null-prototype value that cannot be stringified', () => {
+    expect(() => deliveryErrorLogFields(Object.create(null))).not.toThrow();
+    expect(deliveryErrorLogFields(Object.create(null))).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[unserializable error]',
+      retryable: false,
+    });
+  });
+
+  it('falls back for a thrown value whose string conversion throws', () => {
+    const error = {
+      toString() {
+        throw new Error('toString exploded');
+      },
+    };
+    expect(() => deliveryErrorLogFields(error)).not.toThrow();
+    expect(deliveryErrorLogFields(error)).toEqual({
+      errorCode: 'transport_or_internal_error',
+      errorMessage: '[unserializable error]',
+      retryable: false,
+    });
+  });
+
   it.each([false, true])(
-    'classifies transport exceptions without copying fields when overloaded=%s',
+    'classifies a transport exception with its detail when overloaded=%s',
     overloaded => {
-      const error = Object.assign(new Error('sensitive-message'), {
+      const error = Object.assign(new Error('transport detail'), {
         code: 'session_busy',
         retryable: true,
         overloaded,
@@ -121,6 +280,7 @@ describe('deliveryErrorLogFields', () => {
       });
       expect(deliveryErrorLogFields(error)).toEqual({
         errorCode: 'transport_or_internal_error',
+        errorMessage: 'transport detail',
         retryable: !overloaded,
       });
     }

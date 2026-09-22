@@ -246,8 +246,8 @@ export function useAgentAttachmentUpload(
   // Cancel handles for in-flight uploads, keyed by attachment id. Each handle
   // cancels the upload task and deletes a cache-owned partial file. The entry
   // is removed when the upload settles (in `startUpload`'s finally) or when a
-  // cancel runs.
-  const cancelHandlesRef = useRef(new Map<string, () => Promise<void>>());
+  // cancel runs. The modern task cancels synchronously, so a handle returns void.
+  const cancelHandlesRef = useRef(new Map<string, () => void>());
 
   const cancelUpload = useCallback((id: string) => {
     const handle = cancelHandlesRef.current.get(id);
@@ -255,7 +255,11 @@ export function useAgentAttachmentUpload(
       return;
     }
     cancelHandlesRef.current.delete(id);
-    void runBestEffort(handle);
+    try {
+      handle();
+    } catch {
+      // Best-effort: a failed cancel must not block removal.
+    }
   }, []);
 
   useEffect(() => {
@@ -322,14 +326,12 @@ export function useAgentAttachmentUpload(
         // cache-owned file and blocks task creation after the signed URL
         // returns.
         let cancelled = false;
-        let task: { cancelAsync: () => Promise<void> } | undefined = undefined;
-        cancelHandlesRef.current.set(attachment.id, async () => {
+        let task: { cancel: () => void } | undefined = undefined;
+        cancelHandlesRef.current.set(attachment.id, () => {
           cancelled = true;
           progressCoalescer.cancel();
           try {
-            if (task) {
-              await task.cancelAsync();
-            }
+            task?.cancel();
           } finally {
             deleteCacheOwnedFile(attachment.localUri);
           }
@@ -427,6 +429,7 @@ export function useAgentAttachmentUpload(
       const limit = canAddAttachments(attachments.length, candidates.length);
       if (!limit.ok) {
         toast.error(
+          // i18n-dup-ok: 'agentChat.attachmentPicker.maxFilesAllowed_other' is this message's plural other category — the bare key carries that copy by i18next convention, so the family is one message, not two keys for the same copy.
           i18n.t('agentChat.attachmentPicker.maxFilesAllowed', {
             count: AGENT_ATTACHMENT_MAX_FILES,
             displayCount: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
@@ -436,8 +439,15 @@ export function useAgentAttachmentUpload(
       }
       const accepted = candidates.slice(0, limit.acceptedCount);
       if (limit.truncated) {
+        // The admitted count selects the plural category, because that is the
+        // numeral a catalog's own grammar inflects the warning's noun on
+        // ("1 of 2 files", French "Ajout de 1 fichier …"). The total the user
+        // selected is interpolated beside it, and English carries the plural
+        // noun in every category, so the sentence still reads "1 of 2 files".
+        // i18n-dup-ok: 'agentChat.attachmentPicker.onlyAddingFiles_one' and 'agentChat.attachmentPicker.onlyAddingFiles_other' are this counted message's plural categories, not two keys for one string — English reads the same at every count, but fr and zu inflect the one-form, so the family stays.
         toast.warning(
           i18n.t('agentChat.attachmentPicker.onlyAddingFiles', {
+            count: limit.acceptedCount,
             accepted: formatNumber(limit.acceptedCount, i18n.language),
             total: formatNumber(candidates.length, i18n.language),
             max: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),

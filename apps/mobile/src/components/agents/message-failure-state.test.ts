@@ -74,16 +74,32 @@ describe('selectMessageFailure', () => {
         expect(result?.kind).toBe('delivery');
         expect(result?.title).toBe('Failed to deliver');
         expect(result?.detail).toBe(detail);
+        expect(result?.title).not.toContain('RAW_TRANSPORT_TEXT');
         expect(result?.detail).not.toContain('RAW_TRANSPORT_TEXT');
+        // The raw transport text stays reachable behind the copy action only.
+        expect(result?.copyDetail).toBe('RAW_TRANSPORT_TEXT');
         expect(result?.canRetry).toBe(true);
         expect(result?.canCopy).toBe(true);
       }
+    });
+
+    it('exposes no copy detail when the delivery failure carries no transport text', () => {
+      const result = selectMessageFailure({
+        info: userInfo(),
+        deliveryState: { status: 'failed', error: '', reason: 'exhausted' },
+      });
+      expect(result?.copyDetail).toBe('');
     });
   });
 
   describe('assistant', () => {
     it('returns null for an assistant info with no error', () => {
       expect(selectMessageFailure({ info: assistantInfoWithoutError() })).toBeNull();
+    });
+
+    it('never carries a copy detail for an assistant row', () => {
+      const result = selectMessageFailure({ info: assistantInfo('APIError') });
+      expect(result?.copyDetail).toBe('');
     });
 
     it('derives fixed copy from a known error name and never emits provider text', () => {
@@ -96,10 +112,11 @@ describe('selectMessageFailure', () => {
       expect(result?.canCopy).toBe(false);
     });
 
-    it('falls back to the generic line for an unknown error name', () => {
+    it('adds no detail line for an unknown error name, which the title states', () => {
       const result = selectMessageFailure({ info: assistantInfo('UnknownError') });
-      expect(result?.detail).toBe('The response failed.');
-      expect(result?.detail).not.toContain('RAW_PROVIDER_TEXT');
+      expect(result?.title).toBe('Response failed');
+      expect(result?.detail).toBeNull();
+      expect(JSON.stringify(result)).not.toContain('RAW_PROVIDER_TEXT');
     });
 
     it('sets canRetry false only for NON_RETRYABLE_ASSISTANT_ERRORS', () => {

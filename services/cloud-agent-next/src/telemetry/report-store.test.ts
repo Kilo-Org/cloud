@@ -236,7 +236,11 @@ describe('cloud agent reporting store', () => {
     const result = await store.recordSessionFailure({
       cloudAgentSessionId,
       occurredAt,
-      failure: { stage: 'initial_admission', code: 'initial_queue_full' },
+      failure: {
+        stage: 'initial_admission',
+        code: 'initial_queue_full',
+        admissionCode: 'PENDING_QUEUE_FULL',
+      },
       diagnostic: {
         errorMessageRedacted: 'Initial queue is full',
         errorExpiresAt: '2026-06-01T12:00:00.000Z',
@@ -247,9 +251,30 @@ describe('cloud agent reporting store', () => {
       failure_at: occurredAt,
       failure_stage: 'initial_admission',
       failure_code: 'initial_queue_full',
-      failure_responsibility: 'unknown',
-      failure_reason: 'initial_admission_unknown',
+      failure_responsibility: 'platform',
+      failure_reason: 'admission_capacity',
       error_message_redacted: 'Initial queue is full',
+    });
+  });
+
+  it('attributes an admission rejection from the preserved admission code', async () => {
+    const fake = makeDb([], [[{ cloudAgentSessionId }]]);
+    const store = createCloudAgentReportStore(fake.db as never);
+    const result = await store.recordSessionFailure({
+      cloudAgentSessionId,
+      occurredAt,
+      failure: {
+        stage: 'initial_admission',
+        code: 'initial_admission_rejected',
+        admissionCode: 'INTERNAL',
+      },
+    });
+    expect(result).toEqual({ applied: true });
+    expect(fake.updates.find(call => call.table === cloud_agent_sessions)?.values).toMatchObject({
+      failure_stage: 'initial_admission',
+      failure_code: 'initial_admission_rejected',
+      failure_responsibility: 'platform',
+      failure_reason: 'admission_internal',
     });
   });
 
@@ -292,6 +317,113 @@ describe('cloud agent reporting store', () => {
     expect(fake.inserts).toHaveLength(0);
   });
 
+  const anchor = {
+    kiloSessionId: 'ses_12345678901234567890123456',
+    initialMessageId: 'msg_anchor_initial',
+    reportingCreatedAt: occurredAt,
+  };
+  const anchoredReport = {
+    version: 1,
+    type: 'run.state',
+    occurredAt,
+    session: { cloudAgentSessionId, ...anchor },
+    run: { messageId: 'msg_anchor_run', status: 'queued', queuedAt: occurredAt },
+  } satisfies CloudAgentRunStateReport;
+
+  it('creates a retention-eligible parent from a trusted anchor then applies the run', async () => {
+    const fake = makeDb([
+      [],
+      [
+        {
+          createdAt: occurredAt,
+          kiloSessionId: anchor.kiloSessionId,
+          initialMessageId: anchor.initialMessageId,
+        },
+      ],
+      [],
+    ]);
+    const store = createCloudAgentReportStore(fake.db as never);
+
+    expect(await store.saveReport(anchoredReport, occurredAt)).toEqual({ outcome: 'applied' });
+    expect(fake.inserts.find(call => call.table === cloud_agent_sessions)?.values).toEqual({
+      cloud_agent_session_id: cloudAgentSessionId,
+      kilo_session_id: anchor.kiloSessionId,
+      initial_message_id: anchor.initialMessageId,
+      created_at: anchor.reportingCreatedAt,
+    });
+    expect(
+      fake.inserts.find(call => call.table === cloud_agent_session_runs)?.values
+    ).toMatchObject({
+      cloud_agent_session_id: cloudAgentSessionId,
+      message_id: 'msg_anchor_run',
+      status: 'queued',
+    });
+  });
+
+  it('refuses to resurrect a parent for an anchor older than the retention cutoff', async () => {
+    const fake = makeDb([[]]);
+    const store = createCloudAgentReportStore(fake.db as never);
+    const expiredAnchor = {
+      ...anchoredReport,
+      session: {
+        cloudAgentSessionId,
+        ...anchor,
+        reportingCreatedAt: new Date(
+          Date.parse(occurredAt) - 91 * 24 * 60 * 60 * 1000
+        ).toISOString(),
+      },
+    } satisfies CloudAgentRunStateReport;
+
+    expect(await store.saveReport(expiredAnchor, occurredAt)).toEqual({
+      outcome: 'missing_parent',
+    });
+    expect(fake.inserts).toHaveLength(0);
+  });
+
+  it('reports missing_parent when a concurrent parent still cannot be read back', async () => {
+    const fake = makeDb([[], [], []]);
+    const store = createCloudAgentReportStore(fake.db as never);
+
+    expect(await store.saveReport(anchoredReport, occurredAt)).toEqual({
+      outcome: 'missing_parent',
+    });
+    expect(fake.inserts.some(call => call.table === cloud_agent_sessions)).toBe(true);
+    expect(fake.inserts.some(call => call.table === cloud_agent_session_runs)).toBe(false);
+  });
+
+  it('leaves an existing parent untouched when applying an anchored report', async () => {
+    const fake = makeDb([
+      [
+        {
+          createdAt: occurredAt,
+          kiloSessionId: anchor.kiloSessionId,
+          initialMessageId: anchor.initialMessageId,
+        },
+      ],
+      [],
+    ]);
+    const store = createCloudAgentReportStore(fake.db as never);
+
+    expect(await store.saveReport(anchoredReport, occurredAt)).toEqual({ outcome: 'applied' });
+    expect(fake.inserts.some(call => call.table === cloud_agent_sessions)).toBe(false);
+  });
+
+  it('refuses an anchored report whose parent identity conflicts', async () => {
+    const fake = makeDb([
+      [
+        {
+          createdAt: occurredAt,
+          kiloSessionId: 'ses_zzzzzzzzzzzzzzzzzzzzzzzzzz',
+          initialMessageId: 'msg_other_initial',
+        },
+      ],
+    ]);
+    const store = createCloudAgentReportStore(fake.db as never);
+
+    expect(await store.saveReport(anchoredReport, occurredAt)).toEqual({ outcome: 'conflict' });
+    expect(fake.inserts).toHaveLength(0);
+  });
+
   it('persists run milestones, typed failure and sanitized detail by natural composite key', async () => {
     const fake = makeDb([[{ createdAt: occurredAt }], []]);
     const store = createCloudAgentReportStore(fake.db as never);
@@ -329,6 +461,32 @@ describe('cloud agent reporting store', () => {
       failure_responsibility: 'user',
       failure_reason: 'setup_command',
       error_message_redacted: 'Workspace setup failed',
+    });
+  });
+
+  it('persists a provider failure responsibility and reason unchanged', async () => {
+    const fake = makeDb([[{ createdAt: occurredAt }], []]);
+    const store = createCloudAgentReportStore(fake.db as never);
+    const result = await store.saveReport(
+      {
+        ...failedReport,
+        run: {
+          ...failedReport.run,
+          failureResponsibility: 'provider',
+          failureReason: 'provider_unavailable',
+        },
+      },
+      occurredAt
+    );
+    expect(result).toEqual({ outcome: 'applied' });
+    expect(
+      fake.inserts.find(call => call.table === cloud_agent_session_runs)?.values
+    ).toMatchObject({
+      cloud_agent_session_id: cloudAgentSessionId,
+      message_id: failedReport.run.messageId,
+      status: 'failed',
+      failure_responsibility: 'provider',
+      failure_reason: 'provider_unavailable',
     });
   });
 

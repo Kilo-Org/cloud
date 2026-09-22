@@ -207,7 +207,7 @@ export function QuestionCard({
       </View>
 
       {presentation.errorMessage ? (
-        <View className="border-b border-border bg-destructive/10 px-4 py-2">
+        <View className="border-b border-border bg-danger-tile-bg px-4 py-2">
           <Text className="text-xs text-destructive">{presentation.errorMessage}</Text>
         </View>
       ) : null}
@@ -227,6 +227,14 @@ export function QuestionCard({
                 <View className="gap-1">
                   {question.options.map((option, oIndex) => {
                     const isSelected = selectedOptions[qIndex]?.has(oIndex) ?? false;
+                    // The description is content, not an action hint: TalkBack
+                    // (Android) reads the node's hint text, never the tooltip
+                    // React Native fills from `accessibilityHint`, so a hint
+                    // would leave the subtitle unannounced. Join it into the
+                    // accessible name, the way the Kilo Pass card does.
+                    const optionLabel = option.description
+                      ? `${option.label}, ${option.description}`
+                      : option.label;
                     return (
                       <Button
                         key={oIndex}
@@ -239,22 +247,43 @@ export function QuestionCard({
                         accessibilityRole="button"
                         accessibilityLabel={
                           isSelected
-                            ? t('agentChat.questionCard.optionSelected', { label: option.label })
-                            : t('agentChat.questionCard.option', { label: option.label })
+                            ? t('agentChat.questionCard.optionSelected', { label: optionLabel })
+                            : t('agentChat.questionCard.option', { label: optionLabel })
                         }
                         className={cn(
                           'h-auto justify-start py-2.5',
                           isSelected ? 'bg-primary' : 'bg-background'
                         )}
                       >
-                        <Text
-                          className={cn(
-                            'text-sm',
-                            isSelected ? 'text-primary-foreground' : 'text-foreground'
-                          )}
-                        >
-                          {option.label}
-                        </Text>
+                        {/*
+                          The agent may attach an explanation to a choice; the
+                          CLI, web, and extension all show it as a muted
+                          subtitle under the label. Stack the two lines so the
+                          label stays the prominent line and the description
+                          reads as supporting text.
+                        */}
+                        <View className="flex-1 flex-col items-start gap-0.5">
+                          <Text
+                            className={cn(
+                              'text-sm',
+                              isSelected ? 'text-primary-foreground' : 'text-foreground'
+                            )}
+                          >
+                            {option.label}
+                          </Text>
+                          {option.description ? (
+                            <Text
+                              className={cn(
+                                'text-xs',
+                                isSelected
+                                  ? 'text-primary-foreground opacity-70'
+                                  : 'text-muted-foreground'
+                              )}
+                            >
+                              {option.description}
+                            </Text>
+                          ) : null}
+                        </View>
                       </Button>
                     );
                   })}
@@ -331,35 +360,35 @@ export function QuestionCard({
       </ScrollView>
 
       {presentation.hasPrimaryCta || presentation.hasRetryCta || presentation.hasRejectCta ? (
-        <View className="flex-row gap-2 border-t border-border p-3">
+        <View className="flex-col gap-2 border-t border-border p-3">
           {presentation.hasRejectCta ? (
             <Button
               variant="outline"
-              className="flex-1"
+              className="w-full"
               onPress={handleReject}
               disabled={interactionDisabled}
             >
-              <Text className="text-sm">{t('agentChat.questionCard.skip')}</Text>
+              <Text className="shrink text-center text-sm">{t('agentChat.questionCard.skip')}</Text>
             </Button>
           ) : null}
           {presentation.hasRetryCta && presentation.retryAction === 'answer' ? (
-            <Button className="flex-1" onPress={handleSubmit} disabled={submitDisabled}>
+            <Button className="w-full" onPress={handleSubmit} disabled={submitDisabled}>
               {submittingSpinner}
-              <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>{t('common.retry')}</Text>
+              <Text className="shrink text-center text-sm">{t('common.retry')}</Text>
             </Button>
           ) : null}
           {presentation.hasRetryCta && presentation.retryAction === 'reject' ? (
-            <Button className="flex-1" onPress={handleRetrySkip} disabled={interactionDisabled}>
+            <Button className="w-full" onPress={handleRetrySkip} disabled={interactionDisabled}>
               {submittingSpinner}
-              <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>
+              <Text className="shrink text-center text-sm">
                 {t('agentChat.questionCard.retrySkip')}
               </Text>
             </Button>
           ) : null}
           {presentation.hasPrimaryCta ? (
-            <Button className="flex-1" onPress={handleSubmit} disabled={submitDisabled}>
+            <Button className="w-full" onPress={handleSubmit} disabled={submitDisabled}>
               {submittingSpinner}
-              <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>
+              <Text className="shrink text-center text-sm">
                 {isSubmitting
                   ? t('agentChat.questionCard.submitting')
                   : t('agentChat.questionCard.sendAnswers')}

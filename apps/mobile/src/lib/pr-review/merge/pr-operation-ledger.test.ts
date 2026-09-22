@@ -47,7 +47,11 @@ describe('mapPrOperationError', () => {
     ['create-comment', 'Could not post comment.'],
     ['submit-review', 'Could not submit review. Check your connection and try again.'],
     ['reply', 'Could not reply.'],
+    // A resolve/unresolve toggle is not a reply: the duplicate-operation toast
+    // must name the thread action, never "Could not reply".
+    ['resolve', 'Could not complete this action.'],
     ['merge', 'Could not merge pull request.'],
+    ['pr-comment', 'Could not post comment.'],
   ] as const)(
     'maps operation_in_progress onto the existing %s retryable copy',
     (surface, expected) => {
@@ -57,7 +61,7 @@ describe('mapPrOperationError', () => {
     }
   );
 
-  it.each(['create-comment', 'submit-review', 'reply', 'merge'] as const)(
+  it.each(['create-comment', 'submit-review', 'reply', 'resolve', 'merge', 'pr-comment'] as const)(
     'maps the ambiguous outcome onto the verify-before-retrying copy for %s',
     surface => {
       const mapped = mapPrOperationError(AMBIGUOUS, surface);
@@ -66,7 +70,7 @@ describe('mapPrOperationError', () => {
     }
   );
 
-  it.each(['create-comment', 'submit-review', 'reply', 'merge'] as const)(
+  it.each(['create-comment', 'submit-review', 'reply', 'resolve', 'merge', 'pr-comment'] as const)(
     'maps the persistence-failure marker onto the terminal could-not-record copy for %s',
     surface => {
       const mapped = mapPrOperationError(PERSISTENCE_FAILED, surface);

@@ -1,18 +1,33 @@
 import { WifiOff } from '@/components/ui/icons';
-import { useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OfflineBannerSpaceProvider } from '@/components/offline-banner-space';
 import { Text } from '@/components/ui/text';
 import { announceForA11y } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
+import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
+
+/**
+ * Publishes the banner's visibility to every pinned `ScreenHeader`. Mounted by
+ * the root layout above the navigation tree; the header then reserves the
+ * overlay's height without importing the connectivity stack itself.
+ */
+export function OfflineBannerSpaceGate({ children }: Readonly<{ children: ReactNode }>) {
+  const isOffline = useOfflineBannerState();
+  return <OfflineBannerSpaceProvider isOffline={isOffline}>{children}</OfflineBannerSpaceProvider>;
+}
 
 /**
  * App-wide offline banner. Absolute overlay, so app content keeps its layout
  * position; `pointerEvents="none"` passes every touch to the header below.
+ * Surfaces with a pinned top header reserve `OFFLINE_BANNER_HEIGHT` above the
+ * header while the banner is visible so it never covers the title (see
+ * `offlineHeaderReservation`).
  */
 export function OfflineBanner() {
   const isOffline = useOfflineBannerState();
@@ -46,7 +61,8 @@ export function OfflineBanner() {
         accessible
         accessibilityRole="alert"
         accessibilityLabel={t('offline.noInternet')}
-        className="flex-row items-center justify-center gap-2 bg-warn px-4 py-2"
+        className="flex-row items-center justify-center gap-2 bg-warn px-4"
+        style={{ height: OFFLINE_BANNER_HEIGHT }}
       >
         <WifiOff size={14} color={colors.warnForeground} />
         <Text className="text-sm font-medium text-warn-foreground">{t('offline.noInternet')}</Text>

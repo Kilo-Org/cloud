@@ -1,7 +1,9 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import {
   canOrganizationUseMultipleGitHubInstallations,
+  canOrganizationCreateSharedGitHubConnection,
   parseMultipleGitHubInstallationOrganizationIds,
+  parseSharedGitHubInstallationOrganizationIds,
 } from './multiple-installations';
 
 jest.mock('@/lib/dotenvx', () => ({
@@ -36,6 +38,36 @@ describe('canOrganizationUseMultipleGitHubInstallations', () => {
     expect(
       canOrganizationUseMultipleGitHubInstallations('9d278969-5453-4ae3-a51f-a8d2274a7b56')
     ).toBe(false);
+  });
+});
+
+describe('shared GitHub installation admission', () => {
+  const organizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+
+  it('is default-off and independent from multiple-installation admission', () => {
+    mockedGetEnvVariable.mockImplementation(name =>
+      name === 'GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS' ? organizationId : ''
+    );
+
+    expect(canOrganizationUseMultipleGitHubInstallations(organizationId)).toBe(true);
+    expect(canOrganizationCreateSharedGitHubConnection(organizationId)).toBe(false);
+  });
+
+  it('admits only exact organization UUIDs from the sharing allowlist', () => {
+    mockedGetEnvVariable.mockImplementation(name =>
+      name === 'GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS' ? organizationId : ''
+    );
+
+    expect(canOrganizationCreateSharedGitHubConnection(organizationId)).toBe(true);
+    expect(
+      canOrganizationCreateSharedGitHubConnection('00000000-0000-4000-8000-000000000001')
+    ).toBe(false);
+  });
+
+  it('validates the sharing allowlist without exposing malformed values', () => {
+    expect(() => parseSharedGitHubInstallationOrganizationIds('not-an-id')).toThrow(
+      'GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS must be a comma-separated list of UUIDs'
+    );
   });
 });
 

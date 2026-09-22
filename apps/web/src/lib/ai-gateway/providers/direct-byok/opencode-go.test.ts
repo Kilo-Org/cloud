@@ -24,6 +24,7 @@ describe('OpenCode Go session headers', () => {
         id: 'direct-byok',
         apiUrl: openCodeGo.base_url,
         apiUrlOverrides: {},
+        disableUrlSuffix: false,
         apiKey: 'test-api-key',
         apiKeyHeader: null,
         supportedChatApis: openCodeGo.supported_chat_apis,
@@ -128,7 +129,7 @@ describe('getAiSdkProvider', () => {
   );
 
   test('uses Chat Completions for MiniMax models from other direct providers', () => {
-    expect(getAiSdkProvider('minimax/minimax-m2.5', 'crofai')).toBeUndefined();
+    expect(getAiSdkProvider('minimax/minimax-m2.5', 'chutes-byok')).toBeUndefined();
   });
 
   test('uses OpenAI-compatible Chat Completions for Morph direct BYOK models', () => {

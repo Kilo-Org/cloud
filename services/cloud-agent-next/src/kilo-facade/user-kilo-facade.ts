@@ -845,7 +845,7 @@ async function admitBasicPrompt(params: {
   try {
     return await preflightAndAdmitPromptMessage(
       { cloudAgentSessionId: params.cloudAgentSessionId, ...command },
-      { env: params.env, userId: params.userId },
+      { env: params.env, userId: params.userId, authToken: params.authToken },
       'kilo.prompt_async',
       () =>
         admitPrompt({

@@ -1,8 +1,18 @@
 import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 
 export const LOCAL_FAKE_DETERMINISTIC_MODEL_ID = 'fake-deterministic';
+
+/**
+ * Speech-to-text catalog ids served by the local fake LLM
+ * (`services/cloud-agent-next/test/e2e/fake-llm-server.ts`). Keep in sync with
+ * its `TRANSCRIPTION_MODELS`.
+ */
+export const LOCAL_FAKE_TRANSCRIPTION_MODEL_IDS = ['fake-transcribe', 'fake-transcribe-broken'];
+
+export const LOCAL_FAKE_LLM_API_KEY = 'local-fake-llm';
 
 function parseAbsoluteHttpUrl(value: string | undefined): URL | null {
   if (!value) return null;
@@ -20,6 +30,11 @@ export function isLocalFakeDeterministicModel(id: string | undefined | null): bo
   return (
     id === LOCAL_FAKE_DETERMINISTIC_MODEL_ID || id === `kilo/${LOCAL_FAKE_DETERMINISTIC_MODEL_ID}`
   );
+}
+
+export function isLocalFakeTranscriptionModel(id: string | undefined | null): boolean {
+  if (!id) return false;
+  return LOCAL_FAKE_TRANSCRIPTION_MODEL_IDS.some(model => id === model || id === `kilo/${model}`);
 }
 
 export function isLocalFakeLlmEnabled(): boolean {
@@ -79,8 +94,29 @@ export function getLocalFakeLlmProvider(): Provider | null {
     {
       base_url: `${baseUrl}/api/openrouter`,
       internal_id: LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
-      api_key: 'local-fake-llm',
+      api_key: LOCAL_FAKE_LLM_API_KEY,
     },
     null
   );
+}
+
+/**
+ * OpenRouter-shaped provider that points speech-to-text traffic at the local
+ * fake LLM, for e2e runs without a real OpenRouter key.
+ */
+export function getLocalFakeTranscriptionProvider(): Provider | null {
+  const url = parseAbsoluteHttpUrl(process.env.FAKE_LLM_URL);
+  if (!isLocalFakeLlmEnabled() || !url) return null;
+  return {
+    ...OPENROUTER,
+    apiUrl: `${url.href.replace(/\/$/, '')}/api/openrouter`,
+    apiKey: LOCAL_FAKE_LLM_API_KEY,
+  };
+}
+
+/** Full transcription-models catalog URL on the local fake LLM, or null. */
+export function getLocalFakeTranscriptionModelsUrl(): string | null {
+  const url = parseAbsoluteHttpUrl(process.env.FAKE_LLM_URL);
+  if (!isLocalFakeLlmEnabled() || !url) return null;
+  return `${url.href.replace(/\/$/, '')}/api/openrouter/models?output_modalities=transcription`;
 }

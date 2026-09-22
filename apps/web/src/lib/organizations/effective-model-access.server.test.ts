@@ -163,6 +163,32 @@ describe('effective organization model access', () => {
     expect((await getEffectiveModelDecision(policy, 'openai/o3:free')).allowed).toBe(false);
   });
 
+  it('judges each model variant on the providers that serve that variant', async () => {
+    const policy = evaluateEffectiveModelAccessPolicy(
+      context({
+        organization: {
+          ...context().organization,
+          settings: { provider_allow_list: ['deepinfra'], model_deny_list: [] },
+        },
+        defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+      })
+    );
+    const variantAwareLookup = async (modelId: string) =>
+      new Set(
+        {
+          'nvidia/nemotron': ['deepinfra', 'coreweave'],
+          'nvidia/nemotron:free': ['nvidia'],
+        }[modelId] ?? []
+      );
+
+    await expect(
+      getEffectiveModelDecision(policy, 'nvidia/nemotron', variantAwareLookup)
+    ).resolves.toEqual({ allowed: true, eligibleProviderRoutes: new Set(['deepinfra']) });
+    await expect(
+      getEffectiveModelDecision(policy, 'nvidia/nemotron:free', variantAwareLookup)
+    ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+  });
+
   it('requires an explicit none policy to grant no models', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(context());
     expect((await getEffectiveModelDecision(policy, 'anthropic/claude')).allowed).toBe(false);
@@ -350,10 +376,10 @@ describe('effective organization model access', () => {
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
     );
-    const catalogLookup = async () => new Set(['fireworks', 'openai']);
+    const catalogLookup = async () => new Set(['fireworks', 'stepfun']);
 
     expect(
-      await getEffectiveModelDecision(policy, 'openai/gpt-5.6-sol-discounted', catalogLookup)
+      await getEffectiveModelDecision(policy, 'stepfun/step-3.7-flash:free', catalogLookup)
     ).toEqual({ allowed: false, denialSource: 'organization_provider' });
   });
 
@@ -362,19 +388,19 @@ describe('effective organization model access', () => {
       context({
         organization: {
           ...context().organization,
-          settings: { provider_allow_list: ['openai', 'fireworks'], model_deny_list: [] },
+          settings: { provider_allow_list: ['stepfun', 'fireworks'], model_deny_list: [] },
         },
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
     );
     const decision = await getEffectiveModelDecision(
       policy,
-      'openai/gpt-5.6-sol-discounted',
+      'stepfun/step-3.7-flash:free',
       async () => new Set(['fireworks'])
     );
 
     expect(decision.allowed).toBe(true);
-    expect([...decision.eligibleProviderRoutes!]).toEqual(['openai']);
+    expect([...decision.eligibleProviderRoutes!]).toEqual(['stepfun']);
   });
 
   it('does not apply exclusive restrictions to the unsuffixed catalog model', async () => {
@@ -387,16 +413,16 @@ describe('effective organization model access', () => {
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
     );
-    const catalogLookup = async () => new Set(['fireworks', 'openai']);
+    const catalogLookup = async () => new Set(['fireworks', 'stepfun']);
 
     const exclusive = await getEffectiveModelDecision(
       policy,
-      'openai/gpt-5.6-sol-discounted',
+      'stepfun/step-3.7-flash:free',
       catalogLookup
     );
     const catalogModel = await getEffectiveModelDecision(
       policy,
-      'openai/gpt-5.6-sol',
+      'stepfun/step-3.7-flash',
       catalogLookup
     );
 
@@ -410,7 +436,7 @@ describe('effective organization model access', () => {
       context({
         organization: {
           ...context().organization,
-          settings: { provider_allow_list: ['openai'], model_deny_list: [] },
+          settings: { provider_allow_list: ['stepfun'], model_deny_list: [] },
         },
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
@@ -419,13 +445,13 @@ describe('effective organization model access', () => {
 
     const restricted = await getEffectiveModelDecision(
       policy,
-      'openai/gpt-5.6-sol-discounted',
+      'stepfun/step-3.7-flash:free',
       emptySnapshot
     );
     const unrestricted = await getEffectiveModelDecision(policy, 'unknown/model', emptySnapshot);
 
     expect(restricted.allowed).toBe(true);
-    expect([...restricted.eligibleProviderRoutes!]).toEqual(['openai']);
+    expect([...restricted.eligibleProviderRoutes!]).toEqual(['stepfun']);
     expect(unrestricted).toEqual({ allowed: false, denialSource: 'organization_model' });
   });
 });

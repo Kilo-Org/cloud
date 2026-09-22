@@ -1,7 +1,9 @@
 import type { StoredMessage } from '@kilocode/cloud-agent-sdk';
 
 const COST_RECONCILIATION_EPSILON_USD = 1e-6;
-const MINIMUM_RENDERABLE_COST_MICRODOLLARS = 50;
+const MICRODOLLARS_PER_DISPLAY_UNIT = 10_000;
+const DISPLAY_UNITS_PER_DOLLAR = 100;
+const MINIMUM_RENDERABLE_COST_MICRODOLLARS = MICRODOLLARS_PER_DISPLAY_UNIT / 2;
 
 export type SessionCostBreakdown = {
   totalCostUsd: number;
@@ -17,11 +19,11 @@ export function isRenderableSessionCost(costUsd: number): boolean {
 
 function getDisplayedSessionCostUnits(costUsd: number): number {
   const costMicrodollars = Math.round(sanitizeNonNegativeCost(costUsd) * 1_000_000);
-  return Math.round(costMicrodollars / 100);
+  return Math.round(costMicrodollars / MICRODOLLARS_PER_DISPLAY_UNIT);
 }
 
 export function formatSessionCost(costUsd: number): string {
-  return `$${(getDisplayedSessionCostUnits(costUsd) / 10_000).toFixed(4)}`;
+  return `$${(getDisplayedSessionCostUnits(costUsd) / DISPLAY_UNITS_PER_DOLLAR).toFixed(2)}`;
 }
 
 export function getDisplayedSessionCostBreakdown(
@@ -38,10 +40,10 @@ export function getDisplayedSessionCostBreakdown(
   );
 
   return {
-    totalCostUsd: totalUnits / 10_000,
-    rootCostUsd: (totalUnits - subagentUnits - olderActivityUnits) / 10_000,
-    subagentCostUsd: subagentUnits / 10_000,
-    olderActivityCostUsd: olderActivityUnits / 10_000,
+    totalCostUsd: totalUnits / DISPLAY_UNITS_PER_DOLLAR,
+    rootCostUsd: (totalUnits - subagentUnits - olderActivityUnits) / DISPLAY_UNITS_PER_DOLLAR,
+    subagentCostUsd: subagentUnits / DISPLAY_UNITS_PER_DOLLAR,
+    olderActivityCostUsd: olderActivityUnits / DISPLAY_UNITS_PER_DOLLAR,
   };
 }
 

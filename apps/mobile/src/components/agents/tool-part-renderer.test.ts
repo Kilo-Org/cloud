@@ -2,7 +2,7 @@
 import { type Part, type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import * as React from 'react';
 import { Pressable } from 'react-native';
-import { type ReactTestInstance } from 'react-test-renderer';
+import { type ReactTestInstance } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SpinningIcon } from '@/components/ui/spinning-icon';
@@ -187,7 +187,6 @@ function makeTaskState(status: ToolPart['state']['status']): ToolPart['state'] {
   return taskCompletedState;
 }
 
-// eslint-disable-next-line typescript-eslint/no-deprecated -- the existing harness uses this DOM-free React renderer
 function textContent(node: ReactTestInstance | string): string {
   return typeof node === 'string' ? node : node.children.map(textContent).join('');
 }
@@ -244,8 +243,8 @@ const toolActivities: [string, Record<string, unknown>, string][] = [
   ].map(tool => [tool, {}, tool] satisfies [string, Record<string, unknown>, string]),
 ];
 const activityHistories: [string, StoredMessage[], string][] = [
-  ['empty history', [], 'Waiting for activity'],
-  ['incomplete history', [makeStoredMessage()], 'Waiting for activity'],
+  ['empty history', [], 'Thinking'],
+  ['incomplete history', [makeStoredMessage()], 'Thinking'],
   [
     'delayed latest parts',
     [makeStoredMessage([textPart]), makeStoredMessage()],

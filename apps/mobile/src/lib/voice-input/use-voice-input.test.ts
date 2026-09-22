@@ -36,6 +36,8 @@ const platformMock = vi.hoisted(() => ({ OS: 'ios' }));
 
 const toastMock = vi.hoisted(() => ({
   error: vi.fn(),
+  info: vi.fn(),
+  dismiss: vi.fn(),
   success: vi.fn(),
 }));
 
@@ -49,6 +51,15 @@ const getSupportedLocalesMock = vi.hoisted(() =>
     installedLocales: ['en-US'],
   })
 );
+
+const routerMock = vi.hoisted(() => ({
+  push: vi.fn(),
+}));
+
+const gatewayPreferenceMock = vi.hoisted(() => ({
+  isGatewayTranscriptionEnabled: vi.fn<() => boolean>(() => false),
+  readGatewayTranscriptionModel: vi.fn<() => { id: string; name: string } | null>(() => null),
+}));
 
 const triggerOfflineModelDownloadMock = vi.hoisted(() =>
   vi
@@ -64,6 +75,12 @@ vi.mock('expo-haptics', () => ({
 vi.mock('expo-localization', () => ({
   getLocales: localizationMock.getLocales,
 }));
+
+vi.mock('expo-router', () => ({
+  router: routerMock,
+}));
+
+vi.mock('./gateway/gateway-transcription-preference', () => gatewayPreferenceMock);
 
 vi.mock('expo-speech-recognition', () => ({
   ExpoSpeechRecognitionModule: {
@@ -139,18 +156,26 @@ type ActionHarness = {
 };
 
 function buildActions(
-  overrides: { disabled?: boolean; draft?: string; owner?: string; userId?: string } = {}
+  overrides: {
+    disabled?: boolean;
+    draft?: string;
+    languageTag?: string | null;
+    owner?: string;
+    userId?: string;
+  } = {}
 ): ActionHarness {
   const owner = overrides.owner ?? 'owner-A';
   const draft = vi.fn<() => string>(() => overrides.draft ?? 'draft text');
   const onDraftChange = vi.fn<(nextDraft: string) => void>();
   const disabled = vi.fn<() => boolean>(() => overrides.disabled ?? false);
   const userId = vi.fn<() => string | undefined>(() => overrides.userId);
+  const languageTag = overrides.languageTag;
 
   const actions = createVoiceInputActions({
     controller: mockController,
     getDisabled: disabled,
     getDraft: draft,
+    getLanguageTag: languageTag === undefined ? undefined : () => languageTag,
     getOnDraftChange: () => onDraftChange,
     getOwner: () => owner,
     getUserId: userId,
@@ -181,6 +206,8 @@ describe('useVoiceInput integration', () => {
       locales: ['en-US', 'nl-NL'],
       installedLocales: ['en-US'],
     });
+    gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(false);
+    gatewayPreferenceMock.readGatewayTranscriptionModel.mockReturnValue(null);
     __resetVoiceInputLanguageTagCacheForTests();
   });
 
@@ -235,6 +262,65 @@ describe('useVoiceInput integration', () => {
         expect(startOptions.onFeedback).toBe(showFeedback);
       });
 
+      it('uses the persisted language choice instead of resolving the app language', async () => {
+        const { actions } = buildActions({ languageTag: 'nl-NL', userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('granted');
+
+        await actions.toggle();
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        const startOptions = mockController.start.mock.calls[0]?.[0];
+        if (!startOptions) {
+          throw new Error('controller.start was not called');
+        }
+        expect(startOptions.languageTag).toBe('nl-NL');
+      });
+
+      it('reconciles a gateway language tag onto the device locale before starting', async () => {
+        const { actions } = buildActions({ languageTag: 'zh-Hans', userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('granted');
+        getSupportedLocalesMock.mockResolvedValue({
+          locales: ['zh-CN', 'en-US'],
+          installedLocales: ['zh-CN'],
+        });
+
+        await actions.toggle();
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.languageTag).toBe('zh-CN');
+      });
+
+      it('reconciles a device locale onto the app language in gateway mode without a device fetch', async () => {
+        const { actions } = buildActions({ languageTag: 'de-DE', userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
+
+        await actions.toggle();
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.languageTag).toBe('de');
+        expect(getSupportedLocalesMock).not.toHaveBeenCalled();
+      });
+
+      it('resolves the app/device language when no language choice is persisted', async () => {
+        const { actions } = buildActions({ languageTag: null });
+        mockController.setSnapshot(idleSnapshot());
+        localizationMock.getLocales.mockReturnValue([{ languageTag: 'en-US' }]);
+
+        await actions.toggle();
+
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        const startOptions = mockController.start.mock.calls[0]?.[0];
+        if (!startOptions) {
+          throw new Error('controller.start was not called');
+        }
+        expect(startOptions.languageTag).toBe('en-US');
+      });
+
       it('resolves an en-DE device locale to en-US when the supported list contains en-AU and en-US', async () => {
         const { actions } = buildActions();
         mockController.setSnapshot(idleSnapshot());
@@ -281,6 +367,60 @@ describe('useVoiceInput integration', () => {
         await actions.toggle();
 
         expect(mockController.start).not.toHaveBeenCalled();
+      });
+
+      it('gateway mode: starts without the consent disclosure and ignores any stored model', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+
+        await actions.toggle();
+
+        // The gateway engine resolves the model itself (the stored choice,
+        // else the first catalogue entry), so the action layer starts the
+        // session without a model precondition.
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.requiresOnDeviceRecognition).toBe(false);
+        expect(alertMock.alert).not.toHaveBeenCalled();
+        expect(toastMock.error).not.toHaveBeenCalled();
+        expect(voiceNetworkConsentMock.readVoiceNetworkConsent).not.toHaveBeenCalled();
+      });
+
+      it('gateway mode while listening: stops the session through the controller', async () => {
+        const { actions, owner } = buildActions();
+        mockController.setSnapshot(activeSnapshot(owner, 'listening'));
+        gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
+
+        await actions.toggle();
+
+        expect(hapticsMock.impactAsync).toHaveBeenCalledWith('medium');
+        expect(mockController.stop).toHaveBeenCalledWith(owner);
+        expect(mockController.start).not.toHaveBeenCalled();
+      });
+
+      it('gateway mode while transcribing: aborts the hung upload instead of starting', async () => {
+        const { actions, owner } = buildActions();
+        mockController.setSnapshot(activeSnapshot(owner, 'transcribing'));
+        gatewayPreferenceMock.isGatewayTranscriptionEnabled.mockReturnValue(true);
+
+        await actions.toggle();
+
+        expect(mockController.abort).toHaveBeenCalledWith(owner);
+        expect(mockController.start).not.toHaveBeenCalled();
+        expect(mockController.stop).not.toHaveBeenCalled();
+      });
+
+      it('device mode: keeps the OS consent flow', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(false);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
+
+        await actions.toggle();
+
+        expect(mockController.start).not.toHaveBeenCalled();
+        expect(alertMock.alert).toHaveBeenCalledTimes(1);
       });
 
       it('starts with on-device recognition when on-device is supported regardless of consent', async () => {

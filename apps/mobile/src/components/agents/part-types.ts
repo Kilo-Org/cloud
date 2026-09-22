@@ -4,6 +4,7 @@ import {
   type Part,
   type PatchPart,
   type ReasoningPart,
+  type StoredMessage,
   type TextPart,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
@@ -43,6 +44,26 @@ export function isReasoningPart(part: Part): part is ReasoningPart {
   return part.type === 'reasoning';
 }
 
+/**
+ * Returns the messages with every reasoning part removed, for the
+ * "Hide thinking details" option. A message that has no reasoning part keeps
+ * its identity, and the input array itself is returned when nothing changed,
+ * so memoized consumers do not churn when thinking is already absent.
+ */
+export function withoutReasoningParts(messages: readonly StoredMessage[]): StoredMessage[] {
+  const next = messages.map(message => {
+    const parts = message.parts.filter(part => !isReasoningPart(part));
+    if (parts.length === message.parts.length) {
+      return message;
+    }
+    return { ...message, parts };
+  });
+  const changed = next.some((message, index) => message !== messages[index]);
+  // Hand back the input array itself when nothing was removed. Callers only
+  // read the result, so widening the readonly view is safe.
+  return changed ? next : (messages as StoredMessage[]);
+}
+
 export function isCompactionPart(part: Part): part is CompactionPart {
   return part.type === 'compaction';
 }
@@ -64,8 +85,19 @@ export function isPartStreaming(part: Part): boolean {
   return false;
 }
 
+/**
+ * `text.trim() !== ''` without allocating the trimmed copy. The transcript
+ * asks this of every part on every streamed publish, and a streamed reasoning
+ * part can hold hundreds of kilobytes, so the allocation-free predicate keeps
+ * the per-publish cost from scaling with the accumulated text.
+ */
+export function hasNonWhitespaceText(text: string): boolean {
+  // `\S` is the exact complement of the whitespace class `String#trim` strips.
+  return /\S/.test(text);
+}
+
 function hasReasoningText(text: string | undefined): boolean {
-  return text != null && text.trim() !== '';
+  return text != null && hasNonWhitespaceText(text);
 }
 
 export function shouldRenderReasoningPart(part: Part, _isStreaming: boolean): boolean {

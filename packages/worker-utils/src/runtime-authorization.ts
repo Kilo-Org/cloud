@@ -40,6 +40,19 @@ export type RuntimeAuthorizationAdapters = {
   }) => Promise<RuntimeAuthorizationMembership | null>;
 };
 
+export type RuntimeAuthorizationBindingRejectionReason =
+  | 'principal_missing'
+  | 'principal_blocked'
+  | 'pepper_changed'
+  | 'membership_missing'
+  | 'organization_deleted'
+  | 'membership_role_invalid'
+  | 'membership_changed';
+
+type BindingDiagnostics = {
+  onBindingRejected?: (reason: RuntimeAuthorizationBindingRejectionReason) => void;
+};
+
 type CommonInput = {
   secret: string;
   connectionString: string;
@@ -135,7 +148,7 @@ async function getMembership(
 }
 
 async function requireBindings(
-  input: CommonInput,
+  input: CommonInput & BindingDiagnostics,
   record: RuntimeAuthorization
 ): Promise<{
   user: RuntimeAuthorizationPrincipal;
@@ -143,15 +156,21 @@ async function requireBindings(
 }> {
   const user = await getPrincipal(input, record.userId);
   const authorizationUser = await getPrincipal(input, record.authorizationUserId);
+  const reject = (reason: RuntimeAuthorizationBindingRejectionReason): never => {
+    try {
+      input.onBindingRejected?.(reason);
+    } catch {
+      // Diagnostics must not replace the authorization rejection.
+    }
+    throw new RuntimeAuthorizationRevokedError();
+  };
+  if (user === null || authorizationUser === null) return reject('principal_missing');
+  if (isBlocked(user) || isBlocked(authorizationUser)) return reject('principal_blocked');
   if (
-    user === null ||
-    authorizationUser === null ||
-    isBlocked(user) ||
-    isBlocked(authorizationUser) ||
     (await digest(user.apiTokenPepper)) !== record.bindings.userPepperDigest ||
     (await digest(authorizationUser.apiTokenPepper)) !== record.bindings.authorizationPepperDigest
   )
-    throw new RuntimeAuthorizationRevokedError();
+    return reject('pepper_changed');
   if (record.organizationId) {
     const userMembership = await getMembership(input, user.id, record.organizationId);
     const authorizationMembership = await getMembership(
@@ -159,17 +178,23 @@ async function requireBindings(
       authorizationUser.id,
       record.organizationId
     );
+    if (userMembership === null || authorizationMembership === null)
+      return reject('membership_missing');
     if (
-      userMembership === null ||
-      authorizationMembership === null ||
       userMembership.organizationDeletedAt !== null ||
-      authorizationMembership.organizationDeletedAt !== null ||
+      authorizationMembership.organizationDeletedAt !== null
+    )
+      return reject('organization_deleted');
+    if (
       !membershipRole.safeParse(userMembership.role).success ||
-      !membershipRole.safeParse(authorizationMembership.role).success ||
+      !membershipRole.safeParse(authorizationMembership.role).success
+    )
+      return reject('membership_role_invalid');
+    if (
       userMembership.id !== record.bindings.userMembershipId ||
       authorizationMembership.id !== record.bindings.authorizationUserMembershipId
     )
-      throw new RuntimeAuthorizationRevokedError();
+      return reject('membership_changed');
   }
   return { user, authorizationUser };
 }
@@ -316,7 +341,7 @@ async function issueRuntimeToken(
 }
 
 export async function renewRuntimeAuthorization(
-  input: CommonInput & { authorization: RuntimeAuthorization; now?: Date }
+  input: CommonInput & BindingDiagnostics & { authorization: RuntimeAuthorization; now?: Date }
 ): Promise<{ token: string; expiresAt: string }> {
   const authorization = RuntimeAuthorizationSchema.parse(input.authorization);
   if (authorization.state !== 'active') throw new RuntimeAuthorizationRevokedError();

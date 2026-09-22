@@ -41,3 +41,27 @@ export function computeStatus(part: Part): string {
   }
   return i18n.t('agentChat.computeStatus.consideringNextSteps');
 }
+
+/**
+ * opencode pre-creates an empty `text` part for the response block before any
+ * token arrives, and its id sorts after the reasoning part (a stream looks
+ * like `[step-start, reasoning, text(0)]`). Reading the raw last part would
+ * therefore label the whole reasoning stream "Writing response", and the
+ * spinner would never read "Thinking". Skip empty text placeholders and
+ * describe the last part that actually carries activity.
+ */
+export function lastActivePart(parts: readonly Part[]): Part | undefined {
+  for (let i = parts.length - 1; i >= 0; i -= 1) {
+    const part = parts[i];
+    if (part !== undefined && !(part.type === 'text' && part.text === '')) {
+      return part;
+    }
+  }
+  return undefined;
+}
+
+/** Spinner label for an assistant message's parts. */
+export function computeMessageStatus(parts: readonly Part[]): string {
+  const part = lastActivePart(parts);
+  return part ? computeStatus(part) : i18n.t('agentChat.computeStatus.consideringNextSteps');
+}

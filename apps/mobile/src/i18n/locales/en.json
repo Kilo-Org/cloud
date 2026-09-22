@@ -36,6 +36,7 @@
     "cost": "Cost",
     "discard": "Discard",
     "findings": "Findings",
+    "mergeRequest": "merge request",
     "notConnected": "Not connected",
     "notifications": "Notifications",
     "pullRequest": "pull request",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Use a different email",
     "signInWithApple": "Sign in with Apple",
     "signInWithGoogle": "Sign in with Google",
+    "signInWithPasskey": "Sign in with a passkey",
     "emailAddress": "Email address",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "Continue with email",
@@ -174,6 +176,10 @@
     "termsConnector": " and ",
     "termsSuffix": ".",
     "moreSignInOptions": "More sign-in options",
+    "passkeyCancelled": "Passkey sign-in was cancelled. Please try again.",
+    "passkeyNotFound": "No passkey is saved for this device. Sign in with Apple, Google, or your email instead.",
+    "passkeyUnsupported": "Passkeys are not available on this device. Sign in with Apple, Google, or your email instead.",
+    "passkeyFailed": "That passkey could not sign you in. Sign in with Apple, Google, or your email instead.",
     "couldNotCompleteSignIn": "Could not complete sign in. Please try again.",
     "sessionEnded": "Your session ended. Please sign in again.",
     "signInCodeExpired": "Your sign-in code has expired. Please try again.",
@@ -224,13 +230,36 @@
     "providerTestAccount": "Test Account",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Enterprise SSO"
+    "providerEnterpriseSso": "Enterprise SSO",
+    "passkeysTitle": "Passkeys",
+    "passkeysSubtitle": "Sign in without a password",
+    "passkeysEmpty": "No passkeys yet",
+    "passkeysEmptyHint": "$t(profile.addPasskey) to sign in without a password.",
+    "passkeysCouldNotLoad": "Could not load passkeys",
+    "passkeysLoadFailed": "Passkeys are unavailable until this loads.",
+    "addPasskey": "Add a passkey",
+    "passkeyDefaultName": "Passkey",
+    "passkeyAddedOn": "Added {{date}}",
+    "passkeyAdded": "Passkey added.",
+    "passkeyAddFailed": "Could not add a passkey. Try again.",
+    "passkeyAddUnsupported": "This device cannot create passkeys.",
+    "passkeyAddCancelled": "Passkey creation was cancelled.",
+    "passkeyRemoved": "Passkey removed.",
+    "passkeyRemoveFailed": "Could not remove that passkey. Try again.",
+    "passkeyRenamed": "Passkey renamed.",
+    "passkeyName": "Passkey name",
+    "renamePasskey": "Rename passkey",
+    "removePasskey": "Remove passkey",
+    "removePasskeyTitle": "Remove passkey?",
+    "removePasskeyMessage": "You will no longer be able to sign in with this passkey."
   },
   "preferences": {
     "biometricUnlock": "Unlock with biometrics",
     "biometricUnlockSubtitle": "Unlock at launch and after five minutes in the background.",
     "autoExpandThinking": "Auto expand thinking",
     "autoExpandThinkingSubtitle": "Show the agent's thinking expanded when it finishes.",
+    "hideThinking": "Hide thinking details",
+    "hideThinkingSubtitle": "Don't show the agent's thinking on the session page.",
     "keepScreenOn": "Keep screen on while on session page",
     "keepScreenOnSubtitle": "Hold the screen awake while the session is working.",
     "appearance": "Appearance",
@@ -238,7 +267,10 @@
     "appearanceSystem": "System",
     "appearanceLight": "Light",
     "appearanceDark": "Dark",
+    "general": "General",
     "account": "Account",
+    "accountSubtitle": "Language, trusted hosts, and device sessions",
+    "voiceInput": "Voice input",
     "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "returnSendsMessage": "Return key sends message",
@@ -247,7 +279,15 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Gateway transcription",
+    "gatewayTranscriptionSubtitle": "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Condense tool calls",
+    "condenseToolCallsSubtitle": "Group consecutive tool calls into one row you can open.",
+    "toolSummaryTranslation": "Translate tool summaries",
+    "toolSummaryTranslationSubtitle": "Send each tool summary to a model to translate it into your app language. The original is shown if translation fails.",
+    "toolSummaryTranslationModelUnavailableNotice": "This model is no longer offered. Tap $t(common.model) to choose another."
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",
@@ -308,17 +348,27 @@
       "loadingLines": "Loading {{loaded}} of {{total}} lines…",
       "expandContext": "Expand context",
       "expandMoreContext": "Expand more context",
+      "expandLines_one": "Expand {{displayCount}} line ({{start}}–{{end}})",
       "expandLines": "Expand {{displayCount}} lines ({{start}}–{{end}})",
+      "expandLines_other": "Expand {{displayCount}} lines ({{start}}–{{end}})",
+      "expandMoreLines_one": "Expand more {{displayCount}} line ({{start}}–{{end}})",
       "expandMoreLines": "Expand more {{displayCount}} lines ({{start}}–{{end}})",
+      "expandMoreLines_other": "Expand more {{displayCount}} lines ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Expand {{displayCount}} line of context",
       "expandLinesOfContext": "Expand {{displayCount}} lines of context",
+      "expandLinesOfContext_other": "Expand {{displayCount}} lines of context",
       "expandAll": "Expand all",
+      "expandAllLines_one": "Expand all {{displayCount}} line",
       "expandAllLines": "Expand all {{displayCount}} lines",
+      "expandAllLines_other": "Expand all {{displayCount}} lines",
       "loadingMoreFiles": "Loading more files…",
       "retryLoadingNextPage": "Retry loading next page",
       "failedToLoadMoreFiles": "Failed to load more files — tap to retry",
       "loadingAllFiles": "Loading all files — {{loaded}}…",
       "loadingAllFilesOf": "Loading all files — {{loaded}} of {{total}}…",
+      "loadedOfTotalFiles_one": "{{loaded}} of {{total}} files loaded",
       "loadedOfTotalFiles": "{{loaded}} of {{total}} files loaded",
+      "loadedOfTotalFiles_other": "{{loaded}} of {{total}} files loaded",
       "loadAllFiles": "Load all files",
       "loadAll": "Load all",
       "fileLoadedCount_one": "{{displayCount}} file loaded",
@@ -344,6 +394,7 @@
       "merge": "Merge",
       "mergeNow": "Merge now",
       "mergePullRequest": "Merge pull request",
+      "mergeTermTitle": "Merge {{term}}",
       "enableAutoMerge": "Enable auto-merge",
       "disableAutoMerge": "Disable auto-merge",
       "autoMergeOn": "Auto-merge is on",
@@ -362,9 +413,12 @@
       "deleteBranchAfterMerge": "Delete branch after merge",
       "noEnabledMethods": "This repository has no enabled merge methods. Ask a repository admin to enable merge, squash, or rebase merging.",
       "confirmTitle": "Merge pull request?",
+      "confirmTitleTerm": "Merge {{term}}?",
       "confirmMessage": "This will merge your changes into the base branch.",
       "enableAutoMergeConfirmTitle": "Enable auto-merge?",
       "enableAutoMergeConfirmMessage": "GitHub will merge this pull request automatically when all required checks pass.",
+      "enableAutoMergeConfirmMessageTerm": "The {{term}} will merge automatically once its pipeline succeeds.",
+      "enableAutoMergeDescriptionTerm": "GitLab merges this {{term}} automatically once its pipeline succeeds.",
       "forbidden": "You don't have permission to merge this pull request.",
       "cannotMerge": "This pull request cannot be merged as is.",
       "couldNotMerge": "Could not merge pull request.",
@@ -375,7 +429,8 @@
       },
       "terminal": {
         "alreadyMerged": "Already merged",
-        "closed": "This pull request is closed"
+        "closed": "This pull request is closed",
+        "closedMergeRequest": "This merge request is closed"
       },
       "partialSuccessBanner": {
         "body": "Couldn't delete the branch: {{reason}}",
@@ -400,6 +455,18 @@
         "behindDetail": "The head branch is behind the base. Rebase or update the branch before merging.",
         "notMergeableTitle": "This pull request is not mergeable yet",
         "notMergeableDetail": "GitHub reported a {{state}} mergeable state."
+      },
+      "restrictions": {
+        "title": "Merge restrictions",
+        "approvalsRequired_one": "{{displayCount}} approval required",
+        "approvalsRequired_other": "{{displayCount}} approvals required",
+        "pipelineMustSucceed": "The pipeline must succeed before merging."
+      },
+      "providerBlocked": {
+        "failingPipeline": "The pipeline is failing on the latest commit.",
+        "pendingPipeline": "The pipeline is still running on the latest commit.",
+        "permission": "You don't have permission to merge this {{term}}.",
+        "draft": "Mark the {{term}} as ready for review before merging."
       },
       "methodLabels": {
         "merge": "Create a merge commit",
@@ -448,6 +515,11 @@
       "acceptTerms": "Accept",
       "replyBadRequest": "This reply can't be posted. The thread may have changed.",
       "replyForbidden": "You don't have permission to reply to this pull request.",
+      "addCommentCta": "Comment on this pull request",
+      "fixWithKilo": "Fix with Kilo",
+      "fixWithKiloPrompt": "Please address the following PR comment: {{link}}",
+      "commentBadRequest": "This comment can't be posted. The pull request may have changed.",
+      "commentForbidden": "You don't have permission to comment on this pull request.",
       "moderation": {
         "reportContent": {
           "terminal": "This comment can't be reported.",
@@ -496,7 +568,10 @@
         "outdatedOnLines": "Outdated on {{lines}}",
         "outdatedOnPath": "Outdated on {{path}}"
       },
-      "deletedUser": "deleted user"
+      "deletedUser": "deleted user",
+      "replyForbiddenTerm": "You don't have permission to reply to this {{term}}.",
+      "moreLinesAbove_one": "… {{displayCount}} more line above",
+      "moreLinesAbove_other": "… {{displayCount}} more lines above"
     },
     "couldNotOpenGitHubAppSettings": "Could not open GitHub App settings",
     "installKiloGitHubApp": "Install the Kilo GitHub App",
@@ -508,17 +583,19 @@
     "reviewPullRequest": "Review pull request",
     "headLine": "{{counts}} · head {{sha}}",
     "entry": {
-      "eyebrow": "Open a pull request by URL",
-      "pastePrLink": "Paste a PR link",
-      "noRecentPrs": "No recent PRs",
-      "noRecentPrsDescription": "Paste a PR link above to start a review — it'll show up here next time.",
+      "eyebrow": "Open a pull request or merge request by URL",
+      "pastePrLink": "Paste a pull request or merge request link",
+      "noRecentPrs": "No recent reviews",
+      "noRecentPrsDescription": "Paste a link above to start a review — it'll show up here next time.",
       "couldNotLoad": "Couldn't load",
       "removeFromRecentsTitle": "Remove from recents?",
-      "removeFromRecentsMessage": "This pull request will be removed from your recents.",
+      "removeFromRecentsMessage": "This review will be removed from your recents.",
       "removeRecentAccessibility": "Remove {{repo}} from recents",
-      "urlAccessibility": "GitHub pull request URL",
-      "clearLink": "Clear pull request link",
-      "pasteLink": "Paste pull request link",
+      "urlAccessibility": "Enter a pull request or merge request URL",
+      "urlPlaceholder": "Pull request or merge request URL",
+      "openAccessibility": "Open pull request or merge request",
+      "clearLink": "Clear link",
+      "pasteLink": "Paste pull request or merge request link",
       "open": "Open"
     },
     "checks": {
@@ -535,6 +612,8 @@
       "pending": "{{displayCount}} pending",
       "skipped": "{{displayCount}} skipped",
       "checksCount": "{{displayCount}} checks",
+      "checksCount_one": "{{displayCount}} check",
+      "checksCount_other": "{{displayCount}} checks",
       "checkDetails": "check details"
     },
     "inbox": {
@@ -567,9 +646,15 @@
     "connect": {
       "checkFailedTitle": "Could not check GitHub connection",
       "checkFailedMessage": "Sign-in status is unavailable until this loads.",
+      "checkFailedTitleGitLab": "Could not check GitLab connection",
+      "checkFailedTitleBitbucket": "Could not check Bitbucket connection",
+      "providerCheckFailedMessage": "Connection status is unavailable until this loads.",
       "reconnectTitle": "Reconnect GitHub",
       "reconnectDescription": "Your GitHub connection was revoked. Reconnect to keep reviewing pull requests on mobile.",
-      "description": "Connect your GitHub account to review pull requests on mobile."
+      "description": "Connect your GitHub account to review pull requests on mobile.",
+      "gitlabDescription": "Connect your GitLab account to review merge requests on mobile.",
+      "bitbucketDescription": "Connect Bitbucket to this organization to review pull requests on mobile.",
+      "bitbucketOrgOnlyDescription": "Select an organization in your profile to review its Bitbucket pull requests."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +676,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub connection expired",
-      "message": "Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed."
+      "message": "Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed.",
+      "gitlabTitle": "GitLab connection expired",
+      "bitbucketTitle": "Bitbucket connection expired",
+      "providerMessage": "Your {{provider}} connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed."
     },
     "eventChips": {
       "comment": "Comment",
@@ -652,14 +740,16 @@
     "diff": {
       "selectedTapToChange": "Selected {{label}}, tap to change selection",
       "tapToComment": "{{label}}, tap to comment",
+      "truncationBanner_one": "Showing the first {{limit}} of {{total}} changed file — GitHub API limit",
       "truncationBanner": "Showing the first {{limit}} of {{total}} changed files — GitHub API limit",
+      "truncationBanner_other": "Showing the first {{limit}} of {{total}} changed files — GitHub API limit",
       "statusContext": "Context",
       "lineLabel": "{{status}} line {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(empty)"
     },
     "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link",
+    "linkPasteNotAPullRequest": "Not a pull request or merge request link",
     "announce": {
       "commentPosted": "Comment posted",
       "reviewSubmitted": "Review submitted",
@@ -668,6 +758,7 @@
     "mutationError": {
       "commentNotPosted": "This comment can't be posted. The selected line may have changed, or the PR may have been updated.",
       "reviewNotSubmitted": "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request.",
+      "reviewNotSubmittedTerm": "This review can't be submitted as is. The {{term}} may have changed, or you can't review your own {{term}}.",
       "couldNotPostComment": "Could not post comment.",
       "couldNotSubmitReview": "Could not submit review. Check your connection and try again."
     },
@@ -675,9 +766,31 @@
       "couldNotReply": "Could not reply.",
       "couldNotCompleteAction": "Could not complete this action.",
       "mergeResultDefaultError": "GitHub did not complete the merge.",
+      "mergeResultNotCompleted": "The {{term}} was not merged. Check its state and try again.",
       "ambiguous": "Couldn't confirm — check the PR before retrying.",
       "persistenceFailed": "We could not record this action. Please try again later.",
       "forbidden": "Forbidden"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Not available on this provider",
+        "accessibility": "Not available on this provider: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Pull request",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "Merge request !{{number}}",
+      "shareMergeRequest": "Share merge request",
+      "viewOnProvider": "View on {{provider}}",
+      "mergeRequestUnavailable": "Merge request unavailable",
+      "unavailableDescription": "It may have been deleted, or you may not have access to it.",
+      "accessDeniedMergeRequest": "You don't have permission to view this merge request.",
+      "couldNotLoadMergeRequest": "Could not load merge request",
+      "discussionAccessDenied": "You don't have permission to view this merge request's discussion.",
+      "discussionUnavailableMessage": "This merge request may have been removed.",
+      "noDiscussionDescription": "No review threads or conversation comments on this merge request.",
+      "noFilesChangedDescription": "This merge request has no file changes."
     }
   },
   "notifications": {
@@ -710,11 +823,12 @@
     "previewFullDescription": "Notifications show the message text on your lock screen.",
     "previewGenericDescription": "Notifications show that something happened. Open Kilo to read it.",
     "channel": {
-      "agent": "Agent sessions",
+      "agentProgress": "Agent progress",
       "chat": "Chat messages",
       "kiloclaw": "KiloClaw activity",
       "balance": "Balance alerts",
-      "security": "Security findings"
+      "security": "Security findings",
+      "spend": "Spend alerts"
     },
     "category": {
       "chatMessagesSubtitle": "replies in your conversations",
@@ -725,8 +839,22 @@
       "sessionStatusTitle": "Session status",
       "sessionStatusSubtitle": "finished / failed / ready to control",
       "kiloclawActivitySubtitle": "instance ready/failed, scheduled actions",
+      "kiloclawActivityUnavailable": "Start a KiloClaw instance to get KiloClaw activity.",
       "balanceAlertsSubtitle": "low organization balance warnings",
-      "securityFindingsSubtitle": "new findings and SLA reminders"
+      "balanceAlertsUnavailable": "Join an organization to get balance alerts.",
+      "securityFindingsSubtitle": "new findings and SLA reminders",
+      "securityFindingsUnavailable": "Enable Kilo Security Agent on a scope to get security findings.",
+      "spendAlertsSubtitle": "threshold crossings and hourly spikes",
+      "spendAlertsToggle": "Spend alerts category"
+    },
+    "action": {
+      "openSession": "Open session"
+    },
+    "needsInputAction": {
+      "approved": "Request approved",
+      "replied": "Reply sent",
+      "failed": "Couldn't answer. Tap again to retry.",
+      "unavailable": "This request is no longer waiting."
     }
   },
   "tabs": {
@@ -800,7 +928,9 @@
       "open": "Open {{filename}}",
       "openFailed": "Couldn't open attachment. Check your connection and try again.",
       "attachFailed": "Failed to attach file",
+      "limit_one": "You can attach up to {{displayCount}} file.",
       "limit": "You can attach up to {{displayCount}} files.",
+      "limit_other": "You can attach up to {{displayCount}} files.",
       "sizeRejection": "{{filename}} exceeds the {{limit}} attachment limit.",
       "unreadable": "Couldn't read {{filename}}.",
       "pastedImage": "the pasted image",
@@ -1525,7 +1655,9 @@
       "no": "No"
     },
     "dashboard": {
+      "findingsCount_one": "{{displayCount}} finding",
       "findingsCount": "{{displayCount}} findings",
+      "findingsCount_other": "{{displayCount}} findings",
       "notMeasured": "Not measured",
       "actFirst": "Act first",
       "slaPosture": "SLA posture",
@@ -1534,7 +1666,9 @@
       "repositoryActionPlan": "Repository action plan",
       "noOpenFindings": "No open findings need attention",
       "deadlineToday": "Deadline reached today",
+      "daysOverdue_one": "{{displayCount}} day overdue",
       "daysOverdue": "{{displayCount}} days overdue",
+      "daysOverdue_other": "{{displayCount}} days overdue",
       "withinDeadline": "Within deadline",
       "criticalOverdue": "Critical overdue",
       "highOverdue": "High overdue",
@@ -1956,6 +2090,10 @@
       "couldNotLoad": "Could not load session",
       "failedToLoadDetails": "Failed to load session details",
       "failedToStopExecution": "Failed to stop execution",
+      "stopped": "Session stopped",
+      "committing": "Committing…",
+      "committed": "Committed",
+      "commitFailed": "Commit failed",
       "renameSession": "Rename session",
       "renamePlaceholder": "Session name",
       "transcriptAccessibility": "Session transcript",
@@ -1990,10 +2128,29 @@
       "exitNeedsNewerCli": "Remote slash commands require a newer Kilo CLI. Update Kilo CLI and reconnect."
     },
     "sessionConnection": {
+      "label": "Connection",
       "connecting": "Connecting…",
       "reconnecting": "Reconnecting…",
       "connectionLost": "Connection lost",
       "retryConnection": "Retry connection"
+    },
+    "goal": {
+      "title": "Goal",
+      "statusActive": "Active goal",
+      "statusPaused": "Paused goal",
+      "statusComplete": "Goal complete",
+      "statusBlocked": "Goal blocked",
+      "edit": "Edit goal",
+      "remove": "Remove goal",
+      "pause": "Pause goal",
+      "resume": "Resume goal",
+      "editPlaceholder": "Describe the goal",
+      "removeConfirmTitle": "Remove goal?",
+      "removeConfirmMessage": "The CLI clears this session's goal.",
+      "updateFailed": "Could not update the goal.",
+      "sectionAccessibility": "{{status}}. Goal: {{text}}",
+      "collapse": "Collapse goal",
+      "expand": "Expand goal"
     },
     "newSession": {
       "recentlyUsed": "Recently used",
@@ -2012,6 +2169,15 @@
       "noRepositoriesVisible": "No repositories visible. Check repository access for the Kilo GitHub App, then refresh.",
       "noRepositoriesVisibleGitlab": "No repositories visible. Check repository access for GitLab, then refresh.",
       "noRepositoriesVisibleBitbucket": "No repositories visible. Check repository access for Bitbucket, then refresh.",
+      "bitbucketOrganizationsOnly": "Bitbucket is available for organizations only.",
+      "branchPickerTitle": "Select branch",
+      "branchDefault": "Default",
+      "branchAccessibility": "Branch: {{label}}",
+      "branchLoading": "Loading branches",
+      "branchLoadError": "Couldn't load branches",
+      "branchUnavailable": "Branches aren't available for this repository. Check your access with the provider, then pick another repository.",
+      "branchEmpty": "No branches available",
+      "branchPlaceholder": "Select a branch",
       "runOnWithTarget": "Run on: {{target}}",
       "environment": "Environment",
       "couldNotLoadEnvironment": "Couldn't load your environment",
@@ -2034,7 +2200,7 @@
       "discardDraftMessage": "Your prompt will be lost.",
       "discardWithUploadsMessage": "Your prompt and any unclaimed uploads will be deleted.",
       "discardFailed": "Could not discard the draft. Please try again.",
-      "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
+      "remoteHint": "Run kilo remote on your computer, or /remote in a running CLI session, to control a local kilo process.",
       "continueFrom": "Continuing {{title}}",
       "importingSession": "Importing session",
       "cliCannotContinue": "This CLI cannot continue a session. Pick Cloud Agent or another CLI.",
@@ -2060,9 +2226,16 @@
       "toolTask": "task",
       "readTodos": "Read todos",
       "updateTodos": "Update todos",
+      "linesBadge_one": "{{displayCount}} line",
       "linesBadge": "{{displayCount}} lines",
+      "linesBadge_other": "{{displayCount}} lines",
+      "filesBadge_one": "{{displayCount}} file",
       "filesBadge": "{{displayCount}} files",
-      "matchesBadge": "{{displayCount}} matches"
+      "filesBadge_other": "{{displayCount}} files",
+      "matchesBadge_one": "{{displayCount}} match",
+      "matchesBadge": "{{displayCount}} matches",
+      "matchesBadge_other": "{{displayCount}} matches",
+      "noOutput": "No output."
     },
     "readToolMarkdown": {
       "linesTruncated": "lines {{start}}–{{end}} (truncated)",
@@ -2085,7 +2258,7 @@
       "cloudAgent": "Cloud Agent",
       "cloudAgentDescription": "Run on Kilo's cloud sandbox",
       "noCliInstances": "No CLI instances connected",
-      "noCliInstancesDescription": "Run `kilo remote` in a project on your computer, or update Kilo CLI if one is already running.",
+      "noCliInstancesDescription": "Run kilo remote in a project on your computer, or update Kilo CLI if one is already running.",
       "instanceOnProject": "{{name}} on {{project}}",
       "instanceOnProjectSuffix": "{{name}} on {{project}} ({{suffix}})",
       "runOnCloudAgent": "Run on Cloud Agent"
@@ -2097,7 +2270,7 @@
       "emptyTitle": "No folders inside",
       "emptyDescription": "Done uses this folder.",
       "retryableTitle": "Couldn't list folders",
-      "retryableDescription": "Check your connection and Retry. Done still confirms this folder.",
+      "retryableDescription": "Check your connection and try again. Done still confirms this folder.",
       "unsupportedTitle": "Can't list folders",
       "unsupportedDescription": "This CLI can't list folders. Done keeps the launch folder and Start session starts there."
     },
@@ -2367,15 +2540,21 @@
       "photoLibrary": "Photo Library",
       "files": "Files",
       "couldNotOpenPhotoPicker": "Could not open the photo picker. Restart Kilo and try again.",
+      "maxFilesAllowed_one": "Maximum {{displayCount}} file allowed",
       "maxFilesAllowed": "Maximum {{displayCount}} files allowed",
-      "onlyAddingFiles": "Only adding {{accepted}} of {{total}} files (max {{max}})"
+      "maxFilesAllowed_other": "Maximum {{displayCount}} files allowed",
+      "onlyAddingFiles_one": "Only adding {{accepted}} of {{total}} files (max {{max}})",
+      "onlyAddingFiles": "Only adding {{accepted}} of {{total}} files (max {{max}})",
+      "onlyAddingFiles_other": "Only adding {{accepted}} of {{total}} files (max {{max}})"
     },
     "composer": {
       "addAttachment": "Add attachment",
       "removeOrRetryFailed": "Remove or retry failed attachments first.",
       "attachmentsWithSlashCommands": "Attachments cannot be sent with slash commands.",
       "photoMetadataNotRemoved": "Photo metadata could not be removed from an attachment.",
+      "charactersRemaining_one": "{{count}} character remaining",
       "charactersRemaining": "{{count}} characters remaining",
+      "charactersRemaining_other": "{{count}} characters remaining",
       "discardAttachmentsTitle": "Discard attachments?",
       "discardAttachmentsMessage": "Unclaimed uploads will be deleted.",
       "waitForUploads": "Wait for attachments to finish uploading.",
@@ -2427,6 +2606,12 @@
       "startNewSession": "Start a new session",
       "exitSession": "Exit the session",
       "clearSession": "End this session and start a new one",
+      "compactDescription": "compact the current session context",
+      "goalDescription": "Keep working toward a session goal. /goal <objective> or pause, resume, clear",
+      "initDescription": "guided AGENTS.md setup",
+      "resumeClaudeDescription": "import a Claude Code session transcript",
+      "resumeCodexDescription": "import an OpenAI Codex session transcript",
+      "reviewDescription": "review changes [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Use /{{command}}",
       "insert": "Insert",
       "upgradeRequiredFallback": "Please upgrade your CLI to use this command.",
@@ -2447,7 +2632,9 @@
       "usageReflectsLatest": "Usage reflects the latest completed assistant response.",
       "tokenUsage": "Token usage",
       "cacheRate": "Cache rate",
+      "modelsCount_one": "Model ({{displayCount}})",
       "modelsCount": "Models ({{displayCount}})",
+      "modelsCount_other": "Models ({{displayCount}})",
       "tokenTotalsNote": "Token totals cover this session only and exclude subagent/child-session tokens.",
       "subagents": "Subagents",
       "subagentsDescription": "Residual cost from child sessions",
@@ -2461,6 +2648,11 @@
       "stepsCount_other": "{{steps}} steps",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
     },
+    "autoApprove": {
+      "title": "Auto-approve",
+      "description": "Approve permission asks for this session automatically. Tools then run without a prompt.",
+      "unavailable": "This session cannot receive permission asks."
+    },
     "prBadge": {
       "open": "open pull request",
       "closed": "closed pull request",
@@ -2468,6 +2660,12 @@
       "draft": "draft pull request",
       "updating": "Updating, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
+    },
+    "toolRun": {
+      "sheetTitle": "Tool calls",
+      "condensedLabel_one": "{{itemCount}} item; {{last}}",
+      "condensedLabel": "{{itemCount}} items; {{last}}",
+      "condensedLabel_other": "{{itemCount}} items; {{last}}"
     }
   },
   "bootstrap": {
@@ -2520,6 +2718,7 @@
     "couldNotLoadActiveSessions": "Couldn't load active sessions",
     "agentSessions": "Live now",
     "newCodingTask": "New coding task",
+    "newTaskFromPicture": "New task from a picture",
     "explore": "Explore",
     "seeAll": "See all",
     "noLiveSessions": "Nothing running right now"
@@ -2581,7 +2780,17 @@
     "languageNotInstalledTitle": "Voice input for {{language}} isn't ready",
     "languageNotInstalledMessage": "The {{language}} offline speech files aren't installed on this phone. Download them, then try voice input again.",
     "downloadOfflineModel": "Download",
-    "offlineModelDownloadScheduled": "The offline speech files will download in the background. Try voice input again later."
+    "offlineModelDownloadScheduled": "The offline speech files will download in the background. Try voice input again later.",
+    "transcribing": "Transcribing...",
+    "gatewayUnreachable": "Couldn't reach the Kilo gateway. Check your connection and try again.",
+    "gatewayTimeout": "Transcription took too long. Try again.",
+    "gatewayModelUnavailable": "This transcription model isn't available. Pick another one in Preferences.",
+    "gatewayModelUnavailableNotice": "This model is no longer offered. Tap $t(transcriptionModel.title) to choose another.",
+    "gatewaySignInRequired": "Sign in to use gateway transcription.",
+    "gatewayNoModel": "Choose a transcription model in Preferences first.",
+    "testTitle": "Test voice input",
+    "testPlaceholder": "Tap the microphone and start speaking.",
+    "testClear": "Clear text"
   },
   "share": {
     "title": "Share to Kilo",
@@ -2590,7 +2799,9 @@
     "connectedCli": "On a connected CLI",
     "newSessionOn": "New session on {{name}}",
     "noMatchingSessions": "No matching sessions.",
+    "onlyFirstFilesAttached_one": "Only the first {{displayCount}} file will be attached.",
     "onlyFirstFilesAttached": "Only the first {{displayCount}} files will be attached.",
+    "onlyFirstFilesAttached_other": "Only the first {{displayCount}} files will be attached.",
     "staleMessage": "This share is no longer available.",
     "retryableMessage": "Couldn't load your sessions.",
     "emptyMessage": "No sessions yet — start a new one to send this.",
@@ -2693,6 +2904,7 @@
     "privacyPolicyPrefix": "Your data is handled per the",
     "privacyPolicy": "Kilo privacy policy",
     "onDevice": "On device",
+    "viaGateway": "Via the Kilo gateway",
     "couldNotLoadTranscription": "Could not load your transcription setting.",
     "signInToManageTranscription": "Sign in to manage online transcription.",
     "onlineTranscription": "Online transcription",
@@ -2731,7 +2943,7 @@
     "aiProvidersWhat": "Your prompts, conversation history, and any files you attach.",
     "aiProvidersWhy": "To generate AI responses.",
     "aiProvidersWho": "Anthropic, OpenAI, Google, and other providers you select per request.",
-    "gatewayWhat": "Account ID, request metadata, token usage.",
+    "gatewayWhat": "Account ID, request metadata, token usage, and the prompts and voice recordings the app sends through it.",
     "gatewayWhy": "Authentication, routing requests, billing reconciliation.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Crash and error reports, with app content scrubbed.",
@@ -2751,7 +2963,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Your recording while you dictate.",
     "voiceTranscriptionWhy": "To turn speech into text.",
-    "voiceTranscriptionWho": "On-device only, or Apple or Google when this device cannot transcribe offline.",
+    "voiceTranscriptionWho": "Your device, the Kilo gateway with your chosen transcription model, or Apple or Google for online recognition.",
     "installAttributionPromptTitle": "Allow install attribution?",
     "installAttributionPromptMessage": "Kilo uses Apple's tracking permission only to learn which channel brought you here. Your prompts and conversations are never used.",
     "what": "What",
@@ -2923,6 +3135,14 @@
     "tooManySignInAttempts": "Too many sign-in attempts. Please wait and try again."
   },
   "models": {
+    "auto": {
+      "frontier": "Auto Frontier",
+      "balanced": "Auto Balanced",
+      "efficient": "Auto Efficient",
+      "small": "Auto Small",
+      "free": "Auto Free",
+      "organization": "Organization Auto"
+    },
     "dataCollected": "Data collected",
     "free": "Free",
     "couldNotUpdateFavorites": "Could not update favorites",
@@ -2945,7 +3165,74 @@
     "privacy": "Open Kilo to see agents",
     "openAgents": "Open agents",
     "needsInput": "Needs input",
+    "newestSession": "Newest: {{title}}",
+    "noneWaiting": "No agents waiting",
+    "newAgent": "New agent",
+    "approving": "Approving…",
+    "couldNotApprove": "Could not approve",
+    "couldNotStart": "Could not start",
     "channelName": "Active agents",
-    "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."
+    "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
+    "openSession": "Open",
+    "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again.",
+    "newestResult": "Newest result"
+  },
+  "transcriptionModel": {
+    "title": "Transcription model",
+    "noneChosen": "None chosen",
+    "emptyTitle": "No transcription models",
+    "emptyDescription": "The gateway offers no transcription models right now.",
+    "loadFailed": "Couldn't load transcription models."
+  },
+  "voiceLanguage": {
+    "title": "Voice language",
+    "automatic": "Automatic",
+    "loadFailed": "Couldn't load the languages this device supports.",
+    "emptyTitle": "No supported languages",
+    "emptyDescription": "This device's speech recognition reports no supported languages."
+  },
+  "tour": {
+    "eyebrow": "Quick tour",
+    "forkTitle": "Where would you like to run Kilo?",
+    "forkSubtitle": "Pick where Kilo runs for your first session.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Run Kilo in a sandboxed cloud environment with nothing to install.",
+    "remoteOptionTitle": "Your computer",
+    "remoteOptionBody": "Run Kilo on your own machine through the kilo remote CLI.",
+    "skip": "Skip tour",
+    "tutorialLabel": "Tutorial"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Start agent needs a prompt. Add a prompt and run it again.",
+      "repositoryUnknown": "Kilo doesn't recognize {{repository}} as a GitHub or GitLab repository. Choose another repository in Kilo.",
+      "repositoryUnsupported": "{{repository}} is a Bitbucket repository — Start agent can't use it yet. Choose another repository in Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Open last session"
+  },
+  "spendAlerts": {
+    "subtitle": "Email or push an alert to the billing contacts when this scope's spend crosses a limit or spikes above its usual hourly rate.",
+    "enable": "Enable spend alerts",
+    "thresholdTitle": "Threshold crossing",
+    "thresholdSubtitle": "Rolling spend crosses your limit",
+    "anomalyTitle": "Hourly spike",
+    "anomalySubtitle": "An hour is far above this scope's usual rate",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Window",
+    "window24h": "24 hours",
+    "window7d": "7 days",
+    "window30d": "30 days",
+    "multiplierLabel": "Spike multiplier",
+    "saved": "Spend alert settings saved",
+    "loadError": "Couldn't load spend alerts.",
+    "saveError": "Couldn't save spend alerts.",
+    "empty": "Spend alerts are off. Turn them on to alert this scope's billing contacts.",
+    "noSpend": "No spend recorded yet",
+    "spend24h": "Spend in the last 24 hours",
+    "multiplierError": "Enter a multiplier of 1 or more",
+    "permissionDenied": "You don't have permission to manage spend alerts.",
+    "pushOffByCategory": "Off in Notifications"
   }
 }

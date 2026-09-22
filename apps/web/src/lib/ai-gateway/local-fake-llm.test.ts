@@ -4,8 +4,11 @@ import {
   appendLocalFakeDeterministicCatalogModels,
   getLocalFakeDeterministicCatalogEntry,
   getLocalFakeLlmProvider,
+  getLocalFakeTranscriptionModelsUrl,
+  getLocalFakeTranscriptionProvider,
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
+  isLocalFakeTranscriptionModel,
   LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
 } from '@/lib/ai-gateway/local-fake-llm';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
@@ -34,6 +37,14 @@ describe('local fake deterministic model', () => {
     expect(isLocalFakeDeterministicModel(LOCAL_FAKE_DETERMINISTIC_MODEL_ID)).toBe(true);
     expect(isLocalFakeDeterministicModel('kilo/fake-deterministic')).toBe(true);
     expect(isLocalFakeDeterministicModel('kilo-auto/efficient')).toBe(false);
+  });
+
+  test('matches the fake transcription catalog ids, bare and kilo-prefixed', () => {
+    expect(isLocalFakeTranscriptionModel('fake-transcribe')).toBe(true);
+    expect(isLocalFakeTranscriptionModel('fake-transcribe-broken')).toBe(true);
+    expect(isLocalFakeTranscriptionModel('kilo/fake-transcribe')).toBe(true);
+    expect(isLocalFakeTranscriptionModel('openai/whisper-1')).toBe(false);
+    expect(isLocalFakeTranscriptionModel(null)).toBe(false);
   });
 
   test('is enabled only in local development with an absolute FAKE_LLM_URL', () => {
@@ -113,13 +124,34 @@ describe('local fake deterministic model', () => {
     env.restore();
   });
 
+  test('builds a transcription provider and models URL pointed at FAKE_LLM_URL', () => {
+    expect(getLocalFakeTranscriptionProvider()).toBeNull();
+    expect(getLocalFakeTranscriptionModelsUrl()).toBeNull();
+
+    const env = replaceEnv({ NODE_ENV: 'development', FAKE_LLM_URL: 'http://localhost:8811/' });
+    expect(getLocalFakeTranscriptionProvider()).toMatchObject({
+      id: 'openrouter',
+      apiUrl: 'http://localhost:8811/api/openrouter',
+      apiKey: 'local-fake-llm',
+    });
+    expect(getLocalFakeTranscriptionModelsUrl()).toBe(
+      'http://localhost:8811/api/openrouter/models?output_modalities=transcription'
+    );
+    env.restore();
+  });
+
   test('isFreeModel is true only when the local fake LLM is enabled', async () => {
     expect(await isFreeModel(LOCAL_FAKE_DETERMINISTIC_MODEL_ID)).toBe(false);
     expect(await isFreeModel('kilo/fake-deterministic')).toBe(false);
+    expect(await isFreeModel('fake-transcribe')).toBe(false);
+    expect(await isFreeModel('fake-transcribe-broken')).toBe(false);
 
     const env = replaceEnv({ NODE_ENV: 'development', FAKE_LLM_URL: 'http://localhost:8811' });
     expect(await isFreeModel(LOCAL_FAKE_DETERMINISTIC_MODEL_ID)).toBe(true);
     expect(await isFreeModel('kilo/fake-deterministic')).toBe(true);
+    expect(await isFreeModel('fake-transcribe')).toBe(true);
+    expect(await isFreeModel('fake-transcribe-broken')).toBe(true);
+    expect(await isFreeModel('openai/whisper-1')).toBe(false);
     expect(await isFreeModel('anthropic/claude-sonnet-4')).toBe(false);
     env.restore();
   });

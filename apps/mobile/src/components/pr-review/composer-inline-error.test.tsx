@@ -3,9 +3,8 @@
 // gate, and an `outdated` outcome is terminal (bad-request copy, no retry).
 // Only the hook is under test, so no full composer mount is required.
 
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to test React/RN structure under vitest */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useComposerInlineError } from './composer-inline-error';

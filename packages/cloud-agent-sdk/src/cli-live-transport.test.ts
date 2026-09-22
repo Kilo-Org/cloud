@@ -312,6 +312,38 @@ describe('CliLiveTransport unified user web connection', () => {
     transport.destroy();
   });
 
+  it('publishes v1 when the CLI catalog uses interleaved.field=reasoning_text', async () => {
+    const catalog: RemoteModelCatalogWireV1 = structuredClone(WIRE_CATALOG);
+    catalog.all[0]!.models['claude-sonnet-4']!.capabilities.interleaved = {
+      field: 'reasoning_text',
+    };
+    const connection = createConnection();
+    jest
+      .mocked(connection.sendCommand)
+      .mockImplementation((_sessionId, command) =>
+        Promise.resolve(command === 'list_models' ? catalog : { ok: true })
+      );
+    const states: RemoteModelState[] = [];
+    const { transport } = createTransportWithSinks({
+      connection,
+      onRemoteModelStateChange: state => states.push(state),
+    });
+
+    transport.connect();
+    emitOwner(connection);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(states.at(-1)).toEqual({
+      ownerConnectionId: 'owner',
+      protocol: 'v1',
+      catalog: REMOTE_CATALOG,
+      refresh: 'idle',
+    });
+    expect(transport.canSend?.()).toBe(true);
+    transport.destroy();
+  });
+
   it('keeps protocol unknown and owner send capability after a malformed initial catalog', async () => {
     const connection = createConnection();
     jest.mocked(connection.sendCommand).mockResolvedValueOnce({
@@ -725,6 +757,70 @@ describe('CliLiveTransport unified user web connection', () => {
       'message.part.updated',
       'message.updated',
     ]);
+    transport.destroy();
+  });
+
+  it('delivers the CLI part update event time to the sink', () => {
+    const { userWebConnection, transport, chatEvents } = createTransportWithSinks();
+    transport.connect();
+
+    const part = {
+      id: 'part-task-1',
+      sessionID: KILO_SESSION_ID,
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'task',
+      state: { status: 'running', input: {}, time: { start: 1 } },
+    };
+    userWebConnection.emitCli({
+      sessionId: KILO_SESSION_ID,
+      event: 'message.part.updated',
+      data: { sessionID: KILO_SESSION_ID, part, time: 1_772_214_640_111 },
+    });
+
+    expect(chatEvents).toEqual([{ type: 'message.part.updated', part, time: 1_772_214_640_111 }]);
+    transport.destroy();
+  });
+
+  it('threads a settled tool part settle time through the snapshot replay', async () => {
+    const taskPart = {
+      id: 'part-task-1',
+      sessionID: KILO_SESSION_ID,
+      messageID: 'msg-1',
+      type: 'tool' as const,
+      callID: 'call-1',
+      tool: 'task',
+      state: {
+        status: 'completed' as const,
+        input: {},
+        output: 'done',
+        title: 'task',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      },
+    };
+    const snapshot: SessionSnapshot = {
+      info: { id: KILO_SESSION_ID },
+      messages: [
+        {
+          info: stubUserMessage({ id: 'msg-1', sessionID: KILO_SESSION_ID }),
+          parts: [taskPart],
+        },
+      ],
+    };
+    const { transport, chatEvents } = createTransportWithSinks({
+      fetchSnapshot: () => Promise.resolve(snapshot),
+    });
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(chatEvents).toContainEqual({
+      type: 'message.part.updated',
+      part: taskPart,
+      time: 2,
+    });
     transport.destroy();
   });
 

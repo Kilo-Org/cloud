@@ -36,6 +36,7 @@
     "cost": "Xərc",
     "discard": "Ləğv et",
     "findings": "Aşkarlanan problemlər",
+    "mergeRequest": "merge sorğusu",
     "notConnected": "Qoşulmayıb",
     "notifications": "Bildirişlər",
     "pullRequest": "birləşdirmə sorğusu",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Başqa e-poçt ünvanından istifadə et",
     "signInWithApple": "Apple ilə daxil ol",
     "signInWithGoogle": "Google ilə daxil ol",
+    "signInWithPasskey": "Giriş açarı ilə daxil ol",
     "emailAddress": "E-poçt ünvanı",
     "emailPlaceholder": "sen@example.com",
     "continueWithEmail": "E-poçtla davam et",
@@ -174,6 +176,10 @@
     "termsConnector": " və ",
     "termsSuffix": ".",
     "moreSignInOptions": "Digər giriş üsulları",
+    "passkeyCancelled": "Giriş açarı ilə daxil olma ləğv edildi. Yenidən cəhd edin.",
+    "passkeyNotFound": "Bu cihaz üçün heç bir giriş açarı saxlanmayıb. Bunun yerinə Apple, Google və ya e-poçtunuzla daxil olun.",
+    "passkeyUnsupported": "Giriş açarları bu cihazda mövcud deyil. Bunun yerinə Apple, Google və ya e-poçtunuzla daxil olun.",
+    "passkeyFailed": "Giriş açarı ilə daxil olmaq mümkün olmadı. Yenidən cəhd edin.",
     "couldNotCompleteSignIn": "Girişi tamamlamaq mümkün olmadı. Yenidən cəhd et.",
     "sessionEnded": "Sessiyan başa çatıb. Yenidən daxil ol.",
     "signInCodeExpired": "Giriş kodunun vaxtı bitib. Yenidən cəhd et.",
@@ -224,11 +230,36 @@
     "providerTestAccount": "Sınaq hesabı",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Korporativ SSO"
+    "providerEnterpriseSso": "Korporativ SSO",
+    "passkeysTitle": "Giriş açarları",
+    "passkeysSubtitle": "Şifrəsiz daxil ol",
+    "passkeysEmpty": "Hələ giriş açarı yoxdur",
+    "passkeysEmptyHint": "$t(profile.addPasskey) şifrəsiz daxil olmaq üçün.",
+    "passkeysCouldNotLoad": "Giriş açarlarını yükləmək mümkün olmadı",
+    "passkeysLoadFailed": "Bu yüklənənə qədər giriş açarları əlçatan deyil.",
+    "addPasskey": "Giriş açarı əlavə et",
+    "passkeyDefaultName": "Giriş açarı",
+    "passkeyAddedOn": "{{date}} tarixində əlavə edildi",
+    "passkeyAdded": "Giriş açarı əlavə edildi.",
+    "passkeyAddFailed": "Giriş açarı əlavə etmək mümkün olmadı. Yenidən cəhd edin.",
+    "passkeyAddUnsupported": "Bu cihaz giriş açarı yarada bilmir.",
+    "passkeyAddCancelled": "Giriş açarının yaradılması ləğv edildi.",
+    "passkeyRemoved": "Giriş açarı silindi.",
+    "passkeyRemoveFailed": "Həmin giriş açarını silmək mümkün olmadı. Yenidən cəhd edin.",
+    "passkeyRenamed": "Giriş açarının adı dəyişdirildi.",
+    "passkeyName": "Giriş açarının adı",
+    "renamePasskey": "Giriş açarının adını dəyiş",
+    "removePasskey": "Giriş açarını sil",
+    "removePasskeyTitle": "Giriş açarı silinsin?",
+    "removePasskeyMessage": "Artıq bu giriş açarı ilə daxil ola bilməyəcəksiniz."
   },
   "preferences": {
+    "general": "Ümumi",
+    "voiceInput": "Səsli daxiletmə",
     "autoExpandThinking": "Düşüncə bölməsini avtomatik aç",
     "autoExpandThinkingSubtitle": "Agent düşünməni bitirdikdə düşüncə bölməsini açıq göstər.",
+    "hideThinking": "Düşüncə təfərrüatlarını gizlət",
+    "hideThinkingSubtitle": "Agentin düşüncəsini sessiya səhifəsində göstərmə.",
     "keepScreenOn": "Sessiya səhifəsində ikən ekranı açıq saxla",
     "keepScreenOnSubtitle": "Sessiya işləyərkən ekranı açıq saxla.",
     "appearance": "Görünüş",
@@ -237,6 +268,7 @@
     "appearanceLight": "Açıq",
     "appearanceDark": "Tünd",
     "account": "Hesab",
+    "accountSubtitle": "Dil, etibarlı saytlar və cihaz sessiyaları",
     "prReviewAttribution": "PR yoxlamalarında tətbiqin adını qeyd et",
     "prReviewAttributionSubtitle": "Yoxlama nəticəsini göndərərkən sonuna «Kilo vasitəsilə yoxlanılıb» qeydi əlavə et.",
     "returnSendsMessage": "Sətirsonu düyməsi mesaj göndərir",
@@ -247,7 +279,15 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Səsin Kilo Gateway ilə mətnə çevrilməsi",
+    "gatewayTranscriptionSubtitle": "Səslə daxiletməni cihazın nitq tanımasının əvəzinə Kilo Gateway modeli ilə mətnə çevirin. Səs yazınız Kilo Gateway-e göndərilir.",
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Alət çağırışlarını sıxlaşdır",
+    "condenseToolCallsSubtitle": "Ardıcıl alət çağırışlarını aça biləcəyiniz bir sətirdə qruplaşdırın.",
+    "toolSummaryTranslation": "Alət xülasələrini tərcümə et",
+    "toolSummaryTranslationSubtitle": "Hər alət xülasəsini tətbiq dilinə tərcümə etmək üçün modelə göndərin. Tərcümə uğursuz olarsa, orijinal göstərilir.",
+    "toolSummaryTranslationModelUnavailableNotice": "Bu model artıq təklif edilmir. Başqasını seçmək üçün $t(common.model) üzərinə toxunun."
   },
   "prReview": {
     "pullRequestUnavailable": "Birləşdirmə sorğusu əlçatan deyil",
@@ -329,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "{{total}} fayldan {{displayCount}} fayl yükləndi",
       "filesStillLoading": "Fayllar hələ yüklənir. Yeniləmək üçün aşağı çək.",
       "goToOverview": "Xülasəyə keç",
-      "goToOverviewTab": "Xülasə vərəqinə keç"
+      "goToOverviewTab": "Xülasə vərəqinə keç",
+      "expandAllLines_one": "Bütün {{displayCount}} sətri göstər",
+      "expandAllLines_other": "Bütün {{displayCount}} sətri göstər",
+      "expandLines_one": "{{displayCount}} sətir göstər ({{start}}–{{end}})",
+      "expandLines_other": "{{displayCount}} sətir göstər ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "{{displayCount}} kontekst sətri göstər",
+      "expandLinesOfContext_other": "{{displayCount}} kontekst sətri göstər",
+      "expandMoreLines_one": "Daha {{displayCount}} sətir göstər ({{start}}–{{end}})",
+      "expandMoreLines_other": "Daha {{displayCount}} sətir göstər ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "{{loaded}} / {{total}} fayl yükləndi",
+      "loadedOfTotalFiles_other": "{{loaded}} / {{total}} fayl yükləndi"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ faylın sonunda yeni sətir yoxdur",
@@ -344,6 +394,7 @@
       "merge": "Birləşdirmə",
       "mergeNow": "İndi birləşdir",
       "mergePullRequest": "Sorğunun birləşdirilməsi",
+      "mergeTermTitle": "{{term}}nun birləşdirilməsi",
       "enableAutoMerge": "Avtomatik birləşdirməni aktivləşdir",
       "disableAutoMerge": "Avtomatik birləşdirməni söndür",
       "autoMergeOn": "Avtomatik birləşdirmə aktivdir",
@@ -362,9 +413,12 @@
       "deleteBranchAfterMerge": "Birləşdirmədən sonra budağı sil",
       "noEnabledMethods": "Bu repozitoriyada heç bir birləşdirmə üsulu aktiv deyil. Repozitoriyanın inzibatçısından adi birləşdirmə, sıxlaşdırma və ya bazanı dəyişmə üsulunu aktivləşdirməsini istə.",
       "confirmTitle": "Birləşdirmə sorğusu birləşdirilsin?",
+      "confirmTitleTerm": "{{term}} birləşdirilsin?",
       "confirmMessage": "Dəyişikliklərin əsas budağa birləşdiriləcək.",
       "enableAutoMergeConfirmTitle": "Avtomatik birləşdirmə aktivləşdirilsin?",
       "enableAutoMergeConfirmMessage": "Bütün məcburi yoxlamalar uğurla başa çatdıqda GitHub bu birləşdirmə sorğusunu avtomatik birləşdirəcək.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}}, pipeline uğurlu olduqda avtomatik olaraq birləşdiriləcək.",
+      "enableAutoMergeDescriptionTerm": "GitLab, pipeline uğurlu olduqda bu {{term}}nu avtomatik olaraq birləşdirir.",
       "forbidden": "Bu birləşdirmə sorğusunu birləşdirmək icazən yoxdur.",
       "cannotMerge": "Bu birləşdirmə sorğusunu indiki vəziyyətdə birləşdirmək mümkün deyil.",
       "couldNotMerge": "Birləşdirmə sorğusunu birləşdirmək mümkün olmadı.",
@@ -375,7 +429,8 @@
       },
       "terminal": {
         "alreadyMerged": "Artıq birləşdirilib",
-        "closed": "Bu birləşdirmə sorğusu bağlanıb"
+        "closed": "Bu birləşdirmə sorğusu bağlanıb",
+        "closedMergeRequest": "Bu merge sorğusu bağlanıb"
       },
       "partialSuccessBanner": {
         "body": "Budağı silmək mümkün olmadı. Səbəb: {{reason}}",
@@ -400,6 +455,18 @@
         "behindDetail": "Mənbə budaq əsas budaqdan geri qalır. Birləşdirmədən əvvəl budağın bazasını dəyiş və ya budağı yenilə.",
         "notMergeableTitle": "Bu birləşdirmə sorğusunu hələ birləşdirmək mümkün deyil",
         "notMergeableDetail": "GitHub birləşdirmə vəziyyətini {{state}} kimi bildirdi."
+      },
+      "restrictions": {
+        "title": "Birləşdirmə məhdudiyyətləri",
+        "approvalsRequired_one": "{{displayCount}} təsdiq tələb olunur",
+        "approvalsRequired_other": "{{displayCount}} təsdiq tələb olunur",
+        "pipelineMustSucceed": "Birləşdirmədən əvvəl pipeline uğurlu olmalıdır."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline ən son kommitdə uğursuz olur.",
+        "pendingPipeline": "Pipeline ən son kommitdə hələ işləyir.",
+        "permission": "Bu {{term}}nu birləşdirmək icazən yoxdur.",
+        "draft": "Birləşdirmədən əvvəl {{term}}nu kod baxışına hazır kimi işarələ."
       },
       "methodLabels": {
         "merge": "Birləşdirmə kommiti yarat",
@@ -448,6 +515,11 @@
       "acceptTerms": "Qəbul et",
       "replyBadRequest": "Bu cavabı göndərmək mümkün deyil. Müzakirə dəyişmiş ola bilər.",
       "replyForbidden": "Bu birləşdirmə sorğusuna cavab vermək icazən yoxdur.",
+      "addCommentCta": "Bu birləşdirmə sorğusuna şərh yaz",
+      "fixWithKilo": "Kilo ilə düzəlt",
+      "fixWithKiloPrompt": "Zəhmət olmasa aşağıdakı birləşdirmə sorğusu şərhini həll et: {{link}}",
+      "commentBadRequest": "Bu şərhi göndərmək mümkün deyil. Birləşdirmə sorğusu dəyişmiş ola bilər.",
+      "commentForbidden": "Bu birləşdirmə sorğusuna şərh yazmaq icazən yoxdur.",
       "moderation": {
         "reportContent": {
           "terminal": "Bu şərhdən şikayət etmək mümkün deyil.",
@@ -496,7 +568,10 @@
         "outdatedOnLines": "Köhnəlib: {{lines}}",
         "outdatedOnPath": "Köhnəlib: {{path}}"
       },
-      "deletedUser": "silinmiş istifadəçi"
+      "deletedUser": "silinmiş istifadəçi",
+      "replyForbiddenTerm": "Bu {{term}}na cavab vermək icazən yoxdur.",
+      "moreLinesAbove_one": "… yuxarıda daha {{displayCount}} sətir var.",
+      "moreLinesAbove_other": "… yuxarıda daha {{displayCount}} sətir var."
     },
     "couldNotOpenGitHubAppSettings": "GitHub tətbiqinin parametrlərini açmaq mümkün olmadı.",
     "installKiloGitHubApp": "Kilo GitHub tətbiqini quraşdır",
@@ -508,17 +583,19 @@
     "reviewPullRequest": "Birləşdirmə sorğusunu nəzərdən keçir",
     "headLine": "{{counts}} · son kommit: {{sha}}",
     "entry": {
-      "eyebrow": "Birləşdirmə sorğusunu URL ilə aç.",
-      "pastePrLink": "PR keçidini yapışdır",
-      "noRecentPrs": "Son baxılan PR yoxdur",
-      "noRecentPrsDescription": "Kod baxışına başlamaq üçün yuxarıdakı sahəyə PR keçidini yapışdır — növbəti dəfə burada görünəcək.",
+      "eyebrow": "Birləşdirmə sorğusunu və ya merge sorğusunu URL ilə aç",
+      "pastePrLink": "Birləşdirmə sorğusu və ya merge sorğusu keçidini yapışdır",
+      "noRecentPrs": "Son baxış yoxdur",
+      "noRecentPrsDescription": "Kod baxışına başlamaq üçün yuxarıya keçid yapışdır — növbəti dəfə burada görünəcək.",
       "couldNotLoad": "Yükləmək mümkün olmadı.",
       "removeFromRecentsTitle": "Son baxılanlardan silinsin?",
-      "removeFromRecentsMessage": "Bu birləşdirmə sorğusu son baxılanlar siyahından silinəcək.",
+      "removeFromRecentsMessage": "Bu baxış son baxılanlar siyahısından silinəcək.",
       "removeRecentAccessibility": "{{repo}} repozitoriyasını son baxılanlardan sil",
-      "urlAccessibility": "GitHub birləşdirmə sorğusunun URL-i",
-      "clearLink": "Birləşdirmə sorğusunun keçidini təmizlə",
-      "pasteLink": "Birləşdirmə sorğusunun keçidini yapışdır",
+      "urlAccessibility": "Birləşdirmə sorğusu və ya merge sorğusu URL-ni daxil et",
+      "urlPlaceholder": "Birləşdirmə sorğusu və ya merge sorğusu URL-i",
+      "openAccessibility": "Birləşdirmə sorğusu və ya merge sorğusu aç",
+      "clearLink": "Keçidi təmizlə",
+      "pasteLink": "Birləşdirmə sorğusunun və ya merge sorğusunun keçidini yapışdır",
       "open": "Açıq"
     },
     "checks": {
@@ -535,6 +612,8 @@
       "pending": "{{displayCount}} gözləmədə",
       "skipped": "{{displayCount}} buraxılıb",
       "checksCount": "{{displayCount}} yoxlama",
+      "checksCount_one": "{{displayCount}} yoxlama",
+      "checksCount_other": "{{displayCount}} yoxlama",
       "checkDetails": "yoxlama təfərrüatları"
     },
     "inbox": {
@@ -567,9 +646,15 @@
     "connect": {
       "checkFailedTitle": "GitHub bağlantısını yoxlamaq mümkün olmadı.",
       "checkFailedMessage": "Bu məlumat yüklənənədək giriş statusunu göstərmək mümkün deyil.",
+      "checkFailedTitleGitLab": "GitLab bağlantısını yoxlamaq mümkün olmadı.",
+      "checkFailedTitleBitbucket": "Bitbucket bağlantısını yoxlamaq mümkün olmadı.",
+      "providerCheckFailedMessage": "Yüklənənə qədər bağlantı statusu əlçatan deyil.",
       "reconnectTitle": "GitHub-a yenidən qoşul",
       "reconnectDescription": "GitHub bağlantın ləğv edilib. Mobil cihazda birləşdirmə sorğularını nəzərdən keçirməyə davam etmək üçün yenidən qoşul.",
-      "description": "Mobil cihazda birləşdirmə sorğularını nəzərdən keçirmək üçün GitHub hesabını qoş."
+      "description": "Mobil cihazda birləşdirmə sorğularını nəzərdən keçirmək üçün GitHub hesabını qoş.",
+      "gitlabDescription": "Mobil cihazda merge sorğularına baxış keçirmək üçün GitLab hesabını qoş.",
+      "bitbucketDescription": "Mobil cihazda birləşdirmə sorğularına baxış keçirmək üçün Bitbucket-ı bu təşkilata qoş.",
+      "bitbucketOrgOnlyDescription": "Profilində bir təşkilat seç və onun Bitbucket birləşdirmə sorğularına baxış keçir."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +676,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub bağlantısının müddəti bitdi.",
-      "message": "GitHub bağlantın artıq etibarlı deyil. Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq."
+      "message": "GitHub bağlantın artıq etibarlı deyil. Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq.",
+      "gitlabTitle": "GitLab bağlantısının müddəti bitdi.",
+      "bitbucketTitle": "Bitbucket bağlantısının müddəti bitdi.",
+      "providerMessage": "{{provider}} bağlantın artıq etibarlı deyil. Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq."
     },
     "eventChips": {
       "comment": "Şərh",
@@ -656,10 +744,12 @@
       "statusContext": "Kontekst",
       "lineLabel": "{{status}}, sətir {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}} sətir: {{text}}",
-      "emptyLine": "(boş)"
+      "emptyLine": "(boş)",
+      "truncationBanner_one": "Dəyişdirilmiş {{total}} fayldan ilk {{limit}} fayl göstərilir — bu, GitHub API məhdudiyyətidir.",
+      "truncationBanner_other": "Dəyişdirilmiş {{total}} fayldan ilk {{limit}} fayl göstərilir — bu, GitHub API məhdudiyyətidir."
     },
     "linkPasteClipboardEmpty": "Mübadilə buferi boşdur.",
-    "linkPasteNotAPullRequest": "Bu, GitHub birləşdirmə sorğusunun keçidi deyil.",
+    "linkPasteNotAPullRequest": "Bu, birləşdirmə sorğusu və ya merge sorğusu keçidi deyil",
     "announce": {
       "commentPosted": "Şərh göndərildi",
       "reviewSubmitted": "Kod baxışı göndərildi",
@@ -668,6 +758,7 @@
     "mutationError": {
       "commentNotPosted": "Bu şərhi göndərmək mümkün deyil. Seçilmiş sətir dəyişmiş və ya PR yenilənmiş ola bilər.",
       "reviewNotSubmitted": "Bu kod baxışını indiki vəziyyətdə göndərmək mümkün deyil. PR dəyişmiş ola bilər və ya öz birləşdirmə sorğuna kod baxışı göndərməyə çalışırsan.",
+      "reviewNotSubmittedTerm": "Bu baxış olduğu kimi göndərilə bilmir. {{term}} dəyişmiş ola bilər və ya öz {{term}}na baxış keçirə bilməzsən.",
       "couldNotPostComment": "Şərhi göndərmək mümkün olmadı.",
       "couldNotSubmitReview": "Kod baxışını göndərmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et."
     },
@@ -675,9 +766,31 @@
       "couldNotReply": "Cavab vermək mümkün olmadı.",
       "couldNotCompleteAction": "Bu əməliyyatı tamamlamaq mümkün olmadı.",
       "mergeResultDefaultError": "GitHub birləşdirməni tamamlamadı.",
+      "mergeResultNotCompleted": "{{term}} birləşdirilmədi. Vəziyyətini yoxla və yenidən cəhd et.",
       "ambiguous": "Nəticəni təsdiqləmək mümkün olmadı — yenidən cəhd etməzdən əvvəl PR-i yoxla.",
       "persistenceFailed": "Bu əməliyyatı qeydə almaq mümkün olmadı. Bir az sonra yenidən cəhd et.",
       "forbidden": "İcazə yoxdur."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Bu provayderdə əlçatan deyil",
+        "accessibility": "Bu provayderdə əlçatan deyil: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Birləşdirmə sorğusu",
+      "mergeRequest": "Merge sorğusu",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Merge sorğusunu paylaş",
+      "viewOnProvider": "{{provider}} üzərində bax",
+      "mergeRequestUnavailable": "Merge sorğusu əlçatan deyil",
+      "unavailableDescription": "Silinmiş ola bilər, yaxud ona giriş icazən olmaya bilər.",
+      "accessDeniedMergeRequest": "Bu merge sorğusuna baxmaq icazən yoxdur.",
+      "couldNotLoadMergeRequest": "Merge sorğusunu yükləmək mümkün olmadı.",
+      "discussionAccessDenied": "Bu merge sorğusunun müzakirəsinə baxmaq icazən yoxdur.",
+      "discussionUnavailableMessage": "Bu merge sorğusu silinmiş ola bilər.",
+      "noDiscussionDescription": "Bu merge sorğusunda kod baxışı müzakirələri və ya ümumi şərhlər yoxdur.",
+      "noFilesChangedDescription": "Bu merge sorğusunda fayl dəyişikliyi yoxdur."
     }
   },
   "notifications": {
@@ -710,11 +823,12 @@
     "previewFullDescription": "Bildirişlər mesajın mətnini kilid ekranında göstərir.",
     "previewGenericDescription": "Bildirişlər yalnız hadisənin baş verdiyini göstərir. Mesajı oxumaq üçün Kilo-nu aç.",
     "channel": {
-      "agent": "Agent sessiyaları",
+      "agentProgress": "Agent gedişatı",
       "chat": "Söhbət mesajları",
       "kiloclaw": "KiloClaw fəaliyyəti",
       "balance": "Balans bildirişləri",
-      "security": "Təhlükəsizlik problemləri"
+      "security": "Təhlükəsizlik problemləri",
+      "spend": "Xərc bildirişləri"
     },
     "category": {
       "chatMessagesSubtitle": "söhbətlərindəki cavablar",
@@ -725,8 +839,22 @@
       "sessionStatusTitle": "Sessiya statusu",
       "sessionStatusSubtitle": "tamamlanıb / uğursuz olub / idarəetməyə hazırdır",
       "kiloclawActivitySubtitle": "nüsxə hazırdır/uğursuz olub, planlaşdırılmış əməliyyatlar",
+      "kiloclawActivityUnavailable": "KiloClaw fəaliyyəti üçün KiloClaw nüsxəsini işə salın.",
       "balanceAlertsSubtitle": "təşkilatın balansının azalması barədə xəbərdarlıqlar",
-      "securityFindingsSubtitle": "yeni aşkarlamalar və SLA xatırlatmaları"
+      "balanceAlertsUnavailable": "Balans xəbərdarlıqları üçün təşkilata qoşulun.",
+      "securityFindingsSubtitle": "yeni aşkarlamalar və SLA xatırlatmaları",
+      "securityFindingsUnavailable": "Təhlükəsizlik aşkarlamaları üçün Kilo Təhlükəsizlik agentini bir əhatə dairəsində aktivləşdirin.",
+      "spendAlertsSubtitle": "hədd aşmaları və saatlıq sıçrayışlar",
+      "spendAlertsToggle": "Xərc bildirişləri kateqoriyası"
+    },
+    "action": {
+      "openSession": "Sessiyanı aç"
+    },
+    "needsInputAction": {
+      "approved": "Sorğu təsdiqləndi",
+      "replied": "Cavab göndərildi",
+      "failed": "Cavab vermək olmadı. Yenidən cəhd etmək üçün yenidən toxunun.",
+      "unavailable": "Bu sorğu artıq gözləmir."
     }
   },
   "tabs": {
@@ -807,7 +935,9 @@
       "uploadFailed": "Yükləmə uğursuz oldu.",
       "failedToUploadFile": "Faylı yükləmək mümkün olmadı: {{reason}}.",
       "nothingToPaste": "Yapışdırılacaq heç nə yoxdur.",
-      "metadataStripFailed": "Şəklin metaməlumatlarını silmək mümkün olmadı."
+      "metadataStripFailed": "Şəklin metaməlumatlarını silmək mümkün olmadı.",
+      "limit_one": "Ən çox {{displayCount}} fayl əlavə edə bilərsən.",
+      "limit_other": "Ən çox {{displayCount}} fayl əlavə edə bilərsən."
     },
     "attachmentPreview": {
       "accessibility": "Fayl: {{filename}}, {{status}}",
@@ -1551,7 +1681,11 @@
       "syncFindings": "Tapıntıları sinxronlaşdır",
       "syncNow": "İndi sinxronlaşdır",
       "syncQueued": "Sinxronlaşdırma növbəyə alındı",
-      "syncStatusUnavailable": "Sinxronlaşdırma statusu əlçatan deyil."
+      "syncStatusUnavailable": "Sinxronlaşdırma statusu əlçatan deyil.",
+      "daysOverdue_one": "{{displayCount}} gün gecikib",
+      "daysOverdue_other": "{{displayCount}} gün gecikib",
+      "findingsCount_one": "{{displayCount}} tapıntı",
+      "findingsCount_other": "{{displayCount}} tapıntı"
     },
     "dashboardMetrics": {
       "openFindings": "Açıq tapıntılar",
@@ -1948,6 +2082,10 @@
       "couldNotLoad": "Sessiyanı yükləmək mümkün olmadı.",
       "failedToLoadDetails": "Sessiyanın təfərrüatlarını yükləmək mümkün olmadı.",
       "failedToStopExecution": "İcranı dayandırmaq mümkün olmadı.",
+      "stopped": "Sessiya dayandırıldı",
+      "committing": "Təsdiqlənir…",
+      "committed": "Təsdiqləndi",
+      "commitFailed": "Təsdiqləmə uğursuz oldu",
       "renameSession": "Sessiyanın adını dəyiş",
       "renamePlaceholder": "Sessiya adı",
       "transcriptAccessibility": "Sessiyanın yazışma tarixçəsi",
@@ -1982,17 +2120,56 @@
       "exitNeedsNewerCli": "Uzaqdan / əmrlərini işlətmək üçün Kilo CLI-nin daha yeni versiyası lazımdır. Kilo CLI-ni yenilə və yenidən qoşul."
     },
     "sessionConnection": {
+      "label": "Bağlantı",
       "connecting": "Qoşulur…",
       "reconnecting": "Yenidən qoşulur…",
       "connectionLost": "Bağlantı kəsildi",
       "retryConnection": "Yenidən qoşul"
     },
+    "goal": {
+      "title": "Məqsəd",
+      "statusActive": "Aktiv məqsəd",
+      "statusPaused": "Dayandırılmış məqsəd",
+      "statusComplete": "Məqsəd tamamlandı",
+      "statusBlocked": "Məqsəd bloklandı",
+      "edit": "Məqsədi redaktə et",
+      "remove": "Məqsədi sil",
+      "pause": "Məqsədi dayandır",
+      "resume": "Məqsədə davam et",
+      "editPlaceholder": "Məqsədi təsvir edin",
+      "removeConfirmTitle": "Məqsəd silinsin?",
+      "removeConfirmMessage": "CLI bu sessiyanın məqsədini təmizləyir.",
+      "updateFailed": "Məqsəd yenilənə bilmədi.",
+      "sectionAccessibility": "{{status}}. Məqsəd: {{text}}",
+      "collapse": "Məqsədi yığ",
+      "expand": "Məqsədi göstər"
+    },
     "newSession": {
+      "recentlyUsed": "Son istifadə edilənlər",
+      "couldNotLoadGithubRepositories": "GitHub repozitoriyalarını yükləmək mümkün olmadı.",
+      "couldNotLoadGitlabRepositories": "GitLab repozitoriyalarını yükləmək mümkün olmadı.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarını yükləmək mümkün olmadı.",
       "connectGithubDescription": "GitHub hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
+      "connectGitlabDescription": "GitLab hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
+      "connectBitbucketDescription": "Bitbucket hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
       "openGithub": "GitHub-u aç",
+      "openGitlab": "GitLab-ı aç",
+      "openBitbucket": "Bitbucket-ı aç",
       "refreshRepositories": "Repozitoriyaları yenilə",
       "githubConnected": "GitHub qoşulub",
+      "gitlabConnected": "GitLab qoşulub",
       "noRepositoriesVisible": "Heç bir repozitoriya görünmür. Kilo GitHub tətbiqinin repozitoriyalara giriş icazəsini yoxla, sonra siyahını yenilə.",
+      "noRepositoriesVisibleGitlab": "Heç bir repozitoriya görünmür. GitLab repozitoriyalarına giriş icazəsini yoxla, sonra siyahını yenilə.",
+      "noRepositoriesVisibleBitbucket": "Heç bir repozitoriya görünmür. Bitbucket repozitoriyalarına giriş icazəsini yoxla, sonra siyahını yenilə.",
+      "bitbucketOrganizationsOnly": "Bitbucket yalnız təşkilatlar üçün əlçatandır.",
+      "branchPickerTitle": "Budaq seç",
+      "branchDefault": "Defolt",
+      "branchAccessibility": "Budaq: {{label}}",
+      "branchLoading": "Budaqlar yüklənir",
+      "branchLoadError": "Budaqları yükləmək mümkün olmadı",
+      "branchUnavailable": "Bu repozitoriya üçün budaq əlçatan deyil. Provayderdəki icazələrini yoxla, sonra başqa repozitoriya seç.",
+      "branchEmpty": "Əlçatan budaq yoxdur",
+      "branchPlaceholder": "Budaq seç",
       "runOnWithTarget": "İcra mühiti: {{target}}",
       "environment": "Mühit",
       "couldNotLoadEnvironment": "Mühitini yükləmək mümkün olmadı.",
@@ -2013,24 +2190,13 @@
       "couldNotRefreshRepositories": "Repozitoriyaları yeniləmək mümkün olmadı. Yenidən cəhd et.",
       "discardDraftTitle": "Qaralama silinsin?",
       "discardDraftMessage": "Sorğun silinəcək.",
+      "discardWithUploadsMessage": "Sorğun və heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək.",
       "discardFailed": "Qaralamanı silmək mümkün olmadı. Yenidən cəhd et.",
       "remoteHint": "Kompüterindəki kilo prosesini idarə etmək üçün kompüterdə `kilo remote` əmrini və ya işləyən CLI sessiyasında `/remote` əmrini işə sal.",
-      "connectBitbucketDescription": "Bitbucket hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
-      "connectGitlabDescription": "GitLab hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarını yükləmək mümkün olmadı.",
-      "couldNotLoadGithubRepositories": "GitHub repozitoriyalarını yükləmək mümkün olmadı.",
-      "couldNotLoadGitlabRepositories": "GitLab repozitoriyalarını yükləmək mümkün olmadı.",
-      "gitlabConnected": "GitLab qoşulub",
-      "noRepositoriesVisibleBitbucket": "Heç bir repozitoriya görünmür. Bitbucket repozitoriyalarına giriş icazəsini yoxla, sonra siyahını yenilə.",
-      "noRepositoriesVisibleGitlab": "Heç bir repozitoriya görünmür. GitLab repozitoriyalarına giriş icazəsini yoxla, sonra siyahını yenilə.",
-      "openBitbucket": "Bitbucket-ı aç",
-      "openGitlab": "GitLab-ı aç",
-      "recentlyUsed": "Son istifadə edilənlər",
       "continueFrom": "{{title}} davam etdirilir.",
       "importingSession": "Sessiya idxal olunur",
       "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seç.",
-      "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı.",
-      "discardWithUploadsMessage": "Sorğun və heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək."
+      "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi.",
@@ -2054,7 +2220,14 @@
       "updateTodos": "Tapşırıqları yenilə",
       "linesBadge": "{{displayCount}} sətir",
       "filesBadge": "{{displayCount}} fayl",
-      "matchesBadge": "{{displayCount}} uyğunluq"
+      "matchesBadge": "{{displayCount}} uyğunluq",
+      "filesBadge_one": "{{displayCount}} fayl",
+      "filesBadge_other": "{{displayCount}} fayl",
+      "linesBadge_one": "{{displayCount}} sətir",
+      "linesBadge_other": "{{displayCount}} sətir",
+      "matchesBadge_one": "{{displayCount}} uyğunluq",
+      "matchesBadge_other": "{{displayCount}} uyğunluq",
+      "noOutput": "Çıxış yoxdur."
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} sətirləri (qısaldılıb)",
@@ -2344,7 +2517,11 @@
       "files": "Fayl",
       "couldNotOpenPhotoPicker": "Şəkil seçicisini açmaq mümkün olmadı. Kilo-nu yenidən başlat və yenidən cəhd et.",
       "maxFilesAllowed": "Ən çox {{displayCount}} fayl əlavə etmək olar.",
-      "onlyAddingFiles": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})"
+      "onlyAddingFiles": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})",
+      "maxFilesAllowed_one": "Ən çox {{displayCount}} fayl əlavə etmək olar.",
+      "maxFilesAllowed_other": "Ən çox {{displayCount}} fayl əlavə etmək olar.",
+      "onlyAddingFiles_one": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})",
+      "onlyAddingFiles_other": "{{total}} fayldan yalnız {{accepted}} fayl əlavə olunur (ən çox {{max}})"
     },
     "composer": {
       "addAttachment": "Qoşma əlavə et",
@@ -2362,7 +2539,9 @@
       "discardAttachmentsMessage": "Heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək.",
       "discardAttachmentsTitle": "Əlavələr silinsin?",
       "charactersRemaining": "{{count}} simvol qalıb",
-      "insertNewline": "Yeni sətir əlavə et"
+      "insertNewline": "Yeni sətir əlavə et",
+      "charactersRemaining_one": "{{count}} simvol qalıb",
+      "charactersRemaining_other": "{{count}} simvol qalıb"
     },
     "chatLink": {
       "linkCopied": "Keçid kopyalandı",
@@ -2396,6 +2575,12 @@
       "startNewSession": "Yeni sessiya başlat",
       "exitSession": "Sessiyadan çıx",
       "clearSession": "Bu sessiyanı bitir və yenisini başlat",
+      "compactDescription": "cari sessiya kontekstini sıxlaşdır",
+      "goalDescription": "Sessiya məqsədi istiqamətində işləməyə davam et. /goal <objective> və ya pause, resume, clear",
+      "initDescription": "bələdçili AGENTS.md quraşdırması",
+      "resumeClaudeDescription": "Claude Code sessiya transkriptini idxal et",
+      "resumeCodexDescription": "OpenAI Codex sessiya transkriptini idxal et",
+      "reviewDescription": "dəyişiklikləri nəzərdən keçir [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} əmrindən istifadə et",
       "insert": "Daxil et",
       "upgradeRequiredFallback": "Bu əmrdən istifadə etmək üçün CLI-ni yenilə.",
@@ -2428,7 +2613,14 @@
       "stepsCount_one": "{{steps}} addım",
       "stepsCount": "{{steps}} addım",
       "stepsCount_other": "{{steps}} addım",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Model ({{displayCount}})",
+      "modelsCount_other": "Modellər ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "Avtomatik təsdiq",
+      "description": "Bu sessiya üçün icazə sorğularını avtomatik təsdiqləyin. Alətlər bundan sonra soruşmadan işləyir.",
+      "unavailable": "Bu sessiya icazə sorğuları qəbul edə bilmir."
     },
     "prBadge": {
       "open": "açıq birləşdirmə sorğusu",
@@ -2460,6 +2652,12 @@
       "retryableDescription": "Bağlantını yoxla və yenidən cəhd et. «Hazırdır» düyməsi ilə bu qovluğu yenə də seçə bilərsən.",
       "unsupportedTitle": "Qovluqların siyahısını göstərmək mümkün deyil",
       "unsupportedDescription": "Bu CLI qovluqların siyahısını göstərə bilmir. «Hazırdır» düyməsi başlanğıc qovluğunu saxlayır, «Sessiyanı başlat» düyməsi isə sessiyanı həmin qovluqda başladır."
+    },
+    "toolRun": {
+      "sheetTitle": "Alət çağırışları",
+      "condensedLabel": "{{itemCount}} element; {{last}}",
+      "condensedLabel_one": "{{itemCount}} element; {{last}}",
+      "condensedLabel_other": "{{itemCount}} element; {{last}}"
     }
   },
   "bootstrap": {
@@ -2504,6 +2702,7 @@
     "couldNotLoadActiveSessions": "Aktiv sessiyaları yükləmək mümkün olmadı.",
     "agentSessions": "Hazırda aktiv",
     "newCodingTask": "Yeni kodlaşdırma tapşırığı",
+    "newTaskFromPicture": "Şəkildən yeni tapşırıq",
     "explore": "Kəşf",
     "seeAll": "Hamısına bax",
     "noLiveSessions": "Hazırda heç nə işləmir"
@@ -2565,7 +2764,17 @@
     "languageNotInstalledMessage": "{{language}} dilinin oflayn nitq faylları bu telefonda quraşdırılmayıb. Onları endir, sonra səslə daxiletməni yenidən sına.",
     "downloadOfflineModel": "Endir",
     "offlineModelDownloadScheduled": "Oflayn nitq faylları fonda endiriləcək. Səslə daxiletməni daha sonra yenidən sına.",
-    "listeningStopped": "Dinləmə dayandı."
+    "listeningStopped": "Dinləmə dayandı.",
+    "transcribing": "Mətnə çevrilir...",
+    "gatewayUnreachable": "Kilo Gateway-e qoşulmaq mümkün olmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
+    "gatewayTimeout": "Səsin mətnə çevrilməsi çox vaxt apardı. Yenidən cəhd edin.",
+    "gatewayModelUnavailable": "Bu səsin mətnə çevrilməsi modeli əlçatan deyil. Seçimlərdə başqasını seçin.",
+    "gatewayModelUnavailableNotice": "Bu model artıq təklif edilmir. Başqasını seçmək üçün $t(transcriptionModel.title) üzərinə toxunun.",
+    "gatewaySignInRequired": "Kilo Gateway ilə mətnə çevirməkdən istifadə etmək üçün hesabınıza daxil olun.",
+    "gatewayNoModel": "Əvvəlcə Seçimlərdə bir səsin mətnə çevrilməsi modeli seçin.",
+    "testTitle": "Səslə daxiletməni yoxla",
+    "testPlaceholder": "Mikrofona toxunun və danışmağa başlayın.",
+    "testClear": "Mətni təmizlə"
   },
   "share": {
     "title": "Kilo-ya göndər",
@@ -2583,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "Bu sessiya fayl qəbul edə bilmir",
     "cliCantReceiveFilesMessage": "Bu sessiyanın işlədiyi Kilo CLI fayl qəbul edə bilmir. Həmin kompüterdə CLI-ni yenilə və ya faylları yeni sessiyaya göndər.",
     "contentlessMessage": "Paylaşılacaq heç nə yoxdur — mətn və ya fayl daxil edilməyib.",
-    "couldNotReadContent": "Paylaşılan məzmunu oxumaq mümkün olmadı."
+    "couldNotReadContent": "Paylaşılan məzmunu oxumaq mümkün olmadı.",
+    "onlyFirstFilesAttached_one": "Yalnız ilk {{displayCount}} fayl əlavə ediləcək.",
+    "onlyFirstFilesAttached_other": "Yalnız ilk {{displayCount}} fayl əlavə ediləcək."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2715,7 +2926,8 @@
     "aiProvidersWhat": "Sorğuların, söhbət tarixçən və əlavə etdiyin bütün fayllar.",
     "aiProvidersWhy": "AI cavabları yaratmaq üçün.",
     "aiProvidersWho": "Anthropic, OpenAI, Google və hər sorğu üçün seçdiyin digər təminatçılar.",
-    "gatewayWhat": "Hesab identifikatoru, sorğunun metaməlumatları, token istifadəsi.",
+    "gatewayWhat": "Hesab identifikatoru, sorğunun metaməlumatları, token istifadəsi, həmçinin tətbiqin onun vasitəsilə göndərdiyi promptlar və səs yazıları.",
+    "viaGateway": "Kilo Gateway vasitəsilə",
     "gatewayWhy": "Kimliyin təsdiqlənməsi, sorğuların yönləndirilməsi, ödənişlərin tutuşdurulması.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Tətbiq məzmunu silinmiş çökmə və xəta hesabatları.",
@@ -2735,7 +2947,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Diktə zamanı səsinin yazısı.",
     "voiceTranscriptionWhy": "Nitqi mətnə çevirmək üçün.",
-    "voiceTranscriptionWho": "Səs yalnız cihazda emal olunur. Cihaz səsi oflayn mətnə çevirə bilmədikdə Apple və ya Google xidmətindən istifadə olunur.",
+    "voiceTranscriptionWho": "Cihazınız, seçdiyiniz transkripsiya modeli ilə Kilo Gateway və ya onlayn tanıma üçün Apple və ya Google.",
     "installAttributionPromptTitle": "Quraşdırma mənbəyini müəyyən etməyə icazə verilsin?",
     "installAttributionPromptMessage": "Kilo Apple-ın izləmə icazəsindən yalnız tətbiqi hansı kanal vasitəsilə tapdığını öyrənmək üçün istifadə edir. Sorğuların və söhbətlərin bunun üçün heç vaxt istifadə olunmur.",
     "what": "Nə",
@@ -2907,6 +3119,14 @@
     "tooManySignInAttempts": "Həddindən çox giriş cəhdi edilib. Bir az gözlə və yenidən cəhd et."
   },
   "models": {
+    "auto": {
+      "frontier": "Avtomatik Qabaqcıl",
+      "balanced": "Avtomatik Balanslı",
+      "efficient": "Avtomatik Səmərəli",
+      "small": "Avtomatik Kiçik",
+      "free": "Avtomatik Pulsuz",
+      "organization": "Təşkilat Avtomatik"
+    },
     "dataCollected": "Məlumat toplanır",
     "free": "Pulsuz",
     "couldNotUpdateFavorites": "Sevimliləri yeniləmək mümkün olmadı.",
@@ -2945,7 +3165,74 @@
     "privacy": "Agentləri görmək üçün Kilo-nu aç",
     "openAgents": "Agentləri aç",
     "needsInput": "Cavab gözləyir",
+    "newestSession": "Ən yenisi: {{title}}",
+    "noneWaiting": "Gözləyən agent yoxdur",
+    "newAgent": "Yeni agent",
+    "approving": "Təsdiqlənir...",
+    "couldNotApprove": "Təsdiqlənmədi",
+    "couldNotStart": "Başladılmadı",
     "channelName": "Aktiv agentlər",
-    "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir."
+    "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir.",
+    "openSession": "Aç",
+    "approveFailed": "Təsdiqləmək mümkün olmadı. Yenidən cəhd etmək üçün $t(common.approve) üzərinə toxun.",
+    "newestResult": "Ən yeni nəticə"
+  },
+  "transcriptionModel": {
+    "title": "Səsin mətnə çevrilməsi modeli",
+    "noneChosen": "Seçilməyib",
+    "emptyTitle": "Səsin mətnə çevrilməsi modeli yoxdur",
+    "emptyDescription": "Kilo Gateway hazırda səsin mətnə çevrilməsi modeli təklif etmir.",
+    "loadFailed": "Səsin mətnə çevrilməsi modellərini yükləmək mümkün olmadı."
+  },
+  "voiceLanguage": {
+    "title": "Səslə daxiletmə dili",
+    "automatic": "Avtomatik",
+    "loadFailed": "Bu cihazın dəstəklədiyi dillər yüklənə bilmədi.",
+    "emptyTitle": "Dəstəklənən dil yoxdur",
+    "emptyDescription": "Bu cihazın nitq tanıma funksiyası heç bir dəstəklənən dil bildirmir."
+  },
+  "tour": {
+    "eyebrow": "Sürətli tur",
+    "forkTitle": "Kilo-nu harada işə salmaq istəyirsən?",
+    "forkSubtitle": "İlk sessiyan üçün Kilo-nun harada işləyəcəyini seç.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Kilo-nu heç nə quraşdırmağa ehtiyac olmadan təcrid olunmuş bulud mühitində işə sal.",
+    "remoteOptionTitle": "Kompüterin",
+    "remoteOptionBody": "Kilo-nu `kilo remote` CLI vasitəsilə öz cihazında işə sal.",
+    "skip": "Turu ötür",
+    "tutorialLabel": "Təlimat"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Agenti başlatmaq üçün sorğu lazımdır. Sorğu əlavə et və yenidən işə sal.",
+      "repositoryUnknown": "Kilo {{repository}} adını GitHub və ya GitLab repozitoriyası kimi tanımır. Kilo-da başqa repozitoriya seç.",
+      "repositoryUnsupported": "{{repository}} Bitbucket repozitoriyasıdır — Agenti başlat hələ ondan istifadə edə bilmir. Kilo-da başqa repozitoriya seç."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Son sessiyanı aç"
+  },
+  "spendAlerts": {
+    "subtitle": "Bu əhatənin xərci həddi aşdıqda və ya adi saatlıq sürətindən yuxarı sıçradıqda ödəniş əlaqələrinə e-poçt və ya push ilə bildiriş göndər.",
+    "enable": "Xərc bildirişlərini aktivləşdir",
+    "thresholdTitle": "Həddin aşılması",
+    "thresholdSubtitle": "Yığılan xərc limitini aşır",
+    "anomalyTitle": "Saatlıq sıçrayış",
+    "anomalySubtitle": "Bir saat bu əhatənin adi sürətindən xeyli yuxarıdır",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Pəncərə",
+    "window24h": "24 saat",
+    "window7d": "7 gün",
+    "window30d": "30 gün",
+    "multiplierLabel": "Sıçrayış əmsalı",
+    "saved": "Xərc bildirişi parametrləri yadda saxlanıldı",
+    "loadError": "Xərc bildirişlərini yükləmək mümkün olmadı.",
+    "saveError": "Xərc bildirişlərini yadda saxlamaq mümkün olmadı.",
+    "empty": "Xərc bildirişləri söndürülüb. Bu əhatənin ödəniş əlaqələrini xəbərdar etmək üçün onları yandır.",
+    "noSpend": "Hələ heç bir xərc qeydə alınmayıb",
+    "spend24h": "Son 24 saatda xərc",
+    "multiplierError": "1 və ya daha böyük əmsal daxil et",
+    "permissionDenied": "Xərc bildirişlərini idarə etmək icazən yoxdur.",
+    "pushOffByCategory": "Bildirişlərdə söndürülüb"
   }
 }

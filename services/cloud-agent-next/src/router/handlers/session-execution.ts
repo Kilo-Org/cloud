@@ -20,7 +20,11 @@ import {
   LegacyExecutionResponse,
 } from '../schemas.js';
 import type { SessionId } from '../../types/ids.js';
-import { preflightAndQueuePromptMessage, queueMessage } from '../../session/queue-message.js';
+import {
+  preflightAndQueuePromptMessage,
+  preflightRuntimeAuthorizationRecovery,
+  queueMessage,
+} from '../../session/queue-message.js';
 import {
   admitLegacyPreparedInitialMessage,
   replayLegacyPreparedInitialMessageIfAlreadyAdmitted,
@@ -58,12 +62,19 @@ export function createSessionExecutionV2Handlers() {
             validatedSessionAccess: ctx.validatedSessionAccess,
           });
           const admissionInput = { cloudAgentSessionId: input.cloudAgentSessionId };
-          const admissionContext = { env: ctx.env, userId: ctx.userId, botId: ctx.botId };
+          const admissionContext = {
+            env: ctx.env,
+            userId: ctx.userId,
+            botId: ctx.botId,
+            authToken: ctx.authToken,
+          };
           const replay = await replayLegacyPreparedInitialMessageIfAlreadyAdmitted(
             admissionInput,
             admissionContext
           );
           if (replay) return withLegacyExecutionId(replay);
+
+          await preflightRuntimeAuthorizationRecovery(input.cloudAgentSessionId, admissionContext);
 
           await preflightPreparedInitialPromptModel({
             env: ctx.env,
@@ -140,7 +151,12 @@ export function createSessionExecutionV2Handlers() {
               condenseOnComplete: input.condenseOnComplete,
             } satisfies TurnFinalization,
           };
-          const admissionContext = { env: ctx.env, userId: ctx.userId, botId: ctx.botId };
+          const admissionContext = {
+            env: ctx.env,
+            userId: ctx.userId,
+            botId: ctx.botId,
+            authToken: ctx.authToken,
+          };
           const ack =
             turn.type === 'prompt'
               ? await preflightAndQueuePromptMessage(

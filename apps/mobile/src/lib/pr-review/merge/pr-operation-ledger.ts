@@ -14,8 +14,14 @@ export const PR_OPERATION_AMBIGUOUS_MESSAGE = "Couldn't confirm — check the PR
 export const PR_OPERATION_PERSISTENCE_FAILED_MESSAGE =
   'We could not record this action. Please try again later.';
 
-/** The four PR mutation surfaces; each has its own existing retryable copy. */
-export type PrMutationSurface = 'create-comment' | 'submit-review' | 'reply' | 'merge';
+/** The PR mutation surfaces; each has its own existing retryable copy. */
+export type PrMutationSurface =
+  | 'create-comment'
+  | 'submit-review'
+  | 'reply'
+  | 'resolve'
+  | 'merge'
+  | 'pr-comment';
 
 // Existing retryable fallback copy per surface (mirrors the sheet/composer
 // defaults so an in-progress duplicate reads like a normal retryable failure).
@@ -24,7 +30,13 @@ const PR_SURFACE_RETRYABLE_COPY = {
   'create-comment': 'prReview.mutationError.couldNotPostComment',
   'submit-review': 'prReview.mutationError.couldNotSubmitReview',
   reply: 'prReview.operation.couldNotReply',
+  // A resolve/unresolve toggle is not a reply: a duplicate operation must not
+  // tell the reader the thread reply failed. The generic action-failure copy
+  // is the existing resolution-neutral string — a new resolution-specific key
+  // would need its 86 translations, which belong to the translation slice.
+  resolve: 'prReview.operation.couldNotCompleteAction',
   merge: 'prReview.merge.couldNotMerge',
+  'pr-comment': 'prReview.mutationError.couldNotPostComment',
 } satisfies Record<PrMutationSurface, string>;
 
 /**

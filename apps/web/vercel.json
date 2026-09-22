@@ -69,6 +69,10 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/cron/minimax-token-health",
+      "schedule": "0 13 * * *"
+    },
+    {
       "path": "/api/cron/usage-daily-rollup-repairs",
       "schedule": "5 * * * *"
     },
@@ -127,6 +131,10 @@
     {
       "path": "/api/cron/cleanup-review-memory",
       "schedule": "0 */12 * * *"
+    },
+    {
+      "path": "/api/cron/dispatch-spend-alerts",
+      "schedule": "*/5 * * * *"
     }
   ],
   "build": {

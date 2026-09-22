@@ -1,19 +1,35 @@
 /* eslint-disable max-lines -- the mocked hook surface, the draft-restore contract, and the attachment-send mocks require a long suite */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/persist/cache-persistence-mount.test.ts */
 /* eslint-disable new-cap -- ChatComposer is called as a plain function, matching repo test convention */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake hooks and handlers settle without await because they resolve immediately */
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
+import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import { Text as renderText } from '@/components/ui/text';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
 import { type ChatComposer } from './chat-composer';
 
+// A remote catalog that advertises safe session detach, so /exit and /quit
+// parse locally instead of short-circuiting to upgrade-required.
+const remoteExitState: RemoteCommandState = {
+  ownerConnectionId: null,
+  refresh: 'idle',
+  commands: [],
+  canExitSession: true,
+};
+
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
+const safeAreaInsets = vi.hoisted(() => ({ bottom: 0, left: 0, right: 0, top: 0 }));
 const TEXT_DIRECTIONS = [
   { direction: 'LTR', isRTL: false, style: undefined },
-  { direction: 'RTL', isRTL: true, style: [{ writingDirection: 'rtl' }, undefined] },
+  {
+    direction: 'RTL',
+    isRTL: true,
+    style: [{ writingDirection: 'rtl' }, { letterSpacing: 0 }, undefined],
+  },
 ];
 
 vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
@@ -95,7 +111,7 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }),
+  useSafeAreaInsets: () => safeAreaInsets,
 }));
 
 vi.mock('react-native-gesture-handler', () => ({
@@ -123,8 +139,16 @@ vi.mock('@/lib/navigation/prevent-remove', () => ({
   usePreventRemove: vi.fn(),
 }));
 
+// Identity-matched so tests can read the inline status row's message prop
+// (slash-command rejections, photo-metadata warning) and the goal compose
+// hint. The real component owns the announcement channel; the composer only
+// needs to render it with the right message. Deliberately not
+// `__testMarker`-tagged so `findInputRowProps` cannot mistake it for the
+// input row.
+const MockAccessibleStatus = () => null;
+
 vi.mock('@/components/ui/accessible-status', () => ({
-  AccessibleStatus: () => null,
+  AccessibleStatus: MockAccessibleStatus,
 }));
 
 vi.mock('react-native-reanimated', () => ({
@@ -223,9 +247,11 @@ vi.mock('@/components/agents/chat-composer-input-state', () => ({
   },
 }));
 
-vi.mock('@/components/ui/blur-bar', () => ({
-  BlurBar: () => null,
-}));
+// The composer's root element; located by identity, never by a __testMarker
+// (findInputRowProps treats any marked function as the input row).
+const MockBlurBar = () => null;
+
+vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: MockBlurBar }));
 
 vi.mock('@/components/voice-input-control', () => ({
   VoiceInputStatus: () => null,
@@ -298,18 +324,27 @@ vi.mock('@/lib/share-prefill', () => ({
   useSharePrefill: vi.fn(),
 }));
 
-vi.mock('@/lib/voice-input/use-voice-input', () => ({
-  useVoiceInput: () => ({
-    available: false,
-    isActive: false,
-    settleBeforeSubmit: vi.fn(async () => true),
-    status: 'idle',
-    toggle: vi.fn(),
-  }),
+// The voice hook options (getDraft/onDraftChange) are captured so a test can
+// drive the transcript-into-draft path through the composer's wiring; the
+// draft module stays unmocked (pure logic) so the real splice runs.
+const voiceHookOptions = vi.hoisted(() => ({
+  current: null as {
+    getDraft: () => string;
+    onDraftChange: (draft: string) => void;
+  } | null,
 }));
 
-vi.mock('@/lib/voice-input/voice-input-draft', () => ({
-  applyVoiceDraftToInput: vi.fn(),
+vi.mock('@/lib/voice-input/use-voice-input', () => ({
+  useVoiceInput: (options: { getDraft: () => string; onDraftChange: (draft: string) => void }) => {
+    voiceHookOptions.current = options;
+    return {
+      available: false,
+      isActive: false,
+      settleBeforeSubmit: vi.fn(async () => true),
+      status: 'idle',
+      toggle: vi.fn(),
+    };
+  },
 }));
 
 vi.mock('@/lib/hooks/use-return-sends-message-preference', () => ({
@@ -376,6 +411,27 @@ function findStripProps(node: Node): Record<string, unknown> | null {
     }
   }
   return null;
+}
+
+// The composer pads the content inside its root BlurBar with the landscape
+// sensor side insets. The container is the only View in the returned tree
+// carrying a style prop, so it is located by that style shape.
+function findComposerInsetContainer(render: React.ReactElement): {
+  type: unknown;
+  props: Record<string, unknown>;
+} {
+  const container = findNode(
+    render,
+    (type, props) =>
+      type === 'View' &&
+      typeof props.style === 'object' &&
+      props.style !== null &&
+      'paddingLeft' in props.style
+  );
+  if (container === null) {
+    throw new Error('composer side-inset container not found in the BlurBar content');
+  }
+  return container;
 }
 
 function requireInputRowOnSubmit(render: React.ReactElement): () => void {
@@ -452,6 +508,10 @@ beforeEach(() => {
   returnSendsPref.returnSendsMessage = false;
   reducedMotionOn.value = false;
   layoutDirection.isRTL = false;
+  safeAreaInsets.bottom = 0;
+  safeAreaInsets.left = 0;
+  safeAreaInsets.right = 0;
+  safeAreaInsets.top = 0;
 });
 
 // The restore contract has one axis: whether the host resolved a draft. Both
@@ -532,7 +592,49 @@ describe('ChatComposer draft restore', () => {
       onOptimisticSend: expect.any(Function),
     });
   });
+
+  // The gateway transcript lands after the Stop tap (the upload resolves
+  // post-stop). The remounted input row must show it: a stop-time snapshot
+  // restored the empty pre-transcript text while the live ref and the durable
+  // draft kept the transcript, so the next dictation appended to the hidden
+  // text and the draft showed the same transcript twice (spot check e12-back).
+  it('restores a transcript that lands after the Stop tap onto the remounted row', async () => {
+    const setNativeProps = vi.fn();
+    const props = makeProps({ draftKey: 'agent-composer:sess-1' });
+    const render = await mount(props);
+    // The first useRef slot is textRef; the second is the TextInput ref.
+    const inputRefSlot = refSlots.slots[1];
+    if (inputRefSlot === undefined) {
+      throw new Error('TextInput ref slot was not mounted');
+    }
+    inputRefSlot.current = { setNativeProps };
+    const voice = voiceHookOptions.current;
+    if (voice === null) {
+      throw new Error('useVoiceInput options were not captured');
+    }
+    voice.getDraft();
+    const onStop = findInputRowProps(render)?.onStop as (() => void) | undefined;
+    if (onStop === undefined) {
+      throw new Error('ChatComposerInputRow element did not carry an onStop handler');
+    }
+
+    onStop();
+    await settle();
+    voice.onDraftChange('Gateway transcription online');
+    expect(setNativeProps).toHaveBeenCalledTimes(1);
+
+    // The first re-render lets the stop-remount machine bump `inputEpoch`
+    // and lets the restore effect write the live text into the (new) row;
+    // the second re-render proves the restore is a one-shot.
+    await rerender(props);
+    await rerender(props);
+
+    expect(setNativeProps).toHaveBeenCalledTimes(2);
+    const restoreCall = setNativeProps.mock.calls[1]?.[0] as { text?: string };
+    expect(restoreCall.text).toBe('Gateway transcription online');
+  });
 });
+
 describe('ChatComposer return-sends wiring', () => {
   it('wires the return-sends preference and an insert-newline handler to the input row', async () => {
     returnSendsPref.returnSendsMessage = true;
@@ -558,6 +660,101 @@ describe('ChatComposer return-sends wiring', () => {
 
     expect(refSlots.slots[0]?.current).toBe('\n');
     expect(onSendMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChatComposer goal compose mode', () => {
+  const GOAL_COMMAND: SlashCommandInfo = { name: 'goal', description: 'Goal', hints: [] };
+
+  function remoteGoalProps(overrides: Partial<ComposerProps> = {}): ComposerProps {
+    const commandState: RemoteCommandState = {
+      ownerConnectionId: 'conn-1',
+      refresh: 'idle',
+      commands: [GOAL_COMMAND],
+    };
+    return makeProps({
+      activeSessionType: 'remote',
+      commandState,
+      ...overrides,
+    });
+  }
+
+  async function enterGoalComposeMode(
+    props: ComposerProps,
+    draft = '/goal '
+  ): Promise<React.ReactElement> {
+    const render = await mount(props);
+    requireInputRowOnChangeText(render)(draft);
+    await settle();
+    requireInputRowOnSubmit(render)();
+    await settle();
+    return rerender(props);
+  }
+
+  // The composer renders the goal objective hint (tone "status") alongside the
+  // always-present slash-command rejection row and the photo-metadata warning,
+  // both tone "error". Match the hint by tone so the always-present error row
+  // is not mistaken for the goal hint.
+  function goalHint(render: React.ReactElement): { props: Record<string, unknown> } | null {
+    return findNode(
+      render,
+      (type, props) => type === MockAccessibleStatus && props.tone === 'status'
+    );
+  }
+
+  it('enters goal compose mode and shows the objective hint on a bare /goal send', async () => {
+    const onSendCommand = vi.fn(async () => true);
+    const props = remoteGoalProps({ onSendCommand });
+    const after = await enterGoalComposeMode(props);
+
+    const hint = goalHint(after);
+    expect(hint?.props).toMatchObject({ message: 'Describe the goal', tone: 'status' });
+    // The draft is kept so the user can complete the goal command.
+    expect(refSlots.slots[0]?.current).toBe('/goal ');
+    expect(onSendCommand).not.toHaveBeenCalled();
+    expect(onSendMock).not.toHaveBeenCalled();
+  });
+
+  it('normalizes a separator-less /goal draft so the next keystroke stays a goal command', async () => {
+    const onSendCommand = vi.fn(async () => true);
+    const props = remoteGoalProps({ onSendCommand });
+    const after = await enterGoalComposeMode(props, '/goal');
+
+    // The retained draft ends with the separator, so the next keystroke
+    // continues the goal command instead of producing `/goalShip it`.
+    const retained = refSlots.slots[0]?.current as string;
+    expect(retained).toBe('/goal ');
+
+    requireInputRowOnChangeText(after)(`${retained}Ship it`);
+    await settle();
+    requireInputRowOnSubmit(after)();
+    await settle();
+
+    expect(onSendCommand).toHaveBeenCalledWith('goal', 'Ship it');
+  });
+
+  it('forwards the objective and leaves compose mode on the next send', async () => {
+    const onSendCommand = vi.fn(async () => true);
+    const props = remoteGoalProps({ onSendCommand });
+    const render = await enterGoalComposeMode(props);
+
+    requireInputRowOnChangeText(render)('/goal Ship it');
+    await settle();
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    expect(onSendCommand).toHaveBeenCalledWith('goal', 'Ship it');
+    const after = await rerender(props);
+    expect(goalHint(after)).toBeNull();
+  });
+
+  it('drops the hint when the draft is no longer the goal command', async () => {
+    const props = remoteGoalProps();
+    const render = await enterGoalComposeMode(props);
+
+    requireInputRowOnChangeText(render)('write the docs');
+    const after = await rerender(props);
+    expect(goalHint(after)).toBeNull();
   });
 });
 
@@ -655,5 +852,82 @@ describe('ChatComposer attachment strip wiring', () => {
     }
     expect(stripProps.onMove).toBe(uploadMoveAttachmentMock);
     expect(stripProps.onReorder).toBe(uploadReorderAttachmentsMock);
+  });
+});
+
+describe('ChatComposer landscape side insets', () => {
+  it('keeps portrait geometry with zero side padding', async () => {
+    safeAreaInsets.left = 0;
+    safeAreaInsets.right = 0;
+    const render = await mount(makeProps({}));
+
+    const container = findComposerInsetContainer(render);
+    expect(container.props.style).toEqual({ paddingLeft: 0, paddingRight: 0 });
+    // The unpadded container still hosts the whole composer content.
+    expect(findNode(container, type => type === MockInputRow)).not.toBeNull();
+  });
+
+  it('pads the composer content by the landscape sensor insets', async () => {
+    // iPhone sensor notch in landscape: a wider left inset than right.
+    safeAreaInsets.left = 59;
+    safeAreaInsets.right = 47;
+    const render = await mount(makeProps({}));
+
+    const container = findComposerInsetContainer(render);
+    expect(container.props.style).toEqual({ paddingLeft: 59, paddingRight: 47 });
+    // Toolbar, input row, and send control all clear the sensor area because
+    // they live inside the padded container.
+    expect(findNode(container, type => type === MockChatToolbar)).not.toBeNull();
+    expect(findNode(container, type => type === MockInputRow)).not.toBeNull();
+  });
+});
+
+describe('ChatComposer slash-command rejection feedback', () => {
+  // A rejected /quit submission (arguments) must announce its validation
+  // message through the inline status row — the same surface /exit uses —
+  // instead of a transient toast the accessibility tree never exposes
+  // (device round p6: the rejection was invisible to the reader and to the
+  // automation digest while the rejected draft sat in the input).
+  function statusMessage(render: React.ReactElement): unknown {
+    const status = findNode(render, type => type === MockAccessibleStatus);
+    if (status === null) {
+      throw new Error('AccessibleStatus element not found in the composer tree');
+    }
+    return status.props.message;
+  }
+
+  it('renders the argument-error inline and never submits the rejected draft', async () => {
+    const render = await mount(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    expect(statusMessage(render)).toBeNull();
+
+    requireInputRowOnChangeText(render)('/quit now');
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    const rejected = await rerender(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    expect(statusMessage(rejected)).toBe('/quit does not take arguments.');
+    expect(onSendMock).not.toHaveBeenCalled();
+    expect(showRemoteSessionExitConfirmation).not.toHaveBeenCalled();
+  });
+
+  it('clears the rejection once the input is edited', async () => {
+    const render = await mount(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    requireInputRowOnChangeText(render)('/quit now');
+    requireInputRowOnSubmit(render)();
+    await settle();
+
+    // Removing the arguments is the fix the message asks for; the stale
+    // rejection must not survive the edit.
+    requireInputRowOnChangeText(render)('/quit');
+    const edited = await rerender(
+      makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
+    );
+    expect(statusMessage(edited)).toBeNull();
   });
 });

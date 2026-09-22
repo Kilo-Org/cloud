@@ -12,8 +12,9 @@
 //   * S7a adds diff-line selection: tapping a line runs the pure
 //     `selectLine` reducer; the result is mirrored into the
 //     `diff-selection-bridge` (so the comment composer can read it on
-//     mount) and a floating action bar (`PrDiffFloatingActions`)
-//     hosts the "Comment" and "Finish review" affordances.
+//     mount) and a footer action bar (`PrDiffFloatingActions`) rendered
+//     in-flow below the list hosts the "Comment" and "Finish review"
+//     affordances.
 //
 // Cold first paint: FlashList mounts only after the first page of files is
 // present. The first-load waiting state is a plain skeleton outside the list
@@ -26,7 +27,7 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View, type ViewStyle } from 'react-native';
+import { View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 
 import { QueryError } from '@/components/query-error';
@@ -41,11 +42,12 @@ import {
 } from '@/components/pr-review/diff/pr-diff-file-list-header';
 import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
+import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
+import { providerPrRefKey, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
 import { EmptyFilesView, TabStateMessage } from '@/components/pr-review/diff/pr-diff-rows';
 import { buildFileItems, buildPaginationItem } from '@/lib/pr-review/diff/pr-diff-list-builder';
-import { prDiffListBottomPadding } from '@/lib/pr-review/diff/pr-diff-list-bottom-padding';
 import { itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { stickyFileHeaderIndices } from '@/lib/pr-review/diff/sticky-file-headers';
 import { usePrDiffContextLoader } from '@/lib/pr-review/diff/use-pr-diff-context-loader';
@@ -55,6 +57,8 @@ import {
   usePrReviewViewedFiles,
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { usePrDiffListScroll } from '@/lib/pr-review/diff/use-pr-diff-list-scroll';
+import { usePrDiffListContentPadding } from '@/lib/pr-review/diff/use-pr-diff-list-content-padding';
+import { usePrDiffPageGate } from '@/lib/pr-review/diff/use-pr-diff-page-gate';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { CenteredState } from '@/components/centered-state';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
@@ -91,7 +95,12 @@ export function PrReviewFileList({
     number,
     enabled: true,
   });
-  const viewed = usePrReviewViewedFiles({ owner, repo, number }, headSha);
+  // The live provider scope: the viewed set is keyed by the ref (s6,
+  // identity rule 17), so a GitLab MR and a same-numbered GitHub PR — or
+  // one project on two GitLab instances — never share a set. On the GitHub
+  // route the fallback ref is the triple itself, keeping the legacy bytes.
+  const scope = useProviderPrScope({ owner, repo, number });
+  const viewed = usePrReviewViewedFiles(scope.ref, headSha);
   const fetchToCompletion = useFetchToCompletion(query, changedFiles);
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -121,24 +130,17 @@ export function PrReviewFileList({
     [owner, repo, number]
   );
 
-  // Measured floating-bar height (null until the first layout event).
-  const [barHeight, setBarHeight] = useState<number | null>(null);
+  // The write bar renders on every provider (s6): its two routes — the
+  // comment composer and the review-submit sheet — are siblings of the
+  // GitHub route AND of the provider route, so the bar pushes the sheet
+  // inside the scope its queries run under. The bar is an in-flow footer
+  // below the list (spot check e3), so the list keeps only the fixed footer
+  // gap plus the landscape side insets (which keep rows clear of the sensor
+  // housing).
+  const listContentStyle = usePrDiffListContentPadding(null);
 
-  // Stable callback: ignore sub-one-point noise to avoid unnecessary
-  // re-renders.  Layout events can fire with fractional-pixel deltas.
-  const handleHeightChange = useCallback((height: number) => {
-    setBarHeight(prev => {
-      if (prev !== null && Math.abs(prev - height) < 1) {
-        return prev;
-      }
-      return height;
-    });
-  }, []);
-
-  const contentContainerStyle = useMemo<ViewStyle>(
-    () => ({ paddingBottom: prDiffListBottomPadding(barHeight) }),
-    [barHeight]
-  );
+  // Which provider's words the terminal and empty states use.
+  const copy = usePrDiffStateCopy({ owner, repo, number });
 
   const viewedCount = useMemo(() => {
     let count = 0;
@@ -227,6 +229,20 @@ export function PrReviewFileList({
 
   const items = useMemo(() => [...fileItems, paginationItem], [fileItems, paginationItem]);
 
+  // FlashList reports the end as reached as soon as its content fits the
+  // viewport, so a first page shorter than the screen used to be replaced by
+  // the next pages before the partial-load row (`prReview.hunkRows
+  // .loadedOfTotalFiles`, "1 of 5 files loaded") and its Load all action could
+  // be read. `usePrDiffPageGate` keeps the row the resting state until the
+  // user's own drag, and keeps the end report FlashList makes before it. The
+  // gate is keyed by the provider ref so a drag on one PR never opens the gate
+  // of a different PR rendered by the same mounted list.
+  //
+  // The drag arrives on `onScrollBeginDrag` only when the list can scroll; a
+  // page that fits the viewport still delivers the finger's own movement, so
+  // `onTouchMove` opens the same gate (see `usePrDiffPageGate`).
+  const { onDragStart, onEndReached } = usePrDiffPageGate(query, providerPrRefKey(scope.ref));
+
   const stickyHeaderIndices = useMemo(() => stickyFileHeaderIndices(items), [items]);
 
   usePrDiffListScroll({
@@ -262,19 +278,11 @@ export function PrReviewFileList({
 
   if (files.length === 0) {
     if (firstPageErrorState?.kind === 'not-found') {
-      return (
-        <TabStateMessage
-          title={t('prReview.pullRequestUnavailable')}
-          message={t('prReview.pullRequestUnavailableDescription')}
-        />
-      );
+      return <TabStateMessage title={copy.unavailableTitle} message={copy.unavailableMessage} />;
     }
     if (firstPageErrorState?.kind === 'permission') {
       return (
-        <TabStateMessage
-          title={t('common.accessDenied')}
-          message={t('prReview.accessDeniedDescription')}
-        />
+        <TabStateMessage title={t('common.accessDenied')} message={copy.accessDeniedMessage} />
       );
     }
     if (firstPageErrorState?.kind === 'reconnect') {
@@ -301,6 +309,7 @@ export function PrReviewFileList({
     return (
       <EmptyFilesView
         changedFiles={changedFiles}
+        noChangesDescription={copy.noChangesDescription}
         onRequestOverview={onRequestOverview}
         refreshControl={
           changedFiles > 0 ? (
@@ -351,13 +360,14 @@ export function PrReviewFileList({
             maintainVisibleContentPosition={{ disabled: true }}
             // Re-measure rows when the bounded font scale changes.
             extraData={diffFontMetrics.scale}
-            onEndReached={() => {
-              if (query.hasNextPage && !query.isFetchingNextPage) {
-                void query.fetchNextPage();
-              }
-            }}
+            onScrollBeginDrag={onDragStart}
+            // The reader's finger still moves when the first page fits the
+            // viewport and the list cannot scroll, so this is the drag report
+            // that opens the gate in the case the row exists for.
+            onTouchMove={onDragStart}
+            onEndReached={onEndReached}
             onEndReachedThreshold={0.5}
-            contentContainerStyle={contentContainerStyle}
+            contentContainerStyle={listContentStyle}
             ItemSeparatorComponent={null}
           />
         )}
@@ -365,10 +375,10 @@ export function PrReviewFileList({
           owner={owner}
           repo={repo}
           number={number}
+          prRef={scope.ref.platform === 'github' ? undefined : scope.ref}
           viewMode={effectiveViewMode}
           selection={selection}
           onClearSelection={clearSelection}
-          onHeightChange={handleHeightChange}
         />
       </View>
     </DiffFontMetricsContext.Provider>

@@ -156,7 +156,7 @@ describe('Session Stop progress', () => {
     ]);
   });
 
-  it('does not terminalize an abort response without confirmed cleanup', async () => {
+  it('does not terminalize root-only abort evidence as runtime-wide cleanup', async () => {
     let messages: SessionMessageRecord[] = [
       {
         messageId: 'a',
@@ -183,7 +183,7 @@ describe('Session Stop progress', () => {
         messages = next;
         return true;
       },
-      abort: async () => ({ status: 'aborted', quiescent: false }),
+      abort: async () => ({ status: 'aborted', quiescent: false, cleanupScope: 'root' }),
       applyDelivery: async () => undefined,
     });
 

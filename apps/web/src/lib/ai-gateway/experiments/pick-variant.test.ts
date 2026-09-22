@@ -53,7 +53,12 @@ beforeEach(async () => {
     google_user_email: `admin-${Math.random()}@admin.example.com`,
     is_admin: true,
   });
-});
+  // The first beforeEach in a worker also pays the drizzle pool's first
+  // connection, which POSTGRES_CONNECT_TIMEOUT budgets at 10000 ms in
+  // .env.test — above jest's default 5000 ms hook timeout. CI runs sibling
+  // workers' migrations against the same postgres at startup, so the cold
+  // path can exceed the default even though later calls are warm.
+}, 30000);
 
 async function clearRoutingCaches() {
   mockRedisStore.delete(EXPERIMENTED_PUBLIC_IDS_REDIS_KEY);

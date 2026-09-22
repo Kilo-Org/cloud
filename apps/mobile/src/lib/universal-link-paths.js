@@ -20,5 +20,7 @@ export const UNIVERSAL_LINK_PATH_PATTERNS = [
   '/organizations/.*/code-reviews',
   '/organizations/.*/code-reviews/.*',
   '/organizations/.*/overview',
+  '/pr-review/gitlab/.*',
+  '/pr-review/bitbucket/.*',
   '/pr-review/.*/.*/.*',
 ];

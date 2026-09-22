@@ -6,7 +6,6 @@ import {
   confirmRunning,
   confirmStopped,
   initialPhysicalRecord,
-  type PhysicalState,
 } from '../physical-lifecycle.js';
 
 describe('allowCreate', () => {
@@ -34,20 +33,16 @@ describe('allowCreate', () => {
     expect(claimCreate(stopped, 'replacement', 3).state).toBe('creating');
   });
 
-  it('never creates from alarm recovery, including after stopping resolves', () => {
-    const states: PhysicalState[] = [
-      'stopped',
-      'creating',
-      'running',
-      'stopping',
-      'failed',
-      'unknown',
-    ];
-
-    for (const state of states) {
-      expect(nextEnsureReadyStep(state, false)).not.toBe('create');
+  it('creates from a queued-head alarm only after the allocation is stopped', () => {
+    // A queued head passes `allowCreate: true`, but a replacement is only
+    // realized from a confirmed `stopped` allocation. Running and stopping
+    // allocations are observed, not replaced, and failed/unknown allocations
+    // reconcile first.
+    for (const state of ['creating', 'running', 'stopping'] as const) {
+      expect(nextEnsureReadyStep(state, true)).not.toBe('create');
     }
-    expect(nextEnsureReadyStep('stopping', false)).toBe('return');
-    expect(nextEnsureReadyStep('stopped', false)).toBe('return');
+    expect(nextEnsureReadyStep('failed', true)).toBe('release-failed');
+    expect(nextEnsureReadyStep('unknown', true)).toBe('observe-unknown');
+    expect(nextEnsureReadyStep('stopped', true)).toBe('create');
   });
 });

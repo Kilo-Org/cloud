@@ -48,7 +48,7 @@ dev-debug-request-logs/*
 .tmp/
 test-results/
 playwright-report/
-playwright/.auth/
+**/playwright/.auth/
 
 # debug logs
 npm-debug.log*
@@ -136,3 +136,7 @@ run-milvus-test.sh
 !.env.test
 !.envrc
 .playwright-mcp
+
+# Harness markers: the kwf workflow drops these in a worktree, and one
+# reached a product commit (46640f5e8e96) before it was removed by hand.
+.kwf*

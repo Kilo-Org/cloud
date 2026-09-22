@@ -10,7 +10,7 @@ type ChatCompletionRequest = Extract<GatewayRequest, { kind: 'chat_completions' 
 
 async function transformRequest(
   request: GatewayRequest,
-  options: Partial<Omit<CustomLlmApiConfig, 'internal_id' | 'base_url'>> = {}
+  options: Partial<Omit<CustomLlmApiConfig, 'base_url'>> = {}
 ) {
   const provider = buildDirectProvider(
     'custom',
@@ -78,6 +78,87 @@ function makeRequest(): ChatCompletionRequest {
 
   return request;
 }
+
+describe('custom LLM endpoint configuration', () => {
+  it('accepts an exact endpoint without an internal model ID', () => {
+    const config = {
+      base_url: 'https://llm.example.com/deployments/my-model/invoke',
+      disable_url_suffix: true,
+    };
+
+    expect(CustomLlmApiConfigSchema.parse(config)).toEqual(config);
+  });
+
+  it.each(['', null])('rejects an explicitly invalid internal ID: %s', internal_id => {
+    expect(
+      CustomLlmApiConfigSchema.safeParse({
+        base_url: 'https://llm.example.com/v1',
+        internal_id,
+      }).success
+    ).toBe(false);
+  });
+
+  it.each([
+    [undefined, false],
+    [false, false],
+    [true, true],
+  ])('resolves disable_url_suffix=%s to %s', (disable_url_suffix, expected) => {
+    const provider = buildDirectProvider(
+      'custom',
+      ['messages'],
+      {
+        base_url: 'https://llm.example.com/invoke',
+        api_key: 'test-key',
+        disable_url_suffix,
+      },
+      null
+    );
+
+    expect(provider.disableUrlSuffix).toBe(expected);
+  });
+});
+
+describe('buildDirectProvider model field', () => {
+  it.each<GatewayRequest>([
+    {
+      kind: 'chat_completions',
+      body: { model: 'public-model', messages: [{ role: 'user', content: 'hello' }] },
+    },
+    {
+      kind: 'responses',
+      body: { model: 'public-model', input: 'hello' },
+    },
+    {
+      kind: 'messages',
+      body: {
+        model: 'public-model',
+        max_tokens: 100,
+        messages: [{ role: 'user', content: 'hello' }],
+      },
+    },
+  ])('removes model from $kind requests when internal_id is absent', async request => {
+    await transformRequest(request, {
+      internal_id: undefined,
+      extra_body: { model: 'extra-body-model', temperature: 0.2 },
+    });
+
+    expect(request.body).not.toHaveProperty('model');
+    expect(JSON.parse(JSON.stringify(request.body))).not.toHaveProperty('model');
+    expect(request.body).toHaveProperty('temperature', 0.2);
+  });
+
+  it('keeps the configured internal ID authoritative over body overrides', async () => {
+    const request = makeRequest();
+
+    await transformRequest(request, {
+      internal_id: 'configured-model',
+      remove_from_body: ['model'],
+      extra_body: { model: 'extra-body-model' },
+    });
+
+    expect(request.body.model).toBe('configured-model');
+  });
+});
 
 describe('custom LLM Gemini reasoning transform configuration', () => {
   const config = {

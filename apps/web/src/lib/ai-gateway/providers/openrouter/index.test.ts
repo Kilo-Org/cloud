@@ -205,6 +205,15 @@ describe('auto models', () => {
     expect(models.data.some(model => model.id === KILO_AUTO_EFFICIENT_MODEL.id)).toBe(true);
   });
 
+  it('explicitly caches authenticated catalog requests', async () => {
+    await getEnhancedOpenRouterModels();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/models',
+      expect.objectContaining({ cache: 'force-cache', next: { revalidate: 60 } })
+    );
+  });
+
   it('excludes OpenRouter batch variants from the public model list', async () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(
@@ -348,6 +357,18 @@ describe('OpenRouter transcription model fetcher', () => {
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('output_modalities=transcription'),
       expect.any(Object)
+    );
+  });
+
+  it('never caches the transcription catalogue so an unreachable gateway surfaces as a failure', async () => {
+    // The Data Cache would keep serving a stale catalogue while the gateway
+    // is down, and the mobile picker would list dead models instead of its
+    // load-failed retry state.
+    await getOpenRouterTranscriptionModels();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ cache: 'no-store' })
     );
   });
 });

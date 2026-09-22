@@ -1,10 +1,10 @@
 import { i18n } from '@/i18n';
 
-export type VoiceInputStatus = 'idle' | 'starting' | 'listening' | 'stopping';
+export type VoiceInputStatus = 'idle' | 'starting' | 'listening' | 'transcribing' | 'stopping';
 export type VoiceInputAvailability = 'available' | 'unavailable';
 
 export type VoiceInputFeedback = {
-  action: 'none' | 'open-settings';
+  action: 'none' | 'open-settings' | 'open-transcription-settings';
   availability: VoiceInputAvailability;
   message: string;
   retryable: boolean;
@@ -127,6 +127,54 @@ export function classifyVoiceInputError(code: string): VoiceInputFeedback {
         action: 'none',
         availability: 'available',
         message: i18n.t('voiceInput.needsConnection'),
+        retryable: true,
+      };
+    }
+    case 'gateway-unreachable': {
+      return {
+        action: 'none',
+        availability: 'available',
+        message: i18n.t('voiceInput.gatewayUnreachable'),
+        retryable: true,
+      };
+    }
+    case 'gateway-timeout': {
+      return {
+        action: 'none',
+        availability: 'available',
+        message: i18n.t('voiceInput.gatewayTimeout'),
+        retryable: true,
+      };
+    }
+    case 'gateway-model-unavailable': {
+      return {
+        action: 'open-transcription-settings',
+        availability: 'available',
+        message: i18n.t('voiceInput.gatewayModelUnavailable'),
+        retryable: false,
+      };
+    }
+    case 'gateway-auth': {
+      return {
+        action: 'none',
+        availability: 'available',
+        message: i18n.t('voiceInput.gatewaySignInRequired'),
+        retryable: false,
+      };
+    }
+    case 'gateway-no-model': {
+      return {
+        action: 'open-transcription-settings',
+        availability: 'available',
+        message: i18n.t('voiceInput.gatewayNoModel'),
+        retryable: false,
+      };
+    }
+    case 'gateway-server': {
+      return {
+        action: 'none',
+        availability: 'available',
+        message: i18n.t('voiceInput.stopped'),
         retryable: true,
       };
     }

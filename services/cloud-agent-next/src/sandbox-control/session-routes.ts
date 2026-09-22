@@ -1,3 +1,5 @@
+import { DEADLINE_MS } from './deadlines.js';
+
 export type SessionActivityState = 'idle' | 'active' | 'finalizing';
 
 export type SessionRoute = {
@@ -174,4 +176,44 @@ export function hasActiveWork(table: Map<string, SessionRoute>): boolean {
     if (route.lastState === 'active' || route.lastState === 'finalizing') return true;
   }
   return false;
+}
+
+export function pinsEnvironment(
+  state: SessionActivityState | null,
+  waitingOn: SessionRoute['waitingOn']
+): boolean {
+  if (state === 'finalizing') return true;
+  if (waitingOn === 'input') return false;
+  return state === 'active';
+}
+
+export function pinsEnvironmentWithinLiveness(
+  route: Pick<SessionRoute, 'lastState' | 'lastStateAt' | 'waitingOn'>,
+  now: number
+): boolean {
+  return (
+    pinsEnvironment(route.lastState, route.waitingOn) &&
+    (route.lastStateAt === null || now < route.lastStateAt + DEADLINE_MS.heartbeatExpiry)
+  );
+}
+
+export function hasEnvironmentPinningWork(
+  table: Map<string, SessionRoute>,
+  payload: {
+    state: SessionActivityState;
+    pendingMessages?: number;
+    sessions: ReadonlyArray<{
+      state: SessionActivityState;
+      waitingOn?: SessionRoute['waitingOn'];
+    }>;
+  }
+): boolean {
+  for (const session of payload.sessions) {
+    if (pinsEnvironment(session.state, session.waitingOn ?? null)) return true;
+  }
+  for (const route of table.values()) {
+    if (pinsEnvironment(route.lastState, route.waitingOn)) return true;
+  }
+  if (payload.sessions.some(session => session.waitingOn === 'input')) return false;
+  return payload.state !== 'idle' || (payload.pendingMessages ?? 0) > 0;
 }

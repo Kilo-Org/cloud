@@ -3,6 +3,11 @@ import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import {
+  sandboxSelectionCapabilitiesSchema,
+  type SandboxAllocationInput,
+  type SandboxSelectionCapabilities,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import type { EncryptedEnvelope } from '@/lib/encryption';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
@@ -21,6 +26,7 @@ import {
   type WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
+import { baseGetMessageResultNextOutputSchema } from '@/routers/cloud-agent-next-schemas';
 import {
   SandboxStatusSnapshotSchema,
   type SandboxStatusSnapshot,
@@ -169,6 +175,7 @@ type PrepareSessionSharedFields = {
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
   /** When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes */
   devcontainer?: boolean;
+  sandboxAllocation?: SandboxAllocationInput;
 };
 
 /** Non-clone prepare input: required `prompt` and the current optional initial fields. */
@@ -192,6 +199,11 @@ export type PrepareSessionCloneInput = PrepareSessionSharedFields & {
 
 /** Input for prepareSession procedure */
 export type PrepareSessionInput = PrepareSessionNonCloneInput | PrepareSessionCloneInput;
+
+export type GetSandboxSelectionOptionsInput = {
+  kilocodeOrganizationId?: string;
+  devcontainer?: boolean;
+};
 
 /** Output from prepareSession procedure */
 export type PrepareSessionOutput = {
@@ -307,6 +319,12 @@ export type GetSessionInput = {
   cloudAgentSessionId: string;
 };
 
+/** Interactions a cloud-agent session currently waits on. */
+export type GetPendingInteractionsOutput = {
+  questions: unknown[];
+  permissions: unknown[];
+};
+
 export type GetWorktreeFileInput = GetSessionInput & WorktreeFileQuery;
 
 /** Execution status for getSession response */
@@ -336,6 +354,11 @@ export type GetSessionOutput = {
   orgId?: string;
   /** Sandbox ID (hashed format like usr-abc123...) for correlating with Cloudflare logs */
   sandboxId?: string;
+
+  // Worktree ownership (present only for worktree sessions)
+  worktreeId?: string | null;
+  parentSessionId?: string | null;
+  cloudAgentSessionScopeId?: string | null;
 
   // Repository info (no tokens)
   githubRepo?: string;
@@ -596,6 +619,9 @@ type CloudAgentNextTRPCClient = {
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
   };
+  getPendingInteractions: {
+    query: (input: GetSessionInput) => Promise<GetPendingInteractionsOutput>;
+  };
   getWorktreeChanges: {
     query: (input: GetSessionInput) => Promise<unknown>;
   };
@@ -607,6 +633,9 @@ type CloudAgentNextTRPCClient = {
   };
   getComputeBillingStatus: {
     query: (input: GetSessionInput) => Promise<ComputeBillingStatus>;
+  };
+  getSandboxSelectionOptions: {
+    query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
   };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
@@ -623,6 +652,9 @@ type CloudAgentNextTRPCClient = {
   };
   sendMessageV2: {
     mutate: (input: SendMessageInput) => Promise<InitiateSessionOutput>;
+  };
+  getMessageResult: {
+    query: (input: { cloudAgentSessionId: string; messageId: string }) => Promise<unknown>;
   };
   createTerminal: {
     mutate: (input: CreateTerminalInput) => Promise<CreateTerminalOutput>;
@@ -920,6 +952,14 @@ export class CloudAgentNextClient {
     }
   }
 
+  async getSandboxSelectionOptions(
+    input: GetSandboxSelectionOptionsInput
+  ): Promise<SandboxSelectionCapabilities> {
+    return sandboxSelectionCapabilitiesSchema.parse(
+      await this.client.getSandboxSelectionOptions.query(input)
+    );
+  }
+
   /**
    * Prepare a new cloud agent session.
    */
@@ -1051,6 +1091,34 @@ export class CloudAgentNextClient {
     }
   }
 
+  async getMessageResult(input: { cloudAgentSessionId: string; messageId: string }) {
+    try {
+      return baseGetMessageResultNextOutputSchema.parse(
+        await this.client.getMessageResult.query(input)
+      );
+    } catch (error) {
+      if (
+        error instanceof TRPCClientError &&
+        (error.data?.code === 'NOT_FOUND' || error.shape?.data?.code === 'NOT_FOUND') &&
+        error.message === 'Message not found'
+      ) {
+        return null;
+      }
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'getMessageResult' },
+        extra: {
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          messageId: input.messageId,
+        },
+      });
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Message result unavailable',
+        cause: error,
+      });
+    }
+  }
+
   async createTerminal(input: CreateTerminalInput): Promise<CreateTerminalOutput> {
     try {
       return await this.client.createTerminal.mutate(input);
@@ -1127,6 +1195,21 @@ export class CloudAgentNextClient {
           endpoint: 'answerPermission',
         },
         extra: { sessionId: input.sessionId, permissionId: input.permissionId },
+      });
+      throw error;
+    }
+  }
+
+  async getPendingInteractions(cloudAgentSessionId: string): Promise<GetPendingInteractionsOutput> {
+    try {
+      return await this.client.getPendingInteractions.query({ cloudAgentSessionId });
+    } catch (error) {
+      captureException(error, {
+        tags: {
+          source: 'cloud-agent-next-client',
+          endpoint: 'getPendingInteractions',
+        },
+        extra: { cloudAgentSessionId },
       });
       throw error;
     }

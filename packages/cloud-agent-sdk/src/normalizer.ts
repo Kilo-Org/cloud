@@ -7,6 +7,8 @@ import { z } from 'zod';
 import type { Part, SessionStatus, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
 import type {
   SessionInfo,
+  SessionGoal,
+  SessionGoalStatus,
   CloudStatus,
   SuggestionAction,
   SlashCommandInfo,
@@ -20,6 +22,7 @@ import {
   messagePartUpdatedDataSchema,
   messagePartDeltaDataSchema,
   messagePartRemovedDataSchema,
+  messageRemovedDataSchema,
   sessionStatusDataSchema,
   sessionCreatedDataSchema,
   sessionUpdatedDataSchema,
@@ -53,7 +56,7 @@ import {
 /** Chat events — data mutations for messages and parts. */
 export type ChatEvent =
   | { type: 'message.updated'; info: Message }
-  | { type: 'message.part.updated'; part: Part }
+  | { type: 'message.part.updated'; part: Part; time?: number | undefined }
   | {
       type: 'message.part.delta';
       sessionId: string;
@@ -67,6 +70,11 @@ export type ChatEvent =
       sessionId: string;
       messageId: string;
       partId: string;
+    }
+  | {
+      type: 'message.removed';
+      sessionId: string;
+      messageId: string;
     };
 
 /** Service events — lifecycle, status, questions, autocommit, preparation. */
@@ -157,6 +165,11 @@ export type ServiceEvent =
       skipped?: boolean | undefined;
       commitHash?: string | undefined;
       commitMessage?: string | undefined;
+      userMessageId?: string | undefined;
+      committedAt?: string | undefined;
+      pushStatus?: 'pushed' | 'failed' | 'not_attempted' | 'unknown' | undefined;
+      commitMessageTruncated?: boolean | undefined;
+      timestamp?: string | undefined;
     }
   | { type: 'cloud.status'; cloudStatus: CloudStatus }
   | {
@@ -212,6 +225,7 @@ const CHAT_EVENT_TYPES = new Set([
   'message.part.updated',
   'message.part.delta',
   'message.part.removed',
+  'message.removed',
 ]);
 
 export function isChatEvent(event: NormalizedEvent): event is ChatEvent {
@@ -241,6 +255,52 @@ const sessionModelSchema = z.object({
   variant: z.string().optional(),
 });
 
+const SESSION_GOAL_STATUSES = new Set<SessionGoalStatus>([
+  'active',
+  'complete',
+  'blocked',
+  'paused',
+]);
+
+/** Validate a candidate `kilo.goal` value. Returns undefined when malformed. */
+function parseSessionGoal(raw: unknown): SessionGoal | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const goal = raw as Record<string, unknown>;
+  const text = goal['text'];
+  if (typeof text !== 'string' || text.length === 0) return undefined;
+  const status = goal['status'];
+  if (typeof status !== 'string' || !SESSION_GOAL_STATUSES.has(status as SessionGoalStatus)) {
+    return undefined;
+  }
+  const reasonRaw = goal['reason'];
+  const reason = typeof reasonRaw === 'string' && reasonRaw.length > 0 ? reasonRaw : undefined;
+  return {
+    text,
+    status: status as SessionGoalStatus,
+    ...(reason === undefined ? {} : { reason }),
+  };
+}
+
+/**
+ * Project the CLI session goal from `session.info.metadata`. The CLI stores it
+ * under the dotted key `kilo.goal`; accept a nested `kilo.goal` object too.
+ * Malformed metadata drops the goal without throwing.
+ */
+export function projectSessionGoal(rawMetadata: unknown): SessionGoal | undefined {
+  if (typeof rawMetadata !== 'object' || rawMetadata === null) return undefined;
+  const metadata = rawMetadata as Record<string, unknown>;
+  const candidates: unknown[] = [metadata['kilo.goal']];
+  const kilo = metadata['kilo'];
+  if (typeof kilo === 'object' && kilo !== null) {
+    candidates.push((kilo as Record<string, unknown>)['goal']);
+  }
+  for (const candidate of candidates) {
+    const goal = parseSessionGoal(candidate);
+    if (goal) return goal;
+  }
+  return undefined;
+}
+
 const connectedServiceDataSchema = connectedDataSchema.extend({
   activeMessageId: z.string().nullable().optional().catch(undefined),
 });
@@ -255,10 +315,12 @@ const cloudMessageCanceledDataSchema = z
 
 function normalizeSessionInfo(rawInfo: { id: string; [key: string]: unknown }): SessionInfo {
   const model = sessionModelSchema.safeParse(rawInfo['model']);
+  const goal = projectSessionGoal(rawInfo['metadata']);
   return {
     id: rawInfo.id,
     parentID: rawInfo['parentID'] != null ? String(rawInfo['parentID']) : undefined,
     ...(model.success ? { model: model.data } : {}),
+    ...(goal === undefined ? {} : { goal }),
   };
 }
 
@@ -273,7 +335,11 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     case 'message.part.updated': {
       const r = messagePartUpdatedDataSchema.safeParse(data);
       if (!r.success) return null;
-      return { type: 'message.part.updated', part: r.data.part as Part };
+      return {
+        type: 'message.part.updated',
+        part: r.data.part as Part,
+        ...(r.data.time === undefined ? {} : { time: r.data.time }),
+      };
     }
 
     case 'message.part.delta': {
@@ -297,6 +363,16 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         sessionId: r.data.sessionID,
         messageId: r.data.messageID,
         partId: r.data.partID,
+      };
+    }
+
+    case 'message.removed': {
+      const r = messageRemovedDataSchema.safeParse(data);
+      if (!r.success) return null;
+      return {
+        type: 'message.removed',
+        sessionId: r.data.sessionID,
+        messageId: r.data.messageID,
       };
     }
 
@@ -505,6 +581,10 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
         skipped: r.data.skipped,
         commitHash: r.data.commitHash,
         commitMessage: r.data.commitMessage,
+        userMessageId: r.data.userMessageId,
+        committedAt: r.data.committedAt,
+        pushStatus: r.data.pushStatus,
+        commitMessageTruncated: r.data.commitMessageTruncated,
       };
     }
 
@@ -635,7 +715,11 @@ export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
   if (raw.streamEventType === 'connected' && event?.type === 'connected') {
     return { ...event, cloudSessionId: raw.sessionId };
   }
-  return event;
+  return event?.type === 'autocommit_completed' &&
+    event.commitHash &&
+    /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(event.commitHash)
+    ? { ...event, timestamp: raw.timestamp }
+    : event;
 }
 
 /**

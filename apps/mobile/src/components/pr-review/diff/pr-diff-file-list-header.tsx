@@ -13,6 +13,7 @@ import { Columns2, Rows3 } from '@/components/ui/icons';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
@@ -21,6 +22,7 @@ import { formatNumber } from '@/lib/format';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DiffViewMode } from '@/lib/pr-review/diff/pr-diff-list-items';
+import { providerPrChildRoutePath, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { cn } from '@/lib/utils';
 
 type PrDiffFileListHeaderProps = {
@@ -33,8 +35,6 @@ type PrDiffFileListHeaderProps = {
   readonly viewMode: DiffViewMode;
   readonly onViewModeChange: (mode: DiffViewMode) => void;
 };
-
-const FILE_NAVIGATOR_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/file-navigator' as const;
 
 export function PrDiffFileListHeader({
   owner,
@@ -50,44 +50,64 @@ export function PrDiffFileListHeader({
   const isTablet = useIsTablet();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
+  // navigator row off the sensor, like ScreenHeader/SheetHeader. They go on an
+  // inner wrapper so they ADD to the `px-4` gutter: an inline padding on the
+  // bordered container would beat the className (inline style wins in React
+  // Native) and swallow the gutter. Zero insets collapse the wrapper style to
+  // `undefined`, so portrait pixels are byte-identical.
+  const insets = useSafeAreaInsets();
+  const sideInsetStyle =
+    insets.left > 0 || insets.right > 0
+      ? {
+          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
+          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
+        }
+      : undefined;
 
-  const navigatorHref = useMemo<Href>(
-    () => ({ pathname: FILE_NAVIGATOR_PATH, params: { owner, repo, number } }),
-    [owner, repo, number]
-  );
+  // The sheet is a sibling of the screen it was opened from, so its href is
+  // built from the live scope: a GitHub ref keeps the original
+  // `[owner]/[repo]/[number]/file-navigator` path, a GitLab or Bitbucket ref
+  // opens the sheet inside the provider layout — the only place its scope is
+  // published, and therefore the only place the sheet can query the right
+  // provider.
+  const { ref } = useProviderPrScope({ owner, repo, number });
+  const navigatorHref = useMemo<Href>(() => providerPrChildRoutePath(ref, 'file-navigator'), [ref]);
 
   const handleOpenNavigator = useCallback(() => {
     router.push(navigatorHref);
   }, [router, navigatorHref]);
 
   return (
-    <View className="flex-row items-center justify-between border-b border-hair-soft bg-background px-4 py-2">
-      <Pressable
-        onPress={handleOpenNavigator}
-        accessibilityRole="button"
-        accessibilityLabel={t('prReview.fileList.openNavigator')}
-        className="min-h-9 flex-row items-center gap-1.5 rounded-md px-2 active:opacity-70"
-        hitSlop={6}
-      >
-        <Rows3 size={14} color={colors.mutedForeground} />
-        <Text className="text-xs font-medium text-foreground">
-          {t('prReview.fileList.filesViewed', {
-            viewed: formatNumber(viewedCount, i18n.language),
-            total: formatNumber(totalListed, i18n.language),
-          })}
-        </Text>
-        {isTruncated ? (
-          <Text
-            variant="muted"
-            className="text-[10px]"
-            // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color
-            style={{ color: colors.mutedForeground }}
-          >
-            {t('prReview.fileList.listed')}
+    <View className="border-b border-hair-soft bg-background px-4 py-4">
+      <View className="flex-1 flex-row items-center justify-between" style={sideInsetStyle}>
+        <Pressable
+          onPress={handleOpenNavigator}
+          accessibilityRole="button"
+          accessibilityLabel={t('prReview.fileList.openNavigator')}
+          className="min-h-9 flex-row items-center gap-1.5 rounded-md px-2 active:opacity-70"
+          hitSlop={6}
+        >
+          <Rows3 size={14} color={colors.mutedForeground} />
+          <Text className="text-xs font-medium text-foreground">
+            {t('prReview.fileList.filesViewed', {
+              viewed: formatNumber(viewedCount, i18n.language),
+              total: formatNumber(totalListed, i18n.language),
+            })}
           </Text>
-        ) : null}
-      </Pressable>
-      {isTablet ? <ViewModeToggle viewMode={viewMode} onChange={onViewModeChange} /> : null}
+          {isTruncated ? (
+            <Text
+              variant="muted"
+              className="text-[10px]"
+              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color
+              style={{ color: colors.mutedForeground }}
+            >
+              {t('prReview.fileList.listed')}
+            </Text>
+          ) : null}
+        </Pressable>
+        {isTablet ? <ViewModeToggle viewMode={viewMode} onChange={onViewModeChange} /> : null}
+      </View>
     </View>
   );
 }

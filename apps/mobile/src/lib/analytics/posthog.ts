@@ -288,10 +288,6 @@ export function identifyUser(email: string): void {
   void client?.reloadFeatureFlags();
 }
 
-export function resetAnalyticsUser(): void {
-  client?.reset();
-}
-
 /**
  * Flush the last live PostHog client's queue. Never rejects: a flush failure
  * is swallowed so a sign-out or consent transition is never blocked by a

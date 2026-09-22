@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatDuration } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { computeStatus } from './compute-status';
+import { computeMessageStatus } from './compute-status';
 
 type WorkingIndicatorProps = {
   messages: StoredMessage[];
@@ -44,15 +44,15 @@ export function WorkingIndicator({ messages, isStreaming }: Readonly<WorkingIndi
     return null;
   }
 
-  // Find the last assistant message and its last part for status
+  // Find the last assistant message and its status part for the label.
+  // `computeMessageStatus` skips the empty text placeholder opencode creates
+  // before the response block, so a reasoning stream reads "Thinking" instead
+  // of "Writing response".
   let statusText = i18n.t('agentChat.computeStatus.consideringNextSteps');
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const msg = messages[i];
     if (msg?.info.role === 'assistant' && msg.parts.length > 0) {
-      const lastPart = msg.parts.at(-1);
-      if (lastPart) {
-        statusText = computeStatus(lastPart);
-      }
+      statusText = computeMessageStatus(msg.parts);
       break;
     }
   }

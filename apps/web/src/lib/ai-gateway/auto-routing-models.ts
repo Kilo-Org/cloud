@@ -1,8 +1,12 @@
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import {
+  AUTO_SMALL_TARGET_MODELS,
+  FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
+  KILO_AUTO_FRONTIER_MODEL,
+  KILO_AUTO_SMALL_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
@@ -19,9 +23,11 @@ export async function addAutoRoutingModels(
 ): Promise<OpenRouterModelsResponse['data']> {
   const availableModelIds = new Set(models.map(model => model.id));
   if (
+    !availableModelIds.has(KILO_AUTO_FRONTIER_MODEL.id) &&
     !availableModelIds.has(KILO_AUTO_BALANCED_MODEL.id) &&
     !availableModelIds.has(KILO_AUTO_EFFICIENT_MODEL.id) &&
-    !availableModelIds.has(KILO_AUTO_FREE_MODEL.id)
+    !availableModelIds.has(KILO_AUTO_FREE_MODEL.id) &&
+    !availableModelIds.has(KILO_AUTO_SMALL_MODEL.id)
   ) {
     return models;
   }
@@ -37,12 +43,22 @@ export async function addAutoRoutingModels(
       .map(candidate => candidate.model),
     availableModelIds
   );
+  const frontierModelIds = visibleConcreteModelIds(
+    Object.values(FRONTIER_MODE_TO_MODEL).map(({ model }) => model),
+    availableModelIds
+  );
   const freeModelIds = visibleConcreteModelIds(autoFreeCandidates ?? [], availableModelIds);
+  const smallModelIds = visibleConcreteModelIds(
+    Object.values(AUTO_SMALL_TARGET_MODELS),
+    availableModelIds
+  );
   const hideAutoFreeModel = autoFreeCandidates !== null && freeModelIds.length === 0;
   const autoRoutingChoices = new Map([
+    [KILO_AUTO_FRONTIER_MODEL.id, frontierModelIds],
     [KILO_AUTO_BALANCED_MODEL.id, efficientModelIds],
     [KILO_AUTO_EFFICIENT_MODEL.id, efficientModelIds],
     [KILO_AUTO_FREE_MODEL.id, freeModelIds],
+    [KILO_AUTO_SMALL_MODEL.id, smallModelIds],
   ]);
 
   return models.flatMap(model => {

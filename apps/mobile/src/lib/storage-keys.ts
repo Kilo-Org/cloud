@@ -19,6 +19,7 @@ export const LAST_RUN_ON_DESTINATION_KEY = 'last-run-on-destination';
 export const CONSENT_USER_KEY_PREFIX = 'consent-accepted-';
 export const AGENT_MODEL_PREFERENCE_KEY = 'agent-model-preference';
 export const REASONING_DEFAULT_EXPANDED_KEY = 'agent-reasoning-default-expanded';
+export const HIDE_THINKING_KEY = 'agent-hide-thinking-details';
 export const REVIEW_REQUESTED_AT_KEY = 'store-review-requested-at';
 /** One-time gate for the neutral post-success feedback prompt. */
 export const FEEDBACK_LAST_ASKED_AT_KEY = 'feedback-last-asked-at';
@@ -38,9 +39,23 @@ export const HIDE_BALANCE_KEY = 'hide-balance';
 export const LIVE_ACTIVITY_KEY = 'live-activity-enabled';
 /** Return key in the agent composer sends/start instead of inserting a newline. */
 export const RETURN_SENDS_MESSAGE_KEY = 'return-sends-message';
+/** Master switch for gateway transcription of voice input (off = device speech recognition). */
+export const GATEWAY_TRANSCRIPTION_ENABLED_KEY = 'gateway-transcription-enabled';
+/** Persisted `{ id, name }` of the chosen gateway transcription model (null = none chosen). */
+export const GATEWAY_TRANSCRIPTION_MODEL_KEY = 'gateway-transcription-model';
+/** Master switch for translating tool summaries into the app language (off = raw summaries). */
+export const TOOL_SUMMARY_TRANSLATION_ENABLED_KEY = 'tool-summary-translation-enabled';
+/** Persisted `{ id, name }` of the chosen tool-summary translation model (defaults to Auto Small). */
+export const TOOL_SUMMARY_TRANSLATION_MODEL_KEY = 'tool-summary-translation-model';
+/** Persisted BCP-47 tag of the chosen voice-input language (empty = auto from the app/device language). */
+export const VOICE_INPUT_LANGUAGE_KEY = 'voice-input-language';
 /** Revocable per-host list of markdown link hosts that open without an Alert. */
 export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';
+/** Group consecutive tool calls on the session page into one condensed row. */
+export const CONDENSE_TOOL_CALLS_KEY = 'condense-tool-calls';
+/** Provider platforms whose new-session "Connect <provider>" CTA the user collapsed. */
+export const COLLAPSED_CONNECT_CTAS_KEY = 'collapsed-connect-ctas';
 /** Master switch for the glanceable Active Agents surfaces (widgets, Live Activity,
  * Android ongoing). Off blanks every surface and unregisters its push tokens. */
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
@@ -83,15 +98,36 @@ export const PICKER_LAUNCH_CONTEXT_KEY = 'picker-launch-context';
  */
 export const VOICE_NETWORK_CONSENT_KEY_PREFIX = 'voice-network-consent-';
 /**
+ * Per-user first-sign-in tour decision (finished or skipped). Not deleted on
+ * sign-out — a per-account decision must survive sign-out and sign-in of the
+ * same account, exactly like `VOICE_NETWORK_CONSENT_KEY_PREFIX`.
+ */
+export const TOUR_COMPLETED_KEY_PREFIX = 'tour-completed-';
+/**
  * Encrypted-KV scope for the durable session-attention ack store (P1-F-48a).
  * Holds one serialized blob of `{ sessionId, raiseId, status, ackedAt,
  * expiresAt }` entries; ids and timestamps only, no secrets.
  */
 export const SESSION_ATTENTION_KEY = 'session-attention';
+/**
+ * Encrypted-KV scope for the offline tool-summary translation cache. Holds one
+ * entry per translated summary: the item's persistent id, the language tag,
+ * the model id, the source summary, the translated summary, and `storedAt` —
+ * ids, tags, and text only, no secrets. The caller owns the expiry rule.
+ */
+export const TOOL_SUMMARY_TRANSLATION_CACHE_SCOPE = 'tool-summary-translation-cache';
+/**
+ * Durable "Open last session" record behind the launcher shortcut and the
+ * quick-settings tile. Holds `{ sessionId, userId, storedAt }`; the account id
+ * scopes it so one account is never offered another account's session. Not a
+ * secret, but it is mirrored through SecureStore like every other record.
+ */
+export const LAST_OPENED_SESSION_KEY = 'last-opened-session';
 
 /**
  * Injective hex-encoding of a per-user storage key: reversible, alphanumeric,
- * no collisions. Shared by the analytics and voice-network consent records.
+ * no collisions. Shared by the analytics, voice-network consent, and
+ * tour-completion records.
  */
 export function encodeStorageKey(prefix: string, userId: string): string {
   return `${prefix}${[...new TextEncoder().encode(userId)]

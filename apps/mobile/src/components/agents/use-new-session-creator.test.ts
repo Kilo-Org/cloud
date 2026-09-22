@@ -1,12 +1,15 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/persist/cache-persistence-mount.test.ts */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake mutate factories settle without await because they resolve immediately */
 /* eslint-disable max-lines -- the creator, operation-key, and generation-fenced draft-load suites share one mock harness in this file */
 import * as React from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
-import { type NewSessionRepository } from './new-session-repository-state';
+import {
+  type NewSessionRepository,
+  resetSelectedBranchOverrides,
+  setSelectedBranchOverride,
+} from './new-session-repository-state';
 import { useNewSessionCreator } from './use-new-session-creator';
 import { clearDraft, flushDraft, loadDraft } from '@/lib/persist/drafts';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
@@ -1236,5 +1239,136 @@ describe('useRemoteSpawnDraftCleanup remote-spawn clear', () => {
     });
     expect(vi.mocked(clearDraft)).not.toHaveBeenCalled();
     expect(vi.mocked(flushDraft)).not.toHaveBeenCalled();
+  });
+});
+
+describe('useNewSessionCreator upstream branch', () => {
+  const githubRow: NewSessionRepository = {
+    platform: 'github',
+    fullName: 'owner/repo',
+    isPrivate: false,
+  };
+  const gitlabRow: NewSessionRepository = {
+    platform: 'gitlab',
+    fullName: 'group/project',
+    isPrivate: true,
+  };
+  const bitbucketRow: NewSessionRepository = {
+    platform: 'bitbucket',
+    fullName: 'workspace/repo',
+    isPrivate: true,
+    workspaceUuid: 'ws-1234',
+    repositoryUuid: 'repo-5678',
+  };
+
+  beforeEach(() => {
+    resetSelectedBranchOverrides();
+  });
+
+  it('omits upstreamBranch when the provider default is in effect', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const creator = runCreator({ selectedRepository: githubRow });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('upstreamBranch');
+  });
+
+  it('sends the chosen branch for a GitHub row', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    setSelectedBranchOverride(githubRow, 'release/2.0');
+    const creator = runCreator({ selectedRepository: githubRow });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      githubRepo: 'owner/repo',
+      upstreamBranch: 'release/2.0',
+    });
+  });
+
+  it('sends the chosen branch for a GitLab row', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    setSelectedBranchOverride(gitlabRow, 'feature/x');
+    const creator = runCreator({ selectedRepository: gitlabRow });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      gitlabProject: 'group/project',
+      upstreamBranch: 'feature/x',
+    });
+  });
+
+  it('sends the chosen branch for a Bitbucket row', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    setSelectedBranchOverride(bitbucketRow, 'develop');
+    const creator = runCreator({ organizationId: 'org-1', selectedRepository: bitbucketRow });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).toMatchObject({
+      bitbucketRepo: { fullName: 'workspace/repo' },
+      upstreamBranch: 'develop',
+    });
+  });
+
+  // A Bitbucket row without uuids cannot be written as a repository field, so
+  // it must not carry the branch chosen for it either (the branch is only
+  // meaningful alongside the repository it belongs to).
+  it('omits both the repository field and upstreamBranch for a Bitbucket row missing its uuids', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const rowWithoutUuids: NewSessionRepository = {
+      platform: 'bitbucket',
+      fullName: 'workspace/repo',
+      isPrivate: true,
+    };
+    setSelectedBranchOverride(rowWithoutUuids, 'develop');
+    const creator = runCreator({ organizationId: 'org-1', selectedRepository: rowWithoutUuids });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    const payload = prepareSessionMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty('bitbucketRepo');
+    expect(payload).not.toHaveProperty('githubRepo');
+    expect(payload).not.toHaveProperty('gitlabProject');
+    expect(payload).not.toHaveProperty('upstreamBranch');
+  });
+
+  it('never carries a branch chosen for another repository', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    setSelectedBranchOverride(gitlabRow, 'feature/x');
+    const creator = runCreator({ selectedRepository: githubRow });
+
+    creator.promptRef.current = 'hello';
+    await creator.createSessionFromDraft();
+
+    expect(prepareSessionMutate.mock.calls[0]?.[0]).not.toHaveProperty('upstreamBranch');
+  });
+
+  it('keeps the retry fingerprint repository-scoped when the branch changes', async () => {
+    prepareSessionMutate.mockResolvedValue(sessionResult());
+    const first = runCreator({ selectedRepository: githubRow });
+    first.promptRef.current = 'hello';
+    await first.createSessionFromDraft();
+    const defaultBranchFingerprint = outboxMock.writeSafeRetry.mock.calls[0]?.[0].fingerprint;
+
+    setSelectedBranchOverride(githubRow, 'release/2.0');
+    const second = runCreator({ selectedRepository: githubRow });
+    second.promptRef.current = 'hello';
+    await second.createSessionFromDraft();
+    const overrideFingerprint = outboxMock.writeSafeRetry.mock.calls[1]?.[0].fingerprint;
+
+    // Same intent, same retry key: a branch change must not fork the safe-retry
+    // row, or one submit could replay as two sessions.
+    expect(overrideFingerprint).toBe(defaultBranchFingerprint);
+    expect(prepareSessionMutate.mock.calls[1]?.[0]).toMatchObject({
+      upstreamBranch: 'release/2.0',
+    });
   });
 });

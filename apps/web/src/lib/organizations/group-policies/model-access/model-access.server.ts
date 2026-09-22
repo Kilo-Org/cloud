@@ -44,6 +44,11 @@ export type EffectiveModelDecision = {
     | 'no_grant';
 };
 
+/**
+ * Resolves the providers that can serve a model. Receives the requested model id
+ * as-is (including variant suffixes such as `:free`) so implementations can
+ * distinguish variants that are served by different providers.
+ */
 export type ProviderLookup = (modelId: string) => Promise<ReadonlySet<string>>;
 
 export function evaluateEffectiveModelAccessPolicy(
@@ -136,7 +141,7 @@ export async function getEffectiveModelDecision(
   const exclusiveProviders = getKiloExclusiveInferenceProviderRestriction(modelId);
   const currentModelProviders =
     exclusiveProviders ??
-    (policy.requireModelInCurrentSnapshot ? await providerLookup(normalizedModelId) : undefined);
+    (policy.requireModelInCurrentSnapshot ? await providerLookup(modelId) : undefined);
   if (currentModelProviders?.size === 0) {
     return { allowed: false, denialSource: 'organization_model' };
   }
@@ -149,7 +154,7 @@ export async function getEffectiveModelDecision(
       return { allowed: false, denialSource: 'organization_model' };
     }
     if (!organizationRoutes) return { allowed: true };
-    const modelProviders = currentModelProviders ?? (await providerLookup(normalizedModelId));
+    const modelProviders = currentModelProviders ?? (await providerLookup(modelId));
     if (modelProviders.size === 0) {
       return { allowed: false, denialSource: 'organization_model' };
     }
@@ -171,7 +176,7 @@ export async function getEffectiveModelDecision(
     return { allowed: true };
   }
   if (policy.memberGrant.providerAllowList.length > 0) {
-    const modelProviders = currentModelProviders ?? (await providerLookup(normalizedModelId));
+    const modelProviders = currentModelProviders ?? (await providerLookup(modelId));
     const memberProviders = new Set(policy.memberGrant.providerAllowList);
     const eligibleProviderRoutes = new Set(
       [...modelProviders].filter(provider => memberProviders.has(provider))

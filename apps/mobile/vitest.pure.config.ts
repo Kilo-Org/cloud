@@ -11,13 +11,29 @@ export default defineProject({
   plugins: [inlineSqlPlugin()],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@': fileURLToPath(new URL('src', import.meta.url)),
     },
   },
   test: {
     name: 'mobile-pure',
     environment: 'node',
+    // The app build's config module cannot load in this project; the setup
+    // file stubs the exports its importers read.
+    setupFiles: ['./vitest.setup.ts'],
+    // Project configs do not inherit the root test options, and this suite
+    // runs both projects in parallel: on a loaded host (dev stack, simulator,
+    // Appium) workers starve and real-timer tests exceed the 5s default. One
+    // timeout leaks its pending act() loop into the worker and cascades
+    // through the file. Bounded pollers (settleBootstrap's 4s budget) still
+    // fail on their own budget, so this only absorbs starvation.
+    testTimeout: 15_000,
+    // encrypted-kv.test.ts imports node:sqlite on purpose (it is the only way
+    // to run real SQL semantics under Node), and Node prints an
+    // ExperimentalWarning for that API on every worker start. Pass the warning
+    // class down to the workers so the suite prints no warnings.
+    execArgv: ['--disable-warning=ExperimentalWarning'],
     include: [
+      'plugins/**/*.test.ts',
       'src/i18n/**/*.test.ts',
       'src/lib/*.test.ts',
       'src/lib/a11y/**/*.test.ts',
@@ -27,6 +43,7 @@ export default defineProject({
       'src/lib/auth/**/*.test.tsx',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',
+      'src/lib/artifacts/**/*.test.ts',
       'src/lib/glanceable/**/*.test.ts',
       'src/lib/kiloclaw/**/*.test.ts',
       'src/glanceable-ios/**/*.test.ts',
@@ -38,8 +55,12 @@ export default defineProject({
       'src/lib/onboarding/**/*.test.ts',
       'src/lib/persist/**/*.test.ts',
       'src/lib/pr-review/**/*.test.ts',
+      'src/lib/app-actions/**/*.test.ts',
+      'src/lib/app-actions/**/!(*.mounted).test.tsx',
+      'modules/kilo-app-actions/*.test.ts',
       'src/lib/query/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
+      'src/lib/tool-summary-translation/**/*.test.ts',
       'src/components/**/*.test.ts',
       'src/components/agents/**/!(*.mounted).test.tsx',
       'src/components/pr-review/**/!(*.mounted).test.tsx',
@@ -47,6 +68,7 @@ export default defineProject({
       // this directory holds both kinds, and a file in both projects runs twice.
       'src/components/kiloclaw/**/!(*.mounted).test.tsx',
       'src/lib/telemetry/**/*.test.ts',
+      'src/lib/tour/**/*.test.ts',
       'modules/kilo-surface-geometry/*.test.ts',
     ],
   },

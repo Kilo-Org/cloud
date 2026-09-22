@@ -36,6 +36,7 @@
     "cost": "Farashi",
     "discard": "Yi watsi",
     "findings": "Sakamakon bincike",
+    "mergeRequest": "buƙatar haɗawa",
     "notConnected": "Ba a haɗa ba",
     "notifications": "Sanarwa",
     "pullRequest": "buƙatar haɗa canje-canje",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Yi amfani da wani imel daban",
     "signInWithApple": "Shiga da Apple",
     "signInWithGoogle": "Shiga da Google",
+    "signInWithPasskey": "Shiga da maɓallin shiga",
     "emailAddress": "Adireshin imel",
     "emailPlaceholder": "kai@example.com",
     "continueWithEmail": "Ci gaba da imel",
@@ -174,6 +176,10 @@
     "termsConnector": " da ",
     "termsSuffix": ".",
     "moreSignInOptions": "Ƙarin zaɓuɓɓukan shiga",
+    "passkeyCancelled": "An soke shiga da maɓallin shiga. Sake gwadawa.",
+    "passkeyNotFound": "Ba a adana maɓallin shiga don wannan na'urar ba. Maimakon haka, shiga da Apple, Google ko imel ɗinka.",
+    "passkeyUnsupported": "Maɓallan shiga ba su samuwa a wannan na'urar ba. Maimakon haka, shiga da Apple, Google ko imel ɗinka.",
+    "passkeyFailed": "Ba a iya shiga da maɓallin shiga ba. Sake gwadawa.",
     "couldNotCompleteSignIn": "An kasa kammala shiga. Sake gwadawa.",
     "sessionEnded": "Zamanka ya ƙare. Sake shiga.",
     "signInCodeExpired": "Wa'adin lambar shigarka ya ƙare. Sake gwadawa.",
@@ -224,11 +230,36 @@
     "providerTestAccount": "Asusun gwaji",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO na kamfani"
+    "providerEnterpriseSso": "SSO na kamfani",
+    "passkeysTitle": "Maɓallan shiga",
+    "passkeysSubtitle": "Shiga ba tare da kalmar sirri ba",
+    "passkeysEmpty": "Babu maɓallin shiga tukuna",
+    "passkeysEmptyHint": "$t(profile.addPasskey) don shiga ba tare da kalmar sirri ba.",
+    "passkeysCouldNotLoad": "Ba a iya loda maɓallan shiga ba",
+    "passkeysLoadFailed": "Maɓallan shiga ba su samuwa har sai an loda wannan.",
+    "addPasskey": "Ƙara maɓallin shiga",
+    "passkeyDefaultName": "Maɓallin shiga",
+    "passkeyAddedOn": "An ƙara {{date}}",
+    "passkeyAdded": "An ƙara maɓallin shiga.",
+    "passkeyAddFailed": "Ba a iya ƙara maɓallin shiga ba. Sake gwadawa.",
+    "passkeyAddUnsupported": "Wannan na'urar ba za ta iya ƙirƙirar maɓallan shiga ba.",
+    "passkeyAddCancelled": "An soke ƙirƙirar maɓallin shiga.",
+    "passkeyRemoved": "An cire maɓallin shiga.",
+    "passkeyRemoveFailed": "Ba a iya cire wannan maɓallin shiga ba. Sake gwadawa.",
+    "passkeyRenamed": "An sake sunan maɓallin shiga.",
+    "passkeyName": "Sunan maɓallin shiga",
+    "renamePasskey": "Sake sunan maɓallin shiga",
+    "removePasskey": "Cire maɓallin shiga",
+    "removePasskeyTitle": "Cire maɓallin shiga?",
+    "removePasskeyMessage": "Ba za ka iya shiga da wannan maɓallin shiga ba kuma."
   },
   "preferences": {
+    "general": "Gaba ɗaya",
+    "voiceInput": "Shigar da murya",
     "autoExpandThinking": "Faɗaɗa tunani kai tsaye",
     "autoExpandThinkingSubtitle": "Nuna cikakken tunanin wakilin idan ya gama.",
+    "hideThinking": "Ɓoye bayanan tunani",
+    "hideThinkingSubtitle": "Kada a nuna tunanin wakilin a shafin zaman.",
     "keepScreenOn": "Bar allo a kunne a shafin zaman",
     "keepScreenOnSubtitle": "Bar allo a kunne yayin da aikin zaman ke gudana.",
     "appearance": "Kamanni",
@@ -237,6 +268,7 @@
     "appearanceLight": "Haske",
     "appearanceDark": "Duhu",
     "account": "Asusu",
+    "accountSubtitle": "Harshe, rukunonin yanar gizo da aka amince da su, da zaman na'urori",
     "prReviewAttribution": "Ƙara sunan manhajar a bitar PR",
     "prReviewAttributionSubtitle": "Ƙara rubutun ƙasa na \"An yi bita ta Kilo\" lokacin da ka aika bita.",
     "returnSendsMessage": "Maɓallin sabon layi yana aika saƙo",
@@ -247,7 +279,15 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Mayar da magana zuwa rubutu ta Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Mayar da shigar da murya zuwa rubutu da samfurin Kilo Gateway maimakon gane magana na na'urar. Ana aika rikodinka zuwa Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Haɗa kiran kayan aiki",
+    "condenseToolCallsSubtitle": "Haɗa kiran kayan aiki a jere cikin layi ɗaya da za ka iya buɗewa.",
+    "toolSummaryTranslation": "Fassara taƙaitaccen bayanin kayan aiki",
+    "toolSummaryTranslationSubtitle": "Aika kowane taƙaitaccen bayanin kayan aiki zuwa ga samfuri don fassara shi zuwa harshen manhajar ka. Ana nuna na asali idan fassarar ta kasa.",
+    "toolSummaryTranslationModelUnavailableNotice": "Ba a ƙara ba da wannan samfuri ba. Matsa $t(common.model) don zaɓar wani."
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
@@ -329,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "An loda fayiloli {{displayCount}} cikin {{total}}",
       "filesStillLoading": "Har yanzu ana loda fayilolin. Ja don sabuntawa.",
       "goToOverview": "Je zuwa taƙaitaccen bayani",
-      "goToOverviewTab": "Je zuwa shafin taƙaitaccen bayani"
+      "goToOverviewTab": "Je zuwa shafin taƙaitaccen bayani",
+      "expandAllLines_one": "Nuna duk layuka {{displayCount}}",
+      "expandAllLines_other": "Nuna duk layuka {{displayCount}}",
+      "expandLines_one": "Nuna layuka {{displayCount}} ({{start}}–{{end}})",
+      "expandLines_other": "Nuna layuka {{displayCount}} ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Nuna layuka {{displayCount}} da ke kewaye",
+      "expandLinesOfContext_other": "Nuna layuka {{displayCount}} da ke kewaye",
+      "expandMoreLines_one": "Nuna ƙarin layuka {{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_other": "Nuna ƙarin layuka {{displayCount}} ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "an loda fayiloli {{loaded}} cikin {{total}}",
+      "loadedOfTotalFiles_other": "an loda fayiloli {{loaded}} cikin {{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ babu sabon layi a ƙarshen fayil",
@@ -344,6 +394,7 @@
       "merge": "Haɗawa",
       "mergeNow": "Haɗa yanzu",
       "mergePullRequest": "Haɗa buƙatar haɗawa",
+      "mergeTermTitle": "Haɗa {{term}}",
       "enableAutoMerge": "Kunna haɗawa ta atomatik",
       "disableAutoMerge": "Kashe haɗawa ta atomatik",
       "autoMergeOn": "Haɗawa ta atomatik tana aiki",
@@ -362,9 +413,12 @@
       "deleteBranchAfterMerge": "Share reshe bayan haɗawa",
       "noEnabledMethods": "Ba a kunna wata hanyar haɗawa a wannan ma'ajiyar lamba ba. Nemi mai kula da ita ya kunna haɗawa, dunƙulewa ko sake kafa tushe.",
       "confirmTitle": "A haɗa buƙatar haɗawa?",
+      "confirmTitleTerm": "A haɗa {{term}}?",
       "confirmMessage": "Wannan zai haɗa canje-canjenka cikin reshen tushe.",
       "enableAutoMergeConfirmTitle": "A kunna haɗawa ta atomatik?",
       "enableAutoMergeConfirmMessage": "GitHub zai haɗa wannan buƙatar haɗawa ta atomatik idan duk gwaje-gwajen da ake buƙata sun yi nasara.",
+      "enableAutoMergeConfirmMessageTerm": "Za a haɗa {{term}} ta atomatik da zarar pipeline ɗinta ya yi nasara.",
+      "enableAutoMergeDescriptionTerm": "GitLab zai haɗa wannan {{term}} ta atomatik da zarar pipeline ɗinta ya yi nasara.",
       "forbidden": "Ba ka da izinin haɗa wannan buƙatar haɗawa.",
       "cannotMerge": "Ba za a iya haɗa wannan buƙatar haɗawa yadda take ba.",
       "couldNotMerge": "An kasa haɗa buƙatar haɗawa.",
@@ -375,7 +429,8 @@
       },
       "terminal": {
         "alreadyMerged": "An riga an haɗa",
-        "closed": "An rufe wannan buƙatar haɗawa"
+        "closed": "An rufe wannan buƙatar haɗawa",
+        "closedMergeRequest": "An rufe wannan buƙatar haɗawa"
       },
       "partialSuccessBanner": {
         "body": "Ba a iya share reshen ba: {{reason}}.",
@@ -400,6 +455,18 @@
         "behindDetail": "Reshen da za a haɗa bai samu sabbin canje-canjen reshen tushe ba. Sake kafa tushensa ko sabunta shi kafin haɗawa.",
         "notMergeableTitle": "Ba za a iya haɗa wannan buƙatar haɗawa ba tukuna",
         "notMergeableDetail": "GitHub ya ba da rahoton matsayin haɗawa: {{state}}."
+      },
+      "restrictions": {
+        "title": "Ƙuntatawan haɗawa",
+        "approvalsRequired_one": "Ana buƙatar amincewa {{displayCount}}",
+        "approvalsRequired_other": "Ana buƙatar amincewa {{displayCount}}",
+        "pipelineMustSucceed": "Dole ne pipeline ya yi nasara kafin haɗawa."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline yana gazaawa a kan rikodin canje-canje na baya-bayan nan.",
+        "pendingPipeline": "Pipeline har yanzu yana aiki a kan rikodin canje-canje na baya-bayan nan.",
+        "permission": "Ba ka da izinin haɗa wannan {{term}}.",
+        "draft": "Sa alamar cewa {{term}} ta shirya don bita kafin haɗawa."
       },
       "methodLabels": {
         "merge": "Ƙirƙiri rikodin haɗawa",
@@ -448,6 +515,11 @@
       "acceptTerms": "Amince",
       "replyBadRequest": "Ba za a iya wallafa wannan amsar ba. Wataƙila silsilar tattaunawar ta canza.",
       "replyForbidden": "Ba ka da izinin amsa wannan buƙatar haɗawa.",
+      "addCommentCta": "Yi tsokaci a wannan buƙatar haɗawa",
+      "fixWithKilo": "Gyara da Kilo",
+      "fixWithKiloPrompt": "Don Allah a magance wannan tsokacin buƙatar haɗawa: {{link}}",
+      "commentBadRequest": "Ba za a iya wallafa wannan tsokaci ba. Wataƙila buƙatar haɗawa ta canza.",
+      "commentForbidden": "Ba ka da izinin yin tsokaci a wannan buƙatar haɗawa.",
       "moderation": {
         "reportContent": {
           "terminal": "Ba za a iya kai rahoton wannan tsokacin ba.",
@@ -496,7 +568,10 @@
         "outdatedOnLines": "Bai dace da sabon yanayin {{lines}} ba",
         "outdatedOnPath": "Bai dace da sabon yanayin {{path}} ba"
       },
-      "deletedUser": "mai amfani da aka share"
+      "deletedUser": "mai amfani da aka share",
+      "replyForbiddenTerm": "Ba ka da izinin amsa wannan {{term}}.",
+      "moreLinesAbove_one": "… akwai ƙarin layuka {{displayCount}} a sama.",
+      "moreLinesAbove_other": "… akwai ƙarin layuka {{displayCount}} a sama."
     },
     "couldNotOpenGitHubAppSettings": "An kasa buɗe saitunan manhajar GitHub.",
     "installKiloGitHubApp": "Shigar da manhajar Kilo ta GitHub",
@@ -508,17 +583,19 @@
     "reviewPullRequest": "Yi bitar buƙatar haɗawa",
     "headLine": "{{counts}} · rikodin ƙarshe {{sha}}",
     "entry": {
-      "eyebrow": "Buɗe buƙatar haɗawa ta URL.",
-      "pastePrLink": "Manna mahaɗin PR",
-      "noRecentPrs": "Babu PR na kwanan nan",
-      "noRecentPrsDescription": "Manna mahaɗin PR a sama don fara bita — zai bayyana a nan a gaba.",
+      "eyebrow": "Buɗe buƙatar haɗa canje-canje ko buƙatar haɗawa ta URL",
+      "pastePrLink": "Manna mahaɗin buƙatar haɗa canje-canje ko buƙatar haɗawa",
+      "noRecentPrs": "Babu bitutu na baya-bayan nan",
+      "noRecentPrsDescription": "Manna mahaɗi a sama don fara bita — zai bayyana a nan a karo na gaba.",
       "couldNotLoad": "Ba a iya lodawa ba.",
       "removeFromRecentsTitle": "A cire daga jerin na kwanan nan?",
-      "removeFromRecentsMessage": "Za a cire wannan buƙatar haɗawa daga jerin waɗanda ka buɗe kwanan nan.",
+      "removeFromRecentsMessage": "Za a cire wannan bita daga na baya-bayan nan.",
       "removeRecentAccessibility": "Cire {{repo}} daga jerin na kwanan nan",
-      "urlAccessibility": "URL na buƙatar haɗawa a GitHub",
-      "clearLink": "Share mahaɗin buƙatar haɗawa",
-      "pasteLink": "Manna mahaɗin buƙatar haɗawa",
+      "urlAccessibility": "Shigar da URL na buƙatar haɗa canje-canje ko buƙatar haɗawa",
+      "urlPlaceholder": "URL na buƙatar haɗa canje-canje ko buƙatar haɗawa",
+      "openAccessibility": "Buɗe buƙatar haɗa canje-canje ko buƙatar haɗawa",
+      "clearLink": "Share mahaɗi",
+      "pasteLink": "Manna mahaɗin buƙatar haɗa canje-canje ko buƙatar haɗawa",
       "open": "Buɗe"
     },
     "checks": {
@@ -535,6 +612,8 @@
       "pending": "{{displayCount}} suna jira",
       "skipped": "an tsallake {{displayCount}}",
       "checksCount": "gwaje-gwaje {{displayCount}}",
+      "checksCount_one": "gwaje-gwaje {{displayCount}}",
+      "checksCount_other": "gwaje-gwaje {{displayCount}}",
       "checkDetails": "cikakken bayanin gwaji"
     },
     "inbox": {
@@ -567,9 +646,15 @@
     "connect": {
       "checkFailedTitle": "Ba a iya duba haɗin GitHub ba.",
       "checkFailedMessage": "Ba za a iya sanin matsayin shiga ba har sai an loda wannan.",
+      "checkFailedTitleGitLab": "Ba a iya duba haɗin GitLab ba.",
+      "checkFailedTitleBitbucket": "Ba a iya duba haɗin Bitbucket ba.",
+      "providerCheckFailedMessage": "Ba a samun yanayin haɗi har sai wannan ya lodu.",
       "reconnectTitle": "Sake haɗa GitHub",
       "reconnectDescription": "An soke haɗinka na GitHub. Sake haɗawa don ci gaba da bitar buƙatun haɗawa a waya.",
-      "description": "Haɗa asusunka na GitHub don yin bitar buƙatun haɗawa a waya."
+      "description": "Haɗa asusunka na GitHub don yin bitar buƙatun haɗawa a waya.",
+      "gitlabDescription": "Haɗa asusun GitLab ɗinka don bita buƙatun haɗawa a wayar hannu.",
+      "bitbucketDescription": "Haɗa Bitbucket da wannan ƙungiya don bita buƙatun haɗa canje-canje a wayar hannu.",
+      "bitbucketOrgOnlyDescription": "Zaɓi ƙungiya a cikin bayanan martabarka don bita buƙatun haɗa canje-canje na Bitbucket na ƙungiyar."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +676,10 @@
     },
     "reconnectNotice": {
       "title": "Wa'adin haɗin GitHub ya ƙare.",
-      "message": "Haɗinka na GitHub ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata."
+      "message": "Haɗinka na GitHub ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
+      "gitlabTitle": "Wa'adin haɗin GitLab ya ƙare.",
+      "bitbucketTitle": "Wa'adin haɗin Bitbucket ya ƙare.",
+      "providerMessage": "Haɗinka na {{provider}} ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata."
     },
     "eventChips": {
       "comment": "Yi tsokaci",
@@ -656,10 +744,12 @@
       "statusContext": "Layukan da ke kewaye",
       "lineLabel": "layi {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(marar komai)"
+      "emptyLine": "(marar komai)",
+      "truncationBanner_one": "Ana nuna fayiloli {{limit}} na farko cikin {{total}} da aka canza — iyakar API na GitHub.",
+      "truncationBanner_other": "Ana nuna fayiloli {{limit}} na farko cikin {{total}} da aka canza — iyakar API na GitHub."
     },
     "linkPasteClipboardEmpty": "Babu komai a allon kwafi.",
-    "linkPasteNotAPullRequest": "Wannan ba mahaɗin buƙatar haɗawa ta GitHub ba ne.",
+    "linkPasteNotAPullRequest": "Ba mahaɗin buƙatar haɗa canje-canje ko buƙatar haɗawa ba ne",
     "announce": {
       "commentPosted": "An wallafa tsokaci",
       "reviewSubmitted": "An aika bita",
@@ -668,6 +758,7 @@
     "mutationError": {
       "commentNotPosted": "Ba za a iya wallafa wannan tsokacin ba. Wataƙila layin da aka zaɓa ya canza, ko an sabunta PR.",
       "reviewNotSubmitted": "Ba za a iya aika wannan bitar yadda take ba. Wataƙila PR ya canza, ko kuma ba za ka iya yin bitar buƙatar haɗawa da ka buɗe da kanka ba.",
+      "reviewNotSubmittedTerm": "Ba a iya aika wannan bita yadda yake ba. Wataƙila {{term}} ya canza, ko ba za ka iya bita {{term}} ɗinka ba.",
       "couldNotPostComment": "Ba a iya wallafa tsokaci ba.",
       "couldNotSubmitReview": "Ba a iya aika bita ba. Duba haɗinka na intanet ka sake gwadawa."
     },
@@ -675,9 +766,31 @@
       "couldNotReply": "An kasa amsawa.",
       "couldNotCompleteAction": "Ba a iya kammala wannan aikin ba.",
       "mergeResultDefaultError": "GitHub bai kammala haɗawa ba.",
+      "mergeResultNotCompleted": "Ba a haɗa {{term}} ba. Duba yanayinsa ka sake gwadawa.",
       "ambiguous": "Ba a iya tabbatarwa ba — duba PR kafin ka sake gwadawa.",
       "persistenceFailed": "Ba mu iya adana wannan aikin ba. Sake gwadawa daga baya.",
       "forbidden": "Ba a ba da izini ba."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ba ya samuwa ga wannan mai ba da sabis",
+        "accessibility": "Ba ya samuwa ga wannan mai ba da sabis: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "Buƙatar haɗa canje-canje",
+      "mergeRequest": "Buƙatar haɗawa",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Raba buƙatar haɗawa",
+      "viewOnProvider": "Duba a {{provider}}",
+      "mergeRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
+      "unavailableDescription": "Wataƙila an share shi, ko kuma ba ka da damar shiga.",
+      "accessDeniedMergeRequest": "Ba ka da izinin duba wannan buƙatar haɗawa.",
+      "couldNotLoadMergeRequest": "Ba a iya loda buƙatar haɗawa ba.",
+      "discussionAccessDenied": "Ba ka da izinin duba tattaunawar wannan buƙatar haɗawa.",
+      "discussionUnavailableMessage": "Wataƙila an cire wannan buƙatar haɗawa.",
+      "noDiscussionDescription": "Babu silsilar bita ko tsokacin tattaunawa a wannan buƙatar haɗawa.",
+      "noFilesChangedDescription": "Babu canje-canje ga fayiloli a wannan buƙatar haɗawa."
     }
   },
   "notifications": {
@@ -710,11 +823,12 @@
     "previewFullDescription": "Sanarwa suna nuna rubutun saƙo a allon kullenka.",
     "previewGenericDescription": "Sanarwa suna nuna cewa wani abu ya faru. Buɗe Kilo don karanta shi.",
     "channel": {
-      "agent": "Zamannin wakilai",
+      "agentProgress": "Ci gaban wakilai",
       "chat": "Saƙonnin tattaunawa",
       "kiloclaw": "Ayyukan KiloClaw",
       "balance": "Faɗakarwar ragowar kuɗi",
-      "security": "Sakamakon binciken tsaro"
+      "security": "Sakamakon binciken tsaro",
+      "spend": "Faɗakarwar kashe kuɗi"
     },
     "category": {
       "chatMessagesSubtitle": "amsoshi a cikin tattaunawarka",
@@ -725,8 +839,22 @@
       "sessionStatusTitle": "Halin zaman",
       "sessionStatusSubtitle": "an gama / an kasa / a shirye don sarrafawa",
       "kiloclawActivitySubtitle": "kwafin shirin ya shirya ko ya gaza, ayyukan da aka tsara",
+      "kiloclawActivityUnavailable": "Fara kwafin KiloClaw don samun ayyukan KiloClaw.",
       "balanceAlertsSubtitle": "gargaɗin ƙarancin kuɗin ƙungiya",
-      "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA"
+      "balanceAlertsUnavailable": "Shiga ƙungiya don samun gargaɗin kuɗi.",
+      "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA",
+      "securityFindingsUnavailable": "Kunna Wakilin tsaro na Kilo a kan wani iyaka don samun sakamakon binciken tsaro.",
+      "spendAlertsSubtitle": "wucewar iyaka da hauhawar sa'a",
+      "spendAlertsToggle": "Rukunin faɗakarwar kashe kuɗi"
+    },
+    "action": {
+      "openSession": "Buɗe zaman"
+    },
+    "needsInputAction": {
+      "approved": "An amince da buƙatar",
+      "replied": "An tura amsa",
+      "failed": "Ba a iya amsawa ba. Sake danna don sake gwadawa.",
+      "unavailable": "Wannan buƙatar ba ta jira ba."
     }
   },
   "tabs": {
@@ -807,7 +935,9 @@
       "uploadFailed": "An kasa ɗora fayil ɗin.",
       "failedToUploadFile": "An kasa ɗora fayil: {{reason}}.",
       "nothingToPaste": "Babu abin da za a manna.",
-      "metadataStripFailed": "An kasa cire ƙarin bayanan da ke cikin fayil ɗin hoton."
+      "metadataStripFailed": "An kasa cire ƙarin bayanan da ke cikin fayil ɗin hoton.",
+      "limit_one": "Za ka iya haɗa fayiloli har {{displayCount}}.",
+      "limit_other": "Za ka iya haɗa fayiloli har {{displayCount}}."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1551,7 +1681,11 @@
       "syncFindings": "Daidaita matsalolin da aka gano",
       "syncNow": "Daidaita yanzu",
       "syncQueued": "An saka daidaitawa a jerin jira",
-      "syncStatusUnavailable": "Ba a iya samun halin daidaitawa ba."
+      "syncStatusUnavailable": "Ba a iya samun halin daidaitawa ba.",
+      "daysOverdue_one": "Wa'adin ya wuce da kwanaki {{displayCount}}",
+      "daysOverdue_other": "Wa'adin ya wuce da kwanaki {{displayCount}}",
+      "findingsCount_one": "Matsaloli {{displayCount}} da aka gano",
+      "findingsCount_other": "Matsaloli {{displayCount}} da aka gano"
     },
     "dashboardMetrics": {
       "openFindings": "Matsalolin da ba a warware ba",
@@ -1948,6 +2082,10 @@
       "couldNotLoad": "An kasa loda zaman.",
       "failedToLoadDetails": "An kasa loda cikakkun bayanan zaman.",
       "failedToStopExecution": "An kasa dakatar da aikin.",
+      "stopped": "An dakatar da zama",
+      "committing": "Ana adanawa…",
+      "committed": "An adana",
+      "commitFailed": "Adanawa ta kasa",
       "renameSession": "Canza sunan zaman",
       "renamePlaceholder": "Sunan zaman",
       "transcriptAccessibility": "Tarihin tattaunawar zaman",
@@ -1982,17 +2120,56 @@
       "exitNeedsNewerCli": "Amfani da umarnin / daga nesa yana buƙatar sabuwar sigar Kilo CLI. Sabunta Kilo CLI ka sake haɗawa."
     },
     "sessionConnection": {
+      "label": "Haɗi",
       "connecting": "Ana haɗawa…",
       "reconnecting": "Ana sake haɗawa…",
       "connectionLost": "Haɗi ya katse",
       "retryConnection": "Sake gwada haɗi"
     },
+    "goal": {
+      "title": "Manufa",
+      "statusActive": "Manufa mai aiki",
+      "statusPaused": "Manufar da aka dakatar",
+      "statusComplete": "An kammala manufa",
+      "statusBlocked": "An toshe manufa",
+      "edit": "Gyara manufa",
+      "remove": "Cire manufa",
+      "pause": "Dakatar da manufa",
+      "resume": "Ci gaba da manufa",
+      "editPlaceholder": "Bayyana manufa",
+      "removeConfirmTitle": "Cire manufa?",
+      "removeConfirmMessage": "CLI yana share manufar wannan zaman.",
+      "updateFailed": "Ba a iya sabunta manufar ba.",
+      "sectionAccessibility": "{{status}}. Manufa: {{text}}",
+      "collapse": "Ɓoye manufa",
+      "expand": "Nuna manufa"
+    },
     "newSession": {
+      "recentlyUsed": "An yi amfani da su kwanan nan",
+      "couldNotLoadGithubRepositories": "An kasa loda ma'ajiyoyin GitHub.",
+      "couldNotLoadGitlabRepositories": "An kasa loda ma'ajiyoyin GitLab.",
+      "couldNotLoadBitbucketRepositories": "An kasa loda ma'ajiyoyin Bitbucket.",
       "connectGithubDescription": "Haɗa GitHub a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
+      "connectGitlabDescription": "Haɗa GitLab a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
+      "connectBitbucketDescription": "Haɗa Bitbucket a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
       "openGithub": "Buɗe GitHub",
+      "openGitlab": "Buɗe GitLab",
+      "openBitbucket": "Buɗe Bitbucket",
       "refreshRepositories": "Sabunta ma'ajiyoyi",
       "githubConnected": "An haɗa GitHub",
+      "gitlabConnected": "An haɗa GitLab",
       "noRepositoriesVisible": "Babu ma'ajiyoyi da ake gani. Duba izinin shiga ma'ajiyoyi na manhajar Kilo ta GitHub, sannan ka sabunta.",
+      "noRepositoriesVisibleGitlab": "Babu ma'ajiyoyi da ake gani. Duba izinin shiga ma'ajiyoyi na GitLab, sannan ka sabunta.",
+      "noRepositoriesVisibleBitbucket": "Babu ma'ajiyoyi da ake gani. Duba izinin shiga ma'ajiyoyi na Bitbucket, sannan ka sabunta.",
+      "bitbucketOrganizationsOnly": "Bitbucket yana samuwa ga ƙungiyoyi kawai.",
+      "branchPickerTitle": "Zaɓi reshe",
+      "branchDefault": "Na al'ada",
+      "branchAccessibility": "Reshe: {{label}}",
+      "branchLoading": "Ana loda rasshe",
+      "branchLoadError": "Ba a iya loda rasshe ba",
+      "branchUnavailable": "Rasshe ba su samuwa ga wannan ma'ajiya ba. Duba damar shigarka tare da mai ba da sabis, sannan ka zaɓi wata ma'ajiya.",
+      "branchEmpty": "Babu reshe da ya samu",
+      "branchPlaceholder": "Zaɓi reshe",
       "runOnWithTarget": "Gudanar da aiki a: {{target}}",
       "environment": "Muhallin aiki",
       "couldNotLoadEnvironment": "An kasa loda muhallin aikinka.",
@@ -2013,24 +2190,13 @@
       "couldNotRefreshRepositories": "An kasa sabunta ma'ajiyoyi. Sake gwadawa.",
       "discardDraftTitle": "Watsar da daftari?",
       "discardDraftMessage": "Za a rasa umarnin aikinka.",
+      "discardWithUploadsMessage": "Za a share umarnin aikinka da duk fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
       "discardFailed": "An kasa watsar da daftarin. Sake gwadawa.",
       "remoteHint": "Gudanar da `kilo remote` a kwamfutarka, ko `/remote` a zaman CLI da ke gudana, don sarrafa aikin kilo a kwamfutarka.",
-      "connectBitbucketDescription": "Haɗa Bitbucket a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
-      "connectGitlabDescription": "Haɗa GitLab a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
-      "couldNotLoadBitbucketRepositories": "An kasa loda ma'ajiyoyin Bitbucket.",
-      "couldNotLoadGithubRepositories": "An kasa loda ma'ajiyoyin GitHub.",
-      "couldNotLoadGitlabRepositories": "An kasa loda ma'ajiyoyin GitLab.",
-      "gitlabConnected": "An haɗa GitLab",
-      "noRepositoriesVisibleBitbucket": "Babu ma'ajiyoyi da ake gani. Duba izinin shiga ma'ajiyoyi na Bitbucket, sannan ka sabunta.",
-      "noRepositoriesVisibleGitlab": "Babu ma'ajiyoyi da ake gani. Duba izinin shiga ma'ajiyoyi na GitLab, sannan ka sabunta.",
-      "openBitbucket": "Buɗe Bitbucket",
-      "openGitlab": "Buɗe GitLab",
-      "recentlyUsed": "An yi amfani da su kwanan nan",
-      "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zaman ba. Zaɓi Cloud Agent ko wani CLI.",
       "continueFrom": "Ana ci gaba da {{title}}.",
-      "importFailed": "An kasa shigo da wannan zaman.",
       "importingSession": "Ana shigo da zaman",
-      "discardWithUploadsMessage": "Za a share umarnin aikinka da duk fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba."
+      "cliCannotContinue": "Wannan CLI ba zai iya ci gaba da zaman ba. Zaɓi Cloud Agent ko wani CLI.",
+      "importFailed": "An kasa shigo da wannan zaman."
     },
     "partRenderer": {
       "updatedFileCount_one": "An sabunta fayil {{displayCount}}.",
@@ -2054,7 +2220,14 @@
       "updateTodos": "Sabunta jerin ayyuka",
       "linesBadge": "layuka {{displayCount}}",
       "filesBadge": "fayiloli {{displayCount}}",
-      "matchesBadge": "sakamako {{displayCount}}"
+      "matchesBadge": "sakamako {{displayCount}}",
+      "filesBadge_one": "fayiloli {{displayCount}}",
+      "filesBadge_other": "fayiloli {{displayCount}}",
+      "linesBadge_one": "layuka {{displayCount}}",
+      "linesBadge_other": "layuka {{displayCount}}",
+      "matchesBadge_one": "sakamako {{displayCount}}",
+      "matchesBadge_other": "sakamako {{displayCount}}",
+      "noOutput": "Babu fitarwa."
     },
     "readToolMarkdown": {
       "linesTruncated": "layuka {{start}}–{{end}} (an rage)",
@@ -2344,7 +2517,11 @@
       "files": "Fayiloli",
       "couldNotOpenPhotoPicker": "An kasa buɗe wurin zaɓar hoto. Sake kunna Kilo ka sake gwadawa.",
       "maxFilesAllowed": "Ba za ka iya ƙara fiye da fayiloli {{displayCount}} ba.",
-      "onlyAddingFiles": "Ana ƙara fayiloli {{accepted}} kawai cikin {{total}} (iyaka {{max}})"
+      "onlyAddingFiles": "Ana ƙara fayiloli {{accepted}} kawai cikin {{total}} (iyaka {{max}})",
+      "maxFilesAllowed_one": "Ba za ka iya ƙara fiye da fayiloli {{displayCount}} ba.",
+      "maxFilesAllowed_other": "Ba za ka iya ƙara fiye da fayiloli {{displayCount}} ba.",
+      "onlyAddingFiles_one": "Ana ƙara fayiloli {{accepted}} kawai cikin {{total}} (iyaka {{max}})",
+      "onlyAddingFiles_other": "Ana ƙara fayiloli {{accepted}} kawai cikin {{total}} (iyaka {{max}})"
     },
     "composer": {
       "addAttachment": "Haɗa fayil",
@@ -2362,7 +2539,9 @@
       "discardAttachmentsMessage": "Za a share fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
       "discardAttachmentsTitle": "Watsar da haɗe-haɗe?",
       "charactersRemaining": "Haruffa {{count}} ne suka rage",
-      "insertNewline": "Saka sabon layi"
+      "insertNewline": "Saka sabon layi",
+      "charactersRemaining_one": "Haruffa {{count}} ne suka rage",
+      "charactersRemaining_other": "Haruffa {{count}} ne suka rage"
     },
     "chatLink": {
       "linkCopied": "An kwafi mahaɗin",
@@ -2396,6 +2575,12 @@
       "startNewSession": "Fara sabon zama",
       "exitSession": "Fita daga zaman",
       "clearSession": "Ƙare wannan zaman ka fara sabon zama",
+      "compactDescription": "taƙaita mahallin zaman na yanzu",
+      "goalDescription": "Ci gaba da aiki zuwa manufar zaman. /goal <objective> ko pause, resume, clear",
+      "initDescription": "saitin AGENTS.md mai jagora",
+      "resumeClaudeDescription": "shigo da rubutun zaman Claude Code",
+      "resumeCodexDescription": "shigo da rubutun zaman OpenAI Codex",
+      "reviewDescription": "duba canje-canje [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Yi amfani da /{{command}}",
       "insert": "Saka",
       "upgradeRequiredFallback": "Sabunta CLI ɗinka don amfani da wannan umarnin.",
@@ -2428,7 +2613,14 @@
       "stepsCount_one": "mataki {{steps}}",
       "stepsCount": "matakai {{steps}}",
       "stepsCount_other": "matakai {{steps}}",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Samfur ({{displayCount}})",
+      "modelsCount_other": "Samfura ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "Amincewa ta atomatik",
+      "description": "Amince buƙatun izini na wannan zaman ta atomatik. Sannan kayan aikin suna gudana ba tare da buƙata ba.",
+      "unavailable": "Wannan zaman ba zai iya karɓar buƙatun izini ba."
     },
     "prBadge": {
       "open": "buɗe buƙatar haɗa canje-canje",
@@ -2460,6 +2652,12 @@
       "tapToListHint": "Danna jaka don jera abubuwan da ke cikinta.",
       "unsupportedDescription": "Wannan CLI ba zai iya jera jakuna ba. Danna An gama don riƙe jakar da aka fara daga gare ta. Danna Fara zama don farawa a can.",
       "unsupportedTitle": "Ba za a iya jera jakuna ba"
+    },
+    "toolRun": {
+      "sheetTitle": "Kiran kayan aiki",
+      "condensedLabel": "{{itemCount}} abubuwa; {{last}}",
+      "condensedLabel_one": "{{itemCount}} abubuwa; {{last}}",
+      "condensedLabel_other": "{{itemCount}} abubuwa; {{last}}"
     }
   },
   "bootstrap": {
@@ -2504,6 +2702,7 @@
     "couldNotLoadActiveSessions": "An kasa loda zaman aikin da ke gudana.",
     "agentSessions": "Masu gudana yanzu",
     "newCodingTask": "Sabon aikin rubuta lambar shiri",
+    "newTaskFromPicture": "Sabon aiki daga hoto",
     "explore": "Bincika",
     "seeAll": "Duba duka",
     "noLiveSessions": "Babu abin da ke gudana a yanzu"
@@ -2565,7 +2764,17 @@
     "languageNotInstalledMessage": "Fayilolin magana na offline na {{language}} ba a shigar da su a wayar ba. Sauke su, sannan sake gwada shigar da rubutu ta murya.",
     "downloadOfflineModel": "Sauke",
     "offlineModelDownloadScheduled": "Za a sauke fayilolin magana na offline a bango. Gwada shigar da rubutu ta murya daga baya.",
-    "listeningStopped": "An dakatar da sauraro."
+    "listeningStopped": "An dakatar da sauraro.",
+    "transcribing": "Ana mayar da magana rubutu...",
+    "gatewayUnreachable": "An kasa samun Kilo Gateway. Duba haɗinka ka sake gwadawa.",
+    "gatewayTimeout": "Mayar da magana zuwa rubutu ta ɗauki lokaci mai tsawo. Sake gwadawa.",
+    "gatewayModelUnavailable": "Wannan samfurin mayar da magana zuwa rubutu ba ya nan. Zaɓi wani a Zaɓuɓɓuka.",
+    "gatewayModelUnavailableNotice": "Ba a ƙara ba da wannan samfuri ba. Matsa $t(transcriptionModel.title) don zaɓar wani.",
+    "gatewaySignInRequired": "Shiga don amfani da mayar da magana ta Kilo Gateway.",
+    "gatewayNoModel": "Da farko zaɓi samfurin mayar da magana zuwa rubutu a Zaɓuɓɓuka.",
+    "testTitle": "Gwada shigar da murya",
+    "testPlaceholder": "Danna makirufo ka fara magana.",
+    "testClear": "Share rubutu"
   },
   "share": {
     "title": "Raba zuwa Kilo",
@@ -2583,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "Wannan zaman ba zai iya karɓar fayiloli ba",
     "cliCantReceiveFilesMessage": "Kilo CLI da ke gudanar da wannan zaman ba zai iya karɓar fayiloli ba. Sabunta CLI a waccan na'urar ko raba zuwa sabon zama.",
     "contentlessMessage": "Babu abin da za a raba — ba a haɗa rubutu ko fayiloli ba.",
-    "couldNotReadContent": "Ba a iya karanta abin da aka raba ba."
+    "couldNotReadContent": "Ba a iya karanta abin da aka raba ba.",
+    "onlyFirstFilesAttached_one": "Fayiloli {{displayCount}} na farko kawai za a haɗa.",
+    "onlyFirstFilesAttached_other": "Fayiloli {{displayCount}} na farko kawai za a haɗa."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2715,7 +2926,8 @@
     "aiProvidersWhat": "Umarnin aikinka, tarihin tattaunawa, da duk fayilolin da ka haɗa.",
     "aiProvidersWhy": "Don samar da amsoshin AI.",
     "aiProvidersWho": "Anthropic, OpenAI, Google, da sauran masu ba da sabis da ka zaɓa don kowace buƙata.",
-    "gatewayWhat": "ID ɗin asusu, ƙarin bayanan buƙata, da yawan guntayen rubutun da aka yi amfani da su.",
+    "gatewayWhat": "ID ɗin asusu, ƙarin bayanan buƙata, yawan guntayen rubutu, da kuma prompts da rikodin murya da manhajar ke aikawa ta cikinsa.",
+    "viaGateway": "Ta hanyar Kilo Gateway",
     "gatewayWhy": "Tantance mai amfani, tura buƙatu, da daidaita lissafin kuɗi.",
     "gatewayWho": "Kilo (kilo.ai).",
     "crashReportingWhat": "Rahotannin tsayawar manhaja da kurakurai, bayan an cire abubuwan da ke cikin manhajar.",
@@ -2735,7 +2947,7 @@
     "installAttributionWho": "AppsFlyer.",
     "voiceTranscriptionWhat": "Rikodinka yayin da kake magana.",
     "voiceTranscriptionWhy": "Don mayar da magana zuwa rubutu.",
-    "voiceTranscriptionWho": "A na'urar kawai, ko Apple ko Google idan na'urar ba za ta iya mayar da magana zuwa rubutu ba tare da intanet ba.",
+    "voiceTranscriptionWho": "Na'urar ka, Kilo Gateway tare da samfurin rubutun da ka zaɓa, ko Apple ko Google don ganewa ta kan layi.",
     "installAttributionPromptTitle": "A ba da izinin gano inda aka samo manhaja?",
     "installAttributionPromptMessage": "Kilo yana amfani da izinin bin diddigi na Apple kawai don sanin hanyar da ta kawo ka nan. Ba a taɓa amfani da umarnin aikinka ko tattaunawarka ba.",
     "what": "Me",
@@ -2907,6 +3119,14 @@
     "tooManySignInAttempts": "An yi ƙoƙarin shiga da yawa. Jira ɗan lokaci ka sake gwadawa."
   },
   "models": {
+    "auto": {
+      "frontier": "Na atomatik Mafi ƙarfi",
+      "balanced": "Na atomatik Daidaitacce",
+      "efficient": "Na atomatik Mai inganci",
+      "small": "Na atomatik Ƙarami",
+      "free": "Na atomatik Kyauta",
+      "organization": "Na atomatik na ƙungiya"
+    },
     "dataCollected": "Ana tattara bayanai",
     "free": "Kyauta",
     "couldNotUpdateFavorites": "An kasa sabunta waɗanda ka fi so.",
@@ -2945,7 +3165,74 @@
     "privacy": "Buɗe Kilo don ganin wakilai",
     "openAgents": "Buɗe wakilai",
     "needsInput": "Ana buƙatar bayani",
+    "newestSession": "Mafi sabo: {{title}}",
+    "noneWaiting": "Babu wakilin da ke jira",
+    "newAgent": "Sabon wakili",
+    "approving": "Ana amincewa...",
+    "couldNotApprove": "Ba a iya amincewa ba",
+    "couldNotStart": "Ba a iya farawa ba",
     "channelName": "Wakilai da ke aiki",
-    "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle."
+    "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle.",
+    "openSession": "Buɗe",
+    "approveFailed": "An kasa amincewa. Danna $t(common.approve) don sake gwadawa.",
+    "newestResult": "Sabon sakamako"
+  },
+  "transcriptionModel": {
+    "title": "Samfurin mayar da magana zuwa rubutu",
+    "noneChosen": "Ba a zaɓi ba",
+    "emptyTitle": "Babu samfuran mayar da magana zuwa rubutu",
+    "emptyDescription": "Kilo Gateway bai ba da samfuran mayar da magana zuwa rubutu a halin yanzu.",
+    "loadFailed": "An kasa loda samfuran mayar da magana zuwa rubutu."
+  },
+  "voiceLanguage": {
+    "title": "Harshen shigar da murya",
+    "automatic": "Na atomatik",
+    "loadFailed": "An kasa loda harsunan da wannan na'urar ke goyan baya.",
+    "emptyTitle": "Babu harsunan da ake goyan baya",
+    "emptyDescription": "Fahimtar magana ta wannan na'urar ba ta bayar da wani harshe da ake goyan baya ba."
+  },
+  "tour": {
+    "eyebrow": "Kaita gajere",
+    "forkTitle": "Ina kake son ka gudanar da Kilo?",
+    "forkSubtitle": "Zaɓi inda Kilo zai gudanar da zaman ka na farko.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Gudanar da Kilo a cikin yanarin gajimare mai keɓe ba tare da shigar da komai ba.",
+    "remoteOptionTitle": "Kwamfutarka",
+    "remoteOptionBody": "Gudanar da Kilo a na'urarka ta hanyar CLI na `kilo remote`.",
+    "skip": "Tsallake kaita",
+    "tutorialLabel": "Koyarwa"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Fara wakili na buƙatar umarni. Ƙara umarni sannan ka sake gudanar da shi.",
+      "repositoryUnknown": "Kilo ba ya gane {{repository}} a matsayin ma'ajiyar GitHub ko GitLab. Zaɓi wata ma'ajiya a cikin Kilo.",
+      "repositoryUnsupported": "{{repository}} ma'ajiyar Bitbucket ce — Fara wakili ba zai iya amfani da ita ba tukuna. Zaɓi wata ma'ajiya a cikin Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Buɗe zaman ƙarshe"
+  },
+  "spendAlerts": {
+    "subtitle": "Aika faɗakarwa ta imel ko turawa zuwa ga abokan hulɗar biyan kuɗi lokacin da kashe kuɗin wannan yanki ya wuce iyaka ko ya haura fiye da yawan sa'ar da ya saba.",
+    "enable": "Kunna faɗakarwar kashe kuɗi",
+    "thresholdTitle": "Wucewar iyaka",
+    "thresholdSubtitle": "Kashe kuɗin da ake yi ya wuce iyakarka",
+    "anomalyTitle": "Hauhawar sa'a",
+    "anomalySubtitle": "Sa'a ɗaya ta fi yawan da wannan yanki ya saba nisa",
+    "limitLabel": "Iyaka (USD)",
+    "windowLabel": "Taga",
+    "window24h": "Sa'o'i 24",
+    "window7d": "Kwanaki 7",
+    "window30d": "Kwanaki 30",
+    "multiplierLabel": "Mai ninka hauhawa",
+    "saved": "An adana saitunan faɗakarwar kashe kuɗi",
+    "loadError": "An kasa loda faɗakarwar kashe kuɗi.",
+    "saveError": "An kasa adana faɗakarwar kashe kuɗi.",
+    "empty": "Faɗakarwar kashe kuɗi a kashe take. Kunna ta domin faɗakar da abokan hulɗar biyan kuɗi na wannan yanki.",
+    "noSpend": "Ba a rubuta wani kashe kuɗi ba tukuna",
+    "spend24h": "Kashe kuɗi a cikin sa'o'i 24 da suka gabata",
+    "multiplierError": "Shigar da mai ninka 1 ko fiye",
+    "permissionDenied": "Ba ka da izinin sarrafa faɗakarwar kashe kuɗi.",
+    "pushOffByCategory": "A kashe a cikin Sanarwa"
   }
 }

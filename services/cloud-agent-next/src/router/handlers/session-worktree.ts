@@ -13,6 +13,12 @@ import {
   type CloudAgentWorktreeId,
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
+import {
+  createRuntimeAuthorization,
+  sealRuntimeAuthorization,
+} from '@kilocode/worker-utils/runtime-authorization';
+import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
+import { sandboxAllocationSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -23,9 +29,10 @@ import {
 } from '../../persistence/session-metadata.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
-import { generateSessionId, isControlPlaneOwner } from '../../session-plane.js';
+import { generateSessionId } from '../../session-plane.js';
 import {
   assertSessionOperationIdentity,
+  assertRuntimeIsolationAdmission,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
 } from '../../session/session-registration.js';
 import type { TRPCContext } from '../../types.js';
@@ -33,7 +40,8 @@ import { withDORetry } from '../../utils/do-retry.js';
 import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
 import { sha256Hex } from '../../utils/sha256.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
-import { internalApiProtectedProcedure } from '../auth.js';
+import { protectedProcedure } from '../auth.js';
+import { resolveSecret } from '../../auth.js';
 import { assertOrganizationMembership } from './organization-membership.js';
 
 const workspaceSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
@@ -74,6 +82,7 @@ const ownershipRowSchema = z
 const operationProgressSchema = CreateWorktreeChatOutput.omit({ replayed: true })
   .extend({
     [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: z.string().regex(/^[a-f0-9]{64}$/),
+    sandboxAllocation: sandboxAllocationSchema.optional(),
   })
   .strict();
 
@@ -199,11 +208,7 @@ async function loadWorktreeSource(
     !worktreeId ||
     ownership.parentSessionId !== null ||
     ownership.cloudAgentSessionScopeId !== input.sourceCloudAgentSessionId ||
-    ownership.createdOnPlatform !== 'cloud-agent-web' ||
-    !isControlPlaneOwner(ctx.env, {
-      userId: ctx.userId,
-      orgId: input.kilocodeOrganizationId,
-    })
+    ownership.createdOnPlatform !== 'cloud-agent-web'
   ) {
     throw sourceRejected();
   }
@@ -258,15 +263,18 @@ async function loadWorktreeSource(
 
 async function worktreeIntentFingerprint(
   input: WorktreeInput,
-  worktreeId: CloudAgentWorktreeId
+  source: WorktreeSource
 ): Promise<string> {
   return sha256Hex(
     JSON.stringify({
       sourceKiloSessionId: input.sourceKiloSessionId,
       sourceCloudAgentSessionId: input.sourceCloudAgentSessionId,
       organizationId: input.kilocodeOrganizationId ?? null,
-      worktreeId,
+      worktreeId: source.worktreeId,
       clientProvenance: input.clientProvenance,
+      ...(source.workspace.sandboxAllocation
+        ? { sandboxAllocation: source.workspace.sandboxAllocation }
+        : {}),
     })
   );
 }
@@ -281,6 +289,7 @@ function readOperationProgress(
   if (
     !progress.success ||
     progress.data.worktreeId !== source.worktreeId ||
+    progress.data.sandboxAllocation !== source.workspace.sandboxAllocation ||
     progress.data[SESSION_CREATE_INTENT_FINGERPRINT_KEY] !== fingerprint
   ) {
     throw operationConflict();
@@ -297,6 +306,74 @@ function resultFromProgress(progress: OperationProgress, replayed = false): Work
   return replayed ? { ...result, replayed: true } : result;
 }
 
+type WorktreeRuntimeAuthorization = { token: string; seal: string } | undefined;
+
+/**
+ * Establish whether the current caller presented modern control authority.
+ * This deliberately verifies the token instead of inferring its type from an
+ * untrusted decoded JWT payload.  The actual authorization is re-created for
+ * each registration RPC below, which also re-checks principal and membership
+ * bindings.
+ */
+async function requiresRuntimeAuthorization(ctx: TRPCContext): Promise<boolean> {
+  const secret = await resolveSecret(ctx.env.NEXTAUTH_SECRET);
+  if (!secret) {
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
+  }
+  try {
+    const verified = await verifyKiloTokenForPolicy(ctx.authToken, secret, {
+      audience: 'cloud-agent-next',
+      mode: 'allow-legacy',
+    });
+    const modern =
+      verified.claims.tokenPurpose !== undefined ||
+      verified.claims.credentialExchange !== undefined ||
+      verified.claims.runtimeAdmission !== undefined;
+    if (modern && verified.claims.runtimeAdmission === undefined) {
+      throw new Error('Missing runtime admission');
+    }
+    return modern;
+  } catch {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+  }
+}
+
+async function createDestinationRuntimeAuthorization(
+  ctx: TRPCContext,
+  progress: OperationProgress,
+  organizationId: string | undefined
+): Promise<WorktreeRuntimeAuthorization> {
+  if (!(await requiresRuntimeAuthorization(ctx))) return undefined;
+
+  const secret = await resolveSecret(ctx.env.NEXTAUTH_SECRET);
+  if (!secret) {
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
+  }
+  try {
+    const created = await createRuntimeAuthorization({
+      token: ctx.authToken,
+      secret,
+      connectionString: ctx.env.HYPERDRIVE.connectionString,
+      resourceKind: 'cloud-agent-next',
+      resourceId: progress.cloudAgentSessionId,
+      ...(organizationId ? { organizationId } : {}),
+    });
+    return {
+      token: created.token,
+      seal: await sealRuntimeAuthorization(created.authorization, secret),
+    };
+  } catch {
+    // Membership, principal, and token admission can all change between a
+    // lost response and a replay. Never revive a destination on stale control
+    // authority.
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+  }
+}
+
+async function assertNewDestinationRuntimeIsolation(ctx: TRPCContext): Promise<void> {
+  if (await requiresRuntimeAuthorization(ctx)) assertRuntimeIsolationAdmission(ctx.env);
+}
+
 function sourceWorktreeBranchName(source: WorktreeSource): string {
   return (
     source.workspace.branchName ??
@@ -308,7 +385,8 @@ function sourceWorktreeBranchName(source: WorktreeSource): string {
 function buildRegistrationInput(
   source: WorktreeSource,
   ctx: TRPCContext,
-  progress: OperationProgress
+  progress: OperationProgress,
+  runtimeAuthorization: WorktreeRuntimeAuthorization
 ): Parameters<ReturnType<typeof getSandboxSessionStub>['registerSession']>[0] {
   const repository = { ...source.repository };
   if ('token' in repository) delete repository.token;
@@ -319,13 +397,32 @@ function buildRegistrationInput(
 
   return {
     identity: { ...source.metadata.identity, sessionId: progress.cloudAgentSessionId },
-    auth: { kiloSessionId: progress.kiloSessionId, kilocodeToken: ctx.authToken },
+    auth: {
+      kiloSessionId: progress.kiloSessionId,
+      kilocodeToken: runtimeAuthorization?.token ?? ctx.authToken,
+    },
     agent: source.metadata.agent,
     repository,
     workspace,
     ...(source.metadata.profile ? { profile: source.metadata.profile } : {}),
     ...(source.metadata.finalization ? { finalization: source.metadata.finalization } : {}),
+    ...(runtimeAuthorization ? { runtimeAuthorizationSeal: runtimeAuthorization.seal } : {}),
   };
+}
+
+async function assertDestinationRuntimeAuthorizationActive(
+  ctx: TRPCContext,
+  sessionId: string
+): Promise<void> {
+  if (!(await requiresRuntimeAuthorization(ctx))) return;
+  const status = await withDORetry(
+    () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+    stub => stub.getRuntimeAuthorizationStatus(),
+    'getRuntimeAuthorizationStatus'
+  );
+  if (status !== 'active') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+  }
 }
 
 function assertRegisteredMetadata(
@@ -349,6 +446,7 @@ function assertRegisteredMetadata(
     workspace.workspacePath !== source.workspace.workspacePath ||
     workspace.sandboxId !== source.workspace.sandboxId ||
     workspace.sandboxProvider !== source.workspace.sandboxProvider ||
+    workspace.sandboxAllocation !== source.workspace.sandboxAllocation ||
     workspace.branchName !== sourceWorktreeBranchName(source) ||
     JSON.stringify(workspace.sandboxRoute) !== JSON.stringify(source.workspace.sandboxRoute) ||
     !metadata.repository ||
@@ -571,7 +669,6 @@ async function registerWorktreeSession(
     cloudAgentSessionId: progress.cloudAgentSessionId,
     kiloSessionId: progress.kiloSessionId,
   };
-  const registrationInput = buildRegistrationInput(source, ctx, progress);
   let registrationAttempted = false;
   let response: unknown;
 
@@ -583,6 +680,7 @@ async function registerWorktreeSession(
           const existing = await stub.getMetadata();
           if (existing) {
             assertRegisteredMetadata(existing, source, progress);
+            await assertDestinationRuntimeAuthorizationActive(ctx, progress.cloudAgentSessionId);
             logControlDiagnostic('worktree_chat_reconciliation', {
               ...diagnostic,
               result: 'registration_recovered',
@@ -592,7 +690,15 @@ async function registerWorktreeSession(
           }
         }
         registrationAttempted = true;
-        return stub.registerSession(registrationInput);
+        await assertNewDestinationRuntimeIsolation(ctx);
+        const runtimeAuthorization = await createDestinationRuntimeAuthorization(
+          ctx,
+          progress,
+          source.ownership.organizationId ?? undefined
+        );
+        return stub.registerSession(
+          buildRegistrationInput(source, ctx, progress, runtimeAuthorization)
+        );
       },
       'registerSession'
     );
@@ -703,11 +809,15 @@ async function executeWorktreeCreate(
   fingerprint: string
 ): Promise<WorktreeResult> {
   const startedAt = Date.now();
+  await assertNewDestinationRuntimeIsolation(ctx);
   const progress = operationProgressSchema.parse({
     cloudAgentSessionId: generateSessionId('control'),
     kiloSessionId: generateKiloSessionId(),
     worktreeId: source.worktreeId,
     [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: fingerprint,
+    ...(source.workspace.sandboxAllocation
+      ? { sandboxAllocation: source.workspace.sandboxAllocation }
+      : {}),
   });
   const diagnostic = {
     operationRowId: row.id,
@@ -804,6 +914,9 @@ async function reconcileWorktreeCreate(
       );
       throw error;
     }
+    await assertDestinationRuntimeAuthorizationActive(ctx, progress.cloudAgentSessionId);
+  } else {
+    await assertNewDestinationRuntimeIsolation(ctx);
   }
 
   const ownership = await findOwnershipRow(
@@ -868,14 +981,14 @@ async function reconcileWorktreeCreate(
   return resultFromProgress(progress, true);
 }
 
-const createWorktreeChatHandler = internalApiProtectedProcedure
+const createWorktreeChatHandler = protectedProcedure
   .input(CreateWorktreeChatInput)
   .output(CreateWorktreeChatOutput)
   .mutation(async ({ input, ctx }) => {
     const startedAt = Date.now();
     const db = getPgDb(ctx.env);
     const source = await loadWorktreeSource(db, ctx, input);
-    const fingerprint = await worktreeIntentFingerprint(input, source.worktreeId);
+    const fingerprint = await worktreeIntentFingerprint(input, source);
     const admission = await admitOperation(db, {
       userId: ctx.userId,
       orgId: input.kilocodeOrganizationId,

@@ -4,6 +4,8 @@
     "done": "完了",
     "retry": "再試行",
     "tryAgain": "再試行",
+    "continue": "続行",
+    "notNow": "後で",
     "language": "言語",
     "device": "デバイス",
     "share": "{{title}}を共有",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "クリップボードにコピーできませんでした。",
     "required": "必須",
     "error": "エラー: {{error}}",
-    "notNow": "後で",
-    "continue": "続行",
     "back": "戻る",
     "somethingWentWrong": "問題が発生しました。",
     "couldNotOpen": "{{label}}を開けませんでした。",
@@ -36,6 +36,7 @@
     "cost": "コスト",
     "discard": "破棄",
     "findings": "検出事項",
+    "mergeRequest": "マージリクエスト",
     "notConnected": "未連携",
     "notifications": "通知",
     "pullRequest": "プルリクエスト",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "別のメールアドレスを使用",
     "signInWithApple": "Appleでサインイン",
     "signInWithGoogle": "Googleでサインイン",
+    "signInWithPasskey": "パスキーでサインイン",
     "emailAddress": "メールアドレス",
     "emailPlaceholder": "例：you@example.com",
     "continueWithEmail": "メールで続行",
@@ -174,6 +176,10 @@
     "termsConnector": " および ",
     "termsSuffix": "に同意したことになります。",
     "moreSignInOptions": "その他のサインイン方法",
+    "passkeyCancelled": "パスキーでのサインインがキャンセルされました。もう一度お試しください。",
+    "passkeyNotFound": "このデバイスに保存されたパスキーはありません。代わりに Apple、Google、またはメールでサインインしてください。",
+    "passkeyUnsupported": "このデバイスではパスキーを利用できません。代わりに Apple、Google、またはメールでサインインしてください。",
+    "passkeyFailed": "パスキーでサインインできませんでした。もう一度お試しください。",
     "couldNotCompleteSignIn": "サインインを完了できませんでした。もう一度お試しください。",
     "sessionEnded": "セッションが終了しました。もう一度サインインしてください。",
     "signInCodeExpired": "サインインコードの有効期限が切れました。もう一度お試しください。",
@@ -224,11 +230,36 @@
     "providerTestAccount": "テストアカウント",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "エンタープライズSSO"
+    "providerEnterpriseSso": "エンタープライズSSO",
+    "passkeysTitle": "パスキー",
+    "passkeysSubtitle": "パスワードなしでサインイン",
+    "passkeysEmpty": "パスキーはまだありません",
+    "passkeysEmptyHint": "$t(profile.addPasskey)してパスワードなしでサインインします。",
+    "passkeysCouldNotLoad": "パスキーを読み込めませんでした",
+    "passkeysLoadFailed": "これが読み込まれるまでパスキーは利用できません。",
+    "addPasskey": "パスキーを追加",
+    "passkeyDefaultName": "パスキー",
+    "passkeyAddedOn": "{{date}} に追加",
+    "passkeyAdded": "パスキーを追加しました。",
+    "passkeyAddFailed": "パスキーを追加できませんでした。もう一度お試しください。",
+    "passkeyAddUnsupported": "このデバイスではパスキーを作成できません。",
+    "passkeyAddCancelled": "パスキーの作成がキャンセルされました。",
+    "passkeyRemoved": "パスキーを削除しました。",
+    "passkeyRemoveFailed": "そのパスキーを削除できませんでした。もう一度お試しください。",
+    "passkeyRenamed": "パスキーの名前を変更しました。",
+    "passkeyName": "パスキー名",
+    "renamePasskey": "パスキーの名前を変更",
+    "removePasskey": "パスキーを削除",
+    "removePasskeyTitle": "パスキーを削除しますか?",
+    "removePasskeyMessage": "このパスキーではサインインできなくなります。"
   },
   "preferences": {
+    "general": "一般",
+    "voiceInput": "音声入力",
     "autoExpandThinking": "思考を自動展開",
     "autoExpandThinkingSubtitle": "エージェントの思考が終了したときに展開して表示します。",
+    "hideThinking": "思考の詳細を非表示",
+    "hideThinkingSubtitle": "セッション画面でエージェントの思考を表示しません。",
     "keepScreenOn": "セッション画面で画面を常時オン",
     "keepScreenOnSubtitle": "セッションの実行中は画面が消えないようにします。",
     "appearance": "外観",
@@ -237,6 +268,7 @@
     "appearanceLight": "ライト",
     "appearanceDark": "ダーク",
     "account": "アカウント",
+    "accountSubtitle": "言語、信頼済みホスト、デバイスのセッション",
     "prReviewAttribution": "PRレビューに使用アプリ名を追加",
     "prReviewAttributionSubtitle": "レビューを送信すると、末尾にKiloでレビューしたことを示す文言を追加します。",
     "returnSendsMessage": "リターンキーでメッセージを送信",
@@ -247,7 +279,15 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gatewayによる文字起こし",
+    "gatewayTranscriptionSubtitle": "デバイスの音声認識の代わりにKilo Gatewayのモデルで音声入力を文字起こしします。録音はKilo Gatewayに送信されます。",
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "ツール呼び出しをまとめる",
+    "condenseToolCallsSubtitle": "連続するツール呼び出しを、開ける1つの行にまとめます。",
+    "toolSummaryTranslation": "ツールの概要を翻訳",
+    "toolSummaryTranslationSubtitle": "各ツールの概要をモデルに送信して、アプリの言語に翻訳します。翻訳に失敗した場合は元のテキストが表示されます。",
+    "toolSummaryTranslationModelUnavailableNotice": "このモデルは提供が終了しました。別のモデルを選ぶには$t(common.model)をタップしてください。"
   },
   "notifications": {
     "liveActivities": "ライブアクティビティ",
@@ -279,11 +319,12 @@
     "previewFullDescription": "ロック画面の通知にメッセージ本文を表示します。",
     "previewGenericDescription": "通知では新しい動きがあったことだけを知らせます。内容を読むにはKiloを開いてください。",
     "channel": {
-      "agent": "エージェントセッション",
+      "agentProgress": "エージェントの進捗",
       "chat": "チャットメッセージ",
       "kiloclaw": "KiloClawのアクティビティ",
       "balance": "残高アラート",
-      "security": "セキュリティの検出事項"
+      "security": "セキュリティの検出事項",
+      "spend": "支出アラート"
     },
     "category": {
       "chatMessagesSubtitle": "会話内の返信",
@@ -294,8 +335,22 @@
       "sessionStatusTitle": "セッションの状態",
       "sessionStatusSubtitle": "完了 / 失敗 / 操作可能",
       "kiloclawActivitySubtitle": "インスタンスの準備完了や失敗、予定された操作",
+      "kiloclawActivityUnavailable": "KiloClawアクティビティを受け取るには、KiloClawインスタンスを開始してください。",
       "balanceAlertsSubtitle": "組織の残高低下に関する警告",
-      "securityFindingsSubtitle": "新たな検出結果とSLAのリマインダー"
+      "balanceAlertsUnavailable": "残高アラートを受け取るには、組織に参加してください。",
+      "securityFindingsSubtitle": "新たな検出結果とSLAのリマインダー",
+      "securityFindingsUnavailable": "セキュリティの検出結果を受け取るには、スコープでKiloセキュリティエージェントを有効にしてください。",
+      "spendAlertsSubtitle": "しきい値の超過と毎時の急増",
+      "spendAlertsToggle": "支出アラートのカテゴリ"
+    },
+    "action": {
+      "openSession": "セッションを開く"
+    },
+    "needsInputAction": {
+      "approved": "リクエストを承認しました",
+      "replied": "返信を送信しました",
+      "failed": "回答できませんでした。もう一度タップして再試行してください。",
+      "unavailable": "このリクエストは待機中ではなくなりました。"
     }
   },
   "tabs": {
@@ -376,7 +431,9 @@
       "uploadFailed": "アップロードに失敗しました。",
       "failedToUploadFile": "ファイルのアップロードに失敗しました（{{reason}}）。",
       "nothingToPaste": "貼り付ける内容がありません。",
-      "metadataStripFailed": "写真のメタデータを削除できませんでした。"
+      "metadataStripFailed": "写真のメタデータを削除できませんでした。",
+      "limit_one": "ファイルは最大{{displayCount}}件まで添付できます。",
+      "limit_other": "ファイルは最大{{displayCount}}件まで添付できます。"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}、{{status}}",
@@ -1145,7 +1202,11 @@
       "syncNow": "今すぐ同期",
       "syncQueued": "同期をキューに追加しました。",
       "syncStatusUnavailable": "同期の状態を確認できません。",
-      "withinDeadline": "期限内"
+      "withinDeadline": "期限内",
+      "daysOverdue_one": "{{displayCount}}日超過",
+      "daysOverdue_other": "{{displayCount}}日超過",
+      "findingsCount_one": "検出結果{{displayCount}}件",
+      "findingsCount_other": "検出結果{{displayCount}}件"
     },
     "dashboardMetrics": {
       "openFindings": "未解決の検出結果",
@@ -1517,6 +1578,10 @@
       "couldNotLoad": "セッションを読み込めませんでした。",
       "failedToLoadDetails": "セッションの詳細を読み込めませんでした。",
       "failedToStopExecution": "実行を停止できませんでした。",
+      "stopped": "セッションを停止しました",
+      "committing": "コミット中…",
+      "committed": "コミットしました",
+      "commitFailed": "コミットに失敗しました",
       "renameSession": "セッション名の変更",
       "renamePlaceholder": "セッション名",
       "transcriptAccessibility": "セッションの会話履歴",
@@ -1551,17 +1616,56 @@
       "exitNeedsNewerCli": "リモートのスラッシュコマンドには新しいKilo CLIが必要です。Kilo CLIを更新して再接続してください。"
     },
     "sessionConnection": {
+      "label": "接続",
       "connecting": "接続中…",
       "reconnecting": "再接続中…",
       "connectionLost": "接続切断",
       "retryConnection": "接続を再試行"
     },
+    "goal": {
+      "title": "ゴール",
+      "statusActive": "アクティブなゴール",
+      "statusPaused": "一時停止中のゴール",
+      "statusComplete": "ゴール完了",
+      "statusBlocked": "ゴールがブロックされました",
+      "edit": "ゴールを編集",
+      "remove": "ゴールを削除",
+      "pause": "ゴールを一時停止",
+      "resume": "ゴールを再開",
+      "editPlaceholder": "ゴールを説明",
+      "removeConfirmTitle": "ゴールを削除しますか？",
+      "removeConfirmMessage": "CLI がこのセッションのゴールを消去します。",
+      "updateFailed": "ゴールを更新できませんでした。",
+      "sectionAccessibility": "{{status}}。ゴール: {{text}}",
+      "collapse": "ゴールを折りたたむ",
+      "expand": "ゴールを展開"
+    },
     "newSession": {
+      "recentlyUsed": "最近使用した項目",
+      "couldNotLoadGithubRepositories": "GitHubのリポジトリを読み込めませんでした。",
+      "couldNotLoadGitlabRepositories": "GitLabのリポジトリを読み込めませんでした。",
+      "couldNotLoadBitbucketRepositories": "Bitbucketのリポジトリを読み込めませんでした。",
       "connectGithubDescription": "ブラウザーでGitHubと連携し、この画面に戻ってリポジトリを選択してください。",
+      "connectGitlabDescription": "ブラウザーでGitLabと連携し、この画面に戻ってリポジトリを選択してください。",
+      "connectBitbucketDescription": "ブラウザーでBitbucketと連携し、この画面に戻ってリポジトリを選択してください。",
       "openGithub": "GitHubを開く",
+      "openGitlab": "GitLabを開く",
+      "openBitbucket": "Bitbucketを開く",
       "refreshRepositories": "リポジトリを更新",
       "githubConnected": "GitHubと連携済み",
+      "gitlabConnected": "GitLabと連携済み",
       "noRepositoriesVisible": "表示できるリポジトリがありません。KiloのGitHubアプリがリポジトリにアクセスできるか確認してから、一覧を更新してください。",
+      "noRepositoriesVisibleGitlab": "表示できるリポジトリがありません。GitLabのリポジトリへのアクセス権を確認してから、一覧を更新してください。",
+      "noRepositoriesVisibleBitbucket": "表示できるリポジトリがありません。Bitbucketのリポジトリへのアクセス権を確認してから、一覧を更新してください。",
+      "bitbucketOrganizationsOnly": "Bitbucketは組織でのみ利用できます。",
+      "branchPickerTitle": "ブランチを選択",
+      "branchDefault": "デフォルト",
+      "branchAccessibility": "ブランチ: {{label}}",
+      "branchLoading": "ブランチを読み込み中",
+      "branchLoadError": "ブランチを読み込めませんでした",
+      "branchUnavailable": "このリポジトリではブランチが利用できません。プロバイダーでのアクセスを確認し、別のリポジトリを選択してください。",
+      "branchEmpty": "利用可能なブランチがありません",
+      "branchPlaceholder": "ブランチを選択",
       "runOnWithTarget": "実行先：{{target}}",
       "environment": "環境",
       "couldNotLoadEnvironment": "環境を読み込めませんでした。",
@@ -1580,26 +1684,15 @@
       "couldNotReadPendingSessions": "保留中のセッションを読み取れませんでした。もう一度お試しください。",
       "failedToCreate": "セッションを作成できませんでした。",
       "couldNotRefreshRepositories": "リポジトリを更新できませんでした。もう一度お試しください。",
-      "discardDraftMessage": "入力したプロンプトが削除されます。",
       "discardDraftTitle": "下書きを破棄しますか？",
+      "discardDraftMessage": "入力したプロンプトが削除されます。",
+      "discardWithUploadsMessage": "プロンプトと、送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
       "discardFailed": "下書きを破棄できませんでした。もう一度お試しください。",
       "remoteHint": "ローカルのkiloプロセスを操作するには、コンピューターで`kilo remote`を実行するか、実行中のCLIセッションで`/remote`を実行してください。",
-      "connectBitbucketDescription": "ブラウザーでBitbucketと連携し、この画面に戻ってリポジトリを選択してください。",
-      "connectGitlabDescription": "ブラウザーでGitLabと連携し、この画面に戻ってリポジトリを選択してください。",
-      "couldNotLoadBitbucketRepositories": "Bitbucketのリポジトリを読み込めませんでした。",
-      "couldNotLoadGithubRepositories": "GitHubのリポジトリを読み込めませんでした。",
-      "couldNotLoadGitlabRepositories": "GitLabのリポジトリを読み込めませんでした。",
-      "gitlabConnected": "GitLabと連携済み",
-      "noRepositoriesVisibleBitbucket": "表示できるリポジトリがありません。Bitbucketのリポジトリへのアクセス権を確認してから、一覧を更新してください。",
-      "noRepositoriesVisibleGitlab": "表示できるリポジトリがありません。GitLabのリポジトリへのアクセス権を確認してから、一覧を更新してください。",
-      "openBitbucket": "Bitbucketを開く",
-      "openGitlab": "GitLabを開く",
-      "recentlyUsed": "最近使用した項目",
-      "cliCannotContinue": "このCLIではセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
       "continueFrom": "{{title}}を続行しています。",
-      "importFailed": "このセッションをインポートできませんでした。",
       "importingSession": "セッションをインポート中",
-      "discardWithUploadsMessage": "プロンプトと、送信済みメッセージに添付されていないアップロード済みファイルは削除されます。"
+      "cliCannotContinue": "このCLIではセッションを続行できません。Cloud Agentまたは別のCLIを選択してください。",
+      "importFailed": "このセッションをインポートできませんでした。"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}件のファイルを更新しました。",
@@ -1623,7 +1716,14 @@
       "updateTodos": "タスクを更新",
       "linesBadge": "{{displayCount}}行",
       "filesBadge": "{{displayCount}}ファイル",
-      "matchesBadge": "{{displayCount}}件"
+      "matchesBadge": "{{displayCount}}件",
+      "filesBadge_one": "{{displayCount}}ファイル",
+      "filesBadge_other": "{{displayCount}}ファイル",
+      "linesBadge_one": "{{displayCount}}行",
+      "linesBadge_other": "{{displayCount}}行",
+      "matchesBadge_one": "{{displayCount}}件",
+      "matchesBadge_other": "{{displayCount}}件",
+      "noOutput": "出力はありません。"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}～{{end}}行目（一部省略）",
@@ -1913,7 +2013,11 @@
       "files": "ファイル",
       "couldNotOpenPhotoPicker": "写真の選択画面を開けませんでした。Kiloを再起動して、もう一度お試しください。",
       "maxFilesAllowed": "添付できるファイルは最大{{displayCount}}件です。",
-      "onlyAddingFiles": "{{total}}件のファイルのうち{{accepted}}件のみ追加します（最大{{max}}件）"
+      "onlyAddingFiles": "{{total}}件のファイルのうち{{accepted}}件のみ追加します（最大{{max}}件）",
+      "maxFilesAllowed_one": "添付できるファイルは最大{{displayCount}}件です。",
+      "maxFilesAllowed_other": "添付できるファイルは最大{{displayCount}}件です。",
+      "onlyAddingFiles_one": "{{total}}件のファイルのうち{{accepted}}件のみ追加します（最大{{max}}件）",
+      "onlyAddingFiles_other": "{{total}}件のファイルのうち{{accepted}}件のみ追加します（最大{{max}}件）"
     },
     "composer": {
       "addAttachment": "添付ファイルを追加",
@@ -1931,7 +2035,9 @@
       "discardAttachmentsMessage": "送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
       "discardAttachmentsTitle": "添付ファイルを破棄しますか？",
       "charactersRemaining": "残り{{count}}文字",
-      "insertNewline": "改行を挿入"
+      "insertNewline": "改行を挿入",
+      "charactersRemaining_one": "残り{{count}}文字",
+      "charactersRemaining_other": "残り{{count}}文字"
     },
     "chatLink": {
       "linkCopied": "リンクをコピーしました",
@@ -1965,6 +2071,12 @@
       "startNewSession": "新しいセッションを開始",
       "exitSession": "セッションを終了",
       "clearSession": "このセッションを終了して新しいセッションを開始",
+      "compactDescription": "現在のセッションコンテキストを圧縮",
+      "goalDescription": "セッションの目標に向けて作業を続ける。/goal <objective> または pause, resume, clear",
+      "initDescription": "ガイド付きAGENTS.mdセットアップ",
+      "resumeClaudeDescription": "Claude Codeセッションのトランスクリプトをインポート",
+      "resumeCodexDescription": "OpenAI Codexセッションのトランスクリプトをインポート",
+      "reviewDescription": "変更をレビュー [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}}を使用",
       "insert": "挿入",
       "upgradeRequiredFallback": "このコマンドを使用するにはCLIをアップグレードしてください。",
@@ -1997,7 +2109,14 @@
       "stepsCount_one": "{{steps}}ステップ",
       "stepsCount": "{{steps}}ステップ",
       "stepsCount_other": "{{steps}}ステップ",
-      "modelAccessibilityLabel": "{{name}}、{{provider}}、{{steps}}、{{cost}}"
+      "modelAccessibilityLabel": "{{name}}、{{provider}}、{{steps}}、{{cost}}",
+      "modelsCount_one": "モデル（{{displayCount}}）",
+      "modelsCount_other": "モデル（{{displayCount}}）"
+    },
+    "autoApprove": {
+      "title": "自動承認",
+      "description": "このセッションの権限リクエストを自動的に承認します。その後、ツールは確認なしで実行されます。",
+      "unavailable": "このセッションは権限リクエストを受信できません。"
     },
     "prBadge": {
       "open": "プルリクエストを開く",
@@ -2029,6 +2148,12 @@
       "tapToListHint": "フォルダをタップすると、内容を一覧表示できます。",
       "unsupportedDescription": "このCLIはフォルダの一覧表示に対応していません。「完了」をタップすると起動時のフォルダが選択され、「セッションを開始」をタップするとそのフォルダでセッションが始まります。",
       "unsupportedTitle": "フォルダを一覧表示できません"
+    },
+    "toolRun": {
+      "sheetTitle": "ツール呼び出し",
+      "condensedLabel": "{{itemCount}}件の項目; {{last}}",
+      "condensedLabel_one": "{{itemCount}}件の項目; {{last}}",
+      "condensedLabel_other": "{{itemCount}}件の項目; {{last}}"
     }
   },
   "bootstrap": {
@@ -2073,6 +2198,7 @@
     "couldNotLoadActiveSessions": "実行中のセッションを読み込めませんでした。",
     "agentSessions": "現在実行中",
     "newCodingTask": "新しいコーディングタスク",
+    "newTaskFromPicture": "画像から新しいタスク",
     "explore": "機能を探す",
     "seeAll": "すべて表示",
     "noLiveSessions": "現在実行中のセッションはありません"
@@ -2134,7 +2260,17 @@
     "languageNotInstalledMessage": "{{language}}のオフライン音声ファイルがこのスマートフォンにインストールされていません。ダウンロードしてから、音声入力をもう一度お試しください。",
     "downloadOfflineModel": "ダウンロード",
     "offlineModelDownloadScheduled": "オフライン音声ファイルはバックグラウンドでダウンロードされます。しばらくしてから、音声入力をもう一度お試しください。",
-    "listeningStopped": "聞き取りを停止しました。"
+    "listeningStopped": "聞き取りを停止しました。",
+    "transcribing": "文字起こし中…",
+    "gatewayUnreachable": "Kilo Gatewayに接続できませんでした。接続を確認して、もう一度お試しください。",
+    "gatewayTimeout": "文字起こしに時間がかかりすぎました。もう一度お試しください。",
+    "gatewayModelUnavailable": "この文字起こしモデルは利用できません。設定で別のモデルを選択してください。",
+    "gatewayModelUnavailableNotice": "このモデルは提供が終了しました。別のモデルを選ぶには$t(transcriptionModel.title)をタップしてください。",
+    "gatewaySignInRequired": "Kilo Gatewayの文字起こしを使うにはサインインしてください。",
+    "gatewayNoModel": "まず設定で文字起こしモデルを選択してください。",
+    "testTitle": "音声入力をテスト",
+    "testPlaceholder": "マイクをタップして話し始めてください。",
+    "testClear": "テキストを消去"
   },
   "share": {
     "title": "Kiloに共有",
@@ -2152,7 +2288,9 @@
     "cliCantReceiveFilesTitle": "このセッションはファイルを受信できません",
     "cliCantReceiveFilesMessage": "このセッションを実行しているKilo CLIはファイルを受信できません。そのマシンでCLIを更新するか、新しいセッションに共有してください。",
     "contentlessMessage": "共有するテキストやファイルがありません。",
-    "couldNotReadContent": "共有コンテンツを読み取れませんでした。"
+    "couldNotReadContent": "共有コンテンツを読み取れませんでした。",
+    "onlyFirstFilesAttached_one": "最初の{{displayCount}}件のファイルのみが添付されます。",
+    "onlyFirstFilesAttached_other": "最初の{{displayCount}}件のファイルのみが添付されます。"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2284,7 +2422,8 @@
     "aiProvidersWhat": "プロンプト、会話履歴、添付ファイル",
     "aiProvidersWhy": "AIの応答を生成するため",
     "aiProvidersWho": "Anthropic、OpenAI、Googleなど、リクエストごとに選択したプロバイダー",
-    "gatewayWhat": "アカウントID、リクエストのメタデータ、トークン使用量",
+    "gatewayWhat": "アカウントID、リクエストのメタデータ、トークン使用量、およびアプリがこれを経由して送信するプロンプトと音声録音。",
+    "viaGateway": "Kilo Gateway経由",
     "gatewayWhy": "認証、リクエストの振り分け、請求内容の照合のため",
     "gatewayWho": "Kilo（kilo.ai）",
     "crashReportingWhat": "アプリ内のコンテンツを除いたクラッシュやエラーのレポート",
@@ -2304,7 +2443,7 @@
     "installAttributionWho": "AppsFlyer",
     "voiceTranscriptionWhat": "音声入力中の録音データ",
     "voiceTranscriptionWhy": "音声をテキストに変換するため",
-    "voiceTranscriptionWho": "デバイス内のみで処理します。オフラインで文字起こしができない場合は、AppleまたはGoogleに送信します。",
+    "voiceTranscriptionWho": "お使いのデバイス、選択した文字起こしモデルを使うKilo Gateway、またはオンライン認識のためのAppleまたはGoogle。",
     "what": "共有するデータ",
     "why": "利用目的",
     "who": "共有先",
@@ -2316,6 +2455,8 @@
     "checkConnection": "接続を確認",
     "checks": {
       "checksCount": "{{displayCount}}件のチェック",
+      "checksCount_one": "{{displayCount}}件のチェック",
+      "checksCount_other": "{{displayCount}}件のチェック",
       "couldNotLoad": "チェックを読み込めませんでした。",
       "failed": "{{displayCount}}件失敗",
       "noAccess": "このリポジトリのチェックにアクセスできません。",
@@ -2351,11 +2492,17 @@
       "tapDiffLineToSuggest": "修正提案を入力するには、差分の行をタップしてください。"
     },
     "connect": {
-      "checkFailedMessage": "読み込みが完了するまで、サインイン状態を確認できません。",
       "checkFailedTitle": "GitHubとの接続を確認できませんでした。",
-      "description": "モバイルでプルリクエストをレビューするには、GitHubアカウントを接続してください。",
+      "checkFailedMessage": "読み込みが完了するまで、サインイン状態を確認できません。",
+      "checkFailedTitleGitLab": "GitLabとの接続を確認できませんでした。",
+      "checkFailedTitleBitbucket": "Bitbucketとの接続を確認できませんでした。",
+      "providerCheckFailedMessage": "読み込みが完了するまで接続状態は利用できません。",
+      "reconnectTitle": "GitHubに再接続",
       "reconnectDescription": "GitHubとの接続が解除されました。モバイルでプルリクエストのレビューを続けるには、再接続してください。",
-      "reconnectTitle": "GitHubに再接続"
+      "description": "モバイルでプルリクエストをレビューするには、GitHubアカウントを接続してください。",
+      "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
+      "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
+      "bitbucketOrgOnlyDescription": "プロフィールで組織を選択すると、そのBitbucketプルリクエストをレビューできます。"
     },
     "connectionExpired": "GitHubとの連携が期限切れになりました。",
     "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした。",
@@ -2408,6 +2555,11 @@
       "replyBadRequest": "この返信は投稿できません。スレッドが変更された可能性があります。",
       "replyBody": "返信の本文",
       "replyForbidden": "このプルリクエストに返信する権限がありません。",
+      "addCommentCta": "このプルリクエストにコメントする",
+      "fixWithKilo": "Kiloで修正",
+      "fixWithKiloPrompt": "次のプルリクエストのコメントに対応してください：{{link}}",
+      "commentBadRequest": "このコメントは投稿できません。プルリクエストが変更された可能性があります。",
+      "commentForbidden": "このプルリクエストにコメントする権限がありません。",
       "replyPlaceholder": "返信…",
       "reportContent": "コンテンツを報告",
       "reportUser": "ユーザーを報告",
@@ -2445,21 +2597,26 @@
         "outdatedOnLines": "{{lines}}（変更前のコードへのコメント）",
         "outdatedOnPath": "{{path}}（変更前のコードへのコメント）"
       },
-      "deletedUser": "削除されたユーザー"
+      "deletedUser": "削除されたユーザー",
+      "replyForbiddenTerm": "この{{term}}に返信する権限がありません。",
+      "moreLinesAbove_one": "… この上にさらに{{displayCount}}行あります。",
+      "moreLinesAbove_other": "… この上にさらに{{displayCount}}行あります。"
     },
     "entry": {
-      "clearLink": "プルリクエストのリンクをクリア",
+      "eyebrow": "URLからプルリクエストまたはマージリクエストを開く",
+      "pastePrLink": "プルリクエストまたはマージリクエストのリンクを貼り付け",
+      "noRecentPrs": "最近のレビューはありません",
+      "noRecentPrsDescription": "上にリンクを貼り付けてレビューを始めると、次からはここに表示されます。",
       "couldNotLoad": "読み込めませんでした。",
-      "eyebrow": "URLからプルリクエストを開けます。",
-      "noRecentPrs": "最近のPRはありません",
-      "noRecentPrsDescription": "上の欄にPRのリンクを貼り付けてレビューを始めてください。次回からはここに表示されます。",
-      "open": "オープン",
-      "pasteLink": "プルリクエストのリンクを貼り付け",
-      "pastePrLink": "PRのリンクを貼り付け",
-      "removeFromRecentsMessage": "このプルリクエストは最近の履歴から削除されます。",
       "removeFromRecentsTitle": "最近の履歴から削除しますか？",
+      "removeFromRecentsMessage": "このレビューは最近の履歴から削除されます。",
       "removeRecentAccessibility": "{{repo}}を最近の履歴から削除",
-      "urlAccessibility": "GitHubのプルリクエストのURL"
+      "urlAccessibility": "プルリクエストまたはマージリクエストのURLを入力",
+      "urlPlaceholder": "プルリクエストまたはマージリクエストのURL",
+      "openAccessibility": "プルリクエストまたはマージリクエストを開く",
+      "clearLink": "リンクをクリア",
+      "pasteLink": "プルリクエストまたはマージリクエストのリンクを貼り付け",
+      "open": "オープン"
     },
     "eventChips": {
       "comment": "コメント",
@@ -2541,7 +2698,17 @@
       "loadingLines": "{{total}}行中{{loaded}}行を読み込み中…",
       "loadingMoreFiles": "追加のファイルを読み込み中…",
       "retryLoadingContext": "前後の行の読み込みを再試行",
-      "retryLoadingNextPage": "次のページの読み込みを再試行"
+      "retryLoadingNextPage": "次のページの読み込みを再試行",
+      "expandAllLines_one": "全{{displayCount}}行を展開",
+      "expandAllLines_other": "全{{displayCount}}行を展開",
+      "expandLines_one": "{{displayCount}}行を展開（{{start}}–{{end}}）",
+      "expandLines_other": "{{displayCount}}行を展開（{{start}}–{{end}}）",
+      "expandLinesOfContext_one": "前後の{{displayCount}}行を展開",
+      "expandLinesOfContext_other": "前後の{{displayCount}}行を展開",
+      "expandMoreLines_one": "さらに{{displayCount}}行を展開（{{start}}–{{end}}）",
+      "expandMoreLines_other": "さらに{{displayCount}}行を展開（{{start}}–{{end}}）",
+      "loadedOfTotalFiles_one": "{{total}}件中{{loaded}}件のファイルを読み込み済み",
+      "loadedOfTotalFiles_other": "{{total}}件中{{loaded}}件のファイルを読み込み済み"
     },
     "inbox": {
       "couldNotLoad": "受信トレイを読み込めませんでした。",
@@ -2552,47 +2719,52 @@
     },
     "installKiloGitHubApp": "Kilo GitHub Appをインストール",
     "merge": {
-      "autoMergeDescription": "必須チェックがすべて成功すると、GitHubがこのプルリクエストを自動でマージします（方法：{{method}}）。",
-      "autoMergeOn": "自動マージ有効",
-      "blockedTitle": "まだマージできない理由",
-      "cannotMerge": "このプルリクエストは現状ではマージできません。",
-      "checking": "マージできるか確認中…",
-      "commitMessage": "コミットメッセージ",
-      "commitMessagePlaceholder": "マージコミットの説明（任意）",
-      "commitTitle": "コミットのタイトル",
-      "confirmMessage": "変更をベースブランチにマージします。",
-      "confirmTitle": "プルリクエストをマージしますか？",
-      "couldNotDetermine": "マージできるか確認できませんでした。",
-      "couldNotMerge": "プルリクエストをマージできませんでした。",
-      "deleteBranch": "ブランチを削除",
-      "deleteBranchAfterMerge": "マージ後にブランチを削除",
-      "disableAutoMerge": "自動マージを無効にする",
-      "enableAutoMerge": "自動マージを有効にする",
-      "enableAutoMergeConfirmMessage": "必須チェックがすべて成功すると、GitHubがこのプルリクエストを自動でマージします。",
-      "enableAutoMergeConfirmTitle": "自動マージを有効にしますか？",
-      "forbidden": "このプルリクエストをマージする権限がありません。",
-      "loadFailedTitle": "マージの設定を読み込めませんでした。",
       "merge": "マージ",
       "mergeNow": "今すぐマージ",
       "mergePullRequest": "プルリクエストのマージ",
+      "mergeTermTitle": "{{term}}のマージ",
+      "enableAutoMerge": "自動マージを有効にする",
+      "disableAutoMerge": "自動マージを無効にする",
+      "autoMergeOn": "自動マージ有効",
+      "autoMergeDescription": "必須チェックがすべて成功すると、GitHubがこのプルリクエストを自動でマージします（方法：{{method}}）。",
+      "checking": "マージできるか確認中…",
+      "couldNotDetermine": "マージできるか確認できませんでした。",
+      "refreshMergeability": "マージできるか再確認",
+      "blockedTitle": "まだマージできない理由",
+      "updateBranch": "ブランチを更新",
+      "updateBranchFromBase": "ベースブランチの変更を取り込んで更新",
       "methodLabel": "マージ方法",
+      "commitTitle": "コミットのタイトル",
+      "commitMessage": "コミットメッセージ",
+      "commitMessagePlaceholder": "マージコミットの説明（任意）",
+      "deleteBranch": "ブランチを削除",
+      "deleteBranchAfterMerge": "マージ後にブランチを削除",
+      "noEnabledMethods": "このリポジトリではマージ方法が有効になっていません。リポジトリの管理者に、通常のマージ、スカッシュマージ、リベースマージのいずれかを有効にするよう依頼してください。",
+      "confirmTitle": "プルリクエストをマージしますか？",
+      "confirmTitleTerm": "{{term}}をマージしますか？",
+      "confirmMessage": "変更をベースブランチにマージします。",
+      "enableAutoMergeConfirmTitle": "自動マージを有効にしますか？",
+      "enableAutoMergeConfirmMessage": "必須チェックがすべて成功すると、GitHubがこのプルリクエストを自動でマージします。",
+      "enableAutoMergeConfirmMessageTerm": "パイプラインが成功すると、{{term}}は自動的にマージされます。",
+      "enableAutoMergeDescriptionTerm": "パイプラインが成功すると、GitLabはこの{{term}}を自動的にマージします。",
+      "forbidden": "このプルリクエストをマージする権限がありません。",
+      "cannotMerge": "このプルリクエストは現状ではマージできません。",
+      "couldNotMerge": "プルリクエストをマージできませんでした。",
       "methods": {
         "merge": "マージ",
         "rebase": "リベース",
         "squash": "スカッシュ"
       },
-      "noEnabledMethods": "このリポジトリではマージ方法が有効になっていません。リポジトリの管理者に、通常のマージ、スカッシュマージ、リベースマージのいずれかを有効にするよう依頼してください。",
+      "terminal": {
+        "alreadyMerged": "マージ済み",
+        "closed": "プルリクエストはクローズ済み",
+        "closedMergeRequest": "マージリクエストはクローズ済み"
+      },
       "partialSuccessBanner": {
         "accessibility": "マージしました。ブランチを削除できませんでした。理由：{{reason}}",
         "body": "ブランチを削除できませんでした。理由：{{reason}}"
       },
-      "refreshMergeability": "マージできるか再確認",
-      "terminal": {
-        "alreadyMerged": "マージ済み",
-        "closed": "プルリクエストはクローズ済み"
-      },
-      "updateBranch": "ブランチを更新",
-      "updateBranchFromBase": "ベースブランチの変更を取り込んで更新",
+      "loadFailedTitle": "マージの設定を読み込めませんでした。",
       "blocked": {
         "unknownStateTitle": "GitHubからマージ可能との情報が届いていません",
         "unknownStateDetail": "しばらくしてから概要を更新してください。",
@@ -2611,6 +2783,18 @@
         "behindDetail": "マージ元のブランチにベースブランチの最新の変更が反映されていません。マージする前に、リベースするか、ブランチを更新してください。",
         "notMergeableTitle": "このプルリクエストはまだマージできません",
         "notMergeableDetail": "GitHubから報告されたマージの状態は「{{state}}」です。"
+      },
+      "restrictions": {
+        "title": "マージの制限",
+        "approvalsRequired_one": "{{displayCount}}件の承認が必要",
+        "approvalsRequired_other": "{{displayCount}}件の承認が必要",
+        "pipelineMustSucceed": "マージする前にパイプラインが成功する必要があります。"
+      },
+      "providerBlocked": {
+        "failingPipeline": "最新コミットでパイプラインが失敗しています。",
+        "pendingPipeline": "最新コミットでパイプラインはまだ実行中です。",
+        "permission": "この{{term}}をマージする権限がありません。",
+        "draft": "マージする前に、{{term}}をレビュー可能な状態に変更してください。"
       },
       "methodLabels": {
         "merge": "マージコミットを作成",
@@ -2669,8 +2853,11 @@
     "pullRequestUnavailable": "プルリクエストを開けません",
     "pullRequestUnavailableDescription": "このPRを開けません。PRが削除されたか、リポジトリが非公開になっているか、リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
     "reconnectNotice": {
+      "title": "GitHubとの連携が期限切れになりました。",
       "message": "GitHubとの接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
-      "title": "GitHubとの連携が期限切れになりました。"
+      "gitlabTitle": "GitLabとの連携が期限切れになりました。",
+      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。",
+      "providerMessage": "{{provider}}との接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。"
     },
     "review": "レビュー",
     "reviewPullRequest": "プルリクエストをレビュー",
@@ -2718,10 +2905,12 @@
       "statusContext": "前後の行",
       "lineLabel": "{{status}}、{{line}}行目：{{text}}",
       "lineLabelNoNumber": "{{status}}：{{text}}",
-      "emptyLine": "（空）"
+      "emptyLine": "（空）",
+      "truncationBanner_one": "GitHub APIの制限により、変更された{{total}}件のファイルのうち、最初の{{limit}}件を表示しています。",
+      "truncationBanner_other": "GitHub APIの制限により、変更された{{total}}件のファイルのうち、最初の{{limit}}件を表示しています。"
     },
     "linkPasteClipboardEmpty": "クリップボードが空です。",
-    "linkPasteNotAPullRequest": "GitHubのプルリクエストのリンクではありません。",
+    "linkPasteNotAPullRequest": "プルリクエストまたはマージリクエストのリンクではありません",
     "announce": {
       "commentPosted": "コメントを投稿しました",
       "reviewSubmitted": "レビューを送信しました",
@@ -2730,6 +2919,7 @@
     "mutationError": {
       "commentNotPosted": "このコメントは投稿できません。選択した行が変更されたか、PRが更新された可能性があります。",
       "reviewNotSubmitted": "このレビューはこのままでは送信できません。PRが更新されていないか、自分が作成したプルリクエストではないか確認してください。",
+      "reviewNotSubmittedTerm": "このレビューはそのまま送信できません。{{term}}が変更されたか、自分の{{term}}はレビューできません。",
       "couldNotPostComment": "コメントを投稿できませんでした。",
       "couldNotSubmitReview": "レビューを送信できませんでした。接続を確認して、もう一度お試しください。"
     },
@@ -2737,9 +2927,31 @@
       "couldNotReply": "返信できませんでした。",
       "couldNotCompleteAction": "この操作を完了できませんでした。",
       "mergeResultDefaultError": "GitHubでマージが完了しませんでした。",
+      "mergeResultNotCompleted": "{{term}}はマージされませんでした。状態を確認して再試行してください。",
       "ambiguous": "操作の結果を確認できませんでした。再試行する前にPRを確認してください。",
       "persistenceFailed": "この操作を記録できませんでした。しばらくしてからもう一度お試しください。",
       "forbidden": "この操作を行う権限がありません。"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "このプロバイダーでは利用できません",
+        "accessibility": "このプロバイダーでは利用できません: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "プルリクエスト",
+      "mergeRequest": "マージリクエスト",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "マージリクエストを共有",
+      "viewOnProvider": "{{provider}}で表示",
+      "mergeRequestUnavailable": "マージリクエストを開けません",
+      "unavailableDescription": "削除されたか、アクセス権がない可能性があります。",
+      "accessDeniedMergeRequest": "このマージリクエストを表示する権限がありません。",
+      "couldNotLoadMergeRequest": "マージリクエストを読み込めませんでした。",
+      "discussionAccessDenied": "このマージリクエストのディスカッションを表示する権限がありません。",
+      "discussionUnavailableMessage": "このマージリクエストは削除された可能性があります。",
+      "noDiscussionDescription": "このマージリクエストには、レビュースレッドもコメントもまだありません。",
+      "noFilesChangedDescription": "このマージリクエストにはファイルの変更がありません。"
     }
   },
   "organization": {
@@ -2907,6 +3119,14 @@
     "tooManySignInAttempts": "サインインの試行回数が多すぎます。しばらく待ってから、もう一度お試しください。"
   },
   "models": {
+    "auto": {
+      "frontier": "自動最先端",
+      "balanced": "自動バランス",
+      "efficient": "自動効率",
+      "small": "自動小型",
+      "free": "自動無料",
+      "organization": "組織の自動"
+    },
     "dataCollected": "データ収集あり",
     "free": "無料",
     "couldNotUpdateFavorites": "お気に入りを更新できませんでした。",
@@ -2945,7 +3165,74 @@
     "privacy": "Kiloを開いてエージェントを確認",
     "openAgents": "エージェントを開く",
     "needsInput": "入力が必要",
+    "newestSession": "最新: {{title}}",
+    "noneWaiting": "待機中のエージェントはありません",
+    "newAgent": "新しいエージェント",
+    "approving": "承認中...",
+    "couldNotApprove": "承認できませんでした",
+    "couldNotStart": "開始できませんでした",
     "channelName": "アクティブなエージェント",
-    "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。"
+    "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。",
+    "openSession": "開く",
+    "approveFailed": "承認できませんでした。もう一度試すには$t(common.approve)をタップしてください。",
+    "newestResult": "最新の結果"
+  },
+  "transcriptionModel": {
+    "title": "文字起こしモデル",
+    "noneChosen": "未選択",
+    "emptyTitle": "文字起こしモデルがありません",
+    "emptyDescription": "現在、Kilo Gatewayは文字起こしモデルを提供していません。",
+    "loadFailed": "文字起こしモデルを読み込めませんでした。"
+  },
+  "voiceLanguage": {
+    "title": "音声入力の言語",
+    "automatic": "自動",
+    "loadFailed": "このデバイスがサポートする言語を読み込めませんでした。",
+    "emptyTitle": "サポートされている言語がありません",
+    "emptyDescription": "このデバイスの音声認識は、サポートされている言語を報告しません。"
+  },
+  "tour": {
+    "eyebrow": "クイックツアー",
+    "forkTitle": "Kilo をどこで実行しますか？",
+    "forkSubtitle": "最初のセッションの実行場所を選択してください。",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "インストール不要で、サンドボックス化されたクラウド環境で Kilo を実行できます。",
+    "remoteOptionTitle": "お使いのコンピューター",
+    "remoteOptionBody": "`kilo remote` CLI を使って自分のコンピューターで Kilo を実行します。",
+    "skip": "ツアーをスキップ",
+    "tutorialLabel": "チュートリアル"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "エージェントを開始するにはプロンプトが必要です。プロンプトを追加して、もう一度実行してください。",
+      "repositoryUnknown": "Kilo は {{repository}} を GitHub または GitLab のリポジトリとして認識しません。Kilo で別のリポジトリを選択してください。",
+      "repositoryUnsupported": "{{repository}} は Bitbucket のリポジトリです — エージェントを開始はまだこれを使用できません。Kilo で別のリポジトリを選択してください。"
+    }
+  },
+  "launcher": {
+    "openLastSession": "最後のセッションを開く"
+  },
+  "spendAlerts": {
+    "subtitle": "このスコープの支出が上限を超えたとき、または通常の毎時のペースを大きく上回ったときに、請求担当者にメールまたはプッシュでアラートを送信します。",
+    "enable": "支出アラートを有効にする",
+    "thresholdTitle": "しきい値の超過",
+    "thresholdSubtitle": "累計支出が上限を超えています",
+    "anomalyTitle": "毎時の急増",
+    "anomalySubtitle": "1時間の支出がこのスコープの通常のペースを大きく上回っています",
+    "limitLabel": "上限 (USD)",
+    "windowLabel": "期間",
+    "window24h": "24時間",
+    "window7d": "7日間",
+    "window30d": "30日間",
+    "multiplierLabel": "急増の倍率",
+    "saved": "支出アラートの設定を保存しました",
+    "loadError": "支出アラートを読み込めませんでした。",
+    "saveError": "支出アラートを保存できませんでした。",
+    "empty": "支出アラートはオフです。このスコープの請求担当者に通知するにはオンにしてください。",
+    "noSpend": "まだ支出が記録されていません",
+    "spend24h": "過去24時間の支出",
+    "multiplierError": "1以上の倍率を入力してください",
+    "permissionDenied": "支出アラートを管理する権限がありません。",
+    "pushOffByCategory": "通知でオフ"
   }
 }

@@ -57,6 +57,7 @@ import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrout
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { userHasCustomLlmAccess } from '@/lib/ai-gateway/custom-llm/access';
 
 function makeTestOpenRouterModel(id: string): OpenRouterModel {
@@ -90,13 +91,15 @@ const mockedIsPublicIdExperimented = isPublicIdExperimented as unknown as jest.M
 describe('organizations settings trpc router', () => {
   beforeEach(() => {
     mockedGetProviderSlugsForModel.mockReset();
+    // The lookup receives exact ids (e.g. `openai/gpt-4o:free`); this fixture
+    // serves every variant from the same provider.
     mockedGetProviderSlugsForModel.mockImplementation(async modelId => {
       const provider = {
         'anthropic/claude-3-opus': 'anthropic',
         'gpt-3.5-turbo': 'openai',
         'gpt-4': 'openai',
         'openai/gpt-4o': 'openai',
-      }[modelId];
+      }[normalizeModelId(modelId)];
       return provider ? new Set([provider]) : new Set();
     });
     mockedGetEnhancedOpenRouterModels.mockReset();

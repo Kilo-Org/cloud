@@ -1,4 +1,5 @@
 import { type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { type ReactNode } from 'react';
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
@@ -23,6 +24,7 @@ import {
   WriteToolCard,
 } from './tool-cards';
 import { SuggestToolCard } from './suggest-tool-card';
+import { ToolSummaryTranslationScope } from './tool-summary-translation-scope';
 
 type ToolPartRendererProps = {
   part: ToolPart;
@@ -57,49 +59,64 @@ export function ToolPartRenderer({
     );
   }
 
+  let card: ReactNode = null;
   switch (part.tool) {
     case 'read': {
-      return <ReadToolCard part={part} />;
+      card = <ReadToolCard part={part} />;
+      break;
     }
     case 'edit': {
-      return <EditToolCard part={part} />;
+      card = <EditToolCard part={part} />;
+      break;
     }
     case 'write': {
-      return <WriteToolCard part={part} />;
+      card = <WriteToolCard part={part} />;
+      break;
     }
     case 'bash': {
-      return <BashToolCard part={part} />;
+      card = <BashToolCard part={part} />;
+      break;
     }
     case 'glob': {
-      return <GlobToolCard part={part} />;
+      card = <GlobToolCard part={part} />;
+      break;
     }
     case 'grep': {
-      return <GrepToolCard part={part} />;
+      card = <GrepToolCard part={part} />;
+      break;
     }
     case 'websearch':
     case 'codesearch':
     case 'webfetch': {
-      return <WebSearchToolCard part={part} />;
+      card = <WebSearchToolCard part={part} />;
+      break;
     }
     case 'list': {
-      return <ListToolCard part={part} />;
+      card = <ListToolCard part={part} />;
+      break;
     }
     case 'patch':
     case 'apply_patch': {
-      return <PatchToolCard part={part} />;
+      card = <PatchToolCard part={part} />;
+      break;
     }
     case 'todoread':
     case 'todowrite': {
-      return <TodoToolCard part={part} />;
+      card = <TodoToolCard part={part} />;
+      break;
     }
     case 'task': {
-      return <TaskToolCard part={part} />;
+      card = <TaskToolCard part={part} />;
+      break;
     }
     case 'suggest': {
-      return <SuggestToolCard part={part} />;
+      card = <SuggestToolCard part={part} />;
+      break;
     }
     default: {
-      return <GenericToolCard part={part} />;
+      card = <GenericToolCard part={part} />;
     }
   }
+
+  return <ToolSummaryTranslationScope itemId={part.id}>{card}</ToolSummaryTranslationScope>;
 }

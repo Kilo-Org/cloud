@@ -1030,7 +1030,7 @@ describe('CloudflareAgentSandbox', () => {
     vi.restoreAllMocks();
   });
 
-  it('does not retry a restored workspace when setup fails', async () => {
+  it('does not retry a restored workspace when an explicit branch is missing', async () => {
     const sourceCommit = 'c'.repeat(40);
     const request = ensureRequest({ cacheEligible: true });
     const candidate = await buildWorkspaceBackupCandidate({
@@ -1063,7 +1063,10 @@ describe('CloudflareAgentSandbox', () => {
       }),
       put: vi.fn(),
     };
-    const setupError = new WrapperError('restored setup failed', 'WORKSPACE_SETUP_FAILED', 503);
+    const setupError = new WrapperError('restored branch missing', 'WORKSPACE_SETUP_FAILED', 503, {
+      workspaceFailureSubtype: 'git_branch_missing',
+      retryable: false,
+    });
     const ensureSessionReady = vi.fn().mockRejectedValue(setupError);
     vi.spyOn(WrapperClient, 'ensureBootstrapWrapper').mockResolvedValueOnce({
       client: { ensureSessionReady } as unknown as WrapperClient,
@@ -1096,6 +1099,109 @@ describe('CloudflareAgentSandbox', () => {
     expect(ensureSessionReady).toHaveBeenCalledOnce();
     expect(exec.mock.calls.filter(([command]) => command.includes('rm -rf'))).toHaveLength(1);
     vi.restoreAllMocks();
+  });
+
+  it('cleans and retries once after a retryable restored checkout conflict', async () => {
+    const sourceCommit = 'a'.repeat(40);
+    const request = ensureRequest({ cacheEligible: true });
+    const candidate = await buildWorkspaceBackupCandidate({
+      fresh: true,
+      devcontainer: false,
+      setupCommands: ['pnpm install', 'node ./scripts/custom-setup.mjs --arbitrary'],
+      setupEnvironment: {
+        variables: { CACHE_VARIANT: 'resolved-profile-env' },
+        secretIdentities: {
+          API_TOKEN:
+            '{"algorithm":"rsa-aes-256-gcm","version":1,"encryptedData":"encrypted-token","encryptedDEK":"encrypted-dek"}',
+        },
+      },
+      userId: 'user_cloudflare',
+      orgId: 'org_cloudflare',
+      repository: { type: 'github', repo: 'acme/repo' },
+    });
+    if (!candidate) throw new Error('expected eligible candidate');
+    const bucket = {
+      get: vi.fn().mockImplementation(async (key: string) => ({
+        json: async () => ({
+          schema: 'workspace-backup-v1',
+          digest: key
+            .split('/')
+            .at(-1)
+            ?.replace(/\.json$/, ''),
+          owner: { type: 'organization', organizationId: 'org_cloudflare' },
+          sourceCommit,
+          createdAt: Date.now() - 1_000,
+          expiresAt: Date.now() + 10_000,
+          backup: { id: 'backup-1', dir: '/workspace/source' },
+        }),
+      })),
+      put: vi.fn(),
+    };
+    const reconciliationError = new WrapperError(
+      'Repository checkout failed',
+      'WORKSPACE_RECONCILIATION_FAILED',
+      503,
+      { workspaceFailureSubtype: 'git_checkout_conflict', retryable: true }
+    );
+    const ensureSessionReady = vi
+      .fn()
+      .mockRejectedValueOnce(reconciliationError)
+      .mockResolvedValueOnce({ kiloSessionId: 'kilo_cloudflare' });
+    vi.spyOn(WrapperClient, 'ensureBootstrapWrapper').mockResolvedValueOnce({
+      client: { ensureSessionReady } as unknown as WrapperClient,
+    });
+    const activeOrigin = 'https://token@github.com/acme/repo.git';
+    const bootstrapSession = {
+      exec: vi
+        .fn()
+        .mockResolvedValueOnce({ exitCode: 0, stdout: `${sourceCommit}\n` })
+        .mockResolvedValueOnce({ exitCode: 0, stdout: `${activeOrigin}\n` })
+        .mockResolvedValue({ exitCode: 0, stdout: '' }),
+    };
+    const exec = vi.fn(async (command: string) => {
+      if (command.includes('df -B1')) {
+        return { exitCode: 0, stdout: '3145728000 10485760000\n', stderr: '' };
+      }
+      if (command.startsWith('test -d') && !command.includes('git -C')) {
+        return { exitCode: 1, stdout: '', stderr: '' };
+      }
+      if (command.includes('rev-parse --verify HEAD')) {
+        return { exitCode: 0, stdout: `${sourceCommit}\n`, stderr: '' };
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const sandboxApi = {
+      exec,
+      restoreBackup: vi.fn().mockResolvedValue(undefined),
+      createSession: vi.fn().mockResolvedValue(bootstrapSession),
+      createBackup: vi
+        .fn()
+        .mockResolvedValue({ id: 'backup-republished', dir: '/workspace/cloudflare' }),
+    };
+    const sandbox = new CloudflareAgentSandbox(
+      {
+        WORKER_URL: 'http://localhost:8787',
+        BACKUP_BUCKET: bucket,
+        REPO_SNAPSHOT_ORG_IDS: '*',
+      } as unknown as Env,
+      metadata(),
+      { resolveSandbox: () => sandboxApi as unknown as SandboxInstance }
+    );
+
+    await expect(sandbox.ensureWrapper(request)).resolves.toMatchObject({
+      status: 'session-ready',
+    });
+    expect(ensureSessionReady).toHaveBeenCalledTimes(2);
+    expect(ensureSessionReady).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        workspace: expect.objectContaining({ restoredFromBackup: true }),
+      })
+    );
+    expect(ensureSessionReady).toHaveBeenNthCalledWith(2, request.prepared.readyRequest);
+    expect(exec.mock.calls.filter(([command]) => command.includes('rm -rf'))).toHaveLength(2);
+    expect(sandboxApi.createBackup).toHaveBeenCalledOnce();
+    expect(bucket.put).toHaveBeenCalledOnce();
   });
 
   it('keeps index publication failure nonfatal after restoring the authenticated origin', async () => {

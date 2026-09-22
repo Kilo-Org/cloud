@@ -3,7 +3,6 @@ import { verifyBearerToken } from '../utils/auth';
 import { logger, formatError } from '../utils/logger';
 
 export async function handleDelete(request: Request, env: Env, appId: string): Promise<Response> {
-  // Verify server-to-server auth token
   const authResult = verifyBearerToken(request, env);
   if (!authResult.isAuthenticated) {
     if (!authResult.errorResponse) {
@@ -15,12 +14,10 @@ export async function handleDelete(request: Request, env: Env, appId: string): P
   logger.info('Deleting app');
 
   try {
-    // Delete git repository data
     const gitId = env.GIT_REPOSITORY.idFromName(appId);
     const gitStub = env.GIT_REPOSITORY.get(gitId);
     await gitStub.deleteAll();
 
-    // Delete preview data and sandbox
     const previewId = env.PREVIEW.idFromName(appId);
     const previewStub = env.PREVIEW.get(previewId);
     await previewStub.deleteAll();

@@ -17,9 +17,9 @@ export type ProviderId =
   | 'longcat'
   | 'martian'
   | 'mistral'
-  | 'perplexity'
   | 'streamlake'
   | 'vercel'
+  | 'openai-chatgpt'
   | 'custom'
   | 'experiment'
   | 'dev-tools';
@@ -51,6 +51,7 @@ export type Provider = {
   id: ProviderId;
   apiUrl: string;
   apiUrlOverrides: ProviderApiUrlOverrides;
+  disableUrlSuffix: boolean;
   apiKey: string;
   /** Uses bearer authorization unless the provider requires an x-api-key header. */
   apiKeyHeader: 'x-api-key' | null;

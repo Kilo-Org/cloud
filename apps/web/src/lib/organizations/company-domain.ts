@@ -15,7 +15,6 @@ export function normalizeCompanyDomain(input: string): string | null {
 
   let authority = trimmed;
 
-  // Strip protocol
   const protoEnd = authority.indexOf('://');
   if (protoEnd !== -1) authority = authority.slice(protoEnd + 3);
 
@@ -25,7 +24,6 @@ export function normalizeCompanyDomain(input: string): string | null {
   const atIndex = authorityPart.lastIndexOf('@');
   if (atIndex !== -1) authority = authority.slice(atIndex + 1);
 
-  // Extract hostname (before port, path, query, or fragment)
   const hostname = authority.split(/[/:?#]/)[0];
 
   return hostname || null;

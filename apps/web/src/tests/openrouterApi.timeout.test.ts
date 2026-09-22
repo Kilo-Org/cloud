@@ -1,6 +1,6 @@
 import { captureException } from '@sentry/nextjs';
 import { upstreamRequest } from '../lib/ai-gateway/providers/upstream-request';
-import { OPENROUTER } from '../lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER } from '../lib/ai-gateway/providers/definitions/openrouter';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -70,6 +70,92 @@ describe('upstreamRequest timeout', () => {
       expect(mockFetch).toHaveBeenCalledWith(expectedUrl, expect.any(Object));
     }
   );
+
+  test.each([
+    {
+      chatApi: 'messages',
+      apiUrlOverrides: { messages: 'https://messages.example.test/deployments/model:invoke' },
+      search: '',
+      expectedUrl: 'https://messages.example.test/deployments/model:invoke',
+    },
+    {
+      chatApi: 'responses',
+      apiUrlOverrides: {},
+      search: '',
+      expectedUrl: 'https://gateway.example.test/deployments/model:invoke?api-version=2026-09-01',
+    },
+    {
+      chatApi: 'chat_completions',
+      apiUrlOverrides: {},
+      search: '?beta=true&tag=one&tag=two',
+      expectedUrl:
+        'https://gateway.example.test/deployments/model:invoke?api-version=2026-09-01&beta=true&tag=one&tag=two',
+    },
+    {
+      chatApi: 'messages',
+      apiUrlOverrides: { messages: 'https://messages.example.test/invoke/' },
+      search: '?beta=true',
+      expectedUrl: 'https://messages.example.test/invoke/?beta=true',
+    },
+    {
+      chatApi: 'messages',
+      apiUrlOverrides: {
+        messages: 'https://messages.example.test/invoke?tag=one%20two&encoded=%2f#section',
+      },
+      search: '?tag=three+four&beta=true',
+      expectedUrl:
+        'https://messages.example.test/invoke?tag=one%20two&encoded=%2f&tag=three+four&beta=true#section',
+    },
+  ] as const)(
+    'uses the configured $chatApi endpoint without a suffix and preserves query parameters',
+    async ({ chatApi, apiUrlOverrides, search, expectedUrl }) => {
+      const mockFetch = jest.fn().mockResolvedValue(new Response('{}'));
+      global.fetch = mockFetch;
+
+      const result = await upstreamRequest({
+        chatApi,
+        reasoningEffort: null,
+        search,
+        method: 'POST',
+        body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
+        extraHeaders: {},
+        provider: {
+          ...OPENROUTER,
+          apiUrl: 'https://gateway.example.test/deployments/model:invoke?api-version=2026-09-01',
+          apiUrlOverrides,
+          disableUrlSuffix: true,
+        },
+      });
+
+      expect(result.type).toBe('success');
+      expect(mockFetch).toHaveBeenCalledWith(expectedUrl, expect.any(Object));
+    }
+  );
+
+  it('appends the suffix when explicitly enabled', async () => {
+    const mockFetch = jest.fn().mockResolvedValue(new Response('{}'));
+    global.fetch = mockFetch;
+
+    await upstreamRequest({
+      chatApi: 'messages',
+      reasoningEffort: null,
+      search: '',
+      method: 'POST',
+      body: { model: 'test-model', messages: [{ role: 'user', content: 'test' }] },
+      extraHeaders: {},
+      provider: {
+        ...OPENROUTER,
+        apiUrl: 'https://gateway.example.test/v1',
+        apiUrlOverrides: {},
+        disableUrlSuffix: false,
+      },
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://gateway.example.test/v1/messages',
+      expect.any(Object)
+    );
+  });
 
   it('uses x-api-key instead of authorization when configured by the provider', async () => {
     const mockFetch = jest.fn().mockResolvedValue(new Response('{}'));

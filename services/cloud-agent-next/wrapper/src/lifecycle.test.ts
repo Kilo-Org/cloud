@@ -18,6 +18,23 @@ function wait(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * The stable-idle drain emits `complete` only after `finalizeDrain` probes the
+ * workspace branch with a git subprocess, so a fixed short wait races that
+ * spawn. Poll for the event instead of assuming it lands inside the wait.
+ */
+async function waitForStreamEvent(
+  events: IngestEvent[],
+  streamEventType: IngestEvent['streamEventType'],
+  timeoutMs = 10_000
+): Promise<void> {
+  const start = Date.now();
+  while (!events.some(event => event.streamEventType === streamEventType)) {
+    if (Date.now() - start > timeoutMs) return;
+    await wait(25);
+  }
+}
+
 describe('wrapper lifecycle drain races', () => {
   it('clears aborted state when activity cancels an aborted drain', async () => {
     const state = new WrapperState();
@@ -57,9 +74,9 @@ describe('wrapper lifecycle drain races', () => {
 
     lifecycle.onSessionIdle();
     await wait(3_050);
-
+    await waitForStreamEvent(events, 'complete');
     expect(events.map(event => event.streamEventType)).toContain('complete');
-  });
+  }, 15_000);
 
   it('does not complete, close, or clear a session when reset interrupts an active drain', async () => {
     const state = new WrapperState();
@@ -118,8 +135,9 @@ describe('wrapper lifecycle drain races', () => {
     expect(events.map(event => event.streamEventType)).not.toContain('complete');
 
     await wait(150);
+    await waitForStreamEvent(events, 'complete');
     expect(events.map(event => event.streamEventType)).toContain('complete');
-  });
+  }, 15_000);
 
   it('requires a fresh stable idle interval after root activity', async () => {
     const state = new WrapperState();
@@ -153,6 +171,7 @@ describe('wrapper lifecycle drain races', () => {
     expect(events.map(event => event.streamEventType)).not.toContain('complete');
 
     await wait(500);
+    await waitForStreamEvent(events, 'complete');
     expect(events.filter(event => event.streamEventType === 'complete')).toHaveLength(1);
-  }, 10_000);
+  }, 20_000);
 });

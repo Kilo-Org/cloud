@@ -7,10 +7,6 @@ import {
 } from './db-session-atoms';
 import type { DbSession } from './db-session-atoms';
 
-// ============================================================================
-// extractRepoFromGitUrl Tests
-// ============================================================================
-
 describe('extractRepoFromGitUrl', () => {
   test('should extract owner/repo from HTTPS URL', () => {
     expect(extractRepoFromGitUrl('https://github.com/owner/repo')).toBe('owner/repo');
@@ -53,10 +49,6 @@ describe('extractRepoFromGitUrl', () => {
     expect(extractRepoFromGitUrl('https://github.com/owner/repo/tree/main')).toBe('owner/repo');
   });
 });
-
-// ============================================================================
-// convertToCloudMessages Tests
-// ============================================================================
 
 describe('convertToCloudMessages', () => {
   test('should convert user_feedback messages to user type', () => {
@@ -218,10 +210,6 @@ describe('convertToCloudMessages', () => {
   });
 });
 
-// ============================================================================
-// formatSessionDate Tests
-// ============================================================================
-
 describe('formatSessionDate', () => {
   test('should format recent time as "just now"', () => {
     const now = new Date();
@@ -246,7 +234,6 @@ describe('formatSessionDate', () => {
   test('should format older dates as month and day', () => {
     const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
     const result = formatSessionDate(twoWeeksAgo);
-    // Should be something like "Nov 25" depending on current date
     expect(result).toMatch(/^[A-Z][a-z]+ \d+$/);
   });
 
@@ -255,10 +242,6 @@ describe('formatSessionDate', () => {
     expect(formatSessionDate(dateString)).toBe('just now');
   });
 });
-
-// ============================================================================
-// getSessionDisplayTitle Tests
-// ============================================================================
 
 describe('getSessionDisplayTitle', () => {
   const baseSession: DbSession = {
@@ -308,13 +291,11 @@ describe('Staleness Detection Logic', () => {
    * checkStalenessWithHighWaterMarkAtom.
    */
 
-  // Helper function that mirrors the actual staleness check logic
   function isSessionStale(
     dbUpdatedAt: string | Date,
     highWaterMark: number,
     toleranceMs: number = 1000
   ): boolean {
-    // If no highWaterMark, can't determine staleness - not stale
     if (!highWaterMark) return false;
 
     const dbUpdatedAtMs = new Date(dbUpdatedAt).getTime();
@@ -323,14 +304,14 @@ describe('Staleness Detection Logic', () => {
 
   test('should detect staleness when DB has newer data', () => {
     const highWaterMark = new Date('2024-01-15T10:00:00Z').getTime();
-    const dbUpdatedAt = '2024-01-15T10:05:00Z'; // 5 minutes newer
+    const dbUpdatedAt = '2024-01-15T10:05:00Z';
 
     expect(isSessionStale(dbUpdatedAt, highWaterMark)).toBe(true);
   });
 
   test('should not detect staleness when DB is older', () => {
     const highWaterMark = new Date('2024-01-15T10:05:00Z').getTime();
-    const dbUpdatedAt = '2024-01-15T10:00:00Z'; // 5 minutes older
+    const dbUpdatedAt = '2024-01-15T10:00:00Z';
 
     expect(isSessionStale(dbUpdatedAt, highWaterMark)).toBe(false);
   });
@@ -345,11 +326,9 @@ describe('Staleness Detection Logic', () => {
   test('should use 1 second tolerance for timestamp comparison', () => {
     const highWaterMark = new Date('2024-01-15T10:00:00.000Z').getTime();
 
-    // 500ms difference - within tolerance (1000ms)
     const dbUpdatedAt500ms = '2024-01-15T10:00:00.500Z';
     expect(isSessionStale(dbUpdatedAt500ms, highWaterMark)).toBe(false);
 
-    // 1500ms difference - outside tolerance
     const dbUpdatedAt1500ms = '2024-01-15T10:00:01.500Z';
     expect(isSessionStale(dbUpdatedAt1500ms, highWaterMark)).toBe(true);
   });
@@ -368,10 +347,6 @@ describe('Staleness Detection Logic', () => {
   });
 });
 
-// ============================================================================
-// Session Loading Logic Tests
-// ============================================================================
-
 describe('Session Loading Logic', () => {
   /**
    * These tests verify the session loading behavior without IndexedDB.
@@ -384,18 +359,13 @@ describe('Session Loading Logic', () => {
     dbUpdatedAt: Date;
   };
 
-  // This mirrors the CORRECT logic in loadSessionToIndexedDbAtom after the fix
   function computeHighWaterMarkOnLoad(params: MergeSessionParams): number {
     const dbUpdatedAtMs = params.dbUpdatedAt.getTime();
-    // CORRECT: Always use DB's updated_at when loading from DB
-    // This is our new sync reference point
     return dbUpdatedAtMs;
   }
 
-  // This is the OLD (buggy) logic for comparison
   function computeHighWaterMarkOnLoadBuggy(params: MergeSessionParams): number {
     const dbUpdatedAtMs = params.dbUpdatedAt.getTime();
-    // BUGGY: Using Math.max can preserve stale highWaterMark values
     return Math.max(dbUpdatedAtMs, params.existingHighWaterMark);
   }
 
@@ -405,7 +375,6 @@ describe('Session Loading Logic', () => {
 
     const result = computeHighWaterMarkOnLoad({ existingHighWaterMark, dbUpdatedAt });
 
-    // Should be DB's timestamp, not existing
     expect(result).toBe(dbUpdatedAt.getTime());
     expect(result).not.toBe(existingHighWaterMark);
   });
@@ -419,10 +388,8 @@ describe('Session Loading Logic', () => {
     const correctResult = computeHighWaterMarkOnLoad({ existingHighWaterMark, dbUpdatedAt });
     const buggyResult = computeHighWaterMarkOnLoadBuggy({ existingHighWaterMark, dbUpdatedAt });
 
-    // CORRECT: Should use DB's timestamp (our new sync point)
     expect(correctResult).toBe(dbUpdatedAt.getTime());
 
-    // BUGGY: Would keep the old (wrong) highWaterMark
     expect(buggyResult).toBe(existingHighWaterMark);
     expect(buggyResult).not.toBe(correctResult);
   });
@@ -447,13 +414,11 @@ describe('Session Loading Logic', () => {
     const messageTimestamp = 1300; // Higher than DB's updated_at
     const dbUpdatedAtOnRefresh = new Date(1060);
 
-    // With Math.max (buggy): existing value stays
     const buggyHighWaterMark = Math.max(dbUpdatedAtOnRefresh.getTime(), messageTimestamp);
-    expect(buggyHighWaterMark).toBe(1300); // WRONG - keeps message timestamp
+    expect(buggyHighWaterMark).toBe(1300);
 
-    // Without Math.max (correct): DB value used
     const correctHighWaterMark = dbUpdatedAtOnRefresh.getTime();
-    expect(correctHighWaterMark).toBe(1060); // CORRECT - uses DB timestamp
+    expect(correctHighWaterMark).toBe(1060);
   });
 });
 
@@ -462,36 +427,19 @@ describe('Session Loading Logic', () => {
 // ============================================================================
 
 describe('createSessionData (via import from indexeddb-store)', () => {
-  // Note: createSessionData is exported from indexeddb-store.ts
-  // We test it here conceptually since it contains highWaterMark logic
-
   test('should initialize highWaterMark from dbUpdatedAt', () => {
-    // The createSessionData function should set highWaterMark from dbUpdatedAt
-    // This verifies the concept - actual timestamp depends on timezone
     const dbUpdatedAt = '2024-01-15T10:00:00Z';
     const expectedHighWaterMark = new Date(dbUpdatedAt).getTime();
 
-    // createSessionData is called like:
-    // createSessionData({ sessionId, dbUpdatedAt, ... }, messages, repository)
-    // And should set highWaterMark = Date.parse(dbUpdatedAt)
-
-    // Verify it's a reasonable unix timestamp (Jan 2024)
     expect(expectedHighWaterMark).toBeGreaterThan(1704000000000); // After Jan 1, 2024
     expect(expectedHighWaterMark).toBeLessThan(1706000000000); // Before Feb 1, 2024
   });
 
   test('should initialize highWaterMark to 0 when dbUpdatedAt is null', () => {
-    // When creating a brand new session (not loaded from DB),
-    // dbUpdatedAt would be null/undefined, and highWaterMark should be 0
-    // This means "we don't know the DB timestamp yet"
     const expectedHighWaterMark = 0;
     expect(expectedHighWaterMark).toBe(0);
   });
 });
-
-// ============================================================================
-// IndexedDB Cleanup Logic Tests
-// ============================================================================
 
 describe('IndexedDB Cleanup Logic', () => {
   /**
@@ -504,7 +452,6 @@ describe('IndexedDB Cleanup Logic', () => {
     updatedAt: string;
   };
 
-  // Helper function that mirrors the cleanup filtering logic
   function getSessionsToDelete(
     entries: SessionEntry[],
     currentSessionId: string | null,
@@ -514,7 +461,6 @@ describe('IndexedDB Cleanup Logic', () => {
     const sessionsToDelete: string[] = [];
 
     for (const { sessionId, updatedAt } of entries) {
-      // Skip the current active session
       if (sessionId === currentSessionId) {
         continue;
       }
@@ -601,26 +547,15 @@ describe('IndexedDB Cleanup Logic', () => {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
     const entries: SessionEntry[] = [{ sessionId: 'session', updatedAt: fifteenMinutesAgo }];
 
-    // With 10 minute max age, 15 minute old session should be deleted
     const toDeleteWith10Min = getSessionsToDelete(entries, null, 10 * 60 * 1000);
     expect(toDeleteWith10Min).toContain('session');
 
-    // With 20 minute max age, 15 minute old session should NOT be deleted
     const toDeleteWith20Min = getSessionsToDelete(entries, null, 20 * 60 * 1000);
     expect(toDeleteWith20Min).not.toContain('session');
   });
 });
 
-// ============================================================================
-// New Session Creation Logic Tests
-// ============================================================================
-
 describe('New Session Creation Logic', () => {
-  /**
-   * Tests for the logic that adds new sessions to dbSessionsAtom
-   * when a session_created event is received.
-   */
-
   type DbSession = {
     session_id: string;
     title: string | null;
@@ -633,7 +568,6 @@ describe('New Session Creation Logic', () => {
     organization_id?: string | null;
   };
 
-  // Helper that mirrors the logic in createNewSessionInIndexedDbAtom
   function createDbSessionFromEvent(
     kiloSessionId: string,
     cloudAgentSessionId: string,
@@ -652,7 +586,6 @@ describe('New Session Creation Logic', () => {
     };
   }
 
-  // Helper that mirrors prepending to sessions list
   function addSessionToList(existingSessions: DbSession[], newSession: DbSession): DbSession[] {
     return [newSession, ...existingSessions];
   }
@@ -700,7 +633,6 @@ describe('New Session Creation Logic', () => {
     const updatedList = addSessionToList([existingSession], newSession);
 
     expect(updatedList).toHaveLength(2);
-    expect(updatedList[0].session_id).toBe('new-session'); // New session is first
     expect(updatedList[1].session_id).toBe('existing-session');
   });
 

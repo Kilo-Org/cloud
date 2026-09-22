@@ -3,9 +3,7 @@ import type {
   BackgroundProcessInfo,
   Event,
   EventBackgroundProcessUpdated,
-  EventInteractiveTerminalUpdated,
   EventMessagePartUpdated,
-  InteractiveTerminalInfo,
   Pty,
   ToolState,
 } from '@kilocode/sdk/v2';
@@ -82,29 +80,6 @@ function backgroundEvent(
   };
 }
 
-function interactiveEvent(
-  status: InteractiveTerminalInfo['status'],
-  sessionID = 'root'
-): EventInteractiveTerminalUpdated {
-  return {
-    id: 'event',
-    type: 'interactive_terminal.updated',
-    properties: {
-      info: {
-        id: 'terminal-not-a-session',
-        sessionID,
-        pid: 123,
-        command: 'git commit',
-        cwd: directory,
-        status,
-        cols: 80,
-        rows: 24,
-        time: { started: 1, updated: 2 },
-      },
-    },
-  };
-}
-
 function resourceEvents(sessionID = 'root') {
   return [
     ...(['starting', 'running', 'ready', 'exited', 'failed', 'stopping', 'stopped'] as const).map(
@@ -114,23 +89,6 @@ function resourceEvents(sessionID = 'root') {
       id: 'event',
       type: 'background_process.deleted',
       properties: { sessionID, processID: 'process-not-a-session', scope: 'session' },
-    },
-    interactiveEvent('running', sessionID),
-    interactiveEvent('closed', sessionID),
-    {
-      id: 'event',
-      type: 'interactive_terminal.data',
-      properties: {
-        sessionID,
-        terminalID: 'terminal-not-a-session',
-        data: 'output must not be forwarded',
-        cursor: 10,
-      },
-    },
-    {
-      id: 'event',
-      type: 'interactive_terminal.deleted',
-      properties: { sessionID, terminalID: 'terminal-not-a-session' },
     },
   ] satisfies Event[];
 }
@@ -244,19 +202,32 @@ const disposers: Array<() => void> = [];
 function setup(deliver?: SendEvent, signal?: AbortSignal) {
   const sessions: HandlerSessionSnapshot[] = [];
   const runtimes = new Map<string, WorktreeKiloRuntime>();
+  const key = (identity: { sessionId: string; kiloSessionId: string; directory: string }) =>
+    `${identity.sessionId}\0${identity.kiloSessionId}\0${identity.directory}`;
   const abort = new AbortController();
   const sendEvent = mock(deliver ?? (() => true));
   const notifications = createWorktreeMutationNotifications({
     sessions,
-    kiloRuntimes: { get: directory => runtimes.get(directory) },
+    kiloRuntimes: {
+      get: identity =>
+        typeof identity === 'string'
+          ? [...runtimes.values()].find(runtime => runtime.directory === identity)
+          : runtimes.get(key(identity)),
+      isCurrent: runtime =>
+        runtime.identity !== undefined && runtimes.get(key(runtime.identity)) === runtime,
+    },
     signal: signal ?? abort.signal,
     sendEvent,
   });
   disposers.push(notifications.dispose);
-  function addRuntime(directory: string) {
+  function addRuntime(
+    directory: string,
+    identity = { sessionId: 'workspace_root', kiloSessionId: 'root', directory }
+  ) {
     const controller = new AbortController();
     let client = {} as WrapperKiloClient;
     const runtime: WorktreeKiloRuntime = {
+      identity,
       runtimeId: crypto.randomUUID(),
       directory,
       scopeId: directory,
@@ -266,7 +237,7 @@ function setup(deliver?: SendEvent, signal?: AbortSignal) {
         return client;
       },
     };
-    runtimes.set(directory, runtime);
+    runtimes.set(key(identity), runtime);
     return {
       runtime,
       controller,
@@ -522,11 +493,7 @@ describe('worktree mutation notifications', () => {
             ]
           : [undefined, null, 123, ''].map(id => ({
               ...properties,
-              [event.type === 'background_process.deleted'
-                ? 'processID'
-                : event.type.startsWith('pty.')
-                  ? 'id'
-                  : 'terminalID']: id,
+              [event.type === 'background_process.deleted' ? 'processID' : 'id']: id,
             }));
       for (const properties of invalid) {
         h.notifications.observe(h.runtime, { ...event, properties, directory });
@@ -534,18 +501,6 @@ describe('worktree mutation notifications', () => {
     }
     jest.advanceTimersByTime(5_000);
     expect(h.sendEvent).not.toHaveBeenCalled();
-    expect(jest.getTimerCount()).toBe(0);
-  });
-
-  it('bounds sustained terminal output hints without forwarding output', () => {
-    const h = setup();
-    const event = resourceEvents().find(event => event.type === 'interactive_terminal.data');
-    if (!event) throw new Error('Missing terminal data fixture');
-    for (let index = 0; index < 20; index += 1) {
-      h.notifications.observe(h.runtime, { ...event, directory });
-      jest.advanceTimersByTime(500);
-    }
-    expect(h.sendEvent.mock.calls).toEqual([expectedHint()]);
     expect(jest.getTimerCount()).toBe(0);
   });
 
@@ -593,6 +548,22 @@ describe('worktree mutation notifications', () => {
       properties: { ...nextProperties, sessionID: 'grandchild' },
     });
     jest.advanceTimersByTime(5_000);
+    expect(h.sendEvent.mock.calls).toEqual([expectedHint(), expectedHint('sibling')]);
+  });
+
+  it('fans a same-directory mutation from an isolated sibling runtime to both roots', () => {
+    const h = setup();
+    const siblingIdentity = {
+      sessionId: 'workspace_sibling',
+      kiloSessionId: 'sibling',
+      directory,
+    };
+    const siblingRuntime = h.addRuntime(directory, siblingIdentity).runtime;
+    h.attach('sibling');
+
+    h.notifications.observe(siblingRuntime, { ...fileEdited, directory });
+    jest.advanceTimersByTime(5_000);
+
     expect(h.sendEvent.mock.calls).toEqual([expectedHint(), expectedHint('sibling')]);
   });
 

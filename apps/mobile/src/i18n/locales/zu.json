@@ -36,6 +36,7 @@
     "cost": "Izindleko",
     "discard": "Lahla",
     "findings": "Okutholakele",
+    "mergeRequest": "isicelo sokuhlanganisa",
     "notConnected": "Ayixhunyiwe",
     "notifications": "Izaziso",
     "pullRequest": "i-PR",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "Sebenzisa elinye ikheli le-imeyili",
     "signInWithApple": "Ngena nge-Apple",
     "signInWithGoogle": "Ngena nge-Google",
+    "signInWithPasskey": "Ngena ngokhiye wokungena",
     "emailAddress": "Ikheli le-imeyili",
     "emailPlaceholder": "wena@example.com",
     "continueWithEmail": "Qhubeka nge-imeyili",
@@ -174,6 +176,10 @@
     "termsConnector": " kanye ",
     "termsSuffix": ".",
     "moreSignInOptions": "Ezinye izinketho zokungena",
+    "passkeyCancelled": "Ukungena ngokhiye wokungena kukhanseliwe. Zama futhi.",
+    "passkeyNotFound": "Akukho khiye lokungena eligciniwe lale divayisi. Ngena nge-Apple, i-Google noma nge-imeyili yakho esikhundleni salokho.",
+    "passkeyUnsupported": "Amakhiye okungena awatholakali kule divayisi. Ngena nge-Apple, i-Google noma nge-imeyili yakho esikhundleni salokho.",
+    "passkeyFailed": "Ayikwazanga ukungena ngokhiye wokungena. Zama futhi.",
     "couldNotCompleteSignIn": "Asikwazanga ukuqeda ukungena. Sicela uzame futhi.",
     "sessionEnded": "Iseshini yakho iphelile. Sicela ungene futhi.",
     "signInCodeExpired": "Ikhodi yakho yokungena iphelelwe yisikhathi. Sicela uzame futhi.",
@@ -224,11 +230,36 @@
     "providerTestAccount": "I-akhawunti yokuhlola",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "SSO yebhizinisi"
+    "providerEnterpriseSso": "SSO yebhizinisi",
+    "passkeysTitle": "Amakhiye okungena",
+    "passkeysSubtitle": "Ngena ngaphandle kwephasiwedi",
+    "passkeysEmpty": "Awekho amakhiye okungena okwamanje",
+    "passkeysEmptyHint": "$t(profile.addPasskey) ukuze ungena ngaphandle kwephasiwedi.",
+    "passkeysCouldNotLoad": "Amakhiye okungena awakwazanga ukulayishwa",
+    "passkeysLoadFailed": "Amakhiye okungena awatholakali kuze kulayishwe lokhu.",
+    "addPasskey": "Engeza ukhiye wokungena",
+    "passkeyDefaultName": "Ukhiye wokungena",
+    "passkeyAddedOn": "Kungezwe {{date}}",
+    "passkeyAdded": "Ukhiye wokungena kungeziwe.",
+    "passkeyAddFailed": "Ukhiye wokungena awukwazanga ukungezwa. Zama futhi.",
+    "passkeyAddUnsupported": "Le divayisi ayikwazi ukudala amakhiye okungena.",
+    "passkeyAddCancelled": "Ukudalwa kokhiye wokungena kukhanseliwe.",
+    "passkeyRemoved": "Ukhiye wokungena ususiwe.",
+    "passkeyRemoveFailed": "Lowo khiye wokungena awukwazanga ukususwa. Zama futhi.",
+    "passkeyRenamed": "Ukhiye wokungena uqanjwe kabusha.",
+    "passkeyName": "Igama likakhiye wokungena",
+    "renamePasskey": "Qamba kabusha ukhiye wokungena",
+    "removePasskey": "Susa ukhiye wokungena",
+    "removePasskeyTitle": "Susa ukhiye wokungena?",
+    "removePasskeyMessage": "Ngeke usakwazi ukungena ngalo khiye wokungena."
   },
   "preferences": {
+    "general": "Okujwayelekile",
+    "voiceInput": "Ukufaka ngezwi",
     "autoExpandThinking": "Nweba ukucabanga ngokuzenzakalelayo",
     "autoExpandThinkingSubtitle": "Bonisa ukucabanga komenzeli kunwetshiwe uma eseqedile ukucabanga.",
+    "hideThinking": "Fihla imininingwane yokucabanga",
+    "hideThinkingSubtitle": "Ungakubonisi ukucabanga komenzeli ekhasini leseshini.",
     "keepScreenOn": "Gcina isikrini sivuliwe ngenkathi usekhasini leseshini",
     "keepScreenOnSubtitle": "Gcina isikrini sivuliwe ngenkathi iseshini isebenza.",
     "appearance": "Ukubukeka",
@@ -237,6 +268,7 @@
     "appearanceLight": "Okukhanyayo",
     "appearanceDark": "Okumnyama",
     "account": "I-akhawunti",
+    "accountSubtitle": "Ulimi, abasingathi abathenjwayo namaseshini edivayisi",
     "prReviewAttribution": "Veza uhlelo lokusebenza ekuhlolweni kwe-PR",
     "prReviewAttributionSubtitle": "Faka umbhalo ongezansi othi kuhlolwe nge-Kilo uma uthumela ukuhlolwa.",
     "returnSendsMessage": "Inkinobho yokubuyela ithumela umlayezo",
@@ -247,7 +279,15 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Ukuguqulwa kwenkulumo ibe umbhalo nge-Kilo Gateway",
+    "gatewayTranscriptionSubtitle": "Guqula ukufaka ngezwi kube umbhalo usebenzisa imodeli ye-Kilo Gateway kunokubona inkulumo kwedivayisi. Ukuqopha kwakho kuthunyelwa ku-Kilo Gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "Finyeza izingcingo zamathuluzi",
+    "condenseToolCallsSubtitle": "Hlanganisa izingcingo zamathuluzi ezilandelanayo zibe umugqa owodwa ongawuvula.",
+    "toolSummaryTranslation": "Humusha izifinyezo zamathuluzi",
+    "toolSummaryTranslationSubtitle": "Thumela isifinyezo sethuluzi ngasinye kumodeli ukuze siyihumushele olimini lohlelo lwakho. Okwangempela kuyaboniswa uma ukuhumusha kwehluleka.",
+    "toolSummaryTranslationModelUnavailableNotice": "Le modeli ayisanikezwa. Thepha $t(common.model) ukukhetha enye."
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokuhlanganisa asitholakali",
@@ -329,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "Kulayishwe amafayela angu-{{displayCount}} kwangu-{{total}}",
       "filesStillLoading": "Amafayela asalayishwa. Donsela phansi ukuze uvuselele.",
       "goToOverview": "Iya ekubukeni konke",
-      "goToOverviewTab": "Iya kuthebhu yokubuka konke"
+      "goToOverviewTab": "Iya kuthebhu yokubuka konke",
+      "expandAllLines_one": "Nweba wonke umugqa ongu-{{displayCount}}",
+      "expandAllLines_other": "Nweba yonke imigqa engu-{{displayCount}}",
+      "expandLines_one": "Nweba umugqa ongu-{{displayCount}} ({{start}}–{{end}})",
+      "expandLines_other": "Nweba imigqa engu-{{displayCount}} ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Nweba umugqa womongo ongu-{{displayCount}}",
+      "expandLinesOfContext_other": "Nweba imigqa yomongo engu-{{displayCount}}",
+      "expandMoreLines_one": "Nweba omunye umugqa ongu-{{displayCount}} ({{start}}–{{end}})",
+      "expandMoreLines_other": "Nweba eminye imigqa engu-{{displayCount}} ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "kulayishwe ifayela elingu-{{loaded}} kwangu-{{total}}",
+      "loadedOfTotalFiles_other": "kulayishwe amafayela angu-{{loaded}} kwangu-{{total}}"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ akukho mugqa omusha ekugcineni kwefayela",
@@ -344,6 +394,7 @@
       "merge": "Ukuhlanganisa",
       "mergeNow": "Hlanganisa manje",
       "mergePullRequest": "Hlanganisa isicelo sokuhlanganisa",
+      "mergeTermTitle": "Hlanganisa {{term}}",
       "enableAutoMerge": "Vula ukuhlanganisa okuzenzakalelayo",
       "disableAutoMerge": "Vala ukuhlanganisa okuzenzakalelayo",
       "autoMergeOn": "Ukuhlanganisa okuzenzakalelayo kuvuliwe",
@@ -362,9 +413,12 @@
       "deleteBranchAfterMerge": "Susa igatsha ngemva kokuhlanganisa",
       "noEnabledMethods": "Le nqolobane yekhodi ayinazo izindlela zokuhlanganisa ezivuliwe. Cela umphathi wayo avule ukuhlanganisa, ukuhlanganisa amarekhodi abe linye, noma ukubeka amarekhodi esisekelweni esisha.",
       "confirmTitle": "Uyasihlanganisa isicelo sokuhlanganisa?",
+      "confirmTitleTerm": "Uyasihlanganisa {{term}}?",
       "confirmMessage": "Lokhu kuzohlanganisa izinguquko zakho egatsheni eliyisisekelo.",
       "enableAutoMergeConfirmTitle": "Uyavula ukuhlanganisa okuzenzakalelayo?",
       "enableAutoMergeConfirmMessage": "I-GitHub izohlanganisa lesi sicelo sokuhlanganisa ngokuzenzakalelayo lapho zonke izihlolo ezidingekayo ziphumelela.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} luzohlanganiswa ngokuzenzakalelayo uma i-pipeline yaso iphumelela.",
+      "enableAutoMergeDescriptionTerm": "I-GitLab izohlanganisa {{term}} ngokuzenzakalelayo uma i-pipeline yaso iphumelela.",
       "forbidden": "Awunayo imvume yokuhlanganisa lesi sicelo sokuhlanganisa.",
       "cannotMerge": "Lesi sicelo sokuhlanganisa asikwazi ukuhlanganiswa njengoba sinjalo.",
       "couldNotMerge": "Asikwazanga ukuhlanganisa isicelo sokuhlanganisa.",
@@ -375,7 +429,8 @@
       },
       "terminal": {
         "alreadyMerged": "Sekuhlanganisiwe",
-        "closed": "Lesi sicelo sokuhlanganisa sivaliwe"
+        "closed": "Lesi sicelo sokuhlanganisa sivaliwe",
+        "closedMergeRequest": "Lesi sicelo sokuhlanganisa sivaliwe"
       },
       "partialSuccessBanner": {
         "body": "Asikwazanga ukususa igatsha: {{reason}}.",
@@ -400,6 +455,18 @@
         "behindDetail": "Igatsha eliqukethe izinguquko lisalele emuva kwegatsha eliyisisekelo. Beka amarekhodi alo esisekelweni esisha noma ulibuyekeze ngaphambi kokuhlanganisa.",
         "notMergeableTitle": "Lesi sicelo sokuhlanganisa asikakwazi ukuhlanganiswa",
         "notMergeableDetail": "I-GitHub ibike isimo sokuhlanganiseka esingu-{{state}}."
+      },
+      "restrictions": {
+        "title": "Imikhawulo yokuhlanganisa",
+        "approvalsRequired_one": "Kudingeka imvume {{displayCount}}",
+        "approvalsRequired_other": "Kudingeka izimvume {{displayCount}}",
+        "pipelineMustSucceed": "I-pipeline kumele iphumelele ngaphambi kokuhlanganisa."
+      },
+      "providerBlocked": {
+        "failingPipeline": "I-pipeline iyehluleka kwi-commit yakamuva.",
+        "pendingPipeline": "I-pipeline isasebenza kwi-commit yakamuva.",
+        "permission": "Awunayo imvume yokuhlanganisa {{term}}.",
+        "draft": "Maka {{term}} njengesilungele ukubuyekezwa ngaphambi kokuhlanganisa."
       },
       "methodLabels": {
         "merge": "Dala irekhodi lokuhlanganisa",
@@ -448,6 +515,11 @@
       "acceptTerms": "Yamukela",
       "replyBadRequest": "Le mpendulo ayikwazi ukuthunyelwa. Kungenzeka uchungechunge lwengxoxo lushintshile.",
       "replyForbidden": "Awunayo imvume yokuphendula kulesi sicelo sokuhlanganisa.",
+      "addCommentCta": "Phawula kulesi sicelo sokuhlanganisa",
+      "fixWithKilo": "Lungisa nge-Kilo",
+      "fixWithKiloPrompt": "Sicela ubhekane nokuphawula okulandelayo kwesicelo sokuhlanganisa: {{link}}",
+      "commentBadRequest": "Le phawula ayikwazi ukuthunyelwa. Kungenzeka lesi sicelo sokuhlanganisa sishintshile.",
+      "commentForbidden": "Awunayo imvume yokuphawula kulesi sicelo sokuhlanganisa.",
       "moderation": {
         "reportContent": {
           "terminal": "La mazwana awakwazi ukubikwa.",
@@ -496,7 +568,10 @@
         "outdatedOnLines": "Aphelelwe yisikhathi ku-{{lines}}",
         "outdatedOnPath": "Aphelelwe yisikhathi ku-{{path}}"
       },
-      "deletedUser": "umsebenzisi osusiwe"
+      "deletedUser": "umsebenzisi osusiwe",
+      "replyForbiddenTerm": "Awunayo imvume yokuphendula ku-{{term}}.",
+      "moreLinesAbove_one": "… omunye umugqa ongu-{{displayCount}} ngenhla",
+      "moreLinesAbove_other": "… eminye imigqa engu-{{displayCount}} ngenhla"
     },
     "couldNotOpenGitHubAppSettings": "Asikwazanga ukuvula izilungiselelo zohlelo lokusebenza lwe-GitHub.",
     "installKiloGitHubApp": "Faka i-Kilo GitHub App",
@@ -508,17 +583,19 @@
     "reviewPullRequest": "Buyekeza isicelo sokuhlanganisa",
     "headLine": "{{counts}} · irekhodi lakamuva {{sha}}",
     "entry": {
-      "eyebrow": "Vula isicelo sokuhlanganisa nge-URL.",
-      "pastePrLink": "Namathisela isixhumanisi se-PR",
-      "noRecentPrs": "Awekho ama-PR akamuva",
-      "noRecentPrsDescription": "Namathisela isixhumanisi se-PR ngenhla ukuze uqale ukubuyekeza — i-PR izovela lapha ngokuzayo.",
+      "eyebrow": "Vula i-PR noma isicelo sokuhlanganisa nge-URL",
+      "pastePrLink": "Namathisela isixhumanisi se-PR noma sesicelo sokuhlanganisa",
+      "noRecentPrs": "Azikho izibuyekeza zakamuva",
+      "noRecentPrsDescription": "Namathisela isixhumanisi ngenhla ukuze uqale ukubuyekeza — sizovela lapha okwesinye isikhathi.",
       "couldNotLoad": "Asikwazanga ukulayisha.",
       "removeFromRecentsTitle": "Uyakususa kokusanda kubukwa?",
-      "removeFromRecentsMessage": "Lesi sicelo sokuhlanganisa sizosuswa ohlwini lokusanda kubukwa.",
+      "removeFromRecentsMessage": "Lokhu kubuyekeza kuzosuswa ohlwini lwakho lwakamuva.",
       "removeRecentAccessibility": "Susa {{repo}} ohlwini lokusanda kubukwa",
-      "urlAccessibility": "I-URL yesicelo sokuhlanganisa se-GitHub",
-      "clearLink": "Sula isixhumanisi sesicelo sokuhlanganisa",
-      "pasteLink": "Namathisela isixhumanisi sesicelo sokuhlanganisa",
+      "urlAccessibility": "Faka i-URL ye-PR noma yesicelo sokuhlanganisa",
+      "urlPlaceholder": "I-URL ye-PR noma yesicelo sokuhlanganisa",
+      "openAccessibility": "Vula i-PR noma isicelo sokuhlanganisa",
+      "clearLink": "Sula isixhumanisi",
+      "pasteLink": "Namathisela isixhumanisi se-PR noma sesicelo sokuhlanganisa",
       "open": "Vula"
     },
     "checks": {
@@ -535,6 +612,8 @@
       "pending": "{{displayCount}} zilindile",
       "skipped": "{{displayCount}} zeqiwe",
       "checksCount": "izihlolo ezingu-{{displayCount}}",
+      "checksCount_one": "isihlolo esingu-{{displayCount}}",
+      "checksCount_other": "izihlolo ezingu-{{displayCount}}",
       "checkDetails": "imininingwane yesihlolo"
     },
     "inbox": {
@@ -567,9 +646,15 @@
     "connect": {
       "checkFailedTitle": "Asikwazanga ukuhlola ukuxhumana kwe-GitHub.",
       "checkFailedMessage": "Isimo sokungena asitholakali kuze kuphele ukulayisha.",
+      "checkFailedTitleGitLab": "Asikwazanga ukuhlola ukuxhumana kwe-GitLab.",
+      "checkFailedTitleBitbucket": "Asikwazanga ukuhlola ukuxhumana kwe-Bitbucket.",
+      "providerCheckFailedMessage": "Isimo sokuxhumana asitholakali kuze kulayishwe lokhu.",
       "reconnectTitle": "Xhuma kabusha i-GitHub",
       "reconnectDescription": "Ukuxhumana kwakho kwe-GitHub kuhoxisiwe. Xhuma kabusha ukuze uqhubeke ubuyekeza izicelo zokuhlanganisa efonini.",
-      "description": "Xhuma i-akhawunti yakho ye-GitHub ukuze ubuyekeze izicelo zokuhlanganisa efonini."
+      "description": "Xhuma i-akhawunti yakho ye-GitHub ukuze ubuyekeze izicelo zokuhlanganisa efonini.",
+      "gitlabDescription": "Xhuma i-akhawunti yakho ye-GitLab ukuze ubuyekeze izicelo zokuhlanganisa kufoni.",
+      "bitbucketDescription": "Xhuma i-Bitbucket kule nhlangano ukuze ubuyekeze ama-PR kufoni.",
+      "bitbucketOrgOnlyDescription": "Khetha inhlangano kuphrofayili yakho ukuze ubuyekeze ama-PR e-Bitbucket ayo."
     },
     "screen": {
       "title": "#{{number}}",
@@ -591,7 +676,10 @@
     },
     "reconnectNotice": {
       "title": "Ukuxhumana ne-GitHub kuphelelwe yisikhathi.",
-      "message": "Ukuxhumana kwakho kwe-GitHub akusavumelekile. Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka."
+      "message": "Ukuxhumana kwakho kwe-GitHub akusavumelekile. Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka.",
+      "gitlabTitle": "Ukuxhumana ne-GitLab kuphelelwe yisikhathi.",
+      "bitbucketTitle": "Ukuxhumana ne-Bitbucket kuphelelwe yisikhathi.",
+      "providerMessage": "Ukuxhumana kwakho kwe-{{provider}} akusavumelekile. Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka."
     },
     "eventChips": {
       "comment": "Phawula",
@@ -656,10 +744,12 @@
       "statusContext": "Umongo",
       "lineLabel": "umugqa {{line}} ({{status}}): {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(okungenalutho)"
+      "emptyLine": "(okungenalutho)",
+      "truncationBanner_one": "Kuboniswa amafayela okuqala angu-{{limit}} kwangu-{{total}} ashintshiwe — umkhawulo we-API ye-GitHub.",
+      "truncationBanner_other": "Kuboniswa amafayela okuqala angu-{{limit}} kwangu-{{total}} ashintshiwe — umkhawulo we-API ye-GitHub."
     },
     "linkPasteClipboardEmpty": "Ibhodi lokukopisha alinalutho.",
-    "linkPasteNotAPullRequest": "Lesi akusona isixhumanisi sesicelo sokuhlanganisa se-GitHub.",
+    "linkPasteNotAPullRequest": "Lokhu akusiso isixhumanisi se-PR noma sesicelo sokuhlanganisa",
     "announce": {
       "commentPosted": "Amazwana athunyelwe",
       "reviewSubmitted": "Ukubuyekeza kuthunyelwe",
@@ -668,6 +758,7 @@
     "mutationError": {
       "commentNotPosted": "La mazwana awakwazi ukuthunyelwa. Kungenzeka umugqa okhethiwe ushintshile noma i-PR ibuyekeziwe.",
       "reviewNotSubmitted": "Lokhu kubuyekeza akukwazi ukuthunyelwa njengoba kunjalo. Kungenzeka i-PR ishintshile, noma awukwazi ukubuyekeza isicelo sakho sokuhlanganisa.",
+      "reviewNotSubmittedTerm": "Lokhu kubuyekeza akukwazi ukuthunyelwa kanjalo. Kungenzeka {{term}} kushintshe, noma awukwazi ukubuyekeza {{term}} wakho siqu.",
       "couldNotPostComment": "Asikwazanga ukuthumela amazwana.",
       "couldNotSubmitReview": "Asikwazanga ukuthumela ukubuyekeza. Hlola ukuxhumana kwakho bese uzama futhi."
     },
@@ -675,9 +766,31 @@
       "couldNotReply": "Asikwazanga ukuphendula.",
       "couldNotCompleteAction": "Asikwazanga ukuqeda lesi senzo.",
       "mergeResultDefaultError": "I-GitHub ayizange iqede ukuhlanganisa.",
+      "mergeResultNotCompleted": "{{term}} alihlanganisiwe. Bheka isimo salo bese uzama futhi.",
       "ambiguous": "Asikwazanga ukuqinisekisa — hlola i-PR ngaphambi kokuzama futhi.",
       "persistenceFailed": "Asikwazanga ukurekhoda lesi senzo. Sicela uzame futhi kamuva.",
       "forbidden": "Lesi senzo asivunyelwe."
+    },
+    "capabilities": {
+      "banner": {
+        "title": "Ayitholakali kulo mhlinzeki",
+        "accessibility": "Ayitholakali kulo mhlinzeki: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "I-PR",
+      "mergeRequest": "Isicelo sokuhlanganisa",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Yabelana ngesicelo sokuhlanganisa",
+      "viewOnProvider": "Buka ku-{{provider}}",
+      "mergeRequestUnavailable": "Isicelo sokuhlanganisa asitholakali",
+      "unavailableDescription": "Kungenzeka sisusiwe, noma awunayo imvume yokufinyelela kuso.",
+      "accessDeniedMergeRequest": "Awunayo imvume yokubuka lesi sicelo sokuhlanganisa.",
+      "couldNotLoadMergeRequest": "Asikwazanga ukulayisha isicelo sokuhlanganisa.",
+      "discussionAccessDenied": "Awunayo imvume yokubuka ingxoxo yalesi sicelo sokuhlanganisa.",
+      "discussionUnavailableMessage": "Kungenzeka lesi sicelo sokuhlanganisa sisusiwe.",
+      "noDiscussionDescription": "Azikho izingxoxo zokubuyekeza noma amazwana engxoxo kulesi sicelo sokuhlanganisa.",
+      "noFilesChangedDescription": "Lesi sicelo sokuhlanganisa asinazo izinguquko zamafayela."
     }
   },
   "notifications": {
@@ -710,11 +823,12 @@
     "previewFullDescription": "Izaziso zibonisa umbhalo womlayezo esikrinini sakho sokukhiya.",
     "previewGenericDescription": "Izaziso zibonisa ukuthi kukhona okwenzekile. Vula i-Kilo ukuze ufunde umlayezo.",
     "channel": {
-      "agent": "Iziseshini zabenzeli",
+      "agentProgress": "Inqubekelaphambili yabenzeli",
       "chat": "Imilayezo yengxoxo",
       "kiloclaw": "Umsebenzi we-KiloClaw",
       "balance": "Izexwayiso zebhalansi",
-      "security": "Okutholakele kwezokuphepha"
+      "security": "Okutholakele kwezokuphepha",
+      "spend": "Izexwayiso zokusebenzisa imali"
     },
     "category": {
       "chatMessagesSubtitle": "izimpendulo ezingxoxweni zakho",
@@ -725,8 +839,22 @@
       "sessionStatusTitle": "Isimo seseshini",
       "sessionStatusSubtitle": "kuqediwe / kwehlulekile / kulungele ukulawulwa",
       "kiloclawActivitySubtitle": "uhlelo selulungile/lwehlulekile, izenzo ezihleliwe",
+      "kiloclawActivityUnavailable": "Qala i-instance ye-KiloClaw ukuze uthole umsebenzi we-KiloClaw.",
       "balanceAlertsSubtitle": "izexwayiso zebhalansi ephansi yenhlangano",
-      "securityFindingsSubtitle": "okutholakele okusha nezikhumbuzo ze-SLA"
+      "balanceAlertsUnavailable": "Joyina inhlangano ukuze uthole izexwayiso zebhalansi.",
+      "securityFindingsSubtitle": "okutholakele okusha nezikhumbuzo ze-SLA",
+      "securityFindingsUnavailable": "Nika amandla i-ejenti yezokuphepha ye-Kilo kububanzi ukuze uthole okutholakele kwezokuphepha.",
+      "spendAlertsSubtitle": "ukweqa imingcele nokukhuphuka ngehora",
+      "spendAlertsToggle": "Isigaba sezexwayiso zokusebenzisa imali"
+    },
+    "action": {
+      "openSession": "Vula iseshini"
+    },
+    "needsInputAction": {
+      "approved": "Isicelo sigunyaziwe",
+      "replied": "Impendulo ithunyelwe",
+      "failed": "Ayikwazanga ukuphendula. Thepha kabusha ukuze uzame kabusha.",
+      "unavailable": "Lesi sicelo asisalindile."
     }
   },
   "tabs": {
@@ -807,7 +935,9 @@
       "uploadFailed": "Ukulayisha kwehlulekile.",
       "failedToUploadFile": "Asikwazanga ukulayisha ifayela: {{reason}}.",
       "nothingToPaste": "Akukho ongakunamathisela.",
-      "metadataStripFailed": "Asikwazanga ukususa imininingwane efihliwe yesithombe."
+      "metadataStripFailed": "Asikwazanga ukususa imininingwane efihliwe yesithombe.",
+      "limit_one": "Unganamathisela ifayela afinyelela ku-{{displayCount}}.",
+      "limit_other": "Unganamathisela amafayela afinyelela ku-{{displayCount}}."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1551,7 +1681,11 @@
       "syncFindings": "Vumelanisa okutholakele",
       "syncNow": "Vumelanisa manje",
       "syncQueued": "Ukuvumelanisa kufakwe emgqeni",
-      "syncStatusUnavailable": "Isimo sokuvumelanisa asitholakali."
+      "syncStatusUnavailable": "Isimo sokuvumelanisa asitholakali.",
+      "daysOverdue_one": "Kudlule umnqamulajuqu ngosuku olungu-{{displayCount}}",
+      "daysOverdue_other": "Kudlule umnqamulajuqu ngezinsuku ezingu-{{displayCount}}",
+      "findingsCount_one": "Okutholakele: {{displayCount}}",
+      "findingsCount_other": "Okutholakele: {{displayCount}}"
     },
     "dashboardMetrics": {
       "openFindings": "Okutholakele okungakaxazululwa",
@@ -1948,6 +2082,10 @@
       "couldNotLoad": "Asikwazanga ukulayisha iseshini.",
       "failedToLoadDetails": "Asikwazanga ukulayisha imininingwane yeseshini.",
       "failedToStopExecution": "Asikwazanga ukumisa ukusebenza.",
+      "stopped": "Iseshini imisiwe",
+      "committing": "Kuyaqoshwa…",
+      "committed": "Kuqoshiwe",
+      "commitFailed": "Ukuqopha kuhlulekile",
       "renameSession": "Qamba kabusha iseshini",
       "renamePlaceholder": "Igama leseshini",
       "transcriptAccessibility": "Umbhalo weseshini",
@@ -1982,17 +2120,56 @@
       "exitNeedsNewerCli": "Imiyalo eqala ngo-/ esetshenziswa ukude idinga inguqulo entsha ye-Kilo CLI. Buyekeza i-Kilo CLI bese uxhuma futhi."
     },
     "sessionConnection": {
+      "label": "Ukuxhumana",
       "connecting": "Kuyaxhunywa…",
       "reconnecting": "Kuxhunywa futhi…",
       "connectionLost": "Ukuxhumana kunqamukile",
       "retryConnection": "Zama ukuxhuma futhi"
     },
+    "goal": {
+      "title": "Umgomo",
+      "statusActive": "Umgomo osebenzayo",
+      "statusPaused": "Umgomo omisiwe",
+      "statusComplete": "Umgomo uqediwe",
+      "statusBlocked": "Umgomo uvinjiwe",
+      "edit": "Hlela umgomo",
+      "remove": "Susa umgomo",
+      "pause": "Misa umgomo",
+      "resume": "Qhubeka nomgomo",
+      "editPlaceholder": "Chaza umgomo",
+      "removeConfirmTitle": "Susa umgomo?",
+      "removeConfirmMessage": "I-CLI isusa umgomo wale seshini.",
+      "updateFailed": "Ayikwazanga ukubuyekeza umgomo.",
+      "sectionAccessibility": "{{status}}. Umgomo: {{text}}",
+      "collapse": "Goqa umgomo",
+      "expand": "Nweba umgomo"
+    },
     "newSession": {
+      "recentlyUsed": "Okusetshenziswe muva nje",
+      "couldNotLoadGithubRepositories": "Asikwazanga ukulayisha izinqolobane zekhodi ze-GitHub.",
+      "couldNotLoadGitlabRepositories": "Asikwazanga ukulayisha izinqolobane zekhodi ze-GitLab.",
+      "couldNotLoadBitbucketRepositories": "Asikwazanga ukulayisha izinqolobane zekhodi ze-Bitbucket.",
       "connectGithubDescription": "Xhuma i-GitHub esipheqululini sakho, bese ubuyela lapha ukuze ukhethe inqolobane yekhodi.",
+      "connectGitlabDescription": "Xhuma i-GitLab esipheqululini sakho, bese ubuyela lapha ukuze ukhethe inqolobane yekhodi.",
+      "connectBitbucketDescription": "Xhuma i-Bitbucket esipheqululini sakho, bese ubuyela lapha ukuze ukhethe inqolobane yekhodi.",
       "openGithub": "Vula i-GitHub",
+      "openGitlab": "Vula i-GitLab",
+      "openBitbucket": "Vula i-Bitbucket",
       "refreshRepositories": "Vuselela izinqolobane zekhodi",
       "githubConnected": "I-GitHub ixhunyiwe",
+      "gitlabConnected": "I-GitLab ixhunyiwe",
       "noRepositoriesVisible": "Azikho izinqolobane zekhodi ezibonakalayo. Hlola imvume yohlelo lokusebenza lwe-Kilo ku-GitHub yokufinyelela ezinqolobaneni zekhodi, bese uvuselela.",
+      "noRepositoriesVisibleGitlab": "Azikho izinqolobane zekhodi ezibonakalayo. Hlola imvume yokufinyelela ezinqolobaneni zekhodi ku-GitLab, bese uvuselela.",
+      "noRepositoriesVisibleBitbucket": "Azikho izinqolobane zekhodi ezibonakalayo. Hlola imvume yokufinyelela ezinqolobaneni zekhodi ku-Bitbucket, bese uvuselela.",
+      "bitbucketOrganizationsOnly": "I-Bitbucket itholakala ezinhlanganweni kuphela.",
+      "branchPickerTitle": "Khetha igatsha",
+      "branchDefault": "Okuzenzakalelayo",
+      "branchAccessibility": "Igatsha: {{label}}",
+      "branchLoading": "Kulayishwa amagatsha",
+      "branchLoadError": "Kwehlulekile ukulayisha amagatsha",
+      "branchUnavailable": "Amagatsha awatholakali kule nqolobane yekhodi. Hlola ukufinyelela kwakho kumhlinzeki, bese ukhetha enye inqolobane yekhodi.",
+      "branchEmpty": "Akukho gatsha elitholakalayo",
+      "branchPlaceholder": "Khetha igatsha",
       "runOnWithTarget": "Qalisa ku: {{target}}",
       "environment": "Indawo yokusebenza",
       "couldNotLoadEnvironment": "Asikwazanga ukulayisha indawo yakho yokusebenza.",
@@ -2013,24 +2190,13 @@
       "couldNotRefreshRepositories": "Asikwazanga ukuvuselela izinqolobane zekhodi. Sicela uzame futhi.",
       "discardDraftTitle": "Uyafuna ukulahla okusalungiswa?",
       "discardDraftMessage": "Isicelo sakho sizolahleka.",
+      "discardWithUploadsMessage": "Isicelo sakho namafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe kuzosuswa.",
       "discardFailed": "Asikwazanga ukulahla okusalungiswa. Sicela uzame futhi.",
       "remoteHint": "Qalisa `kilo remote` kukhompyutha yakho, noma `/remote` eseshini ye-CLI esebenzayo, ukuze ulawule inqubo ye-kilo yasendaweni.",
-      "connectBitbucketDescription": "Xhuma i-Bitbucket esipheqululini sakho, bese ubuyela lapha ukuze ukhethe inqolobane yekhodi.",
-      "connectGitlabDescription": "Xhuma i-GitLab esipheqululini sakho, bese ubuyela lapha ukuze ukhethe inqolobane yekhodi.",
-      "couldNotLoadBitbucketRepositories": "Asikwazanga ukulayisha izinqolobane zekhodi ze-Bitbucket.",
-      "couldNotLoadGithubRepositories": "Asikwazanga ukulayisha izinqolobane zekhodi ze-GitHub.",
-      "couldNotLoadGitlabRepositories": "Asikwazanga ukulayisha izinqolobane zekhodi ze-GitLab.",
-      "gitlabConnected": "I-GitLab ixhunyiwe",
-      "noRepositoriesVisibleBitbucket": "Azikho izinqolobane zekhodi ezibonakalayo. Hlola imvume yokufinyelela ezinqolobaneni zekhodi ku-Bitbucket, bese uvuselela.",
-      "noRepositoriesVisibleGitlab": "Azikho izinqolobane zekhodi ezibonakalayo. Hlola imvume yokufinyelela ezinqolobaneni zekhodi ku-GitLab, bese uvuselela.",
-      "openBitbucket": "Vula i-Bitbucket",
-      "openGitlab": "Vula i-GitLab",
-      "recentlyUsed": "Okusetshenziswe muva nje",
       "continueFrom": "Kuqhutshekwa neseshini ethi {{title}}.",
       "importingSession": "Iseshini iyangeniswa",
       "cliCannotContinue": "Le CLI ayikwazi ukuqhubeka neseshini. Khetha i-Cloud Agent noma enye i-CLI.",
-      "importFailed": "Asikwazanga ukungenisa le seshini.",
-      "discardWithUploadsMessage": "Isicelo sakho namafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe kuzosuswa."
+      "importFailed": "Asikwazanga ukungenisa le seshini."
     },
     "partRenderer": {
       "updatedFileCount_one": "Kubuyekezwe ifayela eli-{{displayCount}}.",
@@ -2054,7 +2220,14 @@
       "updateTodos": "Buyekeza uhlu lwemisebenzi",
       "linesBadge": "imigqa engu-{{displayCount}}",
       "filesBadge": "amafayela angu-{{displayCount}}",
-      "matchesBadge": "okufanayo okungu-{{displayCount}}"
+      "matchesBadge": "okufanayo okungu-{{displayCount}}",
+      "filesBadge_one": "ifayela elingu-{{displayCount}}",
+      "filesBadge_other": "amafayela angu-{{displayCount}}",
+      "linesBadge_one": "umugqa ongu-{{displayCount}}",
+      "linesBadge_other": "imigqa engu-{{displayCount}}",
+      "matchesBadge_one": "okufanayo okungu-{{displayCount}}",
+      "matchesBadge_other": "okufanayo okungu-{{displayCount}}",
+      "noOutput": "Akukho mphumela."
     },
     "readToolMarkdown": {
       "linesTruncated": "imigqa {{start}}–{{end}} (ifinyeziwe)",
@@ -2344,7 +2517,11 @@
       "files": "Amafayela",
       "couldNotOpenPhotoPicker": "Asikwazanga ukuvula isikhethi sezithombe. Qala kabusha i-Kilo bese uzama futhi.",
       "maxFilesAllowed": "Kuvunyelwe amafayela angeqi ku-{{displayCount}}.",
-      "onlyAddingFiles": "Kwengezwa amafayela angu-{{accepted}} kuphela kwangu-{{total}} (umkhawulo: {{max}})"
+      "onlyAddingFiles": "Kwengezwa amafayela angu-{{accepted}} kuphela kwangu-{{total}} (umkhawulo: {{max}})",
+      "maxFilesAllowed_one": "Kuvunyelwe ifayela angeqi ku-{{displayCount}}.",
+      "maxFilesAllowed_other": "Kuvunyelwe amafayela angeqi ku-{{displayCount}}.",
+      "onlyAddingFiles_one": "Kwengezwa ifayela elingu-{{accepted}} kuphela kwangu-{{total}} (umkhawulo: {{max}})",
+      "onlyAddingFiles_other": "Kwengezwa amafayela angu-{{accepted}} kuphela kwangu-{{total}} (umkhawulo: {{max}})"
     },
     "composer": {
       "addAttachment": "Engeza okunamathiselwe",
@@ -2362,7 +2539,9 @@
       "discardAttachmentsMessage": "Amafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe azosuswa.",
       "discardAttachmentsTitle": "Uyafuna ukulahla okunamathiselwe?",
       "charactersRemaining": "Kusele izinhlamvu ezingu-{{count}}",
-      "insertNewline": "Faka umugqa omusha"
+      "insertNewline": "Faka umugqa omusha",
+      "charactersRemaining_one": "Kusele uhlamvu olungu-{{count}}",
+      "charactersRemaining_other": "Kusele izinhlamvu ezingu-{{count}}"
     },
     "chatLink": {
       "linkCopied": "Isixhumanisi sikopiwe",
@@ -2396,6 +2575,12 @@
       "startNewSession": "Qala iseshini entsha",
       "exitSession": "Phuma eseshini",
       "clearSession": "Qeda le seshini bese uqala entsha",
+      "compactDescription": "hlanganisa umongo weseshini yamanje",
+      "goalDescription": "Qhubeka usebenza uqonde emgomweni weseshini. /goal <objective> noma pause, resume, clear",
+      "initDescription": "ukusethwa kwe-AGENTS.md okuholwayo",
+      "resumeClaudeDescription": "ngenisa umbhalo weseshini ye-Claude Code",
+      "resumeCodexDescription": "ngenisa umbhalo weseshini ye-OpenAI Codex",
+      "reviewDescription": "buyekeza izinguquko [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Sebenzisa /{{command}}",
       "insert": "Faka",
       "upgradeRequiredFallback": "Sicela ubuyekeze i-CLI yakho ukuze usebenzise lo myalo.",
@@ -2428,7 +2613,14 @@
       "stepsCount_one": "isinyathelo esi-{{steps}}",
       "stepsCount": "Izinyathelo ezingu-{{steps}}",
       "stepsCount_other": "Izinyathelo ezingu-{{steps}}",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Imodeli ({{displayCount}})",
+      "modelsCount_other": "Amamodeli ({{displayCount}})"
+    },
+    "autoApprove": {
+      "title": "Ukuvumela okuzenzakalelayo",
+      "description": "Vumela ngokuzenzakalelayo izicelo zemvume zalesi sikhathi. Amathuluzi abe esebenza ngaphandle kwesicelo.",
+      "unavailable": "Lesi sikhathi asikwazi ukwamukela izicelo zemvume."
     },
     "prBadge": {
       "open": "vula i-PR",
@@ -2460,6 +2652,12 @@
       "retryableDescription": "Hlola ukuxhumana kwakho bese uzama futhi. Usengaqinisekisa le folda ngokuqeda ukukhetha.",
       "unsupportedTitle": "Uhlu lwamafolda alukwazi ukuboniswa",
       "unsupportedDescription": "Le CLI ayikwazi ukubonisa uhlu lwamafolda. Uma uqeda ukukhetha, kugcinwa ifolda yokuqalisa. Iseshini izoqala kuleyo folda."
+    },
+    "toolRun": {
+      "sheetTitle": "Izingcingo zamathuluzi",
+      "condensedLabel": "{{itemCount}} izinto; {{last}}",
+      "condensedLabel_one": "{{itemCount}} into; {{last}}",
+      "condensedLabel_other": "{{itemCount}} izinto; {{last}}"
     }
   },
   "bootstrap": {
@@ -2504,6 +2702,7 @@
     "couldNotLoadActiveSessions": "Asikwazanga ukulayisha amaseshini asebenzayo.",
     "agentSessions": "Okusebenza manje",
     "newCodingTask": "Umsebenzi omusha wokubhala ikhodi",
+    "newTaskFromPicture": "Umsebenzi omusha ovela esithombeni",
     "explore": "Hlola",
     "seeAll": "Bona konke",
     "noLiveSessions": "Akukho okusebenzayo njengamanje"
@@ -2565,7 +2764,17 @@
     "languageNotInstalledMessage": "Amafayela okukhuluma e-offline e-{{language}} awafakwanga kule foni. Landa la mafayela, bese uzame futhi ukufaka ngezwi.",
     "downloadOfflineModel": "Landa",
     "offlineModelDownloadScheduled": "Amafayela okukhuluma e-offline azolandwa ngemuva. Zama futhi ukufaka ngezwi kamuva.",
-    "listeningStopped": "Ukulalela kumisiwe."
+    "listeningStopped": "Ukulalela kumisiwe.",
+    "transcribing": "Kuguqulwa ibe umbhalo...",
+    "gatewayUnreachable": "I-Kilo Gateway ayifinyelelwanga. Hlola ukuxhumana kwakho bese uzama futhi.",
+    "gatewayTimeout": "Ukuguqula inkulumo kuthathe isikhathi eside kakhulu. Zama futhi.",
+    "gatewayModelUnavailable": "Le modeli yokuguqula inkulumo ayitholakali. Khetha enye Ku-Okuncamelayo.",
+    "gatewayModelUnavailableNotice": "Le modeli ayisanikezwa. Thepha $t(transcriptionModel.title) ukukhetha enye.",
+    "gatewaySignInRequired": "Ngena ngemvume ukuze usebenzise ukuguqula inkulumo nge-Kilo Gateway.",
+    "gatewayNoModel": "Okokuqala, khetha imodeli yokuguqula inkulumo Ku-Okuncamelayo.",
+    "testTitle": "Hlola ukufaka ngezwi",
+    "testPlaceholder": "Thepha imakrofoni bese uqala ukukhuluma.",
+    "testClear": "Sula umbhalo"
   },
   "share": {
     "title": "Yabelana ku-Kilo",
@@ -2583,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "Le seshini ayikwazi ukwamukela amafayela",
     "cliCantReceiveFilesMessage": "I-Kilo CLI eqhuba le seshini ayikwazi ukwamukela amafayela. Buyekeza i-CLI kulowo mshini noma wabelane kuseshini entsha.",
     "contentlessMessage": "Akukho ongabelana ngakho — akufakiwe umbhalo namafayela.",
-    "couldNotReadContent": "Asikwazanga ukufunda okuqukethwe okwabelwane ngakho."
+    "couldNotReadContent": "Asikwazanga ukufunda okuqukethwe okwabelwane ngakho.",
+    "onlyFirstFilesAttached_one": "Ifayela okuqala angu-{{displayCount}} kuphela azonamathiselwa.",
+    "onlyFirstFilesAttached_other": "Amafayela okuqala angu-{{displayCount}} kuphela azonamathiselwa."
   },
   "kiloPass": {
     "title": "I-Kilo Pass",
@@ -2715,7 +2926,8 @@
     "aiProvidersWhat": "Izicelo zakho, umlando wengxoxo nanoma yimaphi amafayela owanamathiselayo.",
     "aiProvidersWhy": "Ukuze kukhiqizwe izimpendulo ze-AI.",
     "aiProvidersWho": "I-Anthropic, i-OpenAI, i-Google nabanye abahlinzeki obakhetha ngesicelo ngasinye.",
-    "gatewayWhat": "I-ID ye-akhawunti, imininingwane yezicelo nokusetshenziswa kwamathokheni.",
+    "gatewayWhat": "I-ID ye-akhawunti, imininingwane yezicelo, ukusetshenziswa kwamathokheni, kanye nama-prompt namarekhodi ezwi uhlelo lokusebenza eluwathumela ngalo.",
+    "viaGateway": "Ngokusebenzisa i-Kilo Gateway",
     "gatewayWhy": "Ukuqinisekisa ubuwena, ukuqondisa izicelo nokuvumelanisa amarekhodi ezinkokhelo.",
     "gatewayWho": "I-Kilo (kilo.ai).",
     "crashReportingWhat": "Imibiko yokuphahlazeka namaphutha, okususiwe kuyo okuqukethwe kohlelo lokusebenza.",
@@ -2735,7 +2947,7 @@
     "installAttributionWho": "I-AppsFlyer.",
     "voiceTranscriptionWhat": "Inkulumo yakho erekhodiwe ngenkathi uyisho ukuze ibhalwe.",
     "voiceTranscriptionWhy": "Ukuze kuguqulwe inkulumo ibe umbhalo.",
-    "voiceTranscriptionWho": "Edivayisini kuphela, noma ku-Apple noma ku-Google uma le divayisi ingakwazi ukuguqula inkulumo ibe umbhalo ngaphandle kwe-inthanethi.",
+    "voiceTranscriptionWho": "Idivayisi yakho, i-Kilo Gateway enemodeli yokuguqula umbhalo oyikhethile, noma i-Apple noma i-Google ukuze kuqashelwe ku-inthanethi.",
     "installAttributionPromptTitle": "Uyafuna ukuvumela ukuhlonzwa komthombo wokufakwa?",
     "installAttributionPromptMessage": "I-Kilo isebenzisa imvume yokulandelela ka-Apple ukuze ithole kuphela ukuthi iyiphi indlela ekulethile lapha. Izicelo zakho nezingxoxo azisetshenziswa nhlobo.",
     "what": "Ini",
@@ -2907,6 +3119,14 @@
     "tooManySignInAttempts": "Imizamo eminingi kakhulu yokungena. Sicela ulinde bese uzama futhi."
   },
   "models": {
+    "auto": {
+      "frontier": "Okuzenzakalelayo Ehamba phambili",
+      "balanced": "Okuzenzakalelayo Okulingene",
+      "efficient": "Okuzenzakalelayo Osebenza kahle",
+      "small": "Okuzenzakalelayo Okuncane",
+      "free": "Okuzenzakalelayo Mahhala",
+      "organization": "Okuzenzakalelayo Inhlangano"
+    },
     "dataCollected": "Idatha iyaqoqwa",
     "free": "Mahhala",
     "couldNotUpdateFavorites": "Asikwazanga ukubuyekeza okuthandwayo.",
@@ -2945,7 +3165,74 @@
     "privacy": "Vula i-Kilo ukuze ubone ama-ejenti",
     "openAgents": "Vula ama-ejenti",
     "needsInput": "Kudinga impendulo",
+    "newestSession": "Okusha kakhulu: {{title}}",
+    "noneWaiting": "Awekho ama-ejenti alindile",
+    "newAgent": "I-ejenti entsha",
+    "approving": "Kuyagunyaza...",
+    "couldNotApprove": "Akukwazi ukugunyaza",
+    "couldNotStart": "Akukwazi ukuqala",
     "channelName": "Ama-ejenti asebenzayo",
-    "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe."
+    "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe.",
+    "openSession": "Vula",
+    "approveFailed": "Asikwazanga ukugunyaza. Thepha $t(common.approve) ukuze uzame futhi.",
+    "newestResult": "Umphumela wakamuva"
+  },
+  "transcriptionModel": {
+    "title": "Imodeli yokuguqula inkulumo",
+    "noneChosen": "Akukho okukhethiwe",
+    "emptyTitle": "Azikho izimodeli zokuguqula inkulumo",
+    "emptyDescription": "I-Kilo Gateway ayinikezi zimodeli zokuguqula inkulumo okwamanje.",
+    "loadFailed": "Azikwazanga ukulayisha izimodeli zokuguqula inkulumo."
+  },
+  "voiceLanguage": {
+    "title": "Ulimi lokufaka ngezwi",
+    "automatic": "Okuzenzakalelayo",
+    "loadFailed": "Izilimi ezisekelwa yile divayisi azikwazanga ukulayishwa.",
+    "emptyTitle": "Azikho izilimi ezisekelwayo",
+    "emptyDescription": "Ukubona inkulumo kwale divayisi akubiki zilimi ezisekelwayo."
+  },
+  "tour": {
+    "eyebrow": "Uhambo olusheshayo",
+    "forkTitle": "Ufuna ukusebenzisa i-Kilo kuphi?",
+    "forkSubtitle": "Khetha ukuthi i-Kilo izosebenza kuphi eseshini yakho yokuqala.",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "Sebenzisa i-Kilo endaweni yefu ehlukanisiwe ngaphandle kokufaka lutho.",
+    "remoteOptionTitle": "Ikhompyutha yakho",
+    "remoteOptionBody": "Sebenzisa i-Kilo ekhompyutheni yakho ngokusebenzisa i-CLI ethi `kilo remote`.",
+    "skip": "Qeda uhambo",
+    "tutorialLabel": "Uqeqesho"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "Qala i-ejenti kudinga isicelo. Engeza isicelo bese uyiphinda.",
+      "repositoryUnknown": "I-Kilo ayiyiboni i-{{repository}} njengenqolobane yekhodi ye-GitHub noma ye-GitLab. Khetha enye inqolobane yekhodi ku-Kilo.",
+      "repositoryUnsupported": "I-{{repository}} iyinqolobane yekhodi ye-Bitbucket — Qala i-ejenti ayikakwazi ukuyisebenzisa. Khetha enye inqolobane yekhodi ku-Kilo."
+    }
+  },
+  "launcher": {
+    "openLastSession": "Vula iseshini yokugcina"
+  },
+  "spendAlerts": {
+    "subtitle": "Thumela isexwayiso nge-imeyili noma nge-push kwabathintwayo bokukhokha lapho ukusetshenziswa kwemali kwalesi sikhathi kweqa umkhawulo noma kukhuphuka ngaphezu kwezinga elivamile lehora.",
+    "enable": "Vula izexwayiso zokusebenzisa imali",
+    "thresholdTitle": "Ukweqa umkhawulo",
+    "thresholdSubtitle": "Ukusetshenziswa kwemali okwamanje kweqa umkhawulo wakho",
+    "anomalyTitle": "Ukukhuphuka ngehora",
+    "anomalySubtitle": "Ihora elilodwa liphakeme kakhulu kunezinga elivamile lalesi sikhathi",
+    "limitLabel": "Umkhawulo (USD)",
+    "windowLabel": "Isikhathi",
+    "window24h": "Amahora angu-24",
+    "window7d": "Izinsuku ezingu-7",
+    "window30d": "Izinsuku ezingu-30",
+    "multiplierLabel": "Isiphindaphindi sokukhuphuka",
+    "saved": "Izilungiselelo zexwayiso lokusetshenziswa kwemali zilondoloziwe",
+    "loadError": "Ayikwazanga ukulayisha izexwayiso zokusetshenziswa kwemali.",
+    "saveError": "Ayikwazanga ukulondoloza izexwayiso zokusetshenziswa kwemali.",
+    "empty": "Izexwayiso zokusetshenziswa kwemali zivaliwe. Zivule ukuze uxwayise abathintwayo bokukhokha balesi sikhathi.",
+    "noSpend": "Akukho kusetshenziswa kwemali okurekhodiwe okwamanje",
+    "spend24h": "Ukusetshenziswa kwemali emahoreni angu-24 edlule",
+    "multiplierError": "Faka isiphindaphindi esingu-1 noma ngaphezulu",
+    "permissionDenied": "Awunayo imvume yokuphatha izexwayiso zokusetshenziswa kwemali.",
+    "pushOffByCategory": "Kucishiwe kuzaziso"
   }
 }

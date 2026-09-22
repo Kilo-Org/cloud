@@ -1,11 +1,10 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as screen-header.mounted.test.tsx) */
 import { createElement } from 'react';
 import { RefreshControl } from '@/components/ui/refresh-control';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
-import { EmptyFilesView, TabStateMessage } from './pr-diff-hunk-rows';
+import { i18n } from '@/i18n';
+import { EmptyFilesView, HunkHeaderRow, PaginationRow, TabStateMessage } from './pr-diff-hunk-rows';
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -88,5 +87,57 @@ describe('Files pane full-body states', () => {
       (cta.props.onPress as () => void)();
     });
     expect(onRequestOverview).toHaveBeenCalledOnce();
+  });
+});
+
+describe('HunkHeaderRow code direction', () => {
+  // The header is a code literal ("@@ -0,0 +1,82 @@"). Under the interface's
+  // RTL base direction its runs reorder — the "+"/"-" land on the wrong side of
+  // their numbers and the ranges swap ends — so the header names its own
+  // left-to-right direction, like the diff lines below it.
+  it('names the left-to-right base direction on the header text', () => {
+    const renderer = mountNode(createElement(HunkHeaderRow, { header: '@@ -0,0 +1,82 @@' }));
+
+    const [headerText] = renderer.root.findAll(node => String(node.type) === 'Text');
+    if (headerText === undefined) {
+      throw new Error('expected the hunk header text');
+    }
+    const style = headerText.props.style as { direction?: string; writingDirection?: string };
+    expect(style.direction).toBe('ltr');
+    expect(style.writingDirection).toBe('ltr');
+  });
+});
+
+describe('PaginationRow', () => {
+  function renderPaginationRow() {
+    const renderer = mountNode(
+      createElement(PaginationRow, {
+        state: 'no-pages',
+        loadedFiles: 1,
+        totalFiles: 5,
+        onRetry: vi.fn<() => void>(),
+        onFetchAll: vi.fn<() => void>(),
+      })
+    );
+    return renderer.root
+      .findAll(node => String(node.type) === 'Text')
+      .map(node => String(node.props.children));
+  }
+
+  it('reads the one-file page as plural files, naming the whole page set', () => {
+    expect(renderPaginationRow()).toContain('1 of 5 files loaded');
+  });
+
+  // The count handed to i18next picks the plural category. It must be the
+  // loaded count, because the catalogs inflect the participle on the loaded
+  // number — French says "1 fichier chargé sur 5", not the plural
+  // "1 fichiers chargés sur 5" a total-keyed category renders.
+  it('keys the plural category on the loaded count, not the total', async () => {
+    await i18n.changeLanguage('fr');
+    try {
+      expect(renderPaginationRow()).toContain('1 fichier chargé sur 5');
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

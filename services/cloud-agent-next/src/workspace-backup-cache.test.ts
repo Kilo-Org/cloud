@@ -44,17 +44,8 @@ function bucketWith(value: unknown) {
 }
 
 describe('workspace backup cache policy', () => {
-  it.each([[undefined], [[]]])(
-    'rejects requests without setup commands: %j',
-    async setupCommands => {
-      await expect(
-        buildWorkspaceBackupCandidate({ ...eligibleRequest, setupCommands })
-      ).resolves.toBeNull();
-    }
-  );
-
-  it.each([[['npm ci']], [['echo first', 'custom-tool --prepare', 'npm test']]])(
-    'accepts fresh repository requests with setup commands: %j',
+  it.each([[undefined], [[]], [['npm ci']], [['echo first', 'custom-tool --prepare', 'npm test']]])(
+    'accepts fresh repository requests regardless of setup commands: %j',
     async setupCommands => {
       await expect(
         buildWorkspaceBackupCandidate({ ...eligibleRequest, setupCommands })
@@ -111,6 +102,7 @@ describe('workspace backup cache policy', () => {
         repository: { type: 'github', repo: 'acme/other' },
       }),
       buildWorkspaceBackupCandidate({ ...eligibleRequest, shallow: false }),
+      buildWorkspaceBackupCandidate({ ...eligibleRequest, setupCommands: [] }),
       buildWorkspaceBackupCandidate({ ...eligibleRequest, setupCommands: ['npm ci'] }),
       buildWorkspaceBackupCandidate({
         ...eligibleRequest,
@@ -121,7 +113,7 @@ describe('workspace backup cache policy', () => {
       }),
     ]);
 
-    expect(new Set([base?.digest, ...variants.map(value => value?.digest)]).size).toBe(6);
+    expect(new Set([base?.digest, ...variants.map(value => value?.digest)]).size).toBe(7);
   });
 
   it('canonicalizes setup environment key order', async () => {

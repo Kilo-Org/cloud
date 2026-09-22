@@ -8,6 +8,10 @@ import {
   type SessionMessageIntent,
   type TurnFinalization,
 } from '../execution/types.js';
+import type {
+  CloudAgentAssistantFailureReason,
+  CloudAgentProviderOwnership,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 import {
@@ -46,11 +50,13 @@ export type SessionOperationProof = {
   completedAt?: number;
   attachmentEpoch?: number;
   decision?: SessionOperationAck['decision'];
+  rejectionReceived?: true;
 };
 
 type SessionMessageLifecycle = {
   messageId: string;
   state: SessionMessageState;
+  queuedAt?: number;
   acceptedAt?: number;
   lastActivityAt?: number;
   deliveryDeadlineAt?: number;
@@ -60,12 +66,27 @@ type SessionMessageLifecycle = {
   terminalAt?: number;
   terminalSource?: SessionMessageTerminalSource;
   failedReason?: string;
+  failedDetail?: string;
+  assistantReason?: CloudAgentAssistantFailureReason;
+  providerOwnership?: CloudAgentProviderOwnership;
   attachFailures?: number;
   promptFailures?: number;
   preparationAttemptId?: string;
+  /**
+   * Durable wait reason for a head whose preparation attempt is finalized but
+   * still bound to an unreleased operation proof. `onProgress` cannot write to
+   * a finalized attempt, so reconnect reads this instead. Cleared whenever the
+   * attempt identity rotates or the binding is released.
+   */
+  preparationWait?: { step: string; message: string };
   retryNotBefore?: number;
   executionDeadlineAt?: number;
   cancellation?: { operationId: string; deadlineAt: number };
+  /**
+   * PR gate verdict reported by a code-review turn. Present only on a completed
+   * terminal record whose wrapper observed a gate result; absent otherwise.
+   */
+  gateResult?: 'pass' | 'fail';
   operations?: {
     attach?: SessionOperationProof;
     retiredAttach?: SessionOperationProof;
@@ -245,7 +266,9 @@ export function assignPreparationAttemptId(
   const attemptId = mint();
   return {
     messages: messages.map(item =>
-      item.messageId === messageId ? { ...item, preparationAttemptId: attemptId } : item
+      item.messageId === messageId
+        ? { ...item, preparationAttemptId: attemptId, preparationWait: undefined }
+        : item
     ),
     attemptId,
   };
@@ -275,46 +298,106 @@ export function failWaitingMessages(
         return message;
       }
       failedIds.push(message.messageId);
-      return { ...message, state: 'failed', failedReason: reason };
+      return {
+        ...message,
+        state: 'failed',
+        failedReason: reason,
+      };
     }),
     failedIds,
   };
 }
 
 /**
+ * True when a queued message still holds an operation proof that binds the
+ * current runtime identity and has not been authoritatively retired: a
+ * dispatched/completed attach, or any prompt other than one authoritatively
+ * rejected before admission (`dispatched === false`). While such a proof exists
+ * the delivery must reconcile that operation. It must not mint a new
+ * preparation attempt/acquisition or dispatch a new authorization, or the
+ * operation identity is split and the reconcile is rejected as changed.
+ */
+export function hasUnreleasedOperationProof(message: SessionMessageRecord): boolean {
+  const attach = message.operations?.attach;
+  const prompt = message.operations?.prompt;
+  return (
+    (attach !== undefined && attach.dispatched === true) ||
+    (prompt !== undefined && prompt.dispatched !== false)
+  );
+}
+
+/**
  * Release queued messages bound to a dying wrapper that never reached a
- * committed attach or prompt. These are safe to retry on a replacement
- * runtime. Messages with a completed attach proof, a prompt operation,
- * or exhausted attach failures remain bound so `failWaitingMessages`
- * can fail them as today.
+ * committed prompt. These are safe to retry on a replacement runtime.
+ *
+ * A never-dispatched message keeps its original `deliveryDeadlineAt`; only its
+ * wrapper binding and in-flight preparation state are cleared. A completed (or
+ * authoritatively retired) attach proof is moved to `retiredAttach` so a late
+ * result for the old authorization cannot restore it and the message can bind a
+ * new wrapper. Messages with an ambiguous attach (dispatched without a
+ * completed result) stay bound unless `releaseDispatchedAttach` marks the
+ * invalidation as an authoritative matching retirement.
  */
 export function releaseUnadmittedWaitingMessages(
   messages: readonly SessionMessageRecord[],
-  wrapperInstanceId: string
+  wrapperInstanceId: string,
+  options?: { releaseDispatchedAttach?: boolean }
 ): { messages: SessionMessageRecord[]; releasedIds: string[] } {
   const releasedIds: string[] = [];
+  const releaseDispatchedAttach = options?.releaseDispatchedAttach === true;
   return {
     messages: messages.map(message => {
       if (message.state !== 'queued' || message.wrapperInstanceId !== wrapperInstanceId) {
         return message;
       }
-      if (message.unresolvedDispatch) return message;
-      if (message.operations?.prompt) return message;
-      if (message.operations?.attach?.completedAt !== undefined) return message;
-      if ((message.attachFailures ?? 0) >= ATTACH_FAILURE_LIMIT) return message;
+      // A dispatched (or ambiguous) prompt may already have executed; never
+      // release it here. A prompt authoritatively rejected before admission
+      // (`dispatched === false`) never executed, so it is releasable.
+      const prompt = message.operations?.prompt;
+      if (prompt !== undefined && prompt.dispatched !== false) return message;
+
+      const attach = message.operations?.attach;
+      const completedAttach = attach?.dispatched === true && attach.completedAt !== undefined;
+      const ambiguousAttach = attach?.dispatched === true && !completedAttach;
+      const releaseAttach = completedAttach || (ambiguousAttach && releaseDispatchedAttach);
+      if (ambiguousAttach && !releaseAttach) return message;
+      if (message.unresolvedDispatch === true && !releaseDispatchedAttach) return message;
+      if (!releaseAttach && (message.attachFailures ?? 0) >= ATTACH_FAILURE_LIMIT) return message;
 
       releasedIds.push(message.messageId);
       return {
         ...message,
         wrapperInstanceId: undefined,
         preparationAttemptId: undefined,
+        preparationWait: undefined,
         retryNotBefore: undefined,
-        deliveryDeadlineAt: undefined,
-        operations: undefined,
+        unresolvedDispatch: undefined,
+        // Preserve intent and deliveryDeadlineAt: the head keeps its original
+        // preparation bound. A released attach proof is retained for late results.
+        ...(releaseAttach && attach
+          ? { operations: { retiredAttach: attach } }
+          : { operations: undefined }),
       };
     }),
     releasedIds,
   };
+}
+
+/**
+ * Replace a finalized preparation attempt with a fresh one so later wait
+ * progress is visible. Preparation may resume on an environment rebuild, so a
+ * new attempt id is legal while the prompt has not been dispatched.
+ */
+export function replacePreparationAttemptId(
+  messages: readonly SessionMessageRecord[],
+  messageId: string,
+  attemptId: string
+): SessionMessageRecord[] {
+  return messages.map(message =>
+    message.messageId === messageId
+      ? { ...message, preparationAttemptId: attemptId, preparationWait: undefined }
+      : message
+  );
 }
 
 export function releaseCompletedRetryableAttach(
@@ -332,6 +415,69 @@ export function releaseCompletedRetryableAttach(
       ...message,
       unresolvedDispatch: undefined,
       preparationAttemptId: undefined,
+      preparationWait: undefined,
+      retryNotBefore,
+      ...(Object.keys(operations).length > 0 ? { operations } : { operations: undefined }),
+    };
+  });
+}
+
+/**
+ * Retire a dispatched attach with no result so this delivery can record a
+ * fresh attach against the same runtime, attempt, and deadline. Late results
+ * for the reused authorization apply to the live proof; retiredAttach is
+ * consulted only when the live slot no longer matches.
+ */
+export function releaseUnconfirmedAttach(
+  messages: readonly SessionMessageRecord[],
+  authorization: SessionOperationAuthorization
+): SessionMessageRecord[] | undefined {
+  const message = messages.find(item => item.messageId === authorization.messageId);
+  const attach = message?.operations?.attach;
+  if (
+    !message ||
+    !attach?.dispatched ||
+    attach.result !== undefined ||
+    !sameSessionOperation(attach.authorization, authorization)
+  )
+    return undefined;
+  const operations = { ...message.operations, retiredAttach: attach };
+  delete operations.attach;
+  return messages.map(item =>
+    item.messageId !== message.messageId
+      ? item
+      : { ...item, unresolvedDispatch: undefined, operations }
+  );
+}
+
+export function rotateLostPreparationAttempt(
+  messages: readonly SessionMessageRecord[],
+  messageId: string,
+  retryNotBefore: number
+): SessionMessageRecord[] | undefined {
+  const message = messages.find(item => item.messageId === messageId);
+  if (
+    !message ||
+    message.state !== 'queued' ||
+    message.preparationAttemptId === undefined ||
+    message.unresolvedDispatch ||
+    message.operations?.attach?.dispatched === true ||
+    message.operations?.prompt?.dispatched === true
+  )
+    return undefined;
+  return messages.map(item => {
+    if (item.messageId !== messageId) return item;
+    const operations = { ...item.operations };
+    // Drop only definitively unadmitted proofs (dispatched === false after an
+    // authoritative not-admitted rejection). Retain retiredAttach: it is consulted
+    // only for late results of the old authorization and cannot block re-dispatch.
+    if (operations.attach?.dispatched !== true) delete operations.attach;
+    if (operations.prompt?.dispatched !== true) delete operations.prompt;
+    return {
+      ...item,
+      preparationAttemptId: undefined,
+      preparationWait: undefined,
+      deliveryRetryScope: undefined,
       retryNotBefore,
       ...(Object.keys(operations).length > 0 ? { operations } : { operations: undefined }),
     };
@@ -387,6 +533,9 @@ export function applyMessageOutcome(
           terminalAt: now,
           terminalSource,
           ...(outcome.reason ? { failedReason: outcome.reason } : {}),
+          ...(outcome.gateResult !== undefined ? { gateResult: outcome.gateResult } : {}),
+          ...(outcome.assistantReason ? { assistantReason: outcome.assistantReason } : {}),
+          ...(outcome.providerOwnership ? { providerOwnership: outcome.providerOwnership } : {}),
         }
       : item
   );
@@ -399,14 +548,41 @@ export function hasAcceptedMessage(messages: readonly SessionMessageRecord[]): b
 export function failQueuedMessage(
   messages: readonly SessionMessageRecord[],
   messageId: string,
-  reason?: string
+  reason?: string,
+  detail?: string
 ): SessionMessageRecord[] | undefined {
   if (!messages.some(message => message.messageId === messageId && message.state === 'queued')) {
     return undefined;
   }
   return messages.map(message =>
     message.messageId === messageId && message.state === 'queued'
-      ? { ...message, state: 'failed', ...(reason ? { failedReason: reason } : {}) }
+      ? {
+          ...message,
+          state: 'failed',
+          ...(reason ? { failedReason: reason } : {}),
+          ...(detail ? { failedDetail: detail } : {}),
+        }
+      : message
+  );
+}
+
+export function failAcceptedMessage(
+  messages: readonly SessionMessageRecord[],
+  messageId: string,
+  reason?: string,
+  detail?: string
+): SessionMessageRecord[] | undefined {
+  if (!messages.some(message => message.messageId === messageId && message.state === 'accepted')) {
+    return undefined;
+  }
+  return messages.map(message =>
+    message.messageId === messageId && message.state === 'accepted'
+      ? {
+          ...message,
+          state: 'failed',
+          ...(reason ? { failedReason: reason } : {}),
+          ...(detail ? { failedDetail: detail } : {}),
+        }
       : message
   );
 }
@@ -420,15 +596,15 @@ export function cancelPendingMessage(
   if (target.state === 'cancelled' && target.failedReason === 'queued_message_cancelled') {
     return { dropped: true };
   }
+  // A queued message whose prompt was never dispatched is always cancellable,
+  // even with a preparation attempt, wrapper binding, head deadline, or an
+  // incomplete attach proof. An unresolved dispatch or a dispatched prompt is
+  // ambiguous with the agent and must be reconciled instead of silently dropped.
   if (
     target.state !== 'queued' ||
     target.acceptedAt !== undefined ||
     target.unresolvedDispatch ||
-    target.preparationAttemptId !== undefined ||
-    target.deliveryDeadlineAt !== undefined ||
-    target.wrapperInstanceId !== undefined ||
-    target.operations !== undefined ||
-    target.cancellation !== undefined
+    target.operations?.prompt?.dispatched === true
   ) {
     return { dropped: false };
   }
@@ -493,8 +669,8 @@ export function failedMessageSnapshot(
     reason: cancelled ? 'interrupted' : message.failedReason,
     ...(cancelled
       ? { error: 'The message was interrupted' }
-      : message.failedReason
-        ? { error: message.failedReason }
+      : message.failedDetail || message.failedReason
+        ? { error: message.failedDetail ?? message.failedReason }
         : {}),
     timestamp: message.acceptedAt ?? now,
   };
@@ -677,6 +853,35 @@ export function recordSessionOperationDispatch(
                   authorization.dispatchDeadlineAt + SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
               }
             : {}),
+        }
+      : item
+  );
+}
+
+export function markSessionOperationRejection(
+  messages: readonly SessionMessageRecord[],
+  authorization: SessionOperationAuthorization
+): SessionMessageRecord[] | undefined {
+  if (authorization.operation !== 'session.attach') return [...messages];
+  const message = messages.find(item => item.messageId === authorization.messageId);
+  const proof = message?.operations?.attach;
+  const storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
+  if (
+    !message ||
+    !proof?.dispatched ||
+    !storedAuthorization.success ||
+    !sameSessionOperation(storedAuthorization.data, authorization)
+  )
+    return undefined;
+  if (proof.rejectionReceived) return [...messages];
+  return messages.map(item =>
+    item.messageId === message.messageId
+      ? {
+          ...item,
+          operations: {
+            ...item.operations,
+            attach: { ...proof, rejectionReceived: true },
+          },
         }
       : item
   );

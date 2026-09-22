@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type {
-  DispatchPushInput,
-  DispatchPushOutcome,
-  SendAgentSessionNotificationParams,
+import {
+  agentNotificationKindForPushData,
+  androidChannelIdForPushData,
+  iosInterruptionLevelForPushData,
+  pushDataSchema,
+  type DispatchPushInput,
+  type DispatchPushOutcome,
+  type SendAgentSessionNotificationParams,
 } from '@kilocode/notifications';
 
 import {
@@ -30,6 +34,7 @@ const ALL_ON: UserNotificationPreferences = {
   sessionStatusEnabled: true,
   kiloclawActivityEnabled: true,
   balanceAlertsEnabled: true,
+  spendAlertsEnabled: true,
   securityFindingsEnabled: true,
 };
 
@@ -113,12 +118,29 @@ describe('buildAgentSessionNotificationDispatchInput', () => {
         body: 'Build finished',
         i18nKey: 'agentSession.notification',
         i18nParams: { sessionTitle: 'Refactor auth module', message: 'Build finished' },
-        data: { type: 'cloud_agent_session', cliSessionId: 'ses_abc' },
+        data: { type: 'cloud_agent_session', cliSessionId: 'ses_abc', category: 'attention' },
         sound: 'default',
         priority: 'high',
       },
       rateLimit: { key: 'agent:ses_abc', limit: 5, windowSeconds: 600 },
     });
+  });
+
+  it('classifies the notify_user push as needs-input on every presentation surface', () => {
+    const content = buildAgentSessionNotificationContent(baseParams, session);
+    const input = buildAgentSessionNotificationDispatchInput(baseParams, content);
+    const data = pushDataSchema.parse(input.push.data);
+
+    // The explicit user-attention path must not depend on the absent-category
+    // fallback for legacy status producers.
+    expect(data).toEqual({
+      type: 'cloud_agent_session',
+      cliSessionId: 'ses_abc',
+      category: 'attention',
+    });
+    expect(agentNotificationKindForPushData(data)).toBe('needs-input');
+    expect(androidChannelIdForPushData(data)).toBe('needs-input');
+    expect(iosInterruptionLevelForPushData(data)).toBe('time-sensitive');
   });
 });
 
@@ -170,19 +192,21 @@ describe('dispatchAgentSessionNotificationPush', () => {
     expect(deps.readPreferences).not.toHaveBeenCalled();
   });
 
-  it('returns suppressed_preference when the user has turned agent pushes off', async () => {
-    const { deps, calls } = fakeDeps({ preferences: { agentPushEnabled: false } });
+  it('returns suppressed_preference when the user has turned the "Agent needs you" kind off', async () => {
+    const { deps, calls } = fakeDeps({ preferences: { agentAttentionEnabled: false } });
     const result = await dispatchAgentSessionNotificationPush(baseParams, deps);
     expect(result).toEqual({ dispatched: false, reason: 'suppressed_preference' });
     expect(calls.dispatchPushInputs).toHaveLength(0);
   });
 
-  it('keeps other category preferences irrelevant — only agentPushEnabled gates this RPC', async () => {
+  it('gates on agentAttentionEnabled only — the needs-input kind, not agentPushEnabled', async () => {
     const { deps, calls } = fakeDeps({
       preferences: {
-        agentPushEnabled: true,
+        // The push is needs-input now, so the 'Agent updates' toggle no longer
+        // governs it; every other category stays irrelevant.
+        agentPushEnabled: false,
         chatMessagesEnabled: false,
-        agentAttentionEnabled: false,
+        agentAttentionEnabled: true,
         sessionStatusEnabled: false,
         kiloclawActivityEnabled: false,
       },
@@ -220,7 +244,11 @@ describe('dispatchAgentSessionNotificationPush', () => {
       windowSeconds: 600,
     });
     expect(input.push.title).toBe('Refactor auth module');
-    expect(input.push.data).toEqual({ type: 'cloud_agent_session', cliSessionId: 'ses_abc' });
+    expect(input.push.data).toEqual({
+      type: 'cloud_agent_session',
+      cliSessionId: 'ses_abc',
+      category: 'attention',
+    });
   });
 
   it('passes through suppressed_presence / suppressed_rate_limit / no_tokens / duplicate outcomes', async () => {

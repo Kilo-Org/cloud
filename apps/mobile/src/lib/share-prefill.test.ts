@@ -20,13 +20,6 @@ vi.mock('expo-crypto', () => {
   };
 });
 
-vi.mock('expo-file-system/legacy', () => ({
-  cacheDirectory: 'file:///cache/',
-  copyAsync: vi.fn(async () => {
-    await Promise.resolve();
-  }),
-}));
-
 const expoFileSystemMock = vi.hoisted(() => {
   const files = new Map<string, string>();
   const File = vi.fn(function FileMock(_base: unknown, ...rest: unknown[]) {

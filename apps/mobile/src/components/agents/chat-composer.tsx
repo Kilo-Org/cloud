@@ -49,6 +49,7 @@ import {
   createMobileSlashCommandList,
   getSlashCommandCandidate,
   getSlashCommandSuggestions,
+  isGoalCommandDraft,
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
@@ -58,6 +59,7 @@ import {
 } from '@/components/agents/composer-paste-text';
 import {
   COMPOSER_CHROME_HEIGHT,
+  COMPOSER_INPUT_MAX_HEIGHT,
   COMPOSER_INPUT_PADDING_HORIZONTAL,
   resolveComposerMaxHeight,
   resolveComposerTextContentWidth,
@@ -161,6 +163,15 @@ type ChatComposerProps = {
   ) => Promise<void>;
   onStop?: () => void | Promise<void>;
   disabled?: boolean;
+  /**
+   * Session-level send gate, separate from `disabled`. True while the active
+   * session cannot accept a message (a failed turn, a dropped remote owner, an
+   * unresolved open). It locks sending, the toolbar and the attachment picker
+   * exactly as `disabled` does, but keeps the text input editable, so a failed
+   * turn leaves the reader able to type the next message beside the error's
+   * Retry instead of only Retry.
+   */
+  sendDisabled?: boolean;
   isStreaming?: boolean;
   placeholder?: string;
   mode: AgentMode;
@@ -221,6 +232,7 @@ export function ChatComposer({
   onExitSession,
   onStop,
   disabled = false,
+  sendDisabled = false,
   isStreaming = false,
   placeholder = i18n.t('common.sendMessage'),
   mode,
@@ -280,6 +292,17 @@ export function ChatComposer({
   const [characterCount, setCharacterCount] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
+  // Inline validation feedback for a rejected slash-command submission. A
+  // transient toast (sonner-native) renders outside the accessibility /
+  // automation tree and floats over the composer, so the reader cannot see
+  // the message and a device round cannot assert it. Rendering the rejection
+  // inline keeps it visible above the input row, announced, and out of the
+  // send control's way.
+  const [slashCommandFeedback, setSlashCommandFeedback] = useState<string | null>(null);
+  // True after a bare `/goal` submission: the composer is collecting the goal
+  // objective. Keeps the `/goal ` draft and surfaces the objective hint so the
+  // next step is explicit instead of the send silently doing nothing.
+  const [goalComposeActive, setGoalComposeActive] = useState(false);
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -298,7 +321,8 @@ export function ChatComposer({
   // mounts with editable=true from the start. Draft text is restored after
   // remount.
   const [inputEpoch, setInputEpoch] = useState(0);
-  const pendingDraftRestoreRef = useRef<string | null>(null);
+  // Armed by handleStop; the remount effect restores the live text once.
+  const pendingDraftRestoreRef = useRef(false);
   const stopRemountPhaseRef = useRef<StopRemountPhase>('idle');
   const [stopCompleted, setStopCompleted] = useState(false);
   const stopGenerationRef = useRef(0);
@@ -373,6 +397,7 @@ export function ChatComposer({
     sessionHeaderHeight: SESSION_HEADER_HEIGHT * fontScale,
     composerChromeHeight: COMPOSER_CHROME_HEIGHT * fontScale,
     minHeight: inputMinHeight,
+    absoluteMaxHeight: COMPOSER_INPUT_MAX_HEIGHT * fontScale,
   });
 
   // Track the keyboard's reported height so the remaining-space cap follows it.
@@ -454,15 +479,25 @@ export function ChatComposer({
     setHasText(draft.trim().length > 0);
     setCharacterCount(draft.length);
     setSlashCommandInput(getSlashCommandCandidate(draft));
+    if (!isGoalCommandDraft(draft)) {
+      setGoalComposeActive(false);
+    }
     measureRef.current.setText(draft);
   }, []);
 
   useEffect(() => {
-    const draft = pendingDraftRestoreRef.current;
-    if (draft === null) {
+    if (!pendingDraftRestoreRef.current) {
       return;
     }
-    pendingDraftRestoreRef.current = null;
+    pendingDraftRestoreRef.current = false;
+    // Read the live text at remount time, never the stop-tap snapshot: the
+    // gateway transcript lands after Stop (the upload resolves post-stop),
+    // so a stop-time snapshot is the pre-transcript text. Restoring it — or
+    // skipping the restore when it is empty — left the remounted row blank
+    // while the live ref and the durable draft kept the transcript, and the
+    // next dictation then appended to the hidden text: the draft showed the
+    // same transcript twice (spot check e12-back).
+    const draft = textRef.current;
     if (!draft) {
       return;
     }
@@ -505,7 +540,7 @@ export function ChatComposer({
   // `isStreaming` is intentionally NOT a composer gate (see
   // `chat-composer-input-state.ts`); the user must remain able to type and
   // send while the agent runs.
-  const toolbarDisabled = disabled || isSending;
+  const toolbarDisabled = disabled || sendDisabled || isSending;
   const voiceDisabled = toolbarDisabled;
 
   // One place text is written into the live input from an external caller
@@ -522,6 +557,9 @@ export function ChatComposer({
     setHasText(value.trim().length > 0);
     setCharacterCount(value.length);
     setSlashCommandInput(null);
+    if (!isGoalCommandDraft(value)) {
+      setGoalComposeActive(false);
+    }
     inputRef.current?.setNativeProps({
       text: value,
       selection: { start: value.length, end: value.length },
@@ -564,6 +602,15 @@ export function ChatComposer({
 
   function handleChangeText(value: string) {
     textRef.current = value;
+    // Any edit clears a stale slash-command rejection: the reader is fixing
+    // the input the message is about.
+    setSlashCommandFeedback(null);
+    // A draft that is no longer the `/goal` command ends goal compose mode, so
+    // the objective hint never outlives the text it describes. A no-op when the
+    // mode is already off.
+    if (!isGoalCommandDraft(value)) {
+      setGoalComposeActive(false);
+    }
     // Derived state (measure node, hasText, slash command) is coalesced to one
     // publication per frame; the live submit-time ref and the debounced draft
     // write stay synchronous so neither can lag a keystroke.
@@ -656,6 +703,7 @@ export function ChatComposer({
     ).length,
     attachmentMax: AGENT_ATTACHMENT_MAX_FILES,
     disabled,
+    sendDisabled,
     hasText,
     isFocused,
     isSending,
@@ -850,6 +898,7 @@ export function ChatComposer({
     setHasText(false);
     setCharacterCount(0);
     setSlashCommandInput(null);
+    setGoalComposeActive(false);
     measure.reset();
     inputRef.current?.clear();
     // Clear the persisted draft only on successful send / explicit clear,
@@ -868,7 +917,12 @@ export function ChatComposer({
     const sendableAttachmentsCount = upload.attachments.filter(
       attachment => !(attachment.status === 'error' && attachment.terminal === true)
     ).length;
-    if ((trimmed.length === 0 && sendableAttachmentsCount === 0) || disabled || isSending) {
+    if (
+      (trimmed.length === 0 && sendableAttachmentsCount === 0) ||
+      disabled ||
+      sendDisabled ||
+      isSending
+    ) {
       return;
     }
     if (upload.hasFailedAttachments) {
@@ -883,17 +937,35 @@ export function ChatComposer({
     });
 
     if (submission.type === 'attachment-error') {
-      toast.error(i18n.t('agentChat.composer.attachmentsWithSlashCommands'));
+      setSlashCommandFeedback(i18n.t('agentChat.composer.attachmentsWithSlashCommands'));
       return;
     }
     if (submission.type === 'argument-error') {
-      toast.error(submission.message);
+      setSlashCommandFeedback(submission.message);
       return;
     }
     if (submission.type === 'upgrade-required') {
-      toast.error(submission.message);
+      setSlashCommandFeedback(submission.message);
       return;
     }
+    // Valid submission: drop a rejection left over from an earlier attempt.
+    setSlashCommandFeedback(null);
+
+    if (submission.type === 'goal-compose') {
+      // Bare `/goal` is a compose mode: keep the draft, mark the composer so the
+      // objective hint appears, and focus the input so the user can type the
+      // objective. Normalize the retained draft to `/goal ` first — a bare
+      // `/goal` with no separator would put the next keystroke directly after
+      // `goal` (`/goalShip it`), which is no longer a goal command and would be
+      // sent as an ordinary prompt. `applyComposerText` moves the caret to the
+      // end and focuses the input. The next send parses as `/goal <objective>`
+      // and forwards to the CLI.
+      setGoalComposeActive(true);
+      applyComposerText(`${trimmed} `);
+      return;
+    }
+    // Any other submission leaves goal compose mode.
+    setGoalComposeActive(false);
 
     // The admission lock is owned by `settleVoiceInputBeforeSubmit` for the
     // full settle + submit sequence, so `handleSend` performs validation and
@@ -1051,7 +1123,10 @@ export function ChatComposer({
 
   function handleStop() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    pendingDraftRestoreRef.current = textRef.current;
+    // Arm the remount restore; the remount effect reads the live text, so
+    // a transcript that lands between this tap and the remount is kept (the
+    // gateway upload resolves after Stop).
+    pendingDraftRestoreRef.current = true;
     Keyboard.dismiss();
     setIsFocused(false);
     // Arm the state machine and clear the completion flag.  The effect
@@ -1127,128 +1202,160 @@ export function ChatComposer({
       </Animated.View>
     ) : null;
 
+  // Landscape safe area: pad the whole composer content (suggestion card,
+  // toolbar, attachment strip, voice row, counter, input row with the send
+  // control) by the sensor side insets while the BlurBar background stays
+  // full-bleed. The insets are 0 in portrait, so portrait geometry is
+  // unchanged, and the rotation applies as a style-only re-render — no
+  // remount, so the uncontrolled input keeps its text.
   return (
     <BlurBar>
-      {measure.measureElement}
+      <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
+        {measure.measureElement}
 
-      {suggestionRow}
+        {suggestionRow}
 
-      {!suggestionRow && control.showToolbar ? (
-        <Animated.View
-          entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-          exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
-        >
-          <ChatToolbar
-            mode={mode}
-            onModeChange={onModeChange}
-            model={model}
-            variant={variant}
-            modelOptions={modelOptions}
-            onModelSelect={onModelSelect}
-            disabled={control.toolbarDisabled}
-            onPaste={attachmentsEnabled ? pasteClipboard : undefined}
-            pasteDisabled={!control.inputEditable}
-            customOptions={customOptions}
-            modelLocked={modelLocked}
-            modelLockLabel={modelLockLabel}
+        {!suggestionRow && control.showToolbar ? (
+          <Animated.View
+            entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
+            exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
+          >
+            <ChatToolbar
+              mode={mode}
+              onModeChange={onModeChange}
+              model={model}
+              variant={variant}
+              modelOptions={modelOptions}
+              onModelSelect={onModelSelect}
+              disabled={control.toolbarDisabled}
+              onPaste={attachmentsEnabled ? pasteClipboard : undefined}
+              pasteDisabled={!control.inputEditable}
+              customOptions={customOptions}
+              modelLocked={modelLocked}
+              modelLockLabel={modelLockLabel}
+            />
+          </Animated.View>
+        ) : null}
+
+        {showAttachments ? (
+          <AttachmentPreviewStrip
+            attachments={upload.attachments}
+            onRemove={removeAttachment}
+            onRetry={retryAttachment}
+            onMove={moveAttachment}
+            onReorder={reorderAttachments}
           />
-        </Animated.View>
-      ) : null}
+        ) : null}
 
-      {showAttachments ? (
-        <AttachmentPreviewStrip
-          attachments={upload.attachments}
-          onRemove={removeAttachment}
-          onRetry={retryAttachment}
-          onMove={moveAttachment}
-          onReorder={reorderAttachments}
-        />
-      ) : null}
+        {upload.attachments.some(attachment => attachment.metadataStripFailed === true) ? (
+          <AccessibleStatus
+            tone="error"
+            message={i18n.t('agentChat.composer.photoMetadataNotRemoved')}
+            className="mb-2 px-4 text-xs"
+          />
+        ) : null}
 
-      {upload.attachments.some(attachment => attachment.metadataStripFailed === true) ? (
+        {slashCommandSuggestions.length > 0 && !isSending ? (
+          <Animated.View
+            entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
+            exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
+          >
+            <SlashCommandSuggestions
+              commands={slashCommandSuggestions}
+              onSelect={handleSelectSlashCommand}
+            />
+          </Animated.View>
+        ) : null}
+
         <AccessibleStatus
+          message={slashCommandFeedback}
           tone="error"
-          message={i18n.t('agentChat.composer.photoMetadataNotRemoved')}
           className="mb-2 px-4 text-xs"
         />
-      ) : null}
 
-      {slashCommandSuggestions.length > 0 && !isSending ? (
-        <Animated.View
-          entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-          exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
+        <View
+          className={cn(
+            'px-3',
+            voiceInput.status === 'listening' || voiceInput.status === 'transcribing'
+              ? 'pb-1'
+              : 'pb-0'
+          )}
         >
-          <SlashCommandSuggestions
-            commands={slashCommandSuggestions}
-            onSelect={handleSelectSlashCommand}
-          />
-        </Animated.View>
-      ) : null}
+          <VoiceInputStatus status={voiceInput.status} />
+        </View>
 
-      <View className={cn('px-3', voiceInput.status === 'listening' ? 'pb-1' : 'pb-0')}>
-        <VoiceInputStatus status={voiceInput.status} />
+        {goalComposeActive ? (
+          <AccessibleStatus
+            message={i18n.t('agentChat.goal.editPlaceholder')}
+            tone="status"
+            className="px-4 pb-1 text-xs"
+          />
+        ) : null}
+
+        {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount <= COMPOSER_COUNTER_VISIBLE_REMAINING ? (
+          <View className="flex-row justify-end px-4 pb-1">
+            {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
+            <Text
+              className="text-xs font-normal text-muted-foreground"
+              accessibilityLabel={i18n.t('agentChat.composer.charactersRemaining', {
+                count: CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount,
+              })}
+            >
+              {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount}
+            </Text>
+          </View>
+        ) : null}
+
+        <GestureDetector gesture={dismissKeyboardPan}>
+          <View collapsable={false} className="w-full" {...androidDismissKeyboardTouchProps}>
+            <ChatComposerInputRow
+              key={inputEpoch}
+              attachmentsEnabled={attachmentsEnabled}
+              canSend={control.canSend}
+              // The row's `disabled` only gates the Stop control, which keeps
+              // the merged gate it had before the send gate was split out.
+              disabled={disabled || sendDisabled}
+              hasSendableContent={control.hasSendableContent}
+              inputAccessibilityDisabled={control.inputAccessibilityDisabled}
+              inputEditable={control.inputEditable}
+              inputRef={inputRef}
+              isSending={isSending}
+              isStreaming={isStreaming}
+              maxInputHeight={inputMaxHeight}
+              measureHeight={measure.height}
+              onAddAttachment={() => {
+                void handleAddAttachment();
+              }}
+              onChangeText={handleChangeText}
+              onInputBlur={() => {
+                inputFocusedRef.current = false;
+                setIsFocused(false);
+              }}
+              onInputFocus={() => {
+                inputFocusedRef.current = true;
+                setIsFocused(true);
+              }}
+              onInputLayout={handleInputLayout}
+              onInsertNewline={handleInsertNewline}
+              onSelectionChange={handleSelectionChange}
+              onStop={handleStop}
+              onSubmit={() => {
+                void submit();
+              }}
+              onToggleVoice={() => {
+                void voiceInput.toggle();
+              }}
+              paperclipDisabled={control.paperclipDisabled}
+              placeholder={placeholder}
+              returnSendsMessage={returnSendsMessage}
+              textInputStyle={textInputStyle}
+              voiceDisabled={control.voiceDisabled}
+              voiceInputAvailable={voiceInput.available}
+              voiceInputStatus={voiceInput.status}
+            />
+          </View>
+        </GestureDetector>
       </View>
-
-      {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount <= COMPOSER_COUNTER_VISIBLE_REMAINING ? (
-        <View className="flex-row justify-end px-4 pb-1">
-          <Text
-            className="text-xs font-normal text-muted-foreground"
-            accessibilityLabel={i18n.t('agentChat.composer.charactersRemaining', {
-              count: CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount,
-            })}
-          >
-            {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount}
-          </Text>
-        </View>
-      ) : null}
-
-      <GestureDetector gesture={dismissKeyboardPan}>
-        <View collapsable={false} className="w-full" {...androidDismissKeyboardTouchProps}>
-          <ChatComposerInputRow
-            key={inputEpoch}
-            attachmentsEnabled={attachmentsEnabled}
-            canSend={control.canSend}
-            disabled={disabled}
-            hasSendableContent={control.hasSendableContent}
-            inputAccessibilityDisabled={control.inputAccessibilityDisabled}
-            inputEditable={control.inputEditable}
-            inputRef={inputRef}
-            isSending={isSending}
-            isStreaming={isStreaming}
-            maxInputHeight={inputMaxHeight}
-            measureHeight={measure.height}
-            onAddAttachment={() => {
-              void handleAddAttachment();
-            }}
-            onChangeText={handleChangeText}
-            onInputBlur={() => {
-              inputFocusedRef.current = false;
-              setIsFocused(false);
-            }}
-            onInputFocus={() => {
-              inputFocusedRef.current = true;
-              setIsFocused(true);
-            }}
-            onInputLayout={handleInputLayout}
-            onInsertNewline={handleInsertNewline}
-            onSelectionChange={handleSelectionChange}
-            onStop={handleStop}
-            onSubmit={() => {
-              void submit();
-            }}
-            onToggleVoice={() => {
-              void voiceInput.toggle();
-            }}
-            paperclipDisabled={control.paperclipDisabled}
-            placeholder={placeholder}
-            returnSendsMessage={returnSendsMessage}
-            textInputStyle={textInputStyle}
-            voiceDisabled={control.voiceDisabled}
-            voiceInputAvailable={voiceInput.available}
-            voiceInputStatus={voiceInput.status}
-          />
-        </View>
-      </GestureDetector>
     </BlurBar>
   );
 }

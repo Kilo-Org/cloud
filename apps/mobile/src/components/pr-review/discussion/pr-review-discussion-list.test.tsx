@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as screen-header.mounted.test.tsx) */
 import { createElement, Fragment, type ReactElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrReviewDiscussionList } from './pr-review-discussion-list';
@@ -31,6 +30,8 @@ vi.mock('@/lib/trpc', () => ({
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus' }));
 vi.mock('@/components/pr-review/discussion/comment-row', () => ({ CommentRow: 'CommentRow' }));
 vi.mock('@/components/pr-review/discussion/discussion-thread', () => ({
   DiscussionThread: 'DiscussionThread',
@@ -77,6 +78,38 @@ function footerView(renderer: TestRenderer.ReactTestRenderer): TestRenderer.Reac
   }
   return footer;
 }
+
+describe('PrReviewDiscussionList side insets (landscape)', () => {
+  beforeEach(() => {
+    insetsState.bottom = 0;
+    insetsState.left = 0;
+    insetsState.right = 0;
+    flashListProps.current = null;
+  });
+
+  it('carries explicit zero side insets at portrait', () => {
+    mountList();
+
+    expect(flashListProps.current?.contentContainerStyle).toEqual({
+      paddingTop: 12,
+      paddingLeft: 0,
+      paddingRight: 0,
+    });
+  });
+
+  it('clears the sensor housing with the landscape side insets', () => {
+    insetsState.left = 47;
+    insetsState.right = 59;
+
+    mountList();
+
+    expect(flashListProps.current?.contentContainerStyle).toEqual({
+      paddingTop: 12,
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
+  });
+});
 
 describe('PrReviewDiscussionList footer bottom inset (plan §6)', () => {
   beforeEach(() => {

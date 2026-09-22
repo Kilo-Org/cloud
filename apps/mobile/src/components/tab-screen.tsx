@@ -1,26 +1,22 @@
-import { Platform, ScrollView, type ScrollViewProps, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { type Ref } from 'react';
+import { ScrollView, type ScrollViewProps } from 'react-native';
 
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
 // FlatList/FlashList screens use this directly for contentContainerStyle.paddingBottom.
 export function useTabBarBottomPadding() {
-  const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
-  return (
-    getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }) +
-    TAB_SCREEN_BOTTOM_GAP
-  );
+  return useEffectiveTabBarHeight() + TAB_SCREEN_BOTTOM_GAP;
 }
 
 export function TabScreenScrollView({
   children,
   style,
   refreshControl,
+  ref,
   ...props
-}: ScrollViewProps) {
+}: ScrollViewProps & { ref?: Ref<ScrollView> }) {
   const paddingBottom = useTabBarBottomPadding();
   // Reserve the tab bar's space in the layout: the bar is an absolute blur
   // overlay, and rows parked behind it read as clipped (b911 vr1 spot check,
@@ -32,6 +28,7 @@ export function TabScreenScrollView({
   return (
     <ScrollView
       {...props}
+      ref={ref}
       refreshControl={refreshControl}
       style={[style, { marginBottom: paddingBottom }]}
     >

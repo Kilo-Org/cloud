@@ -1,5 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
-
+import { readStoredValue, type SecureStoreReadOptions } from '@/lib/auth/secure-store-value';
 import { E2E_SECURE_STORE_FAULT_MS } from '@/lib/config';
 
 /**
@@ -34,13 +33,13 @@ async function delay(ms: number): Promise<void> {
 /** One attempt: the handed-over read if there is one, otherwise a fresh one. */
 async function readOnce(
   key: string,
-  options: SecureStore.SecureStoreOptions | undefined,
+  options: SecureStoreReadOptions | undefined,
   firstAttempt: Promise<string | null> | undefined
 ): Promise<string | null> {
   if (isFaultWindowOpen()) {
     throw new Error(`E2E secure-store fault window is open: read of ${key} rejected`);
   }
-  const value = await (firstAttempt ?? SecureStore.getItemAsync(key, options));
+  const value = await (firstAttempt ?? readStoredValue(key, options));
   return value;
 }
 
@@ -54,7 +53,7 @@ async function readOnce(
  */
 export async function readStoredValueWithRetry(
   key: string,
-  options?: SecureStore.SecureStoreOptions,
+  options?: SecureStoreReadOptions,
   firstAttempt?: Promise<string | null>
 ): Promise<string | null> {
   let pending = firstAttempt;

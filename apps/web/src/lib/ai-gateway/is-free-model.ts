@@ -4,6 +4,7 @@ import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership'
 import {
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
+  isLocalFakeTranscriptionModel,
 } from '@/lib/ai-gateway/local-fake-llm';
 
 /**
@@ -17,14 +18,16 @@ import {
  * don't transitively pull in the Redis client.
  */
 export async function isFreeModel(model: string): Promise<boolean> {
+  const modelId = model ?? '';
   return (
-    (isLocalFakeDeterministicModel(model) && isLocalFakeLlmEnabled()) ||
-    isKiloExclusiveFreeModel(model) ||
-    model === KILO_AUTO_FREE_MODEL.id ||
-    (model ?? '').endsWith(':free') ||
-    model === 'openrouter/free' ||
-    model === 'stealth/ox-alpha' ||
-    (await isPublicIdExperimented(model ?? ''))
+    ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
+      isLocalFakeLlmEnabled()) ||
+    isKiloExclusiveFreeModel(modelId) ||
+    modelId === KILO_AUTO_FREE_MODEL.id ||
+    modelId.endsWith(':free') ||
+    modelId === 'openrouter/free' ||
+    (modelId.startsWith('stealth/') && modelId.endsWith('-alpha')) ||
+    (await isPublicIdExperimented(modelId))
   );
 }
 

@@ -11,6 +11,9 @@ jest.mock('@/lib/user/server');
 jest.mock('@/lib/integrations/linear-service', () => ({
   getLinearOAuthUrl: jest.fn(),
 }));
+jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
+  beginProviderOAuthAttempt: jest.fn(async () => undefined),
+}));
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
 }));

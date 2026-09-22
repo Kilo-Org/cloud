@@ -78,6 +78,16 @@ export function resolveVoiceInputControlState(
         showListeningStatus: true,
       };
     }
+    case 'transcribing': {
+      // The upload can hang; keep the button tappable so the user can cancel.
+      return {
+        accessibilityLabel: i18n.t('voiceInput.stop'),
+        busy: false,
+        disabled,
+        icon: 'stop',
+        showListeningStatus: true,
+      };
+    }
     case 'stopping': {
       return {
         accessibilityLabel: i18n.t('voiceInput.stop'),

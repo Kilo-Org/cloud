@@ -119,4 +119,24 @@ describe('resolveVoiceInputControlState', () => {
       showListeningStatus: true,
     });
   });
+
+  it('transcribing + not disabled => Stop label, stop icon, not busy, enabled, status shown', () => {
+    expect(resolveVoiceInputControlState('transcribing', false)).toEqual<VoiceInputControlState>({
+      accessibilityLabel: 'Stop voice input',
+      busy: false,
+      disabled: false,
+      icon: 'stop',
+      showListeningStatus: true,
+    });
+  });
+
+  it('transcribing + external disabled => Stop label, stop icon, not busy, disabled, status shown', () => {
+    expect(resolveVoiceInputControlState('transcribing', true)).toEqual<VoiceInputControlState>({
+      accessibilityLabel: 'Stop voice input',
+      busy: false,
+      disabled: true,
+      icon: 'stop',
+      showListeningStatus: true,
+    });
+  });
 });

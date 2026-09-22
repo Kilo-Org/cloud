@@ -16,15 +16,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
 import jwt from 'jsonwebtoken';
+import { eq, or } from 'drizzle-orm';
 import { computeDatabaseUrl, createDrizzleClient, kilocode_users, sql } from '@kilocode/db';
 
 export const DRIVER_USER_EMAIL_SUFFIX = '@cloud-agent-next-e2e.example.com';
 export const FUNDED_DRIVER_BALANCE_MICRODOLLARS = 10_000_000;
 const JWT_TOKEN_VERSION = 3;
-
-// ---------------------------------------------------------------------------
-// .dev.vars loader
-// ---------------------------------------------------------------------------
 
 /**
  * Parse a `.dev.vars` file — same format as `.env`, with `KEY=value` pairs.
@@ -83,10 +80,6 @@ export function loadRepoEnvFiles(servicePackageDir: string): void {
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// User ensure
-// ---------------------------------------------------------------------------
 
 export type TestUser = {
   id: string;
@@ -148,9 +141,52 @@ export async function ensureTestUser(
   }
 }
 
-// ---------------------------------------------------------------------------
-// JWT minting
-// ---------------------------------------------------------------------------
+/**
+ * Load a seeded local user by email (the cloud-worktree-setup identity).
+ * Does not create a `usr_e2e_*` stand-in; GitHub integration lives on the
+ * real row. Never logs the pepper or other credentials.
+ */
+export async function loadExistingUserByEmail(
+  databaseUrl: string | undefined,
+  email: string
+): Promise<TestUser> {
+  const resolvedUrl = databaseUrl ?? computeDatabaseUrl();
+  const driver = createDrizzleClient({
+    connectionString: resolvedUrl,
+    poolConfig: { application_name: 'cloud-agent-next-e2e-driver', max: 1 },
+  });
+  try {
+    const normalizedEmail = email.trim().toLowerCase();
+    const rows = await driver.db
+      .select({
+        id: kilocode_users.id,
+        email: kilocode_users.google_user_email,
+        api_token_pepper: kilocode_users.api_token_pepper,
+      })
+      .from(kilocode_users)
+      .where(
+        or(
+          eq(kilocode_users.google_user_email, email),
+          eq(kilocode_users.normalized_email, normalizedEmail)
+        )
+      );
+    const exact = rows.filter(row => row.email === email);
+    const matches = exact.length > 0 ? exact : rows;
+    const row = matches[0];
+    if (matches.length !== 1 || !row?.id) {
+      throw new Error(
+        `No unique local user for ${email}. Run ~/.config/kilo/bin/cloud-worktree-setup from this worktree, then retry.`
+      );
+    }
+    return {
+      id: row.id,
+      email: row.email ?? email,
+      api_token_pepper: row.api_token_pepper ?? '',
+    };
+  } finally {
+    await driver.pool.end().catch(() => {});
+  }
+}
 
 export type MintedTokens = {
   apiToken: string;
@@ -161,12 +197,18 @@ export type MintedTokens = {
  * `apps/web/src/lib/tokens.ts:generateApiToken` but with a short expiry
  * since the driver is ephemeral.
  */
-export function mintApiToken(user: TestUser, nextAuthSecret: string): string {
+export function mintApiToken(
+  user: { id: string; api_token_pepper?: string },
+  nextAuthSecret: string | undefined
+): string {
+  if (!nextAuthSecret) {
+    throw new Error('mintApiToken requires NEXTAUTH_SECRET for local JWT minting');
+  }
   return jwt.sign(
     {
       env: 'development',
       kiloUserId: user.id,
-      apiTokenPepper: user.api_token_pepper,
+      ...(user.api_token_pepper ? { apiTokenPepper: user.api_token_pepper } : {}),
       version: JWT_TOKEN_VERSION,
       tokenSource: 'cloud-agent',
     },
@@ -180,7 +222,7 @@ export function mintApiToken(user: TestUser, nextAuthSecret: string): string {
  * `apps/web/src/lib/cloud-agent/stream-ticket.ts:signStreamTicket`.
  */
 export function mintStreamTicket(
-  user: TestUser,
+  user: { id: string },
   cloudAgentSessionId: string,
   nextAuthSecret: string,
   expiresInSeconds = 120

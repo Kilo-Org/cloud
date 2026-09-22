@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import { once } from 'node:events';
+import * as fs from 'node:fs';
 import { runProcess } from '../utils.js';
-import { createOwnedProcessScope } from './owned-processes.js';
+import { createOwnedProcessScope, classifyDirectProcessState } from './owned-processes.js';
 
 const spawned: ReturnType<typeof createOwnedProcessScope>[] = [];
 
@@ -39,6 +40,30 @@ describe('owned process scopes', () => {
     expect(stopped).toBe(await scope.verify(false));
     await exited;
     if (process.platform !== 'linux') expect(await scope.verify(false)).toBe(false);
+  });
+
+  it('keeps proven death after a bounded cgroup removal failure on Linux', async () => {
+    if (process.platform !== 'linux') return;
+    const scope = createOwnedProcessScope();
+    spawned.push(scope);
+    const child = scope.spawn(process.execPath, ['-e', 'process.exit(0)'], {
+      cwd: process.cwd(),
+      env: process.env,
+    });
+    await once(child, 'exit');
+    if (!scope.observesOccupancy()) return;
+    const removal = spyOn(fs, 'rmdirSync').mockImplementation(() => {
+      throw new Error('simulated cgroup removal failure');
+    });
+    try {
+      expect(await scope.stop(Date.now() + 1_000)).toBe(true);
+      const deadlineAt = Date.now() + 1_000;
+      while (removal.mock.calls.length === 0 && Date.now() < deadlineAt) await Bun.sleep(5);
+      expect(removal).toHaveBeenCalled();
+      expect(await scope.verify(false)).toBe(true);
+    } finally {
+      removal.mockRestore();
+    }
   });
 
   it('removes a delayed descendant that outlives its tracked parent when containment is available', async () => {
@@ -153,5 +178,132 @@ describe('owned process scopes', () => {
       return completed;
     });
     expect(result.exitCode).toBe(0);
+  });
+
+  it('observes a directly spawned child as alive until it exits', async () => {
+    const scope = createOwnedProcessScope();
+    spawned.push(scope);
+    const child = scope.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1_000)'], {
+      cwd: process.cwd(),
+      env: process.env,
+    });
+    const observer = scope.observeChild(child);
+    expect(observer).toBeDefined();
+    expect(await observer?.observe()).toBe('alive');
+    child.kill('SIGKILL');
+    await once(child, 'exit');
+    expect(await observer?.observe()).toBe('absent');
+  });
+
+  it('does not treat a released scope as proven cleanup', async () => {
+    const scope = createOwnedProcessScope();
+    spawned.push(scope);
+    const child = scope.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1_000)'], {
+      cwd: process.cwd(),
+      env: process.env,
+    });
+    try {
+      scope.releaseAbandoned();
+      expect(await scope.verify(false)).toBe(false);
+      expect(scope.dispose()).toBe(false);
+    } finally {
+      child.kill('SIGKILL');
+      await once(child, 'exit');
+    }
+  });
+
+  it('releases inherited child streams for an abandoned scope across repeated replacements', async () => {
+    for (let index = 0; index < 2; index += 1) {
+      const scope = createOwnedProcessScope();
+      spawned.push(scope);
+      const child = scope.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1_000)'], {
+        cwd: process.cwd(),
+        env: process.env,
+      });
+      try {
+        expect(child.stdout.destroyed).toBe(false);
+        expect(child.stderr.destroyed).toBe(false);
+        scope.releaseAbandoned();
+        scope.releaseAbandoned();
+        expect(child.stdout.destroyed).toBe(true);
+        expect(child.stderr.destroyed).toBe(true);
+        expect(child.stdin.destroyed).toBe(true);
+        expect(await scope.verify(false)).toBe(false);
+        expect(scope.dispose()).toBe(false);
+      } finally {
+        child.kill('SIGKILL');
+        await once(child, 'exit');
+      }
+    }
+  });
+
+  describe('direct process observation classification', () => {
+    it('classifies a changed start identity as reused instead of alive', () => {
+      const pid = 4321;
+      const live = '4321 (kilo) S 1 4321 4321 0 -1 4194304 100 0 0 0 1 2 0 0 20 0 1 0 111 0 0';
+      const reused = '4321 (kilo) S 1 4321 4321 0 -1 4194304 100 0 0 0 1 2 0 0 20 0 1 0 222 0 0';
+      expect(
+        classifyDirectProcessState({
+          exited: false,
+          pid,
+          platform: 'linux',
+          storedIdentity: `${pid}:111`,
+          statText: live,
+        })
+      ).toBe('alive');
+      expect(
+        classifyDirectProcessState({
+          exited: false,
+          pid,
+          platform: 'linux',
+          storedIdentity: `${pid}:111`,
+          statText: reused,
+        })
+      ).toBe('reused');
+      expect(
+        classifyDirectProcessState({
+          exited: false,
+          pid,
+          platform: 'linux',
+          storedIdentity: undefined,
+          statText: live,
+        })
+      ).toBe('unknown');
+    });
+
+    it('treats only positively established absence as absent on the non-Linux probe', () => {
+      const missing = Object.assign(new Error('missing'), {
+        code: 'ESRCH',
+      }) as NodeJS.ErrnoException;
+      const denied = Object.assign(new Error('denied'), {
+        code: 'EPERM',
+      }) as NodeJS.ErrnoException;
+      expect(
+        classifyDirectProcessState({
+          exited: false,
+          pid: 99,
+          platform: 'darwin',
+          storedIdentity: undefined,
+        })
+      ).toBe('alive');
+      expect(
+        classifyDirectProcessState({
+          exited: false,
+          pid: 99,
+          platform: 'darwin',
+          storedIdentity: undefined,
+          probeError: missing,
+        })
+      ).toBe('absent');
+      expect(
+        classifyDirectProcessState({
+          exited: false,
+          pid: 99,
+          platform: 'darwin',
+          storedIdentity: undefined,
+          probeError: denied,
+        })
+      ).toBe('unknown');
+    });
   });
 });

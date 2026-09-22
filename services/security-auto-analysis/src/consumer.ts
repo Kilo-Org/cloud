@@ -468,7 +468,6 @@ async function processOwnerMessage(params: {
         triageModel: models.triageModel,
         analysisModel: models.analysisModel,
         analysisMode: claim.config.analysis_mode,
-        organizationId: launchOwner.type === 'org' ? launchOwner.id : undefined,
         nextAuthSecret,
         internalApiSecret,
         callbackTokenSecret,

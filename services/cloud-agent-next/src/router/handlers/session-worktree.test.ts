@@ -2,9 +2,14 @@ import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
 import type { OperationLedgerRow } from '@kilocode/db/schema';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  SELECTABLE_SANDBOX_ALLOCATIONS,
+  getSandboxAllocationProvider,
+  type SandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
 
 import { t } from '../auth.js';
-import type { SessionMetadata } from '../../persistence/session-metadata.js';
+import { parseSessionMetadata, type SessionMetadata } from '../../persistence/session-metadata.js';
 import type * as SessionPlane from '../../session-plane.js';
 import type { TRPCContext } from '../../types.js';
 import { sha256Hex } from '../../utils/sha256.js';
@@ -23,6 +28,9 @@ const {
   withDORetryMock,
   createSessionForCloudAgentMock,
   deleteSessionForCloudAgentMock,
+  createRuntimeAuthorizationMock,
+  sealRuntimeAuthorizationMock,
+  verifyKiloTokenForPolicyMock,
 } = vi.hoisted(() => ({
   admitOperationMock: vi.fn(),
   markReconcilePendingMock: vi.fn(),
@@ -35,6 +43,9 @@ const {
   withDORetryMock: vi.fn(),
   createSessionForCloudAgentMock: vi.fn(),
   deleteSessionForCloudAgentMock: vi.fn(),
+  createRuntimeAuthorizationMock: vi.fn(),
+  sealRuntimeAuthorizationMock: vi.fn(),
+  verifyKiloTokenForPolicyMock: vi.fn(),
 }));
 
 vi.mock('@kilocode/db/operation-ledger', () => ({
@@ -68,6 +79,15 @@ vi.mock('../../utils/do-retry.js', () => ({
     operation: (stub: unknown) => Promise<unknown>,
     operationName: string
   ) => withDORetryMock(getStub, operation, operationName),
+}));
+
+vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
+  createRuntimeAuthorization: createRuntimeAuthorizationMock,
+  sealRuntimeAuthorization: sealRuntimeAuthorizationMock,
+}));
+
+vi.mock('@kilocode/worker-utils/kilo-token-policy', () => ({
+  verifyKiloTokenForPolicy: verifyKiloTokenForPolicyMock,
 }));
 
 const USER_ID = 'oauth/google:1234';
@@ -143,6 +163,33 @@ function sourceMetadata(options?: {
       credentialContainment: { github: true, gitlab: false, kilocode: true },
     },
     lifecycle: { version: 1, timestamp: 1 },
+  };
+}
+
+function sourceMetadataWithPreset(sandboxAllocation: SandboxAllocation): SessionMetadata {
+  const metadata = sourceMetadata({ organizationId: ORGANIZATION_ID });
+  const sandboxId =
+    sandboxAllocation === 'cloudflare-shared'
+      ? 'org-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      : 'ses-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const sandboxProvider = getSandboxAllocationProvider(sandboxAllocation);
+  return {
+    ...metadata,
+    workspace: {
+      ...metadata.workspace,
+      sandboxId,
+      sandboxProvider,
+      sandboxAllocation,
+      sandboxRoute:
+        sandboxAllocation === 'cloudflare-shared'
+          ? { kind: 'shared', routeKey: sandboxId }
+          : undefined,
+      providerRuntime:
+        sandboxProvider === 'vercel'
+          ? { provider: 'vercel', sessionId: 'vercel-runtime' }
+          : undefined,
+      credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: false },
+    },
   };
 }
 
@@ -225,7 +272,9 @@ function fixture(options?: {
   ownershipResults?: OwnershipFixture[][];
   internalSecret?: string;
   controlPlaneIds?: string;
+  runtimeIsolationEnabled?: string;
   botId?: string;
+  authToken?: string;
 }) {
   const userId = options?.userId ?? USER_ID;
   const metadata =
@@ -243,6 +292,7 @@ function fixture(options?: {
   const sourceStub = { getMetadata: vi.fn().mockResolvedValue(metadata) };
   const destinationStub = {
     getMetadata: vi.fn().mockResolvedValue(null),
+    getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy'),
     registerSession: vi.fn().mockResolvedValue({ success: true }),
     createSessionWithInitialAdmission: vi.fn(),
   };
@@ -254,18 +304,21 @@ function fixture(options?: {
   };
   const legacySessionNamespace = { idFromName: vi.fn(), get: vi.fn() };
   const sandboxControlNamespace = { idFromName: vi.fn(), get: vi.fn() };
-  const headers = new Headers({
-    'x-internal-api-key': options?.internalSecret ?? INTERNAL_SECRET,
-  });
+  const headers = new Headers();
+  if (options?.internalSecret) {
+    headers.set('x-internal-api-key', options.internalSecret);
+  }
   const context = {
     userId,
-    authToken: CURRENT_AUTH_TOKEN,
+    authToken: options?.authToken ?? CURRENT_AUTH_TOKEN,
     ...(options?.botId ? { botId: options.botId } : {}),
     request: { headers } as Request,
     env: {
       INTERNAL_API_SECRET: INTERNAL_SECRET,
+      NEXTAUTH_SECRET: 'runtime-authorization-test-secret',
       CONTROL_PLANE_IDS: options?.controlPlaneIds ?? '*',
       WORKTREE_CREATION_ENABLED_IDS: '',
+      RUNTIME_ISOLATION_ENABLED: options?.runtimeIsolationEnabled ?? 'true',
       HYPERDRIVE: { connectionString: 'postgres://worktree-handler-test' },
       SANDBOX_SESSION: sandboxSessionNamespace,
       CLOUD_AGENT_SESSION: legacySessionNamespace,
@@ -333,6 +386,12 @@ beforeEach(() => {
   );
   settleOperationMock.mockResolvedValue({ settled: true });
   deleteSessionForCloudAgentMock.mockResolvedValue(undefined);
+  verifyKiloTokenForPolicyMock.mockResolvedValue({ claims: {} });
+  createRuntimeAuthorizationMock.mockResolvedValue({
+    authorization: { id: 'destination-authorization', state: 'active' },
+    token: 'destination-delegated-token',
+  });
+  sealRuntimeAuthorizationMock.mockResolvedValue('destination-seal');
   createSessionForCloudAgentMock.mockResolvedValue({
     status: 'ready',
     clone: { sessionId: DESTINATION_KILO_SESSION_ID, copiedItemCount: 0 },
@@ -388,12 +447,25 @@ describe('createWorktreeChat request validation and authorization', () => {
     expect(CreateWorktreeChatInput.safeParse({ ...input, unexpected: true }).success).toBe(false);
   });
 
-  it('requires internal authentication before loading source ownership', async () => {
-    const { caller, input } = fixture({ internalSecret: 'wrong-secret' });
+  it('requires a user token before loading source ownership', async () => {
+    const { caller, input } = fixture({ authToken: '' });
 
     await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     expect(getPgDbMock).not.toHaveBeenCalled();
     expect(admitOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('creates a worktree chat for an owned source without an internal API key', async () => {
+    const { caller, context, input, destinationStub } = fixture();
+
+    expect(context.request.headers.get('x-internal-api-key')).toBeNull();
+    await expect(caller.createWorktreeChat(input)).resolves.toEqual({
+      cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
+      kiloSessionId: DESTINATION_KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
+    });
+    expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
+    expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
   });
 
   it('rejects another owner or a same-organization member without source ownership', async () => {
@@ -512,15 +584,233 @@ describe('createWorktreeChat request validation and authorization', () => {
     expect(admitOperationMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a grouped owner that is no longer enrolled in the control plane', async () => {
+  it('creates a sibling for a grouped owner no longer enrolled in the control plane', async () => {
     const { caller, input } = fixture({ controlPlaneIds: 'another-owner' });
 
-    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(caller.createWorktreeChat(input)).resolves.toEqual({
+      cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
+      kiloSessionId: DESTINATION_KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
+    });
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+  });
+});
+
+describe('createWorktreeChat sandbox preset inheritance', () => {
+  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
+    'inherits %s after control-plane and selection rollouts are disabled',
+    async sandboxAllocation => {
+      const metadata = sourceMetadataWithPreset(sandboxAllocation);
+      const { caller, context, input, destinationStub, sandboxControlNamespace } = fixture({
+        metadata,
+        organizationId: ORGANIZATION_ID,
+      });
+      context.env.SANDBOX_SELECTION_IDS = '';
+      context.env.CONTROL_PLANE_IDS = '';
+      context.env.PER_SESSION_SANDBOX_ORG_IDS =
+        sandboxAllocation === 'cloudflare-shared' ? '*' : '';
+      context.env.VERCEL_SANDBOX_ORG_IDS = sandboxAllocation.startsWith('vercel-') ? '' : '*';
+      context.env.CREDENTIAL_CONTAINMENT_ENABLED = 'true';
+      await caller.createWorktreeChat(input);
+      const registration = destinationStub.registerSession.mock.calls[0]?.[0];
+      const registered = parseSessionMetadata({
+        ...registration,
+        metadataSchemaVersion: 2,
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+      expect(registered.identity.sessionId).toBe(DESTINATION_WORKSPACE_ID);
+      expect(registered.workspace).toEqual({ ...metadata.workspace, providerRuntime: undefined });
+      expect(registered.workspace?.worktreeId).toBe(WORKTREE_ID);
+      expect(registered.workspace?.sandboxAllocation).toBe(sandboxAllocation);
+      expect(registered.workspace).not.toHaveProperty('resources');
+      expect(recordOperationProgressMock).toHaveBeenCalledWith(
+        expect.anything(),
+        LEDGER_ROW_ID,
+        expect.objectContaining({ sandboxAllocation })
+      );
+      expect(sandboxControlNamespace.get).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { sandboxAllocation: 'vercel-large' },
+    { runtime: { sandboxAllocation: 'vercel-large' } },
+    { workspace: { sandboxAllocation: 'vercel-large' } },
+    { sandboxProvider: 'vercel' },
+    { resources: { vcpus: 4, memory: 8192 } },
+  ])('rejects direct sibling allocation overrides before side effects: %j', async override => {
+    const { caller, input, destinationStub } = fixture({
+      metadata: sourceMetadataWithPreset('cloudflare-single'),
+      organizationId: ORGANIZATION_ID,
+    });
+    await expect(caller.createWorktreeChat({ ...input, ...override })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(assertOrganizationMembershipMock).not.toHaveBeenCalled();
     expect(admitOperationMock).not.toHaveBeenCalled();
+    expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+    expect(destinationStub.registerSession).not.toHaveBeenCalled();
+  });
+
+  it.each(['vercel-large', undefined] as const)(
+    'rejects same-key replay if the source preset changes to %s',
+    async sandboxAllocation => {
+      const metadata = sourceMetadataWithPreset('vercel-small');
+      const source = ownershipRow({ organizationId: ORGANIZATION_ID });
+      const { caller, input, destinationStub } = fixture({
+        metadata,
+        organizationId: ORGANIZATION_ID,
+        ownershipResults: [[source], [source]],
+      });
+      await caller.createWorktreeChat(input);
+      const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+      metadata.workspace = { ...metadata.workspace, sandboxAllocation };
+      admitOperationMock.mockResolvedValueOnce({
+        admission: 'duplicate_settled',
+        row: ledgerRow({
+          organization_id: ORGANIZATION_ID,
+          status: 'completed',
+          canonical_result: progress,
+        }),
+      });
+      await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+        code: 'CONFLICT',
+        message: 'operation_key_reuse_mismatch',
+      });
+      expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
+      expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
+      expect(destinationStub.getMetadata).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects recovered sibling metadata with a different size on the same provider', async () => {
+    const metadata = sourceMetadataWithPreset('vercel-small');
+    const source = ownershipRow({ organizationId: ORGANIZATION_ID });
+    const { caller, input, destinationStub } = fixture({
+      metadata,
+      organizationId: ORGANIZATION_ID,
+      ownershipResults: [[source], [source]],
+    });
+    destinationStub.registerSession.mockRejectedValueOnce(new Error('registration response lost'));
+    await expect(caller.createWorktreeChat(input)).rejects.toThrow('registration response lost');
+    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    const registered = destinationMetadata(metadata);
+    registered.workspace = { ...registered.workspace, sandboxAllocation: 'vercel-large' };
+    destinationStub.getMetadata.mockResolvedValueOnce(registered);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({
+        organization_id: ORGANIZATION_ID,
+        status: 'reconcile_pending',
+        canonical_result: progress,
+      }),
+    });
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+    expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
+    expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
+    expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('replays the inherited preset after rollouts are disabled without re-registering', async () => {
+    const metadata = sourceMetadataWithPreset('vercel-large');
+    const source = ownershipRow({ organizationId: ORGANIZATION_ID });
+    const { caller, context, input, destinationStub } = fixture({
+      metadata,
+      organizationId: ORGANIZATION_ID,
+      ownershipResults: [[source], [source]],
+    });
+    await caller.createWorktreeChat(input);
+    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    context.env.SANDBOX_SELECTION_IDS = '';
+    context.env.CONTROL_PLANE_IDS = '';
+    context.env.VERCEL_TOKEN = '';
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: ledgerRow({
+        organization_id: ORGANIZATION_ID,
+        status: 'completed',
+        canonical_result: progress,
+      }),
+    });
+    await expect(caller.createWorktreeChat(input)).resolves.toMatchObject({
+      cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
+      kiloSessionId: DESTINATION_KILO_SESSION_ID,
+      worktreeId: WORKTREE_ID,
+      replayed: true,
+    });
+    expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(1);
+    expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
+    expect(assertOrganizationMembershipMock).toHaveBeenCalledTimes(2);
   });
 });
 
 describe('createWorktreeChat ownership, metadata, and control-plane routing', () => {
+  it('rejects a new destination before recording ownership when runtime isolation is disabled', async () => {
+    const { caller, input, destinationStub } = fixture({ runtimeIsolationEnabled: 'false' });
+    verifyKiloTokenForPolicyMock.mockResolvedValue({ claims: { runtimeAdmission: {} } });
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'runtime_isolation_unavailable',
+    });
+    expect(recordOperationProgressMock).not.toHaveBeenCalled();
+    expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+    expect(destinationStub.registerSession).not.toHaveBeenCalled();
+  });
+
+  it('preserves legacy registration for audience-bound tokens without modern policy markers', async () => {
+    const controlToken = 'legacy.header.signature';
+    verifyKiloTokenForPolicyMock.mockResolvedValue({
+      claims: { aud: 'cloud-agent-next' },
+    });
+    const { caller, input, destinationStub } = fixture({ authToken: controlToken });
+
+    await caller.createWorktreeChat(input);
+
+    expect(createRuntimeAuthorizationMock).not.toHaveBeenCalled();
+    expect(destinationStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auth: { kiloSessionId: DESTINATION_KILO_SESSION_ID, kilocodeToken: controlToken },
+      })
+    );
+  });
+
+  it('derives and seals authority for the exact destination, never persisting control authority', async () => {
+    const controlToken = 'header.payload.signature';
+    verifyKiloTokenForPolicyMock.mockResolvedValue({
+      claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
+    });
+    const { caller, input, destinationStub } = fixture({ authToken: controlToken });
+
+    await caller.createWorktreeChat(input);
+
+    expect(createRuntimeAuthorizationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        token: controlToken,
+        resourceKind: 'cloud-agent-next',
+        resourceId: DESTINATION_WORKSPACE_ID,
+      })
+    );
+    expect(destinationStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auth: {
+          kiloSessionId: DESTINATION_KILO_SESSION_ID,
+          kilocodeToken: 'destination-delegated-token',
+        },
+        runtimeAuthorizationSeal: 'destination-seal',
+      })
+    );
+    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    const completed = settleOperationMock.mock.calls.at(-1)?.[1] as Record<string, unknown>;
+    expect(JSON.stringify(progress)).not.toContain(controlToken);
+    expect(JSON.stringify(progress)).not.toContain('destination-seal');
+    expect(JSON.stringify(completed)).not.toContain(controlToken);
+    expect(JSON.stringify(completed)).not.toContain('destination-seal');
+  });
+
   it.each([
     { autoCommit: true, condenseOnComplete: true },
     { autoCommit: false, condenseOnComplete: true },
@@ -795,6 +1085,79 @@ describe('createWorktreeChat operation-ledger replay and conflict handling', () 
 });
 
 describe('createWorktreeChat registration rollback and unknown-outcome reconciliation', () => {
+  it('recreates a fresh destination seal after a lost response', async () => {
+    const controlToken = 'header.payload.signature';
+    verifyKiloTokenForPolicyMock.mockResolvedValue({
+      claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
+    });
+    const { caller, input, metadata, destinationStub } = fixture({
+      authToken: controlToken,
+      ownershipResults: [[ownershipRow()], [ownershipRow()], [destinationOwnershipRow()]],
+    });
+    destinationStub.registerSession.mockRejectedValueOnce(new Error('lost response'));
+
+    await expect(caller.createWorktreeChat(input)).rejects.toThrow('lost response');
+    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({ status: 'reconcile_pending', canonical_result: progress }),
+    });
+    destinationStub.getMetadata.mockResolvedValueOnce(null);
+    sealRuntimeAuthorizationMock.mockResolvedValueOnce('fresh-recovery-seal');
+
+    await caller.createWorktreeChat(input);
+
+    expect(createRuntimeAuthorizationMock).toHaveBeenCalledTimes(2);
+    expect(destinationStub.registerSession.mock.calls[1]?.[0]).toMatchObject({
+      auth: { kilocodeToken: 'destination-delegated-token' },
+      runtimeAuthorizationSeal: 'fresh-recovery-seal',
+    });
+    expect(JSON.stringify(metadata)).not.toContain('fresh-recovery-seal');
+  });
+
+  it('fails closed when current control authority is revoked during recovery', async () => {
+    const controlToken = 'header.payload.signature';
+    verifyKiloTokenForPolicyMock.mockResolvedValueOnce({
+      claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
+    });
+    const { caller, input, destinationStub } = fixture({
+      authToken: controlToken,
+      ownershipResults: [[ownershipRow()], [ownershipRow()], [destinationOwnershipRow()]],
+    });
+    destinationStub.registerSession.mockRejectedValueOnce(new Error('lost response'));
+    await expect(caller.createWorktreeChat(input)).rejects.toThrow('lost response');
+
+    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({ status: 'reconcile_pending', canonical_result: progress }),
+    });
+    verifyKiloTokenForPolicyMock.mockRejectedValueOnce(new Error('revoked'));
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not accept a modern committed destination without its private authorization record', async () => {
+    const controlToken = 'header.payload.signature';
+    verifyKiloTokenForPolicyMock.mockResolvedValue({
+      claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
+    });
+    const { caller, input, metadata, destinationStub } = fixture({ authToken: controlToken });
+    destinationStub.getMetadata.mockResolvedValueOnce(destinationMetadata(metadata));
+    destinationStub.getRuntimeAuthorizationStatus.mockResolvedValueOnce('revoked');
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({
+        status: 'reconcile_pending',
+        canonical_result: await progressFor(input),
+      }),
+    });
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(destinationStub.registerSession).not.toHaveBeenCalled();
+  });
+
   it('rolls back only the empty ownership row after an explicit registration rejection', async () => {
     const { caller, input, destinationStub } = fixture();
     destinationStub.registerSession.mockResolvedValueOnce({

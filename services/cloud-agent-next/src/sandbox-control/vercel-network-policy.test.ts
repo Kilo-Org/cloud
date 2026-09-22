@@ -101,6 +101,149 @@ describe('buildVercelCredentialNetworkPolicy', () => {
     });
   });
 
+  it('authenticates only packaged CLI provider paths through the runtime proxy', () => {
+    const policy = buildVercelCredentialNetworkPolicy({
+      kilo: kiloInput({
+        runtimeProxy: {
+          members: [
+            {
+              sessionId: 'workspace_a',
+              kiloSessionId: ROOT_SESSION_ID,
+              handle: 'runtime-proxy-handle',
+            },
+          ],
+          targets: {
+            backendBaseUrl: 'https://worker.example.com',
+            providerBaseUrl: 'https://worker.example.com',
+            sessionIngestBaseUrl: 'https://worker.example.com',
+          },
+        },
+      }),
+    });
+    const authorization = 'Bearer runtime-proxy-handle';
+    const base = 'https://worker.example.com/api/openrouter';
+
+    for (const [path, method] of [
+      ['/models', 'GET'],
+      ['/models/validate', 'POST'],
+      ['/chat/completions', 'POST'],
+      ['/messages', 'POST'],
+      ['/responses', 'POST'],
+      ['/embeddings', 'POST'],
+    ]) {
+      expect(effectiveAuthorization(policy, { url: `${base}${path}`, authorization, method })).toBe(
+        authorization
+      );
+    }
+    for (const path of ['/v1/chat/completions', '/v1/responses']) {
+      expect(
+        effectiveAuthorization(policy, {
+          url: `https://worker.example.com/api/gateway${path}`,
+          authorization,
+          method: 'POST',
+        })
+      ).toBe(authorization);
+      expect(
+        effectiveAuthorization(policy, {
+          url: `${base}${path}`,
+          authorization,
+          method: 'POST',
+        })
+      ).toBeUndefined();
+      expect(
+        effectiveAuthorization(policy, {
+          url: `https://worker.example.com/api/gateway${path}`,
+          authorization,
+          method: 'GET',
+        })
+      ).toBeUndefined();
+    }
+
+    for (const [path, method] of [
+      ['/models', 'POST'],
+      ['/chat/completions', 'GET'],
+      ['/api/organizations/trusted-org/models', 'GET'],
+      ['/unknown', 'POST'],
+      ['/../chat/completions', 'POST'],
+      ['/models', 'DELETE'],
+    ]) {
+      expect(
+        effectiveAuthorization(policy, { url: `${base}${path}`, authorization, method })
+      ).toBeUndefined();
+    }
+    expect(
+      effectiveAuthorization(policy, {
+        url: 'https://worker.example.com/chat/completions',
+        authorization,
+        method: 'POST',
+      })
+    ).toBeUndefined();
+  });
+
+  it('uses the owning member handle for every proxy route', () => {
+    const policy = buildVercelCredentialNetworkPolicy({
+      kilo: kiloInput({
+        rootSessionIds: [ROOT_SESSION_ID, OTHER_SESSION_ID],
+        runtimeProxy: {
+          members: [
+            { sessionId: 'workspace_a', kiloSessionId: ROOT_SESSION_ID, handle: 'member-a' },
+            { sessionId: 'workspace_b', kiloSessionId: OTHER_SESSION_ID, handle: 'member-b' },
+          ],
+          targets: {
+            backendBaseUrl: 'https://worker.example.com',
+            providerBaseUrl: 'https://worker.example.com',
+            sessionIngestBaseUrl: 'https://worker.example.com',
+          },
+        },
+      }),
+    });
+    const authorization = 'Bearer member-a';
+    expect(
+      effectiveAuthorization(policy, {
+        url: 'https://worker.example.com/api/openrouter/chat/completions',
+        method: 'POST',
+        authorization,
+      })
+    ).toBe('Bearer member-a');
+    expect(
+      effectiveAuthorization(policy, {
+        url: `https://worker.example.com/api/session/${ROOT_SESSION_ID}/ingest`,
+        method: 'POST',
+        authorization,
+      })
+    ).toBe('Bearer member-a');
+    expect(
+      effectiveAuthorization(policy, {
+        url: `https://worker.example.com/api/session/${OTHER_SESSION_ID}/title`,
+        method: 'POST',
+        authorization: 'Bearer member-b',
+      })
+    ).toBe('Bearer member-b');
+    expect(
+      effectiveAuthorization(policy, {
+        url: 'https://worker.example.com/api/session/unrelated/ingest',
+        method: 'POST',
+        authorization,
+      })
+    ).toBeUndefined();
+    // The policy can only key `/api/session` on the injected handle; the
+    // facade validates its JSON body against that handle's root identity.
+    expect(
+      effectiveAuthorization(policy, {
+        url: 'https://worker.example.com/api/session',
+        method: 'POST',
+        authorization: 'Bearer member-b',
+      })
+    ).toBe('Bearer member-b');
+    expect(
+      effectiveAuthorization(policy, {
+        url: `https://worker.example.com/api/session/${ROOT_SESSION_ID}/export`,
+        method: 'GET',
+        authorization: 'Bearer member-b',
+      })
+    ).toBeUndefined();
+  });
+
   it.each([
     ['trusted organization', 'trusted-org', 'trusted-org'],
     ['personal account', undefined, ''],

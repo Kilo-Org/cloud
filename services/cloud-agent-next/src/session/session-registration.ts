@@ -18,7 +18,19 @@ import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
+import { cli_sessions_v2, kilocode_users, operation_ledgers } from '@kilocode/db/schema';
+import {
+  isSelectableSandboxAllocation,
+  sandboxAllocationRequiresControlPlane,
+  sandboxAllocationSchema,
+  type SandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import {
+  assertSandboxAllocationAvailable,
+  getSandboxSelectionCapabilities,
+  isSandboxAllocationAvailable,
+} from '../sandbox-selection.js';
+import { assertOrganizationMembership } from '../router/handlers/organization-membership.js';
 import {
   admitOperation,
   markReconcilePending,
@@ -33,11 +45,17 @@ import {
   type CloudAgentWorktreeId,
 } from '@kilocode/session-ingest-contracts';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
+import {
+  createRuntimeAuthorization,
+  sealRuntimeAuthorization,
+} from '@kilocode/worker-utils/runtime-authorization';
+import jwt from 'jsonwebtoken';
 
-import type { Env, SandboxId } from '../types.js';
+import { agentSandboxProviderSchema, type Env, type SandboxId } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import {
   getControlPlaneCredentialContainment,
+  CurrentSessionMetadataSchema,
   type CredentialContainment,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
@@ -61,6 +79,8 @@ import {
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '../utils/sha256.js';
+import { assertKiloModelAvailable } from '../model-validation.js';
+import { initialAdmissionFailure } from './admission-failure.js';
 import { createMessageId } from './message-id.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import type {
@@ -77,24 +97,51 @@ type SharedSandboxRouteMetadata = NonNullable<
   NonNullable<SessionMetadata['workspace']>['sandboxRoute']
 >;
 
+/**
+ * The plane a new session will be created on. Vercel and DO-managed Cloudflare
+ * containers exist only on the control plane, so those allocations force it;
+ * every other request — including a Cloudflare allocation — defers to
+ * `sessionPlaneForNewOwner`. Single source of truth: the allocation checks and
+ * the session-ID generation must agree.
+ */
+function sessionPlaneForCreate(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext
+): SessionPlane {
+  return sandboxAllocationRequiresControlPlane(input.runtime?.sandboxAllocation)
+    ? 'control'
+    : sessionPlaneForNewOwner(
+        ctx.env,
+        {
+          userId: ctx.userId,
+          orgId: input.options?.kilocodeOrganizationId,
+        },
+        { createdOnPlatform: input.options?.createdOnPlatform }
+      );
+}
+
 function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): void {
+  const allocation = input.runtime?.sandboxAllocation;
+  if (allocation === undefined) return;
+  if (!sandboxAllocationSchema.safeParse(allocation).success) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid sandbox allocation' });
+  }
   if (
-    input.runtime?.sandboxAllocation === 'isolated-standard' &&
-    (input.runtime.devcontainer === true || options?.billingOrigin === 'code-review')
+    input.runtime?.devcontainer === true ||
+    options?.billingOrigin === 'code-review' ||
+    input.options?.createdOnPlatform === 'code-review'
   ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
-      message: 'Isolated Standard allocation is incompatible with specialized sandbox routing',
+      message: 'Sandbox allocations cannot be combined with specialized sandbox routing',
     });
   }
-  if (
-    input.runtime?.sandboxAllocation === 'isolated-standard' &&
-    sessionPlaneForCreate(input, ctx) === 'control'
-  ) {
+  // Isolated Standard predates the selectable allocations and remains legacy-plane only.
+  if (allocation === 'isolated-standard' && sessionPlaneForCreate(input, ctx) === 'control') {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Isolated Standard allocation is not supported for control-plane sessions',
@@ -116,6 +163,7 @@ export type SessionRegistrationResult = {
   sandboxRoute?: SharedSandboxRouteMetadata;
   sandboxProvider: SandboxSelection['provider'];
   worktreeId?: CloudAgentWorktreeId;
+  sandboxAllocation?: SandboxAllocation;
   /**
    * Canonical initial turn reserved for a later legacy initiation request.
    * Omitted for a clone-only create, which has no synthetic initial turn.
@@ -162,20 +210,12 @@ export function executionTurnSubmissionFromAcceptedTurn(
       };
 }
 
-type SessionEstablishmentFailure =
-  | { stage: 'sandbox_identity'; code: 'sandbox_id_derivation_failed' }
-  | { stage: 'registration'; code: 'do_registration_rejected' }
-  | {
-      stage: 'initial_admission';
-      code: 'initial_admission_rejected' | 'initial_queue_full' | 'invalid_initial_intent';
-    }
-  | { stage: 'transport'; code: 'do_rpc_outcome_unknown' };
-
 type NewSessionAllocation = SessionRegistrationResult & {
   reportingCreatedAt?: string;
   credentialContainment: CredentialContainment;
   sessionService: SessionService;
   rollbackCliSession: () => Promise<void>;
+  runtimeAuthorization?: { token: string; seal: string };
 };
 
 // ----- operation-ledger boundary (P1-A-08b) -----------------------------------
@@ -405,18 +445,6 @@ function sessionCreateSettledOutboxEvent(params: {
   };
 }
 
-function initialAdmissionFailure(
-  result: Extract<SessionMessageAdmissionResult, { success: false }>
-): Extract<SessionEstablishmentFailure, { stage: 'initial_admission' }> {
-  if (result.code === 'PENDING_QUEUE_FULL') {
-    return { stage: 'initial_admission', code: 'initial_queue_full' };
-  }
-  if (result.code === 'BAD_REQUEST') {
-    return { stage: 'initial_admission', code: 'invalid_initial_intent' };
-  }
-  return { stage: 'initial_admission', code: 'initial_admission_rejected' };
-}
-
 async function recordPostSetupFailure(record: () => Promise<void>): Promise<void> {
   try {
     await record();
@@ -499,15 +527,9 @@ function worktreeEnabledForCreate(
   return sessionPlaneForCreate(input, ctx) === 'control' && isWorktreeOwner(ctx.env, owner);
 }
 
-function sessionPlaneForCreate(
-  input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext
-): SessionPlane {
-  return sessionPlaneForNewOwner(
-    ctx.env,
-    { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId },
-    { createdOnPlatform: input.options?.createdOnPlatform }
-  );
+export function assertRuntimeIsolationAdmission(env: Pick<Env, 'RUNTIME_ISOLATION_ENABLED'>): void {
+  if (env.RUNTIME_ISOLATION_ENABLED === 'true') return;
+  throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'runtime_isolation_unavailable' });
 }
 
 function finalizationVersionForCreate(row: OperationLedgerRow): 1 | 2 {
@@ -531,15 +553,79 @@ function effectiveSessionRegistrationInput(
   };
 }
 
+async function issueSessionRuntimeAuthorization(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  cloudAgentSessionId: string,
+  initialTurn: AcceptedExecutionTurn | undefined
+): Promise<NewSessionAllocation['runtimeAuthorization']> {
+  const orgId = input.options?.kilocodeOrganizationId;
+  let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
+  // authMiddleware has verified this bearer (including legacy tokens) against
+  // its audience and current pepper. Decode only selects the compatibility path;
+  // createRuntimeAuthorization re-verifies modern claims and runtime admission.
+  const claims = jwt.decode(ctx.authToken);
+  const isPolicyBearing =
+    claims !== null &&
+    typeof claims === 'object' &&
+    ('aud' in claims || 'tokenPurpose' in claims || 'credentialExchange' in claims);
+  if (isPolicyBearing) {
+    if (cloudAgentSessionId.startsWith('workspace_')) assertRuntimeIsolationAdmission(ctx.env);
+    const secret = ctx.env.NEXTAUTH_SECRET;
+    const nextAuthSecret = typeof secret === 'string' ? secret : await secret.get();
+    if (!nextAuthSecret)
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
+    const created = await createRuntimeAuthorization({
+      token: ctx.authToken,
+      secret: nextAuthSecret,
+      connectionString: ctx.env.HYPERDRIVE.connectionString,
+      resourceKind: 'cloud-agent-next',
+      resourceId: cloudAgentSessionId,
+      ...(orgId ? { organizationId: orgId } : {}),
+    });
+    runtimeAuthorization = {
+      token: created.token,
+      seal: await sealRuntimeAuthorization(created.authorization, nextAuthSecret),
+    };
+    if (initialTurn?.type === 'prompt') {
+      await assertKiloModelAvailable({
+        env: ctx.env,
+        submittedModel: input.agent.model,
+        originalToken: runtimeAuthorization.token,
+        originalOrganizationId: orgId,
+        createdOnPlatform: input.options?.createdOnPlatform,
+        procedure: 'runtime_authorized_session_create',
+      });
+    }
+  }
+
+  return runtimeAuthorization;
+}
+
+async function assertSandboxAllocationMembership(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext
+): Promise<void> {
+  if (input.runtime?.sandboxAllocation === undefined) return;
+  const orgId = input.options?.kilocodeOrganizationId;
+  if (!orgId) return;
+  await assertOrganizationMembership(getPgDb(ctx.env), ctx.userId, orgId);
+}
+
 async function allocateNewSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string },
   ledger?: SessionCreationLedgerHooks
 ): Promise<NewSessionAllocation> {
+  await assertSandboxAllocationMembership(input, ctx);
+  const sandboxAllocation = input.runtime?.sandboxAllocation;
+  const orgId = input.options?.kilocodeOrganizationId;
+  if (sandboxAllocation !== undefined) {
+    assertSandboxAllocationAvailable(ctx.env, { userId: ctx.userId, orgId }, sandboxAllocation);
+  }
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
-  const orgId = input.options?.kilocodeOrganizationId;
   const cloudAgentSessionId = generateSessionId(sessionPlaneForCreate(input, ctx));
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =
@@ -553,6 +639,12 @@ async function allocateNewSession(
         )
       : undefined;
   const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
+  const runtimeAuthorization = await issueSessionRuntimeAuthorization(
+    input,
+    ctx,
+    cloudAgentSessionId,
+    initialTurn
+  );
 
   try {
     if (ledger) {
@@ -572,6 +664,7 @@ async function allocateNewSession(
         [SESSION_CREATE_WORKTREE_ENABLED_KEY]: worktreeId !== undefined,
         [SESSION_CREATE_FINALIZATION_VERSION_KEY]: ledger.finalizationVersion,
         [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: await sessionCreateIntentFingerprint(input),
+        ...(isSelectableSandboxAllocation(sandboxAllocation) ? { sandboxAllocation } : {}),
       });
     }
 
@@ -599,7 +692,7 @@ async function allocateNewSession(
       {
         devcontainer: input.runtime?.devcontainer,
         createdOnPlatform: options?.billingOrigin === 'code-review' ? 'code-review' : undefined,
-        sandboxAllocation: input.runtime?.sandboxAllocation,
+        sandboxAllocation,
       }
     );
     if (target.kind === 'shared') {
@@ -621,6 +714,7 @@ async function allocateNewSession(
         sandboxId,
         sessionId: cloudAgentSessionId,
         devcontainer: input.runtime?.devcontainer,
+        sandboxAllocation,
       });
     }
   } catch (error) {
@@ -757,6 +851,7 @@ async function allocateNewSession(
     sandboxRoute,
     sandboxProvider,
     ...(worktreeId ? { worktreeId } : {}),
+    ...(sandboxAllocation ? { sandboxAllocation } : {}),
     initialTurn,
     reportingCreatedAt,
     credentialContainment,
@@ -779,6 +874,7 @@ async function allocateNewSession(
           .error('Failed to rollback cli_sessions_v2 record');
       }
     },
+    ...(runtimeAuthorization ? { runtimeAuthorization } : {}),
   };
 }
 
@@ -803,12 +899,34 @@ function rebuildRecordedSessionAllocation(
   const sandboxId = canonical.sandboxId;
   const sandboxProvider = canonical.sandboxProvider;
   const sandboxRoute = canonical.sandboxRoute;
+  const requested = isSelectableSandboxAllocation(input.runtime?.sandboxAllocation)
+    ? input.runtime?.sandboxAllocation
+    : undefined;
+  const recorded = sandboxAllocationSchema.optional().safeParse(canonical.sandboxAllocation);
+  if (!recorded.success || recorded.data !== requested) {
+    throw creationInProgressError();
+  }
+  if (recorded.data !== undefined) {
+    const metadata = CurrentSessionMetadataSchema.safeParse({
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: cloudAgentSessionId,
+        userId: ctx.userId,
+        orgId: input.options?.kilocodeOrganizationId,
+      },
+      auth: {},
+      workspace: { sandboxId, sandboxProvider, sandboxRoute, sandboxAllocation: recorded.data },
+      lifecycle: { version: 1, timestamp: Date.now() },
+    });
+    if (!metadata.success) throw creationInProgressError();
+  }
   const reportingCreatedAt = z
     .string()
     .datetime({ offset: true })
     .optional()
     .safeParse(canonical.reportingCreatedAt);
   const worktreeCreate = worktreeEnabledForCreate(input, ctx, row);
+  const recordedProvider = agentSandboxProviderSchema.safeParse(sandboxProvider);
 
   if (
     !reportingCreatedAt.success ||
@@ -818,7 +936,7 @@ function rebuildRecordedSessionAllocation(
     kiloSessionId.length === 0 ||
     typeof sandboxId !== 'string' ||
     sandboxId.length === 0 ||
-    (sandboxProvider !== 'cloudflare' && sandboxProvider !== 'vercel')
+    !recordedProvider.success
   ) {
     throw creationInProgressError();
   }
@@ -867,8 +985,9 @@ function rebuildRecordedSessionAllocation(
     kiloSessionId,
     sandboxId: sandboxId as SandboxId,
     sandboxRoute: route,
-    sandboxProvider,
+    sandboxProvider: recordedProvider.data,
     ...(worktreeId ? { worktreeId } : {}),
+    ...(recorded.data ? { sandboxAllocation: recorded.data } : {}),
     initialTurn,
     reportingCreatedAt:
       !initialTurn && cloudAgentSessionId.startsWith('agent_')
@@ -914,8 +1033,11 @@ function buildSessionRegistrationCommand(
     },
     auth: {
       kiloSessionId: allocation.kiloSessionId,
-      kilocodeToken: ctx.authToken,
+      kilocodeToken: allocation.runtimeAuthorization?.token ?? ctx.authToken,
     },
+    ...(allocation.runtimeAuthorization
+      ? { runtimeAuthorizationSeal: allocation.runtimeAuthorization.seal }
+      : {}),
     clone: input.clone
       ? {
           cloneFromKiloSessionId: input.clone.cloneFromKiloSessionId,
@@ -943,6 +1065,7 @@ function buildSessionRegistrationCommand(
     workspace: {
       sandboxId: allocation.sandboxId,
       sandboxProvider: allocation.sandboxProvider,
+      ...(allocation.sandboxAllocation ? { sandboxAllocation: allocation.sandboxAllocation } : {}),
       shallow: input.options?.shallow,
       ...(allocation.worktreeId
         ? {
@@ -1102,6 +1225,7 @@ async function registerAndAdmitInitialTurn(
     kiloSessionId: allocation.kiloSessionId,
     sandboxId: allocation.sandboxId,
     sandboxProvider: allocation.sandboxProvider,
+    ...(allocation.sandboxAllocation ? { sandboxAllocation: allocation.sandboxAllocation } : {}),
     admission,
   };
   if (ledger) {
@@ -1423,7 +1547,17 @@ async function assertCreateIntentUnchanged(
   input: SessionRegistrationInput,
   row: OperationLedgerRow
 ): Promise<void> {
+  if (row.canonical_result === null) return;
   const stored = row.canonical_result?.[SESSION_CREATE_INTENT_FINGERPRINT_KEY];
+  const selectable = isSelectableSandboxAllocation(input.runtime?.sandboxAllocation)
+    ? input.runtime?.sandboxAllocation
+    : undefined;
+  if (
+    row.canonical_result?.sandboxAllocation !== selectable ||
+    (selectable !== undefined && (typeof stored !== 'string' || stored.length === 0))
+  ) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'session_creation_failed' });
+  }
   if (typeof stored !== 'string' || stored.length === 0) {
     return;
   }
@@ -1446,7 +1580,47 @@ export async function createSessionWithLedger(
   options: SessionLedgerCreateOptions
 ): Promise<LedgerSessionCreateResult> {
   assertSupportedSandboxAllocation(input, ctx, { billingOrigin: options.billingOrigin });
+  await assertSandboxAllocationMembership(input, ctx);
   const db = getPgDb(ctx.env);
+  const allocation = input.runtime?.sandboxAllocation;
+  if (allocation !== undefined) {
+    const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
+    const available = isSandboxAllocationAvailable(
+      getSandboxSelectionCapabilities(ctx.env, owner),
+      allocation
+    );
+    if (!available) {
+      const [existing] = await db
+        .select()
+        .from(operation_ledgers)
+        .where(
+          and(
+            eq(operation_ledgers.kilo_user_id, ctx.userId),
+            eq(operation_ledgers.domain, 'session'),
+            eq(operation_ledgers.operation_key, options.operationKey)
+          )
+        )
+        .limit(1);
+      if (!existing || new Date(existing.expires_at).getTime() <= Date.now()) {
+        assertSandboxAllocationAvailable(ctx.env, owner, allocation);
+      } else {
+        assertSessionOperationIdentity(existing, {
+          userId: ctx.userId,
+          intent: 'create_cloud',
+          organizationId: input.options?.kilocodeOrganizationId,
+          resourceKey: null,
+        });
+        await assertCreateIntentUnchanged(
+          effectiveSessionRegistrationInput(
+            input,
+            worktreeEnabledForCreate(input, ctx, existing),
+            finalizationVersionForCreate(existing)
+          ),
+          existing
+        );
+      }
+    }
+  }
   const admission = await admitOperation(db, {
     userId: ctx.userId,
     orgId: input.options?.kilocodeOrganizationId,
@@ -1686,6 +1860,7 @@ async function resumeCloneCreate(
     throw creationInProgressError();
   }
 
+  const allocation = rebuildRecordedSessionAllocation(input, ctx, row);
   const hooks = await buildLedgerHooks(input, ctx, options, db, row, 'takeover');
   const sessionService = new SessionService();
   const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
@@ -1753,7 +1928,12 @@ async function resumeCloneCreate(
   }
   // `ready` continues.
 
-  const allocation = rebuildRecordedSessionAllocation(input, ctx, row);
+  allocation.runtimeAuthorization = await issueSessionRuntimeAuthorization(
+    input,
+    ctx,
+    allocation.cloudAgentSessionId,
+    allocation.initialTurn
+  );
   const billingOrigin = { billingOrigin: options.billingOrigin };
   const result =
     input.initialTurn === undefined
@@ -1821,6 +2001,12 @@ async function resumeFirstWorktreeCreate(
     }
   }
 
+  allocation.runtimeAuthorization = await issueSessionRuntimeAuthorization(
+    input,
+    ctx,
+    allocation.cloudAgentSessionId,
+    allocation.initialTurn
+  );
   const result = await registerAndAdmitInitialTurn(
     input,
     ctx,

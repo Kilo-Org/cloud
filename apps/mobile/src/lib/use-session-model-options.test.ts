@@ -141,6 +141,48 @@ describe('buildSessionModelOptions', () => {
     expect(result.selectedVariant).toBe('high');
   });
 
+  it('strips the vendor prefix the catalog repeats in a CLI model display name', () => {
+    const result = buildSessionModelOptions({
+      activeSessionType: 'remote',
+      remoteModelState: {
+        ownerConnectionId: 'cli-owner',
+        protocol: 'v1',
+        refresh: 'idle',
+        catalog: {
+          protocolVersion: 1,
+          truncated: false,
+          providers: [
+            {
+              id: 'kilo',
+              name: 'Kilo',
+              models: [
+                {
+                  id: 'deepseek/deepseek-v4-flash-0731',
+                  name: 'DeepSeek: DeepSeek V4 Flash 0731',
+                  variants: [],
+                  capabilities: { attachment: false, reasoning: true },
+                  limits: { context: 200_000, output: 8192 },
+                },
+              ],
+            },
+          ],
+        },
+      },
+      observedModel: null,
+      remoteModelOverride: null,
+      gatewayModels,
+      gatewayModelsLoading: false,
+      organizationId: 'org-persisted',
+    });
+
+    expect(result.options[0]?.name).toBe('DeepSeek V4 Flash 0731');
+    expect(result.options[0]?.displayId).toBe('deepseek/deepseek-v4-flash-0731');
+    expect(result.options[0]?.modelRef).toEqual({
+      providerID: 'kilo',
+      modelID: 'deepseek/deepseek-v4-flash-0731',
+    });
+  });
+
   it('sorts provider-aware CLI rows like the CLI TUI picker', () => {
     const result = buildSessionModelOptions({
       activeSessionType: 'remote',
@@ -372,6 +414,34 @@ describe('buildSessionModelOptions', () => {
     expect(result.selectedVariant).toBe('high');
     expect(result.options.some(option => option.unavailable)).toBe(false);
     expect(result.options.some(option => option.name === 'Use session model')).toBe(false);
+  });
+
+  it('locks the chip to the observed model id when catalog parse never becomes v1', () => {
+    const result = buildSessionModelOptions({
+      activeSessionType: 'remote',
+      remoteModelState: {
+        ownerConnectionId: 'cli-owner',
+        protocol: 'unknown',
+        refresh: 'error',
+        error: 'Invalid remote model catalog',
+      },
+      observedModel: {
+        model: { providerID: 'kilo', modelID: 'muse-spark-1.3-contributor' },
+      },
+      remoteModelOverride: null,
+      gatewayModels,
+      gatewayModelsLoading: false,
+      organizationId: 'org-persisted',
+    });
+
+    expect(result.source).toBe('remote-unavailable');
+    expect(result.pickerDisabled).toBe(true);
+    expect(result.options).toEqual([
+      expect.objectContaining({
+        name: 'muse-spark-1.3-contributor',
+        unavailable: true,
+      }),
+    ]);
   });
 
   it('disables model changes when remote discovery fails without exposing Gateway rows', () => {

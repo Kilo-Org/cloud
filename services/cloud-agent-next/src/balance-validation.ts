@@ -1,3 +1,5 @@
+import jwt from 'jsonwebtoken';
+import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { DEFAULT_BACKEND_URL } from './constants.js';
 import { logger } from './logger.js';
 import type { Env } from './types.js';
@@ -36,9 +38,21 @@ export async function validateBalanceOnly(
     headers.set('X-KiloCode-OrganizationId', orgId);
   }
 
+  // Decode only to select the endpoint; the backend verifies the bearer and
+  // current user/organization authorization for its exact expected audience.
+  let claims: ReturnType<typeof jwt.decode>;
+  try {
+    claims = jwt.decode(token);
+  } catch {
+    return { success: false, status: 500, message: 'Failed to verify balance' };
+  }
+  const isControlToken =
+    claims !== null && typeof claims === 'object' && claims.aud === CLOUD_AGENT_NEXT_AUDIENCE;
+  const balancePath = isControlToken ? '/api/cloud-agent-next/balance' : '/api/profile/balance';
+
   let response: Response;
   try {
-    response = await fetch(`${backendUrl}/api/profile/balance`, {
+    response = await fetch(`${backendUrl}${balancePath}`, {
       method: 'GET',
       headers,
     });

@@ -3,6 +3,7 @@ import {
   autoFreeModels,
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviderRestriction,
+  isDisabledKiloExclusiveModel,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
   preferredModels,
@@ -18,7 +19,7 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
-import { gpt_5_6_sol_discounted_model } from './providers/openai-exclusive';
+import { gpt_5_6_sol_discounted_model, gpt_6_astra_flex_model } from './providers/openai-exclusive';
 import { gemma_4_26b_a4b_it_free_model } from './providers/google';
 import { isUnavailableModel } from './unavailable-models';
 import { getRandomNumber } from './getRandomNumber';
@@ -44,6 +45,15 @@ describe('isFreeModel', () => {
 
     test('should return true for openrouter/free', async () => {
       expect(await isFreeModel('openrouter/free')).toBe(true);
+    });
+
+    test('should return true for OpenRouter stealth alpha models', async () => {
+      expect(await isFreeModel('stealth/ox-alpha')).toBe(true);
+      expect(await isFreeModel('stealth/other-alpha')).toBe(true);
+      expect(await isFreeModel('stealth/claude-opus-4.7')).toBe(false);
+      expect(await isFreeModel('stealth/qwen3.6-plus')).toBe(false);
+      expect(await isFreeModel('openrouter/model-alpha')).toBe(false);
+      expect(await isFreeModel('stealth/model-beta')).toBe(false);
     });
 
     test('should return true for enabled Kilo exclusive models with no pricing', async () => {
@@ -117,11 +127,11 @@ describe('isFreeModel', () => {
       expect(claude_opus_4_6_stealth_model.public_id).toBe('stealth/claude-opus-4.6');
     });
 
-    test('registers the discounted GPT-5.6 Sol OpenAI endpoint', async () => {
-      expect(findKiloExclusiveModel(gpt_5_6_sol_discounted_model.public_id)).toBe(
-        gpt_5_6_sol_discounted_model
-      );
+    test('keeps the discounted GPT-5.6 Sol OpenAI endpoint disabled', async () => {
+      expect(findKiloExclusiveModel(gpt_5_6_sol_discounted_model.public_id)).toBeNull();
+      expect(isDisabledKiloExclusiveModel(gpt_5_6_sol_discounted_model.public_id)).toBe(true);
       expect(gpt_5_6_sol_discounted_model).toMatchObject({
+        status: 'disabled',
         internal_id: 'openai/gpt-5.6-sol',
         gateway: 'vercel',
         flags: ['reasoning', 'vision'],
@@ -147,6 +157,41 @@ describe('isFreeModel', () => {
             completion_per_million: 15,
             input_cache_read_per_million: 0.4,
             input_cache_write_per_million: 5,
+          },
+        },
+      ]);
+    });
+
+    test('keeps the GPT-6 Astra OpenAI Flex endpoint disabled', async () => {
+      expect(findKiloExclusiveModel(gpt_6_astra_flex_model.public_id)).toBeNull();
+      expect(gpt_6_astra_flex_model).toMatchObject({
+        status: 'disabled',
+        internal_id: 'openai/gpt-6-astra',
+        gateway: 'vercel',
+        flags: ['reasoning', 'vision', 'flex'],
+        inference_provider_restriction: ['openai'],
+        pricing: { fallbackOnly: true },
+      });
+      expect(
+        await hasBestEffortGuessDataCollectionRequirement(gpt_6_astra_flex_model.public_id)
+      ).toBe(false);
+      expect(gpt_6_astra_flex_model.pricing?.tiers).toEqual([
+        {
+          start_context_length: 0,
+          pricing: {
+            prompt_per_million: 5,
+            completion_per_million: 25,
+            input_cache_read_per_million: 0.5,
+            input_cache_write_per_million: 6.25,
+          },
+        },
+        {
+          start_context_length: 272_000,
+          pricing: {
+            prompt_per_million: 10,
+            completion_per_million: 37.5,
+            input_cache_read_per_million: 1,
+            input_cache_write_per_million: 12.5,
           },
         },
       ]);
@@ -196,11 +241,11 @@ describe('isFreeModel', () => {
       expect(
         Object.fromEntries(autoFreeModels.map(({ model, reasoning }) => [model, reasoning]))
       ).toEqual({
-        'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
         'nvidia/nemotron-3-ultra-550b-a55b:free': { enabled: true, effort: 'high' },
         'dots-studio/dots-3-note-preview:free': { enabled: true, effort: 'high' },
         'nex-agi/nex-n2.5-pro:free': { enabled: true, effort: 'high' },
+        'inclusionai/ling-3.0-flash-vl:free': { enabled: true, effort: 'high' },
       });
     });
 
@@ -209,11 +254,11 @@ describe('isFreeModel', () => {
         autoFreeModels.map(({ model, weight }) => [model, weight])
       );
       expect(weights).toEqual({
-        'stepfun/step-3.7-flash:free': 1,
         'poolside/laguna-s-2.1:free': 1,
         'nvidia/nemotron-3-ultra-550b-a55b:free': 1,
         'dots-studio/dots-3-note-preview:free': 1,
         'nex-agi/nex-n2.5-pro:free': 1,
+        'inclusionai/ling-3.0-flash-vl:free': 1,
       });
     });
 
@@ -375,12 +420,15 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
 
 describe('getKiloExclusiveInferenceProviderRestriction', () => {
   test('returns the routing allow-list for restricted exclusive models', () => {
-    expect(
-      getKiloExclusiveInferenceProviderRestriction(gpt_5_6_sol_discounted_model.public_id)
-    ).toEqual(new Set(['openai']));
+    expect(getKiloExclusiveInferenceProviderRestriction('stepfun/step-3.7-flash:free')).toEqual(
+      new Set(['stepfun'])
+    );
   });
 
   test('does not treat removed or unrestricted exclusives or unknown ids as restricted', () => {
+    expect(
+      getKiloExclusiveInferenceProviderRestriction(gpt_5_6_sol_discounted_model.public_id)
+    ).toBeUndefined();
     expect(getKiloExclusiveInferenceProviderRestriction('tencent/hy3:free')).toBeUndefined();
     expect(
       getKiloExclusiveInferenceProviderRestriction(gemma_4_26b_a4b_it_free_model.public_id)

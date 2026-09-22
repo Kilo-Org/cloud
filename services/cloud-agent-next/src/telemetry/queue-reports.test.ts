@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
-import { emitRunStateReport } from './queue-reports.js';
+import {
+  CloudAgentQueueReportSchema,
+  type CloudAgentQueueReport,
+} from '@kilocode/worker-utils/cloud-agent-queue-report';
+import { buildRunStateReport, emitRunStateReport } from './queue-reports.js';
 import type { SessionMessageState } from '../session/session-message-state.js';
 import type { WorkspaceFailureSubtype } from '../shared/wrapper-bootstrap.js';
 
@@ -70,7 +73,7 @@ describe('Cloud Agent report emitter', () => {
           failureStage: 'agent_activity',
           failureCode: 'wrapper_error_after_activity',
           failureResponsibility: 'platform',
-          failureReason: 'wrapper_liveness',
+          failureReason: 'wrapper_crash',
           diagnostic: {
             errorMessageRedacted: 'Wrapper failed after agent activity',
             errorExpiresAt: new Date(5 + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -81,6 +84,28 @@ describe('Cloud Agent report emitter', () => {
     expect(JSON.stringify(reports)).not.toContain('never report');
     expect(JSON.stringify(reports)).not.toContain('secret');
     expect(JSON.stringify(reports)).not.toContain('model/test');
+  });
+
+  it('assembles a provider-classified failed run that passes the report validation boundary', () => {
+    const report = buildRunStateReport({
+      cloudAgentSessionId: 'agent_report',
+      run: {
+        messageId: 'msg_provider',
+        status: 'failed',
+        terminalAt: new Date(5).toISOString(),
+        failureStage: 'agent_activity',
+        failureCode: 'assistant_error',
+        failureResponsibility: 'provider',
+        failureReason: 'provider_unavailable',
+      },
+      occurredAt: 6,
+    });
+
+    expect(CloudAgentQueueReportSchema.safeParse(report).success).toBe(true);
+    expect(report.run).toMatchObject({
+      failureResponsibility: 'provider',
+      failureReason: 'provider_unavailable',
+    });
   });
 
   it('keeps diagnostic expiry tied to terminal time when a failed run is reported again later', async () => {
@@ -111,13 +136,13 @@ describe('Cloud Agent report emitter', () => {
   });
 
   it.each([
-    ['agent_activity', 'payment_required', 'insufficient_credits'],
-    ['agent_activity', 'model_missing', 'model_unavailable'],
-    ['post_dispatch_no_activity', 'payment_required', 'insufficient_credits'],
-    ['post_dispatch_no_activity', 'model_missing', 'model_unavailable'],
+    ['agent_activity', 'payment_required', 'user', 'insufficient_credits'],
+    ['agent_activity', 'model_missing', 'provider', 'model_unavailable'],
+    ['post_dispatch_no_activity', 'payment_required', 'user', 'insufficient_credits'],
+    ['post_dispatch_no_activity', 'model_missing', 'provider', 'model_unavailable'],
   ] as const)(
-    'preserves %s/%s with user reason %s',
-    async (failureStage, failureCode, expectedFailureReason) => {
+    'preserves %s/%s with responsibility %s and reason %s',
+    async (failureStage, failureCode, expectedFailureResponsibility, expectedFailureReason) => {
       const reports: CloudAgentQueueReport[] = [];
       await emitRunStateReport({
         queue: { send: async report => void reports.push(report) },
@@ -128,7 +153,7 @@ describe('Cloud Agent report emitter', () => {
       expect(reports[0]?.run).toMatchObject({
         failureStage,
         failureCode,
-        failureResponsibility: 'user',
+        failureResponsibility: expectedFailureResponsibility,
         failureReason: expectedFailureReason,
       });
     }
@@ -165,38 +190,45 @@ describe('Cloud Agent report emitter', () => {
   });
 
   it.each([
-    ['wrapper_ping_timeout', 'Wrapper health check timed out'],
-    ['wrapper_no_output', 'Wrapper made no execution progress during the watchdog window'],
-    ['wrapper_disconnected', 'Wrapper disconnected before completion'],
-  ] as const)('reports %s before and after activity', async (failureCode, expectedDiagnostic) => {
-    for (const failureStage of ['post_dispatch_no_activity', 'agent_activity'] as const) {
-      const reports: CloudAgentQueueReport[] = [];
-      await emitRunStateReport({
-        queue: { send: async report => void reports.push(report) },
-        cloudAgentSessionId: 'agent_report',
-        state: {
-          ...state,
+    ['wrapper_ping_timeout', 'Wrapper health check timed out', 'wrapper_liveness'],
+    [
+      'wrapper_no_output',
+      'Wrapper made no execution progress during the watchdog window',
+      'wrapper_liveness',
+    ],
+    ['wrapper_disconnected', 'Wrapper disconnected before completion', 'wrapper_disconnected'],
+  ] as const)(
+    'reports %s before and after activity',
+    async (failureCode, expectedDiagnostic, expectedFailureReason) => {
+      for (const failureStage of ['post_dispatch_no_activity', 'agent_activity'] as const) {
+        const reports: CloudAgentQueueReport[] = [];
+        await emitRunStateReport({
+          queue: { send: async report => void reports.push(report) },
+          cloudAgentSessionId: 'agent_report',
+          state: {
+            ...state,
+            failureStage,
+            failureCode,
+            agentActivityObservedAt: failureStage === 'agent_activity' ? 4 : undefined,
+          },
+        });
+
+        expect(reports).toHaveLength(1);
+        expect(reports[0].run).toMatchObject({
           failureStage,
           failureCode,
-          agentActivityObservedAt: failureStage === 'agent_activity' ? 4 : undefined,
-        },
-      });
-
-      expect(reports).toHaveLength(1);
-      expect(reports[0].run).toMatchObject({
-        failureStage,
-        failureCode,
-        failureResponsibility: 'platform',
-        failureReason: 'wrapper_liveness',
-        diagnostic: { errorMessageRedacted: expectedDiagnostic },
-      });
-      if (failureStage === 'agent_activity') {
-        expect(reports[0].run.agentActivityObservedAt).toBe(new Date(4).toISOString());
-      } else {
-        expect(reports[0].run).not.toHaveProperty('agentActivityObservedAt');
+          failureResponsibility: 'platform',
+          failureReason: expectedFailureReason,
+          diagnostic: { errorMessageRedacted: expectedDiagnostic },
+        });
+        if (failureStage === 'agent_activity') {
+          expect(reports[0].run.agentActivityObservedAt).toBe(new Date(4).toISOString());
+        } else {
+          expect(reports[0].run).not.toHaveProperty('agentActivityObservedAt');
+        }
       }
     }
-  });
+  );
 
   it.each([
     [
@@ -213,18 +245,18 @@ describe('Cloud Agent report emitter', () => {
     ],
     ['provider_unavailable', 'Assistant service is unavailable', 'managed_provider_unavailable'],
     ['timeout', 'Assistant request timed out', 'request_timeout'],
-    ['invalid_request', 'Assistant request was invalid', 'invalid_request'],
-    ['context_limit', 'The model context limit was exceeded', 'context_limit'],
-    ['output_limit', 'The model output limit was reached', 'output_limit'],
+    ['invalid_request', 'Assistant request was invalid', 'assistant_invalid_request'],
+    ['context_limit', 'The model context limit was exceeded', 'assistant_context_limit'],
+    ['output_limit', 'The model output limit was reached', 'assistant_output_limit'],
     [
       'content_filter',
       'The model provider blocked the response under its content policy',
-      'content_filter',
+      'assistant_content_filter',
     ],
     [
       'structured_output',
       'The model response did not match the required format',
-      'structured_output',
+      'assistant_structured_output',
     ],
     ['unknown', 'Assistant request failed', 'assistant_unknown'],
     [undefined, 'Assistant request failed', 'assistant_unknown'],
@@ -304,7 +336,7 @@ describe('Cloud Agent report emitter', () => {
     );
   });
 
-  it('attributes an absent model chosen by managed auto-routing to platform configuration', async () => {
+  it('attributes an absent model to the provider even when managed auto-routing selected it', async () => {
     const reports: CloudAgentQueueReport[] = [];
     await emitRunStateReport({
       queue: { send: async report => void reports.push(report) },
@@ -321,8 +353,8 @@ describe('Cloud Agent report emitter', () => {
 
     expect(reports[0]?.run).toMatchObject({
       failureCode: 'model_missing',
-      failureResponsibility: 'platform',
-      failureReason: 'managed_model_configuration',
+      failureResponsibility: 'provider',
+      failureReason: 'model_unavailable',
     });
   });
 
@@ -459,7 +491,7 @@ describe('Cloud Agent report emitter', () => {
       'Assistant request was rate limited'
     );
     expect(reports[0]?.run).toMatchObject({
-      failureResponsibility: 'user',
+      failureResponsibility: 'provider',
       failureReason: 'rate_limited',
     });
     expect(JSON.stringify(reports)).not.toContain('usage_limit_exceeded');
@@ -506,7 +538,7 @@ describe('Cloud Agent report emitter', () => {
     expect(metric).toHaveBeenCalledWith('Cloud Agent failure classified', {
       metric: 'cloud_agent_failure_classified',
       count: 1,
-      responsibility: 'platform',
+      responsibility: 'provider',
       reason: 'managed_provider_unavailable',
       stage: 'agent_activity',
       code: 'assistant_error',

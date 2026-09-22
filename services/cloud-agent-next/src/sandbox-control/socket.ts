@@ -15,6 +15,7 @@ import {
   sandboxControlSocketAttachmentSchema,
   sandboxControlObservationSchema,
   sandboxEventPublicationPayloadSchema,
+  sandboxEventBatchPayloadSchema,
   sessionNativeRuntimeRetirementPayloadSchema,
   sessionOperationAuthorizationSchema,
   sessionOperationDeliverySchema,
@@ -24,6 +25,8 @@ import {
   type RequestFrame,
   type ResponseFrame,
   type SandboxControlSocketAttachment,
+  type SandboxEventBatchPayload,
+  type SandboxEventBatchResult,
   type SandboxHeartbeatPayload,
   type SessionEventIdentity,
   type SessionEventPayload,
@@ -62,6 +65,7 @@ export type SandboxControlOutboundRequest = {
   authorization?: SessionOperationAuthorization;
   timeoutMs?: number;
   expectedWrapperInstanceId?: string;
+  expectedConnection?: SandboxControlConnectionIdentity;
   deadlineAt?: number;
 };
 
@@ -70,6 +74,8 @@ export type SandboxControlConnectionIdentity = {
   providerInstanceId: string;
   wrapperInstanceId?: string;
   recoveryCapable?: boolean;
+  runtimeIsolation?: true;
+  runtimeRecovery?: true;
 };
 
 export type SandboxControlEventResult = { applied: boolean; retryable?: boolean };
@@ -99,6 +105,10 @@ export type SandboxControlSocketHooks = {
     receiptId?: string,
     sequence?: number
   ): void | SandboxControlEventResult | Promise<void | SandboxControlEventResult | undefined>;
+  onSessionEventBatch?(
+    payload: SandboxEventBatchPayload,
+    identity: SandboxControlConnectionIdentity
+  ): SandboxEventBatchResult | Promise<SandboxEventBatchResult | undefined> | undefined;
   onOperationResult?(
     session: SessionRequestIdentity,
     delivery: SessionOperationDelivery,
@@ -124,11 +134,14 @@ export type SandboxControlSocketHandler = {
   hasHandshakenSocket(): boolean;
   supportsOperationResults(): boolean;
   supportsScopedStopAbort(): boolean;
+  supportsScopedCleanupResult?(): boolean;
   supportsNativeRuntimeRetirement(): boolean;
   supportsWorkingBranches?(): boolean;
   supportsConnectionRecovery(): boolean;
   getConnectionIdentity(): SandboxControlConnectionIdentity | null;
   getReadySocket(): WebSocket | null;
+  /** Current-isolate outstanding control-RPC waiters. */
+  pendingControlRequests(): number;
   closeProvisionalSockets(): void;
 };
 
@@ -226,6 +239,8 @@ function readConnectionIdentity(
     providerInstanceId: attachment.providerInstanceId,
     ...(attachment.recoveryCapable ? { recoveryCapable: true } : {}),
     ...(attachment.wrapperInstanceId ? { wrapperInstanceId: attachment.wrapperInstanceId } : {}),
+    ...(attachment.runtimeIsolation ? { runtimeIsolation: true } : {}),
+    ...(attachment.runtimeRecovery ? { runtimeRecovery: true } : {}),
   };
 }
 
@@ -363,6 +378,14 @@ export function createSandboxControlSocketHandler(
       );
     },
 
+    supportsScopedCleanupResult(): boolean {
+      const current = currentHandshakenSocket(state);
+      return (
+        current !== null &&
+        readAttachment(current.socket)?.capabilities?.scopedCleanupResult === true
+      );
+    },
+
     supportsNativeRuntimeRetirement(): boolean {
       const current = currentHandshakenSocket(state);
       return (
@@ -393,6 +416,10 @@ export function createSandboxControlSocketHandler(
     getReadySocket(): WebSocket | null {
       const ws = currentHandshakenSocket(state)?.socket;
       return ws && readAttachment(ws)?.kiloReady === true ? ws : null;
+    },
+
+    pendingControlRequests(): number {
+      return waiters.pendingCount();
     },
 
     closeProvisionalSockets(): void {
@@ -541,6 +568,8 @@ export function createSandboxControlSocketHandler(
           providerInstanceId: payload.providerInstanceId,
           ...(payload.wrapperInstanceId ? { wrapperInstanceId: payload.wrapperInstanceId } : {}),
           ...(payload.capabilities?.connectionRecovery === true ? { recoveryCapable: true } : {}),
+          ...(payload.capabilities?.runtimeIsolation === true ? { runtimeIsolation: true } : {}),
+          ...(payload.capabilities?.runtimeRecovery === true ? { runtimeRecovery: true } : {}),
         };
         const completed: SandboxControlSocketAttachment = {
           handshakeComplete: true,
@@ -552,6 +581,8 @@ export function createSandboxControlSocketHandler(
           providerInstanceId: identity.providerInstanceId,
           ...(payload.capabilities ? { capabilities: payload.capabilities } : {}),
           ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
+          ...(identity.runtimeIsolation ? { runtimeIsolation: true } : {}),
+          ...(identity.runtimeRecovery ? { runtimeRecovery: true } : {}),
         };
         const superseded: WebSocket[] = [];
         let replaced = false;
@@ -602,6 +633,8 @@ export function createSandboxControlSocketHandler(
             helloResult({
               connectionRecovery: payload.capabilities?.connectionRecovery === true,
               eventReceipts: payload.capabilities?.eventReceipts === true,
+              eventBatches: true,
+              scopedCleanupResult: payload.capabilities?.scopedCleanupResult === true,
             })
           )
         );
@@ -752,6 +785,54 @@ export function createSandboxControlSocketHandler(
             sendJson(
               ws,
               errorResponse(frame.requestId, 'not_ready', 'Sandbox event publication failed', true)
+            );
+        }
+        return;
+      }
+
+      if (frame.operation === 'sandbox.event.publishBatch') {
+        const capabilities = readAttachment(ws)?.capabilities;
+        if (capabilities?.eventBatches !== true || capabilities.eventReceipts !== true) {
+          sendJson(
+            ws,
+            errorResponse(
+              frame.requestId,
+              'protocol_error',
+              'Event batching is not negotiated',
+              false
+            )
+          );
+          return;
+        }
+        const batch = sandboxEventBatchPayloadSchema.safeParse(frame.payload);
+        if (!batch.success) {
+          sendJson(
+            ws,
+            errorResponse(frame.requestId, 'protocol_error', 'Invalid sandbox event batch', false)
+          );
+          return;
+        }
+        try {
+          const result = await hooks.onSessionEventBatch?.(batch.data, identity);
+          if (!isCurrentConnection(state, ws, identity)) return;
+          if (!result) {
+            sendJson(
+              ws,
+              errorResponse(
+                frame.requestId,
+                'not_ready',
+                'Sandbox event batch was not applied',
+                true
+              )
+            );
+            return;
+          }
+          sendJson(ws, okResponse(frame.requestId, result));
+        } catch {
+          if (isCurrentConnection(state, ws, identity))
+            sendJson(
+              ws,
+              errorResponse(frame.requestId, 'not_ready', 'Sandbox event batch failed', true)
             );
         }
         return;

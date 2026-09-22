@@ -1,15 +1,21 @@
 /* eslint-disable max-lines -- renderer host-key, image, link interaction, and empty-fence mount suites stay in one cohesive unit test file */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount RN trees under vitest (same pattern as code-block.test.ts) */
 // eslint-disable-next-line import/no-nodejs-modules -- patching the CJS loader is the only way to stub react-native for the externalized react-native-marked; the library under test stays real
 import Module from 'node:module';
 import { createElement, type ReactElement, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 
 import { type MarkdownPalette } from './markdown-palette';
 import { type MarkdownRenderer } from './markdown-renderer';
+
+// The first createRenderer() pays the full react-native-marked import, and the
+// empty-fence suite re-imports that graph after vi.resetModules(). On a loaded
+// machine (the full gate saturates every core) either import can stretch past
+// the 5 s vitest default and fail a healthy test. The file-wide timeout leaves
+// that headroom; a genuinely hung import still fails, only later.
+vi.setConfig({ testTimeout: 30_000 });
 
 // react-native-marked is externalized by vitest, so vi.mock('react-native') does
 // not intercept its nested requires. Patch Module._load before loading the
@@ -21,6 +27,8 @@ const rnStub = {
   ScrollView: 'ScrollView',
   TouchableHighlight: 'TouchableHighlight',
   Image: 'Image',
+  // CodeBlock reads the color scheme to pick its syntax palette.
+  useColorScheme: () => 'light',
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
     hairlineWidth: 1,
@@ -133,7 +141,7 @@ function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: strin
   if (!instance) {
     return undefined;
   }
-  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
   return instance.props[key];
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
 }
@@ -559,6 +567,48 @@ describe('MarkdownRenderer code override', () => {
     >;
     expect((inner(element).props as { maxLength?: unknown }).maxLength).toBe(cap);
   });
+
+  it('passes an onCopyCode handler through to CodeBlock and omits it otherwise', async () => {
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const copyable = new RendererClass(palette, true, { onCopyCode });
+    const element = copyable.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect((inner(element).props as { onCopyCode?: unknown }).onCopyCode).toBe(onCopyCode);
+
+    const plain = new RendererClass(palette, true, {});
+    const plainElement = plain.code(
+      'const x = 1;',
+      'ts',
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+    expect((inner(plainElement).props as { onCopyCode?: unknown }).onCopyCode).toBeUndefined();
+  });
+
+  it('passes an onLongPressCode handler through to CodeBlock and omits it otherwise', async () => {
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const onLongPressCode = vi.fn<() => void>();
+    const copyable = new RendererClass(palette, true, { onLongPressCode });
+    const element = copyable.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect((inner(element).props as { onLongPressCode?: unknown }).onLongPressCode).toBe(
+      onLongPressCode
+    );
+
+    const plain = new RendererClass(palette, true, {});
+    const plainElement = plain.code(
+      'const x = 1;',
+      'ts',
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+    expect(
+      (inner(plainElement).props as { onLongPressCode?: unknown }).onLongPressCode
+    ).toBeUndefined();
+  });
 });
 
 describe('MarkdownRenderer empty fence mounting', () => {
@@ -601,6 +651,62 @@ describe('MarkdownRenderer empty fence mounting', () => {
       { deep: true }
     );
     expect(codeTexts).toHaveLength(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      mounted.unmount();
+    });
+    // Restore the stubbed module graph for any dynamic import that follows.
+    vi.resetModules();
+  });
+
+  it('renders a transcript (non-selectable) fence as a chunk of lines per Text', async () => {
+    // TextPartRenderer renders the chat transcript with selectable={false}.
+    // Android builds one SpannableStringBuilder per ReactTextView on the UI
+    // thread, so the transcript fence must split into chunks instead of putting
+    // the whole fence into one Text (the SetSpanOperation.execute ANR) — and
+    // not one Text per source line either, which would scale the native view
+    // count with the file.
+    vi.doUnmock('./code-block');
+    vi.resetModules();
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const renderer = new RendererClass(palette, false, {});
+    const sourceLines = Array.from({ length: 80 }, (_, index) => `const value${index} = ${index};`);
+    const element = renderer.code(
+      sourceLines.join('\n'),
+      'ts',
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(element);
+    });
+    const mounted = rendererRef.current;
+    if (!mounted) {
+      throw new Error('renderer was not created');
+    }
+
+    const codeTexts = mounted.root.findAll(
+      node => {
+        const className = propOf(node, 'className');
+        return (
+          typeof node.type === 'string' &&
+          typeof className === 'string' &&
+          className.includes('font-mono text-xs')
+        );
+      },
+      { deep: true }
+    );
+    expect(codeTexts.length).toBeGreaterThan(1);
+    expect(codeTexts.length).toBeLessThan(sourceLines.length);
+    for (const codeText of codeTexts) {
+      expect(propOf(codeText, 'selectable')).toBe(false);
+    }
 
     await act(async () => {
       await Promise.resolve();

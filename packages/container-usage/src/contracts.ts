@@ -124,10 +124,15 @@ export const recordAckSchema = z
   .strict();
 export type RecordAck = z.infer<typeof recordAckSchema>;
 
-export const recordStartFailureCodeSchema = z.enum([
+/** Start-failure codes that cannot succeed on retry until SKU configuration changes. */
+export const nonRetryableSkuAdmissionCodes = [
   'sku_not_found',
   'sku_unit_mismatch',
   'sku_not_accepting_new_usage',
+] as const;
+
+export const recordStartFailureCodeSchema = z.enum([
+  ...nonRetryableSkuAdmissionCodes,
   'insufficient_credits',
 ]);
 export type RecordStartFailureCode = z.infer<typeof recordStartFailureCodeSchema>;
@@ -144,7 +149,7 @@ const recordStartFailureSchema = z.discriminatedUnion('code', [
     .strict(),
   z
     .object({
-      code: z.enum(['sku_not_found', 'sku_unit_mismatch', 'sku_not_accepting_new_usage']),
+      code: z.enum(nonRetryableSkuAdmissionCodes),
       message: z.string().min(1),
     })
     .strict(),

@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { type Provider } from '@/lib/ai-gateway/providers/types';
-import { OPENROUTER, VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { getEnvVariable } from '@/lib/dotenvx';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 

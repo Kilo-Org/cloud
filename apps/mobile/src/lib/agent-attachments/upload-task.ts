@@ -1,4 +1,4 @@
-import { createUploadTask, FileSystemUploadType, getInfoAsync } from 'expo-file-system/legacy';
+import { File, UploadType } from 'expo-file-system';
 
 import { i18n } from '@/i18n';
 import { trpcClient } from '@/lib/trpc';
@@ -17,11 +17,12 @@ export function normalizeFilename(name: string, extension: AgentAttachmentExtens
   return `${name}.${extension}`;
 }
 
+// eslint-disable-next-line require-await -- the modern File API exposes size synchronously; the public signature stays async for callers.
 export async function measureLocalSize(uri: string): Promise<number | null> {
   try {
-    const info = await getInfoAsync(uri);
-    if (info.exists && !info.isDirectory) {
-      return info.size;
+    const file = new File(uri);
+    if (file.exists) {
+      return file.size;
     }
   } catch {
     return null;
@@ -46,7 +47,7 @@ export async function uploadOne(args: {
   contentLength: number;
   localUri: string;
   onProgress: (progress: number | null) => void;
-  onTask?: (task: { cancelAsync: () => Promise<void> }) => void;
+  onTask?: (task: { cancel: () => void }) => void;
   onAdmitted?: (key: string) => void;
   isCancelled?: () => boolean;
 }): Promise<UploadOutcome> {
@@ -83,32 +84,26 @@ export async function uploadOne(args: {
   // ledger row, so a remove/leave that races the PUT must still release it.
   onAdmitted?.(result.key);
 
-  // Per-chip determinate progress via `createUploadTask` (the
-  // main-module `createUploadTask` throws at runtime in SDK 55, so we
-  // import from `expo-file-system/legacy`). A signed-URL PUT only
-  // reports progress when the response advertises Content-Length; we
-  // fall back to `null` (indeterminate) when the server omits it.
-  const task = createUploadTask(
-    result.signedUrl,
-    localUri,
-    {
-      uploadType: FileSystemUploadType.BINARY_CONTENT,
-      httpMethod: 'PUT',
-      headers: { 'Content-Type': contentType },
-    },
-    progress => {
-      const total = progress.totalBytesExpectedToSend;
-      if (total > 0) {
-        onProgress(progress.totalBytesSent / total);
+  // Per-chip determinate progress via the modern `File.createUploadTask`. A
+  // signed-URL PUT only reports progress when the response advertises
+  // Content-Length; we fall back to `null` (indeterminate) when the server
+  // omits it.
+  const task = new File(localUri).createUploadTask(result.signedUrl, {
+    uploadType: UploadType.BINARY_CONTENT,
+    httpMethod: 'PUT',
+    headers: { 'Content-Type': contentType },
+    onProgress: ({ bytesSent, totalBytes }) => {
+      if (totalBytes > 0) {
+        onProgress(bytesSent / totalBytes);
       } else {
         onProgress(null);
       }
-    }
-  );
+    },
+  });
   onTask?.(task);
   const uploadResult = await task.uploadAsync();
-  if (!uploadResult || uploadResult.status < 200 || uploadResult.status >= 300) {
-    throw new Error(`Upload failed with status ${uploadResult?.status ?? 'no response'}`);
+  if (uploadResult.status < 200 || uploadResult.status >= 300) {
+    throw new Error(`Upload failed with status ${uploadResult.status}`);
   }
   return { key: result.key };
 }

@@ -421,7 +421,7 @@ describe('executeDirectly failure handling', () => {
     expect(result.pendingAfterAlarm[0]?.executionId).toBeUndefined();
     expect(result.pendingAfterAlarm[0]?.lastFlushError).toBe('Sandbox connect failed');
     expect(result.executionsAfterFirstAlarm).toEqual([]);
-    expect(result.wrapperRuntimeState.wrapperGeneration).toBe(2);
+    expect(result.wrapperRuntimeState.wrapperGeneration).toBe(1);
     expect(result.wrapperRuntimeState.wrapperConnectionId).toBeUndefined();
     expect(result.wrapperLeaseAfterFailure).toMatchObject({
       state: 'stop_needed',

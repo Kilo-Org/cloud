@@ -4,6 +4,8 @@
     "done": "完成",
     "retry": "再試一次",
     "tryAgain": "再試一次",
+    "continue": "繼續",
+    "notNow": "稍後再說",
     "language": "語言",
     "device": "裝置",
     "share": "分享 {{title}}",
@@ -21,8 +23,6 @@
     "couldNotCopyToClipboard": "無法複製到剪貼簿。",
     "required": "必填",
     "error": "錯誤：{{error}}",
-    "notNow": "稍後再說",
-    "continue": "繼續",
     "back": "返回",
     "somethingWentWrong": "發生錯誤。",
     "couldNotOpen": "無法開啟 {{label}}。",
@@ -36,6 +36,7 @@
     "cost": "費用",
     "discard": "捨棄",
     "findings": "問題",
+    "mergeRequest": "合併請求",
     "notConnected": "未連結",
     "notifications": "通知",
     "pullRequest": "提取要求",
@@ -162,6 +163,7 @@
     "useDifferentEmail": "改用其他電子郵件地址",
     "signInWithApple": "使用 Apple 登入",
     "signInWithGoogle": "使用 Google 登入",
+    "signInWithPasskey": "使用通行密鑰登入",
     "emailAddress": "電子郵件地址",
     "emailPlaceholder": "例如：name@example.com",
     "continueWithEmail": "透過電子郵件繼續登入",
@@ -174,6 +176,10 @@
     "termsConnector": " 和 ",
     "termsSuffix": "。",
     "moreSignInOptions": "更多登入選項",
+    "passkeyCancelled": "通行密鑰登入已取消。請重試。",
+    "passkeyNotFound": "此裝置未儲存通行密鑰。請改用 Apple、Google 或電子郵件登入。",
+    "passkeyUnsupported": "此裝置無法使用通行密鑰。請改用 Apple、Google 或電子郵件登入。",
+    "passkeyFailed": "無法使用通行密鑰登入。請重試。",
     "couldNotCompleteSignIn": "無法完成登入。請再試一次。",
     "sessionEnded": "你的工作階段已結束。請重新登入。",
     "signInCodeExpired": "你的登入驗證碼已過期。請再試一次。",
@@ -224,11 +230,36 @@
     "providerTestAccount": "測試帳戶",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "企業 SSO"
+    "providerEnterpriseSso": "企業 SSO",
+    "passkeysTitle": "通行密鑰",
+    "passkeysSubtitle": "無需密碼即可登入",
+    "passkeysEmpty": "還沒有通行密鑰",
+    "passkeysEmptyHint": "$t(profile.addPasskey)以無需密碼登入。",
+    "passkeysCouldNotLoad": "無法載入通行密鑰",
+    "passkeysLoadFailed": "在此內容載入完成之前，通行密鑰無法使用。",
+    "addPasskey": "新增通行密鑰",
+    "passkeyDefaultName": "通行密鑰",
+    "passkeyAddedOn": "新增於 {{date}}",
+    "passkeyAdded": "已新增通行密鑰。",
+    "passkeyAddFailed": "無法新增通行密鑰。請重試。",
+    "passkeyAddUnsupported": "此裝置無法建立通行密鑰。",
+    "passkeyAddCancelled": "通行密鑰建立已取消。",
+    "passkeyRemoved": "已移除通行密鑰。",
+    "passkeyRemoveFailed": "無法移除該通行密鑰。請重試。",
+    "passkeyRenamed": "已重新命名通行密鑰。",
+    "passkeyName": "通行密鑰名稱",
+    "renamePasskey": "重新命名通行密鑰",
+    "removePasskey": "移除通行密鑰",
+    "removePasskeyTitle": "移除通行密鑰？",
+    "removePasskeyMessage": "您將無法再使用此通行密鑰登入。"
   },
   "preferences": {
+    "general": "一般",
+    "voiceInput": "語音輸入",
     "autoExpandThinking": "自動展開思考內容",
     "autoExpandThinkingSubtitle": "智慧代理完成思考後，自動展開思考內容。",
+    "hideThinking": "隱藏思考詳情",
+    "hideThinkingSubtitle": "不在工作階段頁面顯示智慧代理的思考內容。",
     "keepScreenOn": "在工作階段頁面保持螢幕亮起",
     "keepScreenOnSubtitle": "工作階段執行期間，保持螢幕亮起。",
     "appearance": "外觀",
@@ -237,6 +268,7 @@
     "appearanceLight": "淺色",
     "appearanceDark": "深色",
     "account": "帳戶",
+    "accountSubtitle": "語言、信任的主機和裝置工作階段",
     "prReviewAttribution": "在 PR 審查中註明使用的應用程式",
     "prReviewAttributionSubtitle": "送出審查時，在結尾註明透過 Kilo 審查。",
     "returnSendsMessage": "按換行鍵傳送訊息",
@@ -247,7 +279,15 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "使用 Kilo Gateway 轉錄",
+    "gatewayTranscriptionSubtitle": "使用 Kilo Gateway 模型將語音輸入轉錄成文字，而不使用裝置上的語音辨識。您的錄音將傳送至 Kilo Gateway。",
+    "transcriptionModel": "$t(transcriptionModel.title)",
+    "condenseToolCalls": "精簡工具呼叫",
+    "condenseToolCallsSubtitle": "將連續的工具呼叫合併為一列，點擊即可開啟。",
+    "toolSummaryTranslation": "翻譯工具摘要",
+    "toolSummaryTranslationSubtitle": "將每個工具摘要傳送給模型，翻譯成你的應用程式語言。翻譯失敗時會顯示原文。",
+    "toolSummaryTranslationModelUnavailableNotice": "這個模型已不再提供。點一下$t(common.model)選擇另一個。"
   },
   "notifications": {
     "liveActivities": "即時動態",
@@ -279,11 +319,12 @@
     "previewFullDescription": "通知會在鎖定畫面上顯示訊息文字。",
     "previewGenericDescription": "通知只會提示有新動態。開啟 Kilo 即可查看內容。",
     "channel": {
-      "agent": "智慧代理工作階段",
+      "agentProgress": "智慧代理進度",
       "chat": "聊天訊息",
       "kiloclaw": "KiloClaw 活動",
       "balance": "餘額提醒",
-      "security": "資安問題"
+      "security": "資安問題",
+      "spend": "支出提醒"
     },
     "category": {
       "chatMessagesSubtitle": "對話中的回覆",
@@ -294,8 +335,22 @@
       "sessionStatusTitle": "工作階段狀態",
       "sessionStatusSubtitle": "已完成／失敗／可開始控制",
       "kiloclawActivitySubtitle": "執行個體就緒或失敗、排程動作",
+      "kiloclawActivityUnavailable": "啟動 KiloClaw 執行個體以接收 KiloClaw 活動。",
       "balanceAlertsSubtitle": "組織餘額不足警告",
-      "securityFindingsSubtitle": "新發現的安全問題與 SLA 提醒"
+      "balanceAlertsUnavailable": "加入組織以接收餘額提醒。",
+      "securityFindingsSubtitle": "新發現的安全問題與 SLA 提醒",
+      "securityFindingsUnavailable": "在某個範圍啟用 Kilo 資安代理程式以接收安全問題。",
+      "spendAlertsSubtitle": "門檻突破與每小時激增",
+      "spendAlertsToggle": "支出提醒類別"
+    },
+    "action": {
+      "openSession": "開啟工作階段"
+    },
+    "needsInputAction": {
+      "approved": "要求已核准",
+      "replied": "回覆已傳送",
+      "failed": "無法回答。再次點按即可重試。",
+      "unavailable": "此要求已不再等待。"
     }
   },
   "tabs": {
@@ -376,7 +431,9 @@
       "uploadFailed": "上傳失敗。",
       "failedToUploadFile": "無法上傳檔案：{{reason}}。",
       "nothingToPaste": "沒有可貼上的內容。",
-      "metadataStripFailed": "無法移除相片中繼資料。"
+      "metadataStripFailed": "無法移除相片中繼資料。",
+      "limit_one": "最多可附加 {{displayCount}} 個檔案。",
+      "limit_other": "最多可附加 {{displayCount}} 個檔案。"
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}，{{status}}",
@@ -1145,7 +1202,11 @@
       "syncNow": "立即同步",
       "syncQueued": "已排入同步佇列",
       "syncStatusUnavailable": "無法取得同步狀態。",
-      "withinDeadline": "期限內"
+      "withinDeadline": "期限內",
+      "daysOverdue_one": "逾期 {{displayCount}} 天",
+      "daysOverdue_other": "逾期 {{displayCount}} 天",
+      "findingsCount_one": "{{displayCount}} 項資安問題",
+      "findingsCount_other": "{{displayCount}} 項資安問題"
     },
     "dashboardMetrics": {
       "openFindings": "未解決的資安問題",
@@ -1517,6 +1578,10 @@
       "couldNotLoad": "無法載入工作階段。",
       "failedToLoadDetails": "無法載入工作階段詳細資料。",
       "failedToStopExecution": "無法停止執行。",
+      "stopped": "工作階段已停止",
+      "committing": "正在提交…",
+      "committed": "已提交",
+      "commitFailed": "提交失敗",
       "renameSession": "重新命名工作階段",
       "renamePlaceholder": "工作階段名稱",
       "transcriptAccessibility": "工作階段對話記錄",
@@ -1551,17 +1616,56 @@
       "exitNeedsNewerCli": "遠端斜線指令需要較新版本的 Kilo CLI。請更新 Kilo CLI 後重新連線。"
     },
     "sessionConnection": {
+      "label": "連線",
       "connecting": "連線中…",
       "reconnecting": "重新連線中…",
       "connectionLost": "連線中斷",
       "retryConnection": "重新連線"
     },
+    "goal": {
+      "title": "目標",
+      "statusActive": "進行中的目標",
+      "statusPaused": "已暫停的目標",
+      "statusComplete": "目標已完成",
+      "statusBlocked": "目標已封鎖",
+      "edit": "編輯目標",
+      "remove": "移除目標",
+      "pause": "暫停目標",
+      "resume": "繼續目標",
+      "editPlaceholder": "描述目標",
+      "removeConfirmTitle": "移除目標？",
+      "removeConfirmMessage": "CLI 會清除此工作階段的目標。",
+      "updateFailed": "無法更新目標。",
+      "sectionAccessibility": "{{status}}。目標：{{text}}",
+      "collapse": "收合目標",
+      "expand": "展開目標"
+    },
     "newSession": {
+      "recentlyUsed": "最近使用",
+      "couldNotLoadGithubRepositories": "無法載入 GitHub 儲存庫。",
+      "couldNotLoadGitlabRepositories": "無法載入 GitLab 儲存庫。",
+      "couldNotLoadBitbucketRepositories": "無法載入 Bitbucket 儲存庫。",
       "connectGithubDescription": "請在瀏覽器中連結 GitHub，再回到這裡選取儲存庫。",
+      "connectGitlabDescription": "請在瀏覽器中連結 GitLab，再回到這裡選取儲存庫。",
+      "connectBitbucketDescription": "請在瀏覽器中連結 Bitbucket，再回到這裡選取儲存庫。",
       "openGithub": "開啟 GitHub",
+      "openGitlab": "開啟 GitLab",
+      "openBitbucket": "開啟 Bitbucket",
       "refreshRepositories": "重新整理儲存庫",
       "githubConnected": "已連結 GitHub",
+      "gitlabConnected": "已連結 GitLab",
       "noRepositoriesVisible": "沒有可顯示的儲存庫。請檢查 Kilo GitHub 應用程式的儲存庫存取權限，再重新整理。",
+      "noRepositoriesVisibleGitlab": "沒有可顯示的儲存庫。請檢查 GitLab 的儲存庫存取權限，再重新整理。",
+      "noRepositoriesVisibleBitbucket": "沒有可顯示的儲存庫。請檢查 Bitbucket 的儲存庫存取權限，再重新整理。",
+      "bitbucketOrganizationsOnly": "Bitbucket 僅供組織使用。",
+      "branchPickerTitle": "選取分支",
+      "branchDefault": "預設",
+      "branchAccessibility": "分支: {{label}}",
+      "branchLoading": "正在載入分支",
+      "branchLoadError": "無法載入分支",
+      "branchUnavailable": "此存放庫沒有可用的分支。檢查你在供應商處的存取權限，然後選取另一個存放庫。",
+      "branchEmpty": "沒有可用的分支",
+      "branchPlaceholder": "選取一個分支",
       "runOnWithTarget": "執行環境：{{target}}",
       "environment": "環境",
       "couldNotLoadEnvironment": "無法載入你的環境。",
@@ -1580,26 +1684,15 @@
       "couldNotReadPendingSessions": "無法讀取待處理的工作階段。請再試一次。",
       "failedToCreate": "無法建立工作階段。",
       "couldNotRefreshRepositories": "無法重新整理儲存庫。請再試一次。",
-      "discardDraftMessage": "你輸入的提示詞將不會保留。",
       "discardDraftTitle": "捨棄草稿？",
+      "discardDraftMessage": "你輸入的提示詞將不會保留。",
+      "discardWithUploadsMessage": "你輸入的提示詞與尚未附加至已傳送訊息的上傳檔案都會刪除。",
       "discardFailed": "無法捨棄草稿。請再試一次。",
       "remoteHint": "在電腦上執行 `kilo remote`，或在執行中的 CLI 工作階段執行 `/remote`，即可控制本機的 kilo 程序。",
-      "connectBitbucketDescription": "請在瀏覽器中連結 Bitbucket，再回到這裡選取儲存庫。",
-      "connectGitlabDescription": "請在瀏覽器中連結 GitLab，再回到這裡選取儲存庫。",
-      "couldNotLoadBitbucketRepositories": "無法載入 Bitbucket 儲存庫。",
-      "couldNotLoadGithubRepositories": "無法載入 GitHub 儲存庫。",
-      "couldNotLoadGitlabRepositories": "無法載入 GitLab 儲存庫。",
-      "gitlabConnected": "已連結 GitLab",
-      "noRepositoriesVisibleBitbucket": "沒有可顯示的儲存庫。請檢查 Bitbucket 的儲存庫存取權限，再重新整理。",
-      "noRepositoriesVisibleGitlab": "沒有可顯示的儲存庫。請檢查 GitLab 的儲存庫存取權限，再重新整理。",
-      "openBitbucket": "開啟 Bitbucket",
-      "openGitlab": "開啟 GitLab",
-      "recentlyUsed": "最近使用",
       "continueFrom": "正在接續 {{title}}。",
       "importingSession": "匯入工作階段中",
       "cliCannotContinue": "此 CLI 無法繼續工作階段。請選擇 Cloud Agent 或其他 CLI。",
-      "importFailed": "無法匯入此工作階段。",
-      "discardWithUploadsMessage": "你輸入的提示詞與尚未附加至已傳送訊息的上傳檔案都會刪除。"
+      "importFailed": "無法匯入此工作階段。"
     },
     "partRenderer": {
       "updatedFileCount_one": "已更新 {{displayCount}} 個檔案。",
@@ -1623,7 +1716,14 @@
       "updateTodos": "更新待辦事項",
       "linesBadge": "{{displayCount}} 行",
       "filesBadge": "{{displayCount}} 個檔案",
-      "matchesBadge": "{{displayCount}} 筆相符結果"
+      "matchesBadge": "{{displayCount}} 筆相符結果",
+      "filesBadge_one": "{{displayCount}} 個檔案",
+      "filesBadge_other": "{{displayCount}} 個檔案",
+      "linesBadge_one": "{{displayCount}} 行",
+      "linesBadge_other": "{{displayCount}} 行",
+      "matchesBadge_one": "{{displayCount}} 筆相符結果",
+      "matchesBadge_other": "{{displayCount}} 筆相符結果",
+      "noOutput": "沒有輸出。"
     },
     "readToolMarkdown": {
       "linesTruncated": "第 {{start}}–{{end}} 行（已截斷）",
@@ -1913,7 +2013,11 @@
       "files": "檔案",
       "couldNotOpenPhotoPicker": "無法開啟照片選擇器。請重新啟動 Kilo 並再試一次。",
       "maxFilesAllowed": "最多可附加 {{displayCount}} 個檔案。",
-      "onlyAddingFiles": "僅附加 {{total}} 個檔案中的 {{accepted}} 個（最多 {{max}} 個）"
+      "onlyAddingFiles": "僅附加 {{total}} 個檔案中的 {{accepted}} 個（最多 {{max}} 個）",
+      "maxFilesAllowed_one": "最多可附加 {{displayCount}} 個檔案。",
+      "maxFilesAllowed_other": "最多可附加 {{displayCount}} 個檔案。",
+      "onlyAddingFiles_one": "僅附加 {{total}} 個檔案中的 {{accepted}} 個（最多 {{max}} 個）",
+      "onlyAddingFiles_other": "僅附加 {{total}} 個檔案中的 {{accepted}} 個（最多 {{max}} 個）"
     },
     "composer": {
       "addAttachment": "新增附件",
@@ -1931,7 +2035,9 @@
       "discardAttachmentsMessage": "尚未附加至已傳送訊息的上傳檔案都會刪除。",
       "discardAttachmentsTitle": "捨棄附件？",
       "charactersRemaining": "剩餘 {{count}} 個字元",
-      "insertNewline": "插入換行"
+      "insertNewline": "插入換行",
+      "charactersRemaining_one": "剩餘 {{count}} 個字元",
+      "charactersRemaining_other": "剩餘 {{count}} 個字元"
     },
     "chatLink": {
       "linkCopied": "連結已複製",
@@ -1965,6 +2071,12 @@
       "startNewSession": "開始新工作階段",
       "exitSession": "結束工作階段",
       "clearSession": "結束此工作階段並開始新的工作階段",
+      "compactDescription": "壓縮目前工作階段的上下文",
+      "goalDescription": "繼續朝著工作階段目標推進。/goal <objective> 或 pause、resume、clear",
+      "initDescription": "引導式 AGENTS.md 設定",
+      "resumeClaudeDescription": "匯入 Claude Code 工作階段記錄",
+      "resumeCodexDescription": "匯入 OpenAI Codex 工作階段記錄",
+      "reviewDescription": "檢閱變更 [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "使用 /{{command}}",
       "insert": "插入",
       "upgradeRequiredFallback": "請升級 CLI，才能使用此指令。",
@@ -1997,7 +2109,14 @@
       "stepsCount_one": "{{steps}} 個步驟",
       "stepsCount": "{{steps}} 個步驟",
       "stepsCount_other": "{{steps}} 個步驟",
-      "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}"
+      "modelAccessibilityLabel": "{{name}}，{{provider}}，{{steps}}，{{cost}}",
+      "modelsCount_one": "模型（{{displayCount}}）",
+      "modelsCount_other": "模型（{{displayCount}}）"
+    },
+    "autoApprove": {
+      "title": "自動核准",
+      "description": "自動核准此工作階段的權限要求。工具隨後會在不提示的情況下執行。",
+      "unavailable": "此工作階段無法接收權限要求。"
     },
     "prBadge": {
       "open": "開啟提取要求",
@@ -2029,6 +2148,12 @@
       "tapToListHint": "點一下資料夾，即可查看其中的內容。",
       "unsupportedDescription": "此 CLI 無法列出資料夾。點一下「完成」會保留啟動時的資料夾，再點一下「開始工作階段」即可從該資料夾開始。",
       "unsupportedTitle": "無法列出資料夾"
+    },
+    "toolRun": {
+      "sheetTitle": "工具呼叫",
+      "condensedLabel": "{{itemCount}} 個項目; {{last}}",
+      "condensedLabel_one": "{{itemCount}} 個項目; {{last}}",
+      "condensedLabel_other": "{{itemCount}} 個項目; {{last}}"
     }
   },
   "bootstrap": {
@@ -2073,6 +2198,7 @@
     "couldNotLoadActiveSessions": "無法載入進行中的工作階段。",
     "agentSessions": "目前執行中",
     "newCodingTask": "新增程式設計任務",
+    "newTaskFromPicture": "從圖片新增任務",
     "explore": "探索",
     "seeAll": "檢視全部",
     "noLiveSessions": "目前沒有執行中的工作階段"
@@ -2134,7 +2260,17 @@
     "languageNotInstalledMessage": "此手機尚未安裝 {{language}} 的離線語音檔案。請下載這些檔案，然後再試一次語音輸入。",
     "downloadOfflineModel": "下載",
     "offlineModelDownloadScheduled": "離線語音檔案將在背景下載。請稍後再試一次語音輸入。",
-    "listeningStopped": "已停止聆聽。"
+    "listeningStopped": "已停止聆聽。",
+    "transcribing": "正在轉錄…",
+    "gatewayUnreachable": "無法連線至 Kilo Gateway。請檢查連線後再試一次。",
+    "gatewayTimeout": "轉錄花費太長時間。請再試一次。",
+    "gatewayModelUnavailable": "這個轉錄模型無法使用。請在偏好設定中選擇其他模型。",
+    "gatewayModelUnavailableNotice": "這個模型已不再提供。點一下$t(transcriptionModel.title)選擇另一個。",
+    "gatewaySignInRequired": "登入後即可使用 Kilo Gateway 轉錄。",
+    "gatewayNoModel": "請先在偏好設定中選擇轉錄模型。",
+    "testTitle": "測試語音輸入",
+    "testPlaceholder": "點按麥克風並開始說話。",
+    "testClear": "清除文字"
   },
   "share": {
     "title": "分享到 Kilo",
@@ -2152,7 +2288,9 @@
     "cliCantReceiveFilesTitle": "此工作階段無法接收檔案",
     "cliCantReceiveFilesMessage": "執行此工作階段的 Kilo CLI 無法接收檔案。請更新該電腦上的 CLI，或改為分享到新工作階段。",
     "contentlessMessage": "沒有可分享的內容，未包含任何文字或檔案。",
-    "couldNotReadContent": "無法讀取分享的內容。"
+    "couldNotReadContent": "無法讀取分享的內容。",
+    "onlyFirstFilesAttached_one": "只會附加前 {{displayCount}} 個檔案。",
+    "onlyFirstFilesAttached_other": "只會附加前 {{displayCount}} 個檔案。"
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -2284,7 +2422,8 @@
     "aiProvidersWhat": "你的提示詞、對話記錄與附加的檔案。",
     "aiProvidersWhy": "用於產生 AI 回覆。",
     "aiProvidersWho": "Anthropic、OpenAI、Google，以及你在每次請求中選取的其他供應商。",
-    "gatewayWhat": "帳戶 ID、請求中繼資料、詞元用量。",
+    "gatewayWhat": "帳戶 ID、請求中繼資料、詞元用量，以及應用程式透過它傳送的提示詞與語音錄音。",
+    "viaGateway": "透過 Kilo Gateway",
     "gatewayWhy": "身分驗證、請求路由、帳單對帳。",
     "gatewayWho": "Kilo（kilo.ai）。",
     "crashReportingWhat": "已移除應用程式內容的當機與錯誤報告。",
@@ -2304,7 +2443,7 @@
     "installAttributionWho": "AppsFlyer。",
     "voiceTranscriptionWhat": "你口述時的錄音。",
     "voiceTranscriptionWhy": "將語音轉為文字。",
-    "voiceTranscriptionWho": "僅在裝置上處理；若裝置無法離線將語音轉為文字，則交由 Apple 或 Google 處理。",
+    "voiceTranscriptionWho": "你的裝置、使用你選擇的轉寫模型的 Kilo Gateway，或用於線上辨識的 Apple 或 Google。",
     "what": "內容",
     "why": "用途",
     "who": "對象",
@@ -2316,6 +2455,8 @@
     "checkConnection": "檢查連線",
     "checks": {
       "checksCount": "{{displayCount}} 項檢查",
+      "checksCount_one": "{{displayCount}} 項檢查",
+      "checksCount_other": "{{displayCount}} 項檢查",
       "couldNotLoad": "無法載入檢查。",
       "failed": "{{displayCount}} 項失敗",
       "noAccess": "你沒有權限檢視此存放庫的檢查結果。",
@@ -2351,11 +2492,17 @@
       "tapDiffLineToSuggest": "點一下差異中的任一行，即可啟用建議功能。"
     },
     "connect": {
-      "checkFailedMessage": "載入完成前，無法確認登入狀態。",
       "checkFailedTitle": "無法檢查 GitHub 連線。",
-      "description": "連結你的 GitHub 帳戶，即可在行動裝置上審查提取請求。",
+      "checkFailedMessage": "載入完成前，無法確認登入狀態。",
+      "checkFailedTitleGitLab": "無法檢查 GitLab 連線。",
+      "checkFailedTitleBitbucket": "無法檢查 Bitbucket 連線。",
+      "providerCheckFailedMessage": "載入完成前無法取得連線狀態。",
+      "reconnectTitle": "重新連線至 GitHub",
       "reconnectDescription": "你的 GitHub 連線授權已撤銷。請重新連線，以繼續在行動裝置上審查提取請求。",
-      "reconnectTitle": "重新連線至 GitHub"
+      "description": "連結你的 GitHub 帳戶，即可在行動裝置上審查提取請求。",
+      "gitlabDescription": "連結你的 GitLab 帳戶，以便在行動裝置上審查合併請求。",
+      "bitbucketDescription": "將 Bitbucket 連結到此組織，以便在行動裝置上審查提取請求。",
+      "bitbucketOrgOnlyDescription": "在你的個人資料中選取一個組織，以審查其 Bitbucket 提取請求。"
     },
     "connectionExpired": "GitHub 連線已過期。",
     "couldNotLoadPullRequest": "無法載入提取請求。",
@@ -2408,6 +2555,11 @@
       "replyBadRequest": "無法發佈此回覆。討論串可能已變更。",
       "replyBody": "回覆內容",
       "replyForbidden": "你沒有權限回覆此提取請求。",
+      "addCommentCta": "對此提取請求留言",
+      "fixWithKilo": "使用 Kilo 修復",
+      "fixWithKiloPrompt": "請處理以下提取請求留言：{{link}}",
+      "commentBadRequest": "無法發佈此留言。此提取請求可能已變更。",
+      "commentForbidden": "你沒有權限在此提取請求留言。",
       "replyPlaceholder": "回覆…",
       "reportContent": "檢舉內容",
       "reportUser": "檢舉使用者",
@@ -2445,21 +2597,26 @@
         "outdatedOnLines": "{{lines}} 的留言已過時",
         "outdatedOnPath": "{{path}} 的留言已過時"
       },
-      "deletedUser": "已刪除的使用者"
+      "deletedUser": "已刪除的使用者",
+      "replyForbiddenTerm": "你沒有權限回覆此{{term}}。",
+      "moreLinesAbove_one": "…上方還有 {{displayCount}} 行。",
+      "moreLinesAbove_other": "…上方還有 {{displayCount}} 行。"
     },
     "entry": {
-      "clearLink": "清除提取請求連結",
+      "eyebrow": "透過 URL 開啟提取請求或合併請求",
+      "pastePrLink": "貼上提取請求或合併請求連結",
+      "noRecentPrs": "尚無最近審查",
+      "noRecentPrsDescription": "在上方貼上連結即可開始審查，下次就會在這裡看到。",
       "couldNotLoad": "無法載入。",
-      "eyebrow": "透過 URL 開啟提取請求。",
-      "noRecentPrs": "尚無最近開啟的 PR",
-      "noRecentPrsDescription": "在上方貼上 PR 連結即可開始審查，下次就會在這裡看到這個 PR。",
-      "open": "開啟",
-      "pasteLink": "貼上提取請求連結",
-      "pastePrLink": "貼上 PR 連結",
-      "removeFromRecentsMessage": "此提取請求將從你的最近項目中移除。",
       "removeFromRecentsTitle": "要從最近項目移除嗎？",
+      "removeFromRecentsMessage": "此審查將從你的最近項目中移除。",
       "removeRecentAccessibility": "從最近項目移除 {{repo}}",
-      "urlAccessibility": "GitHub 提取請求 URL"
+      "urlAccessibility": "輸入提取請求或合併請求 URL",
+      "urlPlaceholder": "提取請求或合併請求 URL",
+      "openAccessibility": "開啟提取請求或合併請求",
+      "clearLink": "清除連結",
+      "pasteLink": "貼上提取請求或合併請求連結",
+      "open": "開啟"
     },
     "eventChips": {
       "comment": "留言",
@@ -2541,7 +2698,17 @@
       "loadingLines": "正在載入 {{loaded}} / {{total}} 行…",
       "loadingMoreFiles": "正在載入更多檔案…",
       "retryLoadingContext": "重新載入前後文",
-      "retryLoadingNextPage": "重新載入下一頁"
+      "retryLoadingNextPage": "重新載入下一頁",
+      "expandAllLines_one": "展開全部 {{displayCount}} 行",
+      "expandAllLines_other": "展開全部 {{displayCount}} 行",
+      "expandLines_one": "展開 {{displayCount}} 行（第 {{start}}–{{end}} 行）",
+      "expandLines_other": "展開 {{displayCount}} 行（第 {{start}}–{{end}} 行）",
+      "expandLinesOfContext_one": "展開 {{displayCount}} 行前後文",
+      "expandLinesOfContext_other": "展開 {{displayCount}} 行前後文",
+      "expandMoreLines_one": "再展開 {{displayCount}} 行（第 {{start}}–{{end}} 行）",
+      "expandMoreLines_other": "再展開 {{displayCount}} 行（第 {{start}}–{{end}} 行）",
+      "loadedOfTotalFiles_one": "已載入 {{loaded}} / {{total}} 個檔案",
+      "loadedOfTotalFiles_other": "已載入 {{loaded}} / {{total}} 個檔案"
     },
     "inbox": {
       "couldNotLoad": "無法載入收件匣。",
@@ -2552,47 +2719,52 @@
     },
     "installKiloGitHubApp": "安裝 Kilo GitHub App",
     "merge": {
-      "autoMergeDescription": "所有必要檢查通過後，GitHub 會自動合併此提取請求（合併方式：{{method}}）。",
-      "autoMergeOn": "已啟用自動合併",
-      "blockedTitle": "目前無法合併的原因",
-      "cannotMerge": "此提取請求目前無法合併。",
-      "checking": "正在檢查可否合併…",
-      "commitMessage": "提交訊息",
-      "commitMessagePlaceholder": "合併提交的說明（非必填）",
-      "commitTitle": "提交標題",
-      "confirmMessage": "這會將你的變更合併到基礎分支。",
-      "confirmTitle": "要合併提取請求嗎？",
-      "couldNotDetermine": "無法判斷可否合併。",
-      "couldNotMerge": "無法合併提取請求。",
-      "deleteBranch": "刪除分支",
-      "deleteBranchAfterMerge": "合併後刪除分支",
-      "disableAutoMerge": "停用自動合併",
-      "enableAutoMerge": "啟用自動合併",
-      "enableAutoMergeConfirmMessage": "所有必要檢查通過後，GitHub 會自動合併此提取請求。",
-      "enableAutoMergeConfirmTitle": "要啟用自動合併嗎？",
-      "forbidden": "你沒有權限合併此提取請求。",
-      "loadFailedTitle": "無法載入合併選項。",
       "merge": "合併",
       "mergeNow": "立即合併",
       "mergePullRequest": "合併提取請求",
+      "mergeTermTitle": "合併{{term}}",
+      "enableAutoMerge": "啟用自動合併",
+      "disableAutoMerge": "停用自動合併",
+      "autoMergeOn": "已啟用自動合併",
+      "autoMergeDescription": "所有必要檢查通過後，GitHub 會自動合併此提取請求（合併方式：{{method}}）。",
+      "checking": "正在檢查可否合併…",
+      "couldNotDetermine": "無法判斷可否合併。",
+      "refreshMergeability": "重新整理合併狀態",
+      "blockedTitle": "目前無法合併的原因",
+      "updateBranch": "更新分支",
+      "updateBranchFromBase": "以基礎分支的內容更新此分支",
       "methodLabel": "合併方式",
+      "commitTitle": "提交標題",
+      "commitMessage": "提交訊息",
+      "commitMessagePlaceholder": "合併提交的說明（非必填）",
+      "deleteBranch": "刪除分支",
+      "deleteBranchAfterMerge": "合併後刪除分支",
+      "noEnabledMethods": "此存放庫未啟用任何合併方式。請存放庫管理員啟用一般合併、壓縮合併或變基合併。",
+      "confirmTitle": "要合併提取請求嗎？",
+      "confirmTitleTerm": "要合併{{term}}嗎？",
+      "confirmMessage": "這會將你的變更合併到基礎分支。",
+      "enableAutoMergeConfirmTitle": "要啟用自動合併嗎？",
+      "enableAutoMergeConfirmMessage": "所有必要檢查通過後，GitHub 會自動合併此提取請求。",
+      "enableAutoMergeConfirmMessageTerm": "管線成功後，{{term}}將自動合併。",
+      "enableAutoMergeDescriptionTerm": "管線成功後，GitLab 會自動合併此{{term}}。",
+      "forbidden": "你沒有權限合併此提取請求。",
+      "cannotMerge": "此提取請求目前無法合併。",
+      "couldNotMerge": "無法合併提取請求。",
       "methods": {
         "merge": "合併",
         "rebase": "變基",
         "squash": "壓縮"
       },
-      "noEnabledMethods": "此存放庫未啟用任何合併方式。請存放庫管理員啟用一般合併、壓縮合併或變基合併。",
+      "terminal": {
+        "alreadyMerged": "已合併",
+        "closed": "此提取請求已關閉",
+        "closedMergeRequest": "此合併請求已關閉"
+      },
       "partialSuccessBanner": {
         "accessibility": "已合併。無法刪除分支：{{reason}}",
         "body": "無法刪除分支：{{reason}}。"
       },
-      "refreshMergeability": "重新整理合併狀態",
-      "terminal": {
-        "alreadyMerged": "已合併",
-        "closed": "此提取請求已關閉"
-      },
-      "updateBranch": "更新分支",
-      "updateBranchFromBase": "以基礎分支的內容更新此分支",
+      "loadFailedTitle": "無法載入合併選項。",
       "blocked": {
         "unknownStateTitle": "GitHub 尚未確認是否可合併",
         "unknownStateDetail": "請稍後再重新整理總覽。",
@@ -2611,6 +2783,18 @@
         "behindDetail": "來源分支落後於基礎分支。合併前，請先進行變基或更新來源分支。",
         "notMergeableTitle": "此提取請求尚無法合併",
         "notMergeableDetail": "GitHub 回報的合併狀態為 {{state}}。"
+      },
+      "restrictions": {
+        "title": "合併限制",
+        "approvalsRequired_one": "需要 {{displayCount}} 個核准",
+        "approvalsRequired_other": "需要 {{displayCount}} 個核准",
+        "pipelineMustSucceed": "合併前管線必須成功。"
+      },
+      "providerBlocked": {
+        "failingPipeline": "管線在最新提交上失敗。",
+        "pendingPipeline": "管線在最新提交上仍在執行。",
+        "permission": "你沒有權限合併此{{term}}。",
+        "draft": "合併前，請先將{{term}}標記為可供審查。"
       },
       "methodLabels": {
         "merge": "建立合併提交",
@@ -2669,8 +2853,11 @@
     "pullRequestUnavailable": "無法開啟提取請求",
     "pullRequestUnavailableDescription": "無法開啟此 PR。可能是 PR 已刪除、存放庫設為私人，或存放庫尚未安裝 Kilo GitHub App。",
     "reconnectNotice": {
+      "title": "GitHub 連線已過期。",
       "message": "你的 GitHub 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。",
-      "title": "GitHub 連線已過期。"
+      "gitlabTitle": "GitLab 連線已過期。",
+      "bitbucketTitle": "Bitbucket 連線已過期。",
+      "providerMessage": "你的 {{provider}} 連線已失效。請重新檢查連線；如有需要，系統會提示你重新連線。"
     },
     "review": "審查",
     "reviewPullRequest": "審查提取請求",
@@ -2718,10 +2905,12 @@
       "statusContext": "前後文",
       "lineLabel": "{{status}}，第 {{line}} 行：{{text}}",
       "lineLabelNoNumber": "{{status}}：{{text}}",
-      "emptyLine": "（空白）"
+      "emptyLine": "（空白）",
+      "truncationBanner_one": "受 GitHub API 限制，僅顯示 {{total}} 個變更檔案中的前 {{limit}} 個。",
+      "truncationBanner_other": "受 GitHub API 限制，僅顯示 {{total}} 個變更檔案中的前 {{limit}} 個。"
     },
     "linkPasteClipboardEmpty": "剪貼簿沒有內容。",
-    "linkPasteNotAPullRequest": "這不是 GitHub 提取請求連結。",
+    "linkPasteNotAPullRequest": "不是提取請求或合併請求連結",
     "announce": {
       "commentPosted": "留言已發佈",
       "reviewSubmitted": "審查已送出",
@@ -2730,6 +2919,7 @@
     "mutationError": {
       "commentNotPosted": "無法發佈此留言。選取的行可能已變更，或 PR 已更新。",
       "reviewNotSubmitted": "目前無法送出此審查。可能是 PR 已更新，或你正在審查自己的提取請求。",
+      "reviewNotSubmittedTerm": "此審查無法依現況提交。{{term}}可能已變更，或者你不能審查自己的{{term}}。",
       "couldNotPostComment": "無法發佈留言。",
       "couldNotSubmitReview": "無法送出審查。請檢查連線後再試一次。"
     },
@@ -2737,9 +2927,31 @@
       "couldNotReply": "無法回覆。",
       "couldNotCompleteAction": "無法完成此操作。",
       "mergeResultDefaultError": "GitHub 未完成合併。",
+      "mergeResultNotCompleted": "{{term}}未合併。檢查其狀態後重試。",
       "ambiguous": "無法確認操作結果。請先檢查 PR，再試一次。",
       "persistenceFailed": "無法記錄此操作。請稍後再試。",
       "forbidden": "沒有執行此操作的權限。"
+    },
+    "capabilities": {
+      "banner": {
+        "title": "此供應商不支援",
+        "accessibility": "此供應商不支援: {{reason}}"
+      }
+    },
+    "terms": {
+      "pullRequest": "提取要求",
+      "mergeRequest": "合併請求",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "分享合併請求",
+      "viewOnProvider": "在 {{provider}} 上檢視",
+      "mergeRequestUnavailable": "無法開啟合併請求",
+      "unavailableDescription": "它可能已被移除，或者你可能沒有存取權限。",
+      "accessDeniedMergeRequest": "你沒有權限檢視此合併請求。",
+      "couldNotLoadMergeRequest": "無法載入合併請求。",
+      "discussionAccessDenied": "你沒有權限檢視此合併請求的討論。",
+      "discussionUnavailableMessage": "此合併請求可能已移除。",
+      "noDiscussionDescription": "此合併請求尚無審查討論串或留言。",
+      "noFilesChangedDescription": "此合併請求沒有檔案變更。"
     }
   },
   "organization": {
@@ -2907,6 +3119,14 @@
     "tooManySignInAttempts": "登入嘗試次數過多。請稍候再試。"
   },
   "models": {
+    "auto": {
+      "frontier": "自動頂尖",
+      "balanced": "自動均衡",
+      "efficient": "自動高效",
+      "small": "自動小型",
+      "free": "自動免費",
+      "organization": "組織自動"
+    },
     "dataCollected": "會收集資料",
     "free": "免費",
     "couldNotUpdateFavorites": "無法更新我的最愛。",
@@ -2945,7 +3165,74 @@
     "privacy": "開啟 Kilo 以查看代理程式",
     "openAgents": "開啟代理程式",
     "needsInput": "等待輸入",
+    "newestSession": "最新: {{title}}",
+    "noneWaiting": "沒有等待中的代理程式",
+    "newAgent": "新增代理程式",
+    "approving": "正在核准...",
+    "couldNotApprove": "無法核准",
+    "couldNotStart": "無法開始",
     "channelName": "執行中的代理程式",
-    "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。"
+    "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。",
+    "openSession": "開啟",
+    "approveFailed": "無法核准。點一下$t(common.approve)再試一次。",
+    "newestResult": "最新結果"
+  },
+  "transcriptionModel": {
+    "title": "轉錄模型",
+    "noneChosen": "未選擇",
+    "emptyTitle": "沒有轉錄模型",
+    "emptyDescription": "Kilo Gateway 目前沒有提供轉錄模型。",
+    "loadFailed": "無法載入轉錄模型。"
+  },
+  "voiceLanguage": {
+    "title": "語音輸入語言",
+    "automatic": "自動",
+    "loadFailed": "無法載入此裝置支援的語言。",
+    "emptyTitle": "沒有支援的語言",
+    "emptyDescription": "此裝置的語音辨識未回報任何支援的語言。"
+  },
+  "tour": {
+    "eyebrow": "快速導覽",
+    "forkTitle": "你想在哪裡執行 Kilo？",
+    "forkSubtitle": "為你的第一個工作階段選擇執行位置。",
+    "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
+    "cloudOptionBody": "在隔離的雲端環境中執行 Kilo，無需安裝任何內容。",
+    "remoteOptionTitle": "你的電腦",
+    "remoteOptionBody": "透過 `kilo remote` CLI 在你自己的電腦上執行 Kilo。",
+    "skip": "跳過導覽",
+    "tutorialLabel": "教學"
+  },
+  "appActions": {
+    "start": {
+      "promptRequired": "啟動代理程式需要提示詞。請新增提示詞後重新執行。",
+      "repositoryUnknown": "Kilo 無法將 {{repository}} 辨識為 GitHub 或 GitLab 存放庫。請在 Kilo 中選擇其他存放庫。",
+      "repositoryUnsupported": "{{repository}} 是 Bitbucket 存放庫——啟動代理程式暫時無法使用它。請在 Kilo 中選擇其他存放庫。"
+    }
+  },
+  "launcher": {
+    "openLastSession": "開啟上次工作階段"
+  },
+  "spendAlerts": {
+    "subtitle": "當此範圍的支出超過限額或高於其平時每小時速率時，透過電子郵件或推播向帳單聯絡人發送提醒。",
+    "enable": "啟用支出提醒",
+    "thresholdTitle": "門檻突破",
+    "thresholdSubtitle": "累計支出超過你的限額",
+    "anomalyTitle": "每小時激增",
+    "anomalySubtitle": "某一小時的支出遠高於此範圍的平時速率",
+    "limitLabel": "限額 (USD)",
+    "windowLabel": "時間視窗",
+    "window24h": "24 小時",
+    "window7d": "7 天",
+    "window30d": "30 天",
+    "multiplierLabel": "激增倍數",
+    "saved": "支出提醒設定已儲存",
+    "loadError": "無法載入支出提醒。",
+    "saveError": "無法儲存支出提醒。",
+    "empty": "支出提醒已關閉。開啟後會通知此範圍的帳單聯絡人。",
+    "noSpend": "尚無支出記錄",
+    "spend24h": "過去 24 小時的支出",
+    "multiplierError": "請輸入 1 或更大的倍數",
+    "permissionDenied": "你沒有管理支出提醒的權限。",
+    "pushOffByCategory": "已在通知中關閉"
   }
 }

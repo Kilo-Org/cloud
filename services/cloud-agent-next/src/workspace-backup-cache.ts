@@ -174,13 +174,7 @@ function ownersEqual(left: WorkspaceBackupOwner, right: WorkspaceBackupOwner): b
 export async function buildWorkspaceBackupCandidate(
   request: WorkspaceBackupCandidateRequest
 ): Promise<WorkspaceBackupCandidate | null> {
-  if (
-    !request.fresh ||
-    request.devcontainer ||
-    request.userId.length === 0 ||
-    request.orgId === '' ||
-    !request.setupCommands?.length
-  )
+  if (!request.fresh || request.devcontainer || request.userId.length === 0 || request.orgId === '')
     return null;
 
   const canonicalRepository = canonicalizeRepository(request.repository);

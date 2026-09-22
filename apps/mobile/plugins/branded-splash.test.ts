@@ -173,6 +173,8 @@ describe('shared branded splash', () => {
     // compileModsAsync introspects the project's existing android resources, so
     // the colors array also carries the project's other theme colors. Assert the
     // splash color this plugin owns instead of the array's exact contents.
+    // `introspect` merges into the colors a local prebuild already generated, so
+    // assert the plugin's entry instead of the whole array.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),

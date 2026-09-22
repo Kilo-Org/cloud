@@ -85,6 +85,10 @@ describe('screen side insets: one implementation for both platforms', () => {
     expect(profile, `${PROFILE_SCREEN} imports the native safe-area module again`).not.toMatch(
       SAFE_AREA_MODULE
     );
+    // The screen forks once on purpose: Android's native alert cannot show a
+    // red destructive button, so sign-out opens the in-app confirmation there.
+    // That fork is not on the insets path — every other line, and in
+    // particular the ones that carry the insets, stays one implementation.
     expect(
       profile,
       `${PROFILE_SCREEN} no longer delegates its deliberate Android sign-out confirmation to needsInAppDestructiveConfirm`

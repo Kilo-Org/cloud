@@ -40,7 +40,9 @@ describe('Claude refusal limit', () => {
     await recordClaudeRefusal('user-123');
 
     expect(mockedEval).toHaveBeenCalledWith(
-      expect.stringContaining("redis.call('EXPIRE', KEYS[1], ARGV[1])"),
+      expect.stringMatching(
+        /if count == 1 then\s+redis\.call\('EXPIRE', KEYS\[1\], ARGV\[1\]\)\s+end/
+      ),
       ['ai-gateway:claude-refusals:v1:user-123'],
       [CLAUDE_REFUSAL_TTL_SECONDS]
     );

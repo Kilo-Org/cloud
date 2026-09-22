@@ -183,7 +183,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
       // response.created and response.in_progress.
       if (json.response) {
         const response = json.response;
-        wasRefusal ||= responseContainsRefusal(response.output);
+        wasRefusal ||= Array.isArray(response.output) && responseContainsRefusal(response.output);
         messageId = response.id ?? messageId;
         model = response.model ?? model;
         if (response.usage) {

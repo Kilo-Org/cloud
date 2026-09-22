@@ -813,6 +813,31 @@ describe('logMicrodollarUsage', () => {
     expect(mockedRecordClaudeRefusal).toHaveBeenCalledWith('test-claude-refusal-user');
   });
 
+  test('does not record a refusal for a non-Claude model', async () => {
+    mockedRecordClaudeRefusal.mockClear();
+    const user = await insertTestUser({
+      id: 'test-non-claude-refusal-user',
+      microdollars_used: 0,
+      google_user_email: 'non-claude-refusal@example.com',
+    });
+
+    const result = await processTokenData(
+      {
+        ...BASE_USAGE_STATS,
+        messageId: 'test-non-claude-refusal-message',
+        model: 'openai/gpt-5',
+        wasRefusal: true,
+      },
+      {
+        ...createBaseUsageContext(user),
+        requested_model: 'openai/gpt-5',
+      }
+    );
+
+    expect(result).not.toBeNull();
+    expect(mockedRecordClaudeRefusal).not.toHaveBeenCalled();
+  });
+
   test('stores session_id when provided', async () => {
     const user = await insertTestUser({
       id: 'test-log-user-session',

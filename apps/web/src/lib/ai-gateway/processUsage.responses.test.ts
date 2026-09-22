@@ -141,6 +141,23 @@ describe('processResponsesApiUsage', () => {
 });
 
 describe('parseMicrodollarUsageFromStream approval tests', () => {
+  test('handles early response events without output', async () => {
+    const result = await parseResponsesMicrodollarUsageFromStream(
+      streamFromText(
+        'data: {"type":"response.created","response":{"id":"resp-1","model":"anthropic/claude-sonnet-4.5","status":"in_progress"}}\n\n' +
+          'data: {"type":"response.completed","response":{"id":"resp-1","model":"anthropic/claude-sonnet-4.5","status":"completed","usage":{"input_tokens":2,"output_tokens":3,"total_tokens":5,"input_tokens_details":{"cached_tokens":0},"output_tokens_details":{"reasoning_tokens":0}},"output":[]}}\n\n'
+      ),
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200
+    );
+
+    expect(result.hasError).toBe(false);
+    expect(result.inputTokens).toBe(2);
+    expect(result.outputTokens).toBe(3);
+  });
+
   test('detects a streamed refusal', async () => {
     const result = await parseResponsesMicrodollarUsageFromStream(
       streamFromText(

@@ -21,12 +21,19 @@ import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
+import {
+  useAgentsBottomBands,
+  useSessionListInsets,
+} from '@/components/agents/session-list-chrome';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
+import {
+  AppAwareKeyboardPaddingView,
+  useKeyboardOcclusion,
+} from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
@@ -75,6 +82,35 @@ export function AgentSessionListScreen() {
   // affordance while the list is failing.
   const noMatchBody = hasLiveRows && visibleSessions.length === 0;
   const showFab = context.isReady && content !== 'empty' && !noMatchBody;
+  // The screen's bottom bands. The centered states' band ends at the tab bar
+  // while the keyboard is down: the FAB's band rides the rows list's own frame
+  // inset and the no-match body owns the band, so reserving it here as well
+  // shrank the band below the tab bar's top edge in a short landscape window
+  // and parked the state's second line and action behind the bar (landscape
+  // spot defect e8). While the keyboard is up the IME's occlusion replaces the
+  // tab-bar band, because the bar hides with the keyboard
+  // (`tabBarHideOnKeyboard`): Android's edge-to-edge window does not resize for
+  // the IME, so the centered empty states must reserve the keyboard's own
+  // height or their copy and Clear search action draw behind it (explorer
+  // finding, agents-list / agents-search-empty). The rows list's total band is
+  // `listBand`, floored at the FAB's own overlay band, because the button keeps
+  // its screen-bottom-anchored position while the keyboard is up (device defect
+  // uxs1); the frame carries only the part the keyboard container leaves
+  // (`rowsFrameBand`).
+  const { surfaceBand, listBand } = useAgentsBottomBands(tabBarHeight, showFab);
+  const { keyboardOcclusion } = useKeyboardOcclusion();
+  // The centered states reserve the hook's own band in both keyboard positions,
+  // so the keyboard-down rule lives in `useAgentsBottomBands` alone rather than
+  // being re-resolved here (review finding, session-list-chrome.ts:48).
+  // The keyboard container below already pads the region by the IME's occlusion,
+  // so the rows frame adds only the part of `listBand` that container does not
+  // cover: `listBand` is the band the viewport must clear from the screen
+  // bottom, and the container has moved the viewport's bottom edge up by
+  // `keyboardOcclusion` already. Handing `listBand` to the frame as well
+  // reserved the keyboard twice and ended the list a whole IME height above the
+  // keyboard's top edge instead of at it (review finding,
+  // session-list-screen.tsx:418).
+  const rowsFrameBand = Math.max(0, listBand - keyboardOcclusion);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
   const refetchRef = useRef(refetch);
@@ -221,24 +257,14 @@ export function AgentSessionListScreen() {
   );
 
   // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
-  // content must clear them. The inset rides on the list's frame as a
-  // `marginBottom` (the viewport ends above the band) — the same viewport inset
-  // `TabScreenScrollView` uses — never on the list's content and never as
-  // `style` padding: a content inset only cleared the end of the list, so every
-  // row the user scrolled into the button's band had its right-aligned
-  // timestamp and chevron covered, and a scroll view's padding is not part of
-  // its scrollable content on iOS, so padding on the frame clipped the last
-  // rows under the bar with no way to scroll them clear. The vertical value
-  // matches the screen's `StateSurfaceInsets`. The landscape side insets keep
-  // row text clear of the sensor housing; portrait insets are 0, keeping the
-  // geometry unchanged.
-  const listInsets = useMemo(
-    () => ({
-      frame: { marginBottom: showFab ? tabBarHeight + FAB_SIZE + FAB_MARGIN : tabBarHeight },
-      content: { paddingTop: 0, paddingBottom: 0, paddingLeft: left, paddingRight: right },
-    }),
-    [showFab, tabBarHeight, left, right]
-  );
+  // content must clear them: the band rides on the list's frame as a
+  // `marginBottom` (the viewport ends above it), never on the content and never
+  // as `style` padding, which only cleared the end of the list. The frame band is
+  // the rows list's own (`rowsFrameBand`): the part of the total `listBand` the
+  // keyboard container does not already cover, so no row parks behind the
+  // keyboard or the button. The landscape side insets keep row text clear of the
+  // sensor housing.
+  const listInsets = useSessionListInsets({ bottomBand: rowsFrameBand, left, right });
 
   // The fixed 20pt margin gains the landscape right inset so the FAB clears the
   // sensor area; portrait insets are 0, keeping the geometry unchanged.
@@ -354,14 +380,15 @@ export function AgentSessionListScreen() {
   );
 
   return (
-    // The band the no-match body is laid out in ends at the tab bar. The FAB is
-    // a corner control with its own frame inset on the rows list, and reserving
-    // its band here as well shrank the band to the FAB's top: in a short
-    // landscape window that is below the empty state's height, so the state fell
-    // to the scroll anchor and its second line and action were parked behind the
-    // tab bar (landscape spot defect e8). The no-match body therefore keeps the
-    // whole band and the FAB yields to it (`showFab`).
-    <StateSurfaceInsets bottomInset={tabBarHeight}>
+    // The band the centered states are laid out in. The FAB is a corner control
+    // with its own frame inset on the rows list and it yields to the no-match
+    // body, so the band ends at the tab bar while the keyboard is down (a band
+    // shrank to the FAB's top pushed the empty state's second line and action
+    // behind the bar in a short landscape window, landscape spot defect e8);
+    // while the keyboard is up the band is the IME's occlusion instead. Both
+    // positions are the hook's `surfaceBand` (review finding,
+    // session-list-chrome.ts:48).
+    <StateSurfaceInsets bottomInset={surfaceBand}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}

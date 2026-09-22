@@ -879,19 +879,20 @@ describe('SandboxControl lifecycle boundaries', () => {
     });
     expect(h.sandboxContainers.getByName).toHaveBeenCalledWith(SANDBOX_ID);
 
-    const physical = await h.control.getPhysicalRecord();
-    expect(physical.state).toBe('running');
-    expect(physical.createIntent?.allocationName).toMatch(/^ses-[0-9a-f]{48}$/);
-    expect(decodeCloudflareProviderRef(physical.providerRef ?? '')).toEqual({
-      sandboxId: physical.createIntent?.allocationName,
+    const physical = await h.control.getAllocationRecord();
+    expect(physical.state.kind).toBe('allocated');
+    expect(canonicalTarget(physical)?.provider).toBe('cloudflare');
+    expect(canonicalAllocationName(physical)).toMatch(/^ses-[0-9a-f]{48}$/);
+    expect(decodeCloudflareProviderRef(canonicalProviderRef(physical) ?? '')).toEqual({
+      sandboxId: canonicalAllocationName(physical),
       containment: false,
-      instanceId: physical.createIntent?.intentId,
+      instanceId: canonicalCreateIntentId(physical),
     });
     expect(h.containerStub.launchWrapper).toHaveBeenCalledWith({
-      allocationRef: physical.providerRef,
+      allocationRef: canonicalProviderRef(physical),
       instance: CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
       env: expect.objectContaining({
-        PROVIDER_INSTANCE_ID: physical.providerRef,
+        PROVIDER_INSTANCE_ID: canonicalProviderRef(physical),
         WRAPPER_LOG_PATH: '/tmp/kilocode-control-wrapper.log',
       }),
     });
@@ -902,11 +903,11 @@ describe('SandboxControl lifecycle boundaries', () => {
       provider: 'cloudflare-containers',
       allowCreate: false,
     });
-    const unchanged = await h.control.getPhysicalRecord();
-    expect(unchanged.state).toBe('running');
-    expect(unchanged.stopTombstone).toBeNull();
-    expect(unchanged.providerRef).toBe(physical.providerRef);
-    expect(unchanged.createIntent?.intentId).toBe(physical.createIntent?.intentId);
+    const unchanged = await h.control.getAllocationRecord();
+    expect(unchanged.state.kind).toBe('allocated');
+    expect(canonicalStopIntent(unchanged)).toBeNull();
+    expect(canonicalProviderRef(unchanged)).toBe(canonicalProviderRef(physical));
+    expect(canonicalCreateIntentId(unchanged)).toBe(canonicalCreateIntentId(physical));
     expect(h.containerStub.launchWrapper).toHaveBeenCalledTimes(1);
   });
 

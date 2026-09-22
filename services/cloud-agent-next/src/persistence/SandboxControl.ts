@@ -103,6 +103,7 @@ import {
   type SessionRoute,
 } from '../sandbox-control/session-routes.js';
 import { projectStatusSnapshot } from '../sandbox-control/status-snapshot.js';
+import { legacyPhysicalState } from '../sandbox-state/project/physical-label.js';
 import { projectStatus, type StatusProjection } from '../sandbox-state/project/status.js';
 import {
   type AllocationController,
@@ -301,27 +302,6 @@ function canonicalStopIntent(record: AllocationRecord) {
 
 function canonicalStopWrapperInstanceId(record: AllocationRecord): string | undefined {
   return canonicalStopIntent(record)?.wrapperInstanceId;
-}
-
-/** The legacy flat allocation label for a canonical record (public status only). */
-function legacyPhysicalState(record: AllocationRecord): PhysicalState {
-  const state = record.state;
-  switch (state.kind) {
-    case 'stopped':
-      return 'stopped';
-    case 'creating':
-      return 'creating';
-    case 'allocated':
-      return 'running';
-    case 'stopping':
-      return 'stopping';
-    case 'unknown':
-      return state.reason === 'legacy_failed'
-        ? 'failed'
-        : state.reason === 'legacy_unknown' || state.stopIntent !== null
-          ? 'unknown'
-          : 'failed';
-  }
 }
 
 /**
@@ -2697,13 +2677,14 @@ export class SandboxControl extends DurableObject<Env> {
     requiredContainment: CredentialContainmentRequirements,
     allocationName: string
   ): AllocationTarget {
+    const provider = this.providerKind === 'vercel' ? 'vercel' : 'cloudflare';
     const capabilities =
-      this.providerKind === 'vercel'
+      provider === 'vercel'
         ? { persistentWorkspace: true, destroysOnStop: false }
         : { persistentWorkspace: false, destroysOnStop: true };
     const vercel = this.controlVercelIntentConfig();
     return {
-      provider: this.providerKind,
+      provider,
       providerRef: null,
       allocationName,
       capabilities,

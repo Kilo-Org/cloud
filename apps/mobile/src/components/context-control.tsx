@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { ChevronDown } from '@/components/ui/icons';
+import { Check, ChevronDown } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -23,7 +23,7 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
-  const { setOrganizationId } = useOrganization();
+  const { setOrganizationId, organizationId } = useOrganization();
 
   return () => {
     if (!orgs) {
@@ -35,6 +35,11 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
       t('common.cancel'),
     ];
     const cancelButtonIndex = options.length - 1;
+    // Personal is index 0 and the memberships follow in list order. A persisted
+    // membership that is no longer listed checks nothing, so the mark never
+    // names an account the user is not on.
+    const isCurrent = (index: number) =>
+      index === 0 ? organizationId === null : orgs[index - 1]?.organizationId === organizationId;
     showActionSheetWithOptions(
       {
         options,
@@ -43,6 +48,21 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
         containerStyle: { paddingBottom: bottom, backgroundColor: colors.card },
         textStyle: { color: colors.foreground },
         titleTextStyle: { color: colors.mutedForeground },
+        // A rule between rows and a check in a shared left gutter turn the
+        // list from plain copy into distinct choices, with the current account
+        // marked. A row without the check keeps the gutter (a transparent
+        // check) so every label starts on the same line; Cancel takes none.
+        showSeparators: true,
+        separatorStyle: { backgroundColor: colors.border, height: 0.5 },
+        icons: options.map((_, index) =>
+          index === cancelButtonIndex ? null : (
+            <Check
+              key={index}
+              size={18}
+              color={isCurrent(index) ? colors.foreground : 'transparent'}
+            />
+          )
+        ),
       },
       index => {
         if (index === undefined || index === cancelButtonIndex) {

@@ -165,7 +165,15 @@ describe('shared branded splash', () => {
       },
     });
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        // The app's other Android plugins (alert-dialog theme, rotation
+        // surface, splash window background) contribute their own colors to
+        // the same resource file, so assert this test's own color is present
+        // rather than that it is the only one.
+        color: expect.arrayContaining([
+          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+        ]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

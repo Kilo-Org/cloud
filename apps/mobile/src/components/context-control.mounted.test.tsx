@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- test-renderer mounts native presentation with mocked bridges. */
-import { createElement, type ElementType, useEffect, useState } from 'react';
+import { createElement, type ElementType, type ReactNode, useEffect, useState } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -58,7 +58,7 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 18 }) }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
+vi.mock('@/components/ui/icons', () => ({ Check: 'Check', ChevronDown: 'ChevronDown' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => theme.colors,
 }));
@@ -121,6 +121,9 @@ function nativePicker() {
           containerStyle: { paddingBottom: number; backgroundColor: string };
           textStyle: { color: string };
           titleTextStyle: { color: string };
+          showSeparators: boolean;
+          separatorStyle: { backgroundColor: string; height: number };
+          icons: ReactNode[];
         },
         (index?: number) => void,
       ]
@@ -201,6 +204,45 @@ describe('ContextControl', () => {
       expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe(expected);
     }
   );
+
+  it.each([
+    { stored: null, checked: 0 },
+    { stored: 'org-a', checked: 1 },
+    { stored: 'org-missing', checked: -1 },
+  ])(
+    'separates the rows and checks the current account (stored=$stored)',
+    async ({ stored, checked }) => {
+      storage.read.mockResolvedValue(stored);
+      const ui = await mount();
+      await waitFor(() => !picker(ui).props.disabled);
+      await press(picker(ui));
+      const native = nativePicker();
+      expect(native.options.showSeparators).toBe(true);
+      expect(native.options.separatorStyle).toEqual({
+        backgroundColor: DARK_COLORS.border,
+        height: 0.5,
+      });
+      expect(native.options.icons).toHaveLength(3);
+      expect(native.options.icons[2]).toBeNull();
+      const paint = (index: number) =>
+        (native.options.icons[index] as { props: { color: string } }).props.color;
+      expect(paint(0)).toBe(checked === 0 ? DARK_COLORS.foreground : 'transparent');
+      expect(paint(1)).toBe(checked === 1 ? DARK_COLORS.foreground : 'transparent');
+    }
+  );
+
+  it('checks Personal with no memberships', async () => {
+    list.mockResolvedValue([]);
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await press(picker(ui));
+    const native = nativePicker();
+    expect(native.options.options).toEqual(['Personal', 'Cancel']);
+    expect(native.options.icons[1]).toBeNull();
+    expect((native.options.icons[0] as { props: { color: string } }).props.color).toBe(
+      DARK_COLORS.foreground
+    );
+  });
 
   it('themes the native picker with the active theme colors', async () => {
     const ui = await mount();

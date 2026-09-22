@@ -6,6 +6,7 @@ export const ALIBABA = {
   id: 'alibaba',
   apiUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
   apiUrlOverrides: {},
+  disableUrlSuffix: false,
   apiKey: getEnvVariable('ALIBABA_API_KEY'),
   apiKeyHeader: null,
   supportedChatApis: [

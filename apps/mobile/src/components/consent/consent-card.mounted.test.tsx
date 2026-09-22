@@ -2,7 +2,7 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConsentCard } from './consent-card';
+import { CONSENT_DISCLOSURE_MAX_FONT_SCALE, ConsentCard } from './consent-card';
 import { i18n } from '@/i18n';
 
 const mockedAcceptConsent = vi.hoisted(() => vi.fn());
@@ -126,6 +126,44 @@ function texts(root: I): string[] {
     .map(n => n.props.children as string);
 }
 
+function disclosureTexts(root: I): I[] {
+  return root.findAll(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Text' &&
+      n.props.children === 'Kilo privacy policy'
+  );
+}
+
+function requireDisclosure(root: I): I {
+  const nodes = disclosureTexts(root);
+  if (nodes.length !== 1) {
+    throw new Error(`expected 1 privacy disclosure, got ${nodes.length}`);
+  }
+  const n = nodes[0];
+  if (!n) {
+    throw new Error('privacy disclosure not found');
+  }
+  return n;
+}
+
+function requireParent(node: I): I {
+  const parent = node.parent;
+  if (!parent) {
+    throw new Error('node has no parent');
+  }
+  return parent;
+}
+
+function hasAncestorOfType(node: I, type: string): boolean {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (parent.type === type) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function flush() {
   await new Promise<void>(resolve => {
     setTimeout(resolve, 10);
@@ -158,22 +196,28 @@ describe('ConsentCard', () => {
     expect(singleSwitch(renderer.root).props.value).toBe(true);
   });
 
-  it('keeps the privacy line in the scroll body, clear of the pinned actions', () => {
-    // The privacy sentence is the last child of the scroll body and the action
-    // footer is a following sibling, not an overlay: the viewport ends above
-    // the footer, so a swipe brings the whole sentence into view (consent
-    // finding read the still at scroll offset 0 as a clipped line).
+  it('keeps the privacy line clear of the pinned actions', () => {
+    // Finding 2 (the sentence cut in half at the footer boundary) is fixed at
+    // the base revision by pinning the disclosure into the footer above the
+    // actions, so the footer edge can no longer cut it and the actions cannot
+    // overlay it. The earlier assertion that the sentence was the tail of the
+    // scrolling body no longer holds: the sentence has left the scroller.
     const renderer = mountCard('onboarding');
     const scroller = renderer.root.findByType('ScrollView' as never);
 
     const privacyPrefix = i18n.t('consent.privacyPolicyPrefix');
-    const privacyLine = scroller.findAll(node => {
+    const privacyLine = renderer.root.findAll(node => {
       const text = node.children
         .filter((child): child is string => typeof child === 'string')
         .join('');
       return (node.type as string) === 'Text' && text.length > 0 && text.includes(privacyPrefix);
     });
     expect(privacyLine).toHaveLength(1);
+    const line = privacyLine[0];
+    if (!line) {
+      throw new Error('privacy line not found');
+    }
+    expect(hasAncestorOfType(line, 'ScrollView')).toBe(false);
 
     // The pinned actions are outside the scroller, so they never cover it.
     const primary = findButton(renderer.root, 'Accept and continue');
@@ -371,5 +415,55 @@ describe('ConsentCard', () => {
     expect(row).toBeDefined();
     expect(row?.props.title).toBe('Account & usage data');
     expect(row?.props.title).not.toContain('&amp;');
+  });
+
+  it('renders the privacy disclosure in the pinned footer, outside the scrolling body', () => {
+    for (const mode of ['onboarding', 'review'] as const) {
+      const renderer = mountCard(mode);
+      const root = renderer.root;
+      // One scroll region and one disclosure: the disclosure lives in the
+      // pinned footer, where the footer edge cannot cut it (the body tail
+      // rendered across the fold on a full-height screen).
+      expect(countByType(root, 'ScrollView')).toBe(1);
+      const disclosure = requireDisclosure(root);
+      expect(hasAncestorOfType(disclosure, 'ScrollView')).toBe(false);
+
+      const primary = mode === 'onboarding' ? 'Accept and continue' : 'Back';
+      const footer = requireParent(findButton(root, primary));
+      expect(disclosureTexts(footer).length).toBe(1);
+    }
+  });
+
+  it('keeps the privacy disclosure in the footer when an error occupies the footer slot', async () => {
+    mockedReadConsent.mockRejectedValue(new Error('keychain read failed'));
+    const renderer = mountCard('review');
+    await act(flush);
+    const root = renderer.root;
+    expect(texts(root)).toContain('Could not load your consent settings. Please try again.');
+    const footer = requireParent(findButton(root, 'Back'));
+    expect(disclosureTexts(footer).length).toBe(1);
+    expect(hasAncestorOfType(requireDisclosure(root), 'ScrollView')).toBe(false);
+  });
+
+  it('caps the pinned disclosure font scale so its footer height stays bounded', () => {
+    for (const mode of ['onboarding', 'review'] as const) {
+      const root = mountCard(mode).root;
+      // The sentence has no line cap: uncapped it grows to several lines at
+      // the largest system text size and the pinned footer's fixed height
+      // pushes the actions off the sheet.
+      const outer = root.findAll(
+        n =>
+          typeof n.type === 'string' &&
+          (n.type as string) === 'Text' &&
+          Array.isArray(n.props.children) &&
+          n.props.children.includes('Your data is handled per the')
+      );
+      expect(outer.length).toBe(1);
+      expect(outer[0]?.props.maxFontSizeMultiplier).toBe(CONSENT_DISCLOSURE_MAX_FONT_SCALE);
+      // The nested link is its own native text node, so it needs the cap too.
+      expect(requireDisclosure(root).props.maxFontSizeMultiplier).toBe(
+        CONSENT_DISCLOSURE_MAX_FONT_SCALE
+      );
+    }
   });
 });

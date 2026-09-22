@@ -55,8 +55,9 @@ export type DriverConfig = {
   /** Deployed profile: fetches a fresh stream ticket for a session. */
   fetchStreamTicket?: (sessionId: string) => Promise<string>;
   /**
-   * When explicitly `false`, omit `x-skip-balance-check` (the deployed profile
-   * must exercise real balance admission). Undefined keeps the local default.
+   * When explicitly `false`, omit `x-skip-balance-check`. Both e2e profiles
+   * send it: the deterministic fake LLM performs no billable inference, so the
+   * driver never needs a funded user.
    */
   skipBalanceCheck?: boolean;
   /**
@@ -171,9 +172,8 @@ export async function trpcCall<T>(
   };
   if (config.skipBalanceCheck !== false) {
     // cloud-agent-client.ts sends this for App Builder callers; it cleanly
-    // skips dev billing checks. The local driver sends it by default; the
-    // deployed profile sets `skipBalanceCheck: false` to exercise real
-    // balance admission.
+    // skips dev billing checks. Both e2e profiles send it, because the fake
+    // LLM performs no billable inference.
     headers['x-skip-balance-check'] = 'true';
   }
   if (opts?.internalApiSecret) {

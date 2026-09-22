@@ -7,17 +7,19 @@ import {
   parseArgs,
   requireScenarioApi,
   resultOutcome,
+  WORKTREE_ENROLLMENT_SCENARIOS,
 } from '../../e2e/run.js';
 import type { LifecycleResult } from '../../e2e/lifecycle.js';
+import { SHARED_SCENARIOS } from '../../e2e/scenarios-shared.js';
 
 describe('run timeout option', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('accepts an overall timeout only for file-state scenarios', () => {
-    expect(parseArgs(['--timeout-ms=1234', 'cold-resume', '_'])).toMatchObject({
-      lifecycle: 'cold-resume',
+  it('accepts an overall timeout for a shared long-running scenario', () => {
+    expect(parseArgs(['--timeout-ms=1234', 'long-conversation', '_'])).toMatchObject({
+      lifecycle: 'long-conversation',
       timeoutMs: 1234,
     });
   });
@@ -36,10 +38,19 @@ describe('run timeout option', () => {
     });
   });
 
-  it('rejects timeout overrides for legacy scenarios', () => {
+  it('rejects timeout overrides for a name absent from the shared registry', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    expect(parseArgs(['--timeout-ms=1234', 'worktree-shared', '_'])).toBeNull();
+    expect(parseArgs(['--timeout-ms=1234', 'cold-resume', '_'])).toBeNull();
     expect(error).toHaveBeenCalledWith(expect.stringContaining('--timeout-ms is only supported'));
+  });
+
+  it('accepts a timeout override for exactly the shared registry names', () => {
+    for (const name of Object.keys(SHARED_SCENARIOS)) {
+      expect(parseArgs([`--timeout-ms=1000`, name, '_'])).toMatchObject({
+        lifecycle: name,
+        timeoutMs: 1000,
+      });
+    }
   });
 });
 
@@ -75,6 +86,42 @@ describe('requireScenarioApi (matrix fail-fast contract)', () => {
 
     expect(exit).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
+  });
+});
+
+describe('worktree enrollment derivation', () => {
+  it('enrolls scenarios that declare requiresWorktreeCreation', () => {
+    for (const name of [
+      'worktree-chat',
+      'worktree-multi-chat',
+      'long-conversation',
+      'leave-and-return',
+    ]) {
+      expect(WORKTREE_ENROLLMENT_SCENARIOS.has(name)).toBe(true);
+    }
+  });
+
+  it('does not enroll a scenario that creates no worktree session', () => {
+    expect(WORKTREE_ENROLLMENT_SCENARIOS.has('cold-hot')).toBe(false);
+    expect(WORKTREE_ENROLLMENT_SCENARIOS.has('hot')).toBe(false);
+  });
+
+  it('matches exactly the shared definitions that declare the flag', () => {
+    const declared = Object.values(SHARED_SCENARIOS)
+      .filter(definition => definition.requiresWorktreeCreation === true)
+      .map(definition => definition.name)
+      .sort();
+    expect([...WORKTREE_ENROLLMENT_SCENARIOS].sort()).toEqual(declared);
+  });
+});
+
+describe('matrix stale-name contract', () => {
+  it('resolves every smoke matrix name from the shared registry', () => {
+    // Mirrors the smoke runner's hard-failure rule: a name absent from
+    // `SHARED_SCENARIOS` is an unknown lifecycle, never a silent skip.
+    for (const name of ['cold-hot', 'cold', 'hot', 'queue-while-busy', 'auth-reject']) {
+      expect(SHARED_SCENARIOS[name]).toBeDefined();
+    }
   });
 });
 
@@ -145,6 +192,21 @@ describe('exitCodeForResults', () => {
 
   it('returns 1 when a failure accompanies passes', () => {
     expect(exitCodeForResults([pass, failure, unsupported])).toBe(1);
+  });
+
+  it('returns 0 when every unsupported result is in the expected set', () => {
+    const expected = new Set(['unsupported']);
+    expect(exitCodeForResults([pass, unsupported], { expectedUnsupported: expected })).toBe(0);
+  });
+
+  it('returns 2 for an unsupported result outside the expected set', () => {
+    const expected = new Set(['other']);
+    expect(exitCodeForResults([pass, unsupported], { expectedUnsupported: expected })).toBe(2);
+  });
+
+  it('still returns 1 when a failure accompanies an expected unsupported result', () => {
+    const expected = new Set(['unsupported']);
+    expect(exitCodeForResults([unsupported, failure], { expectedUnsupported: expected })).toBe(1);
   });
 });
 

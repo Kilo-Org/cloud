@@ -43,6 +43,10 @@ import { STREAMING_SHARED_SCENARIOS } from './scenarios-shared-streaming.js';
 import { CONTINUITY_SHARED_SCENARIOS } from './scenarios-shared-continuity.js';
 import { MICRO_SHARED_SCENARIOS } from './scenarios-shared-micro.js';
 import { QUEUE_SHARED_SCENARIOS } from './scenarios-shared-queue.js';
+import { WORKTREE_SHARED_SCENARIOS } from './scenarios-shared-worktrees.js';
+import { CONVERSATION_SHARED_SCENARIOS } from './scenarios-shared-conversations.js';
+import { LOAD_SHARED_SCENARIOS } from './scenarios-shared-load.js';
+import { FAULT_SHARED_SCENARIOS } from './scenarios-shared-faults.js';
 
 /** Generous default per-turn budget for a real first container cold start. */
 const DEFAULT_TURN_TIMEOUT_MS = 240_000;
@@ -62,6 +66,12 @@ export type SharedScenario = {
   defaultTimeoutMs?: number;
   /** API surface the scenario must use; callers default to `unified`. */
   defaultApi?: ApiVersion;
+  /**
+   * Worktree-creation enrollment only: the local e2e user must be in
+   * `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS`. This is not a
+   * capability and must not gate a scenario's execution.
+   */
+  requiresWorktreeCreation?: boolean;
   run(args: LifecycleArgs, env: ScenarioEnvironment): Promise<LifecycleResult>;
 };
 
@@ -80,6 +90,13 @@ function asRecord(value: unknown): Record<string, unknown> | null {
  * selected by `part.messageID`; the parent and the role are looked up on the
  * message info, because `parentID` is a message property, not a part property.
  * Unknown event shapes are ignored.
+ *
+ * Removal events mirror the replay consumer
+ * (`src/session/queries/events.ts`): `message.part.removed` drops the tracked
+ * part and `message.removed` drops the tracked child message, so replayed
+ * content the replay explicitly removed no longer contributes. Deletion is by
+ * the event's own key, so removing something untracked is a no-op, and a part
+ * removed and then re-updated contributes again.
  */
 export function collectChildMessageText(events: StreamEvent[], parentMessageId: string): string {
   const childMessageIds = new Set<string>();
@@ -111,6 +128,16 @@ export function collectChildMessageText(events: StreamEvent[], parentMessageId: 
         messageID: part.messageID,
         text: typeof part.text === 'string' ? part.text : '',
       });
+      continue;
+    }
+
+    if (name === 'message.part.removed') {
+      if (typeof properties.partID === 'string') textParts.delete(properties.partID);
+      continue;
+    }
+
+    if (name === 'message.removed') {
+      if (typeof properties.messageID === 'string') childMessageIds.delete(properties.messageID);
     }
   }
 
@@ -121,6 +148,114 @@ export function collectChildMessageText(events: StreamEvent[], parentMessageId: 
     }
   }
   return text;
+}
+
+type CorrelatedProgressStats = {
+  /** Assistant child ids established as children of the parent. */
+  children: number;
+  /** `message.part.updated` events seen for any message. */
+  parts: number;
+  /** Part updates whose `part.messageID` is one of the children. */
+  correlated: number;
+  /** Correlated parts of `type: "text"`. */
+  text: number;
+  /** Correlated text parts with `text.length > 0`. */
+  nonEmptyText: number;
+  /** Longest correlated text seen, for diagnostics. */
+  maxTextLength: number;
+};
+
+/**
+ * Collect what a stream shows for direct assistant children of
+ * `parentMessageId`. Child ids are collected from the whole event list first, so
+ * a part emitted before its `message.updated` still counts. Shared by
+ * `hasCorrelatedStreamProgress` and `correlatedProgressSummary` so the pass
+ * rule and its diagnosis cannot drift.
+ */
+function collectCorrelatedProgress(
+  events: readonly StreamEvent[],
+  parentMessageId: string
+): CorrelatedProgressStats {
+  const childMessageIds = new Set<string>();
+  for (const event of events) {
+    if (event.streamEventType !== 'kilocode') continue;
+    const data = asRecord(event.data);
+    if (!data) continue;
+    const name = typeof data.type === 'string' ? data.type : data.event;
+    if (name !== 'message.updated') continue;
+    const info = asRecord(asRecord(data.properties)?.info);
+    if (!info || info.role !== 'assistant' || info.parentID !== parentMessageId) continue;
+    if (typeof info.id === 'string' && info.id.length > 0) childMessageIds.add(info.id);
+  }
+
+  const stats: CorrelatedProgressStats = {
+    children: childMessageIds.size,
+    parts: 0,
+    correlated: 0,
+    text: 0,
+    nonEmptyText: 0,
+    maxTextLength: 0,
+  };
+  for (const event of events) {
+    if (event.streamEventType !== 'kilocode') continue;
+    const data = asRecord(event.data);
+    if (!data) continue;
+    const name = typeof data.type === 'string' ? data.type : data.event;
+    if (name !== 'message.part.updated') continue;
+    stats.parts += 1;
+    const part = asRecord(asRecord(data.properties)?.part);
+    if (!part || typeof part.messageID !== 'string' || !childMessageIds.has(part.messageID)) {
+      continue;
+    }
+    stats.correlated += 1;
+    if (part.type !== 'text') continue;
+    stats.text += 1;
+    const length = typeof part.text === 'string' ? part.text.length : 0;
+    if (length > stats.maxTextLength) stats.maxTextLength = length;
+    if (length > 0) stats.nonEmptyText += 1;
+  }
+  return stats;
+}
+
+/**
+ * True when the stream shows any message-correlated part for a direct assistant
+ * child of `parentMessageId`: a `message.updated` with `role: "assistant"` and
+ * `parentID === parentMessageId` establishes the child id, and any
+ * `message.part.updated` whose `part.messageID` is that child counts, transient
+ * streaming parts included (unlike `collectChildMessageText`, which excludes
+ * them as progress rather than content). Child ids are collected from the whole
+ * list first, so a part emitted before its `message.updated` still counts.
+ *
+ * This is a liveness signal for the turn's own stream, not proof the model was
+ * dialed: the Kilo CLI's transient initialization part is correlated but empty,
+ * and for a paced response the streamed content can take longer than the wait
+ * budget to appear. A caller that needs "the model request started" must gate
+ * on an observed request (see `waitForPacedProgress`). Unrelated message ids and
+ * lifecycle-only events do not count, and a stream with no correlated child is
+ * false.
+ */
+export function hasCorrelatedStreamProgress(
+  events: readonly StreamEvent[],
+  parentMessageId: string
+): boolean {
+  return collectCorrelatedProgress(events, parentMessageId).correlated > 0;
+}
+
+/**
+ * Compact diagnosis of a failed `hasCorrelatedStreamProgress` wait: how many
+ * child ids were established and how many part updates correlated to them, so a
+ * timeout distinguishes "no events for this turn" from "events but no
+ * non-empty text". Reporting only.
+ */
+export function correlatedProgressSummary(
+  events: readonly StreamEvent[],
+  parentMessageId: string
+): string {
+  const stats = collectCorrelatedProgress(events, parentMessageId);
+  return (
+    `children=${stats.children} parts=${stats.parts} correlated=${stats.correlated} ` +
+    `text=${stats.text} nonEmptyText=${stats.nonEmptyText} maxTextLength=${stats.maxTextLength}`
+  );
 }
 
 /**
@@ -742,4 +877,10 @@ export const SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultConversation: '_',
     run: runAuthReject,
   },
+  // The longest realistic flows run last so a short-scenario failure surfaces
+  // before a long cold boot is paid.
+  ...WORKTREE_SHARED_SCENARIOS,
+  ...LOAD_SHARED_SCENARIOS,
+  ...CONVERSATION_SHARED_SCENARIOS,
+  ...FAULT_SHARED_SCENARIOS,
 };

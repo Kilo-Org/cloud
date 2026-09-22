@@ -12,7 +12,10 @@
  * Usage:
  *   pnpm --filter cloud-agent-next run e2e:deployed
  *
- * Exit policy: 1 if any scenario failed, else 2 if any was unsupported, else 0.
+ * Exit policy: 1 if any scenario failed, else 2 if any scenario was
+ * unsupported that this profile does not expect, else 0. A scenario whose
+ * `requires` names a capability the deployed profile does not provide is
+ * reported `unsupported` and does not fail the run.
  */
 
 import { bootstrapDeployedProfile } from './deployed-auth.js';
@@ -26,7 +29,7 @@ import {
   resultOutcome,
 } from './run.js';
 import { createDeployedScenarioEnvironment } from './capabilities-deployed.js';
-import { runSharedScenario } from './scenario-capabilities.js';
+import { isScenarioSupported, runSharedScenario } from './scenario-capabilities.js';
 import { cleanupRemoteSession, SHARED_SCENARIOS } from './scenarios-shared.js';
 
 async function main(): Promise<void> {
@@ -86,7 +89,22 @@ async function main(): Promise<void> {
     }
   }
 
-  process.exit(exitCodeForResults(results));
+  process.exit(
+    exitCodeForResults(results, {
+      expectedUnsupported: expectedUnsupportedFor(env),
+    })
+  );
+}
+
+/** Names whose declared capabilities this profile cannot satisfy (derived). */
+function expectedUnsupportedFor(
+  env: ReturnType<typeof createDeployedScenarioEnvironment>
+): Set<string> {
+  return new Set(
+    Object.entries(SHARED_SCENARIOS)
+      .filter(([, definition]) => !isScenarioSupported(definition, env))
+      .map(([name]) => name)
+  );
 }
 
 main().catch(err => {

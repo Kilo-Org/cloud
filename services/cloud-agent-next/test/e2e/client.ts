@@ -216,6 +216,8 @@ export type StartSessionArgs = {
   branch?: string;
   callbackTarget?: CallbackTarget;
   messageId?: string;
+  /** Bounds the start HTTP call(s) from the caller's scenario deadline. */
+  signal?: AbortSignal;
 };
 
 /**
@@ -254,33 +256,38 @@ async function startSessionUnified(
   if (args.callbackTarget) {
     throw new Error('callbackTarget is accepted by prepareSession only; rerun with --api=legacy');
   }
-  return trpcCall<StartSessionResult>(config, 'start', {
-    message: {
-      prompt: args.prompt,
-      ...(args.messageId ? { id: args.messageId } : {}),
+  return trpcCall<StartSessionResult>(
+    config,
+    'start',
+    {
+      message: {
+        prompt: args.prompt,
+        ...(args.messageId ? { id: args.messageId } : {}),
+      },
+      agent: {
+        mode: args.mode ?? 'code',
+        model: config.model,
+      },
+      repository: config.githubRepo
+        ? {
+            type: 'github' as const,
+            repo: config.githubRepo,
+            ...(args.branch !== undefined ? { branch: args.branch } : {}),
+          }
+        : {
+            type: 'git' as const,
+            url: config.gitUrl,
+            ...(args.branch !== undefined ? { branch: args.branch } : {}),
+          },
+      options: {
+        createdOnPlatform: 'cloud-agent-web',
+        ...(config.kilocodeOrganizationId
+          ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
+          : {}),
+      },
     },
-    agent: {
-      mode: args.mode ?? 'code',
-      model: config.model,
-    },
-    repository: config.githubRepo
-      ? {
-          type: 'github' as const,
-          repo: config.githubRepo,
-          ...(args.branch !== undefined ? { branch: args.branch } : {}),
-        }
-      : {
-          type: 'git' as const,
-          url: config.gitUrl,
-          ...(args.branch !== undefined ? { branch: args.branch } : {}),
-        },
-    options: {
-      createdOnPlatform: 'cloud-agent-web',
-      ...(config.kilocodeOrganizationId
-        ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
-        : {}),
-    },
-  });
+    { signal: args.signal }
+  );
 }
 
 /**
@@ -324,20 +331,24 @@ async function startSessionLegacy(
     cloudAgentSessionId: string;
     kiloSessionId: string;
   };
-  const prepared = await prepareSessionCall<PrepareResult>(config, {
-    prompt: args.prompt,
-    mode: args.mode ?? 'code',
-    model: config.model,
-    ...(config.githubRepo ? { githubRepo: config.githubRepo } : { gitUrl: config.gitUrl }),
-    createdOnPlatform: 'cloud-agent-web',
-    shallow: args.shallow ?? true,
-    ...(args.branch !== undefined ? { upstreamBranch: args.branch } : {}),
-    ...(args.callbackTarget ? { callbackTarget: args.callbackTarget } : {}),
-    ...(args.messageId ? { initialMessageId: args.messageId } : {}),
-    ...(config.kilocodeOrganizationId
-      ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
-      : {}),
-  });
+  const prepared = await prepareSessionCall<PrepareResult>(
+    config,
+    {
+      prompt: args.prompt,
+      mode: args.mode ?? 'code',
+      model: config.model,
+      ...(config.githubRepo ? { githubRepo: config.githubRepo } : { gitUrl: config.gitUrl }),
+      createdOnPlatform: 'cloud-agent-web',
+      shallow: args.shallow ?? true,
+      ...(args.branch !== undefined ? { upstreamBranch: args.branch } : {}),
+      ...(args.callbackTarget ? { callbackTarget: args.callbackTarget } : {}),
+      ...(args.messageId ? { initialMessageId: args.messageId } : {}),
+      ...(config.kilocodeOrganizationId
+        ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
+        : {}),
+    },
+    args.signal
+  );
 
   type InitiateResult = {
     cloudAgentSessionId: string;
@@ -348,9 +359,14 @@ async function startSessionLegacy(
     status?: string;
   };
   config.onSessionCreated?.(prepared.cloudAgentSessionId);
-  const initiated = await trpcCall<InitiateResult>(config, 'initiateFromKilocodeSessionV2', {
-    cloudAgentSessionId: prepared.cloudAgentSessionId,
-  });
+  const initiated = await trpcCall<InitiateResult>(
+    config,
+    'initiateFromKilocodeSessionV2',
+    {
+      cloudAgentSessionId: prepared.cloudAgentSessionId,
+    },
+    { signal: args.signal }
+  );
 
   return {
     cloudAgentSessionId: prepared.cloudAgentSessionId,
@@ -565,13 +581,15 @@ export async function answerQuestion(
   config: DriverConfig,
   sessionId: string,
   questionId: string,
-  answers: string[][]
+  answers: string[][],
+  signal?: AbortSignal
 ): Promise<{ success: boolean }> {
-  return trpcCall<{ success: boolean }>(config, 'answerQuestion', {
-    sessionId,
-    questionId,
-    answers,
-  });
+  return trpcCall<{ success: boolean }>(
+    config,
+    'answerQuestion',
+    { sessionId, questionId, answers },
+    { signal }
+  );
 }
 
 export async function deleteSession(
@@ -636,9 +654,12 @@ export type FakeRequestSnapshot = {
   chatCompletions: number;
 };
 
-export async function fetchFakeRequests(fakeLlmUrl: string): Promise<FakeRequestSnapshot> {
+export async function fetchFakeRequests(
+  fakeLlmUrl: string,
+  signal?: AbortSignal
+): Promise<FakeRequestSnapshot> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/requests`;
-  const res = await fetch(url, { headers: fakeControlHeaders() });
+  const res = await fetch(url, { headers: fakeControlHeaders(), signal });
   if (!res.ok) {
     throw new Error(`fetchFakeRequests failed: ${res.status} ${res.statusText}`);
   }

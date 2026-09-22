@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { DriverConfig } from '../../e2e/client.js';
 import {
+  assessScenarioSupport,
+  isScenarioSupported,
   missingCapabilities,
   resolveScenarioApi,
   runSharedScenario,
@@ -9,6 +11,7 @@ import {
 import type {
   CapabilityName,
   RunnableSharedScenario,
+  SandboxFaultObservation,
   SandboxObservation,
   ScenarioEnvironment,
   SessionSandboxObservation,
@@ -269,5 +272,100 @@ describe('missingCapabilities', () => {
         deployedHttpAuthBoundary: { modelRoutesAuthenticated: true },
       })
     ).toEqual([]);
+  });
+});
+
+function sandboxFaultsStub(): SandboxFaultObservation {
+  return {
+    captureWrapperIdentity: vi.fn(async () => ({ instanceId: 'c:1', pid: 1 })),
+    killOwnedContainer: vi.fn(async () => ({ killed: true, observedRef: 'c', detail: '' })),
+    freezeWrapperProcess: vi.fn(async () => ({ frozen: true, pid: 1, detail: '' })),
+    unfreezeWrapperProcess: vi.fn(async () => {}),
+    captureEvidenceCursor: vi.fn(async () => 0),
+    observeReapEvidence: vi.fn(async input => ({
+      reapedAllocationRef: input.reapedAllocationRef,
+      physicalStopCause: 'recovery_settled_reap',
+      physicalStopStopCause: 'recovery_settled_reap',
+      physicalStopFromState: 'running',
+      physicalStopToState: 'stopping',
+      providerStopObserved: true,
+      heartbeatExpiryDeadline: true,
+      recoveryCause: 'heartbeat_expired',
+      recoveryOutcome: 'started',
+      wrapperReadyAfterFault: false,
+      acceptedReconciliation: 'runtime_unhealthy',
+      routeStaleActive: true,
+    })),
+  };
+}
+
+describe('assessScenarioSupport', () => {
+  it('reports the required set and the missing subset together', () => {
+    expect(assessScenarioSupport({ requires: ['gates', 'sandbox'] }, localEnv())).toEqual({
+      supported: false,
+      required: ['sandbox', 'gates'],
+      missing: ['gates'],
+    });
+  });
+
+  it('reports a supported assessment with no missing capabilities', () => {
+    expect(assessScenarioSupport({ requires: ['sandbox'] }, localEnv())).toEqual({
+      supported: true,
+      required: ['sandbox'],
+      missing: [],
+    });
+  });
+});
+
+describe('isScenarioSupported', () => {
+  it('is true when the profile-mandatory and declared capabilities are present', () => {
+    expect(isScenarioSupported({ requires: ['sandbox'] }, localEnv())).toBe(true);
+    expect(isScenarioSupported({ requires: [] }, localHttpEnv())).toBe(true);
+    expect(
+      isScenarioSupported(
+        { requires: ['gates', 'sandboxFaults'] },
+        {
+          ...localEnv(),
+          gates: { parkedStreamsSupported: true },
+          sandboxFaults: sandboxFaultsStub(),
+        }
+      )
+    ).toBe(true);
+  });
+
+  it('is false when a declared capability is absent', () => {
+    expect(isScenarioSupported({ requires: ['gates'] }, localEnv())).toBe(false);
+    expect(isScenarioSupported({ requires: ['sandboxFaults'] }, localHttpEnv())).toBe(false);
+    expect(isScenarioSupported({ requires: ['callbacks'] }, localEnv())).toBe(false);
+  });
+
+  it('is false for a local profile that lacks the mandatory sandbox capability', () => {
+    expect(
+      isScenarioSupported({ requires: [] }, { profile: 'local', requireControlPlaneSession: false })
+    ).toBe(false);
+  });
+
+  it('is false for a local-http profile that lacks the mandatory sessionSandbox capability', () => {
+    expect(
+      isScenarioSupported(
+        { requires: [] },
+        { profile: 'local-http', requireControlPlaneSession: true }
+      )
+    ).toBe(false);
+  });
+
+  it('is true for the deployed profile with no declared capabilities', () => {
+    expect(
+      isScenarioSupported(
+        { requires: [] },
+        { profile: 'deployed', requireControlPlaneSession: true }
+      )
+    ).toBe(true);
+    expect(
+      isScenarioSupported(
+        { requires: ['sandboxFaults'] },
+        { profile: 'deployed', requireControlPlaneSession: true }
+      )
+    ).toBe(false);
   });
 });

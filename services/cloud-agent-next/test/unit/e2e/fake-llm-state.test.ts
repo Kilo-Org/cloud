@@ -45,6 +45,7 @@ function seedScenario(state: FakeLlmState, tag: string, requests = 1): void {
     toolResults: { write: 0, read: 0, edit: 0, question: 0 },
     unsupportedToolSchema: false,
     seenToolResults: new Set(),
+    fileCompleted: false,
   });
 }
 
@@ -172,6 +173,7 @@ describe('serializeFakeLlmState', () => {
       toolResults: { write: 0, read: 0, edit: 0, question: 0 },
       unsupportedToolSchema: false,
       seenToolResults: new Set(),
+      fileCompleted: false,
     });
     seedScenario(state, 'short', 2);
 
@@ -194,6 +196,7 @@ describe('hydrateFakeLlmState', () => {
       toolResults: { write: 1, read: 0, edit: 0, question: 0 },
       unsupportedToolSchema: true,
       seenToolResults: new Set(['call_abc_write']),
+      fileCompleted: true,
     });
 
     const hydrated = hydrateFakeLlmState(serializeFakeLlmState(state));
@@ -211,6 +214,7 @@ describe('hydrateFakeLlmState', () => {
       toolResults: { write: 1 },
     });
     expect([...(writer?.seenToolResults ?? [])]).toEqual(['call_abc_write']);
+    expect(writer?.fileCompleted).toBe(true);
   });
 
   it('always starts with empty transient maps', () => {

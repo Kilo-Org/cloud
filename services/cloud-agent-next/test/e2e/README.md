@@ -14,8 +14,12 @@ cloud-agent-next refactor.
 1. Copy `.dev.vars.example` → `.dev.vars` and fill in local values.
    Leave `KILO_OPENROUTER_BASE` pointed at local Next.js (`@url nextjs/api`).
    For control-plane scenarios, enroll the E2E user in `CONTROL_PLANE_IDS`.
-   `worktree-shared` additionally requires `WORKTREE_CREATION_ENABLED_IDS`; it creates a fresh
-   personal user per run, so set both flags to `*` for that local scenario.
+   The worktree-creating scenarios (`worktree-chat`, `worktree-multi-chat`,
+   `long-conversation`, `leave-and-return`, `large-stream`, `concurrent-chats`,
+   `interrupt-then-continue`, `question-idle-resume`, and the four `sandboxFaults`
+   scenarios) additionally
+   require `WORKTREE_CREATION_ENABLED_IDS`; use the seeded enrolled user
+   (`E2E_USER_EMAIL`) rather than a fresh per-run user.
    Both accept comma-separated user or org IDs or `*`. Production defaults to empty/off;
    wrangler `dev` and `.dev.vars.example` default to `*`.
    Ordinary control-plane scenarios do not require `WORKTREE_CREATION_ENABLED_IDS`.
@@ -125,27 +129,28 @@ tsx services/cloud-agent-next/test/e2e/run.ts [--api=unified|legacy] [--timeout-
 ```
 
 `--timeout-ms=<n>` sets one finite, positive overall deadline for the selected
-`long-session`, `cold-resume`, `multi-session-collab`, or continuity scenario
-(`recover-same-session`, `interrupt-then-continue`, `warm-cold-cycles`,
-`question-idle-resume`, `large-stream`, `concurrent-chats`), and for any shared
-scenario (`cold-hot`, `unknown-model`, `auth-reject`); it is not a
-per-operation timeout. The flag is rejected for all other scenarios.
+scenario. It is accepted for exactly the names in the shared registry
+(`SHARED_SCENARIOS`); every runnable scenario is a shared definition now. The
+flag is rejected for any other name; it is not a per-operation timeout.
 
 Examples:
 
 ```bash
 tsx services/cloud-agent-next/test/e2e/run.ts cold echo:hi
 tsx services/cloud-agent-next/test/e2e/run.ts cold-hot echo:hi
-tsx services/cloud-agent-next/test/e2e/run.ts worktree-shared _
+tsx services/cloud-agent-next/test/e2e/run.ts worktree-chat _
+tsx services/cloud-agent-next/test/e2e/run.ts worktree-multi-chat _
+tsx services/cloud-agent-next/test/e2e/run.ts long-conversation echo:cold
+tsx services/cloud-agent-next/test/e2e/run.ts leave-and-return _
 tsx services/cloud-agent-next/test/e2e/run.ts hot echo:hi
-tsx services/cloud-agent-next/test/e2e/run.ts followup echo:continue
 tsx services/cloud-agent-next/test/e2e/run.ts external-kill echo:hi
 tsx services/cloud-agent-next/test/e2e/run.ts kill-mid-flight hang
+tsx services/cloud-agent-next/test/e2e/run.ts wrapper-freeze-settled-reap _
+tsx services/cloud-agent-next/test/e2e/run.ts question-idle-resume _
 
-# Queue semantics — use a gate tag the scenario will pass through as
-# `__fake__:gate:<tag>` internally. Queue scenarios ignore the conversation
-# value for their own directive and just use it as a tag suffix.
-tsx services/cloud-agent-next/test/e2e/run.ts queue-while-busy gate1
+# Queue semantics — the hold is a bounded `slow:60:1000:16` turn (no parked
+# gate, no release call); the conversation value is a result label only.
+tsx services/cloud-agent-next/test/e2e/run.ts queue-while-busy _
 tsx services/cloud-agent-next/test/e2e/run.ts queue-overflow _
 tsx services/cloud-agent-next/test/e2e/run.ts queue-interrupt-clears _
 
@@ -155,7 +160,8 @@ tsx services/cloud-agent-next/test/e2e/run.ts chunked-streaming slow:5:50
 tsx services/cloud-agent-next/test/e2e/run.ts empty-response _
 tsx services/cloud-agent-next/test/e2e/run.ts interrupt-mid-stream _
 tsx services/cloud-agent-next/test/e2e/run.ts unknown-model _
-tsx services/cloud-agent-next/test/e2e/run.ts waiters-clean _
+tsx services/cloud-agent-next/test/e2e/run.ts large-stream _
+tsx services/cloud-agent-next/test/e2e/run.ts concurrent-chats _
 
 # Callback delivery — the scenario opens a callback sink and asserts on receipt.
 # `callbackTarget` is accepted by prepareSession only, so these scenarios pin
@@ -174,11 +180,16 @@ tsx services/cloud-agent-next/test/e2e/run.ts callback-interrupt _
 tsx services/cloud-agent-next/test/e2e/run.ts --api=legacy cold-hot echo:legacy
 ```
 
-Long-running scenarios (`long-session`, `cold-resume`,
-`multi-session-collab`, and the continuity scenarios `recover-same-session`,
-`interrupt-then-continue`, `warm-cold-cycles`, `question-idle-resume`,
-`large-stream`, `concurrent-chats`) are not included in `smoke.ts`'s
-`DEFAULT_MATRIX`. They take 6–25 minutes and require the funded seeded user
+Every scenario is now a shared definition. The long scenarios (`worktree-chat`,
+`worktree-multi-chat`, `long-conversation`, `leave-and-return`, `large-stream`,
+`concurrent-chats`, `question-idle-resume`) and the `sandboxFaults` scenarios
+(`external-kill`, `kill-mid-flight`, `wrapper-freeze-settled-reap`,
+`wrapper-freeze-inflight-reap`) are included in `smoke.ts`'s `DEFAULT_MATRIX`:
+the worktree flows need an enrolled driver user, and the fault flows stop or
+freeze a real container, so they run last. They stay name-runnable
+(`run.ts <name> _`) for focused runs; `smoke-deployed` runs the shared
+registry and marks the capability-gated ones `unsupported`. Long scenarios take
+6–30 minutes and require the funded seeded user
 (`E2E_USER_EMAIL=evgeny@kilocode.ai`), the offset-prefixed `WORKER_URL` and
 `FAKE_LLM_URL`, and `E2E_MODEL=kilo/fake-deterministic`; the new scenarios reject
 other models. They use the unified API and require control-plane/worktree
@@ -334,14 +345,18 @@ Exact run command, from `services/cloud-agent-next`:
 E2E_PROFILE=deployed pnpm exec tsx test/e2e/run.ts cold-hot echo:hi
 ```
 
-Shared scenarios run under both profiles from one implementation
-(`scenarios-shared.ts`). Capabilities a scenario needs but a profile does not
-provide make it `unsupported`: the run reports `ok: false, unsupported: true`
-with the missing capability names, and it never runs with the assertion
-dropped. `auth-reject` requires `deployedHttpAuthBoundary`, so it is
-`unsupported` under the local profile; `cold-hot` and `unknown-model` need no
-declared capability and run under both, while container identity stays a
-local-only assertion.
+Every runnable scenario is a shared definition in `scenarios-shared*.ts`.
+Capabilities a scenario declares but a profile does not provide make it
+`unsupported`: the run reports `ok: false, unsupported: true` with the missing
+capability names, and it never runs with the assertion dropped. `auth-reject`
+requires `deployedHttpAuthBoundary`, so it is `unsupported` under the local
+profile; the four `sandboxFaults` scenarios (`external-kill`, `kill-mid-flight`,
+`wrapper-freeze-settled-reap`, `wrapper-freeze-inflight-reap`) are `unsupported`
+deployed, and `kill-mid-flight` also needs the local-only `gates` marker.
+Only `cold-hot` and `unknown-model` declare no capability. Every other scenario
+that runs under both declares `sessionSandbox`, which both profiles provide;
+`auth-reject` and the four `sandboxFaults` scenarios are the exceptions named
+above. Container identity stays a capability-gated assertion.
 
 Scenario matrix:
 
@@ -350,6 +365,10 @@ Scenario matrix:
 | `cold-hot <directive>` | One cold turn plus `echo:hot`, `slow:3:50`, `echo:followup` hot turns on one session. Requires positive cold preparation evidence and per-message hot completion evidence, and rejects any hot-turn preparation event. For an `echo:<token>` directive it also asserts the correlated cold text: assistant messages whose `info.parentID` is the cold user message id, their `text` parts selected by `part.messageID`, latest snapshot per part id, joined equals `<token>`. Non-echo directives skip that assertion (`cold-content=skipped(not-echo:<token>)`). Default `240s` per turn. Under the local profile it also proves the cold container persists and no new container appears. |
 | `unknown-model` | Starts with `kilo/does-not-exist`; requires fail-closed admission (`Selected model is not available`) with no fake chat completion dispatched. Under the local profile it also confirms on a short delay that no sandbox appeared. |
 | `auth-reject _` | Starts no session. Probes the fake Worker directly over HTTPS (every request timeout-bounded): each model route with no bearer → 401; `Bearer not-a-jwt` → 401; a JWT signed with the wrong secret → 401; positive control `GET /api/openrouter/models` with the real `config.bearerToken` → 200; each `/test/*` route without the admin bearer → 401 and with it → 2xx/400/404; crossover both ways (admin bearer on a model route → 401, model token on `/test/*` → 401). It proves the public HTTP auth boundary only: no sandbox credential propagation and no session path. |
+| `worktree-chat _` | Creates a worktree chat through the public tRPC surface. Requires the worktree id to correspond to the workspace identity (`workspace_<uuid>` → `worktree_<uuid>`), the session's own scope id, `parentSessionId` null and `autoCommit=false`, then a cold echo boot turn, an idempotent same-key replay (same identities, `replayed=true`), and one hot echo turn with no reported preparation, matching allocation references observed before and after the turn through the capability's bounded present-reference wait, and correlated content. The boot allocation reference is acquired **after** the boot turn completes through that bounded wait with a `240 s` budget, so the wait starts only after the boot turn has completed, not while the sandbox is still cold; the hot-turn read uses the same bounded wait (`waitForPresentAllocation`) with a `30 s` cap plus a `1 s` outer backstop slack, tolerates a transient `null` observation, and hard-fails only when no reference appears within the budget. It proves matching observed references before and after each turn, not uninterrupted presence between observations. It runs under the local Docker and deployed HTTP profiles from one definition and asserts only public-surface, per-chat outcomes. |
+| `worktree-multi-chat _` | Boots a root chat, then starts a paced `slow:90:1000:32` turn and waits (budget `60 s`) until that turn is underway: correlated-part liveness for the paced message (transient and empty initialization parts permitted) plus a bounded increase in the fake's aggregate `chatCompletions` counter. The counter is **not** an authoritative paced-request signal: it is attributed to the paced request only under the documented assumption that no auxiliary/title request is in flight in that window, and it cannot distinguish the paced primary request from an auxiliary one. A content-based predicate (correlated non-empty text) was tried and reverted: the paced child's only correlated part can be the empty transient init part, and its streamed content can lag past the wait budget, so the predicate never fired even though the fake had served the request. The laziness baseline is taken only after readiness. It then creates a sibling chat while the turn is still streaming. Requires the root still `queued`/`running` immediately after the create and completing afterwards, the sibling to share one non-null `worktreeId` and `sandboxId` while keeping a distinct workspace/`ses_` identity and its own scope, `chatCompletions` unchanged over a 15 s window (lazy create) and over a same-key replay, the sibling's first turn to report its own `preparing`, and interleaved root-second and sibling-second turns. It proves the shared checkout (the root writes an uncommitted file, the sibling reads it, the root overwrites it, a fresh sibling read echoes the second nonce), sequential question ownership (asked in the root while the sibling is idle, visible only on the root's stream, only the root can answer, and a reconnect replays the still-open question with no new model request), a targeted interrupt of the sibling while the root holds a paced `slow` turn (the root stays nonterminal and then completes, the sibling's turn fails `reason=interrupted`, and the root's allocation reference is unchanged), and a targeted delete of the sibling while the root is active (the sibling's `getSession` rejects and the root accepts and completes another turn). Chat-content isolation scans each chat's streams and a fresh replay stream for the other chat's message ids and, without the `parentID` filter, the other chat's markers. Honest limit: the worktree runtime serializes streaming model turns, so the scenario does not ask a question or start a model turn in one chat while the other streams, and it does not claim concurrent streaming; isolation is per-chat control/state. No `gate`/`hang` is used. |
+| `long-conversation [echo:cold]` | One cold `echo:cold` turn plus twelve hot turns (nine `echo:<token>` turns, one paced `slow:2:50` turn, and a real `file:write`/`file:read` pair). Requires the cold turn to complete with a reported preparation and its correlated content, every hot turn to complete without a reported preparation and with matching allocation references observed before and after through the bounded present-reference wait (not uninterrupted presence between observations), and each `echo:` turn's correlated content. Measured behaviour, not history restoration. |
+| `leave-and-return _` | Boots, completes a boot echo turn, then leaves the session with no demand. Samples the allocation reference targeting +60 s (must still be the baseline `P1`); the baseline read is the bounded present-reference wait, so it may take up to `30 s` to obtain a present reference and its measured timestamp can be later than +60 s. Then every 15 s for up to a 15-minute budget; it fails closed while `P1` remains and if a different non-null reference appears, and stops once the reference is absent. On resume it requires a reported preparation, a different non-null reference `P2`, a completed turn with its echo marker and — from a fresh replay stream — the boot turn's replayed correlated content. It never names a stop cause: a `null` reference is reported as "the allocation disappeared while unattended", not as a release. |
 
 Run artifact for `cold-hot`: capture the fake `/test/requests`
 `chatCompletions` count before and after the run and expect **at least 4 new
@@ -357,6 +376,63 @@ completions** across the run (one cold turn plus three hot turns). Record that
 delta with the scenario's
 `session=workspace_<uuid>; cold=complete; cold-content="<token>"; hot=...` line
 and the deployment id from `wrangler deployments list`.
+
+### Public-surface-only evidence
+
+The four shared scenarios above reach the Worker only through `client.ts` tRPC
+helpers, WebSocket streams, the fake `/test/*` surface and the `sessionSandbox`
+capability. They inspect no Docker files or processes, no worker logs and no
+Postgres/`@kilocode/db`, and they call no auth helper directly. Authentication
+is profile-specific: the deployed/HTTP path mints no token, while the local
+Docker profile authenticates through the same local `mintApiToken` seam as every
+other local scenario (`client.ts` → `auth.ts`). The acknowledged transitive
+`client.ts → auth.ts → @kilocode/db` import exists, but no new scenario path
+uses it.
+
+Honest limits, recorded deliberately:
+
+- `fetchFakeRequests` is a global counter on a shared fake, so the lazy-create
+  evidence holds only while no other run is dispatching. In `worktree-multi-chat`
+  a bounded increase in that same counter is the paced-readiness gate; it is
+  **not** an authoritative paced-request signal. It is attributed to the paced
+  request only under the assumption that no auxiliary/title request is in flight
+  in that window, and the fake's aggregate `/test/requests` surface cannot
+  distinguish the paced primary request from an auxiliary one.
+- `worktree-multi-chat` paced readiness is **correlated-part liveness for the
+  paced message** (transient and empty initialization parts permitted) **plus a
+  bounded increase in the aggregate `chatCompletions` counter**, budget `60 s`.
+  This proves the turn is live and that some request was dialed; it does not
+  prove the increase was the paced primary request. A stronger content predicate
+  (correlated **non-empty text**) was tried and reverted: live runs showed the
+  paced child with `children=1 parts=9 correlated=2 text=1 nonEmptyText=0` (only
+  the empty transient init part) while the fake had already served the paced
+  request, so the predicate never fired and the counter check was never
+  consulted.
+- `physicalProviderRef === null` is not a release proof: a `creating` allocation
+  and a local probe error also yield `null`. The leave-and-return baseline
+  targets +60 s but is acquired through the bounded present-reference wait, so it
+  may take up to `30 s` to obtain a present reference and its measured timestamp
+  can be later than +60 s; the baseline sample plus "no demand during the
+  interval" is what makes the absence meaningful, and the stop cause is never
+  claimed from it. Local absence is a coarse signal.
+- A missing preparation event proves the absence of *reported* preparation, not
+  the absence of attachment.
+- The fresh replay stream proves that the DO's persisted event log still replays
+  the boot marker ("replayed transcript preservation"), not sandbox transcript
+  or model-context restoration. The collector is removal-aware, so a replay that
+  removes the content no longer passes.
+- Chat-content isolation is a content check only: it does not prove physical
+  isolation or that the two chats share one container.
+- Cleanup is clean only for the returned-id path. A create that succeeds
+  server-side but loses its response, or is aborted, returns no id and cannot be
+  cleaned from that call; operation keys make the create idempotent for retry.
+
+Run artifacts for the new scenarios (local Docker profile):
+
+- `worktree-chat`: `session=workspace_<uuid>; ses=ses_...; worktreeId=worktree_<uuid> (matches workspace identity); scope=self; autoCommit=false; allocationRef=<R>; initial=<marker>; hot=no-preparing; hotAllocationRef=<R> (read); replay=idempotent`
+- `worktree-multi-chat`: `root=...; sibling=...; worktree=<worktree_...>; sandboxId=<ses-...>; scope=distinct; rootNonterminalAfterSiblingCreate=true; lazyChatCompletions=<before>-><after> (unchanged over <interval>); replay=idempotent; siblingPreparing=true; interleaved=root-second+sibling-second complete; chatContentIsolation=true (no other-chat ids or markers in either chat's streams/replay)`
+- `long-conversation`: `cold=prepare; hot=12/12 complete; no-preparing=true; allocationRef stable=<R> (read each turn)`
+- `leave-and-return`: `session=workspace_<uuid>; providerRef=<P1>; baselineSample=<P1>@t=<ms>; absentSample=null@t=<ms>; samples=<n>:<ref>@t=<ms>|<ref>@t=<ms>|...; resumePreparing=true; replacement=<P2>!=<P1>; replayedTranscript=<bootMessageId>:<marker>; stopCause=not-read` (every poll sample is reported with its elapsed time, all measured from one interval origin)
 
 ### Deployed matrix runner
 
@@ -377,9 +453,12 @@ Each scenario owns its own cleanup. The runner tracks session ids through
 thrown, so one stuck session cannot hide the remaining scenarios.
 
 The summary reports passed / failed / unsupported as distinct categories.
-Exit policy: `1` if any scenario failed, else `2` if any was unsupported, else
-`0`. An `unsupported` result also has `ok: false`, so failure means
-`!ok && !unsupported`. The unsupported lines name the missing capabilities.
+Exit policy: `1` if any scenario failed, else `2` if any unsupported result is
+**not** in the runner's derived expected set, else `0`. An `unsupported` result
+also has `ok: false`, so failure means `!ok && !unsupported`. The expected set is
+derived per run from `isScenarioSupported(definition, env)`, so a declared
+capability gap is a reported skip, not a failure. The unsupported lines name the
+missing capabilities. Local expected-unsupported is exactly `auth-reject`.
 
 The `e2e-deployed` GitHub workflow (`.github/workflows/e2e-deployed.yml`) is a
 `workflow_dispatch`-only runner around this script. It maps the `worker_url`,
@@ -405,9 +484,11 @@ The deployed profile's `auth-reject` scenario is the only deployed negative
 auth proof. It does not exercise a sandbox, so it cannot show that credentials
 reached the fake from inside a session.
 
-Every other scenario is local-only because it needs Docker-backed
-inspection/control. Long `gate`/`hang` directives are outside the supported
-deployed profile (short streams only).
+Every shared scenario runs under both profiles from one definition; each
+declares its required capabilities, so the deployed profile marks a
+Docker-only flow (`sandboxFaults`/`gates`) `unsupported` rather than skipping its
+assertions. Long `gate`/`hang` directives remain outside the supported deployed
+profile (short streams only).
 
 The deployed profile does **not** send `x-skip-balance-check`: the enrolled user
 must have positive balance, and a 403 at `start` means fund the user.
@@ -415,6 +496,15 @@ must have positive balance, and a 403 at `start` means fund the user.
 Honest caveat: `cold-hot` proves the warm dispatch path, not physical
 container identity. The absence of hot-turn preparation events is not proof that
 the same container served the turns; identity stays a local-only assertion.
+
+The four `sandboxFaults` scenarios' deployed statements are inference, not
+proof: the deployed matrix was not run for this change. The workflow's
+`timeout-minutes: 300` is an operational ceiling, not a certified or
+registry-derived bound; the scenarios mix per-turn and overall budgets, so no
+whole-matrix total is derivable. Their `sessionSandbox` capability over HTTP reports the
+persisted control-plane allocation reference, so "the same container" is
+allocation-reference stability, not a live runtime observation, and the HTTP
+surface cannot enumerate containers.
 
 Cleanup and retained artifacts: cleanup against the e2e Worker runs first —
 `interruptSession` and `deleteSession`, each attempted independently and bounded
@@ -476,6 +566,10 @@ Node server (`fake-llm-server.ts`) and the deployed Worker + Durable Object
 | `error:<msg>` | HTTP 402 with OpenAI-shaped error body carrying `<msg>`. The non-BYOK gateway converts this to retryable HTTP 503. |
 | `gate:<tag>` | Opens the SSE stream, emits no chunks, blocks until the driver calls `POST /test/release?tag=<tag>`. On release, emits `"done"` + stop + `[DONE]`. |
 | `read-then-write:<tag>:<srcPath>:<destPath>:<prefix>` | Issues a real `read` for `srcPath`, then writes `prefix` plus a newline plus the cleaned read body to `destPath`, and gates until release. The prefix may contain colons; line-number wrappers and prompt context are removed from the carried body. |
+| `file:write:<tag>:<path>:<contents>` | Issues a real `write` tool call for `<path>` with `<contents>` (colons and newlines allowed in the contents), then answers `file-write:<path>` after the tool result. |
+| `file:seed:<tag>:<path>:<bytes>:<nonce>` | Issues a real `write` of a deterministic `<bytes>`-byte seed fixture prefixed by `<nonce>` to `<path>`. The write tool argument carries the large payload; the read-back echo is where it is measured, so `large-stream` never substitutes assistant text. |
+| `file:read:<tag>:<path>` | Issues a real `read` for `<path>` and answers `file-read:<path>` plus the normalized body; rejects a result that does not match the requested path, is an error, or is empty. |
+| `question:<tag>:<text>` | Issues a real question tool call for `<text>`. The turn parks until `answerQuestion` resolves the question id; `toolResults.question` stays `0` while unanswered. |
 
 Unknown `__fake__:<name>` directives produce HTTP 402 with
 `unknown fake scenario: <name>` — easy to spot in fake-LLM logs.
@@ -518,33 +612,32 @@ reusable catalog of planned and existing scenarios, see
 |---|---|
 | `cold` | Fresh session; verify a new per-session sandbox appears and the conversation completes. |
 | `hot` | Warmup with `echo:warmup`, then send the real prompt on the same session. Same container. |
-| `followup` | Same as `hot` today; kept distinct for future resume-path splits. |
 | `cold-hot` | One cold turn plus `echo:hot`, `slow:3:50`, and `echo:followup` hot turns on the same session/sandbox. |
-| `worktree-shared` | Creates a new worktree and a sibling chat; verifies idempotent creation, a shared dirty checkout, and chat isolation. Requires both `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS` enrollment and `--api=unified`; pass `_` as the conversation placeholder. |
-| `long-session` | Runs 11 sequential real file turns (writes plus read/edit turns) in one sandbox, asserting exact dirty file state and this root's checkpoint identity after every turn. Requires the seeded enrolled user and `kilo/fake-deterministic`. |
-| `cold-resume` | Waits for the control plane's automatic idle stop, then resumes the same session on a new container and asserts two-sided history preservation and a stable Git HEAD before releasing a gate-only turn; dirty-file survival is recorded as a non-gating observation. Requires the seeded enrolled user and `kilo/fake-deterministic`. |
-| `multi-session-collab` | Runs planner, implementer, and reviewer chats serially in one worktree; each real file artifact carries the previous token and all three files are asserted on disk. Requires the seeded enrolled user and `kilo/fake-deterministic`. |
-| `recover-same-session` | Captures the target connection by `sandboxId` plus connection/wrapper ids, pauses the owned primary wrapper (`docker pause`), requires a matched `deadline_fired deadlineId=heartbeatExpiry` followed by a matched `recovery_outcome cause=heartbeat_expired outcome=started` before any recovery send, then completes a new ordered-lifecycle message on the original `workspace_*` session. A `control_disconnected` started outcome is reported as generic same-session recovery, not heartbeat coverage. Requires control-plane/worktree enrollment. |
-| `interrupt-then-continue` | Interrupts a gated turn, asserts `cloud.message.failed reason=interrupted`, then completes a follow-up on the same session in the same container. |
-| `warm-cold-cycles` | Runs two work -> automatic idle-stop -> resume -> work cycles with independent idle-stop evidence, old-primary absence, distinct replacement container, pre-idle history, and a completed ordered-lifecycle follow-up per cycle. Each cycle records its resumed message id and dirty-file survival; completed cycles are retained if a later cycle fails. |
-| `question-idle-resume` | Sends a real `question:<tag>:<text>` and leaves it unanswered; requires a positive scoped pending-question observation while the primary is inspectable (inspection failure is inconclusive) and automatic idle-stop within the idle budget, then requires the parked message to be terminal (`failed`/`interrupted`) before continuing. The exact-match target heartbeat `waitingOn=input` is the input-wait proof and may be absent once the parked message is terminal. Continues on a replacement container. |
-| `large-stream` | Runs a 256 KiB `tool-stream:<tag>:<bytes>` turn plus a paced `slow:20:50:32` follow-up; claims large-stream coverage only for the exact completed read call whose streamed part is correlated and whose persisted output meets the request, otherwise records requested vs observed vs written bytes. |
-| `concurrent-chats` | Boots three independent sessions, parks one gated turn in each with proven overlapping `running`, classifies each `completed_clean`/`completed_after_recovery`/`wedged`/`failed` from matched recovery evidence, and requires a completed same-chat follow-up for any turn that did not complete. |
-| `external-kill` | Warmup, `docker kill` the sandbox, send another prompt, verify recovery/failure. |
-| `kill-mid-flight` | Cold `hang`, kill while pending, verify DO surfaces disconnect/error. |
-| `queue-while-busy` | Block on `gate:<tag>`, enqueue two echoes, release the gate, assert FIFO delivery through `cloud.message.*` events. |
+| `worktree-chat` | Creates a worktree chat through the public tRPC surface; verifies workspace/worktree identity, idempotent same-key replay, a cold echo boot, and one hot echo turn with stable allocation references. |
+| `worktree-multi-chat` | Boots a root chat, lazily creates a sibling in the same worktree/sandbox, and proves: shared uncommitted file write→read→overwrite (parsed echo equals an independent writer nonce), sequential question ownership/replay/answer isolation (asked in the root while the sibling is idle), targeted interrupt of the sibling while the root holds a paced turn (root nonterminal then completing, allocation unchanged), and targeted delete of the sibling leaving the root accepting another turn. The runtime serializes streaming model turns, so it does not claim two chats streaming at one instant. |
+| `long-conversation` | One cold `echo:cold` turn plus twelve hot turns — nine `echo:<token>`, one paced `slow:2:50`, and a real `file:write`/`file:read` pair whose parsed echo body equals the writer nonce. Every hot turn completes with no re-preparation and a stable allocation reference. |
+| `leave-and-return` | Boots, completes a boot echo turn, then leaves the session unattended; requires the allocation to disappear, then a resume turn on a distinct non-null allocation with the boot content replayed from a fresh stream. |
+| `large-stream` | Stages a real file and asks the model to read it; requires a correlated completed read whose persisted output meets the byte floor, plus a paced follow-up on the same session. |
+| `concurrent-chats` | Boots two independent sessions, holds one paced turn in each with proven overlapping `running`, and requires both to reach a completed terminal (or recover) on their own chat. |
+| `interrupt-then-continue` | Interrupts an actively running paced turn, asserts `cloud.message.failed reason=interrupted`, then completes a follow-up on the same session. |
+| `question-idle-resume` | Leaves a real `question:<tag>:<text>` unanswered; requires `toolResults.question=0`, the allocation to disappear inside the 15-minute idle window, the parked message to be terminal before the continuation, and a follow-up completing on a distinct non-null allocation (~30-minute budget). |
+| `external-kill` | After a completed turn, kills the identity-matched owned container via `sandboxFaults`; requires the same session to complete a follow-up on a distinct allocation reference. |
+| `kill-mid-flight` | Kills the identity-matched owned container while a parked `gate:<tag>` turn runs; requires a durable failure and a follow-up on a distinct allocation. Needs `gates` + `sandboxFaults`. |
+| `wrapper-freeze-settled-reap` | Freezes only the identity-matched control-wrapper process after a completed turn; requires identity-correlated evidence — the `recovery_settled_reap` `physical_committed running→stopping` cause and stopCause, a terminal `provider_stop`, the heartbeat-expiry recovery outcome, no re-ready wrapper — plus a distinct replacement. |
+| `wrapper-freeze-inflight-reap` | Freezes the identity-matched control-wrapper process while a paced turn is held; requires the held message to terminalise `runtime_unhealthy`, an identity-matched `accepted_reconciliation` and still-active route, the settled-reap stop evidence, and a distinct replacement. |
+| `queue-while-busy` | Hold a bounded `slow:60:1000:16` turn, enqueue two echoes, and assert FIFO delivery through `cloud.message.*` events as the hold completes. |
 | `queue-rapid-fire-no-gate` | Send immediate follow-ups behind `echo:first` and assert they reach their terminal FIFO state without gate coordination. |
-| `queue-overflow` | Block on `gate:overflow`, fill the pending queue until enqueue fails with HTTP 429, release gate, drain. |
-| `queue-interrupt-clears` | Block on `gate:<tag>`, enqueue two, `interruptSession`, assert `cloud.message.failed` with `reason: 'interrupted'` for each. |
-| `llm-error` | Return fake provider HTTP 402 (terminal credit-exhaustion classification), assert `cloud.message.failed` with `status: 'failed'` and no retry status, assert `interruptSession` is a no-op on the settled message (`failed` stays durable, no `reason=interrupted`), then assert a completed follow-up on the same session and container. |
+| `queue-overflow` | Hold a paced turn and fill the pending queue until enqueue fails with HTTP 429, then drain. |
+| `queue-interrupt-clears` | Hold a paced turn, enqueue two, `interruptSession`, assert `cloud.message.failed` with `reason: 'interrupted'` for each. |
+| `llm-error` | Return fake provider HTTP 402 with an `insufficient_quota` body, then assert a terminal `cloud.message.failed`, `interruptSession` as a no-op on the settled message, and a completed follow-up on the same session. **Fails locally**: the non-BYOK Next.js gateway converts the 402 to retryable HTTP 503, so the wrapper retries instead of settling (observed: 21 `scenario="error"` requests, no terminal within 120s). Pre-existing behavior of the unchanged `fake-llm-core.ts` error handler, not a harness assertion bug. |
 | `chunked-streaming` | Stream delayed fake chunks and assert multiple downstream `message.part.delta` events survive. |
 | `empty-response` | Run `idle`, assert completion, and assert no downstream `message.part.delta` is emitted. |
-| `interrupt-mid-stream` | Interrupt an actively gated fake request and assert the active message is interrupted, not a queued message. |
+| `interrupt-mid-stream` | Interrupt an actively paced fake request and assert the active message is interrupted, not a queued message. |
 | `unknown-model` | Use a model rejected by the fake validation route and require synchronous rejection before sandbox creation or fake chat dispatch. |
-| `waiters-clean` | Complete a normal fake turn, then assert the fake server has no parked waiters or live responses. |
+| `auth-reject` | Probes the deployed fake Worker's public auth boundary (model routes and `/test/*`) with/without valid bearers; declares `deployedHttpAuthBoundary`, so it is unsupported locally. |
 | `callback-completion` | Open the profile's callback sink, register `callbackTarget.url`, run `echo:done`, assert the sink received `status: 'completed'`. |
-| `callback-batch-followup` | Queue two turns behind a gated callback session, assert one callback for the final queued turn, then assert a later hot turn emits a fresh callback and no extra one after the batch settles. |
-| `callback-interrupt` | Gated active turn + `interruptSession`, assert callback fires with `status: 'interrupted'`. |
+| `callback-batch-followup` | Queue two turns behind a paced callback session, assert one callback for the final queued turn, then assert a later hot turn emits a fresh callback and no extra one after the batch settles. |
+| `callback-interrupt` | Paced active turn + `interruptSession`, assert callback fires with `status: 'interrupted'`. |
 
 The three callback scenarios are shared definitions. Their `callbacks` capability
 is provided by the profile: a host HTTP sink under local Docker, and the e2e

@@ -195,6 +195,22 @@ async function waitForWaiterCount(tag: string, expected: number, timeoutMs = 5_0
   throw new Error(`tag ${tag} never reached waiter count ${expected}`);
 }
 
+/** Global open-stream count from `/test/waiters` (gate waiters plus `hang`). */
+async function liveResponses(): Promise<number> {
+  const res = await SELF.fetch(`${ORIGIN}/test/waiters`, { headers: adminHeaders() });
+  const body = (await res.json()) as { liveResponses: number };
+  return body.liveResponses;
+}
+
+async function waitForLiveResponses(expected: number, timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if ((await liveResponses()) === expected) return;
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+  throw new Error(`liveResponses never drained to ${expected}`);
+}
+
 const CONTROL_ROUTES: Array<{ label: string; path: string; init?: RequestInit }> = [
   { label: 'POST /test/release', path: '/test/release?tag=worker-guard', init: { method: 'POST' } },
   { label: 'GET /test/gate-status', path: '/test/gate-status?tag=worker-guard' },
@@ -275,6 +291,7 @@ describe('deployed fake llm worker', () => {
   });
 
   it('releases a parked gate with a bodyless 204 and completes the stream', async () => {
+    const baseline = await liveResponses();
     const tag = `deployed-${Date.now()}`;
     const pending = chat(`__fake__:gate:${tag}`);
     await waitForTag(tag, true);
@@ -283,6 +300,8 @@ describe('deployed fake llm worker', () => {
     expect(waiters.status).toBe(200);
     const waitersBody = (await waiters.json()) as { tags: Array<{ tag: string; count: number }> };
     expect(waitersBody.tags.find(entry => entry.tag === tag)?.count).toBe(1);
+    // The parked stream is tracked globally while it waits.
+    expect(await liveResponses()).toBe(baseline + 1);
 
     const release = await SELF.fetch(`${ORIGIN}/test/release?tag=${tag}`, {
       method: 'POST',
@@ -297,6 +316,8 @@ describe('deployed fake llm worker', () => {
     expect(stream.events[0]).toContain('"content":"done"');
     expect(stream.events.at(-1)).toContain('[DONE]');
     await waitForTag(tag, false);
+    // Released waiters drain: the open-stream count returns to its baseline.
+    await waitForLiveResponses(baseline);
   });
 
   it('streams a slow scenario incrementally instead of batching it', async () => {

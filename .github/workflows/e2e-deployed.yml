@@ -27,7 +27,11 @@ concurrency:
 jobs:
   e2e-deployed:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Operational ceiling for the whole matrix, not a certified bound: the
+    # scenarios mix per-turn and overall budgets (some, like `cold-hot`, permit
+    # several long turn waits), so no total is derivable from the registry.
+    # 300 minutes leaves room for cold starts and runner variance.
+    timeout-minutes: 300
     env:
       WORKER_URL: ${{ inputs.worker_url }}
       FAKE_LLM_URL: ${{ inputs.fake_llm_url }}

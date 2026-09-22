@@ -5,6 +5,7 @@ import { createDeployedScenarioEnvironment } from '../../e2e/capabilities-deploy
 const SECRET = 'e2e-internal-secret-0123456789';
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -86,7 +87,7 @@ describe('createDeployedScenarioEnvironment', () => {
   });
 
   it('reads physical provider refs from the surface allocation route with the internal key', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) =>
       Response.json({
         logicalSandboxId: 'usr-123456789abc',
         physicalProviderRef: 'provider-ref-9',
@@ -112,5 +113,34 @@ describe('createDeployedScenarioEnvironment', () => {
       Authorization: 'Bearer token-1',
       'x-internal-api-key': SECRET,
     });
+  });
+
+  it('polls the allocation route until a provider ref appears (transient miss tolerated)', async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const fetchMock = vi.fn(async () => {
+      calls += 1;
+      return Response.json({
+        logicalSandboxId: 'usr-123456789abc',
+        physicalProviderRef: calls === 1 ? null : 'provider-ref-9',
+        physicalState: calls === 1 ? 'creating' : 'running',
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const env = createDeployedScenarioEnvironment({
+      surfaceUrl: 'https://worker.test/',
+      bearerToken: 'token-1',
+      internalApiSecret: SECRET,
+    });
+    const pending = env.sessionSandbox!.waitForContainer({
+      cloudAgentSessionId: 'agent_1',
+      kiloSessionId: 'ses_1',
+      timeoutMs: 5_000,
+    });
+    await vi.advanceTimersByTimeAsync(600);
+
+    await expect(pending).resolves.toBe('provider-ref-9');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

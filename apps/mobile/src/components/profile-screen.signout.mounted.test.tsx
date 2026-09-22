@@ -39,6 +39,14 @@ vi.mock('react-native-reanimated', () => ({
 // reads its landscape side insets from it, so the mock returns the hoisted
 // `safeArea`; the alignment guard in `screen-insets.test.ts` holds that read to
 // the shared entry point.
+// ProfileScreen reads the landscape side insets, so the real native module
+// would load here. Its build requires `react-native` itself, whose Flow source
+// the vitest transform cannot parse (see `test/render-with-providers.tsx`), so
+// the harness mocks it exactly as `profile-screen.queries.mounted.test.tsx` does.
+// ProfileScreen reads the landscape side insets, so the real native module
+// would load here. Its build requires `react-native` itself, whose Flow source
+// the vitest transform cannot parse (see `test/render-with-providers.tsx`), so
+// the harness mocks it exactly as `profile-screen.queries.mounted.test.tsx` does.
 // The screen reads its side insets through `@/lib/screen-insets`, whose real
 // `react-native-safe-area-context` entry is a Flow source this pipeline cannot
 // transform; the insets are irrelevant to the sign-out flow.

@@ -27,24 +27,11 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * The notifications.category.*Unavailable reasons below landed in all 86
- * catalogs, so nothing is pending translation today.
- *
- * The `credits.*` keys are the Buy credits screen copy. English is written
- * first and the translation slice lands them in every catalog next.
+ * The notifications.category.*Unavailable reasons landed in all 86 catalogs,
+ * and the `credits.*` keys of the Buy credits screen landed with them, so
+ * nothing is pending translation today.
  */
-const PENDING_TRANSLATION_KEYS = new Set<string>([
-  'credits.title',
-  'credits.description',
-  'credits.packLabel',
-  'credits.priceUnavailable',
-  'credits.purchased',
-  'credits.empty',
-  'credits.noMatchingProducts',
-  'credits.noMatchingProductsPlay',
-  'credits.purchaseOwnedByAnotherAccount',
-  'credits.purchaseOwnedByAnotherAccountPlay',
-]);
+const PENDING_TRANSLATION_KEYS = new Set<string>();
 
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {

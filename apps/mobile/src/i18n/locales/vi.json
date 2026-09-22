@@ -214,7 +214,6 @@
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
     "bonusCreditsExpiring": "Khoản tiền thưởng {{amount}} sẽ hết hạn vào {{date}}.",
-    "creditBalanceEmpty": "Số dư của bạn đã hết. Với tài khoản này, bạn cần quản lý số dư bên ngoài ứng dụng iOS.",
     "signOutTitle": "Đăng xuất?",
     "signOutMessage": "Bạn cần đăng nhập lại để truy cập không gian làm việc của mình.",
     "deleteAccountTitle": "Xóa tài khoản?",
@@ -2168,6 +2167,18 @@
     "cta": "Nạp tiền",
     "description": "Nạp tiền để tiếp tục sử dụng.",
     "billingPage": "trang thanh toán"
+  },
+  "credits": {
+    "title": "Mua tín dụng",
+    "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",
+    "packLabel": "Thêm {{amount}} tín dụng",
+    "priceUnavailable": "Không có giá",
+    "purchased": "Đã thêm tín dụng vào số dư của bạn.",
+    "empty": "Các gói tín dụng hiện không khả dụng.",
+    "noMatchingProducts": "App Store không trả về gói tín dụng phù hợp nào.",
+    "noMatchingProductsPlay": "Google Play không trả về gói tín dụng phù hợp nào.",
+    "purchaseOwnedByAnotherAccount": "Tín dụng trên Apple Account này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng.",
+    "purchaseOwnedByAnotherAccountPlay": "Tín dụng trên Tài khoản Google Play này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng."
   },
   "deviceSessions": {
     "couldNotLoadDescription": "Bạn chưa thể xem các phiên đang hoạt động cho đến khi tải xong dữ liệu.",

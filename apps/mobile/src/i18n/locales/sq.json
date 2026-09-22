@@ -214,7 +214,6 @@
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
     "bonusCreditsExpiring": "Kredite bonus në vlerën {{amount}} skadojnë më {{date}}.",
-    "creditBalanceEmpty": "Nuk ke më kredite. Për këtë llogari, kreditet menaxhohen jashtë aplikacionit iOS.",
     "signOutTitle": "Do të dalësh nga llogaria?",
     "signOutMessage": "Do të duhet të hysh përsëri për të pasur qasje në hapësirën tënde të punës.",
     "deleteAccountTitle": "Të fshihet llogaria?",
@@ -2672,6 +2671,18 @@
     "cta": "Shto kredite",
     "description": "Shto kredite për të vazhduar përdorimin.",
     "billingPage": "faqja e faturimit"
+  },
+  "credits": {
+    "title": "Bli kredite",
+    "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",
+    "packLabel": "Shto {{amount}} në kredite",
+    "priceUnavailable": "Çmimi nuk disponohet",
+    "purchased": "Kreditet u shtuan në bilancin tuaj.",
+    "empty": "Paketat e krediteve nuk janë të disponueshme tani.",
+    "noMatchingProducts": "App Store nuk ktheu paketa kreditesh që përputhen.",
+    "noMatchingProductsPlay": "Google Play nuk ktheu paketa kreditesh që përputhen.",
+    "purchaseOwnedByAnotherAccount": "Kreditet në këtë Apple Account i përkasin një llogarie tjetër Kilo. Hyr në atë llogari Kilo për t'i përdorur.",
+    "purchaseOwnedByAnotherAccountPlay": "Kreditet në këtë llogari Google Play i përkasin një llogarie tjetër Kilo. Hyni në atë llogari Kilo për t'i përdorur."
   },
   "deviceSessions": {
     "couldNotLoadDescription": "Seancat e tua aktive nuk janë të disponueshme derisa të ngarkohen të dhënat.",

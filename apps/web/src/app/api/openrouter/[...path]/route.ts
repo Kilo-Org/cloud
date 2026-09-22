@@ -760,6 +760,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
 
   if (
     !autoModel &&
+    !effectiveProviderContext.userByok &&
     (isFableModel(effectiveModelIdLowerCased) ||
       isOpus5Model(effectiveModelIdLowerCased) ||
       effectiveModelIdLowerCased === CLAUDE_OPUS_LATEST_MODEL_ALIAS)

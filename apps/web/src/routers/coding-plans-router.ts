@@ -5,6 +5,8 @@ import * as z from 'zod';
 import {
   adminCancelCodingPlanSubscription,
   cancelCodingPlanSubscription,
+  CodingPlanCredentialReassignmentError,
+  CodingPlanInventoryReductionError,
   CodingPlanInventoryReplacementError,
   CodingPlanInventoryUploadError,
   extendCodingPlanSubscriptionPeriod,
@@ -12,6 +14,8 @@ import {
   getCodingPlanAvailabilityIntentCounts,
   getCodingPlanAvailabilityIntentPlanIds,
   getKeyInventoryCounts,
+  reassignSubscriptionCredential,
+  queueAvailableInventoryForRevocation,
   replaceInventoryCredential,
   requestCodingPlanAvailabilityNotification,
   subscribeToCodingPlan,
@@ -811,6 +815,25 @@ export const codingPlansRouter = createTRPCRouter({
       }
     }),
 
+  adminReduceInventory: adminProcedure
+    .input(
+      z.object({
+        planId: CodingPlanIdSchema,
+        count: z.number().int().min(1).max(1000),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      try {
+        return await queueAvailableInventoryForRevocation(input.planId, input.count, ctx.user.id);
+      } catch (error) {
+        const message =
+          error instanceof CodingPlanInventoryReductionError
+            ? error.message
+            : 'Unable to reduce Coding Plan inventory.';
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message });
+      }
+    }),
+
   adminTerminateSubscription: adminProcedure
     .input(z.object({ subscriptionId: SubscriptionIdSchema }))
     .mutation(async ({ input }) => {
@@ -876,6 +899,26 @@ export const codingPlansRouter = createTRPCRouter({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Unable to replace the inventory credential.',
+        });
+      }
+    }),
+
+  adminReassignSubscriptionCredential: adminProcedure
+    .input(z.object({ subscriptionId: SubscriptionIdSchema }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        return await reassignSubscriptionCredential(input.subscriptionId, ctx.user.id);
+      } catch (error) {
+        if (error instanceof CodingPlanCredentialReassignmentError) {
+          throw new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('No live subscription')) {
+          throw new TRPCError({ code: 'NOT_FOUND', message });
+        }
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Unable to reassign the subscription credential.',
         });
       }
     }),

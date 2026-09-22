@@ -41,6 +41,18 @@ describe('root layout startup order (text contract)', () => {
     ).toBe(true);
   });
 
+  it('excludes the held restore-error surface from bootstrap loading', () => {
+    // A successful retry clears restoreFailed before the hidden gate settles.
+    // The held error screen still owns feedback, including its inline spinner.
+    const excludesHeldError =
+      /\{showBootstrapLoading\s*&&\s*!showRestoreError\s*\?\s*<BootstrapLoadingSurface\s*\/>\s*:\s*null\}/.test(
+        stripComments(layoutSource)
+      );
+    expect(excludesHeldError, 'the held restore error must exclude BootstrapLoadingSurface').toBe(
+      true
+    );
+  });
+
   // The persisted deep-link record is account-bound. Auth bootstrap publishes
   // the signed-in user id before it clears `authLoading`, so a restore that
   // runs on an empty dependency array reads a null user id and deletes the
@@ -75,6 +87,23 @@ describe('root layout startup order (text contract)', () => {
       codeSource.includes('usePendingDeepLinkRestore({ authLoading, restoreFailed })'),
       '_layout.tsx must gate the persisted deep-link restore through usePendingDeepLinkRestore'
     ).toBe(true);
+  });
+
+  // The module-scope category registration runs under the English default
+  // while the stored preference is still loading, so the post-preference
+  // language apply must re-register the needs-input categories next to the
+  // channel rename — or every non-English user keeps English Approve / Reply
+  // buttons for the whole session.
+  it('re-registers the needs-input categories next to the language-apply channel rename', () => {
+    const codeSource = stripComments(layoutSource);
+    const pair =
+      /void renameAndroidNotificationChannels\(\);\s*void registerNeedsInputCategories\(\);/.exec(
+        codeSource
+      );
+    expect(
+      pair,
+      '_layout.tsx must re-register the needs-input categories right after renameAndroidNotificationChannels in prepareLanguage'
+    ).not.toBe(null);
   });
 
   it.each(FORBIDDEN_IDENTIFIERS)('does not reference %s', identifier => {

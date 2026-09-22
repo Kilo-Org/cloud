@@ -1,4 +1,5 @@
 import {
+  GLANCEABLE_STALE_MS,
   type GlanceableAgentsSnapshot,
   isIdleOnlyGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
@@ -33,6 +34,15 @@ type AndroidWidgetCount = {
 export type GlanceableCountFormat = (value: number) => string;
 
 /**
+ * Format a timestamp as the active language's relative time.
+ *
+ * Injected the same way as `formatCount` and for the same reason: this module
+ * stays free of i18n and of `Intl`, so its tests need no language bootstrap and
+ * the app passes `formatGlanceableAgo`.
+ */
+export type GlanceableAgoFormat = (at: string) => string;
+
+/**
  * The two in-place actions a state offers, plus the translated row labels the
  * widget host draws. A disabled action's label is still carried so the widget
  * never composes copy of its own.
@@ -49,7 +59,8 @@ type AndroidWidgetActions = {
 /**
  * The props the Android widget renders. The builder below is the only producer,
  * so a title, organization name, account id, or raw session id can never reach
- * the widget host. Android has no elapsed timer, so there is no elapsed anchor.
+ * the widget host. The newest-result label is a translated state word, not a
+ * session title. Android has no elapsed timer, so there is no elapsed anchor.
  */
 export type AndroidWidgetProps = {
   /**
@@ -62,6 +73,17 @@ export type AndroidWidgetProps = {
   countLines: AndroidWidgetCount[];
   /** Top-ranked count label; the only row that keeps the foreground color. */
   primaryLabel: string | null;
+  /** Kind of the most recent state change; null when no row carried a timestamp. */
+  newestResultKind: GlanceableCountKind | null;
+  /**
+   * Caption of the newest-result footer. Null while no counts show: a locked
+   * frame carries one fact, and the caption is the third fact's.
+   */
+  newestResultTitle: string | null;
+  /** The kind label read from `countLines`, never a second spelling of the word. */
+  newestResultLabel: string | null;
+  /** Preformatted relative time of that change, from the injected formatter. */
+  newestResultAgo: string | null;
   /**
    * The reserved slot under the counts: the newest session's title, the
    * in-flight action's progress or failure, or null. Its height is reserved in
@@ -121,17 +143,28 @@ function newestLineFor(
 }
 
 /** Build the Android widget props from a snapshot, surface flags, and a translator. */
-// eslint-disable-next-line max-params -- snapshot, flags, and the two injected formatters
+// eslint-disable-next-line max-params -- snapshot, flags, the translator, and the two injected formatters
 export function buildAndroidWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
   translate: (key: string) => string,
-  formatCount: GlanceableCountFormat = String
+  formatCount: GlanceableCountFormat = String,
+  formatAgo: GlanceableAgoFormat = String
 ): AndroidWidgetProps {
   const status = resolveGlanceableStatus(snapshot, flags);
   const statusKey = glanceableStatusCopyKey(snapshot, flags);
   const showCounts = status === 'happy' || status === 'stale';
   const primary = showCounts ? primaryGlanceableCount(snapshot) : null;
+  const countLines = (showCounts ? glanceableCountLines(snapshot) : []).map(line => ({
+    label: translate(line.key),
+    kind: line.kind,
+    count: formatCount(line.count),
+  }));
+  // The three facts locked frames must not carry: with no counts there is no
+  // newest result either, so a waiting or privacy-blanked widget keeps one fact.
+  const newestKind = showCounts ? snapshot.newestResultKind : null;
+  const newestAt = showCounts ? snapshot.newestResultAt : null;
+
   const extras = getSurfaceExtras();
   // Android's empty surface is the one that offers `New agent`, so its copy
   // says what that action is about — nothing waiting — instead of the generic
@@ -142,12 +175,15 @@ export function buildAndroidWidgetProps(
 
   return {
     statusLine: statusKey === null ? null : androidCopy(statusKey),
-    countLines: (showCounts ? glanceableCountLines(snapshot) : []).map(line => ({
-      label: translate(line.key),
-      kind: line.kind,
-      count: formatCount(line.count),
-    })),
+    countLines,
     primaryLabel: primary === null ? null : translate(primary.key),
+    newestResultKind: newestKind,
+    newestResultTitle: showCounts ? translate('glanceable.newestResult') : null,
+    newestResultLabel:
+      newestKind === null
+        ? null
+        : (countLines.find(line => line.kind === newestKind)?.label ?? null),
+    newestResultAgo: newestKind === null || newestAt === null ? null : formatAgo(newestAt),
     newestLine: newestLineFor(extras, status, translate),
     actions: {
       // Only a permission wait can be answered from the widget, so the button
@@ -165,26 +201,46 @@ export function buildAndroidWidgetProps(
 }
 
 /** Every redraw checks the data deadline, including a task queued by an older alarm. */
+// eslint-disable-next-line max-params -- snapshot, the translator, and the two injected formatters
 export function buildCurrentWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   translate: (key: string) => string,
-  formatCount: GlanceableCountFormat = String
+  formatCount: GlanceableCountFormat,
+  formatAgo: GlanceableAgoFormat
 ): AndroidWidgetProps {
   const expiresAt = Date.parse(snapshot.expiresAt);
   if (
     (snapshot.status === 'happy' || snapshot.status === 'stale') &&
     (!Number.isFinite(expiresAt) || expiresAt <= Date.now())
   ) {
-    return buildExpiredWidgetProps(snapshot, translate, formatCount);
+    return buildExpiredWidgetProps(snapshot, translate, formatCount, formatAgo);
   }
-  return buildAndroidWidgetProps(snapshot, {}, translate, formatCount);
+  // The Android twin of the iOS stale timeline frame: a redraw past
+  // `updatedAt + GLANCEABLE_STALE_MS` stops asserting the counts are current.
+  // The counts stay — they are still the last thing the device knew — and only
+  // the age goes. The platform's own redraw is what runs this check, so the
+  // claim stays honest without the app running. The deadline above wins, so a
+  // lapsed snapshot past `expiresAt` still draws the expired frame.
+  const staleAt = Date.parse(snapshot.updatedAt) + GLANCEABLE_STALE_MS;
+  if (snapshot.status === 'happy' && staleAt <= Date.now()) {
+    return buildAndroidWidgetProps(
+      { ...snapshot, status: 'stale' },
+      {},
+      translate,
+      formatCount,
+      formatAgo
+    );
+  }
+  return buildAndroidWidgetProps(snapshot, {}, translate, formatCount, formatAgo);
 }
 
 /** Zero-count expired props: the single future redraw hides counts at expiresAt. */
+// eslint-disable-next-line max-params -- snapshot, the translator, and the two injected formatters
 function buildExpiredWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   translate: (key: string) => string,
-  formatCount: GlanceableCountFormat
+  formatCount: GlanceableCountFormat,
+  formatAgo: GlanceableAgoFormat
 ): AndroidWidgetProps {
   return buildAndroidWidgetProps(
     {
@@ -197,7 +253,8 @@ function buildExpiredWidgetProps(
     },
     {},
     translate,
-    formatCount
+    formatCount,
+    formatAgo
   );
 }
 
@@ -208,6 +265,10 @@ export function buildGenericWidgetProps(translate: (key: string) => string): And
     statusLine: empty,
     countLines: [],
     primaryLabel: null,
+    newestResultKind: null,
+    newestResultTitle: null,
+    newestResultLabel: null,
+    newestResultAgo: null,
     newestLine: null,
     // No snapshot means no state to act on: the placeholder offers nothing.
     actions: {
@@ -222,14 +283,18 @@ export function buildGenericWidgetProps(translate: (key: string) => string): And
 
 /**
  * Ongoing notification: every ranked count, with a warning when stale, otherwise
- * the locked status copy. Never a title, organization name, or id.
+ * the locked status copy. A pending action notice (an approve attempt that has
+ * to be retried) prefixes the line, separated by a space because the notice is
+ * a full sentence; the compact and promoted surfaces never carry it. Never a
+ * title, organization name, or id.
  */
-// eslint-disable-next-line max-params -- snapshot, flags, and the two injected formatters
+// eslint-disable-next-line max-params -- snapshot, flags, the two injected formatters, and the notice
 export function buildOngoingNotificationText(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
   translate: (key: string) => string,
-  formatCount: GlanceableCountFormat = String
+  formatCount: GlanceableCountFormat = String,
+  notice: string | null = null
 ): string {
   const status = resolveGlanceableStatus(snapshot, flags);
   if (status === 'happy' || status === 'stale') {
@@ -240,26 +305,12 @@ export function buildOngoingNotificationText(
       const counts = lines
         .map(line => `${formatCount(line.count)} ${translate(line.key)}`)
         .join(', ');
-      return status === 'stale' ? `${translate('glanceable.stale')}, ${counts}` : counts;
+      const text = status === 'stale' ? `${translate('glanceable.stale')}, ${counts}` : counts;
+      return notice === null ? text : `${notice} ${text}`;
     }
   }
-  return translate(glanceableStatusCopyKey(snapshot, flags) ?? 'glanceable.empty');
-}
-
-/**
- * The ongoing notification's Approve action label, or null when no action must
- * be offered.
- *
- * Only a session waiting on a permission prompt can be approved without
- * choosing an option, and `needsApproval` counts exactly those rows — an older
- * producer omits the field, so absent reads as zero. A `question` or `retry`
- * wait therefore gets no action, and neither does an empty surface.
- */
-export function buildApproveLabel(
-  snapshot: GlanceableAgentsSnapshot,
-  translate: (key: string) => string
-): string | null {
-  return (snapshot.needsApproval ?? 0) > 0 ? translate('common.approve') : null;
+  const text = translate(glanceableStatusCopyKey(snapshot, flags) ?? 'glanceable.empty');
+  return notice === null ? text : `${notice} ${text}`;
 }
 
 /** The promoted chip shows only the primary number; the full text keeps all labels. */

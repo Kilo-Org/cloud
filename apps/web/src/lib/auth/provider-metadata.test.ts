@@ -29,7 +29,7 @@ describe('OpenAI provider metadata', () => {
     expect(getProviderById('openai')).toMatchObject({
       id: 'openai',
       name: 'ChatGPT',
-      signInLabel: 'Sign in with ChatGPT',
+      signInLabel: 'Continue with ChatGPT',
     });
     expect(OAuthProviderIds).toContain('openai');
     expect(ProdNonSSOAuthProviders).toContain('openai');

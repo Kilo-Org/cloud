@@ -22,6 +22,10 @@ import type { OpenAiChatGptStatus } from '@/lib/ai-gateway/openai-chatgpt/status
 /** Where the connect call returns after OpenAI redirects back to the app. */
 const BYOK_PATH = '/byok';
 
+function byokPath(organizationId: string | undefined): string {
+  return organizationId ? `/organizations/${organizationId}/byok` : BYOK_PATH;
+}
+
 /**
  * The query parameter the OpenAI callback route appends when an authorization
  * is declined or fails (see `apps/web/src/app/auth/openai/callback/route.ts`).
@@ -37,6 +41,14 @@ const CARD_TITLE = 'OpenAI (ChatGPT subscription)';
 
 const CONNECT_DESCRIPTION =
   'Connect with your ChatGPT subscription to use OpenAI models in Kilo. No API key needed.';
+/**
+ * The organization variant. The connection is personal, so the copy must not
+ * read as an organization-wide setting that one member configures for everyone.
+ */
+const ORGANIZATION_CONNECT_DESCRIPTION =
+  'Connect your own ChatGPT subscription. This connection is yours and applies only to your requests in this organization.';
+const ORGANIZATION_SCOPE_NOTE =
+  'This connection is yours and applies only to your requests in this organization.';
 const CONNECT_LABEL = 'Sign in with ChatGPT';
 const RECONNECT_LABEL = 'Reconnect with ChatGPT';
 const TRY_AGAIN_LABEL = 'Try again';
@@ -100,13 +112,20 @@ function openAiChatGptAuthErrorMessage(code: string): string {
  * signed-in person, then the OpenAI authorization with the token-sharing
  * scope. The linking session is what lets the callback attach this identity to
  * the current account (and skip the sign-in Turnstile gate); it must succeed
- * before the browser leaves for OpenAI.
+ * before the browser leaves for OpenAI. When `organizationId` is set, the
+ * linking session records the organization and the callback returns to its BYOK
+ * page.
  */
 export async function startOpenAiChatGptConnect(
-  createLinkingSession: () => Promise<unknown>
+  createLinkingSession: () => Promise<unknown>,
+  organizationId?: string
 ): Promise<void> {
   await createLinkingSession();
-  await signIn('openai', { callbackUrl: BYOK_PATH }, { scope: OPENAI_TOKEN_SHARING_SCOPE });
+  await signIn(
+    'openai',
+    { callbackUrl: byokPath(organizationId) },
+    { scope: OPENAI_TOKEN_SHARING_SCOPE }
+  );
 }
 
 /** The email claim, or the issuer-scoped subject when the token has no email. */
@@ -132,6 +151,8 @@ export type OpenAiChatGptCardViewProps = {
   onRetry?: () => void;
   isConnecting?: boolean;
   isDisconnecting?: boolean;
+  /** Organization scope: the connection is the member's own, not the organization's. */
+  isOrganization?: boolean;
 };
 
 /**
@@ -208,6 +229,7 @@ function CardBody({
   onRetry,
   isConnecting,
   isDisconnecting,
+  isOrganization,
 }: OpenAiChatGptCardViewProps) {
   if (hasLoadError) {
     return (
@@ -292,7 +314,9 @@ function CardBody({
     // branch above, so this body is only reached without an error code.
     return (
       <>
-        <p className="type-body text-muted-foreground">{CONNECT_DESCRIPTION}</p>
+        <p className="type-body text-muted-foreground">
+          {isOrganization ? ORGANIZATION_CONNECT_DESCRIPTION : CONNECT_DESCRIPTION}
+        </p>
         <Button size="sm" className={CARD_ACTION_CLASS} onClick={onConnect} disabled={isConnecting}>
           {isConnecting ? CONNECTING_LABEL : CONNECT_LABEL}
         </Button>
@@ -309,6 +333,9 @@ function CardBody({
             <p className="type-body text-muted-foreground">
               Connected on {new Date(status.connectedAt).toLocaleDateString()}
             </p>
+          ) : null}
+          {isOrganization ? (
+            <p className="type-body text-muted-foreground">{ORGANIZATION_SCOPE_NOTE}</p>
           ) : null}
         </div>
         <Button
@@ -363,7 +390,7 @@ export function OpenAiChatGptCardView(props: OpenAiChatGptCardViewProps) {
   );
 }
 
-function OpenAiChatGptCardConnected() {
+function OpenAiChatGptCardConnected({ organizationId }: { organizationId?: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -377,21 +404,23 @@ function OpenAiChatGptCardConnected() {
   // the button look idle (and clickable) while the redirect is still in flight.
   const [isConnecting, setIsConnecting] = useState(false);
 
+  const ownerInput = organizationId ? { organizationId } : {};
+
   // Show the returned error once, then strip it from the URL so a refresh does
   // not repeat the message.
   useEffect(() => {
     if (!openaiError) return;
     setAuthErrorCode(openaiError);
-    router.replace(BYOK_PATH);
-  }, [openaiError, router]);
+    router.replace(byokPath(organizationId));
+  }, [openaiError, organizationId, router]);
 
-  const statusQuery = useQuery(trpc.openAiChatGpt.status.queryOptions());
+  const statusQuery = useQuery(trpc.openAiChatGpt.status.queryOptions(ownerInput));
   const disconnectMutation = useMutation(
     trpc.openAiChatGpt.disconnect.mutationOptions({
       onSuccess: () => {
         setHasDisconnectError(false);
         void queryClient.invalidateQueries({
-          queryKey: trpc.openAiChatGpt.status.queryKey(),
+          queryKey: trpc.openAiChatGpt.status.queryKey(ownerInput),
         });
       },
       onError: () => {
@@ -407,19 +436,23 @@ function OpenAiChatGptCardConnected() {
     // new attempt.
     setAuthErrorCode(null);
     setIsConnecting(true);
-    void startOpenAiChatGptConnect(() => linkMutation.mutateAsync({ provider: 'openai' })).catch(
-      () => {
-        // Only a failed attempt releases the busy state; a successful one
-        // navigates away with the label still pending.
-        setIsConnecting(false);
-        setAuthErrorCode(CONNECT_FAILED_CODE);
-      }
-    );
+    void startOpenAiChatGptConnect(
+      () =>
+        linkMutation.mutateAsync(
+          organizationId ? { provider: 'openai', organizationId } : { provider: 'openai' }
+        ),
+      organizationId
+    ).catch(() => {
+      // Only a failed attempt releases the busy state; a successful one
+      // navigates away with the label still pending.
+      setIsConnecting(false);
+      setAuthErrorCode(CONNECT_FAILED_CODE);
+    });
   };
 
   const handleDisconnect = () => {
     setHasDisconnectError(false);
-    disconnectMutation.mutate();
+    disconnectMutation.mutate(ownerInput);
   };
 
   const handleRetryLoad = () => {
@@ -437,16 +470,21 @@ function OpenAiChatGptCardConnected() {
       onRetry={handleRetryLoad}
       isConnecting={isConnecting}
       isDisconnecting={disconnectMutation.isPending}
+      isOrganization={Boolean(organizationId)}
     />
   );
 }
 
-export function OpenAiChatGptCard() {
+export function OpenAiChatGptCard({ organizationId }: { organizationId?: string }) {
   // `useSearchParams` needs a Suspense boundary; the fallback is the card's own
   // loading state, so the reserved height covers it too.
   return (
-    <Suspense fallback={<OpenAiChatGptCardView status={undefined} />}>
-      <OpenAiChatGptCardConnected />
+    <Suspense
+      fallback={
+        <OpenAiChatGptCardView status={undefined} isOrganization={Boolean(organizationId)} />
+      }
+    >
+      <OpenAiChatGptCardConnected organizationId={organizationId} />
     </Suspense>
   );
 }

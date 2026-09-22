@@ -53,10 +53,69 @@ const storage = vi.hoisted(() => ({ getItemAsync: vi.fn(), setItemAsync: vi.fn()
 const catalogs = vi.hoisted(() => ({ fr: vi.fn() }));
 const announcements = vi.hoisted(() => vi.fn());
 const platform = vi.hoisted(() => ({ OS: 'ios' }));
-const lifecycle = vi.hoisted(() => ({
-  change: undefined as ((state: AppStateStatus) => void) | undefined,
+// The route the mocked expo-router reports, shaped like production: segments
+// carry the group names, the pathname strips them. Defaults to a screen
+// pushed over the tabs, where no tab bar is on screen.
+const route = vi.hoisted(() => ({
+  segments: ['(app)', 'agent-chat'] as string[],
+  pathname: '/agent-chat',
 }));
-export { announcements, catalogs, lifecycle, native, platform, storage };
+// AppState has more than one subscriber on this screen (the query client
+// lifecycle and the keyboard-lift hooks), so the harness keeps every listener
+// and broadcasts to all of them. A single slot let the last registration
+// shadow the earlier ones, which hid the stale-lift defect these mounted tests
+// exist to catch. Ported from the closed #6392.
+const lifecycle = vi.hoisted(() => {
+  const listeners = new Set<(state: AppStateStatus) => void>();
+  return {
+    listeners,
+    change: (state: AppStateStatus) => {
+      for (const listener of listeners) {
+        listener(state);
+      }
+    },
+  };
+});
+const keyboard = vi.hoisted(() => {
+  // Keyboard has more than one subscriber in production: `AppRootProviders`
+  // mounts the Toaster's shared keyboard hook alongside a screen's, so the mock
+  // keeps every listener in a set per direction. One slot per direction let the
+  // last registration shadow the earlier ones, and a `remove()` that cleared
+  // both slots detached a listener it did not own. The AppState mock below is a
+  // set for the same reason. Same signature for both directions; `hide` is
+  // dispatched with an empty payload.
+  const showListeners = new Set<(event: { endCoordinates: { height: number } }) => void>();
+  const hideListeners = new Set<(event: { endCoordinates: { height: number } }) => void>();
+  const addListener = (
+    event: string,
+    listener: (event: { endCoordinates: { height: number } }) => void
+  ) => {
+    const listeners =
+      event === 'keyboardDidShow' || event === 'keyboardWillShow' ? showListeners : hideListeners;
+    listeners.add(listener);
+    return {
+      remove: () => {
+        listeners.delete(listener);
+      },
+    };
+  };
+  return {
+    addListener,
+    showListeners,
+    hideListeners,
+    show: (event: { endCoordinates: { height: number } }) => {
+      for (const listener of showListeners) {
+        listener(event);
+      }
+    },
+    hide: () => {
+      for (const listener of hideListeners) {
+        listener({ endCoordinates: { height: 0 } });
+      }
+    },
+  };
+});
+export { announcements, catalogs, keyboard, lifecycle, native, platform, route, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
@@ -72,16 +131,20 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platform,
+  useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
   StatusBar: { currentHeight: 0 },
   I18nManager: { isRTL: false },
   AccessibilityInfo: { announceForAccessibility: announcements },
+  Keyboard: {
+    addListener: keyboard.addListener,
+  },
   AppState: {
     currentState: 'active',
     addEventListener: (_event: string, listener: (state: AppStateStatus) => void) => {
-      lifecycle.change = listener;
+      lifecycle.listeners.add(listener);
       return {
         remove: () => {
-          lifecycle.change = undefined;
+          lifecycle.listeners.delete(listener);
         },
       };
     },
@@ -135,9 +198,9 @@ vi.mock('expo-router', () => ({
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
-  usePathname: () => '/(app)/(tabs)/(0_home)',
+  usePathname: () => route.pathname,
   useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
-  useSegments: () => ['(app)', '(tabs)', '(3_profile)', 'organization'],
+  useSegments: () => route.segments,
 }));
 vi.mock('@expo/react-native-action-sheet', () => ({ ActionSheetProvider: 'ActionSheetProvider' }));
 vi.mock('@rn-primitives/portal', () => ({ PortalHost: 'PortalHost' }));
@@ -148,6 +211,11 @@ vi.mock('sonner-native', () => ({ Toaster: 'Toaster' }));
 vi.mock('@/lib/auth/auth-context', () => ({ AuthProvider: 'AuthProvider' }));
 vi.mock('@/lib/glanceable/org-fence', () => ({ useGlanceableOrgFence: () => undefined }));
 vi.mock('@/lib/glanceable/mount', () => ({ GlanceablePublisherMount: () => null }));
+// The second OS-surface publisher in the (app) layout. It renders nothing and
+// needs the org/session hooks this harness does not provide, so it is stubbed
+// like the glanceable mount — and the stub keeps its `expo` root import (which
+// needs `__DEV__` and a native binding) out of this DOM-free harness.
+vi.mock('@/components/launcher-surfaces-mount', () => ({ LauncherSurfacesMount: () => null }));
 vi.mock('@/lib/organization-context', () => ({ OrganizationProvider: 'OrganizationProvider' }));
 vi.mock('@/components/offline-banner', () => ({ OfflineBanner: 'OfflineBanner' }));
 vi.mock('@/lib/query-client-lifecycle', () => ({
@@ -175,7 +243,16 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({ useCurrentUserId: () => ({ userId: null }) }));
-vi.mock('@/lib/form-sheet', () => ({ useFormSheetDetents: () => ({ fullSheetDetent: 1 }) }));
+vi.mock('@/lib/form-sheet', () => ({
+  useFormSheetDetents: () => ({ fullSheetDetent: 1 }),
+  useFormSheetScreenOptions: () => ({
+    presentation: 'formSheet',
+    sheetAllowedDetents: [0.5, 1],
+    sheetGrabberVisible: true,
+    headerShown: false,
+    sheetShouldOverflowTopInset: true,
+  }),
+}));
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 vi.mock('@/lib/hooks/use-security-lifecycle-invalidation', () => ({
   useSecurityLifecycleInvalidation: vi.fn(),
@@ -200,8 +277,17 @@ vi.mock('@/components/share/share-payload-navigator', () => ({
 vi.mock('@/lib/active-sessions-live-sync-mount', () => ({
   ActiveSessionsLiveSyncMount: 'ActiveSessionsLiveSyncMount',
 }));
+vi.mock('@/lib/artifacts/artifact-mirror-sync-mount', () => ({
+  ArtifactMirrorSyncMount: 'ArtifactMirrorSyncMount',
+}));
 vi.mock('@/lib/persist/cache-persistence-mount', () => ({
   CachePersistenceMount: 'CachePersistenceMount',
+}));
+vi.mock('@/lib/system-search-index-mount', () => ({
+  SystemSearchIndexMount: 'SystemSearchIndexMount',
+}));
+vi.mock('@/lib/tool-summary-translation/tool-summary-translation-retry-mount', () => ({
+  ToolSummaryTranslationRetryMount: 'ToolSummaryTranslationRetryMount',
 }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/pr-review/pr-review-connect-gate', () => ({
@@ -279,6 +365,11 @@ export function resetUnlockMocks() {
   vi.stubGlobal('__DEV__', true);
   vi.resetAllMocks();
   platform.OS = 'ios';
+  route.segments = ['(app)', 'agent-chat'];
+  route.pathname = '/agent-chat';
+  lifecycle.listeners.clear();
+  keyboard.showListeners.clear();
+  keyboard.hideListeners.clear();
   storage.getItemAsync.mockResolvedValue('enabled');
   native.hasHardwareAsync.mockResolvedValue(true);
   native.isEnrolledAsync.mockResolvedValue(true);

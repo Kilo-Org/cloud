@@ -1,6 +1,10 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import 'server-only';
-import { validateAuthorizationHeader, JWT_TOKEN_VERSION } from '@/lib/tokens';
+import {
+  validateAuthorizationHeader,
+  JWT_TOKEN_VERSION,
+  isRejectedCredentialReason,
+} from '@/lib/tokens';
 import {
   CloudAgentNextRuntimeAuthorizationClaimSchema,
   RuntimeProxyAttestationAudienceSchema,
@@ -34,6 +38,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { allow_fake_login, IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
+import { consumeSignInTicket } from '@/lib/auth/passkey';
 import { redirect } from 'next/navigation';
 import { IMPACT_CLICK_ID_COOKIE } from '@/lib/impact/affiliate-utils';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
@@ -80,6 +85,7 @@ import {
   isOpenAiTokenSharingGrant,
 } from '@/lib/auth/openai/config';
 import { saveOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
+import type { OpenAiChatGptOwner } from '@/lib/ai-gateway/openai-chatgpt/store';
 import {
   GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET,
@@ -305,19 +311,28 @@ async function persistOpenAiChatGptConnection(
     if (!isOpenAiTokenSharingGrant(account)) return;
 
     const email = (profile as { email?: unknown } | undefined)?.email;
-    await saveOpenAiChatGptConnection(userId, {
-      access_token: accessToken,
-      ...(account.refresh_token ? { refresh_token: account.refresh_token } : {}),
-      expires_at: account.expires_at ?? Math.floor(Date.now() / 1000) + 3600,
-      ...(account.scope ? { scope: account.scope } : {}),
-      ...(account.token_type ? { token_type: account.token_type } : {}),
-      issuer: OPENAI_ISSUER,
-      client_id: OPENAI_CLIENT_ID,
-      subject,
-      ...(typeof email === 'string' && email ? { email } : {}),
-      connected_at: new Date().toISOString(),
-      status: 'connected',
-    });
+    const organizationId = (profile as ExtendedProfile | undefined)?.openAiChatGptOrganizationId;
+    const owner: OpenAiChatGptOwner = {
+      kiloUserId: userId,
+      organizationId: organizationId ?? null,
+    };
+    await saveOpenAiChatGptConnection(
+      owner,
+      {
+        access_token: accessToken,
+        ...(account.refresh_token ? { refresh_token: account.refresh_token } : {}),
+        expires_at: account.expires_at ?? Math.floor(Date.now() / 1000) + 3600,
+        ...(account.scope ? { scope: account.scope } : {}),
+        ...(account.token_type ? { token_type: account.token_type } : {}),
+        issuer: OPENAI_ISSUER,
+        client_id: OPENAI_CLIENT_ID,
+        subject,
+        ...(typeof email === 'string' && email ? { email } : {}),
+        connected_at: new Date().toISOString(),
+        status: 'connected',
+      },
+      userId
+    );
   } catch (error) {
     captureException(error, {
       tags: { operation: 'openai_chatgpt_connection_persist' },
@@ -519,6 +534,33 @@ function createEmailAccountInfo(
   };
 }
 
+/**
+ * A passkey sign-in is resolved by its ticket, so the credentials `authorize`
+ * returns the Kilo user id as the account id and this is the identity the
+ * provider carries. A passkey never owns a `user_auth_provider` row: the
+ * credential lives in `passkey_credentials`, keyed by user id.
+ */
+function createPasskeyAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'passkey') return null;
+  assert(user.email, 'User email is required for passkey auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || user.email.split('@')[0],
+    google_user_image_url: user.image || '',
+    // Never used for a passkey: the sign-in callback returns before user
+    // settlement and the jwt callback resolves the account by user id without
+    // rewriting its hosted domain.
+    hosted_domain: getLowerDomainFromEmail(user.email) ?? null,
+    provider: 'passkey',
+    provider_account_id: account.providerAccountId,
+    display_name: null,
+  };
+}
+
 function createAccountInfo(
   account: Account,
   user: NextUser | AdapterUser,
@@ -534,6 +576,7 @@ function createAccountInfo(
     createLinkedInAccountInfo(account, user) ??
     createDiscordAccountInfo(account, user) ??
     createEmailAccountInfo(account, user) ??
+    createPasskeyAccountInfo(account, user) ??
     createFakeAccountInfo(account, user) ??
     createSSOAccountInfo(account, user, profile);
 
@@ -675,6 +718,7 @@ async function getImpactTrackingContextFromAuthFlow(requestHeaders?: Headers): P
 
 type ExtendedProfile = Profile & {
   isNewUser?: boolean; // Add isNewUser to the user type
+  openAiChatGptOrganizationId?: string;
 };
 
 const posthogClient = PostHogClient();
@@ -854,6 +898,40 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
+    // Passkey sign-in. The authenticate route verifies the WebAuthn assertion
+    // against a server-stored challenge and mints a one-time ticket; redeeming
+    // that ticket here is the identity proof, so `authorize` only exchanges it.
+    CredentialsProvider({
+      id: 'passkey',
+      name: 'Passkey',
+      credentials: {
+        ticket: { label: 'Ticket', type: 'text' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.ticket) {
+          return null;
+        }
+
+        const ticket = await consumeSignInTicket(credentials.ticket);
+        if (!ticket) {
+          // Unknown, expired, or already redeemed: a replayed ticket yields no
+          // user, so NextAuth mints no session for it.
+          return null;
+        }
+
+        const user = await findUserById(ticket.kilo_user_id);
+        if (!user) {
+          return null;
+        }
+
+        return {
+          id: user.id,
+          email: user.google_user_email,
+          name: user.google_user_name || user.google_user_email.split('@')[0],
+          image: user.google_user_image_url,
+        };
+      },
+    }),
     // Fake login provider for development and testing
     ...(allow_fake_login
       ? [
@@ -924,6 +1002,19 @@ export const authOptions: NextAuthOptions = {
 
         isAccountLinking = linkingSession && linkingSession.targetProvider === accountInfo.provider;
 
+        // The linking session is consumed here, so it carries the organization
+        // through to the jwt callback on the profile, the same way `isNewUser`
+        // travels. Only an OpenAI link stores an organization-scoped
+        // connection, so the session must have targeted OpenAI.
+        if (
+          account.provider === 'openai' &&
+          linkingSession?.targetProvider === 'openai' &&
+          linkingSession.organizationId &&
+          profile
+        ) {
+          (profile as ExtendedProfile).openAiChatGptOrganizationId = linkingSession.organizationId;
+        }
+
         // if a user's email domain matches any organization's SSO domain and they are not logging in with SSO, force them to use SSO immediately
         const domain = getLowerDomainFromEmail(accountInfo.google_user_email);
 
@@ -963,7 +1054,13 @@ export const authOptions: NextAuthOptions = {
 
         // we don't need to check gmail domains for SSO for now.
         // This is mostly an optimization so we don't hit the DB on every gmail login since they defacto aren't using SSO
-        if (domainToCheck !== 'gmail.com') {
+        //
+        // Account linking is not a sign-in: the person is already
+        // authenticated and is only attaching another provider. Enforcing the
+        // domain SSO policy here would redirect them to the sign-in page and
+        // abort the link, so a BYOK connection (for example "Sign in with
+        // ChatGPT") would never be stored for an SSO-protected domain.
+        if (domainToCheck !== 'gmail.com' && !isAccountLinking) {
           // Fake login is intentionally exempt in supported non-production environments.
           if (accountInfo.provider !== 'workos' && accountInfo.provider !== 'fake-login') {
             const ssoAuthority = await resolveSsoAuthorityForDomain(domainToCheck);
@@ -977,6 +1074,15 @@ export const authOptions: NextAuthOptions = {
               return ssoSignInRedirectUrl(domainToCheck);
             }
           }
+        }
+
+        // A redeemed passkey ticket already proved identity, so a passkey skips
+        // both Turnstile and user settlement. This return sits after the domain
+        // blacklist and SSO-authority checks above, so a passkey can never
+        // bypass a domain that enforces SSO. No `user_auth_provider` row is
+        // written for a passkey: the jwt callback resolves it by user id.
+        if (accountInfo.provider === 'passkey') {
+          return true;
         }
 
         const requestHeaders = await headers();
@@ -1260,6 +1366,16 @@ type GetAuthResponse =
   | {
       user: null;
       authFailedResponse: NextResponse<FailureResult<string>>;
+      /**
+       * True when the request presented a credential that failed verification,
+       * rather than presenting none. Such a request must not be downgraded to
+       * an anonymous identity; see `isRejectedCredentialReason`.
+       *
+       * `authError` always sets this. It is optional only so existing callers
+       * that construct a failure result directly keep compiling; absent means
+       * false.
+       */
+      credentialsRejected?: boolean;
       isNewUser?: undefined;
       organizationId?: undefined;
       internalApiUse?: undefined;
@@ -1270,6 +1386,7 @@ type GetAuthResponse =
   | {
       user: User;
       authFailedResponse: null;
+      credentialsRejected?: undefined;
       isNewUser?: boolean;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
@@ -1391,7 +1508,7 @@ async function resolveUserFromAuth(
     try {
       decoded = bearer ? jwt.decode(bearer) : null;
     } catch {
-      return authError(401, 'Invalid API token', '?');
+      return authError(401, 'Invalid API token', '?', { credentialsRejected: true });
     }
     const decodedPayload = decoded !== null && typeof decoded !== 'string' ? decoded : null;
     const decodedRuntimeAuthorization = decodedPayload?.runtimeAuthorization;
@@ -1421,7 +1538,9 @@ async function resolveUserFromAuth(
       runtimeProxyAttestationVerified,
     });
     if (authorizationValidationResult.error != undefined) {
-      return authError(401, authorizationValidationResult.error, '?');
+      return authError(401, authorizationValidationResult.error, '?', {
+        credentialsRejected: isRejectedCredentialReason(authorizationValidationResult.reason),
+      });
     }
 
     const user = await findUserById(authorizationValidationResult.kiloUserId, readDb);
@@ -1430,7 +1549,7 @@ async function resolveUserFromAuth(
       user?.api_token_pepper &&
       user.api_token_pepper !== authorizationValidationResult.apiTokenPepper
     ) {
-      return authError(401, 'Invalid API token', user.id);
+      return authError(401, 'Invalid API token', user.id, { credentialsRejected: true });
     }
     // A token-bound organization is signed; the request header is mutable.
     // Legacy and personal tokens intentionally continue to use the header.
@@ -1523,17 +1642,27 @@ async function appendCallbackPath(url: string): Promise<string> {
   const headersList = await headers();
   const pathname = headersList.get('x-pathname');
   if (pathname && pathname !== '/') {
+    // Keep the request's query in the callback so a resume link does not lose
+    // its `?at=` anchor across sign-in (see the `/cloud/sessions/<id>` route,
+    // whose layout redirects before the page can build its own callbackPath).
+    const search = headersList.get('x-search') ?? '';
     const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}callbackPath=${encodeURIComponent(pathname)}`;
+    return `${url}${separator}callbackPath=${encodeURIComponent(`${pathname}${search}`)}`;
   }
   return url;
 }
 
-function authError(status: number, error: string, kiloUserId: string) {
+function authError(
+  status: number,
+  error: string,
+  kiloUserId: string,
+  options?: { credentialsRejected?: boolean }
+) {
   console.warn(`AUTH-FAIL ${status} (${kiloUserId}): ${error}`);
   return {
     user: null,
     authFailedResponse: NextResponse.json(failureResult(error), { status }),
+    credentialsRejected: options?.credentialsRejected ?? false,
   };
 }
 

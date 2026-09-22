@@ -1,6 +1,7 @@
 /* eslint-disable require-await, @typescript-eslint/require-await -- injectable query/sleep fakes settle without await */
 /* eslint-disable max-lines -- the manager suite pins retry cadence and attachment mints in one file. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createStore } from 'jotai';
 import { RequestDeadlineError } from '@kilocode/event-service';
 
 import { type AgentAttachmentSubmissionPayload } from '@/lib/agent-attachments/agent-attachment-types';
@@ -46,12 +47,11 @@ vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
   fetchMobileSessionSnapshotPage: vi.fn(),
 }));
-// The transcript cache owns the encrypted KV (SQLCipher) chain; this suite is
-// pure and only needs the call seams.
-vi.mock('@/lib/persist/session-transcript-cache', () => ({
-  readSessionTranscriptPage: vi.fn(async () => null),
-  writeSessionTranscriptPage: vi.fn(async () => undefined),
-  clearSessionTranscriptPage: vi.fn(async () => undefined),
+// The resolved-delivery-failure memory owns the encrypted KV (SQLCipher)
+// chain; this suite is pure and only needs the call seam.
+vi.mock('@/lib/persist/resolved-delivery-failures', () => ({
+  readResolvedDeliveryFailures: vi.fn(async () => []),
+  persistResolvedDeliveryFailure: vi.fn(async () => undefined),
 }));
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.test',
@@ -68,6 +68,11 @@ vi.mock('@/components/agents/tool-card-image-cache', () => ({
 vi.mock('@/components/agents/file-part-cache', () => ({
   cacheFilePart: vi.fn(),
 }));
+// The shared answer path is a sibling module whose pure suite covers its body;
+// this suite only pins the manager's wiring to it. Mocking it keeps this suite
+// free of the transient native imports `approve-ask` pulls (secure store,
+// widgets) and of the sibling record store.
+vi.mock('@/lib/glanceable/approve-ask', () => ({ answerSessionPermission: vi.fn() }));
 
 const mutate = vi.fn();
 const prepareSessionMutate = vi.fn();
@@ -101,6 +106,9 @@ vi.mock('@/lib/trpc', () => ({
 
 const { buildRemoteAttachmentParts } =
   await import('@/components/agents/mobile-session-manager-helpers');
+const { answerSessionPermission: mockedAnswerSessionPermission } =
+  await import('@/lib/glanceable/approve-ask');
+const answerSessionPermissionMock = vi.mocked(mockedAnswerSessionPermission);
 const {
   createMobileAgentSessionManager,
   fetchSessionWithNotFoundRetry,
@@ -617,6 +625,117 @@ describe('createMobileAgentSessionManager api.cancelQueuedMessage', () => {
   });
 });
 
+describe('createMobileAgentSessionManager organization adoption', () => {
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+    getWithRuntimeStateQuery.mockReset();
+    cancelQueuedMessageMutate.mockReset();
+  });
+
+  function setup(organizationId?: string): SessionManagerConfig {
+    const options = {
+      store: {},
+      userWebConnection: {},
+      ...(organizationId ? { organizationId } : {}),
+    };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    return config;
+  }
+
+  async function expectCancelOrganization(
+    config: SessionManagerConfig,
+    organizationId: string
+  ): Promise<void> {
+    cancelQueuedMessageMutate.mockResolvedValue({ dropped: true });
+    const cancel = config.api.cancelQueuedMessage;
+    if (!cancel) {
+      throw new Error('expected cancelQueuedMessage api');
+    }
+    const input = { sessionId: 'c-1', messageId: 'm-1' };
+    await cancel(input as never);
+
+    expect(cancelQueuedMessageMutate).toHaveBeenCalledWith(
+      { sessionId: 'c-1', messageId: 'm-1', organizationId },
+      { context: { skipBatch: true } }
+    );
+  }
+
+  it('adopts the organization its metadata read resolves when the route supplied none', async () => {
+    // The route mounted before its metadata read settled (offline or stalled)
+    // and handed in no scope. The manager's own read resolves it a beat later;
+    // org-scoped requests must carry it without recreating the manager.
+    getWithRuntimeStateQuery.mockResolvedValue({ organization_id: 'org-1', runtimeState: null });
+    const config = setup();
+
+    await config.fetchSession(SESSION_ID);
+
+    await expectCancelOrganization(config, 'org-1');
+  });
+
+  it('keeps the explicit route organization over the one its read names', async () => {
+    getWithRuntimeStateQuery.mockResolvedValue({ organization_id: 'org-2', runtimeState: null });
+    const config = setup('org-1');
+
+    await config.fetchSession(SESSION_ID);
+
+    await expectCancelOrganization(config, 'org-1');
+  });
+});
+
+describe('createMobileAgentSessionManager api.respondToPermission', () => {
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+    answerSessionPermissionMock.mockReset();
+  });
+
+  function setup(organizationId?: string): SessionManagerConfig {
+    const options = {
+      store: {},
+      userWebConnection: {},
+      ...(organizationId ? { organizationId } : {}),
+    };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    return config;
+  }
+
+  it('answers through the shared answerSessionPermission body', async () => {
+    const config = setup();
+    const input = { sessionId: 'c-1', requestId: 'p-1', response: 'once' };
+    await config.api.respondToPermission(input as never);
+
+    expect(answerSessionPermissionMock).toHaveBeenCalledTimes(1);
+    expect(answerSessionPermissionMock).toHaveBeenCalledWith({
+      cloudAgentSessionId: 'c-1',
+      requestId: 'p-1',
+      response: 'once',
+      organizationId: undefined,
+    });
+  });
+
+  it('passes the manager organization through to the shared body', async () => {
+    const config = setup('org-1');
+    const input = { sessionId: 'c-1', requestId: 'p-1', response: 'always' };
+    await config.api.respondToPermission(input as never);
+
+    expect(answerSessionPermissionMock).toHaveBeenCalledWith({
+      cloudAgentSessionId: 'c-1',
+      requestId: 'p-1',
+      response: 'always',
+      organizationId: 'org-1',
+    });
+  });
+});
+
 describe('isCancelQueuedUpgradeRequired', () => {
   it('returns true for a CLI_UPGRADE_REQUIRED code', () => {
     expect(
@@ -688,5 +807,47 @@ describe('createMobileAgentSessionManager metadata memo', () => {
       cloudAgentSessionId: 'agent_1',
     });
     expect(getSessionQuery).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('createMobileAgentSessionManager cold open', () => {
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+    getWithRuntimeStateQuery.mockReset();
+    getSessionQuery.mockReset();
+    getSessionMessagesQuery.mockReset();
+  });
+
+  it('omits the cached-snapshot reader so a cold open cannot paint stale rows', () => {
+    const options = { store: {}, userWebConnection: {} };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    expect(config.readCachedSnapshotPage).toBeUndefined();
+  });
+
+  it('leaves the transcript empty while the live page has not landed', async () => {
+    const store = createStore();
+    // The live metadata read never settles: the open is still in flight, so the
+    // screen keeps its full-page skeleton instead of painting rows.
+    const pending = Promise.withResolvers<unknown>();
+    getWithRuntimeStateQuery.mockReturnValue(pending.promise);
+    const options = { store, userWebConnection: {} };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    const { createSessionManager } = await import('@kilocode/cloud-agent-sdk/session-manager');
+    const manager = createSessionManager(config);
+
+    void manager.switchSession(SESSION_ID);
+
+    expect(store.get(manager.atoms.messagesList)).toHaveLength(0);
+    expect(store.get(manager.atoms.isLoading)).toBe(true);
+    expect(store.get(manager.atoms.isRefreshingCachedTranscript)).toBe(false);
   });
 });

@@ -163,6 +163,7 @@
     "useDifferentEmail": "Използвай друг имейл",
     "signInWithApple": "Влез с Apple",
     "signInWithGoogle": "Влез с Google",
+    "signInWithPasskey": "Влез с ключ за достъп",
     "emailAddress": "Имейл адрес",
     "emailPlaceholder": "потребител@example.com",
     "continueWithEmail": "Продължи с имейл",
@@ -175,6 +176,10 @@
     "termsConnector": " и ",
     "termsSuffix": ".",
     "moreSignInOptions": "Още опции за влизане",
+    "passkeyCancelled": "Влизането с ключ за достъп беше отменено. Опитайте отново.",
+    "passkeyNotFound": "За това устройство не е запазен ключ за достъп. Влезте вместо това с Apple, Google или имейла си.",
+    "passkeyUnsupported": "Ключовете за достъп не са налични на това устройство. Влезте вместо това с Apple, Google или имейла си.",
+    "passkeyFailed": "Неуспешно влизане с ключ за достъп. Опитайте отново.",
     "couldNotCompleteSignIn": "Не можахме да завършим влизането. Моля, опитай отново.",
     "sessionEnded": "Сесията ти приключи. Влез отново.",
     "signInCodeExpired": "Кодът ти за влизане е изтекъл. Опитай отново.",
@@ -225,7 +230,28 @@
     "providerTestAccount": "Тестов акаунт",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
-    "providerEnterpriseSso": "Корпоративно SSO"
+    "providerEnterpriseSso": "Корпоративно SSO",
+    "passkeysTitle": "Ключове за достъп",
+    "passkeysSubtitle": "Влезте без парола",
+    "passkeysEmpty": "Още няма ключове за достъп",
+    "passkeysEmptyHint": "$t(profile.addPasskey), за да влезете без парола.",
+    "passkeysCouldNotLoad": "Ключовете за достъп не можаха да се заредят",
+    "passkeysLoadFailed": "Ключовете за достъп са недостъпни, докато това не се зареди.",
+    "addPasskey": "Добавяне на ключ за достъп",
+    "passkeyDefaultName": "Ключ за достъп",
+    "passkeyAddedOn": "Добавен {{date}}",
+    "passkeyAdded": "Ключът за достъп е добавен.",
+    "passkeyAddFailed": "Неуспешно добавяне на ключ за достъп. Опитайте отново.",
+    "passkeyAddUnsupported": "Това устройство не може да създава ключове за достъп.",
+    "passkeyAddCancelled": "Създаването на ключа за достъп беше отменено.",
+    "passkeyRemoved": "Ключът за достъп е премахнат.",
+    "passkeyRemoveFailed": "Този ключ за достъп не можа да се премахне. Опитайте отново.",
+    "passkeyRenamed": "Ключът за достъп е преименуван.",
+    "passkeyName": "Име на ключа за достъп",
+    "renamePasskey": "Преименуване на ключа за достъп",
+    "removePasskey": "Премахване на ключа за достъп",
+    "removePasskeyTitle": "Да се премахне ли ключът за достъп?",
+    "removePasskeyMessage": "Вече няма да можете да влезете с този ключ за достъп."
   },
   "preferences": {
     "general": "Общи",
@@ -326,7 +352,7 @@
       "expandMoreLines": "Покажи още {{displayCount}} реда ({{start}}–{{end}})",
       "expandLinesOfContext": "Покажи {{displayCount}} реда от контекста",
       "expandAll": "Разгъни всичко",
-      "expandAllLines": "Разгъни всички {{displayCount}} реда",
+      "expandAllLines": "Разгъни всички редове ({{displayCount}})",
       "loadingMoreFiles": "Зареждане на още файлове…",
       "retryLoadingNextPage": "Опитай отново да заредиш следващата страница",
       "failedToLoadMoreFiles": "Не можахме да заредим още файлове — докосни, за да опиташ отново",
@@ -343,7 +369,17 @@
       "fileLoadedOfTotalCount_other": "Заредени {{displayCount}} от {{total}} файла",
       "filesStillLoading": "Файловете все още се зареждат. Плъзни надолу, за да опресниш.",
       "goToOverview": "Отвори обзора",
-      "goToOverviewTab": "Отвори раздела „Обзор“"
+      "goToOverviewTab": "Отвори раздела „Обзор“",
+      "expandAllLines_one": "Разгъни всички редове ({{displayCount}})",
+      "expandAllLines_other": "Разгъни всички редове ({{displayCount}})",
+      "expandLines_one": "Покажи {{displayCount}} ред ({{start}}–{{end}})",
+      "expandLines_other": "Покажи {{displayCount}} реда ({{start}}–{{end}})",
+      "expandLinesOfContext_one": "Покажи {{displayCount}} ред от контекста",
+      "expandLinesOfContext_other": "Покажи {{displayCount}} реда от контекста",
+      "expandMoreLines_one": "Покажи още {{displayCount}} ред ({{start}}–{{end}})",
+      "expandMoreLines_other": "Покажи още {{displayCount}} реда ({{start}}–{{end}})",
+      "loadedOfTotalFiles_one": "заредени {{loaded}} от {{total}} файла",
+      "loadedOfTotalFiles_other": "заредени {{loaded}} от {{total}} файла"
     },
     "sideBySide": {
       "noNewlineAtEndOfFile": "⚠️ няма нов ред в края на файла",
@@ -533,7 +569,9 @@
         "outdatedOnPath": "Неактуален коментар: {{path}}"
       },
       "deletedUser": "изтрит потребител",
-      "replyForbiddenTerm": "Нямате разрешение да отговаряте в {{term}}."
+      "replyForbiddenTerm": "Нямате разрешение да отговаряте в {{term}}.",
+      "moreLinesAbove_one": "… още {{displayCount}} ред по-горе",
+      "moreLinesAbove_other": "… още {{displayCount}} реда по-горе"
     },
     "couldNotOpenGitHubAppSettings": "Настройките на приложението в GitHub не се отвориха.",
     "installKiloGitHubApp": "Инсталирай приложението Kilo за GitHub",
@@ -706,7 +744,9 @@
       "statusContext": "Контекст",
       "lineLabel": "Ред {{line}}, {{status}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
-      "emptyLine": "(празно)"
+      "emptyLine": "(празно)",
+      "truncationBanner_one": "Показват се първите {{limit}} от {{total}} променени файла поради ограничение на API на GitHub.",
+      "truncationBanner_other": "Показват се първите {{limit}} от {{total}} променени файла поради ограничение на API на GitHub."
     },
     "linkPasteClipboardEmpty": "Клипбордът е празен.",
     "linkPasteNotAPullRequest": "Това не е връзка към заявка за сливане или merge заявка",
@@ -783,11 +823,12 @@
     "previewFullDescription": "Известията показват текста на съобщението на заключения ти екран.",
     "previewGenericDescription": "Известията само съобщават за нова активност. Отвори Kilo, за да прочетеш съобщението.",
     "channel": {
-      "agent": "Сесии с агенти",
+      "agentProgress": "Напредък на агентите",
       "chat": "Съобщения в чата",
       "kiloclaw": "Активност на KiloClaw",
       "balance": "Известия за салдото",
-      "security": "Проблеми със сигурността"
+      "security": "Проблеми със сигурността",
+      "spend": "Известия за разходи"
     },
     "category": {
       "chatMessagesSubtitle": "отговори в разговорите ти",
@@ -798,8 +839,22 @@
       "sessionStatusTitle": "Статус на сесията",
       "sessionStatusSubtitle": "завършена / неуспешна / готова за управление",
       "kiloclawActivitySubtitle": "готова инстанция или грешка, планирани действия",
+      "kiloclawActivityUnavailable": "Стартирай инстанция на KiloClaw, за да получаваш активност от KiloClaw.",
       "balanceAlertsSubtitle": "предупреждения за ниска наличност на организацията",
-      "securityFindingsSubtitle": "нови открити проблеми и напомняния за SLA"
+      "balanceAlertsUnavailable": "Присъедини се към организация, за да получаваш предупреждения за нисък баланс.",
+      "securityFindingsSubtitle": "нови открити проблеми и напомняния за SLA",
+      "securityFindingsUnavailable": "Активирай агента по сигурността на Kilo за даден обхват, за да получаваш проблеми със сигурността.",
+      "spendAlertsSubtitle": "преминаване на прагове и часови скокове",
+      "spendAlertsToggle": "Категория известия за разходи"
+    },
+    "action": {
+      "openSession": "Отваряне на сесия"
+    },
+    "needsInputAction": {
+      "approved": "Заявката е одобрена",
+      "replied": "Отговорът е изпратен",
+      "failed": "Не можа да се отговори. Докоснете отново, за да опитате пак.",
+      "unavailable": "Тази заявка вече не чака."
     }
   },
   "tabs": {
@@ -880,7 +935,9 @@
       "uploadFailed": "Качването завърши неуспешно.",
       "failedToUploadFile": "Не успяхме да качим файла: {{reason}}.",
       "nothingToPaste": "Няма какво да поставиш.",
-      "metadataStripFailed": "Метаданните на снимката не можаха да бъдат премахнати."
+      "metadataStripFailed": "Метаданните на снимката не можаха да бъдат премахнати.",
+      "limit_one": "Можеш да прикачиш до {{displayCount}} файл.",
+      "limit_other": "Можеш да прикачиш до {{displayCount}} файла."
     },
     "attachmentPreview": {
       "accessibility": "{{filename}}, {{status}}",
@@ -1624,7 +1681,11 @@
       "syncFindings": "Синхронизирай проблемите",
       "syncNow": "Синхронизирай сега",
       "syncQueued": "Синхронизацията е добавена в опашката",
-      "syncStatusUnavailable": "Състоянието на синхронизацията не е достъпно."
+      "syncStatusUnavailable": "Състоянието на синхронизацията не е достъпно.",
+      "daysOverdue_one": "Просрочие от {{displayCount}} ден",
+      "daysOverdue_other": "Просрочие от {{displayCount}} дни",
+      "findingsCount_one": "{{displayCount}} проблем",
+      "findingsCount_other": "{{displayCount}} проблема"
     },
     "dashboardMetrics": {
       "openFindings": "Отворени проблеми",
@@ -2021,6 +2082,10 @@
       "couldNotLoad": "Не успяхме да заредим сесията.",
       "failedToLoadDetails": "Не успяхме да заредим подробностите за сесията.",
       "failedToStopExecution": "Не успяхме да спрем изпълнението.",
+      "stopped": "Сесията е спряна",
+      "committing": "Създава се комит…",
+      "committed": "Комитът е създаден",
+      "commitFailed": "Неуспешно създаване на комит",
       "renameSession": "Преименуване на сесията",
       "renamePlaceholder": "Име на сесията",
       "transcriptAccessibility": "Запис на разговора",
@@ -2131,20 +2196,7 @@
       "continueFrom": "Продължаваш сесията {{title}}.",
       "importingSession": "Импортиране на сесията",
       "cliCannotContinue": "Този CLI не може да продължи сесия. Избери Cloud Agent или друг CLI.",
-      "importFailed": "Тази сесия не можа да бъде импортирана.",
-      "sandbox": "Пясъчник",
-      "sandboxAccessibility": "Пясъчник: {{label}}",
-      "sandboxDefaultWithDestination": "По подразбиране · {{destination}}",
-      "sandboxProviderCloudflare": "Cloudflare",
-      "sandboxProviderVercel": "Vercel",
-      "sandboxInstanceSmall": "Малка",
-      "sandboxInstanceShared": "Споделена",
-      "sandboxInstanceLarge": "Голяма",
-      "sandboxInstanceDevcontainer": "Контейнер за разработка",
-      "sandboxInstanceProviderDefault": "По подразбиране от доставчика",
-      "sandboxCouldNotLoad": "Опциите за пясъчника не можаха да се заредят",
-      "sandboxUnavailable": "Този пясъчник е недостъпен. Изберете друг пясъчник или По подразбиране.",
-      "sandboxUseDefault": "Използвай По подразбиране"
+      "importFailed": "Тази сесия не можа да бъде импортирана."
     },
     "partRenderer": {
       "updatedFileCount_one": "Актуализиран е {{displayCount}} файл.",
@@ -2168,7 +2220,14 @@
       "updateTodos": "Актуализирай задачите",
       "linesBadge": "{{displayCount}} реда",
       "filesBadge": "{{displayCount}} файла",
-      "matchesBadge": "{{displayCount}} съвпадения"
+      "matchesBadge": "{{displayCount}} съвпадения",
+      "filesBadge_one": "{{displayCount}} файл",
+      "filesBadge_other": "{{displayCount}} файла",
+      "linesBadge_one": "{{displayCount}} ред",
+      "linesBadge_other": "{{displayCount}} реда",
+      "matchesBadge_one": "{{displayCount}} съвпадение",
+      "matchesBadge_other": "{{displayCount}} съвпадения",
+      "noOutput": "Няма изход."
     },
     "readToolMarkdown": {
       "linesTruncated": "редове {{start}}–{{end}} (съкратено)",
@@ -2458,7 +2517,11 @@
       "files": "Файлове",
       "couldNotOpenPhotoPicker": "Не успяхме да отворим прозореца за избор на снимки. Рестартирай Kilo и опитай отново.",
       "maxFilesAllowed": "Можеш да прикачиш най-много {{displayCount}} файла.",
-      "onlyAddingFiles": "Добавят се само {{accepted}} от {{total}} файла (макс. {{max}})"
+      "onlyAddingFiles": "Добавят се само {{accepted}} от {{total}} файла (макс. {{max}})",
+      "maxFilesAllowed_one": "Можеш да прикачиш най-много {{displayCount}} файл.",
+      "maxFilesAllowed_other": "Можеш да прикачиш най-много {{displayCount}} файла.",
+      "onlyAddingFiles_one": "Добавят се само {{accepted}} от {{total}} файла (макс. {{max}})",
+      "onlyAddingFiles_other": "Добавят се само {{accepted}} от {{total}} файла (макс. {{max}})"
     },
     "composer": {
       "addAttachment": "Прикачи файл",
@@ -2476,7 +2539,9 @@
       "discardAttachmentsMessage": "Качените файлове, които не са прикачени към изпратени съобщения, ще бъдат изтрити.",
       "discardAttachmentsTitle": "Да се премахнат ли прикачените файлове?",
       "charactersRemaining": "Остават {{count}} знака",
-      "insertNewline": "Вмъкни нов ред"
+      "insertNewline": "Вмъкни нов ред",
+      "charactersRemaining_one": "Остава {{count}} знак",
+      "charactersRemaining_other": "Остават {{count}} знака"
     },
     "chatLink": {
       "linkCopied": "Връзката е копирана",
@@ -2548,7 +2613,9 @@
       "stepsCount_one": "{{steps}} стъпка",
       "stepsCount": "{{steps}} стъпки",
       "stepsCount_other": "{{steps}} стъпки",
-      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}"
+      "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
+      "modelsCount_one": "Модел ({{displayCount}})",
+      "modelsCount_other": "Модели ({{displayCount}})"
     },
     "autoApprove": {
       "title": "Автоматично одобряване",
@@ -2588,7 +2655,9 @@
     },
     "toolRun": {
       "sheetTitle": "Извиквания на инструменти",
-      "condensedLabel": "{{itemCount}} елемента; {{last}}"
+      "condensedLabel": "{{itemCount}} елемента; {{last}}",
+      "condensedLabel_one": "{{itemCount}} елемент; {{last}}",
+      "condensedLabel_other": "{{itemCount}} елемента; {{last}}"
     }
   },
   "bootstrap": {
@@ -2723,7 +2792,9 @@
     "cliCantReceiveFilesTitle": "Тази сесия не може да получава файлове",
     "cliCantReceiveFilesMessage": "Kilo CLI, в който се изпълнява тази сесия, не може да получава файлове. Актуализирай CLI на тази машина или сподели съдържанието в нова сесия.",
     "contentlessMessage": "Няма какво да се сподели — не бяха включени текст или файлове.",
-    "couldNotReadContent": "Не можахме да прочетем споделеното съдържание."
+    "couldNotReadContent": "Не можахме да прочетем споделеното съдържание.",
+    "onlyFirstFilesAttached_one": "Ще бъдат прикачени само първите {{displayCount}} файл.",
+    "onlyFirstFilesAttached_other": "Ще бъдат прикачени само първите {{displayCount}} файла."
   },
   "kiloPass": {
     "title": "Kilo Pass",
@@ -3093,7 +3164,10 @@
     "couldNotApprove": "Одобряването не бе успешно",
     "couldNotStart": "Стартирането не бе успешно",
     "channelName": "Активни агенти",
-    "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран."
+    "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран.",
+    "openSession": "Отвори",
+    "approveFailed": "Не успяхме да одобрим. Докосни $t(common.approve), за да опиташ отново.",
+    "newestResult": "Най-нов резултат"
   },
   "transcriptionModel": {
     "title": "Модел за транскрипция",
@@ -3118,15 +3192,7 @@
     "remoteOptionTitle": "Компютърът ти",
     "remoteOptionBody": "Стартирай Kilo на собствената си машина през `kilo remote` CLI.",
     "skip": "Пропусни тура",
-    "tutorialLabel": "Ръководство",
-    "remoteTitle": "Стартирай първата си отдалечена сесия",
-    "remoteBody": "Свържи компютъра си, после стартирай сесията оттук.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Все още няма свързан компютър",
-    "remoteEmptyBody": "За да го свържеш, изпълни `kilo remote` на компютъра си.",
-    "remoteFound": "Компютърът е свързан",
-    "checkAgain": "Провери отново",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Ръководство"
   },
   "appActions": {
     "start": {
@@ -3134,5 +3200,31 @@
       "repositoryUnknown": "Kilo не разпознава {{repository}} като хранилище в GitHub или GitLab. Избери друго хранилище в Kilo.",
       "repositoryUnsupported": "{{repository}} е хранилище в Bitbucket — Стартирай агент още не може да го използва. Избери друго хранилище в Kilo."
     }
+  },
+  "launcher": {
+    "openLastSession": "Отвори последната сесия"
+  },
+  "spendAlerts": {
+    "subtitle": "Изпращай известие по имейл или push до контактите за фактуриране, когато разходите на този обхват надхвърлят лимит или скочат над обичайната си часова норма.",
+    "enable": "Включи известията за разходи",
+    "thresholdTitle": "Преминаване на праг",
+    "thresholdSubtitle": "Текущите разходи надхвърлят лимита ти",
+    "anomalyTitle": "Часов скок",
+    "anomalySubtitle": "Един час е далеч над обичайната норма за този обхват",
+    "limitLabel": "Лимит (USD)",
+    "windowLabel": "Прозорец",
+    "window24h": "24 часа",
+    "window7d": "7 дни",
+    "window30d": "30 дни",
+    "multiplierLabel": "Множител на скока",
+    "saved": "Настройките за известия за разходи са запазени",
+    "loadError": "Известията за разходи не можаха да се заредят.",
+    "saveError": "Известията за разходи не можаха да се запазят.",
+    "empty": "Известията за разходи са изключени. Включи ги, за да предупреждаваш контактите за фактуриране на този обхват.",
+    "noSpend": "Още няма записани разходи",
+    "spend24h": "Разходи през последните 24 часа",
+    "multiplierError": "Въведи множител 1 или повече",
+    "permissionDenied": "Нямаш разрешение да управляваш известията за разходи.",
+    "pushOffByCategory": "Изключено в „Известия“"
   }
 }

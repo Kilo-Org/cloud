@@ -117,6 +117,11 @@ import {
   createSessionMessageRecord,
   type SessionMessageRecord,
 } from '../../src/sandbox-session/session-message-queue.js';
+import {
+  CALLBACK_OUTBOX_PREFIX,
+  type PendingCallbackJob,
+} from '../../src/sandbox-session/message-callbacks.js';
+import type { CallbackTarget } from '../../src/callbacks/types.js';
 import { getPreparationSnapshots } from '../../src/session/preparation-history.js';
 import { createEventQueries } from '../../src/session/queries/index.js';
 import { throwAdmissionError } from '../../src/session/queue-message.js';
@@ -148,6 +153,7 @@ import {
   WORKTREE_CHANGES_KEY,
   WORKTREE_FILE_PREFIX,
 } from '../../src/sandbox-session/worktree-changes.js';
+import { waitFor } from './wait-for.js';
 
 vi.mock('@kilocode/db/client', () => ({
   getWorkerDb: () => {
@@ -507,7 +513,7 @@ function signalWrapperReady(socket: WebSocket): void {
 
 async function waitForWrapperReady(fixture: TerminalRuntimeFixture): Promise<void> {
   const control = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
-  await vi.waitFor(async () => {
+  await waitFor(async () => {
     const status = await runInDurableObject(control, instance => instance.getStatus());
     expect(status).toMatchObject({
       connection: 'ready',
@@ -1226,7 +1232,7 @@ async function credentialTerminalFixture(provider: AgentSandboxProvider) {
     wrapperInstanceId,
   });
   signalWrapperReady(socket);
-  await vi.waitFor(async () => {
+  await waitFor(async () => {
     await expect(fixture.control.getStatus()).resolves.toMatchObject({
       connection: 'ready',
       wrapperInstanceId,
@@ -1507,7 +1513,7 @@ describe('SandboxControl in the Workers runtime', () => {
     sendHello(second, 'hello-2');
     await expect(firstClosed).resolves.toBe(4000);
     await expect(secondClosed).resolves.toBe(4001);
-    await vi.waitFor(() => expect(provider.stop).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(provider.stop).toHaveBeenCalledTimes(1));
     await expect(control.getPhysicalRecord()).resolves.toMatchObject({
       state: 'stopping',
       providerRef: cloudflareRef(id),
@@ -1587,7 +1593,7 @@ describe('SandboxControl in the Workers runtime', () => {
 
     const stub = env.SANDBOX_CONTROL.getByName(sandboxId);
     signalWrapperReady(ws);
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       await expect(stub.getStatus()).resolves.toMatchObject({ connection: 'ready' });
     });
     const inbound = nextMessage(ws);
@@ -1720,7 +1726,7 @@ describe('SandboxControl recovery watchdogs', () => {
         payload: { kiloReady: true, globalFeedAttached: true },
       })
     );
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       await runInDurableObject(stub, async instance => {
         await expect(instance.getStatus()).resolves.toMatchObject({ connection: 'ready' });
       });
@@ -2266,7 +2272,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
     });
 
     signalWrapperReady(current);
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       await expect(stub.getStatus()).resolves.toMatchObject({ connection: 'ready' });
     });
     const inbound = nextMessage(current);
@@ -2597,7 +2603,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
         workingBranches: true,
       });
       signalWrapperReady(previous);
-      await vi.waitFor(async () => {
+      await waitFor(async () => {
         await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
       });
       await runInDurableObject(control, async (instance, state) => {
@@ -2702,7 +2708,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
           workingBranches: true,
         });
         signalWrapperReady(replacement);
-        await vi.waitFor(async () => {
+        await waitFor(async () => {
           await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
         });
         const attachment = attachInput(registration, fresh);
@@ -3317,7 +3323,7 @@ describe('SandboxControl mandatory worktree credentials', () => {
       );
       expect(ws.readyState).toBe(1);
       signalWrapperReady(ws);
-      await vi.waitFor(async () => {
+      await waitFor(async () => {
         await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
       });
       const attachment = attachInput(registration, payload);
@@ -4906,12 +4912,12 @@ describe('SandboxControl native worktree containment', () => {
       );
       let currentSocket: WebSocket | undefined;
       try {
-        await vi.waitFor(() => expect(firstResult).toBeDefined());
+        await waitFor(() => expect(firstResult).toBeDefined());
         if (!firstResult || !('providerRef' in firstResult))
           throw new Error('First instance was not confirmed');
         const firstRef = firstResult.providerRef;
         if (completion === 'startup-failed') {
-          await vi.waitFor(() => expect(containers.launches).toHaveLength(1));
+          await waitFor(() => expect(containers.launches).toHaveLength(1));
           await expect(control.getPhysicalRecord()).resolves.toMatchObject({
             state: 'running',
             providerRef: firstRef,
@@ -4964,7 +4970,7 @@ describe('SandboxControl native worktree containment', () => {
           providerInstanceId: physical.providerRef,
         });
         signalWrapperReady(currentSocket);
-        await vi.waitFor(async () => {
+        await waitFor(async () => {
           await expect(control.getStatus()).resolves.toMatchObject({
             physical: 'running',
             connection: 'ready',
@@ -5679,7 +5685,7 @@ describe('SandboxControl acquisition receipts', () => {
       (error: unknown) => error
     );
     try {
-      await vi.waitFor(() => expect(responseHeld).toBe(true));
+      await waitFor(() => expect(responseHeld).toBe(true));
       const physical = await control.getPhysicalRecord();
       expect(physical).toMatchObject({ state: 'running', providerRef: expect.any(String) });
       const receipts = await runInDurableObject(control, (_instance, state) =>
@@ -6023,7 +6029,7 @@ describe('SandboxControl durable remainder', () => {
         payload: { kiloReady: true, globalFeedAttached: true },
       })
     );
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       await runInDurableObject(stub, async (_instance, state) => {
         expect((await loadDeadlines(state.storage)).idleStop).toEqual(expect.any(Number));
       });
@@ -6041,7 +6047,7 @@ describe('SandboxControl durable remainder', () => {
         },
       })
     );
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       await runInDurableObject(stub, async (instance, state) => {
         expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
         expect(await instance.listRoutes()).toEqual([
@@ -6062,7 +6068,7 @@ describe('SandboxControl durable remainder', () => {
         },
       })
     );
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       await runInDurableObject(stub, async (instance, state) => {
         expect((await loadDeadlines(state.storage)).idleStop).toEqual(expect.any(Number));
         expect(await instance.listRoutes()).toEqual([
@@ -6150,7 +6156,7 @@ describe('SandboxControl durable remainder', () => {
             },
           })
         );
-        await vi.waitFor(async () => {
+        await waitFor(async () => {
           await runInDurableObject(control, async (_instance, state) => {
             const deadlines = await loadDeadlines(state.storage);
             expect(deadlines.idleStop).toBeUndefined();
@@ -6266,7 +6272,7 @@ describe('SandboxControl durable remainder', () => {
       providerInstanceId: cloudflareRef(twoSessionId),
     });
     signalWrapperReady(response.webSocket);
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       await expect(stub.getStatus()).resolves.toMatchObject({ connection: 'ready' });
     });
 
@@ -6503,7 +6509,7 @@ describe('SandboxControl passive status', () => {
       });
       instance['provider'].stop = vi.fn<ProviderAdapter['stop']>(async () => 'retryable');
       await receiveHeartbeat(instance, state, { ...statusHeartbeat, kilo: { ready: false } });
-      await vi.waitFor(async () => {
+      await waitFor(async () => {
         expect((await instance.getPhysicalRecord()).stopTombstone).toMatchObject({
           reason: 'kilo_unhealthy',
           attempts: 1,
@@ -6555,7 +6561,7 @@ describe('SandboxControl passive status', () => {
     );
     sendHello(second, 'hello-status-new', { wrapperInstanceId: crypto.randomUUID() });
     await expect(closed).resolves.toBe(4001);
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       expect((await stub.getPhysicalRecord()).stopTombstone).toMatchObject({
         reason: 'control_replaced',
         attempts: 1,
@@ -7078,7 +7084,11 @@ const savedWorktreeSnapshot: WorktreeChangesSnapshot = {
 };
 
 async function worktreeFixture(
-  options: { sessionOperationResults?: boolean; sessionId?: `workspace_${string}` } = {}
+  options: {
+    sessionOperationResults?: boolean;
+    sessionId?: `workspace_${string}`;
+    callbackTarget?: CallbackTarget;
+  } = {}
 ) {
   const suffix = crypto.randomUUID();
   const userId = `user_worktree_${suffix}`;
@@ -7119,6 +7129,7 @@ async function worktreeFixture(
         repo: 'acme/demo',
         upstreamBranch: 'main',
       },
+      ...(options.callbackTarget ? { callback: { target: options.callbackTarget } } : {}),
       workspace: {
         sandboxId,
         sandboxProvider: 'cloudflare',
@@ -7509,6 +7520,109 @@ describe('SandboxSession operation authorization admission', () => {
         ]);
       });
       expect(fixture.prompts).toHaveLength(1);
+    } finally {
+      fixture.close();
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('persists a completed operation result gate failure to the message and callback outbox', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => Response.json({ valid: true }));
+    const fixture = await worktreeFixture({
+      sessionOperationResults: true,
+      callbackTarget: { url: 'https://example.com/gate-result' },
+    });
+    const messageId = 'msg_operation_result_gate';
+    try {
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'record the gate result' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+      await fixture.promptSeen;
+      const prompt = fixture.prompts[0];
+      if (!prompt) throw new Error('Missing prompt operation request');
+      const authorization = sessionOperationAuthorizationSchema.parse(prompt.authorization);
+      const delivery: SessionOperationDelivery = {
+        version: 2,
+        authorization,
+        completedAt: Date.now(),
+        result: { ok: true, result: { messageId, status: 'accepted' } },
+        outcome: { messageId, status: 'completed', gateResult: 'fail' },
+        events: [],
+        preparing: [],
+      };
+
+      await expect(fixture.sendOperationResult(delivery)).resolves.toMatchObject({
+        ok: true,
+        result: { disposition: 'applied' },
+      });
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        expect(messages).toMatchObject([
+          { messageId, state: 'completed', terminalSource: 'operation_result', gateResult: 'fail' },
+        ]);
+        const outbox = state.storage.kv.get<PendingCallbackJob>(
+          `${CALLBACK_OUTBOX_PREFIX}${messageId}`
+        );
+        expect(outbox).toBeDefined();
+        expect(outbox?.job.payload.gateResult).toBe('fail');
+      });
+    } finally {
+      fixture.close();
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('omits the gate result when a completed operation result carries none', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => Response.json({ valid: true }));
+    const fixture = await worktreeFixture({
+      sessionOperationResults: true,
+      callbackTarget: { url: 'https://example.com/gate-result-absent' },
+    });
+    const messageId = 'msg_operation_result_no_gate';
+    try {
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'record no gate result' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+      await fixture.promptSeen;
+      const prompt = fixture.prompts[0];
+      if (!prompt) throw new Error('Missing prompt operation request');
+      const authorization = sessionOperationAuthorizationSchema.parse(prompt.authorization);
+      const delivery: SessionOperationDelivery = {
+        version: 2,
+        authorization,
+        completedAt: Date.now(),
+        result: { ok: true, result: { messageId, status: 'accepted' } },
+        outcome: { messageId, status: 'completed' },
+        events: [],
+        preparing: [],
+      };
+
+      await expect(fixture.sendOperationResult(delivery)).resolves.toMatchObject({
+        ok: true,
+        result: { disposition: 'applied' },
+      });
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        const message = messages.find(item => item.messageId === messageId);
+        expect(message).toMatchObject({ state: 'completed', terminalSource: 'operation_result' });
+        expect(message).not.toHaveProperty('gateResult');
+        const outbox = state.storage.kv.get<PendingCallbackJob>(
+          `${CALLBACK_OUTBOX_PREFIX}${messageId}`
+        );
+        expect(outbox).toBeDefined();
+        expect(outbox?.job.payload).toMatchObject({ messageId });
+        expect(outbox?.job.payload).not.toHaveProperty('gateResult');
+      });
     } finally {
       fixture.close();
       fetchMock.mockRestore();
@@ -8049,6 +8163,9 @@ describe('SandboxSession worktree changes persistence', () => {
     }
   });
 
+  // The payload is deliberately near the 10 MiB snapshot cap (20 x 512 KiB
+  // files), so building, JSON-serializing, and writing the per-file KV records
+  // can exceed vitest's 5s default whenever the gate host is under load.
   it('parses, validates, and stores a near-10 MiB snapshot as bounded per-file KV records', async () => {
     const fixture = await worktreeFixture();
     try {
@@ -8132,7 +8249,7 @@ describe('SandboxSession worktree changes persistence', () => {
     } finally {
       fixture.close();
     }
-  });
+  }, 60_000);
 
   it('rolls back a replacement after body writes and deletions when the manifest write fails', async () => {
     const fixture = await worktreeFixture();
@@ -8315,7 +8432,7 @@ describe('SandboxSession worktree changes persistence', () => {
       }));
 
       await fixture.event(WORKTREE_CHANGED_EVENT);
-      await vi.waitFor(() => expect(fixture.captures).toHaveLength(2));
+      await waitFor(() => expect(fixture.captures).toHaveLength(2));
       const dirty = await fixture.nextCapture();
       for (let hint = 0; hint < 3; hint++) await fixture.event(WORKTREE_CHANGED_EVENT);
       expect(fixture.captures).toHaveLength(2);
@@ -8944,7 +9061,7 @@ describe('SandboxSession worktree changes persistence', () => {
         () => null,
         (error: unknown) => (error instanceof Error ? error.message : 'Unexpected deletion failure')
       );
-      await vi.waitFor(() => expect(cleanupStarted).toBe(true));
+      await waitFor(() => expect(cleanupStarted).toBe(true));
       const whileCleanupPending = await readErasure(fixture.session);
       fixture.reply(lateRequest, worktreeSnapshotCapture(captureRevision(lateRequest)));
       await expect(lateCapture).resolves.toEqual({ status: 'failed', snapshot: saved.snapshot });
@@ -9278,7 +9395,7 @@ describe('SandboxSession control-plane regressions', () => {
   }
 
   async function waitForAccepted(session: SessionStub, messageId: string) {
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       await expect(session.getMessageResult(messageId)).resolves.toMatchObject({
         type: 'found',
         result: { status: 'running' },
@@ -9354,7 +9471,7 @@ describe('SandboxSession control-plane regressions', () => {
 
       const firstDispatch = runInDurableObject(session, instance => instance.alarm());
       await firstDispatch;
-      await vi.waitFor(async () => {
+      await waitFor(async () => {
         const state = await admissionState(session);
         expect(state.messages[0]).toMatchObject({
           messageId,
@@ -9450,7 +9567,7 @@ describe('SandboxSession control-plane regressions', () => {
           'session.prompt',
         ]);
         sendOutcome(replacement, messageId);
-        await vi.waitFor(async () => {
+        await waitFor(async () => {
           await expect(session.getMessageResult(messageId)).resolves.toMatchObject({
             type: 'found',
             result: { status: 'completed' },
@@ -9537,7 +9654,7 @@ describe('SandboxSession control-plane regressions', () => {
         joined = true;
         return instance.alarm();
       });
-      await vi.waitFor(() => expect(joined).toBe(true));
+      await waitFor(() => expect(joined).toBe(true));
       await expect(session.interruptExecution()).resolves.toEqual({ success: true });
       const cancelled = await preparationSnapshots(session);
       expect(cancelled).toEqual(
@@ -9579,7 +9696,7 @@ describe('SandboxSession control-plane regressions', () => {
           turn: { type: 'prompt', id: 'msg_after_cancel_b', prompt: 'B' },
         })
       ).resolves.toMatchObject({ success: true, compatibilityDelivery: 'queued' });
-      await vi.waitFor(async () => {
+      await waitFor(async () => {
         expect((await admissionState(session)).messages[1]).toMatchObject({
           state: 'queued',
           preparationAttemptId: expect.any(String),
@@ -9684,7 +9801,7 @@ describe('SandboxSession control-plane regressions', () => {
         events.push(JSON.parse(String(event.data)));
       });
       stream.accept();
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expectOnlyBOwnedExtras(
           events
             .filter(event => event.streamEventType === 'preparing')
@@ -9695,7 +9812,7 @@ describe('SandboxSession control-plane regressions', () => {
 
       transferUnavailable = false;
       await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
-      await vi.waitFor(() => expect(provider.stop).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(provider.stop).toHaveBeenCalledTimes(1));
       await expect(control.getPhysicalRecord()).resolves.toMatchObject({
         state: 'stopping',
         providerRef: cloudflareRef(fixture.sandboxId),
@@ -9895,7 +10012,7 @@ describe('SandboxSession control-plane regressions', () => {
         );
       });
       await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
-      await vi.waitFor(async () => {
+      await waitFor(async () => {
         await expect(control.listRoutes()).resolves.toEqual([
           expect.not.objectContaining({ nativeRuntimeId }),
         ]);
@@ -10033,7 +10150,7 @@ describe('SandboxSession control-plane regressions', () => {
             },
           },
         });
-        await vi.waitFor(() => expect(heldRequest).toBeDefined());
+        await waitFor(() => expect(heldRequest).toBeDefined());
         expect(heldRequest).toMatchObject({
           operation,
           session: {
@@ -10048,7 +10165,7 @@ describe('SandboxSession control-plane regressions', () => {
           joined = true;
           return instance.alarm();
         });
-        await vi.waitFor(() => expect(joined).toBe(true));
+        await waitFor(() => expect(joined).toBe(true));
         await expect(session.interruptExecution()).resolves.toEqual({ success: true });
         await expect(
           session.getMessageResult('msg_ffffffffffff00000000000002')
@@ -10068,7 +10185,7 @@ describe('SandboxSession control-plane regressions', () => {
             turn: { type: 'prompt', id: 'msg_replacement_b', prompt: 'B' },
           })
         ).resolves.toMatchObject({ success: true, compatibilityDelivery: 'queued' });
-        await vi.waitFor(async () => {
+        await waitFor(async () => {
           expect((await admissionState(session)).messages[1]).toMatchObject({
             state: 'queued',
             preparationAttemptId: expect.any(String),
@@ -10082,7 +10199,7 @@ describe('SandboxSession control-plane regressions', () => {
 
         transferUnavailable = false;
         await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
-        await vi.waitFor(() => expect(provider.stop).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(provider.stop).toHaveBeenCalledTimes(1));
         await expect(control.getPhysicalRecord()).resolves.toMatchObject({
           state: 'stopping',
           providerRef,
@@ -10120,7 +10237,7 @@ describe('SandboxSession control-plane regressions', () => {
         signalWrapperReady(replacement);
         await waitForWrapperReady(replacementFixture);
         dispatchB = runDurableObjectAlarm(session);
-        await vi.waitFor(() => expect(replacementAttachment).toBeDefined());
+        await waitFor(() => expect(replacementAttachment).toBeDefined());
         if (!replacementAttachment) throw new Error('Expected B attachment before its prompt');
         expect(replacementAttachment).toMatchObject({
           operation: 'session.attach',
@@ -10234,7 +10351,7 @@ describe('SandboxSession control-plane regressions', () => {
           },
         })
       ).resolves.toMatchObject({ success: true, compatibilityDelivery: 'queued' });
-      await vi.waitFor(() => expect(entered).toBe(true));
+      await waitFor(() => expect(entered).toBe(true));
       const before = await admissionState(session);
       const alarmAt = await runInDurableObject(session, (_instance, state) =>
         state.storage.getAlarm()
@@ -10341,9 +10458,9 @@ describe('SandboxSession control-plane regressions', () => {
           joined = true;
           return instance.alarm();
         });
-        await vi.waitFor(() => expect(joined).toBe(true));
+        await waitFor(() => expect(joined).toBe(true));
         sendOutcome(socket, 'msg_ffffffffffff00000000000004', status);
-        await vi.waitFor(async () => {
+        await waitFor(async () => {
           await expect(
             session.getMessageResult('msg_ffffffffffff00000000000004')
           ).resolves.toMatchObject({
@@ -10453,7 +10570,7 @@ describe('SandboxSession control-plane regressions', () => {
           },
         })
       );
-      await vi.waitFor(async () => {
+      await waitFor(async () => {
         await runInDurableObject(session, (_instance, state) => {
           const stored = createEventQueries(
             drizzle(state.storage, { logger: false }),
@@ -10480,7 +10597,7 @@ describe('SandboxSession control-plane regressions', () => {
       });
       expect(provider.stop).not.toHaveBeenCalled();
       sendOutcome(socket, 'msg_current_b');
-      await vi.waitFor(async () => {
+      await waitFor(async () => {
         await expect(session.getMessageResult('msg_current_b')).resolves.toMatchObject({
           type: 'found',
           result: { status: 'completed' },
@@ -10549,7 +10666,7 @@ describe('SandboxSession control-plane regressions', () => {
         }
         await session.markAsInterrupted();
         await expect(session.interruptExecution()).resolves.toMatchObject({ success: true });
-        await vi.waitFor(() => expect(activeWork).toBe(false));
+        await waitFor(() => expect(activeWork).toBe(false));
         expect((await admissionState(session)).messages).toMatchObject([
           { messageId: 'msg_ffffffffffff00000000000006', state: 'cancelled' },
           { messageId: 'msg_cancel_follower', state: 'cancelled' },
@@ -10567,7 +10684,7 @@ describe('SandboxSession control-plane regressions', () => {
           ]);
           expect(provider.stop).not.toHaveBeenCalled();
         } else {
-          await vi.waitFor(async () => {
+          await waitFor(async () => {
             await expect(control.getPhysicalRecord()).resolves.toMatchObject({
               state: 'stopped',
               providerRef: null,
@@ -10631,7 +10748,7 @@ describe('SandboxSession control-plane regressions', () => {
           payload: { state: 'active', kilo: { ready: false }, sessions: [] },
         })
       );
-      await vi.waitFor(async () => {
+      await waitFor(async () => {
         await expect(
           session.getMessageResult('msg_ffffffffffff00000000000007')
         ).resolves.toMatchObject({
@@ -10699,7 +10816,7 @@ describe('SandboxSession control-plane regressions', () => {
           turn: { type: 'prompt', id: 'msg_recovered', prompt: 'try again' },
         })
       ).resolves.toMatchObject({ success: true });
-      await vi.waitFor(() => expect(provider.launch).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(provider.launch).toHaveBeenCalledTimes(1));
       const launch = provider.launch.mock.calls[0];
       if (!launch) throw new Error('Expected replacement wrapper launch');
       expect(launch[0]).not.toBe(cloudflareRef(fixture.sandboxId));
@@ -10739,7 +10856,7 @@ describe('SandboxSession control-plane regressions', () => {
       socket.close();
       replacement?.close();
     }
-  });
+  }, 30_000);
 
   it('normalizes initial and command models once without preflight or leaking session finalization', async () => {
     const { fixture, session } = messageFixture();
@@ -11129,7 +11246,7 @@ describe('SandboxSession control-plane regressions', () => {
     });
     return {
       entered: async () => {
-        await vi.waitFor(() => expect(entered).toBe(true));
+        await waitFor(() => expect(entered).toBe(true));
         if (typeof body !== 'string') throw new Error('Expected validation request body');
         return JSON.parse(body) as unknown;
       },
@@ -11393,7 +11510,7 @@ describe('SandboxSession control-plane regressions', () => {
         });
       });
       dispatch = runInDurableObject(session, instance => instance.alarm());
-      await vi.waitFor(() => expect(entered).toBe(true));
+      await waitFor(() => expect(entered).toBe(true));
       expect((await admissionState(session)).messages[0]?.intent?.agent).toEqual(agentA);
       await runInDurableObject(session, async (instance, state) => {
         const metadata = await instance.getMetadata();
@@ -11463,7 +11580,7 @@ describe('SandboxSession control-plane regressions', () => {
         alarmStarted = true;
         return instance.alarm();
       });
-      await vi.waitFor(() => expect(alarmStarted).toBe(true));
+      await waitFor(() => expect(alarmStarted).toBe(true));
       const replay: SubmittedSessionMessageRequest = {
         userId: fixture.ownerId,
         turn: { type: 'prompt', id: INITIAL_MESSAGE_ID, prompt: 'retry A' },
@@ -11558,7 +11675,7 @@ describe('SandboxSession control-plane regressions', () => {
     });
     socket.accept();
     try {
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(
           events
             .filter(event => event.streamEventType === 'cloud.message.queued')
@@ -11642,7 +11759,7 @@ describe('SandboxSession control-plane regressions', () => {
         wrapperInstanceId,
       });
       signalWrapperReady(ws);
-      await vi.waitFor(async () => {
+      await waitFor(async () => {
         await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
       });
       ws.send(
@@ -11660,7 +11777,7 @@ describe('SandboxSession control-plane regressions', () => {
           },
         })
       );
-      await vi.waitFor(async () => {
+      await waitFor(async () => {
         await runInDurableObject(control, async (_instance, state) => {
           expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
         });
@@ -11936,7 +12053,7 @@ describe('SandboxControl terminal runtime coordination', () => {
         wrapperInstanceId,
       });
       signalWrapperReady(socket);
-      await vi.waitFor(async () => {
+      await waitFor(async () => {
         await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
       });
       await runInDurableObject(control, async instance => {
@@ -12360,7 +12477,7 @@ describe('SandboxControl terminal runtime coordination', () => {
             replacementIdentity === 'same' ? fixture.wrapperInstanceId : crypto.randomUUID(),
         });
         await expect(replaced).resolves.toBe(4001);
-        await vi.waitFor(async () => {
+        await waitFor(async () => {
           await expect(control.getPhysicalRecord()).resolves.toMatchObject({ state: 'stopped' });
           await runInDurableObject(session, (_instance, state) => {
             expect(state.storage.kv.get<{ state: string }>('terminal:pty_original')).toMatchObject({
@@ -12468,7 +12585,7 @@ describe('SandboxControl terminal runtime coordination', () => {
     });
     expect(provider.stop).toHaveBeenCalledTimes(1);
     expect(provider.stop.mock.calls[0]?.[0]).toBe(cloudflareRef(fixture.sandboxId));
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       await runInDurableObject(session, (_instance, state) => {
         expect(state.storage.kv.get<{ state: string }>('terminal:pty_original')).toMatchObject({
           state: 'ended',
@@ -12494,7 +12611,7 @@ describe('SandboxControl terminal runtime coordination', () => {
       await expect(instance.confirmStopped()).resolves.toMatchObject({ state: 'stopped' });
       expect(await instance.getStatus()).not.toHaveProperty('wrapperInstanceId');
     });
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       await runInDurableObject(session, (_instance, state) => {
         expect(state.storage.kv.get<{ state: string }>('terminal:pty_original')).toMatchObject({
           state: 'ended',
@@ -13389,7 +13506,7 @@ describe('SandboxSession worktree admission', () => {
         messageId: INITIAL_MESSAGE_ID,
         status: 'accepted',
       });
-      await vi.waitFor(async () => {
+      await waitFor(async () => {
         expect(await session.getCurrentMessageWork()).toMatchObject({
           messageId: INITIAL_MESSAGE_ID,
           status: 'running',
@@ -13502,7 +13619,7 @@ describe('SandboxSession worktree admission', () => {
       messageId: INITIAL_MESSAGE_ID,
       status: 'accepted',
     });
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       expect(await session.getCurrentMessageWork()).toMatchObject({
         messageId: INITIAL_MESSAGE_ID,
         status: 'running',
@@ -13622,7 +13739,7 @@ describe('SandboxSession worktree admission', () => {
       messageId: INITIAL_MESSAGE_ID,
       status: 'accepted',
     });
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       expect(await session.getCurrentMessageWork()).toMatchObject({
         messageId: INITIAL_MESSAGE_ID,
         status: 'running',
@@ -15103,7 +15220,7 @@ describe('SandboxSession targeted deletion', () => {
       wrapperInstanceId: crypto.randomUUID(),
     });
     signalWrapperReady(wrapper);
-    await vi.waitFor(async () => {
+    await waitFor(async () => {
       await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
     });
     const requests: RequestFrame[] = [];

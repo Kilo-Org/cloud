@@ -1,9 +1,15 @@
 /* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as composer-paste-button.mounted.test.tsx) */
+// eslint-disable-next-line import/no-nodejs-modules -- The compiler's CommonJS export is the only way to load it under vitest.
+import { createRequire } from 'node:module';
+import tailwindcss from '@tailwindcss/postcss';
+import postcss from 'postcss';
 import { type ComponentProps, createElement } from 'react';
+import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
+import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
 import { ScreenHeader } from './screen-header';
 import { OfflineBannerSpaceProvider } from './offline-banner-space';
 
@@ -112,6 +118,60 @@ function deriveTitleFontSize(className: string): number {
   throw new Error(`no known title font size in class: ${className}`);
 }
 
+const { compile } = createRequire(import.meta.url)(
+  'react-native-css/compiler'
+) as typeof NativeCSSCompiler;
+
+/** The property name(s) of one compiled style declaration. */
+function declarationProperties(declaration: unknown): string[] {
+  if (Array.isArray(declaration)) {
+    const property: unknown = declaration[1];
+    return typeof property === 'string' ? [property] : [];
+  }
+  return typeof declaration === 'object' && declaration !== null ? Object.keys(declaration) : [];
+}
+
+/**
+ * The React Native style property each margin utility in a className compiles
+ * to, through the app's own Tailwind and NativeWind compilers — not a
+ * hand-written utility-to-property map.
+ *
+ * The physical/logical name matters: `ml`/`mr` compile to `marginLeft`/
+ * `marginRight`, which Fabric rewrites to Yoga Start/End for an RTL tree when
+ * `I18nManager.doLeftAndRightSwapInRTL` is on
+ * (`YogaLayoutableShadowNode::swapLeftAndRightInYogaStyleProps`), while `ms`
+ * compiles to `marginInlineStart`, already logical and passed through as
+ * Yoga Start in both directions.
+ */
+async function compiledMarginProperties(className: string): Promise<string[]> {
+  const margins = className
+    .split(' ')
+    .filter(token => /^-?m[slre]-/.test(token))
+    .join(' ');
+  const { css } = await postcss([tailwindcss()]).process(
+    `@reference "../global.css"; .target { @apply ${margins}; }`,
+    { from: import.meta.filename }
+  );
+  const rules = compile(css, { inlineVariables: false }).stylesheet().s;
+  const declarations =
+    rules?.find(([name]) => name === 'target')?.[1].flatMap(rule => rule.d ?? []) ?? [];
+  return declarations.flatMap(declaration => declarationProperties(declaration));
+}
+
+function findHeaderRight(root: TestInstance): TestInstance {
+  const headerRight = root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'View' &&
+      typeof node.props.className === 'string' &&
+      /(^|\s)-?m[slre]-[0-9]/.test(node.props.className)
+  )[0];
+  if (!headerRight) {
+    throw new Error('headerRight view not found');
+  }
+  return headerRight;
+}
+
 function renderHeader(props: ScreenHeaderProps): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
@@ -146,33 +206,38 @@ describe('ScreenHeader mounted', () => {
     expect(back.props.className).toContain('h-11 w-11');
     expect(back.props.className).toContain('items-center');
     expect(back.props.className).toContain('justify-center');
-    expect(back.props.className).toContain('-ml-4');
+    expect(back.props.className).toContain('-ms-4');
     expect(back.props.className).toContain('shrink-0');
     expect(back.props.className).toContain('active:opacity-70');
     expect(back.props.className).not.toContain('mr-1');
     expect(back.props.hitSlop).toBeUndefined();
   });
 
-  it('swaps the back and headerRight margins to the logical edges in RTL', () => {
-    i18nManager.isRTL = true;
+  it('pulls the leading controls with a logical start margin the RTL swap cannot mirror', async () => {
     const renderer = renderHeader({ title: 'Sessions', headerRight: 'RIGHT' });
 
+    // The pull is on the START edge, so it must compile to the logical
+    // `marginInlineStart`. A hand-picked `-mr-4` under RTL compiles to
+    // `marginRight`, which Fabric rewrites to Yoga End for an RTL tree, landing
+    // the pull on the side that faces the title: the heading then started 12
+    // points under the 44-point back target and the title's box covered 0.27 of
+    // it — the "two controls cover each other" finding (the scan reports above
+    // 0.25). `-ms-4` keeps a real 4-point `gap-1` between the two controls in
+    // both writing directions.
     const back = findBackPressable(renderer.root);
-    expect(back.props.className).toContain('-mr-4');
-    expect(back.props.className).not.toContain('-ml-4');
+    expect(back.props.className).toContain('-ms-4');
+    expect(await compiledMarginProperties(back.props.className as string)).toEqual([
+      'marginInlineStart',
+    ]);
 
-    const headerRight = renderer.root.findAll(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'View' &&
-        typeof node.props.className === 'string' &&
-        (node.props.className.includes('ml-3') || node.props.className.includes('mr-3'))
-    )[0];
-    if (!headerRight) {
-      throw new Error('headerRight view not found');
-    }
-    expect(headerRight.props.className).toContain('mr-3');
-    expect(headerRight.props.className).not.toContain('ml-3');
+    // The 12-point gap between the title and the cluster sits on the cluster's
+    // start side, so it mirrors with the direction instead of leaving the two
+    // touching and adding the space to the outer gutter.
+    const headerRight = findHeaderRight(renderer.root);
+    expect(headerRight.props.className).toContain('ms-3');
+    expect(await compiledMarginProperties(headerRight.props.className as string)).toEqual([
+      'marginInlineStart',
+    ]);
     expect(headerRight.props.className).toContain('max-w-[50%]');
     expect(headerRight.props.className).toContain('shrink');
     expect(headerRight.props.className).not.toContain('shrink-0');
@@ -356,17 +421,23 @@ describe('ScreenHeader mounted', () => {
       { title: 'Sessions', headerRight: 'RIGHT', reserveTitleSpace: true },
       { title: longTitle, titleNumberOfLines: 1, headerRight: 'METRICS' },
       { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
+      { title: longTitle, titleNumberOfLines: 3, headerRight: 'METRICS', reserveTitleSpace: true },
+      { title: longTitle, titleNumberOfLines: 9, reserveTitleSpace: true },
     ];
 
     for (const props of variants) {
       const renderer = renderHeader(props);
       const back = findBackPressable(renderer.root);
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-      expect(title.props.numberOfLines).toBe(props.titleNumberOfLines ?? 2);
+      // The cap is clamped to the three lines the reserved box covers, so a
+      // title can never paint a line the reserve does not hold.
+      const cappedLines = Math.min(props.titleNumberOfLines ?? 2, 3);
+      expect(title.props.numberOfLines).toBe(cappedLines);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);
       if (props.reserveTitleSpace) {
-        expect(title.parent?.props.className).toContain('min-h-14 justify-center');
+        expect(title.parent?.props.className).toContain(cappedLines > 2 ? 'min-h-21' : 'min-h-14');
+        expect(title.parent?.props.className).toContain('justify-center');
       }
       if (props.context) {
         expect(title.parent?.children).toEqual([title, props.context]);
@@ -378,6 +449,25 @@ describe('ScreenHeader mounted', () => {
         expect(title.parent?.parent?.parent).toBe(back.parent);
       }
     }
+  });
+
+  it('gives the session header three title lines so a real session name is not cut mid-word', () => {
+    // 15-session-working: the session header's primary heading was capped at
+    // two lines, so a name like "Tax export formatter test" truncated mid-word
+    // beside the back control and the metrics/copy cluster on a narrow window.
+    const renderer = renderHeader({
+      title: 'Tax export formatter test',
+      titleNumberOfLines: SESSION_HEADER_TITLE_LINES,
+      reserveTitleSpace: true,
+      headerRight: 'METRICS',
+    });
+
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
+    // The reserved box holds the same three lines (3 x the `text-lg` 1.75rem
+    // line height), so the rendered title cannot move the body below it.
+    expect(title.parent?.props.className).toContain('min-h-21');
+    expect(title.parent?.props.className).toContain('justify-center');
   });
 
   it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {
@@ -395,6 +485,64 @@ describe('ScreenHeader mounted', () => {
     expect(title.parent?.parent).toBe(back.parent);
     expect(renderer.root.props.style).toBeUndefined();
     expect(renderer.root.props.className).toContain('pt-3');
+  });
+
+  it.each([false, true])('keeps repository eyebrows on one line with RTL=%s', isRTL => {
+    i18nManager.isRTL = isRTL;
+    platform.OS = 'android';
+    const repositories = ['KILO-ORG/CLOUD', 'organization-with-a-long-name/repository-name'];
+
+    for (const eyebrow of repositories) {
+      const renderer = renderHeader({ title: '#6054', eyebrow, headerRight: 'Submit review' });
+      const label = renderer.root.findByType('Eyebrow');
+      expect(label.props.numberOfLines).toBe(1);
+      expect(label.props.ellipsizeMode).toBe('tail');
+      expect(label.children).toEqual([eyebrow]);
+      expect(label.props.accessible).toBe(true);
+      expect(label.parent?.props.className).toContain('min-w-0 flex-1');
+
+      // Files and Discussion have fewer header actions than Overview. Keep the
+      // same line limit as their available width changes instead of reflowing.
+      act(() => {
+        renderer.update(createElement(ScreenHeader, { title: '#6054', eyebrow }));
+      });
+      expect(renderer.root.findByType('Eyebrow').props.numberOfLines).toBe(1);
+      expect(findBackPressable(renderer.root).props.className).toContain('h-11 w-11');
+      renderer.unmount();
+    }
+  });
+
+  it('keeps a reserved eyebrow hidden and on one line until its label arrives', () => {
+    const renderer = renderHeader({ title: '#6054', reserveEyebrow: true, centerTitle: true });
+    const placeholder = renderer.root.findByType('Eyebrow');
+    expect(placeholder.props.numberOfLines).toBe(1);
+    expect(placeholder.props.accessible).toBe(false);
+    expect(placeholder.props.accessibilityElementsHidden).toBe(true);
+    expect(placeholder.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(placeholder.props.className).toContain('opacity-0');
+
+    act(() => {
+      renderer.update(
+        createElement(ScreenHeader, {
+          title: '#6054',
+          reserveEyebrow: true,
+          centerTitle: true,
+          eyebrow: 'KILO-ORG/CLOUD',
+        })
+      );
+    });
+    const label = renderer.root.findByType('Eyebrow');
+    expect(label.props.numberOfLines).toBe(1);
+    expect(label.props.className).toContain('text-center');
+    expect(label.props.className).not.toContain('opacity-0');
+    expect(label.props.accessible).toBe(true);
+    renderer.unmount();
+  });
+
+  it('omits an absent eyebrow when no space is reserved', () => {
+    const renderer = renderHeader({ title: '#6054' });
+    expect(renderer.root.findAllByType('Eyebrow')).toHaveLength(0);
+    renderer.unmount();
   });
 
   it('pads the sheet header by the landscape side insets even when it skips the safe-area top', () => {
@@ -429,7 +577,7 @@ describe('ScreenHeader mounted', () => {
     // The outer container keeps only its top inset and the `px-4` gutter class;
     // the side insets land on the inner wrapper so they ADD to the gutter (an
     // inline padding on the container would override the class and pull the
-    // back control's `-ml-4` chevron back into the sensor area).
+    // back control's `-ms-4` chevron back into the sensor area).
     const container = findOuterContainer(renderer.root);
     expect(container.props.style).toEqual({ paddingTop: 8 });
     expect(container.props.className).toContain('px-4');
@@ -437,7 +585,7 @@ describe('ScreenHeader mounted', () => {
       paddingLeft: 47,
       paddingRight: 59,
     });
-    expect(findBackPressable(renderer.root).props.className).toContain('-ml-4');
+    expect(findBackPressable(renderer.root).props.className).toContain('-ms-4');
   });
 
   it('keeps the container style a portrait no-op with zero side insets', () => {
@@ -530,5 +678,27 @@ describe('ScreenHeader mounted', () => {
 
     expect(iosStyle).toEqual({ paddingTop: 32 });
     expect(androidStyle).toEqual(iosStyle);
+  });
+
+  it('caps the eyebrow to one line with a middle ellipsis when eyebrowNumberOfLines is set', () => {
+    const renderer = renderHeader({
+      title: '#1',
+      eyebrow: 'KILO-STUB/DISCUSSION-MIXED',
+      eyebrowNumberOfLines: 1,
+    });
+
+    const eyebrow = renderer.root.findByType('Eyebrow');
+    expect(eyebrow.props.numberOfLines).toBe(1);
+    expect(eyebrow.props.ellipsizeMode).toBe('middle');
+    expect(eyebrow.children).toEqual(['KILO-STUB/DISCUSSION-MIXED']);
+  });
+
+  it('keeps the reserved eyebrow placeholder on the same single capped line', () => {
+    const renderer = renderHeader({ reserveEyebrow: true, eyebrowNumberOfLines: 1 });
+
+    const eyebrow = renderer.root.findByType('Eyebrow');
+    expect(eyebrow.props.numberOfLines).toBe(1);
+    expect(eyebrow.props.ellipsizeMode).toBe('middle');
+    expect(eyebrow.children).toEqual(['\u00A0']);
   });
 });

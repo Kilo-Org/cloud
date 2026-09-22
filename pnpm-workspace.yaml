@@ -50,12 +50,26 @@ catalog:
   ulid: 3.0.2
   vitest: 4.1.6
   workers-tagged-logger: 1.0.0
-  wrangler: 4.112.0
+  wrangler: 4.135.0
   zod: 4.4.3
 
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx
+  # Cloudflare's DO-managed container runtime (ctx.container, snapshotContainer).
+  # wrangler 4.134.0 is the first release with local development support for
+  # DO-managed Containers (named-image selection via ctx.container.images).
+  # 4.135.0 exact-pins its own workerd/miniflare runtime, so those exact versions
+  # are exempted with it. Approved early-access exception; remove all eight entries
+  # when 4.135.0 matures (workerd 2026-09-18, wrangler 2026-09-18).
+  - wrangler@4.135.0
+  - workerd@1.20260918.1
+  - miniflare@5.20260918.0-alpha
+  - '@cloudflare/workerd-darwin-64@1.20260918.1'
+  - '@cloudflare/workerd-darwin-arm64@1.20260918.1'
+  - '@cloudflare/workerd-linux-64@1.20260918.1'
+  - '@cloudflare/workerd-linux-arm64@1.20260918.1'
+  - '@cloudflare/workerd-windows-64@1.20260918.1'
   # Expo SDK 57 alignment: the 2026-09-08 patch releases `expo install --check`
   # expects, plus the exact transitive versions that aligned graph resolves to.
   # Each entry exempts exactly the listed package@version required by that
@@ -144,6 +158,15 @@ overrides:
   serialize-javascript: '>=7.0.3'
   hono: 4.12.34
   '@modelcontextprotocol/sdk@1.30.0>@hono/node-server': 2.0.10
+  # @simplewebauthn/server's ASN.1 parser must come from the same
+  # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their
+  # schemas into. apps/web pins asn1-schema/-x509 to 2.8.0 for its Apple App
+  # Attest code, and pnpm deduped the WebAuthn library's ^2.6.0 range onto that
+  # copy while asn1-ecc resolved 2.9.4, so `AsnParser.parse(DER, ECDSASigValue)`
+  # threw "Cannot get schema for 'ECDSASigValue' target" and every ES256
+  # assertion was refused. Scope the newer copy to this dependency only.
+  '@simplewebauthn/server>@peculiar/asn1-schema': 2.9.4
+  '@simplewebauthn/server>@peculiar/asn1-x509': 2.9.4
   undici@^6: 6.28.0
   undici@^8: 8.9.0
   # 1.30.2+ regresses var() round-trip through JS visitors, breaking

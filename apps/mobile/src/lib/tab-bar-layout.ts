@@ -16,8 +16,8 @@ export const TAB_ICON_FORWARD_FONT_SCALE = 2;
 const TAB_ICON_BASE_SIZE = 22;
 const TAB_ICON_MAX_SIZE = 26;
 
-// Label metrics mirrored from `TabLabel` in
-// `apps/mobile/src/app/(app)/(tabs)/_layout.tsx`: `font-mono-medium text-[11px]
+// Label metrics mirrored from `TabBarLabel`
+// (`apps/mobile/src/components/tab-bar-label.tsx`): `font-mono-medium text-[11px]
 // leading-4 uppercase tracking-[0.2px]`. Keep these in step with that style.
 const TAB_LABEL_FONT_SIZE = 11;
 const TAB_LABEL_LETTER_SPACING = 0.2;
@@ -152,11 +152,12 @@ function isFullWidthCharacter(character: string): boolean {
 }
 
 /**
- * Estimated rendered width (dp) of the widest line of a tab label. The label
- * box wraps at whitespace (`numberOfLines={2}` in `TabLabel`), so a pre-wrapped
- * `Kilo\nClaw` counts its wider line. The estimate is deliberately conservative:
- * it only decides whether the labels are dropped, so over-estimating hides them
- * slightly early and never leaves a broken word on screen.
+ * Estimated rendered width (dp) of the widest line of a tab label. A label is
+ * one line (`tabLabelNumberOfLines`), except copy that carries its own break
+ * (`Kilo\nClaw`), whose wider line is the one that has to fit. The estimate is
+ * deliberately conservative: it only decides whether the labels are dropped, so
+ * over-estimating hides them slightly early and never leaves a broken word on
+ * screen.
  */
 export function tabLabelWidth(label: string, fontScale = 1): number {
   let widest = 0;

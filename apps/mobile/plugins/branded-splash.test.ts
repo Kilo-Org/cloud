@@ -124,6 +124,13 @@ describe('shared branded splash', () => {
   });
 
   it('generates both native splash surfaces from the same options', async () => {
+    // Introspect a throwaway project rather than the repository's own generated
+    // `android/` tree. In introspect mode the android colors mod merges the
+    // existing colors.xml, so a worktree that has prebuilt (the device round
+    // always does) picks up every other plugin's colors and the exact-array
+    // assertion below fails. The iOS surface is computed in memory, so it needs
+    // no native tree.
+    const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
       { image: './assets/images/logo-mark.png', backgroundColor: '#FAF74F', imageWidth: 100 }

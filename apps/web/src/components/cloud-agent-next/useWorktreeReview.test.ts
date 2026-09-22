@@ -16,11 +16,17 @@ const mockPersistence = { load: mockLoad, save: mockSave, clear: mockClear };
 jest.mock('./worktree-review-persistence', () => ({
   createWorktreeReviewPersistence: () => mockPersistence,
 }));
+jest.mock(
+  '@pierre/diffs',
+  () => ({
+    SPLIT_WITH_NEWLINES: /(\r\n|\n|\r)/,
+    parsePatchFiles: () => [],
+    hydratePartialDiff: () => ({}),
+  }),
+  { virtual: true }
+);
 jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', () => ({
   iterateOverDiff: () => [],
-}));
-jest.mock('../../../node_modules/@pierre/diffs/dist/utils/parsePatchFiles.js', () => ({
-  parsePatchFiles: () => [],
 }));
 
 const snapshot = {
@@ -477,6 +483,35 @@ describe('useWorktreeReview hydration', () => {
       expect(latest?.draft?.delivery.phase).toBe('idle');
       expect(latest?.draft?.comments).toHaveLength(1);
       expect(latest?.draft?.error).toMatch(/could not be applied to the current saved capture/);
+    } finally {
+      snapshot.revision = originalRevision;
+      snapshot.files = originalFiles;
+    }
+  });
+
+  it('keeps a stale comment unlabeled while the current file cannot be verified', async () => {
+    mockLoad.mockResolvedValue({
+      version: 1,
+      comments: [{ id: 'saved', anchor, text: 'Saved feedback' }],
+      editor: null,
+      overall: '',
+      destinationKiloSessionId: targetSession.session_id,
+      allowOlderCapture: false,
+    });
+    const originalRevision = snapshot.revision;
+    const originalFiles = snapshot.files;
+    snapshot.revision = 99;
+    snapshot.files = [{ path: 'src/example.ts', revision: 99 }];
+    try {
+      const mounted = mount();
+      ({ cleanup } = mounted.dom);
+      root = mounted.root;
+      await flushAsyncWork();
+      act(() => latest?.setOpen(true));
+      await flushAsyncWork();
+
+      expect(latest?.unappliedCommentIds.size).toBe(0);
+      expect(latest?.draft?.comments?.map(comment => comment.id)).toEqual(['saved']);
     } finally {
       snapshot.revision = originalRevision;
       snapshot.files = originalFiles;

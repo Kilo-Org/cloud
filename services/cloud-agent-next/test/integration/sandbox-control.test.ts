@@ -16593,6 +16593,11 @@ describe('SandboxControl event batch forwarding', () => {
         rpcWaitMs: expect.any(Number),
       });
       expect(runs[1]?.fields.queueWaitMs as number).toBeGreaterThan(DEADLINE_MS.stopAttempt);
+      expect(runs.map(run => run.fields.result)).toEqual(['delivered', 'delivered']);
+      expect(runs.map(run => run.fields.applied)).toEqual([true, true]);
+      expect(
+        diagnostics.emissions.filter(emission => emission.event === 'forward_response_timeout')
+      ).toEqual([]);
     } finally {
       clock.mockRestore();
       receiver.restore();
@@ -16686,6 +16691,7 @@ describe('SandboxControl event batch forwarding', () => {
         frameItems: 1,
         forwardSequence: expect.any(Number),
       });
+      expect(failedDrops[0]?.level).toBe('warn');
     } finally {
       clock.mockRestore();
       receiver.restore();

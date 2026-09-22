@@ -3726,7 +3726,7 @@ export class SandboxControl extends DurableObject<Env> {
       connection,
       { identity, payload, ...(receiptId ? { receiptId, sequence } : {}) },
       1,
-      (route, fields, allocation, deadlineAt) =>
+      (route, fields, allocation) =>
         this.forwardSessionFrame(
           route,
           allocation,
@@ -3740,8 +3740,7 @@ export class SandboxControl extends DurableObject<Env> {
               wrapperInstanceId: connection.wrapperInstanceId,
               ...(receiptId ? { receiptId, sequence } : {}),
             }),
-          receiptId !== undefined,
-          deadlineAt
+          receiptId !== undefined
         )
     );
     if (!receiptId) {
@@ -3777,7 +3776,7 @@ export class SandboxControl extends DurableObject<Env> {
       connection,
       { identity, payload, ...(receiptId ? { receiptId, sequence } : {}) },
       1,
-      (route, fields, allocation, deadlineAt) =>
+      (route, fields, allocation) =>
         this.forwardSessionFrame(
           route,
           allocation,
@@ -3791,8 +3790,7 @@ export class SandboxControl extends DurableObject<Env> {
               wrapperInstanceId: connection.wrapperInstanceId,
               ...(receiptId ? { receiptId, sequence } : {}),
             }),
-          receiptId !== undefined,
-          deadlineAt
+          receiptId !== undefined
         )
     );
     if (!receiptId) {
@@ -4096,8 +4094,7 @@ export class SandboxControl extends DurableObject<Env> {
     forward: (
       route: SessionRoute,
       diagnostic: ControlDiagnosticFields,
-      allocation: AllocationRecord,
-      deadlineAt: number
+      allocation: AllocationRecord
     ) => Promise<SandboxControlEventResult>
   ): Promise<SandboxControlEventResult> {
     const diagnostic = {
@@ -4112,7 +4109,6 @@ export class SandboxControl extends DurableObject<Env> {
       return { applied: false };
     }
     const queuedAt = Date.now();
-    const forwardDeadlineAt = queuedAt + DEADLINE_MS.stopAttempt;
     const admission = this.resolveForwardingAdmission(identity);
     if (!admission) {
       this.recordForwardDrop('unroutable', diagnostic);
@@ -4157,8 +4153,7 @@ export class SandboxControl extends DurableObject<Env> {
               sessionId: eligibility.route.sessionId,
               sessionAdmissionDepth: members[0]?.admissionDepth ?? 0,
             },
-            eligibility.allocation,
-            forwardDeadlineAt
+            eligibility.allocation
           ),
         ];
       },
@@ -4188,7 +4183,6 @@ export class SandboxControl extends DurableObject<Env> {
       return batchOutcomes(payload, 'unattempted', true);
     }
     const queuedAt = Date.now();
-    const forwardDeadlineAt = queuedAt + DEADLINE_MS.stopAttempt;
     const admission = this.resolveForwardingAdmission(identity);
     if (!admission) {
       this.recordForwardDrop('unroutable', diagnostic);
@@ -4210,8 +4204,7 @@ export class SandboxControl extends DurableObject<Env> {
       bytes: frameBytes,
       items: payload.items.length,
       item: member,
-      run: members =>
-        this.forwardSessionBatchRun(members, connection, identity, admission, forwardDeadlineAt),
+      run: members => this.forwardSessionBatchRun(members, connection, identity, admission),
     });
     this.ctx.waitUntil(
       next.catch(error => {
@@ -4225,10 +4218,9 @@ export class SandboxControl extends DurableObject<Env> {
     members: readonly SessionForwardRunMember<BatchForwardMember>[],
     connection: SandboxControlConnectionIdentity,
     identity: SessionEventIdentity,
-    admission: { sessionId: string; nativeRuntimeId?: string },
-    forwardDeadlineAt: number
+    admission: { sessionId: string; nativeRuntimeId?: string }
   ): Promise<SandboxEventBatchResult[]> {
-    return this.deliverBatchRun(members, connection, identity, admission, forwardDeadlineAt);
+    return this.deliverBatchRun(members, connection, identity, admission);
   }
 
   private logForwardRun(fields: ControlDiagnosticFields, level: 'info' | 'warn' = 'info'): void {
@@ -4282,8 +4274,7 @@ export class SandboxControl extends DurableObject<Env> {
     members: readonly SessionForwardRunMember<BatchForwardMember>[],
     connection: SandboxControlConnectionIdentity,
     identity: SessionEventIdentity,
-    admission: { sessionId: string; nativeRuntimeId?: string },
-    forwardDeadlineAt: number
+    admission: { sessionId: string; nativeRuntimeId?: string }
   ): Promise<SandboxEventBatchResult[]> {
     const queueWaitMs = Date.now() - (members[0]?.item.queuedAt ?? Date.now());
     const sessionAdmissionDepth = members[0]?.admissionDepth ?? 0;
@@ -4347,8 +4338,7 @@ export class SandboxControl extends DurableObject<Env> {
           allApplied = allApplied && applied;
         }
         return { applied: allApplied };
-      },
-      forwardDeadlineAt
+      }
     );
     const results = members.map(
       (member, index) =>
@@ -4408,12 +4398,12 @@ export class SandboxControl extends DurableObject<Env> {
 
   private recordForwardDrop(reason: string, fields: ControlDiagnosticFields): void {
     const level =
-      reason === 'forwarding_capacity_exhausted' || reason === 'forwarding_failed'
-        ? 'error'
-        : reason === 'forwarding_frame_rejected'
-          ? fields.rejectStage === 'before_forward'
-            ? 'error'
-            : 'warn'
+      reason === 'forwarding_frame_rejected'
+        ? fields.rejectStage === 'before_forward'
+          ? 'error'
+          : 'warn'
+        : reason === 'forwarding_failed' || reason === 'forwarding_capacity_exhausted'
+          ? 'warn'
           : 'info';
     this.logDiagnostic(
       'forward_dropped',
@@ -4466,8 +4456,7 @@ export class SandboxControl extends DurableObject<Env> {
     send: (
       stub: ReturnType<typeof getSandboxSessionStub>
     ) => Promise<{ applied: boolean; retryable?: boolean }>,
-    requireApplied: boolean,
-    forwardDeadlineAt: number
+    requireApplied: boolean
   ): Promise<SandboxControlEventResult> {
     const queueWaitMs =
       typeof diagnostic.queuedAt === 'number' ? Date.now() - diagnostic.queuedAt : undefined;
@@ -4494,8 +4483,7 @@ export class SandboxControl extends DurableObject<Env> {
       connection,
       [diagnostic],
       operation,
-      send,
-      forwardDeadlineAt
+      send
     );
     const applied = delivery.applied === true;
     const outcome = this.forwardRunOutcome(delivery);
@@ -4537,25 +4525,21 @@ export class SandboxControl extends DurableObject<Env> {
     operation: ForwardOperation,
     send: (
       stub: ReturnType<typeof getSandboxSessionStub>
-    ) => Promise<{ applied: boolean; retryable?: boolean }>,
-    forwardDeadlineAt: number
+    ) => Promise<{ applied: boolean; retryable?: boolean }>
   ): Promise<SessionFrameDelivery> {
     const startedAt = Date.now();
     let timedOut = false;
     let skipped = false;
     let attempts = 0;
-    const timeout = setTimeout(
-      () => {
-        timedOut = true;
-        for (const diagnostic of diagnostics)
-          this.logDiagnostic('forward_response_timeout', {
-            ...diagnostic,
-            operation,
-            attempts,
-          });
-      },
-      Math.max(1, forwardDeadlineAt - Date.now())
-    );
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      for (const diagnostic of diagnostics)
+        this.logDiagnostic('forward_response_timeout', {
+          ...diagnostic,
+          operation,
+          attempts,
+        });
+    }, DEADLINE_MS.stopAttempt);
     timeout.unref();
     return withDORetry(
       () => getSandboxSessionStub(this.env, route.ownerId, route.sessionId),

@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- The dedicated Notifications screen composes the master
- * OS-permission gate, the push-token registration flow, and 7 per-category toggles
+ * OS-permission gate, the push-token registration flow, and 8 per-category toggles
  * with their optimistic-mutation + retry + loading patterns. CATEGORY_META still
- * has seven keys; the KiloClaw row is hidden when useKiloClawTabVisible is false.
+ * has eight keys; the KiloClaw row is hidden when useKiloClawTabVisible is false.
  * Extracting subcomponents would re-encode the same hooks. The screen stays a
  * single rendered surface. */
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
@@ -150,6 +150,16 @@ const CATEGORY_META = [
     icon: Wallet,
   },
   {
+    key: 'spendAlerts',
+    titleKey: 'notifications.channel.spend',
+    subtitleKey: 'notifications.category.spendAlertsSubtitle',
+    icon: Wallet,
+    // A dedicated label for the device scene: the spend view owns a switch with
+    // the same visible wording, so this row's control must be addressable on
+    // its own. The low-balance sheet uses the same `*A11y` pattern.
+    accessibilityLabelKey: 'notifications.category.spendAlertsToggle',
+  },
+  {
     key: 'securityFindings',
     titleKey: 'notifications.channel.security',
     subtitleKey: 'notifications.category.securityFindingsSubtitle',
@@ -259,6 +269,10 @@ function CategoryRow({
       ? (CATEGORY_UNAVAILABLE_SUBTITLE_KEYS.get(meta.key) ?? meta.subtitleKey)
       : meta.subtitleKey;
   const subtitle = t(reasonKey ?? noCodeFallbackKey);
+  // Most rows take the visible title as their control label; the spend row
+  // carries its own so the device scene can address it unambiguously.
+  const accessibilityLabel =
+    'accessibilityLabelKey' in meta ? t(meta.accessibilityLabelKey) : t(meta.titleKey);
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />
@@ -277,7 +291,7 @@ function CategoryRow({
       <Switch
         value={displayedValue}
         disabled={isDisabled}
-        accessibilityLabel={title}
+        accessibilityLabel={accessibilityLabel}
         accessibilityState={{ disabled: isDisabled, busy: isPending }}
         onValueChange={value => {
           if (isDisabled) {
@@ -301,8 +315,8 @@ export function NotificationsScreen() {
 
   const [isTogglingPermission, setIsTogglingPermission] = useState(false);
   const [isRegisteringToken, setIsRegisteringToken] = useState(false);
-  // The `setNotificationPreferences` mutation object is shared across all five
-  // rows, and its `isPending` is a single flag for the whole procedure. Two
+  // The `setNotificationPreferences` mutation object is shared across every
+  // category row, and its `isPending` is a single flag for the whole procedure. Two
   // category flips can therefore be in flight at once, so we track the set of
   // in-flight categories explicitly and scope each row's busy state to its own
   // key. Each mutation callback resolves its own category from `variables`
@@ -640,7 +654,7 @@ export function NotificationsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* The glanceable surface. First on the screen because it is what the
-            user sees without opening the app, and it must not sit below seven
+            user sees without opening the app, and it must not sit below eight
             category rows. Each platform names it the way its own OS does:
             a Live Activity on iOS, a Live Update on Android. */}
         <View className="gap-3">

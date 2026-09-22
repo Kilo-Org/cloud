@@ -827,7 +827,8 @@
       "chat": "Spjallskilaboð",
       "kiloclaw": "Virkni í KiloClaw",
       "balance": "Inneignarviðvaranir",
-      "security": "Öryggisniðurstöður"
+      "security": "Öryggisniðurstöður",
+      "spend": "Útgjaldaviðvaranir"
     },
     "category": {
       "chatMessagesSubtitle": "svör í samtölunum þínum",
@@ -842,7 +843,9 @@
       "balanceAlertsSubtitle": "viðvaranir um lága inneign félagsins",
       "balanceAlertsUnavailable": "Skráðu þig í félag til að fá viðvaranir um inneign.",
       "securityFindingsSubtitle": "nýjar niðurstöður og SLA-áminningar",
-      "securityFindingsUnavailable": "Virkjaðu Kilo-öryggiserindreka á sviði til að fá öryggisniðurstöður."
+      "securityFindingsUnavailable": "Virkjaðu Kilo-öryggiserindreka á sviði til að fá öryggisniðurstöður.",
+      "spendAlertsSubtitle": "yfirferðir þröskulda og uppsveiflur á klukkustund",
+      "spendAlertsToggle": "Flokkur útgjaldaviðvarana"
     },
     "action": {
       "openSession": "Opna lotu"
@@ -3200,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Opna síðustu lotu"
+  },
+  "spendAlerts": {
+    "subtitle": "Sendu viðvörun í tölvupósti eða push til innheimtutengiliða þegar útgjöld þessa svæðis fara yfir mörk eða stökkva yfir venjulegan klukkustundarhraða þess.",
+    "enable": "Virkja útgjaldaviðvaranir",
+    "thresholdTitle": "Yfirferð þröskulds",
+    "thresholdSubtitle": "Safnað útgjöld fara yfir mörkin þín",
+    "anomalyTitle": "Uppsveifla á klukkustund",
+    "anomalySubtitle": "Klukkustund er langt yfir venjulegum hraða þessa svæðis",
+    "limitLabel": "Mörk (USD)",
+    "windowLabel": "Gluggi",
+    "window24h": "24 klukkustundir",
+    "window7d": "7 dagar",
+    "window30d": "30 dagar",
+    "multiplierLabel": "Margfaldari uppsveiflunnar",
+    "saved": "Stillingar útgjaldaviðvarana vistaðar",
+    "loadError": "Ekki tókst að hlaða útgjaldaviðvörunum.",
+    "saveError": "Ekki tókst að vista útgjaldaviðvaranir.",
+    "empty": "Útgjaldaviðvaranir eru af. Kveiktu á þeim til að vara innheimtutengiliði þessa svæðis við.",
+    "noSpend": "Engin útgjöld skráð ennþá",
+    "spend24h": "Útgjöld síðustu 24 klukkustundir",
+    "multiplierError": "Sláðu inn margfaldara sem er 1 eða meira",
+    "permissionDenied": "Þú hefur ekki heimild til að stjórna útgjaldaviðvörunum.",
+    "pushOffByCategory": "Af í Tilkynningum"
   }
 }

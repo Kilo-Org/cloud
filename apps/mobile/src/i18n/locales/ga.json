@@ -875,7 +875,8 @@
       "chat": "Teachtaireachtaí comhrá",
       "kiloclaw": "Gníomhaíocht KiloClaw",
       "balance": "Foláirimh iarmhéid",
-      "security": "Torthaí slándála"
+      "security": "Torthaí slándála",
+      "spend": "Foláirimh chaiteachais"
     },
     "category": {
       "chatMessagesSubtitle": "freagraí i do chomhráite",
@@ -890,7 +891,9 @@
       "balanceAlertsSubtitle": "rabhaidh faoi iarmhéid íseal na heagraíochta",
       "balanceAlertsUnavailable": "Bí páirteach in eagraíocht chun rabhaidh iarmhéid a fháil.",
       "securityFindingsSubtitle": "torthaí nua agus meabhrúcháin SLA",
-      "securityFindingsUnavailable": "Cumasaigh Gníomhaire slándála Kilo ar raon chun torthaí slándála a fháil."
+      "securityFindingsUnavailable": "Cumasaigh Gníomhaire slándála Kilo ar raon chun torthaí slándála a fháil.",
+      "spendAlertsSubtitle": "sáruithe tairsí agus spuaiceanna uaire",
+      "spendAlertsToggle": "Catagóir foláirimh chaiteachais"
     },
     "action": {
       "openSession": "Oscail an seisiún"
@@ -3329,5 +3332,28 @@
   },
   "launcher": {
     "openLastSession": "Oscail an seisiún deireanach"
+  },
+  "spendAlerts": {
+    "subtitle": "Seol foláireamh trí ríomhphost nó trí push chuig na teagmhálaithe billeála nuair a sháraíonn caiteachas an raoin seo teorainn nó nuair a ardaíonn sé os cionn a ghnáthráta uaire.",
+    "enable": "Cumasaigh foláirimh chaiteachais",
+    "thresholdTitle": "Sárú tairsí",
+    "thresholdSubtitle": "Sáraíonn caiteachas reatha do theorainn",
+    "anomalyTitle": "Spuaic uaire",
+    "anomalySubtitle": "Tá uair an chloig i bhfad os cionn gnáthráta an raoin seo",
+    "limitLabel": "Teorainn (USD)",
+    "windowLabel": "Fuinneog",
+    "window24h": "24 uair an chloig",
+    "window7d": "7 lá",
+    "window30d": "30 lá",
+    "multiplierLabel": "Iolraitheoir na spuaice",
+    "saved": "Sábháladh socruithe foláirimh chaiteachais",
+    "loadError": "Níorbh fhéidir foláirimh chaiteachais a lódáil.",
+    "saveError": "Níorbh fhéidir foláirimh chaiteachais a shábháil.",
+    "empty": "Tá foláirimh chaiteachais as. Cuir ar siúl iad chun teagmhálaithe billeála an raoin seo a chur ar an eolas.",
+    "noSpend": "Níor taifeadadh aon chaiteachas fós",
+    "spend24h": "Caiteachas sna 24 uair an chloig seo caite",
+    "multiplierError": "Iontráil iolraitheoir 1 nó níos mó",
+    "permissionDenied": "Níl cead agat foláirimh chaiteachais a bhainistiú.",
+    "pushOffByCategory": "As i bhFógraí"
   }
 }

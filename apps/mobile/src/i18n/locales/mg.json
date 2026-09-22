@@ -827,7 +827,8 @@
       "chat": "Hafatra amin'ny resaka",
       "kiloclaw": "Hetsika ao amin'ny KiloClaw",
       "balance": "Fampitandremana momba ny vola sisa",
-      "security": "Olana hita amin'ny fiarovana"
+      "security": "Olana hita amin'ny fiarovana",
+      "spend": "Fampitandremana momba ny fandaniana"
     },
     "category": {
       "chatMessagesSubtitle": "valiny amin'ny resakao",
@@ -842,7 +843,9 @@
       "balanceAlertsSubtitle": "fampitandremana rehefa kely ny ambim-bolan'ny fikambanana",
       "balanceAlertsUnavailable": "Miaraha amin'ny fikambanana iray mba hahazoana fampitandremana momba ny ambim-bola.",
       "securityFindingsSubtitle": "olana vaovao hita sy fampahatsiahivana SLA",
-      "securityFindingsUnavailable": "Ampio ny mpanampy amin'ny fiarovana Kilo ao amin'ny faritra iray mba hahazoana ny olana ara-piarovana hita."
+      "securityFindingsUnavailable": "Ampio ny mpanampy amin'ny fiarovana Kilo ao amin'ny faritra iray mba hahazoana ny olana ara-piarovana hita.",
+      "spendAlertsSubtitle": "fihoaram-bidy sy fitsambikinana isan'ora",
+      "spendAlertsToggle": "Sokajin'ny fampitandremana momba ny fandaniana"
     },
     "action": {
       "openSession": "Sokafy ny fotoam-piasana"
@@ -3200,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Sokafy ny fotoam-piasana farany"
+  },
+  "spendAlerts": {
+    "subtitle": "Alefaso fampitandremana amin'ny mailaka na push ho an'ny mpifandray amin'ny faktiora rehefa mihoatra fetra ny fandaniana amin'ity faritra ity na miakatra ambonin'ny taha isan'ora mahazatra.",
+    "enable": "Velomy ny fampitandremana momba ny fandaniana",
+    "thresholdTitle": "Fihoaram-bidy",
+    "thresholdSubtitle": "Mihoatra ny fetranao ny fandaniana mitohy",
+    "anomalyTitle": "Fitsambikinana isan'ora",
+    "anomalySubtitle": "Ny adiny iray dia ambony lavitra noho ny taha mahazatra amin'ity faritra ity",
+    "limitLabel": "Fetra (USD)",
+    "windowLabel": "Fe-potoana",
+    "window24h": "Adiny 24",
+    "window7d": "7 andro",
+    "window30d": "30 andro",
+    "multiplierLabel": "Mpamaro ny fitsambikinana",
+    "saved": "Voatahiry ny fikirakirana ny fampitandremana momba ny fandaniana",
+    "loadError": "Tsy afaka nampiditra ny fampitandremana momba ny fandaniana.",
+    "saveError": "Tsy afaka nitahiry ny fampitandremana momba ny fandaniana.",
+    "empty": "Mihidy ny fampitandremana momba ny fandaniana. Velomy izy ireo hampandre ny mpifandray amin'ny faktiora amin'ity faritra ity.",
+    "noSpend": "Mbola tsy misy fandaniana voarakitra",
+    "spend24h": "Fandaniana tao anatin'ny 24 ora farany",
+    "multiplierError": "Ampidiro mpamaro 1 na mihoatra",
+    "permissionDenied": "Tsy manana alalana hitantana ny fampitandremana momba ny fandaniana ianao.",
+    "pushOffByCategory": "Mihidy ao amin'ny Fampandrenesana"
   }
 }

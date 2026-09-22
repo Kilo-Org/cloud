@@ -323,7 +323,8 @@
       "chat": "رسائل الدردشة",
       "kiloclaw": "نشاط KiloClaw",
       "balance": "تنبيهات الرصيد",
-      "security": "ملاحظات الأمان"
+      "security": "ملاحظات الأمان",
+      "spend": "تنبيهات الإنفاق"
     },
     "category": {
       "chatMessagesSubtitle": "الردود في محادثاتك",
@@ -338,7 +339,9 @@
       "balanceAlertsSubtitle": "تحذيرات انخفاض رصيد المؤسسة",
       "balanceAlertsUnavailable": "انضم إلى مؤسسة للحصول على تنبيهات الرصيد.",
       "securityFindingsSubtitle": "نتائج جديدة وتذكيرات SLA",
-      "securityFindingsUnavailable": "فعِّل وكيل الأمان من Kilo على نطاق للحصول على النتائج الأمنية."
+      "securityFindingsUnavailable": "فعِّل وكيل الأمان من Kilo على نطاق للحصول على النتائج الأمنية.",
+      "spendAlertsSubtitle": "تجاوزات الحدود والارتفاعات الساعية",
+      "spendAlertsToggle": "فئة تنبيهات الإنفاق"
     },
     "action": {
       "openSession": "فتح الجلسة"
@@ -3372,5 +3375,28 @@
   },
   "launcher": {
     "openLastSession": "فتح آخر جلسة"
+  },
+  "spendAlerts": {
+    "subtitle": "أرسل تنبيهًا بالبريد الإلكتروني أو بالإشعارات إلى جهات اتصال الفوترة عندما يتجاوز إنفاق هذا النطاق حدًا معينًا أو يرتفع فوق معدله الساعي المعتاد.",
+    "enable": "تفعيل تنبيهات الإنفاق",
+    "thresholdTitle": "تجاوز الحد",
+    "thresholdSubtitle": "الإنفاق المتحرك يتجاوز حدك",
+    "anomalyTitle": "ارتفاع ساعي",
+    "anomalySubtitle": "الساعة أعلى بكثير من المعدل المعتاد لهذا النطاق",
+    "limitLabel": "الحد (USD)",
+    "windowLabel": "النافذة الزمنية",
+    "window24h": "24 ساعة",
+    "window7d": "7 أيام",
+    "window30d": "30 يومًا",
+    "multiplierLabel": "مضاعف الارتفاع",
+    "saved": "تم حفظ إعدادات تنبيهات الإنفاق",
+    "loadError": "تعذّر تحميل تنبيهات الإنفاق.",
+    "saveError": "تعذّر حفظ تنبيهات الإنفاق.",
+    "empty": "تنبيهات الإنفاق متوقفة. فعّلها لتنبيه جهات اتصال الفوترة لهذا النطاق.",
+    "noSpend": "لم يُسجَّل أي إنفاق بعد",
+    "spend24h": "الإنفاق خلال آخر 24 ساعة",
+    "multiplierError": "أدخل مضاعفًا يساوي 1 أو أكثر",
+    "permissionDenied": "ليست لديك صلاحية لإدارة تنبيهات الإنفاق.",
+    "pushOffByCategory": "معطّل في الإشعارات"
   }
 }

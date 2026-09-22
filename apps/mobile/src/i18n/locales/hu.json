@@ -827,7 +827,8 @@
       "chat": "Csevegőüzenetek",
       "kiloclaw": "KiloClaw-tevékenység",
       "balance": "Egyenlegértesítések",
-      "security": "Biztonsági találatok"
+      "security": "Biztonsági találatok",
+      "spend": "Költésfigyelmeztetések"
     },
     "category": {
       "chatMessagesSubtitle": "válaszok a beszélgetéseidben",
@@ -842,7 +843,9 @@
       "balanceAlertsSubtitle": "figyelmeztetések a szervezet alacsony egyenlegére",
       "balanceAlertsUnavailable": "Csatlakozz egy szervezethez, hogy egyenleg-figyelmeztetéseket kapj.",
       "securityFindingsSubtitle": "új biztonsági problémák és SLA-emlékeztetők",
-      "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörön, hogy biztonsági problémákat kapj."
+      "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörön, hogy biztonsági problémákat kapj.",
+      "spendAlertsSubtitle": "küszöbátlépések és óránkénti kiugrások",
+      "spendAlertsToggle": "Költésfigyelmeztetések kategória"
     },
     "action": {
       "openSession": "Munkamenet megnyitása"
@@ -3200,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Utolsó munkamenet megnyitása"
+  },
+  "spendAlerts": {
+    "subtitle": "Küldj e-mailes vagy push értesítést a számlázási kapcsolatoknak, amikor ennek a hatókörnek a költése átlép egy limitet, vagy a szokásos óránkénti üteme fölé ugrik.",
+    "enable": "Költésfigyelmeztetések engedélyezése",
+    "thresholdTitle": "Küszöbátlépés",
+    "thresholdSubtitle": "A folyó költés átlépi a limited",
+    "anomalyTitle": "Óránkénti kiugrás",
+    "anomalySubtitle": "Egy óra messze a hatókör szokásos üteme felett van",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Ablak",
+    "window24h": "24 óra",
+    "window7d": "7 nap",
+    "window30d": "30 nap",
+    "multiplierLabel": "Kiugrási szorzó",
+    "saved": "A költésfigyelmeztetési beállítások elmentve",
+    "loadError": "A költésfigyelmeztetéseket nem sikerült betölteni.",
+    "saveError": "A költésfigyelmeztetéseket nem sikerült elmenteni.",
+    "empty": "A költésfigyelmeztetések ki vannak kapcsolva. Kapcsold be őket, hogy értesítsd a hatókör számlázási kapcsolatait.",
+    "noSpend": "Még nincs rögzített költés",
+    "spend24h": "Költés az elmúlt 24 órában",
+    "multiplierError": "Adj meg 1 vagy nagyobb szorzót",
+    "permissionDenied": "Nincs jogosultságod a költésfigyelmeztetések kezelésére.",
+    "pushOffByCategory": "Értesítésekben kikapcsolva"
   }
 }

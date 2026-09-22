@@ -42,6 +42,15 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/form-field-a11y', () => ({ formFieldA11y: () => 'a11y' }));
+// The screen wraps its scroll view in the shared keyboard padding; the real
+// components pull the React Native CJS module, which the mounted project
+// cannot parse. Mock them like the other screen dependencies above.
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
+  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
+}));
+vi.mock('@/components/kilo-chat/use-reveal-end-on-keyboard', () => ({
+  useRevealEndOnKeyboard: () => ({ current: null }),
+}));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check', GitPullRequest: 'GitPullRequest' }));
 vi.mock('@/components/ui/radio-group', () => ({
   RadioGroup: 'RadioGroup',

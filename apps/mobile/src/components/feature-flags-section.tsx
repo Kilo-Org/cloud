@@ -13,9 +13,9 @@ import { type FeatureFlagStatus, useFeatureFlagStatuses } from '@/lib/analytics/
  *
  * Each row reads `<value> · <source> · <version relation>`, e.g.
  * `Enabled · remote · ≥ 1.0.4`: the value the UI acts on, whether it came
- * from PostHog or the flag's default, and the gate that decided. The source
- * and relation copy is technical notation (see the i18n allowlist); the
- * translated part is the value word and the section header.
+ * from PostHog or the flag's default, and the gate that decided. Both the
+ * value word and the reason copy come from the catalog, so the row reads in
+ * the reader's language; only the flag key and the build version are notation.
  */
 function FlagRow({ status }: { status: FeatureFlagStatus }) {
   const { t } = useTranslation();

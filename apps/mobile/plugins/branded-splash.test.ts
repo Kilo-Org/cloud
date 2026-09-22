@@ -164,9 +164,17 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
-    });
+    // The compiled result also carries the app's other Android color resources
+    // (iconBackground, colorPrimary, app_background, notification_icon_color);
+    // pin the splash background this plugin contributes without requiring the
+    // list to hold only it.
+    expect(evaluated._internal?.modResults?.android?.colors).toEqual(
+      expect.objectContaining({
+        resources: expect.objectContaining({
+          color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+        }),
+      })
+    );
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {
         style: expect.arrayContaining([

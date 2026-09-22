@@ -25,13 +25,16 @@ export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<Se
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
-          // The copy sits at the end of the row, so it is placed with the box's
-          // own direction (`justify-end` on a `flex-row`) and never with a
-          // physical `text-left`/`text-right`: React Native swaps those two
-          // under RTL (Android maps `textAlign: 'left'` to `Gravity.RIGHT` when
-          // the layout is RTL), which floated the action onto the inner edge of
-          // its box instead of the row's end in Arabic.
-          className="max-w-full grow flex-row justify-end active:opacity-70"
+          // The label alone grows, so the row's `justify-between` places this
+          // box at the row's end: the physical right in LTR, the physical left
+          // in RTL. It must NOT grow too — when both children grew, the row
+          // split in half and the action sat at the inner edge of its half (the
+          // screen centre in Arabic), so it never reached the margin while the
+          // tab bar, cards and rows below were fully mirrored
+          // (home-arabic-rtl, home). Never a physical `text-left`/`text-right`:
+          // React Native swaps those two under RTL (Android maps
+          // `textAlign: 'left'` to `Gravity.RIGHT` when the layout is RTL).
+          className="max-w-full shrink-0 flex-row active:opacity-70"
         >
           <Text
             className={cn(

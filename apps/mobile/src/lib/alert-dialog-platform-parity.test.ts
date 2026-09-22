@@ -116,6 +116,31 @@ describe('one implementation for both platforms on the alert dialog path', () =>
     );
   });
 
+  it('drops the stock ALL-CAPS from the Android dialog action labels', async () => {
+    // discard-draft-dialog: AppCompat's alert button style sets
+    // `textAllCaps=true`, so the sentence-case catalog copy ("Scarta",
+    // "Continua a modificare") rendered as "SCARTA" / "CONTINUA A MODIFICARE"
+    // while every button the app draws itself is sentence case. The dialog
+    // theme must point both button-bar style attributes at a child style that
+    // clears the caps, so no dialog keeps the stock treatment.
+    const config = loadConfig();
+    const androidMods = config.mods.android ?? {};
+
+    const styles = await runAndroidMod(config, androidMods.styles, {
+      resources: { style: [{ $: { name: 'AppTheme' } }] },
+    });
+
+    const buttonStyle = styles.resources.style?.find(
+      style => style.$.name === 'AppAlertDialogButton'
+    );
+    expect(buttonStyle?.$.parent).toBe('Widget.AppCompat.Button.ButtonBar.AlertDialog');
+    expect(styleValue(styles, 'AppAlertDialogButton', 'android:textAllCaps')).toBe('false');
+    // Both spellings, because either alert layout may inflate the button bar.
+    for (const item of ['buttonBarButtonStyle', 'android:buttonBarButtonStyle']) {
+      expect(styleValue(styles, 'AppAlertDialogTheme', item)).toBe('@style/AppAlertDialogButton');
+    }
+  });
+
   it('keeps the alert dialog theme when the styles file has no style yet', async () => {
     // styles.xml can reach the mod without a `<style>` array (the plugin's
     // fallback path). Pushing the overlay into a throwaway array there would
@@ -125,7 +150,10 @@ describe('one implementation for both platforms on the alert dialog path', () =>
 
     const styles = await runAndroidMod(config, androidMods.styles, { resources: {} });
 
-    expect(styles.resources.style?.map(style => style.$.name)).toEqual(['AppAlertDialogTheme']);
+    expect(styles.resources.style?.map(style => style.$.name)).toEqual([
+      'AppAlertDialogButton',
+      'AppAlertDialogTheme',
+    ]);
     expect(styleValue(styles, 'AppAlertDialogTheme', 'colorAccent')).toBe(
       '@color/app_dialog_action'
     );

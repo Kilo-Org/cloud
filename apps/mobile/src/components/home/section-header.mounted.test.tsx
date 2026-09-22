@@ -14,7 +14,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 
-const ACTION_BOX_CLASSES = ['grow', 'max-w-full', 'flex-row', 'justify-end'];
+const ACTION_BOX_CLASSES = ['shrink-0', 'max-w-full', 'flex-row'];
 const ACTION_TEXT_CLASSES = ['shrink', 'font-mono-medium', 'text-[11px]', 'text-primary'];
 const PHYSICAL_ALIGNMENT_CLASSES = new Set([
   'text-left',
@@ -87,17 +87,21 @@ describe('SectionHeader mounted layout', () => {
       expect(text.props.style).toBeUndefined();
     }
 
-    expect((action.parent?.props.className as string | undefined)?.split(' ')).toContain(
-      'flex-wrap'
-    );
-    // The action copy must sit at the row's end in both directions, so the box
-    // is a row that places its content at the main-axis end, and the layout is
-    // direction-relative and identical under RTL. The row's outer edge comes
-    // from the action box's flex direction, never from a physical text
-    // alignment.
-    expect((action.props.className as string).split(' ')).toEqual(
-      expect.arrayContaining(ACTION_BOX_CLASSES)
-    );
+    // The action copy must sit at the row's end in both directions, so the row
+    // keeps `justify-between` and only the label grows: an action box that grew
+    // too split the row in half, and its inner `justify-end` then pinned the
+    // copy to the box's physical right — the screen centre in Arabic — so the
+    // action never reached the outer margin (home-arabic-rtl, home). The
+    // layout is direction-relative and identical under RTL, and the row's outer
+    // edge comes from the row's own main-axis placement, never from a physical
+    // text alignment.
+    const rowClasses = ((action.parent?.props.className as string | undefined) ?? '').split(' ');
+    expect(rowClasses).toContain('flex-wrap');
+    expect(rowClasses).toContain('justify-between');
+    const actionBoxClasses = (action.props.className as string).split(' ');
+    expect(actionBoxClasses).toEqual(expect.arrayContaining(ACTION_BOX_CLASSES));
+    expect(actionBoxClasses).not.toContain('grow');
+    expect(actionBoxClasses).not.toContain('justify-end');
     const actionTextClasses = (text.props.className as string).split(' ');
     expect(actionTextClasses).toEqual(expect.arrayContaining(ACTION_TEXT_CLASSES));
     expect(actionTextClasses.filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name))).toEqual([]);

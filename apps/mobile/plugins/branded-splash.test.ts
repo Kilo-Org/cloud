@@ -135,8 +135,12 @@ describe('shared branded splash', () => {
     ).toBeTypeOf('function');
     expect(config.mods?.android?.styles).toBeTypeOf('function');
 
+    // Compile against a throwaway project: introspection reads the resources it
+    // finds under `projectRoot`, and a developer's prebuilt `android/` tree
+    // carries colors this test does not own, which the mod results would merge.
+    const { root } = createAndroidProject();
     const evaluated = await compileModsAsync(config, {
-      projectRoot,
+      projectRoot: root,
       platforms: ['ios', 'android'],
       introspect: true,
     });

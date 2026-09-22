@@ -175,6 +175,9 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // compileModsAsync introspects the project's existing android resources, so
+    // the colors array also carries the project's other theme colors. Assert the
+    // splash color this plugin owns instead of the array's exact contents.
     // Introspection reads the project's own native resources, so the colors
     // modResults carry whatever the worktree's generated `android/` project
     // declares (adaptive-icon, notification, app background) next to the

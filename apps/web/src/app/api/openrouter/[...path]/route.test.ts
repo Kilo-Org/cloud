@@ -151,6 +151,7 @@ const provider = {
   id: 'openrouter',
   apiUrl: 'https://openrouter.ai/api/v1',
   apiUrlOverrides: {},
+  disableUrlSuffix: false,
   apiKey: 'test-key',
   apiKeyHeader: null,
   supportedChatApis: ['chat_completions', 'responses', 'messages'],

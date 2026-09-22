@@ -85,12 +85,10 @@ export function ProfileScreen() {
   // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
-  // Android's native alert paints every button with the theme accent, so
-  // `Alert.alert`'s destructive style never shows the red affordance there.
-  // Android opens the in-app confirmation instead; iOS keeps the native alert,
-  // which already renders the destructive sign-out choice in red.
-  // The confirmation's platform split lives in the hook, keeping this screen's
-  // shared layout path free of platform forks (`screen-insets.test.ts`).
+  // One destructive confirm for both platforms: the in-app dialog carries the
+  // destructive (red) affordance on iOS and Android alike, so the sign-out
+  // path never branches on the platform. The confirmation itself, and its
+  // rationale, live in `useSignOutConfirmation`.
   const { confirmVisible, requestSignOut, dismissConfirm, confirmSignOut } = useSignOutConfirmation(
     () => void signOut()
   );

@@ -1,38 +1,26 @@
 import { useCallback, useState } from 'react';
-import { Alert } from 'react-native';
-import { useTranslation } from 'react-i18next';
-
-import { needsInAppDestructiveConfirm } from '@/lib/destructive-confirm-platform';
 
 /**
- * Sign-out confirmation, including its platform split.
+ * Sign-out confirmation.
  *
- * Kept in its own module so the Profile screen carries no platform fork: that
- * screen is a caller of the shared side-inset entry point, and
- * `screen-insets.test.ts` pins every such caller to one cross-platform
+ * One destructive confirm for both platforms: the in-app
+ * `DestructiveConfirmDialog` carries the red affordance on iOS and Android
+ * alike. The native alert cannot be the shared implementation — Android's
+ * `AlertDialog` paints every button with the theme accent, so
+ * `Alert.alert`'s `style: 'destructive'` never reaches the screen there — so
+ * this hook never branches on the platform.
+ *
+ * Kept in its own module so the Profile screen holds no confirmation state:
+ * that screen reads its side insets from the shared entry point, and
+ * `screen-insets.test.ts` pins every caller of it to one cross-platform
  * implementation.
- *
- * Android's native `AlertDialog` paints every button with the theme accent, so
- * `Alert.alert`'s `style: 'destructive'` never reaches the screen there.
- * Android opens the in-app `DestructiveConfirmDialog` instead; iOS keeps the
- * native alert, whose destructive choice already renders red. The platform read
- * itself lives in `needsInAppDestructiveConfirm`, shared with the other
- * destructive confirmations.
  */
 export function useSignOutConfirmation(onSignOut: () => void) {
-  const { t } = useTranslation();
   const [confirmVisible, setConfirmVisible] = useState(false);
 
   const requestSignOut = useCallback(() => {
-    if (needsInAppDestructiveConfirm()) {
-      setConfirmVisible(true);
-      return;
-    }
-    Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('common.signOut'), style: 'destructive', onPress: onSignOut },
-    ]);
-  }, [onSignOut, t]);
+    setConfirmVisible(true);
+  }, []);
 
   const dismissConfirm = useCallback(() => {
     setConfirmVisible(false);

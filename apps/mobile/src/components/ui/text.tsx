@@ -1,9 +1,9 @@
 import * as Slot from '@rn-primitives/slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
-import { I18nManager, Text as RNText, type Role } from 'react-native';
+import { I18nManager, Text as RNText, type Role, type TextStyle } from 'react-native';
 
-import { RTL_NO_LETTER_SPACING, RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
+import { RTL_NO_LETTER_SPACING, RTL_WRITING_DIRECTION, textLetterSpacing } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 const textVariants = cva('text-foreground text-base font-medium', {
@@ -74,6 +74,18 @@ function Text({
   }) {
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot.Text : RNText;
+  // Letter spacing — Tailwind's `tracking-*` — is a Latin typographic device:
+  // it opens every glyph from its neighbour. A joined-script run (Arabic,
+  // Farsi, Urdu, Kurdish, Pashto) is one connected shape, so any tracking class
+  // on it would pull apart letters the script joins; the app's RTL catalogs do
+  // not take tracking either. The reset therefore follows the script whatever
+  // the interface direction is, and an RTL interface whatever the script is.
+  // Latin runs in LTR keep the style's tracking. The caller's own style stays
+  // last, so an explicit `letterSpacing` still wins.
+  const ownStyles = [
+    I18nManager.isRTL ? RTL_WRITING_DIRECTION : undefined,
+    textLetterSpacing(props.children) ?? (I18nManager.isRTL ? RTL_NO_LETTER_SPACING : undefined),
+  ].filter((style): style is TextStyle => style !== undefined);
   return (
     <Component
       className={cn(
@@ -85,11 +97,7 @@ function Text({
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
-      style={
-        I18nManager.isRTL
-          ? [RTL_WRITING_DIRECTION, RTL_NO_LETTER_SPACING, props.style]
-          : props.style
-      }
+      style={ownStyles.length > 0 ? [...ownStyles, props.style] : props.style}
     />
   );
 }

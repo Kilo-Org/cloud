@@ -697,6 +697,73 @@ describe('useNewSessionCreator upload gate', () => {
   });
 });
 
+describe('useNewSessionCreator in-flight draft edit', () => {
+  // The composer stays editable while a create is in flight (locking a focused
+  // Android input drops the IME and collapses the pinned footer), so the
+  // attempt must not silently discard a draft the user changed behind it.
+  it('cancels the attempt before dispatch when the draft changes during the upload', async () => {
+    const uploadGate = deferred<{ ok: true; wire: undefined; submission: undefined }>();
+    const gatedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      uploadPending: vi.fn(async () => uploadGate.promise),
+    };
+    const setIsCreating = vi.fn(() => undefined);
+    const resultRef = mountCreator(
+      createInput({ organizationId: 'org-1', setIsCreating, attachments: gatedAttachments })
+    );
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+
+    // The create is still in flight; the user keeps typing.
+    promptRef.current = 'first draft, plus detail';
+    await act(async () => {
+      uploadGate.resolve({ ok: true, wire: undefined, submission: undefined });
+      await attempt;
+    });
+
+    // The attempt never reached the server, so no session was created from the
+    // stale snapshot, and the edited draft is still the composer's text.
+    expect(prepareSessionMutate).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(setIsCreating).toHaveBeenCalledWith(false);
+    expect(promptRef.current).toBe('first draft, plus detail');
+  });
+
+  it('creates normally when the draft is unchanged across the in-flight upload', async () => {
+    const uploadGate = deferred<{ ok: true; wire: undefined; submission: undefined }>();
+    const gatedAttachments: CreatorInput['attachments'] = {
+      ...FAKE_ATTACHMENTS,
+      uploadPending: vi.fn(async () => uploadGate.promise),
+    };
+    const resultRef = mountCreator(
+      createInput({ organizationId: 'org-1', attachments: gatedAttachments })
+    );
+    const { createSessionFromDraft, promptRef } = requireResult(resultRef);
+    promptRef.current = 'first draft';
+
+    let attempt: Promise<void> | undefined = undefined;
+    await act(async () => {
+      attempt = createSessionFromDraft();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      uploadGate.resolve({ ok: true, wire: undefined, submission: undefined });
+      await attempt;
+    });
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: 'first draft' })
+    );
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('useNewSessionCreator profileId', () => {
   it('passes profileId into prepareSession when an effective id exists', async () => {
     prepareSessionMutate.mockResolvedValue(sessionResult());

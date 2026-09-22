@@ -392,7 +392,9 @@ export function NewSessionPrompt({
           // No dimming while a create is in flight: the field stays editable
           // (an in-flight create must not steal the IME from the pinned
           // footer), so it must not read as disabled. The busy affordance is
-          // the Start button's own spinner.
+          // the Start button's own spinner. An edit made mid-flight is not
+          // discarded: the creator cancels the attempt before it dispatches
+          // and keeps this draft (see `createSessionFromDraft`).
           className="w-full px-2 py-2 text-base leading-6 text-foreground"
           style={[
             promptInputStyle,

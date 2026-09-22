@@ -44,7 +44,11 @@ type ScreenHeaderProps = {
   /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
   size?: 'default' | 'large';
   headerRight?: React.ReactNode;
-  /** Home, Agents, Quick Chat, and session headers supply context below the title.
+  /** Controls rendered at the trailing edge of the title row. The heading keeps
+   * `flex-1 min-w-0`, so the title keeps its tail ellipsis and the controls keep
+   * their full width instead of the `headerRight` half-row cap wrapping them. */
+  inlineActions?: React.ReactNode;
+  /** Home, Quick Chat, and session headers supply context below the title.
    * Other callers keep their existing title-only layout when this slot is absent. */
   context?: React.ReactNode;
   modal?: boolean;
@@ -96,6 +100,7 @@ export function ScreenHeader({
   reserveEyebrow = false,
   size = 'default',
   headerRight,
+  inlineActions,
   context,
   modal,
   centerTitle = modal ?? false,
@@ -302,6 +307,7 @@ export function ScreenHeader({
             {headerRight ? (
               <View className="ms-3 min-w-0 max-w-[50%] shrink">{headerRight}</View>
             ) : null}
+            {inlineActions ? <View className="ms-3 min-w-0 shrink">{inlineActions}</View> : null}
           </View>
         )}
       </View>

@@ -33,6 +33,14 @@ import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } f
 
 const SKELETON_ROW_COUNT = 8;
 
+/** The FAB's square box, shared by its layout style. */
+const FAB_BOX = { width: FAB_SIZE, height: FAB_SIZE } as const;
+
+/** The See-all label's uppercase micro type, kept out of the JSX so the long
+ * class list does not force the `Text` open tag to wrap. */
+const SEE_ALL_TEXT_CLASS =
+  'shrink text-center font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary';
+
 export function AgentSessionListScreen() {
   const router = useRouter();
   const navigation = useNavigation();
@@ -156,17 +164,18 @@ export function AgentSessionListScreen() {
   const navigateToSession = useAgentSessionNavigator();
 
   const seeAllLabel = t('home.seeAll');
-  // The list controls take the header's `context` slot, one line below the
-  // title, so the 30px title owns the whole title row (Quick Chat puts its
-  // account control in the same slot). Sharing that row through `headerRight`,
-  // the slot's half-row cap squeezed both columns on a narrow viewport until
+  // The list controls share the title's row through the header's `inlineActions`
+  // slot, trailing the eyebrow + title heading. The heading keeps
+  // `min-w-0 flex-1`, so the 30px title keeps its tail ellipsis while the
+  // controls keep their full width — sharing that row through the old
+  // `headerRight` half-row cap squeezed both columns on a narrow viewport until
   // the title broke mid-word and this label stacked onto two lines (device
-  // capture at 480x1040: "Age / nts" beside "SEE / ALL"). On its own row the
-  // control keeps the header's full width at every display size, and the
-  // reserved row height keeps the header from moving when the filter button
-  // appears with the loaded sessions.
+  // capture at 480x1040: "Age / nts" beside "SEE / ALL"). The reserved row
+  // height keeps the header from moving when the filter button appears with the
+  // loaded sessions, and the box can shrink so an extreme accessibility scale
+  // ellipsizes the label instead of wrapping it to a second line.
   const headerActions = (
-    <View className="min-h-11 min-w-0 flex-row items-center justify-end gap-4">
+    <View className="min-h-11 min-w-0 shrink flex-row items-center justify-end gap-4">
       <Pressable
         onPress={() => {
           router.push('/(app)/(tabs)/(2_agents)/history' as Href);
@@ -178,7 +187,7 @@ export function AgentSessionListScreen() {
         testID="agents-view-history"
         className="min-w-0 shrink justify-center active:opacity-70"
       >
-        <Text className="shrink text-center font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
+        <Text numberOfLines={1} className={SEE_ALL_TEXT_CLASS}>
           {seeAllLabel}
         </Text>
       </Pressable>
@@ -207,34 +216,27 @@ export function AgentSessionListScreen() {
   );
 
   // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
-  // content must clear them. The inset rides on the list's frame as a
-  // `marginBottom` (the viewport ends above the band) — the same viewport inset
-  // `TabScreenScrollView` uses — never on the list's content and never as
-  // `style` padding: a content inset only cleared the end of the list, so every
-  // row the user scrolled into the button's band had its right-aligned
-  // timestamp and chevron covered, and a scroll view's padding is not part of
-  // its scrollable content on iOS, so padding on the frame clipped the last
-  // rows under the bar with no way to scroll them clear. The vertical value
-  // matches the screen's `StateSurfaceInsets`. The landscape side insets keep
-  // row text clear of the sensor housing; portrait insets are 0, keeping the
-  // geometry unchanged.
-  const listInsets = useMemo(
-    () => ({
-      frame: { marginBottom: showFab ? tabBarHeight + FAB_SIZE + FAB_MARGIN : tabBarHeight },
-      content: { paddingTop: 0, paddingBottom: 0, paddingLeft: left, paddingRight: right },
-    }),
-    [showFab, tabBarHeight, left, right]
-  );
+  // content must clear them. The tab bar keeps its viewport inset as the list
+  // frame's `marginBottom` — the same viewport inset `TabScreenScrollView` uses
+  // — so the list's own background runs clean to the tab bar edge with no bare
+  // band between the last row and the bar. The FAB's clearance rides on the
+  // list's content as `paddingBottom` instead: the button floats over the list,
+  // and the end padding still carries the last row clear of it. Frame margin
+  // plus content padding together match the screen's `StateSurfaceInsets`. The
+  // landscape side insets keep row text clear of the sensor housing; portrait
+  // insets are 0, keeping the geometry unchanged.
+  const listInsets = useMemo(() => {
+    const fabPad = showFab ? FAB_SIZE + FAB_MARGIN : 0;
+    return {
+      frame: { marginBottom: tabBarHeight },
+      content: { paddingTop: 0, paddingBottom: fabPad, paddingLeft: left, paddingRight: right },
+    };
+  }, [showFab, tabBarHeight, left, right]);
 
   // The fixed 20pt margin gains the landscape right inset so the FAB clears the
   // sensor area; portrait insets are 0, keeping the geometry unchanged.
   const fabStyle = useMemo(
-    () => ({
-      bottom: tabBarHeight + FAB_MARGIN,
-      right: 20 + right,
-      width: FAB_SIZE,
-      height: FAB_SIZE,
-    }),
+    () => ({ ...FAB_BOX, bottom: tabBarHeight + FAB_MARGIN, right: 20 + right }),
     [tabBarHeight, right]
   );
 
@@ -290,9 +292,9 @@ export function AgentSessionListScreen() {
       <LiveSessionListEmptyState organizationId={organizationId} refreshControl={refreshControl} />
     );
   } else if (hasLiveRows) {
-    // The FAB-band inset shrinks the list's frame (`marginBottom`), so the
-    // viewport ends above the button's band and no row can scroll into it on
-    // either platform.
+    // The tab-bar inset rides on the list frame, so the viewport ends at the tab
+    // bar; the FAB clearance rides on the content's `paddingBottom`, so the
+    // button floats over the list and the last row still scrolls clear of it.
     body = (
       <FlatList
         ref={listRef}
@@ -328,7 +330,7 @@ export function AgentSessionListScreen() {
           size="large"
           showBackButton={false}
           className="px-[22px] pb-1"
-          context={headerActions}
+          inlineActions={headerActions}
         />
         {hasLiveRows || isSearching ? (
           <SessionListSearchHeader

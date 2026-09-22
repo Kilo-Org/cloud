@@ -43,13 +43,22 @@ const native = vi.hoisted(() => {
   const measureInWindow = vi.fn<(onMeasure: Measurement) => void>();
   const node: Partial<ScrollNode> = { measureInWindow };
   const scroll: Partial<ScrollView> = { getNativeScrollRef: () => node as ScrollNode };
-  return { measurements: [] as Measurement[], surface, scroll, measureInWindow };
+  return {
+    measurements: [] as Measurement[],
+    surface,
+    scroll,
+    measureInWindow,
+    window: { width: 400, height: 900 },
+  };
 });
 
 vi.mock('@/components/centered-state-surface', () => ({ useStateSurface: () => native.surface }));
 vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
 vi.mock('react-native', () => ({
   PixelRatio: { roundToNearestPixel: (value: number) => Math.round(value * 2) / 2 },
+  // Portrait by default, so the short-band flag the scroller publishes stays
+  // false and a state inside it keeps its full stack.
+  useWindowDimensions: () => ({ ...native.window, fontScale: 1 }),
   View: 'View',
   ScrollView: (props: ComponentPropsWithRef<typeof ScrollView>) => {
     const { ref, ...rest } = props;
@@ -131,6 +140,7 @@ beforeEach(() => {
     register: vi.fn(() => vi.fn()),
   };
   native.measurements = [];
+  native.window = { width: 400, height: 900 };
   native.measureInWindow.mockImplementation(onMeasure => {
     native.measurements.push(onMeasure);
   });
@@ -156,6 +166,32 @@ describe('Shared state placement', () => {
       mounted.unmount();
     }
   );
+
+  it('publishes a short band for a phone held sideways and a tall one otherwise', async () => {
+    // The Agents no-match state overflowed this band: the bubble, the copy and
+    // the action need ~167dp and a 411dp-tall window leaves the band ~120dp.
+    native.window = { width: 914, height: 411 };
+    const landscape = await renderWithProviders(
+      <EmptyState icon={SearchX} title="Empty" description="No results" />
+    );
+    expect(landscape.renderer.root.findAllByType(SearchX)).toHaveLength(0);
+    landscape.unmount();
+
+    // A tablet is wide but tall enough for the whole stack.
+    native.window = { width: 1024, height: 768 };
+    const tablet = await renderWithProviders(
+      <EmptyState icon={SearchX} title="Empty" description="No results" />
+    );
+    expect(tablet.renderer.root.findAllByType(SearchX)).toHaveLength(1);
+    tablet.unmount();
+
+    native.window = { width: 411, height: 914 };
+    const portrait = await renderWithProviders(
+      <EmptyState icon={SearchX} title="Empty" description="No results" />
+    );
+    expect(portrait.renderer.root.findAllByType(SearchX)).toHaveLength(1);
+    portrait.unmount();
+  });
 
   it('keeps an invalid route state directly scrollable beneath a native sheet header', async () => {
     const mounted = await renderWithProviders(<InvalidRouteState backTo="/" />);

@@ -20,6 +20,11 @@ type Org = { organizationId: string; organizationName: string };
 const state = vi.hoisted(() => ({
   focused: true,
   fontScale: 1,
+  // Mutable so a case can put the tree in a short landscape window: the
+  // reserved band the centered bodies clear is the tab bar's alone there (the
+  // FAB's strip would leave a no-match state less room than one line of copy).
+  windowWidth: 390,
+  windowHeight: 844,
   // Mutable so a case can put the tree on Android: the platform decides
   // whether the floating pull-to-refresh indicator is safe (device defect
   // uxs1) or the reserved band carries the in-flight state instead.
@@ -83,7 +88,11 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
-  useWindowDimensions: () => ({ fontScale: state.fontScale, height: 844 }),
+  useWindowDimensions: () => ({
+    fontScale: state.fontScale,
+    height: state.windowHeight,
+    width: state.windowWidth,
+  }),
   AppState: {
     addEventListener: (_event: string, listener: (next: string) => void) => {
       state.listeners.add(listener);
@@ -357,6 +366,8 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   state.focused = true;
   state.fontScale = 1;
+  state.windowWidth = 390;
+  state.windowHeight = 844;
   state.platform.OS = 'ios';
   state.reducedMotion = false;
   state.topInset = 0;
@@ -512,6 +523,36 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(label.props.numberOfLines).toBeUndefined();
     expect(label.props.allowFontScaling).not.toBe(false);
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
+  });
+
+  it('reserves the tab-bar band alone for a centered body in a short landscape window', async () => {
+    // Device defect e4: in a 411dp-tall landscape window the FAB's own strip is
+    // taller than the band the centered body gets, so reserving it as well left
+    // the no-match state less room than one line of copy — its copy and
+    // Clear-search action sat under the bar, whose overlay swallowed the taps,
+    // and only a scroll brought them back. The FAB is a corner overlay there and
+    // the centered column never reaches it, so the band is the tab bar's alone.
+    Object.assign(state.live, { hasAcceptedSuccess: false, terminalError: failure, isError: true });
+    state.windowWidth = 914;
+    state.windowHeight = 411;
+
+    await renderScreen();
+
+    expect(nodes('CenteredState')).toHaveLength(1);
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight);
+  });
+
+  it('still reserves the FAB strip on a tablet held sideways', async () => {
+    // Wide but not short: the band there is taller than the whole state, so
+    // the FAB keeps its own strip and the state centers above it.
+    Object.assign(state.live, { hasAcceptedSuccess: false, terminalError: failure, isError: true });
+    state.windowWidth = 1024;
+    state.windowHeight = 768;
+
+    await renderScreen();
+
+    expect(nodes('CenteredState')).toHaveLength(1);
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight + 64);
   });
 
   it('renders the empty-state New session action as the tab’s primary affordance', async () => {

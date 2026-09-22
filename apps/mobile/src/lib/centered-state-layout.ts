@@ -31,6 +31,45 @@ export function getStateSurfaceInsets({
   };
 }
 
+/**
+ * The tallest window that is still a phone held sideways. A phone's short edge
+ * tops out around 480dp and a tablet's is at least 768dp, so this sits in the
+ * empty gap between them: above it the band between the page header and the tab
+ * bar is taller than any centered state's full stack and nothing needs to give.
+ */
+const SHORT_WINDOW_MAX_HEIGHT = 600;
+
+/**
+ * Whether the window is a short one — a phone held sideways.
+ *
+ * A centered state is centered in the band the surface leaves between the page
+ * header and the fixed bottom tab bar, and that band is only tall while the
+ * window is taller than it is wide. On a 411dp-tall landscape window the band
+ * is ~120dp — and ~49dp once the FAB's own 72dp strip is reserved as well —
+ * against the ~167dp the Agents no-match state's icon bubble, its copy and its
+ * action need stacked, so `getCenteredStateLayout` cannot fit it: the body is
+ * pinned to the top of the band and the copy and the action spill under the
+ * tab bar, which owns the taps there, and only a scroll brings them back.
+ * Callers that can drop decoration for a short window ask this.
+ *
+ * Both halves matter: a portrait window is tall even when the keyboard shortens
+ * it, and a tablet in landscape is wide but tall enough to keep the full stack.
+ * An unavailable dimension (a partial platform mock) is never a short window.
+ *
+ * `CenteredState` owns the band, so it is the one that asks this and publishes
+ * the answer as the short-centered-band flag; a state that can drop decoration
+ * for a short band reads that (`useShortCenteredBand`). Nothing outside a
+ * centered scroller is short.
+ */
+export function isShortViewport(width: number, height: number): boolean {
+  return (
+    Number.isFinite(width) &&
+    Number.isFinite(height) &&
+    width > height &&
+    height <= SHORT_WINDOW_MAX_HEIGHT
+  );
+}
+
 export function intersectStateFrames(frame: StateFrame, clip: StateFrame): StateFrame {
   const top = Math.max(clip.top, Math.min(frame.top, clip.bottom));
   return { top, bottom: Math.max(top, Math.min(frame.bottom, clip.bottom)) };

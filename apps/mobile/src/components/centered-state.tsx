@@ -12,12 +12,18 @@ import {
   PixelRatio,
   ScrollView,
   type ScrollViewProps,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
+import { ShortCenteredBandProvider } from '@/components/centered-state-band';
 import { useStateSurface } from '@/components/centered-state-surface';
 import { RefreshProgress } from '@/components/ui/refresh-progress';
-import { getCenteredStateLayout, type StateFrame } from '@/lib/centered-state-layout';
+import {
+  getCenteredStateLayout,
+  isShortViewport,
+  type StateFrame,
+} from '@/lib/centered-state-layout';
 import { cn } from '@/lib/utils';
 
 type CenteredStateProps = {
@@ -44,6 +50,8 @@ export function CenteredState({
 }: CenteredStateProps) {
   const surface = useStateSurface();
   const frame = surface?.frame;
+  const windowSize = useWindowDimensions();
+  const shortBand = isShortViewport(windowSize.width, windowSize.height);
   const scrollRef = useRef<ScrollView | null>(null);
   const requestRef = useRef(0);
   const [viewport, setViewport] = useState<MeasuredViewport | null>(null);
@@ -154,27 +162,29 @@ export function CenteredState({
   }
 
   return (
-    <ScrollView
-      ref={capture}
-      className={cn('flex-1', className)}
-      testID={testID}
-      onLayout={measure}
-      contentContainerStyle={contentStyle}
-      contentInsetAdjustmentBehavior="never"
-      automaticallyAdjustKeyboardInsets={false}
-      refreshControl={refreshControl}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View
-        className={cn('w-full', !visible && 'opacity-0')}
-        testID={testID ? `${testID}-content` : undefined}
-        onLayout={measureContent}
-        accessibilityElementsHidden={!visible}
-        importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
+    <ShortCenteredBandProvider value={shortBand}>
+      <ScrollView
+        ref={capture}
+        className={cn('flex-1', className)}
+        testID={testID}
+        onLayout={measure}
+        contentContainerStyle={contentStyle}
+        contentInsetAdjustmentBehavior="never"
+        automaticallyAdjustKeyboardInsets={false}
+        refreshControl={refreshControl}
+        keyboardShouldPersistTaps="handled"
       >
-        {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
-        {children}
-      </View>
-    </ScrollView>
+        <View
+          className={cn('w-full', !visible && 'opacity-0')}
+          testID={testID ? `${testID}-content` : undefined}
+          onLayout={measureContent}
+          accessibilityElementsHidden={!visible}
+          importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
+        >
+          {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
+          {children}
+        </View>
+      </ScrollView>
+    </ShortCenteredBandProvider>
   );
 }

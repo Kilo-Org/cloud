@@ -3,7 +3,7 @@ import { AppState, FlatList, Platform, Pressable, useWindowDimensions, View } fr
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Bot, Plus } from '@/components/ui/icons';
+import { Bot } from '@/components/ui/icons';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
@@ -16,7 +16,7 @@ import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
-import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
+import { SessionListFab } from '@/components/agents/session-list-fab';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { isShortViewport } from '@/lib/centered-state-layout';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -36,10 +36,9 @@ const SKELETON_ROW_COUNT = 8;
 export function AgentSessionListScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const colors = useThemeColors();
   const { t } = useTranslation();
   const { bottom, left, right } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
+  const { fontScale, height: windowHeight, width: windowWidth } = useWindowDimensions();
 
   const tabBarHeight = useMemo(
     () => getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }),
@@ -314,8 +313,21 @@ export function AgentSessionListScreen() {
     );
   }
 
+  // The centered bodies on this screen (the no-match state, the no-live-session
+  // state, the load failure) are centered in the band the surface leaves above
+  // the fixed tab bar, so the surface reserves that band plus, while the FAB is
+  // on screen, the FAB's own strip. The FAB's strip is only worth reserving
+  // while the window can spare it: in a short landscape window the strip is
+  // 72dp of a ~120dp band, which leaves the state ~49dp — less than its copy
+  // and its action need — and drops its action under the bar. There the FAB is
+  // a corner overlay and the centered column never reaches it, so the reserved
+  // band is the tab bar's own.
+  const centeredBottomInset =
+    tabBarHeight +
+    (showFab && !isShortViewport(windowWidth, windowHeight) ? FAB_SIZE + FAB_MARGIN : 0);
+
   return (
-    <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
+    <StateSurfaceInsets bottomInset={centeredBottomInset}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}
@@ -368,20 +380,7 @@ export function AgentSessionListScreen() {
         </View>
         {body}
         {/* Empty content owns its creation action; other admitted states keep the FAB. */}
-        {showFab && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('common.newSession')}
-            testID="agents-new-session-fab"
-            onPress={() => {
-              router.push(getNewAgentSessionPath(organizationId) as Href);
-            }}
-            className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80"
-            style={fabStyle}
-          >
-            <Plus size={24} color={colors.primaryForeground} />
-          </Pressable>
-        )}
+        {showFab && <SessionListFab organizationId={organizationId} style={fabStyle} />}
         {showFilterModal && (
           <SessionFilterModal
             selectedPlatforms={query.platformFilter}

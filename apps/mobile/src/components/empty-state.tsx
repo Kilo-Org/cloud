@@ -3,6 +3,7 @@ import { type ReactNode } from 'react';
 import { type ScrollViewProps, View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
+import { useShortCenteredBand } from '@/components/centered-state-band';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -31,25 +32,58 @@ type EmptyStateProps = {
 };
 
 export function EmptyState({
+  placement = 'center',
+  refreshControl,
+  ...props
+}: Readonly<EmptyStateProps>) {
+  const body = <EmptyStateBody {...props} placement={placement} />;
+  return placement === 'center' ? (
+    <CenteredState refreshControl={refreshControl}>{body}</CenteredState>
+  ) : (
+    body
+  );
+}
+
+function EmptyStateBody({
   icon: Icon,
   title,
   description,
   className,
   action,
-  placement = 'center',
-  refreshControl,
+  placement,
   iconContainerClassName = DEFAULT_ICON_CONTAINER_CLASS,
   iconSize = 24,
   iconStrokeWidth = 1.5,
   titleAccessibilityRole,
 }: Readonly<EmptyStateProps>) {
   const colors = useThemeColors();
+  // A centered state is handed the band between the page header and the fixed
+  // bottom tab bar, and in a short landscape window that band is shorter than
+  // the full stack: on a 411dp-tall window the band is ~120dp — ~49dp once the
+  // FAB's own strip is reserved — against the ~167dp the bubble, the copy and
+  // the action need. The stack then overflows the band, so the copy and the
+  // action sit under the bar, whose overlay swallows their taps, and only a
+  // scroll brings them back. The bubble is decoration: a short band drops it
+  // and halves the gaps, which keeps the copy and the action inside the band
+  // with no scroll. `placement="top"` and `placement="static"` states are laid
+  // out by their own caller and keep the full stack.
+  const shortBand = useShortCenteredBand();
+  const compact = placement === 'center' && shortBand;
 
   const content = (
-    <View className={cn('items-center gap-4 px-6', placement === 'top' && 'pt-16', className)}>
-      <View className={cn('items-center justify-center', iconContainerClassName)}>
-        <Icon size={iconSize} color={colors.mutedForeground} strokeWidth={iconStrokeWidth} />
-      </View>
+    <View
+      className={cn(
+        'items-center px-6',
+        compact ? 'gap-2' : 'gap-4',
+        placement === 'top' && 'pt-16',
+        className
+      )}
+    >
+      {compact ? null : (
+        <View className={cn('items-center justify-center', iconContainerClassName)}>
+          <Icon size={iconSize} color={colors.mutedForeground} strokeWidth={iconStrokeWidth} />
+        </View>
+      )}
       <View className="items-center gap-1">
         <Text variant="large" accessibilityRole={titleAccessibilityRole}>
           {title}
@@ -69,9 +103,5 @@ export function EmptyState({
     </View>
   );
 
-  return placement === 'center' ? (
-    <CenteredState refreshControl={refreshControl}>{content}</CenteredState>
-  ) : (
-    content
-  );
+  return content;
 }

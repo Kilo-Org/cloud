@@ -51,6 +51,7 @@ const keyboardSubscribers = vi.hoisted(() => ({
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Keyboard: {
@@ -136,8 +137,9 @@ vi.mock('@/components/ui/segmented-control', () => ({
 // whose module imports `react-native-reanimated`: this pure suite does not set
 // Reanimated up, and this project runs in plain Node, where the
 // Reanimated/worklets native entry cannot resolve (the published worklets
-// build uses bundler-style extensionless imports). The primitive is a stub like
-// every other UI element above; its own rendering is not under test here.
+// build uses bundler-style extensionless imports). The stub is the type the
+// pending-environment case asserts by name; its own rendering is not under test
+// here.
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 vi.mock('@/components/ui/text', () => ({

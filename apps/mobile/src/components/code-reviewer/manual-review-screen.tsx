@@ -163,7 +163,12 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           title={t('codeReviewer.manualReview.connectProvider')}
           description={t('codeReviewer.manualReview.connectProviderDescription')}
           action={
+            // `mt-3 w-full` matches the near-identical PR-review connect gate
+            // (pr-review-connect-gate.tsx) and the Code Reviewer
+            // ProviderConnectCard, so the same Connect GitHub action is styled
+            // the same wherever it appears.
             <Button
+              className="mt-3 w-full"
               onPress={() => {
                 router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/github` as Href);
               }}

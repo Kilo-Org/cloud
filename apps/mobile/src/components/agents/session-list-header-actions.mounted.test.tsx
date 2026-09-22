@@ -242,7 +242,9 @@ describe('SessionListHeaderActions new-session control', () => {
     // side while the new-session control caps its right side.
     // The new-session control sits left of the filter, so the gap has to fit
     // both facing slops; more than the gap means the two regions overlap. Either
-    // control may express hitSlop as one number or as per-side insets.
+    // control may express hitSlop as one number or as per-side insets: the
+    // filter writes its slop as one number for every side, the new-session
+    // control as a per-side object.
     expect(
       slopSideDp(newSession.props.hitSlop, 'right') + slopSideDp(filter.props.hitSlop, 'left')
     ).toBeLessThanOrEqual(gapDp);

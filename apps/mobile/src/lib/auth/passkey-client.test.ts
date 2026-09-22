@@ -134,6 +134,16 @@ describe('classifyPasskeyError', () => {
   );
 
   it.each(['name', 'message', 'code'])(
+    'classifies ASCII identifiers in %s without changing the localized copy key',
+    field => {
+      const failure = classifyPasskeyError({ [field]: 'NOTCONFIGURED' });
+
+      expect(failure).toBe('unsupported');
+      expect(passkeyFailureKey(failure)).toBe('login.passkeyUnsupported');
+    }
+  );
+
+  it.each(['name', 'message', 'code'])(
     'classifies uppercase protocol errors in %s without locale-dependent casing',
     field => {
       expect(classifyPasskeyError({ [field]: 'NOCREDENTIALS' })).toBe('no-passkey');
@@ -174,6 +184,18 @@ describe('classifyPasskeyError', () => {
     ['UNKNOWNERROR', 'login.passkeyFailed'],
   ])('maps the normalized native code %s to catalog-owned display copy', (code, key) => {
     expect(passkeyFailureKey(classifyPasskeyError({ code }))).toBe(key);
+  });
+
+  it.each([
+    [{ name: 'USERCANCELLEDEXCEPTION' }, 'cancelled', 'login.passkeyCancelled'],
+    [{ code: 'NoCrEdEnTiAlS' }, 'no-passkey', 'login.passkeyNotFound'],
+    [{ message: 'NOTCONFIGURED' }, 'unsupported', 'login.passkeyUnsupported'],
+    [{ code: 'NoTsUpPoRtEd' }, 'unsupported', 'login.passkeyUnsupported'],
+    [{ name: 'UNKNOWNERROR' }, 'failed', 'login.passkeyFailed'],
+  ])('classifies %j without re-casing the catalog key', (nativeError, failure, key) => {
+    const classified = classifyPasskeyError(nativeError);
+    expect(classified).toBe(failure);
+    expect(passkeyFailureKey(classified)).toBe(key);
   });
 
   it.each([

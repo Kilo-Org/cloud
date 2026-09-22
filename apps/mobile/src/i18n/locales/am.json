@@ -827,7 +827,8 @@
       "chat": "የውይይት መልእክቶች",
       "kiloclaw": "የKiloClaw እንቅስቃሴ",
       "balance": "የቀሪ ሂሳብ ማስጠንቀቂያዎች",
-      "security": "የደህንነት ግኝቶች"
+      "security": "የደህንነት ግኝቶች",
+      "spend": "የወጪ ማስጠንቀቂያዎች"
     },
     "category": {
       "chatMessagesSubtitle": "በውይይቶችዎ ውስጥ የሚሰጡ ምላሾች",
@@ -842,7 +843,9 @@
       "balanceAlertsSubtitle": "ዝቅተኛ የድርጅት ቀሪ ሂሳብ ማስጠንቀቂያዎች",
       "balanceAlertsUnavailable": "የቀሪ ሂሳብ ማስጠንቀቂያዎችን ለማግኘት ድርጅት ይቀላቀሉ።",
       "securityFindingsSubtitle": "አዳዲስ ግኝቶችና የSLA ማስታወሻዎች",
-      "securityFindingsUnavailable": "የደህንነት ግኝቶችን ለማግኘት የKilo የደህንነት ወኪልን በአንድ ወሰን ያንቁ።"
+      "securityFindingsUnavailable": "የደህንነት ግኝቶችን ለማግኘት የKilo የደህንነት ወኪልን በአንድ ወሰን ያንቁ።",
+      "spendAlertsSubtitle": "የገደብ መሻገሪያዎች እና የሰዓት ጭማሪዎች",
+      "spendAlertsToggle": "የወጪ ማስጠንቀቂያ ምድብ"
     },
     "action": {
       "openSession": "ክፍለ ጊዜውን ክፈት"
@@ -3200,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "የመጨረሻውን ክፍለ ጊዜ ክፈት"
+  },
+  "spendAlerts": {
+    "subtitle": "የዚህ አካባቢ ወጪ ገደብ ሲያልፍ ወይም ከተለመደው የሰዓት መጠኑ በላይ ሲጨምር ለሂሳብ ተጠሪዎች በኢሜይል ወይም በግፋ ማስጠንቀቂያ ላክ።",
+    "enable": "የወጪ ማስጠንቀቂያዎችን አንቃ",
+    "thresholdTitle": "የገደብ መሻገር",
+    "thresholdSubtitle": "ተንቀሳቃሽ ወጪ ገደብህን ያልፋል",
+    "anomalyTitle": "የሰዓት ጭማሪ",
+    "anomalySubtitle": "አንድ ሰዓት ከዚህ አካባቢ የተለመደው መጠን በጣም ከፍ ይላል",
+    "limitLabel": "ገደብ (USD)",
+    "windowLabel": "የጊዜ መስኮት",
+    "window24h": "24 ሰዓታት",
+    "window7d": "7 ቀናት",
+    "window30d": "30 ቀናት",
+    "multiplierLabel": "የጭማሪ ብዜት",
+    "saved": "የወጪ ማስጠንቀቂያ ቅንብሮች ተቀምጠዋል",
+    "loadError": "የወጪ ማስጠንቀቂያዎችን መጫን አልተቻለም።",
+    "saveError": "የወጪ ማስጠንቀቂያዎችን ማስቀመጥ አልተቻለም።",
+    "empty": "የወጪ ማስጠንቀቂያዎች ጠፍተዋል። የዚህን አካባቢ የሂሳብ ተጠሪዎች ለማስጠንቀቅ ያብራቸው።",
+    "noSpend": "እስካሁን ምንም ወጪ አልተመዘገበም",
+    "spend24h": "ባለፉት 24 ሰዓታት የወጣ ወጪ",
+    "multiplierError": "ከ1 ወይም ከዚያ በላይ የሆነ ብዜት ያስገቡ",
+    "permissionDenied": "የወጪ ማስጠንቀቂያዎችን ለማስተዳደር ፈቃድ የለዎትም።",
+    "pushOffByCategory": "በማሳወቂያዎች ውስጥ ተሰናክሏል"
   }
 }

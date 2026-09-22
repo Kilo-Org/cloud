@@ -767,6 +767,7 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
 
   if (
     isTemporarilyBlockedModel &&
+    !effectiveProviderContext.userByok &&
     !(await isTemporarilyBlockedModelAllowedForOrganization(organizationId))
   ) {
     console.warn(

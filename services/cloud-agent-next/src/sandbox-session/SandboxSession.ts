@@ -3512,6 +3512,13 @@ export class SandboxSession extends DurableObject<Env> {
                   message.wrapperInstanceId === runtime.data
                     ? message.unresolvedDispatch
                     : undefined,
+                // A different runtime identity means the replacement the head
+                // was waiting on has rebound, so the deferral chain that spent
+                // the previous budget is over. The next retirement starts with a
+                // fresh budget instead of inheriting the spent one.
+                ...(message.wrapperInstanceId === runtime.data
+                  ? {}
+                  : { replacementWaits: undefined }),
               }
             : message
         ),
@@ -4405,10 +4412,12 @@ export class SandboxSession extends DurableObject<Env> {
    * Only a still-queued head is rewritten.
    *
    * The wait is bounded: each deferral spends one unit of
-   * `RUNTIME_REPLACEMENT_WAIT_LIMIT`. A retirement fence that never clears
-   * exhausts the budget and the existing terminal path fails the head exactly
-   * as before, so a runtime that never returns still reaches
-   * `preparation_timeout`.
+   * `RUNTIME_REPLACEMENT_WAIT_LIMIT` for the current retirement cycle. A
+   * retirement fence that never clears exhausts the budget and the existing
+   * terminal path fails the head exactly as before, so a runtime that never
+   * returns still reaches `preparation_timeout`. Binding a replacement runtime
+   * ends the cycle and resets the budget, so a later, unrelated retirement does
+   * not inherit a partially spent one.
    *
    * Every re-arm mints a fresh preparation attempt. A preparation attempt is
    * the acquisition request identity, and `SandboxControl` binds it to its

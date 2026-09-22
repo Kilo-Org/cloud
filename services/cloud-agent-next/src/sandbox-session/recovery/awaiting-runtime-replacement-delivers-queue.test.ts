@@ -324,4 +324,80 @@ describe('runtime replacement in flight', () => {
       failedReason: 'preparation_timeout',
     });
   });
+
+  it('resets the deferral budget once the head binds the replacement runtime', async () => {
+    const fixture = createSessionFixture(fixtureDeps);
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'connected',
+      wrapperInstanceId: RUNTIME_ID,
+      runtimeReplacementInFlight: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+
+    // Fence A: the head defers once and spends one unit of the budget.
+    const fenceDeadline = Date.now() + 20_000;
+    const stored = fixture.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+    fixture.storage.kv.put(
+      'session_messages',
+      stored.map(message =>
+        message.messageId === 'a' ? { ...message, deliveryDeadlineAt: fenceDeadline } : message
+      )
+    );
+    vi.setSystemTime(fenceDeadline);
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({ state: 'queued', replacementWaits: 1 });
+
+    // Fence A clears: the replacement rebinds with a new incarnation and the
+    // head binds it, which ends the deferral chain that spent that unit.
+    fixture.setStatus({
+      physical: 'creating',
+      connection: 'disconnected',
+      wrapperInstanceId: NEXT_RUNTIME_ID,
+    });
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({
+      state: 'queued',
+      wrapperInstanceId: NEXT_RUNTIME_ID,
+      replacementWaits: undefined,
+    });
+
+    // A later, unrelated fence must get the full budget, not the five units
+    // fence A left behind.
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'connected',
+      wrapperInstanceId: NEXT_RUNTIME_ID,
+      runtimeReplacementInFlight: true,
+    });
+    let deadlineAt = Date.now() + 20_000;
+    const rewrite = fixture.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+    fixture.storage.kv.put(
+      'session_messages',
+      rewrite.map(message =>
+        message.messageId === 'a' ? { ...message, deliveryDeadlineAt: deadlineAt } : message
+      )
+    );
+    for (let pass = 0; pass < RUNTIME_REPLACEMENT_WAIT_LIMIT; pass++) {
+      vi.setSystemTime(deadlineAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+      expect(fixture.record('a')?.state).toBe('queued');
+      deadlineAt = fixture.record('a')?.deliveryDeadlineAt ?? 0;
+      if (deadlineAt <= Date.now()) throw new Error('Deferral did not extend the deadline');
+    }
+
+    // The budget stays finite: the next deadline exhausts it and the existing
+    // terminal path runs, so a fence that never clears still fails the head.
+    vi.setSystemTime(deadlineAt);
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      failedReason: 'preparation_timeout',
+    });
+  });
 });

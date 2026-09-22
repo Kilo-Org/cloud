@@ -60,6 +60,37 @@ describe('countActiveSessionFilters', () => {
       })
     ).toBe(3);
   });
+
+  it('counts an empty project filter as zero', () => {
+    expect(countActiveSessionFilters(createDefaultAgentSessionFilters())).toBe(0);
+  });
+
+  it('counts one project option as one', () => {
+    expect(
+      countActiveSessionFilters({
+        platformFilter: [],
+        projectFilter: ['https://github.com/org/repo.git'],
+      })
+    ).toBe(1);
+  });
+
+  it('counts one merged project option once across its git-URL aliases', () => {
+    expect(
+      countActiveSessionFilters({
+        platformFilter: [],
+        projectFilter: ['https://github.com/org/repo.git', 'git@github.com:org/repo.git'],
+      })
+    ).toBe(1);
+  });
+
+  it('counts two distinct projects as two', () => {
+    expect(
+      countActiveSessionFilters({
+        platformFilter: [],
+        projectFilter: ['https://github.com/org/a', 'https://github.com/org/b'],
+      })
+    ).toBe(2);
+  });
 });
 
 it('ignores a legacy stored sortBy field', () => {

@@ -1,9 +1,14 @@
 import { z } from 'zod';
 
+import { projectOptionKey } from '@/components/agents/session-list-helpers';
+
 /**
  * Pure contract for the persisted session filter set. Intentionally free of
- * any Expo / SecureStore imports so it can be unit-tested in node and re-used
- * by tests/mocks without touching the native bridge.
+ * any Expo / SecureStore / native-bridge imports so it can be unit-tested in
+ * node and re-used by tests/mocks without touching the native bridge. It
+ * imports the visible-label key (`projectOptionKey`) from the session-list
+ * helpers so the badge counts one merged project option once; that module is
+ * native-free too, so the node test still runs.
  *
  * Both session-list pages persist this shape, under their own storage key.
  */
@@ -73,5 +78,9 @@ export function parseStoredAgentSessionFilters(raw: string | null): AgentSession
 
 /** How many narrowing filters are applied — drives the header badge count. */
 export function countActiveSessionFilters(filters: AgentSessionFilters): number {
-  return filters.platformFilter.length + filters.projectFilter.length;
+  // One visible project option can carry several git-URL aliases (https vs ssh,
+  // a `.git` suffix, host case) that render to one label, so the raw array
+  // length over-counts the rows the sheet shows.
+  const projectCount = new Set(filters.projectFilter.map(gitUrl => projectOptionKey(gitUrl))).size;
+  return filters.platformFilter.length + projectCount;
 }

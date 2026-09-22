@@ -42,20 +42,25 @@ afterEach(() => {
 
 describe('Text eyebrow letterspacing', () => {
   // Finding home-ar-loading: an Arabic section label carried the Latin
-  // uppercase letter-spacing and broke apart mid-word ('ال جلسا ت').
-  it.each([false, true])('keeps the eyebrow display treatment in LTR only (RTL=%s)', isRTL => {
-    i18nManager.isRTL = isRTL;
-    const classes = hostClasses(mount(createElement(Text, { variant: 'eyebrow' }, 'Live now')));
-    expect(classes).toEqual(
-      expect.arrayContaining(['font-mono-medium', 'text-[10px]', 'text-muted-foreground'])
-    );
-    if (isRTL) {
-      expect(classes).not.toContain('uppercase');
-      expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
-    } else {
-      expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
+  // uppercase letter-spacing and broke apart mid-word ('ال جلسا ت'). The class
+  // stays in the className in both directions; the RTL style array neutralizes
+  // its letter-spacing (see text.rtl-tracking.mounted.test.tsx).
+  it.each([false, true])(
+    'keeps the eyebrow display treatment in either direction (RTL=%s)',
+    isRTL => {
+      i18nManager.isRTL = isRTL;
+      const classes = hostClasses(mount(createElement(Text, { variant: 'eyebrow' }, 'Live now')));
+      expect(classes).toEqual(
+        expect.arrayContaining([
+          'font-mono-medium',
+          'text-[10px]',
+          'text-muted-foreground',
+          'uppercase',
+          'tracking-[1.5px]',
+        ])
+      );
     }
-  });
+  );
 
   it('leaves a non-eyebrow variant untouched in either direction', () => {
     i18nManager.isRTL = true;
@@ -69,12 +74,8 @@ describe('Text eyebrow letterspacing', () => {
     const classes = hostClasses(
       mount(createElement(Eyebrow, null, isRTL ? 'الجلسات الجارية الآن' : 'LIVE NOW'))
     );
-    expect(classes).toEqual(expect.arrayContaining(['font-mono-medium', 'text-[10px]']));
-    if (isRTL) {
-      expect(classes).not.toContain('uppercase');
-      expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
-    } else {
-      expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
-    }
+    expect(classes).toEqual(
+      expect.arrayContaining(['font-mono-medium', 'text-[10px]', 'uppercase', 'tracking-[1.5px]'])
+    );
   });
 });

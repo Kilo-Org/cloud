@@ -60,8 +60,8 @@ describe('SectionHeader mounted layout', () => {
       node => Object.is(node.type, 'Text') && node.children.includes('Live now')
     );
 
-    // The Latin display treatment is LTR-only (home-ar-loading) and is
-    // asserted per direction by the letterspacing test below.
+    // The tracked class is asserted in both directions by the letterspacing
+    // test below; RTL neutralizes it through the style array.
     expect((label.props.className as string).split(' ')).toEqual(
       expect.arrayContaining([
         'grow',
@@ -76,8 +76,15 @@ describe('SectionHeader mounted layout', () => {
     expect(label.props.maxFontSizeMultiplier).toBeUndefined();
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
     expect(label.children).toEqual(['Live now']);
+    // The tracked class stays for the LTR design; RTL renders it unspaced, so
+    // the Arabic labels keep their joins (see lib/rtl-text.ts).
     if (isRTL) {
       expect(label.props.style).toContainEqual({ writingDirection: 'rtl' });
+      expect(label.props.style).toContainEqual({ letterSpacing: 0 });
+      expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+    } else {
+      expect(label.props.style).toBeUndefined();
+      expect(text.props.style).toBeUndefined();
     }
 
     expect((action.parent?.props.className as string | undefined)?.split(' ')).toContain(
@@ -127,38 +134,34 @@ describe('SectionHeader mounted layout', () => {
 
   // Finding home-ar-loading: the Arabic section labels carried the Latin
   // uppercase letter-spacing, whose glyph gaps break a cursive script's joins
-  // ('ال جلسا ت'). The display treatment is LTR-only.
-  it.each([
-    { isRTL: false, tracked: true },
-    { isRTL: true, tracked: false },
-  ])('letterspaces the section labels only outside RTL (RTL=$isRTL)', ({ isRTL, tracked }) => {
-    i18nManager.isRTL = isRTL;
-    const root = mount(
-      createElement(SectionHeader, {
-        label: 'الجلسات الجارية الآن',
-        actionLabel: 'عرض الكل',
-        onActionPress: () => undefined,
-      })
-    );
-    const action = root.findByProps({ accessibilityRole: 'button' });
-    const text = action.find(node => Object.is(node.type, 'Text'));
-    const label = root.find(
-      node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
-    );
+  // ('ال جلسا ت'). The tracked class stays in the className in both directions
+  // and the RTL style array renders it unspaced (see lib/rtl-text.ts).
+  it.each([false, true])(
+    'keeps the tracked section-label class in either direction (RTL=%s)',
+    isRTL => {
+      i18nManager.isRTL = isRTL;
+      const root = mount(
+        createElement(SectionHeader, {
+          label: 'الجلسات الجارية الآن',
+          actionLabel: 'عرض الكل',
+          onActionPress: () => undefined,
+        })
+      );
+      const action = root.findByProps({ accessibilityRole: 'button' });
+      const text = action.find(node => Object.is(node.type, 'Text'));
+      const label = root.find(
+        node => Object.is(node.type, 'Text') && node.children.includes('الجلسات الجارية الآن')
+      );
 
-    for (const node of [label, text]) {
-      const classes = (node.props.className as string).split(' ');
-      if (tracked) {
+      for (const node of [label, text]) {
+        const classes = (node.props.className as string).split(' ');
         expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
-      } else {
-        expect(classes).not.toContain('uppercase');
-        expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
       }
     }
-  });
+  );
 
-  // The action's display treatment intentionally branches on direction (the
-  // LTR-only letterspacing); the layout must not.
+  // The action's display treatment is direction-independent (the tracked class
+  // stays; RTL neutralizes it through the style); the layout must be too.
   it('does not branch the action layout on direction', () => {
     function actionLayout(isRTL: boolean) {
       i18nManager.isRTL = isRTL;

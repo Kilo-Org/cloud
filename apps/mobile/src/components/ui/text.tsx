@@ -3,7 +3,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { I18nManager, Text as RNText, type Role } from 'react-native';
 
-import { RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
+import { RTL_NO_LETTER_SPACING, RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 const textVariants = cva('text-foreground text-base font-medium', {
@@ -50,9 +50,10 @@ const ARIA_LEVEL = {
 
 /**
  * The eyebrow's Latin display treatment: full capitals, letterspaced. It is an
- * LTR-only addition to the variant because `letter-spacing` pulls a cursive
- * script apart — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت'. An RTL
- * interface keeps the mono family, size and color and drops both classes.
+ * addition to the variant in both directions because the tracked class is the
+ * LTR design's and the RTL style array neutralizes its letter-spacing (see
+ * `RTL_NO_LETTER_SPACING`) — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت'
+ * only when the class's `letter-spacing` actually draws.
  *
  * Exported so the eyebrow-scale labels rendered outside the variant — the
  * `SectionHeader` action link — carry the identical treatment instead of a
@@ -78,14 +79,18 @@ function Text({
     <Component
       className={cn(
         textVariants({ variant }),
-        variant === 'eyebrow' && !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY,
+        variant === 'eyebrow' && EYEBROW_LATIN_DISPLAY,
         textClass,
         className
       )}
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
-      style={I18nManager.isRTL ? [RTL_WRITING_DIRECTION, props.style] : props.style}
+      style={
+        I18nManager.isRTL
+          ? [RTL_WRITING_DIRECTION, RTL_NO_LETTER_SPACING, props.style]
+          : props.style
+      }
     />
   );
 }

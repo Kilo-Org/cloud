@@ -25,7 +25,11 @@ const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
 const safeAreaInsets = vi.hoisted(() => ({ bottom: 0, left: 0, right: 0, top: 0 }));
 const TEXT_DIRECTIONS = [
   { direction: 'LTR', isRTL: false, style: undefined },
-  { direction: 'RTL', isRTL: true, style: [{ writingDirection: 'rtl' }, undefined] },
+  {
+    direction: 'RTL',
+    isRTL: true,
+    style: [{ writingDirection: 'rtl' }, { letterSpacing: 0 }, undefined],
+  },
 ];
 
 vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));

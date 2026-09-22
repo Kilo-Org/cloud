@@ -77,6 +77,10 @@ describe('screen side insets: one implementation for both platforms', () => {
     // The sign-out confirmation legitimately picks its dialog per platform,
     // which is not on the alignment path, so only the path from
     // `useScreenSideInsets` to the first applied side inset is held to the rule.
+    // The screen forks once on purpose: Android's native alert cannot show a
+    // red destructive button, so sign-out opens the in-app confirmation there.
+    // That fork is not on the insets path — every other line, and in
+    // particular the ones that carry the insets, stays one implementation.
     expect(
       alignmentPath(profile),
       `${PROFILE_SCREEN}'s alignment path carries a per-platform branch`

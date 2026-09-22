@@ -7,31 +7,39 @@ import { openExternalUrl } from '@/lib/external-link';
 import { cn } from '@/lib/utils';
 
 type AddCreditsRowProps = Readonly<{
-  url: string;
+  /** External billing page to open. App Store review forbids this on iOS. */
+  url?: string;
+  /** In-app destination (the credit purchase screen); platform-agnostic. */
+  onPress?: () => void;
   className?: string;
 }>;
 
-/** Zero-balance CTA row: muted copy + an "Add credits" button to the web billing page. */
-export function AddCreditsRow({ url, className }: AddCreditsRowProps) {
+/**
+ * Muted copy + an "Add credits" button. With `onPress` the button is an in-app
+ * CTA on every platform. With `url` it opens the external web billing page,
+ * which App Store review forbids from an in-app CTA, so that variant stays
+ * Android-only — gate it here so no call site can surface it on iOS.
+ */
+export function AddCreditsRow({ url, onPress, className }: AddCreditsRowProps) {
   const { t } = useTranslation();
-  // App Store review: iOS must not show an in-app CTA that opens an external
-  // purchase/billing page. Credits are managed on the web there, so this row is
-  // Android-only — gate it here so no call site can surface it on iOS.
-  if (Platform.OS === 'ios') {
+  if (!onPress && Platform.OS === 'ios') {
     return null;
   }
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+      return;
+    }
+    if (url) {
+      void openExternalUrl(url, { label: t('addCredits.billingPage') });
+    }
+  };
   return (
     <View className={cn('flex-row items-center justify-between', className)}>
       <Text className="flex-1 pr-3 text-xs text-muted-foreground">
         {t('addCredits.description')}
       </Text>
-      <Button
-        size="sm"
-        variant="outline"
-        onPress={() => {
-          void openExternalUrl(url, { label: t('addCredits.billingPage') });
-        }}
-      >
+      <Button size="sm" variant="outline" onPress={handlePress}>
         <Text className="text-xs font-semibold">{t('addCredits.cta')}</Text>
       </Button>
     </View>

@@ -16043,6 +16043,573 @@
     ],
     "searchBlob": "openAiChatGpt.status Check whether the signed-in user's \"Sign in with ChatGPT\" (OpenAI ChatGPT BYOK) connection is connected, disconnected, or in an error state, including linked account email and connection time. openaichatgpt status organizationid organizationId"
   },
+  "organizations.alerts.archive": {
+    "path": "organizations.alerts.archive",
+    "kind": "mutation",
+    "summary": "Permanently retire an organization alert so it no longer fires or appears in the active list. Use to remove a spending or low-balance notification rule.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "alertId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId",
+            "alertId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "alerts",
+      "archive",
+      "organizationid",
+      "alertid"
+    ],
+    "searchBlob": "organizations.alerts.archive Permanently retire an organization alert so it no longer fires or appears in the active list. Use to remove a spending or low-balance notification rule. organizations alerts archive organizationid alertid organizationId alertId"
+  },
+  "organizations.alerts.create": {
+    "path": "organizations.alerts.create",
+    "kind": "mutation",
+    "summary": "Create a new billing alert that notifies recipients when AI usage spending hits a threshold or when the account balance drops below a set amount. Use to set up spending or low-balance email notifications for an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "definition": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "monthly_spending"
+                    },
+                    "configuration": {
+                      "type": "object",
+                      "properties": {
+                        "thresholdMicrodollars": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 1000000000000000,
+                          "multipleOf": 10000
+                        },
+                        "period": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "const": "calendar_month_utc"
+                                },
+                                "version": {
+                                  "type": "number",
+                                  "const": 1
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "scope": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "const": "organization"
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "const": "group"
+                                },
+                                "groupId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "groupId"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "recipients": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "thresholdMicrodollars",
+                        "period",
+                        "scope",
+                        "recipients"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "configuration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "low_balance"
+                    },
+                    "configuration": {
+                      "type": "object",
+                      "properties": {
+                        "thresholdMicrodollars": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 1000000000000000,
+                          "multipleOf": 10000
+                        },
+                        "recipients": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "thresholdMicrodollars",
+                        "recipients"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "configuration"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "recipientDisclosureConfirmed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "organizationId",
+            "definition",
+            "recipientDisclosureConfirmed"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "alerts",
+      "create",
+      "organizationid",
+      "definition",
+      "enabled",
+      "recipientdisclosureconfirmed"
+    ],
+    "searchBlob": "organizations.alerts.create Create a new billing alert that notifies recipients when AI usage spending hits a threshold or when the account balance drops below a set amount. Use to set up spending or low-balance email notifications for an organization. organizations alerts create organizationid definition enabled recipientdisclosureconfirmed organizationId definition enabled recipientDisclosureConfirmed"
+  },
+  "organizations.alerts.list": {
+    "path": "organizations.alerts.list",
+    "kind": "query",
+    "summary": "List all billing and usage alert rules configured for an organization, with pagination and an option to include archived ones. Use to see which spend thresholds and balance warnings exist and whether they are enabled.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "cursor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "includeArchived": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "organizationId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "alerts",
+      "list",
+      "organizationid",
+      "cursor",
+      "limit",
+      "includearchived"
+    ],
+    "searchBlob": "organizations.alerts.list List all billing and usage alert rules configured for an organization, with pagination and an option to include archived ones. Use to see which spend thresholds and balance warnings exist and whether they are enabled. organizations alerts list organizationid cursor limit includearchived organizationId cursor limit includeArchived"
+  },
+  "organizations.alerts.setEnabled": {
+    "path": "organizations.alerts.setEnabled",
+    "kind": "mutation",
+    "summary": "Turn an organization alert on or off without deleting it. Use to pause or resume notifications for a spend or balance threshold.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "alertId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "expectedConfigurationVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "organizationId",
+            "alertId",
+            "enabled",
+            "expectedConfigurationVersion"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "alerts",
+      "setenabled",
+      "organizationid",
+      "alertid",
+      "enabled",
+      "expectedconfigurationversion"
+    ],
+    "searchBlob": "organizations.alerts.setEnabled Turn an organization alert on or off without deleting it. Use to pause or resume notifications for a spend or balance threshold. organizations alerts setenabled organizationid alertid enabled expectedconfigurationversion organizationId alertId enabled expectedConfigurationVersion"
+  },
+  "organizations.alerts.update": {
+    "path": "organizations.alerts.update",
+    "kind": "mutation",
+    "summary": "Change an existing organization alert's threshold, scope, or recipient list. Use to edit a spending or low-balance alert's settings.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          "required": [
+            "organizationId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "alertId": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "definition": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "monthly_spending"
+                    },
+                    "configuration": {
+                      "type": "object",
+                      "properties": {
+                        "thresholdMicrodollars": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 1000000000000000,
+                          "multipleOf": 10000
+                        },
+                        "period": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "const": "calendar_month_utc"
+                                },
+                                "version": {
+                                  "type": "number",
+                                  "const": 1
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "version"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "scope": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "const": "organization"
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "const": "group"
+                                },
+                                "groupId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "groupId"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "recipients": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "thresholdMicrodollars",
+                        "period",
+                        "scope",
+                        "recipients"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "configuration"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "low_balance"
+                    },
+                    "configuration": {
+                      "type": "object",
+                      "properties": {
+                        "thresholdMicrodollars": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 1000000000000000,
+                          "multipleOf": 10000
+                        },
+                        "recipients": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "thresholdMicrodollars",
+                        "recipients"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "configuration"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "expectedConfigurationVersion": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "recipientDisclosureConfirmed": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "organizationId",
+            "alertId",
+            "definition",
+            "expectedConfigurationVersion"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "tags": [
+      "organizations",
+      "alerts",
+      "update",
+      "organizationid",
+      "alertid",
+      "definition",
+      "expectedconfigurationversion",
+      "recipientdisclosureconfirmed"
+    ],
+    "searchBlob": "organizations.alerts.update Change an existing organization alert's threshold, scope, or recipient list. Use to edit a spending or low-balance alert's settings. organizations alerts update organizationid alertid definition expectedconfigurationversion recipientdisclosureconfirmed organizationId alertId definition expectedConfigurationVersion recipientDisclosureConfirmed"
+  },
   "organizations.appBuilder.canMigrateToGitHub": {
     "path": "organizations.appBuilder.canMigrateToGitHub",
     "kind": "query",
@@ -16822,6 +17389,11 @@
               "organization.group.default_policy.remove",
               "organization.group.policy_type.enable",
               "organization.group.policy_type.disable",
+              "organization.alert.create",
+              "organization.alert.update",
+              "organization.alert.enable",
+              "organization.alert.disable",
+              "organization.alert.archive",
               "organization.created",
               "organization.token.generate",
               "organization.funds.distribute_to_children"

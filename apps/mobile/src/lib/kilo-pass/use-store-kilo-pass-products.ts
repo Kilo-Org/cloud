@@ -6,7 +6,10 @@ import { i18n } from '@/i18n';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useTRPC } from '@/lib/trpc';
 import { type StoreKiloPassProduct } from './store-products';
-import { getStoreKiloPassProductsState } from './store-products-state';
+import {
+  getStoreKiloPassProductsState,
+  isStoreKiloPassProductsLoading,
+} from './store-products-state';
 import {
   getAuthoredProductsErrorMessage,
   loadAppStoreKiloPassProducts,
@@ -30,6 +33,22 @@ export type StoreKiloPassProductsOptions = {
   /** Fetches store SKUs. Injected by the IAP owner so this module never imports `expo-iap`. */
   fetchStoreProducts: (productSkus: string[]) => Promise<readonly StoreKiloPassProduct[]>;
 };
+
+type KiloPassTrpc = ReturnType<typeof useTRPC>;
+
+/**
+ * Query options for the backend store-product catalog, carrying the same
+ * lifetime as the joined entry this module keeps. Every reader (this hook's
+ * `loadBackendProducts` and the IAP owner's server-backed fallback) shares one
+ * cache entry, so leaving Kilo Pass and returning inside the window reads the
+ * catalog instead of issuing `getMobileStoreProducts` again.
+ */
+export function backendStoreKiloPassProductsQueryOptions(trpc: KiloPassTrpc) {
+  return {
+    ...trpc.kiloPass.getMobileStoreProducts.queryOptions(),
+    staleTime: STORE_KILO_PASS_PRODUCTS_STALE_TIME_MS,
+  };
+}
 
 export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) {
   const trpc = useTRPC();
@@ -59,7 +78,7 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
         fetchStoreProducts: options.fetchStoreProducts,
         loadBackendProducts: async () => {
           const backendResponse = await queryClient.fetchQuery(
-            trpc.kiloPass.getMobileStoreProducts.queryOptions()
+            backendStoreKiloPassProductsQueryOptions(trpc)
           );
           return backendResponse;
         },
@@ -95,9 +114,13 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
 
   return {
     products: productsState.products,
-    isLoading:
-      storeErrorMessage === null &&
-      (productsQuery.isLoading || (isIapPlatform && !options.connected)),
+    isLoading: isStoreKiloPassProductsLoading({
+      data: productsQuery.data,
+      queryIsLoading: productsQuery.isLoading,
+      isIapPlatform,
+      isStoreConnected: options.connected,
+      storeErrorMessage,
+    }),
     isRefetching: productsQuery.isRefetching,
     isError: productsState.isError,
     errorMessage: productsState.errorMessage,

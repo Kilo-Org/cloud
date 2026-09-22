@@ -50,6 +50,15 @@ vi.mock('@/components/ui/radio-group', () => ({
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+// The screen's keyboard-lift wrapper and its scroll-to-end hook reach
+// react-native-safe-area-context, whose source the vitest transform cannot
+// parse; every child is already a stub in this suite, so stub these too.
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
+  AppAwareKeyboardPaddingView: 'View',
+}));
+vi.mock('@/components/kilo-chat/use-reveal-end-on-keyboard', () => ({
+  useRevealEndOnKeyboard: () => ({ current: null }),
+}));
 vi.mock('@/lib/code-reviewer-config', () => ({
   PLATFORM_CAPABILITIES: { github: { label: 'GitHub' }, gitlab: { label: 'GitLab' } },
 }));

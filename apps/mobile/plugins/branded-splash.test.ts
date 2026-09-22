@@ -164,8 +164,14 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // Introspection reads the colors already generated under the project root,
+    // so a developer's prebuilt android/ directory contributes its own colors
+    // (iconBackground, app_background, ...). Assert the splash color the plugin
+    // owns instead of the whole set.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

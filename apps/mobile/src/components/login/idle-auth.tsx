@@ -250,14 +250,15 @@ export function IdleAuth({
           variant="outline"
           size="lg"
           // min-h (not fixed h) so Dynamic Type can grow the control; keep
-          // Apple-parity 44pt floor and full-width rounded chrome.
-          className="min-h-[44px] w-full flex-row flex-wrap gap-2 rounded-[8px] py-2.5"
+          // Apple-parity 44pt floor and full-width rounded chrome. No flex-wrap:
+          // the label must stay on the icon's line, never wrap to its own.
+          className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
           disabled={authBusy}
           onPress={() => void signInWithGoogle()}
           accessibilityLabel={t('login.signInWithGoogle')}
         >
           {busy === 'google' ? <ActivityIndicator size="small" /> : <GoogleLogo size={18} />}
-          <Text className="shrink text-center text-[17px] font-medium">
+          <Text className="flex-1 text-center text-[17px] font-medium">
             {t('login.signInWithGoogle')}
           </Text>
         </Button>
@@ -272,8 +273,9 @@ export function IdleAuth({
             variant="outline"
             size="lg"
             // min-h (not fixed h) so Dynamic Type can grow the control, matching
-            // the Google button's Apple-parity 44pt floor.
-            className="min-h-[44px] w-full flex-row flex-wrap gap-2 rounded-[8px] py-2.5"
+            // the Google button's Apple-parity 44pt floor. No flex-wrap: the label
+            // must stay on the icon's line, never wrap to its own.
+            className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
             disabled={authBusy}
             onPress={() => {
               void signInWithPasskey();
@@ -281,7 +283,7 @@ export function IdleAuth({
             accessibilityLabel={t('login.signInWithPasskey')}
           >
             {busy === 'passkey' ? <ActivityIndicator size="small" /> : null}
-            <Text className="shrink text-center text-[17px] font-medium">
+            <Text className="flex-1 text-center text-[17px] font-medium">
               {t('login.signInWithPasskey')}
             </Text>
           </Button>

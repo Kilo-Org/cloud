@@ -28,6 +28,7 @@ import {
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
+import { SESSION_TITLE_MAX_LENGTH } from './session-detail-rename-state';
 import {
   activeSessionMetaTimestamp,
   canExitSessionFromList,
@@ -258,6 +259,7 @@ export function RemoteSessionRow({
           title={t('agentChat.session.renameSession')}
           placeholder={t('agentChat.session.renamePlaceholder')}
           initialValue={title}
+          maxLength={SESSION_TITLE_MAX_LENGTH}
           onClose={() => {
             setRenameVisible(false);
           }}

@@ -129,6 +129,13 @@ vi.mock('@/components/ui/segmented-control', () => ({
   SegmentedControl: 'SegmentedControl',
 }));
 
+// The environment row's pending state asserts on the Skeleton host element; the
+// real component animates through Reanimated, which this node-environment suite
+// does not load.
+vi.mock('@/components/ui/skeleton', () => ({
+  Skeleton: 'Skeleton',
+}));
+
 // The profile row and the environment row both render a loading `Skeleton`,
 // whose module imports `react-native-reanimated`: this pure suite does not set
 // Reanimated up, and this project runs in plain Node, where the

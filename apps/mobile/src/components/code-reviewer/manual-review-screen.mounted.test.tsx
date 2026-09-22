@@ -36,6 +36,15 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   View: 'View',
 }));
+// The screen wraps its form in the keyboard-padding view, whose hook reads the
+// native safe-area package and the keyboard event rails; the mounted project
+// cannot load those. The connect CTA under test does not depend on the padding,
+// so the module is stubbed the same way the other keyboard-wrapped screens'
+// suites stub it.
+vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
+  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
+  useAppAwareKeyboardPadding: () => 0,
+}));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));

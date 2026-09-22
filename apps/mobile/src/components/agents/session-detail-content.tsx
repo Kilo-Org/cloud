@@ -130,6 +130,10 @@ import {
   type SessionTranscriptItem,
 } from '@/components/agents/session-transcript';
 import { resolveSessionTranscriptView } from '@/components/agents/session-transcript-view';
+import {
+  displaySessionTitle,
+  SESSION_TITLE_MAX_LENGTH,
+} from '@/components/agents/session-detail-rename-state';
 import { useSessionDetailRename } from '@/components/agents/use-session-detail-rename';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { getChildSessionStreaming } from '@/components/agents/child-session-card-state';
@@ -1529,7 +1533,10 @@ export function SessionDetailContent({
   });
 
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
-  const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
+  // A `New session - <ISO>` placeholder is not a title: showing it truncates
+  // the header to "New session - 2026-…". Fall through to the short fallback
+  // until auto-titling (or a rename) supplies a real one.
+  const serverTitle = isSessionLoaded ? displaySessionTitle(fetchedData.title) : undefined;
   const rename = useSessionDetailRename({
     sessionId,
     isLoaded: isSessionLoaded,
@@ -1926,9 +1933,14 @@ export function SessionDetailContent({
           ) : null}
           <ScreenHeader
             title={rename.title}
+            // The loaded header, the route's loading header and its error state
+            // all share one cap (`SESSION_HEADER_TITLE_LINES`), and
+            // `reserveTitleSpace` holds exactly that many lines, so a long title
+            // wraps at a word boundary instead of being cut to one tail-ellipsized
+            // line ("Moving-average empty windo…").
             reserveTitleSpace
             titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-            backFallback="/(app)/(tabs)/(2_agents)"
+            backFallback={'/(app)/(tabs)/(2_agents)' as Href}
             headerRight={headerRight}
             className="pb-1"
             {...(rename.isTitleInteractive
@@ -2070,6 +2082,10 @@ export function SessionDetailContent({
               title={t('agentChat.session.renameSession')}
               placeholder={t('agentChat.session.renamePlaceholder')}
               initialValue={rename.modalInitialValue}
+              // The server accepts a title this long; the modal's 50-character
+              // default would cut a longer title mid-word and the header would
+              // then show the fragment.
+              maxLength={SESSION_TITLE_MAX_LENGTH}
               onSave={handleRenameSave}
               onClose={handleRenameClose}
             />

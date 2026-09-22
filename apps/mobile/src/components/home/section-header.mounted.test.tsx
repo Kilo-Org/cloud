@@ -60,6 +60,8 @@ describe('SectionHeader mounted layout', () => {
       node => Object.is(node.type, 'Text') && node.children.includes('Live now')
     );
 
+    // The Latin display treatment is LTR-only (home-ar-loading) and is
+    // asserted per direction by the letterspacing test below.
     expect((label.props.className as string).split(' ')).toEqual(
       expect.arrayContaining([
         'grow',
@@ -74,15 +76,25 @@ describe('SectionHeader mounted layout', () => {
     expect(label.props.maxFontSizeMultiplier).toBeUndefined();
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
     expect(label.children).toEqual(['Live now']);
+    // The tracked class stays for the LTR design; RTL renders it unspaced, so
+    // the Arabic labels keep their joins (see lib/rtl-text.ts).
     if (isRTL) {
       expect(label.props.style).toContainEqual({ writingDirection: 'rtl' });
+      expect(label.props.style).toContainEqual({ letterSpacing: 0 });
+      expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+    } else {
+      expect(label.props.style).toBeUndefined();
+      expect(text.props.style).toBeUndefined();
     }
 
     expect((action.parent?.props.className as string | undefined)?.split(' ')).toContain(
       'flex-wrap'
     );
-    // The row's outer edge comes from the action box's flex direction, never
-    // from a physical text alignment.
+    // The action copy must sit at the row's end in both directions, so the box
+    // is a row that places its content at the main-axis end, and the layout is
+    // direction-relative and identical under RTL. The row's outer edge comes
+    // from the action box's flex direction, never from a physical text
+    // alignment.
     expect((action.props.className as string).split(' ')).toEqual(
       expect.arrayContaining(ACTION_BOX_CLASSES)
     );
@@ -94,6 +106,31 @@ describe('SectionHeader mounted layout', () => {
     expect(text.props.maxFontSizeMultiplier).toBeUndefined();
     expect(text.children).toEqual(['See all']);
   });
+
+  it.each([{ isRTL: false }, { isRTL: true }])(
+    'aligns the action with the row edges, never with a physical text align, with RTL=$isRTL',
+    ({ isRTL }) => {
+      // React Native swaps `textAlign: 'left'` and `'right'` under RTL (Android
+      // maps 'left' to Gravity.RIGHT), so a physical alignment would pin the
+      // action to the inner edge of its box and float "See all" away from the
+      // row end in Arabic.
+      i18nManager.isRTL = isRTL;
+      const root = mount(
+        createElement(SectionHeader, {
+          label: 'Live now',
+          actionLabel: 'See all',
+          onActionPress: () => undefined,
+        })
+      );
+      const classes = root
+        .findAll(node => typeof node.props.className === 'string')
+        .flatMap(node => (node.props.className as string).split(' '));
+
+      expect(classes.filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name))).toEqual([]);
+      expect(classes).not.toContain('text-left');
+      expect(classes).not.toContain('text-right');
+    }
+  );
 
   // Finding home-ar-loading: the Arabic section labels carried the Latin
   // uppercase letter-spacing, whose glyph gaps break a cursive script's joins

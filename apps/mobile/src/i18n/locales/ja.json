@@ -323,7 +323,8 @@
       "chat": "チャットメッセージ",
       "kiloclaw": "KiloClawのアクティビティ",
       "balance": "残高アラート",
-      "security": "セキュリティの検出事項"
+      "security": "セキュリティの検出事項",
+      "spend": "支出アラート"
     },
     "category": {
       "chatMessagesSubtitle": "会話内の返信",
@@ -338,7 +339,9 @@
       "balanceAlertsSubtitle": "組織の残高低下に関する警告",
       "balanceAlertsUnavailable": "残高アラートを受け取るには、組織に参加してください。",
       "securityFindingsSubtitle": "新たな検出結果とSLAのリマインダー",
-      "securityFindingsUnavailable": "セキュリティの検出事項を受け取るには、スコープでKiloセキュリティエージェントを有効にしてください。"
+      "securityFindingsUnavailable": "セキュリティの検出事項を受け取るには、スコープでKiloセキュリティエージェントを有効にしてください。",
+      "spendAlertsSubtitle": "しきい値の超過と毎時の急増",
+      "spendAlertsToggle": "支出アラートのカテゴリ"
     },
     "action": {
       "openSession": "セッションを開く"
@@ -3163,7 +3166,8 @@
     "channelName": "アクティブなエージェント",
     "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。",
     "openSession": "開く",
-    "approveFailed": "承認できませんでした。もう一度試すには$t(common.approve)をタップしてください。"
+    "approveFailed": "承認できませんでした。もう一度試すには$t(common.approve)をタップしてください。",
+    "newestResult": "最新の結果"
   },
   "transcriptionModel": {
     "title": "文字起こしモデル",
@@ -3199,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "最後のセッションを開く"
+  },
+  "spendAlerts": {
+    "subtitle": "このスコープの支出が上限を超えたとき、または通常の毎時のペースを大きく上回ったときに、請求担当者にメールまたはプッシュでアラートを送信します。",
+    "enable": "支出アラートを有効にする",
+    "thresholdTitle": "しきい値の超過",
+    "thresholdSubtitle": "累計支出が上限を超えています",
+    "anomalyTitle": "毎時の急増",
+    "anomalySubtitle": "1時間の支出がこのスコープの通常のペースを大きく上回っています",
+    "limitLabel": "上限 (USD)",
+    "windowLabel": "期間",
+    "window24h": "24時間",
+    "window7d": "7日間",
+    "window30d": "30日間",
+    "multiplierLabel": "急増の倍率",
+    "saved": "支出アラートの設定を保存しました",
+    "loadError": "支出アラートを読み込めませんでした。",
+    "saveError": "支出アラートを保存できませんでした。",
+    "empty": "支出アラートはオフです。このスコープの請求担当者に通知するにはオンにしてください。",
+    "noSpend": "まだ支出が記録されていません",
+    "spend24h": "過去24時間の支出",
+    "multiplierError": "1以上の倍率を入力してください",
+    "permissionDenied": "支出アラートを管理する権限がありません。",
+    "pushOffByCategory": "通知でオフ"
   }
 }

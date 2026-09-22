@@ -31,7 +31,9 @@ import {
 import { getSandbox } from '@cloudflare/sandbox';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import {
+  getSandboxAllocationInstance,
   getSandboxAllocationResources,
+  type CloudflareContainersInstance,
   type VercelSandboxResources,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
@@ -232,6 +234,7 @@ import {
   createCloudflareProviderAdapter,
   decodeCloudflareProviderRef,
 } from '../sandbox-control/cloudflare-provider.js';
+import { createCloudflareContainersProviderAdapter } from '../sandbox-control/cloudflare-containers-provider.js';
 import {
   createVercelProviderAdapter,
   decodeVercelProviderRef,
@@ -261,7 +264,7 @@ import {
   type SandboxTerminalAccessInput,
   type SandboxTerminalAccessResult,
 } from '../sandbox-control/terminal-billing.js';
-import type { AgentSandboxProvider } from '../types.js';
+import { agentSandboxProviderSchema, type AgentSandboxProvider } from '../types.js';
 import {
   safeSandboxRuntimeVersion,
   type SandboxRuntimeMetadata,
@@ -420,6 +423,7 @@ export class SandboxControl extends DurableObject<Env> {
   private readyConnectionId: string | null = null;
   private providerKind: AgentSandboxProvider = 'cloudflare';
   private vercelResources: VercelSandboxResources | undefined;
+  private containersInstance: CloudflareContainersInstance | undefined;
   private readonly sessionForwarding = createSessionForwarding();
   private readonly forwarding = {
     enqueued: 0,
@@ -553,6 +557,8 @@ export class SandboxControl extends DurableObject<Env> {
       this.providerKind = configuration?.provider ?? 'cloudflare';
       this.vercelResources =
         configuration?.provider === 'vercel' ? configuration.resources : undefined;
+      this.containersInstance =
+        configuration?.provider === 'cloudflare-containers' ? configuration.instance : undefined;
       this.provider = this.createProviderAdapter(this.providerKind, physical);
       this.runtimeDeleted = (await ctx.storage.get(RUNTIME_DELETED_KEY)) === true;
       this.exclusiveDeletionWorktreeId = cloudAgentWorktreeIdSchema
@@ -1503,6 +1509,7 @@ export class SandboxControl extends DurableObject<Env> {
     const provider = getSandboxProvider(metadata);
     await this.pinProvider(provider, {
       resources: getSandboxAllocationResources(metadata.workspace?.sandboxAllocation),
+      instance: getSandboxAllocationInstance(metadata.workspace?.sandboxAllocation),
     });
     const physical = await loadPhysicalRecord(this.ctx.storage);
     const requiredContainment = getWorktreeCredentialContainment(
@@ -1672,6 +1679,7 @@ export class SandboxControl extends DurableObject<Env> {
     sessionId: string;
     provider?: AgentSandboxProvider;
     resources?: VercelSandboxResources;
+    instance?: CloudflareContainersInstance;
     allowCreate?: boolean;
     acquisition?: SandboxAcquisition;
     billing?: SandboxBillingInput;
@@ -1713,7 +1721,10 @@ export class SandboxControl extends DurableObject<Env> {
       await this.ctx.storage.delete(RUNTIME_DELETED_KEY);
       this.runtimeDeleted = false;
     }
-    await this.pinProvider(input.provider, { resources: input.resources });
+    await this.pinProvider(input.provider, {
+      resources: input.resources,
+      instance: input.instance,
+    });
     if (acquisition && this.providerKind !== 'cloudflare') {
       throw new Error('Sandbox acquisition is only supported for Cloudflare');
     }
@@ -2856,7 +2867,7 @@ export class SandboxControl extends DurableObject<Env> {
     const matches =
       ownerId !== null &&
       ownerId === input.ownerId &&
-      (provider === 'cloudflare' || provider === 'vercel') &&
+      agentSandboxProviderSchema.safeParse(provider).success &&
       provider === input.provider;
     return projectSandboxStatus({
       stored: matches ? stored : { physical: null, deadlines: null, routes: null },
@@ -3170,6 +3181,7 @@ export class SandboxControl extends DurableObject<Env> {
     ]);
     this.vercelLocator = undefined;
     this.vercelResources = undefined;
+    this.containersInstance = undefined;
     this.activeConnection = null;
     this.readyConnectionId = null;
     this.kiloReady = false;
@@ -3304,6 +3316,14 @@ export class SandboxControl extends DurableObject<Env> {
         config: config && locator ? { ...config, teamId: locator.teamId } : config,
       });
     }
+    if (kind === 'cloudflare-containers') {
+      return createCloudflareContainersProviderAdapter({
+        logicalSandboxId: this.sandboxId,
+        allocationName,
+        instance: this.containersInstance,
+        getContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
+      });
+    }
     return createCloudflareProviderAdapter({
       sandboxId: allocationName,
       getSandbox: (id, options) =>
@@ -3339,7 +3359,7 @@ export class SandboxControl extends DurableObject<Env> {
 
   private async pinProvider(
     requested?: AgentSandboxProvider,
-    allocation?: { resources?: VercelSandboxResources }
+    allocation?: { resources?: VercelSandboxResources; instance?: CloudflareContainersInstance }
   ): Promise<void> {
     const configuration = await this.ctx.storage.transaction(async () => {
       const stored = await this.readProviderConfiguration();
@@ -3349,6 +3369,9 @@ export class SandboxControl extends DurableObject<Env> {
           : stored?.provider === 'vercel'
             ? stored.resources
             : undefined;
+      const instance =
+        allocation?.instance ??
+        (stored?.provider === 'cloudflare-containers' ? stored.instance : undefined);
       const provider = requested ?? stored?.provider ?? 'cloudflare';
       if (stored && stored.provider !== provider) {
         throw new Error('Sandbox provider mismatch');
@@ -3356,6 +3379,7 @@ export class SandboxControl extends DurableObject<Env> {
       const next = sandboxProviderConfigurationSchema.parse({
         provider,
         ...(resources === undefined ? {} : { resources }),
+        ...(instance === undefined ? {} : { instance }),
       });
       if (
         stored?.provider === 'vercel' &&
@@ -3364,6 +3388,14 @@ export class SandboxControl extends DurableObject<Env> {
           stored.resources?.memory !== next.resources?.memory)
       ) {
         throw new Error('Sandbox resources mismatch');
+      }
+      if (
+        stored?.provider === 'cloudflare-containers' &&
+        next.provider === 'cloudflare-containers' &&
+        next.instance !== undefined &&
+        stored.instance !== next.instance
+      ) {
+        throw new Error('Sandbox instance mismatch');
       }
       if (next.provider === 'vercel' && parseVercelSandboxRuntimeConfig(this.env) === undefined) {
         throw new Error('Vercel sandbox runtime configuration is unavailable');
@@ -3377,6 +3409,8 @@ export class SandboxControl extends DurableObject<Env> {
     this.providerKind = configuration.provider;
     this.vercelResources =
       configuration.provider === 'vercel' ? configuration.resources : undefined;
+    this.containersInstance =
+      configuration.provider === 'cloudflare-containers' ? configuration.instance : undefined;
     this.provider = this.createProviderAdapter(
       configuration.provider,
       await loadPhysicalRecord(this.ctx.storage)

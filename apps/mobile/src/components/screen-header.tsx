@@ -10,6 +10,7 @@ import { Text } from '@/components/ui/text';
 import { useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { offlineHeaderReservation } from '@/lib/offline-banner-state';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 /**
@@ -34,6 +35,14 @@ type ScreenHeaderProps = {
   titleContent?: React.ReactNode;
   /** Line cap for the title, at most {@link MAX_TITLE_LINES}. */
   titleNumberOfLines?: number;
+  /**
+   * Cap the eyebrow to this many lines, overriding the header's default single
+   * line. When set the eyebrow ellipsizes in the middle: the repo name is the
+   * distinguishing tail of a path, so a middle ellipsis keeps more of it than a
+   * tail ellipsis. Left undefined every caller keeps the default one-line tail
+   * ellipsis, so a long repository label never reflows the header.
+   */
+  eyebrowNumberOfLines?: number;
   /** Reserve the title's line cap so state changes do not move the screen body. */
   reserveTitleSpace?: boolean;
   /** Optional mono-uppercase line above the title. */
@@ -90,6 +99,7 @@ export function ScreenHeader({
   title,
   titleContent,
   titleNumberOfLines = 2,
+  eyebrowNumberOfLines,
   reserveTitleSpace = false,
   eyebrow,
   reserveEyebrow = false,
@@ -133,21 +143,17 @@ export function ScreenHeader({
   const safeAreaStyle = safeAreaTop ? { paddingTop } : undefined;
 
   // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
-  // whole chrome off the sensor. They go on an inner wrapper so they ADD to the
-  // `px-4` gutter: an inline padding on the container would beat the className
-  // (inline style wins in React Native) and swallow the gutter, pulling the
-  // back control's `-ms-4` chevron back inside the sensor area. Zero insets
-  // collapse the wrapper style to `undefined`, so portrait geometry is
+  // whole chrome off the sensor. The one shared hook serves both platforms and
+  // every caller: the brand mark on a page root and the sections, cards and
+  // actions below it then share one leading edge. It goes on an inner wrapper so
+  // it ADDS to the `px-4` gutter: an inline padding on the container would beat
+  // the className (inline style wins in React Native) and swallow the gutter,
+  // pulling the back control's `-ms-4` chevron back inside the sensor area. Zero
+  // insets collapse the wrapper style to `undefined`, so portrait geometry is
   // byte-identical and a rotation never moves anything vertically. Side padding
   // applies to every caller — a sheet with `safeAreaTop={false}` still runs
   // edge-to-edge horizontally and must clear the cutout too.
-  const sideInsetStyle =
-    insets.left > 0 || insets.right > 0
-      ? {
-          ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
-          ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
-        }
-      : undefined;
+  const sideInsetStyle = useSideInsetStyle();
 
   // When `backIcon` isn't specified, fall back to the historical behaviour
   // where iOS modals get a ChevronDown and everything else gets a ChevronLeft.
@@ -224,8 +230,8 @@ export function ScreenHeader({
       {eyebrow || reserveEyebrow ? (
         <Eyebrow
           className={cn('mb-0.5', centerTitle && 'text-center', !eyebrow && 'opacity-0')}
-          numberOfLines={1}
-          ellipsizeMode="tail"
+          numberOfLines={eyebrowNumberOfLines ?? 1}
+          ellipsizeMode={eyebrowNumberOfLines === undefined ? 'tail' : 'middle'}
           accessible={Boolean(eyebrow)}
           accessibilityElementsHidden={!eyebrow}
           importantForAccessibility={eyebrow ? 'auto' : 'no-hide-descendants'}

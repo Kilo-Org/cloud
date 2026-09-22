@@ -67,13 +67,7 @@ function slopDp(hitSlop: unknown): number {
 
 /** One side's reach, from a hitSlop that is one number for every side or per-side insets. */
 function slopSideDp(hitSlop: unknown, side: keyof Insets): number {
-  if (typeof hitSlop === 'number') {
-    return hitSlop;
-  }
-  if (hitSlop && typeof hitSlop === 'object') {
-    return (hitSlop as Partial<Insets>)[side] ?? 0;
-  }
-  return 0;
+  return hitSlopInsets(hitSlop)[side];
 }
 
 function pressesWithLabel(root: I, label: string): I[] {
@@ -243,18 +237,23 @@ describe('SessionListHeaderActions new-session control', () => {
     // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
     expect(gapDp).toBe(14);
 
-    const newSessionSlop = hitSlopInsets(newSession.props.hitSlop);
-    const filterSlop = hitSlopInsets(filter.props.hitSlop);
+    // `hitSlopInsets` (inside `slopSideDp`) validates and normalizes either
+    // shape, because the filter expresses its slop as one dp value for every
+    // side while the new-session control caps its right side.
     // The new-session control sits left of the filter, so the gap has to fit
     // both facing slops; more than the gap means the two regions overlap. Either
-    // control may express hitSlop as one number or as per-side insets.
+    // control may express hitSlop as one number or as per-side insets: the
+    // filter writes its slop as one number for every side, the new-session
+    // control as a per-side object.
     expect(
-      slopSideDp(newSessionSlop, 'right') + slopSideDp(filterSlop, 'left')
+      slopSideDp(newSession.props.hitSlop, 'right') + slopSideDp(filter.props.hitSlop, 'left')
     ).toBeLessThanOrEqual(gapDp);
     // Capping the right side must not drop the control below the design target.
     const box = boxDp(newSession.props.className as string);
     expect(
-      box.width + slopSideDp(newSessionSlop, 'left') + slopSideDp(newSessionSlop, 'right')
+      box.width +
+        slopSideDp(newSession.props.hitSlop, 'left') +
+        slopSideDp(newSession.props.hitSlop, 'right')
     ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
 
     act(() => {

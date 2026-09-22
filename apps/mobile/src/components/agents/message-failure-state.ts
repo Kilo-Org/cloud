@@ -11,8 +11,23 @@ type DeliveryReason = Extract<MessageDeliveryState, { status: 'failed' }>['reaso
 const DELIVERY_DETAIL_KEY_BY_REASON = {
   interrupted: 'agentChat.messageFailure.deliveryInterrupted',
   exhausted: 'agentChat.messageFailure.deliveryExhausted',
+  // `execution` is the response failure, not a delivery one (the message
+  // reached the agent): the row shows the assistant-failure title instead, so
+  // this line is never rendered. It stays in the record to keep the reason
+  // coverage complete.
   execution: 'agentChat.messageFailure.deliveryExecution',
 } as const satisfies Record<DeliveryReason, string>;
+
+/**
+ * The one delivery reason that is an agent run failing, not the transport: the
+ * message was delivered and the agent could not run it. The row states it in
+ * the assistant-failure copy ("Response failed") with no second line — the
+ * session's own status line reports the same failure, so a delivery-flavoured
+ * title here plus the footer's line read as the failure stated three times
+ * (UX-DEFECT session-detail failed turn). Retry and Copy-to-composer keep
+ * working: the transport text stays reachable behind the copy action.
+ */
+const AGENT_EXECUTION_DELIVERY_REASON: DeliveryReason = 'execution';
 
 /**
  * Assistant error names that can never be retried. Pinned to the exact names
@@ -53,8 +68,10 @@ export type MessageFailure = {
   title: string;
   /**
    * The explanation line under the title, or `null` when the title alone says
-   * it (an assistant failure with no classified reason). The footer then shows
-   * one statement plus the action rather than the same sentence twice.
+   * it (an assistant failure with no classified reason, or an agent-execution
+   * delivery failure whose response-failure title is the whole statement). The
+   * footer then shows one statement plus the action rather than the same
+   * sentence twice.
    */
   detail: string | null;
   /**
@@ -75,6 +92,16 @@ export function selectMessageFailure(input: {
   const { deliveryState, info } = input;
 
   if (info.role === 'user' && deliveryState?.status === 'failed') {
+    if (deliveryState.reason === AGENT_EXECUTION_DELIVERY_REASON) {
+      return {
+        kind: 'delivery',
+        title: i18n.t('agentChat.messageFailure.assistantTitle'),
+        detail: null,
+        copyDetail: deliveryState.error,
+        canRetry: true,
+        canCopy: true,
+      };
+    }
     return {
       kind: 'delivery',
       title: i18n.t('agentChat.messageFailure.deliveryTitle'),

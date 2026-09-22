@@ -321,9 +321,12 @@ export function statusIndicatorDuplicatesMessageFailure(input: {
     return true;
   }
   // An unclassified status error resolves to the generic assistant line, which
-  // is the same failure the row's own title states.
+  // is the same failure the row's own title states. Keyed on the title, not the
+  // kind: an agent-execution delivery failure renders the assistant-failure
+  // title too (message-failure-state.ts), so the footer line would restate it.
   return (
-    failure.kind === 'assistant' && copy === i18n.t('agentChat.messageFailure.assistantFailed')
+    failure.title === i18n.t('agentChat.messageFailure.assistantTitle') &&
+    copy === i18n.t('agentChat.messageFailure.assistantFailed')
   );
 }
 

@@ -479,6 +479,26 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
     ).toBe(true);
   });
 
+  it('suppresses the generic assistant line the row states in its delivery title', () => {
+    // An agent-execution delivery failure renders the assistant-failure title
+    // (message-failure-state.ts), so the unclassified status line would be the
+    // same failure stated a second time.
+    const executionFailure: MessageFailure = {
+      kind: 'delivery',
+      title: 'Response failed',
+      detail: null,
+      copyDetail: 'simulated error',
+      canRetry: true,
+      canCopy: true,
+    };
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'simulated error' },
+        failure: executionFailure,
+      })
+    ).toBe(true);
+  });
+
   it('keeps a classified line the row does not carry', () => {
     expect(
       statusIndicatorDuplicatesMessageFailure({

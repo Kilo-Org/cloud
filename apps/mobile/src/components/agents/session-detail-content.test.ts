@@ -1000,7 +1000,7 @@ describe('session detail failed delivery retry', () => {
       );
     });
     expect(renderedText(view.renderer.root)).toContain(
-      i18n.t('agentChat.messageFailure.deliveryTitle')
+      i18n.t('agentChat.messageFailure.assistantTitle')
     );
 
     const send = vi.spyOn(view.manager, 'send').mockResolvedValue(true);

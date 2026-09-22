@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi một lát rồi thử lại."
   },
   "models": {
+    "auto": {
+      "frontier": "Tự động Tiên tiến",
+      "balanced": "Tự động Cân bằng",
+      "efficient": "Tự động Hiệu quả",
+      "small": "Tự động Nhỏ",
+      "free": "Tự động Miễn phí",
+      "organization": "Tự động Tổ chức"
+    },
     "dataCollected": "Có thu thập dữ liệu",
     "free": "Miễn phí",
     "couldNotUpdateFavorites": "Không thể cập nhật mục yêu thích.",

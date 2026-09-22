@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Mgbalị nbanye karịrị akarị. Biko chere ma nwaa ọzọ."
   },
   "models": {
+    "auto": {
+      "frontier": "Akpaaka Kachasị elu",
+      "balanced": "Akpaaka Nhatanha",
+      "efficient": "Akpaaka Na-arụ ọrụ nke ọma",
+      "small": "Akpaaka Nta",
+      "free": "Akpaaka N'efu",
+      "organization": "Akpaaka Òtù"
+    },
     "dataCollected": "Data anakọtara",
     "free": "N'efu",
     "couldNotUpdateFavorites": "Enweghị ike imelite ihe kacha amasị gị.",

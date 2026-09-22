@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "サインインの試行回数が多すぎます。しばらく待ってから、もう一度お試しください。"
   },
   "models": {
+    "auto": {
+      "frontier": "自動最先端",
+      "balanced": "自動バランス",
+      "efficient": "自動効率",
+      "small": "自動小型",
+      "free": "自動無料",
+      "organization": "組織の自動"
+    },
     "dataCollected": "データ収集あり",
     "free": "無料",
     "couldNotUpdateFavorites": "お気に入りを更新できませんでした。",

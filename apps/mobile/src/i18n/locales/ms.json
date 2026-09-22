@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Terlalu banyak percubaan log masuk. Sila tunggu dan cuba lagi."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatik Tercanggih",
+      "balanced": "Automatik Seimbang",
+      "efficient": "Automatik Cekap",
+      "small": "Automatik Kecil",
+      "free": "Automatik Percuma",
+      "organization": "Automatik Organisasi"
+    },
     "dataCollected": "Data dikumpul",
     "free": "Percuma",
     "couldNotUpdateFavorites": "Tidak dapat mengemas kini kegemaran.",

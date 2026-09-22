@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "Túl sok bejelentkezési kísérlet történt. Várj egy kicsit, majd próbáld újra."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatikus Csúcskategóriás",
+      "balanced": "Automatikus Kiegyensúlyozott",
+      "efficient": "Automatikus Hatékony",
+      "small": "Automatikus Kicsi",
+      "free": "Automatikus Ingyenes",
+      "organization": "Szervezeti automatikus"
+    },
     "dataCollected": "Adatgyűjtés",
     "free": "Ingyenes",
     "couldNotUpdateFavorites": "Nem sikerült frissíteni a kedvenceket.",

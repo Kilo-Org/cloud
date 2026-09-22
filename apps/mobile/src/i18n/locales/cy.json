@@ -3291,6 +3291,14 @@
     "tooManySignInAttempts": "Rydych wedi ceisio mewngofnodi gormod o weithiau. Arhoswch a rhowch gynnig eto."
   },
   "models": {
+    "auto": {
+      "frontier": "Awtomatig Blaengar",
+      "balanced": "Awtomatig Cytbwys",
+      "efficient": "Awtomatig Effeithlon",
+      "small": "Awtomatig Bach",
+      "free": "Awtomatig Am ddim",
+      "organization": "Sefydliad Awtomatig"
+    },
     "dataCollected": "Cesglir data",
     "free": "Am ddim",
     "couldNotUpdateFavorites": "Methu diweddaru'r ffefrynnau.",

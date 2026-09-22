@@ -827,7 +827,8 @@
       "chat": "Chattmeddelanden",
       "kiloclaw": "KiloClaw-aktivitet",
       "balance": "Saldovarningar",
-      "security": "Säkerhetsanmärkningar"
+      "security": "Säkerhetsanmärkningar",
+      "spend": "Utgiftsvarningar"
     },
     "category": {
       "chatMessagesSubtitle": "svar i dina konversationer",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Sessionsstatus",
       "sessionStatusSubtitle": "avslutad / misslyckad / redo att styras",
       "kiloclawActivitySubtitle": "instans klar eller misslyckad, schemalagda åtgärder",
+      "kiloclawActivityUnavailable": "Starta en KiloClaw-instans för att få KiloClaw-aktivitet.",
       "balanceAlertsSubtitle": "varningar om lågt organisationssaldo",
-      "securityFindingsSubtitle": "nya säkerhetsfynd och SLA-påminnelser"
+      "balanceAlertsUnavailable": "Gå med i en organisation för att få saldovarningar.",
+      "securityFindingsSubtitle": "nya säkerhetsfynd och SLA-påminnelser",
+      "securityFindingsUnavailable": "Aktivera Kilo-säkerhetsagenten i en omfattning för att få säkerhetsfynd.",
+      "spendAlertsSubtitle": "gränsöverskridanden och toppar per timme",
+      "spendAlertsToggle": "Kategorin utgiftsvarningar"
     },
     "action": {
       "openSession": "Öppna session"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Det gick inte att läsa in sessionen.",
       "failedToLoadDetails": "Det gick inte att läsa in sessionsinformationen.",
       "failedToStopExecution": "Det gick inte att stoppa körningen.",
+      "stopped": "Sessionen stoppad",
+      "committing": "Committar…",
+      "committed": "Committad",
+      "commitFailed": "Committen misslyckades",
       "renameSession": "Byt namn på sessionen",
       "renamePlaceholder": "Sessionens namn",
       "transcriptAccessibility": "Meddelandehistorik",
@@ -3156,7 +3166,8 @@
     "channelName": "Aktiva agenter",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen.",
     "openSession": "Öppna",
-    "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen."
+    "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen.",
+    "newestResult": "Nyaste resultatet"
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",
@@ -3192,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Öppna senaste sessionen"
+  },
+  "spendAlerts": {
+    "subtitle": "Skicka en varning via e-post eller push till faktureringskontakterna när detta områdes utgifter överskrider en gräns eller stiger över den vanliga timtakten.",
+    "enable": "Aktivera utgiftsvarningar",
+    "thresholdTitle": "Gränsöverskridande",
+    "thresholdSubtitle": "Löpande utgifter överskrider din gräns",
+    "anomalyTitle": "Topp per timme",
+    "anomalySubtitle": "En timme ligger långt över detta områdes vanliga takt",
+    "limitLabel": "Gräns (USD)",
+    "windowLabel": "Fönster",
+    "window24h": "24 timmar",
+    "window7d": "7 dagar",
+    "window30d": "30 dagar",
+    "multiplierLabel": "Toppmultiplikator",
+    "saved": "Inställningarna för utgiftsvarningar har sparats",
+    "loadError": "Utgiftsvarningarna kunde inte läsas in.",
+    "saveError": "Utgiftsvarningarna kunde inte sparas.",
+    "empty": "Utgiftsvarningar är av. Slå på dem för att varna detta områdes faktureringskontakter.",
+    "noSpend": "Ingen utgift registrerad ännu",
+    "spend24h": "Utgifter de senaste 24 timmarna",
+    "multiplierError": "Ange en multiplikator på 1 eller mer",
+    "permissionDenied": "Du har inte behörighet att hantera utgiftsvarningar.",
+    "pushOffByCategory": "Av i Aviseringar"
   }
 }

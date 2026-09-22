@@ -108,11 +108,44 @@ export type SessionActivity =
   | { type: 'idle' }
   | { type: 'retrying'; attempt: number; message: string };
 
+/**
+ * Stable, locale-free code for every user-visible string the SDK writes
+ * itself. A localized client renders its own copy from the code; the web app
+ * keeps rendering `message` unchanged.
+ */
+export type SdkStatusMessageCode =
+  | 'agent-connection-lost'
+  | 'session-stopped'
+  | 'session-terminated'
+  | 'setting-up-environment'
+  | 'wrapping-up'
+  | 'committing'
+  | 'committed'
+  | 'commit-failed'
+  | 'message-delivery-failed'
+  | 'failed-to-stop-execution'
+  | 'child-session-not-found'
+  | 'selected-model-unavailable'
+  | 'insufficient-credits'
+  | 'not-authorized'
+  | 'service-unavailable'
+  | 'previous-task-in-progress'
+  | 'service-temporarily-unavailable'
+  | 'generic-error'
+  | 'connection-lost'
+  | 'connection-failed';
+
 /** Lifecycle outcome — drives bottom bar content (one thing at a time). */
 export type AgentStatus =
   | { type: 'idle' }
-  | { type: 'autocommit'; step: string; message: string; commitHash?: string }
-  | { type: 'error'; message: string }
+  | {
+      type: 'autocommit';
+      step: string;
+      message: string;
+      commitHash?: string;
+      code?: SdkStatusMessageCode;
+    }
+  | { type: 'error'; message: string; code?: SdkStatusMessageCode }
   | { type: 'disconnected' }
   | { type: 'interrupted' };
 

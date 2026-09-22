@@ -859,7 +859,8 @@
       "chat": "Pokalbių žinutės",
       "kiloclaw": "KiloClaw veikla",
       "balance": "Įspėjimai apie likutį",
-      "security": "Saugos problemos"
+      "security": "Saugos problemos",
+      "spend": "Išlaidų įspėjimai"
     },
     "category": {
       "chatMessagesSubtitle": "atsakymai jūsų pokalbiuose",
@@ -870,8 +871,13 @@
       "sessionStatusTitle": "Sesijos būsena",
       "sessionStatusSubtitle": "baigta / nepavyko / paruošta valdyti",
       "kiloclawActivitySubtitle": "egzemplioriaus parengtis ar klaida, suplanuoti veiksmai",
+      "kiloclawActivityUnavailable": "Paleiskite KiloClaw egzempliorių, kad gautumėte KiloClaw veiklą.",
       "balanceAlertsSubtitle": "įspėjimai apie mažą organizacijos likutį",
-      "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai"
+      "balanceAlertsUnavailable": "Prisijunkite prie organizacijos, kad gautumėte balanso įspėjimus.",
+      "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai",
+      "securityFindingsUnavailable": "Įjunkite Kilo saugos agentą apimtyje, kad gautumėte saugos radinius.",
+      "spendAlertsSubtitle": "slenksčių viršijimai ir valandiniai šuoliai",
+      "spendAlertsToggle": "Išlaidų įspėjimų kategorija"
     },
     "action": {
       "openSession": "Atidaryti sesiją"
@@ -2132,6 +2138,10 @@
       "couldNotLoad": "Nepavyko įkelti sesijos.",
       "failedToLoadDetails": "Nepavyko įkelti sesijos informacijos.",
       "failedToStopExecution": "Nepavyko sustabdyti vykdymo.",
+      "stopped": "Sesija sustabdyta",
+      "committing": "Įrašoma…",
+      "committed": "Įrašyta",
+      "commitFailed": "Nepavyko įrašyti",
       "renameSession": "Pervadinti sesiją",
       "renamePlaceholder": "Sesijos pavadinimas",
       "transcriptAccessibility": "Sesijos pokalbio išrašas",
@@ -3242,7 +3252,8 @@
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
     "openSession": "Atidaryti",
-    "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą."
+    "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą.",
+    "newestResult": "Naujausias rezultatas"
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",
@@ -3278,5 +3289,28 @@
   },
   "launcher": {
     "openLastSession": "Atidaryti paskutinę sesiją"
+  },
+  "spendAlerts": {
+    "subtitle": "Siųsk įspėjimą el. paštu arba push pranešimu atsiskaitymo kontaktams, kai šios srities išlaidos viršija limitą arba pakyla virš įprasto valandinio tempo.",
+    "enable": "Įjungti išlaidų įspėjimus",
+    "thresholdTitle": "Slenksčio viršijimas",
+    "thresholdSubtitle": "Einamosios išlaidos viršija tavo limitą",
+    "anomalyTitle": "Valandinis šuolis",
+    "anomalySubtitle": "Viena valanda gerokai viršija įprastą šios srities tempą",
+    "limitLabel": "Limitas (USD)",
+    "windowLabel": "Langas",
+    "window24h": "24 valandos",
+    "window7d": "7 dienos",
+    "window30d": "30 dienų",
+    "multiplierLabel": "Šuolio daugiklis",
+    "saved": "Išlaidų įspėjimų nustatymai išsaugoti",
+    "loadError": "Nepavyko įkelti išlaidų įspėjimų.",
+    "saveError": "Nepavyko išsaugoti išlaidų įspėjimų.",
+    "empty": "Išlaidų įspėjimai išjungti. Įjunk juos, kad įspėtum šios srities atsiskaitymo kontaktus.",
+    "noSpend": "Išlaidų dar neužregistruota",
+    "spend24h": "Išlaidos per paskutines 24 valandas",
+    "multiplierError": "Įvesk daugiklį, lygų 1 arba didesnį",
+    "permissionDenied": "Neturite leidimo valdyti išlaidų įspėjimų.",
+    "pushOffByCategory": "Išjungta pranešimuose"
   }
 }

@@ -586,6 +586,139 @@ describe('operation results and delivery', () => {
     expect(record.snapshot().delivery?.state).toBe('acknowledged');
   });
 
+  it('attaches assistant facts from a native turn error', async () => {
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: async () =>
+          completion({
+            name: 'APIError',
+            data: { message: 'rate limit exceeded', statusCode: 429, isRetryable: false },
+          }),
+      }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    const record = onlyOperation(handlerDeps);
+    await record.done;
+    await record.waitForDelivery();
+
+    expect(record.snapshot().outcome).toMatchObject({
+      status: 'failed',
+      reason: 'Kilo execution ended with APIError',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'unknown',
+    });
+  });
+
+  it('attaches assistant facts from a late native error after an abort', async () => {
+    const started = Promise.withResolvers<void>();
+    const original = Promise.withResolvers<ReturnType<typeof completion>>();
+    const abortAcknowledged = Promise.withResolvers<void>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return original.promise;
+        },
+        abortSession: async () => {
+          abortAcknowledged.resolve();
+          setTimeout(
+            () =>
+              original.resolve(
+                completion({
+                  name: 'APIError',
+                  data: { message: 'rate limit exceeded', statusCode: 429, isRetryable: false },
+                })
+              ),
+            125
+          );
+          return true;
+        },
+      }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    const authorization = operationAuthorization();
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      authorization
+    );
+    await started.promise;
+    const record = onlyOperation(handlerDeps);
+    const aborting = handleControlRequest(
+      'session.abort',
+      session,
+      { messageId: 'msg_1' },
+      handlerDeps
+    );
+    await abortAcknowledged.promise;
+    expect(await aborting).toEqual({ ok: true, result: { status: 'aborted' } });
+    await record.done;
+    await record.waitForDelivery();
+
+    expect(record.snapshot().outcome).toMatchObject({
+      status: 'failed',
+      reason: 'Kilo execution ended with APIError',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'unknown',
+    });
+  });
+
+  it('does not attach assistant facts to an auto-commit failure', async () => {
+    const handlerDeps = deps({
+      runAutoCommit: async () => ({ success: false, error: 'git push failed' }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, finalization: { autoCommit: true } },
+      handlerDeps,
+      operationAuthorization()
+    );
+    const record = onlyOperation(handlerDeps);
+    await record.done;
+    await record.waitForDelivery();
+    const outcome = record.snapshot().outcome;
+
+    expect(outcome).toMatchObject({ status: 'failed', reason: 'Auto-commit failed' });
+    expect(outcome?.assistantReason).toBeUndefined();
+    expect(outcome?.providerOwnership).toBeUndefined();
+  });
+
+  it('does not attach assistant facts to an aborted turn', async () => {
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: async () =>
+          completion({ name: 'MessageAbortedError', data: { message: 'User aborted' } }),
+      }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    const record = onlyOperation(handlerDeps);
+    await record.done;
+    await record.waitForDelivery();
+    const outcome = record.snapshot().outcome;
+
+    expect(outcome).toMatchObject({ status: 'cancelled' });
+    expect(outcome?.assistantReason).toBeUndefined();
+    expect(outcome?.providerOwnership).toBeUndefined();
+  });
+
   it.each([
     [undefined, 'completed'],
     [{ name: 'MessageAbortedError', data: { message: 'cancelled' } }, 'cancelled'],

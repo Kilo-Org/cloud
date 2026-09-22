@@ -29,6 +29,7 @@
 import { SELF, env, reset, runInDurableObject } from 'cloudflare:test';
 import jwt from 'jsonwebtoken';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { waitFor } from './wait-for.js';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import type {
   AttachSessionInput,
@@ -380,7 +381,7 @@ async function connectReadyRecoveryWrapper(
   const phases: string[] = [];
   installReconcileResponder(socket, phases);
   signalReady(socket);
-  await vi.waitFor(
+  await waitFor(
     async () => {
       expect((await connectionState(fixture)).connection).toBe('ready');
     },
@@ -390,7 +391,7 @@ async function connectReadyRecoveryWrapper(
 }
 
 async function waitForDisconnected(fixture: RuntimeFixture): Promise<void> {
-  await vi.waitFor(
+  await waitFor(
     async () => {
       expect((await connectionState(fixture)).connection).toBe('disconnected');
     },
@@ -505,7 +506,7 @@ describe('runtime credential proxy fence across a real control reconnect', () =>
       }
     );
 
-    await vi.waitFor(
+    await waitFor(
       async () => {
         expect(await fence(fixture)).toBeNull();
       },
@@ -523,7 +524,7 @@ describe('runtime credential proxy fence across a real control reconnect', () =>
     await runInDurableObject(fixture.control, instance => instance.beginStop('idle'));
     await runInDurableObject(fixture.control, instance => instance.recordStopAttempt());
 
-    await vi.waitFor(
+    await waitFor(
       async () => {
         expect(await fence(fixture)).toBeNull();
       },

@@ -859,7 +859,8 @@
       "chat": "Sporočila v klepetu",
       "kiloclaw": "Dejavnost v KiloClaw",
       "balance": "Opozorila o stanju dobroimetja",
-      "security": "Varnostne ugotovitve"
+      "security": "Varnostne ugotovitve",
+      "spend": "Opozorila o porabi"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori v tvojih pogovorih",
@@ -870,8 +871,13 @@
       "sessionStatusTitle": "Stanje seje",
       "sessionStatusSubtitle": "končano / neuspešno / pripravljeno za upravljanje",
       "kiloclawActivitySubtitle": "instanca pripravljena ali neuspešna, načrtovana dejanja",
+      "kiloclawActivityUnavailable": "Zaženite instanco KiloClaw, da prejemate dejavnost KiloClaw.",
       "balanceAlertsSubtitle": "opozorila o nizkem stanju organizacije",
-      "securityFindingsSubtitle": "nove ugotovitve in opomniki SLA"
+      "balanceAlertsUnavailable": "Pridružite se organizaciji, da prejemate opozorila o stanju.",
+      "securityFindingsSubtitle": "nove ugotovitve in opomniki SLA",
+      "securityFindingsUnavailable": "Omogočite Varnostnega agenta Kilo v obsegu, da prejemate varnostne ugotovitve.",
+      "spendAlertsSubtitle": "preseganja pragov in urni skoki",
+      "spendAlertsToggle": "Kategorija opozoril o porabi"
     },
     "action": {
       "openSession": "Odpri sejo"
@@ -2132,6 +2138,10 @@
       "couldNotLoad": "Seje ni bilo mogoče naložiti.",
       "failedToLoadDetails": "Podrobnosti seje ni bilo mogoče naložiti.",
       "failedToStopExecution": "Izvajanja ni bilo mogoče ustaviti.",
+      "stopped": "Seja ustavljena",
+      "committing": "Uveljavljanje…",
+      "committed": "Uveljavljeno",
+      "commitFailed": "Uveljavljanje ni uspelo",
       "renameSession": "Preimenuj sejo",
       "renamePlaceholder": "Ime seje",
       "transcriptAccessibility": "Zapis pogovora v seji",
@@ -3242,7 +3252,8 @@
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu.",
     "openSession": "Odpri",
-    "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus."
+    "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus.",
+    "newestResult": "Najnovejši rezultat"
   },
   "transcriptionModel": {
     "title": "Model za prepisovanje",
@@ -3278,5 +3289,28 @@
   },
   "launcher": {
     "openLastSession": "Odpri zadnjo sejo"
+  },
+  "spendAlerts": {
+    "subtitle": "Pošlji opozorilo po e-pošti ali push sporočilu obračunskim stikom, ko poraba tega obsega preseže omejitev ali skoči nad običajno urno stopnjo.",
+    "enable": "Omogoči opozorila o porabi",
+    "thresholdTitle": "Preseganje praga",
+    "thresholdSubtitle": "Tekoča poraba presega tvojo omejitev",
+    "anomalyTitle": "Urni skok",
+    "anomalySubtitle": "Ena ura je daleč nad običajno stopnjo tega obsega",
+    "limitLabel": "Omejitev (USD)",
+    "windowLabel": "Okno",
+    "window24h": "24 ur",
+    "window7d": "7 dni",
+    "window30d": "30 dni",
+    "multiplierLabel": "Množitelj skoka",
+    "saved": "Nastavitve opozoril o porabi so shranjene",
+    "loadError": "Opozoril o porabi ni bilo mogoče naložiti.",
+    "saveError": "Opozoril o porabi ni bilo mogoče shraniti.",
+    "empty": "Opozorila o porabi so izklopljena. Vklopi jih, da opozoriš obračunske stike tega obsega.",
+    "noSpend": "Poraba še ni zabeležena",
+    "spend24h": "Poraba v zadnjih 24 urah",
+    "multiplierError": "Vnesi množitelj 1 ali večji",
+    "permissionDenied": "Nimaš dovoljenja za upravljanje opozoril o porabi.",
+    "pushOffByCategory": "Izklopljeno v Obvestilih"
   }
 }

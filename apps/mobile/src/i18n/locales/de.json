@@ -323,7 +323,8 @@
       "chat": "Chat-Nachrichten",
       "kiloclaw": "KiloClaw-Aktivitäten",
       "balance": "Guthaben-Warnungen",
-      "security": "Sicherheitsbefunde"
+      "security": "Sicherheitsbefunde",
+      "spend": "Ausgaben-Warnungen"
     },
     "category": {
       "chatMessagesSubtitle": "antworten in deinen Unterhaltungen",
@@ -334,8 +335,13 @@
       "sessionStatusTitle": "Sitzungsstatus",
       "sessionStatusSubtitle": "beendet / fehlgeschlagen / bereit zur Steuerung",
       "kiloclawActivitySubtitle": "instanz bereit/fehlgeschlagen, geplante Aktionen",
+      "kiloclawActivityUnavailable": "Starte eine KiloClaw-Instanz, um KiloClaw-Aktivität zu erhalten.",
       "balanceAlertsSubtitle": "warnungen bei niedrigem Organisationsguthaben",
-      "securityFindingsSubtitle": "neue Sicherheitsbefunde und SLA-Erinnerungen"
+      "balanceAlertsUnavailable": "Tritt einer Organisation bei, um Guthabenwarnungen zu erhalten.",
+      "securityFindingsSubtitle": "neue Sicherheitsbefunde und SLA-Erinnerungen",
+      "securityFindingsUnavailable": "Aktiviere den Kilo-Sicherheitsagenten in einem Bereich, um Sicherheitsbefunde zu erhalten.",
+      "spendAlertsSubtitle": "Schwellenwertüberschreitungen und stündliche Spitzen",
+      "spendAlertsToggle": "Kategorie „Ausgaben-Warnungen“"
     },
     "action": {
       "openSession": "Sitzung öffnen"
@@ -1572,6 +1578,10 @@
       "couldNotLoad": "Die Sitzung konnte nicht geladen werden.",
       "failedToLoadDetails": "Die Sitzungsdetails konnten nicht geladen werden.",
       "failedToStopExecution": "Die Ausführung konnte nicht gestoppt werden.",
+      "stopped": "Sitzung gestoppt",
+      "committing": "Wird committet…",
+      "committed": "Committet",
+      "commitFailed": "Committen fehlgeschlagen",
       "renameSession": "Sitzung umbenennen",
       "renamePlaceholder": "Sitzungsname",
       "transcriptAccessibility": "Sitzungsprotokoll",
@@ -3156,7 +3166,8 @@
     "channelName": "Aktive Agenten",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen.",
     "openSession": "Öffnen",
-    "approveFailed": "Genehmigen fehlgeschlagen. Tippe auf $t(common.approve), um es erneut zu versuchen."
+    "approveFailed": "Genehmigen fehlgeschlagen. Tippe auf $t(common.approve), um es erneut zu versuchen.",
+    "newestResult": "Neuestes Ergebnis"
   },
   "transcriptionModel": {
     "title": "Transkriptionsmodell",
@@ -3192,5 +3203,28 @@
   },
   "launcher": {
     "openLastSession": "Letzte Sitzung öffnen"
+  },
+  "spendAlerts": {
+    "subtitle": "Sende den Abrechnungskontakten eine E-Mail- oder Push-Warnung, wenn die Ausgaben dieses Bereichs ein Limit überschreiten oder über ihre übliche Stundenrate steigen.",
+    "enable": "Ausgaben-Warnungen aktivieren",
+    "thresholdTitle": "Schwellenwertüberschreitung",
+    "thresholdSubtitle": "Laufende Ausgaben überschreiten dein Limit",
+    "anomalyTitle": "Stündliche Spitze",
+    "anomalySubtitle": "Eine Stunde liegt weit über der üblichen Rate dieses Bereichs",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Zeitfenster",
+    "window24h": "24 Stunden",
+    "window7d": "7 Tage",
+    "window30d": "30 Tage",
+    "multiplierLabel": "Spitzen-Multiplikator",
+    "saved": "Einstellungen für Ausgaben-Warnungen gespeichert",
+    "loadError": "Ausgaben-Warnungen konnten nicht geladen werden.",
+    "saveError": "Ausgaben-Warnungen konnten nicht gespeichert werden.",
+    "empty": "Ausgaben-Warnungen sind aus. Schalte sie ein, um die Abrechnungskontakte dieses Bereichs zu warnen.",
+    "noSpend": "Noch keine Ausgaben erfasst",
+    "spend24h": "Ausgaben der letzten 24 Stunden",
+    "multiplierError": "Gib einen Multiplikator von 1 oder mehr ein",
+    "permissionDenied": "Du hast keine Berechtigung, Ausgaben-Warnungen zu verwalten.",
+    "pushOffByCategory": "In Benachrichtigungen aus"
   }
 }

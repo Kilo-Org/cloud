@@ -16,16 +16,16 @@ import { z } from 'zod';
 import { logger } from './logger.js';
 import {
   assertSandboxBillingAllocation,
+  billingCapacityForSandboxClass,
   parseSandboxBillingInput,
-  SANDBOX_CAPACITIES,
   SANDBOX_USAGE_SKUS,
+  usageServiceForSandboxClass,
   billingAdmissionFailureFromError,
   type SandboxBillingAdmissionResult,
   type SandboxBillingInput,
   type SandboxClassName,
 } from './container-usage-context.js';
 
-const SERVICE = 'cloud-agent-next';
 const PENDING_ATTRIBUTION_STORAGE_KEY = 'container-usage:pending-attribution:v1';
 const PENDING_STOP_REASON_STORAGE_KEY = 'container-usage:pending-stop-reason:v1';
 const START_ACK_GENERATION_STORAGE_KEY = 'container-usage:start-ack-generation:v1';
@@ -79,11 +79,6 @@ const billingBlockSchema = z
 function startInputFromContext(context: BillingContext): ClientRecordStartInput {
   const { service: _service, ...usage } = usageContextFromBillingContext(context);
   return { ...usage, startEpochMs: context.startEpochMs };
-}
-
-export function usageServiceForSandboxClass(sandboxClassName: SandboxClassName): string {
-  const suffix = sandboxClassName.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-  return `${SERVICE}-${suffix}`;
 }
 
 function stoppedAtFromState(
@@ -693,7 +688,7 @@ export class MeteredBillingLifecycle {
     input: SandboxBillingInput,
     trigger: ContainerStartTrigger
   ): Promise<BillingContext> {
-    const capacity = SANDBOX_CAPACITIES[identity.sandboxClassName];
+    const capacity = billingCapacityForSandboxClass(identity.sandboxClassName);
     const previousStartEpochMs =
       (await this.host.storage.get<number>(LAST_START_EPOCH_STORAGE_KEY)) ?? -1;
     const startEpochMs = Math.max(Date.now(), previousStartEpochMs + 1);

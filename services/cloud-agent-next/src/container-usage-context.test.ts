@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { SandboxInstance } from './types.js';
+import type { SandboxId, SandboxInstance } from './types.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import {
   assertSandboxBillingAllocation,
   buildSandboxBillingInput,
   configureSandboxBillingInput,
+  containersBillingIdentity,
   forceDestroyControlPlaneSandbox,
   getSandboxBillingRuntimeStatus,
   SANDBOX_CAPACITIES,
@@ -109,10 +110,68 @@ describe('container usage context', () => {
       SandboxDIND: 'cloud-agent-dind-2026-07',
       SandboxCodeReview: 'cloud-agent-code-review-2026-07',
       SandboxCodeReviewContainment: 'cloud-agent-code-review-2026-07',
+      SandboxContainersStandard3: 'cloud-agent-containers-standard-3-2026-09',
+      SandboxContainersStandard4: 'cloud-agent-containers-standard-4-2026-09',
     });
   });
 
-  it('snapshots the configured capacity for every sandbox class', () => {
+  it('resolves a containers identity per instance size', () => {
+    expect(containersBillingIdentity('standard-3')).toEqual({
+      className: 'SandboxContainersStandard3',
+      service: 'cloud-agent-next-sandbox-containers-standard3',
+      sku: 'cloud-agent-containers-standard-3-2026-09',
+      capacity: { vcpu: 2, memoryMiB: 8_192, diskMB: 16_000 },
+    });
+    expect(containersBillingIdentity('standard-4')).toEqual({
+      className: 'SandboxContainersStandard4',
+      service: 'cloud-agent-next-sandbox-containers-standard4',
+      sku: 'cloud-agent-containers-standard-4-2026-09',
+      capacity: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
+    });
+
+    expect(() => containersBillingIdentity('lite')).toThrow(
+      'Containers billing is unsupported for instance size: lite'
+    );
+    expect(() => containersBillingIdentity('standard-1')).toThrow(
+      'Containers billing is unsupported for instance size: standard-1'
+    );
+    expect(() => containersBillingIdentity('standard-2')).toThrow(
+      'Containers billing is unsupported for instance size: standard-2'
+    );
+
+    for (const instance of ['constructor', 'toString', '__proto__', 'standard-5']) {
+      expect(() => containersBillingIdentity(instance)).toThrow(
+        `Containers billing is unsupported for instance size: ${instance}`
+      );
+    }
+  });
+
+  it('accepts a containers class against an isolated `ses` billing ID and rejects a bare ID', () => {
+    const containersClasses = ['SandboxContainersStandard3', 'SandboxContainersStandard4'] as const;
+    const attribution = {
+      subject: { type: 'user', id: 'user_containers' },
+      actor: { type: 'user', id: 'user_containers' },
+      sessionId: 'agent_1',
+      metadata: { origin: 'cloud-agent' },
+    } as const;
+
+    for (const sandboxClassName of containersClasses) {
+      expect(() =>
+        assertSandboxBillingAllocation(sandboxClassName, {
+          sandboxId: 'ses-abcdef',
+          ...attribution,
+        })
+      ).not.toThrow();
+
+      for (const sandboxId of ['abcdef' as SandboxId, 'org-abcdef' as SandboxId]) {
+        expect(() =>
+          assertSandboxBillingAllocation(sandboxClassName, { sandboxId, ...attribution })
+        ).toThrow(`${sandboxClassName} billing received an incompatible sandbox ID`);
+      }
+    }
+  });
+
+  it('snapshots the configured capacity for every legacy sandbox class', () => {
     expect(SANDBOX_CAPACITIES).toEqual({
       Sandbox: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
       SandboxContainment: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },

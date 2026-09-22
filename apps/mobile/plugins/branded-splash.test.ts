@@ -164,8 +164,15 @@ describe('shared branded splash', () => {
         ],
       },
     });
+    // `introspect: true` merges the resources already in the project's native
+    // tree, and the app writes its own colors there (the alert-dialog theme,
+    // the widget, notifications). Assert this plugin's color instead of the
+    // array's exact length, so the suite also passes in a worktree that has
+    // run `expo prebuild`.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
-      resources: { color: [{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }] },
+      resources: {
+        color: expect.arrayContaining([{ $: { name: 'splashscreen_background' }, _: '#FAF74F' }]),
+      },
     });
     expect(evaluated._internal?.modResults?.android?.styles).toMatchObject({
       resources: {

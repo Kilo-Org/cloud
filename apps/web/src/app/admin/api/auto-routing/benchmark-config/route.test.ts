@@ -7,7 +7,9 @@ import {
 import { getUserFromAuth } from '@/lib/user/server';
 import { findExperimentReservedModelIds } from '@/lib/ai-gateway/experiments/reserved-ids';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import type * as ModelsModule from '@/lib/ai-gateway/models';
+import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+import type * as ModelsModule from '@/lib/ai-gateway/kilo-exclusive-models';
+import type * as ProviderDefinitionsModule from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
 
 jest.mock('@/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
@@ -22,19 +24,32 @@ jest.mock('@/lib/ai-gateway/experiments/reserved-ids', () => ({
   findExperimentReservedModelIds: jest.fn(),
 }));
 
+jest.mock('@/lib/ai-gateway/providers/definitions/try-get-provider-by-id', () => {
+  const actual = jest.requireActual<typeof ProviderDefinitionsModule>(
+    '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id'
+  );
+  return {
+    ...actual,
+    tryGetProviderById: (providerId: ProviderId) =>
+      providerId === 'dev-tools'
+        ? { supportedChatApis: ['chat_completions'] }
+        : actual.tryGetProviderById(providerId),
+  };
+});
+
 // Stub the catalog so tests don't depend on any specific provider file.
-// 'test-exclusive/alibaba-only' maps to the alibaba gateway, which lacks Messages support.
-jest.mock('@/lib/ai-gateway/models', () => {
-  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/models');
+// 'test-exclusive/chat-only' maps to a synthetic gateway that lacks Messages support.
+jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/kilo-exclusive-models');
   const stubModel: KiloExclusiveModel = {
-    public_id: 'test-exclusive/alibaba-only',
-    display_name: 'Test Alibaba-only',
+    public_id: 'test-exclusive/chat-only',
+    display_name: 'Test chat-only model',
     description: 'stub for unit tests',
     context_length: 8192,
     max_completion_tokens: 4096,
     status: 'public',
     flags: [],
-    gateway: 'alibaba',
+    gateway: 'dev-tools',
     internal_id: 'stub-internal',
     pricing: null,
     inference_provider_restriction: [],
@@ -42,7 +57,7 @@ jest.mock('@/lib/ai-gateway/models', () => {
   return {
     ...actual,
     findKiloExclusiveModel: (id: string) =>
-      id === 'test-exclusive/alibaba-only' ? stubModel : actual.findKiloExclusiveModel(id),
+      id === 'test-exclusive/chat-only' ? stubModel : actual.findKiloExclusiveModel(id),
   };
 });
 
@@ -112,14 +127,14 @@ describe('PUT /admin/api/auto-routing/benchmark-config', () => {
         ...validConfig,
         deciderModels: [
           { id: 'openai/gpt-5-mini', reasoningEffort: null },
-          { id: 'test-exclusive/alibaba-only', reasoningEffort: null },
+          { id: 'test-exclusive/chat-only', reasoningEffort: null },
         ],
       })
     );
 
     expect(response.status).toBe(400);
     const body = (await response.json()) as { error: string };
-    expect(body.error).toContain('test-exclusive/alibaba-only');
+    expect(body.error).toContain('test-exclusive/chat-only');
     expect(body.error).toContain('chat_completions');
     expect(body.error).toContain('responses');
     expect(body.error).not.toContain('openai/gpt-5-mini (');

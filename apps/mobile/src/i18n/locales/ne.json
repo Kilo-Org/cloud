@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "एप सुरु गर्दा र पृष्ठभूमिमा पाँच मिनेट रहेपछि अनलक गर्नुपर्छ।",
     "featureFlags": "विशेषता झन्डा",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "सर्भरबाट · ≥ {{min}}",
+    "featureFlagSkipped": "पूर्वनिर्धारित · < {{min}}",
+    "featureFlagNotLoaded": "पूर्वनिर्धारित · लोड भएको छैन",
     "gatewayTranscription": "Kilo Gateway मार्फत बोलीलाई पाठमा रूपान्तरण",
     "gatewayTranscriptionSubtitle": "यन्त्रको वाणी पहिचानको सट्टा Kilo Gateway मोडेल प्रयोग गरेर भ्वाइस इनपुटलाई पाठमा रूपान्तरण गर्नुहोस्। तपाईंको रेकर्डिङ Kilo Gateway मा पठाइन्छ।",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2233,6 @@
       "linesTruncated": "पङ्क्ति {{start}}–{{end}} (केही अंश काटिएको)",
       "linesOf": "कुल {{total}} पङ्क्तिमध्ये {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent मा {{action}} असफल भयो ({{status}})।",
-      "failed": "Cloud Agent मा {{action}} असफल भयो।"
-    },
     "collectCopyableText": {
       "unserializableInput": "[क्रमबद्ध रूपमा रूपान्तरण गर्न नमिल्ने इनपुट]",
       "errorPrefix": "त्रुटि: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "प्रदायकले अनुरोध अस्वीकार गर्‍यो।",
       "assistantStopped": "उत्तर दिन रोकियो।",
       "assistantContextOverflow": "कुराकानी मोडेलका लागि धेरै लामो छ।",
-      "assistantFailed": "उत्तर दिन सकिएन।",
-      "sendFailed": "सन्देश पठाउन सकिएन। फेरि प्रयास गर्नुहोस्।"
+      "assistantFailed": "उत्तर दिन सकिएन।"
     },
     "filePart": {
       "loadingImage": "तस्बिर लोड गर्दै",

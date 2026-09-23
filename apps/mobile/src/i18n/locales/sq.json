@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Zhbllokimi kërkohet kur hap aplikacionin dhe pasi ai qëndron pesë minuta në sfond.",
     "featureFlags": "Flamujt e veçorive",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "nga serveri · ≥ {{min}}",
+    "featureFlagSkipped": "parazgjedhur · < {{min}}",
+    "featureFlagNotLoaded": "parazgjedhur · nuk u ngarkua",
     "gatewayTranscription": "Transkriptim me Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripto diktimin me një model Kilo Gateway në vend të njohjes së të folurit të pajisjes. Regjistrimi yt dërgohet te Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2233,6 @@
       "linesTruncated": "rreshtat {{start}}–{{end}} (përmbajtje e shkurtuar)",
       "linesOf": "rreshtat {{start}}–{{end}} nga {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Veprimi {{action}} në Cloud Agent dështoi ({{status}}).",
-      "failed": "Veprimi {{action}} në Cloud Agent dështoi."
-    },
     "collectCopyableText": {
       "unserializableInput": "[të dhëna hyrëse që nuk mund të serializohen]",
       "errorPrefix": "Gabim: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "Ofruesi e refuzoi kërkesën.",
       "assistantStopped": "Gjenerimi i përgjigjes u ndal.",
       "assistantContextOverflow": "Biseda është shumë e gjatë për modelin.",
-      "assistantFailed": "Gjenerimi i përgjigjes dështoi.",
-      "sendFailed": "Nuk u dërgua mesazhi. Provo përsëri."
+      "assistantFailed": "Gjenerimi i përgjigjes dështoi."
     },
     "filePart": {
       "loadingImage": "Duke u ngarkuar imazhi",

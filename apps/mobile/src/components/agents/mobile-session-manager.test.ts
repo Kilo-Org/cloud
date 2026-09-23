@@ -41,7 +41,6 @@ vi.mock('@/components/agents/mobile-session-transport-payload', () => ({
   normalizeTransportPayload: vi.fn((x: unknown) => x),
 }));
 vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
-  formatSafeCloudAgentFailureDiagnostic: vi.fn(),
   withCloudAgentDiagnostics: vi.fn((_op: string, _org: unknown, fn: () => unknown) => fn()),
 }));
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({
@@ -109,6 +108,7 @@ const { buildRemoteAttachmentParts } =
 const { answerSessionPermission: mockedAnswerSessionPermission } =
   await import('@/lib/glanceable/approve-ask');
 const answerSessionPermissionMock = vi.mocked(mockedAnswerSessionPermission);
+const { toast: sonnerToast } = await import('sonner-native');
 const {
   createMobileAgentSessionManager,
   fetchSessionWithNotFoundRetry,
@@ -565,6 +565,38 @@ describe('createMobileAgentSessionManager api.send', () => {
       payload: 'hi',
       messageId: 'm-1',
     });
+  });
+});
+
+describe('createMobileAgentSessionManager onSendFailed', () => {
+  beforeEach(() => {
+    configHolder.current = null;
+    mockCreateSessionManager.mockClear();
+    vi.mocked(sonnerToast.error).mockClear();
+  });
+
+  function setup(): SessionManagerConfig {
+    const options = {
+      store: {},
+      userWebConnection: {},
+    };
+    createMobileAgentSessionManager(options as never);
+    const config = configHolder.current;
+    if (config === null) {
+      throw new Error('createSessionManager did not capture a config');
+    }
+    return config;
+  }
+
+  it('leaves the failed send to the SDK status indicator instead of toasting developer text', () => {
+    const config = setup();
+    const error = Object.assign(new Error('Insufficient credits: $1 minimum required'), {
+      data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+    });
+
+    config.onSendFailed?.('hello', 'Insufficient credits: $1 minimum required', error);
+
+    expect(vi.mocked(sonnerToast.error)).not.toHaveBeenCalled();
   });
 });
 

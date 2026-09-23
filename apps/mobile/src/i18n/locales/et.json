@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Rakendus tuleb lukust avada käivitamisel ja pärast viit minutit taustal olemist.",
     "featureFlags": "Funktsioonilipud",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "serverist · ≥ {{min}}",
+    "featureFlagSkipped": "vaikeväärtus · < {{min}}",
+    "featureFlagNotLoaded": "vaikeväärtus · laadimata",
     "gatewayTranscription": "Kõnetuvastus Kilo Gateway kaudu",
     "gatewayTranscriptionSubtitle": "Kasuta häälsisestuse tekstiks teisendamiseks seadme kõnetuvastuse asemel Kilo Gateway mudelit. Sinu salvestus saadetakse Kilo Gateway'sse.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2233,6 @@
       "linesTruncated": "read {{start}}–{{end}} (kärbitud)",
       "linesOf": "read {{start}}–{{end}} (kokku {{total}})"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agenti toiming „{{action}}“ ebaõnnestus ({{status}}).",
-      "failed": "Cloud Agenti toiming „{{action}}“ ebaõnnestus."
-    },
     "collectCopyableText": {
       "unserializableInput": "[serialiseerimatu sisend]",
       "errorPrefix": "Viga: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "Pakkuja lükkas päringu tagasi.",
       "assistantStopped": "Vastuse koostamine peatati.",
       "assistantContextOverflow": "Vestlus on mudeli jaoks liiga pikk.",
-      "assistantFailed": "Vastuse koostamine ebaõnnestus.",
-      "sendFailed": "Sõnumi saatmine ebaõnnestus. Proovi uuesti."
+      "assistantFailed": "Vastuse koostamine ebaõnnestus."
     },
     "filePart": {
       "loadingImage": "Pildi laadimine",

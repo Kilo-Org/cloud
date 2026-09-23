@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Yêu cầu mở khóa khi khởi chạy ứng dụng và sau khi ứng dụng ở chế độ nền trong năm phút.",
     "featureFlags": "Cờ tính năng",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "từ máy chủ · ≥ {{min}}",
+    "featureFlagSkipped": "mặc định · < {{min}}",
+    "featureFlagNotLoaded": "mặc định · chưa tải",
     "gatewayTranscription": "Chuyển giọng nói thành văn bản qua Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Sử dụng mô hình Kilo Gateway để chuyển nội dung nhập bằng giọng nói thành văn bản thay vì nhận dạng giọng nói của thiết bị. Bản ghi của bạn được gửi tới Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -1729,10 +1729,6 @@
       "linesTruncated": "dòng {{start}}–{{end}} (đã cắt bớt)",
       "linesOf": "dòng {{start}}–{{end}} trong tổng số {{total}} dòng"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Thao tác {{action}} của Cloud Agent không thành công ({{status}}).",
-      "failed": "Thao tác {{action}} của Cloud Agent không thành công."
-    },
     "collectCopyableText": {
       "unserializableInput": "[đầu vào không thể tuần tự hóa]",
       "errorPrefix": "Lỗi: {{error}}"
@@ -1828,8 +1824,7 @@
       "assistantProviderRejected": "Nhà cung cấp đã từ chối yêu cầu.",
       "assistantStopped": "Quá trình tạo phản hồi đã dừng.",
       "assistantContextOverflow": "Cuộc trò chuyện vượt quá giới hạn độ dài mà mô hình có thể xử lý.",
-      "assistantFailed": "Không thể tạo phản hồi.",
-      "sendFailed": "Không thể gửi tin nhắn. Vui lòng thử lại."
+      "assistantFailed": "Không thể tạo phản hồi."
     },
     "filePart": {
       "loadingImage": "Đang tải hình ảnh",

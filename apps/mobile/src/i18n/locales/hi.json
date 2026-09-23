@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "ऐप शुरू करने पर और पृष्ठभूमि में पाँच मिनट रहने के बाद अनलॉक करना आवश्यक है।",
     "featureFlags": "फ़ीचर फ़्लैग",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "सर्वर से · ≥ {{min}}",
+    "featureFlagSkipped": "डिफ़ॉल्ट · < {{min}}",
+    "featureFlagNotLoaded": "डिफ़ॉल्ट · लोड नहीं हुआ",
     "gatewayTranscription": "Kilo Gateway से आवाज़ को टेक्स्ट में बदलना",
     "gatewayTranscriptionSubtitle": "डिवाइस की स्पीच रिकग्निशन के बजाय Kilo Gateway मॉडल से वॉइस इनपुट को टेक्स्ट में बदलें। आपकी रिकॉर्डिंग Kilo Gateway भेजी जाती है।",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -1703,10 +1703,6 @@
       "linesTruncated": "पंक्तियाँ {{start}}–{{end}} (कुछ हिस्सा हटाया गया है)",
       "linesOf": "{{total}} में से पंक्तियाँ {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent में {{action}} विफल रहा ({{status}})।",
-      "failed": "Cloud Agent में {{action}} विफल रहा।"
-    },
     "collectCopyableText": {
       "unserializableInput": "[इनपुट को सीरियलाइज़ नहीं किया जा सकता]",
       "errorPrefix": "त्रुटि: {{error}}"
@@ -1802,8 +1798,7 @@
       "assistantProviderRejected": "प्रदाता ने अनुरोध अस्वीकार कर दिया।",
       "assistantStopped": "उत्तर देना रोक दिया गया।",
       "assistantContextOverflow": "मॉडल के लिए बातचीत बहुत लंबी है।",
-      "assistantFailed": "उत्तर नहीं मिल सका।",
-      "sendFailed": "संदेश भेजा नहीं जा सका। कृपया फिर से कोशिश करें।"
+      "assistantFailed": "उत्तर नहीं मिल सका।"
     },
     "filePart": {
       "loadingImage": "छवि लोड हो रही है",

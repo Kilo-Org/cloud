@@ -12,25 +12,20 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
-import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
-import {
-  gpt_5_6_sol_discounted_model,
-  gpt_6_astra_flex_model,
-} from '@/lib/ai-gateway/providers/openai-exclusive';
-import {
-  GEMMA_4_26B_A4B_IT_ID,
-  gemma_4_26b_a4b_it_free_model,
-} from '@/lib/ai-gateway/providers/google';
+import { GPT_SOL_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
+import { GEMMA_4_26B_A4B_IT_ID } from '@/lib/ai-gateway/providers/google';
+import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 import { GLM_CURRENT_MODEL_ID, GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 
 describe('OpenRouter Models Config', () => {
   test('preferred models should contain expected models', () => {
     expect(PRIMARY_DEFAULT_MODEL).toBe(GLM_FLASH_CURRENT_MODEL_ID);
+    expect(GPT_SOL_CURRENT_MODEL_ID).toBe('openai/gpt-6-sol');
 
     const expectedModels = [
       CLAUDE_OPUS_CURRENT_MODEL_ID,
-      GPT_CURRENT_MODEL_ID,
+      GPT_SOL_CURRENT_MODEL_ID,
       DEEPSEEK_V4_1_FLASH_MODEL_ID,
       GLM_FLASH_CURRENT_MODEL_ID,
     ];
@@ -45,6 +40,7 @@ describe('OpenRouter Models Config', () => {
     });
 
     const supersededModels = [
+      'openai/gpt-5.6-sol',
       'openai/gpt-5.6-terra',
       'stealth/claude-opus-4.8',
       'stealth/qwen3.6-plus',
@@ -63,21 +59,6 @@ describe('OpenRouter Models Config', () => {
     expect(preferredModels.indexOf(DEEPSEEK_V4_1_FLASH_MODEL_ID)).toBeLessThan(
       preferredModels.indexOf(GLM_FLASH_CURRENT_MODEL_ID)
     );
-
-    if (gpt_5_6_sol_discounted_model.status === 'public') {
-      expect(preferredModels).toContain(gpt_5_6_sol_discounted_model.public_id);
-      expect(preferredModels.indexOf(GPT_CURRENT_MODEL_ID)).toBeLessThan(
-        preferredModels.indexOf(gpt_5_6_sol_discounted_model.public_id)
-      );
-    } else {
-      expect(preferredModels).not.toContain(gpt_5_6_sol_discounted_model.public_id);
-    }
-
-    if (gpt_6_astra_flex_model.status === 'public') {
-      expect(preferredModels).toContain(gpt_6_astra_flex_model.public_id);
-    } else {
-      expect(preferredModels).not.toContain(gpt_6_astra_flex_model.public_id);
-    }
   });
 
   test('monitors only concrete preferred models', () => {

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
+import { TabBarButton } from '@/components/tab-bar-button';
 import { TabBarLabel } from '@/components/tab-bar-label';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
@@ -162,6 +163,12 @@ export default function TabsLayout() {
         screenOptions={{
           headerShown: false,
           freezeOnBlur: true,
+          // The row palette colours a destination inside a screen; a tab tint
+          // says which tab is selected — a state, not a destination. One accent
+          // per tab would put six accents on the bar and fight the rows below
+          // it, and an icon-only recolour would disagree with `TabBarLabel`,
+          // which draws its label from its own `text-foreground` /
+          // `text-muted-foreground` classes and ignores the navigator tint.
           tabBarActiveTintColor: colors.foreground,
           tabBarInactiveTintColor: colors.mutedForeground,
           tabBarBackground: TabBarBackground,
@@ -173,6 +180,7 @@ export default function TabsLayout() {
           // leaving that clipped strip. The content clearance below the bar does
           // not change, so hiding and restoring it moves nothing.
           tabBarHideOnKeyboard: true,
+          tabBarButton: TabBarButton,
           tabBarIconStyle: TAB_BAR_ICON_STYLE,
           tabBarLabelPosition: 'below-icon',
           tabBarStyle: {

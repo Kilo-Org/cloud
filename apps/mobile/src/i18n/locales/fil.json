@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "I-unlock ang app sa pagbukas at matapos ang limang minuto sa background.",
     "featureFlags": "Mga feature flag",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "mula sa server · ≥ {{min}}",
+    "featureFlagSkipped": "paunang itinakda · < {{min}}",
+    "featureFlagNotLoaded": "paunang itinakda · hindi pa na-load",
     "gatewayTranscription": "Pagsasalin ng boses sa teksto gamit ang Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Gamitin ang modelong Kilo Gateway sa pagsasalin ng boses sa teksto imbes na ang pagkilala sa tinig ng device. Ipinapadala sa Kilo Gateway ang iyong recording.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2233,6 @@
       "linesTruncated": "mga linyang {{start}}–{{end}} (pinaikli)",
       "linesOf": "mga linyang {{start}}–{{end}} sa {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Nabigo ang {{action}} ng Cloud Agent ({{status}}).",
-      "failed": "Nabigo ang {{action}} ng Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[input na hindi ma-serialize]",
       "errorPrefix": "Problema: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "Tinanggihan ng tagapagbigay ng serbisyo ang kahilingan.",
       "assistantStopped": "Inihinto ang tugon.",
       "assistantContextOverflow": "Masyadong mahaba ang pag-uusap para sa modelo.",
-      "assistantFailed": "Nabigo ang pagtugon.",
-      "sendFailed": "Hindi maipadala ang mensahe. Subukang muli."
+      "assistantFailed": "Nabigo ang pagtugon."
     },
     "filePart": {
       "loadingImage": "Naglo-load ng larawan",

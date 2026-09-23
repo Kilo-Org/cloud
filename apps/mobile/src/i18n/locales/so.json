@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Fur marka barnaamijku bilaabmo iyo marka uu shan daqiiqo gadaal ka shaqaynayay.",
     "featureFlags": "Calaamadaha sifooyinka",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "server-ka · ≥ {{min}}",
+    "featureFlagSkipped": "caadi · < {{min}}",
+    "featureFlagNotLoaded": "caadi · lama soo degin",
     "gatewayTranscription": "Qoraal u beddelidda codka ee Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Codka ku beddel qoraal moodeelka Kilo Gateway adigoo aan isticmaalayn aqoonsiga hadalka ee qalabka. Duubistaada waxaa loo diraa Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2233,6 @@
       "linesTruncated": "sadarrada {{start}}–{{end}} (la soo gaabiyay)",
       "linesOf": "sadarrada {{start}}–{{end}} ee {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Hawsha {{action}} ee Cloud Agent way fashilantay ({{status}}).",
-      "failed": "Hawsha {{action}} ee Cloud Agent way fashilantay."
-    },
     "collectCopyableText": {
       "unserializableInput": "[xogta la geliyay looma rogi karo qaab la kaydin karo]",
       "errorPrefix": "Khalad: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "Bixiyaha ayaa diiday codsiga.",
       "assistantStopped": "Jawaabta waa la joojiyay.",
       "assistantContextOverflow": "Wadahadalku aad buu ugu dheer yahay moodeelka.",
-      "assistantFailed": "Jawaabtu way fashilantay.",
-      "sendFailed": "Farriinta lama diri karin. Fadlan mar kale isku day."
+      "assistantFailed": "Jawaabtu way fashilantay."
     },
     "filePart": {
       "loadingImage": "Sawirka waa la soo shubayaa",

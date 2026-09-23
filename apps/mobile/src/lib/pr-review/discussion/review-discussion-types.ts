@@ -153,7 +153,7 @@ export function selectCommentAuthorName(author: ReviewComment['author']): string
  * Returns `null` when missing or unparseable so those items sort after
  * every item with a usable timestamp (A2.2 total-order rule).
  */
-function discussionItemTimestampMs(item: DiscussionListItem): number | null {
+export function discussionItemTimestampMs(item: DiscussionListItem): number | null {
   const raw =
     item.kind === 'thread' ? (item.thread.comments[0]?.createdAt ?? null) : item.comment.createdAt;
   if (raw == null || raw === '') {

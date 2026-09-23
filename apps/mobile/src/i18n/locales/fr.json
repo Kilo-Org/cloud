@@ -1644,10 +1644,6 @@
       "linesTruncated": "lignes {{start}}–{{end}} (tronquées)",
       "linesOf": "lignes {{start}}–{{end}} sur {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Échec de l'opération {{action}} de Cloud Agent ({{status}}).",
-      "failed": "Échec de l'opération {{action}} de Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[entrée non sérialisable]",
       "errorPrefix": "Erreur : {{error}}"
@@ -1743,8 +1739,7 @@
       "assistantProviderRejected": "Le fournisseur a rejeté la requête.",
       "assistantStopped": "La génération de la réponse a été interrompue.",
       "assistantContextOverflow": "La conversation est trop longue pour le modèle.",
-      "assistantFailed": "La génération de la réponse a échoué.",
-      "sendFailed": "Impossible d'envoyer le message. Réessayez."
+      "assistantFailed": "La génération de la réponse a échoué."
     },
     "filePart": {
       "loadingImage": "Chargement de l'image",
@@ -2112,9 +2107,9 @@
     "biometricUnlockSubtitle": "Déverrouillage requis au lancement et après cinq minutes en arrière-plan.",
     "featureFlags": "Indicateurs de fonctionnalités",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "distant · ≥ {{min}}",
+    "featureFlagSkipped": "par défaut · < {{min}}",
+    "featureFlagNotLoaded": "par défaut · non chargé",
     "gatewayTranscription": "Transcription via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcrivez la saisie vocale avec un modèle Kilo Gateway au lieu de la reconnaissance vocale de l'appareil. Votre enregistrement est envoyé à Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",

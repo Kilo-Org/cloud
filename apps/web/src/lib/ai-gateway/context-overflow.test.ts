@@ -4,7 +4,7 @@ import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
+import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 
 function chatRequest(body: OpenRouterChatCompletionRequest): GatewayRequest {

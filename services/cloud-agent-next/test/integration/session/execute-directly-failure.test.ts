@@ -10,8 +10,14 @@ import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
-import type { FencedWrapperDispatchRequest } from '../../../src/execution/types.js';
-import { listPendingSessionMessages } from '../../../src/session/pending-messages.js';
+import type {
+  FencedWrapperDispatchRequest,
+  SessionMessageIntent,
+} from '../../../src/execution/types.js';
+import {
+  deletePendingSessionMessageByMessageId,
+  listPendingSessionMessages,
+} from '../../../src/session/pending-messages.js';
 import {
   getWrapperLease,
   getWrapperRuntimeState,
@@ -528,10 +534,11 @@ describe('new-path liveness without executionId', () => {
     );
   });
 
-  it('schedules liveness deadlines for accepted messages and fails them on no-output timeout', async () => {
+  it('recovers an accepted turn once on no-output timeout, then fails the second identical detection', async () => {
     const userId = 'user_newpath_liveness';
     const sessionId = 'agent_newpath_liveness';
     const stub = sessionStub(userId, sessionId);
+    const messageId = 'msg_018f1e2d3c4bnewlivabcdefgh';
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await registerReadySession(instance, {
@@ -549,26 +556,51 @@ describe('new-path liveness without executionId', () => {
       const { state: wrapperState } = await allocateWrapperRuntimeState(instance.ctx.storage);
       const { wrapperRunId, wrapperConnectionId } = wrapperState;
 
-      // Store an accepted (non-terminal) session message state
+      // Store an accepted (non-terminal) session message state carrying the
+      // immutable admission snapshot the recovery re-dispatches.
+      const admissionSnapshot: SessionMessageIntent = {
+        turn: { type: 'prompt', messageId, prompt: 'hello' },
+        agent: { mode: 'code', model: 'test-model' },
+      };
       const acceptedMessage: SessionMessageState = {
-        messageId: 'msg_018f1e2d3c4bnewlivabcdefgh',
+        messageId,
         status: 'accepted',
         prompt: 'hello',
         createdAt: Date.now(),
         acceptedAt: Date.now(),
         wrapperRunId: wrapperRunId!,
+        admissionSnapshot,
       };
       await putSessionMessageState(instance.ctx.storage, acceptedMessage);
 
       // Set expired liveness deadlines — new path has no executionId
       const expiredAt = Date.now() - 1;
-      await instance.ctx.storage.put('wrapper_runtime_state', {
+      const expiredRuntimeState = {
         wrapperGeneration: wrapperState.wrapperGeneration,
         wrapperConnectionId,
         wrapperRunId,
         noOutputDeadlineAt: expiredAt,
         lastHeartbeatUpdate: expiredAt - 10 * 60_000,
+      };
+      await instance.ctx.storage.put('wrapper_runtime_state', expiredRuntimeState);
+
+      await instance.alarm();
+
+      const recoveredMessage = await getSessionMessageState(instance.ctx.storage, messageId);
+      const pendingAfterRecovery = await listPendingSessionMessages(instance.ctx.storage);
+      const db = drizzle(state.storage, { logger: false });
+      const eventQueries = createEventQueries(db, state.storage.sql);
+      const eventsAfterRecovery = eventQueries.findByFilters({});
+
+      // Second identical detection: the recovery budget is spent, so the turn
+      // must take the existing terminal path and record the attempt count.
+      await instance.ctx.storage.delete('wrapper_lease');
+      await deletePendingSessionMessageByMessageId(instance.ctx.storage, messageId);
+      await putSessionMessageState(instance.ctx.storage, {
+        ...acceptedMessage,
+        recoveryAttempts: 1,
       });
+      await instance.ctx.storage.put('wrapper_runtime_state', expiredRuntimeState);
 
       await instance.alarm();
 
@@ -576,28 +608,48 @@ describe('new-path liveness without executionId', () => {
         instance.ctx.storage,
         wrapperRunId!
       );
-      const db = drizzle(state.storage, { logger: false });
-      const eventQueries = createEventQueries(db, state.storage.sql);
+      const terminalMessage = await getSessionMessageState(instance.ctx.storage, messageId);
       const allEvents = eventQueries.findByFilters({});
       return {
+        recoveredMessage,
+        pendingAfterRecovery,
+        eventsAfterRecovery,
         nonTerminalMessages,
+        terminalMessage,
         allEvents,
         wrapperRuntimeState: await getWrapperRuntimeState(instance.ctx.storage),
       };
     });
 
-    // Message must be terminalized as failed
-    expect(result.nonTerminalMessages).toHaveLength(0);
+    // First detection: the accepted turn is recovered, not failed.
+    expect(result.recoveredMessage).toMatchObject({
+      status: 'queued',
+      recoveryAttempts: 1,
+    });
+    expect(result.recoveredMessage?.acceptedAt).toBeUndefined();
+    expect(result.recoveredMessage?.wrapperRunId).toBeUndefined();
+    expect(result.pendingAfterRecovery.map(message => message.messageId)).toEqual([messageId]);
+    expect(
+      result.eventsAfterRecovery.filter(event => event.stream_event_type === 'cloud.message.failed')
+    ).toHaveLength(0);
 
-    // A cloud.message.failed event must be persisted
+    // Second detection: terminal, with the attempt count recorded.
+    expect(result.nonTerminalMessages).toHaveLength(0);
+    expect(result.terminalMessage).toMatchObject({
+      status: 'failed',
+      attempts: 2,
+      failureCode: 'wrapper_no_output',
+    });
+
     const failedEvents = result.allEvents.filter(
       event => event.stream_event_type === 'cloud.message.failed'
     );
     expect(failedEvents).toHaveLength(1);
     const failedPayload = JSON.parse(failedEvents[0].payload);
     expect(failedPayload).toMatchObject({
-      messageId: 'msg_018f1e2d3c4bnewlivabcdefgh',
+      messageId,
       status: 'failed',
+      attempts: 2,
       error: 'Agent wrapper made no execution progress during the watchdog window',
       delivery: 'sent',
       accepted: true,

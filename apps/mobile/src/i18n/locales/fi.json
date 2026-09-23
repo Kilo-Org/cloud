@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Lukitus on avattava sovelluksen käynnistyessä ja sen oltua taustalla viisi minuuttia.",
     "featureFlags": "Ominaisuusliput",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "palvelimelta · ≥ {{min}}",
+    "featureFlagSkipped": "oletus · < {{min}}",
+    "featureFlagNotLoaded": "oletus · ei ladattu",
     "gatewayTranscription": "Puheentunnistus Kilo Gatewayn kautta",
     "gatewayTranscriptionSubtitle": "Muodosta äänisyötteestä teksti Kilo Gateway -mallilla laitteen puheentunnistuksen sijaan. Äänitteesi lähetetään Kilo Gatewayhin.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2233,6 @@
       "linesTruncated": "rivit {{start}}–{{end}} (katkaistu)",
       "linesOf": "rivit {{start}}–{{end}} / {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agentin toiminto epäonnistui: {{action}} ({{status}}).",
-      "failed": "Cloud Agentin toiminto epäonnistui: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[syötettä ei voi sarjallistaa]",
       "errorPrefix": "Virhe: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "Palveluntarjoaja hylkäsi pyynnön.",
       "assistantStopped": "Vastauksen tuottaminen keskeytettiin.",
       "assistantContextOverflow": "Keskustelu on liian pitkä mallille.",
-      "assistantFailed": "Vastauksen tuottaminen epäonnistui.",
-      "sendFailed": "Viestin lähetys epäonnistui. Yritä uudelleen."
+      "assistantFailed": "Vastauksen tuottaminen epäonnistui."
     },
     "filePart": {
       "loadingImage": "Ladataan kuvaa",

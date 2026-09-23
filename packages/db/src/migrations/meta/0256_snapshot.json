@@ -1,6 +1,6 @@
 {
-  "id": "dda86bc8-8c44-442b-ab5f-5c9500ff6188",
-  "prevId": "af10ca69-fd7d-49f4-81ba-6dd4e796d1d7",
+  "id": "8f856e0d-6247-40f4-bdc2-3873c5076eb4",
+  "prevId": "14eec6e8-09a2-4639-97fa-3dac50634bf3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -30608,12 +30608,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "github_connection_role": {
-          "name": "github_connection_role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "github_authorized_by_user_id": {
           "name": "github_authorized_by_user_id",
           "type": "text",
@@ -30773,44 +30767,6 @@
           ],
           "isUnique": true,
           "where": "\"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"owned_by_organization_id\" IS NOT NULL AND \"platform_integrations\".\"github_installation_id\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_platform_integrations_github_workflow_canonical": {
-          "name": "UQ_platform_integrations_github_workflow_canonical",
-          "columns": [
-            {
-              "expression": "github_installation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"platform_integrations\".\"github_connection_role\" = 'workflow'",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_platform_integrations_github_workflow_identity": {
-          "name": "UQ_platform_integrations_github_workflow_identity",
-          "columns": [
-            {
-              "expression": "COALESCE(\"github_app_type\", 'standard')",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "platform_installation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"platform_integrations\".\"github_connection_role\" = 'workflow'",
           "concurrently": true,
           "method": "btree",
           "with": {}
@@ -31154,10 +31110,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "platform_integrations_github_connection_role_check": {
-          "name": "platform_integrations_github_connection_role_check",
-          "value": "\"platform_integrations\".\"github_connection_role\" IS NULL OR (\n        \"platform_integrations\".\"platform\" = 'github' AND \"platform_integrations\".\"integration_type\" = 'app'\n        AND \"platform_integrations\".\"platform_installation_id\" IS NOT NULL\n        AND \"platform_integrations\".\"github_connection_role\" IN ('workflow', 'agent_only')\n        AND (\"platform_integrations\".\"github_connection_role\" <> 'agent_only' OR \"platform_integrations\".\"github_installation_id\" IS NOT NULL)\n      )"
-        },
         "platform_integrations_owner_check": {
           "name": "platform_integrations_owner_check",
           "value": "(\n        (\"platform_integrations\".\"owned_by_user_id\" IS NOT NULL AND \"platform_integrations\".\"owned_by_organization_id\" IS NULL) OR\n        (\"platform_integrations\".\"owned_by_user_id\" IS NULL AND \"platform_integrations\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
@@ -31931,92 +31883,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.repository_customizations": {
-      "name": "repository_customizations",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "platform_integration_id": {
-          "name": "platform_integration_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "repository_id": {
-          "name": "repository_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "bot_mention_model_slug": {
-          "name": "bot_mention_model_slug",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pr_review_mode": {
-          "name": "pr_review_mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "repository_customizations_platform_integration_id_platform_integrations_id_fk": {
-          "name": "repository_customizations_platform_integration_id_platform_integrations_id_fk",
-          "tableFrom": "repository_customizations",
-          "tableTo": "platform_integrations",
-          "columnsFrom": [
-            "platform_integration_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "UQ_repository_customizations_integration_repository": {
-          "name": "UQ_repository_customizations_integration_repository",
-          "nullsNotDistinct": false,
-          "columns": [
-            "platform_integration_id",
-            "repository_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "repository_customizations_pr_review_mode_check": {
-          "name": "repository_customizations_pr_review_mode_check",
-          "value": "\"repository_customizations\".\"pr_review_mode\" IN ('on', 'off')"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.sales_demo_spend_ledger": {
@@ -39123,6 +38989,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "superseded_at": {
+          "name": "superseded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {

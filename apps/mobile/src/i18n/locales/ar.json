@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "يلزم فتح القفل عند تشغيل التطبيق وبعد بقائه في الخلفية لمدة خمس دقائق.",
     "featureFlags": "أعلام الميزات",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "من الخادم · ≥ {{min}}",
+    "featureFlagSkipped": "افتراضي · < {{min}}",
+    "featureFlagNotLoaded": "افتراضي · لم يتم التحميل",
     "gatewayTranscription": "التفريغ الصوتي عبر Kilo Gateway",
     "gatewayTranscriptionSubtitle": "حوّل الإدخال الصوتي إلى نص باستخدام أحد نماذج Kilo Gateway بدلاً من التعرف على الكلام في جهازك. يُرسل تسجيلك إلى Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -1793,10 +1793,6 @@
       "linesTruncated": "الأسطر {{start}}–{{end}} (مقتطعة)",
       "linesOf": "الأسطر {{start}}–{{end}} من {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "فشلت العملية {{action}} في Cloud Agent ({{status}}).",
-      "failed": "فشلت العملية {{action}} في Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[مدخلات لا يمكن تحويلها إلى صيغة قابلة للتخزين]",
       "errorPrefix": "خطأ: {{error}}"
@@ -1892,8 +1888,7 @@
       "assistantProviderRejected": "رفض المزود الطلب.",
       "assistantStopped": "تم إيقاف إنشاء الرد.",
       "assistantContextOverflow": "المحادثة أطول من أن يستوعبها النموذج.",
-      "assistantFailed": "تعذّر إنشاء الرد.",
-      "sendFailed": "تعذّر إرسال الرسالة. حاول مرة أخرى."
+      "assistantFailed": "تعذّر إنشاء الرد."
     },
     "filePart": {
       "loadingImage": "جارٍ تحميل الصورة",

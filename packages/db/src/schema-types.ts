@@ -939,18 +939,6 @@ export const ContributorChampionTier = {
 export type ContributorChampionTier =
   (typeof ContributorChampionTier)[keyof typeof ContributorChampionTier];
 
-// --- Repository customization enums ---
-
-// Per-repository override of automatic PR review dispatch. Manual/@mention
-// review triggers are a separate, later change; for now this only gates
-// automatic reviews on `pull_request` webhook events.
-export const RepositoryReviewMode = {
-  On: 'on',
-  Off: 'off',
-} as const;
-
-export type RepositoryReviewMode = (typeof RepositoryReviewMode)[keyof typeof RepositoryReviewMode];
-
 // =============================================================================
 // B. Type-Only Definitions (used in $type<T>())
 // =============================================================================
@@ -1278,6 +1266,7 @@ export const GatewayApiKindSchema = z.enum([
   'messages',
   'responses',
   'audio_transcriptions',
+  'systemone',
 ]);
 
 export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;

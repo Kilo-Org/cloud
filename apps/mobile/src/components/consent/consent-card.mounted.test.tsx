@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONSENT_DISCLOSURE_MAX_FONT_SCALE, ConsentCard } from './consent-card';
+import { i18n } from '@/i18n';
 
 const mockedAcceptConsent = vi.hoisted(() => vi.fn());
 const mockedReadConsent = vi.hoisted(() => vi.fn());
@@ -193,6 +194,34 @@ describe('ConsentCard', () => {
   it('defaults the optional switch to on', () => {
     const renderer = mountCard('onboarding');
     expect(singleSwitch(renderer.root).props.value).toBe(true);
+  });
+
+  it('keeps the privacy line clear of the pinned actions', () => {
+    // Finding 2 (the sentence cut in half at the footer boundary) is fixed at
+    // the base revision by pinning the disclosure into the footer above the
+    // actions, so the footer edge can no longer cut it and the actions cannot
+    // overlay it. The earlier assertion that the sentence was the tail of the
+    // scrolling body no longer holds: the sentence has left the scroller.
+    const renderer = mountCard('onboarding');
+    const scroller = renderer.root.findByType('ScrollView' as never);
+
+    const privacyPrefix = i18n.t('consent.privacyPolicyPrefix');
+    const privacyLine = renderer.root.findAll(node => {
+      const text = node.children
+        .filter((child): child is string => typeof child === 'string')
+        .join('');
+      return (node.type as string) === 'Text' && text.length > 0 && text.includes(privacyPrefix);
+    });
+    expect(privacyLine).toHaveLength(1);
+    const line = privacyLine[0];
+    if (!line) {
+      throw new Error('privacy line not found');
+    }
+    expect(hasAncestorOfType(line, 'ScrollView')).toBe(false);
+
+    // The pinned actions are outside the scroller, so they never cover it.
+    const primary = findButton(renderer.root, 'Accept and continue');
+    expect(scroller.findAll(node => node === primary)).toHaveLength(0);
   });
 
   it('accepts with optional on when the switch is untouched', async () => {

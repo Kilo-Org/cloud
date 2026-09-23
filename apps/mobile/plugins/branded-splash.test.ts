@@ -124,16 +124,23 @@ describe('shared branded splash', () => {
   });
 
   it('generates both native splash surfaces from the same options', async () => {
-    // Compile and introspect against a throwaway project root like the sibling
-    // cases: `compileModsAsync` seeds the Android color/style mods from the
-    // resources already on disk, so pointing it at this package's root would
-    // read a developer's prebuilt `android/` tree — its generated `colors.xml`
-    // is absent in CI — and merge colors this test does not own into the mod
-    // results, making the assertions depend on the developer's machine.
+    // Compile and introspect against the throwaway project root the sibling
+    // cases use: `compileModsAsync` seeds the Android color/style mods from the
+    // resources already on disk, so compiling against this package's root would
+    // fold a developer's generated, gitignored `android/` tree into the result —
+    // its `colors.xml` is absent in CI — and merge colors this test does not own
+    // into the mod results, so the run would no longer describe only this
+    // plugin's output. The colors array is asserted by containment for the same
+    // reason: the project's own other theme colors (iconBackground, colorPrimary,
+    // …) can ride along without failing this case.
     const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
-      { image: './assets/images/logo-mark.png', backgroundColor: '#FAF74F', imageWidth: 100 }
+      {
+        image: path.join(projectRoot, 'assets/images/logo-mark.png'),
+        backgroundColor: '#FAF74F',
+        imageWidth: 100,
+      }
     );
 
     expect(
@@ -171,16 +178,20 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    // Introspection reads the project's own native resources, so the colors
-    // modResults carry whatever the worktree's generated `android/` project
-    // declares (adaptive-icon, notification, app background) next to the
-    // splash color. Assert the splash color the plugin owns, not the array.
-    // `introspect` merges into the colors a local prebuild already generated, so
-    // a worktree with a prebuilt `android/` directory carries that file's extra
-    // entries. Assert the plugin's entry among them, by containment, the same
-    // way the styles assertion below pins its theme: not the whole array and not
-    // its exact length, so a prebuild's other colors (iconBackground,
-    // colorPrimary, …) surviving here cannot fail the case.
+    // The compile root is the throwaway project `createAndroidProject()`
+    // returns, whose `res/values` holds no `colors.xml`, and `withBrandedSplash`
+    // reads and writes `config.modRequest.platformProjectRoot` under that same
+    // root; a worktree's prebuilt `android/` tree never reaches these
+    // modResults, so the splash color below is the only entry the run produces.
+    // The base `colors` mod resolves its file under `modRequest.projectRoot` —
+    // that throwaway root again — and introspection falls back to empty
+    // `resources` when the file is absent, so the project's own gitignored
+    // `android/app/src/main/res/values/colors.xml` (absent in CI, present in a
+    // worktree that prebuilt) cannot add its icon, notification or app-background
+    // entries to the array. Assert the splash color this plugin owns is present
+    // by containment, not by pinning the whole array or its exact length, and
+    // keep the exact `#FAF74F` value, the same way the styles assertion below
+    // pins its theme: this case speaks only for the entry this plugin writes.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([

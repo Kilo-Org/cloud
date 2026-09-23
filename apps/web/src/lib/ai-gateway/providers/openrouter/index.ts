@@ -1,8 +1,5 @@
-import {
-  isPdfSupportingModel,
-  kiloExclusiveModels,
-  preferredModels,
-} from '@/lib/ai-gateway/models';
+import { isPdfSupportingModel, preferredModels } from '@/lib/ai-gateway/models';
+import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
   getLocalFakeTranscriptionModelsUrl,

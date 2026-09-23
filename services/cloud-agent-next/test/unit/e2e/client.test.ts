@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 type MockSocket = {
   url: string;
   message: (data: string) => void;
-  closeFromServer: () => void;
+  closeFromServer: (code?: number, reason?: string) => void;
   errorFromServer: (error?: unknown) => void;
   closeCalls: number;
 };
@@ -15,28 +15,28 @@ const sockets = vi.hoisted(() => ({
 
 vi.mock('ws', () => ({
   default: class {
-    private readonly handlers = new Map<string, (value: unknown) => void>();
+    private readonly handlers = new Map<string, (...args: unknown[]) => void>();
     private readonly observed: MockSocket;
 
     constructor(url: string) {
       this.observed = {
         url,
         message: data => this.handlers.get('message')?.(Buffer.from(data)),
-        closeFromServer: () => this.handlers.get('close')?.(undefined),
+        closeFromServer: (code = 1006, reason = '') => this.handlers.get('close')?.(code, reason),
         errorFromServer: error => this.handlers.get('error')?.(error ?? new Error('ws error')),
         closeCalls: 0,
       };
       sockets.instances.push(this.observed);
     }
 
-    on(event: string, handler: (value: unknown) => void): this {
+    on(event: string, handler: (...args: unknown[]) => void): this {
       this.handlers.set(event, handler);
       return this;
     }
 
     close(): void {
       this.observed.closeCalls += 1;
-      queueMicrotask(() => this.handlers.get('close')?.(undefined));
+      queueMicrotask(() => this.handlers.get('close')?.(1005, ''));
     }
   },
 }));
@@ -721,6 +721,57 @@ describe('openStream handshake retry', () => {
     await expect(pending).resolves.toBeNull();
     expect(errorSpy).toHaveBeenCalledWith('session stream connection failed', handshakeError);
     expect(sockets.instances).toHaveLength(1);
+    stream.close();
+  });
+});
+
+describe('openStream closeInfo', () => {
+  beforeEach(() => {
+    sockets.instances = [];
+  });
+
+  it('records the first close code/reason and ignores a superseded socket', async () => {
+    const fetchStreamTicket = vi.fn().mockResolvedValue('fresh-ticket');
+    const stream = openStream(
+      { ...baseConfig, nextAuthSecret: undefined, fetchStreamTicket },
+      SESSION_ID,
+      { ticket: 'stale-ticket' }
+    );
+
+    const superseded = sockets.instances[0];
+    if (!superseded) throw new Error('Missing stream socket');
+    // The handshake fails and the single retry opens a second socket, so the
+    // first socket is now a superseded generation.
+    superseded.errorFromServer(new Error('handshake rejected'));
+    await vi.waitFor(() => expect(sockets.instances).toHaveLength(2));
+    const current = sockets.instances[1];
+    if (!current) throw new Error('Missing retried stream socket');
+
+    current.closeFromServer(1011, 'server internal error');
+    expect(stream.closeInfo).toEqual({ code: 1011, reason: 'server internal error' });
+    expect(stream.isOpen).toBe(false);
+
+    // The superseded socket's later close must not overwrite the first cause.
+    superseded.closeFromServer(1006, 'superseded');
+    expect(stream.closeInfo).toEqual({ code: 1011, reason: 'server internal error' });
+
+    stream.close();
+  });
+
+  it('keeps the first close when the current socket closes again', () => {
+    const stream = openStream({ ...baseConfig, nextAuthSecret: undefined }, SESSION_ID, {
+      ticket: 'ticket',
+    });
+    const socket = sockets.instances[0];
+    if (!socket) throw new Error('Missing stream socket');
+
+    socket.closeFromServer(1006, 'first close');
+    expect(stream.closeInfo).toEqual({ code: 1006, reason: 'first close' });
+
+    // A second close from the same (current) generation must not overwrite it.
+    socket.closeFromServer(1011, 'second close');
+    expect(stream.closeInfo).toEqual({ code: 1006, reason: 'first close' });
+
     stream.close();
   });
 });

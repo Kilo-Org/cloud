@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive mounted-test suite for the session filter sheet */
 import { act, type ComponentProps } from 'react';
 import { Modal, Pressable, ScrollView } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -232,6 +233,82 @@ describe('SessionFilterModal', () => {
       projectFilter: [firstProject.gitUrl],
     });
     expect(props.onClose).toHaveBeenCalledOnce();
+  });
+
+  it('renders one platform row per bucket and collapses a persisted variant', async () => {
+    const { renderer } = await renderModal({
+      platformOptions: ['cloud-agent', 'extension'],
+      selectedPlatforms: ['cloud-agent-web', 'vscode'],
+      projectOptions: [],
+    });
+    const checkboxes = renderer.root.findAllByProps({ accessibilityRole: 'checkbox' });
+    expect(checkboxes.map(row => row.findByType(Text).props.children)).toEqual([
+      i18n.t('agentChat.sessionFilter.platformCloud'),
+      i18n.t('agentChat.sessionFilter.platformExtension'),
+    ]);
+    expect(
+      checkboxes.map(
+        row => (row.props as ComponentProps<typeof Pressable>).accessibilityState?.checked
+      )
+    ).toEqual([true, true]);
+  });
+
+  it('renders one project row per visible label and stores every alias on toggle', async () => {
+    const sshAlias = {
+      gitUrl: 'git@github.com:iscekic/kilo-workflow.git',
+      displayName: 'ISCEKIC/KILO-WORKFLOW',
+    };
+    const { renderer, props } = await renderModal({
+      projectOptions: [firstProject, sshAlias, secondProject],
+      selectedProjects: [],
+    });
+    const labels = renderer.root
+      .findAllByProps({ accessibilityRole: 'checkbox' })
+      .map(row => row.findByType(Text).props.children);
+    expect(labels.filter(label => label === firstProject.displayName)).toHaveLength(1);
+    expect(findCheckbox(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: false,
+    });
+
+    act(() => {
+      (findCheckbox(renderer, firstProject.displayName).props.onPress as () => void)();
+    });
+    expect(findCheckbox(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: true,
+    });
+
+    pressButton(renderer, i18n.t('common.apply'));
+    expect(props.onApply).toHaveBeenCalledExactlyOnceWith({
+      platformFilter: [],
+      projectFilter: [firstProject.gitUrl, sshAlias.gitUrl],
+    });
+  });
+
+  it('toggles off every alias of a merged project when any is stored', async () => {
+    const sshAlias = {
+      gitUrl: 'git@github.com:iscekic/kilo-workflow.git',
+      displayName: 'ISCEKIC/KILO-WORKFLOW',
+    };
+    const { renderer, props } = await renderModal({
+      projectOptions: [firstProject, sshAlias, secondProject],
+      selectedProjects: [sshAlias.gitUrl],
+    });
+    expect(findCheckbox(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: true,
+    });
+
+    act(() => {
+      (findCheckbox(renderer, firstProject.displayName).props.onPress as () => void)();
+    });
+    expect(findCheckbox(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: false,
+    });
+
+    pressButton(renderer, i18n.t('common.apply'));
+    expect(props.onApply).toHaveBeenCalledExactlyOnceWith({
+      platformFilter: [],
+      projectFilter: [],
+    });
   });
 
   it('applies empty filters after deselecting both dimensions', async () => {

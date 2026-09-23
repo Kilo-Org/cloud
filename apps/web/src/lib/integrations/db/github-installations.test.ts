@@ -95,12 +95,12 @@ async function applyConnectionRoleBackfill() {
   const migration = readFileSync(
     resolve(
       process.cwd(),
-      '../../packages/db/src/migrations/0256_github_connection_role_indexes.sql'
+      '../../packages/db/src/migrations/0259_github_connection_role_indexes.sql'
     ),
     'utf8'
   );
   const backfill = migration
-    .split('--> statement-breakpoint')
+    .split(/-->\s+statement-breakpoint/)
     .map(statement => statement.trim())
     .filter(statement => statement.startsWith('WITH eligible AS'));
   expect(backfill).toHaveLength(1);

@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Odklepanje je obvezno ob zagonu aplikacije in po petih minutah v ozadju.",
     "featureFlags": "Zastavice funkcij",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "oddaljeno · ≥ {{min}}",
+    "featureFlagSkipped": "privzeto · < {{min}}",
+    "featureFlagNotLoaded": "privzeto · ni naloženo",
     "gatewayTranscription": "Prepisovanje prek Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Glasovni vnos prepiši z modelom Kilo Gateway namesto prepoznavanja govora naprave. Posnetje se pošlje v Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2297,10 +2297,6 @@
       "linesTruncated": "vrstice {{start}}–{{end}} (skrajšano)",
       "linesOf": "vrstice {{start}}–{{end}} od {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Dejanje {{action}} v storitvi Cloud Agent ni uspelo ({{status}}).",
-      "failed": "Dejanje {{action}} v storitvi Cloud Agent ni uspelo."
-    },
     "collectCopyableText": {
       "unserializableInput": "[vnosa ni mogoče serializirati]",
       "errorPrefix": "Napaka: {{error}}"
@@ -2396,8 +2392,7 @@
       "assistantProviderRejected": "Ponudnik je zavrnil zahtevo.",
       "assistantStopped": "Ustvarjanje odgovora je bilo ustavljeno.",
       "assistantContextOverflow": "Pogovor je predolg za model.",
-      "assistantFailed": "Odgovora ni bilo mogoče ustvariti.",
-      "sendFailed": "Sporočila ni bilo mogoče poslati. Poskusi znova."
+      "assistantFailed": "Odgovora ni bilo mogoče ustvariti."
     },
     "filePart": {
       "loadingImage": "Nalaganje slike",

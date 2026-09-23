@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { TypeSafeClient, choice, noul, score } from '@typesafe-ai/sdk';
 import type { User } from '@kilocode/db/schema';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { after, NextRequest, NextResponse } from 'next/server';
+import type * as NextServer from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
@@ -27,7 +28,7 @@ import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 import { POST } from './route';
 
 jest.mock('next/server', () => ({
-  ...jest.requireActual<typeof import('next/server')>('next/server'),
+  ...jest.requireActual<typeof NextServer>('next/server'),
   after: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({
@@ -107,7 +108,7 @@ const memberDecision = {
   },
   decision: { allowed: true },
 };
-const mockedFetch = jest.fn<typeof fetch>();
+const mockedFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 const originalFetch = globalThis.fetch;
 
 function makeRequest(body: unknown = requestBody, headers: Record<string, string> = {}) {
@@ -167,7 +168,14 @@ describe('POST /api/gateway/typesafe/v1/systemone', () => {
     jest
       .mocked(modelNotAllowedResponse)
       .mockImplementation(() =>
-        NextResponse.json({ error_type: 'model_not_allowed' }, { status: 404 })
+        NextResponse.json(
+          {
+            error: 'Model not allowed',
+            error_type: 'model_not_allowed',
+            message: 'Model not allowed',
+          },
+          { status: 404 }
+        )
       );
     mockedFetch.mockImplementation(async () => Response.json(upstreamBody));
   });
@@ -178,7 +186,7 @@ describe('POST /api/gateway/typesafe/v1/systemone', () => {
 
   it('supports the TypeSafe SDK contract through a custom fetch transport', async () => {
     const routeFetch = jest.fn(async (input: string, init?: RequestInit) =>
-      POST(new NextRequest(input, init))
+      POST(new NextRequest(new Request(input, init)))
     );
     const client = new TypeSafeClient({
       apiKey: 'test-kilo-key',
@@ -396,7 +404,18 @@ describe('POST /api/gateway/typesafe/v1/systemone', () => {
       balance,
       balanceLimitedByUserAllowance: true,
     });
-    const blockedResponse = NextResponse.json({ error_type: 'credits_exhausted' }, { status: 402 });
+    const blockedResponse = NextResponse.json(
+      {
+        error_type: 'usage_limit_exceeded' as const,
+        error: {
+          title: 'Credits exhausted',
+          message: 'Credits exhausted',
+          balance,
+          buyCreditsUrl: '',
+        },
+      },
+      { status: 402 }
+    );
     jest.mocked(creditsBlockedResponse).mockResolvedValue(blockedResponse);
 
     expect(await POST(makeRequest())).toBe(blockedResponse);
@@ -551,9 +570,10 @@ describe('POST /api/gateway/typesafe/v1/systemone', () => {
       message: 'Upstream request failed',
       error_type: 'upstream_error',
     });
-    expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
-      tags: { source: 'systemone_proxy' },
-    });
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.any(String) }),
+      { tags: { source: 'systemone_proxy' } }
+    );
     expect(after).not.toHaveBeenCalled();
     expect(logMicrodollarUsage).not.toHaveBeenCalled();
   });

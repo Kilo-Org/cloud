@@ -335,7 +335,6 @@ describe('SessionFilterModal', () => {
     });
     const merge = vi.mocked(PlatformFilterRows.mergePlatformOptions);
     expect(merge).toHaveBeenCalledTimes(1);
-    const mergedPlatforms = merge.mock.results[0]?.value;
     const labelsBefore = renderer.root
       .findAllByProps({ accessibilityRole: 'checkbox' })
       .map(row => row.findByType(Text).props.children);
@@ -348,9 +347,10 @@ describe('SessionFilterModal', () => {
       );
     });
 
-    // The merge is not rebuilt, so the list receives the same array identity.
+    // The merge derivation is memoized on its props, so an unchanged re-render
+    // must not run it again: that is what keeps the list's array identity (and
+    // therefore every mounted row) stable. The labels stay put as a result.
     expect(merge).toHaveBeenCalledTimes(1);
-    expect(merge.mock.results[0]?.value).toBe(mergedPlatforms);
     expect(
       renderer.root
         .findAllByProps({ accessibilityRole: 'checkbox' })

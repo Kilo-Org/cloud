@@ -60,39 +60,12 @@ describe('getSessionDetailRenameState', () => {
     });
   });
 
-  it('shows the localized fallback instead of the backend placeholder title', () => {
-    expect(
-      getSessionDetailRenameState({
-        fallbackTitle,
-        isLoaded: true,
-        serverTitle: 'New session - 2026-09-22T02:05:22.778Z',
-        renameState: initialRenameState(),
-      })
-    ).toEqual({
-      title: fallbackTitle,
-      isTitleInteractive: true,
-      modalInitialValue: null,
-      isModalOpen: false,
-    });
-  });
-
   it('shows the localized fallback for a child-session placeholder title', () => {
     expect(
       getSessionDetailRenameState({
         fallbackTitle,
         isLoaded: true,
         serverTitle: 'Child session - 2026-09-22T02:05:22.778Z',
-        renameState: initialRenameState(),
-      }).title
-    ).toBe(fallbackTitle);
-  });
-
-  it('shows the localized fallback for a blank server title', () => {
-    expect(
-      getSessionDetailRenameState({
-        fallbackTitle,
-        isLoaded: true,
-        serverTitle: '   ',
         renameState: initialRenameState(),
       }).title
     ).toBe(fallbackTitle);
@@ -119,6 +92,35 @@ describe('getSessionDetailRenameState', () => {
         serverTitle: 'New session - 2026-09-22T02:05:22.778Z',
         renameState: { ...initialRenameState(), isModalOpen: true },
       }).modalInitialValue
+    ).toBe(fallbackTitle);
+  });
+
+  it('shows the fallback label when the loaded record still carries the backend placeholder', () => {
+    // A fresh session is seeded with `New session - ${ISO}`; the app must
+    // paint its own label, never the machine string.
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T01:09:45.623Z',
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+
+  it('shows the fallback label when the loaded record carries a blank title', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: '   ',
+        renameState: initialRenameState(),
+      }).title
     ).toBe(fallbackTitle);
   });
 
@@ -295,11 +297,11 @@ describe('titleFromSessionUpdatedEvent', () => {
     ).toBeUndefined();
   });
 
-  it('ignores the backend placeholder title', () => {
+  it('ignores the backend placeholder so a live event cannot repaint the machine string', () => {
     expect(
       titleFromSessionUpdatedEvent(
         'ses-1',
-        sessionUpdatedPayload({ title: 'New session - 2026-09-22T02:05:22.778Z' })
+        sessionUpdatedPayload({ title: 'New session - 2026-09-22T01:09:45.623Z' })
       )
     ).toBeUndefined();
     expect(

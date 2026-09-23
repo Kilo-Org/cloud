@@ -25,6 +25,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
@@ -39,7 +40,6 @@ import {
   selectRemoteRowSpokenMeta,
 } from './session-list-helpers';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
-import { namedSessionTitle } from './session-detail-rename-state';
 import { type RowVariant } from './session-row';
 import { copySessionId, showRenamePrompt, showSessionActionMenu } from './session-row-actions';
 import {
@@ -94,8 +94,8 @@ export function RemoteSessionRow({
   // The backend names an unnamed session with a raw ISO placeholder
   // ("New session - 2026-09-22T02:05:22.778Z"); it is not a name the user
   // should see, so the row falls back to the localized unnamed name the same
-  // way the session header does.
-  const title = namedSessionTitle(session.title) ?? t('agents.sessionRow.untitled');
+  // way the session header does (`sessionDisplayTitle` owns the rule).
+  const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
   const agentLabel = remoteSessionEyebrowLabel(session);

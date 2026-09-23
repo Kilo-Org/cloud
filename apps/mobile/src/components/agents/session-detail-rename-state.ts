@@ -1,3 +1,5 @@
+import { sessionDisplayTitle } from '@/lib/session-display-title';
+
 export type RenameState = {
   isModalOpen: boolean;
   optimisticTitle: string | null;
@@ -52,32 +54,17 @@ type SessionDetailRenameState = {
 };
 
 /**
- * The backend's "unnamed" session title is a raw ISO placeholder such as
- * `New session - 2026-09-22T02:05:22.778Z`; web nulls it before display.
- * Mirrors `isDefaultSessionTitle` in
- * `packages/session-ingest-contracts/src/index.ts` and must stay in step with
- * it. The pattern is mirrored rather than imported because mobile does not
- * depend on that package (only `apps/web` consumes it) and
- * `apps/mobile/AGENTS.md` requires `npx expo install` for dependencies, which
- * cannot resolve a private workspace package.
- */
-const PLACEHOLDER_SESSION_TITLE_PATTERN =
-  /^(New session - |Child session - )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
-
-/**
  * A title a user should actually see, or undefined when the session has no
  * name: null, blank, or the backend's ISO placeholder. Callers fall back to
  * the localized unnamed-session name.
+ *
+ * The rule lives in `sessionDisplayTitle`, backed by `isDefaultSessionTitle`
+ * in `@kilocode/session-ingest-contracts`; this name is kept for the
+ * session-detail surfaces that already import it so there is a single copy
+ * of the placeholder pattern to keep in step.
  */
 export function namedSessionTitle(title: string | null | undefined): string | undefined {
-  if (title == null) {
-    return undefined;
-  }
-  const trimmed = title.trim();
-  if (trimmed.length === 0 || PLACEHOLDER_SESSION_TITLE_PATTERN.test(trimmed)) {
-    return undefined;
-  }
-  return trimmed;
+  return sessionDisplayTitle(title);
 }
 
 /**
@@ -90,8 +77,9 @@ export function getSessionDetailRenameState(input: {
   serverTitle: string | undefined;
   renameState: RenameState;
 }): SessionDetailRenameState {
-  const serverTitle = namedSessionTitle(input.serverTitle);
-  const baseTitle = input.isLoaded ? (serverTitle ?? input.fallbackTitle) : input.fallbackTitle;
+  const baseTitle = input.isLoaded
+    ? (sessionDisplayTitle(input.serverTitle) ?? input.fallbackTitle)
+    : input.fallbackTitle;
   const title = input.renameState.optimisticTitle ?? baseTitle;
   return {
     title,
@@ -115,5 +103,5 @@ export function titleFromSessionUpdatedEvent(
   if (payload.source !== 'v2' || payload.session.sessionId !== sessionId) {
     return undefined;
   }
-  return namedSessionTitle(payload.session.title);
+  return sessionDisplayTitle(payload.session.title);
 }

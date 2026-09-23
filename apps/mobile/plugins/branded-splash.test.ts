@@ -179,6 +179,9 @@ describe('shared branded splash', () => {
     // prebuilt `android/` tree contributes its own colors alongside the ones
     // Expo generates. Assert the splash background this plugin owns is
     // present, not that it is the only color.
+    // The shared app config carries the other `colors.xml` entries (icon and
+    // notification colors, the app background) through the same mod chain, so
+    // assert this plugin's surface is present rather than the array length.
     // compileModsAsync introspects the project's existing android resources, so
     // the colors array also carries the project's other theme colors. Assert the
     // splash color this plugin owns instead of the array's exact contents.

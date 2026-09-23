@@ -108,6 +108,7 @@ describe('planNeedsInputNotifications', () => {
         },
       ],
       dismiss: [],
+      updates: [],
     });
   });
 
@@ -156,7 +157,7 @@ describe('planNeedsInputNotifications', () => {
       appState: ACTIVE,
       attentionEnabled: true,
     });
-    expect(plan).toEqual({ publish: [], dismiss: [] });
+    expect(plan).toEqual({ publish: [], dismiss: [], updates: [] });
   });
 
   it('re-publishes a still-waiting raise whose associated PR appeared', () => {
@@ -229,7 +230,7 @@ describe('planNeedsInputNotifications', () => {
       appState: ACTIVE,
       attentionEnabled: true,
     });
-    expect(plan).toEqual({ publish: [], dismiss: [] });
+    expect(plan).toEqual({ publish: [], dismiss: [], updates: [] });
   });
 
   it('dismisses a raise that left needs-input', () => {
@@ -240,7 +241,7 @@ describe('planNeedsInputNotifications', () => {
       appState: ACTIVE,
       attentionEnabled: true,
     });
-    expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'] });
+    expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'], updates: [] });
   });
 
   it('dismisses a raise whose row disappeared', () => {
@@ -251,7 +252,7 @@ describe('planNeedsInputNotifications', () => {
       appState: ACTIVE,
       attentionEnabled: true,
     });
-    expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'] });
+    expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'], updates: [] });
   });
 
   it('dismisses a raise that changed organization without re-posting it', () => {
@@ -262,7 +263,7 @@ describe('planNeedsInputNotifications', () => {
       appState: ACTIVE,
       attentionEnabled: true,
     });
-    expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'] });
+    expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'], updates: [] });
   });
 
   it('keeps a still-waiting raise when the gate only withholds the post', () => {
@@ -277,7 +278,7 @@ describe('planNeedsInputNotifications', () => {
           attentionEnabled: true,
           ...input,
         })
-      ).toEqual({ publish: [], dismiss: [] });
+      ).toEqual({ publish: [], dismiss: [], updates: [] });
     }
   });
 
@@ -289,7 +290,7 @@ describe('planNeedsInputNotifications', () => {
       appState: ACTIVE,
       attentionEnabled: false,
     });
-    expect(plan).toEqual({ publish: [], dismiss: [] });
+    expect(plan).toEqual({ publish: [], dismiss: [], updates: [] });
   });
 
   it('dismisses a raise already on screen when agentAttention is turned off', () => {
@@ -306,6 +307,7 @@ describe('planNeedsInputNotifications', () => {
     expect(plan).toEqual({
       publish: [],
       dismiss: ['needs-input:ses_1', 'needs-input:ses_2'],
+      updates: [],
     });
   });
 
@@ -321,7 +323,7 @@ describe('planNeedsInputNotifications', () => {
       appState: ACTIVE,
       attentionEnabled: undefined,
     });
-    expect(plan).toEqual({ publish: [], dismiss: [] });
+    expect(plan).toEqual({ publish: [], dismiss: [], updates: [] });
   });
 
   it('signs out even while the preference row has not loaded', () => {
@@ -333,7 +335,7 @@ describe('planNeedsInputNotifications', () => {
       appState: ACTIVE,
       attentionEnabled: undefined,
     });
-    expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'] });
+    expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'], updates: [] });
   });
 
   it('dismisses every posted identifier on sign-out and posts nothing', () => {
@@ -348,6 +350,7 @@ describe('planNeedsInputNotifications', () => {
     expect(plan).toEqual({
       publish: [],
       dismiss: ['needs-input:ses_1', 'needs-input:ses_2'],
+      updates: [],
     });
   });
 
@@ -359,7 +362,7 @@ describe('planNeedsInputNotifications', () => {
       appState: ACTIVE,
       attentionEnabled: true,
     });
-    expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'] });
+    expect(plan).toEqual({ publish: [], dismiss: ['needs-input:ses_1'], updates: [] });
   });
 });
 
@@ -376,6 +379,7 @@ describe('applyNeedsInputNotifications', () => {
     await applyNeedsInputNotifications({
       publish: [notifiedRow(), notifiedRow({ sessionId: 'ses_2', kind: 'permission' })],
       dismiss: ['needs-input:ses_old'],
+      updates: [],
     });
 
     expect(order).toEqual([
@@ -389,6 +393,7 @@ describe('applyNeedsInputNotifications', () => {
     await applyNeedsInputNotifications({
       publish: [notifiedRow({ title: 'Fix the bug' })],
       dismiss: [],
+      updates: [],
     });
 
     expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith({
@@ -418,6 +423,7 @@ describe('applyNeedsInputNotifications', () => {
         }),
       ],
       dismiss: [],
+      updates: [],
     });
 
     expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
@@ -430,6 +436,94 @@ describe('applyNeedsInputNotifications', () => {
     );
   });
 
+  it('re-posts an already-posted raise quietly so a status change never alerts again', async () => {
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow()],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'permission' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+    expect(plan.updates).toEqual(['ses_1']);
+
+    await applyNeedsInputNotifications(plan);
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.objectContaining({
+          categoryIdentifier: 'kilo-needs-input:permission',
+          sound: false,
+        }),
+      })
+    );
+  });
+
+  it('keeps a first post of a raise alerting on the shared channel', async () => {
+    const plan = planNeedsInputNotifications({
+      previous: [],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+    expect(plan.updates).toEqual([]);
+
+    await applyNeedsInputNotifications(plan);
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith({
+      identifier: 'needs-input:ses_1',
+      content: {
+        title: 'Fix the bug',
+        body: 'Agent needs input',
+        data: {
+          type: 'cloud_agent_session',
+          cliSessionId: 'ses_1',
+          category: 'attention',
+          attentionKind: 'question',
+        },
+        categoryIdentifier: 'kilo-needs-input:question',
+        interruptionLevel: 'timeSensitive',
+      },
+      trigger: { channelId: 'needs-input' },
+    });
+  });
+
+  it('alerts again once the raise was dismissed and comes back', async () => {
+    const raise = makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' });
+    const first = planNeedsInputNotifications({
+      previous: [],
+      next: [raise],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+    await applyNeedsInputNotifications(first);
+    await applyNeedsInputNotifications(
+      planNeedsInputNotifications({
+        previous: first.publish,
+        next: [],
+        pathname: AWAY,
+        appState: ACTIVE,
+        attentionEnabled: true,
+      })
+    );
+    const back = planNeedsInputNotifications({
+      previous: [],
+      next: [raise],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+
+    expect(back.updates).toEqual([]);
+    await applyNeedsInputNotifications(back);
+
+    expect(mocks.scheduleNotificationAsync).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ content: expect.not.objectContaining({ sound: false }) })
+    );
+  });
+
   it('reports and swallows a rejected schedule so the mount never crashes', async () => {
     const events: TelemetryEvent[] = [];
     setTelemetrySink(event => {
@@ -438,7 +532,7 @@ describe('applyNeedsInputNotifications', () => {
     mocks.scheduleNotificationAsync.mockRejectedValue(new Error('permission revoked'));
 
     await expect(
-      applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [] })
+      applyNeedsInputNotifications({ publish: [notifiedRow()], dismiss: [], updates: [] })
     ).resolves.toEqual({ published: [], dismissed: [] });
     expect(events).toHaveLength(1);
     expect(events[0]?.tags?.['error.operation']).toBe('needs_input_publish');
@@ -452,7 +546,7 @@ describe('applyNeedsInputNotifications', () => {
     mocks.dismissNotificationAsync.mockRejectedValue(new Error('no presenter'));
 
     await expect(
-      applyNeedsInputNotifications({ publish: [], dismiss: ['needs-input:ses_1'] })
+      applyNeedsInputNotifications({ publish: [], dismiss: ['needs-input:ses_1'], updates: [] })
     ).resolves.toEqual({ published: [], dismissed: [] });
     expect(events).toHaveLength(1);
     expect(events[0]?.tags?.['error.operation']).toBe('needs_input_dismiss');
@@ -467,6 +561,7 @@ describe('applyNeedsInputNotifications', () => {
       applyNeedsInputNotifications({
         publish: [row],
         dismiss: ['needs-input:ses_old'],
+        updates: [],
       })
     ).resolves.toEqual({ published: [row], dismissed: [] });
   });

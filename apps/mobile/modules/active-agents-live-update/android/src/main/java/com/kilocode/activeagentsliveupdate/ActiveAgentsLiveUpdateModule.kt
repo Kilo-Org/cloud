@@ -8,9 +8,13 @@ import android.content.Intent
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.asCoroutineDispatcher
 
 /**
  * Local Expo module for the Android aggregate ongoing notification.
@@ -55,29 +59,63 @@ class ActiveAgentsLiveUpdateModule : Module() {
 
     // Group the Open label and URL so both entry points fit Expo's eight-argument
     // Function limit while preserving the action and notification-kind fields.
-    Function("start") { title: String, text: String, openAction: Map<String, String>, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean ->
-      post(title, text, openAction.getValue("label"), openAction.getValue("url"), approveLabel, compactText, channelId, alerting, promotion, 0)
-    }
+    //
+    // `start`, `update` and `end` are the durable writes whose state the JS side
+    // never reads back in the same turn: their bodies commit to SharedPreferences
+    // (a synchronous fsync), arm or cancel the OS alarm, and post the
+    // notification, so they run on the module queue rather than the JavaScript
+    // thread. The JS bridge (`src/glanceable-android/live-update.ts`) declares
+    // them `void` and never consumes the promise, which is why `durable` logs a
+    // failure instead of letting it become an unhandled rejection.
+    AsyncFunction("start") { title: String, text: String, openAction: Map<String, String>, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean ->
+      durable {
+        post(title, text, openAction.getValue("label"), openAction.getValue("url"), approveLabel, compactText, channelId, alerting, promotion, 0)
+      }
+    }.runOnQueue(moduleQueue)
 
     // Expo's `Function` builder has one overload per arity and stops at eight
     // arguments (expo-modules-core `ObjectDefinitionBuilder`), so `update`
     // cannot carry `start`'s `promotion` flag on top of the terminal
     // `timeoutMs`. The flag is redundant on this path: `post` gates promotion
     // on `isPromotionCapable()` itself, which is the value the JS side passed.
-    Function("update") { title: String, text: String, openAction: Map<String, String>, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, timeoutMs: Double ->
-      post(title, text, openAction.getValue("label"), openAction.getValue("url"), approveLabel, compactText, channelId, alerting, isPromotionCapable(), timeoutMs.toLong())
-    }
+    AsyncFunction("update") { title: String, text: String, openAction: Map<String, String>, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, timeoutMs: Double ->
+      durable {
+        post(title, text, openAction.getValue("label"), openAction.getValue("url"), approveLabel, compactText, channelId, alerting, isPromotionCapable(), timeoutMs.toLong())
+      }
+    }.runOnQueue(moduleQueue)
 
-    Function("end") {
-      dismiss()
-    }
+    AsyncFunction("end") {
+      durable {
+        dismiss()
+      }
+    }.runOnQueue(moduleQueue)
 
+    // `setWidgetSnapshot` is the one durable write the JS side reads back in the
+    // same turn: an in-place widget action republishes the snapshot through the
+    // sink and `register.ts`'s `handleWidgetAction` redraws immediately, whose
+    // `currentProps()` re-reads native storage (`register.ts:176-189`). The read
+    // must see this write, so the entry point stays a synchronous `Function`: it
+    // records the snapshot on the JS thread and hands only the durable body —
+    // the prefs fsync and the `AlarmManager` round-trip — to the module queue.
     Function("setWidgetSnapshot") { snapshot: String, expiresAt: Double ->
-      ActiveAgentsDeadlineReceiver.setWidgetSnapshot(context, snapshot, expiresAt.toLong())
+      widgetSnapshot = snapshot
+      executor.execute {
+        durable {
+          ActiveAgentsDeadlineReceiver.setWidgetSnapshot(context, snapshot, expiresAt.toLong())
+        }
+      }
     }
 
+    // This read stays a synchronous `Function` too: its Promise form would change
+    // the JS bridge and its consumers (`live-update.ts`, `register.ts`,
+    // `android-sink.ts`), which this module does not own. It answers with the
+    // snapshot this runtime last handed to `setWidgetSnapshot` — so the redraw
+    // after a successful in-place action never reads the pre-action snapshot the
+    // still-queued commit has not replaced — and falls back to the persisted
+    // snapshot only for a runtime that has written none (a fresh process), which
+    // is exactly what the old synchronous body returned.
     Function("getWidgetSnapshot") {
-      ActiveAgentsDeadlineReceiver.getWidgetSnapshot(context)
+      widgetSnapshot ?: ActiveAgentsDeadlineReceiver.getWidgetSnapshot(context)
     }
 
     // The channel the posted card carries, or null when the module has posted
@@ -85,6 +123,58 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // still in the shade from a widget snapshot that was stored without a post.
     Function("getPostedChannel") {
       postedChannelOrNull()
+    }
+
+    OnDestroy {
+      // The single queue thread must not outlive the module: a reload would
+      // otherwise leak one executor thread per module instance.
+      executor.shutdown()
+    }
+  }
+
+  /**
+   * The module's one serial queue for the durable write path.
+   *
+   * The JS thread must not pay the prefs fsync and binder round-trips these
+   * writes make, and neither default queue fits: `Queues.DEFAULT` is a thread
+   * pool (the writes would race each other and the order `post` depends on
+   * would not hold) and `Queues.MAIN` would put the fsync on the UI thread. A
+   * single-thread executor wrapped as a scope is what `runOnQueue` accepts for
+   * a custom queue.
+   *
+   * The queue is Android's alone, like the SharedPreferences fsync and the
+   * `AlarmManager` round-trip it carries: iOS's counterpart card is the
+   * ActivityKit Live Activity driven from `src/glanceable-ios/ios-sink.ts`,
+   * whose snapshot is persisted in JS, so that side has no synchronous native
+   * write to move off the JS thread.
+   */
+  private val executor = Executors.newSingleThreadExecutor { Thread(it, "active-agents-live-update") }
+  private val moduleQueue = CoroutineScope(executor.asCoroutineDispatcher())
+
+  /**
+   * The snapshot this JS runtime most recently handed to `setWidgetSnapshot`, or
+   * null when it has written none. The durable commit runs on the module queue,
+   * so a read in the same turn as the write would otherwise see the previous
+   * snapshot; this record is what lets `getWidgetSnapshot` answer with the value
+   * the JS side just issued. A fresh runtime starts null and falls back to the
+   * persisted snapshot. Both the assignment and the read happen on the JS
+   * thread, so no synchronization is needed.
+   */
+  private var widgetSnapshot: String? = null
+
+  /**
+   * Run one durable write on the module queue and log a failure instead of
+   * throwing it. The JS bridge declares these entry points `void` and never
+   * consumes the promise an `AsyncFunction` returns, so a thrown error would
+   * surface only as an unhandled promise rejection nobody can catch. The
+   * durable bodies keep their `check(...)` guards and their exact order; this
+   * only decides where the failure is reported.
+   */
+  private fun durable(block: () -> Unit) {
+    try {
+      block()
+    } catch (error: Throwable) {
+      Log.e(TAG, "Active agents live update failed", error)
     }
   }
 
@@ -381,6 +471,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
   }
 
   private companion object {
+    const val TAG = "ActiveAgentsLiveUpdate"
     const val HAS_TIMEOUT = "has_timeout"
     const val OPEN_REQUEST_CODE = 1002
     const val OPEN_URL = "open_url"

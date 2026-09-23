@@ -84,6 +84,22 @@ function bridgedArity(name: string): number {
   return countTopLevelArgs(args.slice(0, end));
 }
 
+/**
+ * One registration in the module's `definition()`, from its builder call to the
+ * next one. `AsyncFunction("x") {` still contains the `Function("x") {` marker
+ * `declaredArity` looks for; this helper reads whichever builder is used so a
+ * test can assert the queue attached to a single entry point.
+ */
+function registration(name: string): string {
+  const builder = new RegExp(`(?:Async)?Function\\("${name}"\\)\\s*\\{`);
+  const start = MODULE_SOURCE.search(builder);
+  expect(start, `${name} is not registered on the native module`).toBeGreaterThan(-1);
+  const marker = builder.exec(MODULE_SOURCE.slice(start));
+  const after = marker === null ? MODULE_SOURCE.length : start + marker[0].length;
+  const next = /(?:Async)?Function\("/.exec(MODULE_SOURCE.slice(after));
+  return MODULE_SOURCE.slice(start, next === null ? MODULE_SOURCE.length : after + next.index);
+}
+
 describe('ActiveAgentsLiveUpdate native bridge arity', () => {
   it('keeps every native Function within Expo’s eight-argument builder limit', () => {
     for (const name of [
@@ -103,5 +119,93 @@ describe('ActiveAgentsLiveUpdate native bridge arity', () => {
   it('passes exactly the arguments the native Function declares', () => {
     expect(bridgedArity('start')).toBe(declaredArity('start'));
     expect(bridgedArity('update')).toBe(declaredArity('update'));
+  });
+});
+
+/**
+ * The durable write path — a prefs fsync plus one or more binder round-trips —
+ * must not run on the JavaScript thread, and the JS bridge declares these
+ * entry points `void`, so a rejection would reach nobody. The module owns one
+ * single-thread executor and runs every write on it.
+ */
+describe('ActiveAgentsLiveUpdate durable write queue', () => {
+  it('owns one single-thread executor, not a pool or the UI thread', () => {
+    // Queues.DEFAULT is a pool and Queues.MAIN would put the fsync on the UI
+    // thread, so neither satisfies the finding.
+    expect((MODULE_SOURCE.match(/newSingleThreadExecutor/g) ?? []).length).toBe(1);
+    expect(MODULE_SOURCE).toContain('Thread(it, "active-agents-live-update")');
+    expect(MODULE_SOURCE).toContain('CoroutineScope(');
+    expect(MODULE_SOURCE).toContain('asCoroutineDispatcher()');
+  });
+
+  it('runs every durable write on that queue', () => {
+    for (const name of ['start', 'update', 'end']) {
+      const block = registration(name);
+      expect(block, `${name} must be an AsyncFunction`).toMatch(
+        new RegExp(`^AsyncFunction\\("${name}"\\)`)
+      );
+      expect(block, `${name} must run on the module queue`).toContain('.runOnQueue(moduleQueue)');
+      expect(block, `${name} must not stay on the default or main queue`).not.toContain('Queues.');
+    }
+
+    // `setWidgetSnapshot` keeps the durable commit on the queue but records the
+    // snapshot on the JS thread first, so a read in the same turn as the write
+    // sees the value the JS side just issued instead of the pre-write storage.
+    const write = registration('setWidgetSnapshot');
+    expect(write, 'setWidgetSnapshot must stay a synchronous Function').toMatch(
+      /^Function\("setWidgetSnapshot"\)/
+    );
+    expect(write, 'setWidgetSnapshot must submit its durable body to the module queue').toContain(
+      'executor.execute'
+    );
+    expect(write, 'the JS thread must not run the prefs commit itself').not.toContain('.commit()');
+    expect(write, 'setWidgetSnapshot must not stay on the default or main queue').not.toContain(
+      'Queues.'
+    );
+  });
+
+  it('answers a read with the write the JS side last issued', () => {
+    const write = registration('setWidgetSnapshot');
+    expect(write, 'setWidgetSnapshot must record the snapshot it carries').toMatch(
+      /widgetSnapshot\s*=\s*snapshot/
+    );
+
+    const read = registration('getWidgetSnapshot');
+    expect(read, 'getWidgetSnapshot must stay a synchronous Function').toMatch(
+      /^Function\("getWidgetSnapshot"\)/
+    );
+    const recorded = read.indexOf('widgetSnapshot');
+    const fallback = read.indexOf('ActiveAgentsDeadlineReceiver.getWidgetSnapshot(');
+    expect(recorded, 'getWidgetSnapshot must consult the recorded snapshot').toBeGreaterThan(-1);
+    expect(fallback, 'getWidgetSnapshot must fall back to persisted storage').toBeGreaterThan(-1);
+    expect(
+      recorded,
+      'the recorded snapshot must be returned before the persisted read'
+    ).toBeLessThan(fallback);
+  });
+
+  it('keeps the synchronous read path on the JS thread', () => {
+    // A Promise form would change the JS bridge and its consumers
+    // (`live-update.ts`, `register.ts`, `android-sink.ts`), which this item
+    // does not own.
+    for (const name of [
+      'isPromotionCapable',
+      'isDndAccessGranted',
+      'getWidgetSnapshot',
+      'getPostedChannel',
+    ]) {
+      const block = registration(name);
+      expect(block, `${name} must stay a synchronous Function`).toMatch(
+        new RegExp(`^Function\\("${name}"\\)`)
+      );
+      expect(block, `${name} must not be queued`).not.toContain('.runOnQueue(');
+    }
+  });
+
+  it('shuts the executor down with the module', () => {
+    const destroy = MODULE_SOURCE.slice(MODULE_SOURCE.indexOf('OnDestroy {'));
+    expect(destroy, 'the module must release its executor on destroy').toContain(
+      'executor.shutdown()'
+    );
   });
 });

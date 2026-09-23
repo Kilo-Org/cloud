@@ -16,7 +16,9 @@ import {
 import type { Env } from '../types.js';
 import type { VercelSandboxCreateEnvelope } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
+  SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE,
   isSandboxAcquisitionLostError,
+  isSandboxAcquisitionSupersededError,
   type SandboxHeartbeatPayload,
 } from '../shared/sandbox-control-protocol.js';
 import type {
@@ -1798,7 +1800,13 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.acquire({ ...acquisition, id: 'attempt_b' });
     const replacement = await h.ready();
     expect(replacement.providerInstanceId).not.toBe(original.providerInstanceId);
-    await expect(h.acquire(acquisition)).rejects.toThrow('no longer owns this allocation');
+    const superseded = await h.acquire(acquisition).then(
+      () => new Error('Expected a superseded acquisition rejection'),
+      (error: unknown) => error
+    );
+    expect(isSandboxAcquisitionSupersededError(superseded)).toBe(true);
+    expect(isSandboxAcquisitionLostError(superseded)).toBe(true);
+    expect(superseded).toMatchObject({ message: SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE });
     expect(canonicalProviderRef(await h.control.getAllocationRecord())).toBe(
       replacement.providerInstanceId
     );
@@ -2123,7 +2131,13 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect(isSandboxAcquisitionLostError(changed)).toBe(true);
     expect(changed).toMatchObject({ message: 'Sandbox runtime changed during billing admission' });
     await h.evict();
-    await expect(h.acquire(acquisition)).rejects.toThrow('no longer owns this allocation');
+    const superseded = await h.acquire(acquisition).then(
+      () => new Error('Expected a superseded acquisition rejection'),
+      (error: unknown) => error
+    );
+    expect(isSandboxAcquisitionSupersededError(superseded)).toBe(true);
+    expect(isSandboxAcquisitionLostError(superseded)).toBe(true);
+    expect(superseded).toMatchObject({ message: SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE });
     expect(canonicalProviderRef(await h.control.getAllocationRecord())).toBe(
       replacement.providerInstanceId
     );

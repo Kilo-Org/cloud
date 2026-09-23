@@ -14,6 +14,12 @@ import {
   createAllocationController,
 } from './allocation-controller.js';
 import type { AllocationTransition } from './allocation-transition.js';
+import {
+  SANDBOX_ACQUISITION_LOST_MESSAGE,
+  SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE,
+  isSandboxAcquisitionLostError,
+  isSandboxAcquisitionSupersededError,
+} from '../shared/sandbox-control-protocol.js';
 
 type AllocationTransitionChanged = (
   from: AllocationRecord,
@@ -103,6 +109,10 @@ function allocatedRecordWithIntent(intentId: string): AllocationRecord {
     ...record,
     state: { ...record.state, createIntent: { intentId, createdAt: NOW - 1 } },
   };
+}
+
+function stoppedRecord(): AllocationRecord {
+  return { v: 2, resumable: true, state: { kind: 'stopped', summary: null } };
 }
 
 function stoppingCheckRequiredRecord(): AllocationRecord {
@@ -271,14 +281,54 @@ describe('allocation controller — acquisition fencing', () => {
     ).rejects.toThrow('Sandbox acquisition deadline changed');
   });
 
-  it('throws SandboxAcquisitionLostError when the bound allocation changed', async () => {
+  it('classifies a mismatched receipt against a live replacement as superseded', async () => {
     const { controller } = controllerFor(allocatedRecord());
     const record = await controller.load();
     await controller.bindAcquisition(record, { id: 'acq-1', deadlineAt: NOW + 10_000 }, NOW);
     const other = allocatedRecordWithIntent('intent-2');
-    await expect(
-      controller.bindAcquisition(other, { id: 'acq-1', deadlineAt: NOW + 10_000 }, NOW)
-    ).rejects.toMatchObject({ name: 'SandboxAcquisitionLostError' });
+    const error = await controller
+      .bindAcquisition(other, { id: 'acq-1', deadlineAt: NOW + 10_000 }, NOW)
+      .then(
+        () => new Error('Expected a superseded acquisition rejection'),
+        (thrown: unknown) => thrown
+      );
+    expect(isSandboxAcquisitionSupersededError(error)).toBe(true);
+    expect(isSandboxAcquisitionLostError(error)).toBe(true);
+    expect(error).toMatchObject({
+      name: 'SandboxAcquisitionSupersededError',
+      message: SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE,
+    });
+  });
+
+  it('keeps a mismatched receipt against a dead allocation on the plain acquisition-loss path', async () => {
+    const { controller } = controllerFor(allocatedRecord());
+    const record = await controller.load();
+    await controller.bindAcquisition(record, { id: 'acq-1', deadlineAt: NOW + 10_000 }, NOW);
+    const error = await controller
+      .bindAcquisition(stoppedRecord(), { id: 'acq-1', deadlineAt: NOW + 10_000 }, NOW)
+      .then(
+        () => new Error('Expected an acquisition-loss rejection'),
+        (thrown: unknown) => thrown
+      );
+    expect(isSandboxAcquisitionSupersededError(error)).toBe(false);
+    expect(isSandboxAcquisitionLostError(error)).toBe(true);
+    expect(error).toMatchObject({ message: SANDBOX_ACQUISITION_LOST_MESSAGE });
+  });
+
+  it('recognizes the superseded contract by serialized name or message', () => {
+    expect(
+      isSandboxAcquisitionSupersededError(
+        Object.assign(new Error('unrelated'), { name: 'SandboxAcquisitionSupersededError' })
+      )
+    ).toBe(true);
+    expect(
+      isSandboxAcquisitionSupersededError(
+        Object.assign(new Error(SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE), { name: 'Error' })
+      )
+    ).toBe(true);
+    expect(
+      isSandboxAcquisitionSupersededError(Object.assign(new Error('other'), { name: 'Error' }))
+    ).toBe(false);
   });
 
   it('rejects an expired acquisition', async () => {

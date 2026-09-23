@@ -92,7 +92,7 @@ function terminalState(message: SessionMessage): Record<string, unknown> {
 }
 
 describe('stopped seam — fenced decision', () => {
-  it('terminalizes a queued-only bound session the row-derived binding would reject', () => {
+  it('preserves a queued-only bound session the row-derived binding would reject', () => {
     const result = decideStopped({
       messages: [queuedRow()],
       attachment: ATTACHMENT,
@@ -105,16 +105,18 @@ describe('stopped seam — fenced decision', () => {
     expect(result.messages[0]).toMatchObject({
       messageId: 'm1',
       state: {
-        kind: 'failed',
-        reason: 'allocation_stopped',
-        at: NOW,
-        source: 'coordinator',
+        kind: 'queued',
+        preparationAttemptId: 'prep-1',
       },
     });
-    expect(terminalState(result.messages[0]!).wrapperInstanceId).toBeUndefined();
-    // Allocation loss clears the sibling cancellation marker, exactly as HEAD's
-    // stop projection did.
-    expect(result.messages[0]!.cancellation).toBeUndefined();
+    // The preserved row keeps its whole delivery identity and cancellation
+    // marker; only in-flight work loses them.
+    const preserved = result.messages[0]!.state;
+    expect(preserved.kind === 'queued' && preserved.wrapperInstanceId).toBe('w-1');
+    expect(result.messages[0]!.cancellation).toEqual({
+      operationId: 'cancel-1',
+      deadlineAt: NOW + 10,
+    });
   });
 
   it('terminalizes an accepted row and clears every delivery field', () => {
@@ -164,7 +166,7 @@ describe('stopped seam — fenced decision', () => {
     );
   });
 
-  it('terminalizes once and rejects a replay after the attachment is cleared', () => {
+  it('applies a matching stop once, preserves queued demand and rejects a replay after clearing the attachment', () => {
     const first = decideStopped({
       messages: [queuedRow(), acceptedRow()],
       attachment: ATTACHMENT,
@@ -173,10 +175,10 @@ describe('stopped seam — fenced decision', () => {
     });
     expect(first.outcome).toBe('terminalized');
     if (first.outcome !== 'terminalized') return;
-    expect(first.messages.map(message => message.state.kind)).toEqual(['failed', 'failed']);
+    expect(first.messages.map(message => message.state.kind)).toEqual(['queued', 'failed']);
 
     // The clearest binding is gone, so the replayed proof cannot terminalize
-    // again; the already-terminal messages keep their first terminal timestamps.
+    // again; the already-failed message keeps its first terminal timestamp.
     const replayed = decideStopped({
       messages: first.messages,
       attachment: undefined,
@@ -184,10 +186,10 @@ describe('stopped seam — fenced decision', () => {
       now: NOW + 5_000,
     });
     expect(replayed).toEqual({ outcome: 'rejected' });
-    expect(first.messages.map(message => terminalState(message).at)).toEqual([NOW, NOW]);
+    expect(terminalState(first.messages[1]!).at).toBe(NOW);
   });
 
-  it('does not terminalize fresh demand under an old proof, but a matching new proof does', () => {
+  it('rejects fresh demand under an old proof and preserves it under a matching new proof', () => {
     const freshRows = [queuedRow('fresh', { wrapperInstanceId: 'w-new' })];
     const freshAttachment: StoppedAttachment = {
       allocationIncarnation: 'inc-new',
@@ -213,7 +215,7 @@ describe('stopped seam — fenced decision', () => {
     });
     expect(result.outcome).toBe('terminalized');
     if (result.outcome !== 'terminalized') return;
-    expect(result.messages[0]).toMatchObject({ messageId: 'fresh', state: { kind: 'failed' } });
+    expect(result.messages[0]).toMatchObject({ messageId: 'fresh', state: { kind: 'queued' } });
   });
 
   it('rejects a stale incarnation', () => {

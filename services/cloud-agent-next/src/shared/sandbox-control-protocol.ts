@@ -95,11 +95,30 @@ export class SandboxAcquisitionLostError extends Error {
   }
 }
 
-export function isSandboxAcquisitionLostError(error: unknown): boolean {
+export const SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE =
+  'Sandbox acquisition was superseded by a bindable live replacement allocation';
+
+export class SandboxAcquisitionSupersededError extends Error {
+  constructor(message: string = SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE) {
+    super(message);
+    this.name = 'SandboxAcquisitionSupersededError';
+  }
+}
+
+export function isSandboxAcquisitionSupersededError(error: unknown): boolean {
   return (
     error instanceof Error &&
-    (error.name === 'SandboxAcquisitionLostError' ||
-      error.message === SANDBOX_ACQUISITION_LOST_MESSAGE)
+    (error.name === 'SandboxAcquisitionSupersededError' ||
+      error.message === SANDBOX_ACQUISITION_SUPERSEDED_MESSAGE)
+  );
+}
+
+export function isSandboxAcquisitionLostError(error: unknown): boolean {
+  return (
+    isSandboxAcquisitionSupersededError(error) ||
+    (error instanceof Error &&
+      (error.name === 'SandboxAcquisitionLostError' ||
+        error.message === SANDBOX_ACQUISITION_LOST_MESSAGE))
   );
 }
 

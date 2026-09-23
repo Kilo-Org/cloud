@@ -130,6 +130,7 @@ import { createEventQueries } from '../../src/session/queries/index.js';
 import { throwAdmissionError } from '../../src/session/queue-message.js';
 import {
   isSandboxAcquisitionLostError,
+  isSandboxAcquisitionSupersededError,
   requestFrameSchema,
   responseFrameSchema,
   sandboxEventBatchResultSchema,
@@ -5647,9 +5648,17 @@ describe('SandboxControl acquisition receipts', () => {
       expect(allocations).toEqual(new Set([canonicalProviderRef(replacement)]));
       expect(provider.create).toHaveBeenCalledTimes(2);
       expect(provider.launch).toHaveBeenCalledTimes(2);
-      await expect(Promise.resolve(control.ensureReady(input))).rejects.toThrow(
-        'Sandbox acquisition no longer owns this allocation'
+      const superseded = await Promise.resolve(control.ensureReady(input)).then(
+        () => new Error('Expected a superseded acquisition rejection'),
+        (error: unknown) => error
       );
+      expect(isSandboxAcquisitionSupersededError(superseded)).toBe(true);
+      expect(isSandboxAcquisitionLostError(superseded)).toBe(true);
+      expect(Object.prototype.hasOwnProperty.call(superseded, 'name')).toBe(true);
+      expect(superseded).toMatchObject({
+        name: 'SandboxAcquisitionSupersededError',
+        message: 'Sandbox acquisition was superseded by a bindable live replacement allocation',
+      });
       expect(provider.ensureBillingAdmission).not.toHaveBeenCalled();
       await runInDurableObject(control, async (_instance, state) => {
         expect(await state.storage.get('acquisition_receipts')).toEqual([
@@ -10319,6 +10328,192 @@ describe('SandboxSession control-plane regressions', () => {
         clock.mockRestore();
       }
     } finally {
+      socket.close();
+      replacement?.close();
+    }
+  });
+
+  it('preserves a fenced queued follow-up and creates a replacement allocation after loss', async () => {
+    const { fixture, session } = messageFixture();
+    const { control, socket, provider, allocations } = await initializeTerminalRuntime(fixture);
+    const messageId = 'msg_bbbbbbbbbbbb00000000000002';
+    let replacement: WebSocket | undefined;
+    let diagnostics: Awaited<ReturnType<typeof captureControlDiagnostics>> | undefined;
+    try {
+      await expect(
+        session.createSessionWithInitialAdmission({
+          identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+          auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+          agent: agentA,
+          workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+          message: {
+            initialTurn: { type: 'prompt', messageId, prompt: 'preserve this follow-up' },
+          },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+
+      // First drain writes a real acquisition receipt while the wrapper is not
+      // ready, so the row parks queued with a live preparation attempt.
+      await runInDurableObject(session, instance => instance.alarm());
+      await waitFor(async () => {
+        const state = await admissionState(session);
+        expect(state.messages[0]).toMatchObject({
+          messageId,
+          state: {
+            kind: 'queued',
+            preparationAttemptId: expect.any(String),
+            deadlineAt: expect.any(Number),
+          },
+        });
+      });
+      const firstState = await admissionState(session);
+      const firstMessage = firstState.messages.find(message => message.messageId === messageId);
+      if (
+        firstMessage?.state.kind !== 'queued' ||
+        !firstMessage.state.preparationAttemptId ||
+        firstMessage.state.deadlineAt === null
+      )
+        throw new Error('Missing first acquisition');
+      const firstAttemptId = firstMessage.state.preparationAttemptId;
+      const deadlineAt = firstMessage.state.deadlineAt;
+      const allocated = await control.getAllocationRecord();
+      if (allocated.state.kind !== 'allocated') throw new Error('Expected allocated fixture');
+      const incarnation = allocated.state.health.incarnation;
+      await expect(
+        runInDurableObject(control, (_instance, state) =>
+          state.storage.get<Array<{ id: string; allocation: unknown }>>('acquisition_receipts')
+        )
+      ).resolves.toEqual([
+        expect.objectContaining({ id: firstAttemptId, allocation: expect.anything() }),
+      ]);
+
+      // Bind the session to the live incarnation, then stop the allocation and
+      // fence the loss through the same STOPPED notification production uses.
+      await runInDurableObject(session, (_instance, state) =>
+        state.storage.put('terminal_attached_session', {
+          ownerId: fixture.ownerId,
+          sessionId: fixture.sessionId,
+          kiloSessionId: ROOT_ID,
+          directory: '/workspace/terminal',
+          sandboxId: fixture.sandboxId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+          allocationIncarnation: incarnation,
+        })
+      );
+      await control.beginStop('external_kill');
+      await fireControlDeadline(control, 'stopAttempt');
+      await expect(control.getAllocationRecord()).resolves.toMatchObject({
+        state: { kind: 'stopped' },
+      });
+      await expect(
+        runInDurableObject(session, instance =>
+          instance.notifyStopped({
+            reason: 'external_kill',
+            stopProof: {
+              effect: 'destroy',
+              at: Date.now(),
+              providerRef: cloudflareRef(fixture.sandboxId, incarnation),
+              incarnation,
+              reason: 'external_kill',
+              wrapper: fixture.wrapperInstanceId,
+            },
+          })
+        )
+      ).resolves.toEqual({ outcome: 'delivered' });
+      await waitFor(async () => {
+        const armed = await runInDurableObject(session, (_instance, state) =>
+          state.storage.getAlarm()
+        );
+        expect(armed).not.toBeNull();
+      });
+
+      diagnostics = await captureControlDiagnostics(control);
+      const acquisitionActions: string[] = [];
+      await runInDurableObject(control, instance => {
+        const prototype = Object.getPrototypeOf(instance) as {
+          acquireCanonicalAllocation: (...args: unknown[]) => Promise<{ action: string }>;
+        };
+        const target = instance as unknown as {
+          acquireCanonicalAllocation: (...args: unknown[]) => Promise<{ action: string }>;
+        };
+        const original = target.acquireCanonicalAllocation.bind(instance);
+        vi.spyOn(prototype, 'acquireCanonicalAllocation').mockImplementation(async (...args) => {
+          const result = await original(...args);
+          acquisitionActions.push(result.action);
+          return result;
+        });
+      });
+
+      const beforeClock = Date.now();
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(beforeClock + 5_001);
+      try {
+        // Drain one: the stale receipt rotates the preserved attempt. Rotation
+        // removes `preparationAttemptId` (installing nothing), sets
+        // `retryNotBefore`, and leaves the row queued with no terminal recorded.
+        await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+        const afterLoss = await admissionState(session);
+        expect(afterLoss.messages[0]).toMatchObject({
+          messageId,
+          state: { kind: 'queued', deadlineAt, retryNotBefore: expect.any(Number) },
+        });
+        expect(afterLoss.messages[0]?.state).not.toHaveProperty('preparationAttemptId');
+        // Still queued, not failed: rotation recorded no terminal.
+        await expect(session.getMessageResult(messageId)).resolves.toMatchObject({
+          type: 'found',
+          result: { status: 'queued' },
+        });
+        const retryAt = await runInDurableObject(session, (_instance, state) =>
+          state.storage.getAlarm()
+        );
+        if (retryAt === null) throw new Error('Missing replacement retry alarm');
+        expect(retryAt).toBeLessThanOrEqual(deadlineAt);
+        clock.mockReturnValue(retryAt);
+
+        // Drain two: the real control reaches `action:'create'` and mints a
+        // replacement. A real control plus a fake provider proves control-plane
+        // creation, not a real container replacement, so no container is asserted.
+        await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+        expect(acquisitionActions).toContain('create');
+        expect(provider.create).toHaveBeenCalledTimes(1);
+        expect(
+          diagnostics.emissions
+            .filter(emission => emission.event === 'allocation_transition')
+            .map(emission => emission.fields)
+        ).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ from: 'stopped', to: 'creating', event: 'acquire' }),
+          ])
+        );
+
+        const launch = provider.launch.mock.calls.at(-1);
+        if (!launch) throw new Error('Expected replacement wrapper launch');
+        const replacementWrapperInstanceId = crypto.randomUUID();
+        replacement = await connect(launch[1].SANDBOX_CONTROL_CREDENTIAL, fixture.sandboxId);
+        await completeHello(replacement, 'hello_preserved_queue_replacement', {
+          providerInstanceId: launch[0],
+          wrapperInstanceId: replacementWrapperInstanceId,
+        });
+        const replacementRequests = captureAndAcceptControlRequests(replacement);
+        signalWrapperReady(replacement);
+        await waitForWrapperReady({ ...fixture, wrapperInstanceId: replacementWrapperInstanceId });
+        expect(allocations).toContain(launch[0]);
+
+        const readyRetryAt = await runInDurableObject(session, (_instance, state) =>
+          state.storage.getAlarm()
+        );
+        if (readyRetryAt === null) throw new Error('Missing ready retry alarm');
+        clock.mockReturnValue(readyRetryAt);
+        await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+        await waitForAccepted(session, messageId);
+        expect(replacementRequests.map(request => request.operation)).toEqual([
+          'session.attach',
+          'session.prompt',
+        ]);
+      } finally {
+        clock.mockRestore();
+      }
+    } finally {
+      diagnostics?.restore();
       socket.close();
       replacement?.close();
     }

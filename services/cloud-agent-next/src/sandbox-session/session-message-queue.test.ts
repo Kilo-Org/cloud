@@ -18,6 +18,7 @@ import {
   SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   SandboxAcquisitionLostError,
+  SandboxAcquisitionSupersededError,
   sessionOperationExpiresAt,
   sessionOperationResultHash,
   sessionPromptPayloadSchema,
@@ -4900,6 +4901,182 @@ describe('SandboxSession orchestration', () => {
     await fixture.flush();
     expect(fixture.record('a')).toMatchObject({
       state: { kind: 'failed', reason: 'preparation_timeout', at: deadlineAt },
+    });
+  });
+
+  describe('ATTACH-RECLAIM acquisition supersession recovery', () => {
+    // Real drain: `session.attach` completes against RUNTIME_ID, then the first
+    // prompt is refused pre-send, leaving a queued row with a completed attach
+    // proof and no dispatched prompt. The control plane is mocked here: there is
+    // no real receipt storage, allocation replacement or producer/consumer RPC.
+    // The control-owned classification is proven in the lifecycle suite
+    // (bindable => superseded, dead/non-live => plain).
+    // The identity-less live-record case is source-verified only (`bindable`
+    // requires a non-empty `allocationIdentity`) and is not exercised by a test.
+    // The lifecycle harness storage is a map-backed transaction emulator, not a
+    // real Durable Object transaction. The only real Workers-runtime/RPC evidence
+    // is the integration test in test/integration/sandbox-control.test.ts, which
+    // proves the serialized error name/message survives and does not prove the
+    // full session recovery.
+    async function preparedAttachFixture() {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        allocationIncarnation: 'incarnation_1',
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: RUNTIME_ID,
+        operationResults: true,
+      });
+      // Capture the original before installing the one-shot prompt delegate.
+      const original = fixture.control.request.getMockImplementation();
+      if (!original) throw new Error('Missing control fixture');
+      let promptAttempts = 0;
+      delegateRequest(fixture, 'session.prompt', async input => {
+        promptAttempts += 1;
+        return promptAttempts === 1
+          ? controlFailure(true, 'not_ready', 'not-admitted')
+          : original(input);
+      });
+      await fixture.admit('a');
+      await fixture.flush();
+      const first = fixture.control.ensureReady.mock.calls[0]?.[0].acquisition;
+      const deadlineAt = deadlineAtOf(fixture.record('a'));
+      if (!first || deadlineAt === undefined) throw new Error('Missing first acquisition');
+      expect(deadlineAt).toBe(first.deadlineAt);
+      expect(fixture.record('a')).toMatchObject({
+        state: { kind: 'queued', wrapperInstanceId: RUNTIME_ID },
+        proofs: { attach: { dispatched: true } },
+      });
+      expect(fixture.record('a')?.proofs?.attach?.completedAt).toBeDefined();
+      expect(fixture.record('a')?.proofs?.prompt?.dispatched).not.toBe(true);
+      expect(fixture.alarmAt()).not.toBeNull();
+      return { fixture, first, deadlineAt };
+    }
+
+    it('ATTACH-RECLAIM: a superseded acquisition releases the completed attach and rebinds the replacement', async () => {
+      const { fixture, first, deadlineAt } = await preparedAttachFixture();
+
+      fixture.control.ensureReady.mockRejectedValueOnce(new SandboxAcquisitionSupersededError());
+      fixture.setStatus({
+        allocationIncarnation: 'incarnation_1',
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: NEXT_RUNTIME_ID,
+        operationResults: true,
+      });
+      const recoveryAt = fixture.alarmAt();
+      if (recoveryAt === null) throw new Error('Missing recovery alarm');
+      vi.setSystemTime(recoveryAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')).toMatchObject({
+        state: { kind: 'queued', deadlineAt: deadlineAt },
+      });
+      expect(fixture.record('a')?.state).not.toHaveProperty('preparationAttemptId');
+      expect(fixture.record('a')?.state).not.toHaveProperty('wrapperInstanceId');
+      expect(fixture.record('a')?.proofs?.attach).toBeUndefined();
+      expect(fixture.record('a')?.proofs?.retiredAttach).toBeDefined();
+      expect(fixture.terminalEvents()).toHaveLength(0);
+      expect(fixture.record('a')?.state.kind).not.toBe('failed');
+
+      const retryAt = fixture.alarmAt();
+      if (retryAt === null) throw new Error('Missing post-release retry alarm');
+      vi.setSystemTime(retryAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')).toMatchObject({ state: { kind: 'accepted' } });
+      expect(fixture.terminalEvents()).toHaveLength(0);
+      const postRelease = fixture.control.ensureReady.mock.calls.at(-1)?.[0].acquisition;
+      expect(postRelease?.id).toBeDefined();
+      expect(postRelease?.id).not.toBe(first.id);
+      expect(postRelease?.deadlineAt).toBe(deadlineAt);
+      const postReleaseState = fixture.record('a')?.state;
+      expect(
+        postReleaseState?.kind === 'queued' || postReleaseState?.kind === 'accepted'
+          ? postReleaseState.preparationAttemptId
+          : undefined
+      ).toBe(postRelease?.id);
+      const attachRequests = fixture.control.request.mock.calls
+        .map(([input]) => input)
+        .filter(input => input.operation === 'session.attach');
+      expect(attachRequests).toHaveLength(2);
+      expect(attachRequests[1]?.authorization?.operationId).not.toBe(
+        attachRequests[0]?.authorization?.operationId
+      );
+      expect(attachRequests[1]?.authorization?.wrapperInstanceId).toBe(NEXT_RUNTIME_ID);
+    });
+
+    it('ATTACH-RECLAIM: a plain acquisition loss with a dispatched attach still terminalizes environment_failed', async () => {
+      const { fixture } = await preparedAttachFixture();
+
+      fixture.control.ensureReady.mockRejectedValueOnce(new SandboxAcquisitionLostError());
+      fixture.setStatus({
+        allocationIncarnation: 'incarnation_1',
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: NEXT_RUNTIME_ID,
+        operationResults: true,
+      });
+      const recoveryAt = fixture.alarmAt();
+      if (recoveryAt === null) throw new Error('Missing recovery alarm');
+      vi.setSystemTime(recoveryAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(fixture.record('a')).toMatchObject({
+        state: { kind: 'failed', reason: 'environment_failed' },
+      });
+      expect(fixture.terminalEvents()).toHaveLength(1);
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
+      ).toHaveLength(1);
+    });
+
+    it('ATTACH-RECLAIM: after classification the replacement can vanish and the turn ends preparation_timeout', async () => {
+      const { fixture, deadlineAt } = await preparedAttachFixture();
+
+      fixture.control.ensureReady.mockRejectedValueOnce(new SandboxAcquisitionSupersededError());
+      fixture.setStatus({
+        allocationIncarnation: 'incarnation_1',
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: NEXT_RUNTIME_ID,
+        operationResults: true,
+      });
+      const recoveryAt = fixture.alarmAt();
+      if (recoveryAt === null) throw new Error('Missing recovery alarm');
+      vi.setSystemTime(recoveryAt);
+      await fixture.fireAlarm();
+      await fixture.flush();
+      expect(fixture.record('a')).toMatchObject({
+        state: { kind: 'queued', deadlineAt: deadlineAt },
+      });
+      expect(fixture.record('a')?.state).not.toHaveProperty('preparationAttemptId');
+      expect(fixture.record('a')?.proofs?.attach).toBeUndefined();
+      expect(fixture.record('a')?.proofs?.retiredAttach).toBeDefined();
+      expect(fixture.terminalEvents()).toHaveLength(0);
+
+      // Residual limitation: bindability was established at classification only.
+      // The replacement is unavailable from here, so the pre-existing bounded
+      // path exhausts the original head deadline and stores preparation_timeout.
+      // This is not counted as recovery and adds no new stored reason.
+      fixture.control.ensureReady.mockRejectedValue(new SandboxAcquisitionLostError());
+
+      let guard = 0;
+      while (Date.now() < deadlineAt) {
+        if (++guard > 400) throw new Error('Replacement outage did not reach the head deadline');
+        const retryAt = fixture.alarmAt();
+        if (retryAt === null) throw new Error('Missing queue retry alarm');
+        vi.setSystemTime(Math.min(retryAt, deadlineAt));
+        await fixture.fireAlarm();
+        await fixture.flush();
+      }
+
+      expect(fixture.record('a')).toMatchObject({
+        state: { kind: 'failed', reason: 'preparation_timeout' },
+      });
     });
   });
 

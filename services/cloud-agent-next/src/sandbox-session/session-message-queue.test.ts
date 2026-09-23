@@ -114,6 +114,7 @@ import {
 
 import {
   readSessionValueSync,
+  writeSessionValueSync,
   writeSessionMessages,
   seedSessionValue,
   isSessionMessagesKey,
@@ -1811,7 +1812,7 @@ function updateStoredMessage(
   update: (message: SessionMessage) => SessionMessage
 ): void {
   const stored = readSessionValueSync<{ messages?: SessionMessage[] }>(fixture.storage.kv);
-  fixture.storage.kv.put('session_messages', {
+  writeSessionValueSync(fixture.storage.kv, {
     ...stored,
     messages: (stored?.messages ?? []).map(message =>
       message.messageId === messageId ? update(message) : message

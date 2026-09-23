@@ -7,9 +7,8 @@ import {
 import { getUserFromAuth } from '@/lib/user/server';
 import { findExperimentReservedModelIds } from '@/lib/ai-gateway/experiments/reserved-ids';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import type * as ModelsModule from '@/lib/ai-gateway/kilo-exclusive-models';
-import type * as ProviderDefinitionsModule from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
+import type * as ServingModule from '@/lib/ai-gateway/providers/kilo-exclusive-model-serving';
+import type * as OpenRouterModule from '@/lib/ai-gateway/providers/definitions/openrouter';
 
 jest.mock('@/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
@@ -24,23 +23,13 @@ jest.mock('@/lib/ai-gateway/experiments/reserved-ids', () => ({
   findExperimentReservedModelIds: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/definitions/try-get-provider-by-id', () => {
-  const actual = jest.requireActual<typeof ProviderDefinitionsModule>(
-    '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id'
+jest.mock('@/lib/ai-gateway/providers/kilo-exclusive-model-serving', () => {
+  const actual = jest.requireActual<typeof ServingModule>(
+    '@/lib/ai-gateway/providers/kilo-exclusive-model-serving'
   );
-  return {
-    ...actual,
-    tryGetProviderById: (providerId: ProviderId) =>
-      providerId === 'dev-tools'
-        ? { supportedChatApis: ['chat_completions'] }
-        : actual.tryGetProviderById(providerId),
-  };
-});
-
-// Stub the catalog so tests don't depend on any specific provider file.
-// 'test-exclusive/chat-only' maps to a synthetic gateway that lacks Messages support.
-jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
-  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/kilo-exclusive-models');
+  const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
+    '@/lib/ai-gateway/providers/definitions/openrouter'
+  );
   const stubModel: KiloExclusiveModel = {
     public_id: 'test-exclusive/chat-only',
     display_name: 'Test chat-only model',
@@ -56,8 +45,13 @@ jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
   };
   return {
     ...actual,
-    findKiloExclusiveModel: (id: string) =>
-      id === 'test-exclusive/chat-only' ? stubModel : actual.findKiloExclusiveModel(id),
+    findKiloExclusiveModelServing: (id: string) =>
+      id === 'test-exclusive/chat-only'
+        ? {
+            model: stubModel,
+            provider: { ...OPENROUTER, id: 'dev-tools', supportedChatApis: ['chat_completions'] },
+          }
+        : actual.findKiloExclusiveModelServing(id),
   };
 });
 

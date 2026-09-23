@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { getProvider, getTranscriptionProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { MARTIAN } from '@/lib/ai-gateway/providers/definitions/martian';
+import { kiloExclusiveModelServing } from '@/lib/ai-gateway/providers/kilo-exclusive-model-serving';
 import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
 import { getBYOKforUser, getModelUserByokProviders } from '@/lib/ai-gateway/byok';
@@ -191,6 +193,47 @@ describe('getProvider local fake deterministic routing', () => {
         );
       }
     );
+  });
+});
+
+describe('getProvider exclusive model routing', () => {
+  beforeEach(() => {
+    jest.mocked(shouldRouteToVercel).mockReset().mockResolvedValue(false);
+    jest.mocked(getModelUserByokProviders).mockReset().mockResolvedValue([]);
+  });
+
+  test.each(kiloExclusiveModelServing)(
+    'routes $model.public_id to its bound provider unless disabled',
+    async ({ model, provider }) => {
+      const result = await getProvider(providerInput(model.public_id));
+      expect(result.kind).toBe('provider');
+      if (result.kind !== 'provider') throw new Error('Expected a provider');
+      expect(result.provider).toBe(model.status === 'disabled' ? OPENROUTER : provider);
+      expect(result.userByok).toBeNull();
+      expect(result.bypassAccessCheck).toBe(false);
+    }
+  );
+
+  test.each(kiloExclusiveModelServing.filter(({ provider }) => provider === MARTIAN))(
+    'does not divert $model.public_id to Vercel or BYOK',
+    async ({ model }) => {
+      jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+      jest.mocked(getModelUserByokProviders).mockResolvedValue(['anthropic']);
+
+      const result = await getProvider(providerInput(model.public_id));
+
+      expect(result.kind === 'provider' && result.provider).toBe(MARTIAN);
+      expect(shouldRouteToVercel).not.toHaveBeenCalled();
+      expect(getModelUserByokProviders).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each(
+    kiloExclusiveModelServing.filter(({ model }) => model.flags.includes('vercel-routing'))
+  )('preserves Vercel routing eligibility for $model.public_id', async ({ model }) => {
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+    const result = await getProvider(providerInput(model.public_id));
+    expect(result.kind === 'provider' && result.provider).toBe(VERCEL_AI_GATEWAY);
   });
 });
 

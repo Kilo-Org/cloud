@@ -7531,7 +7531,11 @@ describe('SandboxSession orchestration', () => {
 
   it.each([
     { name: 'unknown physical', physical: 'unknown' as const, connection: 'disconnected' as const },
-    { name: 'stopping physical', physical: 'stopping' as const, connection: 'disconnected' as const },
+    {
+      name: 'stopping physical',
+      physical: 'stopping' as const,
+      connection: 'disconnected' as const,
+    },
     {
       name: 'wrapper mismatch',
       physical: 'running' as const,
@@ -8010,7 +8014,8 @@ describe('SandboxSession orchestration', () => {
       await fixture.flush();
       delegateRequest(fixture, 'session.prompt', async input => {
         const parsed = sessionPromptPayloadSchema.parse(input.payload);
-        if (parsed.messageId === 'a') return controlResponse({ messageId: 'a', status: 'accepted' });
+        if (parsed.messageId === 'a')
+          return controlResponse({ messageId: 'a', status: 'accepted' });
         return controlFailure(true, 'session_busy');
       });
       await fixture.admit('b');

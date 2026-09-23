@@ -400,7 +400,9 @@ export class SessionOperation {
     };
   }
 
-  deliveryResult(authorization?: SessionOperationAuthorization): SessionOperationDelivery | undefined {
+  deliveryResult(
+    authorization?: SessionOperationAuthorization
+  ): SessionOperationDelivery | undefined {
     if (authorization) return this.deliveries.get(authorizationKey(authorization))?.result();
     return this.primaryDelivery()?.result();
   }
@@ -440,10 +442,7 @@ export class SessionOperation {
     if (authorization) {
       for (const entry of this.admitted.values()) {
         if (entry.authorization && sameSessionOperation(entry.authorization, authorization))
-          return isDeepStrictEqual(
-            operationIntent('session.prompt', entry.request),
-            intent
-          );
+          return isDeepStrictEqual(operationIntent('session.prompt', entry.request), intent);
       }
     }
     return isDeepStrictEqual(this.intent, intent);
@@ -473,8 +472,7 @@ export class SessionOperation {
     if (this.signal.aborted) return fail('Operation is aborted', true);
     if (this.messageId === request.messageId || this.admitted.has(request.messageId))
       return { ok: true, result: { messageId: request.messageId, status: 'existing' } };
-    if (this.target?.client !== runtime.kiloClient)
-      return fail('Kilo runtime changed', true);
+    if (this.target?.client !== runtime.kiloClient) return fail('Kilo runtime changed', true);
     this.admitted.set(request.messageId, { request, runtime, authorization });
     this.batchRevision += 1;
     this.rootIdle = false;

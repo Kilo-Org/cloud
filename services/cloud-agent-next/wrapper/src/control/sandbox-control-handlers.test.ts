@@ -4199,7 +4199,13 @@ describe('control finalization and compact', () => {
       wrapperInstanceId: crypto.randomUUID(),
       dispatchDeadlineAt: Date.now() + 60_000,
     };
-    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps, authorization);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      authorization
+    );
     const record = handlerDeps.operations.active(session.kiloSessionId);
     if (!record) throw new Error('Missing operation');
     const followUp = { ...authorization, operationId: 'next', messageId: 'next' };
@@ -4245,7 +4251,13 @@ describe('control finalization and compact', () => {
       wrapperInstanceId: crypto.randomUUID(),
       dispatchDeadlineAt: Date.now() + 60_000,
     };
-    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps, authorization);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      authorization
+    );
     const record = handlerDeps.operations.active(session.kiloSessionId);
     if (!record) throw new Error('Missing operation');
     await handleControlRequest(
@@ -4296,7 +4308,13 @@ describe('control finalization and compact', () => {
       wrapperInstanceId: crypto.randomUUID(),
       dispatchDeadlineAt: Date.now() + 60_000,
     };
-    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps, authorization);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      authorization
+    );
     const record = handlerDeps.operations.active(session.kiloSessionId);
     if (!record) throw new Error('Missing operation');
     await handleControlRequest(
@@ -4309,8 +4327,7 @@ describe('control finalization and compact', () => {
 
     original.resolve(completion({ name: 'UnknownError', data: { message: 'failed' } }));
     await record.done;
-    for (let attempt = 0; attempt < 50 && retired.length === 0; attempt += 1)
-      await Bun.sleep(10);
+    for (let attempt = 0; attempt < 50 && retired.length === 0; attempt += 1) await Bun.sleep(10);
 
     // Unconfirmed cleanup must not release the operation as if Kilo stopped.
     expect(retired).not.toEqual([]);

@@ -1207,9 +1207,7 @@ async function handleAbort(
       // An execution batch must show positive cleanup evidence; for a cancelled
       // preparation there is no owned work to confirm, so keep the prior rule.
       if (
-        task.kind === 'preparation'
-          ? task.cleanup === 'unconfirmed'
-          : task.cleanup !== 'confirmed'
+        task.kind === 'preparation' ? task.cleanup === 'unconfirmed' : task.cleanup !== 'confirmed'
       )
         return fail('not_ready', 'Kilo cancellation was not confirmed', false);
       if (ownsCurrentTask) {

@@ -29,7 +29,10 @@ import {
 } from '../../src/session/session-message-state.js';
 import type { SessionMetadata } from '../../src/persistence/session-metadata.js';
 
-import { readSessionValueSync, writeSessionMessages } from '../../src/sandbox-state/persist/access.js';
+import {
+  readSessionValueSync,
+  writeSessionMessages,
+} from '../../src/sandbox-state/persist/access.js';
 import { readRawSessionMessages } from '../../src/sandbox-state/persist/load.js';
 import type { Binding } from '../../src/sandbox-state/model/session.js';
 const access = vi.hoisted(() => new Map<string, string>());
@@ -129,7 +132,10 @@ function seed(
  * so capacity and cancellation assertions compare only their own side effects.
  */
 function stable(value: Awaited<ReturnType<typeof snapshot>>) {
-  return { ...value, events: value.events.filter(event => event.stream_event_type !== 'preparing') };
+  return {
+    ...value,
+    events: value.events.filter(event => event.stream_event_type !== 'preparing'),
+  };
 }
 
 async function fixture() {
@@ -357,11 +363,7 @@ describe('public control queue capacity and cancellation', () => {
       const persist = instance['persistMessageLifecycleEvent'].bind(instance);
       let injected = false;
       instance['persistMessageLifecycleEvent'] = vi.fn(message => {
-        if (
-          !injected &&
-          message.state.kind !== 'queued' &&
-          message.state.kind !== 'accepted'
-        ) {
+        if (!injected && message.state.kind !== 'queued' && message.state.kind !== 'accepted') {
           injected = true;
           persist(message);
           throw new Error('Injected cancellation persistence failure');

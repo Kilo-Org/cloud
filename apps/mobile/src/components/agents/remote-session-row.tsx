@@ -11,7 +11,6 @@ import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { useOrganization } from '@/lib/organization-context';
 import { Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
@@ -19,6 +18,7 @@ import { refreshActiveSessionsNow } from '@/lib/active-sessions-live-sync';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import {
   isAttentionAcked,
   reconcileSessionAttention,
@@ -66,7 +66,7 @@ export function RemoteSessionRow({
 }: Readonly<RemoteSessionRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const { renameSession } = useSessionMutations();
   const queryClient = useQueryClient();
@@ -201,7 +201,7 @@ export function RemoteSessionRow({
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     showSessionActionMenu({
       showActionSheetWithOptions,
-      bottomInset: bottom,
+      themedSheet,
       onCopySessionId: () => {
         void copySessionId(session.id);
       },

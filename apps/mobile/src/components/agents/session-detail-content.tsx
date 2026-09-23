@@ -171,6 +171,7 @@ import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
@@ -392,11 +393,12 @@ export function SessionDetailContent({
     setFollowTailNonce(count => count + 1);
   }, []);
 
-  const { bottom } = useSafeAreaInsets();
   // The strip below the keyboard container reserves the device safe area so the
   // composer's tail clears the navigation bar / home indicator. The container
   // above does not add it again (`containerReservesBottomInset`), so the space
   // is resolved once per screen instead of twice.
+  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
 
   // Durable composer draft. The composer renders immediately — typing must
@@ -1786,11 +1788,11 @@ export function SessionDetailContent({
     const removeIndex = actions.indexOf('remove');
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         title: t('agentChat.goal.title'),
         options,
         cancelButtonIndex: options.length - 1,
         destructiveButtonIndex: removeIndex === -1 ? undefined : removeIndex,
-        containerStyle: { paddingBottom: bottom },
       },
       index => {
         const action = index === undefined ? undefined : actions[index];
@@ -1821,7 +1823,7 @@ export function SessionDetailContent({
         void runGoalAction(action);
       }
     );
-  }, [sessionGoal, t, showActionSheetWithOptions, bottom, runGoalAction]);
+  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction]);
 
   const handleGoalEditSave = useCallback(
     async (objective: string) => {

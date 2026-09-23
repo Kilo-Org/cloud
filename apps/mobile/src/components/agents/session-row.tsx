@@ -2,7 +2,6 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
@@ -11,6 +10,7 @@ import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import {
   isAttentionAcked,
   reconcileSessionAttention,
@@ -104,7 +104,7 @@ export function StoredSessionRow({
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
   // The rename field seeds the name a person wrote, never the backend default
@@ -134,7 +134,7 @@ export function StoredSessionRow({
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     showSessionActionMenu({
       showActionSheetWithOptions,
-      bottomInset: bottom,
+      themedSheet,
       onCopySessionId: () => {
         void copySessionId(session.session_id);
       },

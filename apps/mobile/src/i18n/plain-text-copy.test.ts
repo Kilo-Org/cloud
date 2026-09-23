@@ -12,8 +12,7 @@ import en from './locales/en.json';
 const RUN_COPY = [
   {
     key: 'agentChat.newSession.remoteHint',
-    value:
-      'Run kilo remote on your computer, or /remote in a running CLI session, to control a local kilo process.',
+    value: 'Run kilo remote in a project on your computer to start sessions there.',
   },
   {
     key: 'agentChat.instancePicker.noCliInstancesDescription',

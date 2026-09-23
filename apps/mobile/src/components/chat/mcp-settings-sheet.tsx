@@ -1,51 +1,98 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { View } from 'react-native';
+import { Alert, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
 import { SheetHeader } from '@/components/sheet-header';
 import { Button } from '@/components/ui/button';
-import { Wrench } from '@/components/ui/icons';
+import { SlidersHorizontal, Wrench } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { Text } from '@/components/ui/text';
 import { kiloMcpState, mcpEnabledFor, watchKiloMcp } from '@/lib/chat/kilo-mcp';
-import { retryKiloMcp, setMcpEnabled as setChatMcpEnabled } from '@/lib/chat/registry';
+import {
+  refreshChatTools,
+  retryKiloMcp,
+  setMcpEnabled as setChatMcpEnabled,
+} from '@/lib/chat/registry';
+import { type RemoteMcpServerDraft, type StoredRemoteMcpServer } from '@/lib/chat/remote-mcp-store';
+import { type ChatPlace } from '@/lib/chat/scope';
+import {
+  isSettingsToolsEnabled,
+  setSettingsToolsEnabled,
+  subscribeSettingsToolsEnabled,
+} from '@/lib/chat/settings-tools-switch';
+import { useRemoteMcpServers } from '@/lib/chat/use-remote-mcp-servers';
 
-import { mcpSettingsView, type McpSettingsView } from './mcp-settings-state';
+import {
+  kiloServerRow,
+  mcpSettingsView,
+  type McpSettingsView,
+  type RemoteMcpServerRow,
+  remoteServerRows,
+  settingsToolsView,
+  type SettingsToolsView,
+} from './mcp-settings-state';
+import { McpServersSection } from './mcp-servers-section';
+import { RemoteMcpServerForm } from './remote-mcp-server-form';
 
 /**
- * The per-chat Kilo MCP control.
+ * The chat-tools sheet.
  *
- * One sheet: the setting, what the connection is doing, and — when a Retry can
- * change the answer — the Retry. The state the sheet draws comes from the pure
- * mapping, so the same view drives the dot on the header control.
+ * One sheet, one scroll: the switch for the app-settings tools, the Kilo MCP
+ * control, and the remote MCP servers the person added. The state the sheet
+ * draws comes from the pure mappings in `mcp-settings-state.ts`, so the same
+ * views drive the dot on the header control and every row here.
  *
- * The setting is written first and the chat is moved onto the tool set it names,
- * which is what the registry does; the sheet only says which switch the person
- * moved.
+ * The hook returns the whole sheet model. It subscribes to the stores rather
+ * than copying them, so a switch an agent flips — or a server another screen
+ * adds — redraws this sheet without it being reopened.
  */
 
 /** The Kilo MCP control as a screen reads it. */
 export type McpSettings = {
+  /** The Kilo row's view, and the tone the header dot draws. */
   readonly view: McpSettingsView;
   readonly setEnabled: (next: boolean) => void;
   readonly retry: () => void;
   /** A Retry is in flight, so the button shows it is working. */
   readonly retrying: boolean;
+  /** The one group switch for the settings-changing tools. */
+  readonly settingsTools: SettingsToolsView;
+  readonly settingsToolsEnabled: boolean;
+  readonly setSettingsToolsEnabled: (next: boolean) => void;
+  /** One row per stored remote server, in the stored order. */
+  readonly servers: readonly RemoteMcpServerRow[];
+  /** The stored servers behind those rows, so an edit can prefill the form. */
+  readonly storedServers: readonly StoredRemoteMcpServer[];
+  readonly setServerEnabled: (id: string, next: boolean) => void;
+  /** Adds a server, discovers it, and answers whether the write landed. */
+  readonly addServer: (draft: RemoteMcpServerDraft) => Promise<boolean>;
+  /** Replaces one server, discovers it, and answers whether the write landed. */
+  readonly updateServer: (id: string, draft: RemoteMcpServerDraft) => Promise<boolean>;
+  /** Removes one server and answers whether the write landed. */
+  readonly deleteServer: (id: string) => Promise<boolean>;
+  /** A server write is in flight, so the form's Save shows it is working. */
+  readonly saving: boolean;
 };
 
 /**
- * Subscribes to the connection and reads the chat's setting.
+ * Subscribes to the connection and the stores, and reads the chat's setting.
  *
  * The connection is the module's snapshot, so a discovery that lands while the
  * screen is open redraws the dot and the sheet. The setting is read once per
  * session and followed across a model switch, because the registry carries it
- * to the new session id.
+ * to the new session id. The server list and what each server answered are
+ * read the same way, so an agent's write is on screen without a reopen.
  */
-export function useMcpSettings(sessionId: string): McpSettings {
+export function useMcpSettings(place: ChatPlace | null, sessionId: string): McpSettings {
   const { t } = useTranslation();
   const state = useSyncExternalStore(watchKiloMcp, kiloMcpState);
+  const settingsToolsEnabled = useSyncExternalStore(
+    subscribeSettingsToolsEnabled,
+    isSettingsToolsEnabled
+  );
+  const remote = useRemoteMcpServers(place);
   const [enabled, setEnabledState] = useState(true);
   const [retrying, setRetrying] = useState(false);
 
@@ -105,59 +152,228 @@ export function useMcpSettings(sessionId: string): McpSettings {
     })();
   }, [sessionId, t]);
 
-  return { view: mcpSettingsView(state, enabled), setEnabled, retry, retrying };
+  /**
+   * Moves the group switch and the tool list together.
+   *
+   * The store is the one source of truth, so it is written first; the registry
+   * is then told, and every open chat moves onto the names the switch now
+   * names at its next use. Without the second call an open chat would keep the
+   * settings tools the switch just took away.
+   */
+  const setGroupEnabled = useCallback((next: boolean) => {
+    setSettingsToolsEnabled(next);
+    void refreshChatTools();
+  }, []);
+
+  return {
+    view: mcpSettingsView(state, enabled),
+    setEnabled,
+    retry,
+    retrying,
+    settingsTools: settingsToolsView(settingsToolsEnabled),
+    settingsToolsEnabled,
+    setSettingsToolsEnabled: setGroupEnabled,
+    servers: remoteServerRows(remote.servers, remote.discovered),
+    storedServers: remote.servers,
+    setServerEnabled: remote.setEnabled,
+    addServer: remote.addServer,
+    updateServer: remote.updateServer,
+    deleteServer: remote.deleteServer,
+    saving: remote.saving,
+  };
 }
 
 type McpSettingsSheetProps = {
   visible: boolean;
   onClose: () => void;
-  view: McpSettingsView;
-  onValueChange: (next: boolean) => void;
-  onRetry: () => void;
-  retrying: boolean;
+  settings: McpSettings;
 };
 
-export function McpSettingsSheet({
-  visible,
-  onClose,
-  view,
-  onValueChange,
-  onRetry,
-  retrying,
-}: Readonly<McpSettingsSheetProps>) {
+/** Which form the nested sheet is showing, or none. */
+type FormTarget =
+  | { readonly kind: 'add' }
+  | { readonly kind: 'edit'; readonly server: StoredRemoteMcpServer };
+
+export function McpSettingsSheet({ visible, onClose, settings }: Readonly<McpSettingsSheetProps>) {
   const { t } = useTranslation();
+  const [form, setForm] = useState<FormTarget | null>(null);
+  const { view, settingsTools } = settings;
+  const kilo = kiloServerRow(view);
+
+  // Closing the sheet closes whatever it had open, so reopening it starts on
+  // the list rather than on a form the person had already left.
+  useEffect(() => {
+    if (!visible) {
+      setForm(null);
+    }
+  }, [visible]);
+
+  const closeForm = useCallback(() => {
+    setForm(null);
+  }, []);
+
+  const openAdd = useCallback(() => {
+    setForm({ kind: 'add' });
+  }, []);
+
+  const openEdit = useCallback(
+    (id: string) => {
+      const server = settings.storedServers.find(one => one.id === id);
+      if (server !== undefined) {
+        setForm({ kind: 'edit', server });
+      }
+    },
+    [settings.storedServers]
+  );
+
+  const confirmDelete = useCallback(
+    (id: string) => {
+      /* The server's tools leave every chat, so the delete is asked for and
+         never taken on the tap alone. */
+      Alert.alert(t('modelChat.mcp.deleteTitle'), t('modelChat.mcp.deleteMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: () => {
+            void settings.deleteServer(id);
+          },
+        },
+      ]);
+    },
+    [settings, t]
+  );
+
+  const submitForm = useCallback(
+    (draft: RemoteMcpServerDraft) => {
+      void (async () => {
+        const saved =
+          form?.kind === 'edit'
+            ? await settings.updateServer(form.server.id, draft)
+            : await settings.addServer(draft);
+        if (saved) {
+          setForm(null);
+        }
+      })();
+    },
+    [form, settings]
+  );
+
   return (
     <SessionPageSheet visible={visible} onClose={onClose}>
-      <SheetHeader title={t('modelChat.mcp.title')} onDone={onClose} topInset="ios-page-sheet" />
-      <View className="gap-4 px-6 pb-6 pt-4">
-        <PreferenceRow
-          icon={Wrench}
-          title={t('modelChat.mcp.use')}
-          subtitle={t('modelChat.mcp.useDescription')}
-          value={view.enabled}
-          disabled={false}
-          busy={view.busy}
-          onValueChange={onValueChange}
-        />
-        {/* The status keeps one line's height in every state, so a discovery
-            that moves connecting -> ready -> failed never moves the row above
-            it or the Retry below. */}
-        <View className="min-h-6 justify-center px-1">
-          <Text className="text-sm font-medium text-foreground">
-            {t(view.statusKey, { count: view.toolCount })}
-          </Text>
+      <SheetHeader
+        title={t('modelChat.mcp.sheetTitle')}
+        onDone={onClose}
+        topInset="ios-page-sheet"
+      />
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="gap-4 px-6 pb-6 pt-4"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 1. The one switch for the settings-changing tools. */}
+        <View className="gap-2">
+          <PreferenceRow
+            icon={SlidersHorizontal}
+            title={t(settingsTools.titleKey)}
+            subtitle={t(settingsTools.subtitleKey)}
+            value={settings.settingsToolsEnabled}
+            disabled={false}
+            onValueChange={next => {
+              settings.setSettingsToolsEnabled(next);
+            }}
+          />
+          {/* One line's height in every state, so on -> off never moves what
+              follows it. */}
+          <View className="min-h-6 justify-center px-1">
+            <Text variant="muted" className="text-xs">
+              {t(settingsTools.statusKey)}
+            </Text>
+          </View>
         </View>
-        {view.descriptionKey === null ? null : (
+
+        {/* 2. The Kilo row: enable, disable and a Retry, and nothing else. The
+            Kilo server is the build's own, so it is never edited or deleted. */}
+        <View className="gap-2">
+          <PreferenceRow
+            icon={Wrench}
+            title={t('modelChat.mcp.use')}
+            subtitle={t('modelChat.mcp.useDescription')}
+            value={kilo.enabled}
+            disabled={false}
+            busy={kilo.busy}
+            onValueChange={next => {
+              settings.setEnabled(next);
+            }}
+          />
+          <View className="min-h-6 justify-center px-1">
+            <Text className="text-sm font-medium text-foreground">
+              {t(kilo.statusKey, { count: kilo.toolCount })}
+            </Text>
+          </View>
+          {kilo.descriptionKey === null ? null : (
+            <Text variant="muted" className="px-1 text-xs">
+              {t(kilo.descriptionKey)}
+            </Text>
+          )}
           <Text variant="muted" className="px-1 text-xs">
-            {t(view.descriptionKey)}
+            {t('modelChat.mcp.kiloBuiltIn')}
           </Text>
-        )}
-        {view.retry ? (
-          <Button variant="secondary" onPress={onRetry} loading={retrying}>
-            <Text>{t('common.retry')}</Text>
-          </Button>
-        ) : null}
-      </View>
+          {kilo.retry ? (
+            <Button
+              variant="secondary"
+              onPress={() => {
+                settings.retry();
+              }}
+              loading={settings.retrying}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          ) : null}
+        </View>
+
+        {/* 3. The remote servers the person added. */}
+        <McpServersSection
+          servers={settings.servers}
+          onToggle={(id, next) => {
+            settings.setServerEnabled(id, next);
+          }}
+          onEdit={openEdit}
+          onDelete={confirmDelete}
+          onAdd={openAdd}
+        />
+      </ScrollView>
+      {form === null ? null : (
+        <SessionPageSheet visible onClose={closeForm}>
+          <SheetHeader
+            title={t(
+              form.kind === 'edit'
+                ? 'modelChat.mcp.editServerTitle'
+                : 'modelChat.mcp.addServerTitle'
+            )}
+            // The form's own Save is the only commit; the header closes the
+            // sheet without writing, so it is a Close and not a second Done.
+            doneLabel={t('common.close')}
+            onDone={closeForm}
+            topInset="ios-page-sheet"
+          />
+          {/* The form's fields live in a scroll view with the keyboard insets
+              adjusted, so a focused field is never under the keyboard and the
+              Save stays reachable on a small screen. */}
+          <ScrollView
+            className="flex-1"
+            contentContainerClassName="px-6 pb-6 pt-4"
+            automaticallyAdjustKeyboardInsets
+            keyboardShouldPersistTaps="handled"
+          >
+            <RemoteMcpServerForm
+              server={form.kind === 'edit' ? form.server : undefined}
+              onSave={submitForm}
+              saving={settings.saving}
+            />
+          </ScrollView>
+        </SessionPageSheet>
+      )}
     </SessionPageSheet>
   );
 }

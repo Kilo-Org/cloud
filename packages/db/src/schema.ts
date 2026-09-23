@@ -2671,6 +2671,18 @@ export const microdollar_usage = pgTable(
   },
   table => [
     index('idx_created_at').on(table.created_at),
+    // Covering index for the spend-alert hourly rollup: it scans
+    // `created_at >= $from AND created_at <= $now` and reads exactly
+    // `kilo_user_id`, `organization_id` and `cost`, so leading with
+    // `created_at` and carrying those three payload columns lets Postgres
+    // satisfy the scan index-only. Drizzle 0.45's PgIndexBuilder cannot
+    // declare `INCLUDE`, and this composite is size-equivalent to one (both
+    // store the payload columns per entry). Built CONCURRENTLY because
+    // `microdollar_usage` is ~1.6B rows; `idx_created_at` stays in place so
+    // the table is never left without a `created_at` index during the build.
+    index('idx_microdollar_usage_created_at_rollup')
+      .on(table.created_at, table.kilo_user_id, table.organization_id, table.cost)
+      .concurrently(),
     index('idx_abuse_classification').on(table.abuse_classification),
     index('idx_kilo_user_id_created_at2').on(table.kilo_user_id, table.created_at),
     index('idx_microdollar_usage_organization_id')

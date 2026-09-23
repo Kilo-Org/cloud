@@ -1807,6 +1807,13 @@
       "when": 1790098375222,
       "tag": "0256_user_activity_tokens_live_ios_activity_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 258,
+      "version": "7",
+      "when": 1790173354576,
+      "tag": "0258_spend_alerts_rollup_covering_index",
+      "breakpoints": true
     }
   ]
 }

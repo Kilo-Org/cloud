@@ -5,12 +5,17 @@
  * `installErrorReporting`) and the real `beforeSend` (`scrubEvent`), then groups
  * the captured events the way Sentry would — by fingerprint. One pair differs
  * only by the ephemeral port, one only by the build worktree path, one only by
- * host and port, and one differs in the HTTP outcome (401 against 412).
+ * host and port, one differs in the HTTP outcome (401 against 412), and one
+ * pair is a 207 batch that differs only in the inner failure status.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
-import { reportNetworkError } from '@/lib/telemetry/network-errors';
+import {
+  createNetworkErrorFetch,
+  readTrpcResponseError,
+  reportNetworkError,
+} from '@/lib/telemetry/network-errors';
 import { NETWORK_BODY_CONTEXT, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { installErrorReporting } from './install-error-reporting';
 
@@ -147,6 +152,39 @@ describe('fingerprint policy', () => {
     const [first, second] = groupKeys();
     expect(first).toBe('network-error | trpc | activeSessions.createWebTicket | http.401');
     expect(second).toBe('network-error | trpc | activeSessions.createWebTicket | http.412');
+    expect(second).not.toBe(first);
+  });
+
+  it('separates two 207 batches that differ only in the inner failure status', async () => {
+    const report = async (httpStatus: number) => {
+      const body = [
+        { result: { data: 'ok' } },
+        {
+          error: {
+            message: 'failed',
+            code: -32_000,
+            data: { code: 'FORBIDDEN', httpStatus, path: 'session.list' },
+          },
+        },
+      ];
+      const response = Response.json(body, { status: 207, statusText: 'Multi-Status' });
+      const fetchMock = vi.fn();
+      fetchMock.mockResolvedValue(response);
+      const wrapped = createNetworkErrorFetch(fetchMock as unknown as typeof fetch, {
+        source: 'trpc',
+        isResponseError: status => status >= 400 || status === 207,
+        readResponseError: readTrpcResponseError,
+      });
+
+      await wrapped('http://127.0.0.1:10416/api/trpc/session.list?batch=1');
+    };
+
+    await report(403);
+    await report(500);
+
+    const [first, second] = groupKeys();
+    expect(first).toBe('network-error | trpc | session.list | http.403');
+    expect(second).toBe('network-error | trpc | session.list | http.500');
     expect(second).not.toBe(first);
   });
 

@@ -264,6 +264,25 @@ function networkOutcome(context: NetworkErrorContext): NetworkOutcome {
   return 'failed';
 }
 
+// tRPC answers a batched call with the multi-status envelope `207`, which only
+// says the body is a batch. It is not the failing procedure's status, so it
+// must not replace the parsed inner status or code.
+const BATCH_ENVELOPE_STATUS = 207;
+
+/**
+ * The status that names the defect: the transport status, except that the tRPC
+ * batch envelope `207` yields to the parsed inner status. `undefined` when
+ * neither is known, so the caller falls through to the tRPC code and the
+ * transport outcome.
+ */
+function effectiveHttpStatus(
+  context: NetworkErrorContext,
+  trpc: TrpcErrorContext
+): number | undefined {
+  const transportStatus = context.status === BATCH_ENVELOPE_STATUS ? undefined : context.status;
+  return transportStatus ?? trpc.httpStatus;
+}
+
 /**
  * The fingerprint's outcome key: the specific HTTP status when there is one,
  * otherwise the tRPC code, otherwise the coarse transport outcome. The old
@@ -271,7 +290,7 @@ function networkOutcome(context: NetworkErrorContext): NetworkOutcome {
  * issue, merging two different root causes.
  */
 function fingerprintOutcome(context: NetworkErrorContext, trpc: TrpcErrorContext): string {
-  const httpStatus = context.status ?? trpc.httpStatus;
+  const httpStatus = effectiveHttpStatus(context, trpc);
   if (httpStatus !== undefined) {
     return `http.${httpStatus}`;
   }
@@ -297,7 +316,7 @@ function buildSyntheticError(
   trpc: TrpcErrorContext
 ): Error {
   const method = context.method ?? 'GET';
-  const status = context.status ?? trpc.httpStatus;
+  const status = effectiveHttpStatus(context, trpc);
   const detail = status === undefined ? trpc.code : String(status);
   const error = new Error(
     detail === undefined ? `${method} ${path} failed` : `${method} ${path} -> ${detail}`

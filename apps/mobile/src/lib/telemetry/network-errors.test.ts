@@ -454,12 +454,59 @@ describe('createNetworkErrorFetch', () => {
     // title the issue from an SDK frame): a real Error carries the stable
     // message and the body rides in the payload context `scrubEvent` redacts.
     expect(event?.error).toBeInstanceOf(Error);
-    expect(errorMessageOf(event)).toBe('GET /api/trpc/session.list -> 207');
+    expect(errorMessageOf(event)).toBe('GET /api/trpc/session.list -> 403');
     expect(event?.contexts?.[NETWORK_BODY_CONTEXT]).toEqual({ data: batchError });
     // Keyed away from the synthesized exception name: that context is owned by
     // `extraErrorDataIntegration`, which would overwrite it with `{}`.
     expect(event?.contexts?.NetworkError).toBeUndefined();
-    expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http.207']);
+    // The inner status names the defect; the 207 envelope only says the body
+    // is a batch, so keying on it would merge a 403 and a 500 of one procedure.
+    expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http.403']);
+  });
+
+  it('(i2) keys a 207 batch on the parsed inner status, not the envelope', async () => {
+    const report = async (httpStatus: number | undefined, code: string) => {
+      const body = [
+        { result: { data: 'ok' } },
+        {
+          error: {
+            message: 'failed',
+            code: -32_000,
+            data: {
+              code,
+              ...(httpStatus === undefined ? {} : { httpStatus }),
+              path: 'session.list',
+            },
+          },
+        },
+      ];
+      const response = Response.json(body, { status: 207, statusText: 'Multi-Status' });
+      const wrapped = createNetworkErrorFetch(resolvingFetch(response), {
+        source: 'trpc',
+        isResponseError: status => status >= 400 || status === 207,
+        readResponseError: readTrpcResponseError,
+      });
+
+      await wrapped('https://example.com/api/trpc/session.list?batch=1');
+      return reportedEvent();
+    };
+
+    const forbidden = await report(403, 'FORBIDDEN');
+    const serverError = await report(500, 'INTERNAL_SERVER_ERROR');
+    // With no inner status the tRPC code keys the group, never the envelope.
+    const noInnerStatus = await report(undefined, 'TOO_MANY_REQUESTS');
+
+    expect(forbidden?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http.403']);
+    expect(serverError?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http.500']);
+    expect(noInnerStatus?.fingerprint).toEqual([
+      'network-error',
+      'trpc',
+      'session.list',
+      'TOO_MANY_REQUESTS',
+    ]);
+    expect(serverError?.fingerprint).not.toEqual(forbidden?.fingerprint);
+    expect(errorMessageOf(forbidden)).toBe('GET /api/trpc/session.list -> 403');
+    expect(errorMessageOf(serverError)).toBe('GET /api/trpc/session.list -> 500');
   });
 
   it('(j) ignores a 207 when no options opt it in', async () => {

@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { AlertCircle, ExternalLink } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -33,6 +33,7 @@ import {
   panelControlsVisible,
   pushChannelNote,
   pushControlDisabled,
+  scopeLine,
   toDraft,
   toSaveInput,
   type SpendAlertFieldErrors,
@@ -60,9 +61,10 @@ import {
  * The bands are element queries rather than media queries because the card
  * width, not the viewport, is what wraps the form: the personal spend view has
  * no organization sidebar, so the same viewport width gives a wide card there
- * and a narrow one on the organization view. Both the skeleton (717px of
- * blocks) and the form render into this same slot, so the two phases are the
- * same height and nothing below moves.
+ * and a narrow one on the organization view. The loading skeleton (717px of
+ * blocks at its tallest), the ready form, and the load-error and forbidden
+ * states all render into this same slot, so every phase is the floor's height
+ * and nothing below moves as the settings arrive, fail or are refused.
  */
 const PANEL_SLOT_CLASS = SPEND_ALERTS_PANEL_SLOT_CLASS;
 
@@ -192,6 +194,13 @@ export function SpendAlertsPanel({ organizationId, callerRole }: SpendAlertsPane
   // be persisted. The empty state reads back the unsaveable defaults, so its
   // only action is the master switch.
   const controlsVisible = panelControlsVisible(currentDraft, view.hasSettings);
+  // The panel renders for both the caller's own account and an organization;
+  // the owner line under the title is what tells the reader which one an alert
+  // watches.
+  const ownerLabel = scopeLine({
+    scope: query.data?.scope,
+    scopeName: query.data?.scopeName,
+  });
 
   const updateDraft = (next: SpendAlertsDraft) => {
     // An edit invalidates a save failure the caller has not retried yet.
@@ -228,6 +237,14 @@ export function SpendAlertsPanel({ organizationId, callerRole }: SpendAlertsPane
       <Card className={cn(PANEL_SLOT_CLASS)}>
         <CardHeader>
           <CardTitle>Spend alerts</CardTitle>
+          {/* One line, ellipsised: a long account or organization name must not
+              wrap and change the panel's reserved height. The full name stays
+              available as the element's title. */}
+          {ownerLabel && (
+            <CardDescription className="truncate" title={ownerLabel}>
+              {ownerLabel}
+            </CardDescription>
+          )}
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
@@ -338,8 +355,8 @@ function RuleEditor({
           </Label>
           <p className="type-body text-muted-foreground">
             {isThreshold
-              ? 'Rolling spend crosses your limit'
-              : "An hour is far above this scope's usual rate"}
+              ? "This scope's rolling spend over the chosen window crosses your limit"
+              : "This scope's hourly rate is far above its own p95 baseline"}
           </p>
         </div>
         <Switch

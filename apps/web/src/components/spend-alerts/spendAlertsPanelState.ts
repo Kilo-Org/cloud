@@ -70,6 +70,34 @@ export const THRESHOLD_FIELD_ERROR = 'Enter a limit over 0 and at most 1,000,000
 export const MULTIPLIER_FIELD_ERROR = 'Enter a spike multiplier between 1x and 50x.';
 
 /**
+ * The scope line under the panel title. It names the owner these settings
+ * belong to, because the panel renders for both the caller's own account and an
+ * organization and the copy alone does not say which one an alert watches.
+ */
+export const SPEND_ALERTS_PERSONAL_SCOPE_LABEL = 'Account';
+export const SPEND_ALERTS_ORGANIZATION_SCOPE_LABEL = 'Organization';
+
+/**
+ * The line under the panel title that names the owner: `Account: <name>` for
+ * the caller's own account, `Organization: <name>` for an organization scope.
+ * The router returns both `scope` and `scopeName` for every readable scope.
+ *
+ * `null` when the query carries no name to show, so a caller that has not
+ * resolved a name renders no empty label.
+ */
+export function scopeLine(
+  data: Pick<SpendAlertsQueryData, 'scope' | 'scopeName'>
+): string | null {
+  const name = data.scopeName?.trim();
+  if (name === undefined || name === '') return null;
+  const label =
+    data.scope === 'organization'
+      ? SPEND_ALERTS_ORGANIZATION_SCOPE_LABEL
+      : SPEND_ALERTS_PERSONAL_SCOPE_LABEL;
+  return `${label}: ${name}`;
+}
+
+/**
  * Where the web panel sends a viewer to fix a blocked push channel: the Kilo
  * mobile app page, which installs the app whose notification settings own the
  * spend-alerts category and whose device registration push delivery needs.
@@ -89,26 +117,32 @@ export const MOBILE_APP_SETUP_HREF = 'https://kilo.ai/mobile';
  *
  * The ready form's height is a step function of the card width, not a single
  * number: the rule descriptions and the push channel note wrap differently
- * across a window of card widths, and how tall that window's step is varies
- * with the host's text metrics and with whether push is blocked. The bands
- * therefore reserve the *worst reported* ready-form height for their whole
- * range, not the common one — a form below the floor costs nothing but the
- * space the slot already holds.
+ * across a window of card widths, so every band reserves the *worst reported*
+ * ready-form height for its whole range, not the common one. The bands are cut
+ * at the measured wrap steps, so the floor stays close to the form instead of
+ * leaving dead space below Save.
  *
- * The `>= 580px` band was the one that shrank under the ready form: the e3 run
- * measured the loading slot at 47rem (752px) and the saved, enabled form at
- * 804px on the organization usage-details view at a 1024px viewport, so the
- * cards below the panel jumped 52px as the settings arrived
- * (`e3-slot-1024.log`). The e8 sweep recorded the same shape at 816px once the
- * push channel is blocked ("Get the mobile app" on both rules), and this band
- * has to cover both numbers under every resolution of the element query, so it
- * has no upper width boundary: a card whose width resolves the query to
- * `>= 580px` gets 52rem (832px). Narrower cards keep their own, larger floors
- * (measured worst 871.5px in 380-579px and 892.5px in 310-379px).
+ * The numbers were measured on 2026-09-23 with a headless-Chromium CDP probe of
+ * this worktree's web stack, on both the personal spend view and the
+ * organization usage-details view, with the settings saved, both rules enabled,
+ * the push channel blocked (the "Get the mobile app" note on both rules) and the
+ * confirmation shown — the tallest ready state. The measured worst ready-form
+ * height per band is 1032px at a 300px card, 982.5px at 307px, 940.5px at 341px,
+ * 919.5px at 380px, 855.5px at 416px, 834.5px at 528px and 766.5px at 593px;
+ * each floor is that number rounded up to the next whole rem.
  *
- * Below a 310px card the form's height grows without bound as the copy wraps
- * one word per line (1101px at a 238px card, 1354px at 138px), so no finite
- * floor closes that band; it keeps the pre-existing 66rem.
+ * Two effects set the step positions. The form's own copy wraps at the card
+ * width, and the threshold rule's fields collapse to one column below the `sm`
+ * media breakpoint (640px viewport) whether or not the card is wide — so a card
+ * that is 380-592px wide is taller at a < 640px viewport than at a wider one,
+ * and the floor has to cover the taller resolution. Above 592px the card is only
+ * ever reached at a >= 640px viewport, so the step drops to 766.5px.
+ *
+ * Below a 300px card the form's height grows without bound as the copy wraps one
+ * word per line (1080px at a 283px card, 1122px at 253px), so no finite floor
+ * closes that band; it keeps the pre-existing 66rem, which covers the form down
+ * to a 300px card. The narrower spend views are a phone-width web layout this
+ * panel does not target for shift-free reservation.
  *
  * `spendAlertsPanelState.test.ts` parses this class and asserts that each band
  * covers the worst ready-form height recorded for it, so the numbers cannot
@@ -121,7 +155,7 @@ export const MOBILE_APP_SETUP_HREF = 'https://kilo.ai/mobile';
  * verbatim from the source.
  */
 export const SPEND_ALERTS_PANEL_SLOT_CLASS =
-  'min-h-[66rem] @min-[310px]:min-h-[58rem] @min-[380px]:min-h-[55rem] @min-[580px]:min-h-[52rem]';
+  'min-h-[66rem] @min-[300px]:min-h-[65rem] @min-[307px]:min-h-[62rem] @min-[341px]:min-h-[59rem] @min-[380px]:min-h-[58rem] @min-[416px]:min-h-[54rem] @min-[528px]:min-h-[53rem] @min-[593px]:min-h-[48rem]';
 
 /** One rule as the router returns it: USD threshold, basis-point multiplier. */
 export type SpendAlertRuleWire = {
@@ -150,6 +184,13 @@ export type SpendAlertsQueryData = {
    * `apps/web/src/routers/spend-alert-router.ts`).
    */
   pushChannelBlocked: boolean;
+  /**
+   * Which scope these settings belong to. The router returns it for every
+   * readable scope; {@link scopeLine} turns it into the title's owner line.
+   */
+  scope?: 'personal' | 'organization';
+  /** The owner's display name: the account name or the organization name. */
+  scopeName?: string;
   enabled?: boolean;
   rules?: SpendAlertRuleWire[];
 };

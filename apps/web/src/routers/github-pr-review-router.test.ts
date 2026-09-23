@@ -59,6 +59,8 @@ type OctokitMock = {
     createReview: jest.Mock;
     createReviewComment: jest.Mock;
     createReplyForReviewComment: jest.Mock;
+    updateReviewComment: jest.Mock;
+    deleteReviewComment: jest.Mock;
     getReviewComment: jest.Mock;
     getReview: jest.Mock;
     updateBranch: jest.Mock;
@@ -69,6 +71,8 @@ type OctokitMock = {
   issues: {
     createComment: jest.Mock;
     getComment: jest.Mock;
+    updateComment: jest.Mock;
+    deleteComment: jest.Mock;
   };
   repos: {
     get: jest.Mock;
@@ -114,6 +118,8 @@ function buildOctokit(token: string): OctokitMock {
       createReview: jest.fn(),
       createReviewComment: jest.fn(),
       createReplyForReviewComment: jest.fn(),
+      updateReviewComment: jest.fn(),
+      deleteReviewComment: jest.fn(),
       getReviewComment: jest.fn(),
       getReview: jest.fn(),
       updateBranch: jest.fn(),
@@ -124,6 +130,8 @@ function buildOctokit(token: string): OctokitMock {
     issues: {
       createComment: jest.fn(),
       getComment: jest.fn(),
+      updateComment: jest.fn(),
+      deleteComment: jest.fn(),
     },
     repos: {
       get: jest.fn(),
@@ -1446,6 +1454,137 @@ describe('githubPrReviewRouter mutations go through withGitHubUserTokenRetry', (
   });
 });
 
+describe('githubPrReviewRouter.updateComment / deleteComment', () => {
+  const updateCommentInput = {
+    owner: 'octocat',
+    repo: 'hello',
+    number: 1,
+    commentId: 77,
+    kind: 'review' as const,
+    body: 'edited',
+  };
+
+  it('updateComment kind review calls pulls.updateReviewComment with the REST field names', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.updateReviewComment.mockResolvedValueOnce({
+      data: { id: 77, node_id: 'N_77', body: 'edited' },
+    });
+
+    const result = await caller.updateComment(updateCommentInput);
+
+    expect(result).toEqual({ commentId: 77, nodeId: 'N_77', body: 'edited' });
+    expect(t1Octokit.pulls.updateReviewComment).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 77,
+      body: 'edited',
+    });
+    expect(t1Octokit.issues.updateComment).not.toHaveBeenCalled();
+  });
+
+  it('updateComment kind conversation calls issues.updateComment', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.issues.updateComment.mockResolvedValueOnce({
+      data: { id: 88, node_id: 'N_88', body: 'edited' },
+    });
+
+    const result = await caller.updateComment({ ...updateCommentInput, kind: 'conversation' });
+
+    expect(result).toEqual({ commentId: 88, nodeId: 'N_88', body: 'edited' });
+    expect(t1Octokit.issues.updateComment).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 77,
+      body: 'edited',
+    });
+    expect(t1Octokit.pulls.updateReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('deleteComment kind review calls pulls.deleteReviewComment and reports deleted', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.deleteReviewComment.mockResolvedValueOnce({ data: {} });
+
+    const result = await caller.deleteComment({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentId: 77,
+      kind: 'review',
+    });
+
+    expect(result).toEqual({ commentId: 77, deleted: true });
+    expect(t1Octokit.pulls.deleteReviewComment).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 77,
+    });
+    expect(t1Octokit.issues.deleteComment).not.toHaveBeenCalled();
+  });
+
+  it('deleteComment kind conversation calls issues.deleteComment', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.issues.deleteComment.mockResolvedValueOnce({ data: {} });
+
+    const result = await caller.deleteComment({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentId: 77,
+      kind: 'conversation',
+    });
+
+    expect(result).toEqual({ commentId: 77, deleted: true });
+    expect(t1Octokit.issues.deleteComment).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 77,
+    });
+    expect(t1Octokit.pulls.deleteReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('maps a 403 from the provider to FORBIDDEN', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.updateReviewComment.mockRejectedValueOnce({
+      status: 403,
+      message: 'Resource not accessible by integration',
+    });
+
+    await expect(caller.updateComment(updateCommentInput)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it('treats a 404 on delete as success (idempotent delete)', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    t1Octokit.pulls.deleteReviewComment.mockRejectedValueOnce({
+      status: 404,
+      message: 'Not Found',
+    });
+
+    const result = await caller.deleteComment({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      commentId: 77,
+      kind: 'review',
+    });
+
+    expect(result).toEqual({ commentId: 77, deleted: true });
+  });
+});
+
 // `submitReview` is a representative batch mutation — a quick smoke test that
 // the comments[] payload is forwarded verbatim, complementing the builder
 // unit tests.
@@ -2613,5 +2752,30 @@ describe('githubPrReviewRouter UGC terms gate', () => {
     });
     expect(mockAdmitOperation).not.toHaveBeenCalled();
     expect(t1Octokit.issues.createComment).not.toHaveBeenCalled();
+  });
+
+  it('rejects updateComment with PRECONDITION_FAILED terms_required before any GitHub write', async () => {
+    // An edit publishes new text, so it goes through the same UGC gate as the
+    // comment-creating mutations.
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockTermsLookup.mockResolvedValueOnce([]);
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(
+      caller.updateComment({
+        owner: 'octocat',
+        repo: 'hello',
+        number: 1,
+        commentId: 77,
+        kind: 'review',
+        body: 'edited',
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'terms_required',
+    });
+    expect(t1Octokit.pulls.updateReviewComment).not.toHaveBeenCalled();
+    expect(t1Octokit.issues.updateComment).not.toHaveBeenCalled();
   });
 });

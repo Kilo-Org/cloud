@@ -9,10 +9,8 @@ import {
   type OpenCodeSettings,
   type Verbosity,
 } from '@kilocode/db/schema-types';
-import {
-  gemma_4_26b_a4b_it_free_model,
-  GEMMA_4_26B_A4B_IT_ID,
-} from '@/lib/ai-gateway/providers/google';
+import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
+import { GEMMA_4_26B_A4B_IT_ID } from '@/lib/ai-gateway/providers/google';
 
 export type AutoModelPricing = {
   prompt: string;

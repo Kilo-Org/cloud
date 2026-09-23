@@ -31,7 +31,7 @@ import { GET as statGET } from '@/app/api/models/stats/[slug]/route';
 import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type * as Byok from '@/lib/ai-gateway/byok';
 import { getTerminalBenchSummaries } from '@/lib/model-stats/terminal-bench';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
 import type { EnkryptBenchmark, EnkryptPublishedBenchmark } from '@kilocode/db/schema-types';
 import { captureException } from '@sentry/nextjs';

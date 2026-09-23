@@ -15,6 +15,7 @@ import {
   freeModelDataLabel,
   freeModelFreeLabel,
   getFreeModelDataAccessibilityLabel,
+  modelNameStatesFree,
 } from '@/lib/free-model-data-disclosure';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -245,13 +246,16 @@ export function ModelPickerOptionRow({
   const { free, byok, collectsData } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
   const name = autoModelLabel(option.displayId, option.name);
+  // The name may already state the fact ("… (free)", "Auto Free"), so the
+  // badge and its accessibility phrase only render when it does not.
+  const showFreeBadge = free && !byok && !modelNameStatesFree(name);
   const accessibilityLabel = formatList(
     [
       option.provider?.name,
       name,
       option.displayId,
       byok ? BYOK_MODEL_LABEL : undefined,
-      free && !byok ? freeModelFreeLabel() : undefined,
+      showFreeBadge ? freeModelFreeLabel() : undefined,
       collectsData ? freeModelDataLabel() : undefined,
       costLabel ?? undefined,
       option.unavailable ? t('agentChat.modelSelector.unavailableState') : undefined,
@@ -300,9 +304,9 @@ export function ModelPickerOptionRow({
                 {t('agentChat.modelSelector.unavailable')}
               </Text>
             ) : null}
-            {free || byok || collectsData ? (
+            {showFreeBadge || byok || collectsData ? (
               <View className="mt-1 flex-row items-center gap-1 self-start">
-                {free && !byok ? (
+                {showFreeBadge ? (
                   <View className="rounded-full bg-good px-2 py-0.5">
                     <Text className="text-[11px] font-medium text-good-foreground">
                       {freeModelFreeLabel()}

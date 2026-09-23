@@ -61,6 +61,19 @@ function cliCatalogOption(overrides: Partial<SessionModelOption> = {}): SessionM
   };
 }
 
+function gatewayCatalogOption(overrides: Partial<SessionModelOption> = {}): SessionModelOption {
+  return {
+    id: 'gateway-model-0',
+    name: 'Laguna S 2.1 (free)',
+    displayId: 'laguna/s-2.1',
+    variants: [],
+    isPreferred: false,
+    isFree: true,
+    showGatewayMetadata: true,
+    ...overrides,
+  };
+}
+
 function renderRow(
   option: SessionModelOption,
   overrides: Partial<{ selected: boolean; isFavorite: boolean }> = {}
@@ -182,6 +195,36 @@ describe('ModelPickerOptionRow BYOK badge', () => {
     const renderer = renderRow(cliCatalogOption({ isFree: true, mayTrainOnYourPrompts: true }));
     expect(textStrings(renderer.root)).not.toContain(freeModelFreeLabel());
     expect(countWithAccessibilityLabel(renderer.root, freeModelDataLabel())).toBe(0);
+  });
+});
+
+describe('ModelPickerOptionRow free badge', () => {
+  // The gateway catalogue names free models "… (free)" and Kilo's own Auto Free
+  // model is named for it in every catalog, so the green free badge would print
+  // a fact the row title already carries.
+  it('renders no free badge when the displayed name already states it', () => {
+    const renderer = renderRow(gatewayCatalogOption({ name: 'Laguna S 2.1 (free)' }));
+
+    expect(textStrings(renderer.root)).not.toContain(freeModelFreeLabel());
+  });
+
+  it('still renders the free badge when the name does not state it', () => {
+    const renderer = renderRow(gatewayCatalogOption({ name: 'Laguna S 2.1' }));
+
+    expect(textStrings(renderer.root)).toContain(freeModelFreeLabel());
+  });
+
+  it('renders no free badge for the localized Auto Free name', () => {
+    const renderer = renderRow(
+      gatewayCatalogOption({
+        id: 'kilo-auto/free',
+        displayId: 'kilo-auto/free',
+        name: 'backend name',
+      })
+    );
+
+    expect(textStrings(renderer.root)).toContain(i18n.t('models.auto.free'));
+    expect(textStrings(renderer.root)).not.toContain(freeModelFreeLabel());
   });
 });
 

@@ -1,3 +1,7 @@
+// This file is deliberately NOT named `_layout.mounted.test.tsx`: Expo Router's
+// typed-route generator reads every `_layout*` file as the directory's layout, and
+// a layout node is not a route, so it drops the whole `(tabs)` subtree from
+// `.expo/types/router.d.ts` and every tab href stops typechecking.
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

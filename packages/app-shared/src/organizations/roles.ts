@@ -21,6 +21,21 @@ export const ORGANIZATION_BILLING_ROLES = [
   'billing_manager',
 ] satisfies OrganizationRole[];
 
+/**
+ * Membership roles that receive an organization-scope spend alert. This is
+ * deliberately narrower than {@link ORGANIZATION_BILLING_ROLES}: an `admin`
+ * may edit billing settings but carries no billing duty, so it is not a
+ * recipient.
+ *
+ * The organization's owner is resolved from
+ * `organizations.created_by_kilo_user_id` by the recipient query, not from
+ * this list, so an owner whose membership role is `member` (or who has no
+ * membership row at all) still receives the alert.
+ */
+export const ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES = [
+  'billing_manager',
+] satisfies OrganizationRole[];
+
 export function canManageOrganization(role: string | undefined): boolean {
   return ORGANIZATION_MANAGE_ROLES.some(allowed => allowed === role);
 }

@@ -344,10 +344,13 @@ describe('authorizedBillingContacts', () => {
     }
   });
 
-  it('resolves only the billing roles of the one scope', async () => {
+  it('resolves the owner and billing managers of the one scope, excluding an admin and a member', async () => {
     const owner = await insertTestUser({ google_user_email: `sa-owner-${Date.now()}@example.com` });
     const billingManager = await insertTestUser({
       google_user_email: `sa-billing-${Date.now()}@example.com`,
+    });
+    const admin = await insertTestUser({
+      google_user_email: `sa-admin-${Date.now()}@example.com`,
     });
     const member = await insertTestUser({
       google_user_email: `sa-member-${Date.now()}@example.com`,
@@ -359,6 +362,7 @@ describe('authorizedBillingContacts', () => {
     const organization = await createOrganization('Spend alert recipients', owner.id);
     createdOrganizationIds.push(organization.id);
     await addUserToOrganization(organization.id, billingManager.id, 'billing_manager');
+    await addUserToOrganization(organization.id, admin.id, 'admin');
     await addUserToOrganization(organization.id, member.id, 'member');
     const otherOrganization = await createOrganization('Spend alert other org', otherOwner.id);
     createdOrganizationIds.push(otherOrganization.id);
@@ -368,12 +372,69 @@ describe('authorizedBillingContacts', () => {
       organizationId: organization.id,
     });
 
+    // The owner is the organization's creator (membership role `owner`); the
+    // billing_manager is a recipient by role. An admin holds billing authority
+    // but has no billing duty, so it does not receive the alert.
     expect(new Set(contacts.userIds)).toEqual(new Set([owner.id, billingManager.id]));
     expect(new Set(contacts.emails)).toEqual(
       new Set([owner.google_user_email, billingManager.google_user_email])
     );
+    expect(contacts.userIds).not.toContain(admin.id);
     expect(contacts.userIds).not.toContain(member.id);
     expect(contacts.userIds).not.toContain(otherOwner.id);
+  });
+
+  it('includes the owner whose membership role is member', async () => {
+    const owner = await insertTestUser({
+      google_user_email: `sa-owner-member-${Date.now()}@example.com`,
+    });
+
+    // The organization's creator without an owner membership row, added later
+    // as a plain member: the owner is resolved from created_by_kilo_user_id.
+    const organization = await createOrganization('Spend alert member owner', owner.id, false);
+    createdOrganizationIds.push(organization.id);
+    await addUserToOrganization(organization.id, owner.id, 'member');
+
+    const contacts = await authorizedBillingContacts(db, {
+      type: 'organization',
+      organizationId: organization.id,
+    });
+
+    expect(contacts).toEqual({ userIds: [owner.id], emails: [owner.google_user_email] });
+  });
+
+  it('includes the owner with no membership row at all', async () => {
+    const owner = await insertTestUser({
+      google_user_email: `sa-owner-absent-${Date.now()}@example.com`,
+    });
+
+    const organization = await createOrganization('Spend alert absent owner', owner.id, false);
+    createdOrganizationIds.push(organization.id);
+
+    const contacts = await authorizedBillingContacts(db, {
+      type: 'organization',
+      organizationId: organization.id,
+    });
+
+    expect(contacts).toEqual({ userIds: [owner.id], emails: [owner.google_user_email] });
+  });
+
+  it('never duplicates the owner who is also a billing_manager', async () => {
+    const owner = await insertTestUser({
+      google_user_email: `sa-owner-billing-${Date.now()}@example.com`,
+    });
+
+    const organization = await createOrganization('Spend alert owner billing', owner.id, false);
+    createdOrganizationIds.push(organization.id);
+    await addUserToOrganization(organization.id, owner.id, 'billing_manager');
+
+    const contacts = await authorizedBillingContacts(db, {
+      type: 'organization',
+      organizationId: organization.id,
+    });
+
+    expect(contacts.userIds).toEqual([owner.id]);
+    expect(contacts.emails).toEqual([owner.google_user_email]);
   });
 
   it('resolves the owner alone for a personal scope', async () => {

@@ -4,12 +4,22 @@ import {
   canManageOrganization,
   canManageOrganizationBilling,
   canManageOrganizationOwners,
+  ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_ROLES,
+  ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES,
 } from './roles';
 
 describe('ORGANIZATION_ROLES', () => {
   it('is exactly owner, admin, member, billing_manager', () => {
     expect(ORGANIZATION_ROLES).toEqual(['owner', 'admin', 'member', 'billing_manager']);
+  });
+});
+
+describe('ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES', () => {
+  it('is billing_manager only, narrower than the billing roles', () => {
+    expect(ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES).toEqual(['billing_manager']);
+    expect(ORGANIZATION_BILLING_ROLES).toContain('admin');
+    expect(ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES).not.toContain('admin');
   });
 });
 

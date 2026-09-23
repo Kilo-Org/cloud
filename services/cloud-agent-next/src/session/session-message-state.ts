@@ -122,6 +122,12 @@ export type SessionMessageState = {
   error?: string;
   failureReason?: string;
   attempts?: number;
+  /**
+   * Number of automatic recoveries already spent on this accepted turn. It is
+   * the shared one-recovery budget for both no-output producers; a message whose
+   * `recoveryAttempts` reaches `NO_OUTPUT_RECOVERY_LIMIT` is terminalized.
+   */
+  recoveryAttempts?: number;
   gateResult?: 'pass' | 'fail';
   callbackRequired?: boolean;
   callbackTarget?: CallbackTarget;
@@ -230,6 +236,7 @@ export const SessionMessageStateSchema = z
     error: z.string().optional(),
     failureReason: z.string().optional(),
     attempts: z.number().int().nonnegative().optional(),
+    recoveryAttempts: z.number().int().nonnegative().optional(),
     gateResult: z.enum(['pass', 'fail']).optional(),
     callbackRequired: z.boolean().optional(),
     callbackTarget: z
@@ -494,6 +501,64 @@ export async function markAgentActivityObserved(
     return null;
   }
   const updated: SessionMessageState = { ...state, agentActivityObservedAt: now };
+  await putSessionMessageState(storage, updated);
+  return updated;
+}
+
+/** One automatic re-dispatch per accepted turn, shared by both no-output producers. */
+const NO_OUTPUT_RECOVERY_LIMIT = 1;
+
+/**
+ * The one-recovery bound for the two producers that raise `wrapper_no_output`
+ * for an accepted turn that produced no execution progress:
+ *
+ * - the control plane's accepted-message inactivity deadline
+ *   (`SandboxSession.failOverdueAcceptedMessage`, per s1), and
+ * - the legacy wrapper-supervisor no-output watchdog
+ *   (`handleUnhealthyWrapper`, this producer).
+ *
+ * Both share the same `recoveryAttempts` counter on `SessionMessageState`, so a
+ * turn recovered by one producer is not recovered again by the other. The
+ * harness ends a silenced accepted turn as "Response failed" for the user; the
+ * first detection re-queues the turn onto a fresh runtime instead.
+ */
+export function noOutputRecoveryAllowed(recoveryAttempts: number): boolean {
+  return recoveryAttempts < NO_OUTPUT_RECOVERY_LIMIT;
+}
+
+/**
+ * Return an accepted message to `queued` so the pending drain re-dispatches it
+ * on a fresh runtime. The immutable `admissionSnapshot` (or the normalized
+ * `legacyAdmissionConstraints` predecessor shape) keeps the user's typed turn
+ * across the recovery; every terminal and dispatch field is cleared and the
+ * recovery attempt is recorded.
+ */
+export async function markMessageQueuedForRecovery(
+  storage: SessionMessageStorage,
+  messageId: string,
+  now = Date.now()
+): Promise<SessionMessageState | null> {
+  const state = await getSessionMessageState(storage, messageId);
+  if (!state || state.status !== 'accepted') return null;
+  const updated: SessionMessageState = {
+    ...state,
+    status: 'queued',
+    queuedAt: now,
+    recoveryAttempts: (state.recoveryAttempts ?? 0) + 1,
+  };
+  delete updated.acceptedAt;
+  delete updated.wrapperRunId;
+  delete updated.dispatchAcceptanceKind;
+  delete updated.agentActivityObservedAt;
+  delete updated.terminalAt;
+  delete updated.failureStage;
+  delete updated.failureCode;
+  delete updated.failureSubtype;
+  delete updated.assistantFailureReason;
+  delete updated.providerOwnership;
+  delete updated.safeFailureMessage;
+  delete updated.error;
+  delete updated.failureReason;
   await putSessionMessageState(storage, updated);
   return updated;
 }

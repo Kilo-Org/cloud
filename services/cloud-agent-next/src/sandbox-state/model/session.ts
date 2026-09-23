@@ -13,6 +13,7 @@ import { z } from 'zod';
 import {
   CloudAgentAssistantFailureReasonSchema,
   CloudAgentProviderOwnershipSchema,
+  WorkspaceFailureSubtypeSchema,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 
 export { CloudAgentAssistantFailureReasonSchema, CloudAgentProviderOwnershipSchema };
@@ -150,6 +151,8 @@ export const controlErrorSchema = z
     retryable: z.boolean(),
     /** Frozen from `shared/sandbox-control-protocol.ts`; preserved end to end. */
     admission: z.literal('not-admitted').optional(),
+    /** Git workspace failure subtype carried on a control rejection; optional/additive. */
+    subtype: WorkspaceFailureSubtypeSchema.optional().catch(undefined),
   })
   .strict();
 
@@ -179,6 +182,8 @@ export const sessionOperationProofSchema = z
     attachmentEpoch: timestamp.optional(),
     decision: sessionOperationDecisionSchema.optional(),
     rejectionReceived: z.literal(true).optional(),
+    /** Git workspace failure subtype recorded from a confirmed attach rejection. */
+    rejectionSubtype: WorkspaceFailureSubtypeSchema.optional(),
   })
   .strict();
 
@@ -218,6 +223,16 @@ const intentCarryFields = {
 };
 
 /**
+ * Automatic no-output recoveries already spent on this turn. The immutable
+ * intent survives a recovery re-queue; this counter is the one piece of the
+ * retired dispatch lifecycle that survives with it, bounding both producers of
+ * `wrapper_no_output` (the accepted-message inactivity path and the legacy
+ * wrapper watchdog) to a single automatic recovery before a second identical
+ * detection terminalizes — and naming the attempt count in that failure payload.
+ */
+const recoveryAttemptsField = z.number().int().nonnegative().optional();
+
+/**
  * The exclusive intent tri-state carried on every lifecycle variant. Each
  * message is exactly one of: resolved (`intent`), unresolved (`intent: null`
  * with a legacy payload a later freeze may resolve), or permanently invalid
@@ -255,6 +270,7 @@ export const queuedMessageStateSchema = z
     kind: z.literal('queued'),
     ...intentCarryFields,
     queuedAt: timestamp.optional(),
+    recoveryAttempts: recoveryAttemptsField,
     deliveryStep: z.enum(['waiting', 'preparing']),
     deadlineAt: timestamp.nullable(),
     retryNotBefore: timestamp.optional(),
@@ -270,6 +286,14 @@ export const queuedMessageStateSchema = z
      * original scope cannot be recovered from it.
      */
     deliveryRetryScope: z.enum(['message', 'runtime']).optional(),
+    /**
+     * Consecutive delivery-deadline deferrals granted while the control plane
+     * reported a runtime replacement in flight. Bounds a replacement that never
+     * completes so the head still reaches its terminal preparation timeout. The
+     * count resets when the head binds a replacement runtime: that closes the
+     * chain, so a later replacement gets its own budget.
+     */
+    replacementWaits: z.number().int().nonnegative().optional(),
   })
   .strict();
 
@@ -278,6 +302,7 @@ export const acceptedMessageStateSchema = z
     kind: z.literal('accepted'),
     ...intentCarryFields,
     queuedAt: timestamp.optional(),
+    recoveryAttempts: recoveryAttemptsField,
     acceptedAt: timestamp,
     lastActivityAt: timestamp.optional(),
     /** The bounded execution deadline (design §7 "execution bound"); never optional. */
@@ -293,6 +318,7 @@ export const completedMessageStateSchema = z
     kind: z.literal('completed'),
     ...intentCarryFields,
     queuedAt: timestamp.optional(),
+    recoveryAttempts: recoveryAttemptsField,
     acceptedAt: timestamp.optional(),
     at: timestamp,
     source: sessionMessageTerminalSourceSchema,
@@ -309,6 +335,7 @@ export const failedMessageStateSchema = z
     kind: z.literal('failed'),
     ...intentCarryFields,
     queuedAt: timestamp.optional(),
+    recoveryAttempts: recoveryAttemptsField,
     acceptedAt: timestamp.optional(),
     at: timestamp,
     source: sessionMessageTerminalSourceSchema,
@@ -326,6 +353,7 @@ export const cancelledMessageStateSchema = z
     kind: z.literal('cancelled'),
     ...intentCarryFields,
     queuedAt: timestamp.optional(),
+    recoveryAttempts: recoveryAttemptsField,
     acceptedAt: timestamp.optional(),
     at: timestamp,
     source: sessionMessageTerminalSourceSchema,

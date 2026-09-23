@@ -1786,6 +1786,27 @@
       "when": 1789848712703,
       "tag": "0254_charming_iron_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 255,
+      "version": "7",
+      "when": 1790087177194,
+      "tag": "0255_drop_repository_customizations",
+      "breakpoints": true
+    },
+    {
+      "idx": 256,
+      "version": "7",
+      "when": 1790097479765,
+      "tag": "0256_add_superseded_at_to_user_activity_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 257,
+      "version": "7",
+      "when": 1790098375222,
+      "tag": "0257_user_activity_tokens_live_ios_activity_unique",
+      "breakpoints": true
     }
   ]
 }

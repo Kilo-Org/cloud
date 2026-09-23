@@ -26,7 +26,7 @@ import { sentryRootSpan } from '@/lib/getRootSpan';
 import {
   isDisabledKiloExclusiveModel,
   isKiloExclusiveRateLimitedModel,
-} from '@/lib/ai-gateway/models';
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
@@ -275,7 +275,8 @@ async function openRouterPost(request: NextRequest): Promise<NextResponseType<un
   const autoRoutingProviderHints = redactProviderHints(requestBodyParsed.body);
 
   const feature = validateFeatureHeader(
-    request.headers.get(FEATURE_HEADER) || determineFallbackFeature(requestBodyParsed)
+    request.headers.get(FEATURE_HEADER) ||
+      determineFallbackFeature(requestBodyParsed, request.headers.get('user-agent'))
   );
 
   const balanceAndSettingsPromise = authPromise.then(res =>

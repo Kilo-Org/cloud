@@ -75,6 +75,7 @@
     "expo-document-picker": "~57.0.1",
     "expo-file-system": "~57.0.5",
     "expo-font": "57.0.3",
+    "expo-glass-effect": "~57.0.3",
     "expo-haptics": "~57.0.1",
     "expo-iap": "5.3.2",
     "expo-image": "57.0.4",

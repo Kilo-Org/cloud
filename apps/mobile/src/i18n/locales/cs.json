@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Při vypnutí této volby klávesa Enter vloží nový řádek do pole pro zprávu agentovi.",
     "biometricUnlock": "Biometrické odemykání",
     "biometricUnlockSubtitle": "Vyžaduje odemknutí při spuštění aplikace a po pěti minutách na pozadí.",
-    "featureFlags": "Příznaky funkcí",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Přepis přes Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Přepisujte diktování pomocí modelu Kilo Gateway místo rozpoznávání řeči ve vašem zařízení. Nahraný zvuk se odešle do Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2297,10 +2292,6 @@
       "linesTruncated": "řádky {{start}}–{{end}} (zkráceno)",
       "linesOf": "řádky {{start}}–{{end}} z {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Akce {{action}} ve službě Cloud Agent selhala ({{status}}).",
-      "failed": "Akce {{action}} ve službě Cloud Agent selhala."
-    },
     "collectCopyableText": {
       "unserializableInput": "[neserializovatelný vstup]",
       "errorPrefix": "Chyba: {{error}}"
@@ -2396,8 +2387,7 @@
       "assistantProviderRejected": "Poskytovatel požadavek odmítl.",
       "assistantStopped": "Generování odpovědi bylo zastaveno.",
       "assistantContextOverflow": "Konverzace je pro model příliš dlouhá.",
-      "assistantFailed": "Odpověď se nepodařilo vytvořit.",
-      "sendFailed": "Zprávu se nepodařilo odeslat. Zkuste to znovu."
+      "assistantFailed": "Odpověď se nepodařilo vytvořit."
     },
     "filePart": {
       "loadingImage": "Načítání obrázku",

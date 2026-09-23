@@ -25,10 +25,14 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
+import {
+  namedSessionTitle,
+  SESSION_TITLE_MAX_LENGTH,
+  useUserSessionTitlesRevision,
+} from './session-detail-rename-state';
 import {
   activeSessionMetaTimestamp,
   canExitSessionFromList,
@@ -91,7 +95,20 @@ export function RemoteSessionRow({
     };
   }, [refreshScope]);
   const exitingRef = useRef(false);
-  const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
+  // The server's creation-default title (`New session - <ISO timestamp>`) is an
+  // internal marker, never row copy: `namedSessionTitle` resolves it through
+  // the shared `sessionDisplayTitle` helper and additionally keeps a
+  // placeholder-shaped title the user's own rename wrote, so the same label
+  // feeds the row, the accessibility label, and the rename prompt. The
+  // subscription repaints the row once the durable record hydrates after a
+  // cold start.
+  useUserSessionTitlesRevision();
+  const title = namedSessionTitle(session.title, session.id) ?? t('agents.sessionRow.untitled');
+  // Same seeding as the stored row: a session the backend has not named yet
+  // opens an empty rename field instead of the `New session - <ISO>` machine
+  // string, and the save paths reject an unchanged or blank value. A title the
+  // user's own rename wrote is still seeded, so a chosen name is not blanked.
+  const renameInitialValue = namedSessionTitle(session.title, session.id) ?? '';
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
   const agentLabel = remoteSessionEyebrowLabel(session);
@@ -203,7 +220,7 @@ export function RemoteSessionRow({
       },
       onRename: () => {
         if (Platform.OS === 'ios') {
-          showRenamePrompt(title, newTitle => {
+          showRenamePrompt(renameInitialValue, newTitle => {
             renameSession(session.id, newTitle);
           });
         } else {
@@ -258,7 +275,8 @@ export function RemoteSessionRow({
         <RenameModal
           title={t('agentChat.session.renameSession')}
           placeholder={t('agentChat.session.renamePlaceholder')}
-          initialValue={title}
+          initialValue={renameInitialValue}
+          maxLength={SESSION_TITLE_MAX_LENGTH}
           onClose={() => {
             setRenameVisible(false);
           }}

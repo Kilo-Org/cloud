@@ -245,12 +245,14 @@ import {
   type SandboxBillingInput,
 } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
+import { providerUsesOutboundCredentialProxy } from '../agent-sandbox/capabilities.js';
 import {
   deriveSandboxAllocationId,
-  getOutboundContainerId,
+  getManagedOutboundContainerId,
   getSandboxNamespace,
 } from '../sandbox-id.js';
 import {
+  validateContainersTerminalBillingRuntime,
   validateTerminalBillingRuntime,
   type SandboxTerminalAccessInput,
   type SandboxTerminalAccessResult,
@@ -500,6 +502,7 @@ export type SandboxControlStatus = StatusProjection & {
   allocationIncarnation?: string;
   operationResults?: true;
   runtimeRecovery?: true;
+  runtimeReplacementInFlight?: true;
 };
 
 export type ControlRuntimeCredentialProxyFence = {
@@ -1350,16 +1353,15 @@ export class SandboxControl extends DurableObject<Env> {
       throw new Error('Sandbox credential containment is unavailable');
     }
     const resolvedProviderRef = canonicalProviderRefOf(record);
-    const outboundContainerId =
-      provider === 'cloudflare' && requiredContainment.kilocode
-        ? getOutboundContainerId(
-            this.env,
+    const outboundContainerId = requiredContainment.kilocode
+      ? getManagedOutboundContainerId(provider, this.env, {
+          logicalSandboxId: this.sandboxId,
+          physicalSandboxId:
             decodeCloudflareProviderRef(resolvedProviderRef)?.sandboxId ??
-              (record.state.kind === 'stopped' ? undefined : record.state.target?.allocationName) ??
-              this.sandboxId,
-            { managedScmContainment: requiredContainment.kilocode }
-          )
-        : undefined;
+            (record.state.kind === 'stopped' ? undefined : record.state.target?.allocationName) ??
+            this.sandboxId,
+        })
+      : undefined;
     const grants = await loadSessionCredentialGrants(this.ctx.storage);
     const scopeId = metadata.workspace?.worktreeId ?? metadata.identity.sessionId;
     const existing = grants.find(grant => grant.scopeId === scopeId);
@@ -1450,11 +1452,14 @@ export class SandboxControl extends DurableObject<Env> {
         const native = decodeCloudflareProviderRef(providerRef);
         if (
           alias?.sandboxId !== this.sandboxId ||
-          this.providerKind !== 'cloudflare' ||
+          !providerUsesOutboundCredentialProxy(this.providerKind) ||
           allocation.state.kind !== 'allocated' ||
           !native ||
           input.outboundContainerId !==
-            getOutboundContainerId(this.env, native.sandboxId, { managedScmContainment: true })
+            getManagedOutboundContainerId(this.providerKind, this.env, {
+              logicalSandboxId: this.sandboxId,
+              physicalSandboxId: native.sandboxId,
+            })
         ) {
           return null;
         }
@@ -2036,7 +2041,7 @@ export class SandboxControl extends DurableObject<Env> {
       ) {
         throw new SandboxAcquisitionLostError();
       }
-      return this.statusForAllocation(current, this.allocationIncarnationOf(current));
+      return this.statusForAllocation(current, this.allocationIncarnationOf(current), sessionId);
     });
   }
 
@@ -2665,35 +2670,56 @@ export class SandboxControl extends DurableObject<Env> {
       ...(input.organizationId ? { orgId: input.organizationId } : {}),
     });
     if (!enforced) return this.renewTerminalCredentialLease(input, runtime);
-    if (runtime.provider !== 'cloudflare') {
+    if (runtime.provider !== 'cloudflare' && runtime.provider !== 'cloudflare-containers') {
       return { allowed: false, reason: 'billing_policy_unavailable' };
     }
 
     let billing: SandboxTerminalAccessResult;
     try {
-      const providerRef = decodeCloudflareProviderRef(canonicalProviderRefOf(runtime.physical));
-      if (!providerRef) return { allowed: false, reason: 'runtime_not_running' };
-      const allocationId = providerRef.sandboxId;
-      const namespace = getSandboxNamespace(this.env, allocationId, {
-        managedScmContainment: providerRef.containment,
-      });
-      const sandbox = getSandbox(namespace, allocationId);
-      billing = validateTerminalBillingRuntime({
-        access: runtime.route.worktreeId
-          ? {
-              ...input,
-              sessionId: `workspace_${runtime.route.worktreeId.slice('worktree_'.length)}`,
-            }
-          : input,
-        sandboxId: allocationId,
-        providerInstanceId: runtime.connection.providerInstanceId,
-        sandboxDurableObjectId: namespace.idFromName(allocationId).toString(),
-        runtime: await withTimeout(
-          getSandboxBillingRuntimeStatus(sandbox),
-          DEADLINE_MS.stopAttempt,
-          'Sandbox billing runtime observation timed out'
-        ),
-      });
+      if (runtime.provider === 'cloudflare') {
+        const providerRef = decodeCloudflareProviderRef(canonicalProviderRefOf(runtime.physical));
+        if (!providerRef) return { allowed: false, reason: 'runtime_not_running' };
+        const allocationId = providerRef.sandboxId;
+        const namespace = getSandboxNamespace(this.env, allocationId, {
+          managedScmContainment: providerRef.containment,
+        });
+        const sandbox = getSandbox(namespace, allocationId);
+        billing = validateTerminalBillingRuntime({
+          access: runtime.route.worktreeId
+            ? {
+                ...input,
+                sessionId: `workspace_${runtime.route.worktreeId.slice('worktree_'.length)}`,
+              }
+            : input,
+          sandboxId: allocationId,
+          providerInstanceId: runtime.connection.providerInstanceId,
+          sandboxDurableObjectId: namespace.idFromName(allocationId).toString(),
+          runtime: await withTimeout(
+            getSandboxBillingRuntimeStatus(sandbox),
+            DEADLINE_MS.stopAttempt,
+            'Sandbox billing runtime observation timed out'
+          ),
+        });
+      } else {
+        const namespace = this.env.SANDBOX_CONTAINERS;
+        const container = namespace.getByName(this.sandboxId);
+        billing = validateContainersTerminalBillingRuntime({
+          access: runtime.route.worktreeId
+            ? {
+                ...input,
+                sessionId: `workspace_${runtime.route.worktreeId.slice('worktree_'.length)}`,
+              }
+            : input,
+          sandboxId: this.sandboxId,
+          providerInstanceId: runtime.connection.providerInstanceId,
+          sandboxDurableObjectId: namespace.idFromName(this.sandboxId).toString(),
+          runtime: await withTimeout(
+            container.getBillingRuntimeStatus(),
+            DEADLINE_MS.stopAttempt,
+            'Sandbox billing runtime observation timed out'
+          ),
+        });
+      }
     } catch {
       return { allowed: false, reason: 'billing_runtime_unavailable' };
     }
@@ -2886,21 +2912,23 @@ export class SandboxControl extends DurableObject<Env> {
     );
   }
 
-  async getStatus(): Promise<SandboxControlStatus> {
+  async getStatus(input?: { sessionId?: string }): Promise<SandboxControlStatus> {
     await this.ensureOperationalInitialized();
     const record = await this.readCanonicalAllocation();
-    return this.statusForAllocation(record, this.allocationIncarnationOf(record));
+    return this.statusForAllocation(record, this.allocationIncarnationOf(record), input?.sessionId);
   }
 
   private async statusForAllocation(
     record: AllocationRecord,
-    allocationIncarnation?: string
+    allocationIncarnation?: string,
+    sessionId?: string
   ): Promise<SandboxControlStatus> {
     const connection = this.connectionState();
     const work = await this.workState();
     const runtime = this.readyWrapperRuntime();
     const physical = legacyPhysicalState(record);
     const projection = projectStatus({ allocation: record, ownerPresent: true, now: Date.now() });
+    const runtimeReplacementInFlight = this.replacementInFlight(record, sessionId);
     return {
       ...projection,
       physical,
@@ -2915,6 +2943,7 @@ export class SandboxControl extends DurableObject<Env> {
         ? { operationResults: true as const }
         : {}),
       ...(runtime?.runtimeRecovery ? { runtimeRecovery: true as const } : {}),
+      ...(runtimeReplacementInFlight ? { runtimeReplacementInFlight: true as const } : {}),
     };
   }
 
@@ -2931,6 +2960,21 @@ export class SandboxControl extends DurableObject<Env> {
     if (status.connection !== 'ready') return status;
     const { wrapperInstanceId: _withheld, ...rest } = status;
     return { ...rest, connection: 'connected' };
+  }
+
+  /**
+   * True while a runtime replacement is in flight for this workspace: the
+   * canonical allocation is still creating its runtime, so the workspace has no
+   * bound runtime and one is on the way. `stopped` and `unknown` allocations are
+   * not a replacement, so a runtime that never comes back still reaches the
+   * caller's terminal preparation path.
+   *
+   * The canonical aggregate is per workspace, not per session, so the probe is
+   * not scoped to one session; `sessionId` is accepted for the RPC contract.
+   */
+  private replacementInFlight(record: AllocationRecord, sessionId?: string): boolean {
+    void sessionId;
+    return record.state.kind === 'creating';
   }
 
   async getSandboxStatus(input: {
@@ -3373,11 +3417,14 @@ export class SandboxControl extends DurableObject<Env> {
       1_000,
       'Diagnostic signing secret lookup timed out'
     ).catch(() => null);
+    const workloadCgroup = (this.env as { CONTROL_WORKLOAD_CGROUP?: unknown })
+      .CONTROL_WORKLOAD_CGROUP;
     const launchEnv = buildControlWrapperLaunchEnv({
       workerUrl: this.env.WORKER_URL,
       sandboxId: this.sandboxId,
       credential,
       diagnostics: { allocationId, signingSecret },
+      ...(typeof workloadCgroup === 'string' ? { workloadCgroup } : {}),
     });
     this.logDiagnostic('wrapper_log_upload', {
       allocationId,

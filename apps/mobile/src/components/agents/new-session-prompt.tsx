@@ -35,14 +35,12 @@ import {
   NEW_SESSION_PROMPT_LINE_HEIGHT,
   NEW_SESSION_PROMPT_VERTICAL_PADDING,
   resolveComposerMaxHeight,
-  resolveComposerMinHeight,
-  resolveComposerMinHeightForViewport,
-  resolveNewSessionPromptCardChrome,
-  resolveNewSessionPromptCardChromeRowsAboveToolbar,
+  resolveNewSessionPromptHeight,
   SESSION_HEADER_HEIGHT,
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
 import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
+import { resolveNewSessionPromptMinHeight } from '@/components/agents/new-session-prompt-fit';
 import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
 import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
@@ -88,9 +86,9 @@ type NewSessionPromptComponentProps = NewSessionPromptProps & {
 };
 
 /**
- * New-session prompt surface: attachment strip, full-width multiline text
- * input, bottom action row (paperclip leading, voice toggle trailing), and
- * the model/mode toolbar. Owns the prompt ref (for voice input to read), the
+ * New-session prompt surface: model/mode toolbar, attachment strip,
+ * full-width multiline text input, and bottom action row (paperclip leading,
+ * voice toggle trailing). Owns the prompt ref (for voice input to read), the
  * height-measuring TextInput machinery, and the `useVoiceInput` hook. The
  * route listens to `onChangeText` so the create handler can read the live
  * prompt value after `settleVoiceInputBeforeSubmit` resolves; the attachment,
@@ -123,7 +121,8 @@ export function NewSessionPrompt({
   shareId,
   voiceInputSettlerRef,
   initialPrompt,
-  promptViewportHeight = 0,
+  frameHeight,
+  cardTop = 0,
   onStartSession,
   isCloneEntry = false,
 }: Readonly<NewSessionPromptComponentProps>) {
@@ -153,66 +152,31 @@ export function NewSessionPrompt({
   const isComposingRef = useRef(false);
   const abortVoiceInputRef = useRef<(() => Promise<boolean>) | null>(null);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
-  // Measured mode/model toolbar height. The pills wrap onto a second row on
-  // narrow viewports, so the chrome the input must not squeeze out is not a
-  // constant; the static budget covers the first frame, before the toolbar
-  // has laid out.
-  const [toolbarHeight, setToolbarHeight] = useState<number | null>(null);
   const promptLineHeight = NEW_SESSION_PROMPT_LINE_HEIGHT * fontScale;
-  // The card rows above the toolbar that render only in some states. The floor
-  // below reserves each one under the same condition the render uses.
-  const hasAttachments = attachments.length > 0;
+  // The card rows that render only in some states, read by name in the render
+  // below (the measured card chrome covers their height without a static
+  // budget, so they need no separate reservation here).
   const showsAttachmentStatus = attachments.some(
     attachment => attachment.metadataStripFailed === true
   );
   const showsCounter =
     PROMPT_INPUT_MAX_CHARS - promptCharacterCount <= PROMPT_COUNTER_VISIBLE_REMAINING;
-  // The models-error block renders in the toolbar's place.
-  const showsModelsError = isModelsError && modelOptions.length === 0;
-  // The input's floor gives up lines on a short viewport (landscape at a high
-  // density) so the card's control row and mode/model toolbar stay above the
-  // keyboard. With room it is still the three-line default. The floor scales
-  // only the rows that grow with `fontScale` (the pill's text line); the header
-  // row is pinned by its own `min-h-14` and does not. The host's measured frame
-  // is the floor's yardstick once it exists; the window-based floor covers the
-  // first frame, before the host has laid out. The max cap below stays
-  // deliberately conservative — only the floor hands lines back.
-  const promptCardChromeHeight = resolveNewSessionPromptCardChrome({
-    fontScale,
-    toolbarHeight,
-    // The card renders three more rows above the toolbar in some states; the
-    // floor reserves each with the same condition the render uses. A row it
-    // does not reserve is a line the input keeps while the pills drop under
-    // the keyboard.
-    rowsAboveToolbarHeight: resolveNewSessionPromptCardChromeRowsAboveToolbar({
-      hasAttachments,
-      showsAttachmentStatus,
-      showsCounter,
-    }),
-    // The models-error block renders in the toolbar's place, so the toolbar's
-    // measured height must not stand in for a row that is not there.
-    toolbarRendered: !showsModelsError,
+  // The chrome the card renders around the input, measured by the card's
+  // `onLayout` below. With the host-measured `cardTop` prop it sizes the space
+  // the frame leaves for the input.
+  const [cardChromeHeight, setCardChromeHeight] = useState(0);
+  const promptMinHeight = resolveNewSessionPromptMinHeight({
+    frameHeight: frameHeight ?? 0,
+    cardTop,
+    cardChromeHeight,
+    // The shared helper keeps the preferred 3-line floor in one place.
+    preferredMinHeight: resolveNewSessionPromptHeight(
+      promptLineHeight,
+      NEW_SESSION_PROMPT_DEFAULT_LINES
+    ),
+    lineHeight: promptLineHeight,
+    preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
   });
-  const promptMinHeight =
-    promptViewportHeight > 0
-      ? resolveComposerMinHeightForViewport({
-          viewportHeight: promptViewportHeight,
-          composerChromeHeight: promptCardChromeHeight,
-          lineHeight: promptLineHeight,
-          verticalPadding: NEW_SESSION_PROMPT_VERTICAL_PADDING,
-          defaultLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
-        })
-      : resolveComposerMinHeight({
-          windowHeight,
-          safeAreaInsetTop: insets.top,
-          safeAreaInsetBottom: insets.bottom,
-          keyboardHeight,
-          sessionHeaderHeight: SESSION_HEADER_HEIGHT,
-          composerChromeHeight: promptCardChromeHeight,
-          lineHeight: promptLineHeight,
-          verticalPadding: NEW_SESSION_PROMPT_VERTICAL_PADDING,
-          defaultLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
-        });
   const promptMaxHeight = resolveComposerMaxHeight({
     windowHeight,
     safeAreaInsetTop: insets.top,
@@ -363,14 +327,15 @@ export function NewSessionPrompt({
     setPromptInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
-  function handleToolbarLayout(event: LayoutChangeEvent) {
-    const nextHeight = Math.round(event.nativeEvent.layout.height);
-    // A zero-height layout is not a measurement — the row is collapsed or has
-    // not laid out — so keep the last measured height (or the `null` that makes
-    // the floor use the static budget). Reserving the rows above the toolbar
-    // alone (68) would sit below the static estimate (125) and let the input
-    // keep lines the card cannot fit.
-    setToolbarHeight(current => (nextHeight <= 0 ? current : nextHeight));
+  function handleCardLayout(event: LayoutChangeEvent) {
+    const { height } = event.nativeEvent.layout;
+    // Everything the card renders other than the input itself. The input's
+    // height changes when the fit yields and the card's height changes with it,
+    // so this is stable across the yielding re-render. The card's `y` is not
+    // read here: it is relative to the padding-free host wrapper, so the host
+    // passes the frame-relative offset as `cardTop` instead.
+    const nextChromeHeight = height - promptMeasure.height;
+    setCardChromeHeight(current => (current === nextChromeHeight ? current : nextChromeHeight));
   }
 
   function handlePromptSelectionChange(event: TextInputSelectionChangeEvent) {
@@ -434,7 +399,37 @@ export function NewSessionPrompt({
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]">
+    <View
+      onLayout={handleCardLayout}
+      className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-[#0000000D]"
+    >
+      {isModelsError && modelOptions.length === 0 ? (
+        <QueryError
+          placement="top"
+          variant="server"
+          title={t('agentChat.newSession.couldNotLoadModels')}
+          message={t('organization.boundary.loadErrorMessage')}
+          onRetry={() => {
+            onRefetchModels();
+          }}
+          className="border-b border-border py-4"
+        />
+      ) : (
+        <ChatToolbar
+          mode={mode}
+          onModeChange={onModeChange}
+          model={model}
+          variant={variant}
+          modelOptions={modelOptions}
+          onModelSelect={onModelSelect}
+          disabled={isCreating}
+          isLoadingModels={isLoadingModels}
+          customOptions={customOptions}
+          modelLocked={modelLocked}
+          modelLockLabel={modelLockLabel}
+          className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
+        />
+      )}
       <AttachmentPreviewStrip
         attachments={attachments}
         onRemove={onRemoveAttachment}
@@ -523,35 +518,6 @@ export function NewSessionPrompt({
           ) : null}
         </NewSessionPromptControls>
       </View>
-      {showsModelsError ? (
-        <QueryError
-          placement="top"
-          variant="server"
-          title={t('agentChat.newSession.couldNotLoadModels')}
-          message={t('organization.boundary.loadErrorMessage')}
-          onRetry={() => {
-            onRefetchModels();
-          }}
-          className="border-t border-border py-4"
-        />
-      ) : (
-        <ChatToolbar
-          mode={mode}
-          onModeChange={onModeChange}
-          model={model}
-          variant={variant}
-          modelOptions={modelOptions}
-          onModelSelect={onModelSelect}
-          disabled={isCreating}
-          isLoadingModels={isLoadingModels}
-          customOptions={customOptions}
-          modelLocked={modelLocked}
-          modelLockLabel={modelLockLabel}
-          onLayout={handleToolbarLayout}
-          wrap
-          className="border-t border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
-        />
-      )}
     </View>
   );
 }

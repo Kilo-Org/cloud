@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { ROW_PALETTE } from '@/lib/agent-color';
 import { darkColors, lightColors } from '@/lib/hooks/use-theme-colors';
 import {
   DEFAULT_TOKEN_COLOR,
@@ -15,6 +16,7 @@ vi.mock('expo-router', () => ({ DarkTheme: {}, DefaultTheme: {} }));
 // The contrast assertions below fail if a shipped pair regresses below 4.5:1.
 
 const MIN_TEXT_RATIO = 4.5;
+const MIN_NON_TEXT_RATIO = 3;
 
 type Rgb = readonly [number, number, number];
 
@@ -182,5 +184,31 @@ describe('warn foreground token contrast (WCAG AA text)', () => {
     // Precomputed ≈ 9.29:1 for #1A1A10 on #F2B05F.
     const ratio = contrastRatio(darkColors.warnForeground, darkColors.warn);
     expect(ratio).toBeGreaterThanOrEqual(MIN_TEXT_RATIO);
+  });
+});
+
+describe('row palette contrast (WCAG 1.4.11 non-text)', () => {
+  // A 16px stroked glyph on a 30x30 tile is a non-text graphic, so WCAG 1.4.11
+  // asks for 3:1: measured against the row surface (`secondary`) and against the
+  // pre-tinted tile the glyph paints on (the hue at 10% alpha over `secondary`).
+  const themes = [
+    ['light', lightColors],
+    ['dark', darkColors],
+  ] as const;
+
+  it('every curated step clears 3:1 on secondary and on its tinted tile', () => {
+    for (const [themeName, colors] of themes) {
+      for (const [step, tint] of Object.entries(ROW_PALETTE)) {
+        const hue = colors[tint.hueThemeKey];
+        const tile = compositeHex(`${hue}1a`, colors.secondary);
+        expect(
+          contrastRatio(hue, colors.secondary),
+          `${step} vs secondary (${themeName})`
+        ).toBeGreaterThanOrEqual(MIN_NON_TEXT_RATIO);
+        expect(contrastRatio(hue, tile), `${step} vs tile (${themeName})`).toBeGreaterThanOrEqual(
+          MIN_NON_TEXT_RATIO
+        );
+      }
+    }
   });
 });

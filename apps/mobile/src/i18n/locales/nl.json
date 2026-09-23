@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Als dit uitstaat, voegt Return een nieuwe regel toe in het berichtveld van de agent.",
     "biometricUnlock": "Ontgrendelen met biometrie",
     "biometricUnlockSubtitle": "Ontgrendelen is vereist bij het starten van de app en nadat de app vijf minuten op de achtergrond heeft gestaan.",
-    "featureFlags": "Functievlaggen",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcriptie via Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Zet spraakinvoer om met een Kilo Gateway-model in plaats van de spraakherkenning van het apparaat. Je opname wordt naar Kilo Gateway verzonden.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -1729,10 +1724,6 @@
       "linesTruncated": "regels {{start}}–{{end}} (afgekapt)",
       "linesOf": "regels {{start}}–{{end}} van {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "De actie {{action}} voor Cloud Agent is mislukt ({{status}}).",
-      "failed": "De actie {{action}} voor Cloud Agent is mislukt."
-    },
     "collectCopyableText": {
       "unserializableInput": "[niet-serialiseerbare invoer]",
       "errorPrefix": "Fout: {{error}}"
@@ -1828,8 +1819,7 @@
       "assistantProviderRejected": "De aanbieder heeft het verzoek afgewezen.",
       "assistantStopped": "Het genereren van het antwoord is gestopt.",
       "assistantContextOverflow": "Het gesprek is te lang voor het model.",
-      "assistantFailed": "Het genereren van het antwoord is mislukt.",
-      "sendFailed": "Het bericht kon niet worden verzonden. Probeer het opnieuw."
+      "assistantFailed": "Het genereren van het antwoord is mislukt."
     },
     "filePart": {
       "loadingImage": "Afbeelding laden",

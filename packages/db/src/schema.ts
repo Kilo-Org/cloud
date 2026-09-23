@@ -10047,9 +10047,19 @@ export const user_activity_tokens = pgTable(
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
+    // Set when this row's card was retired. A live card has `superseded_at` null;
+    // the partial unique index below allows at most one such row per scope.
+    superseded_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [
     uniqueIndex('UQ_user_activity_tokens_token').on(table.token),
+    // One live ios_activity card per (user_id, organization_id) scope. `coalesce`
+    // folds the personal scope (null organization) into a single key, because
+    // Postgres treats NULLs as distinct in a unique index.
+    uniqueIndex('UQ_user_activity_tokens_live_ios_activity')
+      .on(table.user_id, sql`coalesce(${table.organization_id}, '')`)
+      .concurrently()
+      .where(sql`${table.kind} = 'ios_activity' AND ${table.superseded_at} IS NULL`),
     index('IDX_user_activity_tokens_user_org').on(table.user_id, table.organization_id),
   ]
 );

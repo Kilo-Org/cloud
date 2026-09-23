@@ -39,6 +39,7 @@ import {
 import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
 import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
+import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { MessageErrorBoundary } from '@/components/agents/message-error-boundary';
@@ -1592,7 +1593,7 @@ export function SessionDetailContent({
     serverTitle,
     // Same seed the route's loading screen used, so the header keeps the
     // title it opened with instead of blinking back to "Session".
-    fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
+    fallbackTitle: sessionDisplayTitle(cachedTitle) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;
   const handleRenameClose = rename.closeModal;

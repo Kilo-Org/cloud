@@ -314,16 +314,34 @@ export function statusIndicatorDuplicatesMessageFailure(input: {
     return false;
   }
   const copy = sessionStatusErrorMessage({ message: indicator.message, code: indicator.code });
-  if (copy === failure.title) {
+  // Compare catalog keys, not the resolved copy: `failure` can be captured
+  // before an in-place language switch, so its memoized strings may be in the
+  // previous language while `copy` is resolved here in the current one.
+  if (copy === i18n.t(failure.titleKey)) {
     return true;
   }
-  if (failure.detail !== null && copy === failure.detail) {
+  if (failure.detailKey !== null && copy === i18n.t(failure.detailKey)) {
+    return true;
+  }
+  // An agent-execution delivery failure renders the assistant-failure title
+  // (message-failure-state.ts) while the SDK's status indicator for it is the
+  // delivery-failed line ("Message delivery failed" -> "Failed to deliver",
+  // normalizer.ts). The row already states that failed run, so the delivery
+  // line would restate it.
+  if (
+    failure.kind === 'delivery' &&
+    failure.titleKey === 'agentChat.messageFailure.assistantTitle' &&
+    copy === i18n.t('agentChat.messageFailure.deliveryTitle')
+  ) {
     return true;
   }
   // An unclassified status error resolves to the generic assistant line, which
-  // is the same failure the row's own title states.
+  // is the same failure the row's own title states. Keyed on the title key, not
+  // the kind: an agent-execution delivery failure renders the assistant-failure
+  // title too (message-failure-state.ts), so the footer line would restate it.
   return (
-    failure.kind === 'assistant' && copy === i18n.t('agentChat.messageFailure.assistantFailed')
+    failure.titleKey === 'agentChat.messageFailure.assistantTitle' &&
+    copy === i18n.t('agentChat.messageFailure.assistantFailed')
   );
 }
 

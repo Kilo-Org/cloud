@@ -14,4 +14,7 @@ export default {
     ],
   },
   testMatch: ['<rootDir>/src/**/*.test.ts'],
+  // jotai 3 (the version kilo-app and this SDK resolve) ships ESM only, so its
+  // build must go through the transformer instead of jest's node_modules skip.
+  transformIgnorePatterns: ['/node_modules/(?!.*jotai)'],
 };

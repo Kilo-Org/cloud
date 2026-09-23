@@ -27,6 +27,15 @@ vi.mock('@/lib/analytics/posthog', () => ({
   useFeatureFlag: () => true,
 }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: mocks.openExternalUrl }));
+vi.mock('@/lib/hooks/use-themed-action-sheet', () => ({
+  useThemedActionSheetOptions: () => ({
+    containerStyle: { backgroundColor: '#17171A' },
+    textStyle: { color: '#F2F0EB' },
+    titleTextStyle: { color: '#8A8680' },
+    messageTextStyle: { color: '#8A8680' },
+    destructiveColor: '#F28B7A',
+  }),
+}));
 vi.mock('@/components/agents/use-message-copy', () => ({ performCopy: vi.fn() }));
 vi.mock('./markdown-link-confirm', () => ({ formatLinkHost: (href: string) => href }));
 vi.mock('./markdown-text', () => ({

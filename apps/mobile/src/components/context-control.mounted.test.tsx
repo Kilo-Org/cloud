@@ -13,18 +13,25 @@ const list = vi.hoisted(() => vi.fn());
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 const showPicker = vi.hoisted(() => vi.fn());
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
-// Mutable so the theme test can prove the picker re-reads the active palette,
-// not just that the dark values are passed through. Values mirror the real
-// light/dark tokens in theme-colors.generated.ts.
-const theme = vi.hoisted(() => ({
+const platform = vi.hoisted(() => ({ OS: 'android' }));
+// Mutable so the palette cases can prove the picker re-reads the active palette,
+// not just that one set of values is passed through. The initial values mirror
+// the real dark tokens in theme-colors.generated.ts.
+const appearance = vi.hoisted((): { colors: Record<string, string>; bottom: number } => ({
   colors: {
     card: '#17171A',
     foreground: '#F2F0EB',
     mutedForeground: '#8A8680',
     border: 'rgba(255, 255, 255, 0.07)',
   },
+  bottom: 18,
 }));
-const DARK_COLORS = { ...theme.colors };
+
+// The palette the hook returns unless a case overrides it. The palette cases
+// reassign `appearance.colors`, so the per-OS hook restores this default instead
+// of leaking a case's palette into the tests that run after it.
+const DEFAULT_COLORS = appearance.colors;
+const DARK_COLORS = { ...appearance.colors };
 const LIGHT_COLORS = {
   card: '#FFFFFF',
   foreground: '#14130F',
@@ -51,16 +58,18 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  Platform: { OS: 'android' },
+  Platform: platform,
   Pressable: 'Pressable',
   View: 'View',
 }));
-vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 18 }) }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: appearance.bottom }),
+}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => theme.colors,
+  useThemeColors: () => appearance.colors,
 }));
 
 const Text = 'Text' as ElementType;
@@ -117,10 +126,11 @@ function nativePicker() {
         {
           options: string[];
           cancelButtonIndex: number;
-          title: string;
-          containerStyle: { paddingBottom: number; backgroundColor: string };
-          textStyle: { color: string };
-          titleTextStyle: { color: string };
+          title?: string;
+          containerStyle: { paddingBottom: number; backgroundColor?: string };
+          textStyle?: { color: string };
+          titleTextStyle?: { color: string };
+          destructiveColor?: string;
         },
         (index?: number) => void,
       ]
@@ -135,7 +145,7 @@ beforeEach(() => {
   auth.token = 'token';
   persisted = null;
   rerender = undefined;
-  theme.colors = { ...DARK_COLORS };
+  appearance.colors = { ...DARK_COLORS };
   list.mockReset().mockResolvedValue(orgs);
   storage.read.mockReset().mockResolvedValue(null);
   storage.write.mockReset().mockImplementation(async (_key: string, value: string) => {
@@ -154,7 +164,12 @@ afterEach(() => {
   }
 });
 
-describe('ContextControl', () => {
+describe.each(['ios', 'android'])('ContextControl on %s', os => {
+  beforeEach(() => {
+    platform.OS = os;
+    appearance.colors = DEFAULT_COLORS;
+    appearance.bottom = 18;
+  });
   it.each([
     { id: null, label: 'Personal', result: [] },
     { id: 'org-a', label: name, result: orgs },
@@ -202,6 +217,62 @@ describe('ContextControl', () => {
     }
   );
 
+  it.each([
+    {
+      theme: 'dark',
+      colors: {
+        card: '#17171A',
+        foreground: '#F2F0EB',
+        mutedForeground: '#888',
+        destructive: '#F28B7A',
+      },
+      bottom: 34,
+    },
+    {
+      theme: 'light',
+      colors: {
+        card: '#FFFFFF',
+        foreground: '#2F2D27',
+        mutedForeground: '#6B675E',
+        destructive: '#B83422',
+      },
+      bottom: 0,
+    },
+  ])('opens the account sheet with the $theme palette', async ({ colors, bottom }) => {
+    appearance.colors = colors;
+    appearance.bottom = bottom;
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await press(picker(ui));
+    const native = nativePicker();
+    expect(native.options.options).toEqual(['Personal', name, 'Cancel']);
+    expect(native.options.title).toBe('Select account');
+    expect(native.options.containerStyle).toEqual({
+      backgroundColor: colors.card,
+      paddingBottom: bottom,
+    });
+    expect(native.options.textStyle).toEqual({ color: colors.foreground });
+    expect(native.options.titleTextStyle).toEqual({ color: colors.mutedForeground });
+    expect(native.options).toMatchObject({
+      messageTextStyle: { color: colors.mutedForeground },
+      destructiveColor: colors.destructive,
+      autoFocus: true,
+      useModal: true,
+    });
+  });
+
+  // Guards the $theme cases above: they reassign `appearance.colors`, so this
+  // case only sees the default palette if the per-OS hook restored it.
+  it('opens the account sheet with the default palette after a palette case ran', async () => {
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    await press(picker(ui));
+    expect(nativePicker().options.containerStyle).toEqual({
+      backgroundColor: DEFAULT_COLORS.card,
+      paddingBottom: 18,
+    });
+  });
+
   it('themes the native picker with the active theme colors', async () => {
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
@@ -217,7 +288,7 @@ describe('ContextControl', () => {
 
     // Switching the active palette and re-rendering must change what the sheet
     // receives; the picker cannot be hardcoding the dark tokens.
-    theme.colors = { ...LIGHT_COLORS };
+    appearance.colors = { ...LIGHT_COLORS };
     await act(() => {
       rerender?.();
     });
@@ -270,9 +341,10 @@ describe('ContextControl', () => {
     await waitFor(() => texts(ui).includes("Couldn't load your organizations"));
     expect(retry(ui).props.accessibilityHint).toBe("Couldn't load your organizations");
     const status = ui.renderer.root.find(
-      node => node.type === Text && node.props.accessibilityLiveRegion === 'polite'
+      node => node.type === Text && node.props.children === "Couldn't load your organizations"
     );
     expect(status.children).toContain("Couldn't load your organizations");
+    expect(status.props.accessibilityLiveRegion).toBe(os === 'android' ? 'polite' : undefined);
     await press(retry(ui));
     await waitFor(() => texts(ui).includes(name));
     expect(texts(ui)).not.toContain('Retry');

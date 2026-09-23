@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { FeatureFlagsSection } from '@/components/feature-flags-section';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -46,9 +46,10 @@ beforeEach(() => {
   vi.stubGlobal('__DEV__', true);
   posthog.statuses = [];
 });
-afterEach(() => {
+afterEach(async () => {
   view?.unmount();
   view = undefined;
+  await i18n.changeLanguage('en');
   vi.unstubAllGlobals();
 });
 
@@ -116,6 +117,26 @@ describe('FeatureFlagsSection', () => {
     const tree = await mount();
 
     expect(textLines(tree)).toContain('Enabled · default · not loaded');
+  });
+
+  it('keeps the notation English on an Arabic screen while the value word follows the language', async () => {
+    // The finding's capture: the value word is Arabic but "default · not loaded"
+    // stays English. That is by design — `preferences.featureFlagNotLoaded` sits
+    // in `ENGLISH_IDENTICAL_ALLOWLIST` in `tools/i18n/check-catalogs.mjs`, which
+    // records a source marker plus a load state as a technical token, not
+    // translatable prose (the section header and value word are translated).
+    await i18n.changeLanguage('ar');
+    posthog.statuses = [unloaded];
+    const tree = await mount();
+
+    const lines = textLines(tree);
+    const reason = i18n.t('preferences.featureFlagNotLoaded');
+    expect(lines).toContain(`${i18n.t('common.enabled')} · ${reason}`);
+    // The value word follows the selected language…
+    expect(i18n.t('common.enabled')).not.toBe('Enabled');
+    expect(lines).not.toContain(`Enabled · ${reason}`);
+    // …and the notation stays exactly the English source string.
+    expect(reason).toBe('default · not loaded');
   });
 
   it('marks a below-minimum flag with the version gate even before remote flags load', async () => {

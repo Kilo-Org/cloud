@@ -583,7 +583,6 @@
     "reviewPullRequest": "የማዋሃድ ጥያቄውን ገምግም",
     "headLine": "{{counts}} · የቅርንጫፉ የመጨረሻ ኮሚት {{sha}}",
     "entry": {
-      "eyebrow": "የማዋሃድ ጥያቄን በURL ይክፈቱ",
       "pastePrLink": "የማዋሃድ ጥያቄ አገናኝ ያስገቡ",
       "noRecentPrs": "የቅርብ ጊዜ ግምገማዎች የሉም",
       "noRecentPrsDescription": "ግምገማ ለመጀመር ከላይ አገናኝ ያስገቡ — ለቀጣዩ ጊዜ እዚህ ይታያል።",

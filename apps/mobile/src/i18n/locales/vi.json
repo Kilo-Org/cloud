@@ -2603,7 +2603,6 @@
       "moreLinesAbove_other": "… Còn {{displayCount}} dòng ở trên."
     },
     "entry": {
-      "eyebrow": "Mở PR hoặc merge request bằng URL",
       "pastePrLink": "Dán liên kết PR hoặc merge request",
       "noRecentPrs": "Chưa có đánh giá gần đây",
       "noRecentPrsDescription": "Dán liên kết ở trên để bắt đầu đánh giá — lần sau nó sẽ xuất hiện ở đây.",

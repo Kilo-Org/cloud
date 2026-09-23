@@ -583,7 +583,6 @@
     "reviewPullRequest": "Dib u eeg codsiga isku-darka",
     "headLine": "{{counts}} · diiwaanka isbeddelka ugu dambeeya {{sha}}",
     "entry": {
-      "eyebrow": "Ku fur PR ama merge request URL-ka",
       "pastePrLink": "Ku dheji xiriiriye PR ama merge request ah",
       "noRecentPrs": "Ma jiraan dib-u-eegisyo dhowaan la sameeyay",
       "noRecentPrsDescription": "Kor ku dheji xiriiriye si aad u bilowdo dib-u-eegis — marka xigta halkan ayuu ka soo muuqan doonaa.",

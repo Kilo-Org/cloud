@@ -583,7 +583,6 @@
     "reviewPullRequest": "Rishiko kërkesën për bashkim",
     "headLine": "{{counts}} · depozitimi i fundit {{sha}}",
     "entry": {
-      "eyebrow": "Hap një kërkesë për bashkim ose kërkesë integrimi përmes URL-së",
       "pastePrLink": "Ngjit lidhjen e një kërkeze për bashkim ose kërkeze integrimi",
       "noRecentPrs": "Asnjë rishikim i fundit",
       "noRecentPrsDescription": "Ngjit një lidhje më sipër për të filluar një rishikim — do të shfaqet këtu herën tjetër.",

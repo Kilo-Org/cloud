@@ -583,7 +583,6 @@
     "reviewPullRequest": "Ṣe àtúnyẹ̀wò ìbéèrè ìṣọ̀kan",
     "headLine": "{{counts}} · àkọsílẹ̀ ìyípadà tuntun {{sha}}",
     "entry": {
-      "eyebrow": "Ṣí ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan nípa URL",
       "pastePrLink": "Lẹ̀ mọ́ ọ̀nà àsopọ̀ ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan",
       "noRecentPrs": "Kò sí àtúnyẹ̀wò àìpẹ́",
       "noRecentPrsDescription": "Lẹ̀ mọ́ ọ̀nà àsopọ̀ lókè láti bẹ̀rẹ̀ àtúnyẹ̀wò — yóò fara hàn níbí nígbà mìíràn.",

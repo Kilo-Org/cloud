@@ -594,7 +594,6 @@
     "reviewPullRequest": "Revisa la sol·licitud d'integració",
     "headLine": "{{counts}} · última comissió {{sha}}",
     "entry": {
-      "eyebrow": "Obre una sol·licitud d'integració o de fusió amb el seu URL",
       "pastePrLink": "Enganxa l'enllaç d'una sol·licitud d'integració o de fusió",
       "noRecentPrs": "Cap revisió recent",
       "noRecentPrsDescription": "Enganxa un enllaç a dalt per començar una revisió — la propera vegada apareixerà aquí.",

@@ -583,7 +583,6 @@
     "reviewPullRequest": "Berrikusi bateratze-eskaera",
     "headLine": "{{counts}} · azken egikaritzea: {{sha}}",
     "entry": {
-      "eyebrow": "Ireki bateratze-eskaera edo merge-eskaera bat URL bidez",
       "pastePrLink": "Itsatsi bateratze-eskaera edo merge-eskaera baten esteka",
       "noRecentPrs": "Ez dago azkenaldiko berrikuspenik",
       "noRecentPrsDescription": "Itsatsi esteka bat goian berrikuspena hasteko — hemen agertuko da hurrengoan.",

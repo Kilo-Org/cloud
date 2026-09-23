@@ -605,7 +605,6 @@
     "reviewPullRequest": "Zkontrolovat PR",
     "headLine": "{{counts}} · poslední commit {{sha}}",
     "entry": {
-      "eyebrow": "Otevři PR nebo merge request pomocí URL",
       "pastePrLink": "Vložit odkaz na PR nebo merge request",
       "noRecentPrs": "Žádné nedávné revize",
       "noRecentPrsDescription": "Pro spuštění revize vlož nahoře odkaz — příště se zobrazí tady.",

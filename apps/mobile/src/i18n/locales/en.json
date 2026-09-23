@@ -583,7 +583,6 @@
     "reviewPullRequest": "Review pull request",
     "headLine": "{{counts}} · head {{sha}}",
     "entry": {
-      "eyebrow": "Open a pull request or merge request by URL",
       "pastePrLink": "Paste a pull request or merge request link",
       "noRecentPrs": "No recent reviews",
       "noRecentPrsDescription": "Paste a link above to start a review — it'll show up here next time.",

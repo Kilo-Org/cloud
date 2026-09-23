@@ -216,6 +216,11 @@ function fieldByLabel(renderer: ReactTestRenderer, label: string): ReactTestInst
   return field;
 }
 
+/** The scope group renders the owner row first, then the 24 h spend row. */
+function kvRowByLabel(renderer: ReactTestRenderer, label: string): ReactTestInstance | undefined {
+  return byType(renderer, 'KvRow').find(node => node.props.label === label);
+}
+
 function buttonByVariant(renderer: ReactTestRenderer, variant?: string): ReactTestInstance {
   const button = byType(renderer, 'Button').find(node => node.props.variant === variant);
   if (!button) {
@@ -282,7 +287,7 @@ describe('SpendAlertsScreen happy state', () => {
 
     expect(fieldByLabel(renderer, LIMIT).props.defaultValue).toBe('25');
     expect(fieldByLabel(renderer, MULTIPLIER).props.defaultValue).toBe('2');
-    expect(byType(renderer, 'KvRow')[0]?.props.value).toBe('$1.5');
+    expect(kvRowByLabel(renderer, i18n.t('spendAlerts.spend24h'))?.props.value).toBe('$1.5');
     expect(switchByLabel(renderer, i18n.t('spendAlerts.enable'))?.props.value).toBe(true);
     expect(switchByLabel(renderer, i18n.t('spendAlerts.thresholdTitle'))?.props.value).toBe(true);
     expect(byType(renderer, 'SegmentedControl')[0]?.props.value).toBe('24');
@@ -364,7 +369,65 @@ describe('SpendAlertsScreen happy state', () => {
       spend: { spend24hMicrodollars: 0, spend7dMicrodollars: 0, baselineHourlyMicrodollars: null },
     });
 
-    expect(byType(renderer, 'KvRow')[0]?.props.value).toBe(i18n.t('spendAlerts.noSpend'));
+    expect(kvRowByLabel(renderer, i18n.t('spendAlerts.spend24h'))?.props.value).toBe(
+      i18n.t('spendAlerts.noSpend')
+    );
+  });
+});
+
+describe('SpendAlertsScreen scope line', () => {
+  it('names the personal scope with the caller name above the spend row', async () => {
+    const { renderer } = await mountLoaded();
+
+    const rows = byType(renderer, 'KvRow');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.props.label).toBe(i18n.t('preferences.account'));
+    expect(rows[0]?.props.value).toBe('Ada');
+    // The owner row is not the group's last, so the divider separates it from
+    // the spend row that closes the group.
+    expect(rows[0]?.props.last).toBeFalsy();
+    expect(rows[1]?.props.label).toBe(i18n.t('spendAlerts.spend24h'));
+    expect(rows[1]?.props.last).toBe(true);
+  });
+
+  it('names an organization scope with the organization name', async () => {
+    boundary.org = { organizationId: 'org-1' };
+    getQueryFn.mockResolvedValue(
+      settingsFixture({ scope: 'organization', scopeName: 'Acme Corp' })
+    );
+
+    const { renderer } = await mountScreen('org-1');
+    await waitFor(() => byType(renderer, 'KvRow').length === 2);
+
+    expect(byType(renderer, 'KvRow')[0]?.props.label).toBe(i18n.t('common.organization'));
+    expect(byType(renderer, 'KvRow')[0]?.props.value).toBe('Acme Corp');
+  });
+
+  it('keeps the scope line while the master switch is off, so the owner is still named', async () => {
+    const { renderer } = await mountLoaded({ enabled: false });
+
+    expect(kvRowByLabel(renderer, i18n.t('preferences.account'))?.props.value).toBe('Ada');
+  });
+});
+
+describe('SpendAlertsScreen rule descriptions', () => {
+  it('says what each rule measures on this scope', async () => {
+    const { renderer } = await mountLoaded();
+
+    // The copy the two cards render, pinned: a reader must be able to tell that
+    // the threshold measures this scope's rolling spend over the chosen window
+    // and the anomaly measures this scope's hourly rate against its own p95.
+    expect(i18n.t('spendAlerts.thresholdSubtitle')).toBe(
+      "This scope's rolling spend over the chosen window crosses your limit"
+    );
+    expect(i18n.t('spendAlerts.anomalySubtitle')).toBe(
+      "This scope's hourly rate is far above its own p95 baseline"
+    );
+    const copy = texts(renderer);
+    expect(copy).toContain(i18n.t('spendAlerts.thresholdSubtitle'));
+    expect(copy).toContain(i18n.t('spendAlerts.anomalySubtitle'));
+    // The panel subtitle says the alert watches this scope's own spend.
+    expect(i18n.t('spendAlerts.subtitle')).toContain("this scope's own spend");
   });
 });
 

@@ -3213,12 +3213,12 @@
     "openLastSession": "Open last session"
   },
   "spendAlerts": {
-    "subtitle": "Email or push an alert to the billing contacts when this scope's spend crosses a limit or spikes above its usual hourly rate.",
+    "subtitle": "Email or push an alert to the billing contacts when this scope's own spend crosses a limit or spikes above its usual hourly rate.",
     "enable": "Enable spend alerts",
     "thresholdTitle": "Threshold crossing",
-    "thresholdSubtitle": "Rolling spend crosses your limit",
+    "thresholdSubtitle": "This scope's rolling spend over the chosen window crosses your limit",
     "anomalyTitle": "Hourly spike",
-    "anomalySubtitle": "An hour is far above this scope's usual rate",
+    "anomalySubtitle": "This scope's hourly rate is far above its own p95 baseline",
     "limitLabel": "Limit (USD)",
     "windowLabel": "Window",
     "window24h": "24 hours",

@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Meta din l-għażla tkun mitfija, it-tast tar-ritorn idaħħal linja ġdida fil-qasam tal-messaġġ lill-aġent.",
     "biometricUnlock": "Żblokka bil-bijometrija",
     "biometricUnlockSubtitle": "Żblokka l-applikazzjoni meta titnieda u wara ħames minuti fl-isfond.",
-    "featureFlags": "Flags tal-karatteristiċi",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Traskrizzjoni permezz ta' Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Ittraskrivi d-dħul bil-vuċi b'mudell ta' Kilo Gateway minflok ir-rikonoxximent tal-vuċi tal-apparat. Ir-reġistrazzjoni tiegħek tintbagħat lil Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2329,10 +2324,6 @@
       "linesTruncated": "linji {{start}}–{{end}} (maqtugħa)",
       "linesOf": "linji {{start}}–{{end}} minn {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "L-azzjoni {{action}} ta' Cloud Agent falliet ({{status}}).",
-      "failed": "L-azzjoni {{action}} ta' Cloud Agent falliet."
-    },
     "collectCopyableText": {
       "unserializableInput": "[dejta tad-dħul li ma tistax tiġi serjalizzata]",
       "errorPrefix": "Żball: {{error}}"
@@ -2428,8 +2419,7 @@
       "assistantProviderRejected": "Il-fornitur ċaħad it-talba.",
       "assistantStopped": "It-tweġiba twaqqfet.",
       "assistantContextOverflow": "Il-konversazzjoni hija twila wisq għall-mudell.",
-      "assistantFailed": "It-tweġiba falliet.",
-      "sendFailed": "Ma setax jintbagħat il-messaġġ. Erġa' pprova."
+      "assistantFailed": "It-tweġiba falliet."
     },
     "filePart": {
       "loadingImage": "Qed titgħabba l-immaġni",

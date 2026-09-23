@@ -1,7 +1,7 @@
 // One-pass decorated form of the Discussion tab's merge/sort.
 //
 // `mergeDiscussionListItems` sorts with `compareDiscussionListItems`, whose
-// comparator reads (and `parseTimestamp`s) each item's raw timestamp on every
+// comparator reads and re-parses each item's raw timestamp on every
 // comparison — twice per comparison, so thousands of parses per merge on a PR
 // with a few hundred loaded rows. Both inputs to the tab's merge are
 // identity-stable, but the tab re-renders on every expand/collapse tap,
@@ -16,10 +16,10 @@
 import {
   compareDiscussionListItems,
   type ConversationComment,
+  discussionItemTimestampMs,
   type DiscussionListItem,
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
-import { parseTimestamp } from '@/lib/utils';
 
 type DecoratedDiscussionListItem = {
   readonly item: DiscussionListItem;
@@ -29,23 +29,9 @@ type DecoratedDiscussionListItem = {
   readonly ms: number;
 };
 
-/**
- * The A2.2 sort key, read once per item: the first comment's `createdAt` for a
- * thread, the comment's own `createdAt` for a conversation comment. `null`
- * means missing or unparseable; those items sort after every timed item.
- */
-function timestampMsFor(item: DiscussionListItem): number | null {
-  const raw =
-    item.kind === 'thread' ? (item.thread.comments[0]?.createdAt ?? null) : item.comment.createdAt;
-  if (raw == null || raw === '') {
-    return null;
-  }
-  const ms = parseTimestamp(raw).getTime();
-  return Number.isFinite(ms) ? ms : null;
-}
-
 function decorateForMerge(item: DiscussionListItem): DecoratedDiscussionListItem {
-  const ms = timestampMsFor(item);
+  // Shared A2.2 key, read once per item instead of once per comparison.
+  const ms = discussionItemTimestampMs(item);
   return { item, hasMs: ms !== null, ms: ms ?? 0 };
 }
 

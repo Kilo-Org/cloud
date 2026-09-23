@@ -11,7 +11,7 @@ import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { LanguagePickerRow } from '@/components/language-picker-row';
 import { PickerSheet } from '@/components/picker-sheet';
-import { SearchX } from '@/components/ui/icons';
+import { Search, SearchX } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { applyLanguagePreference } from '@/i18n/apply-language';
 import { languagePickerItems } from '@/i18n/language-rows';
@@ -50,8 +50,10 @@ export function LanguagePickerSheet({
   const [restarting, setRestarting] = useState(false);
   const [reloadFailed, setReloadFailed] = useState(false);
   const [query, setQuery] = useState('');
-  // Bumped on every focus so the uncontrolled TextInput remounts empty.
-  const [searchEpoch, setSearchEpoch] = useState(0);
+  // The search field is uncontrolled (iOS drops keystrokes when state drives
+  // `value`), so an emptied field is cleared through this ref rather than by
+  // remounting the input.
+  const searchInputRef = useRef<TextInput>(null);
   const skipNextGuardRef = useRef(false);
   const closeRequestedRef = useRef(false);
   const navigation = useNavigation();
@@ -79,7 +81,15 @@ export function LanguagePickerSheet({
       closeRequestedRef.current = false;
       skipNextGuardRef.current = false;
       setQuery('');
-      setSearchEpoch(epoch => epoch + 1);
+      // Empty the field imperatively instead of remounting it. A remount hands
+      // the recreated native EditText the text it still holds, and the next
+      // keystroke then appends to that stale copy: the sheet's search field
+      // read the typed term twice, as one run ("DeutschDeutsch", "ArabicArabic"),
+      // which then matched nothing (language-search-deutsch,
+      // language-search-kb-up, 2026-09-20). Clearing the live field keeps the
+      // same behaviour — a reopened sheet starts empty — without recreating the
+      // view.
+      searchInputRef.current?.clear();
       setSelected(getLanguagePreference());
       setApplied(getLanguagePreference());
       setAppliedLanguage(getResolvedLanguage());
@@ -208,21 +218,27 @@ export function LanguagePickerSheet({
       disabled={busy}
       scrollable={false}
       headerContent={
-        <View className="px-4 pb-2 pt-3">
+        // Filled pill with a leading magnifier, the one search-field shape the
+        // repository and share pickers use. The outlined box this replaced made
+        // the same control look like two different controls across pickers.
+        <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
+          <Search size={18} color={colors.mutedForeground} />
           <TextInput
-            key={searchEpoch}
+            ref={searchInputRef}
             accessibilityLabel={t('language.search')}
             // leading-[normal] so no lineHeight reaches the style: iOS otherwise
-            // draws the placeholder below the typed text and clips it. min-h-*
-            // sets the height without padding, so iOS centres the text rect.
-            className="rounded-md border border-input bg-background px-3 min-h-[44px] text-sm leading-[normal] text-foreground"
+            // draws the placeholder below the typed text and clips it. The fixed
+            // h-* with p-0 sets the height without padding, so iOS centres the
+            // text rect the same way the repository picker's field does.
+            className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
             placeholder={t('language.search')}
             placeholderTextColor={colors.mutedForeground}
             // textAlign is applied inline, not via a class: NativeWind maps it
             // to a native prop for TextInput and crashes on it in this version.
             style={isRtl ? SEARCH_RTL : undefined}
             // Uncontrolled: iOS drops keystrokes when state drives `value`. The
-            // input remounts on focus via `searchEpoch`, so a reopen starts empty.
+            // focus effect clears the live field through the ref, so a reopen
+            // starts empty.
             onChangeText={setQuery}
             autoCapitalize="none"
             autoCorrect={false}

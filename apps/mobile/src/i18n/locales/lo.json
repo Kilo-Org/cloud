@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "ເມື່ອປິດຕົວເລືອກນີ້ ປຸ່ມຂຶ້ນແຖວໃໝ່ຈະແຊກແຖວໃໝ່ໃນຊ່ອງຂຽນຂໍ້ຄວາມຫາຕົວແທນ.",
     "biometricUnlock": "ປົດລັອກດ້ວຍຂໍ້ມູນຊີວະມິຕິ",
     "biometricUnlockSubtitle": "ຕ້ອງປົດລັອກເມື່ອເປີດແອັບ ແລະ ຫຼັງຈາກແອັບຢູ່ໃນພື້ນຫຼັງເປັນເວລາຫ້ານາທີ.",
-    "featureFlags": "ທຸງຄຸນສົມບັດ",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "ການຖອດສຽງເປັນຂໍ້ຄວາມຜ່ານ Kilo Gateway",
     "gatewayTranscriptionSubtitle": "ຖອດການປ້ອນຂໍ້ຄວາມດ້ວຍສຽງເປັນຂໍ້ຄວາມດ້ວຍໂມເດວ Kilo Gateway ແທນການຈຳລາສຽງພາຍໃນອຸປະກອນ. ໄຟລ໌ບັນທຶກສຽງຂອງທ່ານຈະຖືກສົ່ງໄປ Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "ບັນທັດ {{start}}–{{end}} (ຕັດບາງສ່ວນອອກ)",
       "linesOf": "ບັນທັດ {{start}}–{{end}} ຈາກທັງໝົດ {{total}} ບັນທັດ"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "{{action}} ຂອງ Cloud Agent ລົ້ມເຫຼວ ({{status}}).",
-      "failed": "{{action}} ຂອງ Cloud Agent ລົ້ມເຫຼວ."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ຂໍ້ມູນເຂົ້າທີ່ປ່ຽນເປັນຮູບແບບສຳລັບຈັດເກັບບໍ່ໄດ້]",
       "errorPrefix": "ຂໍ້ຜິດພາດ: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "ຜູ້ໃຫ້ບໍລິການໄດ້ປະຕິເສດຄຳຂໍແລ້ວ.",
       "assistantStopped": "ການສ້າງຄຳຕອບຖືກຢຸດແລ້ວ.",
       "assistantContextOverflow": "ການສົນທະນາຍາວເກີນກວ່າທີ່ໂມເດວຈະຮອງຮັບໄດ້.",
-      "assistantFailed": "ສ້າງຄຳຕອບບໍ່ສຳເລັດ.",
-      "sendFailed": "ບໍ່ສາມາດສົ່ງຂໍ້ຄວາມໄດ້. ກະລຸນາລອງໃໝ່."
+      "assistantFailed": "ສ້າງຄຳຕອບບໍ່ສຳເລັດ."
     },
     "filePart": {
       "loadingImage": "ກຳລັງໂຫຼດຮູບພາບ",

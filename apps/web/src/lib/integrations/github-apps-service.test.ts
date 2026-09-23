@@ -21,6 +21,7 @@ describe('getInstallation', () => {
         {
           owned_by_organization_id: organization.id,
           platform: 'github',
+          github_connection_role: 'workflow',
           integration_type: 'app',
           platform_installation_id: crypto.randomUUID(),
           integration_status: 'active',
@@ -30,6 +31,7 @@ describe('getInstallation', () => {
         {
           owned_by_organization_id: organization.id,
           platform: 'github',
+          github_connection_role: 'workflow',
           integration_type: 'app',
           platform_installation_id: crypto.randomUUID(),
           integration_status: 'active',
@@ -62,6 +64,7 @@ describe('getInstallation', () => {
         {
           owned_by_organization_id: organization.id,
           platform: 'github',
+          github_connection_role: 'workflow',
           integration_type: 'app',
           platform_installation_id: crypto.randomUUID(),
           integration_status: 'active',
@@ -71,6 +74,7 @@ describe('getInstallation', () => {
         {
           owned_by_organization_id: organization.id,
           platform: 'github',
+          github_connection_role: 'workflow',
           integration_type: 'app',
           platform_installation_id: crypto.randomUUID(),
           integration_status: 'active',
@@ -98,6 +102,7 @@ describe('getInstallation', () => {
       .values({
         owned_by_organization_id: organization.id,
         platform: 'github',
+        github_connection_role: 'workflow',
         integration_type: 'app',
         platform_installation_id: crypto.randomUUID(),
         integration_status: 'active',

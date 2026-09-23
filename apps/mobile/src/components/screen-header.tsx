@@ -87,7 +87,12 @@ type ScreenHeaderProps = {
   /** Use Focus's large 30px H1 style (list roots). Default 18px (detail). */
   size?: 'default' | 'large';
   headerRight?: React.ReactNode;
-  /** Home, Agents, Quick Chat, and session headers supply context below the title.
+  /** Controls rendered at the trailing edge of the title row, in the
+   * leading-aligned row and beside a centered title alike. The heading keeps
+   * `flex-1 min-w-0`, so the title keeps its tail ellipsis and the controls keep
+   * their full width instead of the `headerRight` half-row cap wrapping them. */
+  inlineActions?: React.ReactNode;
+  /** Home, Quick Chat, and session headers supply context below the title.
    * Other callers keep their existing title-only layout when this slot is absent. */
   context?: React.ReactNode;
   modal?: boolean;
@@ -140,6 +145,7 @@ export function ScreenHeader({
   reserveEyebrow = false,
   size = 'default',
   headerRight,
+  inlineActions,
   context,
   modal,
   centerTitle = modal ?? false,
@@ -329,7 +335,7 @@ export function ScreenHeader({
     </Pressable>
   ) : null;
   const centeredControls =
-    separateHeading && backControl ? (
+    separateHeading && backControl && !inlineActions && (!headerRight || stackActions) ? (
       <View className="h-11 w-11 shrink-0" accessibilityElementsHidden pointerEvents="none" />
     ) : null;
 
@@ -346,6 +352,7 @@ export function ScreenHeader({
               ) : (
                 centeredControls
               )}
+              {inlineActions ? <View className="ms-3 min-w-0 shrink">{inlineActions}</View> : null}
             </View>
             {headerRight && stackActions ? (
               // The actions keep the title's own row only while it can hold a
@@ -365,6 +372,7 @@ export function ScreenHeader({
               {headerRight && !stackActions ? (
                 <View className="ms-3 min-w-0 max-w-[50%] shrink">{headerRight}</View>
               ) : null}
+              {inlineActions ? <View className="ms-3 min-w-0 shrink">{inlineActions}</View> : null}
             </View>
             {headerRight && stackActions ? (
               <View className="mt-2 min-w-0">{headerRight}</View>

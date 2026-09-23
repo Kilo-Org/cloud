@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "దీన్ని ఆఫ్ చేస్తే, రిటర్న్ కీ ఏజెంట్ సందేశ పెట్టెల్లో కొత్త పంక్తిని చేర్చుతుంది.",
     "biometricUnlock": "బయోమెట్రిక్స్‌తో అన్‌లాక్ చేయండి",
     "biometricUnlockSubtitle": "యాప్‌ను తెరిచినప్పుడు, అలాగే అది నేపథ్యంలో ఐదు నిమిషాలు ఉన్న తర్వాత అన్‌లాక్ చేయాలి.",
-    "featureFlags": "ఫీచర్ ఫ్లాగులు",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Kilo Gateway ద్వారా మాటలను వచనంగా మార్చడం",
     "gatewayTranscriptionSubtitle": "పరికరం యొక్క మాటల గుర్తింపుకు బదులు Kilo Gateway మోడల్‌తో వాయిస్ ఇన్‌పుట్‌ను వచనంగా మార్చండి. మీ రికార్డింగ్ Kilo Gatewayకు పంపబడుతుంది.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "{{start}}–{{end}} పంక్తులు (కొంత భాగం మాత్రమే)",
       "linesOf": "మొత్తం {{total}} పంక్తుల్లో {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agentలో {{action}} విఫలమైంది ({{status}}).",
-      "failed": "Cloud Agentలో {{action}} విఫలమైంది."
-    },
     "collectCopyableText": {
       "unserializableInput": "[సీరియలైజ్ చేయలేని ఇన్‌పుట్]",
       "errorPrefix": "లోపం: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "ప్రొవైడర్ అభ్యర్థనను తిరస్కరించారు.",
       "assistantStopped": "ప్రతిస్పందన ఆపివేయబడింది.",
       "assistantContextOverflow": "ఈ సంభాషణ మోడల్ నిర్వహించగల పరిమాణాన్ని మించిపోయింది.",
-      "assistantFailed": "ప్రతిస్పందన విఫలమైంది.",
-      "sendFailed": "సందేశాన్ని పంపలేకపోయాము. మళ్లీ ప్రయత్నించండి."
+      "assistantFailed": "ప్రతిస్పందన విఫలమైంది."
     },
     "filePart": {
       "loadingImage": "చిత్రాన్ని లోడ్ చేస్తోంది",

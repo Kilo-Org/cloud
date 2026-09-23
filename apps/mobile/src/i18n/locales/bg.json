@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Когато настройката е изключена, клавишът за нов ред вмъква нов ред в полетата за въвеждане на съобщения до агенти.",
     "biometricUnlock": "Отключване с биометрични данни",
     "biometricUnlockSubtitle": "Изисква се отключване при стартиране и след пет минути във фонов режим.",
-    "featureFlags": "Флагове на функции",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Транскрипция през Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Преобразувай гласовото въвеждане с модел на Kilo Gateway вместо разпознаването на реч на устройството. Записът ти се изпраща до Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "редове {{start}}–{{end}} (съкратено)",
       "linesOf": "редове {{start}}–{{end}} от {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Действието „{{action}}“ в Cloud Agent не успя ({{status}}).",
-      "failed": "Действието „{{action}}“ в Cloud Agent не успя."
-    },
     "collectCopyableText": {
       "unserializableInput": "[входни данни, които не могат да се сериализират]",
       "errorPrefix": "Грешка: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Доставчикът отхвърли заявката.",
       "assistantStopped": "Генерирането на отговора беше спряно.",
       "assistantContextOverflow": "Разговорът е твърде дълъг за модела.",
-      "assistantFailed": "Не успяхме да генерираме отговор.",
-      "sendFailed": "Не успяхме да изпратим съобщението. Опитай отново."
+      "assistantFailed": "Не успяхме да генерираме отговор."
     },
     "filePart": {
       "loadingImage": "Зареждане на изображението",

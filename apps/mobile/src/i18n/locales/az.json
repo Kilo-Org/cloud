@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Bu seçim deaktiv olduqda sətirsonu düyməsi agentin mesaj sahəsinə yeni sətir əlavə edir.",
     "biometricUnlock": "Biometrik məlumatlarla kilidi aç",
     "biometricUnlockSubtitle": "Tətbiq başladıqda və arxa planda beş dəqiqə qaldıqdan sonra kilidi açmaq tələb olunur.",
-    "featureFlags": "Funksiya bayroqları",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Səsin Kilo Gateway ilə mətnə çevrilməsi",
     "gatewayTranscriptionSubtitle": "Səslə daxiletməni cihazın nitq tanımasının əvəzinə Kilo Gateway modeli ilə mətnə çevirin. Səs yazınız Kilo Gateway-e göndərilir.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "{{start}}–{{end}} sətirləri (qısaldılıb)",
       "linesOf": "{{start}}–{{end}} sətirləri, cəmi {{total}} sətir"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent üçün {{action}} əməliyyatı uğursuz oldu ({{status}}).",
-      "failed": "Cloud Agent üçün {{action}} əməliyyatı uğursuz oldu."
-    },
     "collectCopyableText": {
       "unserializableInput": "[seriyalaşdırıla bilməyən giriş]",
       "errorPrefix": "Xəta: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Təminatçı sorğunu rədd etdi.",
       "assistantStopped": "Cavabın yaradılması dayandırıldı.",
       "assistantContextOverflow": "Söhbət model üçün çox uzundur.",
-      "assistantFailed": "Cavabı yaratmaq mümkün olmadı.",
-      "sendFailed": "Mesajı göndərmək mümkün olmadı. Yenidən cəhd et."
+      "assistantFailed": "Cavabı yaratmaq mümkün olmadı."
     },
     "filePart": {
       "loadingImage": "Şəkil yüklənir",

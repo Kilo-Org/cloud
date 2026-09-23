@@ -6,6 +6,8 @@ import {
   deriveSharedSandboxId,
   generateSandboxId,
   generateSandboxRoutingTarget,
+  getDefaultSandboxDestination,
+  getManagedOutboundContainerId,
   getOutboundContainerId,
   getSandboxNamespace,
   isOrgInList,
@@ -856,6 +858,95 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.provider).toBe('vercel');
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
+
+  it('skips Vercel for an enforced dual-enrolled organization and selects containers', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: {
+        PER_SESSION_SANDBOX_ORG_IDS: '*',
+        ...completeVercelConfiguration,
+        VERCEL_SANDBOX_ORG_IDS: '*',
+        CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
+        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+        CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org-id',
+      },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+
+    expect(selection.provider).toBe('cloudflare-containers');
+    expect(selection.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('falls through to Cloudflare for an enforced organization without containers enrollment', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: {
+        PER_SESSION_SANDBOX_ORG_IDS: '*',
+        ...completeVercelConfiguration,
+        VERCEL_SANDBOX_ORG_IDS: '*',
+        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+        CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org-id',
+      },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+
+    expect(selection.provider).toBe('cloudflare');
+    expect(selection.sandboxId).toMatch(/^ses-/);
+  });
+
+  it('still selects Vercel for a dual-enrolled organization when enforcement is off', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: {
+        PER_SESSION_SANDBOX_ORG_IDS: '*',
+        ...completeVercelConfiguration,
+        VERCEL_SANDBOX_ORG_IDS: '*',
+        CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
+        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'false',
+      },
+      orgId: 'org-id',
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+
+    expect(selection.provider).toBe('vercel');
+  });
+
+  it('skips Vercel for a personal owner enforced through the user allowlist', async () => {
+    const selection = await selectSandboxForNewSession({
+      env: {
+        PER_SESSION_SANDBOX_ORG_IDS: '*',
+        ...completeVercelConfiguration,
+        VERCEL_SANDBOX_ORG_IDS: '*',
+        CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
+        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+        CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: 'user-id',
+      },
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+
+    expect(selection.provider).toBe('cloudflare-containers');
+  });
+
+  it('defaults an enforced owner to containers instead of Vercel', () => {
+    const destination = getDefaultSandboxDestination(
+      {
+        CONTROL_PLANE_IDS: '*',
+        PER_SESSION_SANDBOX_ORG_IDS: '*',
+        ...completeVercelConfiguration,
+        VERCEL_SANDBOX_ORG_IDS: '*',
+        CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
+        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+        CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org-id',
+      },
+      { userId: 'user-id', orgId: 'org-id' }
+    );
+
+    expect(destination.provider.id).toBe('cloudflare-containers');
+    expect(destination.instanceType).toBe('standard-4');
+  });
 });
 
 describe('getSandboxNamespace', () => {
@@ -999,6 +1090,38 @@ describe('getOutboundContainerId', () => {
     expect(getOutboundContainerId(env, sandboxId, { managedScmContainment: true })).toBe(
       `${expected}:${sandboxId}`
     );
+  });
+});
+
+describe('getManagedOutboundContainerId', () => {
+  it('binds containers containment to the containers Durable Object, not the sandbox class', () => {
+    const env = {
+      SANDBOX_CONTAINERS: {
+        idFromName: (name: string) => ({ toString: () => `containers:${name}` }),
+      },
+      SandboxSmallContainment: {
+        idFromName: (name: string) => ({ toString: () => `sandbox:${name}` }),
+      },
+    } as unknown as Env;
+
+    expect(
+      getManagedOutboundContainerId('cloudflare-containers', env, {
+        logicalSandboxId: 'ses-logical',
+        physicalSandboxId: 'ses-physical',
+      })
+    ).toBe('containers:ses-logical');
+    expect(
+      getManagedOutboundContainerId('cloudflare', env, {
+        logicalSandboxId: 'ses-logical',
+        physicalSandboxId: 'ses-physical',
+      })
+    ).toBe('sandbox:ses-physical');
+    expect(
+      getManagedOutboundContainerId('vercel', env, {
+        logicalSandboxId: 'ses-logical',
+        physicalSandboxId: 'ses-physical',
+      })
+    ).toBeUndefined();
   });
 });
 

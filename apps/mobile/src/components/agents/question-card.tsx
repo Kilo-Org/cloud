@@ -338,7 +338,14 @@ export function QuestionCard({
                           handleCustomTextChange(qIndex, text);
                         }}
                         placeholder={t('agentChat.questionCard.typeYourOwnAnswerPlaceholder')}
-                        placeholderTextColor={colors.mutedForeground}
+                        // The active field swaps its fill to `bg-primary`, so the
+                        // placeholder follows the fill's foreground like the
+                        // typed text and the option label do; the muted grey is
+                        // painted for the plain background and is unreadable on
+                        // the olive fill.
+                        placeholderTextColor={
+                          isCustomActive ? colors.primaryForeground : colors.mutedForeground
+                        }
                         editable={!interactionDisabled}
                         accessibilityLabel={t('agentChat.questionCard.typeYourOwnAnswer')}
                         accessibilityState={{ disabled: interactionDisabled }}

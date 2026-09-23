@@ -1786,6 +1786,13 @@
       "when": 1789848712703,
       "tag": "0254_charming_iron_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 255,
+      "version": "7",
+      "when": 1790201290523,
+      "tag": "0255_ambiguous_shocker",
+      "breakpoints": true
     }
   ]
 }

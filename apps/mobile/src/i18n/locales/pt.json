@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Quando desativado, a tecla de retorno insere uma nova linha nos campos de mensagem dos agentes.",
     "biometricUnlock": "Desbloquear com biometria",
     "biometricUnlockSubtitle": "É necessário desbloquear ao iniciar e após cinco minutos em segundo plano.",
-    "featureFlags": "Sinalizadores de recursos",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Transcrição com Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transcreva o ditado com um modelo do Kilo Gateway em vez do reconhecimento de fala do dispositivo. A sua gravação é enviada para o Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2265,10 +2260,6 @@
       "linesTruncated": "linhas {{start}}–{{end}} (truncadas)",
       "linesOf": "linhas {{start}}–{{end}} de {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Falhou uma operação do Cloud Agent: {{action}} ({{status}}).",
-      "failed": "Falhou uma operação do Cloud Agent: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[entrada não serializável]",
       "errorPrefix": "Erro: {{error}}"
@@ -2364,8 +2355,7 @@
       "assistantProviderRejected": "O fornecedor rejeitou o pedido.",
       "assistantStopped": "A resposta foi interrompida.",
       "assistantContextOverflow": "A conversa é demasiado longa para o modelo.",
-      "assistantFailed": "A resposta falhou.",
-      "sendFailed": "Não foi possível enviar a mensagem. Tente novamente."
+      "assistantFailed": "A resposta falhou."
     },
     "filePart": {
       "loadingImage": "A carregar a imagem",

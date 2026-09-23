@@ -1,5 +1,9 @@
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
 import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
+import {
+  parseSandboxBillingInput,
+  type SandboxBillingAdmissionResult,
+} from '../container-usage-context.js';
 import type {
   ContainerInstanceSize,
   ContainersObservation,
@@ -14,15 +18,19 @@ import {
 import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { DEADLINE_MS, leaseAtLeastMs } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
-import type { CreateIntent, ObserveResult } from './physical-lifecycle.js';
-import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
+import type {
+  ObserveResult,
+  ProviderAdapter,
+  ProviderAllocationIntent,
+  ProviderCreateIntent,
+} from './provider.js';
 
 const LOG_MAX_BYTES = 1024 * 1024;
 
 function mapObservation(
   observation: ContainersObservation,
   providerRef: string,
-  intent: CreateIntent | null | undefined
+  intent: ProviderAllocationIntent | null | undefined
 ): ObserveResult {
   if (observation.state === 'idle') {
     if (observation.running) return 'unknown';
@@ -43,56 +51,82 @@ export function createCloudflareContainersProviderAdapter(deps: {
   getContainer: (logicalSandboxId: string) => DurableObjectStub<SandboxContainers>;
 }): ProviderAdapter {
   const instance = deps.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
-  const encodeIntentProviderRef = (intent: CreateIntent): string =>
+  const encodeIntentProviderRef = (intent: ProviderAllocationIntent): string =>
     encodeCloudflareProviderRef({
       sandboxId: intent.allocationName ?? deps.logicalSandboxId,
-      containment: false,
+      containment: Boolean(intent.containment?.kilocode || intent.containment?.github),
       instanceId: intent.intentId,
     });
 
-  const resolveProviderRef = (ref: string | null, intent?: CreateIntent | null): string | null =>
-    ref ?? (intent ? encodeIntentProviderRef(intent) : null);
+  const resolveProviderRef = (
+    ref: string | null,
+    intent?: ProviderAllocationIntent | null
+  ): string | null => ref ?? (intent ? encodeIntentProviderRef(intent) : null);
 
   const decodeOwnedProviderRef = (ref: string | null): CloudflareProviderRef | null => {
     const decoded = decodeCloudflareProviderRef(ref);
-    return decoded !== null &&
-      decoded.sandboxId === deps.allocationName &&
-      decoded.containment === false
-      ? decoded
-      : null;
+    return decoded !== null && decoded.sandboxId === deps.allocationName ? decoded : null;
   };
 
   const ensureBillingAdmission: ProviderAdapter['ensureBillingAdmission'] = async (
-    _ref,
+    ref,
     billing
   ) => {
-    if (billing?.enforcementRequested) {
-      throw new AgentSandboxUnavailableError('Container billing unavailable', 'billing_blocked');
+    if (!billing) return;
+    const parsed = decodeOwnedProviderRef(ref);
+    if (!parsed) throw new Error('Invalid Cloudflare containers allocation');
+    const input = parseSandboxBillingInput(billing);
+    const container = deps.getContainer(deps.logicalSandboxId);
+    let blocked = false;
+    try {
+      blocked = await container.isBillingBlocked();
+    } catch {
+      blocked = input.enforcementRequested === true;
+    }
+    if (input.enforcementRequested || blocked) {
+      let admission: SandboxBillingAdmissionResult;
+      try {
+        admission = await container.ensureBillingAdmission(input, instance);
+      } catch {
+        admission = {
+          success: false,
+          code: 'meter_unavailable',
+          message: 'Container billing admission is unavailable',
+        };
+      }
+      if (!admission.success) {
+        throw new AgentSandboxUnavailableError(
+          admission.code === 'insufficient_credits' || admission.code === 'stopping'
+            ? 'Container billing requires additional credits'
+            : 'Container billing admission is temporarily unavailable',
+          'billing_blocked'
+        );
+      }
+    } else {
+      await container.configureBilling(input, instance).catch(() => undefined);
     }
   };
 
   return {
     resumable: false,
+    persistentWorkspace: false,
+    destroysOnStop: true,
     ensureBillingAdmission,
     async create(intent: ProviderCreateIntent) {
-      if (intent.containment && (intent.containment.kilocode || intent.containment.github)) {
-        throw new AgentSandboxUnavailableError(
-          'Cloudflare containers do not support credential containment',
-          'capability_unavailable'
-        );
-      }
       const providerRef = encodeIntentProviderRef(intent);
       await ensureBillingAdmission(providerRef, intent.billing);
       return { providerRef };
     },
     async launch(ref, env) {
-      if (decodeOwnedProviderRef(ref) === null) {
+      const owned = decodeOwnedProviderRef(ref);
+      if (owned === null) {
         throw new Error('Invalid Cloudflare containers allocation');
       }
       const container = deps.getContainer(deps.logicalSandboxId);
       await container.launchWrapper({
         allocationRef: ref,
         instance,
+        containment: owned.containment,
         env: {
           ...env,
           PROVIDER_INSTANCE_ID: ref,

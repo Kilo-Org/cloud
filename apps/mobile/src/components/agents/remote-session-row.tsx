@@ -11,7 +11,6 @@ import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { useOrganization } from '@/lib/organization-context';
 import { Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
@@ -19,16 +18,21 @@ import { refreshActiveSessionsNow } from '@/lib/active-sessions-live-sync';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import {
   isAttentionAcked,
   reconcileSessionAttention,
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
-import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
 import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
+import {
+  namedSessionTitle,
+  SESSION_TITLE_MAX_LENGTH,
+  useUserSessionTitlesRevision,
+} from './session-detail-rename-state';
 import {
   activeSessionMetaTimestamp,
   canExitSessionFromList,
@@ -66,7 +70,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
 }: Readonly<RemoteSessionRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const { renameSession } = useSessionMutations();
   const queryClient = useQueryClient();
@@ -91,6 +95,19 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
     };
   }, [refreshScope]);
   const exitingRef = useRef(false);
+  // The server's creation-default title (`New session - <ISO timestamp>`) is an
+  // internal marker, never row copy: `namedSessionTitle` resolves it through
+  // the shared `sessionDisplayTitle` helper and additionally keeps a
+  // placeholder-shaped title the user's own rename wrote, so the same label
+  // feeds the row, the accessibility label, and the rename prompt. The
+  // subscription repaints the row once the durable record hydrates after a
+  // cold start.
+  const titlesRevision = useUserSessionTitlesRevision();
+  // Same seeding as the stored row: a session the backend has not named yet
+  // opens an empty rename field instead of the `New session - <ISO>` machine
+  // string, and the save paths reject an unchanged or blank value. A title the
+  // user's own rename wrote is still seeded, so a chosen name is not blanked.
+  const renameInitialValue = namedSessionTitle(session.title, session.id) ?? '';
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
 
@@ -112,10 +129,10 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
     reconcileSessionAttention(session.id, session.status, null);
   }, [session.id, session.status, revision]);
 
-  // Every derivation below depends only on the session, the row shape and the
-  // attention flag, so an unchanged payload reuses them instead of redoing the
-  // Intl formatting per parent render. `t` changes identity with the language,
-  // which re-derives the localized strings.
+  // Every derivation below depends only on the session, the row shape, the
+  // attention flag and the recorded-titles revision, so an unchanged payload
+  // reuses them instead of redoing the Intl formatting per parent render. `t`
+  // changes identity with the language, which re-derives the localized strings.
   const { title, agentLabel, canExit, statusKind, subtitle, spokenPrNumber, spokenMeta } =
     useMemo(() => {
       // Spoken meta mirrors the visible meta the row renders. When `needsInput`
@@ -125,7 +142,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
       const metaTimestamp = activeSessionMetaTimestamp(session);
       const timeSpoken = metaTimestamp ? formatSpokenTimeAgo(metaTimestamp) : null;
       return {
-        title: sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled'),
+        title: namedSessionTitle(session.title, session.id) ?? t('agents.sessionRow.untitled'),
         agentLabel: remoteSessionEyebrowLabel(session),
         canExit: canExitSessionFromList(session),
         statusKind: glanceableStatusKind(session.status),
@@ -146,7 +163,8 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
           timeSpoken,
         }),
       };
-    }, [session, variant, needsInput, t]);
+      // eslint-disable-next-line react/exhaustive-deps -- the titles revision is a real input: `namedSessionTitle` reads the recorded-titles store, so the title must re-derive when that store ticks.
+    }, [session, variant, needsInput, t, titlesRevision]);
 
   // Tray rows are always live: the eyebrow draws the status glyph from the
   // shared derivation, so the platform glyph has no slot beside it (and the
@@ -219,13 +237,13 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     showSessionActionMenu({
       showActionSheetWithOptions,
-      bottomInset: bottom,
+      themedSheet,
       onCopySessionId: () => {
         void copySessionId(session.id);
       },
       onRename: () => {
         if (Platform.OS === 'ios') {
-          showRenamePrompt(title, newTitle => {
+          showRenamePrompt(renameInitialValue, newTitle => {
             renameSession(session.id, newTitle);
           });
         } else {
@@ -282,7 +300,8 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
         <RenameModal
           title={t('agentChat.session.renameSession')}
           placeholder={t('agentChat.session.renamePlaceholder')}
-          initialValue={title}
+          initialValue={renameInitialValue}
+          maxLength={SESSION_TITLE_MAX_LENGTH}
           onClose={() => {
             setRenameVisible(false);
           }}

@@ -91,6 +91,22 @@ function fakeClient(overrides: Partial<VercelControlRestClient> = {}): VercelCon
 }
 
 describe('vercel provider adapter', () => {
+  it('declares a persistent workspace with a non-destroying stop', () => {
+    const provider = createVercelProviderAdapter({
+      sandboxName: intent.allocationName,
+      config,
+      restClient: fakeClient(),
+    });
+    expect(provider.persistentWorkspace).toBe(true);
+    expect(provider.destroysOnStop).toBe(false);
+  });
+
+  it('keeps the capabilities when the runtime configuration is unavailable', () => {
+    const provider = createVercelProviderAdapter({ sandboxName: intent.allocationName });
+    expect(provider.persistentWorkspace).toBe(true);
+    expect(provider.destroysOnStop).toBe(false);
+  });
+
   it('returns the allocated ref before wrapper launch and preserves logical control routing', async () => {
     const executeCommand = vi.fn().mockResolvedValue({});
     const createSandbox = vi.fn(fakeClient().createSandbox);

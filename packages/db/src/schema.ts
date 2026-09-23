@@ -94,7 +94,6 @@ import {
   ImpactReferralPaymentProvider,
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
-  RepositoryReviewMode,
   BYOKManagementSource,
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
@@ -325,7 +324,6 @@ export const SCHEMA_CHECK_ENUMS = {
   MCPGatewayAuthorizationRequestStatus,
   MCPGatewayPendingProviderAuthorizationStatus,
   MCPGatewayAuditOutcome,
-  RepositoryReviewMode,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -4309,6 +4307,7 @@ export const platform_integrations = pgTable(
       onDelete: 'restrict',
     }),
     github_disconnected_at: timestamp({ withTimezone: true, mode: 'string' }),
+    github_connection_role: text().$type<'workflow' | 'agent_only'>(),
     github_authorized_by_user_id: text(),
     github_authorized_user_id: text(),
     github_authorized_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -4341,6 +4340,23 @@ export const platform_integrations = pgTable(
       .where(
         sql`${table.platform} = 'github' AND ${table.owned_by_organization_id} IS NOT NULL AND ${table.github_installation_id} IS NOT NULL`
       ),
+    check(
+      'platform_integrations_github_connection_role_check',
+      sql`${table.github_connection_role} IS NULL OR (
+        ${table.platform} = 'github' AND ${table.integration_type} = 'app'
+        AND ${table.platform_installation_id} IS NOT NULL
+        AND ${table.github_connection_role} IN ('workflow', 'agent_only')
+        AND (${table.github_connection_role} <> 'agent_only' OR ${table.github_installation_id} IS NOT NULL)
+      )`
+    ),
+    uniqueIndex('UQ_platform_integrations_github_workflow_canonical')
+      .on(table.github_installation_id)
+      .where(sql`${table.github_connection_role} = 'workflow'`)
+      .concurrently(),
+    uniqueIndex('UQ_platform_integrations_github_workflow_identity')
+      .on(sql`COALESCE(${table.github_app_type}, 'standard')`, table.platform_installation_id)
+      .where(sql`${table.github_connection_role} = 'workflow'`)
+      .concurrently(),
     uniqueIndex('UQ_platform_integrations_github_user_canonical')
       .on(table.owned_by_user_id, table.github_installation_id)
       .concurrently()
@@ -4563,45 +4579,6 @@ export const github_connection_attempts = pgTable(
     ),
   ]
 );
-
-// Per-repository overrides for an installation's default bot-mention model
-// and automatic PR review mode. Both columns are nullable: null means
-// "inherit the installation default" (stored in `platform_integrations.metadata`),
-// not "disabled". A row with all-null overrides is equivalent to having no row.
-export const repository_customizations = pgTable(
-  'repository_customizations',
-  {
-    id: idPrimaryKeyColumn,
-    platform_integration_id: uuid()
-      .notNull()
-      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
-    // The platform's repository identifier (e.g. GitHub's numeric repository
-    // ID, stable across renames/transfers), stored as text so platforms with
-    // non-numeric IDs are representable; not the repository's owner/name string.
-    repository_id: text().notNull(),
-    bot_mention_model_slug: text(),
-    pr_review_mode: text().$type<RepositoryReviewMode>(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    unique('UQ_repository_customizations_integration_repository').on(
-      table.platform_integration_id,
-      table.repository_id
-    ),
-    enumCheck(
-      'repository_customizations_pr_review_mode_check',
-      table.pr_review_mode,
-      RepositoryReviewMode
-    ),
-  ]
-);
-
-export type RepositoryCustomization = typeof repository_customizations.$inferSelect;
-export type NewRepositoryCustomization = typeof repository_customizations.$inferInsert;
 
 export const user_github_app_tokens = pgTable(
   'user_github_app_tokens',
@@ -10047,9 +10024,19 @@ export const user_activity_tokens = pgTable(
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
+    // Set when this row's card was retired. A live card has `superseded_at` null;
+    // the partial unique index below allows at most one such row per scope.
+    superseded_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [
     uniqueIndex('UQ_user_activity_tokens_token').on(table.token),
+    // One live ios_activity card per (user_id, organization_id) scope. `coalesce`
+    // folds the personal scope (null organization) into a single key, because
+    // Postgres treats NULLs as distinct in a unique index.
+    uniqueIndex('UQ_user_activity_tokens_live_ios_activity')
+      .on(table.user_id, sql`coalesce(${table.organization_id}, '')`)
+      .concurrently()
+      .where(sql`${table.kind} = 'ios_activity' AND ${table.superseded_at} IS NULL`),
     index('IDX_user_activity_tokens_user_org').on(table.user_id, table.organization_id),
   ]
 );

@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Yoo cufame, furtuun galchii iddoo ergaa ergamaa barreessuu keessatti sarara haaraa galchiti.",
     "biometricUnlock": "Baayoometirikisiin qulfii bani",
     "biometricUnlockSubtitle": "Appilikeeshinichi yeroo jalqabamu fi duubbee keessatti daqiiqaa shan erga turee booda qulfii bani.",
-    "featureFlags": "Albaasa amalaa",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
     "gatewayTranscription": "Sagalee interneetiin barreeffamatti jijjiiruu Kilo Gateway'n",
     "gatewayTranscriptionSubtitle": "Sagalee galchuu mallattoo sagalee meeshaa irraa haa ta'u moodeela Kilo Gateway'ttiin barreeffamatti jijjiiri. Sagaleen kee Kilo Gateway'tti ergama.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "sararoota {{start}}–{{end}} (gabaabbate)",
       "linesOf": "sararoota {{total}} keessaa {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "{{action}} Cloud Agent irratti hin milkoofne ({{status}}).",
-      "failed": "{{action}} Cloud Agent irratti hin milkoofne."
-    },
     "collectCopyableText": {
       "unserializableInput": "[galtee gara bifa kuufamuutti jijjiiramuu hin dandeenye]",
       "errorPrefix": "Dogoggora: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Dhiyeessaan gaaffii dideera.",
       "assistantStopped": "Deebiin dhaabame.",
       "assistantContextOverflow": "Mariin kun moodelichaaf baay'ee dheeraadha.",
-      "assistantFailed": "Deebii kennuun hin milkoofne.",
-      "sendFailed": "Ergaa erguu hin danda'amne. Deebi'ii yaali."
+      "assistantFailed": "Deebii kennuun hin milkoofne."
     },
     "filePart": {
       "loadingImage": "Suuraa fe'aa jira",

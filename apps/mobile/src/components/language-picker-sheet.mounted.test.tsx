@@ -522,6 +522,49 @@ describe('LanguagePickerSheet apply', () => {
   });
 });
 
+describe('LanguagePickerSheet row alignment', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    i18nManager.isRTL = false;
+  });
+
+  function rowLineClassNames(row: TestRenderer.ReactTestInstance): string[] {
+    return findByType(row, 'Text').map(line => line.props.className ?? '');
+  }
+
+  it('pins both lines of a row to the interface start edge in an LTR interface', async () => {
+    i18nManager.isRTL = false;
+    const renderer = await mountSheet(vi.fn<() => void>());
+
+    // `العربية` is the row whose endonym right-aligned itself under LTR; the
+    // device row carries the same two-line shape.
+    for (const label of ['العربية', 'Device language']) {
+      const lines = rowLineClassNames(findChoiceRow(renderer.root, label));
+      expect(lines).toHaveLength(2);
+      for (const className of lines) {
+        expect(className).toContain('text-left');
+      }
+    }
+
+    renderer.unmount();
+  });
+
+  it('leaves an RTL row to the paragraph direction, never a physical edge', async () => {
+    i18nManager.isRTL = true;
+    const renderer = await mountSheet(vi.fn<() => void>());
+
+    for (const label of ['العربية', 'Device language']) {
+      const lines = rowLineClassNames(findChoiceRow(renderer.root, label));
+      expect(lines).toHaveLength(2);
+      for (const className of lines) {
+        expect(className).not.toContain('text-left');
+      }
+    }
+
+    renderer.unmount();
+  });
+});
+
 describe('LanguagePickerSheet search field', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

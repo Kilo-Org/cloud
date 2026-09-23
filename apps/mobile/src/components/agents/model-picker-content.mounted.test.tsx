@@ -100,6 +100,7 @@ const flatListMock = vi.hoisted(
 
 vi.mock('react-native', () => ({
   FlatList: flatListMock,
+  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',

@@ -36,7 +36,7 @@ import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import {
   findKiloExclusiveModel,
   shouldRedactModelNameInMicrodollarUsage,
-} from '@/lib/ai-gateway/models';
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryLogger } from '@/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';

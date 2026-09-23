@@ -1756,10 +1756,6 @@
       "linesTruncated": "строки {{start}}–{{end}} (вывод сокращён)",
       "linesOf": "строки {{start}}–{{end}} из {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Не удалось выполнить действие «{{action}}» в Cloud Agent ({{status}}).",
-      "failed": "Не удалось выполнить действие «{{action}}» в Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[не удалось сериализовать входные данные]",
       "errorPrefix": "Ошибка: {{error}}"
@@ -1855,8 +1851,7 @@
       "assistantProviderRejected": "Провайдер отклонил запрос.",
       "assistantStopped": "Генерация ответа остановлена.",
       "assistantContextOverflow": "Переписка слишком длинная для этой модели.",
-      "assistantFailed": "Не удалось сформировать ответ.",
-      "sendFailed": "Не удалось отправить сообщение. Попробуйте снова."
+      "assistantFailed": "Не удалось сформировать ответ."
     },
     "filePart": {
       "loadingImage": "Загрузка изображения",

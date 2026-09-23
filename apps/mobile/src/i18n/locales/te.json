@@ -2228,10 +2228,6 @@
       "linesTruncated": "{{start}}–{{end}} పంక్తులు (కొంత భాగం మాత్రమే)",
       "linesOf": "మొత్తం {{total}} పంక్తుల్లో {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agentలో {{action}} విఫలమైంది ({{status}}).",
-      "failed": "Cloud Agentలో {{action}} విఫలమైంది."
-    },
     "collectCopyableText": {
       "unserializableInput": "[సీరియలైజ్ చేయలేని ఇన్‌పుట్]",
       "errorPrefix": "లోపం: {{error}}"
@@ -2327,8 +2323,7 @@
       "assistantProviderRejected": "ప్రొవైడర్ అభ్యర్థనను తిరస్కరించారు.",
       "assistantStopped": "ప్రతిస్పందన ఆపివేయబడింది.",
       "assistantContextOverflow": "ఈ సంభాషణ మోడల్ నిర్వహించగల పరిమాణాన్ని మించిపోయింది.",
-      "assistantFailed": "ప్రతిస్పందన విఫలమైంది.",
-      "sendFailed": "సందేశాన్ని పంపలేకపోయాము. మళ్లీ ప్రయత్నించండి."
+      "assistantFailed": "ప్రతిస్పందన విఫలమైంది."
     },
     "filePart": {
       "loadingImage": "చిత్రాన్ని లోడ్ చేస్తోంది",

@@ -1756,10 +1756,6 @@
       "linesTruncated": "рядки {{start}}–{{end}} (скорочено)",
       "linesOf": "рядки {{start}}–{{end}} з {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Не вдалося виконати дію «{{action}}» у Cloud Agent ({{status}}).",
-      "failed": "Не вдалося виконати дію «{{action}}» у Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[вхідні дані неможливо серіалізувати]",
       "errorPrefix": "Помилка: {{error}}"
@@ -1855,8 +1851,7 @@
       "assistantProviderRejected": "Постачальник відхилив запит.",
       "assistantStopped": "Формування відповіді зупинено.",
       "assistantContextOverflow": "Розмова занадто довга для моделі.",
-      "assistantFailed": "Не вдалося сформувати відповідь.",
-      "sendFailed": "Не вдалося надіслати повідомлення. Спробуйте ще раз."
+      "assistantFailed": "Не вдалося сформувати відповідь."
     },
     "filePart": {
       "loadingImage": "Завантаження зображення",

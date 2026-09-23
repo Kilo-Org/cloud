@@ -2260,10 +2260,6 @@
       "linesTruncated": "redovi {{start}}–{{end}} (skraćeno)",
       "linesOf": "redovi {{start}}–{{end}} od {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Radnja {{action}} za agenta Cloud Agent nije uspela ({{status}}).",
-      "failed": "Radnja {{action}} za agenta Cloud Agent nije uspela."
-    },
     "collectCopyableText": {
       "unserializableInput": "[unos koji se ne može serijalizovati]",
       "errorPrefix": "Greška: {{error}}"
@@ -2359,8 +2355,7 @@
       "assistantProviderRejected": "Provajder je odbio zahtev.",
       "assistantStopped": "Generisanje odgovora je zaustavljeno.",
       "assistantContextOverflow": "Razgovor je predugačak za model.",
-      "assistantFailed": "Generisanje odgovora nije uspelo.",
-      "sendFailed": "Slanje poruke nije uspelo. Pokušaj ponovo."
+      "assistantFailed": "Generisanje odgovora nije uspelo."
     },
     "filePart": {
       "loadingImage": "Učitavanje slike",

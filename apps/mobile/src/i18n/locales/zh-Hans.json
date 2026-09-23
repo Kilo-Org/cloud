@@ -1724,10 +1724,6 @@
       "linesTruncated": "第 {{start}}–{{end}} 行（已截断）",
       "linesOf": "第 {{start}}–{{end}} 行，共 {{total}} 行"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent {{action}}失败（{{status}}）。",
-      "failed": "Cloud Agent {{action}}失败。"
-    },
     "collectCopyableText": {
       "unserializableInput": "[无法序列化的输入]",
       "errorPrefix": "错误：{{error}}"
@@ -1823,8 +1819,7 @@
       "assistantProviderRejected": "提供商拒绝了该请求。",
       "assistantStopped": "已停止生成回复。",
       "assistantContextOverflow": "对话长度已超出模型的处理范围。",
-      "assistantFailed": "生成回复失败。",
-      "sendFailed": "发送消息失败。请重试。"
+      "assistantFailed": "生成回复失败。"
     },
     "filePart": {
       "loadingImage": "正在加载图片",

@@ -2195,7 +2195,7 @@
       "discardDraftMessage": "Your prompt will be lost.",
       "discardWithUploadsMessage": "Your prompt and any unclaimed uploads will be deleted.",
       "discardFailed": "Could not discard the draft. Please try again.",
-      "remoteHint": "Run kilo remote in a project on your computer to start sessions there.",
+      "remoteHint": "To run on your computer, start Kilo there and leave it running.",
       "continueFrom": "Continuing {{title}}",
       "importingSession": "Importing session",
       "cliCannotContinue": "This CLI cannot continue a session. Pick Cloud Agent or another CLI.",
@@ -2235,10 +2235,6 @@
     "readToolMarkdown": {
       "linesTruncated": "lines {{start}}–{{end}} (truncated)",
       "linesOf": "lines {{start}}–{{end}} of {{total}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent {{action}} failed ({{status}})",
-      "failed": "Cloud Agent {{action}} failed"
     },
     "collectCopyableText": {
       "unserializableInput": "[unserializable input]",
@@ -2346,8 +2342,7 @@
       "assistantProviderRejected": "The provider rejected the request.",
       "assistantStopped": "The response was stopped.",
       "assistantContextOverflow": "The conversation is too long for the model.",
-      "assistantFailed": "The response failed.",
-      "sendFailed": "Failed to send message. Please try again."
+      "assistantFailed": "The response failed."
     },
     "filePart": {
       "loadingImage": "Loading image",

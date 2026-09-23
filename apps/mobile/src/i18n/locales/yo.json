@@ -2228,10 +2228,6 @@
       "linesTruncated": "ìlà {{start}}–{{end}} (a gé kúrú)",
       "linesOf": "ìlà {{start}}–{{end}} nínú {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Ìṣe {{action}} fún Cloud Agent kùnà ({{status}}).",
-      "failed": "Ìṣe {{action}} fún Cloud Agent kùnà."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ìgbéwọlé tí a kò lè yí sí ọ̀nà ìpamọ́ dátà]",
       "errorPrefix": "Àṣìṣe: {{error}}"
@@ -2327,8 +2323,7 @@
       "assistantProviderRejected": "Olùpèsè náà kọ ìbéèrè náà.",
       "assistantStopped": "A dá ìdáhùn náà dúró.",
       "assistantContextOverflow": "Ìjíròrò náà gùn ju ohun tí àwòṣe náà lè gbà lọ.",
-      "assistantFailed": "Ìdáhùn náà kùnà.",
-      "sendFailed": "A kò lè fi ìfiránṣẹ́ ránṣẹ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
+      "assistantFailed": "Ìdáhùn náà kùnà."
     },
     "filePart": {
       "loadingImage": "Ń gbé àwòrán wọlé",

@@ -2228,10 +2228,6 @@
       "linesTruncated": "სტრიქონები {{start}}–{{end}} (შემოკლებულია)",
       "linesOf": "სტრიქონები {{start}}–{{end}}, სულ {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent-ის მოქმედება ვერ შესრულდა: {{action}} ({{status}}).",
-      "failed": "Cloud Agent-ის მოქმედება ვერ შესრულდა: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[შეყვანილი მონაცემების სერიალიზაცია შეუძლებელია]",
       "errorPrefix": "შეცდომა: {{error}}"
@@ -2327,8 +2323,7 @@
       "assistantProviderRejected": "პროვაიდერმა უარყო მოთხოვნა.",
       "assistantStopped": "პასუხის შექმნა შეწყდა.",
       "assistantContextOverflow": "საუბარი ძალიან გრძელია ამ მოდელისთვის.",
-      "assistantFailed": "პასუხის შექმნა ვერ მოხერხდა.",
-      "sendFailed": "შეტყობინების გაგზავნა ვერ მოხერხდა. სცადეთ ხელახლა."
+      "assistantFailed": "პასუხის შექმნა ვერ მოხერხდა."
     },
     "filePart": {
       "loadingImage": "სურათის ჩატვირთვა",

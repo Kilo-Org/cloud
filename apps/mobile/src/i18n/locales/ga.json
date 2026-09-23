@@ -2324,10 +2324,6 @@
       "linesTruncated": "línte {{start}}–{{end}} (teasctha)",
       "linesOf": "línte {{start}}–{{end}} de {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Theip ar an ngníomh {{action}} in Cloud Agent ({{status}}).",
-      "failed": "Theip ar an ngníomh {{action}} in Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ionchur nach féidir a shraithiú]",
       "errorPrefix": "Earráid: {{error}}"
@@ -2423,8 +2419,7 @@
       "assistantProviderRejected": "Dhiúltaigh an soláthraí don iarratas.",
       "assistantStopped": "Stopadh an freagra.",
       "assistantContextOverflow": "Tá an comhrá rófhada don tsamhail.",
-      "assistantFailed": "Theip ar an bhfreagra.",
-      "sendFailed": "Theip ar an teachtaireacht a sheoladh. Bain triail as arís le do thoil."
+      "assistantFailed": "Theip ar an bhfreagra."
     },
     "filePart": {
       "loadingImage": "Ag lódáil na híomhá",

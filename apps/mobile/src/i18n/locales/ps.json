@@ -2228,10 +2228,6 @@
       "linesTruncated": "کرښې {{start}}–{{end}} (لنډې شوې)",
       "linesOf": "له {{total}} کرښو څخه {{start}}–{{end}} کرښې"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "د Cloud Agent {{action}} ناکام شو ({{status}}).",
-      "failed": "د Cloud Agent {{action}} ناکام شو."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ننوتلي معلومات په لېږد وړ بڼه نه بدلېږي]",
       "errorPrefix": "تېروتنه: {{error}}"
@@ -2327,8 +2323,7 @@
       "assistantProviderRejected": "چمتو کوونکي غوښتنه رد کړه.",
       "assistantStopped": "ځواب ودرول شو.",
       "assistantContextOverflow": "خبرې اترې د ماډل لپاره ډېرې اوږدې دي.",
-      "assistantFailed": "ځواب ناکام شو.",
-      "sendFailed": "پیغام ونه لېږل شو. بیا هڅه وکړئ."
+      "assistantFailed": "ځواب ناکام شو."
     },
     "filePart": {
       "loadingImage": "انځور بارېږي",

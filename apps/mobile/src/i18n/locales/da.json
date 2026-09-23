@@ -2228,10 +2228,6 @@
       "linesTruncated": "linje {{start}}–{{end}} (forkortet)",
       "linesOf": "linje {{start}}–{{end}} af {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Handlingen {{action}} i Cloud Agent mislykkedes ({{status}}).",
-      "failed": "Handlingen {{action}} i Cloud Agent mislykkedes."
-    },
     "collectCopyableText": {
       "unserializableInput": "[inddata kan ikke serialiseres]",
       "errorPrefix": "Fejl: {{error}}"
@@ -2327,8 +2323,7 @@
       "assistantProviderRejected": "Udbyderen afviste anmodningen.",
       "assistantStopped": "Genereringen af svaret blev stoppet.",
       "assistantContextOverflow": "Samtalen er for lang til modellen.",
-      "assistantFailed": "Svaret kunne ikke genereres.",
-      "sendFailed": "Kunne ikke sende beskeden. Prøv igen."
+      "assistantFailed": "Svaret kunne ikke genereres."
     },
     "filePart": {
       "loadingImage": "Indlæser billede",

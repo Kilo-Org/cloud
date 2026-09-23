@@ -2228,10 +2228,6 @@
       "linesTruncated": "{{start}}–{{end}} வரிகள் (முழுவதும் காட்டப்படவில்லை)",
       "linesOf": "மொத்தம் {{total}} வரிகளில் {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent: {{action}} தோல்வியடைந்தது ({{status}}).",
-      "failed": "Cloud Agent: {{action}} தோல்வியடைந்தது."
-    },
     "collectCopyableText": {
       "unserializableInput": "[தொடராக்க முடியாத உள்ளீடு]",
       "errorPrefix": "பிழை: {{error}}"
@@ -2327,8 +2323,7 @@
       "assistantProviderRejected": "வழங்குநர் கோரிக்கையை நிராகரித்தார்.",
       "assistantStopped": "பதில் நிறுத்தப்பட்டது.",
       "assistantContextOverflow": "இந்த உரையாடல் மாதிரி கையாளக்கூடிய அளவைவிட நீளமாக உள்ளது.",
-      "assistantFailed": "பதிலை உருவாக்க முடியவில்லை.",
-      "sendFailed": "செய்தியை அனுப்ப முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
+      "assistantFailed": "பதிலை உருவாக்க முடியவில்லை."
     },
     "filePart": {
       "loadingImage": "படம் ஏற்றப்படுகிறது",

@@ -2228,10 +2228,6 @@
       "linesTruncated": "andalana {{start}}–{{end}} (nohafohezina)",
       "linesOf": "andalana {{start}}–{{end}} amin'ny {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Tsy nahomby ny {{action}} amin'ny Cloud Agent ({{status}}).",
-      "failed": "Tsy nahomby ny {{action}} amin'ny Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[angona nampidirina tsy azo avadika ho endrika fitahirizana]",
       "errorPrefix": "Hadisoana: {{error}}"
@@ -2327,8 +2323,7 @@
       "assistantProviderRejected": "Nolavin'ny mpamatsy ny fangatahana.",
       "assistantStopped": "Najanona ny famaliana.",
       "assistantContextOverflow": "Lava loatra ny resaka ho an'ny modely.",
-      "assistantFailed": "Tsy nahomby ny famaliana.",
-      "sendFailed": "Tsy nahomby ny fandefasana ny hafatra. Andramo indray azafady."
+      "assistantFailed": "Tsy nahomby ny famaliana."
     },
     "filePart": {
       "loadingImage": "Maka sary",

@@ -1724,10 +1724,6 @@
       "linesTruncated": "dòng {{start}}–{{end}} (đã cắt bớt)",
       "linesOf": "dòng {{start}}–{{end}} trong tổng số {{total}} dòng"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Thao tác {{action}} của Cloud Agent không thành công ({{status}}).",
-      "failed": "Thao tác {{action}} của Cloud Agent không thành công."
-    },
     "collectCopyableText": {
       "unserializableInput": "[đầu vào không thể tuần tự hóa]",
       "errorPrefix": "Lỗi: {{error}}"
@@ -1823,8 +1819,7 @@
       "assistantProviderRejected": "Nhà cung cấp đã từ chối yêu cầu.",
       "assistantStopped": "Quá trình tạo phản hồi đã dừng.",
       "assistantContextOverflow": "Cuộc trò chuyện vượt quá giới hạn độ dài mà mô hình có thể xử lý.",
-      "assistantFailed": "Không thể tạo phản hồi.",
-      "sendFailed": "Không thể gửi tin nhắn. Vui lòng thử lại."
+      "assistantFailed": "Không thể tạo phản hồi."
     },
     "filePart": {
       "loadingImage": "Đang tải hình ảnh",

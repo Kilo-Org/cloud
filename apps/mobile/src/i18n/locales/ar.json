@@ -1788,10 +1788,6 @@
       "linesTruncated": "الأسطر {{start}}–{{end}} (مقتطعة)",
       "linesOf": "الأسطر {{start}}–{{end}} من {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "فشلت العملية {{action}} في Cloud Agent ({{status}}).",
-      "failed": "فشلت العملية {{action}} في Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[مدخلات لا يمكن تحويلها إلى صيغة قابلة للتخزين]",
       "errorPrefix": "خطأ: {{error}}"
@@ -1887,8 +1883,7 @@
       "assistantProviderRejected": "رفض المزود الطلب.",
       "assistantStopped": "تم إيقاف إنشاء الرد.",
       "assistantContextOverflow": "المحادثة أطول من أن يستوعبها النموذج.",
-      "assistantFailed": "تعذّر إنشاء الرد.",
-      "sendFailed": "تعذّر إرسال الرسالة. حاول مرة أخرى."
+      "assistantFailed": "تعذّر إنشاء الرد."
     },
     "filePart": {
       "loadingImage": "جارٍ تحميل الصورة",

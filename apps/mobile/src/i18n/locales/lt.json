@@ -2292,10 +2292,6 @@
       "linesTruncated": "eilutės {{start}}–{{end}} (sutrumpinta)",
       "linesOf": "eilutės {{start}}–{{end}} iš {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "„Cloud Agent“ veiksmas nepavyko: {{action}} ({{status}}).",
-      "failed": "„Cloud Agent“ veiksmas nepavyko: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[neserializuojama įvestis]",
       "errorPrefix": "Klaida: {{error}}"
@@ -2391,8 +2387,7 @@
       "assistantProviderRejected": "Teikėjas atmetė užklausą.",
       "assistantStopped": "Atsakymo generavimas sustabdytas.",
       "assistantContextOverflow": "Pokalbis per ilgas šiam modeliui.",
-      "assistantFailed": "Nepavyko sugeneruoti atsakymo.",
-      "sendFailed": "Nepavyko išsiųsti žinutės. Bandykite dar kartą."
+      "assistantFailed": "Nepavyko sugeneruoti atsakymo."
     },
     "filePart": {
       "loadingImage": "Įkeliamas paveikslėlis",

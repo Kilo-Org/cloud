@@ -2228,10 +2228,6 @@
       "linesTruncated": "ओळी {{start}}–{{end}} (काही मजकूर वगळला)",
       "linesOf": "एकूण {{total}} ओळींपैकी {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent मधील {{action}} क्रिया अयशस्वी झाली ({{status}}).",
-      "failed": "Cloud Agent मधील {{action}} क्रिया अयशस्वी झाली."
-    },
     "collectCopyableText": {
       "unserializableInput": "[सीरियलाइझ करता न येणारे इनपुट]",
       "errorPrefix": "त्रुटी: {{error}}"
@@ -2327,8 +2323,7 @@
       "assistantProviderRejected": "सेवा पुरवठादाराने विनंती नाकारली.",
       "assistantStopped": "प्रतिसाद तयार करणे थांबवले.",
       "assistantContextOverflow": "हे संभाषण मॉडेलच्या मर्यादेपेक्षा मोठे आहे.",
-      "assistantFailed": "प्रतिसाद तयार करता आला नाही.",
-      "sendFailed": "संदेश पाठवता आला नाही. कृपया पुन्हा प्रयत्न करा."
+      "assistantFailed": "प्रतिसाद तयार करता आला नाही."
     },
     "filePart": {
       "loadingImage": "प्रतिमा लोड होत आहे",

@@ -2228,10 +2228,6 @@
       "linesTruncated": "ahịrị {{start}}–{{end}} (ebipụrụ akụkụ)",
       "linesOf": "ahịrị {{start}}–{{end}} n'ime {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "{{action}} na Cloud Agent agaghị nke ọma ({{status}}).",
-      "failed": "{{action}} na Cloud Agent agaghị nke ọma."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ntinye a na-apụghị ịgbanwe ka ọ bụrụ usoro nchekwa]",
       "errorPrefix": "Njehie: {{error}}"
@@ -2327,8 +2323,7 @@
       "assistantProviderRejected": "Onye na-enye ọrụ jụrụ arịrịọ ahụ.",
       "assistantStopped": "Akwụsịrị nzaghachi ahụ.",
       "assistantContextOverflow": "Mkparịta ụka ahụ toro ogologo karịa ihe ihe nlereanya ahụ nwere ike ịnabata.",
-      "assistantFailed": "Nzaghachi ahụ agaghị nke ọma.",
-      "sendFailed": "Enweghị ike iziga ozi. Biko nwaa ọzọ."
+      "assistantFailed": "Nzaghachi ahụ agaghị nke ọma."
     },
     "filePart": {
       "loadingImage": "Na-ebudata onyonyo",

@@ -2228,10 +2228,6 @@
       "linesTruncated": "rivit {{start}}–{{end}} (katkaistu)",
       "linesOf": "rivit {{start}}–{{end}} / {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agentin toiminto epäonnistui: {{action}} ({{status}}).",
-      "failed": "Cloud Agentin toiminto epäonnistui: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[syötettä ei voi sarjallistaa]",
       "errorPrefix": "Virhe: {{error}}"
@@ -2327,8 +2323,7 @@
       "assistantProviderRejected": "Palveluntarjoaja hylkäsi pyynnön.",
       "assistantStopped": "Vastauksen tuottaminen keskeytettiin.",
       "assistantContextOverflow": "Keskustelu on liian pitkä mallille.",
-      "assistantFailed": "Vastauksen tuottaminen epäonnistui.",
-      "sendFailed": "Viestin lähetys epäonnistui. Yritä uudelleen."
+      "assistantFailed": "Vastauksen tuottaminen epäonnistui."
     },
     "filePart": {
       "loadingImage": "Ladataan kuvaa",

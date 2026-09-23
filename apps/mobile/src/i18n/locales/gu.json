@@ -2228,10 +2228,6 @@
       "linesTruncated": "પંક્તિઓ {{start}}–{{end}} (ટૂંકાવેલી)",
       "linesOf": "કુલ {{total}} પંક્તિઓમાંથી {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agentની {{action}} ક્રિયા નિષ્ફળ ગઈ ({{status}}).",
-      "failed": "Cloud Agentની {{action}} ક્રિયા નિષ્ફળ ગઈ."
-    },
     "collectCopyableText": {
       "unserializableInput": "[ક્રમબદ્ધ સ્વરૂપમાં ફેરવી ન શકાય તેવું ઇનપુટ]",
       "errorPrefix": "ભૂલ: {{error}}"
@@ -2327,8 +2323,7 @@
       "assistantProviderRejected": "પ્રદાતાએ વિનંતી નકારી કાઢી.",
       "assistantStopped": "જવાબ અટકાવવામાં આવ્યો.",
       "assistantContextOverflow": "મોડલ માટે વાતચીત ખૂબ લાંબી છે.",
-      "assistantFailed": "જવાબ મળી શક્યો નહીં.",
-      "sendFailed": "સંદેશ મોકલી શકાયો નહીં. ફરી પ્રયાસ કરો."
+      "assistantFailed": "જવાબ મળી શક્યો નહીં."
     },
     "filePart": {
       "loadingImage": "છબી લોડ થઈ રહી છે",

@@ -130,7 +130,9 @@ describe('shared branded splash', () => {
     // fold a developer's generated, gitignored `android/` tree into the result —
     // its `colors.xml` is absent in CI — and merge colors this test does not own
     // into the mod results, so the run would no longer describe only this
-    // plugin's output.
+    // plugin's output. The colors array is asserted by containment for the same
+    // reason: the project's own other theme colors (iconBackground, colorPrimary,
+    // …) can ride along without failing this case.
     const { root } = createAndroidProject();
     const config: ExportedConfig = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
@@ -187,9 +189,9 @@ describe('shared branded splash', () => {
     // `android/app/src/main/res/values/colors.xml` (absent in CI, present in a
     // worktree that prebuilt) cannot add its icon, notification or app-background
     // entries to the array. Assert the splash color this plugin owns is present
-    // by containment, not by pinning the whole array or its exact length, the
-    // same way the styles assertion below pins its theme: this case speaks only
-    // for the entry this plugin writes.
+    // by containment, not by pinning the whole array or its exact length, and
+    // keep the exact `#FAF74F` value, the same way the styles assertion below
+    // pins its theme: this case speaks only for the entry this plugin writes.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([

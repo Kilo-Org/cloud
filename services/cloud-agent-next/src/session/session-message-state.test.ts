@@ -8,6 +8,8 @@ import {
   markMessageCompleted,
   markMessageFailed,
   markMessageInterrupted,
+  markMessageQueuedForRecovery,
+  noOutputRecoveryAllowed,
   terminalizeMessageOnce,
   listNonTerminalAcceptedMessages,
   listMessagesForWrapperRun,
@@ -425,6 +427,106 @@ describe('markAgentActivityObserved', () => {
     expect((await getSessionMessageState(storage, VALID_MESSAGE_ID))?.agentActivityObservedAt).toBe(
       3000
     );
+  });
+});
+
+describe('noOutputRecoveryAllowed', () => {
+  it('allows exactly one recovery per accepted turn', () => {
+    expect(noOutputRecoveryAllowed(0)).toBe(true);
+    expect(noOutputRecoveryAllowed(1)).toBe(false);
+    expect(noOutputRecoveryAllowed(2)).toBe(false);
+  });
+});
+
+describe('markMessageQueuedForRecovery', () => {
+  const target = { url: 'https://example.com/callback' };
+
+  async function putAcceptedMessageForRecovery(
+    storage: SessionMessageStorage,
+    overrides?: Partial<SessionMessageState>
+  ): Promise<SessionMessageIntent> {
+    const intent = createIntent(VALID_MESSAGE_ID, 'recover me');
+    await putSessionMessageState(storage, {
+      ...createQueuedSessionMessageState(intent, { required: true, target }, 1000),
+      status: 'accepted',
+      acceptedAt: 2000,
+      dispatchAcceptanceKind: 'observed',
+      agentActivityObservedAt: 2500,
+      wrapperRunId: 'wr_recovery',
+      terminalAt: 3000,
+      failureReason: 'wrapper_failure',
+      error: 'Wrapper made no execution progress during the watchdog window',
+      failureStage: 'post_dispatch_no_activity',
+      failureCode: 'workspace_setup_failed',
+      failureSubtype: 'sandbox_storage_full',
+      assistantFailureReason: 'provider_unavailable',
+      providerOwnership: 'managed',
+      safeFailureMessage: 'Assistant service is unavailable',
+      ...overrides,
+    });
+    return intent;
+  }
+
+  it('returns the accepted turn to queued and clears terminal fields', async () => {
+    const storage = createFakeStorage();
+    const intent = await putAcceptedMessageForRecovery(storage);
+
+    const updated = await markMessageQueuedForRecovery(storage, VALID_MESSAGE_ID, 4000);
+    const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
+
+    expect(updated?.status).toBe('queued');
+    expect(loaded).toMatchObject({
+      status: 'queued',
+      recoveryAttempts: 1,
+      prompt: 'recover me',
+      createdAt: 1000,
+      callbackRequired: true,
+      callbackTarget: target,
+    });
+    expect(loaded?.admissionSnapshot).toEqual(intent);
+    expect(loaded?.acceptedAt).toBeUndefined();
+    expect(loaded?.wrapperRunId).toBeUndefined();
+    expect(loaded?.dispatchAcceptanceKind).toBeUndefined();
+    expect(loaded?.agentActivityObservedAt).toBeUndefined();
+    for (const field of [
+      'terminalAt',
+      'failureReason',
+      'error',
+      'failureStage',
+      'failureCode',
+      'failureSubtype',
+      'assistantFailureReason',
+      'providerOwnership',
+      'safeFailureMessage',
+    ] as const) {
+      expect(loaded).not.toHaveProperty(field);
+    }
+  });
+
+  it('increments an existing recovery attempt count', async () => {
+    const storage = createFakeStorage();
+    await putAcceptedMessageForRecovery(storage, { recoveryAttempts: 1 });
+
+    const updated = await markMessageQueuedForRecovery(storage, VALID_MESSAGE_ID, 4000);
+
+    expect(updated?.recoveryAttempts).toBe(2);
+  });
+
+  it('returns null unless the message is accepted', async () => {
+    const storage = createFakeStorage();
+    await putSessionMessageState(
+      storage,
+      createQueuedSessionMessageState(
+        createIntent(VALID_MESSAGE_ID, 'still queued'),
+        undefined,
+        1000
+      )
+    );
+
+    expect(await markMessageQueuedForRecovery(storage, VALID_MESSAGE_ID)).toBeNull();
+    expect(
+      await markMessageQueuedForRecovery(storage, 'msg_unknown00000000ABCDEFGHIJKLMN')
+    ).toBeNull();
   });
 });
 

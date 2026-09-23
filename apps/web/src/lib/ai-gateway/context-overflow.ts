@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { getMaxTokens } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { ProxyErrorType } from '@/lib/proxy-error-types';

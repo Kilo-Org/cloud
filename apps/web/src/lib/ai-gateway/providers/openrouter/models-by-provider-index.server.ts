@@ -4,9 +4,15 @@ import { readDb } from '@/lib/drizzle';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
   getOpenRouterModelsMetadataFromDatabase,
+  getVercelModelsMetadataFromDatabase,
   type StoredModelMap,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  normalizeInferenceProviderId,
+  normalizeVercelInferenceProviderIdForRouting,
+  openRouterToVercelInferenceProviderId,
+} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
@@ -24,8 +30,8 @@ export type FetchModelsByProviderSnapshot = () => Promise<NormalizedOpenRouterRe
 
 type ProviderIndexLoaderOptions = {
   fetchSnapshot: FetchModelsByProviderSnapshot;
-  /** Gateway `/models/{id}/endpoints` metadata keyed by exact (variant-suffixed) model id. */
-  fetchStoredModels: () => Promise<StoredModelMap>;
+  fetchOpenRouterModels: () => Promise<StoredModelMap>;
+  fetchVercelModels: () => Promise<StoredModelMap>;
   ttlMs: number;
   nowMs: () => number;
 };
@@ -139,8 +145,27 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
     const index = await loadIndex();
     const snapshotProviderSlugs = index.get(normalizeModelId(modelId));
     if (!snapshotProviderSlugs) return new Set();
-    const storedModels = await options.fetchStoredModels();
-    return narrowProviderSlugsToVariant(snapshotProviderSlugs, storedModels[modelId]);
+    const [storedModels, vercelModels] = await Promise.all([
+      options.fetchOpenRouterModels(),
+      options.fetchVercelModels(),
+    ]);
+    const openRouterProviderSlugs = narrowProviderSlugsToVariant(
+      snapshotProviderSlugs,
+      storedModels[modelId]
+    );
+    const vercelModel = vercelModels[mapModelIdToVercel(modelId)];
+    const vercelProviders = new Set(
+      vercelModel?.endpoints.map(endpoint =>
+        normalizeVercelInferenceProviderIdForRouting(endpoint.provider_name ?? endpoint.tag)
+      )
+    );
+    return new Set(
+      [...snapshotProviderSlugs].filter(
+        slug =>
+          openRouterProviderSlugs.has(slug) ||
+          vercelProviders.has(openRouterToVercelInferenceProviderId(slug))
+      )
+    );
   }
 
   return {
@@ -165,7 +190,8 @@ const DEFAULT_TTL_MS = 30_000;
 
 const defaultLoader = createModelsByProviderIndexLoader({
   fetchSnapshot: fetchLatestModelsByProviderSnapshotFromDb,
-  fetchStoredModels: getOpenRouterModelsMetadataFromDatabase,
+  fetchOpenRouterModels: getOpenRouterModelsMetadataFromDatabase,
+  fetchVercelModels: getVercelModelsMetadataFromDatabase,
   ttlMs: DEFAULT_TTL_MS,
   nowMs: () => Date.now(),
 });

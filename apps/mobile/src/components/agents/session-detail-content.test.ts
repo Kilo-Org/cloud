@@ -349,19 +349,37 @@ vi.mock('@/components/agents/use-session-config-sync', () => ({
   useSessionConfigSync: () => ({ currentMode: 'code', currentModel: '', currentVariant: '' }),
 }));
 const openRenameModal = vi.hoisted(() => vi.fn());
-vi.mock('@/components/agents/use-session-detail-rename', () => ({
-  useSessionDetailRename: ({
-    serverTitle,
-    fallbackTitle,
-  }: {
-    serverTitle?: string;
-    fallbackTitle: string;
-  }) => ({
-    title: serverTitle ?? fallbackTitle,
-    isTitleInteractive: serverTitle !== undefined,
-    openModal: openRenameModal,
-  }),
-}));
+vi.mock('@/components/agents/use-session-detail-rename', async () => {
+  // Mirror the real hook's title derivation (the shared pure helper) instead of
+  // re-stating a simpler rule, so the header assertions below exercise the
+  // production placeholder handling. Only the mutation/connection wiring the
+  // component does not touch here is stubbed out.
+  const { getSessionDetailRenameState, initialRenameState } =
+    await import('@/components/agents/session-detail-rename-state');
+  return {
+    useSessionDetailRename: ({
+      isLoaded = true,
+      serverTitle,
+      fallbackTitle,
+    }: {
+      isLoaded?: boolean;
+      serverTitle?: string;
+      fallbackTitle: string;
+    }) => {
+      const state = getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded,
+        serverTitle,
+        renameState: initialRenameState(),
+      });
+      return {
+        title: state.title,
+        isTitleInteractive: state.isTitleInteractive,
+        openModal: openRenameModal,
+      };
+    },
+  };
+});
 vi.mock('@/lib/analytics/posthog', () => ({
   captureEvent: vi.fn(),
   MESSAGE_SENT_EVENT: 'sent',
@@ -641,6 +659,8 @@ type MountDetailsOptions = {
   metadataReady?: Promise<undefined>;
   displayScope?: ComponentProps<typeof SessionDetailContent>['displayScope'];
   cachedRows?: StoredMessage[] | null;
+  /** Title the route read from the session-list cache before metadata resolved. */
+  cachedTitle?: string;
   /** The route's `?at=` param the screen mounts with. */
   resumeAt?: string | null;
 };
@@ -653,6 +673,7 @@ async function mountDetails(
     metadataReady,
     displayScope = PERSONAL_DISPLAY_SCOPE,
     cachedRows = null,
+    cachedTitle,
     resumeAt,
   } = options;
   const store = createStore();
@@ -749,6 +770,7 @@ async function mountDetails(
         key: id,
         sessionId: id,
         displayScope,
+        ...(cachedTitle === undefined ? {} : { cachedTitle }),
         ...(at === undefined ? {} : { resumeAt: at }),
       })
     );
@@ -928,6 +950,45 @@ describe('SessionDetailContent header title', () => {
     const title = header.findByProps({ accessibilityRole: 'header' });
     expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
     expect(title.props.ellipsizeMode).toBe('tail');
+  });
+
+  // The ingest service names a session `New session - <ISO>` at creation, so a
+  // freshly started session has no user-readable name. The header must show the
+  // same localized `Session` label a title-less session shows, and the title
+  // stays pressable so the user can still rename it.
+  it('shows the localized fallback when the loaded server title is the machine placeholder', async () => {
+    sessionTitleOverride = 'New session - 2026-09-22T16:37:00.000Z';
+    const { renderer } = await mountDetails();
+    const header = renderer.root.findByType(ScreenHeader);
+    expect(header.props.title).toBe(i18n.t('agentChat.session.title'));
+    expect(header.props.onTitlePress).toBeTypeOf('function');
+  });
+
+  // The route seeds the header from the session-list cache before the metadata
+  // read settles (and the metadata read can fail with a Retry). A placeholder
+  // cached title must never be painted on either path.
+  it('never paints a placeholder cached list title, even after the metadata read fails', async () => {
+    const metadata = Promise.withResolvers<undefined>();
+    const cachedRows = [childMessage(ROOT_ID, 'cached root row')];
+    const view = await mountDetails(cachedRows, {
+      metadataReady: metadata.promise,
+      cachedRows,
+      cachedTitle: 'New session - 2026-09-22T16:37:00.000Z',
+    });
+    expect(view.renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
+
+    await act(async () => {
+      metadata.reject(new Error('offline'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The retryable failure keeps the same fallback name on screen.
+    expect(view.renderer.root.findByType(ScreenHeader).props.title).toBe(
+      i18n.t('agentChat.session.title')
+    );
   });
 
   // `ScreenHeader` caps the trailing slot at 50% of the row, but RN's default

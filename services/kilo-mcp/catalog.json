@@ -9114,6 +9114,71 @@
     ],
     "searchBlob": "codingPlans.subscribe Start a subscription to a Kilo coding plan. Pay the plan cost in credits and get the managed provider credential installed. codingplans subscribe planid idempotencykey planId idempotencyKey"
   },
+  "credits.completeAppStorePurchase": {
+    "path": "credits.completeAppStorePurchase",
+    "kind": "mutation",
+    "summary": "Finish an Apple App Store one-off credit-pack purchase by validating the receipt and granting the purchased credits to the user's account.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "signedTransactionJws": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "signedTransactionJws"
+      ]
+    },
+    "tags": [
+      "credits",
+      "completeappstorepurchase",
+      "signedtransactionjws"
+    ],
+    "searchBlob": "credits.completeAppStorePurchase Finish an Apple App Store one-off credit-pack purchase by validating the receipt and granting the purchased credits to the user's account. credits completeappstorepurchase signedtransactionjws signedTransactionJws"
+  },
+  "credits.completePlayPurchase": {
+    "path": "credits.completePlayPurchase",
+    "kind": "mutation",
+    "summary": "Finish a Google Play one-off credit-pack purchase by validating the purchase token and granting the purchased credits to the user's account.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "productId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purchaseToken": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "productId",
+        "purchaseToken"
+      ]
+    },
+    "tags": [
+      "credits",
+      "completeplaypurchase",
+      "productid",
+      "purchasetoken"
+    ],
+    "searchBlob": "credits.completePlayPurchase Finish a Google Play one-off credit-pack purchase by validating the purchase token and granting the purchased credits to the user's account. credits completeplaypurchase productid purchasetoken productId purchaseToken"
+  },
+  "credits.getMobileStoreProducts": {
+    "path": "credits.getMobileStoreProducts",
+    "kind": "query",
+    "summary": "List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount.",
+    "inputSchema": {},
+    "tags": [
+      "credits",
+      "getmobilestoreproducts"
+    ],
+    "searchBlob": "credits.getMobileStoreProducts List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount. credits getmobilestoreproducts"
+  },
   "debug.badInputError": {
     "path": "debug.badInputError",
     "kind": "query",

@@ -41,6 +41,11 @@ import {
 } from './store-subscription-completion';
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
+import { getStoreCreditProductByAppleProductId } from '@/lib/credits/store-products';
+import {
+  reverseStoreCreditPurchase,
+  type StoreCreditReversalResult,
+} from '@/lib/credits/store-refund';
 import { dayjs } from './dayjs';
 
 type DbOrTx = DrizzleTransaction | typeof db;
@@ -835,6 +840,26 @@ export async function processAppStoreKiloPassNotification(params: {
           },
         });
       }
+      // A refunded credit pack is not a Kilo Pass purchase, so it is reversed
+      // separately, keyed by its store transaction id.
+      let storeCreditReversal: StoreCreditReversalResult | null = null;
+      if (getStoreCreditProductByAppleProductId(transaction.productId)) {
+        try {
+          storeCreditReversal = await reverseStoreCreditPurchase(tx, {
+            paymentProvider: KiloPassPaymentProvider.AppStore,
+            providerTransactionId: transaction.transactionId,
+          });
+        } catch (error) {
+          captureException(error, {
+            tags: { area: 'kilo-pass', operation: 'reverse-app-store-credit-pack-refund' },
+            extra: {
+              notificationUuid: notification.notificationUUID,
+              transactionId: transaction.transactionId,
+              productId: transaction.productId,
+            },
+          });
+        }
+      }
       await endStoreSubscription(tx, transaction);
       await appendKiloPassAuditLog(tx, {
         action: KiloPassAuditLogAction.StoreSubscriptionRefunded,
@@ -847,6 +872,7 @@ export async function processAppStoreKiloPassNotification(params: {
           creditTransactionIds: reversal?.creditTransactionIds ?? [],
           totalReversalMicrodollars: reversal?.totalReversalMicrodollars ?? 0,
           reversedItemKinds: reversal?.reversedItemKinds ?? [],
+          storeCreditReversal,
         },
       });
       await tx

@@ -214,7 +214,6 @@
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",
     "bonusCreditsExpiring": "Bonus krediti u iznosu od {{amount}} ističu {{date}}.",
-    "creditBalanceEmpty": "Nemaš više kredita. Kreditima za ovaj nalog upravlja se van iOS aplikacije.",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Moraćeš ponovo da se prijaviš da bi pristupio svom radnom prostoru.",
     "deleteAccountTitle": "Obrisati nalog?",
@@ -3277,5 +3276,17 @@
     "multiplierError": "Unesi množilac 1 ili veći",
     "permissionDenied": "Nemaš dozvolu da upravljaš obaveštenjima o potrošnji.",
     "pushOffByCategory": "Isključeno u Obaveštenjima"
+  },
+  "credits": {
+    "title": "Kupi kredite",
+    "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo aplikaciji. Prodavnica tereti tvoj račun, a krediti se dodaju nakon što prodavnica potvrdi plaćanje.",
+    "packLabel": "Dodaj {{amount}} u kreditima",
+    "priceUnavailable": "Cena nije dostupna",
+    "purchased": "Krediti su dodati na tvoj saldo.",
+    "empty": "Paketi kredita trenutno nisu dostupni.",
+    "noMatchingProducts": "App Store nije vratio odgovarajuće pakete kredita.",
+    "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
+    "purchaseOwnedByAnotherAccount": "Krediti na ovom nalogu Apple Account pripadaju drugom Kilo nalogu. Prijavi se na taj Kilo nalog da ih koristiš.",
+    "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play nalogu pripadaju drugom Kilo nalogu. Prijavite se na taj Kilo nalog da biste ih koristili."
   }
 }

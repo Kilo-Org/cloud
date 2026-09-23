@@ -214,7 +214,6 @@
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",
     "bonusCreditsExpiring": "Bonusa kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}}.",
-    "creditBalanceEmpty": "Tavi kredīti ir iztērēti. Šim kontam kredītus var pārvaldīt ārpus iOS lietotnes.",
     "signOutTitle": "Izrakstīties?",
     "signOutMessage": "Lai piekļūtu savai darbvietai, tev būs jāpierakstās vēlreiz.",
     "deleteAccountTitle": "Dzēst kontu?",
@@ -3277,5 +3276,17 @@
     "multiplierError": "Ievadi reizinātāju, kas ir 1 vai lielāks",
     "permissionDenied": "Tev nav atļaujas pārvaldīt izdevumu brīdinājumus.",
     "pushOffByCategory": "Izslēgts paziņojumos"
+  },
+  "credits": {
+    "title": "Pirkt kredītus",
+    "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
+    "packLabel": "Pievienot {{amount}} kredītos",
+    "priceUnavailable": "Cena nav pieejama",
+    "purchased": "Kredīti ir pievienoti tavai bilancei.",
+    "empty": "Kredītu paketes šobrīd nav pieejamas.",
+    "noMatchingProducts": "App Store neatgrieza nevienu atbilstošu kredītu paketi.",
+    "noMatchingProductsPlay": "Google Play neatgrieza nevienu atbilstošu kredītu paketi.",
+    "purchaseOwnedByAnotherAccount": "Kredīti šajā Apple Account kontā pieder citam Kilo kontam. Lai tos izmantotu, pieraksties attiecīgajā Kilo kontā.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredīti šajā Google Play kontā pieder citam Kilo kontam. Lai tos izmantotu, piesakieties tajā Kilo kontā."
   }
 }

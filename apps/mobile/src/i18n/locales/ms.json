@@ -214,7 +214,6 @@
     "showBalance": "Tunjukkan baki",
     "balanceHidden": "Baki disembunyikan",
     "bonusCreditsExpiring": "Kredit bonus sebanyak {{amount}} akan tamat tempoh pada {{date}}.",
-    "creditBalanceEmpty": "Baki kredit anda kosong. Kredit diuruskan di luar apl iOS untuk akaun ini.",
     "signOutTitle": "Log keluar?",
     "signOutMessage": "Anda perlu log masuk semula untuk mengakses ruang kerja anda.",
     "deleteAccountTitle": "Padam akaun?",
@@ -3234,5 +3233,17 @@
     "multiplierError": "Masukkan pengganda 1 atau lebih",
     "permissionDenied": "Anda tidak mempunyai kebenaran untuk mengurus amaran perbelanjaan.",
     "pushOffByCategory": "Dimatikan dalam Pemberitahuan"
+  },
+  "credits": {
+    "title": "Beli kredit",
+    "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",
+    "packLabel": "Tambah kredit {{amount}}",
+    "priceUnavailable": "Harga tidak tersedia",
+    "purchased": "Kredit telah ditambah pada baki anda.",
+    "empty": "Pek kredit tidak tersedia buat masa ini.",
+    "noMatchingProducts": "App Store tidak memulangkan pek kredit yang sepadan.",
+    "noMatchingProductsPlay": "Google Play tidak memulangkan pek kredit yang sepadan.",
+    "purchaseOwnedByAnotherAccount": "Kredit dalam Apple Account ini milik akaun Kilo yang lain. Log masuk ke akaun Kilo itu untuk menggunakannya.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredit pada Akaun Google Play ini kepunyaan akaun Kilo yang berbeza. Log masuk ke akaun Kilo itu untuk menggunakannya."
   }
 }

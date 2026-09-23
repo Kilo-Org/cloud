@@ -214,7 +214,6 @@
     "showBalance": "Onyesha salio",
     "balanceHidden": "Salio limefichwa",
     "bonusCreditsExpiring": "Muda wa salio la bonasi la {{amount}} unaisha {{date}}.",
-    "creditBalanceEmpty": "Salio lako limeisha. Salio la akaunti hii linasimamiwa nje ya programu ya iOS.",
     "signOutTitle": "Ungependa kutoka kwenye akaunti?",
     "signOutMessage": "Utahitaji kuingia tena ili kufikia eneo lako la kazi.",
     "deleteAccountTitle": "Ungependa kufuta akaunti?",
@@ -3234,5 +3233,17 @@
     "multiplierError": "Weka kizidishi cha 1 au zaidi",
     "permissionDenied": "Huna ruhusa ya kusimamia tahadhari za matumizi.",
     "pushOffByCategory": "Imezimwa katika Arifa"
+  },
+  "credits": {
+    "title": "Nunua salio",
+    "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",
+    "packLabel": "Ongeza salio la {{amount}}",
+    "priceUnavailable": "Bei haipatikani",
+    "purchased": "Salio limeongezwa kwenye usawa wako.",
+    "empty": "Pakiti za salio hazipatikani kwa sasa.",
+    "noMatchingProducts": "App Store haikurudisha pakiti za salio zinazolingana.",
+    "noMatchingProductsPlay": "Google Play haikurudisha pakiti za salio zinazolingana.",
+    "purchaseOwnedByAnotherAccount": "Salio katika Apple Account hii ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia.",
+    "purchaseOwnedByAnotherAccountPlay": "Salio kwenye Akaunti hii ya Google Play ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia."
   }
 }

@@ -17,6 +17,7 @@ import {
   getAvailablePurchases as getAvailableIapPurchases,
   type ProductOrSubscription,
   type ProductSubscription,
+  type Purchase,
   useIAP,
 } from 'expo-iap';
 
@@ -165,6 +166,12 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   const [ownershipChecked, setOwnershipChecked] = useState(false);
   const [ownershipCheckFailed, setOwnershipCheckFailed] = useState(false);
   const [ownershipAttempt, setOwnershipAttempt] = useState(0);
+  // What the store says this device owns. Kept here instead of reading the
+  // hook's reactive `availablePurchases`: the hook's own lookup logs a raw
+  // library error on failure, which a dev build shows as a LogBox toast over
+  // every screen the user reaches afterwards. The module-level lookup below
+  // returns the same list without that log.
+  const [availableStorePurchases, setAvailableStorePurchases] = useState<Purchase[]>([]);
   const retryOwnershipCheck = useCallback(() => {
     setOwnershipCheckFailed(false);
     setOwnershipAttempt(attempt => attempt + 1);
@@ -232,15 +239,10 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     },
   });
   const {
-    availablePurchases,
     connected,
     finishTransaction,
     requestPurchase,
     restorePurchases: restoreStorePurchases,
-    // The hook's own fetch is the only one that publishes into `availablePurchases`.
-    // The module-level `getAvailablePurchases` returns the list without touching
-    // hook state, which left every ownership check blind until a manual restore.
-    getAvailablePurchases: refreshAvailablePurchases,
   } = actionsRef;
 
   // Server-backed fallback for the recovery SKU list: when the store fetch
@@ -269,11 +271,11 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       return null;
     }
     return (
-      availablePurchases.find(purchase =>
+      availableStorePurchases.find(purchase =>
         isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds, enabledGoogleProductIds)
       ) ?? null
     );
-  }, [availablePurchases, enabledAppleProductIds, enabledGoogleProductIds]);
+  }, [availableStorePurchases, enabledAppleProductIds, enabledGoogleProductIds]);
   const ownedAppleProductId = isAndroid ? null : (ownedPurchase?.productId ?? null);
   const ownedGoogleProductId = isAndroid ? (ownedPurchase?.productId ?? null) : null;
   const ownedOriginalTransactionId =
@@ -284,13 +286,18 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   const ownedByAnotherAccount = useMemo(
     () =>
       getAppStoreKiloPassOwnershipPreflight({
-        availablePurchases,
+        availablePurchases: availableStorePurchases,
         currentAppAccountToken: serverProductsQuery.data?.appAccountToken,
         enabledAppleProductIds,
         enabledGoogleProductIds,
         platformOS: Platform.OS,
       }) === 'owned-by-another-account',
-    [availablePurchases, enabledAppleProductIds, enabledGoogleProductIds, serverProductsQuery.data]
+    [
+      availableStorePurchases,
+      enabledAppleProductIds,
+      enabledGoogleProductIds,
+      serverProductsQuery.data,
+    ]
   );
 
   const invalidateAfterCompletion = useCallback(async () => {
@@ -442,7 +449,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
 
     void (async () => {
       try {
-        await refreshAvailablePurchases();
+        setAvailableStorePurchases(await getAvailableIapPurchases());
         // Purchases are only known after the store answers. Until then the screen
         // must not start a purchase: a device subscription owned by another Kilo
         // account would otherwise charge the user before any check can see it.
@@ -459,17 +466,17 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         setIapError({ message: i18n.t(STORE_CONNECTION_ERROR_MESSAGE_KEY), storeConnection: true });
       }
     })();
-  }, [connected, ownershipAttempt, refreshAvailablePurchases]);
+  }, [connected, ownershipAttempt]);
 
   useEffect(() => {
     if (
-      availablePurchases.length === 0 ||
+      availableStorePurchases.length === 0 ||
       (enabledAppleProductIds.length === 0 && enabledGoogleProductIds.length === 0)
     ) {
       return;
     }
 
-    const unrecoveredPurchases = availablePurchases.filter(availablePurchase => {
+    const unrecoveredPurchases = availableStorePurchases.filter(availablePurchase => {
       const id = getPurchaseCompletionId(availablePurchase);
       if (
         recoveredPurchaseIdsRef.current.has(id) ||
@@ -497,7 +504,12 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         }
       })();
     }
-  }, [actions, availablePurchases, enabledAppleProductIds.length, enabledGoogleProductIds.length]);
+  }, [
+    actions,
+    availableStorePurchases,
+    enabledAppleProductIds.length,
+    enabledGoogleProductIds.length,
+  ]);
 
   const value = useMemo<KiloPassNativeIapContextValue>(
     () => ({

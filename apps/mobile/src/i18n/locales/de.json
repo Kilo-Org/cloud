@@ -1536,6 +1536,7 @@
       "idCopied": "Sitzungs-ID kopiert",
       "couldNotCopyId": "Die Sitzungs-ID konnte nicht kopiert werden.",
       "untitled": "Sitzung ohne Titel",
+      "actions": "Sitzungsaktionen",
       "sessionDeleted": "Sitzung gelöscht",
       "needsInput": "eingabe erforderlich",
       "fromPlatform": "von {{platform}}",

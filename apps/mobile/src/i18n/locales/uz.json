@@ -2040,6 +2040,7 @@
       "idCopied": "Sessiya identifikatori nusxalandi",
       "couldNotCopyId": "Sessiya identifikatorini nusxalab bo'lmadi.",
       "untitled": "Nomsiz sessiya",
+      "actions": "Sessiya amallari",
       "sessionDeleted": "Sessiya o'chirildi",
       "needsInput": "javob kutilmoqda",
       "fromPlatform": "{{platform}}dan",

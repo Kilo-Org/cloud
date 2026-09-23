@@ -2040,6 +2040,7 @@
       "idCopied": "அமர்வு ID நகலெடுக்கப்பட்டது",
       "couldNotCopyId": "அமர்வு ID-ஐ நகலெடுக்க முடியவில்லை.",
       "untitled": "பெயரிடப்படாத அமர்வு",
+      "actions": "அமர்வுக்கான செயல்கள்",
       "sessionDeleted": "அமர்வு நீக்கப்பட்டது",
       "needsInput": "உள்ளீடு தேவை",
       "fromPlatform": "{{platform}}-இலிருந்து",

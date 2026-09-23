@@ -2040,6 +2040,7 @@
       "idCopied": "सत्राचा ID कॉपी केला",
       "couldNotCopyId": "सत्राचा ID कॉपी करता आला नाही.",
       "untitled": "नाव नसलेले सत्र",
+      "actions": "सत्रासाठी कृती",
       "sessionDeleted": "सत्र हटवले",
       "needsInput": "प्रतिसाद आवश्यक",
       "fromPlatform": "{{platform}} वरून",

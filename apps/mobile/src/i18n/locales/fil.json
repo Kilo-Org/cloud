@@ -2040,6 +2040,7 @@
       "idCopied": "Nakopya ang ID ng session",
       "couldNotCopyId": "Hindi makopya ang ID ng session.",
       "untitled": "Session na walang pamagat",
+      "actions": "Mga aksiyon sa sesyon",
       "sessionDeleted": "Nabura ang session",
       "needsInput": "naghihintay ng sagot",
       "fromPlatform": "mula sa {{platform}}",

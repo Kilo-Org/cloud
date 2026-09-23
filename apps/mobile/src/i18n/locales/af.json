@@ -2040,6 +2040,7 @@
       "idCopied": "Sessie-ID gekopieer",
       "couldNotCopyId": "Kon nie die sessie-ID kopieer nie.",
       "untitled": "Naamlose sessie",
+      "actions": "Sessieaksies",
       "sessionDeleted": "Sessie geskrap",
       "needsInput": "wag op invoer",
       "fromPlatform": "vanaf {{platform}}",

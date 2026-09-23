@@ -2040,6 +2040,7 @@
       "idCopied": "სესიის ID დაკოპირდა",
       "couldNotCopyId": "სესიის ID-ის კოპირება ვერ მოხერხდა.",
       "untitled": "უსათაურო სესია",
+      "actions": "სესიის მოქმედებები",
       "sessionDeleted": "სესია წაიშალა",
       "needsInput": "პასუხს ელის",
       "fromPlatform": "{{platform}}-დან",

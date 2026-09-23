@@ -2040,6 +2040,7 @@
       "idCopied": "Lotukenni afritað",
       "couldNotCopyId": "Ekki tókst að afrita lotukennið.",
       "untitled": "Ónefnd lota",
+      "actions": "Aðgerðir fyrir lotu",
       "sessionDeleted": "Lotu eytt",
       "needsInput": "bíður eftir svari",
       "fromPlatform": "frá {{platform}}",

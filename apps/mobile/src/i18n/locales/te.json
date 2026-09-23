@@ -2040,6 +2040,7 @@
       "idCopied": "సెషన్ ID కాపీ చేయబడింది",
       "couldNotCopyId": "సెషన్ IDని కాపీ చేయలేకపోయాము.",
       "untitled": "పేరులేని సెషన్",
+      "actions": "సెషన్ చర్యలు",
       "sessionDeleted": "సెషన్ తొలగించబడింది",
       "needsInput": "మీ స్పందన అవసరం",
       "fromPlatform": "{{platform}} నుండి",

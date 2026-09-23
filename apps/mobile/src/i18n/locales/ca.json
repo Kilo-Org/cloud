@@ -2065,6 +2065,7 @@
       "idCopied": "ID de la sessió copiat",
       "couldNotCopyId": "No s'ha pogut copiar l'ID de la sessió.",
       "untitled": "Sessió sense títol",
+      "actions": "Accions de la sessió",
       "sessionDeleted": "Sessió eliminada",
       "needsInput": "pendent de resposta",
       "fromPlatform": "des de {{platform}}",

@@ -2040,6 +2040,7 @@
       "idCopied": "ID da sesión copiado",
       "couldNotCopyId": "Non se puido copiar o ID da sesión.",
       "untitled": "Sesión sen título",
+      "actions": "Accións da sesión",
       "sessionDeleted": "Sesión eliminada",
       "needsInput": "agardando resposta",
       "fromPlatform": "desde {{platform}}",

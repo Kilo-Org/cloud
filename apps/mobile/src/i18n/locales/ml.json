@@ -2040,6 +2040,7 @@
       "idCopied": "സെഷൻ ID പകർത്തി",
       "couldNotCopyId": "സെഷൻ ID പകർത്താനായില്ല.",
       "untitled": "പേരില്ലാത്ത സെഷൻ",
+      "actions": "സെഷനുള്ള പ്രവർത്തനങ്ങൾ",
       "sessionDeleted": "സെഷൻ ഇല്ലാതാക്കി",
       "needsInput": "നിങ്ങളുടെ പ്രതികരണം വേണം",
       "fromPlatform": "{{platform}}-ൽ നിന്ന്",

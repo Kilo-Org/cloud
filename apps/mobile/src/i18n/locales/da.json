@@ -2040,6 +2040,7 @@
       "idCopied": "Session-ID kopieret",
       "couldNotCopyId": "Session-ID'et kunne ikke kopieres.",
       "untitled": "Session uden titel",
+      "actions": "Handlinger for sessionen",
       "sessionDeleted": "Session slettet",
       "needsInput": "afventer svar",
       "fromPlatform": "fra {{platform}}",

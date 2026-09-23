@@ -2040,6 +2040,7 @@
       "idCopied": "Сессийн ID хуулагдсан",
       "couldNotCopyId": "Сессийн ID-г хуулж чадсангүй.",
       "untitled": "Гарчиггүй сесс",
+      "actions": "Сессийн үйлдлүүд",
       "sessionDeleted": "Сесс устгагдсан",
       "needsInput": "хариу хүлээж байна",
       "fromPlatform": "{{platform}}-аас",

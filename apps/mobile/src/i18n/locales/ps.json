@@ -2040,6 +2040,7 @@
       "idCopied": "د ناستې ID کاپي شو",
       "couldNotCopyId": "د ناستې ID کاپي نه شو.",
       "untitled": "بې نومه ناسته",
+      "actions": "د ناستې کړنې",
       "sessionDeleted": "ناسته ړنګه شوه",
       "needsInput": "ځواب ته اړتیا لري",
       "fromPlatform": "له {{platform}} څخه",

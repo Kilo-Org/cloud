@@ -2040,6 +2040,7 @@
       "idCopied": "Saio-IDa kopiatuta",
       "couldNotCopyId": "Ezin izan da saio-IDa kopiatu.",
       "untitled": "Izenik gabeko saioa",
+      "actions": "Saioaren ekintzak",
       "sessionDeleted": "Saioa ezabatuta",
       "needsInput": "zure erantzunaren zain",
       "fromPlatform": "jatorria: {{platform}}",

@@ -2040,6 +2040,7 @@
       "idCopied": "Munkamenet-azonosító másolva",
       "couldNotCopyId": "Nem sikerült másolni a munkamenet azonosítóját.",
       "untitled": "Névtelen munkamenet",
+      "actions": "Munkamenet műveletei",
       "sessionDeleted": "Munkamenet törölve",
       "needsInput": "válaszra vár",
       "fromPlatform": "innen: {{platform}}",

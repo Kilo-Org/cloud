@@ -2040,6 +2040,7 @@
       "idCopied": "Sessions-ID kopierat",
       "couldNotCopyId": "Kunde inte kopiera sessions-ID.",
       "untitled": "Namnlös session",
+      "actions": "Sessionsåtgärder",
       "sessionDeleted": "Session borttagen",
       "needsInput": "väntar på svar",
       "fromPlatform": "från {{platform}}",

@@ -1536,6 +1536,7 @@
       "idCopied": "Đã sao chép ID phiên",
       "couldNotCopyId": "Không thể sao chép ID phiên.",
       "untitled": "Phiên chưa đặt tên",
+      "actions": "Thao tác với phiên",
       "sessionDeleted": "Đã xóa phiên",
       "needsInput": "cần phản hồi",
       "fromPlatform": "từ {{platform}}",

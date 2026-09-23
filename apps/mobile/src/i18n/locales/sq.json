@@ -2040,6 +2040,7 @@
       "idCopied": "ID-ja e seancës u kopjua",
       "couldNotCopyId": "Nuk u kopjua ID-ja e seancës.",
       "untitled": "Seancë pa titull",
+      "actions": "Veprimet e seancës",
       "sessionDeleted": "Seanca u fshi",
       "needsInput": "pret përgjigje",
       "fromPlatform": "nga {{platform}}",

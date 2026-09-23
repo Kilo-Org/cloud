@@ -2040,6 +2040,7 @@
       "idCopied": "ID sesyon an kopye",
       "couldNotCopyId": "Pa t ka kopye ID sesyon an.",
       "untitled": "Sesyon san tit",
+      "actions": "Aksyon pou sesyon an",
       "sessionDeleted": "Sesyon an efase",
       "needsInput": "bezwen repons",
       "fromPlatform": "ki soti sou {{platform}}",

@@ -2040,6 +2040,7 @@
       "idCopied": "شناسهٔ نشست کپی شد",
       "couldNotCopyId": "کپی شناسهٔ نشست ممکن نشد.",
       "untitled": "نشست بدون عنوان",
+      "actions": "اقدامات نشست",
       "sessionDeleted": "نشست حذف شد",
       "needsInput": "در انتظار ورودی",
       "fromPlatform": "از {{platform}}",

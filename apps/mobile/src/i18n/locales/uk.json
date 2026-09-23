@@ -1554,6 +1554,7 @@
       "idCopied": "Ідентифікатор сеансу скопійовано",
       "couldNotCopyId": "Не вдалося скопіювати ідентифікатор сеансу.",
       "untitled": "Сеанс без назви",
+      "actions": "Дії з сеансом",
       "sessionDeleted": "Сеанс видалено",
       "needsInput": "очікує відповіді",
       "fromPlatform": "з {{platform}}",

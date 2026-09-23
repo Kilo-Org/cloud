@@ -2040,6 +2040,7 @@
       "idCopied": "Økt-ID kopiert",
       "couldNotCopyId": "Kunne ikke kopiere økt-ID-en.",
       "untitled": "Økt uten tittel",
+      "actions": "Handlinger for økten",
       "sessionDeleted": "Økt slettet",
       "needsInput": "venter på svar",
       "fromPlatform": "fra {{platform}}",

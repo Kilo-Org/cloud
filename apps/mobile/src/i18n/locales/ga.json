@@ -2115,6 +2115,7 @@
       "idCopied": "Aitheantóir an tseisiúin cóipeáilte",
       "couldNotCopyId": "Níorbh fhéidir aitheantóir an tseisiúin a chóipeáil.",
       "untitled": "Seisiún gan teideal",
+      "actions": "Gníomhartha seisiúin",
       "sessionDeleted": "Scriosadh an seisiún",
       "needsInput": "ionchur de dhíth",
       "fromPlatform": "ó {{platform}}",

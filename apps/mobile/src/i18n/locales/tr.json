@@ -1536,6 +1536,7 @@
       "idCopied": "Oturum kimliği kopyalandı",
       "couldNotCopyId": "Oturum kimliği kopyalanamadı.",
       "untitled": "Başlıksız oturum",
+      "actions": "Oturum işlemleri",
       "sessionDeleted": "Oturum silindi",
       "needsInput": "yanıt bekliyor",
       "fromPlatform": "{{platform}} üzerinden",

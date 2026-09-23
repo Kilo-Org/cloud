@@ -2040,6 +2040,7 @@
       "idCopied": "Seansi ID on kopeeritud",
       "couldNotCopyId": "Seansi ID-d ei õnnestunud kopeerida.",
       "untitled": "Pealkirjata seanss",
+      "actions": "Seansi toimingud",
       "sessionDeleted": "Seanss on kustutatud",
       "needsInput": "vajab sisendit",
       "fromPlatform": "{{platform}} kaudu",

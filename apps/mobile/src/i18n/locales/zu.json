@@ -2040,6 +2040,7 @@
       "idCopied": "I-ID yeseshini ikopishiwe",
       "couldNotCopyId": "Asikwazanga ukukopisha i-ID yeseshini.",
       "untitled": "Iseshini engenagama",
+      "actions": "Izenzo zeseshini",
       "sessionDeleted": "Iseshini isusiwe",
       "needsInput": "kudinga impendulo",
       "fromPlatform": "kusuka ku-{{platform}}",

@@ -27,10 +27,10 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * The notifications.category.*Unavailable reasons below landed in all 86
- * catalogs, so nothing is pending translation today.
+ * The session-row accessibility action landed in all 86 catalogs, so nothing
+ * is pending translation today.
  */
-const PENDING_TRANSLATION_KEYS = new Set<string>(['agents.sessionRow.actions']);
+const PENDING_TRANSLATION_KEYS = new Set<string>();
 
 /**
  * The three copy keys the feature-flag row renders: `<value> · <reason>` under

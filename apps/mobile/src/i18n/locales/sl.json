@@ -2090,6 +2090,7 @@
       "idCopied": "ID seje kopiran",
       "couldNotCopyId": "ID-ja seje ni bilo mogoče kopirati.",
       "untitled": "Seja brez naslova",
+      "actions": "Dejanja za sejo",
       "sessionDeleted": "Seja izbrisana",
       "needsInput": "čaka na vnos",
       "fromPlatform": "s platforme {{platform}}",

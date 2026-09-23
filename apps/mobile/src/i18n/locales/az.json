@@ -2040,6 +2040,7 @@
       "idCopied": "Sessiya ID-sinin surəti çıxarıldı",
       "couldNotCopyId": "Sessiya ID-sinin surətini çıxarmaq mümkün olmadı.",
       "untitled": "Adsız sessiya",
+      "actions": "Sessiya əməliyyatları",
       "sessionDeleted": "Sessiya silindi",
       "needsInput": "cavab gözləyir",
       "fromPlatform": "{{platform}} platformasından",

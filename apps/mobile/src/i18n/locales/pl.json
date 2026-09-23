@@ -1554,6 +1554,7 @@
       "idCopied": "Skopiowano identyfikator sesji",
       "couldNotCopyId": "Nie udało się skopiować identyfikatora sesji.",
       "untitled": "Sesja bez tytułu",
+      "actions": "Działania dotyczące sesji",
       "sessionDeleted": "Usunięto sesję",
       "needsInput": "czeka na odpowiedź",
       "fromPlatform": "z {{platform}}",

@@ -2040,6 +2040,7 @@
       "idCopied": "የክፍለ ጊዜ መለያ ተቀድቷል",
       "couldNotCopyId": "የክፍለ ጊዜውን መለያ መቅዳት አልተቻለም።",
       "untitled": "ርዕስ የሌለው ክፍለ ጊዜ",
+      "actions": "የክፍለ ጊዜ ተግባራት",
       "sessionDeleted": "ክፍለ ጊዜው ተሰርዟል",
       "needsInput": "ምላሽ ይፈልጋል",
       "fromPlatform": "ከ{{platform}}",

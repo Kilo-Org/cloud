@@ -2040,6 +2040,7 @@
       "idCopied": "সেশনের আইডি কপি হয়েছে",
       "couldNotCopyId": "সেশনের আইডি কপি করা যায়নি।",
       "untitled": "শিরোনামবিহীন সেশন",
+      "actions": "সেশনের বিকল্প",
       "sessionDeleted": "সেশন মুছে ফেলা হয়েছে",
       "needsInput": "ইনপুট প্রয়োজন",
       "fromPlatform": "{{platform}} থেকে",

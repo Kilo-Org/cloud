@@ -1536,6 +1536,7 @@
       "idCopied": "Sessie-ID gekopieerd",
       "couldNotCopyId": "De sessie-ID kon niet worden gekopieerd.",
       "untitled": "Naamloze sessie",
+      "actions": "Acties voor de sessie",
       "sessionDeleted": "Sessie verwijderd",
       "needsInput": "invoer nodig",
       "fromPlatform": "van {{platform}}",

@@ -1536,6 +1536,7 @@
       "idCopied": "सत्र की ID कॉपी हो गई",
       "renameMessage": "इस सत्र के लिए नया नाम दर्ज करें।",
       "untitled": "बिना शीर्षक वाला सत्र",
+      "actions": "सत्र के विकल्प",
       "sessionDeleted": "सत्र हटाया गया",
       "needsInput": "इनपुट चाहिए",
       "fromPlatform": "{{platform}} से",

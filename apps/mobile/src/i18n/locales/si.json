@@ -2040,6 +2040,7 @@
       "idCopied": "සැසි හැඳුනුම පිටපත් කර ඇත",
       "couldNotCopyId": "සැසි හැඳුනුම පිටපත් කිරීමට නොහැකි විය.",
       "untitled": "නම නැති සැසිය",
+      "actions": "සැසි ක්‍රියා",
       "sessionDeleted": "සැසිය මකා ඇත",
       "needsInput": "ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
       "fromPlatform": "{{platform}} වෙතින්",

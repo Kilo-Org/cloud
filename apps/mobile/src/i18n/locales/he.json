@@ -1545,6 +1545,7 @@
       "idCopied": "מזהה השיחה הועתק",
       "couldNotCopyId": "לא ניתן היה להעתיק את מזהה השיחה.",
       "untitled": "שיחה ללא כותרת",
+      "actions": "פעולות בשיחה",
       "sessionDeleted": "השיחה נמחקה",
       "needsInput": "נדרש קלט",
       "fromPlatform": "מ-{{platform}}",

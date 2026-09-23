@@ -2065,6 +2065,7 @@
       "idCopied": "Sesijas ID nokopēts",
       "couldNotCopyId": "Neizdevās nokopēt sesijas ID.",
       "untitled": "Sesija bez nosaukuma",
+      "actions": "Darbības ar sesiju",
       "sessionDeleted": "Sesija dzēsta",
       "needsInput": "gaida ievadi",
       "fromPlatform": "no {{platform}}",

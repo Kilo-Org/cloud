@@ -2040,6 +2040,7 @@
       "idCopied": "सत्रको ID प्रतिलिपि गरियो",
       "couldNotCopyId": "सत्रको ID प्रतिलिपि गर्न सकिएन।",
       "untitled": "शीर्षकविहीन सत्र",
+      "actions": "सत्रका कार्यहरू",
       "sessionDeleted": "सत्र मेटियो",
       "needsInput": "जवाफ चाहिन्छ",
       "fromPlatform": "{{platform}} बाट",

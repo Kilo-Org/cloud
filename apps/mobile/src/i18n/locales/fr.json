@@ -2435,6 +2435,7 @@
       "idCopied": "Identifiant de la session copié",
       "couldNotCopyId": "Impossible de copier l'identifiant de la session.",
       "untitled": "Session sans titre",
+      "actions": "Actions de la session",
       "sessionDeleted": "Session supprimée",
       "needsInput": "intervention requise",
       "fromPlatform": "depuis {{platform}}",

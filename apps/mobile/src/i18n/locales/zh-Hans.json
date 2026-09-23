@@ -1536,6 +1536,7 @@
       "idCopied": "会话 ID 已复制",
       "couldNotCopyId": "无法复制会话 ID。",
       "untitled": "无标题会话",
+      "actions": "会话操作",
       "sessionDeleted": "会话已删除",
       "needsInput": "等待输入",
       "fromPlatform": "来自 {{platform}}",

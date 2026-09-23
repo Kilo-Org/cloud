@@ -1572,6 +1572,7 @@
       "idCopied": "تم نسخ معرّف الجلسة",
       "couldNotCopyId": "تعذّر نسخ معرّف الجلسة.",
       "untitled": "جلسة بدون عنوان",
+      "actions": "إجراءات الجلسة",
       "sessionDeleted": "تم حذف الجلسة",
       "needsInput": "بانتظار تدخلك",
       "fromPlatform": "من {{platform}}",

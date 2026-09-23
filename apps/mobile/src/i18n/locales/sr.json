@@ -2065,6 +2065,7 @@
       "idCopied": "ID sesije je kopiran",
       "couldNotCopyId": "Nije moguće kopirati ID sesije.",
       "untitled": "Sesija bez naslova",
+      "actions": "Radnje za sesiju",
       "sessionDeleted": "Sesija je obrisana",
       "needsInput": "čeka unos",
       "fromPlatform": "iz {{platform}}",

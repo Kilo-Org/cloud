@@ -2065,6 +2065,7 @@
       "idCopied": "ID-ul sesiunii a fost copiat",
       "couldNotCopyId": "Nu s-a putut copia ID-ul sesiunii.",
       "untitled": "Sesiune fără titlu",
+      "actions": "Acțiuni pentru sesiune",
       "sessionDeleted": "Sesiune ștearsă",
       "needsInput": "așteaptă un răspuns",
       "fromPlatform": "din {{platform}}",

@@ -2040,6 +2040,7 @@
       "idCopied": "Նիստի ID-ն պատճենվել է",
       "couldNotCopyId": "Չհաջողվեց պատճենել նիստի ID-ն։",
       "untitled": "Անվերնագիր նիստ",
+      "actions": "Նիստի գործողություններ",
       "sessionDeleted": "Նիստը ջնջվել է",
       "needsInput": "սպասում է պատասխանի",
       "fromPlatform": "{{platform}}-ից",

@@ -2040,6 +2040,7 @@
       "idCopied": "ຄັດລອກ ID ເຊດຊັນແລ້ວ",
       "couldNotCopyId": "ບໍ່ສາມາດຄັດລອກ ID ເຊດຊັນໄດ້.",
       "untitled": "ເຊດຊັນບໍ່ມີຊື່",
+      "actions": "ຕົວເລືອກເຊດຊັນ",
       "sessionDeleted": "ລຶບເຊດຊັນແລ້ວ",
       "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ",
       "fromPlatform": "ຈາກ {{platform}}",

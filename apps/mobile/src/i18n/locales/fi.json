@@ -2040,6 +2040,7 @@
       "idCopied": "Istunnon tunnus kopioitu",
       "couldNotCopyId": "Istunnon tunnusta ei voitu kopioida.",
       "untitled": "Nimetön istunto",
+      "actions": "Istunnon toiminnot",
       "sessionDeleted": "Istunto poistettu",
       "needsInput": "odottaa vastausta",
       "fromPlatform": "alustalta {{platform}}",

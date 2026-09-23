@@ -1536,6 +1536,7 @@
       "idCopied": "세션 ID 복사됨",
       "couldNotCopyId": "세션 ID를 복사하지 못했습니다.",
       "untitled": "제목 없는 세션",
+      "actions": "세션 작업",
       "sessionDeleted": "세션이 삭제되었습니다.",
       "needsInput": "입력 필요",
       "fromPlatform": "{{platform}}에서",

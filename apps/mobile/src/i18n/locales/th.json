@@ -2040,6 +2040,7 @@
       "idCopied": "คัดลอก ID เซสชันแล้ว",
       "couldNotCopyId": "ไม่สามารถคัดลอก ID เซสชันได้",
       "untitled": "เซสชันไม่มีชื่อ",
+      "actions": "การดำเนินการกับเซสชัน",
       "sessionDeleted": "ลบเซสชันแล้ว",
       "needsInput": "รอข้อมูลจากคุณ",
       "fromPlatform": "จาก {{platform}}",

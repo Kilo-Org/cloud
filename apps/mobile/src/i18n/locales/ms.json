@@ -2040,6 +2040,7 @@
       "idCopied": "ID sesi disalin",
       "couldNotCopyId": "Tidak dapat menyalin ID sesi.",
       "untitled": "Sesi tanpa tajuk",
+      "actions": "Tindakan sesi",
       "sessionDeleted": "Sesi dipadam",
       "needsInput": "perlu input",
       "fromPlatform": "daripada {{platform}}",

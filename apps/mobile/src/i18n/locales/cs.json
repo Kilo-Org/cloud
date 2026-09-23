@@ -2090,6 +2090,7 @@
       "idCopied": "ID relace zkopírováno",
       "couldNotCopyId": "ID relace se nepodařilo zkopírovat.",
       "untitled": "Nepojmenovaná relace",
+      "actions": "Akce s relací",
       "sessionDeleted": "Relace smazána",
       "needsInput": "čeká na reakci",
       "fromPlatform": "z {{platform}}",

@@ -1509,6 +1509,7 @@
       "idCopied": "ID da sessão copiado",
       "couldNotCopyId": "Não foi possível copiar o ID da sessão.",
       "untitled": "Sessão sem título",
+      "actions": "Ações da sessão",
       "sessionDeleted": "Sessão excluída",
       "needsInput": "aguardando resposta",
       "fromPlatform": "de {{platform}}",

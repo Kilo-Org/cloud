@@ -2090,6 +2090,7 @@
       "idCopied": "Sesijos ID nukopijuotas",
       "couldNotCopyId": "Nepavyko nukopijuoti sesijos ID.",
       "untitled": "Sesija be pavadinimo",
+      "actions": "Sesijos veiksmai",
       "sessionDeleted": "Sesija ištrinta",
       "needsInput": "laukia atsakymo",
       "fromPlatform": "iš {{platform}}",

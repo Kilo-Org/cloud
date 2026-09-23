@@ -1536,6 +1536,7 @@
       "idCopied": "ID sesi disalin",
       "couldNotCopyId": "Tidak dapat menyalin ID sesi.",
       "untitled": "Sesi tanpa judul",
+      "actions": "Tindakan untuk sesi",
       "sessionDeleted": "Sesi dihapus",
       "needsInput": "perlu masukan",
       "fromPlatform": "dari {{platform}}",

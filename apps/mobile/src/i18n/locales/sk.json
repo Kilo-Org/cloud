@@ -2090,6 +2090,7 @@
       "idCopied": "ID relácie bolo skopírované",
       "couldNotCopyId": "ID relácie sa nepodarilo skopírovať.",
       "untitled": "Relácia bez názvu",
+      "actions": "Akcie s reláciou",
       "sessionDeleted": "Relácia bola odstránená",
       "needsInput": "čaká na odpoveď",
       "fromPlatform": "z {{platform}}",

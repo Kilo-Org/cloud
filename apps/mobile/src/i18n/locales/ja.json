@@ -1536,6 +1536,7 @@
       "idCopied": "セッションIDをコピーしました",
       "couldNotCopyId": "セッションIDをコピーできませんでした。",
       "untitled": "無題のセッション",
+      "actions": "セッションの操作",
       "sessionDeleted": "セッションを削除しました",
       "needsInput": "入力が必要",
       "fromPlatform": "{{platform}}から",

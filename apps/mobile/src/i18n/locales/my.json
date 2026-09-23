@@ -2040,6 +2040,7 @@
       "idCopied": "စက်ရှင် ID ကူးယူပြီး",
       "couldNotCopyId": "စက်ရှင် ID ကို ကူးယူ၍မရပါ။",
       "untitled": "အမည်မပေးရသေးသော စက်ရှင်",
+      "actions": "စက်ရှင်လုပ်ဆောင်ချက်များ",
       "sessionDeleted": "စက်ရှင် ဖျက်ပြီး",
       "needsInput": "တုံ့ပြန်ချက် လိုအပ်",
       "fromPlatform": "{{platform}} မှ",

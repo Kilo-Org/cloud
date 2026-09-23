@@ -76,8 +76,11 @@ vi.mock('expo-secure-store', () => ({
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
   isMoneyRole: () => false,
-  // The mounted OrganizationProvider resolves its default from this list; an
-  // empty settled list keeps the card's own selection assertions unchanged.
+}));
+
+// The mounted OrganizationProvider resolves its default from this list; an
+// empty settled list keeps the card's own selection assertions unchanged.
+vi.mock('@/lib/hooks/use-organizations-list', () => ({
   useOrganizationsList: () => ({
     data: [],
     isFetched: true,

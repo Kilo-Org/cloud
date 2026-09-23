@@ -3,29 +3,11 @@ import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobil
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { useAuth } from '@/lib/auth/auth-context';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
-
-/**
- * The current user's memberships. `trpc.organizations.list` requires auth (not
- * an active org selection), so it's gated on the token rather than on
- * `organizationId` — mirrors profile-screen's `orgs` query.
- *
- * One cache entry serves every consumer: role resolution, the boundary and the
- * organization provider's default-organization resolution all observe this
- * same query, so no consumer refetches a list another already has.
- */
-export function useOrganizationsList() {
-  const trpc = useTRPC();
-  const { token } = useAuth();
-  return useQuery({
-    ...trpc.organizations.list.queryOptions(),
-    enabled: token != null,
-  });
-}
 
 /**
  * The current user's role in the active organization, resolved from the shared

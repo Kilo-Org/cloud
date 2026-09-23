@@ -15,7 +15,7 @@ import { deleteAccountMetadata, setAccountMetadata } from '@/lib/auth/account-me
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
 import { writePrivacySnapshotAndEnd } from '@/lib/glanceable/cleanup';
-import { useOrganizationsList } from '@/lib/hooks/use-organization-queries';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 /**

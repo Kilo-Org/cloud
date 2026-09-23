@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { INJECTED_FAULT_ERROR_NAME } from '@/lib/telemetry/e2e-fault';
+
 const getItemAsync = vi.hoisted(() =>
   vi.fn<(key: string, options?: unknown) => Promise<string | null>>()
 );
@@ -230,9 +232,10 @@ describe('readStoredValueWithRetry', () => {
     getItemAsync.mockResolvedValue('stored-token');
     const readStoredValueWithRetry = await loadHelper();
 
-    const settled = expect(readStoredValueWithRetry('auth-token')).rejects.toThrow(
-      'E2E secure-store fault window is open: read of auth-token rejected'
-    );
+    const settled = expect(readStoredValueWithRetry('auth-token')).rejects.toMatchObject({
+      name: INJECTED_FAULT_ERROR_NAME,
+      message: 'E2E secure-store fault window is open: read of auth-token rejected',
+    });
     await vi.advanceTimersByTimeAsync(2000);
 
     await settled;

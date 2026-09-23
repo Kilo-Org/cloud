@@ -1,12 +1,12 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
-import { Platform, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { Check, ChevronDown } from '@/components/ui/icons';
+import { ChevronDown } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -17,10 +17,12 @@ import { useTRPC } from '@/lib/trpc';
 
 export type ContextDisplayScope = { organizationId: string | null; isResolved: boolean };
 
-// `ActionSheetIOS` renders option strings and has no icon API, so the native iOS
-// sheet drops the Android `icons` check. iOS carries the current-account mark in
-// the option label instead; U+2713, the text-presentation check iOS uses in menus.
-const IOS_CHECK_MARK = '\u2713';
+// The native iOS action sheet renders only the option strings and has no icon
+// API, so a check passed through the Android-only `icons` gutter never appears
+// there. The option label is the one element both the native iOS sheet and the
+// Android sheet render, so the current-account mark rides the label instead:
+// U+2713, the text-presentation check the platform menus use.
+const CHECK_MARK = '\u2713';
 
 /** The caller supplies its cached memberships; the picker does not fetch data. */
 export function useContextPicker(orgs: OrgListEntry[] | undefined) {
@@ -45,13 +47,11 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
     // an account the user is not on.
     const isCurrent = (index: number) =>
       index === 0 ? organizationId === null : orgs[index - 1]?.organizationId === organizationId;
-    // The native iOS sheet ignores the Android-only `icons`, so iOS would show no
-    // current-account mark at all; a marked label is the platform's own way to
-    // show the selected item. Android keeps the icon and paints the mark there.
+    // One options array for both platforms: the marked label needs no platform
+    // branch. `icons` is Android-only in this library, so leaving it unset keeps
+    // the mark from doubling on Android.
     const options = labels.map((label, index) =>
-      Platform.OS === 'ios' && index !== cancelButtonIndex && isCurrent(index)
-        ? `${IOS_CHECK_MARK} ${label}`
-        : label
+      index !== cancelButtonIndex && isCurrent(index) ? `${CHECK_MARK} ${label}` : label
     );
     showActionSheetWithOptions(
       {
@@ -61,21 +61,11 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
         containerStyle: { paddingBottom: bottom, backgroundColor: colors.card },
         textStyle: { color: colors.foreground },
         titleTextStyle: { color: colors.mutedForeground },
-        // A rule between rows and a check in a shared left gutter turn the
-        // list from plain copy into distinct choices, with the current account
-        // marked. A row without the check keeps the gutter (a transparent
-        // check) so every label starts on the same line; Cancel takes none.
+        // A rule between rows turns the list from plain copy into distinct
+        // choices, with the current account marked in its label. The native iOS
+        // sheet draws its own separators; these color the Android sheet's.
         showSeparators: true,
         separatorStyle: { backgroundColor: colors.border, height: 0.5 },
-        icons: options.map((_, index) =>
-          index === cancelButtonIndex ? null : (
-            <Check
-              key={index}
-              size={18}
-              color={isCurrent(index) ? colors.foreground : 'transparent'}
-            />
-          )
-        ),
       },
       index => {
         if (index === undefined || index === cancelButtonIndex) {

@@ -1,6 +1,5 @@
 /* eslint-disable max-lines -- test-renderer mounts native presentation with mocked bridges. */
 import { createElement, type ElementType, useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,6 +13,9 @@ const list = vi.hoisted(() => vi.fn());
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 const showPicker = vi.hoisted(() => vi.fn());
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
+// Mutable so a test can prove the picker builds one options array for both
+// platforms: the label carries the current-account mark on iOS and Android.
+const platform = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
 // Mutable so the theme test can prove the picker re-reads the active palette,
 // not just that the dark values are passed through. Values mirror the real
 // light/dark tokens in theme-colors.generated.ts.
@@ -52,29 +54,23 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  Platform: { OS: 'android' },
+  Platform: platform,
   Pressable: 'Pressable',
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 18 }) }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown', Check: 'Check' }));
+vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => theme.colors,
 }));
-
-// The `react-native` mock above exposes `Platform` as a plain object, so a test
-// can switch the platform the picker reads without re-mocking the module.
-const platform = Platform as unknown as { OS: 'android' | 'ios' };
 
 const Text = 'Text' as ElementType;
 const Skeleton = 'Skeleton' as ElementType;
 const Pressable = 'Pressable' as ElementType;
 const name = 'An organization with a long name that must remain fully accessible';
 const orgs = [{ organizationId: 'org-a', organizationName: name, role: 'owner' }];
-// The mocked icon renders as a plain element, so the check paint lives on its props.
-type NativeIcon = { props: { size: number; color: string } };
 type Mounted = Awaited<ReturnType<typeof renderWithProviders>>;
 const mounted: Mounted[] = [];
 let persisted: string | null = null;
@@ -130,7 +126,6 @@ function nativePicker() {
           titleTextStyle: { color: string };
           showSeparators: boolean;
           separatorStyle: { backgroundColor: string; height: number };
-          icons: (NativeIcon | null)[];
         },
         (index?: number) => void,
       ]
@@ -139,12 +134,6 @@ function nativePicker() {
     throw new Error('native picker did not open');
   }
   return { options: call[0], choose: call[1] };
-}
-
-// A row without a check keeps the gutter via a transparent check, so its paint
-// is the only thing distinguishing the current account.
-function checkPaints(native: ReturnType<typeof nativePicker>) {
-  return native.options.icons.map(icon => (icon === null ? null : icon.props.color));
 }
 
 beforeEach(() => {
@@ -220,52 +209,38 @@ describe('ContextControl', () => {
   );
 
   it.each([
-    { stored: null, current: 0 },
-    { stored: 'org-a', current: 1 },
-    { stored: 'org-missing', current: null },
+    { stored: null, expected: ['✓ Personal', name, 'Cancel'] },
+    { stored: 'org-a', expected: ['Personal', `✓ ${name}`, 'Cancel'] },
+    { stored: 'org-missing', expected: ['Personal', name, 'Cancel'] },
   ])(
-    'separates the rows and checks the current account (stored=$stored)',
-    async ({ stored, current }) => {
+    'separates the rows and marks the current account in the option label (stored=$stored)',
+    async ({ stored, expected }) => {
       storage.read.mockResolvedValue(stored);
       const ui = await mount();
       await waitFor(() => !picker(ui).props.disabled);
       await press(picker(ui));
       const native = nativePicker();
-      expect(native.options.options).toEqual(['Personal', name, 'Cancel']);
+      expect(native.options.options).toEqual(expected);
       expect(native.options.showSeparators).toBe(true);
       expect(native.options.separatorStyle).toEqual({
         backgroundColor: DARK_COLORS.border,
         height: 0.5,
       });
-      // One check per choice; Cancel takes no gutter.
-      expect(native.options.icons).toHaveLength(3);
-      expect(native.options.icons[2]).toBeNull();
-      expect(native.options.icons.filter(icon => icon !== null)).toHaveLength(2);
-      expect(native.options.icons[0]?.props.size).toBe(18);
-      expect(checkPaints(native)).toEqual([
-        current === 0 ? DARK_COLORS.foreground : 'transparent',
-        current === 1 ? DARK_COLORS.foreground : 'transparent',
-        null,
-      ]);
     }
   );
 
-  it.each([
-    { stored: null, expected: ['✓ Personal', name, 'Cancel'] },
-    { stored: 'org-a', expected: ['Personal', `✓ ${name}`, 'Cancel'] },
-    { stored: 'org-missing', expected: ['Personal', name, 'Cancel'] },
-  ])(
-    'marks the current account in the iOS option label (stored=$stored)',
-    async ({ stored, expected }) => {
-      // The native iOS sheet drops `icons`, so iOS must carry the mark in the label.
-      platform.OS = 'ios';
-      storage.read.mockResolvedValue(stored);
-      const ui = await mount();
-      await waitFor(() => !picker(ui).props.disabled);
-      await press(picker(ui));
-      expect(nativePicker().options.options).toEqual(expected);
-    }
-  );
+  it('marks the current account the same way on iOS and Android', async () => {
+    storage.read.mockResolvedValue('org-a');
+    const ui = await mount();
+    await waitFor(() => !picker(ui).props.disabled);
+    platform.OS = 'android';
+    await press(picker(ui));
+    const android = nativePicker().options.options;
+    platform.OS = 'ios';
+    await press(picker(ui));
+    expect(nativePicker().options.options).toEqual(android);
+    expect(android).toEqual(['Personal', `✓ ${name}`, 'Cancel']);
+  });
 
   it('checks Personal when the membership list is empty', async () => {
     list.mockResolvedValue([]);
@@ -273,15 +248,12 @@ describe('ContextControl', () => {
     await waitFor(() => !picker(ui).props.disabled);
     await press(picker(ui));
     const native = nativePicker();
-    expect(native.options.options).toEqual(['Personal', 'Cancel']);
+    expect(native.options.options).toEqual(['✓ Personal', 'Cancel']);
     expect(native.options.showSeparators).toBe(true);
     expect(native.options.separatorStyle).toEqual({
       backgroundColor: DARK_COLORS.border,
       height: 0.5,
     });
-    expect(native.options.icons).toHaveLength(2);
-    expect(native.options.icons[1]).toBeNull();
-    expect(checkPaints(native)).toEqual([DARK_COLORS.foreground, null]);
   });
 
   it('themes the native picker with the active theme colors', async () => {

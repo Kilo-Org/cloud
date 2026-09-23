@@ -117,7 +117,6 @@ vi.mock('@/lib/hooks/use-hide-balance-preference', async () => {
 });
 
 vi.mock('@/components/ui/icons', () => ({
-  Check: 'Check',
   ChevronDown: 'ChevronDown',
   Eye: 'Eye',
   EyeOff: 'EyeOff',

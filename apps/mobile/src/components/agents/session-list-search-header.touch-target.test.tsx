@@ -35,6 +35,7 @@ function slopInsets(hitSlop: unknown): Insets {
 }
 
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',

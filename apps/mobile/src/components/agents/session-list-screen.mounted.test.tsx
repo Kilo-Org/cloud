@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import type * as MotionContextModule from '@/lib/a11y/motion-context';
 import type * as PlatformFilterModule from './platform-filter-modal';
+import type * as TextModule from '@/components/ui/text';
 import { AgentSessionListScreen } from './session-list-screen';
 import { RowsRefreshControl } from './rows-refresh-control';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
@@ -63,6 +64,10 @@ const keyboardSubscribers = vi.hoisted(() => ({
   hide: null as (() => void) | null,
 }));
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
+// Mutable so a case can put the tree in an RTL interface: the header action's
+// letterspaced capitals are LTR-only and must drop under RTL, keeping the
+// Arabic label's joins.
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: readFilterRecord,
 }));
@@ -81,7 +86,7 @@ vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: ({ children }: { children: ReactNode }): ReactNode => children,
 }));
 vi.mock('react-native', () => ({
-  I18nManager: { isRTL: false },
+  I18nManager: i18nManager,
   Platform: state.platform,
   Modal: 'Modal',
   Pressable: 'Pressable',
@@ -206,9 +211,13 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
 }));
 vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', async () => {
+vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+vi.mock('@/components/ui/text', async importOriginal => {
   const { createContext } = await import('react');
-  return { Text: 'Text', TextClassContext: createContext('') };
+  // The real constant, so the header action's LTR letterspacing is asserted
+  // against the same class string the eyebrow variant uses (it cannot drift).
+  const { EYEBROW_LATIN_DISPLAY } = await importOriginal<typeof TextModule>();
+  return { EYEBROW_LATIN_DISPLAY, Text: 'Text', TextClassContext: createContext('') };
 });
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => state.auth }));
 vi.mock('@/lib/organization-context', () => ({
@@ -392,6 +401,7 @@ beforeEach(() => {
   state.fontScale = 1;
   state.platform.OS = 'ios';
   state.reducedMotion = false;
+  i18nManager.isRTL = false;
   state.topInset = 0;
   state.leftInset = 0;
   state.rightInset = 0;
@@ -1088,7 +1098,7 @@ describe('AgentSessionListScreen header and admission', () => {
       { ...row, gitUrl: test.filterable ? 'https://github.com/kilo/cloud.git' : undefined },
     ];
     await renderScreen();
-    const history = action('Összes megtekintése');
+    const history = action(i18n.t('agents.sessionList.pastSessions'));
     const label = history.findByType(Text);
     const actionsRow = history.parent;
     const title = header().findByProps({ accessibilityRole: 'header' });
@@ -1121,8 +1131,38 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(
       nodes('Pressable').filter(node => node.props.testID === 'agents-open-filters')
     ).toHaveLength(test.filterable ? 1 : 0);
-    press('Összes megtekintése');
+    press(i18n.t('agents.sessionList.pastSessions'));
     expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
+  });
+
+  // Finding live-now-all: the header link opened the stored-session list while
+  // reading "See all", so over a 0-live empty state it named a longer live list
+  // that is not on screen. The label names the surface it opens instead.
+  it('names the stored-session list it opens, with the LTR-only display treatment', async () => {
+    // Accepted empty: zero live rows, the finding's state.
+    await renderScreen();
+    const historyLabel = i18n.t('agents.sessionList.pastSessions');
+    const history = action(historyLabel);
+    expect(history.props.testID).toBe('agents-view-history');
+    expect(history.props.accessibilityLabel).toBe(historyLabel);
+    expect(history.props.accessibilityLabel).not.toBe(i18n.t('home.seeAll'));
+    const label = history.findByType(Text);
+    expect(label.children).toEqual([historyLabel]);
+    expect(label.props.className).toContain('text-primary');
+    expect(label.props.className).toContain('uppercase');
+    expect(label.props.className).toContain('tracking-[1.5px]');
+    press(historyLabel);
+    expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
+
+    // The letterspaced capitals are LTR-only: an RTL label drops them (the
+    // gaps break a cursive script's joins) and keeps the mono family, size and
+    // color, exactly as the eyebrow variant and SectionHeader do.
+    i18nManager.isRTL = true;
+    await renderScreen();
+    const rtlClasses = (action(historyLabel).findByType(Text).props.className as string).split(' ');
+    expect(rtlClasses).not.toContain('uppercase');
+    expect(rtlClasses.some(name => name.startsWith('tracking'))).toBe(false);
+    expect(rtlClasses).toContain('text-primary');
   });
 
   it('withholds cached rows and the live count until membership resolves', async () => {

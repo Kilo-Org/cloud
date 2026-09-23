@@ -2039,6 +2039,7 @@
       "couldNotSearch": "Could not search sessions",
       "completedWillAppear": "Completed sessions will appear here.",
       "noPastSessions": "No past sessions",
+      "pastSessions": "Past sessions",
       "live": "LIVE"
     },
     "sessionRow": {

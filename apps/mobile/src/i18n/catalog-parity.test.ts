@@ -27,10 +27,12 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * The notifications.category.*Unavailable reasons below landed in all 86
- * catalogs, so nothing is pending translation today.
+ * The notifications.category.*Unavailable reasons landed in all 86 catalogs.
+ * The Agents tab header link (`agents.sessionList.pastSessions`) is the one key
+ * pending translation today: the label fix landed English first, and the
+ * translation slice (s-i18n) lands it in every catalog.
  */
-const PENDING_TRANSLATION_KEYS = new Set<string>();
+const PENDING_TRANSLATION_KEYS = new Set<string>(['agents.sessionList.pastSessions']);
 
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {

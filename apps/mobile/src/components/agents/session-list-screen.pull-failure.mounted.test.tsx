@@ -158,7 +158,13 @@ vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshCont
 vi.mock('@/components/ui/refresh-progress', () => ({ RefreshProgress: 'RefreshProgress' }));
 vi.mock('@/components/ui/text', async () => {
   const { createContext } = await import('react');
-  return { Text: 'Text', TextClassContext: createContext('') };
+  // The screen imports the eyebrow's LTR display class constant; the mock only
+  // needs the export to exist (this suite asserts pull-failure states).
+  return {
+    EYEBROW_LATIN_DISPLAY: 'uppercase tracking-[1.5px]',
+    Text: 'Text',
+    TextClassContext: createContext(''),
+  };
 });
 vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => ({ token: 'account', isLoading: false, isSigningOut: false, authEpoch: 0 }),

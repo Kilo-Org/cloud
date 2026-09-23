@@ -1,6 +1,14 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import {
+  AppState,
+  FlatList,
+  I18nManager,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  View,
+} from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -24,13 +32,14 @@ import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Text } from '@/components/ui/text';
+import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { cn } from '@/lib/utils';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
 
@@ -169,7 +178,7 @@ export function AgentSessionListScreen() {
 
   const navigateToSession = useAgentSessionNavigator();
 
-  const seeAllLabel = t('home.seeAll');
+  const historyLabel = t('agents.sessionList.pastSessions');
   // The list controls take the header's `context` slot, one line below the
   // title, so the 30px title owns the whole title row (Quick Chat puts its
   // account control in the same slot). Sharing that row through `headerRight`,
@@ -188,12 +197,21 @@ export function AgentSessionListScreen() {
         // left slop capped against the gap, right slop reaches 44pt wide
         hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
         accessibilityRole="button"
-        accessibilityLabel={seeAllLabel}
+        accessibilityLabel={historyLabel}
         testID="agents-view-history"
         className="min-w-0 shrink justify-center active:opacity-70"
       >
-        <Text className="shrink text-center font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
-          {seeAllLabel}
+        <Text
+          className={cn(
+            'shrink text-center font-mono-medium text-[11px] text-primary',
+            // LTR-only: the letterspaced capitals break a cursive script's
+            // joins, so an RTL action label drops them (home-ar-loading).
+            // The class string is the eyebrow variant's, so the two labels
+            // cannot drift apart.
+            !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY
+          )}
+        >
+          {historyLabel}
         </Text>
       </Pressable>
       {query.canFilter ? (

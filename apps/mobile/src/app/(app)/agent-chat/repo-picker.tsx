@@ -12,6 +12,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
+import { withRtlInputAlignment } from '@/lib/rtl-text';
 
 type PickerListItem =
   | { key: string; kind: 'header'; titleKey: string }
@@ -113,7 +114,10 @@ export default function RepoPickerScreen() {
               second line that the field's fixed height clips against its
               border. A tail-ellipsized Text truncates the copy at any width
               instead. Both texts share leading-[normal] and a centred text rect
-              so the overlay sits exactly where the typed text will. */}
+              so the overlay sits exactly where the typed text will. The
+              overlay box is a row, so the copy starts at the field's start
+              edge — the physical right in RTL — and the hugging Text cannot
+              drift to the other side of the field. */}
           <View className="relative flex-1">
             <TextInput
               accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
@@ -123,16 +127,19 @@ export default function RepoPickerScreen() {
               returnKeyType="search"
               textAlignVertical="center"
               className="h-8 p-0 text-base leading-[normal] text-foreground"
-              style={{ color: colors.foreground }}
+              style={withRtlInputAlignment({ color: colors.foreground })}
               onChangeText={setSearch}
             />
             {search.length === 0 ? (
-              <View className="absolute inset-0 justify-center" pointerEvents="none">
+              <View
+                className="absolute inset-0 flex-row items-center justify-start"
+                pointerEvents="none"
+              >
                 <Text
                   accessible={false}
                   numberOfLines={1}
                   ellipsizeMode="tail"
-                  className="text-base leading-[normal] font-normal text-muted-foreground"
+                  className="shrink max-w-full text-base leading-[normal] font-normal text-muted-foreground"
                 >
                   {t('agentChat.repoPicker.searchPlaceholder')}
                 </Text>

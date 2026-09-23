@@ -84,6 +84,9 @@ const flatListMock = vi.hoisted(
 );
 
 vi.mock('react-native', () => ({
+  // The search field aligns its own content through `withRtlInputAlignment`,
+  // which reads the interface direction; the mock needs the export to exist.
+  I18nManager: { isRTL: false },
   FlatList: flatListMock,
   Pressable: 'Pressable',
   TextInput: 'TextInput',

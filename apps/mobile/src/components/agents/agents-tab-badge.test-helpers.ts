@@ -59,6 +59,10 @@ vi.mock('@/lib/auth/account-metadata-write', () => ({
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
+  // The live Agents header reads the interface direction for its action
+  // label's LTR-only letterspacing (session-list-screen.tsx), so the mock
+  // needs the export to exist.
+  I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
   AppState: { addEventListener: () => ({ remove: () => undefined }) },
   View: 'View',
@@ -81,7 +85,13 @@ vi.mock('@/components/ui/icons', () => ({
   UserRound: 'UserRound',
 }));
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: 'BlurBar' }));
-vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+// The screen imports the eyebrow's LTR display class constant
+// (`@/components/ui/text`); this suite asserts header/count props, not
+// class strings, so the mock only needs the export to exist.
+vi.mock('@/components/ui/text', () => ({
+  EYEBROW_LATIN_DISPLAY: 'uppercase tracking-[1.5px]',
+  Text: 'Text',
+}));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));

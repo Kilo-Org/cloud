@@ -7,10 +7,13 @@ import {
 } from '@kilocode/container-usage';
 import { Sandbox as StockSandbox } from '@cloudflare/sandbox';
 import type { Env } from './types.js';
-import type { SandboxBillingAdmissionResult, SandboxClassName } from './container-usage-context.js';
+import {
+  usageServiceForSandboxClass,
+  type SandboxBillingAdmissionResult,
+  type SandboxClassName,
+} from './container-usage-context.js';
 import {
   MeteredBillingLifecycle,
-  usageServiceForSandboxClass,
   type BillingIdentity,
   type ContainerStopParams,
 } from './metered-billing-lifecycle.js';

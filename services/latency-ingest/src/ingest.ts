@@ -35,6 +35,50 @@ export type LatencyIngestDeps = {
   log(line: Record<string, unknown>): void;
 };
 
+type LatencyIngestOutcome =
+  | 'ok'
+  | 'not_found'
+  | 'unauthorized'
+  | 'version_rejected'
+  | 'rate_limited'
+  | 'payload_too_large'
+  | 'invalid_body'
+  | 'internal_error';
+
+const OUTCOME_BY_STATUS: Record<number, LatencyIngestOutcome> = {
+  204: 'ok',
+  400: 'invalid_body',
+  401: 'unauthorized',
+  403: 'version_rejected',
+  404: 'not_found',
+  413: 'payload_too_large',
+  429: 'rate_limited',
+};
+
+/**
+ * Emit exactly one duration line per request, so a production 504 on
+ * `/v1/latency` is attributable. This handler performs no upstream I/O, so its
+ * 504 can only come from the Cloudflare runtime; the line is the server-side
+ * timing that the next production pull compares against the gateway budget.
+ * The line carries the allow-listed fields only: `route` is the pathname and
+ * never the query string, and nothing here is caller-supplied.
+ */
+function logIngestDuration(
+  deps: LatencyIngestDeps,
+  url: URL,
+  request: Request,
+  status: number,
+  startedAt: number
+): void {
+  deps.log({
+    route: url.pathname,
+    method: request.method,
+    status,
+    durationMs: Date.now() - startedAt,
+    outcome: OUTCOME_BY_STATUS[status] ?? 'internal_error',
+  });
+}
+
 function errorResponse(status: number): Response {
   return new Response(null, { status });
 }
@@ -107,6 +151,24 @@ export async function handleLatencyIngest(
   deps: LatencyIngestDeps
 ): Promise<Response> {
   const url = new URL(request.url);
+  const startedAt = Date.now();
+  try {
+    const response = await routeLatencyIngest(request, url, deps);
+    logIngestDuration(deps, url, request, response.status, startedAt);
+    return response;
+  } catch (err) {
+    // A rejected dependency (e.g. the rate-limiter binding) escapes as a
+    // Worker 500; still emit the one line so the request stays attributable.
+    logIngestDuration(deps, url, request, 500, startedAt);
+    throw err;
+  }
+}
+
+async function routeLatencyIngest(
+  request: Request,
+  url: URL,
+  deps: LatencyIngestDeps
+): Promise<Response> {
   if (request.method !== 'POST' || url.pathname !== '/v1/latency') {
     return errorResponse(404);
   }

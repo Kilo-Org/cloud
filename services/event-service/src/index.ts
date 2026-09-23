@@ -4,7 +4,11 @@ import { cors } from 'hono/cors';
 import { useWorkersLogger } from 'workers-tagged-logger';
 import type { MiddlewareHandler } from 'hono';
 import type { ConnectTicketResponse } from '@kilocode/event-service';
-import { connectTicketQuerySchema } from '@kilocode/event-service';
+import {
+  connectTicketQuerySchema,
+  RequestDeadlineError,
+  withDeadline,
+} from '@kilocode/event-service';
 import { extractBearerToken } from '@kilocode/worker-utils';
 import { authenticateToken } from './auth';
 import { configureDevLogging, logger, withLogTags } from './util/logger';
@@ -16,6 +20,45 @@ export { ConnectionTicketDO } from './do/connection-ticket-do';
 const app = new Hono<{ Bindings: Env }>();
 const ACCEPTED_WEBSOCKET_PROTOCOL = 'kilo.events.v1';
 const CONNECTION_TICKET_TTL_MS = 30_000;
+
+/**
+ * Total budget for one `/connect-ticket` mint: the bearer's pepper read through
+ * Hyperdrive (`authenticateToken`) plus the per-ticket Durable Object mint
+ * (`mintConnectionTicket`). Strictly below the client's
+ * `CONTROL_PLANE_DEADLINE_MS` (15s) because the client gives up there, and
+ * below the gateway's own budget: a mint that outlives either is a 504 with no
+ * server-side attribution. Both hops are unbounded on their own — the Hyperdrive
+ * read has no statement/connect budget and every ticket targets a fresh,
+ * therefore cold, Durable Object — so they share one deadline. On expiry the
+ * route answers with its retryable mint-failure response, which the client
+ * already treats as a reconnect-and-retry
+ * (packages/event-service/src/client.ts).
+ */
+export const TICKET_MINT_BUDGET_MS = 8_000;
+
+type TicketMintOutcome = 'ok' | 'unauthorized' | 'mint_failed' | 'timeout';
+
+type TicketMintResult =
+  | { outcome: 'ok'; ticket: string; userId: string }
+  | { outcome: Exclude<TicketMintOutcome, 'ok'> };
+
+/**
+ * One allow-listed line per request, emitted with `console.log` rather than
+ * the tagged logger on purpose: the request's async context carries a `userId`
+ * tag, and a duration line must never carry a user id — or a query string, an
+ * `Authorization` header, a token, or a request body. Only these five fields.
+ */
+type RequestDurationLine = {
+  route: string;
+  method: string;
+  status: number;
+  durationMs: number;
+  outcome: TicketMintOutcome;
+};
+
+function logRequestDuration(line: RequestDurationLine): void {
+  console.log(JSON.stringify(line));
+}
 const ALLOWED_BROWSER_ORIGINS = ['https://kilo.ai', 'https://app.kilo.ai', 'http://localhost:3000'];
 const LOCALHOST_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
@@ -80,24 +123,81 @@ async function consumeConnectionTicket(env: Env, ticket: string): Promise<string
   }
 }
 
+/**
+ * Authenticate the bearer and mint the ticket under one deadline. The auth read
+ * and the mint share the same budget, so a stalled hop in either resolves the
+ * route with `timeout` instead of hanging past the gateway's budget. A rejected
+ * hop is reported as `mint_failed` — the same retryable failure the client
+ * already reconnects and retries on.
+ */
+async function authenticateAndMintTicket(
+  env: Env,
+  token: string | null
+): Promise<TicketMintResult> {
+  try {
+    return await withDeadline(TICKET_MINT_BUDGET_MS, async () => {
+      const auth = await authenticateToken(token, env);
+      if (!auth) {
+        return { outcome: 'unauthorized' } satisfies TicketMintResult;
+      }
+
+      const ticket = await mintConnectionTicket(env, auth.userId);
+      if (!ticket) {
+        return { outcome: 'mint_failed' } satisfies TicketMintResult;
+      }
+
+      return { outcome: 'ok', ticket, userId: auth.userId } satisfies TicketMintResult;
+    });
+  } catch (err) {
+    if (err instanceof RequestDeadlineError) {
+      logger.debug('connect-ticket: mint budget expired', { budgetMs: TICKET_MINT_BUDGET_MS });
+      return { outcome: 'timeout' };
+    }
+    return { outcome: 'mint_failed' };
+  }
+}
+
 app.post('/connect-ticket', async c => {
+  const startedAt = Date.now();
   const token = extractBearerToken(c.req.header('authorization'));
-  const auth = await authenticateToken(token, c.env);
-  if (!auth) {
+  const result = await authenticateAndMintTicket(c.env, token);
+
+  if (result.outcome === 'unauthorized') {
     logger.debug('connect-ticket: unauthorized');
+    logRequestDuration({
+      route: '/connect-ticket',
+      method: c.req.method,
+      status: 401,
+      durationMs: Date.now() - startedAt,
+      outcome: result.outcome,
+    });
     return c.json({ error: 'Unauthorized' }, 401);
   }
 
-  logger.setTags({ userId: auth.userId });
-  const ticket = await mintConnectionTicket(c.env, auth.userId);
-  if (!ticket) {
-    logger.debug('connect-ticket: mint failed');
+  if (result.outcome !== 'ok') {
+    logger.debug('connect-ticket: mint failed', { outcome: result.outcome });
+    logRequestDuration({
+      route: '/connect-ticket',
+      method: c.req.method,
+      status: 500,
+      durationMs: Date.now() - startedAt,
+      outcome: result.outcome,
+    });
     return c.json({ error: 'Ticket mint failed' }, 500);
   }
 
+  logger.setTags({ userId: result.userId });
   logger.debug('connect-ticket: minted');
 
-  const response = { ticket } satisfies ConnectTicketResponse;
+  logRequestDuration({
+    route: '/connect-ticket',
+    method: c.req.method,
+    status: 200,
+    durationMs: Date.now() - startedAt,
+    outcome: result.outcome,
+  });
+
+  const response = { ticket: result.ticket } satisfies ConnectTicketResponse;
   return c.json(response);
 });
 

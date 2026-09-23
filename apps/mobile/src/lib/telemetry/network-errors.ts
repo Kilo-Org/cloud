@@ -5,11 +5,28 @@
  * transport sink (s2 wires the Sentry adapter); until then every report is a
  * no-op. Query strings are never emitted — tRPC input and tokens live there
  * (mirrors `sentry-scrub.ts`).
+ *
+ * Family 4 (KILO-APP-GX, `fetch failed: Fetch request has been canceled`) is
+ * raised by this module's classifier (`abort-classification.ts`), so the fix
+ * is there: the production abort shape is matched in `isExpoCanceledError`.
+ *
+ * Family 3 (KILO-APP-DJ, `java.net.UnknownHostException`) needs no filter and
+ * no code change. It is a mid-flight device-network drop, not an app defect:
+ * react-query is gated on connectivity — `query-client-lifecycle.tsx` sets
+ * `onlineManager` from `isOnline(...)`, mounted in `app-root-providers.tsx`,
+ * and `connectivity-online.ts` never treats unknown as online — so the app
+ * does not poll while confirmed offline. The reported failure is a request
+ * already in flight when the device lost its network.
  */
 
 import { z } from 'zod';
 
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
+import { isAbortError, isRequestDeadlineError } from '@/lib/telemetry/abort-classification';
+
+// Re-exported for existing consumers and tests; the classifier lives in
+// `abort-classification.ts` so this module stays under the line limit.
+export { isAbortError };
 
 type TelemetrySource = 'trpc' | 'fetch';
 
@@ -69,21 +86,6 @@ const ResponseErrorItemSchema = z.looseObject({ error: TrpcResponseErrorSchema }
 
 /** A parsed tRPC error object read from a response body. */
 export type TrpcResponseError = z.infer<typeof TrpcResponseErrorSchema>;
-
-// `Error` and `DOMException` both carry a string `name`; abort/deadline checks
-// key on it so a structured error never needs an `instanceof` across bundles.
-const NamedErrorSchema = z.looseObject({ name: z.string() });
-
-// Expo SDK 57's fetch rejects a canceled request with a
-// `FetchRequestCanceledException`: a raw native error carries it as `name`, an
-// expo-modules-core `CodedError` as `code`, and the `FetchError` wrapper (whose
-// `name` is `Error`) embeds it in `message`.
-const ErrorCodeSchema = z.looseObject({ code: z.string() });
-const ErrorMessageSchema = z.looseObject({ message: z.string() });
-const ErrorCauseSchema = z.looseObject({ cause: z.unknown() });
-
-const EXPO_CANCEL_NAME = 'FetchRequestCanceledException';
-const ABORT_ERROR_NAME = 'AbortError';
 
 const TRPC_PATH = '/api/trpc/';
 const HTTP_URL_PATTERN = /^https?:\/\//iu;
@@ -171,55 +173,6 @@ export async function readTrpcResponseError(
 function errorPropertyOf(value: unknown): TrpcResponseError | undefined {
   const parsed = ResponseErrorItemSchema.safeParse(value);
   return parsed.success ? parsed.data.error : undefined;
-}
-
-/**
- * True when the value is an abort: an `AbortError` / `DOMException` or an Expo
- * `FetchRequestCanceledException`. The Expo cancellation is checked on the
- * error itself and one level of `cause`, since the SDK wraps it. Total: an
- * unrecognized value yields `false` and never throws.
- */
-export function isAbortError(error: unknown): boolean {
-  try {
-    if (hasErrorName(error, ABORT_ERROR_NAME) || isExpoCanceledError(error)) {
-      return true;
-    }
-    const parsed = ErrorCauseSchema.safeParse(error);
-    return parsed.success && parsed.data.cause !== undefined
-      ? isExpoCanceledError(parsed.data.cause)
-      : false;
-  } catch {
-    return false;
-  }
-}
-
-function isExpoCanceledError(error: unknown): boolean {
-  try {
-    if (hasErrorName(error, EXPO_CANCEL_NAME)) {
-      return true;
-    }
-    const byCode = ErrorCodeSchema.safeParse(error);
-    if (byCode.success && byCode.data.code === EXPO_CANCEL_NAME) {
-      return true;
-    }
-    const byMessage = ErrorMessageSchema.safeParse(error);
-    return byMessage.success && byMessage.data.message.includes(EXPO_CANCEL_NAME);
-  } catch {
-    return false;
-  }
-}
-
-function hasErrorName(error: unknown, name: string): boolean {
-  try {
-    const parsed = NamedErrorSchema.safeParse(error);
-    return parsed.success && parsed.data.name === name;
-  } catch {
-    return false;
-  }
-}
-
-function isRequestDeadlineError(error: unknown): boolean {
-  return hasErrorName(error, 'RequestDeadlineError');
 }
 
 function statusClassFor(status: number | undefined): '4xx' | '5xx' | undefined {

@@ -2,6 +2,7 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
+import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { db } from '@/lib/drizzle';
@@ -344,7 +345,11 @@ export async function listActiveSessions({
     const url = `${SESSION_INGEST_WORKER_URL}/api/sessions/active`;
 
     try {
-      const response = await fetch(url, {
+      // Bounded: a session-ingest worker that never answers aborts inside
+      // `CONTROL_PLANE_UPSTREAM_BUDGET_MS` and rejects with
+      // `ServiceFetchTimeoutError`, which the catch below already degrades
+      // exactly as any other upstream failure does.
+      const response = await fetchWithinBudget(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

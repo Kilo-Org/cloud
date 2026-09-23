@@ -68,8 +68,22 @@ function makeDeps(overrides: Partial<LatencyIngestDeps> = {}) {
   return { deps, lines, keys };
 }
 
-function post(body: unknown, headers: Record<string, string> = {}) {
-  return new Request(ENDPOINT, {
+/** Per-sample ingest lines (`type: 'client_latency'`). */
+function sampleLines(lines: Record<string, unknown>[]) {
+  return lines.filter(line => line.type === 'client_latency');
+}
+
+/** The one per-request duration line the handler now always emits. */
+function durationLines(lines: Record<string, unknown>[]) {
+  return lines.filter(line => typeof line.route === 'string');
+}
+
+/**
+ * POST the endpoint. `search` is appended to the URL so a test can prove a
+ * query string never reaches the duration line.
+ */
+function post(body: unknown, headers: Record<string, string> = {}, search = '') {
+  return new Request(`${ENDPOINT}${search}`, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${BEARER}`,
@@ -87,7 +101,7 @@ afterEach(() => {
 
 describe('handleLatencyIngest routing and auth', () => {
   it('returns 404 on another path', async () => {
-    const { deps } = makeDeps();
+    const { deps, lines } = makeDeps();
     const request = new Request('https://latency.kiloapps.io/v1/other', {
       method: 'POST',
       headers: { authorization: `Bearer ${BEARER}`, 'x-kilo-app-version': '1.0.12' },
@@ -97,6 +111,10 @@ describe('handleLatencyIngest routing and auth', () => {
     const response = await handleLatencyIngest(request, deps);
 
     expect(response.status).toBe(404);
+    expect(sampleLines(lines)).toHaveLength(0);
+    expect(durationLines(lines)).toMatchObject([
+      { route: '/v1/other', method: 'POST', status: 404, outcome: 'not_found' },
+    ]);
   });
 
   it('returns 401 without a bearer authorization header', async () => {
@@ -110,34 +128,42 @@ describe('handleLatencyIngest routing and auth', () => {
     const response = await handleLatencyIngest(request, deps);
 
     expect(response.status).toBe(401);
-    expect(lines).toHaveLength(0);
+    expect(sampleLines(lines)).toHaveLength(0);
+    expect(durationLines(lines)).toMatchObject([
+      { route: '/v1/latency', method: 'POST', status: 401, outcome: 'unauthorized' },
+    ]);
   });
 
   it('returns 403 when the app version is missing', async () => {
-    const { deps } = makeDeps();
+    const { deps, lines } = makeDeps();
     const request = post({ samples: [sample()] }, { 'x-kilo-app-version': '' });
 
     const response = await handleLatencyIngest(request, deps);
 
     expect(response.status).toBe(403);
+    expect(durationLines(lines)).toMatchObject([
+      { route: '/v1/latency', method: 'POST', status: 403, outcome: 'version_rejected' },
+    ]);
   });
 
   it('returns 403 when the app version is malformed', async () => {
-    const { deps } = makeDeps();
+    const { deps, lines } = makeDeps();
     const request = post({ samples: [sample()] }, { 'x-kilo-app-version': 'not-a-version' });
 
     const response = await handleLatencyIngest(request, deps);
 
     expect(response.status).toBe(403);
+    expect(durationLines(lines)).toMatchObject([{ status: 403, outcome: 'version_rejected' }]);
   });
 
   it('returns 403 when the app version is below the minimum', async () => {
-    const { deps } = makeDeps();
+    const { deps, lines } = makeDeps();
     const request = post({ samples: [sample()] }, { 'x-kilo-app-version': '1.0.11' });
 
     const response = await handleLatencyIngest(request, deps);
 
     expect(response.status).toBe(403);
+    expect(durationLines(lines)).toMatchObject([{ status: 403, outcome: 'version_rejected' }]);
   });
 
   it('returns 429 when the limiter rejects the session', async () => {
@@ -148,7 +174,29 @@ describe('handleLatencyIngest routing and auth', () => {
     const response = await handleLatencyIngest(post({ samples: [sample()] }), deps);
 
     expect(response.status).toBe(429);
-    expect(lines).toHaveLength(0);
+    expect(sampleLines(lines)).toHaveLength(0);
+    expect(durationLines(lines)).toMatchObject([
+      { route: '/v1/latency', method: 'POST', status: 429, outcome: 'rate_limited' },
+    ]);
+  });
+
+  it('still emits exactly one duration line when a dependency rejects', async () => {
+    const { deps, lines } = makeDeps({
+      rateLimiter: {
+        limit: async () => {
+          throw new Error('rate limiter unavailable');
+        },
+      },
+    });
+
+    await expect(handleLatencyIngest(post({ samples: [sample()] }), deps)).rejects.toThrow(
+      'rate limiter unavailable'
+    );
+
+    expect(sampleLines(lines)).toHaveLength(0);
+    expect(durationLines(lines)).toMatchObject([
+      { route: '/v1/latency', method: 'POST', status: 500, outcome: 'internal_error' },
+    ]);
   });
 });
 
@@ -159,16 +207,20 @@ describe('handleLatencyIngest body validation', () => {
     const response = await handleLatencyIngest(post('{"samples":['), deps);
 
     expect(response.status).toBe(400);
-    expect(lines).toHaveLength(0);
+    expect(sampleLines(lines)).toHaveLength(0);
+    expect(durationLines(lines)).toMatchObject([
+      { route: '/v1/latency', method: 'POST', status: 400, outcome: 'invalid_body' },
+    ]);
   });
 
   it('returns 400 on a schema mismatch', async () => {
-    const { deps } = makeDeps();
+    const { deps, lines } = makeDeps();
     const request = post({ samples: [{ ...sample(), ttfbMs: '12' }] });
 
     const response = await handleLatencyIngest(request, deps);
 
     expect(response.status).toBe(400);
+    expect(durationLines(lines)).toMatchObject([{ status: 400, outcome: 'invalid_body' }]);
   });
 
   it('returns 400 on an unknown extra key', async () => {
@@ -189,11 +241,12 @@ describe('handleLatencyIngest body validation', () => {
     const response = await handleLatencyIngest(post({ samples }), deps);
 
     expect(response.status).toBe(413);
-    expect(lines).toHaveLength(0);
+    expect(sampleLines(lines)).toHaveLength(0);
+    expect(durationLines(lines)).toMatchObject([{ status: 413, outcome: 'payload_too_large' }]);
   });
 
   it('returns 413 over the payload byte cap', async () => {
-    const { deps } = makeDeps();
+    const { deps, lines } = makeDeps();
     const request = post({
       samples: [sample({ procedures: ['x'.repeat(MAX_PAYLOAD_BYTES)] })],
     });
@@ -201,6 +254,7 @@ describe('handleLatencyIngest body validation', () => {
     const response = await handleLatencyIngest(request, deps);
 
     expect(response.status).toBe(413);
+    expect(durationLines(lines)).toMatchObject([{ status: 413, outcome: 'payload_too_large' }]);
   });
 
   it('aborts the body read as soon as the cap is exceeded', async () => {
@@ -234,7 +288,8 @@ describe('handleLatencyIngest body validation', () => {
     const response = await handleLatencyIngest(request, deps);
 
     expect(response.status).toBe(413);
-    expect(lines).toHaveLength(0);
+    expect(sampleLines(lines)).toHaveLength(0);
+    expect(durationLines(lines)).toMatchObject([{ status: 413, outcome: 'payload_too_large' }]);
     expect(pulled).toBeLessThan(totalChunks);
   });
 
@@ -261,7 +316,8 @@ describe('handleLatencyIngest body validation', () => {
     const response = await handleLatencyIngest(request, deps);
 
     expect(response.status).toBe(413);
-    expect(lines).toHaveLength(0);
+    expect(sampleLines(lines)).toHaveLength(0);
+    expect(durationLines(lines)).toMatchObject([{ status: 413, outcome: 'payload_too_large' }]);
   });
 
   it('answers 413 instead of rejecting when cancel rejects over the cap', async () => {
@@ -290,7 +346,8 @@ describe('handleLatencyIngest body validation', () => {
     const response = await handleLatencyIngest(request, deps);
 
     expect(response.status).toBe(413);
-    expect(lines).toHaveLength(0);
+    expect(sampleLines(lines)).toHaveLength(0);
+    expect(durationLines(lines)).toMatchObject([{ status: 413, outcome: 'payload_too_large' }]);
   });
 });
 
@@ -302,7 +359,7 @@ describe('handleLatencyIngest accepted batches', () => {
     const response = await handleLatencyIngest(post({ samples }), deps);
 
     expect(response.status).toBe(204);
-    expect(lines).toHaveLength(2);
+    expect(sampleLines(lines)).toHaveLength(2);
     expect(lines[0]).toMatchObject({
       type: 'client_latency',
       client: 'mobile',
@@ -317,6 +374,40 @@ describe('handleLatencyIngest accepted batches', () => {
       ok: true,
     });
     expect(lines[1]).toMatchObject({ requestId: 'req-2', batchSize: 2 });
+    expect(durationLines(lines)).toMatchObject([
+      { route: '/v1/latency', method: 'POST', status: 204, outcome: 'ok' },
+    ]);
+  });
+
+  it('emits one duration line per request and strips the query string', async () => {
+    const { deps, lines } = makeDeps();
+
+    const response = await handleLatencyIngest(
+      post({ samples: [sample()] }, {}, '?requestId=leak&token=super-secret'),
+      deps
+    );
+
+    expect(response.status).toBe(204);
+    expect(durationLines(lines)).toHaveLength(1);
+    const duration = durationLines(lines)[0];
+    expect(duration).toMatchObject({
+      route: '/v1/latency',
+      method: 'POST',
+      status: 204,
+      outcome: 'ok',
+    });
+    expect(typeof duration.durationMs).toBe('number');
+    expect(JSON.stringify(duration)).not.toContain('?');
+    expect(JSON.stringify(duration)).not.toContain('requestId=leak');
+    expect(JSON.stringify(duration)).not.toContain('super-secret');
+    // The allow-list is exhaustive: no caller-supplied or extra field rides along.
+    expect(Object.keys(duration).sort()).toEqual([
+      'durationMs',
+      'method',
+      'outcome',
+      'route',
+      'status',
+    ]);
   });
 
   it('never logs the bearer or a userId', async () => {
@@ -331,13 +422,16 @@ describe('handleLatencyIngest accepted batches', () => {
     }
   });
 
-  it('accepts an empty batch with 204 and no lines', async () => {
+  it('accepts an empty batch with 204 and only the duration line', async () => {
     const { deps, lines } = makeDeps();
 
     const response = await handleLatencyIngest(post({ samples: [] }), deps);
 
     expect(response.status).toBe(204);
-    expect(lines).toHaveLength(0);
+    expect(sampleLines(lines)).toHaveLength(0);
+    expect(durationLines(lines)).toMatchObject([
+      { route: '/v1/latency', method: 'POST', status: 204, outcome: 'ok' },
+    ]);
   });
 });
 
@@ -405,11 +499,18 @@ describe('worker entrypoint', () => {
     const response = await worker.fetch(post({ samples: [sample()] }), env());
 
     expect(response.status).toBe(204);
-    expect(log).toHaveBeenCalledTimes(1);
+    // One sample line plus the one per-request duration line.
+    expect(log).toHaveBeenCalledTimes(2);
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
       type: 'client_latency',
       client: 'mobile',
       requestId: 'req-1',
+    });
+    expect(JSON.parse(String(log.mock.calls[1]?.[0]))).toMatchObject({
+      route: '/v1/latency',
+      method: 'POST',
+      status: 204,
+      outcome: 'ok',
     });
   });
 });

@@ -1,7 +1,9 @@
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from 'cloudflare:test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearSecretCacheForTest, signKiloToken } from '@kilocode/worker-utils';
+import { CONTROL_PLANE_DEADLINE_MS } from '@kilocode/event-service';
 import type { ConnectionTicketDO } from '../do/connection-ticket-do';
+import { TICKET_MINT_BUDGET_MS } from '../index';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 const ACCEPTED_PROTOCOL = 'kilo.events.v1';
@@ -164,5 +166,84 @@ describe('event-service WebSocket connection tickets', () => {
       ticket: undefined,
       alarm: null,
     });
+  });
+
+  it('keeps the mint budget strictly below the client control-plane deadline', () => {
+    expect(TICKET_MINT_BUDGET_MS).toBeGreaterThan(0);
+    expect(TICKET_MINT_BUDGET_MS).toBeLessThan(CONTROL_PLANE_DEADLINE_MS);
+  });
+
+  it('answers the retryable mint failure when the auth read never settles', async () => {
+    // Stall the first unbounded hop: authenticateToken reads the signing
+    // secret before it verifies the bearer, so a secret read that never
+    // resolves hangs the auth read. The budget must resolve the route instead
+    // of letting it hang past the client's control-plane deadline.
+    vi.spyOn(env.NEXTAUTH_SECRET, 'get').mockImplementation(() => new Promise<string>(() => {}));
+    const token = await chatToken('user-ticket-hanging-auth');
+    const startedAt = Date.now();
+
+    const res = await SELF.fetch('https://events.test/connect-ticket', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    const elapsed = Date.now() - startedAt;
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toEqual({ error: 'Ticket mint failed' });
+    // It waited for the budget rather than returning early, and stayed inside
+    // the client's deadline, so the client never sees the gateway's 504.
+    expect(elapsed).toBeGreaterThanOrEqual(TICKET_MINT_BUDGET_MS);
+    expect(elapsed).toBeLessThan(CONTROL_PLANE_DEADLINE_MS);
+  }, 20_000);
+
+  it('emits one allow-listed duration line per mint, stripped of query and identity', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const token = await chatToken('user-ticket-duration');
+
+    const res = await SELF.fetch(
+      'https://events.test/connect-ticket?token=super-secret&userId=should-not-be-logged',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      }
+    );
+
+    expect(res.status).toBe(200);
+    const durations = log.mock.calls
+      .map(call => call[0])
+      .filter((line): line is string => typeof line === 'string')
+      .flatMap(line => {
+        try {
+          return [JSON.parse(line) as Record<string, unknown>];
+        } catch {
+          return [];
+        }
+      })
+      .filter(line => line.route === '/connect-ticket');
+
+    expect(durations).toHaveLength(1);
+    const [duration] = durations;
+    expect(duration).toMatchObject({
+      route: '/connect-ticket',
+      method: 'POST',
+      status: 200,
+      outcome: 'ok',
+    });
+    expect(typeof duration.durationMs).toBe('number');
+    // The allow-list is exhaustive: no query string, no Authorization header,
+    // no token, no user id, no body.
+    expect(Object.keys(duration).sort()).toEqual([
+      'durationMs',
+      'method',
+      'outcome',
+      'route',
+      'status',
+    ]);
+    const serialized = JSON.stringify(duration);
+    expect(serialized).not.toContain('?');
+    expect(serialized).not.toContain('super-secret');
+    expect(serialized).not.toContain('should-not-be-logged');
+    expect(serialized).not.toContain(token);
+    expect(duration).not.toHaveProperty('userId');
   });
 });

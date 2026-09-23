@@ -3,6 +3,7 @@ import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 import { INTERNAL_API_SECRET, SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
+import { ServiceFetchTimeoutError, fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type { User } from '@kilocode/db/schema';
@@ -58,6 +59,68 @@ export type SessionSnapshot = z.infer<typeof SessionSnapshotSchema>;
 export type SessionMessage = SessionSnapshot['messages'][number];
 
 // ---------------------------------------------------------------------------
+// Bounded fetch
+// ---------------------------------------------------------------------------
+
+/**
+ * Redact a request URL to an allow-listed route label for logging: the
+ * pathname with its dynamic segment (session id or share token) replaced by a
+ * placeholder, and never the query string. Falls back to a constant when the
+ * URL will not parse, so logging can never throw into a request.
+ */
+function redactedRouteForLog(requestUrl: string): string {
+  try {
+    const pathname = new URL(requestUrl).pathname;
+    if (pathname.startsWith('/api/session/')) {
+      return pathname.replace(/^\/api\/session\/[^/]+/, '/api/session/:sessionId');
+    }
+    if (pathname.startsWith('/session/')) {
+      return pathname.replace(/^\/session\/[^/]+/, '/session/:shareToken');
+    }
+    return pathname;
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
+ * Bound one session-ingest worker fetch with the shared control-plane upstream
+ * budget.
+ *
+ * A worker that never answers rejects with `ServiceFetchTimeoutError` inside
+ * `CONTROL_PLANE_UPSTREAM_BUDGET_MS` (strictly under the mobile app's 15s
+ * `CONTROL_PLANE_DEADLINE_MS`) instead of holding the calling control-plane
+ * procedure open until the client deadline fires or the gateway answers 504.
+ * The timeout keeps the module's existing failure shape: every call site
+ * already propagates a transport failure to its router, which maps it to an
+ * `INTERNAL_SERVER_ERROR` the mobile client renders as its existing retryable
+ * state — never a new non-retryable one.
+ *
+ * On a budget expiry exactly one allow-listed line is emitted. It carries the
+ * redacted route, the elapsed time and a fixed outcome — never the
+ * Authorization header, the internal-service token, the session id, the share
+ * token or a query string.
+ */
+async function fetchSessionIngest(requestUrl: string, init: RequestInit = {}): Promise<Response> {
+  const startedAt = Date.now();
+  try {
+    return await fetchWithinBudget(requestUrl, init);
+  } catch (error) {
+    if (error instanceof ServiceFetchTimeoutError) {
+      console.log(
+        JSON.stringify({
+          type: 'session_ingest_timeout',
+          route: redactedRouteForLog(requestUrl),
+          durationMs: Date.now() - startedAt,
+          outcome: 'timeout',
+        })
+      );
+    }
+    throw error;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Fetch
 // ---------------------------------------------------------------------------
 
@@ -82,7 +145,7 @@ export async function fetchSessionSnapshot(
   });
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/export`;
 
-  const response = await fetch(url, {
+  const response = await fetchSessionIngest(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -180,7 +243,7 @@ export async function fetchSessionMessagesPage(
     audience: SESSION_INGEST_AUDIENCE,
     expiresIn: 60 * 60,
   });
-  const response = await fetch(url, {
+  const response = await fetchSessionIngest(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -267,7 +330,7 @@ export async function shareSession(
   });
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/share`;
 
-  const response = await fetch(url, {
+  const response = await fetchSessionIngest(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -309,7 +372,7 @@ export async function unshareSession(sessionId: string, userId: string): Promise
   });
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}/unshare`;
 
-  const response = await fetch(url, {
+  const response = await fetchSessionIngest(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -352,7 +415,7 @@ export async function fetchSharedSessionMetadata(
   }
 
   const url = `${SESSION_INGEST_WORKER_URL}/session/${encodeURIComponent(shareToken)}/metadata`;
-  const response = await fetch(url, { cache: 'no-store' });
+  const response = await fetchSessionIngest(url, { cache: 'no-store' });
 
   if (response.status === 404) {
     return null;
@@ -402,7 +465,7 @@ export async function fetchSharedSessionSnapshot(
   }
 
   const url = `${SESSION_INGEST_WORKER_URL}/session/${encodeURIComponent(shareToken)}`;
-  const response = await fetch(url, { cache: 'no-store' });
+  const response = await fetchSessionIngest(url, { cache: 'no-store' });
 
   if (response.status === 404) {
     return null;
@@ -447,15 +510,21 @@ export async function invalidateOrganizationSessionAccess(
     throw new Error('INTERNAL_API_SECRET is not configured');
   }
 
-  const response = await fetch(`${SESSION_INGEST_WORKER_URL}/internal/session-access/invalidate`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'X-Internal-Secret': INTERNAL_API_SECRET,
-    },
-    body: JSON.stringify({ kiloUserId, organizationId }),
-    signal: AbortSignal.timeout(30_000),
-  });
+  const response = await fetchSessionIngest(
+    `${SESSION_INGEST_WORKER_URL}/internal/session-access/invalidate`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-Internal-Secret': INTERNAL_API_SECRET,
+      },
+      body: JSON.stringify({ kiloUserId, organizationId }),
+      // Caller deadline, composed with the shared upstream budget by
+      // `fetchWithinBudget`; the shorter budget wins, so a hung worker cannot
+      // hold this past `CONTROL_PLANE_UPSTREAM_BUDGET_MS`.
+      signal: AbortSignal.timeout(30_000),
+    }
+  );
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');
@@ -491,7 +560,7 @@ export async function deleteSession(sessionId: string, userId: string): Promise<
   });
   const url = `${SESSION_INGEST_WORKER_URL}/api/session/${encodeURIComponent(sessionId)}`;
 
-  const response = await fetch(url, {
+  const response = await fetchSessionIngest(url, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });

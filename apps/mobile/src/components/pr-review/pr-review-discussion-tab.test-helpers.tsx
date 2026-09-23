@@ -15,6 +15,14 @@ import { PrReviewDiscussionTab } from './pr-review-discussion-tab';
 const hoisted = vi.hoisted(() => ({
   insetsState: { top: 0, bottom: 0, left: 0, right: 0 },
   pushMock: vi.fn(),
+  // The tab's own-comment delete confirmation (s4). Plain array so a test can
+  // read the exact Alert.alert(title, message, buttons) triple.
+  alertCalls: [] as {
+    title: string;
+    message: string;
+    buttons: { text?: string; onPress?: () => void }[];
+  }[],
+  deleteMutate: vi.fn(),
   // The tab's screen focus drives the CTA bar's keyboard lift (a foreign
   // surface's keyboard must not lift the bar behind it — uxs3, e4-confirm-
   // discard). Flippable so the suite can mount the tab unfocused.
@@ -43,6 +51,8 @@ const hoisted = vi.hoisted(() => ({
 
 export const insetsState = hoisted.insetsState;
 export const pushMock = hoisted.pushMock;
+export const alertCalls = hoisted.alertCalls;
+export const deleteMutate = hoisted.deleteMutate;
 export const focusState = hoisted.focusState;
 export const replyScrollFns = hoisted.replyScrollFns;
 export const discussionState = hoisted.discussionState;
@@ -50,6 +60,11 @@ export const discussionState = hoisted.discussionState;
 vi.mock('react-native', () => ({
   View: 'View',
   Platform: { OS: 'ios' },
+  Alert: {
+    alert: (title: string, message: string, buttons: { text?: string; onPress?: () => void }[]) => {
+      hoisted.alertCalls.push({ title, message, buttons });
+    },
+  },
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: pushMock }),
@@ -90,6 +105,12 @@ vi.mock('@/components/pr-review/discussion/comment-moderation', () => ({
 }));
 vi.mock('@/components/pr-review/discussion/pr-comment-cta', () => ({
   PrCommentCta: 'PrCommentCta',
+}));
+// s4: the tab owns the delete write; the hook's optimistic/rollback behaviour
+// is covered by use-pr-comment-crud-mutations.test.ts and the list mounted
+// suite, so here it is a captured `mutate`.
+vi.mock('@/lib/pr-review/discussion/use-pr-comment-crud-mutations', () => ({
+  useDeletePrCommentMutation: () => ({ mutate: hoisted.deleteMutate }),
 }));
 
 export const BASE_PROPS = {

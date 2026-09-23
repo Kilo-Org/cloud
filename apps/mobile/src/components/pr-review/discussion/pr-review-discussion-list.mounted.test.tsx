@@ -1,4 +1,14 @@
-import { type ComponentProps, createElement, Fragment, type ReactNode } from 'react';
+/* eslint-disable max-lines -- one mounted suite for the list's visible content, its provider reads, and the optimistic own-comment delete harness */
+import type * as ReactQuery from '@tanstack/react-query';
+import {
+  type ComponentProps,
+  createElement,
+  Fragment,
+  type ReactNode,
+  useMemo,
+  useSyncExternalStore,
+} from 'react';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,6 +17,7 @@ import {
   type DiscussionListItem,
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
+import { useDeletePrCommentMutation } from '@/lib/pr-review/discussion/use-pr-comment-crud-mutations';
 import { ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewDiscussionList } from './pr-review-discussion-list';
 
@@ -16,27 +27,45 @@ const observed = vi.hoisted(() => ({
   options: [] as TaggedOptions[],
   blockedLogins: [] as string[],
   mutedLogins: [] as string[],
+  deleteMutate: vi.fn(),
+  toastError: vi.fn(),
+}));
+
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: vi.fn(), error: observed.toastError },
+}));
+vi.mock('@/lib/a11y/announce', () => ({ announceForA11y: vi.fn() }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
 // Records every query the list mounts and answers the overview with a viewer
 // login, so a test can assert BOTH which namespace was asked and what the
-// answer drives.
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: (options: TaggedOptions) => {
-    observed.options.push(options);
-    if (options.tag === 'moderation') {
-      return { data: { blockedLogins: observed.blockedLogins, mutedLogins: observed.mutedLogins } };
-    }
-    return { data: { repo: { viewerLogin: 'octocat' } } };
-  },
-}));
+// answer drives. Everything else (the delete mutation's cache wiring) stays
+// real: the own-comment delete is an optimistic mutation, and this suite is
+// the list-level proof that the row leaves and comes back with the cache.
+vi.mock('@tanstack/react-query', async importOriginal => {
+  const actual = await importOriginal<typeof ReactQuery>();
+  return {
+    ...actual,
+    useQuery: (options: TaggedOptions) => {
+      observed.options.push(options);
+      if (options.tag === 'moderation') {
+        return {
+          data: { blockedLogins: observed.blockedLogins, mutedLogins: observed.mutedLogins },
+        };
+      }
+      return { data: { repo: { viewerLogin: 'octocat' } } };
+    },
+  };
+});
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     moderation: { listHiddenUsers: { queryOptions: () => ({ tag: 'moderation' }) } },
     githubPrReview: {
+      listReviewThreads: {
+        pathFilter: () => ({ queryKey: ['githubPrReview', 'listReviewThreads'] }),
+      },
       getPullRequest: {
         queryOptions: (input: unknown) => ({ tag: 'githubPrReview.getPullRequest', input }),
       },
@@ -47,8 +76,16 @@ vi.mock('@/lib/trpc', () => ({
       },
     },
   }),
+  trpcClient: {
+    githubPrReview: {
+      deleteComment: { mutate: (input: unknown) => observed.deleteMutate(input) },
+    },
+  },
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+// The real `@/i18n` module initializes i18next at import time; the delete
+// mutation only needs `t` for its failure copy, which this suite asserts.
+vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key, language: 'en' } }));
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('@shopify/flash-list', () => ({
   FlashList: ({
@@ -327,5 +364,163 @@ describe('PrReviewDiscussionList visible content', () => {
     act(() => {
       renderer.unmount();
     });
+  });
+});
+
+// s4: the optimistic delete is owned by `useDeletePrCommentMutation`, but the
+// row leaving the list (and returning on a failure) is the list-level
+// behaviour the user sees. This harness keeps the REAL mutation and a real
+// QueryClient, seeds the `listReviewThreads` cache, and derives the rows from
+// that cache, so the assertions are on the rendered rows, not the hook.
+const THREADS_KEY = ['githubPrReview', 'listReviewThreads'] as const;
+
+type ThreadsCache = {
+  pages: {
+    threads: ReviewThread[];
+    conversation: ConversationComment[];
+    nextCursor: string | null;
+  }[];
+  pageParams: unknown[];
+};
+
+function makeThreadsCache(comments: ConversationComment[]): ThreadsCache {
+  return {
+    pages: [{ threads: [], conversation: comments, nextCursor: null }],
+    pageParams: [null],
+  };
+}
+
+function useThreadsCache(): ThreadsCache | undefined {
+  const queryClient = useQueryClient();
+  return useSyncExternalStore(
+    onStoreChange => queryClient.getQueryCache().subscribe(onStoreChange),
+    () => queryClient.getQueryData<ThreadsCache>(THREADS_KEY)
+  );
+}
+
+function OwnCommentHarness() {
+  const deleteComment = useDeletePrCommentMutation();
+  const cache = useThreadsCache();
+  const conversationRows = useMemo<DiscussionListItem[]>(
+    () => (cache?.pages[0]?.conversation ?? []).map(comment => ({ kind: 'comment', comment })),
+    [cache]
+  );
+  return (
+    <PrReviewDiscussionList
+      owner="octocat"
+      repo="hello"
+      number={7}
+      listItems={conversationRows}
+      listRef={{ current: null }}
+      expansion={{}}
+      suppressContentPosition={false}
+      onToggleExpand={noop}
+      onScrollBeginDrag={noop}
+      hasNextPage={false}
+      isFetchingNextPage={false}
+      laterPageError={false}
+      onLoadMore={noop}
+      onRetryLoadMore={noop}
+      onDeleteComment={(comment, kind) => {
+        deleteComment.mutate({
+          owner: 'octocat',
+          repo: 'hello',
+          number: 7,
+          commentId: comment.commentId,
+          kind,
+        });
+      }}
+    />
+  );
+}
+
+async function flush(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+function commentRows(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance[] {
+  return renderer.root.findAll(node => String(node.type) === 'CommentRow');
+}
+
+function pressDelete(renderer: TestRenderer.ReactTestRenderer): void {
+  const row = commentRows(renderer)[0];
+  if (!row) {
+    throw new Error('comment row not found');
+  }
+  act(() => {
+    (row.props.onDeleteComment as () => void)();
+  });
+}
+
+function mountHarness(): TestRenderer.ReactTestRenderer {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(THREADS_KEY, makeThreadsCache([makeComment(1)]));
+  let renderer: TestRenderer.ReactTestRenderer | null = null;
+  act(() => {
+    renderer = TestRenderer.create(
+      <QueryClientProvider client={queryClient}>
+        <OwnCommentHarness />
+      </QueryClientProvider>
+    );
+  });
+  // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- act() may not assign
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+describe('PrReviewDiscussionList optimistic delete (s4, mounted)', () => {
+  beforeEach(() => {
+    observed.deleteMutate.mockReset();
+    observed.toastError.mockReset();
+  });
+
+  it('removes the row optimistically and keeps it gone after the write settles', async () => {
+    const renderer = mountHarness();
+    const pending = Promise.withResolvers<unknown>();
+    observed.deleteMutate.mockReturnValueOnce(pending.promise);
+
+    expect(commentRows(renderer)).toHaveLength(1);
+
+    pressDelete(renderer);
+    await flush();
+    // The row is gone before the server answered.
+    expect(commentRows(renderer)).toHaveLength(0);
+
+    await act(async () => {
+      pending.resolve({ commentId: 1, deleted: true });
+      await Promise.resolve();
+    });
+    await flush();
+    expect(commentRows(renderer)).toHaveLength(0);
+    expect(observed.toastError).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('restores the row from the snapshot when the write fails', async () => {
+    const renderer = mountHarness();
+    const pending = Promise.withResolvers<unknown>();
+    observed.deleteMutate.mockReturnValueOnce(pending.promise);
+
+    pressDelete(renderer);
+    await flush();
+    expect(commentRows(renderer)).toHaveLength(0);
+
+    await act(async () => {
+      pending.reject(new Error('Network request failed'));
+      await Promise.resolve();
+    });
+    await flush();
+
+    // Back in its original position, with the retryable delete copy surfaced.
+    expect(commentRows(renderer)).toHaveLength(1);
+    expect(observed.toastError).toHaveBeenCalledWith('prReview.discussion.commentDeleteFailed');
+
+    renderer.unmount();
   });
 });

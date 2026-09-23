@@ -17,6 +17,8 @@ import { MessageSquarePlus } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import {
   type DiscussionListItem,
+  type PrCommentKind,
+  type ReviewComment,
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { expandedForThread } from '@/lib/pr-review/discussion/thread-expansion';
@@ -57,6 +59,13 @@ type PrReviewDiscussionListProps = {
    * (useReplyFocusScroll). Optional; absent = no viewport reporting.
    */
   readonly onViewportLayout?: (height: number) => void;
+  /**
+   * Own-comment actions (s4). The tab passes them only on the GitHub write
+   * surface; a conversation row binds its comment with `kind: 'conversation'`
+   * and the thread card binds each review comment with `kind: 'review'`.
+   */
+  readonly onEditComment?: (comment: ReviewComment, kind: PrCommentKind) => void;
+  readonly onDeleteComment?: (comment: ReviewComment, kind: PrCommentKind) => void;
 };
 
 export function PrReviewDiscussionList({
@@ -76,6 +85,8 @@ export function PrReviewDiscussionList({
   onRetryLoadMore,
   onReplyInputFocus,
   onViewportLayout,
+  onEditComment,
+  onDeleteComment,
 }: Readonly<PrReviewDiscussionListProps>) {
   const { t } = useTranslation();
   const trpc = useTRPC();
@@ -166,6 +177,20 @@ export function PrReviewDiscussionList({
                   // a provider without them shows no reaction row at all.
                   reactionsSupported={queries.capabilities.reactions.supported}
                   viewerLogin={viewerLogin}
+                  onEditComment={
+                    onEditComment
+                      ? () => {
+                          onEditComment(item.comment, 'conversation');
+                        }
+                      : undefined
+                  }
+                  onDeleteComment={
+                    onDeleteComment
+                      ? () => {
+                          onDeleteComment(item.comment, 'conversation');
+                        }
+                      : undefined
+                  }
                   onToggleReaction={noopReactionToggle}
                 />
               </View>
@@ -188,6 +213,8 @@ export function PrReviewDiscussionList({
               onReplyFocus={() => {
                 onReplyInputFocus?.(index);
               }}
+              onEditComment={onEditComment}
+              onDeleteComment={onDeleteComment}
             />
           </View>
         );

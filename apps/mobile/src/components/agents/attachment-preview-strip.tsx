@@ -27,6 +27,7 @@ import { moveA11yFocus } from '@/lib/a11y/announce';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { cn } from '@/lib/utils';
 import {
   type AgentAttachment,
@@ -144,6 +145,7 @@ function AttachmentChip({
 }: Readonly<AttachmentChipProps>) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const { t } = useTranslation();
   const [viewerVisible, setViewerVisible] = useState(false);
@@ -264,6 +266,7 @@ function AttachmentChip({
     }
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         options: [
           t('agentChat.filePart.openAsText'),
           t('agentChat.filePart.openInExternalApp'),
@@ -383,7 +386,7 @@ function AttachmentChip({
               'overflow-hidden rounded-md border border-border bg-card',
               isImage ? 'h-16 w-20' : 'h-12 w-48',
               description.showRetry && 'border-destructive',
-              isErrored && !description.showRetry && 'border-destructive/60'
+              isErrored && !description.showRetry && 'border-danger-tile-border'
             )}
           >
             {description.showRetry ? (
@@ -534,7 +537,10 @@ export function AttachmentPreviewStrip({
       horizontal
       showsHorizontalScrollIndicator={false}
       className="mb-2"
-      contentContainerClassName="items-center"
+      // pl-3 matches the composer toolbar's px-3 so the first thumbnail's
+      // left edge lines up with the mode/model chips. No right padding: each
+      // chip carries its own mr-2 and the scroll container clips at the edge.
+      contentContainerClassName="items-center pl-3"
       keyboardShouldPersistTaps="handled"
     >
       {attachments.map((attachment, index) => (

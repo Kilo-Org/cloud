@@ -10,6 +10,7 @@ import {
   requiresContainmentSandbox,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
+import { providerUsesOutboundCredentialProxy } from '../agent-sandbox/capabilities.js';
 import { type getOutboundContainerId, isValidSandboxId } from '../sandbox-id.js';
 import { buildSessionAttachPayload } from '../sandbox-session/attach-payload.js';
 import {
@@ -26,7 +27,12 @@ import { readProfileBundle } from '../session-profile.js';
 import { hasModernRuntimeAuthorization } from '../session/runtime-authorization-persistence.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
-import { parseCanonicalBitbucketCloneUrl, sessionIdSchema, type Env } from '../types.js';
+import {
+  agentSandboxProviderSchema,
+  parseCanonicalBitbucketCloneUrl,
+  sessionIdSchema,
+  type Env,
+} from '../types.js';
 import { createControlPlaneCredential, parseControlPlaneCredential } from './managed-credential.js';
 import {
   buildKiloCredentialInjectionRules,
@@ -180,7 +186,7 @@ export const sessionCredentialGrantSchema = z
       ),
     userId: z.string().min(1),
     orgId: organizationIdSchema.optional(),
-    provider: z.enum(['cloudflare', 'vercel']),
+    provider: agentSandboxProviderSchema,
     outboundContainerId: z.string().min(1).optional(),
     members: z.array(memberSchema).min(1),
     repository: repositorySchema.optional(),
@@ -208,7 +214,7 @@ export const sessionCredentialGrantSchema = z
       new Set(grant.members.map(member => member.sessionId)).size !== grant.members.length ||
       new Set(grant.members.map(member => member.kiloSessionId)).size !== grant.members.length ||
       (grant.containmentEnabled !== false &&
-        grant.provider === 'cloudflare' &&
+        providerUsesOutboundCredentialProxy(grant.provider) &&
         !grant.outboundContainerId)
     ) {
       reject();
@@ -245,7 +251,7 @@ export const sessionCredentialGrantSchema = z
       if (
         !grant.members.some(member => member.sessionId === sessionId) ||
         !capability.credential.startsWith('kka1.') ||
-        grant.provider !== 'cloudflare'
+        !providerUsesOutboundCredentialProxy(grant.provider)
       ) {
         reject();
       }
@@ -454,7 +460,11 @@ function repositoryFromMetadata(
     }
     const explicit =
       Boolean(repository.token) && !isKnownScmCredential(repository.token, existing?.scm);
-    if (requiresContainmentSandbox(metadata) && provider === 'cloudflare' && explicit) {
+    if (
+      requiresContainmentSandbox(metadata) &&
+      providerUsesOutboundCredentialProxy(provider) &&
+      explicit
+    ) {
       invalidCredentials();
     }
     return {
@@ -993,7 +1003,7 @@ export async function prepareSessionCredentials(input: {
   };
   if (!containmentEnabled) {
     grant = await resolveDirectScmCredentials(env, grant, payload);
-  } else if (provider === 'cloudflare') {
+  } else if (providerUsesOutboundCredentialProxy(provider)) {
     const outboundContainerId = input.outboundContainerId;
     if (!outboundContainerId) invalidCredentials();
     grant = await refreshKiloCapability(env, grant, member.data, outboundContainerId, now);
@@ -1140,7 +1150,7 @@ export async function resolveSessionCredential(input: {
   const alias = parseControlPlaneCredential(input.credential);
   if (
     !isContainedSessionCredentialGrant(grant) ||
-    grant.provider !== 'cloudflare' ||
+    !providerUsesOutboundCredentialProxy(grant.provider) ||
     now < grant.preparedAt ||
     now >= grant.expiresAt ||
     alias?.sandboxId !== grant.sandboxId ||

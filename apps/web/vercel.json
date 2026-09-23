@@ -25,6 +25,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/cleanup-webhook-events",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/kilo-pass-yearly-monthly-base",
       "schedule": "0 * * * *"
     },
@@ -131,6 +135,10 @@
     {
       "path": "/api/cron/cleanup-review-memory",
       "schedule": "0 */12 * * *"
+    },
+    {
+      "path": "/api/cron/dispatch-spend-alerts",
+      "schedule": "*/5 * * * *"
     }
   ],
   "build": {

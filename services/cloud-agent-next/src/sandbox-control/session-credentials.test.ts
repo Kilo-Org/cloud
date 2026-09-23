@@ -1011,6 +1011,50 @@ describe('direct worktree credentials', () => {
     expect(grant.scm).toBeUndefined();
   });
 
+  it('accepts only direct grants for cloudflare-containers', async () => {
+    const env = environment(createBroker().broker);
+    const data = directMetadata({
+      workspace: { sandboxId: VERCEL_SANDBOX_ID, sandboxProvider: 'cloudflare-containers' },
+    });
+    const { grant } = await prepareDirect(env, data);
+
+    expect(grant.provider).toBe('cloudflare-containers');
+    expect(grant.containmentEnabled).toBe(false);
+    expect(grant.kilo.alias).toBeUndefined();
+    expect(sessionCredentialGrantSchema.parse(JSON.parse(JSON.stringify(grant)))).toEqual(grant);
+    expect(
+      sessionCredentialGrantSchema.safeParse({ ...grant, containmentEnabled: true }).success
+    ).toBe(false);
+    expect(
+      sessionCredentialGrantSchema.safeParse({ ...grant, containmentEnabled: undefined }).success
+    ).toBe(false);
+  });
+
+  it('contains Kilo and GitHub credentials for cloudflare-containers', async () => {
+    const { broker } = createBroker();
+    const data = metadata({
+      workspace: { sandboxId: VERCEL_SANDBOX_ID, sandboxProvider: 'cloudflare-containers' },
+    });
+    const { grant, payload } = await prepare(environment(broker), data);
+
+    expect(grant.provider).toBe('cloudflare-containers');
+    expect(grant.outboundContainerId).toBe(OUTBOUND_CONTAINER_ID);
+    expect(grant.kilo.alias).toEqual(expect.any(String));
+    expect(grant.scm?.alias).toEqual(expect.any(String));
+    expect(grant.scm?.nativeToken).toBeUndefined();
+    expect(payload.env).toMatchObject({
+      KILOCODE_TOKEN: grant.kilo.alias,
+      GH_TOKEN: grant.scm?.alias,
+    });
+    expect(broker.issueKiloSessionCapability).toHaveBeenCalledWith(
+      expect.objectContaining({ outboundContainerId: OUTBOUND_CONTAINER_ID })
+    );
+    expect(broker.issueGitHubSessionCapability).toHaveBeenCalledWith(
+      expect.objectContaining({ outboundContainerId: OUTBOUND_CONTAINER_ID })
+    );
+    expect(broker.getCloudAgentAuthForRepo).not.toHaveBeenCalled();
+  });
+
   it('preserves profile overrides while trusting metadata for Kilo identity and scope', async () => {
     const { broker } = createBroker();
     const token = `https://selected-provider.example.com/api/openrouter:${KILO_TOKEN}`;

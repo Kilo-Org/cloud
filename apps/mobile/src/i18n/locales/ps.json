@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "د اپلیکیشن د پیل پر مهال او په شالید کې له پنځو دقیقو تېرولو وروسته قلف خلاص کړئ.",
     "featureFlags": "د ځانګړتیاوو بیرغونه",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "له سرور څخه · ≥ {{min}}",
+    "featureFlagSkipped": "ډیفالټ · < {{min}}",
+    "featureFlagNotLoaded": "ډیفالټ · بار نه شو",
     "gatewayTranscription": "د Kilo Gateway له لارې د غږ متن ته بدلول",
     "gatewayTranscriptionSubtitle": "غږیز لیکل د وسیلې د ویې پېژندنې پر ځای د Kilo Gateway ماډل سره متن ته واړوئ. غږیز ریکارډ مو د Kilo Gateway ته لیږل کېږي.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -827,7 +827,8 @@
       "chat": "د خبرو اترو پیغامونه",
       "kiloclaw": "د KiloClaw فعالیت",
       "balance": "د بیلانس خبرتیاوې",
-      "security": "امنیتي موندنې"
+      "security": "امنیتي موندنې",
+      "spend": "د لګښت خبرتیاوې"
     },
     "category": {
       "chatMessagesSubtitle": "ستاسو په خبرو اترو کې ځوابونه",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "د ناستې حالت",
       "sessionStatusSubtitle": "بشپړ شوی / ناکام شوی / د کنټرول لپاره چمتو",
       "kiloclawActivitySubtitle": "چمتو یا ناکام انسټانس، مهالویش شوې کړنې",
+      "kiloclawActivityUnavailable": "د KiloClaw فعالیت ترلاسه کولو لپاره یو KiloClaw انسټانس پیل کړئ.",
       "balanceAlertsSubtitle": "د سازمان د کم بیلانس خبرداري",
-      "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې"
+      "balanceAlertsUnavailable": "د بیلانس خبرداریو ترلاسه کولو لپاره یو سازمان ته ورسئ.",
+      "securityFindingsSubtitle": "نوې موندنې او د SLA یادونې",
+      "securityFindingsUnavailable": "د امنیتي موندنو ترلاسه کولو لپاره په یوه ساحه کې Kilo امنیتي اجنټ فعال کړئ.",
+      "spendAlertsSubtitle": "د حدونو تېرېدل او ساعتي زیاتوالی",
+      "spendAlertsToggle": "د لګښت خبرتیاوو کټګوري"
     },
     "action": {
       "openSession": "ناسته پرانیزئ"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "ناسته بار نه شوه.",
       "failedToLoadDetails": "د ناستې جزیات بار نه شول.",
       "failedToStopExecution": "اجرا ونه درول شوه.",
+      "stopped": "ناسته ودرول شوه",
+      "committing": "کمیټ کیږي…",
+      "committed": "کمیټ شو",
+      "commitFailed": "کمیټ ناکام شو",
       "renameSession": "د ناستې نوم بدل کړئ",
       "renamePlaceholder": "د ناستې نوم",
       "transcriptAccessibility": "د ناستې متن",
@@ -2216,15 +2226,12 @@
       "linesBadge_one": "{{displayCount}} کرښې",
       "linesBadge_other": "{{displayCount}} کرښې",
       "matchesBadge_one": "{{displayCount}} پایلې",
-      "matchesBadge_other": "{{displayCount}} پایلې"
+      "matchesBadge_other": "{{displayCount}} پایلې",
+      "noOutput": "هېڅ پایلې نشته."
     },
     "readToolMarkdown": {
       "linesTruncated": "کرښې {{start}}–{{end}} (لنډې شوې)",
       "linesOf": "له {{total}} کرښو څخه {{start}}–{{end}} کرښې"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "د Cloud Agent {{action}} ناکام شو ({{status}}).",
-      "failed": "د Cloud Agent {{action}} ناکام شو."
     },
     "collectCopyableText": {
       "unserializableInput": "[ننوتلي معلومات په لېږد وړ بڼه نه بدلېږي]",
@@ -2321,8 +2328,7 @@
       "assistantProviderRejected": "چمتو کوونکي غوښتنه رد کړه.",
       "assistantStopped": "ځواب ودرول شو.",
       "assistantContextOverflow": "خبرې اترې د ماډل لپاره ډېرې اوږدې دي.",
-      "assistantFailed": "ځواب ناکام شو.",
-      "sendFailed": "پیغام ونه لېږل شو. بیا هڅه وکړئ."
+      "assistantFailed": "ځواب ناکام شو."
     },
     "filePart": {
       "loadingImage": "انځور بارېږي",
@@ -3108,6 +3114,14 @@
     "tooManySignInAttempts": "د ننوتلو ډېرې هڅې وشوې. مهرباني وکړئ انتظار وکړئ او بیا هڅه وکړئ."
   },
   "models": {
+    "auto": {
+      "frontier": "اتومات مخکښ",
+      "balanced": "اتومات متوازن",
+      "efficient": "اتومات اغیزمن",
+      "small": "اتومات کوچنی",
+      "free": "اتومات وړیا",
+      "organization": "اتومات اداره"
+    },
     "dataCollected": "معلومات راټولېږي",
     "free": "وړیا",
     "couldNotUpdateFavorites": "د خوښې ماډلونه تازه نه شول.",
@@ -3155,7 +3169,8 @@
     "channelName": "فعال اجنټان",
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ.",
     "openSession": "پرانیستل",
-    "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ."
+    "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ.",
+    "newestResult": "تر ټولو نوې پایله"
   },
   "transcriptionModel": {
     "title": "د غږ د متن ته بدلولو ماډل",
@@ -3180,15 +3195,7 @@
     "remoteOptionTitle": "ستاسو کمپیوټر",
     "remoteOptionBody": "Kilo په خپل کمپیوټر کې د `kilo remote` CLI له لارې وچلوه.",
     "skip": "سفر پرېږدئ",
-    "tutorialLabel": "زده کړه",
-    "remoteTitle": "خپله لومړۍ لرې ناسته پیل کړئ",
-    "remoteBody": "خپل کمپیوټر ونښلول، بیا ناسته له دې ځای څخه پیل کړئ.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "تر دې دمه هیڅ کمپیوټر نه دی نښلول شوی",
-    "remoteEmptyBody": "د هغه د نښلولو لپاره په خپل کمپیوټر کې `kilo remote` وچلوه.",
-    "remoteFound": "کمپیوټر وڌل شو",
-    "checkAgain": "بیا وګورئ",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "زده کړه"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3206,28 @@
   },
   "launcher": {
     "openLastSession": "وروستۍ ناسته پرانیزئ"
+  },
+  "spendAlerts": {
+    "subtitle": "کله چې د دې ساحې لګښت له یو حد څخه تېر شي یا له خپل عادي ساعتي کچه پورته ووځي، د بلونو اړیکو ته د بریښنالیک یا push له لارې خبرتیا ولېږه.",
+    "enable": "د لګښت خبرتیاوې فعاله کړه",
+    "thresholdTitle": "د حد تېرېدل",
+    "thresholdSubtitle": "روان لګښت ستاسو حد تېروي",
+    "anomalyTitle": "ساعتي زیاتوالی",
+    "anomalySubtitle": "یوه ساعته د دې ساحې له عادي کچې ډېره لوړه ده",
+    "limitLabel": "حد (USD)",
+    "windowLabel": "کړکۍ",
+    "window24h": "24 ساعته",
+    "window7d": "7 ورځې",
+    "window30d": "30 ورځې",
+    "multiplierLabel": "د زیاتوالي ضریب",
+    "saved": "د لګښت خبرتیاوو تنظیمات خوندي شول",
+    "loadError": "د لګښت خبرتیاوې پورته نه شوې.",
+    "saveError": "د لګښت خبرتیاوې خوندي نه شوې.",
+    "empty": "د لګښت خبرتیاوې بندې دي. د دې ساحې د بلونو اړیکو ته د خبر ورکولو لپاره یې فعاله کړه.",
+    "noSpend": "تر دې دمه هیڅ لګښت ثبت شوی نه دی",
+    "spend24h": "د تېرو 24 ساعتونو لګښت",
+    "multiplierError": "د 1 یا ډېر ضریب ولیکه",
+    "permissionDenied": "تاسو د لګښت خبرتیاوو د اداره کولو اجازه نه لرئ.",
+    "pushOffByCategory": "په خبرتیاوو کې بند"
   }
 }

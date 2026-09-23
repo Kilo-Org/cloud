@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "アプリの起動時と、バックグラウンドで5分経過した後は、ロック解除が必要です。",
     "featureFlags": "機能フラグ",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "サーバーから · ≥ {{min}}",
+    "featureFlagSkipped": "既定 · < {{min}}",
+    "featureFlagNotLoaded": "既定 · 未読み込み",
     "gatewayTranscription": "Kilo Gatewayによる文字起こし",
     "gatewayTranscriptionSubtitle": "デバイスの音声認識の代わりにKilo Gatewayのモデルで音声入力を文字起こしします。録音はKilo Gatewayに送信されます。",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -323,7 +323,8 @@
       "chat": "チャットメッセージ",
       "kiloclaw": "KiloClawのアクティビティ",
       "balance": "残高アラート",
-      "security": "セキュリティの検出事項"
+      "security": "セキュリティの検出事項",
+      "spend": "支出アラート"
     },
     "category": {
       "chatMessagesSubtitle": "会話内の返信",
@@ -334,8 +335,13 @@
       "sessionStatusTitle": "セッションの状態",
       "sessionStatusSubtitle": "完了 / 失敗 / 操作可能",
       "kiloclawActivitySubtitle": "インスタンスの準備完了や失敗、予定された操作",
+      "kiloclawActivityUnavailable": "KiloClawアクティビティを受け取るには、KiloClawインスタンスを開始してください。",
       "balanceAlertsSubtitle": "組織の残高低下に関する警告",
-      "securityFindingsSubtitle": "新たな検出結果とSLAのリマインダー"
+      "balanceAlertsUnavailable": "残高アラートを受け取るには、組織に参加してください。",
+      "securityFindingsSubtitle": "新たな検出結果とSLAのリマインダー",
+      "securityFindingsUnavailable": "セキュリティの検出結果を受け取るには、スコープでKiloセキュリティエージェントを有効にしてください。",
+      "spendAlertsSubtitle": "しきい値の超過と毎時の急増",
+      "spendAlertsToggle": "支出アラートのカテゴリ"
     },
     "action": {
       "openSession": "セッションを開く"
@@ -1572,6 +1578,10 @@
       "couldNotLoad": "セッションを読み込めませんでした。",
       "failedToLoadDetails": "セッションの詳細を読み込めませんでした。",
       "failedToStopExecution": "実行を停止できませんでした。",
+      "stopped": "セッションを停止しました",
+      "committing": "コミット中…",
+      "committed": "コミットしました",
+      "commitFailed": "コミットに失敗しました",
       "renameSession": "セッション名の変更",
       "renamePlaceholder": "セッション名",
       "transcriptAccessibility": "セッションの会話履歴",
@@ -1712,15 +1722,12 @@
       "linesBadge_one": "{{displayCount}}行",
       "linesBadge_other": "{{displayCount}}行",
       "matchesBadge_one": "{{displayCount}}件",
-      "matchesBadge_other": "{{displayCount}}件"
+      "matchesBadge_other": "{{displayCount}}件",
+      "noOutput": "出力はありません。"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}～{{end}}行目（一部省略）",
       "linesOf": "{{total}}行中{{start}}–{{end}}行目"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agentの{{action}}に失敗しました（{{status}}）。",
-      "failed": "Cloud Agentの{{action}}に失敗しました。"
     },
     "collectCopyableText": {
       "unserializableInput": "[シリアル化できない入力]",
@@ -1817,8 +1824,7 @@
       "assistantProviderRejected": "プロバイダーがリクエストを拒否しました。",
       "assistantStopped": "応答の生成が停止しました。",
       "assistantContextOverflow": "会話が長すぎてモデルで処理できません。",
-      "assistantFailed": "応答に失敗しました。",
-      "sendFailed": "メッセージを送信できませんでした。もう一度お試しください。"
+      "assistantFailed": "応答に失敗しました。"
     },
     "filePart": {
       "loadingImage": "画像を読み込み中",
@@ -3108,6 +3114,14 @@
     "tooManySignInAttempts": "サインインの試行回数が多すぎます。しばらく待ってから、もう一度お試しください。"
   },
   "models": {
+    "auto": {
+      "frontier": "自動最先端",
+      "balanced": "自動バランス",
+      "efficient": "自動効率",
+      "small": "自動小型",
+      "free": "自動無料",
+      "organization": "組織の自動"
+    },
     "dataCollected": "データ収集あり",
     "free": "無料",
     "couldNotUpdateFavorites": "お気に入りを更新できませんでした。",
@@ -3155,7 +3169,8 @@
     "channelName": "アクティブなエージェント",
     "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。",
     "openSession": "開く",
-    "approveFailed": "承認できませんでした。もう一度試すには$t(common.approve)をタップしてください。"
+    "approveFailed": "承認できませんでした。もう一度試すには$t(common.approve)をタップしてください。",
+    "newestResult": "最新の結果"
   },
   "transcriptionModel": {
     "title": "文字起こしモデル",
@@ -3180,15 +3195,7 @@
     "remoteOptionTitle": "お使いのコンピューター",
     "remoteOptionBody": "`kilo remote` CLI を使って自分のコンピューターで Kilo を実行します。",
     "skip": "ツアーをスキップ",
-    "tutorialLabel": "チュートリアル",
-    "remoteTitle": "最初のリモートセッションを開始",
-    "remoteBody": "コンピューターを接続してから、ここでセッションを開始してください。",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "接続済みのコンピューターはありません",
-    "remoteEmptyBody": "接続するには、コンピューターで `kilo remote` を実行してください。",
-    "remoteFound": "コンピューターが接続されました",
-    "checkAgain": "再チェック",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "チュートリアル"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3206,28 @@
   },
   "launcher": {
     "openLastSession": "最後のセッションを開く"
+  },
+  "spendAlerts": {
+    "subtitle": "このスコープの支出が上限を超えたとき、または通常の毎時のペースを大きく上回ったときに、請求担当者にメールまたはプッシュでアラートを送信します。",
+    "enable": "支出アラートを有効にする",
+    "thresholdTitle": "しきい値の超過",
+    "thresholdSubtitle": "累計支出が上限を超えています",
+    "anomalyTitle": "毎時の急増",
+    "anomalySubtitle": "1時間の支出がこのスコープの通常のペースを大きく上回っています",
+    "limitLabel": "上限 (USD)",
+    "windowLabel": "期間",
+    "window24h": "24時間",
+    "window7d": "7日間",
+    "window30d": "30日間",
+    "multiplierLabel": "急増の倍率",
+    "saved": "支出アラートの設定を保存しました",
+    "loadError": "支出アラートを読み込めませんでした。",
+    "saveError": "支出アラートを保存できませんでした。",
+    "empty": "支出アラートはオフです。このスコープの請求担当者に通知するにはオンにしてください。",
+    "noSpend": "まだ支出が記録されていません",
+    "spend24h": "過去24時間の支出",
+    "multiplierError": "1以上の倍率を入力してください",
+    "permissionDenied": "支出アラートを管理する権限がありません。",
+    "pushOffByCategory": "通知でオフ"
   }
 }

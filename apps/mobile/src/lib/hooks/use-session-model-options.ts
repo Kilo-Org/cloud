@@ -11,6 +11,7 @@ import { sortRemoteModelCatalogProviders } from '@kilocode/cloud-agent-sdk/remot
 
 import { i18n } from '@/i18n';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { formatShortModelDisplayName } from '@/lib/model-display-name';
 
 type SessionModelSource =
   | 'cloud-agent-gateway'
@@ -205,7 +206,7 @@ function buildCliCatalogOptions(input: BuildSessionModelOptionsInput): SessionMo
     provider.models.map(model => {
       const option: SessionModelOption = {
         id: `remote-model-${opaqueIndex}`,
-        name: model.name ?? model.id,
+        name: formatShortModelDisplayName(model.name ?? model.id),
         displayId: model.id,
         variants: model.variants,
         isPreferred: false,

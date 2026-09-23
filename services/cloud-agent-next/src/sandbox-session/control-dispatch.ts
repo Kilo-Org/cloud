@@ -1,5 +1,5 @@
 import { withTimeout } from '@kilocode/worker-utils';
-import type { ConnectionState, PhysicalState } from '../sandbox-control/status-projection.js';
+import type { ConnectionState, PhysicalState } from '../shared/sandbox-status.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
@@ -17,6 +17,7 @@ export class ControlRequestError extends Error {
   readonly code: string;
   readonly retryable: boolean;
   readonly admission: ControlError['admission'];
+  readonly subtype: ControlError['subtype'];
   readonly rejectionReceived?: true;
 
   constructor(error: ControlError, options?: { rejectionReceived?: true }) {
@@ -25,6 +26,7 @@ export class ControlRequestError extends Error {
     this.code = error.code;
     this.retryable = error.retryable;
     this.admission = error.admission;
+    this.subtype = error.subtype;
     if (options?.rejectionReceived) this.rejectionReceived = true;
   }
 }

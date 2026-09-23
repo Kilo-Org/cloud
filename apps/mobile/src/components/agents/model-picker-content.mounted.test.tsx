@@ -1,8 +1,9 @@
+/* eslint-disable max-lines -- The picker's search, empty-state and bottom-inset contracts share one mount harness. */
 import { createElement, Fragment, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type ModelPickerRow } from '@/lib/model-picker-rows';
 import { type ModelPickerBridge } from '@/lib/picker-bridge';
@@ -24,6 +25,10 @@ const listCommitLengths = vi.hoisted(() => ({ values: [] as number[] }));
 const preferences = vi.hoisted(() => ({ favorites: [] as string[] }));
 
 const slotState = vi.hoisted(() => ({ bridge: undefined as unknown }));
+
+// The device's safe-area insets. Configurable so a test can prove the list's
+// viewport ends above the bottom system bar instead of under it.
+const safeAreaInsets = vi.hoisted(() => ({ bottom: 0 }));
 
 const routerBack = vi.hoisted(() => vi.fn());
 
@@ -70,6 +75,8 @@ const flatListMock = vi.hoisted(
       data: readonly ModelPickerRow[];
       renderItem?: (info: { item: ModelPickerRow; index: number }) => ReactNode;
       keyExtractor?: (item: ModelPickerRow) => string;
+      style?: unknown;
+      contentContainerStyle?: unknown;
     }) => {
       listCommitLengths.values.push(props.data.length);
       const rows = props.data.map((item, index) =>
@@ -79,12 +86,21 @@ const flatListMock = vi.hoisted(
           props.renderItem ? props.renderItem({ item, index }) : null
         )
       );
-      return createElement('FlatList', { data: props.data }, ...rows);
+      return createElement(
+        'FlatList',
+        {
+          data: props.data,
+          style: props.style,
+          contentContainerStyle: props.contentContainerStyle,
+        },
+        ...rows
+      );
     }
 );
 
 vi.mock('react-native', () => ({
   FlatList: flatListMock,
+  Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
 }));
@@ -95,19 +111,27 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({ top: 0, bottom: safeAreaInsets.bottom, left: 0, right: 0 }),
 }));
 vi.mock('@/components/picker-sheet', () => ({
   PickerSheet: (props: { children?: ReactNode; headerContent?: ReactNode }) =>
     createElement('PickerSheet', null, props.headerContent, props.children),
 }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+// EmptyState renders its `action` node (as the real component does) so the
+// empty state's clear CTA is reachable from the tree; `title` stays a prop for
+// the existing assertions.
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { title: string; action?: ReactNode }) =>
+    createElement('EmptyState', { title: props.title }, props.action),
+}));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Info: 'Info',
   Search: 'Search',
   SearchX: 'SearchX',
+  X: 'X',
 }));
 vi.mock('@/components/agents/model-selector', () => ({
   ModelPickerOptionRow: 'ModelPickerOptionRow',
@@ -184,6 +208,17 @@ function searchInput(renderer: TestRenderer.ReactTestRenderer): TestRenderer.Rea
   return input;
 }
 
+/**
+ * The in-field clear affordance, found by the label the Agents search field
+ * also uses. It must exist on both platforms: `clearButtonMode` is iOS-only,
+ * so Android previously rendered the query with no way to clear it.
+ */
+function clearSearchButtons(
+  renderer: TestRenderer.ReactTestRenderer
+): TestRenderer.ReactTestInstance[] {
+  return renderer.root.findAll(node => node.props.accessibilityLabel === 'Clear search');
+}
+
 /** Drive the uncontrolled TextInput's handler the way a keystroke would. */
 function typeSearch(renderer: TestRenderer.ReactTestRenderer, next: string): void {
   const { onChangeText } = searchInput(renderer).props as {
@@ -211,7 +246,40 @@ describe('ModelPickerContent deferred search', () => {
     buildSearchCalls.values.length = 0;
     listCommitLengths.values.length = 0;
     slotState.bridge = makeBridge();
+    safeAreaInsets.bottom = 0;
     routerBack.mockClear();
+  });
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('finds an auto model by the translated name its row renders', async () => {
+    // The row shows the catalog's name for a Kilo auto model, so the query a
+    // user types is the translated one. The picker must match it, not answer
+    // "No matches" for the name it drew.
+    const autoModel: SessionModelOption = {
+      id: 'kilo-auto/efficient',
+      name: 'Auto Efficient',
+      displayId: 'kilo-auto/efficient',
+      variants: [],
+      isPreferred: true,
+      showGatewayMetadata: true,
+    };
+    slotState.bridge = { ...makeBridge(), options: [autoModel] };
+    await i18n.changeLanguage('it');
+    const renderer = await mount();
+
+    await act(async () => {
+      typeSearch(renderer, 'Efficiente');
+      await Promise.resolve();
+    });
+
+    expect(listedDisplayIds(renderer)).toEqual(['kilo-auto/efficient']);
+
+    act(() => {
+      renderer.unmount();
+    });
   });
 
   it('holds the rows while typing and commits only the settled query', async () => {
@@ -284,6 +352,139 @@ describe('ModelPickerContent deferred search', () => {
     /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
     expect(emptyState[0]?.props.title).toBe('No matches');
     /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('offers a Clear search action in the No matches empty state that returns the full list', async () => {
+    const renderer = await mount();
+
+    await act(async () => {
+      typeSearch(renderer, 'no-such-model-xyz');
+      await Promise.resolve();
+    });
+
+    // The "No matches" body offers exactly one clear CTA, carrying the same
+    // copy the Agents search empty state uses, so both searches recover the
+    // same way.
+    const clearActions = findByType(renderer.root, 'Button');
+    expect(clearActions).toHaveLength(1);
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    expect(clearActions[0]?.props.children?.props.children).toBe('Clear search');
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    await act(async () => {
+      /* eslint-disable typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+      clearActions[0]?.props.onPress();
+      /* eslint-enable typescript-eslint/no-unsafe-call, typescript-eslint/no-unsafe-member-access */
+      await Promise.resolve();
+    });
+
+    // The empty state is gone and the unfiltered catalog is listed again.
+    expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
+    expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('does not offer a clear action when the catalog itself is empty', async () => {
+    slotState.bridge = { ...makeBridge(), options: [] };
+    const renderer = await mount();
+
+    const emptyState = findByType(renderer.root, 'EmptyState');
+    expect(emptyState).toHaveLength(1);
+    // The mock renders `action` as a child (as the real EmptyState does), so
+    // assert on the rendered children: no action node reaches the empty state.
+    expect(emptyState[0]?.children).toHaveLength(0);
+    expect(findByType(renderer.root, 'Button')).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('offers an in-field clear affordance that resets the query', async () => {
+    const renderer = await mount();
+
+    // Nothing typed: no clear affordance, matching the Agents search field.
+    expect(clearSearchButtons(renderer)).toHaveLength(0);
+
+    await act(async () => {
+      typeSearch(renderer, FINAL_QUERY);
+      await Promise.resolve();
+    });
+
+    expect(listedDisplayIds(renderer)).toHaveLength(FINAL_MATCH_COUNT);
+    const [clear] = clearSearchButtons(renderer);
+    if (!clear) {
+      throw new Error('clear affordance not found');
+    }
+
+    await act(async () => {
+      (clear.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    // Clearing drops the query the rows derive from and hides the affordance.
+    expect(listedDisplayIds(renderer)).toHaveLength(TOTAL_OPTIONS);
+    expect(clearSearchButtons(renderer)).toHaveLength(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('ends the list viewport above the bottom system bar', async () => {
+    // A device with a navigation bar: the viewport must end above it, or the
+    // last row is drawn under the opaque bar (a content inset only cleared the
+    // end of the list, so a row at the viewport bottom stayed covered).
+    safeAreaInsets.bottom = 24;
+    const renderer = await mount();
+
+    const [list] = findByType(renderer.root, 'FlatList');
+    if (!list) {
+      throw new Error('FlatList not found');
+    }
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    expect((list.props.style as { marginBottom?: number }).marginBottom).toBe(24);
+    // The inset lives on the frame alone; leaving it on the content as well
+    // would double the reserved space.
+    expect(list.props.contentContainerStyle).toBeUndefined();
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+// The composer's current model arrives as the bridge's `currentValue`. The row
+// for that id must carry `selected`, or the picker shows no visible selected
+// state for the model the composer is editing (model-selected finding: the
+// DeepSeek V4.1 Flash row read as star-only). `selected` is what renders the
+// trailing Check (see model-selector.mounted.test.tsx).
+describe('ModelPickerContent selected row', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    buildSearchCalls.values.length = 0;
+    listCommitLengths.values.length = 0;
+    slotState.bridge = { ...makeBridge(), currentValue: 'remote-model-17' };
+  });
+
+  it('marks exactly the bridge current model as the selected row', async () => {
+    const renderer = await mount();
+
+    /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+    const selectedIds = findByType(renderer.root, 'ModelPickerOptionRow')
+      .filter(node => node.props.selected === true)
+      .map(node => (node.props.option as SessionModelOption).id);
+    /* eslint-enable typescript-eslint/no-unsafe-member-access */
+
+    expect(selectedIds).toEqual(['remote-model-17']);
 
     act(() => {
       renderer.unmount();

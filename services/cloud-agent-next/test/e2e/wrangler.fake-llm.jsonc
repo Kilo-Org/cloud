@@ -1,0 +1,21 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "fake-llm",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "fake-llm-worker.ts",
+  "compatibility_date": "2026-06-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "dev": { "port": 8812 },
+  "durable_objects": {
+    "bindings": [{ "name": "FAKE_LLM", "class_name": "FakeLlmState" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FakeLlmState"] }],
+  "secrets_store_secrets": [
+    {
+      "binding": "NEXTAUTH_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "NEXTAUTH_SECRET",
+    },
+  ],
+}

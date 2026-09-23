@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Разблокировка требуется при запуске приложения и после пяти минут в фоновом режиме.",
     "featureFlags": "Флаги функций",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "с сервера · ≥ {{min}}",
+    "featureFlagSkipped": "по умолчанию · < {{min}}",
+    "featureFlagNotLoaded": "по умолчанию · не загружено",
     "gatewayTranscription": "Распознавание речи через Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Распознавайте голосовой ввод с помощью модели Kilo Gateway вместо распознавания речи на устройстве. Запись отправляется в Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -323,7 +323,8 @@
       "chat": "Сообщения чата",
       "kiloclaw": "Активность KiloClaw",
       "balance": "Оповещения о балансе",
-      "security": "Замечания по безопасности"
+      "security": "Замечания по безопасности",
+      "spend": "Оповещения о расходах"
     },
     "category": {
       "chatMessagesSubtitle": "ответы в вашей переписке",
@@ -334,8 +335,13 @@
       "sessionStatusTitle": "Статус сеанса",
       "sessionStatusSubtitle": "завершён / ошибка / готов к управлению",
       "kiloclawActivitySubtitle": "готовность и ошибки экземпляра, запланированные действия",
+      "kiloclawActivityUnavailable": "Запустите экземпляр KiloClaw, чтобы получать активность KiloClaw.",
       "balanceAlertsSubtitle": "предупреждения о низком балансе организации",
-      "securityFindingsSubtitle": "новые уязвимости и напоминания о сроках SLA"
+      "balanceAlertsUnavailable": "Присоединитесь к организации, чтобы получать оповещения о балансе.",
+      "securityFindingsSubtitle": "новые уязвимости и напоминания о сроках SLA",
+      "securityFindingsUnavailable": "Включите Агента безопасности Kilo в области, чтобы получать уязвимости.",
+      "spendAlertsSubtitle": "превышения порогов и почасовые всплески",
+      "spendAlertsToggle": "Категория «Оповещения о расходах»"
     },
     "action": {
       "openSession": "Открыть сеанс"
@@ -1596,6 +1602,10 @@
       "couldNotLoad": "Не удалось загрузить сеанс.",
       "failedToLoadDetails": "Не удалось загрузить сведения о сеансе.",
       "failedToStopExecution": "Не удалось остановить выполнение.",
+      "stopped": "Сеанс остановлен",
+      "committing": "Коммитим…",
+      "committed": "Коммит создан",
+      "commitFailed": "Не удалось создать коммит",
       "renameSession": "Переименовать сеанс",
       "renamePlaceholder": "Название сеанса",
       "transcriptAccessibility": "Переписка в сеансе",
@@ -1744,15 +1754,12 @@
       "matchesBadge_one": "совпадение: {{displayCount}}",
       "matchesBadge_other": "совпадений: {{displayCount}}",
       "matchesBadge_few": "совпадения: {{displayCount}}",
-      "matchesBadge_many": "совпадений: {{displayCount}}"
+      "matchesBadge_many": "совпадений: {{displayCount}}",
+      "noOutput": "Нет вывода."
     },
     "readToolMarkdown": {
       "linesTruncated": "строки {{start}}–{{end}} (вывод сокращён)",
       "linesOf": "строки {{start}}–{{end}} из {{total}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Не удалось выполнить действие «{{action}}» в Cloud Agent ({{status}}).",
-      "failed": "Не удалось выполнить действие «{{action}}» в Cloud Agent."
     },
     "collectCopyableText": {
       "unserializableInput": "[не удалось сериализовать входные данные]",
@@ -1849,8 +1856,7 @@
       "assistantProviderRejected": "Провайдер отклонил запрос.",
       "assistantStopped": "Генерация ответа остановлена.",
       "assistantContextOverflow": "Переписка слишком длинная для этой модели.",
-      "assistantFailed": "Не удалось сформировать ответ.",
-      "sendFailed": "Не удалось отправить сообщение. Попробуйте снова."
+      "assistantFailed": "Не удалось сформировать ответ."
     },
     "filePart": {
       "loadingImage": "Загрузка изображения",
@@ -3194,6 +3200,14 @@
     "tooManySignInAttempts": "Слишком много попыток входа. Подождите и попробуйте снова."
   },
   "models": {
+    "auto": {
+      "frontier": "Авто Передовой",
+      "balanced": "Авто Сбалансированный",
+      "efficient": "Авто Эффективный",
+      "small": "Авто Малый",
+      "free": "Авто Бесплатный",
+      "organization": "Авто организации"
+    },
     "dataCollected": "Сбор данных",
     "free": "Бесплатно",
     "couldNotUpdateFavorites": "Не удалось обновить избранное.",
@@ -3241,7 +3255,8 @@
     "channelName": "Активные агенты",
     "activityKitDisabledBody": "Включите «Эфир активности» в настройках, чтобы видеть активных агентов на экране блокировки.",
     "openSession": "Открыть",
-    "approveFailed": "Не удалось одобрить. Нажмите $t(common.approve), чтобы повторить."
+    "approveFailed": "Не удалось одобрить. Нажмите $t(common.approve), чтобы повторить.",
+    "newestResult": "Последний результат"
   },
   "transcriptionModel": {
     "title": "Модель распознавания речи",
@@ -3266,15 +3281,7 @@
     "remoteOptionTitle": "Ваш компьютер",
     "remoteOptionBody": "Запустите Kilo на своём компьютере через CLI `kilo remote`.",
     "skip": "Пропустить тур",
-    "tutorialLabel": "Обучение",
-    "remoteTitle": "Запустите свой первый удалённый сеанс",
-    "remoteBody": "Подключите свой компьютер, а затем запустите сеанс отсюда.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Компьютер ещё не подключён",
-    "remoteEmptyBody": "Чтобы подключить его, выполните `kilo remote` на своём компьютере.",
-    "remoteFound": "Компьютер подключён",
-    "checkAgain": "Проверить ещё раз",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Обучение"
   },
   "appActions": {
     "start": {
@@ -3285,5 +3292,28 @@
   },
   "launcher": {
     "openLastSession": "Открыть последний сеанс"
+  },
+  "spendAlerts": {
+    "subtitle": "Отправляй оповещение по почте или push-уведомлением контактам для оплаты, когда расходы этой области превышают лимит или подскакивают выше обычного почасового темпа.",
+    "enable": "Включить оповещения о расходах",
+    "thresholdTitle": "Превышение порога",
+    "thresholdSubtitle": "Текущие расходы превышают ваш лимит",
+    "anomalyTitle": "Почасовой всплеск",
+    "anomalySubtitle": "Час значительно выше обычного темпа этой области",
+    "limitLabel": "Лимит (USD)",
+    "windowLabel": "Окно",
+    "window24h": "24 часа",
+    "window7d": "7 дней",
+    "window30d": "30 дней",
+    "multiplierLabel": "Множитель всплеска",
+    "saved": "Настройки оповещений о расходах сохранены",
+    "loadError": "Не удалось загрузить оповещения о расходах.",
+    "saveError": "Не удалось сохранить оповещения о расходах.",
+    "empty": "Оповещения о расходах выключены. Включите их, чтобы предупреждать контакты для оплаты этой области.",
+    "noSpend": "Расходы ещё не зафиксированы",
+    "spend24h": "Расходы за последние 24 часа",
+    "multiplierError": "Введите множитель 1 или больше",
+    "permissionDenied": "У вас нет прав на управление оповещениями о расходах.",
+    "pushOffByCategory": "Выключено в уведомлениях"
   }
 }

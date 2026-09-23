@@ -207,7 +207,7 @@ export function QuestionCard({
       </View>
 
       {presentation.errorMessage ? (
-        <View className="border-b border-border bg-destructive/10 px-4 py-2">
+        <View className="border-b border-border bg-danger-tile-bg px-4 py-2">
           <Text className="text-xs text-destructive">{presentation.errorMessage}</Text>
         </View>
       ) : null}
@@ -338,7 +338,14 @@ export function QuestionCard({
                           handleCustomTextChange(qIndex, text);
                         }}
                         placeholder={t('agentChat.questionCard.typeYourOwnAnswerPlaceholder')}
-                        placeholderTextColor={colors.mutedForeground}
+                        // The active field swaps its fill to `bg-primary`, so the
+                        // placeholder follows the fill's foreground like the
+                        // typed text and the option label do; the muted grey is
+                        // painted for the plain background and is unreadable on
+                        // the olive fill.
+                        placeholderTextColor={
+                          isCustomActive ? colors.primaryForeground : colors.mutedForeground
+                        }
                         editable={!interactionDisabled}
                         accessibilityLabel={t('agentChat.questionCard.typeYourOwnAnswer')}
                         accessibilityState={{ disabled: interactionDisabled }}
@@ -360,35 +367,35 @@ export function QuestionCard({
       </ScrollView>
 
       {presentation.hasPrimaryCta || presentation.hasRetryCta || presentation.hasRejectCta ? (
-        <View className="flex-row gap-2 border-t border-border p-3">
+        <View className="flex-col gap-2 border-t border-border p-3">
           {presentation.hasRejectCta ? (
             <Button
               variant="outline"
-              className="flex-1"
+              className="w-full"
               onPress={handleReject}
               disabled={interactionDisabled}
             >
-              <Text className="text-sm">{t('agentChat.questionCard.skip')}</Text>
+              <Text className="shrink text-center text-sm">{t('agentChat.questionCard.skip')}</Text>
             </Button>
           ) : null}
           {presentation.hasRetryCta && presentation.retryAction === 'answer' ? (
-            <Button className="flex-1" onPress={handleSubmit} disabled={submitDisabled}>
+            <Button className="w-full" onPress={handleSubmit} disabled={submitDisabled}>
               {submittingSpinner}
-              <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>{t('common.retry')}</Text>
+              <Text className="shrink text-center text-sm">{t('common.retry')}</Text>
             </Button>
           ) : null}
           {presentation.hasRetryCta && presentation.retryAction === 'reject' ? (
-            <Button className="flex-1" onPress={handleRetrySkip} disabled={interactionDisabled}>
+            <Button className="w-full" onPress={handleRetrySkip} disabled={interactionDisabled}>
               {submittingSpinner}
-              <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>
+              <Text className="shrink text-center text-sm">
                 {t('agentChat.questionCard.retrySkip')}
               </Text>
             </Button>
           ) : null}
           {presentation.hasPrimaryCta ? (
-            <Button className="flex-1" onPress={handleSubmit} disabled={submitDisabled}>
+            <Button className="w-full" onPress={handleSubmit} disabled={submitDisabled}>
               {submittingSpinner}
-              <Text className={cn('text-sm', isSubmitting ? 'ml-2' : '')}>
+              <Text className="shrink text-center text-sm">
                 {isSubmitting
                   ? t('agentChat.questionCard.submitting')
                   : t('agentChat.questionCard.sendAnswers')}

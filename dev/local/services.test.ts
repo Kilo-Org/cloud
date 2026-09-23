@@ -15,10 +15,18 @@ import {
   readPersistedPortOffset,
   resolveGroups,
   resolveDeletionMockSessionEnv,
+  resolveE2eInternalSecretSessionEnv,
+  resolveFakeLlmWorkerPort,
+  resolveFakeLlmSessionEnv,
   resolveSessionNextAuthUrl,
   resolveTargets,
+  serviceCommand,
+  planTunnelRestart,
   writePersistedPortOffset,
 } from './services';
+import { buildStartCommand } from './runner';
+import { LOCAL_FAKE_LLM_ADMIN_TOKEN } from '../../services/cloud-agent-next/test/e2e/fake-llm-admin';
+import { LOCAL_E2E_INTERNAL_API_SECRET } from '../../services/cloud-agent-next/test/e2e/e2e-internal-secret';
 
 test('uses an automatic port offset for secondary worktrees by default', () => {
   assert.equal(
@@ -200,13 +208,33 @@ test('registers user data export with worktree-aware ports and dependencies', ()
   assert.equal(service.port, 8818 + portOffset);
   assert.deepEqual(service.dependsOn, ['postgres', 'nextjs']);
   assert.deepEqual(resolveTargets(['data-export']), [
+    'postgres',
     'stripe',
     'redis',
-    'postgres',
+    'cloudflare-session-ingest',
     'redis-http',
     'nextjs',
     'user-data-export',
   ]);
+});
+
+test('starts the session-ingest worker whenever the web app starts', () => {
+  // The web app mints web tickets through Session Ingest
+  // (`activeSessions.createWebTicket` / `getToken`), so starting the web stack
+  // must pull the worker in transitively — otherwise the mutation fetches a
+  // dead SESSION_INGEST_WORKER_URL and every web-ticket run gets a 412
+  // PRECONDITION_FAILED. Same precedent as mobile -> latency-ingest.
+  const appTargets = resolveTargets(['app']);
+
+  assert.ok(
+    appTargets.includes('cloudflare-session-ingest'),
+    `expected cloudflare-session-ingest in app start targets, got: ${appTargets.join(', ')}`
+  );
+
+  const worker = getService('cloudflare-session-ingest');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/session-ingest');
+  assert.equal(worker.port, 8800 + portOffset);
 });
 
 test('points both user data export Hyperdrive bindings at the offset database', () => {
@@ -270,6 +298,26 @@ test('binds the container usage meter under its unsuffixed Wrangler name', () =>
   assert.equal(scriptFlags.filter(part => part === '--env').length, 0);
   assert.equal(scriptFlags.filter(part => part === '-e').length, 0);
   assert.equal(meter.command.filter(part => part === '--ip').length, 1);
+});
+
+test('starts the latency-ingest worker whenever the mobile stack starts', () => {
+  // The mobile app POSTs its client-observed latency batches to the
+  // latency-ingest worker in every dev session (LATENCY_INGEST_URL in the
+  // mobile env resolves to its wrangler port), so starting the mobile service
+  // must pull the worker in transitively — otherwise the app POSTs to a dead
+  // listener and the ingest path cannot be observed locally.
+  const mobileTargets = resolveTargets(['mobile']);
+
+  assert.ok(
+    mobileTargets.includes('latency-ingest'),
+    `expected latency-ingest in mobile start targets, got: ${mobileTargets.join(', ')}`
+  );
+
+  const worker = getService('latency-ingest');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/latency-ingest');
+  assert.equal(worker.port, 8816 + portOffset);
+  assert.deepEqual(worker.dependsOn, []);
 });
 
 test('starts Storybook with Storybook v10 port flags', () => {
@@ -345,6 +393,83 @@ test('keeps existing deletion provider keys when injecting deletion-mock hosts',
   assert.equal(env?.POSTHOG_HOST, 'http://127.0.0.1:4010');
 });
 
+test('propagates the fake-llm admin token through the session environment', () => {
+  assert.equal(
+    resolveFakeLlmSessionEnv({
+      serviceNames: ['nextjs'],
+      env: { FAKE_LLM_ADMIN_TOKEN: 'custom-admin-token' },
+    }),
+    undefined
+  );
+
+  assert.deepEqual(
+    resolveFakeLlmSessionEnv({
+      serviceNames: ['fake-llm'],
+      env: { FAKE_LLM_ADMIN_TOKEN: 'custom-admin-token' },
+    }),
+    { FAKE_LLM_ADMIN_TOKEN: 'custom-admin-token' }
+  );
+
+  assert.deepEqual(resolveFakeLlmSessionEnv({ serviceNames: ['fake-llm'], env: {} }), {
+    FAKE_LLM_ADMIN_TOKEN: LOCAL_FAKE_LLM_ADMIN_TOKEN,
+  });
+});
+
+test('gives the fake-llm Worker the same NEXTAUTH_SECRET as the main Worker', () => {
+  assert.deepEqual(
+    resolveFakeLlmSessionEnv({
+      serviceNames: ['fake-llm-worker'],
+      env: { FAKE_LLM_ADMIN_TOKEN: 'worker-admin-token' },
+      devVars: new Map([['NEXTAUTH_SECRET', 'worker-nextauth-secret']]),
+    }),
+    {
+      FAKE_LLM_ADMIN_TOKEN: 'worker-admin-token',
+      NEXTAUTH_SECRET: 'worker-nextauth-secret',
+    }
+  );
+
+  // The shell environment wins when it already carries a secret.
+  assert.deepEqual(
+    resolveFakeLlmSessionEnv({
+      serviceNames: ['fake-llm-worker'],
+      env: { NEXTAUTH_SECRET: 'shell-secret' },
+      devVars: new Map([['NEXTAUTH_SECRET', 'file-secret']]),
+    }),
+    {
+      FAKE_LLM_ADMIN_TOKEN: LOCAL_FAKE_LLM_ADMIN_TOKEN,
+      NEXTAUTH_SECRET: 'shell-secret',
+    }
+  );
+});
+
+test('publishes the e2e internal secret into the HTTP e2e session environment only', () => {
+  assert.equal(
+    resolveE2eInternalSecretSessionEnv({
+      serviceNames: ['nextjs'],
+      env: { E2E_INTERNAL_API_SECRET: 'e2e-internal-secret-0123456789' },
+    }),
+    undefined
+  );
+  assert.deepEqual(
+    resolveE2eInternalSecretSessionEnv({
+      serviceNames: ['cloud-agent-next-http'],
+      env: { E2E_INTERNAL_API_SECRET: 'e2e-internal-secret-0123456789' },
+    }),
+    { E2E_INTERNAL_API_SECRET: 'e2e-internal-secret-0123456789' }
+  );
+  // The development default is published too; the renderer rejects it, so an
+  // unexported value fails the group start loudly instead of silently.
+  assert.deepEqual(
+    resolveE2eInternalSecretSessionEnv({ serviceNames: ['cloud-agent-next-http'], env: {} }),
+    { E2E_INTERNAL_API_SECRET: LOCAL_E2E_INTERNAL_API_SECRET }
+  );
+});
+
+test('keeps the e2e internal secret out of the HTTP worker command string', () => {
+  const command = getService('cloud-agent-next-http').command.join(' ');
+  assert.doesNotMatch(command, /E2E_INTERNAL_API_SECRET/);
+});
+
 test('preserves auto routing backend auth secret name', () => {
   const service = getService('auto-routing');
   const wranglerConfig = fs.readFileSync(`${service.dir}/wrangler.jsonc`, 'utf-8');
@@ -352,4 +477,80 @@ test('preserves auto routing backend auth secret name', () => {
   assert.match(wranglerConfig, /"binding": "INTERNAL_API_SECRET_PROD"/);
   assert.match(wranglerConfig, /"secret_name": "INTERNAL_API_SECRET_PROD"/);
   assert.doesNotMatch(wranglerConfig, /BACKEND_AUTH_TOKEN/);
+});
+
+test('runs the HTTP e2e Worker from the rendered local config', () => {
+  const service = getService('cloud-agent-next-http');
+  assert.equal(service.group, 'cloud-agent-next-http');
+  const command = service.command.join(' ');
+  assert.match(command, /render-e2e-worker-config\.mjs --local/);
+  assert.match(command, /--config \.wrangler\/wrangler\.e2e-local\.jsonc/);
+  // `--env dev` must come from the package `dev` script only: the launcher
+  // passing it too made wrangler reject the duplicate `--env dev --env dev`.
+  assert.equal(service.command.includes('--env'), false);
+  const packageJson = JSON.parse(fs.readFileSync(`${service.dir}/package.json`, 'utf-8')) as {
+    scripts?: { dev?: string };
+  };
+  assert.match(packageJson.scripts?.dev ?? '', /--env dev/);
+});
+
+test('starts the fake LLM as a Worker with shell-referenced secrets', () => {
+  const service = getService('fake-llm-worker');
+  const command = service.command.join(' ');
+  assert.match(command, /wrangler dev --config test\/e2e\/wrangler\.fake-llm\.jsonc/);
+  // The secret values are shell references, so they never enter the command
+  // string (which tmux mirrors into dev/logs).
+  assert.match(command, /--var NEXTAUTH_SECRET:\$NEXTAUTH_SECRET/);
+  assert.match(command, /--var FAKE_LLM_ADMIN_TOKEN:\$FAKE_LLM_ADMIN_TOKEN/);
+});
+
+test('publishes the fake-LLM tunnel only when the fake Worker is selected', () => {
+  const tunnels = getService('cloud-agent-public-tunnels');
+  const scriptIndex = tunnels.command.findIndex(part => part.endsWith('start-public-tunnels.ts'));
+  assert.notEqual(scriptIndex, -1);
+
+  // A standalone tunnels start must not require a running fake Worker.
+  const standalone = tunnels.command.slice(scriptIndex + 1);
+  assert.equal(standalone.length, 3);
+  for (const arg of standalone) assert.match(String(arg), /^\d+$/);
+  assert.equal(tunnels.command.includes(String(resolveFakeLlmWorkerPort())), false);
+
+  const withFake = serviceCommand('cloud-agent-public-tunnels', [
+    'cloud-agent-public-tunnels',
+    'fake-llm-worker',
+  ]);
+  const withFakeArgs = withFake.slice(scriptIndex + 1);
+  assert.equal(withFakeArgs.length, 4);
+  for (const arg of withFakeArgs) assert.match(String(arg), /^\d+$/);
+  assert.equal(withFakeArgs[3], String(resolveFakeLlmWorkerPort()));
+
+  const withoutFake = serviceCommand('cloud-agent-public-tunnels', ['cloud-agent-public-tunnels']);
+  assert.equal(withoutFake.length, tunnels.command.length);
+});
+
+test('a tunnels restart keeps the live selection and reloads the HTTP worker', () => {
+  const httpSelection = ['cloud-agent-next-http', 'fake-llm-worker', 'cloud-agent-public-tunnels'];
+  const plan = planTunnelRestart(httpSelection);
+
+  // `restartServiceInTmux` types this exact command into the pane, and the same
+  // selection is forwarded when it has to recreate a vanished pane. Passing it
+  // is what keeps the fourth (fake-LLM) tunnel port; without the selection the
+  // restart falls back to the three-port form and publishes no fake tunnel.
+  const command = buildStartCommand('cloud-agent-public-tunnels', plan.selection);
+  const tokens = command.split(/\s+/);
+  const scriptIndex = tokens.findIndex(token => token.endsWith('start-public-tunnels.ts'));
+  assert.notEqual(scriptIndex, -1);
+  const args = tokens.slice(scriptIndex + 1);
+  assert.equal(args.length, 4);
+  assert.equal(args[3], String(resolveFakeLlmWorkerPort()));
+
+  // The post-capture reload must follow the selection too. The HTTP profile
+  // renders the tunnel URLs into `.wrangler/.dev.vars`; reloading the plain
+  // worker instead would leave the running HTTP Worker on dead copies.
+  assert.equal(plan.reloadTarget, 'cloud-agent-next-http');
+  assert.equal(
+    planTunnelRestart(['cloud-agent-next', 'cloud-agent-public-tunnels']).reloadTarget,
+    'cloud-agent-next'
+  );
+  assert.equal(planTunnelRestart(['cloud-agent-public-tunnels']).reloadTarget, undefined);
 });

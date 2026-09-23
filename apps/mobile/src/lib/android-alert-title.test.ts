@@ -26,6 +26,13 @@ const iosAlertManager = readFileSync(
   ),
   'utf8'
 );
+// The discard confirm is the screen the title override was written for; it has
+// to stay on the shared native alert, or a platform fork would bypass the
+// Android title layout this plugin overlays.
+const discardGuardSource = readFileSync(
+  join(projectRoot, 'src/components/agents/use-new-session-discard-guard.ts'),
+  'utf8'
+);
 
 describe('Android native alert title', () => {
   let platformProjectRoot = '';
@@ -97,7 +104,7 @@ describe('Android native alert title', () => {
         readFileSync(join(projectRoot, 'plugins/backup', name), 'utf8')
       );
     }
-    expect(readFileSync(join(resDir, 'raw/kilo_shrink_sentinel_unused'), 'utf8')).toBe(
+    expect(readFileSync(join(resDir, 'raw/zz_unused_shrink_sentinel'), 'utf8')).toBe(
       'resource shrink sentinel'
     );
   });
@@ -110,5 +117,16 @@ describe('Android native alert title', () => {
     expect(iosAlertManager).toContain('alertControllerWithTitle:title');
     expect(iosAlertManager).toContain('alertController.message = message');
     expect(withAndroidManifestFix({ name: 'Kilo', slug: 'kilo-app' }).mods?.ios).toBeUndefined();
+  });
+
+  it('keeps the discard confirm on the shared native alert that carries the override', () => {
+    // The override restyles the one `Alert.alert()` dialog both platforms
+    // render. A custom dialog or a per-platform branch in the guard would
+    // render outside that native path and silently lose the title alignment.
+    expect(discardGuardSource).toMatch(/Alert\.alert\(/);
+    expect(
+      /\bPlatform\.(?:OS|select|Version)\b/.test(discardGuardSource),
+      'use-new-session-discard-guard.ts must not fork the alert by platform'
+    ).toBe(false);
   });
 });

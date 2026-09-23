@@ -1,15 +1,14 @@
 import * as Slot from '@rn-primitives/slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
-import {
-  I18nManager,
-  Text as RNText,
-  type Role,
-  type StyleProp,
-  type TextStyle,
-} from 'react-native';
+import { I18nManager, Text as RNText, type Role } from 'react-native';
 
-import { RTL_WRITING_DIRECTION, textLetterSpacing } from '@/lib/rtl-text';
+import {
+  hasRtlScript,
+  RTL_NO_LETTER_SPACING,
+  RTL_WRITING_DIRECTION,
+  withoutMonoFamily,
+} from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 const textVariants = cva('text-foreground text-base font-medium', {
@@ -28,7 +27,7 @@ const textVariants = cva('text-foreground text-base font-medium', {
       small: 'text-sm font-medium leading-none',
       muted: 'text-muted-foreground text-sm',
       mono: 'font-mono-medium text-sm',
-      eyebrow: 'font-mono-medium text-[10px] uppercase tracking-[1.5px] text-muted-foreground',
+      eyebrow: 'font-mono-medium text-[10px] text-muted-foreground',
     },
   },
   defaultVariants: {
@@ -54,6 +53,20 @@ const ARIA_LEVEL = {
   h4: '4',
 } satisfies Partial<Record<TextVariant, string>>;
 
+/**
+ * The eyebrow's Latin display treatment: full capitals, letterspaced. It is
+ * dropped for RTL-script copy in an RTL interface (`hasRtlScript`: the app
+ * ships Arabic-script languages and Hebrew): `letter-spacing` pulls a
+ * cursive script apart — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت'
+ * — and that copy also drops the mono family (see `withoutMonoFamily`).
+ * Latin copy, and RTL-script copy in an LTR interface, keep the treatment.
+ *
+ * Exported so the eyebrow-scale labels rendered outside the variant — the
+ * `SectionHeader` action link — carry the identical treatment instead of a
+ * second copy of the class string that can drift.
+ */
+export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
+
 const TextClassContext = React.createContext<string | undefined>(undefined);
 
 function Text({
@@ -68,24 +81,25 @@ function Text({
   }) {
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot.Text : RNText;
-  // The one runtime-direction exception to className-only styling (AGENTS.md):
-  // the interface language is not known at build time, so the joined-script
-  // letter-spacing reset and the RTL paragraph direction are inline and win over
-  // the className through react-native-css's inline-wins merge.
-  const ownStyles: StyleProp<TextStyle>[] = [
-    textLetterSpacing(props.children),
-    I18nManager.isRTL ? RTL_WRITING_DIRECTION : undefined,
-  ].filter((style): style is TextStyle => style !== undefined);
-  if (props.style) {
-    ownStyles.push(props.style);
-  }
+  const isRTL = I18nManager.isRTL;
+  const isRtlScript = hasRtlScript(props.children);
+  const classes = cn(
+    textVariants({ variant }),
+    variant === 'eyebrow' && !(isRTL && isRtlScript) && EYEBROW_LATIN_DISPLAY,
+    textClass,
+    className
+  );
   return (
     <Component
-      className={cn(textVariants({ variant }), textClass, className)}
+      className={isRTL && isRtlScript ? withoutMonoFamily(classes) : classes}
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
-      style={ownStyles.length > 0 ? ownStyles : props.style}
+      style={
+        isRTL
+          ? [RTL_WRITING_DIRECTION, isRtlScript ? RTL_NO_LETTER_SPACING : undefined, props.style]
+          : props.style
+      }
     />
   );
 }

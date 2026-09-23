@@ -14,7 +14,11 @@ import * as ReactI18next from 'react-i18next';
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
 const TEXT_DIRECTIONS = [
   { direction: 'LTR', isRTL: false, style: undefined },
-  { direction: 'RTL', isRTL: true, style: [{ writingDirection: 'rtl' }] },
+  {
+    direction: 'RTL',
+    isRTL: true,
+    style: [{ writingDirection: 'rtl' }, undefined, undefined],
+  },
 ];
 
 vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
@@ -62,6 +66,10 @@ vi.mock('react', async () => {
 });
 
 // ── react-native ────────────────────────────────────────────────────
+const dimensions = vi.hoisted(() => ({
+  current: { fontScale: 1, height: 800, scale: 1, width: 400 },
+}));
+
 vi.mock('react-native', () => ({
   AccessibilityInfo: {
     announceForAccessibility: vi.fn(),
@@ -74,7 +82,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   Text: 'Text',
   TextInput: 'TextInput',
-  useWindowDimensions: () => ({ fontScale: 1, height: 800, scale: 1, width: 400 }),
+  useWindowDimensions: () => dimensions.current,
   View: 'View',
 }));
 
@@ -112,22 +120,30 @@ vi.mock('@/components/ui/accessible-status', () => ({
 }));
 
 vi.mock('@/components/agents/chat-toolbar', () => ({
-  ChatToolbar: () => null,
+  ChatToolbar: 'ChatToolbar',
+}));
+
+/** Captures the options the prompt hands the height-measuring hook. */
+const textHeightOptions = vi.hoisted(() => ({
+  current: null as Record<string, unknown> | null,
 }));
 
 vi.mock('@/components/agents/use-text-height', () => ({
-  useTextHeight: () => ({
-    height: 48,
-    measureElement: null,
-    reset: vi.fn(),
-    setText: vi.fn(),
-  }),
+  useTextHeight: (options: Record<string, unknown>) => {
+    textHeightOptions.current = options;
+    return {
+      height: 48,
+      measureElement: null,
+      reset: vi.fn(),
+      setText: vi.fn(),
+    };
+  },
 }));
 
 const voiceInputAvailable = vi.hoisted(() => ({ current: false }));
 
 vi.mock('@/components/query-error', () => ({
-  QueryError: () => null,
+  QueryError: 'QueryError',
 }));
 
 vi.mock('@/components/voice-input-control', () => ({
@@ -230,6 +246,46 @@ function findElementByType(
   return null;
 }
 
+/**
+ * Index of the first `target` node in a pre-order walk, or null when absent.
+ * Follows the same descent convention as `findElementByType` (through the
+ * `Text` and `NewSessionPromptControls` function components) so the returned
+ * order matches how the tree renders, and siblings' subtrees are visited
+ * left-to-right.
+ */
+function findFirstIndexByType(node: Node, target: ElementType): number | null {
+  let order = 0;
+  const visit = (current: Node): number | null => {
+    if (current === null || typeof current !== 'object') {
+      return null;
+    }
+    const props = current.props ?? {};
+    const children = props.children;
+    const currentOrder = order;
+    order += 1;
+    const nodeType = (current as { type?: unknown }).type;
+    if (nodeType === target) {
+      return currentOrder;
+    }
+    if (nodeType === renderText) {
+      return visit(renderText(props as React.ComponentProps<typeof renderText>));
+    }
+    if (nodeType === renderPromptControls) {
+      return visit(
+        renderPromptControls(props as React.ComponentProps<typeof renderPromptControls>)
+      );
+    }
+    for (const child of Array.isArray(children) ? children : [children]) {
+      const found = visit(child as Node);
+      if (found !== null) {
+        return found;
+      }
+    }
+    return null;
+  };
+  return visit(node);
+}
+
 function defaultProps() {
   const voiceInputSettlerRef: React.RefObject<(() => Promise<boolean>) | null> = {
     current: null,
@@ -263,6 +319,8 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     voiceInputAvailable.current = false;
     returnSendsMessage.current = false;
     layoutDirection.isRTL = false;
+    dimensions.current = { fontScale: 1, height: 800, scale: 1, width: 400 };
+    textHeightOptions.current = null;
   });
 
   it.each(TEXT_DIRECTIONS)(
@@ -453,5 +511,49 @@ describe('NewSessionPrompt initialPrompt seed', () => {
 
     expect(findElementByType(element, 'TextInput')).toBeNull();
     expect(findElementByType(element, renderPromptControls)).toBeNull();
+  });
+
+  it.each([{ isLoadingModels: false }, { isLoadingModels: true }])(
+    'renders the mode/model row above the input (isLoadingModels: $isLoadingModels)',
+    async ({ isLoadingModels }) => {
+      const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+      const element = renderPrompt({ ...defaultProps(), isLoadingModels }) as Node;
+
+      const toolbarIndex = findFirstIndexByType(element, 'ChatToolbar') ?? -1;
+      const inputIndex = findFirstIndexByType(element, 'TextInput') ?? -1;
+
+      expect(toolbarIndex).toBeGreaterThanOrEqual(0);
+      expect(inputIndex).toBeGreaterThanOrEqual(0);
+      expect(toolbarIndex).toBeLessThan(inputIndex);
+    }
+  );
+
+  it('renders the models error above the input', async () => {
+    const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
+    const element = renderPrompt({
+      ...defaultProps(),
+      isModelsError: true,
+      modelOptions: [],
+    }) as Node;
+
+    const errorIndex = findFirstIndexByType(element, 'QueryError') ?? -1;
+    const inputIndex = findFirstIndexByType(element, 'TextInput') ?? -1;
+
+    expect(errorIndex).toBeGreaterThanOrEqual(0);
+    expect(inputIndex).toBeGreaterThanOrEqual(0);
+    expect(errorIndex).toBeLessThan(inputIndex);
+  });
+
+  it('keeps the three-line floor at a large font scale', async () => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+    // Before the host reports a frame, the floor is the preferred three lines
+    // at the scaled line height: 24 * 2 * 3 + 16 = 160.
+    dimensions.current = { ...dimensions.current, fontScale: 2, height: 500 };
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    NewSessionPrompt(defaultProps());
+
+    expect(textHeightOptions.current).toMatchObject({ minHeight: 160 });
+    expect(textHeightOptions.current?.minHeight).not.toBe(64);
   });
 });

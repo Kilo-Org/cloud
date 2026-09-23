@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive mounted-test suite for the session filter sheet */
 import { act, type ComponentProps } from 'react';
 import { Modal, Pressable, ScrollView } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,11 +10,18 @@ import { type AgentSessionFilters } from '@/lib/agent-session-filters';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SessionFilterModal } from './platform-filter-modal';
 
+let windowDimensions = { width: 400, height: 700, fontScale: 1, scale: 1 };
+let insets = { top: 0, bottom: 0, left: 0, right: 0 };
+
 vi.mock('react-native', () => ({
   Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  useWindowDimensions: () => windowDimensions,
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => insets,
 }));
 vi.mock('@/components/ui/icons', () => ({ Check: 'Check' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -71,9 +79,21 @@ function pressButton(renderer: RenderedView['renderer'], label: string) {
   });
 }
 
+function findSheetCard(renderer: RenderedView['renderer']) {
+  const card = renderer.root
+    .findAllByType(Pressable)
+    .find(pressable => String(pressable.props.className).includes('bg-popover'));
+  if (!card) {
+    throw new Error('missing sheet card');
+  }
+  return card;
+}
+
 describe('SessionFilterModal', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    windowDimensions = { width: 400, height: 700, fontScale: 1, scale: 1 };
+    insets = { top: 0, bottom: 0, left: 0, right: 0 };
   });
 
   afterEach(() => {
@@ -108,6 +128,24 @@ describe('SessionFilterModal', () => {
         row => (row.props as ComponentProps<typeof Pressable>).accessibilityState?.checked
       )
     ).toEqual([true, false, false, false, false, false, false, true, false]);
+  });
+
+  it('caps the sheet to the window and keeps the action row out of the option list', async () => {
+    const { renderer } = await renderModal();
+    const card = findSheetCard(renderer);
+    expect(card.props.style).toMatchObject({ maxHeight: 700 - 48 });
+    const options = renderer.root.findByType(ScrollView);
+    expect(String(options.props.className)).toContain('shrink');
+    expect(options.findAllByType(Button)).toHaveLength(0);
+    expect(renderer.root.findAllByType(Button)).toHaveLength(2);
+  });
+
+  it('reserves the safe-area insets inside the window cap', async () => {
+    insets = { top: 47, bottom: 34, left: 0, right: 0 };
+    const { renderer } = await renderModal();
+    expect(findSheetCard(renderer).props.style).toMatchObject({
+      maxHeight: 700 - 47 - 34 - 48,
+    });
   });
 
   it('uses the supplied platform options and omits an empty project section', async () => {
@@ -197,6 +235,82 @@ describe('SessionFilterModal', () => {
     expect(props.onClose).toHaveBeenCalledOnce();
   });
 
+  it('renders one platform row per bucket and collapses a persisted variant', async () => {
+    const { renderer } = await renderModal({
+      platformOptions: ['cloud-agent', 'extension'],
+      selectedPlatforms: ['cloud-agent-web', 'vscode'],
+      projectOptions: [],
+    });
+    const checkboxes = renderer.root.findAllByProps({ accessibilityRole: 'checkbox' });
+    expect(checkboxes.map(row => row.findByType(Text).props.children)).toEqual([
+      i18n.t('agentChat.sessionFilter.platformCloud'),
+      i18n.t('agentChat.sessionFilter.platformExtension'),
+    ]);
+    expect(
+      checkboxes.map(
+        row => (row.props as ComponentProps<typeof Pressable>).accessibilityState?.checked
+      )
+    ).toEqual([true, true]);
+  });
+
+  it('renders one project row per visible label and stores every alias on toggle', async () => {
+    const sshAlias = {
+      gitUrl: 'git@github.com:iscekic/kilo-workflow.git',
+      displayName: 'ISCEKIC/KILO-WORKFLOW',
+    };
+    const { renderer, props } = await renderModal({
+      projectOptions: [firstProject, sshAlias, secondProject],
+      selectedProjects: [],
+    });
+    const labels = renderer.root
+      .findAllByProps({ accessibilityRole: 'checkbox' })
+      .map(row => row.findByType(Text).props.children);
+    expect(labels.filter(label => label === firstProject.displayName)).toHaveLength(1);
+    expect(findCheckbox(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: false,
+    });
+
+    act(() => {
+      (findCheckbox(renderer, firstProject.displayName).props.onPress as () => void)();
+    });
+    expect(findCheckbox(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: true,
+    });
+
+    pressButton(renderer, i18n.t('common.apply'));
+    expect(props.onApply).toHaveBeenCalledExactlyOnceWith({
+      platformFilter: [],
+      projectFilter: [firstProject.gitUrl, sshAlias.gitUrl],
+    });
+  });
+
+  it('toggles off every alias of a merged project when any is stored', async () => {
+    const sshAlias = {
+      gitUrl: 'git@github.com:iscekic/kilo-workflow.git',
+      displayName: 'ISCEKIC/KILO-WORKFLOW',
+    };
+    const { renderer, props } = await renderModal({
+      projectOptions: [firstProject, sshAlias, secondProject],
+      selectedProjects: [sshAlias.gitUrl],
+    });
+    expect(findCheckbox(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: true,
+    });
+
+    act(() => {
+      (findCheckbox(renderer, firstProject.displayName).props.onPress as () => void)();
+    });
+    expect(findCheckbox(renderer, firstProject.displayName).props.accessibilityState).toEqual({
+      checked: false,
+    });
+
+    pressButton(renderer, i18n.t('common.apply'));
+    expect(props.onApply).toHaveBeenCalledExactlyOnceWith({
+      platformFilter: [],
+      projectFilter: [],
+    });
+  });
+
   it('applies empty filters after deselecting both dimensions', async () => {
     const { renderer, props } = await renderModal({
       selectedPlatforms: ['cli'],
@@ -250,4 +364,16 @@ describe('SessionFilterModal', () => {
       expect(props.onApply).not.toHaveBeenCalled();
     }
   );
+
+  // The sheet offers one row per recent repository (up to the server's LIMIT)
+  // plus one per selected project. A long list must not push the Apply/Cancel
+  // row off-screen: the sheet is bounded and its single list shrinks to scroll.
+  it('bounds the sheet and shrinks its single list so extra project rows stay reachable', async () => {
+    const { renderer } = await renderModal();
+    const scrollViews = renderer.root.findAllByType(ScrollView);
+    expect(scrollViews).toHaveLength(1);
+    const scrollView = renderer.root.findByType(ScrollView);
+    expect(scrollView.props.className).toContain('shrink');
+    expect(scrollView.parent?.props.className).toContain('max-h-[80%]');
+  });
 });

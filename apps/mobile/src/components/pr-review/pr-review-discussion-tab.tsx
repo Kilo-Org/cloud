@@ -6,6 +6,13 @@
 //                   "Load more" paginates threads. Full re-sort of
 //                   the entire loaded set on every update (R4: a
 //                   later page can insert rows mid-list).
+//   - filtered-empty: every row the page returned belongs to a
+//                   blocked or muted author (the list owns the
+//                   hidden-user filter). The list body renders the
+//                   empty state this tab hands it and keeps its
+//                   Load more / later-page retry footer, so the body
+//                   never reads as blank. A distinct message needs a
+//                   catalog key the translation slice owns.
 //   - loading:      first page in flight; render `Skeleton`
 //                   placeholders matching the row dimensions. A first
 //                   page that is pending but PAUSED (offline, or a fetch
@@ -55,11 +62,12 @@
 import { type FlashListRef } from '@shopify/flash-list';
 import { MessageSquarePlus } from '@/components/ui/icons';
 import { type Href, useIsFocused, useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CommentModerationProvider } from '@/components/pr-review/discussion/comment-moderation';
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
 import { PrCommentCta } from '@/components/pr-review/discussion/pr-comment-cta';
 import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
@@ -71,11 +79,12 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
+  type ConversationComment,
   type DiscussionListItem,
   isDiscussionEmpty,
-  mergeDiscussionListItems,
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
+import { mergeDiscussionListItemsBySortKey } from '@/lib/pr-review/discussion/merge-discussion-list-items';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 import {
   expandedForThread,
@@ -102,6 +111,15 @@ type PrReviewDiscussionTabProps = {
 };
 
 const SKELETON_ROW_COUNT = 4;
+
+// One shared empty reference for the common "first page carries no
+// conversation comments" case. `retainConversationAcrossMounts` falls back to
+// a brand-new `[]` literal on every call when nothing was retained, so a memo
+// keyed on the raw `conversation` would re-merge and re-sort on every render of
+// such a PR. Substituting this reference keeps the key stable when the set is
+// empty; a non-empty conversation is already identity-stable (it is read from
+// the memoized first page).
+const EMPTY_CONVERSATION: readonly ConversationComment[] = [];
 
 // The GitHub conversation-comment formSheet. GitLab and Bitbucket reach their
 // own sibling route inside the provider layout (providerPrSheetHref) so
@@ -162,6 +180,19 @@ export function PrReviewDiscussionTab({
   // className gutter must survive portrait untouched (inline style wins over
   // className). Same treatment as the diff floating-actions bar.
   const insets = useSafeAreaInsets();
+
+  // Full re-sort of every loaded thread + first-page conversation comments
+  // (R4: "Load more" may insert rows mid-list; accepted). Both inputs are
+  // identity-stable (`threads` is memoized on `pages`; `conversation` is the
+  // retained first page, or EMPTY_CONVERSATION when the PR has none), so
+  // memoize the merge: an expand tap, optimistic reaction or reply focus must
+  // not re-merge and re-sort the whole loaded set.
+  // The merge parses each item's timestamp once (merge-discussion-list-items.ts).
+  const stableConversation = conversation.length === 0 ? EMPTY_CONVERSATION : conversation;
+  const listItems = useMemo(
+    () => mergeDiscussionListItemsBySortKey(threads, stableConversation),
+    [threads, stableConversation]
+  );
 
   // Single write path: the ref is the tap-time source of truth (render-closure
   // state can lag a queued update on rapid taps).
@@ -298,6 +329,33 @@ export function PrReviewDiscussionTab({
     </View>
   );
 
+  // The tab owns the empty copy for both the empty view and the list, whose
+  // blocked / muted filter can remove every row the page returned. The list
+  // renders this node instead of its rows when that happens, so the body never
+  // reads as blank.
+  const emptyState = (
+    <EmptyState
+      icon={MessageSquarePlus}
+      title={t('prReview.discussion.noDiscussion')}
+      description={
+        isMergeRequest
+          ? t('prReview.terms.noDiscussionDescription')
+          : t('prReview.discussion.noDiscussionDescription')
+      }
+      action={
+        onRequestFiles ? (
+          <Button
+            variant="outline"
+            onPress={onRequestFiles}
+            accessibilityLabel={t('prReview.discussion.reviewFiles')}
+          >
+            <Text>{t('prReview.discussion.reviewFiles')}</Text>
+          </Button>
+        ) : null
+      }
+    />
+  );
+
   if (view.kind === 'permission') {
     return (
       <QueryError
@@ -368,64 +426,45 @@ export function PrReviewDiscussionTab({
     );
   }
 
-  // ── Empty (neither threads nor conversation comments) ──────────────
-  if (view.kind === 'empty') {
-    return withCommentCta(
-      <EmptyState
-        icon={MessageSquarePlus}
-        title={t('prReview.discussion.noDiscussion')}
-        description={
-          isMergeRequest
-            ? t('prReview.terms.noDiscussionDescription')
-            : t('prReview.discussion.noDiscussionDescription')
-        }
-        action={
-          onRequestFiles ? (
-            <Button
-              variant="outline"
-              onPress={onRequestFiles}
-              accessibilityLabel={t('prReview.discussion.reviewFiles')}
-            >
-              <Text>{t('prReview.discussion.reviewFiles')}</Text>
-            </Button>
-          ) : null
-        }
-      />
-    );
+  // An empty normalized page can still have more discussion to load. Keep
+  // the list's empty message and pagination footer reachable in that case.
+  // The node is the same `emptyState` this tab owns and hands to the list, so
+  // the copy stays on one surface instead of being duplicated inline.
+  if (view.kind === 'empty' && !query.hasNextPage && !query.isFetchingNextPage && !laterPageError) {
+    return withCommentCta(emptyState);
   }
 
   // ── Happy / paginated list ─────────────────────────────────────────
-  // Full re-sort of every loaded thread + first-page conversation
-  // comments (R4: "Load more" may insert rows mid-list; accepted).
-  const listItems = mergeDiscussionListItems(threads, conversation);
-
   return withCommentCta(
-    <PrReviewDiscussionList
-      owner={owner}
-      repo={repo}
-      number={number}
-      listItems={listItems}
-      listRef={listRef}
-      expansion={expansion}
-      suppressContentPosition={suppressContentPosition}
-      onToggleExpand={handleToggleExpand}
-      onScrollBeginDrag={() => {
-        invalidateSettle();
-        // A user drag wins over the keyboard-open reply park: drop the
-        // pending focus scroll (useReplyFocusScroll).
-        replyScroll.invalidate();
-      }}
-      hasNextPage={query.hasNextPage}
-      isFetchingNextPage={query.isFetchingNextPage}
-      laterPageError={laterPageError || retainedContentError}
-      onLoadMore={() => {
-        void query.fetchNextPage();
-      }}
-      onRetryLoadMore={() => {
-        void query.refetch();
-      }}
-      onReplyInputFocus={handleReplyInputFocus}
-      onViewportLayout={handleViewportLayout}
-    />
+    <CommentModerationProvider>
+      <PrReviewDiscussionList
+        owner={owner}
+        repo={repo}
+        number={number}
+        listItems={listItems}
+        listRef={listRef}
+        emptyState={emptyState}
+        expansion={expansion}
+        suppressContentPosition={suppressContentPosition}
+        onToggleExpand={handleToggleExpand}
+        onScrollBeginDrag={() => {
+          invalidateSettle();
+          // A user drag wins over the keyboard-open reply park: drop the
+          // pending focus scroll (useReplyFocusScroll).
+          replyScroll.invalidate();
+        }}
+        hasNextPage={query.hasNextPage}
+        isFetchingNextPage={query.isFetchingNextPage}
+        laterPageError={laterPageError || retainedContentError}
+        onLoadMore={() => {
+          void query.fetchNextPage();
+        }}
+        onRetryLoadMore={() => {
+          void query.refetch();
+        }}
+        onReplyInputFocus={handleReplyInputFocus}
+        onViewportLayout={handleViewportLayout}
+      />
+    </CommentModerationProvider>
   );
 }

@@ -94,7 +94,6 @@ import {
   ImpactReferralPaymentProvider,
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
-  RepositoryReviewMode,
   BYOKManagementSource,
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
@@ -325,7 +324,6 @@ export const SCHEMA_CHECK_ENUMS = {
   MCPGatewayAuthorizationRequestStatus,
   MCPGatewayPendingProviderAuthorizationStatus,
   MCPGatewayAuditOutcome,
-  RepositoryReviewMode,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -4563,45 +4561,6 @@ export const github_connection_attempts = pgTable(
     ),
   ]
 );
-
-// Per-repository overrides for an installation's default bot-mention model
-// and automatic PR review mode. Both columns are nullable: null means
-// "inherit the installation default" (stored in `platform_integrations.metadata`),
-// not "disabled". A row with all-null overrides is equivalent to having no row.
-export const repository_customizations = pgTable(
-  'repository_customizations',
-  {
-    id: idPrimaryKeyColumn,
-    platform_integration_id: uuid()
-      .notNull()
-      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
-    // The platform's repository identifier (e.g. GitHub's numeric repository
-    // ID, stable across renames/transfers), stored as text so platforms with
-    // non-numeric IDs are representable; not the repository's owner/name string.
-    repository_id: text().notNull(),
-    bot_mention_model_slug: text(),
-    pr_review_mode: text().$type<RepositoryReviewMode>(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    unique('UQ_repository_customizations_integration_repository').on(
-      table.platform_integration_id,
-      table.repository_id
-    ),
-    enumCheck(
-      'repository_customizations_pr_review_mode_check',
-      table.pr_review_mode,
-      RepositoryReviewMode
-    ),
-  ]
-);
-
-export type RepositoryCustomization = typeof repository_customizations.$inferSelect;
-export type NewRepositoryCustomization = typeof repository_customizations.$inferInsert;
 
 export const user_github_app_tokens = pgTable(
   'user_github_app_tokens',
@@ -10047,9 +10006,19 @@ export const user_activity_tokens = pgTable(
       .defaultNow()
       .notNull()
       .$onUpdateFn(() => sql`now()`),
+    // Set when this row's card was retired. A live card has `superseded_at` null;
+    // the partial unique index below allows at most one such row per scope.
+    superseded_at: timestamp({ withTimezone: true, mode: 'string' }),
   },
   table => [
     uniqueIndex('UQ_user_activity_tokens_token').on(table.token),
+    // One live ios_activity card per (user_id, organization_id) scope. `coalesce`
+    // folds the personal scope (null organization) into a single key, because
+    // Postgres treats NULLs as distinct in a unique index.
+    uniqueIndex('UQ_user_activity_tokens_live_ios_activity')
+      .on(table.user_id, sql`coalesce(${table.organization_id}, '')`)
+      .concurrently()
+      .where(sql`${table.kind} = 'ios_activity' AND ${table.superseded_at} IS NULL`),
     index('IDX_user_activity_tokens_user_org').on(table.user_id, table.organization_id),
   ]
 );
@@ -10072,6 +10041,9 @@ export const user_notification_preferences = pgTable('user_notification_preferen
   session_status_enabled: boolean().default(true).notNull(),
   kiloclaw_activity_enabled: boolean().default(true).notNull(),
   balance_alerts_enabled: boolean().default(true).notNull(),
+  // Category "Spend alerts" — also the push channel of the spend view, so the
+  // mobile notification settings and the spend view cannot disagree.
+  spend_alerts_enabled: boolean().default(true).notNull(),
   security_findings_enabled: boolean().default(true).notNull(),
   // 'generic' hides lock-screen content; 'full' shows the message text.
   notification_previews: text().$type<'generic' | 'full'>().default('generic').notNull(),
@@ -10084,6 +10056,155 @@ export const user_notification_preferences = pgTable('user_notification_preferen
 
 export type UserNotificationPreference = typeof user_notification_preferences.$inferSelect;
 export type NewUserNotificationPreference = typeof user_notification_preferences.$inferInsert;
+
+// ─── Spend Alerts ─────────────────────────────────────────────────────
+// Owner-scoped spend alert configuration, the hourly counter the sweep rolls
+// up, and the durable delivery outbox. `scope_key` is `user:<kilocode_users.id>`
+// or `org:<organizations.id>`; a settings row sets exactly one of the two
+// scope foreign keys. Push delivery reuses the existing mobile push
+// infrastructure, and `user_notification_preferences.spend_alerts_enabled` is
+// the notification category behind the spend view's push channel choice.
+
+export const spend_alert_settings = pgTable(
+  'spend_alert_settings',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    // Server-only lookup key derived from the owner scope; never sent to clients.
+    scope_key: text().notNull(),
+    kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    enabled: boolean().default(false).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('uq_spend_alert_settings_scope').on(table.scope_key),
+    check(
+      'spend_alert_settings_scope_check',
+      sql`(${table.kilo_user_id} IS NOT NULL) <> (${table.organization_id} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type SpendAlertSetting = typeof spend_alert_settings.$inferSelect;
+export type NewSpendAlertSetting = typeof spend_alert_settings.$inferInsert;
+
+export const spend_alert_rules = pgTable(
+  'spend_alert_rules',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    settings_id: uuid()
+      .notNull()
+      .references(() => spend_alert_settings.id, { onDelete: 'cascade' }),
+    kind: text().$type<'threshold' | 'anomaly'>().notNull(),
+    enabled: boolean().default(true).notNull(),
+    threshold_microdollars: bigint({ mode: 'number' }),
+    window_hours: integer(),
+    multiplier_basis_points: integer(),
+    email_enabled: boolean().default(true).notNull(),
+    push_enabled: boolean().default(false).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [uniqueIndex('uq_spend_alert_rules_kind').on(table.settings_id, table.kind)]
+);
+
+export type SpendAlertRule = typeof spend_alert_rules.$inferSelect;
+export type NewSpendAlertRule = typeof spend_alert_rules.$inferInsert;
+
+// One row per rule. `firing` is the whole one-alert guarantee: a crossing sets
+// it, and no further alert fires until the condition clears and crosses again.
+export const spend_alert_rule_state = pgTable('spend_alert_rule_state', {
+  rule_id: uuid()
+    .notNull()
+    .primaryKey()
+    .references(() => spend_alert_rules.id, { onDelete: 'cascade' }),
+  firing: boolean().default(false).notNull(),
+  condition_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+  last_value_microdollars: bigint({ mode: 'number' }),
+  updated_at: timestamp({ withTimezone: true, mode: 'string' })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => sql`now()`),
+});
+
+export type SpendAlertRuleState = typeof spend_alert_rule_state.$inferSelect;
+export type NewSpendAlertRuleState = typeof spend_alert_rule_state.$inferInsert;
+
+// Per-hour rollup of an owner's spend, maintained by the sweep. The unique
+// (scope_key, hour_start) index is the conflict target the sweep upserts on.
+export const spend_alert_hourly = pgTable(
+  'spend_alert_hourly',
+  {
+    scope_key: text().notNull(),
+    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    cost_microdollars: bigint({ mode: 'number' }).default(0).notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('uq_spend_alert_hourly_scope_hour').on(table.scope_key, table.hour_start),
+    index('IDX_spend_alert_hourly_hour_start').on(table.hour_start),
+  ]
+);
+
+export type SpendAlertHourly = typeof spend_alert_hourly.$inferSelect;
+
+// Durable outbox for alerts handed to the existing email and push senders.
+// `dedupe_key` makes a replayed sweep a no-op, and the pending index is the
+// claim order for the delivery worker.
+export const spend_alert_deliveries = pgTable(
+  'spend_alert_deliveries',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    dedupe_key: text().notNull(),
+    scope_key: text().notNull(),
+    rule_id: uuid().references(() => spend_alert_rules.id, { onDelete: 'set null' }),
+    kind: text(),
+    channel: text().$type<'email' | 'push'>(),
+    fired_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    recipients: jsonb(),
+    payload: jsonb(),
+    status: text().default('pending').notNull(),
+    attempt_count: integer().default(0).notNull(),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_error_redacted: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_spend_alert_deliveries_dedupe_key').on(table.dedupe_key),
+    index('IDX_spend_alert_deliveries_pending').on(
+      table.status,
+      table.next_attempt_at,
+      table.attempt_count,
+      table.id
+    ),
+  ]
+);
+
+export type SpendAlertDelivery = typeof spend_alert_deliveries.$inferSelect;
+export type NewSpendAlertDelivery = typeof spend_alert_deliveries.$inferInsert;
 
 // ============ EXA USAGE TRACKING ============
 // Pre-aggregated monthly counter (hot path) + per-request audit log (partitioned)

@@ -53,16 +53,32 @@ function boxDp(className: string): { width: number; height: number } {
   return { width: size('w'), height: size('h') };
 }
 
-/** The smallest per-side reach a hitSlop expresses, in dp. */
-function slopDp(hitSlop: unknown): number {
+/** The per-side reach a `hitSlop` prop expresses; a bare number covers every side. */
+function slopInsets(hitSlop: unknown): Insets {
   if (typeof hitSlop === 'number') {
-    return hitSlop;
+    return { top: hitSlop, right: hitSlop, bottom: hitSlop, left: hitSlop };
   }
   if (hitSlop && typeof hitSlop === 'object') {
-    const sides = Object.values(hitSlop as Record<string, number | undefined>);
-    return Math.min(...sides.map(side => side ?? 0));
+    const sides = hitSlop as Partial<Insets>;
+    return {
+      top: sides.top ?? 0,
+      right: sides.right ?? 0,
+      bottom: sides.bottom ?? 0,
+      left: sides.left ?? 0,
+    };
   }
-  return 0;
+  return { top: 0, right: 0, bottom: 0, left: 0 };
+}
+
+/** The smallest per-side reach a hitSlop expresses, in dp. */
+function slopDp(hitSlop: unknown): number {
+  const sides = slopInsets(hitSlop);
+  return Math.min(sides.top, sides.right, sides.bottom, sides.left);
+}
+
+/** One side's reach, from a hitSlop that is one number for every side or per-side insets. */
+function slopSideDp(hitSlop: unknown, side: keyof Insets): number {
+  return hitSlopInsets(hitSlop)[side];
 }
 
 function pressesWithLabel(root: I, label: string): I[] {
@@ -136,6 +152,31 @@ async function compiledGapDp(rowClassName: string): Promise<number> {
 
 type Insets = { top: number; right: number; bottom: number; left: number };
 
+/**
+ * A control's hitSlop as per-side insets. Both controls in this header pass
+ * per-side insets: the shared `IconButton` takes a per-side object, and
+ * `SessionFilterButton` spells out four equal sides (`FILTER_HIT_SLOP`). The
+ * scalar branch mirrors React Native's own `number | Rect` hitSlop type, where
+ * one number applies to every side.
+ */
+function hitSlopInsets(hitSlop: unknown): Insets {
+  if (typeof hitSlop === 'number') {
+    return { top: hitSlop, right: hitSlop, bottom: hitSlop, left: hitSlop };
+  }
+  if (hitSlop && typeof hitSlop === 'object') {
+    const insets = hitSlop as Partial<Insets>;
+    if (typeof insets.right === 'number' && typeof insets.left === 'number') {
+      return {
+        top: insets.top ?? 0,
+        right: insets.right,
+        bottom: insets.bottom ?? 0,
+        left: insets.left,
+      };
+    }
+  }
+  throw new Error(`no measurable hitSlop in ${JSON.stringify(hitSlop)}`);
+}
+
 const noop = (): void => undefined;
 
 async function mountHeader(showNewSession: boolean, onNewSession: () => void): Promise<R> {
@@ -208,16 +249,24 @@ describe('SessionListHeaderActions new-session control', () => {
     // NativeWind v5 fixes 1rem at 14pt, so the row's `gap-4` is 14pt, not 16pt.
     expect(gapDp).toBe(14);
 
-    const newSessionSlop = newSession.props.hitSlop as Insets;
-    const filterSlop = filter.props.hitSlop as Insets;
-    // The new-session control sits left of the filter, so the gap has to fit
-    // both facing slops; more than the gap means the two regions overlap.
-    expect(newSessionSlop.right + filterSlop.left).toBeLessThanOrEqual(gapDp);
+    // `hitSlopInsets` (inside `slopSideDp`) validates and normalizes either
+    // shape of React Native's `number | Rect` hitSlop: a control may express one
+    // dp value for every side or spell out per-side insets. Both header controls
+    // spell out insets today — the filter writes four equal sides, while the
+    // new-session control caps its facing (right) side — so the helper has to
+    // accept either shape rather than assume one. The new-session control sits
+    // left of the filter, so the gap has to fit both facing slops; more than the
+    // gap means the two regions overlap.
+    expect(
+      slopSideDp(newSession.props.hitSlop, 'right') + slopSideDp(filter.props.hitSlop, 'left')
+    ).toBeLessThanOrEqual(gapDp);
     // Capping the right side must not drop the control below the design target.
     const box = boxDp(newSession.props.className as string);
-    expect(box.width + newSessionSlop.left + newSessionSlop.right).toBeGreaterThanOrEqual(
-      TOUCH_TARGET_DP
-    );
+    expect(
+      box.width +
+        slopSideDp(newSession.props.hitSlop, 'left') +
+        slopSideDp(newSession.props.hitSlop, 'right')
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
 
     act(() => {
       renderer.unmount();

@@ -17,6 +17,35 @@ import { SUPPORTED_LANGUAGES } from './languages';
  */
 const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
 
+/**
+ * Keys `en.json` defines that the translation slice still has to land in every
+ * catalog. English copy is written first, and only the translation slice may
+ * write another catalog (apps/mobile/AGENTS.md; every other slice's catalog
+ * edit is reverted), so copy a slice adds sits in `en.json` alone until that
+ * slice runs. Only these keys may be absent; `pnpm check:i18n` still fails
+ * every one of them, as does the section's `i18n-missing.py` gate, so the gap
+ * cannot ship. Delete an entry the translation slice has landed in every
+ * catalog.
+ *
+ * The notifications.category.*Unavailable reasons below landed in all 86
+ * catalogs, so nothing is pending translation today.
+ */
+const PENDING_TRANSLATION_KEYS = new Set<string>();
+
+/**
+ * The three copy keys the feature-flag row renders: `<value> · <reason>` under
+ * `preferences`. The row's value word comes from `common.enabled`/`common.off`,
+ * which every catalog already translates, so a catalog that keeps the English
+ * reason string leaves half the row untranslated — the explorer capture
+ * `language-switch-blank` read `مفعّل · default · not loaded`. A loanword equal
+ * to the English string does not count here: each catalog renders its own words.
+ */
+const FEATURE_FLAG_ROW_KEYS = [
+  'preferences.featureFlagApplied',
+  'preferences.featureFlagSkipped',
+  'preferences.featureFlagNotLoaded',
+];
+
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     const path = prefix ? `${prefix}.${key}` : key;
@@ -29,14 +58,40 @@ function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<
   return out;
 }
 
+/** The value at a dotted key path, so a nested copy value can be compared. */
+function readPath(value: unknown, path: string): unknown {
+  let node: unknown = value;
+  for (const part of path.split('.')) {
+    node = (node as Record<string, unknown> | undefined)?.[part];
+  }
+  return node;
+}
+
 const ENGLISH_FAMILIES = keyFamilies(CATALOG_LOADERS.en());
 
 describe('catalog keys', () => {
+  it('names only pending keys en.json defines', () => {
+    for (const key of PENDING_TRANSLATION_KEYS) {
+      expect(ENGLISH_FAMILIES.has(key), `${key} is not an English key family`).toBe(true);
+    }
+  });
+
   it('retires launcher.newAgent from every catalog', () => {
     for (const tag of SUPPORTED_LANGUAGES) {
       expect(keyFamilies(CATALOG_LOADERS[tag]())).not.toContain('launcher.newAgent');
     }
   });
+
+  it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
+    '%s translates the feature-flag row copy',
+    tag => {
+      for (const key of FEATURE_FLAG_ROW_KEYS) {
+        expect(readPath(CATALOG_LOADERS[tag](), key), `${tag} leaves ${key} in English`).not.toBe(
+          readPath(CATALOG_LOADERS.en(), key)
+        );
+      }
+    }
+  );
 
   it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
     '%s defines exactly the English key families',
@@ -47,7 +102,9 @@ describe('catalog keys', () => {
         `${tag} defines keys en.json does not`
       ).toEqual([]);
       expect(
-        [...ENGLISH_FAMILIES].filter(key => !families.has(key)),
+        [...ENGLISH_FAMILIES].filter(
+          key => !families.has(key) && !PENDING_TRANSLATION_KEYS.has(key)
+        ),
         `${tag} is missing keys en.json defines`
       ).toEqual([]);
     }

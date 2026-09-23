@@ -35,7 +35,10 @@ import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
-import { findKiloExclusiveModel, shouldRedactErrorResponse } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  shouldRedactErrorResponse,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -436,14 +439,6 @@ export function efficientPoolBlockedResponse() {
 
 export function unavailableModelResponse() {
   const error = 'The requested model is currently unavailable. Please choose a different model.';
-  return NextResponse.json(
-    { error, error_type: ProxyErrorType.unavailable_model, message: error },
-    { status: 404 }
-  );
-}
-
-export function temporarilyBlockedModelResponse() {
-  const error = 'This model is temporarily unavailable. Try a different model.';
   return NextResponse.json(
     { error, error_type: ProxyErrorType.unavailable_model, message: error },
     { status: 404 }

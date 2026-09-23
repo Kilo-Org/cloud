@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "एप सुरु गर्दा र पृष्ठभूमिमा पाँच मिनेट रहेपछि अनलक गर्नुपर्छ।",
     "featureFlags": "विशेषता झन्डा",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "सर्भरबाट · ≥ {{min}}",
+    "featureFlagSkipped": "पूर्वनिर्धारित · < {{min}}",
+    "featureFlagNotLoaded": "पूर्वनिर्धारित · लोड भएको छैन",
     "gatewayTranscription": "Kilo Gateway मार्फत बोलीलाई पाठमा रूपान्तरण",
     "gatewayTranscriptionSubtitle": "यन्त्रको वाणी पहिचानको सट्टा Kilo Gateway मोडेल प्रयोग गरेर भ्वाइस इनपुटलाई पाठमा रूपान्तरण गर्नुहोस्। तपाईंको रेकर्डिङ Kilo Gateway मा पठाइन्छ।",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -827,7 +827,8 @@
       "chat": "कुराकानीका सन्देशहरू",
       "kiloclaw": "KiloClaw का गतिविधिहरू",
       "balance": "मौज्दातसम्बन्धी चेतावनीहरू",
-      "security": "भेटिएका सुरक्षा समस्या"
+      "security": "भेटिएका सुरक्षा समस्या",
+      "spend": "खर्चका चेतावनीहरू"
     },
     "category": {
       "chatMessagesSubtitle": "तपाईंका कुराकानीमा आएका उत्तरहरू",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "सत्रको स्थिति",
       "sessionStatusSubtitle": "समाप्त / असफल / नियन्त्रण गर्न तयार",
       "kiloclawActivitySubtitle": "इन्स्ट्यान्स तयार वा असफल, निर्धारित कार्यहरू",
+      "kiloclawActivityUnavailable": "KiloClaw गतिविधि पाउन KiloClaw इन्स्ट्यान्स सुरु गर्नुहोस्।",
       "balanceAlertsSubtitle": "संस्थाको मौज्दात कम भएको चेतावनी",
-      "securityFindingsSubtitle": "फेला परेका नयाँ सुरक्षा समस्या र SLA का सम्झना सूचनाहरू"
+      "balanceAlertsUnavailable": "मौज्दात चेतावनी पाउन संस्थामा सामेल हुनुहोस्।",
+      "securityFindingsSubtitle": "फेला परेका नयाँ सुरक्षा समस्या र SLA का सम्झना सूचनाहरू",
+      "securityFindingsUnavailable": "सुरक्षा समस्या पाउन एउटा दायरामा Kilo सुरक्षा एजेन्ट सक्षम गर्नुहोस्।",
+      "spendAlertsSubtitle": "सीमा नाघ्ने र प्रति घण्टा वृद्धि",
+      "spendAlertsToggle": "खर्चका चेतावनी श्रेणी"
     },
     "action": {
       "openSession": "सत्र खोल्नुहोस्"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "सत्र लोड गर्न सकिएन।",
       "failedToLoadDetails": "सत्रको विवरण लोड गर्न सकिएन।",
       "failedToStopExecution": "चलिरहेको काम रोक्न सकिएन।",
+      "stopped": "सत्र रोकियो",
+      "committing": "कमिट गरिँदै…",
+      "committed": "कमिट भयो",
+      "commitFailed": "कमिट असफल भयो",
       "renameSession": "सत्रको नाम बदल्नुहोस्",
       "renamePlaceholder": "सत्रको नाम",
       "transcriptAccessibility": "सत्रको कुराकानीको अभिलेख",
@@ -2216,15 +2226,12 @@
       "linesBadge_one": "{{displayCount}} पङ्क्ति",
       "linesBadge_other": "{{displayCount}} पङ्क्ति",
       "matchesBadge_one": "{{displayCount}} नतिजा",
-      "matchesBadge_other": "{{displayCount}} नतिजा"
+      "matchesBadge_other": "{{displayCount}} नतिजा",
+      "noOutput": "कुनै आउटपुट छैन।"
     },
     "readToolMarkdown": {
       "linesTruncated": "पङ्क्ति {{start}}–{{end}} (केही अंश काटिएको)",
       "linesOf": "कुल {{total}} पङ्क्तिमध्ये {{start}}–{{end}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent मा {{action}} असफल भयो ({{status}})।",
-      "failed": "Cloud Agent मा {{action}} असफल भयो।"
     },
     "collectCopyableText": {
       "unserializableInput": "[क्रमबद्ध रूपमा रूपान्तरण गर्न नमिल्ने इनपुट]",
@@ -2321,8 +2328,7 @@
       "assistantProviderRejected": "प्रदायकले अनुरोध अस्वीकार गर्‍यो।",
       "assistantStopped": "उत्तर दिन रोकियो।",
       "assistantContextOverflow": "कुराकानी मोडेलका लागि धेरै लामो छ।",
-      "assistantFailed": "उत्तर दिन सकिएन।",
-      "sendFailed": "सन्देश पठाउन सकिएन। फेरि प्रयास गर्नुहोस्।"
+      "assistantFailed": "उत्तर दिन सकिएन।"
     },
     "filePart": {
       "loadingImage": "तस्बिर लोड गर्दै",
@@ -3108,6 +3114,14 @@
     "tooManySignInAttempts": "साइन इन गर्न धेरै पटक प्रयास गरियो। कृपया केही बेर पर्खेर फेरि प्रयास गर्नुहोस्।"
   },
   "models": {
+    "auto": {
+      "frontier": "स्वचालित अग्रणी",
+      "balanced": "स्वचालित सन्तुलित",
+      "efficient": "स्वचालित कुशल",
+      "small": "स्वचालित सानो",
+      "free": "स्वचालित निःशुल्क",
+      "organization": "संस्था स्वचालित"
+    },
     "dataCollected": "डेटा सङ्कलन हुन्छ",
     "free": "निःशुल्क",
     "couldNotUpdateFavorites": "मनपर्ने सूची अद्यावधिक गर्न सकिएन।",
@@ -3155,7 +3169,8 @@
     "channelName": "सक्रिय एजेन्टहरू",
     "activityKitDisabledBody": "लक स्क्रिनमा सक्रिय एजेन्टहरू हेर्न सेटिङ्समा प्रत्यक्ष गतिविधिहरू चालू गर्नुहोस्।",
     "openSession": "खोल्नुहोस्",
-    "approveFailed": "स्वीकृति गर्न सकिएन। फेरि प्रयास गर्न $t(common.approve) मा ट्याप गर्नुहोस्।"
+    "approveFailed": "स्वीकृति गर्न सकिएन। फेरि प्रयास गर्न $t(common.approve) मा ट्याप गर्नुहोस्।",
+    "newestResult": "नवीनतम नतिजा"
   },
   "transcriptionModel": {
     "title": "बोलीलाई पाठमा रूपान्तरण गर्ने मोडेल",
@@ -3180,15 +3195,7 @@
     "remoteOptionTitle": "तपाईंको कम्प्युटर",
     "remoteOptionBody": "आफ्नो मेसिनमा `kilo remote` CLI मार्फत Kilo चलाउनुहोस्।",
     "skip": "भ्रमण छोड्नुहोस्",
-    "tutorialLabel": "ट्युटोरियल",
-    "remoteTitle": "तपाईंको पहिलो रिमोट सत्र सुरु गर्नुहोस्",
-    "remoteBody": "तपाईंको कम्प्युटर जोड्नुहोस्, त्यसपछि यहाँबाट सत्र सुरु गर्नुहोस्।",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "अहिलेसम्म कुनै कम्प्युटर जडान भएको छैन",
-    "remoteEmptyBody": "यसलाई जोड्न तपाईंको कम्प्युटरमा `kilo remote` चलाउनुहोस्।",
-    "remoteFound": "कम्प्युटर जडान भयो",
-    "checkAgain": "फेरि जाँच गर्नुहोस्",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "ट्युटोरियल"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3206,28 @@
   },
   "launcher": {
     "openLastSession": "पछिल्लो सत्र खोल्नुहोस्"
+  },
+  "spendAlerts": {
+    "subtitle": "यो स्कोपको खर्च कुनै सीमा नाघ्दा वा यसको सामान्य प्रति घण्टाको दरभन्दा माथि बढ्दा बिलिङ सम्पर्कहरूलाई इमेल वा पुशमार्फत चेतावनी पठाउनुहोस्।",
+    "enable": "खर्चका चेतावनीहरू खोल्नुहोस्",
+    "thresholdTitle": "सीमा नाघ्नु",
+    "thresholdSubtitle": "चालु खर्च तपाईंको सीमा नाघिरहेको छ",
+    "anomalyTitle": "प्रति घण्टा वृद्धि",
+    "anomalySubtitle": "एक घण्टा यो स्कोपको सामान्य दरभन्दा धेरै माथि छ",
+    "limitLabel": "सीमा (USD)",
+    "windowLabel": "अवधि",
+    "window24h": "24 घण्टा",
+    "window7d": "7 दिन",
+    "window30d": "30 दिन",
+    "multiplierLabel": "वृद्धि गुणक",
+    "saved": "खर्च चेतावनीका सेटिङहरू सुरक्षित भए",
+    "loadError": "खर्चका चेतावनीहरू लोड गर्न सकिएन।",
+    "saveError": "खर्चका चेतावनीहरू सुरक्षित गर्न सकिएन।",
+    "empty": "खर्चका चेतावनीहरू बन्द छन्। यो स्कोपका बिलिङ सम्पर्कहरूलाई जानकारी दिन तिनीहरू खोल्नुहोस्।",
+    "noSpend": "अहिलेसम्म कुनै खर्च अभिलेख भएको छैन",
+    "spend24h": "पछिल्लो 24 घण्टाको खर्च",
+    "multiplierError": "1 वा त्यसभन्दा बढीको गुणक लेख्नुहोस्",
+    "permissionDenied": "तपाईंसँग खर्चका चेतावनीहरू व्यवस्थापन गर्ने अनुमति छैन।",
+    "pushOffByCategory": "सूचनाहरूमा बन्द"
   }
 }

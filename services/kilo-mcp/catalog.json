@@ -7790,6 +7790,41 @@
                         "instanceType"
                       ],
                       "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "const": "cloudflare-containers"
+                            },
+                            "account": {
+                              "type": "string",
+                              "const": "kilo"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "account"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "instanceType": {
+                          "type": "string",
+                          "enum": [
+                            "standard-3",
+                            "standard-4"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "instanceType"
+                      ],
+                      "additionalProperties": false
                     }
                   ]
                 },
@@ -7798,6 +7833,8 @@
                   "enum": [
                     "cloudflare-single",
                     "cloudflare-shared",
+                    "cloudflare-containers-standard-3",
+                    "cloudflare-containers-standard-4",
                     "vercel-small",
                     "vercel-large"
                   ]
@@ -10065,37 +10102,6 @@
     ],
     "searchBlob": "githubApps.getInstallation Get the GitHub app installation for the current user or organization, including install status, permissions, and repositories. githubapps getinstallation organizationid organizationId"
   },
-  "githubApps.getRepositoryCustomizations": {
-    "path": "githubApps.getRepositoryCustomizations",
-    "kind": "query",
-    "summary": "Fetch custom repository settings and configurations for a GitHub app integration.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "integrationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "integrationId"
-      ]
-    },
-    "tags": [
-      "githubapps",
-      "getrepositorycustomizations",
-      "organizationid",
-      "integrationid"
-    ],
-    "searchBlob": "githubApps.getRepositoryCustomizations Fetch custom repository settings and configurations for a GitHub app integration. githubapps getrepositorycustomizations organizationid integrationid organizationId integrationId"
-  },
   "githubApps.getUserAuthorization": {
     "path": "githubApps.getUserAuthorization",
     "kind": "query",
@@ -10339,56 +10345,6 @@
     ],
     "searchBlob": "githubApps.uninstallApp Uninstall the Kilo GitHub App for a user or organization. Use to remove a GitHub installation and revoke its access. githubapps uninstallapp organizationid integrationid organizationId integrationId"
   },
-  "githubApps.updateInstallationSettings": {
-    "path": "githubApps.updateInstallationSettings",
-    "kind": "mutation",
-    "summary": "Update the default settings for a GitHub App installation. Use to configure installation-wide options for a GitHub integration.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "integrationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "settings": {
-          "type": "object",
-          "properties": {
-            "modelSlug": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 512
-            },
-            "prReviewMode": {
-              "type": "string",
-              "enum": [
-                "on",
-                "off"
-              ]
-            }
-          }
-        }
-      },
-      "required": [
-        "integrationId",
-        "settings"
-      ]
-    },
-    "tags": [
-      "githubapps",
-      "updateinstallationsettings",
-      "organizationid",
-      "integrationid",
-      "settings"
-    ],
-    "searchBlob": "githubApps.updateInstallationSettings Update the default settings for a GitHub App installation. Use to configure installation-wide options for a GitHub integration. githubapps updateinstallationsettings organizationid integrationid settings organizationId integrationId settings"
-  },
   "githubApps.updateModel": {
     "path": "githubApps.updateModel",
     "kind": "mutation",
@@ -10423,77 +10379,6 @@
       "modelslug"
     ],
     "searchBlob": "githubApps.updateModel Set the AI model used for a GitHub App integration or installation. Use to change which model handles GitHub-triggered tasks. githubapps updatemodel organizationid integrationid modelslug organizationId integrationId modelSlug"
-  },
-  "githubApps.updateRepositorySettings": {
-    "path": "githubApps.updateRepositorySettings",
-    "kind": "mutation",
-    "summary": "Update settings for a specific repository under a GitHub App installation. Use to configure per-repository options for a GitHub integration.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "integrationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "repositoryId": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
-        },
-        "settings": {
-          "type": "object",
-          "properties": {
-            "modelSlug": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 512
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "prReviewMode": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "enum": [
-                    "on",
-                    "off"
-                  ]
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          }
-        }
-      },
-      "required": [
-        "integrationId",
-        "repositoryId",
-        "settings"
-      ]
-    },
-    "tags": [
-      "githubapps",
-      "updaterepositorysettings",
-      "organizationid",
-      "integrationid",
-      "repositoryid",
-      "settings"
-    ],
-    "searchBlob": "githubApps.updateRepositorySettings Update settings for a specific repository under a GitHub App installation. Use to configure per-repository options for a GitHub integration. githubapps updaterepositorysettings organizationid integrationid repositoryid settings organizationId integrationId repositoryId settings"
   },
   "githubPrReview.addIssueComment": {
     "path": "githubPrReview.addIssueComment",
@@ -20360,6 +20245,41 @@
                             "instanceType"
                           ],
                           "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "const": "cloudflare-containers"
+                                },
+                                "account": {
+                                  "type": "string",
+                                  "const": "kilo"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "account"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "instanceType": {
+                              "type": "string",
+                              "enum": [
+                                "standard-3",
+                                "standard-4"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "instanceType"
+                          ],
+                          "additionalProperties": false
                         }
                       ]
                     },
@@ -20368,6 +20288,8 @@
                       "enum": [
                         "cloudflare-single",
                         "cloudflare-shared",
+                        "cloudflare-containers-standard-3",
+                        "cloudflare-containers-standard-4",
                         "vercel-small",
                         "vercel-large"
                       ]
@@ -35227,6 +35149,136 @@
     ],
     "searchBlob": "slack.updateModel Change the AI model that the Slack integration uses for a specified organization. slack updatemodel organizationid modelslug organizationId modelSlug"
   },
+  "spendAlerts.get": {
+    "path": "spendAlerts.get",
+    "kind": "query",
+    "summary": "View the current spend alert configuration and notification settings for your personal account or an organization you belong to, including whether you have permission to change them.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "spendalerts",
+      "get",
+      "organizationid"
+    ],
+    "searchBlob": "spendAlerts.get View the current spend alert configuration and notification settings for your personal account or an organization you belong to, including whether you have permission to change them. spendalerts get organizationid organizationId"
+  },
+  "spendAlerts.save": {
+    "path": "spendAlerts.save",
+    "kind": "mutation",
+    "summary": "Update spend alert settings and rules for your personal account or an organization, controlling when and how you get notified about spending thresholds.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "threshold",
+                  "anomaly"
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "threshold": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0.000001,
+                    "maximum": 1000000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "windowHours": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "const": 24
+                      },
+                      {
+                        "type": "number",
+                        "const": 168
+                      },
+                      {
+                        "type": "number",
+                        "const": 720
+                      }
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "multiplierBasisPoints": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 5000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "emailEnabled": {
+                "type": "boolean"
+              },
+              "pushEnabled": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "enabled",
+              "emailEnabled",
+              "pushEnabled"
+            ]
+          }
+        }
+      },
+      "required": [
+        "enabled",
+        "rules"
+      ]
+    },
+    "tags": [
+      "spendalerts",
+      "save",
+      "organizationid",
+      "enabled",
+      "rules"
+    ],
+    "searchBlob": "spendAlerts.save Update spend alert settings and rules for your personal account or an organization, controlling when and how you get notified about spending thresholds. spendalerts save organizationid enabled rules organizationId enabled rules"
+  },
   "unifiedSessions.list": {
     "path": "unifiedSessions.list",
     "kind": "query",
@@ -36569,6 +36621,17 @@
     ],
     "searchBlob": "user.getPasskeys List all passkeys (WebAuthn security keys, Face ID, Touch ID) registered to the signed-in user's account, including device type and last used time. user getpasskeys"
   },
+  "user.hasGatewayUsage": {
+    "path": "user.hasGatewayUsage",
+    "kind": "query",
+    "summary": "Check whether the current user has any Kilo gateway usage, including organization-scoped requests and zero-cost free-model requests.",
+    "inputSchema": {},
+    "tags": [
+      "user",
+      "hasgatewayusage"
+    ],
+    "searchBlob": "user.hasGatewayUsage Check whether the current user has any Kilo gateway usage, including organization-scoped requests and zero-cost free-model requests. user hasgatewayusage"
+  },
   "user.linkAuthProvider": {
     "path": "user.linkAuthProvider",
     "kind": "mutation",
@@ -36892,6 +36955,9 @@
         "balanceAlerts": {
           "type": "boolean"
         },
+        "spendAlerts": {
+          "type": "boolean"
+        },
         "securityFindings": {
           "type": "boolean"
         },
@@ -36916,11 +36982,12 @@
       "sessionstatus",
       "kiloclawactivity",
       "balancealerts",
+      "spendalerts",
       "securityfindings",
       "notificationpreviews",
       "agentpushenabled"
     ],
-    "searchBlob": "user.setNotificationPreferences Update notification settings for chat messages, agent updates, balance alerts, and security findings. user setnotificationpreferences chatmessages agentattention agentupdates sessionstatus kiloclawactivity balancealerts securityfindings notificationpreviews agentpushenabled chatMessages agentAttention agentUpdates sessionStatus kiloclawActivity balanceAlerts securityFindings notificationPreviews agentPushEnabled"
+    "searchBlob": "user.setNotificationPreferences Update notification settings for chat messages, agent updates, balance alerts, and security findings. user setnotificationpreferences chatmessages agentattention agentupdates sessionstatus kiloclawactivity balancealerts spendalerts securityfindings notificationpreviews agentpushenabled chatMessages agentAttention agentUpdates sessionStatus kiloclawActivity balanceAlerts spendAlerts securityFindings notificationPreviews agentPushEnabled"
   },
   "user.signOutBrowserSessions": {
     "path": "user.signOutBrowserSessions",

@@ -25,7 +25,6 @@ import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { getRuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
 import { passesRoutingPercentage } from '@/lib/ai-gateway/providers/routing-percentage';
-import { getEnvVariable } from '@/lib/dotenvx';
 
 export function hasCompatibleVercelInferenceProvider(
   openRouterInferenceProviders: string[],
@@ -309,20 +308,6 @@ export async function applyVercelSettings(
       requestToMutate,
       vercelInferenceProviders
     );
-
-    const gatewayOptions = requestToMutate.body.providerOptions.gateway;
-    const openAiApiKey = getEnvVariable('OPENAI_API_KEY');
-    if (
-      gatewayOptions &&
-      openAiApiKey &&
-      vercelInferenceProviders?.includes('openai') &&
-      (!gatewayOptions.only || gatewayOptions.only.includes('openai'))
-    ) {
-      gatewayOptions.byok = {
-        ...gatewayOptions.byok,
-        openai: [{ apiKey: openAiApiKey }],
-      };
-    }
   }
 
   if (requestToMutate.body.providerOptions) {

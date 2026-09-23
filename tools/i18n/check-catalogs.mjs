@@ -79,13 +79,12 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profile.providerAnaconda',
   'profile.providerApple',
   'profile.providerDiscord',
-  // Feature-flag debug surface (Preferences): version comparisons and the
-  // source of a row's value are notation — flag keys, versions and the
-  // remote/default markers are technical tokens, not translatable prose.
+  // Feature-flag debug surface (Preferences): the `≥`/`<` operators, the
+  // `{{min}}` placeholder and the `v{{version}}` build line are notation and
+  // stay identical to English. The value word and the reason copy are prose —
+  // the source ("remote", "default") and state ("not loaded") words included —
+  // so every catalog translates them and they are not allowlisted here.
   'preferences.featureFlagsBuild',
-  'preferences.featureFlagApplied',
-  'preferences.featureFlagSkipped',
-  'preferences.featureFlagNotLoaded',
   'common.github',
   'common.gitlab',
   'profile.providerGoogle',
@@ -119,8 +118,6 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // Pure $t() references in the tour: they name another key's label, so every
   // locale resolves them to its own translation through i18next nesting.
   'tour.cloudOptionTitle',
-  'tour.remoteRunHint',
-  'tour.networkError',
 ]);
 
 /** The supported tags, read from the one source of truth. */

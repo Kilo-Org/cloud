@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Odomknutie sa vyžaduje pri spustení aplikácie a po piatich minútach na pozadí.",
     "featureFlags": "Príznaky funkcií",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "vzdialené · ≥ {{min}}",
+    "featureFlagSkipped": "predvolené · < {{min}}",
+    "featureFlagNotLoaded": "predvolené · nenačítané",
     "gatewayTranscription": "Prepis cez Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Prepisujte hlasový vstup modelom Kilo Gateway namiesto rozpoznávania reči v zariadení. Nahrávka sa odošle do Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -859,7 +859,8 @@
       "chat": "Správy v čete",
       "kiloclaw": "Aktivita KiloClaw",
       "balance": "Upozornenia na zostatok",
-      "security": "Bezpečnostné zistenia"
+      "security": "Bezpečnostné zistenia",
+      "spend": "Upozornenia na výdavky"
     },
     "category": {
       "chatMessagesSubtitle": "odpovede v tvojich konverzáciách",
@@ -870,8 +871,13 @@
       "sessionStatusTitle": "Stav relácie",
       "sessionStatusSubtitle": "dokončená / zlyhala / pripravená na ovládanie",
       "kiloclawActivitySubtitle": "pripravená inštancia, zlyhanie inštancie, naplánované akcie",
+      "kiloclawActivityUnavailable": "Spustite inštanciu KiloClaw, aby ste získali aktivitu KiloClaw.",
       "balanceAlertsSubtitle": "upozornenia na nízky zostatok organizácie",
-      "securityFindingsSubtitle": "nové zistenia a pripomienky SLA"
+      "balanceAlertsUnavailable": "Pripojte sa k organizácii, aby ste získali upozornenia na zostatok.",
+      "securityFindingsSubtitle": "nové zistenia a pripomienky SLA",
+      "securityFindingsUnavailable": "Zapnite Bezpečnostného agenta Kilo v rozsahu, aby ste získali bezpečnostné zistenia.",
+      "spendAlertsSubtitle": "prekročenia prahov a hodinové špičky",
+      "spendAlertsToggle": "Kategória upozornení na výdavky"
     },
     "action": {
       "openSession": "Otvoriť reláciu"
@@ -2132,6 +2138,10 @@
       "couldNotLoad": "Reláciu sa nepodarilo načítať.",
       "failedToLoadDetails": "Podrobnosti relácie sa nepodarilo načítať.",
       "failedToStopExecution": "Vykonávanie sa nepodarilo zastaviť.",
+      "stopped": "Relácia zastavená",
+      "committing": "Vytvára sa commit…",
+      "committed": "Commit vytvorený",
+      "commitFailed": "Vytvorenie commitu zlyhalo",
       "renameSession": "Premenovať reláciu",
       "renamePlaceholder": "Názov relácie",
       "transcriptAccessibility": "Prepis relácie",
@@ -2280,15 +2290,12 @@
       "matchesBadge_one": "zhoda: {{displayCount}}",
       "matchesBadge_other": "zhody: {{displayCount}}",
       "matchesBadge_few": "zhody: {{displayCount}}",
-      "matchesBadge_many": "zhôd: {{displayCount}}"
+      "matchesBadge_many": "zhôd: {{displayCount}}",
+      "noOutput": "Žiadny výstup."
     },
     "readToolMarkdown": {
       "linesTruncated": "riadky {{start}}–{{end}} (skrátené)",
       "linesOf": "riadky {{start}}–{{end}} z {{total}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Akcia {{action}} v službe Cloud Agent zlyhala ({{status}}).",
-      "failed": "Akcia {{action}} v službe Cloud Agent zlyhala."
     },
     "collectCopyableText": {
       "unserializableInput": "[neserializovateľný vstup]",
@@ -2385,8 +2392,7 @@
       "assistantProviderRejected": "Poskytovateľ odmietol požiadavku.",
       "assistantStopped": "Generovanie odpovede sa zastavilo.",
       "assistantContextOverflow": "Konverzácia je pre model príliš dlhá.",
-      "assistantFailed": "Odpoveď sa nepodarilo vytvoriť.",
-      "sendFailed": "Správu sa nepodarilo odoslať. Skús to znova."
+      "assistantFailed": "Odpoveď sa nepodarilo vytvoriť."
     },
     "filePart": {
       "loadingImage": "Načítava sa obrázok",
@@ -3194,6 +3200,14 @@
     "tooManySignInAttempts": "Príliš veľa pokusov o prihlásenie. Chvíľu počkaj a skús to znova."
   },
   "models": {
+    "auto": {
+      "frontier": "Automatický Špičkový",
+      "balanced": "Automatický Vyvážený",
+      "efficient": "Automatický Efektívny",
+      "small": "Automatický Malý",
+      "free": "Automatický Zadarmo",
+      "organization": "Automatický organizácie"
+    },
     "dataCollected": "Zber údajov",
     "free": "Zadarmo",
     "couldNotUpdateFavorites": "Obľúbené sa nepodarilo aktualizovať.",
@@ -3241,7 +3255,8 @@
     "channelName": "Aktívne agenty",
     "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke.",
     "openSession": "Otvoriť",
-    "approveFailed": "Schválenie sa nepodarilo. Klepnutím na $t(common.approve) to skús znova."
+    "approveFailed": "Schválenie sa nepodarilo. Klepnutím na $t(common.approve) to skús znova.",
+    "newestResult": "Najnovší výsledok"
   },
   "transcriptionModel": {
     "title": "Model prepisu",
@@ -3266,15 +3281,7 @@
     "remoteOptionTitle": "Tvoj počítač",
     "remoteOptionBody": "Spusti Kilo na vlastnom stroji cez CLI `kilo remote`.",
     "skip": "Preskočiť prehliadku",
-    "tutorialLabel": "Sprievodca",
-    "remoteTitle": "Spusti svoju prvú vzdialenú reláciu",
-    "remoteBody": "Pripoj svoj počítač a potom spusti reláciu odtiaľto.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Zatiaľ žiadny pripojený počítač",
-    "remoteEmptyBody": "Na pripojenie spusti `kilo remote` na počítači.",
-    "remoteFound": "Počítač pripojený",
-    "checkAgain": "Skontrolovať znova",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Sprievodca"
   },
   "appActions": {
     "start": {
@@ -3285,5 +3292,28 @@
   },
   "launcher": {
     "openLastSession": "Otvoriť poslednú reláciu"
+  },
+  "spendAlerts": {
+    "subtitle": "Pošli e-mailom alebo push oznámením upozornenie fakturačným kontaktom, keď výdavky tohto rozsahu prekročia limit alebo vyskočia nad obvyklú hodinovú sadzbu.",
+    "enable": "Povoliť upozornenia na výdavky",
+    "thresholdTitle": "Prekročenie prahu",
+    "thresholdSubtitle": "Priebežné výdavky prekračujú tvoj limit",
+    "anomalyTitle": "Hodinová špička",
+    "anomalySubtitle": "Hodina je výrazne nad obvyklou sadzbou tohto rozsahu",
+    "limitLabel": "Limit (USD)",
+    "windowLabel": "Okno",
+    "window24h": "24 hodín",
+    "window7d": "7 dní",
+    "window30d": "30 dní",
+    "multiplierLabel": "Násobiteľ špičky",
+    "saved": "Nastavenia upozornení na výdavky boli uložené",
+    "loadError": "Upozornenia na výdavky sa nepodarilo načítať.",
+    "saveError": "Upozornenia na výdavky sa nepodarilo uložiť.",
+    "empty": "Upozornenia na výdavky sú vypnuté. Zapni ich, aby si upozornil fakturačné kontakty tohto rozsahu.",
+    "noSpend": "Zatiaľ nie sú zaznamenané žiadne výdavky",
+    "spend24h": "Výdavky za posledných 24 hodín",
+    "multiplierError": "Zadaj násobiteľ 1 alebo väčší",
+    "permissionDenied": "Nemáš povolenie spravovať upozornenia na výdavky.",
+    "pushOffByCategory": "Vypnuté v Upozorneniach"
   }
 }

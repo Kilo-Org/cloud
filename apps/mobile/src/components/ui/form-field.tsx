@@ -5,12 +5,15 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { withRtlInputAlignment } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 type FormFieldProps = Omit<TextInputProps, 'value'> &
   React.RefAttributes<TextInput> & {
     label: string;
     error?: string;
+    /** Reserve the tallest localized message, including wrapping and font scaling. */
+    reserveErrorMessages?: readonly string[];
     disabled?: boolean;
     /**
      * Mark the field as required: the composed accessibility label appends
@@ -37,12 +40,14 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
 function FormField({
   label,
   error,
+  reserveErrorMessages,
   disabled,
   required,
   className,
   ref,
   validate,
   defaultValue,
+  style,
   onChangeText,
   onBlur,
   ...props
@@ -60,6 +65,11 @@ function FormField({
         {...props}
         defaultValue={defaultValue}
         editable={!disabled}
+        // A field's content follows the interface direction, not the script of
+        // its own value, so an email address stays on the same side as its
+        // label in an RTL catalog (`textAlign: 'auto'` aligns to the value's
+        // first strong character instead).
+        style={withRtlInputAlignment(style)}
         placeholderTextColor={colors.mutedForeground}
         accessibilityLabel={formFieldA11y({ label, required, error: displayedError })}
         accessibilityState={{ disabled }}
@@ -88,7 +98,32 @@ function FormField({
           className
         )}
       />
-      <AccessibleStatus message={displayedError ?? null} className="text-sm" />
+      {reserveErrorMessages?.length ? (
+        <View>
+          {/* Full-width overlapping copies reserve the maximum height in native layout,
+              before validation, without measuring or clipping larger text/RTL copy. */}
+          <View
+            className="flex-row opacity-0"
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            {reserveErrorMessages.map((message, index) => (
+              <Text
+                key={message}
+                className={cn('w-full shrink-0 text-sm', index > 0 && '-ms-[100%]')}
+              >
+                {message}
+              </Text>
+            ))}
+          </View>
+          <View className="absolute inset-x-0 top-0">
+            <AccessibleStatus message={displayedError ?? null} className="text-sm" />
+          </View>
+        </View>
+      ) : (
+        <AccessibleStatus message={displayedError ?? null} className="text-sm" />
+      )}
     </View>
   );
 }

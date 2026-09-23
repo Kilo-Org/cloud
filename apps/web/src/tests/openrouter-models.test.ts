@@ -31,7 +31,7 @@ import { GET as statGET } from '@/app/api/models/stats/[slug]/route';
 import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type * as Byok from '@/lib/ai-gateway/byok';
 import { getTerminalBenchSummaries } from '@/lib/model-stats/terminal-bench';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/models';
+import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
 import type { EnkryptBenchmark, EnkryptPublishedBenchmark } from '@kilocode/db/schema-types';
 import { captureException } from '@sentry/nextjs';
@@ -429,8 +429,12 @@ describe('GET /api/openrouter/models', () => {
 });
 
 describe('GET /api/gateway/v1/models', () => {
-  test('uses the OpenRouter models handler', () => {
-    expect(gatewayV1ModelsGET).toBe(GET);
+  test('re-wraps the OpenRouter models handler with its own timing pattern', () => {
+    // The alias wraps the already timed handler so a gateway pathname logs the
+    // gateway pattern; the inner `/api/openrouter/models` wrapper stays silent
+    // by prefix. A bare re-export would emit no `api_timing` line at all.
+    expect(typeof gatewayV1ModelsGET).toBe('function');
+    expect(gatewayV1ModelsGET).not.toBe(GET);
   });
 
   test('retains Enkrypt and Terminal Bench in the gateway catalog response', async () => {
@@ -503,7 +507,9 @@ describe('Enkrypt catalog publication boundaries', () => {
 
       const raw = await getRawOpenRouterModels();
       const catalog = await GET(createTestRequest('/api/openrouter/models'));
-      const transcription = await transcriptionModelsGET();
+      const transcription = await transcriptionModelsGET(
+        createTestRequest('/api/gateway/transcription-models')
+      );
       expect(catalog.status).toBe(200);
       expect(transcription.status).toBe(200);
       for (const response of [raw, await catalog.json(), await transcription.json()]) {
@@ -525,7 +531,9 @@ describe('Enkrypt catalog publication boundaries', () => {
     expect(await getRawOpenRouterModels()).toEqual({
       data: [{ id: 'provider/invalid', unrelated: 'retained' }],
     });
-    const transcription = await transcriptionModelsGET();
+    const transcription = await transcriptionModelsGET(
+      createTestRequest('/api/gateway/transcription-models')
+    );
     expect(transcription.status).toBe(200);
     expect(await transcription.json()).toEqual({
       data: [{ id: 'provider/invalid', unrelated: 'retained' }],

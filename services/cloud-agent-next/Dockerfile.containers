@@ -1,0 +1,118 @@
+FROM docker.io/library/debian:trixie-slim
+
+# Build arguments for metadata (all optional with defaults)
+ARG BUILD_DATE=""
+ARG VCS_REF=""
+ARG KILOCODE_CLI_VERSION="7.6.2"
+ARG NODE_VERSION="24.9.0"
+ARG BUN_VERSION="1.2.21"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Debian's own git (2.47) and git-lfs (3.6) are current, so the git-core PPA is
+# not needed. gh, jq, libatomic1, openssh-client, ripgrep and locales also come
+# from Debian's repositories, so no third-party apt source or keyring is used.
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		ca-certificates \
+		curl \
+		git \
+		git-lfs \
+		gh \
+		jq \
+		libatomic1 \
+		locales \
+		openssh-client \
+		procps \
+		ripgrep \
+		unzip \
+		wget \
+		xz-utils; \
+	git lfs install --system --skip-repo; \
+	sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen; \
+	locale-gen; \
+	apt-get clean; \
+	rm -rf /var/lib/apt/lists/*
+ENV LC_ALL=en_US.UTF-8
+ENV LANG=en_US.UTF-8
+
+# Install GitLab CLI (glab) from the official .deb release.
+# Version 1.82.0+ is required for OAuth2 access token support (GLAB_IS_OAUTH2),
+# which is newer than the packaged Debian release.
+RUN GLAB_VERSION="1.93.0" \
+	&& wget -nv -O /tmp/glab.deb "https://gitlab.com/gitlab-org/cli/-/releases/v${GLAB_VERSION}/downloads/glab_${GLAB_VERSION}_linux_amd64.deb" \
+	&& dpkg -i /tmp/glab.deb \
+	&& rm /tmp/glab.deb
+
+# Install pinned Node.js from the official dist tarball into /usr/local so that
+# node/npm/npx are on PATH.
+RUN set -eux; \
+	arch="$(dpkg --print-architecture)"; \
+	case "$arch" in \
+		amd64) node_arch="x64" ;; \
+		arm64) node_arch="arm64" ;; \
+		*) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
+	esac; \
+	curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz" -o /tmp/node.tar.xz; \
+	tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1; \
+	rm /tmp/node.tar.xz; \
+	node --version; \
+	npm --version
+
+# Install pinned bun from the official GitHub release into /usr/local/bin.
+RUN set -eux; \
+	arch="$(dpkg --print-architecture)"; \
+	case "$arch" in \
+		amd64) bun_arch="x64" ;; \
+		arm64) bun_arch="aarch64" ;; \
+		*) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
+	esac; \
+	curl -fsSL "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-${bun_arch}.zip" -o /tmp/bun.zip; \
+	unzip -o /tmp/bun.zip -d /tmp/bun; \
+	install -m 0755 "/tmp/bun/bun-linux-${bun_arch}/bun" /usr/local/bin/bun; \
+	rm -rf /tmp/bun /tmp/bun.zip; \
+	bun --version
+
+COPY scripts/kilo-git-credential /opt/kilo-cloud/kilo-git-credential
+RUN chmod +x /opt/kilo-cloud/kilo-git-credential \
+	&& ln -sf /opt/kilo-cloud/kilo-git-credential /usr/local/bin/kilo-git-credential
+
+# Install dependencies globally (accessible to all users)
+RUN npm install -g pnpm @kilocode/cli@${KILOCODE_CLI_VERSION}
+
+# === Build wrapper bundle inside container ===
+# This ensures the wrapper is built with the same Bun version that will run it,
+# avoiding any compatibility issues between build and runtime environments.
+# The wrapper imports from ../../src/shared/protocol.js, so we maintain that structure.
+COPY wrapper /tmp/wrapper-build/wrapper
+COPY src/shared /tmp/wrapper-build/src/shared
+
+# Install wrapper dependencies (pnpm symlinks don't survive COPY) and build
+RUN cd /tmp/wrapper-build/wrapper && \
+    bun install --production && \
+    ln -sfn /tmp/wrapper-build/wrapper/node_modules /tmp/wrapper-build/node_modules && \
+    bun build src/main.ts --outfile=/usr/local/bin/kilocode-wrapper.js --target=bun --minify && \
+    bun build src/restore-session.ts --outfile=/usr/local/bin/kilo-restore-session.js --target=bun --minify && \
+    bun build src/bitbucket-review-cli.ts --outfile=/usr/local/bin/bb --target=bun --minify && \
+    bun build src/control/main.ts --outfile=/usr/local/bin/kilocode-control-wrapper.js --target=bun --minify && \
+    chmod +x /usr/local/bin/bb && \
+    rm -rf /tmp/wrapper-build
+
+# Keep PID 1 alive so the Durable Object's `exec` always has a running container to attach to.
+# Trust the ephemeral intercept CA when containment is enabled; it is absent otherwise.
+RUN printf '%s\n' \
+	'#!/bin/sh' \
+	'ca=/etc/cloudflare/certs/cloudflare-containers-ca.crt' \
+	'if [ -f "$ca" ]; then' \
+	'  cp "$ca" /usr/local/share/ca-certificates/cloudflare-containers-ca.crt' \
+	'  update-ca-certificates' \
+	'fi' \
+	'exec sleep infinity' \
+	> /usr/local/bin/kilo-containers-entrypoint \
+	&& chmod +x /usr/local/bin/kilo-containers-entrypoint
+
+ENTRYPOINT ["/usr/local/bin/kilo-containers-entrypoint"]
+
+# Only local development requires a declared port; production exposes all ports.
+EXPOSE 3000

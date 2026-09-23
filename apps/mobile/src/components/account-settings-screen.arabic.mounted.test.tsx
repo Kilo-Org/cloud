@@ -26,6 +26,8 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('@/components/ui/icons', () => ({
   Globe: 'Globe',
+  // The merged screen carries the passkeys row (`account-settings-screen.tsx`
+  // renders KeyRound); a mock without it fails the whole mount.
   KeyRound: 'KeyRound',
   Shield: 'Shield',
   Smartphone: 'Smartphone',
@@ -79,7 +81,7 @@ afterAll(async () => {
 });
 
 describe('AccountSettingsScreen in Arabic', () => {
-  it('renders the Arabic header title and all three row titles', async () => {
+  it('renders the Arabic header title and every row title', async () => {
     await i18n.changeLanguage('ar');
 
     const renderer = await mountAccount();
@@ -87,6 +89,9 @@ describe('AccountSettingsScreen in Arabic', () => {
     expect(renderer.root.findByType('ScreenHeader').props.title).toBe('الحساب');
     expect(findConfigureRow(renderer, 'اللغة').props).toMatchObject({ subtitle: 'العربية' });
     expect(findConfigureRow(renderer, 'المضيفون الموثوقون')).toBeDefined();
+    expect(findConfigureRow(renderer, 'مفاتيح المرور').props).toMatchObject({
+      subtitle: 'سجّل الدخول بدون كلمة مرور',
+    });
     expect(findConfigureRow(renderer, 'جلسات الأجهزة')).toBeDefined();
   });
 

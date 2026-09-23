@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Odklepanje je obvezno ob zagonu aplikacije in po petih minutah v ozadju.",
     "featureFlags": "Zastavice funkcij",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "oddaljeno · ≥ {{min}}",
+    "featureFlagSkipped": "privzeto · < {{min}}",
+    "featureFlagNotLoaded": "privzeto · ni naloženo",
     "gatewayTranscription": "Prepisovanje prek Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Glasovni vnos prepiši z modelom Kilo Gateway namesto prepoznavanja govora naprave. Posnetje se pošlje v Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -859,7 +859,8 @@
       "chat": "Sporočila v klepetu",
       "kiloclaw": "Dejavnost v KiloClaw",
       "balance": "Opozorila o stanju dobroimetja",
-      "security": "Varnostne ugotovitve"
+      "security": "Varnostne ugotovitve",
+      "spend": "Opozorila o porabi"
     },
     "category": {
       "chatMessagesSubtitle": "odgovori v tvojih pogovorih",
@@ -870,8 +871,13 @@
       "sessionStatusTitle": "Stanje seje",
       "sessionStatusSubtitle": "končano / neuspešno / pripravljeno za upravljanje",
       "kiloclawActivitySubtitle": "instanca pripravljena ali neuspešna, načrtovana dejanja",
+      "kiloclawActivityUnavailable": "Zaženite instanco KiloClaw, da prejemate dejavnost KiloClaw.",
       "balanceAlertsSubtitle": "opozorila o nizkem stanju organizacije",
-      "securityFindingsSubtitle": "nove ugotovitve in opomniki SLA"
+      "balanceAlertsUnavailable": "Pridružite se organizaciji, da prejemate opozorila o stanju.",
+      "securityFindingsSubtitle": "nove ugotovitve in opomniki SLA",
+      "securityFindingsUnavailable": "Omogočite Varnostnega agenta Kilo v obsegu, da prejemate varnostne ugotovitve.",
+      "spendAlertsSubtitle": "preseganja pragov in urni skoki",
+      "spendAlertsToggle": "Kategorija opozoril o porabi"
     },
     "action": {
       "openSession": "Odpri sejo"
@@ -2132,6 +2138,10 @@
       "couldNotLoad": "Seje ni bilo mogoče naložiti.",
       "failedToLoadDetails": "Podrobnosti seje ni bilo mogoče naložiti.",
       "failedToStopExecution": "Izvajanja ni bilo mogoče ustaviti.",
+      "stopped": "Seja ustavljena",
+      "committing": "Uveljavljanje…",
+      "committed": "Uveljavljeno",
+      "commitFailed": "Uveljavljanje ni uspelo",
       "renameSession": "Preimenuj sejo",
       "renamePlaceholder": "Ime seje",
       "transcriptAccessibility": "Zapis pogovora v seji",
@@ -2280,15 +2290,12 @@
       "matchesBadge_one": "{{displayCount}} zadetek",
       "matchesBadge_other": "{{displayCount}} zadetkov",
       "matchesBadge_two": "{{displayCount}} zadetka",
-      "matchesBadge_few": "{{displayCount}} zadetki"
+      "matchesBadge_few": "{{displayCount}} zadetki",
+      "noOutput": "Ni izhoda."
     },
     "readToolMarkdown": {
       "linesTruncated": "vrstice {{start}}–{{end}} (skrajšano)",
       "linesOf": "vrstice {{start}}–{{end}} od {{total}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Dejanje {{action}} v storitvi Cloud Agent ni uspelo ({{status}}).",
-      "failed": "Dejanje {{action}} v storitvi Cloud Agent ni uspelo."
     },
     "collectCopyableText": {
       "unserializableInput": "[vnosa ni mogoče serializirati]",
@@ -2385,8 +2392,7 @@
       "assistantProviderRejected": "Ponudnik je zavrnil zahtevo.",
       "assistantStopped": "Ustvarjanje odgovora je bilo ustavljeno.",
       "assistantContextOverflow": "Pogovor je predolg za model.",
-      "assistantFailed": "Odgovora ni bilo mogoče ustvariti.",
-      "sendFailed": "Sporočila ni bilo mogoče poslati. Poskusi znova."
+      "assistantFailed": "Odgovora ni bilo mogoče ustvariti."
     },
     "filePart": {
       "loadingImage": "Nalaganje slike",
@@ -3194,6 +3200,14 @@
     "tooManySignInAttempts": "Preveč poskusov prijave. Počakaj in poskusi znova."
   },
   "models": {
+    "auto": {
+      "frontier": "Samodejno Vrhunski",
+      "balanced": "Samodejno Uravnoteženo",
+      "efficient": "Samodejno Učinkovito",
+      "small": "Samodejno Malo",
+      "free": "Samodejno Brezplačno",
+      "organization": "Samodejno organizacije"
+    },
     "dataCollected": "Zbiranje podatkov",
     "free": "Brezplačno",
     "couldNotUpdateFavorites": "Priljubljenih ni bilo mogoče posodobiti.",
@@ -3241,7 +3255,8 @@
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu.",
     "openSession": "Odpri",
-    "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus."
+    "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus.",
+    "newestResult": "Najnovejši rezultat"
   },
   "transcriptionModel": {
     "title": "Model za prepisovanje",
@@ -3266,15 +3281,7 @@
     "remoteOptionTitle": "Vaš računalnik",
     "remoteOptionBody": "Zaženi Kilo na svojem računalniku prek CLI-ja `kilo remote`.",
     "skip": "Preskoči ogled",
-    "tutorialLabel": "Vodič",
-    "remoteTitle": "Zaženite svojo prvo oddaljeno sejo",
-    "remoteBody": "Poveži svoj računalnik, nato pa tu zaženi sejo.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Še ni povezanega računalnika",
-    "remoteEmptyBody": "Če ga želite povezati, zaženite `kilo remote` na svojem računalniku.",
-    "remoteFound": "Računalnik povezan",
-    "checkAgain": "Preveri znova",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Vodič"
   },
   "appActions": {
     "start": {
@@ -3285,5 +3292,28 @@
   },
   "launcher": {
     "openLastSession": "Odpri zadnjo sejo"
+  },
+  "spendAlerts": {
+    "subtitle": "Pošlji opozorilo po e-pošti ali push sporočilu obračunskim stikom, ko poraba tega obsega preseže omejitev ali skoči nad običajno urno stopnjo.",
+    "enable": "Omogoči opozorila o porabi",
+    "thresholdTitle": "Preseganje praga",
+    "thresholdSubtitle": "Tekoča poraba presega tvojo omejitev",
+    "anomalyTitle": "Urni skok",
+    "anomalySubtitle": "Ena ura je daleč nad običajno stopnjo tega obsega",
+    "limitLabel": "Omejitev (USD)",
+    "windowLabel": "Okno",
+    "window24h": "24 ur",
+    "window7d": "7 dni",
+    "window30d": "30 dni",
+    "multiplierLabel": "Množitelj skoka",
+    "saved": "Nastavitve opozoril o porabi so shranjene",
+    "loadError": "Opozoril o porabi ni bilo mogoče naložiti.",
+    "saveError": "Opozoril o porabi ni bilo mogoče shraniti.",
+    "empty": "Opozorila o porabi so izklopljena. Vklopi jih, da opozoriš obračunske stike tega obsega.",
+    "noSpend": "Poraba še ni zabeležena",
+    "spend24h": "Poraba v zadnjih 24 urah",
+    "multiplierError": "Vnesi množitelj 1 ali večji",
+    "permissionDenied": "Nimaš dovoljenja za upravljanje opozoril o porabi.",
+    "pushOffByCategory": "Izklopljeno v Obvestilih"
   }
 }

@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "لە کاتی دەستپێکردنی ئەپەکە و دوای پێنج خولەک مانەوەی لە پاشبنەمادا، کردنەوەی قوفڵ پێویستە.",
     "featureFlags": "ئاڵای تایبەتمەندییەکان",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "لە ڕاژەوە · ≥ {{min}}",
+    "featureFlagSkipped": "بنەڕەت · < {{min}}",
+    "featureFlagNotLoaded": "بنەڕەت · بار نەکراوە",
     "gatewayTranscription": "گۆڕینی دەنگ بۆ دەق بە Kilo Gateway",
     "gatewayTranscriptionSubtitle": "دەنگەکانت بە مۆدێلێکی Kilo Gateway بگۆڕە بۆ دەق، نەک بە ناسینەوەی قسەکردنی ئامێرەکەت. تۆمارەکەت بۆ Kilo Gateway دەنێردرێت.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -827,7 +827,8 @@
       "chat": "نامەکانی گفتوگۆ",
       "kiloclaw": "چالاکییەکانی KiloClaw",
       "balance": "ئاگادارکردنەوەکانی باڵانس",
-      "security": "دۆزینەوەکانی ئاسایش"
+      "security": "دۆزینەوەکانی ئاسایش",
+      "spend": "ئاگادارکردنەوەکانی خەرجی"
     },
     "category": {
       "chatMessagesSubtitle": "وەڵامەکان لە گفتوگۆکانتدا",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "دۆخی سێشن",
       "sessionStatusSubtitle": "تەواوبوو / سەرنەکەوتوو / ئامادە بۆ کۆنترۆڵکردن",
       "kiloclawActivitySubtitle": "نموونەی ئامادە یان سەرنەکەوتوو، کردارە کاتدیاریکراوەکان",
+      "kiloclawActivityUnavailable": "دەستپێکردنی نموونەیەکی KiloClaw بۆ وەرگرتنی چالاکی KiloClaw.",
       "balanceAlertsSubtitle": "ئاگادارکردنەوەکانی کەمی باڵانسی ڕێکخراوە",
-      "securityFindingsSubtitle": "دۆزینەوە نوێکان و بیرخستنەوەکانی SLA"
+      "balanceAlertsUnavailable": "بەشداریکردن لە ڕێکخراوێک بۆ وەرگرتنی ئاگادارکردنەوەکانی باڵانس.",
+      "securityFindingsSubtitle": "دۆزینەوە نوێکان و بیرخستنەوەکانی SLA",
+      "securityFindingsUnavailable": "چالاککردنی بریکاری ئاسایشی Kilo لە مەودایەکدا بۆ وەرگرتنی دۆزینەوە ئەمنییەکان.",
+      "spendAlertsSubtitle": "تێپەڕینی سنوورەکان و بەرزبوونەوەکانی کاتژمێری",
+      "spendAlertsToggle": "پۆلی ئاگادارکردنەوەکانی خەرجی"
     },
     "action": {
       "openSession": "کردنەوەی سێشن"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "نەتوانرا سێشنەکە بار بکرێت.",
       "failedToLoadDetails": "نەتوانرا وردەکارییەکانی سێشنەکە بار بکرێن.",
       "failedToStopExecution": "نەتوانرا جێبەجێکردن بوەستێنرێت.",
+      "stopped": "سێشنەکە وەستێنرا",
+      "committing": "کۆمیت دەکرێت…",
+      "committed": "کۆمیت کرا",
+      "commitFailed": "کۆمیتکردن سەرنەکەوت",
       "renameSession": "گۆڕینی ناوی سێشن",
       "renamePlaceholder": "ناوی سێشن",
       "transcriptAccessibility": "تۆماری سێشن",
@@ -2216,15 +2226,12 @@
       "linesBadge_one": "{{displayCount}} دێڕ",
       "linesBadge_other": "{{displayCount}} دێڕ",
       "matchesBadge_one": "{{displayCount}} ئەنجام",
-      "matchesBadge_other": "{{displayCount}} ئەنجام"
+      "matchesBadge_other": "{{displayCount}} ئەنجام",
+      "noOutput": "هیچ دەرچووێک نییە."
     },
     "readToolMarkdown": {
       "linesTruncated": "دێڕەکانی {{start}}–{{end}} (کورتکراوە)",
       "linesOf": "دێڕەکانی {{start}}–{{end}} لە {{total}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "{{action}} بۆ Cloud Agent سەرکەوتوو نەبوو ({{status}}).",
-      "failed": "{{action}} بۆ Cloud Agent سەرکەوتوو نەبوو."
     },
     "collectCopyableText": {
       "unserializableInput": "[تێدراوەکە ناتوانرێت بە زنجیرەیەکی داتا بنووسرێت]",
@@ -2321,8 +2328,7 @@
       "assistantProviderRejected": "دابینکەرەکە داواکارییەکەی ڕەتکردەوە.",
       "assistantStopped": "وەڵامەکە وەستێنرا.",
       "assistantContextOverflow": "گفتوگۆکە بۆ ئەم مۆدێلە زۆر درێژە.",
-      "assistantFailed": "وەڵامدانەوە سەرکەوتوو نەبوو.",
-      "sendFailed": "نەتوانرا پەیامەکە بنێردرێت. تکایە دووبارە هەوڵ بدەرەوە."
+      "assistantFailed": "وەڵامدانەوە سەرکەوتوو نەبوو."
     },
     "filePart": {
       "loadingImage": "بارکردنی وێنە",
@@ -3108,6 +3114,14 @@
     "tooManySignInAttempts": "زۆر جار هەوڵی چوونەژوورەوەت داوە. تکایە کەمێک چاوەڕێ بکە و دووبارە هەوڵ بدەوە."
   },
   "models": {
+    "auto": {
+      "frontier": "خۆکاری پێشکەوتوو",
+      "balanced": "خۆکاری هاوسەنگ",
+      "efficient": "خۆکاری کارا",
+      "small": "خۆکاری بچووک",
+      "free": "خۆکاری خۆڕایی",
+      "organization": "خۆکاری ڕێکخراو"
+    },
     "dataCollected": "زانیاری کۆ دەکرێتەوە",
     "free": "خۆڕایی",
     "couldNotUpdateFavorites": "نەتوانرا دڵخوازەکان نوێ بکرێنەوە.",
@@ -3155,7 +3169,8 @@
     "channelName": "ئەجێنتە چالاکەکان",
     "activityKitDisabledBody": "بۆ بینینی ئەجێنتە چالاکەکان لە شاشەی قوفڵدا، چالاکییە ڕاستەوخۆکان لە ڕێکخستنەکاندا چالاک بکە.",
     "openSession": "بیکەرەوە",
-    "approveFailed": "نەتوانرا پەسند بکرێت. بۆ دووبارە هەوڵدانەوە، لە $t(common.approve) بدە."
+    "approveFailed": "نەتوانرا پەسند بکرێت. بۆ دووبارە هەوڵدانەوە، لە $t(common.approve) بدە.",
+    "newestResult": "نوێترین ئەنجام"
   },
   "transcriptionModel": {
     "title": "مۆدێلی گۆڕینی دەنگ بۆ دەق",
@@ -3180,15 +3195,7 @@
     "remoteOptionTitle": "کۆمپیوتەرەکەت",
     "remoteOptionBody": "Kilo لەسەر ئامێری خۆتدا بە ڕێگای CLI ی `kilo remote` جێبەجێ بکە.",
     "skip": "گەشتەکە دەربپەڕێ",
-    "tutorialLabel": "فێربوون",
-    "remoteTitle": "یەکەم دانیشتنی دوورەکەت دەست پێبکە",
-    "remoteBody": "کۆمپیوتەرەکەت پەیوەست بکە، پاشان دانیشتنەکە لێرەوە دەست پێبکە.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "هێشتا کۆمپیوتەرێک پەیوەست نەبووە",
-    "remoteEmptyBody": "بۆ پەیوەستکردنی، `kilo remote` لە کۆمپیوتەرەکەتدا جێبەجێ بکە.",
-    "remoteFound": "کۆمپیوتەر پەیوەست بوو",
-    "checkAgain": "دووبارە پشکنین بکە",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "فێربوون"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3206,28 @@
   },
   "launcher": {
     "openLastSession": "کردنەوەی دوایین دانیشتن"
+  },
+  "spendAlerts": {
+    "subtitle": "کاتێک خەرجی ئەم بووارە تێپەڕی سنوورێک بکات یان لە ڕێژەی کاتژمێری ئاساییدا بەرز ببێتەوە، ئاگادارکردنەوەیەک بە ئیمەیڵ یان پاڵنەر بۆ پەیوەندییەکانی پارەدان بنێرە.",
+    "enable": "چالاککردنی ئاگادارکردنەوەکانی خەرجی",
+    "thresholdTitle": "تێپەڕینی سنوور",
+    "thresholdSubtitle": "خەرجی جاری لە سنوورەکەت تێدەپەڕێت",
+    "anomalyTitle": "بەرزبوونەوەی کاتژمێری",
+    "anomalySubtitle": "یەک کاتژمێر زۆر لە ڕێژەی ئاسایی ئەم بووارە بەرزترە",
+    "limitLabel": "سنوور (USD)",
+    "windowLabel": "ماوە",
+    "window24h": "24 کاتژمێر",
+    "window7d": "7 ڕۆژ",
+    "window30d": "30 ڕۆژ",
+    "multiplierLabel": "لێکدەری بەرزبوونەوە",
+    "saved": "ڕێکخستنەکانی ئاگادارکردنەوەی خەرجی پاشەکەوتکران",
+    "loadError": "ئاگادارکردنەوەکانی خەرجی بار نەکران.",
+    "saveError": "ئاگادارکردنەوەکانی خەرجی پاشەکەوت نەکران.",
+    "empty": "ئاگادارکردنەوەکانی خەرجی ناچالاکن. چالاکیان بکە بۆ ئاگادارکردنی پەیوەندییەکانی پارەدانی ئەم بووارە.",
+    "noSpend": "هێشتا هیچ خەرجییەک تۆمار نەکراوە",
+    "spend24h": "خەرجی لە 24 کاتژمێری ڕابردوودا",
+    "multiplierError": "لێکدەرێکی 1 یان زیاتر بنووسە",
+    "permissionDenied": "مۆڵەتی بەڕێوەبردنی ئاگادارکردنەوەکانی خەرجیت نییە.",
+    "pushOffByCategory": "لە ئاگادارکردنەوەکاندا ناچالاکە"
   }
 }

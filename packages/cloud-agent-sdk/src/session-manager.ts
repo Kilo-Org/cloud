@@ -46,6 +46,7 @@ import type {
   SessionInfo,
   SessionActivity,
   AgentStatus,
+  SdkStatusMessageCode,
   CloudStatus,
   QuestionState,
   PermissionState,
@@ -87,6 +88,7 @@ type SessionStatusIndicator = {
   message: string;
   timestamp: number;
   commitHash?: string;
+  code?: SdkStatusMessageCode;
 };
 type SessionConfig = {
   sessionId: CloudAgentSessionId | KiloSessionId;
@@ -165,6 +167,13 @@ const EMPTY_REMOTE_COMMAND_STATE = {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const TRANSCRIPT_CLEARED_INDICATOR = 'View cleared — earlier messages are still on this session';
+
+/**
+ * Maximum number of sessions with an in-memory record of retried delivery
+ * failures. Mirrors the durable store's per-user session cap: without one, a
+ * long-lived manager would keep a set for every session the user ever retried.
+ */
+const RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS = 20;
 
 /**
  * Maximum number of retained messages. Once the loaded transcript exceeds this,
@@ -350,6 +359,20 @@ type SessionManagerConfig = {
   onBranchChanged?: (branch: string) => void;
   onSendFailed?: (messageText: string, displayMessage?: string, error?: unknown) => void;
   /**
+   * Optional durable memory of delivery failures the user already retried,
+   * scoped to one session. Read on `switchSession` and consulted when a
+   * `cloud.message.failed` event arrives: the DO replays its stored events on
+   * the next open, so without this the cleared footer returns after a relaunch.
+   * Callers without a reader (web, tests) keep the in-memory-only behaviour.
+   */
+  readResolvedDeliveryFailures?: (kiloSessionId: KiloSessionId) => Promise<readonly string[]>;
+  /**
+   * Optional sink for a delivery failure the user resolved by retrying, so the
+   * next open can drop its replayed `cloud.message.failed`. Never throws into
+   * the caller; a failed write costs one restored footer, not a broken retry.
+   */
+  persistResolvedDeliveryFailure?: (kiloSessionId: KiloSessionId, messageId: string) => void;
+  /**
    * Optional sink for tool attachment bytes, called just before the chat
    * processor strips a completed tool part's attachment data URLs for storage.
    *
@@ -533,9 +556,16 @@ type SessionManager = {
   dismissSuggestion(requestId: string): Promise<void>;
   /**
    * Remove one failed delivery entry after a successful retry so its row
-   * stops showing.
+   * stops showing, and persist the id (when a sink is configured) so a
+   * replayed `cloud.message.failed` on the next open cannot bring it back.
+   *
+   * `ownerSessionId` is the session that owned the retried row, captured by
+   * the caller before the re-send. Pass it whenever the re-send was awaited:
+   * the user can switch sessions while it is in flight, and the resolution
+   * must be recorded against — and only against — the session it belongs to.
+   * Omitted, the currently active session is assumed.
    */
-  clearFailedMessage(messageId: string): void;
+  clearFailedMessage(messageId: string, ownerSessionId?: KiloSessionId): void;
   createAndStart(input: PrepareInput): Promise<void>;
   clearError(): void;
   destroy(): void;
@@ -558,23 +588,44 @@ function isSelectedModelUnavailable(message: string | undefined): boolean {
   return message?.toLowerCase().includes(SELECTED_MODEL_UNAVAILABLE_MESSAGE) ?? false;
 }
 
-function formatError(err: unknown): string {
+type FormattedErrorDetail = { message: string; code: SdkStatusMessageCode };
+
+/**
+ * Pairs the SDK's English failure copy with a stable, locale-free code so a
+ * localized client can render its own text. `formatError` remains the single
+ * string seam the web app renders.
+ */
+function formatErrorDetail(err: unknown): FormattedErrorDetail {
   const r = errorShapeSchema.safeParse(err);
   if (r.success) {
-    if (isSelectedModelUnavailable(r.data.message)) return SELECTED_MODEL_UNAVAILABLE_ERROR;
+    if (isSelectedModelUnavailable(r.data.message))
+      return { message: SELECTED_MODEL_UNAVAILABLE_ERROR, code: 'selected-model-unavailable' };
     const code = r.data.data?.code ?? r.data.shape?.code;
     const http = r.data.data?.httpStatus ?? r.data.shape?.data?.httpStatus;
     if (code === 'PAYMENT_REQUIRED' || http === 402)
-      return 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.';
+      return {
+        message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+        code: 'insufficient-credits',
+      };
     if (code === 'UNAUTHORIZED' || code === 'FORBIDDEN')
-      return 'You are not authorized to use the Cloud Agent.';
-    if (code === 'NOT_FOUND') return 'Service is unavailable right now. Please try again.';
+      return { message: 'You are not authorized to use the Cloud Agent.', code: 'not-authorized' };
+    if (code === 'NOT_FOUND')
+      return {
+        message: 'Service is unavailable right now. Please try again.',
+        code: 'service-unavailable',
+      };
     if (code === 'CONFLICT' || http === 409)
-      return 'Previous task is still finishing up. Please wait a moment.';
+      return {
+        message: 'Previous task is still finishing up. Please wait a moment.',
+        code: 'previous-task-in-progress',
+      };
     if (code === 'SERVICE_UNAVAILABLE' || http === 503)
-      return 'Service is temporarily unavailable. Please retry in a moment.';
+      return {
+        message: 'Service is temporarily unavailable. Please retry in a moment.',
+        code: 'service-temporarily-unavailable',
+      };
     if (code !== undefined || http !== undefined) {
-      return GENERIC_ERROR;
+      return { message: GENERIC_ERROR, code: 'generic-error' };
     }
     // `errorShapeSchema` uses `.passthrough()`, so `safeParse` succeeds on any
     // object — including plain `Error` instances whose own properties satisfy
@@ -584,10 +635,14 @@ function formatError(err: unknown): string {
   }
   if (err instanceof Error) {
     if (err.message.includes('ECONNREFUSED') || err.message.includes('fetch failed'))
-      return 'Connection lost. Please retry in a moment.';
-    return 'Connection failed. Please retry in a moment.';
+      return { message: 'Connection lost. Please retry in a moment.', code: 'connection-lost' };
+    return { message: 'Connection failed. Please retry in a moment.', code: 'connection-failed' };
   }
-  return GENERIC_ERROR;
+  return { message: GENERIC_ERROR, code: 'generic-error' };
+}
+
+function formatError(err: unknown): string {
+  return formatErrorDetail(err).message;
 }
 
 // ---------------------------------------------------------------------------
@@ -707,12 +762,23 @@ function insertOptimisticUserMessage(input: {
 function indicatorForCloudStatus(cs: CloudStatus): SessionStatusIndicator | null {
   const now = Date.now();
   if (cs.type === 'preparing') {
-    return { type: 'progress', message: cs.message ?? 'Setting up environment…', timestamp: now };
+    return {
+      type: 'progress',
+      message: cs.message ?? 'Setting up environment…',
+      timestamp: now,
+      ...(cs.message === undefined ? { code: 'setting-up-environment' } : {}),
+    };
   }
   if (cs.type === 'finalizing') {
-    return { type: 'progress', message: cs.message ?? 'Wrapping up…', timestamp: now };
+    return {
+      type: 'progress',
+      message: cs.message ?? 'Wrapping up…',
+      timestamp: now,
+      ...(cs.message === undefined ? { code: 'wrapping-up' } : {}),
+    };
   }
   if (cs.type === 'error') {
+    // The DO writes this text, so it carries no SDK copy code.
     return { type: 'error', message: cs.message, timestamp: now };
   }
   return null; // 'ready' — no indicator
@@ -727,12 +793,25 @@ function indicatorForStatus(s: AgentStatus): SessionStatusIndicator | null {
       message: s.message,
       timestamp: now,
       ...(s.step === 'completed' && s.commitHash ? { commitHash: s.commitHash } : {}),
+      ...(s.code ? { code: s.code } : {}),
     } satisfies SessionStatusIndicator;
   }
   if (s.type === 'disconnected')
-    return { type: 'error', message: 'Agent connection lost', timestamp: now };
-  if (s.type === 'error') return { type: 'error', message: s.message, timestamp: now };
-  if (s.type === 'interrupted') return { type: 'info', message: 'Session stopped', timestamp: now };
+    return {
+      type: 'error',
+      message: 'Agent connection lost',
+      timestamp: now,
+      code: 'agent-connection-lost',
+    };
+  if (s.type === 'error')
+    return {
+      type: 'error',
+      message: s.message,
+      timestamp: now,
+      ...(s.code ? { code: s.code } : {}),
+    };
+  if (s.type === 'interrupted')
+    return { type: 'info', message: 'Session stopped', timestamp: now, code: 'session-stopped' };
   return null;
 }
 
@@ -934,6 +1013,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   let activeSessionId: KiloSessionId | null = null;
   let switchGeneration = 0;
   let currentSession: CloudAgentSession | null = null;
+  /**
+   * Delivery failures the user already retried, kept per session so a
+   * resolution recorded while another session was active still suppresses the
+   * replayed failure when the user switches back — before the fire-and-forget
+   * durable write lands, or if it never does. The active session's set is the
+   * one its live session predicate reads; `resolvedFailuresForSession` is the
+   * only way to reach any set.
+   */
+  const resolvedDeliveryFailuresBySession = new Map<KiloSessionId, Set<string>>();
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
@@ -1770,6 +1858,36 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
+  /**
+   * The in-memory resolution record for one session, created on demand. The
+   * record outlives a switch so a retry recorded while another session was
+   * active — `clearFailedMessage` with an `ownerSessionId` that is not the
+   * active one — still suppresses the replayed failure when the user switches
+   * back, even before (or without) the durable write landing. Bounded to the
+   * most recently used sessions; the active session is never evicted, because
+   * its live session predicate reads this exact set.
+   */
+  function resolvedFailuresForSession(kiloSessionId: KiloSessionId): Set<string> {
+    const existing = resolvedDeliveryFailuresBySession.get(kiloSessionId);
+    if (existing) {
+      // Refresh insertion order so recently touched sessions survive eviction.
+      resolvedDeliveryFailuresBySession.delete(kiloSessionId);
+      resolvedDeliveryFailuresBySession.set(kiloSessionId, existing);
+      return existing;
+    }
+    const created = new Set<string>();
+    resolvedDeliveryFailuresBySession.set(kiloSessionId, created);
+    if (resolvedDeliveryFailuresBySession.size > RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS) {
+      for (const key of resolvedDeliveryFailuresBySession.keys()) {
+        if (key !== kiloSessionId && key !== activeSessionId) {
+          resolvedDeliveryFailuresBySession.delete(key);
+          break;
+        }
+      }
+    }
+    return created;
+  }
+
   async function switchSession(kiloSessionId: KiloSessionId): Promise<void> {
     // A retry of a failed metadata refresh must keep the transcript mounted.
     // A real session switch (or a caller without caching) still starts clean.
@@ -1792,6 +1910,38 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     currentSession?.destroy();
     currentSession = null;
     setIndicator(null);
+
+    // Seed the durable memory of retried delivery failures for this session.
+    // The record already held for this session is reused, so a resolution
+    // recorded while another session was active suppresses the replay even if
+    // the durable read below returns the pre-write list. The read is not
+    // awaited: if it lands after the DO's replay already applied a resolved
+    // failure, the prune below removes the whole failure; if it lands first,
+    // the predicate suppresses it.
+    const resolvedFailures = resolvedFailuresForSession(kiloSessionId);
+    if (config.readResolvedDeliveryFailures) {
+      void config
+        .readResolvedDeliveryFailures(kiloSessionId)
+        .then(ids => {
+          if (expectedGeneration !== switchGeneration) return;
+          for (const id of ids) {
+            resolvedFailures.add(id);
+          }
+          for (const id of ids) {
+            // `clearFailedMessage` reports when the pruned entry was also the
+            // failure that set the terminal error and has undone it. That
+            // error reached `errorAtom` through `config.onError`, which the
+            // service state cannot reach, so clear it here: the predicate path
+            // never applies the failure at all, and the two must agree.
+            if (currentSession?.state.clearFailedMessage(id)) {
+              store.set(errorAtom, null);
+            }
+          }
+        })
+        .catch(() => {
+          // An unreadable memory is a miss, never a failed open.
+        });
+    }
 
     // Clean slate immediately — the user asked to switch, so clear all
     // previous session state and show a loading indicator.
@@ -1857,11 +2007,22 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         acceptCachedPage = false;
         clearAllAtoms();
         store.set(isLoadingAtom, false);
-        setIndicator({
-          type: 'error',
-          message: code === 'NOT_FOUND' ? CHILD_SESSION_NOT_FOUND_MESSAGE : formatError(err),
-          timestamp: Date.now(),
-        });
+        if (code === 'NOT_FOUND') {
+          setIndicator({
+            type: 'error',
+            message: CHILD_SESSION_NOT_FOUND_MESSAGE,
+            timestamp: Date.now(),
+            code: 'child-session-not-found',
+          });
+        } else {
+          const detail = formatErrorDetail(err);
+          setIndicator({
+            type: 'error',
+            message: detail.message,
+            timestamp: Date.now(),
+            code: detail.code,
+          });
+        }
         return;
       }
       if (config.readCachedSnapshotPage) {
@@ -1885,7 +2046,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         }
         store.set(isLoadingAtom, false);
         store.set(isRefreshingCachedTranscriptAtom, false);
-        setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
+        const detail = formatErrorDetail(err);
+        setIndicator({
+          type: 'error',
+          message: detail.message,
+          timestamp: Date.now(),
+          code: detail.code,
+        });
       };
       if (!cacheReadPending) {
         surfaceFailure();
@@ -1954,6 +2121,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       storage: jotaiStorage,
       onToolAttachment: config.onToolAttachment,
       onFilePart: config.onFilePart,
+      isDeliveryFailureResolved: messageId => resolvedFailures.has(messageId),
       onSessionCreated: info => {
         if (info.parentID == null) {
           // Adopt the server-reported root session ID so message
@@ -2123,6 +2291,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           type: 'error',
           message: 'Message failed to deliver',
           timestamp: Date.now(),
+          code: 'message-delivery-failed',
         });
       },
       onEvent: event => {
@@ -2433,10 +2602,24 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       remoteOptimisticIds.delete(messageId);
       store.set(failedPromptAtom, messageText);
       store.set(billingFailureAtom, parseCustomerBillingFailure(err));
-      const message = formatError(err);
-      config.onSendFailed?.(messageText, message, err);
-      if (store.get(agentStatusAtom).type !== 'disconnected') {
-        setIndicator({ type: 'error', message, timestamp: Date.now() });
+      const detail = formatErrorDetail(err);
+      config.onSendFailed?.(messageText, detail.message, err);
+      // A connection-level failure is what the "Agent connection lost" line
+      // already states, so a disconnected agent keeps that line instead of
+      // restating the same thing. A classified failure (credits, authorization,
+      // service) is an answer from the server, so it must replace the stale
+      // line: the reader needs that reason, and the server just proved the
+      // connection is not the problem. Suppressing it left the failed send
+      // silent on mobile, whose only failed-send surface is this indicator.
+      const connectionFailure =
+        detail.code === 'connection-failed' || detail.code === 'connection-lost';
+      if (store.get(agentStatusAtom).type !== 'disconnected' || !connectionFailure) {
+        setIndicator({
+          type: 'error',
+          message: detail.message,
+          timestamp: Date.now(),
+          code: detail.code,
+        });
       }
       return false;
     }
@@ -2481,7 +2664,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       if (currentSession === session) {
         restoreAfterInterrupt(session);
-        setIndicator({ type: 'info', message: 'Session stopped', timestamp: Date.now() });
+        setIndicator({
+          type: 'info',
+          message: 'Session stopped',
+          timestamp: Date.now(),
+          code: 'session-stopped',
+        });
       }
     } catch {
       if (currentSession === session) {
@@ -2493,6 +2681,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           type: 'error',
           message: 'Failed to stop execution',
           timestamp: Date.now(),
+          code: 'failed-to-stop-execution',
         });
       }
     }
@@ -2563,11 +2752,29 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     if (currentSession) await currentSession.dismissSuggestion({ requestId });
   }
 
-  function clearFailedMessage(messageId: string): void {
-    currentSession?.state.clearFailedMessage(messageId);
-    const next = new Map(store.get(pendingMessagesAtom));
-    next.delete(messageId);
-    store.set(pendingMessagesAtom, next);
+  function clearFailedMessage(messageId: string, ownerSessionId?: KiloSessionId): void {
+    // The re-send is awaited, so the user can switch sessions while it is in
+    // flight. `activeSessionId` is then the switched-to session, and both the
+    // in-memory record and the durable record belong to the session that owned
+    // the row instead — the switched-to session must not have another
+    // transcript's id applied to its state or atom.
+    const owner = ownerSessionId ?? activeSessionId;
+    if (owner === null) return;
+    if (owner === activeSessionId) {
+      currentSession?.state.clearFailedMessage(messageId);
+      const next = new Map(store.get(pendingMessagesAtom));
+      next.delete(messageId);
+      store.set(pendingMessagesAtom, next);
+    }
+    // Remember the resolution for the owner's in-memory suppression: the
+    // failure id is final on the server, so any later `cloud.message.failed`
+    // for it is the DO's stored-event replay and must not restore the footer
+    // the user's retry cleared. Recording it under the owner — not only under
+    // the active session — is what suppresses the replay when the user
+    // switches back before the durable write below lands; that write is what
+    // keeps the clear across a relaunch.
+    resolvedFailuresForSession(owner).add(messageId);
+    config.persistResolvedDeliveryFailure?.(owner, messageId);
   }
 
   async function createAndStart(input: PrepareInput): Promise<void> {
@@ -2581,7 +2788,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(sessionIdAtom, cloudAgentSessionId);
       await switchSession(kiloSessionId);
     } catch (err) {
-      setIndicator({ type: 'error', message: formatError(err), timestamp: Date.now() });
+      const detail = formatErrorDetail(err);
+      setIndicator({
+        type: 'error',
+        message: detail.message,
+        timestamp: Date.now(),
+        code: detail.code,
+      });
     }
   }
 
@@ -2654,6 +2867,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
     clearAllAtoms();
     remoteOptimisticIds.clear();
+    resolvedDeliveryFailuresBySession.clear();
     activeSessionId = null;
     activeSessionType = null;
   }
@@ -2745,7 +2959,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   };
 }
 
-export { CLI_MODEL_ID, cliModelLabel, createSessionManager, formatError };
+export { CLI_MODEL_ID, cliModelLabel, createSessionManager, formatError, formatErrorDetail };
 export type {
   ActiveSessionType,
   CloudAgentModelOverride,

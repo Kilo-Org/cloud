@@ -49,15 +49,16 @@ import { toast } from 'sonner-native';
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
+import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { OfflineBannerSpaceGate } from '@/components/offline-banner';
 import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
-import { QueryError } from '@/components/query-error';
+import { RuntimeErrorScreen } from '@/components/runtime-error-screen';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
 import { useAuth } from '@/lib/auth/auth-context';
-import { resolveBootstrapDecision } from '@/lib/bootstrap-decision';
+import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
 import { checkConsentGate } from '@/lib/consent-gate';
 import { subscribeToConsentChanges } from '@/lib/consent';
@@ -375,13 +376,13 @@ function RootLayoutNav({
       if (returnTarget === 'login') {
         router.replace('/(auth)/login');
       } else if (returnTarget === 'profile') {
-        router.replace('/(app)/(tabs)/(3_profile)');
+        router.replace('/(app)/(tabs)/(3_profile)' as Href);
       } else if (returnTarget === 'preferences') {
         // Two steps, not one `replace`: the relaunched stack has no entry
         // below the reopened screen, so a lone `replace` leaves the header's
         // back control with nothing to pop.
-        router.replace('/(app)/(tabs)/(3_profile)');
-        router.push('/(app)/(tabs)/(3_profile)/preferences');
+        router.replace('/(app)/(tabs)/(3_profile)' as Href);
+        router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
       }
       try {
         // The plural-rules polyfill must be in place before the first render in the new language.
@@ -863,6 +864,12 @@ function RootLayoutNav({
     restoreFailed,
   });
 
+  // Post-startup hidden windows (a sign-in's redirect + consent check, a
+  // sign-out's redirect to login) have no splash over them, so the hidden
+  // wrapper would otherwise paint an empty background. Keep one spinner up
+  // for exactly those windows (app-blank-after-oauth).
+  const showBootstrapLoading = shouldShowBootstrapLoading({ startupFinished, hidden });
+
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
   // both accessibility trees. On the hidden → visible transition,
   // `announceForA11y` is the deterministic entry context for screen-reader
@@ -1010,6 +1017,7 @@ function RootLayoutNav({
       >
         <Slot />
       </View>
+      {showBootstrapLoading && !showRestoreError ? <BootstrapLoadingSurface /> : null}
       {showRestoreError ? (
         <View className="absolute inset-0">
           <BootstrapErrorScreen
@@ -1110,11 +1118,7 @@ function RootLayout() {
 }
 
 function RootErrorBoundary({ retry }: ErrorBoundaryProps) {
-  return (
-    <StateSurface className="flex-1 bg-background">
-      <QueryError onRetry={() => void retry()} />
-    </StateSurface>
-  );
+  return <RuntimeErrorScreen onRetry={() => void retry()} />;
 }
 
 export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(RootErrorBoundary);

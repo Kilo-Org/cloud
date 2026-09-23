@@ -1249,6 +1249,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Connection lost. Please retry in a moment.',
+          code: 'connection-lost',
         })
       );
       expect(atomValue<boolean>(config.store, mgr.atoms.isLoading)).toBe(false);
@@ -1367,6 +1368,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'progress',
           message: 'Setting up environment…',
+          code: 'setting-up-environment',
         })
       );
     });
@@ -2902,6 +2904,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Connection lost. Please retry in a moment.',
+          code: 'connection-lost',
         })
       );
     });
@@ -3048,6 +3051,7 @@ describe('createSessionManager', () => {
           type: 'error',
           message:
             'Selected model is unavailable for Cloud Agent. Choose another available model or select a different agent, then try again.',
+          code: 'selected-model-unavailable',
         })
       );
     });
@@ -3089,6 +3093,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Agent connection lost',
+          code: 'agent-connection-lost',
         })
       );
 
@@ -3107,6 +3112,37 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Agent connection lost',
+          code: 'agent-connection-lost',
+        })
+      );
+    });
+
+    it('paints a classified send failure even while the agent status is disconnected', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.state.getStatus.mockReturnValue({ type: 'disconnected' });
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const error = Object.assign(new Error('Insufficient credits: $1 minimum required'), {
+        data: { code: 'PAYMENT_REQUIRED', httpStatus: 402 },
+      });
+      mockSession.send.mockRejectedValue(error);
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'My prompt', mode: 'code', model: 'claude-3-5-sonnet' },
+      });
+
+      expect(accepted).toBe(false);
+      expect(
+        atomValue<{ type: string; message: string; code?: string } | null>(
+          config.store,
+          mgr.atoms.statusIndicator
+        )
+      ).toEqual(
+        expect.objectContaining({
+          type: 'error',
+          message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+          code: 'insufficient-credits',
         })
       );
     });
@@ -3137,6 +3173,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Agent connection lost',
+          code: 'agent-connection-lost',
         })
       );
 
@@ -3355,6 +3392,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Connection failed. Please retry in a moment.',
+          code: 'connection-failed',
         })
       );
     });
@@ -4701,7 +4739,11 @@ describe('createSessionManager', () => {
         mgr.atoms.statusIndicator
       );
       expect(indicator).toEqual(
-        expect.objectContaining({ type: 'info', message: 'Session stopped' })
+        expect.objectContaining({
+          type: 'info',
+          message: 'Session stopped',
+          code: 'session-stopped',
+        })
       );
     });
 
@@ -4719,7 +4761,11 @@ describe('createSessionManager', () => {
         mgr.atoms.statusIndicator
       );
       expect(indicator).toEqual(
-        expect.objectContaining({ type: 'error', message: 'Failed to stop execution' })
+        expect.objectContaining({
+          type: 'error',
+          message: 'Failed to stop execution',
+          code: 'failed-to-stop-execution',
+        })
       );
     });
 
@@ -4979,7 +5025,11 @@ describe('createSessionManager', () => {
         mgr.atoms.statusIndicator
       );
       expect(indicator).toEqual(
-        expect.objectContaining({ type: 'info', message: 'Session stopped' })
+        expect.objectContaining({
+          type: 'info',
+          message: 'Session stopped',
+          code: 'session-stopped',
+        })
       );
     });
 
@@ -5134,7 +5184,11 @@ describe('createSessionManager', () => {
         mgr.atoms.statusIndicator
       );
       expect(indicator).toEqual(
-        expect.objectContaining({ type: 'info', message: 'Session stopped' })
+        expect.objectContaining({
+          type: 'info',
+          message: 'Session stopped',
+          code: 'session-stopped',
+        })
       );
     });
 
@@ -5262,6 +5316,7 @@ describe('createSessionManager', () => {
         expect.objectContaining({
           type: 'error',
           message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+          code: 'insufficient-credits',
         })
       );
       expect(config.initiate).not.toHaveBeenCalled();
@@ -5835,6 +5890,162 @@ describe('createSessionManager', () => {
       expect(pending.has('m1')).toBe(false);
       expect(pending.get('m2')).toEqual({ status: 'failed', error: 'y', reason: 'execution' });
       expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m1');
+    });
+  });
+
+  describe('resolved delivery failures', () => {
+    function lastSessionConfig() {
+      return jest.mocked(createCloudAgentSession).mock.calls.at(-1)?.[0];
+    }
+
+    it('seeds the resolved ids from the durable reader and persists a retry', async () => {
+      const persistResolvedDeliveryFailure = jest.fn();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn().mockResolvedValue(['m-original']),
+        persistResolvedDeliveryFailure,
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      // The durable read is not awaited on the open path: let its microtask land.
+      await Promise.resolve();
+
+      const sessionConfig = lastSessionConfig();
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-original')).toBe(true);
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-other')).toBe(false);
+
+      mgr.clearFailedMessage('m-other');
+
+      expect(persistResolvedDeliveryFailure).toHaveBeenCalledWith(kiloId('ses-1'), 'm-other');
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-other')).toBe(true);
+    });
+
+    it('persists a retry under the session that owns the row, not the switched-to one', async () => {
+      const persistResolvedDeliveryFailure = jest.fn();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn().mockResolvedValue([]),
+        persistResolvedDeliveryFailure,
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.switchSession(kiloId('ses-2'));
+
+      // The re-send was accepted on `ses-1` while the user switched to `ses-2`,
+      // so the caller passes the session that owned the retried row.
+      mgr.clearFailedMessage('m-other', kiloId('ses-1'));
+
+      expect(persistResolvedDeliveryFailure).toHaveBeenCalledWith(kiloId('ses-1'), 'm-other');
+      // The switched-to session keeps its own transcript: another session's
+      // failure id must not clear an entry in its state.
+      expect(mockSession.state.clearFailedMessage).not.toHaveBeenCalled();
+    });
+
+    it('suppresses the replay when the user switches back before the durable write lands', async () => {
+      // The durable store never sees the retry: the fire-and-forget write has
+      // not landed yet, so both reads return the pre-write list.
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn().mockResolvedValue([]),
+        persistResolvedDeliveryFailure: jest.fn(),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.switchSession(kiloId('ses-2'));
+
+      // The re-send was accepted on `ses-1` while the user was on `ses-2`.
+      mgr.clearFailedMessage('m-other', kiloId('ses-1'));
+
+      // The user switches straight back. The durable read returns [], but the
+      // in-memory record for `ses-1` keeps the resolution, so the session's
+      // predicate suppresses the DO's replayed failure.
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(lastSessionConfig()?.isDeliveryFailureResolved?.('m-other')).toBe(true);
+    });
+
+    it('undoes the terminal error a failure pruned by the durable read had set', async () => {
+      const read = deferred<readonly string[]>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      // The DO's stored-event replay applied the failure and it became the
+      // active turn's terminal error before the durable read resolved.
+      mockSessionCallbacks.onMessageFailed?.('m-original', {
+        status: 'failed',
+        error: 'The message could not be delivered',
+        reason: 'exhausted',
+      });
+      mockSessionCallbacks.onError?.('The message could not be delivered');
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBe(
+        'The message could not be delivered'
+      );
+
+      mockSession.state.clearFailedMessage.mockReturnValueOnce(true);
+      read.resolve(['m-original']);
+      await read.promise;
+      await Promise.resolve();
+
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-original');
+      // The predicate path never reaches `onError`; pruning afterwards must
+      // leave the same state, so the error the failure set goes too.
+      expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+    });
+
+    it('reads the durable memory for the session being opened', async () => {
+      const readResolvedDeliveryFailures = jest.fn().mockResolvedValue([]);
+      const config = createMockConfig({ readResolvedDeliveryFailures });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      expect(readResolvedDeliveryFailures).toHaveBeenCalledWith(kiloId('ses-1'));
+    });
+
+    it('prunes a replayed failure that landed before the durable read resolved', async () => {
+      const read = deferred<readonly string[]>();
+      const config = createMockConfig({
+        readResolvedDeliveryFailures: jest.fn(() => read.promise),
+      });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+
+      const sessionConfig = lastSessionConfig();
+      // The DO's stored-event replay delivered the failure first.
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-original')).toBe(false);
+
+      read.resolve(['m-original']);
+      await read.promise;
+      await Promise.resolve();
+
+      expect(mockSession.state.clearFailedMessage).toHaveBeenCalledWith('m-original');
+      expect(sessionConfig?.isDeliveryFailureResolved?.('m-original')).toBe(true);
+    });
+
+    it('ignores a durable read that resolves after the session switched', async () => {
+      const read = deferred<readonly string[]>();
+      const readResolvedDeliveryFailures = jest
+        .fn()
+        .mockReturnValueOnce(read.promise)
+        .mockResolvedValue([]);
+      const config = createMockConfig({ readResolvedDeliveryFailures });
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.switchSession(kiloId('ses-2'));
+      const secondConfig = lastSessionConfig();
+
+      read.resolve(['m-original']);
+      await read.promise;
+      await Promise.resolve();
+
+      expect(secondConfig?.isDeliveryFailureResolved?.('m-original')).toBe(false);
+      expect(mockSession.state.clearFailedMessage).not.toHaveBeenCalledWith('m-original');
     });
   });
 

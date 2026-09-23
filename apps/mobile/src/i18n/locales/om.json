@@ -277,9 +277,9 @@
     "biometricUnlockSubtitle": "Appilikeeshinichi yeroo jalqabamu fi duubbee keessatti daqiiqaa shan erga turee booda qulfii bani.",
     "featureFlags": "Albaasa amalaa",
     "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "remote · ≥ {{min}}",
-    "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded",
+    "featureFlagApplied": "sirnaa irraa · ≥ {{min}}",
+    "featureFlagSkipped": "jalqaba · < {{min}}",
+    "featureFlagNotLoaded": "jalqaba · hin fe'amne",
     "gatewayTranscription": "Sagalee interneetiin barreeffamatti jijjiiruu Kilo Gateway'n",
     "gatewayTranscriptionSubtitle": "Sagalee galchuu mallattoo sagalee meeshaa irraa haa ta'u moodeela Kilo Gateway'ttiin barreeffamatti jijjiiri. Sagaleen kee Kilo Gateway'tti ergama.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -827,7 +827,8 @@
       "chat": "Ergaawwan marii",
       "kiloclaw": "Sochii KiloClaw",
       "balance": "Akeekkachiisa haftee maallaqaa",
-      "security": "Argannoowwan nageenyaa"
+      "security": "Argannoowwan nageenyaa",
+      "spend": "Akeekkachiisa baasii"
     },
     "category": {
       "chatMessagesSubtitle": "deebiiwwan mariiwwan kee keessatti",
@@ -838,8 +839,13 @@
       "sessionStatusTitle": "Haala turtii",
       "sessionStatusSubtitle": "xumurame / hin milkoofne / to'achuuf qophaa'e",
       "kiloclawActivitySubtitle": "fakkeenyi qophaa'e/hin milkoofne, gochaalee sagantaa qaban",
+      "kiloclawActivityUnavailable": "Sochii KiloClaw argachuuf KiloClaw fakkeenyi eegali.",
       "balanceAlertsSubtitle": "akeekkachiisa haftee dhaabbataa xiqqaa",
-      "securityFindingsSubtitle": "argannoowwan haaraa fi yaadachiisa SLA"
+      "balanceAlertsUnavailable": "Akeekkachiisa haftee argachuuf dhaabbata makami.",
+      "securityFindingsSubtitle": "argannoowwan haaraa fi yaadachiisa SLA",
+      "securityFindingsUnavailable": "Argannoowwan nageenyaa argachuuf Kilo eejentii nageenyaa daangaa irratti dandeessisi.",
+      "spendAlertsSubtitle": "daarbii daangaa fi olka'iinsa sa'aatii",
+      "spendAlertsToggle": "Ramaddii akeekkachiisa baasii"
     },
     "action": {
       "openSession": "Turtii bani"
@@ -2076,6 +2082,10 @@
       "couldNotLoad": "Turtii fe'uu hin danda'amne.",
       "failedToLoadDetails": "Ibsa turtii fe'uu hin danda'amne.",
       "failedToStopExecution": "Raawwii dhaabuu hin danda'amne.",
+      "stopped": "Turtiin dhaabbate",
+      "committing": "Galmeessaa jira…",
+      "committed": "Galmeeffame",
+      "commitFailed": "Galmeessuun hin milkoofne",
       "renameSession": "Maqaa turtii jijjiiri",
       "renamePlaceholder": "Maqaa turtii",
       "transcriptAccessibility": "Galmee marii turtii",
@@ -2216,15 +2226,12 @@
       "linesBadge_one": "Sarara {{displayCount}}",
       "linesBadge_other": "Sarara {{displayCount}}",
       "matchesBadge_one": "Walsimsiisota {{displayCount}}",
-      "matchesBadge_other": "Walsimsiisota {{displayCount}}"
+      "matchesBadge_other": "Walsimsiisota {{displayCount}}",
+      "noOutput": "Bu'aan hin jiru."
     },
     "readToolMarkdown": {
       "linesTruncated": "sararoota {{start}}–{{end}} (gabaabbate)",
       "linesOf": "sararoota {{total}} keessaa {{start}}–{{end}}"
-    },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "{{action}} Cloud Agent irratti hin milkoofne ({{status}}).",
-      "failed": "{{action}} Cloud Agent irratti hin milkoofne."
     },
     "collectCopyableText": {
       "unserializableInput": "[galtee gara bifa kuufamuutti jijjiiramuu hin dandeenye]",
@@ -2321,8 +2328,7 @@
       "assistantProviderRejected": "Dhiyeessaan gaaffii dideera.",
       "assistantStopped": "Deebiin dhaabame.",
       "assistantContextOverflow": "Mariin kun moodelichaaf baay'ee dheeraadha.",
-      "assistantFailed": "Deebii kennuun hin milkoofne.",
-      "sendFailed": "Ergaa erguu hin danda'amne. Deebi'ii yaali."
+      "assistantFailed": "Deebii kennuun hin milkoofne."
     },
     "filePart": {
       "loadingImage": "Suuraa fe'aa jira",
@@ -3108,6 +3114,14 @@
     "tooManySignInAttempts": "Yaalii seensaa baay'etu godhame. Xiqqoo eegiitii irra deebi'ii yaali."
   },
   "models": {
+    "auto": {
+      "frontier": "Ofumaan Sadarkaa olaanaa",
+      "balanced": "Ofumaan Madaalawaa",
+      "efficient": "Ofumaan Gahumsa",
+      "small": "Ofumaan Xiqqaa",
+      "free": "Ofumaan Bilisa",
+      "organization": "Ofumaan Dhaabbata"
+    },
     "dataCollected": "Odeeffannoon walitti qabama",
     "free": "Bilisa",
     "couldNotUpdateFavorites": "Kan jaallatte haaromsuu hin danda'amne.",
@@ -3155,7 +3169,8 @@
     "channelName": "Eejentoota hojii irra jiran",
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi.",
     "openSession": "Bani",
-    "approveFailed": "Raggaasisuun hin danda'amne. Deebi'anii yaaluuf $t(common.approve) tuqi."
+    "approveFailed": "Raggaasisuun hin danda'amne. Deebi'anii yaaluuf $t(common.approve) tuqi.",
+    "newestResult": "Bu'aa haaraa"
   },
   "transcriptionModel": {
     "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",
@@ -3180,15 +3195,7 @@
     "remoteOptionTitle": "Kompiitara kee",
     "remoteOptionBody": "Kilo kompiitara kee irratti `kilo remote` CLI'n hojjechisi.",
     "skip": "Daawannoo darbi",
-    "tutorialLabel": "Barnoota",
-    "remoteTitle": "Turtii fageenya jalqabaa kee eegaladhu",
-    "remoteBody": "Kompiitara kee walqunnamsiisi, itti aanse turtii kana as irraa eegaladhu.",
-    "remoteRunHint": "$t(agentChat.newSession.remoteHint)",
-    "remoteEmptyTitle": "Amma kompiitaraan hin walqabate",
-    "remoteEmptyBody": "Walqunnamuuf, kompiitara kee irratti `kilo remote` raawwadhu.",
-    "remoteFound": "Kompiitaraan walqabate",
-    "checkAgain": "Irra deebi'ii ilaali",
-    "networkError": "$t(authErrors.networkError)"
+    "tutorialLabel": "Barnoota"
   },
   "appActions": {
     "start": {
@@ -3199,5 +3206,28 @@
   },
   "launcher": {
     "openLastSession": "Turtii dhumaa bani"
+  },
+  "spendAlerts": {
+    "subtitle": "Yeroo baasiin naannoo kanaa daangaa darbu ykn sadarkaa sa'aatii baramaa isaa ol ka'u, qunnamtiiwwan kaffaltiitti imeelii ykn push ergaa.",
+    "enable": "Akeekkachiisa baasii dandeessisi",
+    "thresholdTitle": "Daangaa darbuu",
+    "thresholdSubtitle": "Baasiin yeroo ammaa daangaa kee darbaa jira",
+    "anomalyTitle": "Olka'iinsa sa'aatii",
+    "anomalySubtitle": "Sa'aanni tokko sadarkaa baramaa naannoo kanaa caalaa baay'ee ol jira",
+    "limitLabel": "Daangaa (USD)",
+    "windowLabel": "Yeroo",
+    "window24h": "Sa'aatii 24",
+    "window7d": "Guyyaa 7",
+    "window30d": "Guyyaa 30",
+    "multiplierLabel": "Baay'isaa olka'iinsaa",
+    "saved": "Qindaa'inni akeekkachiisa baasii olkaa'ame",
+    "loadError": "Akeekkachiisa baasii fiduun hin danda'amne.",
+    "saveError": "Akeekkachiisa baasii olkaa'uun hin danda'amne.",
+    "empty": "Akeekkachiisni baasii cufaa jira. Qunnamtiiwwan kaffaltii naannoo kanaa akeekkachiisuuf isa bansi.",
+    "noSpend": "Amma ammaatti baasiin galmeeffame hin jiru",
+    "spend24h": "Baasii sa'aatii 24 darban keessatti",
+    "multiplierError": "Baay'isaa 1 ykn isaa ol galchi",
+    "permissionDenied": "Akeekkachiisa baasii bulchuuf hayyamni sitti hin jiru.",
+    "pushOffByCategory": "Beeksisota keessatti cufaa"
   }
 }

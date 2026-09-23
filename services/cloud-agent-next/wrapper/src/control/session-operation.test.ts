@@ -13,9 +13,12 @@ import type { AutoCommitResult } from '../auto-commit';
 import { MAX_COMMIT_MESSAGE_BYTES } from '../commit-objects';
 import {
   buildHeartbeatPayload,
+  createSessionActivityRegistry,
   handleControlRequest,
   type HandlerDeps,
+  type SessionActivityRegistry,
 } from './sandbox-control-handlers';
+import type { WrapperKiloClient } from '../kilo-api';
 import {
   acknowledgeOperation,
   completion,
@@ -583,6 +586,139 @@ describe('operation results and delivery', () => {
     expect(record.snapshot().delivery?.state).toBe('acknowledged');
   });
 
+  it('attaches assistant facts from a native turn error', async () => {
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: async () =>
+          completion({
+            name: 'APIError',
+            data: { message: 'rate limit exceeded', statusCode: 429, isRetryable: false },
+          }),
+      }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    const record = onlyOperation(handlerDeps);
+    await record.done;
+    await record.waitForDelivery();
+
+    expect(record.snapshot().outcome).toMatchObject({
+      status: 'failed',
+      reason: 'Kilo execution ended with APIError',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'unknown',
+    });
+  });
+
+  it('attaches assistant facts from a late native error after an abort', async () => {
+    const started = Promise.withResolvers<void>();
+    const original = Promise.withResolvers<ReturnType<typeof completion>>();
+    const abortAcknowledged = Promise.withResolvers<void>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return original.promise;
+        },
+        abortSession: async () => {
+          abortAcknowledged.resolve();
+          setTimeout(
+            () =>
+              original.resolve(
+                completion({
+                  name: 'APIError',
+                  data: { message: 'rate limit exceeded', statusCode: 429, isRetryable: false },
+                })
+              ),
+            125
+          );
+          return true;
+        },
+      }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    const authorization = operationAuthorization();
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      authorization
+    );
+    await started.promise;
+    const record = onlyOperation(handlerDeps);
+    const aborting = handleControlRequest(
+      'session.abort',
+      session,
+      { messageId: 'msg_1' },
+      handlerDeps
+    );
+    await abortAcknowledged.promise;
+    expect(await aborting).toEqual({ ok: true, result: { status: 'aborted' } });
+    await record.done;
+    await record.waitForDelivery();
+
+    expect(record.snapshot().outcome).toMatchObject({
+      status: 'failed',
+      reason: 'Kilo execution ended with APIError',
+      assistantReason: 'rate_limited',
+      providerOwnership: 'unknown',
+    });
+  });
+
+  it('does not attach assistant facts to an auto-commit failure', async () => {
+    const handlerDeps = deps({
+      runAutoCommit: async () => ({ success: false, error: 'git push failed' }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, finalization: { autoCommit: true } },
+      handlerDeps,
+      operationAuthorization()
+    );
+    const record = onlyOperation(handlerDeps);
+    await record.done;
+    await record.waitForDelivery();
+    const outcome = record.snapshot().outcome;
+
+    expect(outcome).toMatchObject({ status: 'failed', reason: 'Auto-commit failed' });
+    expect(outcome?.assistantReason).toBeUndefined();
+    expect(outcome?.providerOwnership).toBeUndefined();
+  });
+
+  it('does not attach assistant facts to an aborted turn', async () => {
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: async () =>
+          completion({ name: 'MessageAbortedError', data: { message: 'User aborted' } }),
+      }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    const record = onlyOperation(handlerDeps);
+    await record.done;
+    await record.waitForDelivery();
+    const outcome = record.snapshot().outcome;
+
+    expect(outcome).toMatchObject({ status: 'cancelled' });
+    expect(outcome?.assistantReason).toBeUndefined();
+    expect(outcome?.providerOwnership).toBeUndefined();
+  });
+
   it.each([
     [undefined, 'completed'],
     [{ name: 'MessageAbortedError', data: { message: 'cancelled' } }, 'cancelled'],
@@ -880,5 +1016,180 @@ describe('operation results and delivery', () => {
     await record.done;
     await record.waitForDelivery();
     expect(record.snapshot().outcome?.status).toBe('completed');
+  });
+});
+
+describe('control gate result', () => {
+  function latestOperation(handlerDeps: HandlerDeps): SessionOperation {
+    const records = handlerDeps.operations.retained();
+    const record = records[records.length - 1];
+    if (!record) throw new Error('Missing operation record');
+    return record;
+  }
+
+  async function startPrompt(
+    handlerDeps: HandlerDeps,
+    messageId: string
+  ): Promise<SessionOperation> {
+    const result = await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId },
+      handlerDeps,
+      operationAuthorization('session.prompt', messageId)
+    );
+    expect(result).toMatchObject({ ok: true, result: { status: 'accepted' } });
+    return latestOperation(handlerDeps);
+  }
+
+  async function sealedOutcome(record: SessionOperation) {
+    await record.done;
+    await record.waitForDelivery();
+    return record.snapshot().delivery?.payload.outcome;
+  }
+
+  function observeGate(activity: SessionActivityRegistry, gateResult: 'pass' | 'fail'): void {
+    activity.observeEvent('session.updated', session.kiloSessionId, session.kiloSessionId, {
+      sessionID: session.kiloSessionId,
+      gateResult,
+    });
+  }
+
+  function gateDeps(
+    activity: SessionActivityRegistry,
+    sendPrompt: WrapperKiloClient['sendPrompt'] = async () => completion()
+  ): HandlerDeps {
+    return deps({
+      activity,
+      kiloClient: fakeKilo({ sendPrompt }),
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+  }
+
+  function attachedActivity(): SessionActivityRegistry {
+    const activity = createSessionActivityRegistry(() => 100);
+    activity.attach(session.kiloSessionId);
+    return activity;
+  }
+
+  it('attaches an observed gate result to a completed prompt outcome', async () => {
+    const activity = attachedActivity();
+    const handlerDeps = gateDeps(activity, async () => {
+      observeGate(activity, 'fail');
+      return completion();
+    });
+    const record = await startPrompt(handlerDeps, 'msg_1');
+    expect(await sealedOutcome(record)).toEqual({
+      messageId: 'msg_1',
+      status: 'completed',
+      gateResult: 'fail',
+    });
+  });
+
+  it('omits the gate result when no gate event is observed', async () => {
+    const activity = attachedActivity();
+    const handlerDeps = gateDeps(activity);
+    const record = await startPrompt(handlerDeps, 'msg_1');
+    expect(await sealedOutcome(record)).toEqual({ messageId: 'msg_1', status: 'completed' });
+  });
+
+  it('discards a gate result observed during a failed turn', async () => {
+    const activity = attachedActivity();
+    const handlerDeps = gateDeps(activity, async () => {
+      observeGate(activity, 'fail');
+      return completion({ name: 'UnknownError', data: { message: 'boom' } });
+    });
+    const record = await startPrompt(handlerDeps, 'msg_1');
+    const outcome = await sealedOutcome(record);
+    expect(outcome).toMatchObject({ messageId: 'msg_1', status: 'failed' });
+    expect(outcome).not.toHaveProperty('gateResult');
+  });
+
+  it('consumes a terminal gate result so the store is empty before the next turn', async () => {
+    const activity = attachedActivity();
+    const handlerDeps = gateDeps(activity, async () => {
+      observeGate(activity, 'fail');
+      return completion();
+    });
+    const record = await startPrompt(handlerDeps, 'msg_1');
+    expect(await sealedOutcome(record)).toMatchObject({ status: 'completed', gateResult: 'fail' });
+    expect(activity.consumeGateResult(session.kiloSessionId)).toBeUndefined();
+  });
+
+  it('does not leak a failed turn gate result into a later completed turn', async () => {
+    const activity = attachedActivity();
+    const handlerDeps = gateDeps(activity, async options => {
+      if (options.messageId === 'msg_a') {
+        observeGate(activity, 'fail');
+        return completion({ name: 'UnknownError', data: { message: 'boom' } });
+      }
+      return completion();
+    });
+
+    const first = await startPrompt(handlerDeps, 'msg_a');
+    const firstOutcome = await sealedOutcome(first);
+    expect(firstOutcome).toMatchObject({ messageId: 'msg_a', status: 'failed' });
+    expect(firstOutcome).not.toHaveProperty('gateResult');
+
+    const second = await startPrompt(handlerDeps, 'msg_b');
+    expect(await sealedOutcome(second)).toEqual({ messageId: 'msg_b', status: 'completed' });
+  });
+
+  it('does not leak a cancelled turn gate result into a later completed turn', async () => {
+    const activity = attachedActivity();
+    const handlerDeps = gateDeps(activity, async options => {
+      if (options.messageId === 'msg_a') {
+        observeGate(activity, 'fail');
+        return completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } });
+      }
+      return completion();
+    });
+
+    const first = await startPrompt(handlerDeps, 'msg_a');
+    const firstOutcome = await sealedOutcome(first);
+    expect(firstOutcome).toMatchObject({ messageId: 'msg_a', status: 'cancelled' });
+    expect(firstOutcome).not.toHaveProperty('gateResult');
+
+    const second = await startPrompt(handlerDeps, 'msg_b');
+    expect(await sealedOutcome(second)).toEqual({ messageId: 'msg_b', status: 'completed' });
+  });
+
+  it('discards a gate event observed after the sealed turn but before the next turn starts', async () => {
+    const activity = attachedActivity();
+    const handlerDeps = gateDeps(activity);
+
+    const first = await startPrompt(handlerDeps, 'msg_a');
+    expect(await sealedOutcome(first)).toEqual({ messageId: 'msg_a', status: 'completed' });
+
+    observeGate(activity, 'fail');
+
+    const second = await startPrompt(handlerDeps, 'msg_b');
+    expect(await sealedOutcome(second)).toEqual({ messageId: 'msg_b', status: 'completed' });
+  });
+
+  it('ACCEPTED LIMITATION: a prior turn delayed gate event is consumed by a later running turn', async () => {
+    // ACCEPTED multi-turn concurrent late-event limitation, NOT correct isolation:
+    // `session.updated` carries only { sessionID, gateResult } with no turn/message
+    // id, so turn B cannot attribute a delayed event from sealed turn A. This test
+    // pins the behavior until a producer-supplied correlation exists.
+    const activity = attachedActivity();
+    const secondStarted = Promise.withResolvers<void>();
+    const releaseSecond = Promise.withResolvers<void>();
+    const handlerDeps = gateDeps(activity, async options => {
+      if (options.messageId === 'msg_b') {
+        secondStarted.resolve();
+        await releaseSecond.promise;
+      }
+      return completion();
+    });
+
+    const first = await startPrompt(handlerDeps, 'msg_a');
+    expect(await sealedOutcome(first)).toEqual({ messageId: 'msg_a', status: 'completed' });
+
+    const second = await startPrompt(handlerDeps, 'msg_b');
+    await secondStarted.promise;
+    observeGate(activity, 'fail');
+    releaseSecond.resolve();
+    expect(await sealedOutcome(second)).toMatchObject({ status: 'completed', gateResult: 'fail' });
   });
 });

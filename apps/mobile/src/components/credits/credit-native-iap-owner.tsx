@@ -184,7 +184,14 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
 
       void (async () => {
         try {
-          await actions.handlePurchaseSuccess(purchase);
+          const completed = await actions.handlePurchaseSuccess(purchase);
+          if (completed) {
+            // Remember the granted transaction so a re-delivery in this session
+            // (the store keeps an unfinished transaction after a swallowed
+            // `finishTransaction` failure) is neither completed nor announced
+            // twice. Recovery starts from an empty set on the next launch.
+            recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(purchase));
+          }
         } finally {
           releasePurchaseRequest();
         }

@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Lè opsyon sa a dezaktive, bouton retou a ajoute yon nouvo liy nan chan mesaj ajan yo.",
     "biometricUnlock": "Debloke ak byometri",
     "biometricUnlockSubtitle": "Debloke aplikasyon an lè li kòmanse ak apre li pase senk minit an aryèplan.",
-    "featureFlags": "Drapo fonksyon",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Adistans · ≥ {{min}}",
-    "featureFlagSkipped": "Pa defo · < {{min}}",
-    "featureFlagNotLoaded": "Pa defo · pa chaje",
     "gatewayTranscription": "Transkripsyon ak Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Transkripte dikte a ak yon modèl Kilo Gateway olye rekonesans vokal aparèy la. Yo voye anrejistrman ou a bay Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "liy {{start}}–{{end}} (koupe)",
       "linesOf": "liy {{start}}–{{end}} sou {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Aksyon {{action}} pou Cloud Agent echwe ({{status}}).",
-      "failed": "Aksyon {{action}} pou Cloud Agent echwe."
-    },
     "collectCopyableText": {
       "unserializableInput": "[done antre ki pa ka seryalize]",
       "errorPrefix": "Erè: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Founisè a rejte demann lan.",
       "assistantStopped": "Repons lan te sispann.",
       "assistantContextOverflow": "Konvèsasyon an twò long pou modèl la.",
-      "assistantFailed": "Repons lan echwe.",
-      "sendFailed": "Nou pa t ka voye mesaj la. Tanpri eseye ankò."
+      "assistantFailed": "Repons lan echwe."
     },
     "filePart": {
       "loadingImage": "Ap chaje imaj la",

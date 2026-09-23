@@ -78,6 +78,16 @@ function resolveAndroidEnvironment(args: ResolveArgs): AndroidEnvironment {
     process.env.ANDROID_HOME,
     process.env.ANDROID_SDK_ROOT,
     path.join(args.home, 'Library/Android/sdk'),
+    // Linux dev hosts keep the SDK under ~/Android/sdk (Android Studio's
+    // default is ~/Android/Sdk); /usr/local/lib/android/sdk is the
+    // command-line-tools package path. Without them the chain answered
+    // "Android SDK not found" on a host that had the SDK at ~/Android/sdk, so
+    // the resource never started and the mobile gate blocked on the proof gap
+    // (req-iap-ea28, 2026-09-23). These are the same roots the E2E harness
+    // searches in e2e-start-resource.sh.
+    path.join(args.home, 'Android/sdk'),
+    path.join(args.home, 'Android/Sdk'),
+    '/usr/local/lib/android/sdk',
     '/opt/homebrew/share/android-commandlinetools',
     '/usr/local/share/android-commandlinetools',
   ].filter((value): value is string => Boolean(value));
@@ -87,7 +97,7 @@ function resolveAndroidEnvironment(args: ResolveArgs): AndroidEnvironment {
   );
   if (!sdkRoot) {
     throw new Error(
-      'Android SDK not found in ANDROID_HOME, ~/Library/Android/sdk, or Homebrew android-commandlinetools. Run: brew install --cask android-commandlinetools'
+      'Android SDK not found in ANDROID_HOME, ~/Android/sdk, ~/Library/Android/sdk, or Homebrew android-commandlinetools. Run: brew install --cask android-commandlinetools'
     );
   }
 

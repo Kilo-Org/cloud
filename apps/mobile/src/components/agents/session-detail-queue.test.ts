@@ -77,6 +77,9 @@ vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/session-handoff', () => ({ SessionHandoffAdvertiser: () => null }));
 vi.mock('@kilocode/cloud-agent-sdk', () => ({
   createSessionManager: vi.fn(),
+  // The header normalizes the auto-title placeholder through this contract;
+  // this suite's fixture titles are all real, so nothing is a placeholder.
+  isDefaultSessionTitle: () => false,
 }));
 vi.mock('@kilocode/cloud-agent-sdk/preparation-attempts', () => ({
   isNoOpCompletedPreparationAttempt: () => false,
@@ -88,7 +91,6 @@ vi.mock('@/components/agents/mobile-session-transport-payload', () => ({
   normalizeTransportPayload: vi.fn((x: unknown) => x),
 }));
 vi.mock('@/components/agents/mobile-session-diagnostics', () => ({
-  formatSafeCloudAgentFailureDiagnostic: vi.fn(),
   withCloudAgentDiagnostics: vi.fn((_op: string, _org: unknown, fn: () => unknown) => fn()),
 }));
 vi.mock('@/components/agents/mobile-session-page-adapter', () => ({

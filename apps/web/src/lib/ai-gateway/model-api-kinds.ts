@@ -1,4 +1,4 @@
-import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { tryGetProviderById } from '@/lib/ai-gateway/providers/definitions/try-get-provider-by-id';
 import type { GatewayChatApiKind } from '@/lib/ai-gateway/providers/types';

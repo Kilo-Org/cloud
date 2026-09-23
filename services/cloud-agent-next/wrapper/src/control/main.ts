@@ -36,6 +36,7 @@ import {
 } from '../../../src/shared/control-diagnostics.js';
 import { createWorktreeMutationNotifications } from './worktree-mutation-notifications';
 import { createControlEventFailureHandler } from './control-event-transport';
+import { closeControlWorkload, initializeControlWorkload } from './workload-cgroup';
 
 import type { ControlEventOutboxFailure } from './control-event-outbox';
 
@@ -53,6 +54,10 @@ function main(
   delete process.env.SANDBOX_CONTROL_CREDENTIAL;
 
   logToFile(`control-plane wrapper ${WRAPPER_VERSION} starting`);
+  const workload = initializeControlWorkload({
+    env: process.env,
+    report: diagnostics.onDiagnostic,
+  });
   const abort = new AbortController();
   let control: ReturnType<typeof maybeStartSandboxControlClient> = null;
   let shuttingDown = false;
@@ -116,6 +121,7 @@ function main(
     deps.operations.notifyRootDisappeared(disappearance);
   };
   const kiloRuntimes = createWorktreeKiloRuntimes({
+    workload,
     onDiagnostic: diagnostics.onDiagnostic,
     onRootRetirementStarted: markRootRetirementStarted,
     onRootDisappeared: notifyRootDisappeared,
@@ -379,6 +385,7 @@ function main(
         try {
           kiloRuntimes.shutdown();
         } finally {
+          closeControlWorkload(workload);
           process.exit(exitCode);
         }
       }

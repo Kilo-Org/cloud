@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Idan an kashe wannan, maɓallin sabon layi yana saka sabon layi a wuraren rubuta saƙo ga wakilai.",
     "biometricUnlock": "Buɗe kulle da bayanan halittar jiki",
     "biometricUnlockSubtitle": "Ana buƙatar buɗe kulle lokacin fara manhajar da bayan ta yi minti biyar a baya.",
-    "featureFlags": "Tutocin sifofi",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Nesa · ≥ {{min}}",
-    "featureFlagSkipped": "Na al'ada · < {{min}}",
-    "featureFlagNotLoaded": "Na al'ada · ba a yi lodi ba",
     "gatewayTranscription": "Mayar da magana zuwa rubutu ta Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Mayar da shigar da murya zuwa rubutu da samfurin Kilo Gateway maimakon gane magana na na'urar. Ana aika rikodinka zuwa Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "layuka {{start}}–{{end}} (an rage)",
       "linesOf": "layuka {{start}}–{{end}} cikin {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "An kasa yin {{action}} a Cloud Agent ({{status}}).",
-      "failed": "An kasa yin {{action}} a Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[bayanan shigarwa da ba za a iya juyawa zuwa tsarin adanawa ba]",
       "errorPrefix": "Kuskure: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Mai ba da sabis ya ƙi buƙatar.",
       "assistantStopped": "An dakatar da amsar.",
       "assistantContextOverflow": "Tattaunawar ta yi tsawo fiye da abin da samfurin zai iya karɓa.",
-      "assistantFailed": "An kasa samar da amsar.",
-      "sendFailed": "An kasa aika saƙon. Sake gwadawa."
+      "assistantFailed": "An kasa samar da amsar."
     },
     "filePart": {
       "loadingImage": "Ana loda hoto",

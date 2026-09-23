@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Uma lokhu kuvaliwe, inkinobho yokubuyela ifaka umugqa omusha ezindaweni zokubhalela abenzeli.",
     "biometricUnlock": "Vula ngebhayomethrikhi",
     "biometricUnlockSubtitle": "Vula uhlelo lokusebenza lapho luqala nangemva kokuba selunemizuzu emihlanu lusebenza ngemuva.",
-    "featureFlags": "Amaflagi ezici",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Kude · ≥ {{min}}",
-    "featureFlagSkipped": "Okuzenzakalelayo · < {{min}}",
-    "featureFlagNotLoaded": "Okuzenzakalelayo · akukalayishwa",
     "gatewayTranscription": "Ukuguqulwa kwenkulumo ibe umbhalo nge-Kilo Gateway",
     "gatewayTranscriptionSubtitle": "Guqula ukufaka ngezwi kube umbhalo usebenzisa imodeli ye-Kilo Gateway kunokubona inkulumo kwedivayisi. Ukuqopha kwakho kuthunyelwa ku-Kilo Gateway.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "imigqa {{start}}–{{end}} (ifinyeziwe)",
       "linesOf": "imigqa {{start}}–{{end}} kweyingu-{{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Isenzo se-Cloud Agent sehlulekile: {{action}} ({{status}}).",
-      "failed": "Isenzo se-Cloud Agent sehlulekile: {{action}}."
-    },
     "collectCopyableText": {
       "unserializableInput": "[okufakiwe okungaguqulelwa kufomethi yokugcina idatha]",
       "errorPrefix": "Iphutha: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Umhlinzeki wenqabe isicelo.",
       "assistantStopped": "Impendulo yamiswa.",
       "assistantContextOverflow": "Ingxoxo iyinde kakhulu kumodeli.",
-      "assistantFailed": "Impendulo yehlulekile.",
-      "sendFailed": "Asikwazanga ukuthumela umlayezo. Sicela uzame futhi."
+      "assistantFailed": "Impendulo yehlulekile."
     },
     "filePart": {
       "loadingImage": "Isithombe siyalayishwa",

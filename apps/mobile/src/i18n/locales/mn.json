@@ -275,11 +275,6 @@
     "returnSendsMessageSubtitle": "Унтраалттай үед мөр шилжүүлэх товч агентын мессеж оруулах талбарт шинэ мөр оруулна.",
     "biometricUnlock": "Биометрээр түгжээ тайлах",
     "biometricUnlockSubtitle": "Аппыг эхлүүлэхэд болон арын горимд таван минут байсны дараа түгжээг тайлах шаардлагатай.",
-    "featureFlags": "Функцын флагууд",
-    "featureFlagsBuild": "v{{version}}",
-    "featureFlagApplied": "Алсын · ≥ {{min}}",
-    "featureFlagSkipped": "Өгөгдмөл · < {{min}}",
-    "featureFlagNotLoaded": "Өгөгдмөл · ачаалагдаагүй",
     "gatewayTranscription": "Kilo Gateway-р яриаг бичвэр болгох",
     "gatewayTranscriptionSubtitle": "Төхөөрөмжийн яриа танихын оронд Kilo Gateway загвар ашиглан дуугаар оруулж буй зүйлээ бичвэр болгоно уу. Таны бичлэг Kilo Gateway руу илгээгдэнэ.",
     "transcriptionModel": "$t(transcriptionModel.title)",
@@ -2233,10 +2228,6 @@
       "linesTruncated": "{{start}}–{{end}} мөр (товчилсон)",
       "linesOf": "{{start}}–{{end}} мөр, нийт {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent-ийн {{action}} үйлдэл амжилтгүй боллоо ({{status}}).",
-      "failed": "Cloud Agent-ийн {{action}} үйлдэл амжилтгүй боллоо."
-    },
     "collectCopyableText": {
       "unserializableInput": "[цуваа хэлбэрт хөрвүүлэх боломжгүй оролт]",
       "errorPrefix": "Алдаа: {{error}}"
@@ -2332,8 +2323,7 @@
       "assistantProviderRejected": "Үйлчилгээ үзүүлэгч хүсэлтийг хүлээн авахаас татгалзлаа.",
       "assistantStopped": "Хариулт үүсгэхийг зогсоосон.",
       "assistantContextOverflow": "Харилцан яриа загварын боловсруулах хэмжээнээс хэтэрсэн байна.",
-      "assistantFailed": "Хариулт үүсгэж чадсангүй.",
-      "sendFailed": "Мессежийг илгээж чадсангүй. Дахин оролдоно уу."
+      "assistantFailed": "Хариулт үүсгэж чадсангүй."
     },
     "filePart": {
       "loadingImage": "Зургийг ачаалж байна",

@@ -205,7 +205,7 @@ export default function SessionDetailScreen() {
           title={t('agentChat.session.title')}
           reserveTitleSpace
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-          backFallback="/(app)/(tabs)/(2_agents)"
+          backFallback={'/(app)/(tabs)/(2_agents)' as Href}
           headerRight={
             <View className="min-w-0 shrink flex-row items-center gap-2">
               <SessionContextMetrics
@@ -273,7 +273,7 @@ export default function SessionDetailScreen() {
           title={t('agentChat.session.title')}
           reserveTitleSpace
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
-          backFallback="/(app)/(tabs)/(2_agents)"
+          backFallback={'/(app)/(tabs)/(2_agents)' as Href}
         />
         <CenteredState>
           <View className="items-center gap-3 px-6">

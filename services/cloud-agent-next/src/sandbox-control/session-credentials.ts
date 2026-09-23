@@ -10,6 +10,7 @@ import {
   requiresContainmentSandbox,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
+import { providerUsesOutboundCredentialProxy } from '../agent-sandbox/capabilities.js';
 import { type getOutboundContainerId, isValidSandboxId } from '../sandbox-id.js';
 import { buildSessionAttachPayload } from '../sandbox-session/attach-payload.js';
 import {
@@ -213,9 +214,8 @@ export const sessionCredentialGrantSchema = z
       new Set(grant.members.map(member => member.sessionId)).size !== grant.members.length ||
       new Set(grant.members.map(member => member.kiloSessionId)).size !== grant.members.length ||
       (grant.containmentEnabled !== false &&
-        grant.provider === 'cloudflare' &&
-        !grant.outboundContainerId) ||
-      (grant.provider === 'cloudflare-containers' && grant.containmentEnabled !== false)
+        providerUsesOutboundCredentialProxy(grant.provider) &&
+        !grant.outboundContainerId)
     ) {
       reject();
     }
@@ -251,7 +251,7 @@ export const sessionCredentialGrantSchema = z
       if (
         !grant.members.some(member => member.sessionId === sessionId) ||
         !capability.credential.startsWith('kka1.') ||
-        grant.provider !== 'cloudflare'
+        !providerUsesOutboundCredentialProxy(grant.provider)
       ) {
         reject();
       }
@@ -460,7 +460,11 @@ function repositoryFromMetadata(
     }
     const explicit =
       Boolean(repository.token) && !isKnownScmCredential(repository.token, existing?.scm);
-    if (requiresContainmentSandbox(metadata) && provider === 'cloudflare' && explicit) {
+    if (
+      requiresContainmentSandbox(metadata) &&
+      providerUsesOutboundCredentialProxy(provider) &&
+      explicit
+    ) {
       invalidCredentials();
     }
     return {
@@ -999,7 +1003,7 @@ export async function prepareSessionCredentials(input: {
   };
   if (!containmentEnabled) {
     grant = await resolveDirectScmCredentials(env, grant, payload);
-  } else if (provider === 'cloudflare') {
+  } else if (providerUsesOutboundCredentialProxy(provider)) {
     const outboundContainerId = input.outboundContainerId;
     if (!outboundContainerId) invalidCredentials();
     grant = await refreshKiloCapability(env, grant, member.data, outboundContainerId, now);
@@ -1146,7 +1150,7 @@ export async function resolveSessionCredential(input: {
   const alias = parseControlPlaneCredential(input.credential);
   if (
     !isContainedSessionCredentialGrant(grant) ||
-    grant.provider !== 'cloudflare' ||
+    !providerUsesOutboundCredentialProxy(grant.provider) ||
     now < grant.preparedAt ||
     now >= grant.expiresAt ||
     alias?.sandboxId !== grant.sandboxId ||

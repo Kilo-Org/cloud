@@ -14,6 +14,7 @@ import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/rend
 import { type Pressable } from 'react-native';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
+  type AssociatedPrData,
   createSessionManager,
   createUserWebConnection,
   type KiloSessionId,
@@ -48,6 +49,7 @@ import {
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
@@ -351,6 +353,9 @@ vi.mock('@/components/agents/use-session-config-sync', () => ({
   useSessionConfigSync: () => ({ currentMode: 'code', currentModel: '', currentVariant: '' }),
 }));
 const openRenameModal = vi.hoisted(() => vi.fn());
+// Mirrors the real hook's modal fields; a test opens the dialog by flipping
+// `isOpen` so it can inspect the RenameModal the screen renders.
+const renameModalState = vi.hoisted(() => ({ isOpen: false, initialValue: '' }));
 vi.mock('@/components/agents/use-session-detail-rename', () => ({
   useSessionDetailRename: ({
     serverTitle,
@@ -361,7 +366,11 @@ vi.mock('@/components/agents/use-session-detail-rename', () => ({
   }) => ({
     title: serverTitle ?? fallbackTitle,
     isTitleInteractive: serverTitle !== undefined,
+    isModalOpen: renameModalState.isOpen,
+    modalInitialValue: renameModalState.initialValue,
     openModal: openRenameModal,
+    closeModal: vi.fn(),
+    submit: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 vi.mock('@/lib/analytics/posthog', () => ({
@@ -492,6 +501,18 @@ const PERSONAL_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
  * the shared `mountDetails` fixture at its existing three-parameter signature.
  */
 let goalMountOptions: { goal?: SessionGoal; resolvedType?: 'read-only' | 'remote' } = {};
+/** The PR `fetchSession` reports; `null` keeps the PR row off the screen. */
+let associatedPrMountOption: AssociatedPrData | null = null;
+const ASSOCIATED_PR: AssociatedPrData = {
+  url: 'https://github.com/acme/repo/pull/42',
+  number: 42,
+  state: 'open',
+  title: 'Harden the header',
+  headSha: 'abc123',
+  lastSyncedAt: '2026-01-01T00:00:00.000Z',
+  reviewDecision: null,
+  reviewDecisionPending: false,
+};
 const ROOT_ID = kiloId('ses-root');
 const NEXT_ROOT_ID = kiloId('ses-next-root');
 const SELECTED_ID = kiloId('ses-selected');
@@ -630,10 +651,13 @@ function transcriptKeys(renderer: ReactTestRenderer): string[] {
 beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   openRenameModal.mockClear();
+  renameModalState.isOpen = false;
+  renameModalState.initialValue = '';
   showActionSheetWithOptions.mockClear();
   hideThinking.current = false;
   hideThinking.loaded = true;
   goalMountOptions = {};
+  associatedPrMountOption = null;
   globalContext.organizationId = 'global-org';
   globalContext.setOrganizationId.mockClear();
   rootPageNextCursor = null;
@@ -742,7 +766,7 @@ async function mountDetails(
         isPreparingAsync: false,
         prompt: null,
         initialMessageId: null,
-        associatedPr: null,
+        associatedPr: associatedPrMountOption,
       };
     },
   });
@@ -914,6 +938,8 @@ describe('SessionDetailContent display scope', () => {
     );
     expect(header.props.context).toBeUndefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
+    // The PR link shares the goal row now, so the header row holds no badge.
+    expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);
     expect(
       header.findAll(node => node.props.accessibilityHint === i18n.t('profile.selectAccount'))
     ).toHaveLength(0);
@@ -936,17 +962,53 @@ describe('SessionDetailContent header title', () => {
   // The title shares its row with a 44pt context pill and a copy action, so on
   // a narrow phone the title column is a fraction of the row width. The header
   // and this screen share the three-line cap (`SESSION_HEADER_TITLE_LINES`), so
-  // a long name wraps onto the extra line instead of being cut short mid-word;
+  // a long name wraps onto the extra line instead of being cut short mid-word
+  // the way the previous one-line clamp did ("Moving-average empty windo…");
   // the tail ellipsis only applies past the cap. The placeholder header keeps
   // the same cap, so the reserved title box does not move the body when the
   // loaded name replaces "Session".
-  it('caps a long session title at the shared line count with a tail ellipsis', async () => {
+  it('shows a long session title across the shared reserved lines without clipping mid-word', async () => {
     sessionTitleOverride = 'Moving-average rage empty baseline';
     const { renderer } = await mountDetails();
     const header = renderer.root.findByType(ScreenHeader);
     const title = header.findByProps({ accessibilityRole: 'header' });
     expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
     expect(title.props.ellipsizeMode).toBe('tail');
+  });
+
+  it('shows the fallback name instead of the generated placeholder title', async () => {
+    sessionTitleOverride = 'New session - 2026-09-22T02:05:22.778Z';
+    const { renderer } = await mountDetails();
+    const title = renderer.root
+      .findByType(ScreenHeader)
+      .findByProps({ accessibilityRole: 'header' });
+    expect(title.props.children).toBe(i18n.t('agentChat.session.title'));
+  });
+
+  it('renders a real server title unchanged', async () => {
+    sessionTitleOverride = 'Fix the session header';
+    const { renderer } = await mountDetails();
+    const title = renderer.root
+      .findByType(ScreenHeader)
+      .findByProps({ accessibilityRole: 'header' });
+    expect(title.props.children).toBe('Fix the session header');
+  });
+
+  // The rename dialog inherited RenameModal's 50-character default, below the
+  // 200-character cap the rename endpoint accepts. A longer title was dropped
+  // after character 50, and the header then rendered the leftover fragment
+  // ("Moving-average empty window rollup verification pa") as if it were the
+  // whole title.
+  it('lets the rename dialog hold a title as long as the server accepts', async () => {
+    renameModalState.isOpen = true;
+    renameModalState.initialValue = 'Moving-average rage empty baseline';
+    const { renderer } = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const modal = renderer.root.findAllByType('RenameModal')[0];
+    expect(modal?.props).toMatchObject({
+      maxLength: SESSION_TITLE_MAX_LENGTH,
+      initialValue: renameModalState.initialValue,
+    });
+    expect(SESSION_TITLE_MAX_LENGTH).toBe(200);
   });
 
   it('shows the localized unnamed name instead of the backend placeholder cached title', async () => {
@@ -2523,6 +2585,52 @@ describe('SessionDetailContent goal visibility', () => {
     expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
   });
 
+  it('hands the PR badge to the goal row and keeps it out of the header', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+    associatedPrMountOption = ASSOCIATED_PR;
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    // The badge lives on the goal row now, not beside the context pill.
+    const header = view.renderer.root.findByType(ScreenHeader);
+    expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);
+
+    const section = goalSectionOf(view);
+    expect(section.props.goal).toEqual(pausedGoal);
+    expect(section.findAllByType('SessionPrBadge')).toHaveLength(1);
+  });
+
+  it('shows the goal row for a PR-only session', async () => {
+    associatedPrMountOption = ASSOCIATED_PR;
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    const section = goalSectionOf(view);
+    expect(section.props.goal).toBeNull();
+    expect(section.findAllByType('SessionPrBadge')).toHaveLength(1);
+    // The row exists because the PR landed, so the badge never renders the
+    // session-loading skeleton; the wrapper's FadeIn reveals it.
+    expect(section.findAllByType('SessionPrBadge')[0]?.props.loading).toBe(false);
+  });
+
+  it('omits the goal row when it holds neither a goal nor a PR', async () => {
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+  });
+
+  it('omits the goal row while a no-goal, no-PR session is still loading', async () => {
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    act(() => {
+      view.store.set(view.manager.atoms.isLoading, true);
+    });
+
+    // The fetch is in flight and the session has neither a goal nor a PR, so
+    // row 2 has nothing to hold. It must not reserve a min-h-12 box for a
+    // phantom PR skeleton that unmounts (and jumps the transcript 48px) the
+    // moment the fetch lands with no PR.
+    expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+    expect(view.renderer.root.findAllByType('SessionPrBadge')).toHaveLength(0);
+  });
+
   it('persists the goal disclosure through the per-session store', async () => {
     goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
     const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
@@ -2997,6 +3105,42 @@ describe('session detail duplicate failure state', () => {
     expect(nodes[0]?.props).toMatchObject({
       indicator: { message: expect.stringContaining('Insufficient credits') },
     });
+  });
+
+  it('states a failed delivery once: the row keeps Retry/Copy and the footer drops the generic line', async () => {
+    const view = await mountDetails([rootUserMessage('please refactor')]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          [USER_ID, { status: 'failed', error: 'Unauthorized: Unauthorized', reason: 'execution' }],
+        ])
+      );
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        { type: 'error', message: 'simulated error', timestamp: 0 }
+      );
+    });
+
+    const text = renderedText(view.renderer.root);
+    // An agent-execution delivery failure renders the base's assistant-failure
+    // title with no second line (message-failure-state.ts); this branch's rule
+    // drops the footer's delivery-flavoured line, so the row states it once.
+    expect(text).toContain(i18n.t('agentChat.messageFailure.assistantTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.deliveryTitle'));
+    expect(text).not.toContain(i18n.t('agentChat.messageFailure.assistantFailed'));
+    // The footer row that would restate the generic assistant line is gone: the
+    // delivery block is the single failed-send surface.
+    expect(indicatorNodes(view)).toHaveLength(0);
+    const labels = view.renderer.root
+      .findAll(node => Object.is(node.type, 'Button'))
+      .map(node => node.props.accessibilityLabel);
+    expect(labels).toContain(i18n.t('common.retry'));
+    expect(labels).toContain(i18n.t('agentChat.messageBubble.copyToComposer'));
   });
 
   it('keeps the footer line when the transcript drops the failed row it names', async () => {

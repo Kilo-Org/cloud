@@ -111,6 +111,9 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
   // Only the medium row is wide enough for a wait beside the label; in the
   // small square the pair wraps and truncates both halves.
   const wide = family === 'systemMedium';
+  // The large card is a wide card with a footer, so its scheduled row has the
+  // same room for the wake as the medium row; the small square has none.
+  const wakeRow = wide || family === 'systemLarge';
   const needsInputSince = props.needsInputSince ?? null;
   const scheduledAt = props.scheduledAt ?? null;
   // The rows carry zeros too, so their number never says whether work exists —
@@ -169,17 +172,18 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     // labels line up on a grid; only the label colour ranks them, because a
     // second font size in a three-row list reads as a mistake.
     const textStyle = compact ? 'caption' : 'subheadline';
-    // One relative time at most per row: a needs-input wait or a scheduled
-    // wake, never both, and only on the wide family that has room for it. The
-    // wait renders as a relative duration ("28 min") and the wake as an
-    // absolute clock time ("9:00 AM"): a wait is an interval the user is
+    // One time at most per row: a needs-input wait or a scheduled wake, never
+    // both. The wait renders as a relative duration ("28 min") and the wake as
+    // an absolute clock time ("9:00 AM"): a wait is an interval the user is
     // enduring, while a wake is the moment the user asked for, and it must
-    // read as a time of day the way the session list shows it.
+    // read as a time of day the way the session list shows it. The medium card
+    // draws the wait and the wake; the large card draws the wake beside its
+    // scheduled row too; the small square has room for neither.
     let timeAt: string | null = null;
     let timeStyle: 'relative' | 'time' = 'relative';
     if (wide && line.kind === 'needsInput') {
       timeAt = needsInputSince;
-    } else if (wide && line.kind === 'scheduled') {
+    } else if (wakeRow && line.kind === 'scheduled') {
       timeAt = scheduledAt;
       timeStyle = 'time';
     }
@@ -215,7 +219,7 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
         >
           {line.label}
         </Text>
-        {wide ? <Spacer /> : null}
+        {wakeRow ? <Spacer /> : null}
         {timeAt === null ? null : (
           <Text
             date={new Date(timeAt)}

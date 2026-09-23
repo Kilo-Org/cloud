@@ -73,9 +73,15 @@ describe('ActiveAgentsWidget families', () => {
     expect(layout).toContain("scheduled: { icon: 'clock'");
     expect(layout).toMatch(/line\.kind === 'scheduled'[\s\S]*?date=\{new Date\(timeAt\)\}/);
     // The wake is an absolute clock time; the wait above it stays the relative
-    // duration. Only the medium family is wide enough for either.
+    // duration. The medium card draws the wait and the wake, and the large card
+    // draws the wake beside its scheduled row too; the small square has room
+    // for neither. `wakeRow` is what both Home Screen cards that draw a wake
+    // share, and the `Spacer` reserves the trailing slot in every state.
     expect(layout).toContain("let timeStyle: 'relative' | 'time' = 'relative';");
     expect(layout).toContain("timeStyle = 'time';");
+    expect(layout).toContain("const wakeRow = wide || family === 'systemLarge';");
+    expect(layout).toMatch(/else if \(wakeRow && line\.kind === 'scheduled'\)/);
+    expect(layout).toContain('{wakeRow ? <Spacer /> : null}');
     expect(layout).toContain('dateStyle={timeStyle}');
     expect(layout).toContain('const scheduledAt = props.scheduledAt ?? null;');
     expect(layout).toContain(

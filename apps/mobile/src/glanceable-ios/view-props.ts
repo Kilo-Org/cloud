@@ -57,7 +57,8 @@ export type GlanceableViewProps = {
   /**
    * ISO timestamp of the soonest scheduled wake, or null when nothing is
    * scheduled or no scheduled row carried a wake time. Only the scheduled
-   * count row carries it, and only `systemMedium` is wide enough to draw it.
+   * count row carries it; the medium and large Home Screen cards are wide
+   * enough to draw it.
    */
   scheduledAt: string | null;
   /**

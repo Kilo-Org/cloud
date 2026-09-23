@@ -180,7 +180,7 @@ describe('the remote server rows', () => {
 
     expect(rows[0]).toMatchObject({
       enabled: false,
-      statusKey: 'modelChat.mcp.off',
+      statusKey: 'modelChat.mcp.serverOff',
       toolCount: 0,
     });
   });

@@ -175,8 +175,8 @@ export function settingsToolsView(enabled: boolean): SettingsToolsView {
 /** The status line under a remote server row, named by its key. */
 type RemoteMcpStatusKey =
   | 'modelChat.mcp.none'
-  | 'modelChat.mcp.off'
   | 'modelChat.mcp.serverChecking'
+  | 'modelChat.mcp.serverOff'
   | 'modelChat.mcp.serverToolCount'
   | 'modelChat.mcp.serverUnreachable';
 
@@ -212,7 +212,7 @@ function remoteStatusKey(
   state: RemoteMcpServerState | undefined
 ): RemoteMcpStatusKey {
   if (!enabled) {
-    return 'modelChat.mcp.off';
+    return 'modelChat.mcp.serverOff';
   }
   if (state === undefined || state.status === 'idle') {
     return 'modelChat.mcp.none';

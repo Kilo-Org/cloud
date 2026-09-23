@@ -3075,7 +3075,8 @@
       "settingsToolsOff": "Off — no settings tool is sent to the model",
       "serverChecking": "Checking this server…",
       "serverToolCount": "{{count}} tools",
-      "serverUnreachable": "Couldn't reach this server"
+      "serverUnreachable": "Couldn't reach this server",
+      "serverOff": "This server is off"
     }
   },
   "settingsTools": {

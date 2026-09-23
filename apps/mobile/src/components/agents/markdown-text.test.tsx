@@ -729,6 +729,20 @@ describe('splitMarkdownHtmlIncremental', () => {
     }
   });
 
+  it('keeps the snapshot to the fields the next parse reuses', () => {
+    // The snapshot is the only cross-publish state, so every field must be read
+    // by the next call. `headHasHtml` was written on every snapshot but never
+    // read; the snapshot must not carry a dead field again.
+    const { snapshot } = splitMarkdownHtmlIncremental('<b>bold</b> and text\n\nnext\n\n');
+
+    expect(Object.keys(snapshot).toSorted()).toEqual([
+      'hasDefinition',
+      'headSegments',
+      'tailStart',
+      'value',
+    ]);
+  });
+
   it('keeps a streamed loose list with an inline-HTML first item in one html segment', () => {
     // A trailing blank line does not close the list: the new item joins it and
     // flips it from tight to loose, so the frozen head must not hold the list.

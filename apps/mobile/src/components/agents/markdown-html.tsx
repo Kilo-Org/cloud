@@ -76,7 +76,6 @@ export type MarkdownHtmlSnapshot = {
   value: string;
   tailStart: number;
   headSegments: readonly MarkdownHtmlSegment[];
-  headHasHtml: boolean;
   hasDefinition: boolean;
 };
 
@@ -375,7 +374,6 @@ export function splitMarkdownHtmlIncremental(
         value,
         tailStart: value.length,
         headSegments: [segment],
-        headHasHtml: false,
         hasDefinition: false,
       },
     };
@@ -421,7 +419,6 @@ export function splitMarkdownHtmlIncremental(
           value,
           tailStart: appended.tailStart,
           headSegments,
-          headHasHtml,
           hasDefinition: false,
         },
       };
@@ -446,7 +443,6 @@ export function splitMarkdownHtmlIncremental(
       // re-lexes the whole value instead of slicing at the wrong offset.
       tailStart: value.includes('\r') ? value.length : tailStart,
       headSegments,
-      headHasHtml: headSegments.some(segment => segment.type === 'html'),
       hasDefinition: hasDefinitionToken(tokens),
     },
   };

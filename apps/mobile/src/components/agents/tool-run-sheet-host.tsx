@@ -30,17 +30,22 @@ export function indexPartsById(messages: readonly StoredMessage[]): Map<string, 
 /**
  * Per-transcript-surface host: provides the run opener to the condensed rows it
  * wraps and mounts the run sheet. Stores only the open run's part ids and
- * re-resolves the parts through a `messages`-keyed id index on every render, so
- * an open sheet tracks statuses as they stream. A row press closes the run
- * sheet and forwards to the part detail opener.
+ * re-resolves the parts through a `messages`-keyed id index, so an open sheet
+ * tracks statuses as they stream. The index is built only while a run is open:
+ * a closed host pays nothing on the streaming publishes that rebuild `messages`
+ * on every token flush. A row press closes the run sheet and forwards to the
+ * part detail opener.
  */
 export function ToolRunSheetHost({ messages, children }: Readonly<ToolRunSheetHostProps>) {
   const [openPartIds, setOpenPartIds] = useState<readonly string[] | null>(null);
   const openPartDetail = useOpenPartDetail();
-  const partById = useMemo(() => indexPartsById(messages), [messages]);
+  const partById = useMemo(
+    () => (openPartIds === null ? null : indexPartsById(messages)),
+    [messages, openPartIds]
+  );
 
   const parts = (openPartIds ?? [])
-    .map(partId => partById.get(partId))
+    .map(partId => partById?.get(partId))
     .filter((part): part is ToolPart => part !== undefined && isToolPart(part));
 
   const open = useCallback((runParts: readonly ToolPart[]) => {

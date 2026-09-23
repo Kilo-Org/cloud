@@ -26,6 +26,20 @@ import { TextPartRenderer } from './text-part-renderer';
 import { ToolPartRenderer } from './tool-part-renderer';
 import { type OpenChildSession } from './child-session-section';
 
+/**
+ * The absolute cloud-agent workspace prefix every patch path carries:
+ * `/workspace/<userId>/sessions/<sessionId>/` (optionally with an organization
+ * segment before the user id) — the repo is cloned at that root, so dropping it
+ * leaves the repo-relative path a reader wants instead of the workspace ids.
+ *
+ * services/cloud-agent-next/src/workspace.ts:208
+ */
+const CLOUD_AGENT_WORKSPACE_PREFIX = /^\/workspace\/(?:[^/]+\/)?[^/]+\/sessions\/[^/]+\//;
+
+export function patchPartFileLabel(path: string): string {
+  return path.replace(CLOUD_AGENT_WORKSPACE_PREFIX, '');
+}
+
 type PartRendererProps = {
   part: Part;
   isStreaming?: boolean;
@@ -111,8 +125,13 @@ export function PartRenderer({
         <View className="my-1 gap-1">
           <Text className="text-xs text-muted-foreground">{summary}</Text>
           {part.files.map(file => (
-            <Text key={file} className="font-mono text-xs text-muted-foreground" numberOfLines={1}>
-              {file}
+            <Text
+              key={file}
+              className="font-mono text-xs text-muted-foreground"
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {patchPartFileLabel(file)}
             </Text>
           ))}
         </View>

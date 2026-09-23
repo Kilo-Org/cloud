@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
-import { PartRenderer } from './part-renderer';
+import { PartRenderer, patchPartFileLabel } from './part-renderer';
 import { ReasoningPartRenderer } from './reasoning-part-renderer';
 import { TextPartRenderer } from './text-part-renderer';
 import { PatchToolCardBody } from './tool-cards/patch-tool-card';
@@ -303,6 +303,10 @@ describe('PartRenderer', () => {
 });
 
 describe('PartRenderer patch part summary', () => {
+  // `/workspace/<userId>/sessions/<sessionId>` with the repo cloned at that
+  // root (services/cloud-agent-next/src/workspace.ts:208).
+  const WORKSPACE_ROOT = '/workspace/a7e4d40b-c28c-4df1-9a1e-f88e7eb467f1/sessions/W1s2';
+
   it('renders the file count and paths for a patch part', () => {
     const part = makePatchPart(['src/a.ts', 'src/b.ts']);
     // eslint-disable-next-line new-cap
@@ -318,6 +322,56 @@ describe('PartRenderer patch part summary', () => {
     // eslint-disable-next-line new-cap
     const result = PartRenderer({ part });
     expect(findText(result, 'Updated 1 file')).toHaveLength(1);
+  });
+
+  it('shows the repo-relative file name for an absolute workspace path', () => {
+    const part = makePatchPart([`${WORKSPACE_ROOT}/README.md`]);
+    // eslint-disable-next-line new-cap
+    const result = PartRenderer({ part });
+    expect(result).not.toBeNull();
+    expect(findText(result, 'README.md')).toHaveLength(1);
+    expect(
+      findAll(
+        result,
+        el =>
+          el.type === 'Text' &&
+          String((el.props as { children?: unknown }).children).includes('/workspace/')
+      )
+    ).toHaveLength(0);
+  });
+
+  it('keeps the nested repo-relative path for an absolute workspace path', () => {
+    const part = makePatchPart([`${WORKSPACE_ROOT}/src/cli.test.ts`]);
+    // eslint-disable-next-line new-cap
+    const result = PartRenderer({ part });
+    expect(findText(result, 'src/cli.test.ts')).toHaveLength(1);
+  });
+
+  it('strips an org-scoped workspace prefix', () => {
+    const part = makePatchPart(['/workspace/org-1/user-1/sessions/W1s2/src/a.ts']);
+    // eslint-disable-next-line new-cap
+    const result = PartRenderer({ part });
+    expect(findText(result, 'src/a.ts')).toHaveLength(1);
+  });
+
+  it('renders each file row as a single middle-ellipsized line', () => {
+    const part = makePatchPart([`${WORKSPACE_ROOT}/src/a.ts`]);
+    // eslint-disable-next-line new-cap
+    const result = PartRenderer({ part });
+    const [fileRow] = findAll(
+      result,
+      el => el.type === 'Text' && (el.props as { numberOfLines?: number }).numberOfLines === 1
+    );
+    expect(fileRow).toBeDefined();
+    expect(fileRow?.props).toMatchObject({ numberOfLines: 1, ellipsizeMode: 'middle' });
+  });
+
+  it('leaves a path without the workspace prefix untouched', () => {
+    expect(patchPartFileLabel('src/a.ts')).toBe('src/a.ts');
+  });
+
+  it('strips the absolute workspace prefix from a nested path', () => {
+    expect(patchPartFileLabel(`${WORKSPACE_ROOT}/src/nested/a.ts`)).toBe('src/nested/a.ts');
   });
 
   it('returns null for a patch part with no files', () => {

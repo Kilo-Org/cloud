@@ -1,5 +1,9 @@
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
 import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
+import {
+  parseSandboxBillingInput,
+  type SandboxBillingAdmissionResult,
+} from '../container-usage-context.js';
 import type {
   ContainerInstanceSize,
   ContainersObservation,
@@ -69,11 +73,41 @@ export function createCloudflareContainersProviderAdapter(deps: {
   };
 
   const ensureBillingAdmission: ProviderAdapter['ensureBillingAdmission'] = async (
-    _ref,
+    ref,
     billing
   ) => {
-    if (billing?.enforcementRequested) {
-      throw new AgentSandboxUnavailableError('Container billing unavailable', 'billing_blocked');
+    if (!billing) return;
+    const parsed = decodeOwnedProviderRef(ref);
+    if (!parsed) throw new Error('Invalid Cloudflare containers allocation');
+    const input = parseSandboxBillingInput(billing);
+    const container = deps.getContainer(deps.logicalSandboxId);
+    let blocked = false;
+    try {
+      blocked = await container.isBillingBlocked();
+    } catch {
+      blocked = input.enforcementRequested === true;
+    }
+    if (input.enforcementRequested || blocked) {
+      let admission: SandboxBillingAdmissionResult;
+      try {
+        admission = await container.ensureBillingAdmission(input, instance);
+      } catch {
+        admission = {
+          success: false,
+          code: 'meter_unavailable',
+          message: 'Container billing admission is unavailable',
+        };
+      }
+      if (!admission.success) {
+        throw new AgentSandboxUnavailableError(
+          admission.code === 'insufficient_credits' || admission.code === 'stopping'
+            ? 'Container billing requires additional credits'
+            : 'Container billing admission is temporarily unavailable',
+          'billing_blocked'
+        );
+      }
+    } else {
+      await container.configureBilling(input, instance).catch(() => undefined);
     }
   };
 

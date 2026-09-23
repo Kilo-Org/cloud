@@ -196,6 +196,10 @@ function sessionSearchDocument(input: {
   organizationId?: string | null;
   gitBranch?: string | null;
 }): SystemSearchDocument | null {
+  // A backend default title (`New session - <ISO>`) is machine output, so the
+  // entry is treated like a title-less row and stays out of the index. The
+  // helper trims a padded title, so it indexes and fingerprints identically to
+  // the unpadded value.
   const title = sessionDisplayTitle(input.title);
   if (title === undefined) {
     return null;

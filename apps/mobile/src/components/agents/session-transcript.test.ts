@@ -291,6 +291,25 @@ function assistantTextThenToolsMessageAt(id: string, created: number, partIds: s
   };
 }
 
+/** A mixed assistant message whose visible text sits between its tool parts. */
+function assistantToolTextToolMessageAt(id: string, created: number, partIds: string[]) {
+  const base = assistantToolOnlyMessageAt(id, created, partIds);
+  return {
+    info: base.info,
+    parts: [
+      ...base.parts.slice(0, 1),
+      {
+        id: `${id}:text`,
+        sessionID: 'ses_12345678901234567890123456',
+        messageID: id,
+        type: 'text' as const,
+        text: 'visible',
+      },
+      ...base.parts.slice(1),
+    ],
+  };
+}
+
 function toolPartCount(items: ReturnType<typeof mergeSessionTranscript>): number {
   let total = 0;
   for (const item of items) {
@@ -939,6 +958,47 @@ describe('condenseTranscriptToolRuns', () => {
 
     // A run of one is not condensed, so the message item is unchanged.
     expect(keysOf(condensed)).toEqual(['msg_mixed']);
+    const lone = condensed.find(item => item.type === 'message');
+    expect(lone?.type === 'message' ? lone.parts : undefined).toBeUndefined();
+  });
+
+  it('emits the run-of-one fallback fragment with `parts` when the message holds more visible parts', () => {
+    const base = 1_000_000_000;
+    // The message's first visible part is a lone condensable tool call, then a
+    // text part, then a run of two tools. The lone tool's run of one falls back
+    // to the message's plain rendering and starts a fragment; the text part joins
+    // it and the trailing run flushes it. The fragment holds two of the message's
+    // four visible parts, so it must carry `parts` — the count travels with the
+    // run entry, and the fallback reads it rather than re-filtering the message.
+    const messages = [assistantToolTextToolMessageAt('msg_fallback', base, ['fa1', 'fb1', 'fb2'])];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    expect(keysOf(condensed)).toEqual(['message-parts:msg_fallback:fa1', 'tool-run:fb1']);
+    const fragment = condensed.find(item => item.type === 'message');
+    expect(fragment?.type === 'message' ? fragment.parts?.map(part => part.id) : []).toEqual([
+      'fa1',
+      'msg_fallback:text',
+    ]);
+    const run = condensed.find(item => item.type === 'tool-run');
+    expect(run?.parts.map(part => part.id)).toEqual(['fb1', 'fb2']);
+  });
+
+  it('emits the run-of-one fallback fragment without `parts` when it is the message’s only visible part', () => {
+    const base = 1_000_000_000;
+    // A hidden `plan_enter` part renders nothing, so the message's visible count
+    // is one: the run of one is the whole message, and the fallback re-emits the
+    // unchanged item with no `parts`, exactly as it rendered before condensing.
+    const messages = [
+      {
+        ...assistantToolOnlyMessageAt('msg_hidden_lone', base, []),
+        parts: [toolPart('hp1', 'plan_enter'), toolPart('hr1')],
+      },
+    ];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    expect(keysOf(condensed)).toEqual(['msg_hidden_lone']);
     const lone = condensed.find(item => item.type === 'message');
     expect(lone?.type === 'message' ? lone.parts : undefined).toBeUndefined();
   });

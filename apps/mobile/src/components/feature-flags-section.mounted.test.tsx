@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -39,6 +39,37 @@ function textLines(tree: ReactTestRenderer): string[] {
   return tree.root
     .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
     .map(node => [node.props.children].flat().join(''));
+}
+
+/** The Text node whose flattened content is exactly `content`. */
+function textNode(tree: ReactTestRenderer, content: string): ReactTestInstance {
+  const [node] = tree.root.findAll(
+    candidate =>
+      typeof candidate.type === 'string' &&
+      (candidate.type as string) === 'Text' &&
+      [candidate.props.children].flat().join('') === content
+  );
+  if (!node) {
+    throw new Error(`No Text rendered "${content}"`);
+  }
+  return node;
+}
+
+/** The flattened text of `node`'s direct children. */
+function childText(node: ReactTestInstance): string[] {
+  return node.children
+    .filter((child): child is ReactTestInstance => typeof child !== 'string')
+    .map(child => [child.props.children].flat().join(''));
+}
+
+/** Whether `ancestor` sits above `node` in the rendered tree. */
+function contains(ancestor: ReactTestInstance, node: ReactTestInstance): boolean {
+  for (let cursor = node.parent; cursor; cursor = cursor.parent) {
+    if (cursor === ancestor) {
+      return true;
+    }
+  }
+  return false;
 }
 
 beforeEach(() => {
@@ -125,6 +156,35 @@ describe('FeatureFlagsSection', () => {
     const tree = await mount();
 
     expect(textLines(tree)).toContain('Off · default · < 1.0.6');
+  });
+
+  it('keeps the build string on the section label row, not as a list entry', async () => {
+    posthog.statuses = [applied, skipped];
+    const tree = await mount();
+
+    const label = textNode(tree, 'Feature flags');
+    const build = textNode(tree, 'v1.0.5');
+    const row = label.parent;
+    if (!row) {
+      throw new Error('The section label is not rendered inside a row');
+    }
+
+    // The section label and the build string share one row...
+    expect(build.parent).toBe(row);
+    // ...laid out at its two ends rather than stacked...
+    const rowClasses = String(row.props.className ?? '');
+    expect(rowClasses).toContain('flex-row');
+    expect(rowClasses).toContain('items-baseline');
+    expect(rowClasses).toContain('justify-between');
+    // ...holding exactly those two labels, so no flag row can join them.
+    expect(childText(row)).toEqual(['Feature flags', 'v1.0.5']);
+
+    // The version is not an entry of the flag list.
+    const flagList = textNode(tree, 'mobile-pr-review').parent?.parent;
+    if (!flagList) {
+      throw new Error('The flag list container is not rendered');
+    }
+    expect(contains(flagList, build)).toBe(false);
   });
 
   it('renders nothing when the registry is empty', async () => {

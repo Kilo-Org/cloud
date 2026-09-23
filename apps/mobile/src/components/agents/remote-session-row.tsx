@@ -91,6 +91,9 @@ export function RemoteSessionRow({
     };
   }, [refreshScope]);
   const exitingRef = useRef(false);
+  // The server's creation-default title (`New session - <ISO timestamp>`) is
+  // an internal marker, never row copy: resolve it once here so the same
+  // label feeds the row, the accessibility label, and the rename prompt.
   const title = sessionDisplayTitle(session.title) ?? t('agents.sessionRow.untitled');
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;

@@ -1745,10 +1745,6 @@
       "linesTruncated": "שורות {{start}}–{{end}} (התוכן נחתך)",
       "linesOf": "שורות {{start}}–{{end}} מתוך {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "הפעולה {{action}} ב-Cloud Agent נכשלה ({{status}}).",
-      "failed": "הפעולה {{action}} ב-Cloud Agent נכשלה."
-    },
     "collectCopyableText": {
       "unserializableInput": "[קלט שאינו ניתן לסריאליזציה]",
       "errorPrefix": "שגיאה: {{error}}"
@@ -1844,8 +1840,7 @@
       "assistantProviderRejected": "הספק דחה את הבקשה.",
       "assistantStopped": "התשובה הופסקה.",
       "assistantContextOverflow": "השיחה ארוכה מדי עבור המודל.",
-      "assistantFailed": "יצירת התשובה נכשלה.",
-      "sendFailed": "לא ניתן היה לשלוח את ההודעה. נסה שוב."
+      "assistantFailed": "יצירת התשובה נכשלה."
     },
     "filePart": {
       "loadingImage": "טוען תמונה",

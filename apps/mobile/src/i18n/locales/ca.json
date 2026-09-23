@@ -2265,10 +2265,6 @@
       "linesTruncated": "línies {{start}}–{{end}} (truncades)",
       "linesOf": "línies {{start}}–{{end}} de {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Ha fallat l'acció «{{action}}» de Cloud Agent ({{status}}).",
-      "failed": "Ha fallat l'acció «{{action}}» de Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[entrada no serialitzable]",
       "errorPrefix": "Error detectat: {{error}}"
@@ -2364,8 +2360,7 @@
       "assistantProviderRejected": "El proveïdor ha rebutjat la sol·licitud.",
       "assistantStopped": "S'ha aturat la generació de la resposta.",
       "assistantContextOverflow": "La conversa és massa llarga per al model.",
-      "assistantFailed": "No s'ha pogut generar la resposta.",
-      "sendFailed": "No s'ha pogut enviar el missatge. Torna-ho a provar."
+      "assistantFailed": "No s'ha pogut generar la resposta."
     },
     "filePart": {
       "loadingImage": "Carregant la imatge",

@@ -2233,10 +2233,6 @@
       "linesTruncated": "{{start}}–{{end}} വരികൾ (ഭാഗികം)",
       "linesOf": "ആകെ {{total}} വരികളിൽ {{start}}–{{end}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent {{action}} പരാജയപ്പെട്ടു ({{status}}).",
-      "failed": "Cloud Agent {{action}} പരാജയപ്പെട്ടു."
-    },
     "collectCopyableText": {
       "unserializableInput": "[സീരിയലൈസ് ചെയ്യാനാവാത്ത ഇൻപുട്ട്]",
       "errorPrefix": "പിശക്: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "ദാതാവ് അഭ്യർത്ഥന നിരസിച്ചു.",
       "assistantStopped": "മറുപടി നൽകുന്നത് നിർത്തി.",
       "assistantContextOverflow": "ഈ സംഭാഷണത്തിന്റെ നീളം മോഡലിന് കൈകാര്യം ചെയ്യാവുന്ന പരിധിയിലും കൂടുതലാണ്.",
-      "assistantFailed": "മറുപടി നൽകാൻ കഴിഞ്ഞില്ല.",
-      "sendFailed": "സന്ദേശം അയയ്ക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
+      "assistantFailed": "മറുപടി നൽകാൻ കഴിഞ്ഞില്ല."
     },
     "filePart": {
       "loadingImage": "ചിത്രം ലോഡ് ചെയ്യുന്നു",

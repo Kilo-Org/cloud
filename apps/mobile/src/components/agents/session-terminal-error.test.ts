@@ -479,6 +479,30 @@ describe('statusIndicatorDuplicatesMessageFailure', () => {
     ).toBe(true);
   });
 
+  it('suppresses the generic line when the last row is a failed delivery', () => {
+    // A failed delivery row states the failure and carries Retry/Copy; an
+    // unclassified status error resolves to the same generic assistant line,
+    // so the footer must not restate it above the composer.
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: { type: 'error', message: 'simulated error' },
+        failure: deliveryFailure,
+      })
+    ).toBe(true);
+  });
+
+  it('keeps a classified line the delivery row does not carry', () => {
+    expect(
+      statusIndicatorDuplicatesMessageFailure({
+        indicator: {
+          type: 'error',
+          message: 'Assistant request failed: insufficient credits',
+        },
+        failure: deliveryFailure,
+      })
+    ).toBe(false);
+  });
+
   it('keeps a classified line the row does not carry', () => {
     expect(
       statusIndicatorDuplicatesMessageFailure({

@@ -2233,10 +2233,6 @@
       "linesTruncated": "rader {{start}}–{{end}} (avkortat)",
       "linesOf": "rader {{start}}–{{end}} av {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Åtgärden {{action}} i Cloud Agent misslyckades ({{status}}).",
-      "failed": "Åtgärden {{action}} i Cloud Agent misslyckades."
-    },
     "collectCopyableText": {
       "unserializableInput": "[indata som inte kan serialiseras]",
       "errorPrefix": "Fel: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "Leverantören avvisade begäran.",
       "assistantStopped": "Svaret avbröts.",
       "assistantContextOverflow": "Konversationen är för lång för modellen.",
-      "assistantFailed": "Det gick inte att generera svaret.",
-      "sendFailed": "Det gick inte att skicka meddelandet. Försök igen."
+      "assistantFailed": "Det gick inte att generera svaret."
     },
     "filePart": {
       "loadingImage": "Läser in bild",

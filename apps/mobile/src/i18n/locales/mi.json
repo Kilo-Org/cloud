@@ -2233,10 +2233,6 @@
       "linesTruncated": "ngā rārangi {{start}}–{{end}} (kua poroa)",
       "linesOf": "ngā rārangi {{start}}–{{end}} o {{total}}"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "I rahua te mahi {{action}} a Cloud Agent ({{status}}).",
-      "failed": "I rahua te mahi {{action}} a Cloud Agent."
-    },
     "collectCopyableText": {
       "unserializableInput": "[kāore e taea te huri i te tāuru hei raraunga rokiroki]",
       "errorPrefix": "Hapa: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "I whakakāhoretia te tono e te kaiwhakarato.",
       "assistantStopped": "I whakamutua te whakautu.",
       "assistantContextOverflow": "He roa rawa te kōrerorero mō te tauira.",
-      "assistantFailed": "I rahua te whakautu.",
-      "sendFailed": "Kāore i taea te tuku i te karere. Whakamātau anō."
+      "assistantFailed": "I rahua te whakautu."
     },
     "filePart": {
       "loadingImage": "Kei te uta i te atahanga",

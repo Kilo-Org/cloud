@@ -2233,10 +2233,6 @@
       "linesTruncated": "{{start}}–{{end}}-qatorlar (qisqartirilgan)",
       "linesOf": "{{start}}–{{end}}-qatorlar, jami {{total}} ta"
     },
-    "mobileSessionDiagnostics": {
-      "failedWithStatus": "Cloud Agent xizmatida {{action}} amali bajarilmadi ({{status}}).",
-      "failed": "Cloud Agent xizmatida {{action}} amali bajarilmadi."
-    },
     "collectCopyableText": {
       "unserializableInput": "[serializatsiya qilib bo'lmaydigan kirish ma'lumotlari]",
       "errorPrefix": "Xato: {{error}}"
@@ -2332,8 +2328,7 @@
       "assistantProviderRejected": "Provayder so'rovni rad etdi.",
       "assistantStopped": "Javob yaratish to'xtatildi.",
       "assistantContextOverflow": "Suhbat model uchun juda uzun.",
-      "assistantFailed": "Javobni yaratib bo'lmadi.",
-      "sendFailed": "Xabarni yuborib bo'lmadi. Iltimos, qayta urinib ko'ring."
+      "assistantFailed": "Javobni yaratib bo'lmadi."
     },
     "filePart": {
       "loadingImage": "Rasm yuklanmoqda",

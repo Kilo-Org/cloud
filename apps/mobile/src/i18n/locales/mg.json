@@ -214,7 +214,6 @@
     "showBalance": "Aseho ny ambim-bola",
     "balanceHidden": "Voafeno ny ambim-bola",
     "bonusCreditsExpiring": "Kireditra fanampiny {{amount}} ho lany daty amin'ny {{date}}.",
-    "creditBalanceEmpty": "Tsy misy kireditra sisa ao amin'ny kaontinao. Ivelan'ny rindranasa iOS no itantanana ny kireditra ho an'ity kaonty ity.",
     "signOutTitle": "Hivoaka ve?",
     "signOutMessage": "Mila miditra indray ianao vao afaka mampiasa ny sehatra fiasanao.",
     "deleteAccountTitle": "Hofafana ve ny kaonty?",
@@ -3224,5 +3223,17 @@
     "multiplierError": "Ampidiro mpamaro 1 na mihoatra",
     "permissionDenied": "Tsy manana alalana hitantana ny fampitandremana momba ny fandaniana ianao.",
     "pushOffByCategory": "Mihidy ao amin'ny Fampandrenesana"
+  },
+  "credits": {
+    "title": "Hividy kireditra",
+    "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",
+    "packLabel": "Ampio kireditra {{amount}}",
+    "priceUnavailable": "Tsy misy ny vidiny",
+    "purchased": "Nampiana tao amin'ny balananao ny kireditra.",
+    "empty": "Tsy misy ny fonosana kireditra amin'izao fotoana izao.",
+    "noMatchingProducts": "Tsy nisy fonosana kireditra mifanaraka naverin'ny App Store.",
+    "noMatchingProductsPlay": "Tsy nisy fonosana kireditra mifanaraka naverin'ny Google Play.",
+    "purchaseOwnedByAnotherAccount": "Ny kireditra amin'ity Apple Account ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy.",
+    "purchaseOwnedByAnotherAccountPlay": "Ny kireditra amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy."
   }
 }

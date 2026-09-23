@@ -214,7 +214,6 @@
     "showBalance": "Tampilkan saldo",
     "balanceHidden": "Saldo tersembunyi",
     "bonusCreditsExpiring": "Kredit bonus senilai {{amount}} akan kedaluwarsa pada {{date}}.",
-    "creditBalanceEmpty": "Saldo kreditmu kosong. Untuk akun ini, kredit dikelola di luar aplikasi iOS.",
     "signOutTitle": "Keluar?",
     "signOutMessage": "Kamu perlu masuk lagi untuk mengakses ruang kerjamu.",
     "deleteAccountTitle": "Hapus akun?",
@@ -3224,5 +3223,17 @@
     "multiplierError": "Masukkan pengali 1 atau lebih",
     "permissionDenied": "Kamu tidak memiliki izin untuk mengelola peringatan pengeluaran.",
     "pushOffByCategory": "Nonaktif di Notifikasi"
+  },
+  "credits": {
+    "title": "Beli kredit",
+    "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",
+    "packLabel": "Tambahkan kredit {{amount}}",
+    "priceUnavailable": "Harga tidak tersedia",
+    "purchased": "Kredit telah ditambahkan ke saldo Anda.",
+    "empty": "Paket kredit tidak tersedia saat ini.",
+    "noMatchingProducts": "App Store tidak mengembalikan paket kredit yang cocok.",
+    "noMatchingProductsPlay": "Google Play tidak mengembalikan paket kredit yang cocok.",
+    "purchaseOwnedByAnotherAccount": "Kredit pada Apple Account ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredit di akun Google Play ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya."
   }
 }

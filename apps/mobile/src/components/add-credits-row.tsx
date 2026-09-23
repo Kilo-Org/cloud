@@ -8,12 +8,22 @@ import { isNarrowLayout } from '@/lib/narrow-layout';
 import { cn } from '@/lib/utils';
 
 type AddCreditsRowProps = Readonly<{
-  url: string;
+  /** External billing page to open. App Store review forbids this on iOS. */
+  url?: string;
+  /** In-app destination (the credit purchase screen); platform-agnostic. */
+  onPress?: () => void;
   className?: string;
 }>;
 
-/** Zero-balance CTA row: muted copy + an "Add credits" button to the web billing page. */
-export function AddCreditsRow({ url, className }: AddCreditsRowProps) {
+/**
+ * Muted copy + an "Add credits" button. With `onPress` the button is an in-app
+ * CTA on every platform. With `url` it opens the external web billing page,
+ * which only Android has: iOS has no in-app link to an external purchase
+ * (App Store review forbids it), so the gate here keeps that variant off iOS
+ * whichever call site renders it. That is the whole platform fork: the row's
+ * copy, layout and in-app CTA are identical on both.
+ */
+export function AddCreditsRow({ url, onPress, className }: AddCreditsRowProps) {
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   // The button keeps its natural width, so in a narrow window the description
@@ -21,11 +31,21 @@ export function AddCreditsRow({ url, className }: AddCreditsRowProps) {
   // 2026-09-21). Stacking gives the copy the row's full width.
   const narrow = isNarrowLayout(width);
   // App Store review: iOS must not show an in-app CTA that opens an external
-  // purchase/billing page. Credits are managed on the web there, so this row is
-  // Android-only — gate it here so no call site can surface it on iOS.
-  if (Platform.OS === 'ios') {
+  // purchase/billing page, so the external `url` variant stays Android-only —
+  // gate it here so no call site can surface it on iOS. An in-app `onPress`
+  // CTA is platform-agnostic and shows on both platforms.
+  if (!onPress && Platform.OS === 'ios') {
     return null;
   }
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+      return;
+    }
+    if (url) {
+      void openExternalUrl(url, { label: t('addCredits.billingPage') });
+    }
+  };
   return (
     <View className={cn(narrow ? 'gap-2' : 'flex-row items-center justify-between', className)}>
       <Text className={cn(narrow ? undefined : 'flex-1 pr-3', 'text-xs text-muted-foreground')}>
@@ -35,9 +55,7 @@ export function AddCreditsRow({ url, className }: AddCreditsRowProps) {
         size="sm"
         variant="outline"
         className={narrow ? 'w-full' : undefined}
-        onPress={() => {
-          void openExternalUrl(url, { label: t('addCredits.billingPage') });
-        }}
+        onPress={handlePress}
       >
         <Text className="text-xs font-semibold">{t('addCredits.cta')}</Text>
       </Button>

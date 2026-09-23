@@ -214,7 +214,6 @@
     "showBalance": "បង្ហាញសមតុល្យ",
     "balanceHidden": "សមតុល្យត្រូវបានលាក់",
     "bonusCreditsExpiring": "ឥណទានបន្ថែមចំនួន {{amount}} នឹងផុតកំណត់នៅ {{date}}។",
-    "creditBalanceEmpty": "អ្នកអស់ឥណទានហើយ។ សម្រាប់គណនីនេះ អ្នកត្រូវគ្រប់គ្រងឥណទាននៅខាងក្រៅកម្មវិធី iOS។",
     "signOutTitle": "ចេញពីគណនី?",
     "signOutMessage": "អ្នកត្រូវចូលគណនីម្តងទៀត ដើម្បីប្រើកន្លែងធ្វើការរបស់អ្នក។",
     "deleteAccountTitle": "លុបគណនី?",
@@ -3224,5 +3223,17 @@
     "multiplierError": "បញ្ចូលតម្លៃគុណ 1 ឬច្រើនជាងនេះ",
     "permissionDenied": "អ្នកមិនមានសិទ្ធិគ្រប់គ្រងការជូនដំណឹងអំពីការចំណាយទេ។",
     "pushOffByCategory": "បិទក្នុងការជូនដំណឹង"
+  },
+  "credits": {
+    "title": "ទិញឥណទាន",
+    "description": "ឥណទានគឺជាការទិញតែម្តងដែលបន្ថែមទៅសមតុល្យ Kilo របស់អ្នកសម្រាប់ដំណើរការវគ្គសរសេរកូដ AI នៅក្នុង Kilo App។ ហាងគិតប្រាក់ពីគណនីរបស់អ្នក ហើយឥណទានត្រូវបានបន្ថែមបន្ទាប់ពីហាងបញ្ជាក់ការបង់ប្រាក់។",
+    "packLabel": "បន្ថែមឥណទាន {{amount}}",
+    "priceUnavailable": "តម្លៃមិនអាចប្រើបានទេ",
+    "purchased": "ឥណទានត្រូវបានបន្ថែមទៅសមតុល្យរបស់អ្នក។",
+    "empty": "កញ្ចប់ឥណទានមិនអាចប្រើបាននៅពេលនេះទេ។",
+    "noMatchingProducts": "App Store មិនបានត្រឡប់កញ្ចប់ឥណទានដែលត្រូវគ្នាទេ។",
+    "noMatchingProductsPlay": "Google Play មិនបានត្រឡប់កញ្ចប់ឥណទានដែលត្រូវគ្នាទេ។",
+    "purchaseOwnedByAnotherAccount": "ឥណទាននៅលើ Apple Account នេះជារបស់គណនី Kilo ផ្សេង។ ចូលគណនី Kilo នោះដើម្បីប្រើវា។",
+    "purchaseOwnedByAnotherAccountPlay": "ឥណទាននៅលើគណនី Google Play នេះជារបស់គណនី Kilo ផ្សេង។ ចូលគណនី Kilo នោះដើម្បីប្រើវា។"
   }
 }

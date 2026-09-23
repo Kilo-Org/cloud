@@ -1,8 +1,9 @@
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { type Href, useRouter } from 'expo-router';
 import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
-import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -34,6 +35,7 @@ type CreditsCardProps = {
 export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
+  const router = useRouter();
   const { width } = useWindowDimensions();
   // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
   // "CREDITS" eyebrow too little room for one word and Android breaks it
@@ -120,17 +122,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
 
   const canPickContext = orgs !== undefined;
 
-  // Personal (non-org) credits are a consumable purchased directly by the end
-  // user, so Apple requires IAP for them — iOS can't show purchase language
-  // pointing at the web billing page. Org billing is exempt (business/seat
-  // billing), but only members who can manage billing should see the CTA —
-  // matching the money-role gate on the organization hub screen.
+  // Personal credits are a consumable bought in-app, so the personal row is
+  // shown on every platform and at any balance — a funded user must still be
+  // able to top up. Org billing stays a web flow and only members who can
+  // manage billing see the external CTA, matching the money-role gate on the
+  // organization hub screen.
   const selectedOrgRole = orgs?.find(o => o.organizationId === selectedOrgId)?.role;
-  const canShowZeroBalanceCta =
-    selectedOrgId != null ? isMoneyRole(selectedOrgRole) : Platform.OS !== 'ios';
-  const zeroBalanceUrl = selectedOrgId
-    ? `${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`
-    : `${WEB_BASE_URL}/credits`;
+  const canManageOrgBilling = selectedOrgId != null && isMoneyRole(selectedOrgRole);
 
   return (
     <View className="gap-3">
@@ -262,28 +260,27 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </View>
       )}
-      {!balanceLoading &&
+      {selectedOrgId == null ? (
+        // Personal: in-app purchase entry point on both platforms, shown at any
+        // balance so a funded user can still top up.
+        <AddCreditsRow
+          onPress={() => {
+            router.push('/(app)/credits' as Href);
+          }}
+          className="rounded-lg bg-secondary px-3 py-3"
+        />
+      ) : (
+        canManageOrgBilling &&
+        !balanceLoading &&
         !balancePending &&
         !balanceFailed &&
-        balanceDollars === 0 &&
-        canShowZeroBalanceCta && (
-          <AddCreditsRow url={zeroBalanceUrl} className="rounded-lg bg-secondary px-3 py-3" />
-        )}
-      {/* Personal-context IAP disclosure only — never show this personal "managed
-          outside the iOS app" copy under an org context (org billing isn't personal
-          IAP, and a non-money-role member just lacks access). */}
-      {!balanceLoading &&
-        !balancePending &&
-        !balanceFailed &&
-        balanceDollars === 0 &&
-        !canShowZeroBalanceCta &&
-        selectedOrgId == null && (
-          <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-3">
-            <Text className="flex-1 pr-3 text-xs text-muted-foreground">
-              {t('profile.creditBalanceEmpty')}
-            </Text>
-          </View>
-        )}
+        balanceDollars === 0 && (
+          <AddCreditsRow
+            url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`}
+            className="rounded-lg bg-secondary px-3 py-3"
+          />
+        )
+      )}
       {/* One loading indicator per section: while the balance slot shows its
           skeleton, the KiloPass card reserves its slot quietly instead of
           stacking a second skeleton card. The card's queries still run from

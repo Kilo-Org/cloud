@@ -89,8 +89,11 @@ function armRetryTimer(): void {
  * closure that deregisters it. The first row installs the single online
  * listener; the reconnect edge resets the wait to the base delay and re-arms,
  * so the first replay after coming back online happens at the base cadence
- * rather than the backed-off one. The last disarmed row clears the timer and
- * resets the delay, so a later mount starts from the base again.
+ * rather than the backed-off one. The armed handle is cleared first: a
+ * reconnect inside an already-armed long backed-off wait must replace it, or
+ * `armRetryTimer`'s early return would leave the stale wait standing. The last
+ * disarmed row clears the timer and resets the delay, so a later mount starts
+ * from the base again.
  */
 function armTranslationRetry(): () => void {
   retrySubscribers += 1;
@@ -99,6 +102,7 @@ function armTranslationRetry(): () => void {
     onlineManager.subscribe(online => {
       if (online && retrySubscribers > 0) {
         retryDelayMs = TOOL_SUMMARY_TRANSLATION_RETRY_MS;
+        clearRetryTimer();
         armRetryTimer();
       }
     });

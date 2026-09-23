@@ -250,24 +250,51 @@ describe('useResolvedFilePartUrl sweeper', () => {
     expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 2_147_483_647);
   });
 
-  it('falls back to the 30 s floor when a cached expiry is not finite', async () => {
-    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+  it('renews a cached entry whose expiry is not finite instead of spinning at the floor', async () => {
     const uuid = '11111111-1111-4111-8111-111111111111';
     // An unparseable server `expiresAt` lands as NaN: parseTimestamp(...).getTime().
     cacheRenewableEntry('part-1', { uuid, filename: 'a.png' }, { urlExpiresAt: Number.NaN });
 
     await mountProbe(makeFilePart('part-1', uuid, 'a.png'));
+    await flushMicrotasks();
 
-    // A NaN delay makes setTimeout fire after ~1 ms and the sweep re-arm
-    // forever; a non-finite expiry must fall back to the 30 s floor instead.
-    expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 30_000);
+    // A NaN delay would make setTimeout fire after ~1 ms and the sweep re-arm
+    // forever, and a NaN expiry never compares as due, so the malformed entry is
+    // renewed at once and its finite replacement expiry governs the sweep again.
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
+    expect(getFilePartCacheEntry('part-1')?.urlExpiresAt).toBe(Date.parse('2099-01-01T00:00:00Z'));
+  });
 
-    advance(30_000);
+  it('lets a finite sibling deadline govern after renewing a malformed entry', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const badUuid = '11111111-1111-4111-8111-111111111111';
+    const farUuid = '22222222-2222-4222-8222-222222222222';
+    // The malformed entry is stored first so it is visited before any finite
+    // one: its NaN used to be the last word on `soonest`, pinning the whole
+    // shared sweep to the 30 s floor and never renewing itself.
+    cacheRenewableEntry(
+      'part-1',
+      { uuid: badUuid, filename: 'a.png' },
+      { url: 'https://r2.example/bad', urlExpiresAt: Number.NaN }
+    );
+    const farDue = Date.now() + 900_000;
+    cacheRenewableEntry(
+      'part-2',
+      { uuid: farUuid, filename: 'b.png' },
+      { url: 'https://r2.example/far', urlExpiresAt: farDue }
+    );
+    await mountProbe(makeFilePart('part-1', badUuid, 'a.png'));
+    await mountProbe(makeFilePart('part-2', farUuid, 'b.png'));
+    await flushMicrotasks();
 
-    // The entry is never due (NaN <= threshold is false), so the sweep does no
-    // work and re-arms at the floor rather than spinning.
-    expect(getAttachmentDownloadUrlMutate).not.toHaveBeenCalled();
-    expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 30_000);
+    // Only the malformed entry is renewed; the far sibling is untouched.
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledTimes(1);
+    expect(getAttachmentDownloadUrlMutate).toHaveBeenCalledWith({
+      messageUuid: badUuid,
+      filename: 'a.png',
+    });
+    // The sweep waits for the sibling's real deadline, not the 30 s floor.
+    expect(setTimeoutSpy.mock.calls.map(call => call[1])).toContain(farDue - Date.now() - 120_000);
   });
 
   it('renews each due entry exactly once per sweep', async () => {

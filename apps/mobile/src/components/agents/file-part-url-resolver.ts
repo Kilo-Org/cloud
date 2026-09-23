@@ -103,34 +103,42 @@ async function presignAttachment(
   }
 }
 
+/** Milliseconds until a presigned entry is due for a renew. A missing or
+ *  non-finite `urlExpiresAt` (an unparseable server `expiresAt` stored as NaN)
+ *  is due at once: its URL has no trusted deadline to wait on, so the sweep
+ *  re-presigns it instead of letting a NaN poison the earliest-due reduction or
+ *  stranding the entry forever. */
+function renewDueInMs(entry: FilePartCacheEntry, now: number): number {
+  if (entry.urlExpiresAt === undefined || !Number.isFinite(entry.urlExpiresAt)) {
+    return 0;
+  }
+  return entry.urlExpiresAt - now - RENEW_THRESHOLD_MS;
+}
+
 /** True when a presigned entry needs a renew now: a ref and URL exist and the
- *  expiry is missing (old entry) or at/reached the renew threshold. */
+ *  expiry is missing, non-finite, or at/reached the renew threshold. */
 function isRenewDue(entry: FilePartCacheEntry, now: number): boolean {
   return (
-    entry.attachmentRef !== undefined &&
-    entry.url !== undefined &&
-    (entry.urlExpiresAt === undefined || entry.urlExpiresAt - now <= RENEW_THRESHOLD_MS)
+    entry.attachmentRef !== undefined && entry.url !== undefined && renewDueInMs(entry, now) <= 0
   );
 }
 
 /**
  * Delay until the earliest entry is due for a renew, floored at
  * RENEW_INTERVAL_MS, or null when no cached entry carries both an attachment
- * ref and a URL (nothing to renew). A non-finite expiry (an unparseable server
- * `expiresAt` stored as NaN) falls back to the floor: a NaN delay would arm a
- * ~1 ms timeout and re-schedule the sweep forever.
+ * ref and a URL (nothing to renew). `renewDueInMs` never returns NaN, so one
+ * malformed expiry cannot swallow a later entry's deadline or arm a ~1 ms
+ * timeout that re-schedules the sweep forever.
  */
 function nextRenewDelayMs(now: number): number | null {
   let soonest: number | undefined = undefined;
   for (const { entry } of listFilePartCacheEntries()) {
     if (entry.attachmentRef !== undefined && entry.url !== undefined) {
-      const dueIn = (entry.urlExpiresAt ?? now) - now - RENEW_THRESHOLD_MS;
+      const dueIn = renewDueInMs(entry, now);
       soonest = soonest === undefined || dueIn < soonest ? dueIn : soonest;
     }
   }
-  return soonest === undefined
-    ? null
-    : Math.max(RENEW_INTERVAL_MS, Number.isFinite(soonest) ? soonest : 0);
+  return soonest === undefined ? null : Math.max(RENEW_INTERVAL_MS, soonest);
 }
 
 /** Re-presign every cached entry that is due now and return the in-flight

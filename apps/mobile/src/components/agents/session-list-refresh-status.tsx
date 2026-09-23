@@ -30,13 +30,14 @@ type SessionListRefreshStatusProps = {
 
 /**
  * Agents-list refresh status. Where the platform's own pull-to-refresh
- * indicator is inset in the scroll content (`nativeRefreshIndicatorIsInset`),
- * the pull-in-flight copy is screen-reader only and takes no layout: that
- * indicator is the visual. Where it is not inset — Android, where it would
- * rest over the first row — the reserved band carries the in-flight spinner
- * and copy instead (device defect uxs1), unless the surface's centered body
- * draws the pull's progress itself (`progressInBody`). Failure shows
- * "Couldn't refresh" + Retry on its own line.
+ * indicator is inset in the scroll content (`nativeRefreshIndicatorIsInset`)
+ * and actually runs, the pull-in-flight copy is screen-reader only and takes
+ * no layout: that indicator is the visual. Where it is not inset — Android,
+ * where it would rest over the first row — or where reduced motion has parked
+ * it, the reserved band carries the in-flight spinner and copy instead (device
+ * defect uxs1), unless the surface's centered body draws the pull's progress
+ * itself (`progressInBody`). Failure shows "Couldn't refresh" + Retry on its
+ * own line.
  */
 export function SessionListRefreshStatus({
   busy,
@@ -51,9 +52,15 @@ export function SessionListRefreshStatus({
   // The body only draws that progress while the platform control is inert
   // (reduced motion), so only then can the band stand down its own spinner.
   const bodyDrawsProgress = progressInBody && reducedMotion;
+  // The platform's own indicator is the pull's visual only while it actually
+  // runs: the app's `RefreshControl` parks it under reduced motion (its
+  // rotation is the animation the policy removes), so there the reserved band
+  // draws the spinner on every platform — including iOS, where the inset
+  // platform control otherwise takes that role.
+  const platformControlIsTheVisual = nativeRefreshIndicatorIsInset(Platform.OS) && !reducedMotion;
   const showRetry = failed && !busy;
   if (busy) {
-    if (nativeRefreshIndicatorIsInset(Platform.OS)) {
+    if (platformControlIsTheVisual) {
       return (
         <AccessibleStatus
           message={t('agents.sessionList.updating')}

@@ -23,6 +23,12 @@ type EmptyStateProps = {
    *  depend on a measured surface (the root runtime-error screen). */
   placement?: 'center' | 'top' | 'static';
   refreshControl?: ScrollViewProps['refreshControl'];
+  /** The caller's surface reserves a status band that draws the pull's
+   *  progress itself, so a short band may drop the in-body progress strip
+   *  (`CenteredState.progressInBand`). Only the Agents no-match state passes
+   *  it; every other centered state keeps the strip, its only reduced-motion
+   *  pull indicator. */
+  progressInBand?: boolean;
   /** Overrides the icon bubble's container classes (size/shape/background). Defaults to the card-style bubble. */
   iconContainerClassName?: string;
   iconSize?: number;
@@ -34,11 +40,14 @@ type EmptyStateProps = {
 export function EmptyState({
   placement = 'center',
   refreshControl,
+  progressInBand,
   ...props
 }: Readonly<EmptyStateProps>) {
   const body = <EmptyStateBody {...props} placement={placement} />;
   return placement === 'center' ? (
-    <CenteredState refreshControl={refreshControl}>{body}</CenteredState>
+    <CenteredState refreshControl={refreshControl} progressInBand={progressInBand}>
+      {body}
+    </CenteredState>
   ) : (
     body
   );

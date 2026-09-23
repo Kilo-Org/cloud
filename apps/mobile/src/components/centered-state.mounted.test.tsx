@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SearchX } from '@/components/ui/icons';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 
 import { CenteredState, STATE_SURFACE_FALLBACK_MS } from './centered-state';
 import { type useStateSurface } from './centered-state-surface';
@@ -190,6 +191,43 @@ describe('Shared state placement', () => {
       <EmptyState icon={SearchX} title="Empty" description="No results" />
     );
     expect(portrait.renderer.root.findAllByType(SearchX)).toHaveLength(1);
+    portrait.unmount();
+  });
+
+  it('drops the pull progress strip in a short band only where the band draws it', async () => {
+    // Landscape UX defect e1: the strip the reduced-motion pull reserves is
+    // measured as part of the body, so a 411dp-tall landscape band could not
+    // hold it and the state's copy and its action — on the Agents no-match
+    // state that reservation pushed the second line and the Clear-search action
+    // under the fixed tab bar. Only the surface whose own reserved band draws
+    // the pull (`progressInBand`) may yield the strip there; a centered
+    // refreshable surface with no band to fall back on keeps it, because the
+    // strip is the pull's only reduced-motion indicator.
+    const refreshControl = createElement('RefreshControl', {
+      refreshing: false,
+      onRefresh: vi.fn(),
+    });
+    const state = (progressInBand?: boolean) =>
+      createElement(EmptyState, {
+        icon: SearchX,
+        title: 'Empty',
+        description: 'No results',
+        refreshControl,
+        progressInBand,
+      });
+
+    native.window = { width: 914, height: 411 };
+    const banded = await renderWithProviders(state(true));
+    expect(banded.renderer.root.findAllByType(RefreshProgress)).toHaveLength(0);
+    banded.unmount();
+
+    const bandless = await renderWithProviders(state());
+    expect(bandless.renderer.root.findAllByType(RefreshProgress)).toHaveLength(1);
+    bandless.unmount();
+
+    native.window = { width: 411, height: 914 };
+    const portrait = await renderWithProviders(state(true));
+    expect(portrait.renderer.root.findAllByType(RefreshProgress)).toHaveLength(1);
     portrait.unmount();
   });
 

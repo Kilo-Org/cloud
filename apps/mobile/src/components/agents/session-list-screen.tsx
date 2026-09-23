@@ -57,8 +57,11 @@ export function AgentSessionListScreen() {
   // the keyboard events instead (the repo's one platform fork for this).
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
   // The window decides the short-landscape case below: the FAB's own strip is
-  // only worth reserving while the window can spare it.
+  // only worth reserving while the window can spare it, and the centered
+  // bodies' pull progress moves to the reserved status line above them, because
+  // a short band cannot hold both the body and the body's own progress strip.
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const shortWindow = isShortViewport(windowWidth, windowHeight);
 
   const context = useLiveSessionContext();
   const { organizationId, isError: isContextError, refetch: refetchContext } = context;
@@ -289,6 +292,10 @@ export function AgentSessionListScreen() {
     // over it (device defect uxs1). That body is centered, so it draws the
     // pull's own progress while reduced motion is on, and the band then
     // yields its spinner to it (`progressInBody` on the reserved line).
+    // A short landscape band cannot hold both the body and that in-body
+    // progress strip, so the body yields the strip to the band instead
+    // (`progressInBand`): one indicator either way, and the copy and the
+    // Clear-search action stay clear of the fixed tab bar.
     // The centered body clears the fixed tab bar through the surface
     // reservation this screen already sets: `CenteredState`'s pending-layout
     // fallback pads by `surface.bottomReservation` (the tab bar plus the FAB
@@ -300,6 +307,7 @@ export function AgentSessionListScreen() {
         icon={Bot}
         title={t('agents.sessionList.noMatches')}
         refreshControl={rowsControl}
+        progressInBand
         description={
           isSearching
             ? t('agents.sessionList.tryDifferentSearch')
@@ -347,9 +355,7 @@ export function AgentSessionListScreen() {
   // and its action need — and drops its action under the bar. There the FAB is
   // a corner overlay and the centered column never reaches it, so the reserved
   // band is the tab bar's own.
-  const centeredBottomInset =
-    tabBarHeight +
-    (showFab && !isShortViewport(windowWidth, windowHeight) ? FAB_SIZE + FAB_MARGIN : 0);
+  const centeredBottomInset = tabBarHeight + (showFab && !shortWindow ? FAB_SIZE + FAB_MARGIN : 0);
 
   // The feedback band and the body share one keyboard container so every
   // centered state (no-match, live-empty, skeletons, load failure) re-measures
@@ -372,8 +378,12 @@ export function AgentSessionListScreen() {
             onRetry: handleRefreshRetry,
             // The pull's progress belongs to the centered no-match body (the
             // same state that mounts it), so the band does not draw a second
-            // spinner while that body shows one.
-            progressInBody: hasLiveRows && visibleSessions.length === 0 && pull.refreshing,
+            // spinner while that body shows one. A short landscape band cannot
+            // hold the body's own progress strip and its copy and action, so
+            // the strip yields there (`progressInBand` on that body) and the
+            // band keeps the pull's spinner: exactly one indicator either way.
+            progressInBody:
+              hasLiveRows && visibleSessions.length === 0 && pull.refreshing && !shortWindow,
           }}
           refreshControl={refreshControl}
         />

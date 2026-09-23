@@ -91,6 +91,7 @@ afterEach(() => {
   act(() => renderer?.unmount());
   renderer = undefined;
   device.reducedMotion = false;
+  device.platform.OS = 'android';
 });
 
 describe('SessionListRefreshStatus pull progress', () => {
@@ -117,5 +118,21 @@ describe('SessionListRefreshStatus pull progress', () => {
     const mounted = mount(bandSurface(true));
     expect(mounted.root.findAllByType('NativeActivityIndicator' as ElementType)).toHaveLength(1);
     expect(mounted.root.findAllByType('Loader2' as ElementType)).toHaveLength(0);
+  });
+
+  it('draws the pull spinner on iOS once reduced motion parks the platform control', () => {
+    device.platform.OS = 'ios';
+    device.reducedMotion = true;
+    // The app's `RefreshControl` parks the inset platform control while the
+    // policy removes its rotation, so the reserved band — not the inert
+    // platform indicator — is the pull's visual there.
+    expect(mount(bandSurface()).root.findAllByType('Loader2' as ElementType)).toHaveLength(1);
+  });
+
+  it('leaves the pull visual to the iOS platform control without reduced motion', () => {
+    device.platform.OS = 'ios';
+    const mounted = mount(bandSurface());
+    expect(mounted.root.findAllByType('Loader2' as ElementType)).toHaveLength(0);
+    expect(mounted.root.findAllByType('NativeActivityIndicator' as ElementType)).toHaveLength(0);
   });
 });

@@ -31,6 +31,14 @@ type CenteredStateProps = {
   className?: string;
   testID?: string;
   refreshControl?: ScrollViewProps['refreshControl'];
+  /**
+   * The surface reserves a status band that draws the pull's progress itself
+   * (the Agents no-match state's reserved line). A short band cannot hold both
+   * the body and the in-body progress strip, so the strip yields to that band.
+   * Every other centered refreshable surface has no band to fall back on: the
+   * strip is the pull's only reduced-motion indicator there and stays.
+   */
+  progressInBand?: boolean;
 };
 
 type MeasuredViewport = { frame: StateFrame; surface: StateFrame };
@@ -47,6 +55,7 @@ export function CenteredState({
   className,
   testID = 'centered-state',
   refreshControl,
+  progressInBand = false,
 }: CenteredStateProps) {
   const surface = useStateSurface();
   const frame = surface?.frame;
@@ -181,7 +190,21 @@ export function CenteredState({
           accessibilityElementsHidden={!visible}
           importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
         >
-          {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
+          {/*
+            The in-body strip reserves the pull's static spinner, which the app
+            draws itself while reduced motion has parked the platform control.
+            It is measured as part of the body, so a short band — a phone held
+            sideways — cannot hold it and the state's copy and its action: on
+            the Agents no-match state that reservation is exactly what pushed
+            the second line and the Clear-search action under the fixed tab bar
+            (landscape UX defect, e1). That surface's own reserved band carries
+            the pull (`progressInBand`), so a short band drops the reservation
+            there; a centered refreshable surface with no such band keeps the
+            strip, which is the pull's only reduced-motion indicator.
+          */}
+          {refreshControl && !(shortBand && progressInBand) ? (
+            <RefreshProgress refreshControl={refreshControl} />
+          ) : null}
           {children}
         </View>
       </ScrollView>

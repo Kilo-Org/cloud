@@ -579,6 +579,10 @@ describe('AgentSessionListScreen live presentation', () => {
 
     expect(nodes('CenteredState')).toHaveLength(1);
     expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(state.tabBarHeight);
+    // This body is the load-failure block, which has no reserved status band of
+    // its own: it keeps the in-body progress strip, the pull's only
+    // reduced-motion indicator there.
+    expect(nodes('CenteredState')[0]?.props.progressInBand).toBeUndefined();
   });
 
   it('still reserves the FAB strip on a tablet held sideways', async () => {
@@ -1040,6 +1044,47 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(updating).toBeDefined();
     expect(updating?.props.className).not.toContain('absolute');
     expect(nodes('ActivityIndicator')).toHaveLength(0);
+    await act(async () => {
+      pending.resolve(true);
+      await pending.promise;
+    });
+    expect(nodes('ActivityIndicator')).toHaveLength(0);
+    expect(refresh().props.refreshing).toBe(false);
+  });
+
+  it('hands the pull back to the reserved band when a short landscape band cannot hold the strip', async () => {
+    // Landscape UX defect e1: a 411dp-tall landscape band cannot hold both the
+    // no-match body and the progress strip the body reserves for its
+    // reduced-motion spinner, so the strip yields there (`progressInBand`) and
+    // the reserved band above the body keeps the pull's spinner instead — one
+    // indicator, and the copy and Clear-search action stay clear of the bar.
+    state.live.activeSessions = [row];
+    const pending = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValue(pending.promise);
+    state.platform.OS = 'android';
+    state.reducedMotion = true;
+    state.windowWidth = 914;
+    state.windowHeight = 411;
+    await renderScreen();
+    const searchHeader = requireNode('SessionListSearchHeader');
+    act(() => {
+      (searchHeader.props.onChangeText as (text: string) => void)('nothing matches this');
+    });
+    // Only this body's surface draws the pull in its own reserved status line
+    // (`progressInBody` is false in a short window), so only it may yield the
+    // in-body strip.
+    expect(nodes('CenteredState')[0]?.props.progressInBand).toBe(true);
+    const refresh = () =>
+      nodes('CenteredState')[0]?.props.refreshControl as ReactElement<{
+        refreshing: boolean;
+        onRefresh: () => void;
+      }>;
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    expect(nodes('ActivityIndicator')).toHaveLength(1);
+    const updating = nodes('Text').find(node => node.children.includes('Updating'));
+    expect(updating).toBeDefined();
     await act(async () => {
       pending.resolve(true);
       await pending.promise;

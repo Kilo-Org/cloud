@@ -49,6 +49,15 @@ const BUTTON_BAR_STYLE_ITEMS = [
 const TEXT_ALL_CAPS_ITEM = 'android:textAllCaps';
 const WINDOW_BACKGROUND_ITEM = 'android:windowBackground';
 
+/**
+ * A per-platform branch in shared JS: a `Platform.OS`/`Platform.select` check,
+ * or an import of a platform-suffixed module. Narrower than a bare `Platform`
+ * token so a comment, a type name, or an unrelated plugin reference does not
+ * read as a fork (same shape as alert-dialog-platform-parity.test.ts).
+ */
+const PLATFORM_BRANCH =
+  /\bPlatform\.(?:OS|select|Version)\b|from '[^']+\.(?:ios|android)'|require\('[^']+\.(?:ios|android)'\)/;
+
 type StyleItem = { $?: { name?: string }; _?: string };
 type Style = { $?: { name?: string; parent?: string }; item?: StyleItem[] };
 type StylesTree = { resources: { style: Style[] } };
@@ -175,20 +184,31 @@ describe('Android alert-dialog button case plugin', () => {
   it('is registered in the evaluated app config exactly once', () => {
     const occurrences = appConfigSource.split(`'${PLUGIN_PATH}'`).length - 1;
     expect(occurrences).toBe(1);
-    // One shared config for both platforms: a `Platform` branch around the
+    // One shared config for both platforms: a platform branch around the
     // registration would be the only way to fork it, and there is none.
-    expect(appConfigSource).not.toMatch(/\bPlatform\b/);
+    expect(appConfigSource).not.toMatch(PLATFORM_BRANCH);
   });
 
   it('leaves the discard confirm as one shared Alert.alert call site', () => {
     // Parity guard: Android and iOS share the one call. The fix re-cases the
-    // Android render; it does not fork the call site by platform. Any
-    // `Platform` reference at all is rejected, so the guard also catches the
-    // shapes a later edit could reach for (`Platform.OS`, `Platform.select`, a
-    // platform-specific import) rather than only the two literal forms.
+    // Android render; it does not fork the call site by platform. The guard
+    // matches the branch shapes a later edit could reach for (`Platform.OS`,
+    // `Platform.select`, a platform-specific import) rather than a bare
+    // `Platform` token, so a comment or an unrelated reference is not a fork.
     expect(discardGuardSource.match(/Alert\.alert\(/g)).toHaveLength(1);
     expect(discardGuardSource).toContain("i18n.t('common.keepEditing')");
     expect(discardGuardSource).toContain("i18n.t('common.discard')");
-    expect(discardGuardSource).not.toMatch(/\bPlatform\b/);
+    expect(discardGuardSource).not.toMatch(PLATFORM_BRANCH);
+  });
+
+  it('reads a real platform fork but not a bare Platform token', () => {
+    // The guard's intent is a per-platform fork, not the word itself: a
+    // comment, a type name, or an unrelated module reference must not fail it.
+    expect(PLATFORM_BRANCH.test('// Platform-specific plugin, registered once')).toBe(false);
+    expect(PLATFORM_BRANCH.test("require('react-native')")).toBe(false);
+    // The shapes a later edit could actually fork with still must.
+    expect(PLATFORM_BRANCH.test("if (Platform.OS === 'android') return;")).toBe(true);
+    expect(PLATFORM_BRANCH.test('Platform.select({ android: 1, default: 2 })')).toBe(true);
+    expect(PLATFORM_BRANCH.test("import { button } from './alert-button.android'")).toBe(true);
   });
 });

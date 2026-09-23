@@ -3294,6 +3294,7 @@
     "addVariable": "Variable hinzufügen",
     "keyLabel": "Schlüssel",
     "keyTooLong": "Der Schlüssel darf höchstens 256 Zeichen lang sein",
+    "keyDuplicate": "Dieser Schlüssel ist bereits im Profil vorhanden",
     "valueLabel": "Wert",
     "secretLabel": "Geheimnis",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Geben Sie einen Servernamen ein",
       "nameInvalid": "Der Name darf nur Buchstaben, Zahlen, Unterstriche und Bindestriche enthalten",
       "commandRequired": "Geben Sie einen Befehl ein",
+      "commandTooLong": "Verwenden Sie höchstens 50 Argumente mit je 500 Zeichen",
       "urlRequired": "Geben Sie eine URL ein",
       "urlInvalid": "Geben Sie eine gültige URL ein",
+      "urlTooLong": "Die URL darf höchstens 2048 Zeichen lang sein",
       "jsonInvalid": "Geben Sie gültiges JSON ein – ein Objekt mit Zeichenfolgenwerten",
+      "jsonTooLarge": "Verwenden Sie höchstens 50 Einträge, Schlüssel bis 128 und Werte bis 4096 Zeichen",
       "timeoutInvalid": "Das Zeitlimit muss eine ganze Zahl von Millisekunden betragen",
       "edit": "Bearbeiten Sie den MCP-Server",
       "saveFailed": "Der MCP-Server konnte nicht gespeichert werden"

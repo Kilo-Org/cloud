@@ -3294,6 +3294,7 @@
     "addVariable": "Lägg till variabel",
     "keyLabel": "Nyckel",
     "keyTooLong": "Nyckeln får innehålla högst 256 tecken",
+    "keyDuplicate": "Den här nyckeln finns redan i profilen",
     "valueLabel": "Värde",
     "secretLabel": "Hemlighet",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Ange ett servernamn",
       "nameInvalid": "Namn kan endast använda bokstäver, siffror, understreck och bindestreck",
       "commandRequired": "Ange ett kommando",
+      "commandTooLong": "Använd högst 50 argument med 500 tecken vardera",
       "urlRequired": "Ange en URL",
       "urlInvalid": "Ange en giltig URL",
+      "urlTooLong": "URL:en får innehålla högst 2048 tecken",
       "jsonInvalid": "Ange giltig JSON — ett objekt med strängvärden",
+      "jsonTooLarge": "Använd högst 50 poster, nycklar upp till 128 och värden upp till 4096 tecken",
       "timeoutInvalid": "Timeout måste vara ett helt antal millisekunder",
       "edit": "Redigera MCP-server",
       "saveFailed": "Det gick inte att spara MCP-servern"

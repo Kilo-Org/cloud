@@ -3294,6 +3294,7 @@
     "addVariable": "Ajoute varyab",
     "keyLabel": "Kle",
     "keyTooLong": "Kle a dwe gen 256 karaktè oswa mwens",
+    "keyDuplicate": "Kle sa a deja egziste nan pwofil la",
     "valueLabel": "Valè",
     "secretLabel": "Sekrè",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Antre yon non sèvè",
       "nameInvalid": "Non ka itilize sèlman lèt, nimewo, tirè ak tirè",
       "commandRequired": "Antre yon lòd",
+      "commandTooLong": "Sèvi ak pa plis pase 50 agiman, chak 500 karaktè",
       "urlRequired": "Antre yon URL",
       "urlInvalid": "Antre yon URL ki valab",
+      "urlTooLong": "URL la dwe gen 2048 karaktè oswa mwens",
       "jsonInvalid": "Antre JSON valab - yon objè ki gen valè fisèl",
+      "jsonTooLarge": "Sèvi ak pa plis pase 50 antre, kle jiska 128 ak valè jiska 4096 karaktè",
       "timeoutInvalid": "Timeout dwe yon kantite antye milisgond",
       "edit": "Edit sèvè MCP",
       "saveFailed": "Pa t 'kapab sove sèvè MCP"

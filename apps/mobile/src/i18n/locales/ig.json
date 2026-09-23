@@ -3294,6 +3294,7 @@
     "addVariable": "Tinye mgbanwe",
     "keyLabel": "Igodo",
     "keyTooLong": "Igodo ga-abụ mkpụrụedemede 256 ma ọ bụ obere",
+    "keyDuplicate": "Igodo a dịworị na profaịlụ",
     "valueLabel": "Uru",
     "secretLabel": "Nzuzo",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Tinye aha nkesa",
       "nameInvalid": "Aha nwere ike iji naanị mkpụrụedemede, ọnụọgụ, akara akara, na dashes",
       "commandRequired": "Tinye iwu",
+      "commandTooLong": "Ejila ihe karịrị arụmụka 50, nke ọ bụla mkpụrụedemede 500",
       "urlRequired": "Tinye URL",
       "urlInvalid": "Tinye URL ziri ezi",
+      "urlTooLong": "URL ga-abụ mkpụrụedemede 2048 ma ọ bụ obere",
       "jsonInvalid": "Tinye JSON bara uru - ihe nwere ụkpụrụ eriri",
+      "jsonTooLarge": "Ejila ihe karịrị ndenye 50, igodo ruo 128 na uru ruo mkpụrụedemede 4096",
       "timeoutInvalid": "Oge ngwụcha ga-abụrịrị ọnụ ọgụgụ millisekọnd dum",
       "edit": "Dezie ihe nkesa MCP",
       "saveFailed": "Enweghị ike ichekwa ihe nkesa MCP"

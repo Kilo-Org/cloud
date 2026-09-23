@@ -3294,6 +3294,7 @@
     "addVariable": "Magdagdag ng variable",
     "keyLabel": "Susi",
     "keyTooLong": "Ang susi ay dapat 256 na character o mas kaunti",
+    "keyDuplicate": "Umiiral na ang key na ito sa profile",
     "valueLabel": "Halaga",
     "secretLabel": "Lihim",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Maglagay ng pangalan ng server",
       "nameInvalid": "Ang pangalan ay maaari lamang gumamit ng mga titik, numero, underscore, at gitling",
       "commandRequired": "Maglagay ng command",
+      "commandTooLong": "Gumamit ng hindi hihigit sa 50 argumento na 500 character bawat isa",
       "urlRequired": "Maglagay ng URL",
       "urlInvalid": "Maglagay ng wastong URL",
+      "urlTooLong": "Dapat 2048 character o mas kaunti ang URL",
       "jsonInvalid": "Maglagay ng wastong JSON — isang bagay ng mga halaga ng string",
+      "jsonTooLarge": "Gumamit ng hindi hihigit sa 50 entry, mga key hanggang 128 at mga value hanggang 4096 character",
       "timeoutInvalid": "Ang timeout ay dapat na isang buong bilang ng mga millisecond",
       "edit": "I-edit ang MCP server",
       "saveFailed": "Hindi ma-save ang MCP server"

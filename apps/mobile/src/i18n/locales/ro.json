@@ -3337,6 +3337,7 @@
     "addVariable": "Adăugați o variabilă",
     "keyLabel": "Cheie",
     "keyTooLong": "Cheia trebuie să aibă 256 de caractere sau mai puțin",
+    "keyDuplicate": "Această cheie există deja în profil",
     "valueLabel": "Valoare",
     "secretLabel": "Secret",
     "secrets": {
@@ -3387,9 +3388,12 @@
       "nameRequired": "Introduceți un nume de server",
       "nameInvalid": "Numele poate folosi numai litere, cifre, litere de subliniere și liniuțe",
       "commandRequired": "Introduceți o comandă",
+      "commandTooLong": "Folosiți cel mult 50 de argumente de 500 de caractere fiecare",
       "urlRequired": "Introduceți o adresă URL",
       "urlInvalid": "Introduceți o adresă URL validă",
+      "urlTooLong": "URL-ul trebuie să aibă 2048 de caractere sau mai puțin",
       "jsonInvalid": "Introduceți JSON valid — un obiect cu valori de șir",
+      "jsonTooLarge": "Folosiți cel mult 50 de intrări, chei de până la 128 și valori de până la 4096 de caractere",
       "timeoutInvalid": "Timeout trebuie să fie un număr întreg de milisecunde",
       "edit": "Editați serverul MCP",
       "saveFailed": "Serverul MCP nu a putut fi salvat"

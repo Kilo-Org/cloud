@@ -3294,6 +3294,7 @@
     "addVariable": "Legg til variabel",
     "keyLabel": "Nøkkel",
     "keyTooLong": "Nøkkelen kan ha høyst 256 tegn",
+    "keyDuplicate": "Denne nøkkelen finnes allerede i profilen",
     "valueLabel": "Verdi",
     "secretLabel": "Hemmelig",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Skriv inn et servernavn",
       "nameInvalid": "Navn kan bare bruke bokstaver, tall, understreker og bindestreker",
       "commandRequired": "Skriv inn en kommando",
+      "commandTooLong": "Bruk maks 50 argumenter på 500 tegn hver",
       "urlRequired": "Skriv inn en URL",
       "urlInvalid": "Skriv inn en gyldig URL",
+      "urlTooLong": "URL-en kan ha høyst 2048 tegn",
       "jsonInvalid": "Skriv inn gyldig JSON - et objekt med strengverdier",
+      "jsonTooLarge": "Bruk maks 50 oppføringer, nøkler opptil 128 og verdier opptil 4096 tegn",
       "timeoutInvalid": "Tidsavbrudd må være et helt antall millisekunder",
       "edit": "Rediger MCP-server",
       "saveFailed": "Kunne ikke lagre MCP-serveren"

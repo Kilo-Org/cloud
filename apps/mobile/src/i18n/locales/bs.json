@@ -3337,6 +3337,7 @@
     "addVariable": "Dodaj varijablu",
     "keyLabel": "Ključ",
     "keyTooLong": "Ključ može imati najviše 256 znakova",
+    "keyDuplicate": "Ovaj ključ već postoji u profilu",
     "valueLabel": "Vrijednost",
     "secretLabel": "Tajna",
     "secrets": {
@@ -3387,9 +3388,12 @@
       "nameRequired": "Unesite ime servera",
       "nameInvalid": "Ime može koristiti samo slova, brojeve, donje crte i crtice",
       "commandRequired": "Unesite komandu",
+      "commandTooLong": "Koristite najviše 50 argumenata od po 500 znakova",
       "urlRequired": "Unesite URL",
       "urlInvalid": "Unesite važeći URL",
+      "urlTooLong": "URL može imati najviše 2048 znakova",
       "jsonInvalid": "Unesite važeći JSON — objekt vrijednosti niza",
+      "jsonTooLarge": "Koristite najviše 50 unosa, ključevi do 128 i vrijednosti do 4096 znakova",
       "timeoutInvalid": "Vremensko ograničenje mora biti cijeli broj milisekundi",
       "edit": "Uredite MCP server",
       "saveFailed": "Nije moguće sačuvati MCP server"

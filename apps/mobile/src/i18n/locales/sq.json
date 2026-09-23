@@ -3294,6 +3294,7 @@
     "addVariable": "Shto variabël",
     "keyLabel": "Çelësi",
     "keyTooLong": "Çelësi duhet të ketë 256 karaktere ose më pak",
+    "keyDuplicate": "Ky çelës ekziston tashmë në profil",
     "valueLabel": "Vlera",
     "secretLabel": "Sekret",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Futni një emër serveri",
       "nameInvalid": "Emri mund të përdorë vetëm shkronja, numra, nënvizime dhe viza",
       "commandRequired": "Futni një komandë",
+      "commandTooLong": "Përdor maksimumi 50 argumente nga 500 karaktere secili",
       "urlRequired": "Fut një URL",
       "urlInvalid": "Fut një URL të vlefshme",
+      "urlTooLong": "URL-ja duhet të ketë 2048 karaktere ose më pak",
       "jsonInvalid": "Fut JSON të vlefshëm - një objekt vlerash vargu",
+      "jsonTooLarge": "Përdor maksimumi 50 hyrje, çelësa deri në 128 dhe vlera deri në 4096 karaktere",
       "timeoutInvalid": "Kohëzgjatja duhet të jetë një numër i plotë milisekondash",
       "edit": "Ndrysho serverin MCP",
       "saveFailed": "Serveri MCP nuk mund të ruhej"

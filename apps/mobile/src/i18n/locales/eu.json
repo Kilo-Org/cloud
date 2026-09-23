@@ -3294,6 +3294,7 @@
     "addVariable": "Gehitu aldagaia",
     "keyLabel": "Gakoa",
     "keyTooLong": "Gakoak 256 karaktere edo gutxiago izan behar ditu",
+    "keyDuplicate": "Gako hau jada badago profilean",
     "valueLabel": "Balioa",
     "secretLabel": "Sekretua",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Sartu zerbitzariaren izena",
       "nameInvalid": "Izenak hizkiak, zenbakiak, azpimarra eta marra soilik erabil ditzake",
       "commandRequired": "Sartu komando bat",
+      "commandTooLong": "Erabili gehienez 50 argumentu, bakoitza 500 karakterekoa",
       "urlRequired": "Sartu URL bat",
       "urlInvalid": "Sartu baliozko URL bat",
+      "urlTooLong": "URLak 2048 karaktere edo gutxiago izan behar ditu",
       "jsonInvalid": "Sartu baliozko JSON - kate-balioen objektua",
+      "jsonTooLarge": "Erabili gehienez 50 sarrera, gakoak 128 arte eta balioak 4096 karaktere arte",
       "timeoutInvalid": "Denbora-mugak milisegundo kopuru osoa izan behar du",
       "edit": "Editatu MCP zerbitzaria",
       "saveFailed": "Ezin izan da MCP zerbitzaria gorde"

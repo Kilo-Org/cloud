@@ -3466,6 +3466,7 @@
     "addVariable": "Ychwanegu newidyn",
     "keyLabel": "Allwedd",
     "keyTooLong": "Rhaid i'r allwedd fod yn 256 nod neu lai",
+    "keyDuplicate": "Mae'r allwedd hon eisoes yn bodoli yn y proffil",
     "valueLabel": "Gwerth",
     "secretLabel": "Cyfrinach",
     "secrets": {
@@ -3516,9 +3517,12 @@
       "nameRequired": "Rhowch enw gweinydd",
       "nameInvalid": "Dim ond llythrennau, rhifau, tanlinellau a llinellau toriad y gall enw eu defnyddio",
       "commandRequired": "Rhowch orchymyn",
+      "commandTooLong": "Defnyddiwch 50 dadl ar y mwyaf, pob un yn 500 nod",
       "urlRequired": "Rhowch URL",
       "urlInvalid": "Rhowch URL dilys",
+      "urlTooLong": "Rhaid i'r URL fod yn 2048 nod neu lai",
       "jsonInvalid": "Rhowch JSON dilys - gwrthrych o werthoedd llinynnol",
+      "jsonTooLarge": "Defnyddiwch 50 cofnod ar y mwyaf, allweddi hyd at 128 a gwerthoedd hyd at 4096 nod",
       "timeoutInvalid": "Rhaid i'r terfyn amser fod yn nifer gyfan o filieiliadau",
       "edit": "Golygu gweinydd MCP",
       "saveFailed": "Methu â chadw gweinydd MCP"

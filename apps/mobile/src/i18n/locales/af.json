@@ -3294,6 +3294,7 @@
     "addVariable": "Voeg veranderlike by",
     "keyLabel": "Sleutel",
     "keyTooLong": "Sleutel moet 256 karakters of minder wees",
+    "keyDuplicate": "Hierdie sleutel bestaan reeds in die profiel",
     "valueLabel": "Waarde",
     "secretLabel": "Geheim",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Voer 'n bedienernaam in",
       "nameInvalid": "Naam kan slegs letters, syfers, onderstrepe en strepe gebruik",
       "commandRequired": "Voer 'n opdrag in",
+      "commandTooLong": "Gebruik hoogstens 50 argumente van 500 karakters elk",
       "urlRequired": "Voer 'n URL in",
       "urlInvalid": "Voer 'n geldige URL in",
+      "urlTooLong": "Die URL moet 2048 karakters of minder wees",
       "jsonInvalid": "Voer geldige JSON in - 'n objek van stringwaardes",
+      "jsonTooLarge": "Gebruik hoogstens 50 inskrywings, sleutels tot 128 en waardes tot 4096 karakters",
       "timeoutInvalid": "Uitteltyd moet 'n hele aantal millisekondes wees",
       "edit": "Wysig MCP-bediener",
       "saveFailed": "Kon nie MCP-bediener stoor nie"

@@ -3294,6 +3294,7 @@
     "addVariable": "Lisa muutuja",
     "keyLabel": "Võti",
     "keyTooLong": "Võti võib olla kuni 256 tähemärki",
+    "keyDuplicate": "See võti on profiilis juba olemas",
     "valueLabel": "Väärtus",
     "secretLabel": "Saladus",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Sisestage serveri nimi",
       "nameInvalid": "Nimes võib kasutada ainult tähti, numbreid, allkriipse ja sidekriipse",
       "commandRequired": "Sisestage käsk",
+      "commandTooLong": "Kasuta kõige rohkem 50 argumenti, igaüks kuni 500 tähemärki",
       "urlRequired": "Sisestage URL",
       "urlInvalid": "Sisestage kehtiv URL",
+      "urlTooLong": "URL võib olla kuni 2048 tähemärki",
       "jsonInvalid": "Sisestage kehtiv JSON – stringiväärtuste objekt",
+      "jsonTooLarge": "Kasuta kõige rohkem 50 kirjet, võtmed kuni 128 ja väärtused kuni 4096 tähemärki",
       "timeoutInvalid": "Aegumine peab olema täisarv millisekundeid",
       "edit": "Redigeeri MCP-serverit",
       "saveFailed": "MCP-serverit ei saanud salvestada"

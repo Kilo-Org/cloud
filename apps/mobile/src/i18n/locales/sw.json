@@ -3294,6 +3294,7 @@
     "addVariable": "Ongeza tofauti",
     "keyLabel": "Ufunguo",
     "keyTooLong": "Ufunguo lazima uwe na vibambo 256 au chini yake",
+    "keyDuplicate": "Ufunguo huu tayari upo katika wasifu",
     "valueLabel": "Thamani",
     "secretLabel": "Siri",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Ingiza jina la seva",
       "nameInvalid": "Jina linaweza kutumia herufi, nambari, mistari chini na deshi pekee",
       "commandRequired": "Ingiza amri",
+      "commandTooLong": "Tumia hoja 50 au chini, kila moja vibambo 500",
       "urlRequired": "Weka URL",
       "urlInvalid": "Weka URL halali",
+      "urlTooLong": "URL lazima iwe na vibambo 2048 au chini",
       "jsonInvalid": "Weka JSON halali - kitu cha thamani za mfuatano",
+      "jsonTooLarge": "Tumia maingizo 50 au chini, funguo hadi 128 na thamani hadi vibambo 4096",
       "timeoutInvalid": "Muda umekwisha lazima iwe idadi nzima ya milisekunde",
       "edit": "Badilisha seva ya MCP",
       "saveFailed": "Haikuweza kuhifadhi seva ya MCP"

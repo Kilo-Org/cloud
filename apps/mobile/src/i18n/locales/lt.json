@@ -3380,6 +3380,7 @@
     "addVariable": "Pridėti kintamąjį",
     "keyLabel": "Raktas",
     "keyTooLong": "Raktas gali būti ne ilgesnis kaip 256 simboliai",
+    "keyDuplicate": "Šis raktas jau yra profilyje",
     "valueLabel": "Vertė",
     "secretLabel": "Paslaptis",
     "secrets": {
@@ -3430,9 +3431,12 @@
       "nameRequired": "Įveskite serverio pavadinimą",
       "nameInvalid": "Varde gali būti naudojamos tik raidės, skaičiai, apatiniai brūkšniai ir brūkšniai",
       "commandRequired": "Įveskite komandą",
+      "commandTooLong": "Naudokite ne daugiau kaip 50 argumentų, kurių kiekvienas 500 simbolių",
       "urlRequired": "Įveskite URL",
       "urlInvalid": "Įveskite tinkamą URL",
+      "urlTooLong": "URL gali būti ne ilgesnis kaip 2048 simboliai",
       "jsonInvalid": "Įveskite galiojantį JSON – eilutės reikšmių objektą",
+      "jsonTooLarge": "Naudokite ne daugiau kaip 50 įrašų, raktai iki 128 ir reikšmės iki 4096 simbolių",
       "timeoutInvalid": "Skirtasis laikas turi būti sveikas milisekundžių skaičius",
       "edit": "Redaguoti MCP serverį",
       "saveFailed": "Nepavyko išsaugoti MCP serverio"

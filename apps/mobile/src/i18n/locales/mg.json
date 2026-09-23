@@ -3294,6 +3294,7 @@
     "addVariable": "Ampio miovaova",
     "keyLabel": "Fanalahidy",
     "keyTooLong": "Tokony tsy mihoatra ny 256 tarehintsoratra ny fanalahidy",
+    "keyDuplicate": "Efa ao amin'ny profil ity fanalahidy ity",
     "valueLabel": "Sanda",
     "secretLabel": "zava-miafina",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Ampidiro anarana mpizara",
       "nameInvalid": "Ny anarana dia tsy afaka mampiasa afa-tsy litera, isa, tsipiho, ary tsipiho",
       "commandRequired": "Ampidiro baiko",
+      "commandTooLong": "Ampiasao farafahabetsany 50 tohan-kevitra, 500 tarehintsoratra avy",
       "urlRequired": "Ampidiro URL",
       "urlInvalid": "Ampidiro URL manan-kery",
+      "urlTooLong": "Tsy mihoatra ny 2048 tarehintsoratra ny URL",
       "jsonInvalid": "Ampidiro JSON manan-kery - zavatra misy soatoavin'ny tady",
+      "jsonTooLarge": "Ampiasao farafahabetsany 50 fidirana, fanalahidy hatramin'ny 128 ary sanda hatramin'ny 4096 tarehintsoratra",
       "timeoutInvalid": "Tokony ho milisegondra iray manontolo ny fotoana fiatoana",
       "edit": "Ahitsio MCP server",
       "saveFailed": "Tsy afaka nitahiry mpizara MCP"

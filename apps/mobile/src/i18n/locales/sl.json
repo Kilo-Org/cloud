@@ -3380,6 +3380,7 @@
     "addVariable": "Dodajte spremenljivko",
     "keyLabel": "Ključ",
     "keyTooLong": "Ključ ima lahko največ 256 znakov",
+    "keyDuplicate": "Ta ključ že obstaja v profilu",
     "valueLabel": "Vrednost",
     "secretLabel": "Skrivnost",
     "secrets": {
@@ -3430,9 +3431,12 @@
       "nameRequired": "Vnesite ime strežnika",
       "nameInvalid": "Ime lahko vsebuje samo črke, številke, podčrtaje in pomišljaje",
       "commandRequired": "Vnesite ukaz",
+      "commandTooLong": "Uporabite največ 50 argumentov po 500 znakov",
       "urlRequired": "Vnesite URL",
       "urlInvalid": "Vnesite veljaven URL",
+      "urlTooLong": "URL ima lahko največ 2048 znakov",
       "jsonInvalid": "Vnesite veljaven JSON — objekt vrednosti niza",
+      "jsonTooLarge": "Uporabite največ 50 vnosov, ključi do 128 in vrednosti do 4096 znakov",
       "timeoutInvalid": "Časovna omejitev mora biti celo število milisekund",
       "edit": "Uredi strežnik MCP",
       "saveFailed": "Strežnika MCP ni bilo mogoče shraniti"

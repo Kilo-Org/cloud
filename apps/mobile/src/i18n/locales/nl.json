@@ -3294,6 +3294,7 @@
     "addVariable": "Variabele toevoegen",
     "keyLabel": "Sleutel",
     "keyTooLong": "De sleutel mag maximaal 256 tekens bevatten",
+    "keyDuplicate": "Deze sleutel bestaat al in het profiel",
     "valueLabel": "Waarde",
     "secretLabel": "Geheim",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Voer een servernaam in",
       "nameInvalid": "De naam mag alleen letters, cijfers, onderstrepingstekens en streepjes bevatten",
       "commandRequired": "Voer een opdracht in",
+      "commandTooLong": "Gebruik maximaal 50 argumenten van elk 500 tekens",
       "urlRequired": "Voer een URL in",
       "urlInvalid": "Voer een geldige URL in",
+      "urlTooLong": "De URL mag maximaal 2048 tekens bevatten",
       "jsonInvalid": "Voer geldige JSON in: een object met tekenreekswaarden",
+      "jsonTooLarge": "Gebruik maximaal 50 vermeldingen, sleutels tot 128 en waarden tot 4096 tekens",
       "timeoutInvalid": "De time-out moet een geheel aantal milliseconden bedragen",
       "edit": "MCP-server bewerken",
       "saveFailed": "Kan MCP-server niet opslaan"

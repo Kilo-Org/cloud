@@ -3294,6 +3294,7 @@
     "addVariable": "Tilføj variabel",
     "keyLabel": "Nøgle",
     "keyTooLong": "Nøglen må højst være 256 tegn",
+    "keyDuplicate": "Denne nøgle findes allerede i profilen",
     "valueLabel": "Værdi",
     "secretLabel": "Hemmelighed",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Indtast et servernavn",
       "nameInvalid": "Navn kan kun bruge bogstaver, tal, understregninger og bindestreger",
       "commandRequired": "Indtast en kommando",
+      "commandTooLong": "Brug højst 50 argumenter på 500 tegn hver",
       "urlRequired": "Indtast en URL",
       "urlInvalid": "Indtast en gyldig URL",
+      "urlTooLong": "URL'en må højst være 2048 tegn",
       "jsonInvalid": "Indtast gyldig JSON - et objekt med strengværdier",
+      "jsonTooLarge": "Brug højst 50 poster, nøgler op til 128 og værdier op til 4096 tegn",
       "timeoutInvalid": "Timeout skal være et helt antal millisekunder",
       "edit": "Rediger MCP-server",
       "saveFailed": "MCP-serveren kunne ikke gemmes"

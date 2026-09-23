@@ -3294,6 +3294,7 @@
     "addVariable": "Ku dar doorsoome",
     "keyLabel": "Furaha",
     "keyTooLong": "Furaha waa inuu ahaadaa 256 xaraf ama ka yar",
+    "keyDuplicate": "Furahan hore ayuu ugu jiraa borofiilka",
     "valueLabel": "Qiimaha",
     "secretLabel": "Sirta",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Geli magaca adeegaha",
       "nameInvalid": "Magaca waxa uu isticmaali karaa xarfo, lambaro, hoosta, iyo xariijimaha",
       "commandRequired": "Gali amar",
+      "commandTooLong": "Isticmaal ugu badnaan 50 doodood oo mid kastaa 500 xaraf",
       "urlRequired": "Gali URL",
       "urlInvalid": "Geli URL sax ah",
+      "urlTooLong": "URL waa inuu noqdaa 2048 xaraf ama ka yar",
       "jsonInvalid": "Geli JSON sax ah - waa shay qiimayaal xadhig ah",
+      "jsonTooLarge": "Isticmaal ugu badnaan 50 gelin, furaha ilaa 128 iyo qiimaha ilaa 4096 xaraf",
       "timeoutInvalid": "Wakhtiga kama dambaysta ahi waa inuu noqdaa tiro dhan oo millise seconds",
       "edit": "Wax ka beddel serverka MCP",
       "saveFailed": "Waa la kaydin kari waayay seerfarka MCP"

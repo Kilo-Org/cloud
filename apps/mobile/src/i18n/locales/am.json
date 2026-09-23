@@ -3294,6 +3294,7 @@
     "addVariable": "ተለዋዋጭ ያክሉ",
     "keyLabel": "ቁልፍ",
     "keyTooLong": "ቁልፉ 256 ቁምፊዎች ወይም ከዚያ ያነሰ መሆን አለበት",
+    "keyDuplicate": "ይህ ቁልፍ አስቀድሞ በመገለጫው ውስጥ አለ",
     "valueLabel": "ዋጋ",
     "secretLabel": "ምስጢር",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "የአገልጋይ ስም አስገባ",
       "nameInvalid": "ስም ፊደሎችን፣ ቁጥሮችን፣ ሰረዞችን እና ሰረዞችን ብቻ መጠቀም ይችላል።",
       "commandRequired": "ትእዛዝ አስገባ",
+      "commandTooLong": "ቢበዛ 50 አርጉመንቶችን ይጠቀሙ፣ እያንዳንዱ 500 ቁምፊ",
       "urlRequired": "URL አስገባ",
       "urlInvalid": "የሚሰራ URL አስገባ",
+      "urlTooLong": "URL 2048 ቁምፊ ወይም ከዚያ ያነሰ መሆን አለበት",
       "jsonInvalid": "የሚሰራ JSON ያስገቡ - የሕብረቁምፊ እሴቶች ነገር",
+      "jsonTooLarge": "ቢበዛ 50 ግቤቶችን ይጠቀሙ፣ ቁልፎች እስከ 128 እና እሴቶች እስከ 4096 ቁምፊ",
       "timeoutInvalid": "ጊዜው ያለፈበት ሙሉ የሚሊሰከንዶች ቁጥር መሆን አለበት።",
       "edit": "የMCP አገልጋይ ያርትዑ",
       "saveFailed": "የMCP አገልጋይን ማስቀመጥ አልተቻለም"

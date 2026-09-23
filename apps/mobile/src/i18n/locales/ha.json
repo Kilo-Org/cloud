@@ -3294,6 +3294,7 @@
     "addVariable": "Ƙara m",
     "keyLabel": "Maɓalli",
     "keyTooLong": "Maɓalli dole ya zama haruffa 256 ko ƙasa da haka",
+    "keyDuplicate": "Wannan maɓalli ya riga ya kasance a cikin bayanin martaba",
     "valueLabel": "Daraja",
     "secretLabel": "Sirrin",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Shigar da sunan uwar garke",
       "nameInvalid": "Sunan zai iya amfani da haruffa kawai, lambobi, ƙararraki, da dashes",
       "commandRequired": "Shigar da umarni",
+      "commandTooLong": "Yi amfani da bai fi hujjoji 50 ba, kowanne haruffa 500",
       "urlRequired": "Shigar da URL",
       "urlInvalid": "Shigar da ingantaccen URL",
+      "urlTooLong": "Dole URL ya zama haruffa 2048 ko ƙasa da haka",
       "jsonInvalid": "Shigar da ingantacciyar JSON - abu na ƙimar kirtani",
+      "jsonTooLarge": "Yi amfani da bai fi shigarwa 50 ba, maɓallai har 128 da ƙimomi har haruffa 4096",
       "timeoutInvalid": "Ƙayyadaddun lokaci dole ne ya zama cikakken adadin millise seconds",
       "edit": "Shirya uwar garken MCP",
       "saveFailed": "An kasa ajiye uwar garken MCP"

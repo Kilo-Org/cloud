@@ -3294,6 +3294,7 @@
     "addVariable": "添加变量",
     "keyLabel": "键",
     "keyTooLong": "键不能超过 256 个字符",
+    "keyDuplicate": "此键已存在于配置文件中",
     "valueLabel": "值",
     "secretLabel": "秘密",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "输入服务器名称",
       "nameInvalid": "名称只能使用字母、数字、下划线和破折号",
       "commandRequired": "输入命令",
+      "commandTooLong": "最多使用 50 个参数，每个参数 500 个字符",
       "urlRequired": "输入网址",
       "urlInvalid": "输入有效的网址",
+      "urlTooLong": "网址不能超过 2048 个字符",
       "jsonInvalid": "输入有效的 JSON — 字符串值的对象",
+      "jsonTooLarge": "最多使用 50 个条目，键最多 128 个字符，值最多 4096 个字符",
       "timeoutInvalid": "超时必须是整数毫秒",
       "edit": "编辑 MCP 服务器",
       "saveFailed": "无法保存 MCP 服务器"

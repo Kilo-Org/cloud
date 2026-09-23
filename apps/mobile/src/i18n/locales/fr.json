@@ -3337,6 +3337,7 @@
     "addVariable": "Ajouter une variable",
     "keyLabel": "Clé",
     "keyTooLong": "La clé doit contenir 256 caractères ou moins",
+    "keyDuplicate": "Cette clé existe déjà dans le profil",
     "valueLabel": "Valeur",
     "secretLabel": "Secrète",
     "secrets": {
@@ -3387,9 +3388,12 @@
       "nameRequired": "Entrez un nom de serveur",
       "nameInvalid": "Le nom ne peut utiliser que des lettres, des chiffres, des traits de soulignement et des tirets.",
       "commandRequired": "Entrez une commande",
+      "commandTooLong": "Utilisez au maximum 50 arguments de 500 caractères chacun",
       "urlRequired": "Entrez une URL",
       "urlInvalid": "Entrez une URL valide",
+      "urlTooLong": "L'URL doit contenir 2048 caractères ou moins",
       "jsonInvalid": "Entrez un JSON valide - un objet de valeurs de chaîne",
+      "jsonTooLarge": "Utilisez au maximum 50 entrées, des clés jusqu'à 128 et des valeurs jusqu'à 4096 caractères",
       "timeoutInvalid": "Le délai d'attente doit être un nombre entier de millisecondes",
       "edit": "Modifier le serveur MCP",
       "saveFailed": "Impossible de sauvegarder le serveur MCP"

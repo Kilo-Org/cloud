@@ -3294,6 +3294,7 @@
     "addVariable": "Bæta við breytu",
     "keyLabel": "Lykill",
     "keyTooLong": "Lykillinn má vera að hámarki 256 stafir",
+    "keyDuplicate": "Þessi lykill er þegar til í prófílnum",
     "valueLabel": "Gildi",
     "secretLabel": "Leyndarmál",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Sláðu inn nafn netþjóns",
       "nameInvalid": "Nafn getur aðeins notað bókstafi, tölustafi, undirstrik og strik",
       "commandRequired": "Sláðu inn skipun",
+      "commandTooLong": "Notaðu að hámarki 50 rök, hvert 500 stafir",
       "urlRequired": "Sláðu inn vefslóð",
       "urlInvalid": "Sláðu inn gilda vefslóð",
+      "urlTooLong": "URL má vera að hámarki 2048 stafir",
       "jsonInvalid": "Sláðu inn gilt JSON - hlut með strengjagildum",
+      "jsonTooLarge": "Notaðu að hámarki 50 færslur, lyklar upp að 128 og gildi upp að 4096 stafir",
       "timeoutInvalid": "Tímamörk verða að vera heil tala af millisekúndum",
       "edit": "Breyta MCP miðlara",
       "saveFailed": "Gat ekki vistað MCP þjón"

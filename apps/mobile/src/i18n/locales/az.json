@@ -3294,6 +3294,7 @@
     "addVariable": "Dəyişən əlavə edin",
     "keyLabel": "Açar",
     "keyTooLong": "Açar 256 simvol və ya daha az olmalıdır",
+    "keyDuplicate": "Bu açar artıq profildə mövcuddur",
     "valueLabel": "Dəyər",
     "secretLabel": "Gizli",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Server adını daxil edin",
       "nameInvalid": "Ad yalnız hərflərdən, rəqəmlərdən, alt xəttlərdən və tirelərdən istifadə edə bilər",
       "commandRequired": "Komanda daxil edin",
+      "commandTooLong": "Ən çoxu 500 simvoldan ibarət 50 arqumentdən istifadə edin",
       "urlRequired": "URL daxil edin",
       "urlInvalid": "Etibarlı URL daxil edin",
+      "urlTooLong": "URL 2048 simvol və ya daha az olmalıdır",
       "jsonInvalid": "Etibarlı JSON daxil edin — sətir dəyərlərinin obyekti",
+      "jsonTooLarge": "Ən çoxu 50 giriş, 128-ə qədər açar və 4096 simvola qədər dəyər istifadə edin",
       "timeoutInvalid": "Taymout tam sayda millisaniyə olmalıdır",
       "edit": "MCP serverini redaktə edin",
       "saveFailed": "MCP serverini saxlamaq mümkün olmadı"

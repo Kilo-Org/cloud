@@ -3423,6 +3423,7 @@
     "addVariable": "Żid varjabbli",
     "keyLabel": "Ewlenin",
     "keyTooLong": "L-ewlenin irid ikun 256 karattru jew inqas",
+    "keyDuplicate": "Dan l-ewlenin diġà jeżisti fil-profil",
     "valueLabel": "Valur",
     "secretLabel": "Sigriet",
     "secrets": {
@@ -3473,9 +3474,12 @@
       "nameRequired": "Daħħal isem server",
       "nameInvalid": "Isem jista 'juża biss ittri, numri, underscore, u sing",
       "commandRequired": "Daħħal kmand",
+      "commandTooLong": "Uża mhux aktar minn 50 argument, kull wieħed 500 karattru",
       "urlRequired": "Daħħal URL",
       "urlInvalid": "Daħħal URL validu",
+      "urlTooLong": "L-URL irid ikun 2048 karattru jew inqas",
       "jsonInvalid": "Daħħal JSON validu — oġġett ta' valuri ta' string",
+      "jsonTooLarge": "Uża mhux aktar minn 50 entrata, ewlenin sa 128 u valuri sa 4096 karattru",
       "timeoutInvalid": "Timeout għandu jkun numru sħiħ ta' millisekondi",
       "edit": "Editja server MCP",
       "saveFailed": "Ma setax isalva server MCP"

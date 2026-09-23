@@ -3423,6 +3423,7 @@
     "addVariable": "Cuir athróg leis",
     "keyLabel": "eochair",
     "keyTooLong": "Caithfidh an eochair a bheith 256 carachtar nó níos lú",
+    "keyDuplicate": "Tá an eochair seo ann cheana sa phróifíl",
     "valueLabel": "Luach",
     "secretLabel": "Rúnda",
     "secrets": {
@@ -3473,9 +3474,12 @@
       "nameRequired": "Cuir isteach ainm freastalaí",
       "nameInvalid": "Ní féidir le hainm ach litreacha, uimhreacha, béimeanna agus daiseanna a úsáid",
       "commandRequired": "Cuir isteach ordú",
+      "commandTooLong": "Úsáid 50 argóint ar a mhéad, 500 carachtar sa cheann",
       "urlRequired": "Cuir isteach URL",
       "urlInvalid": "Cuir isteach URL bailí",
+      "urlTooLong": "Caithfidh an URL a bheith 2048 carachtar nó níos lú",
       "jsonInvalid": "Iontráil JSON bailí — réad teaghluachanna",
+      "jsonTooLarge": "Úsáid 50 iontráil ar a mhéad, eochracha suas le 128 agus luachanna suas le 4096 carachtar",
       "timeoutInvalid": "Caithfidh teorainn ama a bheith ina iomlán de na milleasoicindí",
       "edit": "Cuir freastalaí MCP in eagar",
       "saveFailed": "Níorbh fhéidir an freastalaí MCP a shábháil"

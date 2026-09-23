@@ -3294,6 +3294,7 @@
     "addVariable": "Engeza okuguquguqukayo",
     "keyLabel": "Ukhiye",
     "keyTooLong": "Ukhiye kufanele ube yizinhlamvu ezingu-256 noma ngaphansi",
+    "keyDuplicate": "Lolu khi selukhona kuphrofayela",
     "valueLabel": "Inani",
     "secretLabel": "Imfihlo",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Faka igama leseva",
       "nameInvalid": "Igama lingasebenzisa kuphela izinhlamvu, izinombolo, ama-underscore, namadeshi",
       "commandRequired": "Faka umyalo",
+      "commandTooLong": "Sebenzisa ama-agumenti angu-50 noma ngaphansi, ngalinye izinhlamvu ezingu-500",
       "urlRequired": "Faka i-URL",
       "urlInvalid": "Faka i-URL evumelekile",
+      "urlTooLong": "I-URL kufanele ibe yizinhlamvu ezingu-2048 noma ngaphansi",
       "jsonInvalid": "Faka i-JSON evumelekile — into enamanani eyunithi yezinhlamvu",
+      "jsonTooLarge": "Sebenzisa okufakiwe okungu-50 noma ngaphansi, okhiye kufika ku-128 kanye namavelu kufika ezinhlamvu ezingu-4096",
       "timeoutInvalid": "Isikhathi sokuvala kufanele sibe inani eliphelele lama-millisecond",
       "edit": "Hlela iseva ye-MCP",
       "saveFailed": "Ayikwazanga ukulondoloza iseva ye-MCP"

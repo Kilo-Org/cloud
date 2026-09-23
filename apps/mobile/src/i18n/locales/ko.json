@@ -3294,6 +3294,7 @@
     "addVariable": "변수 추가",
     "keyLabel": "열쇠",
     "keyTooLong": "키는 256자 이하여야 합니다",
+    "keyDuplicate": "이 키는 이미 프로필에 있습니다.",
     "valueLabel": "값",
     "secretLabel": "비밀",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "서버 이름을 입력하세요.",
       "nameInvalid": "이름에는 문자, 숫자, 밑줄, 대시만 사용할 수 있습니다.",
       "commandRequired": "명령을 입력하세요",
+      "commandTooLong": "최대 50개의 인수(각 500자)를 사용하세요.",
       "urlRequired": "URL을 입력하세요",
       "urlInvalid": "유효한 URL을 입력하세요.",
+      "urlTooLong": "URL은 2048자 이하여야 합니다.",
       "jsonInvalid": "유효한 JSON을 입력하세요 - 문자열 값의 객체",
+      "jsonTooLarge": "최대 50개의 항목(키는 128자, 값은 4096자까지)을 사용하세요.",
       "timeoutInvalid": "제한시간은 정수 밀리초여야 합니다.",
       "edit": "MCP 서버 편집",
       "saveFailed": "MCP 서버를 저장할 수 없습니다."

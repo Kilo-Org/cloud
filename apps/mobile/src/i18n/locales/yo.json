@@ -3294,6 +3294,7 @@
     "addVariable": "Fi oniyipada kun",
     "keyLabel": "Bọtini",
     "keyTooLong": "Bọtini gbọdọ̀ jẹ́ 256 àmì tàbí kéré sí i",
+    "keyDuplicate": "Bọtini yii ti wà tẹ́lẹ̀ nínú profaili",
     "valueLabel": "Iye",
     "secretLabel": "Asiri",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Tẹ orukọ olupin sii",
       "nameInvalid": "Orukọ le lo awọn lẹta nikan, awọn nọmba, awọn abẹlẹ, ati dashes",
       "commandRequired": "Tẹ aṣẹ sii",
+      "commandTooLong": "Lo kò ju 50 àríyànjiyàn lọ, ọ̀kọ̀ọ̀kan 500 àmì",
       "urlRequired": "Tẹ URL kan sii",
       "urlInvalid": "Tẹ URL to wulo",
+      "urlTooLong": "URL gbọdọ̀ jẹ́ 2048 àmì tàbí kéré sí i",
       "jsonInvalid": "Tẹ JSON ti o tọ sii - ohun kan ti awọn iye okun",
+      "jsonTooLarge": "Lo kò ju 50 àkọsílẹ̀ lọ, bọtini tó 128 àti iye tó 4096 àmì",
       "timeoutInvalid": "Akoko ipari gbọdọ jẹ gbogbo nọmba ti milliseconds",
       "edit": "Ṣatunkọ olupin MCP",
       "saveFailed": "Ko le fi olupin MCP pamọ"

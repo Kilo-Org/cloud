@@ -3380,6 +3380,7 @@
     "addVariable": "Dodaj zmienną",
     "keyLabel": "Klawisz",
     "keyTooLong": "Klucz może mieć maksymalnie 256 znaków",
+    "keyDuplicate": "Ten klucz już istnieje w profilu",
     "valueLabel": "Wartość",
     "secretLabel": "Sekret",
     "secrets": {
@@ -3430,9 +3431,12 @@
       "nameRequired": "Wprowadź nazwę serwera",
       "nameInvalid": "W nazwie można używać wyłącznie liter, cyfr, podkreśleń i myślników",
       "commandRequired": "Wprowadź polecenie",
+      "commandTooLong": "Użyj maksymalnie 50 argumentów po 500 znaków",
       "urlRequired": "Wpisz adres URL",
       "urlInvalid": "Wprowadź prawidłowy adres URL",
+      "urlTooLong": "Adres URL może mieć maksymalnie 2048 znaków",
       "jsonInvalid": "Wpisz poprawny JSON — obiekt wartości łańcuchowych",
+      "jsonTooLarge": "Użyj maksymalnie 50 wpisów, klucze do 128 i wartości do 4096 znaków",
       "timeoutInvalid": "Limit czasu musi być liczbą całkowitą milisekund",
       "edit": "Edytuj serwer MCP",
       "saveFailed": "Nie można zapisać serwera MCP"

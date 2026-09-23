@@ -3294,6 +3294,7 @@
     "addVariable": "新增變數",
     "keyLabel": "鍵",
     "keyTooLong": "鍵不能超過 256 個字元",
+    "keyDuplicate": "此鍵已存在於設定檔中",
     "valueLabel": "值",
     "secretLabel": "秘密",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "輸入伺服器名稱",
       "nameInvalid": "名稱只能使用字母、數字、底線和破折號",
       "commandRequired": "輸入命令",
+      "commandTooLong": "最多使用 50 個引數，每個引數 500 個字元",
       "urlRequired": "輸入網址",
       "urlInvalid": "輸入有效的網址",
+      "urlTooLong": "網址不能超過 2048 個字元",
       "jsonInvalid": "輸入有效的 JSON — 字串值的對象",
+      "jsonTooLarge": "最多使用 50 個項目，鍵最多 128 個字元，值最多 4096 個字元",
       "timeoutInvalid": "超時必須是整數毫秒",
       "edit": "編輯 MCP 伺服器",
       "saveFailed": "無法保存 MCP 伺服器"

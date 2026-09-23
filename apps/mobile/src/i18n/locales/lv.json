@@ -3337,6 +3337,7 @@
     "addVariable": "Pievienot mainīgo",
     "keyLabel": "Atslēga",
     "keyTooLong": "Atslēgai jābūt 256 rakstzīmēm vai mazāk",
+    "keyDuplicate": "Šī atslēga jau ir profilā",
     "valueLabel": "Vērtība",
     "secretLabel": "Noslēpums",
     "secrets": {
@@ -3387,9 +3388,12 @@
       "nameRequired": "Ievadiet servera nosaukumu",
       "nameInvalid": "Nosaukumā var izmantot tikai burtus, ciparus, pasvītras un domuzīmes",
       "commandRequired": "Ievadiet komandu",
+      "commandTooLong": "Izmantojiet ne vairāk kā 50 argumentus, katrs 500 rakstzīmes",
       "urlRequired": "Ievadiet URL",
       "urlInvalid": "Ievadiet derīgu URL",
+      "urlTooLong": "URL nedrīkst pārsniegt 2048 rakstzīmes",
       "jsonInvalid": "Ievadiet derīgu JSON — virknes vērtību objektu",
+      "jsonTooLarge": "Izmantojiet ne vairāk kā 50 ierakstus, atslēgas līdz 128 un vērtības līdz 4096 rakstzīmēm",
       "timeoutInvalid": "Taimautai ir jābūt veselam milisekunžu skaitam",
       "edit": "Rediģēt MCP serveri",
       "saveFailed": "Nevarēja saglabāt MCP serveri"

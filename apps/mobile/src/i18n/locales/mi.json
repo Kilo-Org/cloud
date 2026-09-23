@@ -3294,6 +3294,7 @@
     "addVariable": "Tāpiri taurangi",
     "keyLabel": "Kī",
     "keyTooLong": "Kia 256 pūāhua iti iho rānei te kī",
+    "keyDuplicate": "Kua noho kē tēnei kī i te kōtaha",
     "valueLabel": "Uara",
     "secretLabel": "Mea ngaro",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Whakauruhia he ingoa tūmau",
       "nameInvalid": "Ka taea e te ingoa te whakamahi i nga reta, nga nama, nga tohu, me nga tohu",
       "commandRequired": "Whakauruhia he whakahau",
+      "commandTooLong": "Whakamahia kia 50 ngā tautohe, 500 pūāhua ia",
       "urlRequired": "Whakauruhia he URL",
       "urlInvalid": "Whakauruhia he URL whaimana",
+      "urlTooLong": "Kia 2048 pūāhua iti iho rānei te URL",
       "jsonInvalid": "Whakauruhia JSON whaimana - he ahanoa o nga uara aho",
+      "jsonTooLarge": "Whakamahia kia 50 ngā tāurunga, kī tae atu ki 128 me ngā uara tae atu ki 4096 pūāhua",
       "timeoutInvalid": "Ko te wa poto me he maha katoa o nga manomano",
       "edit": "Whakatika tūmau MCP",
       "saveFailed": "Kāore i taea te tiaki i te tūmau MCP"

@@ -3294,6 +3294,7 @@
     "addVariable": "Tambahkan variabel",
     "keyLabel": "Kunci",
     "keyTooLong": "Kunci harus 256 karakter atau kurang",
+    "keyDuplicate": "Kunci ini sudah ada di profil",
     "valueLabel": "Nilai",
     "secretLabel": "Rahasia",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Masukkan nama server",
       "nameInvalid": "Nama hanya boleh menggunakan huruf, angka, garis bawah, dan tanda hubung",
       "commandRequired": "Masukkan perintah",
+      "commandTooLong": "Gunakan maksimal 50 argumen yang masing-masing 500 karakter",
       "urlRequired": "Masukkan URL",
       "urlInvalid": "Masukkan URL yang valid",
+      "urlTooLong": "URL harus 2048 karakter atau kurang",
       "jsonInvalid": "Masukkan JSON yang valid — objek nilai string",
+      "jsonTooLarge": "Gunakan maksimal 50 entri, kunci hingga 128 dan nilai hingga 4096 karakter",
       "timeoutInvalid": "Batas waktu harus berupa bilangan bulat dalam milidetik",
       "edit": "Sunting server MCP",
       "saveFailed": "Tidak dapat menyimpan server MCP"

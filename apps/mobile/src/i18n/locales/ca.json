@@ -3337,6 +3337,7 @@
     "addVariable": "Afegeix variable",
     "keyLabel": "clau",
     "keyTooLong": "La clau ha de tenir 256 caràcters o menys",
+    "keyDuplicate": "Aquesta clau ja existeix al perfil",
     "valueLabel": "Valor",
     "secretLabel": "Secret",
     "secrets": {
@@ -3387,9 +3388,12 @@
       "nameRequired": "Introduïu un nom de servidor",
       "nameInvalid": "El nom només pot utilitzar lletres, números, guions baixos i guions",
       "commandRequired": "Introduïu una ordre",
+      "commandTooLong": "Utilitzeu com a màxim 50 arguments de 500 caràcters cadascun",
       "urlRequired": "Introduïu un URL",
       "urlInvalid": "Introduïu un URL vàlid",
+      "urlTooLong": "L'URL ha de tenir 2048 caràcters o menys",
       "jsonInvalid": "Introduïu JSON vàlid: un objecte de valors de cadena",
+      "jsonTooLarge": "Utilitzeu com a màxim 50 entrades, claus de fins a 128 i valors de fins a 4096 caràcters",
       "timeoutInvalid": "El temps d'espera ha de ser un nombre sencer de mil·lisegons",
       "edit": "Edita el servidor MCP",
       "saveFailed": "No s'ha pogut desar el servidor MCP"

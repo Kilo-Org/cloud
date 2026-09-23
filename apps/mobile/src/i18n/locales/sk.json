@@ -3380,6 +3380,7 @@
     "addVariable": "Pridať premennú",
     "keyLabel": "kľúč",
     "keyTooLong": "Kľúč môže mať maximálne 256 znakov",
+    "keyDuplicate": "Tento kľúč už v profile existuje",
     "valueLabel": "Hodnota",
     "secretLabel": "Tajomstvo",
     "secrets": {
@@ -3430,9 +3431,12 @@
       "nameRequired": "Zadajte názov servera",
       "nameInvalid": "Názov môže používať iba písmená, čísla, podčiarkovníky a pomlčky",
       "commandRequired": "Zadajte príkaz",
+      "commandTooLong": "Použite najviac 50 argumentov s 500 znakmi",
       "urlRequired": "Zadajte adresu URL",
       "urlInvalid": "Zadajte platnú webovú adresu",
+      "urlTooLong": "Adresa URL môže mať najviac 2048 znakov",
       "jsonInvalid": "Zadajte platný JSON — objekt reťazcových hodnôt",
+      "jsonTooLarge": "Použite najviac 50 položiek, kľúče do 128 a hodnoty do 4096 znakov",
       "timeoutInvalid": "Časový limit musí byť celý počet milisekúnd",
       "edit": "Upravte server MCP",
       "saveFailed": "Server MCP sa nepodarilo uložiť"

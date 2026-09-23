@@ -3294,6 +3294,7 @@
     "addVariable": "Tambah pembolehubah",
     "keyLabel": "kunci",
     "keyTooLong": "Kunci mestilah 256 aksara atau kurang",
+    "keyDuplicate": "Kunci ini sudah ada dalam profil",
     "valueLabel": "Nilai",
     "secretLabel": "Rahsia",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Masukkan nama pelayan",
       "nameInvalid": "Nama hanya boleh menggunakan huruf, nombor, garis bawah dan sempang",
       "commandRequired": "Masukkan arahan",
+      "commandTooLong": "Gunakan paling banyak 50 argumen yang setiap satu 500 aksara",
       "urlRequired": "Masukkan URL",
       "urlInvalid": "Masukkan URL yang sah",
+      "urlTooLong": "URL mestilah 2048 aksara atau kurang",
       "jsonInvalid": "Masukkan JSON yang sah — objek nilai rentetan",
+      "jsonTooLarge": "Gunakan paling banyak 50 entri, kunci sehingga 128 dan nilai sehingga 4096 aksara",
       "timeoutInvalid": "Tamat masa mestilah bilangan keseluruhan milisaat",
       "edit": "Edit pelayan MCP",
       "saveFailed": "Tidak dapat menyimpan pelayan MCP"

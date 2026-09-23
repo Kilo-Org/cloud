@@ -3294,6 +3294,7 @@
     "addVariable": "Değişken ekle",
     "keyLabel": "Anahtar",
     "keyTooLong": "Anahtar en fazla 256 karakter olmalıdır",
+    "keyDuplicate": "Bu anahtar profilde zaten var",
     "valueLabel": "Değer",
     "secretLabel": "Gizli",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Bir sunucu adı girin",
       "nameInvalid": "Adda yalnızca harf, rakam, alt çizgi ve kısa çizgi kullanılabilir",
       "commandRequired": "Bir komut girin",
+      "commandTooLong": "En fazla 500 karakterlik 50 argüman kullanın",
       "urlRequired": "Bir URL girin",
       "urlInvalid": "Geçerli bir URL girin",
+      "urlTooLong": "URL en fazla 2048 karakter olmalıdır",
       "jsonInvalid": "Geçerli JSON girin — dize değerlerinden oluşan bir nesne",
+      "jsonTooLarge": "En fazla 50 giriş, 128'e kadar anahtar ve 4096 karaktere kadar değer kullanın",
       "timeoutInvalid": "Zaman aşımı tam sayı milisaniye olmalıdır",
       "edit": "MCP sunucusunu düzenle",
       "saveFailed": "MCP sunucusu kaydedilemedi"

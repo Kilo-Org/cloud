@@ -3294,6 +3294,7 @@
     "addVariable": "Változó hozzáadása",
     "keyLabel": "Kulcsfontosságú",
     "keyTooLong": "A kulcs legfeljebb 256 karakter lehet",
+    "keyDuplicate": "Ez a kulcs már létezik a profilban",
     "valueLabel": "Érték",
     "secretLabel": "Titkos",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Adja meg a szerver nevét",
       "nameInvalid": "A név csak betűket, számokat, aláhúzásjeleket és kötőjeleket tartalmazhat",
       "commandRequired": "Írjon be egy parancsot",
+      "commandTooLong": "Legfeljebb 50 argumentumot használjon, egyenként 500 karakterrel",
       "urlRequired": "Adjon meg egy URL-t",
       "urlInvalid": "Adjon meg egy érvényes URL-t",
+      "urlTooLong": "Az URL legfeljebb 2048 karakter lehet",
       "jsonInvalid": "Írjon be érvényes JSON-t – karakterlánc-értékekből álló objektumot",
+      "jsonTooLarge": "Legfeljebb 50 bejegyzést használjon, kulcsok 128-ig és értékek 4096 karakterig",
       "timeoutInvalid": "Az időtúllépésnek egész számú ezredmásodpercnek kell lennie",
       "edit": "MCP szerver szerkesztése",
       "saveFailed": "Nem sikerült menteni az MCP-kiszolgálót"

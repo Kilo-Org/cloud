@@ -3294,6 +3294,7 @@
     "addVariable": "Lisää muuttuja",
     "keyLabel": "Avain",
     "keyTooLong": "Avaimessa saa olla enintään 256 merkkiä",
+    "keyDuplicate": "Tämä avain on jo profiilissa",
     "valueLabel": "Arvo",
     "secretLabel": "Salaisuus",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Anna palvelimen nimi",
       "nameInvalid": "Nimessä voi käyttää vain kirjaimia, numeroita, alaviivoja ja väliviivoja",
       "commandRequired": "Anna komento",
+      "commandTooLong": "Käytä enintään 50 argumenttia, kukin 500 merkkiä",
       "urlRequired": "Anna URL-osoite",
       "urlInvalid": "Anna kelvollinen URL-osoite",
+      "urlTooLong": "URL-osoitteessa saa olla enintään 2048 merkkiä",
       "jsonInvalid": "Anna kelvollinen JSON — merkkijonoarvojen objekti",
+      "jsonTooLarge": "Käytä enintään 50 merkintää, avaimet enintään 128 ja arvot enintään 4096 merkkiä",
       "timeoutInvalid": "Aikakatkaisun on oltava millisekuntien kokonaisluku",
       "edit": "Muokkaa MCP-palvelinta",
       "saveFailed": "MCP-palvelinta ei voitu tallentaa"

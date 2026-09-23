@@ -3294,6 +3294,7 @@
     "addVariable": "O'zgaruvchini qo'shish",
     "keyLabel": "Kalit",
     "keyTooLong": "Kalit 256 ta belgi yoki undan kam bo'lishi kerak",
+    "keyDuplicate": "Bu kalit profilda allaqachon mavjud",
     "valueLabel": "Qiymat",
     "secretLabel": "Sir",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Server nomini kiriting",
       "nameInvalid": "Ism faqat harflar, raqamlar, pastki chiziq va chiziqlardan foydalanishi mumkin",
       "commandRequired": "Buyruqni kiriting",
+      "commandTooLong": "Ko'pi bilan 500 belgidan iborat 50 ta argumentdan foydalaning",
       "urlRequired": "URL manzilini kiriting",
       "urlInvalid": "Yaroqli URL manzilini kiriting",
+      "urlTooLong": "URL 2048 ta belgi yoki undan kam bo'lishi kerak",
       "jsonInvalid": "To'g'ri JSON kiriting - satr qiymatlari ob'ekti",
+      "jsonTooLarge": "Ko'pi bilan 50 ta yozuv, kalitlar 128 tagacha va qiymatlar 4096 belgigacha foydalaning",
       "timeoutInvalid": "Vaqt tugashi butun son millisekund bo'lishi kerak",
       "edit": "MCP serverini tahrirlash",
       "saveFailed": "MCP serverini saqlab boʻlmadi"

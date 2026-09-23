@@ -3294,6 +3294,7 @@
     "addVariable": "Jijjiiramaa itti dabali",
     "keyLabel": "Furtuu",
     "keyTooLong": "Furtuun 256 arfii ykn isaa gadi ta'uu qaba",
+    "keyDuplicate": "Furtuun kun duraanuu piroofaayilii keessa jira",
     "valueLabel": "Gatii",
     "secretLabel": "Icitii",
     "secrets": {
@@ -3344,9 +3345,12 @@
       "nameRequired": "Maqaa sarvarii galchi",
       "nameInvalid": "Maqaan qubee, lakkoofsota, sarara jalaa fi daash qofa fayyadamuu danda'a",
       "commandRequired": "Ajaja galchi",
+      "commandTooLong": "Arguumentii 50 ol fayyadami, tokkoon tokkoon isaanii arfii 500",
       "urlRequired": "URL galchi",
       "urlInvalid": "URL sirrii ta'e galchi",
+      "urlTooLong": "URL arfii 2048 ykn isaa gadi ta'uu qaba",
       "jsonInvalid": "JSON sirrii galchi — wanta gatiiwwan dhangii",
+      "jsonTooLarge": "Galmee 50 ol fayyadami, furtuu hanga 128 fi gatii hanga arfii 4096",
       "timeoutInvalid": "Yeroon xumuraa lakkoofsa milisekondii guutuu ta'uu qaba",
       "edit": "Sarvarii MCP gulaali",
       "saveFailed": "Sarvarii MCP qusachuu hin dandeenye"

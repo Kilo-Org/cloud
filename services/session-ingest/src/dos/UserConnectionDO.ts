@@ -20,6 +20,10 @@ import {
 type HeartbeatSession = {
   id: string;
   status: string;
+  // Wake time for a `scheduled` session (ISO-8601). Optional: absent for every
+  // other status and on legacy CLIs that predate scheduling. `aggregateSessions`
+  // spreads the session through, so it reaches `sessions.list` untouched.
+  scheduledAt?: string;
   title: string;
   gitUrl?: string;
   gitBranch?: string;

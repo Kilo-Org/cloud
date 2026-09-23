@@ -402,6 +402,7 @@ function sendHeartbeat(
     status: string;
     title: string;
     platform?: string;
+    scheduledAt?: string;
     prLink?: { platform: string; prUrl: string; prNumber: number };
   }>,
   options: {
@@ -4328,6 +4329,56 @@ describe('UserConnectionDO', () => {
         { id: 's1', status: 'busy', title: 'Legacy', connectionId: 'cli-1' },
       ]);
       expect(result[0]).not.toHaveProperty('platform');
+    });
+
+    it('forwards a scheduled status and its wake time (scheduledAt)', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        {
+          id: 's1',
+          status: 'scheduled',
+          title: 'Wake later',
+          scheduledAt: '2026-09-24T09:00:00.000Z',
+        },
+      ]);
+
+      expect(doInstance.getActiveSessions()).toEqual([
+        {
+          id: 's1',
+          status: 'scheduled',
+          title: 'Wake later',
+          connectionId: 'cli-1',
+          scheduledAt: '2026-09-24T09:00:00.000Z',
+        },
+      ]);
+    });
+
+    it('forwards scheduled without a wake time when the CLI omits scheduledAt', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [{ id: 's1', status: 'scheduled', title: 'Wake later' }]);
+
+      const result = doInstance.getActiveSessions();
+      expect(result).toEqual([
+        { id: 's1', status: 'scheduled', title: 'Wake later', connectionId: 'cli-1' },
+      ]);
+      expect(result[0]).not.toHaveProperty('scheduledAt');
+    });
+
+    it('accepts an unrecognized status without dropping the session', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        { id: 's1', status: 'brand-new-status', title: 'Future' },
+      ]);
+
+      expect(doInstance.getActiveSessions()).toEqual([
+        { id: 's1', status: 'brand-new-status', title: 'Future', connectionId: 'cli-1' },
+      ]);
     });
   });
 

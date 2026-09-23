@@ -550,6 +550,19 @@ describe('resetAttentionStatusOnCliDisconnect', () => {
     }
   );
 
+  it('leaves an unknown stored status untouched without throwing', async () => {
+    const db = createTransactionDb({ initialStatus: 'scheduled' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never;
+    await expect(
+      resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1')
+    ).resolves.toBeUndefined();
+
+    expect(db.applyUpdate).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
   it('no-ops when the session row is missing', async () => {
     const db = createTransactionDb({ initialStatus: 'question', rowMissing: true });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
@@ -803,6 +816,39 @@ describe('applyMetadataChanges', () => {
       expect(delivery.messages).toEqual([]);
     });
   });
+
+  it.each(['scheduled', 'some-future-status'])(
+    'relays a stored %s status without throwing and reports it as the previous status',
+    async initialStatus => {
+      const db = createApplyMetadataDb({ initialStatus });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+
+      await expect(
+        applyMetadataChanges(
+          delivery.env as never,
+          'usr_1',
+          'ses_1',
+          new Map([['status', 'busy']]),
+          delivery.ctx
+        )
+      ).resolves.toBeUndefined();
+      await Promise.all(delivery.tasks);
+
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        delivery.env,
+        'usr_1',
+        expect.objectContaining({
+          type: 'session.status.updated',
+          data: expect.objectContaining({
+            previousStatus: initialStatus,
+            status: 'busy',
+          }),
+        }),
+        delivery.ctx
+      );
+    }
+  );
 
   it('persists organization_id and invalidates access cache when the user is a member', async () => {
     const db = createApplyMetadataDb({ membershipRows: 1 });

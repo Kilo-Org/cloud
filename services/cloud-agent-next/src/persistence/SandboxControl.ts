@@ -3359,11 +3359,14 @@ export class SandboxControl extends DurableObject<Env> {
       1_000,
       'Diagnostic signing secret lookup timed out'
     ).catch(() => null);
+    const workloadCgroup = (this.env as { CONTROL_WORKLOAD_CGROUP?: unknown })
+      .CONTROL_WORKLOAD_CGROUP;
     const launchEnv = buildControlWrapperLaunchEnv({
       workerUrl: this.env.WORKER_URL,
       sandboxId: this.sandboxId,
       credential,
       diagnostics: { allocationId, signingSecret },
+      ...(typeof workloadCgroup === 'string' ? { workloadCgroup } : {}),
     });
     this.logDiagnostic('wrapper_log_upload', {
       allocationId,

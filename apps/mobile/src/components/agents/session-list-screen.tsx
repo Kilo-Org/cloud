@@ -1,10 +1,18 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, FlatList, KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
+import {
+  AppState,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Bot, Plus } from '@/components/ui/icons';
+import { Bot } from '@/components/ui/icons';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
@@ -18,7 +26,7 @@ import { SessionListSearchHeader } from '@/components/agents/session-list-search
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
-import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
+import { SessionListFab } from '@/components/agents/session-list-fab';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
@@ -27,7 +35,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { isShortViewport } from '@/lib/centered-state-layout';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -39,7 +47,6 @@ const SKELETON_ROW_COUNT = 8;
 export function AgentSessionListScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const colors = useThemeColors();
   const { t } = useTranslation();
   const { left, right } = useSafeAreaInsets();
   // The tabs layout's width-aware label decision rides along, so this screen's
@@ -49,6 +56,9 @@ export function AgentSessionListScreen() {
   // native KeyboardAvoidingView is inert there; the app-aware container follows
   // the keyboard events instead (the repo's one platform fork for this).
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
+  // The window decides the short-landscape case below: the FAB's own strip is
+  // only worth reserving while the window can spare it.
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
 
   const context = useLiveSessionContext();
   const { organizationId, isError: isContextError, refetch: refetchContext } = context;
@@ -279,6 +289,12 @@ export function AgentSessionListScreen() {
     // over it (device defect uxs1). That body is centered, so it draws the
     // pull's own progress while reduced motion is on, and the band then
     // yields its spinner to it (`progressInBody` on the reserved line).
+    // The centered body clears the fixed tab bar through the surface
+    // reservation this screen already sets: `CenteredState`'s pending-layout
+    // fallback pads by `surface.bottomReservation` (the tab bar plus the FAB
+    // band) and its measured layout clamps by the same inset. Adding that band
+    // as a frame clearance here too reserved it twice and pushed the centered
+    // copy roughly half the band above the centre of the area above the bar.
     body = (
       <EmptyState
         icon={Bot}
@@ -322,6 +338,19 @@ export function AgentSessionListScreen() {
     );
   }
 
+  // The centered bodies on this screen (the no-match state, the no-live-session
+  // state, the load failure) are centered in the band the surface leaves above
+  // the fixed tab bar, so the surface reserves that band plus, while the FAB is
+  // on screen, the FAB's own strip. The FAB's strip is only worth reserving
+  // while the window can spare it: in a short landscape window the strip is
+  // 72dp of a ~120dp band, which leaves the state ~49dp — less than its copy
+  // and its action need — and drops its action under the bar. There the FAB is
+  // a corner overlay and the centered column never reaches it, so the reserved
+  // band is the tab bar's own.
+  const centeredBottomInset =
+    tabBarHeight +
+    (showFab && !isShortViewport(windowWidth, windowHeight) ? FAB_SIZE + FAB_MARGIN : 0);
+
   // The feedback band and the body share one keyboard container so every
   // centered state (no-match, live-empty, skeletons, load failure) re-measures
   // against the viewport the keyboard leaves, not the full window. The header
@@ -354,14 +383,7 @@ export function AgentSessionListScreen() {
   );
 
   return (
-    // The band the no-match body is laid out in ends at the tab bar. The FAB is
-    // a corner control with its own frame inset on the rows list, and reserving
-    // its band here as well shrank the band to the FAB's top: in a short
-    // landscape window that is below the empty state's height, so the state fell
-    // to the scroll anchor and its second line and action were parked behind the
-    // tab bar (landscape spot defect e8). The no-match body therefore keeps the
-    // whole band and the FAB yields to it (`showFab`).
-    <StateSurfaceInsets bottomInset={tabBarHeight}>
+    <StateSurfaceInsets bottomInset={centeredBottomInset}>
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}
@@ -399,20 +421,7 @@ export function AgentSessionListScreen() {
           </KeyboardAvoidingView>
         )}
         {/* Empty content owns its creation action; the no-match body owns the band. */}
-        {showFab && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('common.newSession')}
-            testID="agents-new-session-fab"
-            onPress={() => {
-              router.push(getNewAgentSessionPath(organizationId) as Href);
-            }}
-            className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80"
-            style={fabStyle}
-          >
-            <Plus size={24} color={colors.primaryForeground} />
-          </Pressable>
-        )}
+        {showFab && <SessionListFab organizationId={organizationId} style={fabStyle} />}
         {showFilterModal && (
           <SessionFilterModal
             selectedPlatforms={query.platformFilter}

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildFileItems,
@@ -6,7 +6,14 @@ import {
   buildPaginationItem,
 } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { type BuildItemsArgs, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
+import { parsePatch } from '@/lib/pr-review/diff/parse-patch';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
+
+// Wraps the real parser in a spy so a test can count parse calls.
+vi.mock('@/lib/pr-review/diff/parse-patch', async importOriginal => {
+  const actual = await importOriginal<{ parsePatch: typeof parsePatch }>();
+  return { ...actual, parsePatch: vi.fn(actual.parsePatch) };
+});
 
 type FilePatchMissingItem = Extract<ListItem, { kind: 'file-patch-missing' }>;
 
@@ -307,5 +314,17 @@ describe('buildItems composition', () => {
     const composed = [...buildFileItems(args), buildPaginationItem(args)];
     const direct = buildItems(args);
     expect(composed).toEqual(direct);
+  });
+});
+
+describe('buildFileItems parsed patch cache', () => {
+  it('parses each file object once across two builds that differ only in viewed', () => {
+    const spy = vi.mocked(parsePatch);
+    spy.mockClear();
+    const args = baseArgs({ files: [makeFile(singleHunkPatch)], expanded: { 'a.ts': true } });
+    const build = (next: BuildItemsArgs) =>
+      buildFileItems(next).find((i): i is DiffLineListItem => i.kind === 'diff-line');
+    expect(build(args)?.parsed).toBe(build({ ...args, viewed: () => true })?.parsed);
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });

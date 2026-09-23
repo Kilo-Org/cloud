@@ -134,10 +134,15 @@ export function mergeProviderInboxSources(
   sources: readonly ProviderInboxSource[]
 ): MergedProviderInbox {
   const active = sources.filter(source => source.enabled);
-  const items = active
-    .flatMap(source => source.rows)
-    // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; flatMap already copies so nothing shared is mutated
-    .sort((left, right) => updatedAtMs(right) - updatedAtMs(left));
+  // Decorate once, then sort on the precomputed milliseconds: a plain
+  // comparator would re-parse BOTH timestamps on every comparison, turning a
+  // few hundred rows into thousands of `parseTimestamp` calls per merge.
+  const decorated = active.flatMap(source =>
+    source.rows.map(row => ({ row, ms: updatedAtMs(row) }))
+  );
+  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; flatMap already copies so nothing shared is mutated
+  decorated.sort((left, right) => right.ms - left.ms);
+  const items = decorated.map(entry => entry.row);
   const failed = active.filter(source => source.error !== null && source.error !== undefined);
   const firstPageFailures = failed.filter(source => !source.hasLoadedPages);
   const allFailed = active.length > 0 && firstPageFailures.length === active.length;
@@ -300,7 +305,41 @@ export function useProviderInbox(enabled: boolean) {
     hasNextPage: bitbucket.hasNextPage,
     isFetchingNextPage: bitbucket.isFetchingNextPage,
   };
-  const merged = mergeProviderInboxSources([githubSource, gitlabSource, bitbucketSource]);
+  // Memoized on every value the merge reads, so the merge (and its sort) only
+  // re-runs when an input actually moved. Keying on the source values rather
+  // than the per-render `*Source` objects keeps the merge off the render path
+  // while `retryFailedPages` below still reads the fresh objects it needs.
+  const merged = useMemo(
+    () => mergeProviderInboxSources([githubSource, gitlabSource, bitbucketSource]),
+    // eslint-disable-next-line react/exhaustive-deps -- the deps below are exactly the values the three sources read, so the freshly built *Source objects add nothing to compare
+    [
+      githubRows,
+      gitlabRows,
+      bitbucketRows,
+      enabled,
+      githubEnabled,
+      gitlabEnabled,
+      bitbucketEnabled,
+      githubAuthorization.isPending,
+      githubAuthorization.isError,
+      githubAuthorization.error,
+      github.query.isPending,
+      github.query.data,
+      github.query.error,
+      github.query.hasNextPage,
+      github.query.isFetchingNextPage,
+      gitlab.isPending,
+      gitlab.error,
+      gitlab.hasNextPage,
+      gitlab.isFetchingNextPage,
+      gitlabPages,
+      bitbucket.isPending,
+      bitbucket.error,
+      bitbucket.hasNextPage,
+      bitbucket.isFetchingNextPage,
+      bitbucketPages,
+    ]
+  );
 
   // Every source advances on ITS OWN cursor; nothing is shared or merged.
   const fetchNextPage = useCallback(() => {

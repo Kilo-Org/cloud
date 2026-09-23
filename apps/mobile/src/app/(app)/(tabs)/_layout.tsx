@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
+import { TabBarButton } from '@/components/tab-bar-button';
 import { TabBarLabel } from '@/components/tab-bar-label';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
@@ -173,6 +174,7 @@ export default function TabsLayout() {
           // leaving that clipped strip. The content clearance below the bar does
           // not change, so hiding and restoring it moves nothing.
           tabBarHideOnKeyboard: true,
+          tabBarButton: TabBarButton,
           tabBarIconStyle: TAB_BAR_ICON_STYLE,
           tabBarLabelPosition: 'below-icon',
           tabBarStyle: {

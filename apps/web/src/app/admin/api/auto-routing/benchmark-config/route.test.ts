@@ -7,7 +7,7 @@ import {
 import { getUserFromAuth } from '@/lib/user/server';
 import { findExperimentReservedModelIds } from '@/lib/ai-gateway/experiments/reserved-ids';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import type * as ServingModule from '@/lib/ai-gateway/providers/kilo-exclusive-model-serving';
+import type * as ExclusiveModelsModule from '@/lib/ai-gateway/kilo-exclusive-models';
 import type * as OpenRouterModule from '@/lib/ai-gateway/providers/definitions/openrouter';
 
 jest.mock('@/lib/user/server', () => ({
@@ -23,9 +23,9 @@ jest.mock('@/lib/ai-gateway/experiments/reserved-ids', () => ({
   findExperimentReservedModelIds: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/kilo-exclusive-model-serving', () => {
-  const actual = jest.requireActual<typeof ServingModule>(
-    '@/lib/ai-gateway/providers/kilo-exclusive-model-serving'
+jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof ExclusiveModelsModule>(
+    '@/lib/ai-gateway/kilo-exclusive-models'
   );
   const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
     '@/lib/ai-gateway/providers/definitions/openrouter'
@@ -38,20 +38,15 @@ jest.mock('@/lib/ai-gateway/providers/kilo-exclusive-model-serving', () => {
     max_completion_tokens: 4096,
     status: 'public',
     flags: [],
-    gateway: 'dev-tools',
+    provider: { ...OPENROUTER, id: 'dev-tools', supportedChatApis: ['chat_completions'] },
     internal_id: 'stub-internal',
     pricing: null,
     inference_provider_restriction: [],
   };
   return {
     ...actual,
-    findKiloExclusiveModelServing: (id: string) =>
-      id === 'test-exclusive/chat-only'
-        ? {
-            model: stubModel,
-            provider: { ...OPENROUTER, id: 'dev-tools', supportedChatApis: ['chat_completions'] },
-          }
-        : actual.findKiloExclusiveModelServing(id),
+    findKiloExclusiveModel: (id: string) =>
+      id === 'test-exclusive/chat-only' ? stubModel : actual.findKiloExclusiveModel(id),
   };
 });
 

@@ -3,7 +3,10 @@ import type {
   OpenRouterProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
-import { isKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
+import {
+  isKiloExclusiveModel,
+  findKiloExclusiveModel,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
 import {
   getBYOKforOrganization,
@@ -17,7 +20,6 @@ import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { findKiloExclusiveModelServing } from '@/lib/ai-gateway/providers/kilo-exclusive-model-serving';
 import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { checkOpenAiChatGptByok } from '@/lib/ai-gateway/openai-chatgpt/routing';
@@ -277,14 +279,14 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     };
   }
 
-  const exclusiveServing = findKiloExclusiveModelServing(requestedModel);
+  const exclusiveModel = findKiloExclusiveModel(requestedModel);
 
   // Model experiment routing for dedicated preview public ids. Runs before
   // the custom-LLM (`kilo-internal/...`) and the `kiloExclusiveModels` lookup
   // so an experimented public id never falls through to OpenRouter/Vercel.
   const experimented = await isPublicIdExperimented(requestedModel);
   if (experimented === true) {
-    if (exclusiveServing) {
+    if (exclusiveModel) {
       throw new Error(
         `Configuration error: ${requestedModel} cannot be both an experiment and a Kilo-exclusive model`
       );
@@ -328,7 +330,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   }
 
   const eligibleForVercelRouting =
-    !exclusiveServing || exclusiveServing.model.flags.includes('vercel-routing');
+    !exclusiveModel || exclusiveModel.flags.includes('vercel-routing');
   const resolveRoutingProviderConfig = async () =>
     (await getRoutingProviderConfig?.()) ?? request.body.provider;
 
@@ -351,7 +353,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   return {
     kind: 'provider',
-    provider: exclusiveServing?.provider ?? OPENROUTER,
+    provider: exclusiveModel?.provider ?? OPENROUTER,
     userByok: null,
     bypassAccessCheck: false,
   };

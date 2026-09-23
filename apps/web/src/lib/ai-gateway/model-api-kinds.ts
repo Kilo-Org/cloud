@@ -1,5 +1,5 @@
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { findKiloExclusiveModelServing } from '@/lib/ai-gateway/providers/kilo-exclusive-model-serving';
+import { findKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 import type { GatewayChatApiKind } from '@/lib/ai-gateway/providers/types';
 
 const GATEWAY_CHAT_API_KINDS: readonly GatewayChatApiKind[] = [
@@ -15,7 +15,7 @@ const GATEWAY_CHAT_API_KINDS: readonly GatewayChatApiKind[] = [
  * declared gateway, everything else by OpenRouter.
  */
 export function gatewayChatApisForModel(modelId: string): ReadonlyArray<GatewayChatApiKind> {
-  const provider = findKiloExclusiveModelServing(modelId)?.provider ?? OPENROUTER;
+  const provider = findKiloExclusiveModel(modelId)?.provider ?? OPENROUTER;
   return provider.supportedChatApis;
 }
 

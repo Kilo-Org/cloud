@@ -27,9 +27,11 @@ import {
   PRIMARY_DEFAULT_MODEL,
   selectAutoFreeCandidate,
 } from '@/lib/ai-gateway/models';
-import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/kilo-exclusive-models';
+import {
+  findKiloExclusiveModel,
+  isKiloExclusiveFreeModel,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { findKiloExclusiveModelServing } from '@/lib/ai-gateway/providers/kilo-exclusive-model-serving';
 import {
   getOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
@@ -77,10 +79,10 @@ export async function getAutoFreeCandidates(
   const candidates = new Set<string>();
   for (const { model } of autoFreeModels) {
     if (isKiloExclusiveFreeModel(model)) {
-      const serving = findKiloExclusiveModelServing(model);
+      const exclusiveModel = findKiloExclusiveModel(model);
       if (
-        serving &&
-        (apiKind === null || serving.provider.supportedChatApis.some(k => k === apiKind))
+        exclusiveModel &&
+        (apiKind === null || exclusiveModel.provider.supportedChatApis.some(k => k === apiKind))
       ) {
         candidates.add(model);
       }

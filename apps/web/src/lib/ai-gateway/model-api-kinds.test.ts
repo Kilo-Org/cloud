@@ -2,19 +2,19 @@ import { describe, expect, it } from '@jest/globals';
 import { gatewayChatApisForModel, modelServesAllGatewayChatApis } from './model-api-kinds';
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import {
-  findKiloExclusiveModelServing,
-  kiloExclusiveModelServing,
-} from '@/lib/ai-gateway/providers/kilo-exclusive-model-serving';
-import type * as ServingModule from '@/lib/ai-gateway/providers/kilo-exclusive-model-serving';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
+  findKiloExclusiveModel,
+  kiloExclusiveModels,
+  gemma_4_26b_a4b_it_free_model,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
+import type * as ExclusiveModelsModule from '@/lib/ai-gateway/kilo-exclusive-models';
 
-jest.mock('@/lib/ai-gateway/providers/kilo-exclusive-model-serving', () => {
-  const actual = jest.requireActual<typeof ServingModule>(
-    '@/lib/ai-gateway/providers/kilo-exclusive-model-serving'
+jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof ExclusiveModelsModule>(
+    '@/lib/ai-gateway/kilo-exclusive-models'
   );
   return {
     ...actual,
-    findKiloExclusiveModelServing: jest.fn(actual.findKiloExclusiveModelServing),
+    findKiloExclusiveModel: jest.fn(actual.findKiloExclusiveModel),
   };
 });
 
@@ -24,18 +24,20 @@ describe('modelServesAllGatewayChatApis', () => {
   });
 
   it('rejects a Kilo-exclusive model served by a provider without Messages support', () => {
-    jest.mocked(findKiloExclusiveModelServing).mockReturnValueOnce({
-      model: gemma_4_26b_a4b_it_free_model,
+    jest.mocked(findKiloExclusiveModel).mockReturnValueOnce({
+      ...gemma_4_26b_a4b_it_free_model,
       provider: { ...OPENROUTER, supportedChatApis: ['chat_completions'] },
     });
     expect(modelServesAllGatewayChatApis(gemma_4_26b_a4b_it_free_model.public_id)).toBe(false);
   });
 
-  it.each(kiloExclusiveModelServing)(
-    'uses the bound provider APIs for $model.public_id, falling back for disabled models',
-    ({ model, provider }) => {
+  it.each(kiloExclusiveModels)(
+    'uses the provider APIs for $public_id, falling back for disabled models',
+    model => {
       expect(gatewayChatApisForModel(model.public_id)).toBe(
-        model.status === 'disabled' ? OPENROUTER.supportedChatApis : provider.supportedChatApis
+        model.status === 'disabled'
+          ? OPENROUTER.supportedChatApis
+          : model.provider.supportedChatApis
       );
     }
   );

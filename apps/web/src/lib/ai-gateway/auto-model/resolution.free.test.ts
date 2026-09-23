@@ -1,20 +1,25 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { getAutoFreeCandidates } from './resolution';
 import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { findKiloExclusiveModelServing } from '@/lib/ai-gateway/providers/kilo-exclusive-model-serving';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
-import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
+import {
+  findKiloExclusiveModel,
+  gemma_4_26b_a4b_it_free_model,
+  stepfun_37_flash_free_model,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import type * as ModelsModule from '@/lib/ai-gateway/models';
-import type * as ServingModule from '@/lib/ai-gateway/providers/kilo-exclusive-model-serving';
+import type * as ExclusiveModelsModule from '@/lib/ai-gateway/kilo-exclusive-models';
 import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 jest.mock('@/lib/ai-gateway/models', () => {
   const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/models');
+  const { kiloExclusiveModels } = jest.requireActual<typeof ExclusiveModelsModule>(
+    '@/lib/ai-gateway/kilo-exclusive-models'
+  );
   return {
     ...actual,
     autoFreeModels: [
-      ...actual.kiloExclusiveModels.map(model => model.public_id),
+      ...kiloExclusiveModels.map(model => model.public_id),
       'test/present:free',
       'test/absent:free',
     ].map(model => ({ model, weight: 1, reasoning: { enabled: true } })),
@@ -28,13 +33,13 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsFromDatabase: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/kilo-exclusive-model-serving', () => {
-  const actual = jest.requireActual<typeof ServingModule>(
-    '@/lib/ai-gateway/providers/kilo-exclusive-model-serving'
+jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof ExclusiveModelsModule>(
+    '@/lib/ai-gateway/kilo-exclusive-models'
   );
   return {
     ...actual,
-    findKiloExclusiveModelServing: jest.fn(actual.findKiloExclusiveModelServing),
+    findKiloExclusiveModel: jest.fn(actual.findKiloExclusiveModel),
   };
 });
 
@@ -44,7 +49,7 @@ describe('getAutoFreeCandidates exclusive model capabilities', () => {
   });
 
   it.each(['chat_completions', 'messages', 'responses', null] as const)(
-    'includes hidden and public free bindings for %s without requiring catalog presence',
+    'includes hidden and public free models for %s without requiring catalog presence',
     async apiKind => {
       expect(await getAutoFreeCandidates(apiKind)).toEqual(
         [
@@ -56,9 +61,9 @@ describe('getAutoFreeCandidates exclusive model capabilities', () => {
     }
   );
 
-  it('filters using the bound provider capabilities rather than the metadata gateway', async () => {
-    jest.mocked(findKiloExclusiveModelServing).mockReturnValueOnce({
-      model: gemma_4_26b_a4b_it_free_model,
+  it('filters using the model provider capabilities', async () => {
+    jest.mocked(findKiloExclusiveModel).mockReturnValueOnce({
+      ...gemma_4_26b_a4b_it_free_model,
       provider: { ...OPENROUTER, supportedChatApis: ['chat_completions'] },
     });
 
@@ -68,8 +73,8 @@ describe('getAutoFreeCandidates exclusive model capabilities', () => {
   });
 
   it('does not filter provider capabilities when the API kind is null', async () => {
-    jest.mocked(findKiloExclusiveModelServing).mockReturnValueOnce({
-      model: gemma_4_26b_a4b_it_free_model,
+    jest.mocked(findKiloExclusiveModel).mockReturnValueOnce({
+      ...gemma_4_26b_a4b_it_free_model,
       provider: { ...OPENROUTER, supportedChatApis: ['chat_completions'] },
     });
 

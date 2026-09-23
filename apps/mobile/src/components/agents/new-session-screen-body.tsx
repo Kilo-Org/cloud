@@ -45,6 +45,7 @@ import { useLaunchFolder } from '@/lib/hooks/use-launch-folder';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { usePersistedRunOnDestination } from '@/lib/hooks/use-persisted-run-on-destination';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
 import {
   resolveContinueStartDisabled,
@@ -99,6 +100,7 @@ export function NewSessionScreenBody() {
   const { mode, setMode, model, setModel, variant, setVariant } = useNewSessionModelState();
   const { t } = useTranslation();
   const router = useRouter();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const searchParams = useLocalSearchParams<{
     organizationId?: string;
@@ -620,13 +622,17 @@ export function NewSessionScreenBody() {
 
   const handleAddAttachment = useCallback(async () => {
     void addCandidates(
-      await pickAgentAttachments(showActionSheetWithOptions, {
-        userId,
-        surface: 'agent-new',
-        sessionId: null,
-      })
+      await pickAgentAttachments(
+        showActionSheetWithOptions,
+        {
+          userId,
+          surface: 'agent-new',
+          sessionId: null,
+        },
+        themedSheet
+      )
     );
-  }, [addCandidates, showActionSheetWithOptions, userId]);
+  }, [addCandidates, showActionSheetWithOptions, userId, themedSheet]);
 
   const handleRemoveAttachment = useCallback(
     (id: string) => {

@@ -298,6 +298,32 @@ describe('CreditNativeIapOwner', () => {
     expect(handle.value?.completedPurchaseCount).toBe(1);
   });
 
+  it('does not complete or announce a transaction the purchase request already completed', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const { handle } = await mountOwner();
+
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    await flushPromises();
+
+    // The request's own transaction completes and announces once.
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    expect(handle.value?.completedPurchaseCount).toBe(1);
+
+    // `finishTransaction` failed and its error was swallowed, so the store
+    // re-delivers the same transaction. The request already completed it, so
+    // the re-delivery must not complete or announce it a second time.
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    expect(handle.value?.completedPurchaseCount).toBe(1);
+  });
+
   it('ignores a delivered transaction that is not a credit pack', async () => {
     mockedQuery.serverProductsData = {
       appAccountToken: APP_ACCOUNT_TOKEN,

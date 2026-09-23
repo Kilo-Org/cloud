@@ -138,6 +138,20 @@ function findByType(
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
 }
 
+// The TextInput mock forwards its ref through a wrapper component, so a found
+// `TextInput` node's immediate test-instance parent is that wrapper, which
+// carries the input's own props. Walk up to the pill View that hosts the field.
+function findFieldContainer(input: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  let node: TestRenderer.ReactTestInstance | null = input.parent;
+  while (node) {
+    if (typeof node.props.className === 'string' && node.props.className.includes('rounded-full')) {
+      return node;
+    }
+    node = node.parent;
+  }
+  throw new Error('language search field container not found');
+}
+
 function findChoiceRow(
   root: TestRenderer.ReactTestInstance,
   endonym: string
@@ -523,10 +537,7 @@ describe('LanguagePickerSheet search field', () => {
     if (!input) {
       throw new Error('language search input not found');
     }
-    const field = input.parent;
-    if (!field) {
-      throw new Error('language search field container not found');
-    }
+    const field = findFieldContainer(input);
 
     expect((field.props.className as string).split(/\s+/)).toEqual(
       expect.arrayContaining([

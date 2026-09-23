@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import { choice, noul, score } from '@typesafe-ai/sdk';
-import { systemOneRequestSchema, systemOneResponseSchema, TYPESAFE_MODEL } from './typesafe';
+import { systemOneRequestSchema, systemOneResponseSchema, TYPESAFE_MODEL } from './schemas';
 
 describe('systemOneRequestSchema', () => {
   it('accepts SDK question helpers with structured entries and strips routing overrides', () => {

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import { captureException, captureMessage } from '@sentry/nextjs';
+import { z } from 'zod';
+import { errorExceptInTest } from '@/lib/utils.server';
 import { TypeSafeClient, choice, noul, score } from '@typesafe-ai/sdk';
 import type { User } from '@kilocode/db/schema';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -23,7 +24,7 @@ import {
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
-import { TYPESAFE_MODEL } from '@/lib/ai-gateway/typesafe';
+import { systemOneRequestSchema, TYPESAFE_MODEL } from '@/lib/ai-gateway/typesafe/schemas';
 import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 import { POST } from './route';
 
@@ -31,10 +32,7 @@ jest.mock('next/server', () => ({
   ...jest.requireActual<typeof NextServer>('next/server'),
   after: jest.fn(),
 }));
-jest.mock('@sentry/nextjs', () => ({
-  captureException: jest.fn(),
-  captureMessage: jest.fn(),
-}));
+jest.mock('@/lib/utils.server', () => ({ errorExceptInTest: jest.fn() }));
 jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
 jest.mock('@/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
@@ -396,6 +394,21 @@ describe('POST /api/gateway/typesafe/v1/systemone', () => {
     expect(after).not.toHaveBeenCalled();
   });
 
+  it('formats validation errors with Zod while preserving the TypeSafe error shape', async () => {
+    const body = { ...requestBody, questions: { refund: { type: 'invalid' } } };
+    const validation = systemOneRequestSchema.safeParse(body);
+    if (validation.success) throw new Error('Expected an invalid question');
+
+    const response = await POST(makeRequest(body));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      message: z.prettifyError(validation.error),
+      error_type: 'invalid_request',
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
   it.each([0, -1])('blocks balance %s using the shared credits response', async balance => {
     setAuth('org-123');
     jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
@@ -531,9 +544,7 @@ describe('POST /api/gateway/typesafe/v1/systemone', () => {
       message: 'Service temporarily unavailable',
       error_type: 'upstream_error',
     });
-    expect(captureMessage).toHaveBeenCalledWith('OpenRouter System One balance exhausted', {
-      level: 'error',
-    });
+    expect(errorExceptInTest).toHaveBeenCalledWith('OpenRouter System One balance exhausted');
     expect(wrapInSafeNextResponse).not.toHaveBeenCalled();
     expect(after).not.toHaveBeenCalled();
     expect(logMicrodollarUsage).not.toHaveBeenCalled();
@@ -568,9 +579,9 @@ describe('POST /api/gateway/typesafe/v1/systemone', () => {
       message: 'Upstream request failed',
       error_type: 'upstream_error',
     });
-    expect(captureException).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.any(String) }),
-      { tags: { source: 'systemone_proxy' } }
+    expect(errorExceptInTest).toHaveBeenCalledWith(
+      'OpenRouter System One request failed',
+      expect.objectContaining({ message: expect.any(String) })
     );
     expect(after).not.toHaveBeenCalled();
     expect(logMicrodollarUsage).not.toHaveBeenCalled();
@@ -595,9 +606,8 @@ describe('POST /api/gateway/typesafe/v1/systemone', () => {
       message: 'Invalid upstream response',
       error_type: 'upstream_error',
     });
-    expect(captureMessage).toHaveBeenCalledWith(
-      'Invalid OpenRouter System One response or missing usage',
-      { level: 'error' }
+    expect(errorExceptInTest).toHaveBeenCalledWith(
+      'Invalid OpenRouter System One response or missing usage'
     );
     expect(after).not.toHaveBeenCalled();
     expect(logMicrodollarUsage).not.toHaveBeenCalled();

@@ -16,29 +16,28 @@ import { RemoteSessionRow } from './remote-session-row';
 import { showRenamePrompt, showSessionActionMenu } from './session-row-actions';
 import { StoredSessionRow } from './session-row';
 
-vi.mock('react-native', async () => {
-  const React = await import('react');
-  return {
-    View: 'View',
-    Pressable: 'Pressable',
-    TextInput: 'TextInput',
-    Platform: { OS: 'ios' },
-    FlatList: ({
-      data,
-      renderItem,
-    }: {
-      data: ShareDestinationRow[];
-      renderItem: (info: { item: ShareDestinationRow }) => ReactElement;
-    }) =>
-      React.createElement(
-        'FlatList',
-        null,
-        data.map(item =>
-          React.createElement('Cell', { key: item.session_id }, renderItem({ item }))
-        )
-      ),
-  };
-});
+// The share destination list renders through FlashList v2; the stub feeds the
+// real `renderItem` every row, exactly as the old react-native FlatList stub did.
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: ({
+    data,
+    renderItem,
+  }: {
+    data: ShareDestinationRow[];
+    renderItem: (info: { item: ShareDestinationRow }) => ReactElement;
+  }) =>
+    createElement(
+      'FlashList',
+      null,
+      data.map(item => createElement('Cell', { key: item.session_id }, renderItem({ item })))
+    ),
+}));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Pressable: 'Pressable',
+  TextInput: 'TextInput',
+  Platform: { OS: 'ios' },
+}));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
 }));

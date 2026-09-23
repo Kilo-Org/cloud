@@ -17,7 +17,10 @@ import {
   type WorktreeReviewCapture,
   type WorktreeReviewComment,
 } from './worktree-review';
-import { verifyWorktreeReviewComment } from './worktree-review-verify';
+import {
+  verifyWorktreeReviewComment,
+  type WorktreeReviewVerification,
+} from './worktree-review-verify';
 import {
   createWorktreeReviewDraft,
   createWorktreeReviewStore,
@@ -36,6 +39,13 @@ export type WorktreeReviewDestination = {
   title: string;
 };
 
+const WORKTREE_REVIEW_UNVERIFIED_RETRY_DELAYS_MS = [1_000, 3_000];
+
+type WorktreeReviewVerificationRecord = {
+  signature: string;
+  phase: 'inflight' | 'settled';
+};
+
 function worktreeReviewVerificationSignature(
   comment: WorktreeReviewComment,
   capture: WorktreeReviewCapture
@@ -50,6 +60,46 @@ function worktreeReviewVerificationSignature(
     capture.capturedAt,
     capture.comparison,
   ]);
+}
+
+function worktreeReviewSnapshotVerificationKey(
+  snapshot: {
+    revision: number;
+    capturedAt: string;
+    comparison: { baseRef: string; mergeBase: string; head: string };
+    files: readonly { path: string; revision: number }[];
+  } | null
+): string {
+  if (!snapshot) return '';
+  return JSON.stringify([
+    snapshot.revision,
+    snapshot.capturedAt,
+    snapshot.comparison.baseRef,
+    snapshot.comparison.mergeBase,
+    snapshot.comparison.head,
+    snapshot.files.map(file => [file.path, file.revision]),
+  ]);
+}
+
+function deleteAbsentIds<T>(entries: Map<string, T>, liveIds: ReadonlySet<string>) {
+  for (const id of entries.keys()) {
+    if (!liveIds.has(id)) entries.delete(id);
+  }
+}
+
+function pruneUnappliedVerifications(
+  previous: ReadonlyMap<string, string>,
+  liveIds: ReadonlySet<string>
+): ReadonlyMap<string, string> {
+  for (const id of previous.keys()) {
+    if (liveIds.has(id)) continue;
+    const next = new Map(previous);
+    for (const staleId of next.keys()) {
+      if (!liveIds.has(staleId)) next.delete(staleId);
+    }
+    return next;
+  }
+  return previous;
 }
 
 export function useWorktreeReview({
@@ -280,68 +330,140 @@ export function useWorktreeReview({
     );
   };
 
-  const verificationSignatures = useRef(new Map<string, string>());
-  const latestCaptureRef = useRef(captures);
-  useEffect(() => {
-    latestCaptureRef.current = captures;
-  }, [captures]);
+  const verificationRecords = useRef(new Map<string, WorktreeReviewVerificationRecord>());
+  const verificationScopeKey = useRef<string | null>(null);
+  const capturesRef = useRef(captures);
+  const snapshotsRef = useRef(latestSnapshots);
+  const fetchFileRef = useRef(fetchWorktreeReviewFile);
+  const applyRebaseRef = useRef(applyWorktreeReviewRebase);
+  const isOpenRef = useRef(isOpen);
+  const scopeKeyRef = useRef<string | null>(scope ? worktreeReviewScopeKey(scope) : null);
+  const commentIdsRef = useRef(new Set((draft?.comments ?? []).map(comment => comment.id)));
+  capturesRef.current = captures;
+  snapshotsRef.current = latestSnapshots;
+  fetchFileRef.current = fetchWorktreeReviewFile;
+  applyRebaseRef.current = applyWorktreeReviewRebase;
+  isOpenRef.current = isOpen;
+  scopeKeyRef.current = scope ? worktreeReviewScopeKey(scope) : null;
+  commentIdsRef.current = new Set((draft?.comments ?? []).map(comment => comment.id));
   const [unappliedVerifications, setUnappliedVerifications] = useState<ReadonlyMap<string, string>>(
     new Map()
   );
+  const verificationInputKey = [...latestSnapshots.entries()]
+    .map(([source, snapshot]) => `${source}\0${worktreeReviewSnapshotVerificationKey(snapshot)}`)
+    .join('\n');
   useEffect(() => {
+    const comments = draft?.comments ?? [];
+    const liveIds = new Set(comments.map(comment => comment.id));
+    const scopeKey = scope ? worktreeReviewScopeKey(scope) : null;
+    if (verificationScopeKey.current !== scopeKey) {
+      verificationScopeKey.current = scopeKey;
+      verificationRecords.current.clear();
+      setUnappliedVerifications(previous => (previous.size === 0 ? previous : new Map()));
+    }
+    deleteAbsentIds(verificationRecords.current, liveIds);
+    setUnappliedVerifications(previous => pruneUnappliedVerifications(previous, liveIds));
     if (!isOpen || !scope || hydration !== 'ready') return;
-    for (const comment of draft?.comments ?? []) {
+
+    let cancelled = false;
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+    const pendingRetries: Array<(retry: boolean) => void> = [];
+    const started = new Map<string, string>();
+    const releaseInflight = (id: string, signature: string) => {
+      const current = verificationRecords.current.get(id);
+      if (current?.phase === 'inflight' && current.signature === signature) {
+        verificationRecords.current.delete(id);
+      }
+    };
+    const forgetUnapplied = (id: string) => {
+      setUnappliedVerifications(previous => {
+        if (!previous.has(id)) return previous;
+        const next = new Map(previous);
+        next.delete(id);
+        return next;
+      });
+    };
+    const stillCurrent = (
+      id: string,
+      signature: string,
+      source: string,
+      capture: WorktreeReviewCapture
+    ) => {
+      if (cancelled || scopeKeyRef.current !== scopeKey || !commentIdsRef.current.has(id)) {
+        return false;
+      }
+      const record = verificationRecords.current.get(id);
+      if (!record || record.signature !== signature) return false;
+      const currentCapture = capturesRef.current.get(source) ?? null;
+      return currentCapture !== null && sameWorktreeReviewCapture(currentCapture, capture);
+    };
+
+    for (const comment of comments) {
       const source = comment.anchor.capture.sourceCloudAgentSessionId;
-      const capture = captures.get(source) ?? null;
+      const capture = capturesRef.current.get(source) ?? null;
       if (!capture || getWorktreeReviewFreshness(comment, capture) !== 'stale') continue;
-      const snapshot = latestSnapshots.get(source);
+      const snapshot = snapshotsRef.current.get(source);
       if (!snapshot) continue;
       const signature = worktreeReviewVerificationSignature(comment, capture);
-      if (verificationSignatures.current.get(comment.id) === signature) continue;
-      verificationSignatures.current.set(comment.id, signature);
+      if (verificationRecords.current.get(comment.id)?.signature === signature) continue;
+      verificationRecords.current.set(comment.id, { signature, phase: 'inflight' });
+      started.set(comment.id, signature);
+      const commentId = comment.id;
       void (async () => {
-        const result = await verifyWorktreeReviewComment({
-          comment,
-          scope,
-          snapshot,
-          fetchFile: input => fetchWorktreeReviewFile(source, input),
-        });
-        if (verificationSignatures.current.get(comment.id) !== signature) return;
-        const currentCapture = latestCaptureRef.current.get(source) ?? null;
-        if (!currentCapture || !sameWorktreeReviewCapture(currentCapture, capture)) return;
-        if (result.status === 'applied') {
-          applyWorktreeReviewRebase(comment, result.comment);
-          setUnappliedVerifications(previous => {
-            if (!previous.has(comment.id)) return previous;
-            const next = new Map(previous);
-            next.delete(comment.id);
-            return next;
-          });
-          return;
-        }
-        setUnappliedVerifications(previous => {
-          if (result.status === 'unapplied') {
-            if (previous.get(comment.id) === signature) return previous;
-            return new Map(previous).set(comment.id, signature);
+        for (let attempt = 0; ; attempt += 1) {
+          if (!stillCurrent(commentId, signature, source, capture)) return;
+          const fetchFile = fetchFileRef.current;
+          const result: WorktreeReviewVerification = await verifyWorktreeReviewComment({
+            comment,
+            scope,
+            snapshot,
+            fetchFile: input => fetchFile(source, input),
+          }).catch(() => ({ status: 'unverified' }));
+          if (!stillCurrent(commentId, signature, source, capture)) return;
+          if (result.status === 'applied') {
+            verificationRecords.current.set(commentId, { signature, phase: 'settled' });
+            applyRebaseRef.current(comment, result.comment);
+            forgetUnapplied(commentId);
+            return;
           }
-          if (!previous.has(comment.id)) return previous;
-          const next = new Map(previous);
-          next.delete(comment.id);
-          return next;
-        });
+          if (result.status === 'unapplied') {
+            verificationRecords.current.set(commentId, { signature, phase: 'settled' });
+            setUnappliedVerifications(previous =>
+              previous.get(commentId) === signature
+                ? previous
+                : new Map(previous).set(commentId, signature)
+            );
+            return;
+          }
+          const delay = WORKTREE_REVIEW_UNVERIFIED_RETRY_DELAYS_MS[attempt];
+          if (delay === undefined || !isOpenRef.current) {
+            releaseInflight(commentId, signature);
+            forgetUnapplied(commentId);
+            return;
+          }
+          const retry = await new Promise<boolean>(resolve => {
+            pendingRetries.push(resolve);
+            const timer = setTimeout(() => {
+              timers.delete(timer);
+              resolve(!cancelled && isOpenRef.current);
+            }, delay);
+            timers.add(timer);
+          });
+          if (!retry || !stillCurrent(commentId, signature, source, capture)) {
+            releaseInflight(commentId, signature);
+            return;
+          }
+        }
       })();
     }
-  }, [
-    applyWorktreeReviewRebase,
-    captures,
-    draft?.comments,
-    fetchWorktreeReviewFile,
-    hydration,
-    isOpen,
-    latestSnapshots,
-    scope,
-    store,
-  ]);
+
+    return () => {
+      cancelled = true;
+      for (const timer of timers) clearTimeout(timer);
+      for (const resolve of pendingRetries) resolve(false);
+      for (const [id, signature] of started) releaseInflight(id, signature);
+    };
+  }, [draft?.comments, hydration, isOpen, scope, verificationInputKey]);
   const unappliedCommentIds = new Set<string>();
   for (const comment of draft?.comments ?? []) {
     const signature = unappliedVerifications.get(comment.id);

@@ -9,6 +9,12 @@ describe('formatShortModelDisplayName', () => {
     );
   });
 
+  it('strips the prefix from the reported DeepSeek V4.1 Flash catalogue name', () => {
+    expect(formatShortModelDisplayName('DeepSeek: DeepSeek V4.1 Flash')).toBe(
+      'DeepSeek V4.1 Flash'
+    );
+  });
+
   it('keeps a name that carries no vendor prefix', () => {
     expect(formatShortModelDisplayName('GPT-4o')).toBe('GPT-4o');
   });

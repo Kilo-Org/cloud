@@ -43,6 +43,22 @@ describe('getSessionDetailRenameState', () => {
     });
   });
 
+  it('treats a machine placeholder server title as absent and shows the fallback label', () => {
+    expect(
+      getSessionDetailRenameState({
+        fallbackTitle,
+        isLoaded: true,
+        serverTitle: 'New session - 2026-09-22T16:37:00.000Z',
+        renameState: initialRenameState(),
+      })
+    ).toEqual({
+      title: fallbackTitle,
+      isTitleInteractive: true,
+      modalInitialValue: null,
+      isModalOpen: false,
+    });
+  });
+
   it('hides interactivity when fetched data belongs to a different session', () => {
     expect(
       getSessionDetailRenameState({
@@ -258,6 +274,21 @@ describe('titleFromSessionUpdatedEvent', () => {
     ).toBeUndefined();
     expect(
       titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ title: '  ' }))
+    ).toBeUndefined();
+  });
+
+  it('ignores a machine placeholder title so a live update cannot repaint the timestamp', () => {
+    expect(
+      titleFromSessionUpdatedEvent(
+        'ses-1',
+        sessionUpdatedPayload({ title: 'New session - 2026-09-22T16:37:00.000Z' })
+      )
+    ).toBeUndefined();
+    expect(
+      titleFromSessionUpdatedEvent(
+        'ses-1',
+        sessionUpdatedPayload({ title: 'Child session - 2026-09-22T16:37:00.000Z' })
+      )
     ).toBeUndefined();
   });
 

@@ -147,6 +147,59 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     );
   }
 
+  it('keeps skill-sourced rows in the catalog so the composer can list and invoke them', async () => {
+    const stub = startStub(200, [
+      { name: 'review', description: 'Review', hints: [], source: 'command', template: 'x' },
+      {
+        name: 'kilo-config',
+        description: 'Guide for Kilo configuration',
+        hints: [],
+        source: 'skill',
+        template: 'y',
+      },
+    ]);
+
+    const commands = await createClient(stub.url).listCommands();
+
+    expect(commands).toEqual([
+      { name: 'review', description: 'Review', source: 'command', hints: [] },
+      {
+        name: 'kilo-config',
+        description: 'Guide for Kilo configuration',
+        source: 'skill',
+        hints: [],
+      },
+    ]);
+  });
+
+  it('keeps every skill row when a full catalog is bounded', async () => {
+    const stub = startStub(200, [
+      ...Array.from({ length: 260 }, (_, index) => ({
+        name: `cmd-${index}`,
+        description: 'Command',
+        hints: [],
+        source: 'command',
+        template: 'x',
+      })),
+      ...Array.from({ length: 3 }, (_, index) => ({
+        name: `skill-${index}`,
+        description: 'Guide',
+        hints: [],
+        source: 'skill',
+        template: 'y',
+      })),
+    ]);
+
+    const commands = await createClient(stub.url).listCommands();
+
+    expect(commands).toHaveLength(256);
+    expect(commands.filter(command => command.source === 'skill')).toEqual([
+      { name: 'skill-0', description: 'Guide', source: 'skill', hints: [] },
+      { name: 'skill-1', description: 'Guide', source: 'skill', hints: [] },
+      { name: 'skill-2', description: 'Guide', source: 'skill', hints: [] },
+    ]);
+  });
+
   const questions: QuestionRequest[] = [
     {
       id: 'question_1',

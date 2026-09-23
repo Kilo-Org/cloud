@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "OpenAI Codex सत्रको ट्रान्सक्रिप्ट आयात गर्नुहोस्",
       "reviewDescription": "परिवर्तनहरू समीक्षा गर्नुहोस् [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} प्रयोग गर्नुहोस्",
+      "useSkillCommand": "सीप /{{command}} प्रयोग गर्नुहोस्",
+      "skillBadge": "सीप",
       "insert": "थप्नुहोस्",
       "upgradeRequiredFallback": "यो कमाण्ड प्रयोग गर्न आफ्नो CLI अद्यावधिक गर्नुहोस्।",
       "exitCapabilityUnavailable": "सत्रबाट बाहिरिन आफ्नो CLI अद्यावधिक गर्नुहोस्।",

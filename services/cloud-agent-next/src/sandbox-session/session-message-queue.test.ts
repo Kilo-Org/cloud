@@ -118,6 +118,7 @@ import {
   readSessionValueSync,
   writeSessionValueSync,
   writeSessionMessages,
+  writeSessionValueSync,
   seedSessionValue,
   isSessionMessagesKey,
 } from '../sandbox-state/persist/access.js';

@@ -16,7 +16,11 @@ import {
 } from '@kilocode/sdk/v2';
 import { z } from 'zod';
 import { logToFile } from './utils.js';
-import { toSlashCommandInfo, type SlashCommandInfo } from '../../src/shared/slash-commands.js';
+import {
+  boundSlashCommandCatalog,
+  toSlashCommandInfo,
+  type SlashCommandInfo,
+} from '../../src/shared/slash-commands.js';
 
 const sessionStatusesSchema = z.record(
   z.string().min(1),
@@ -512,9 +516,22 @@ export function createWrapperKiloClient(
       const commands: SlashCommandInfo[] = [];
       for (const item of raw) {
         const trimmed = toSlashCommandInfo(item);
-        if (trimmed && trimmed.source !== 'skill') commands.push(trimmed);
+        // Skill-sourced rows stay in the catalog: the mobile composer lists
+        // and invokes them like any other command. The CLI reports a skill
+        // only when it is available to this session, so keeping every reported
+        // row never un-hides an unavailable skill.
+        if (trimmed) commands.push(trimmed);
       }
-      return commands;
+      // Bound the catalog the same way the remote catalog is bounded. The
+      // bound drops non-skill rows first and never truncates a skill row; a
+      // full catalog is reported rather than silently hiding skills.
+      const bounded = boundSlashCommandCatalog(commands);
+      if (bounded.dropped > 0) {
+        logToFile(
+          `slash command catalog full: dropped ${bounded.dropped} non-skill rows, kept ${bounded.commands.length}`
+        );
+      }
+      return bounded.commands;
     },
 
     answerPermission: async (

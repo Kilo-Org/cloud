@@ -2039,7 +2039,9 @@
       "clearCapabilityUnavailable": "सत्र फिर से शुरू करने के लिए अपना CLI अपडेट करें।",
       "argumentError": "{{command}} आर्ग्युमेंट नहीं लेता।",
       "insert": "डालें",
-      "useCommand": "/{{command}} का उपयोग करें"
+      "useCommand": "/{{command}} का उपयोग करें",
+      "useSkillCommand": "स्किल /{{command}} का उपयोग करें",
+      "skillBadge": "स्किल"
     },
     "contextUsage": {
       "windowUnavailable": "संदर्भ विंडो का आकार उपलब्ध नहीं",

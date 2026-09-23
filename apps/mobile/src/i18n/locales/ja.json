@@ -2068,6 +2068,8 @@
       "resumeCodexDescription": "OpenAI Codexセッションのトランスクリプトをインポート",
       "reviewDescription": "変更をレビュー [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}}を使用",
+      "useSkillCommand": "スキル /{{command}}を使用",
+      "skillBadge": "スキル",
       "insert": "挿入",
       "upgradeRequiredFallback": "このコマンドを使用するにはCLIをアップグレードしてください。",
       "exitCapabilityUnavailable": "セッションを終了するにはCLIを更新してください。",

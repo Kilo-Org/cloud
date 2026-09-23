@@ -2686,6 +2686,8 @@
       "resumeCodexDescription": "iompórtáil tras-scríobh seisiúin OpenAI Codex",
       "reviewDescription": "athbhreithnigh na hathruithe [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Úsáid /{{command}}",
+      "useSkillCommand": "Úsáid scil /{{command}}",
+      "skillBadge": "Scil",
       "insert": "Cuir isteach",
       "upgradeRequiredFallback": "Uasghrádaigh do CLI le húsáid a bhaint as an ordú seo.",
       "exitCapabilityUnavailable": "Nuashonraigh do CLI chun scoir den seisiún.",

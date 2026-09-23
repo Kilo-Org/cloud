@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "OpenAI Codex сессиясының транскриптін импортта",
       "reviewDescription": "өзгерістерді шолу [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} пәрменін қолдану",
+      "useSkillCommand": "/{{command}} дағдысын қолдану",
+      "skillBadge": "Дағды",
       "insert": "Кірістіру",
       "upgradeRequiredFallback": "Бұл пәрменді қолдану үшін CLI құралын жаңартыңыз.",
       "exitCapabilityUnavailable": "Сессиядан шығу үшін CLI құралын жаңартыңыз.",

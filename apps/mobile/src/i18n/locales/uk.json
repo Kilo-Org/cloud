@@ -2112,6 +2112,8 @@
       "resumeCodexDescription": "імпортувати транскрипт сеансу OpenAI Codex",
       "reviewDescription": "переглянути зміни [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Використати /{{command}}",
+      "useSkillCommand": "Використати навичку /{{command}}",
+      "skillBadge": "Навичка",
       "insert": "Вставити",
       "upgradeRequiredFallback": "Оновіть CLI, щоб скористатися цією командою.",
       "exitCapabilityUnavailable": "Оновіть CLI, щоб завершити сеанс.",

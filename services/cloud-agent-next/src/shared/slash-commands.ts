@@ -60,6 +60,68 @@ export function toSlashCommandInfo(raw: unknown): SlashCommandInfo | null {
 }
 
 /**
+ * Catalog bounds shared with the remote CLI catalog
+ * (`packages/cloud-agent-sdk/src/schemas.ts`). The cloud-agent path builds its
+ * own catalog in the wrapper and now carries skill rows too, so it must respect
+ * the same 256-command / 512 KiB limits the composer is sized for.
+ */
+export const SLASH_COMMAND_CATALOG_MAX_COMMANDS = 256;
+export const SLASH_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
+
+export type BoundedSlashCommandCatalog = {
+  commands: SlashCommandInfo[];
+  /** Non-skill rows removed to bring the catalog back inside its bounds. */
+  dropped: number;
+};
+
+/**
+ * Bound a catalog to the shared limits without ever truncating a skill row.
+ *
+ * Skill rows always survive: non-skill rows fill the remaining count budget in
+ * their original order, and if the payload is still over the byte limit,
+ * non-skill rows are dropped from the end. When only skill rows remain and the
+ * payload is still over the byte limit the skills are kept anyway, so a skill
+ * is never truncated; the caller reports the full catalog instead of hiding
+ * skills silently.
+ */
+export function boundSlashCommandCatalog(commands: SlashCommandInfo[]): BoundedSlashCommandCatalog {
+  if (isWithinCatalogBounds(commands)) {
+    return { commands, dropped: 0 };
+  }
+
+  const skills = commands.filter(command => command.source === 'skill');
+  const nonSkills = commands.filter(command => command.source !== 'skill');
+  const countBudget = Math.max(0, SLASH_COMMAND_CATALOG_MAX_COMMANDS - skills.length);
+  const kept = new Set<SlashCommandInfo>([...skills, ...nonSkills.slice(0, countBudget)]);
+  const bounded = commands.filter(command => kept.has(command));
+
+  while (serializedCatalogBytes(bounded) > SLASH_COMMAND_CATALOG_MAX_SERIALIZED_BYTES) {
+    let dropIndex = -1;
+    for (let index = bounded.length - 1; index >= 0; index -= 1) {
+      if (bounded[index]?.source !== 'skill') {
+        dropIndex = index;
+        break;
+      }
+    }
+    if (dropIndex === -1) break;
+    bounded.splice(dropIndex, 1);
+  }
+
+  return { commands: bounded, dropped: commands.length - bounded.length };
+}
+
+function isWithinCatalogBounds(commands: SlashCommandInfo[]): boolean {
+  return (
+    commands.length <= SLASH_COMMAND_CATALOG_MAX_COMMANDS &&
+    serializedCatalogBytes(commands) <= SLASH_COMMAND_CATALOG_MAX_SERIALIZED_BYTES
+  );
+}
+
+function serializedCatalogBytes(commands: SlashCommandInfo[]): number {
+  return new TextEncoder().encode(JSON.stringify(commands)).byteLength;
+}
+
+/**
  * Return the provided command list when it is non-empty, otherwise fall back
  * to the hardcoded default catalog. Used both server-side (DO storage) and
  * client-side (hook) so empty always means "defaults" rather than "none yet".

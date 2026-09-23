@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "OpenAI Codex సెషన్ ట్రాన్స్క్రిప్ట్ను దిగుమతి చేయండి",
       "reviewDescription": "మార్పులను సమీక్షించండి [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ఉపయోగించండి",
+      "useSkillCommand": "నైపుణ్యం /{{command}} ఉపయోగించండి",
+      "skillBadge": "నైపుణ్యం",
       "insert": "చేర్చండి",
       "upgradeRequiredFallback": "ఈ కమాండ్‌ను ఉపయోగించడానికి మీ CLIను నవీకరించండి.",
       "exitCapabilityUnavailable": "సెషన్ నుండి నిష్క్రమించడానికి మీ CLIని నవీకరించండి.",

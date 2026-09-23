@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "bubata ndekọ nnọkọ OpenAI Codex",
       "reviewDescription": "leba anya na mgbanwe [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Jiri /{{command}}",
+      "useSkillCommand": "Jiri nkà /{{command}}",
+      "skillBadge": "Nkà",
       "insert": "Tinye",
       "upgradeRequiredFallback": "Biko kwalite CLI gị ka ị jiri iwu a.",
       "exitCapabilityUnavailable": "Melite CLI gị ka ị pụọ na nnọkọ.",

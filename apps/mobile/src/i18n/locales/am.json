@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "የOpenAI Codex ክፍለ ጊዜ ግልባጭ አስገባ",
       "reviewDescription": "ለውጦችን ገምግም [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}}ን ይጠቀሙ",
+      "useSkillCommand": "ክህሎት /{{command}}ን ይጠቀሙ",
+      "skillBadge": "ክህሎት",
       "insert": "ያስገቡ",
       "upgradeRequiredFallback": "ይህን ትዕዛዝ ለመጠቀም እባክዎ CLIዎን ያዘምኑ።",
       "exitCapabilityUnavailable": "ከክፍለ ጊዜው ለመውጣት CLIዎን ያዘምኑ።",

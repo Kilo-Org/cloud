@@ -2572,6 +2572,8 @@
       "resumeCodexDescription": "impordi OpenAI Codexi seansi transkript",
       "reviewDescription": "vaata muudatused üle [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Kasuta /{{command}}",
+      "useSkillCommand": "Kasuta oskust /{{command}}",
+      "skillBadge": "Oskus",
       "insert": "Lisa",
       "upgradeRequiredFallback": "Selle käsu kasutamiseks uuenda CLI-d.",
       "exitCapabilityUnavailable": "Seansist väljumiseks uuenda CLI-d.",

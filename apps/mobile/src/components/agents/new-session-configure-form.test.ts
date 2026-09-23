@@ -847,10 +847,12 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === 'Changes')).toBe(false);
   });
 
-  // ── Case 12: kilo remote hint ──
-  it('renders the plain remote-run hint for cloud and remote targets', async () => {
+  // ── Case 12: the Run on helper sentence stays in plain language ──
+  it('renders the plain help sentence, without CLI jargon, for cloud and remote targets', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-    const HINT = 'Run kilo remote in a project on your computer to start sessions there.';
+
+    const helpSentence = 'To run on your computer, start Kilo there and leave it running.';
+    const cliTerms = ['kilo remote', '/remote', 'CLI session', 'local kilo process'];
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
     const cloud = NewSessionConfigureForm({
@@ -858,12 +860,15 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: null,
       showRunOnSelector: true,
     }) as Node;
-    expect(findTextContent(cloud, t => t === HINT)).toBe(true);
-    // The help draws the command as prose: the CLI-only entry point, the
-    // internal vocabulary and the authoring markers must not reach the screen.
-    expect(findTextContent(cloud, t => t.includes('/remote'))).toBe(false);
-    expect(findTextContent(cloud, t => t.includes('CLI session'))).toBe(false);
-    expect(findTextContent(cloud, t => t.includes('local kilo process'))).toBe(false);
+    expect(findTextContent(cloud, t => t === helpSentence)).toBe(true);
+    for (const term of cliTerms) {
+      expect(
+        findTextContent(cloud, t => t.includes(term)),
+        term
+      ).toBe(false);
+    }
+    // The help draws the sentence as prose: the authoring markers must not
+    // reach the screen.
     expect(findTextContent(cloud, t => t.includes('`'))).toBe(false);
 
     // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
@@ -872,10 +877,13 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: INSTANCE,
       showRunOnSelector: false,
     }) as Node;
-    expect(findTextContent(remote, t => t === HINT)).toBe(true);
-    expect(findTextContent(remote, t => t.includes('/remote'))).toBe(false);
-    expect(findTextContent(remote, t => t.includes('CLI session'))).toBe(false);
-    expect(findTextContent(remote, t => t.includes('local kilo process'))).toBe(false);
+    expect(findTextContent(remote, t => t === helpSentence)).toBe(true);
+    for (const term of cliTerms) {
+      expect(
+        findTextContent(remote, t => t.includes(term)),
+        term
+      ).toBe(false);
+    }
     expect(findTextContent(remote, t => t.includes('`'))).toBe(false);
   });
 

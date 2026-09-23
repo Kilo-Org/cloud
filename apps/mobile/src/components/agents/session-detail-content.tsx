@@ -1612,12 +1612,17 @@ export function SessionDetailContent({
   });
 
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
-  // A `New session - <ISO>` placeholder is not a title: showing it truncates
-  // the header to "New session - 2026-…". Fall through to the short fallback
-  // until auto-titling (or a rename) supplies a real one. `namedSessionTitle`
-  // applies the shared placeholder rule and still returns a placeholder-shaped
-  // title the user's own rename wrote, so the header keeps their name.
-  const serverTitle = isSessionLoaded ? namedSessionTitle(fetchedData.title, sessionId) : undefined;
+  // A generated placeholder title (`New session - <ISO>` / `Child session -
+  // <ISO>`) is a storage key, not a name: showing it truncates the header to
+  // "New session - 2026-…". Treat it as absent and let the fallback name (or a
+  // live rename) show instead. The judgement lives in `namedSessionTitle`
+  // rather than here so it can also consult the record of titles the app's own
+  // rename wrote: a user-chosen title that happens to match the placeholder
+  // shape is kept, and a genuine placeholder still reaches
+  // `getSessionDetailRenameState` as absent.
+  const serverTitle = isSessionLoaded
+    ? namedSessionTitle(fetchedData.title ?? undefined, sessionId)
+    : undefined;
   const rename = useSessionDetailRename({
     sessionId,
     isLoaded: isSessionLoaded,
@@ -1626,7 +1631,8 @@ export function SessionDetailContent({
     // title it opened with instead of blinking back to "Session". The route's
     // cached metadata can hold the backend's ISO placeholder, which must not
     // paint; `namedSessionTitle` drops a placeholder (unless the app's own
-    // rename flow wrote it), so the fallback label shows instead.
+    // rename flow wrote it) so the fallback label shows instead, while a title
+    // the user's own rename wrote is kept.
     fallbackTitle: namedSessionTitle(cachedTitle, sessionId) ?? t('agentChat.session.title'),
   });
   const handleRenameSave = rename.submit;

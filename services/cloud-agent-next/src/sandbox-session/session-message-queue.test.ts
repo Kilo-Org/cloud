@@ -972,6 +972,32 @@ describe('releaseUnconfirmedAttach', () => {
     expect(released?.[0]?.proofs?.attach).toBeUndefined();
   });
 
+  it('keeps the retired attach epoch when the replacement proof has none', () => {
+    const message = queuedMessage({ authorization, dispatched: true });
+    if (!message.proofs) throw new Error('Missing attach proof');
+    const released = releaseUnconfirmedAttach(
+      [
+        {
+          ...message,
+          proofs: {
+            ...message.proofs,
+            retiredAttach: {
+              authorization,
+              dispatched: true,
+              completedAt: 400,
+              attachmentEpoch: 3,
+            },
+          },
+        },
+      ],
+      authorization
+    );
+
+    // The dispatched attach carries no epoch until its result arrives, so the
+    // overwritten slot would drop the watermark the fence holds.
+    expect(released?.[0]?.proofs?.retiredAttach).toMatchObject({ attachmentEpoch: 3 });
+  });
+
   it('refuses a message id that is not in the messages array', () => {
     expect(releaseUnconfirmedAttach([], authorization)).toBeUndefined();
   });
@@ -5622,7 +5648,10 @@ describe('SandboxSession orchestration', () => {
       expect(input.acquisition).toEqual(acquisition);
       expect(input.allowCreate).toBeUndefined();
     }
-    expect(fixture.control.getStatus).not.toHaveBeenCalled();
+    // The deadline check probes the control plane for an in-flight runtime
+    // replacement before terminalizing. Absent one, it terminalizes without
+    // dispatching or quarantining.
+    expect(fixture.control.getStatus).toHaveBeenCalledWith({ sessionId: SESSION_ID });
     expect(fixture.control.request).not.toHaveBeenCalled();
   });
 

@@ -37,6 +37,9 @@ describe('sessionDisplayTitle', () => {
     expect(sessionDisplayTitle('New session - implementation plan')).toBe(
       'New session - implementation plan'
     );
+    expect(sessionDisplayTitle('New session - 2026-09-22T01:09:45.623Z notes')).toBe(
+      'New session - 2026-09-22T01:09:45.623Z notes'
+    );
     expect(sessionDisplayTitle('New session - 2026-09-22T01:09:45Z')).toBe(
       'New session - 2026-09-22T01:09:45Z'
     );

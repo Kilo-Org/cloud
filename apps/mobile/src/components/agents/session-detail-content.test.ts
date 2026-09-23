@@ -1018,6 +1018,24 @@ describe('SessionDetailContent header title', () => {
     );
   });
 
+  it('shows the fallback name instead of the generated placeholder title', async () => {
+    sessionTitleOverride = 'New session - 2026-09-22T02:05:22.778Z';
+    const { renderer } = await mountDetails();
+    const title = renderer.root
+      .findByType(ScreenHeader)
+      .findByProps({ accessibilityRole: 'header' });
+    expect(title.props.children).toBe(i18n.t('agentChat.session.title'));
+  });
+
+  it('renders a real server title unchanged', async () => {
+    sessionTitleOverride = 'Fix the session header';
+    const { renderer } = await mountDetails();
+    const title = renderer.root
+      .findByType(ScreenHeader)
+      .findByProps({ accessibilityRole: 'header' });
+    expect(title.props.children).toBe('Fix the session header');
+  });
+
   // The rename dialog inherited RenameModal's 50-character default, below the
   // 200-character cap the rename endpoint accepts. A longer title was dropped
   // after character 50, and the header then rendered the leftover fragment

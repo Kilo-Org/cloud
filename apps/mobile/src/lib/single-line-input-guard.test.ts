@@ -1,9 +1,13 @@
+/* eslint-disable max-lines -- the guard is one cohesive test file: the alias-resolving scan, the reasoned allowlist and owner-boundary record, and the synthetic cases that prove the scan all read together. */
 // Source guard for the "one single-line box" class: a single-line text field
 // must render the shared `Input` (`src/components/ui/input.tsx`), never a raw
 // `<TextInput>`. The raw control draws its placeholder and its value from two
 // different boxes — on Android the value starts at the top of a taller box
 // while the placeholder is centred — so the class can only be closed at the one
 // shared component. A raw single-line field anywhere else fails this guard.
+// The import name is resolved, not spelled: a file that imports
+// `TextInput as RNTextInput` and renders `<RNTextInput>` holds a raw field too,
+// so aliasing the import cannot hide one.
 //
 // Multiline composers are a different control: they keep their own box (an
 // explicit `leading-*`, their own `textAlignVertical`) and cannot use the
@@ -45,6 +49,8 @@ const ALLOWLIST: Readonly<Record<string, string>> = {
   'src/app/(app)/(tabs)/(3_profile)/code-reviewer/[scope]/[platform]/(edit)/instructions.tsx':
     'multiline instruction editor (`h-32`, `leading-5`)',
   'src/components/agents/chat-composer-input-row.tsx': 'multiline prompt composer',
+  'src/components/agents/new-session-prompt.tsx':
+    'multiline new-session prompt composer (multiline, leading-6, measured height)',
   'src/components/code-reviewer/manual-review-screen.tsx':
     'multiline `h-24` summary editor (its single-line URL field uses the shared box)',
   'src/components/kilo-chat/message-input-view.tsx': 'multiline chat composer',
@@ -81,12 +87,31 @@ const OWNER_BOUNDARY_INPUTS: Readonly<Record<string, string>> = {
     'Kilo Claw owner boundary: the onboarding location field stays raw until the Kilo Claw owner migrates it',
 };
 
+/** A named `react-native` import, in a single- or multi-line statement. */
+const REACT_NATIVE_IMPORT = /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s*['"]react-native['"]/g;
+
+/** An alias binding inside such an import: `TextInput as RNTextInput`. */
+const TEXT_INPUT_ALIAS = /\bTextInput\s+as\s+([A-Za-z_$][\w$]*)\b/;
+
 /**
- * A JSX `<TextInput` opening. The lookbehind drops a type reference such as
- * `useRef<TextInput>` or `RefObject<TextInput | null>`: the `<` or a word
- * character precedes it, which JSX never does.
+ * The local names `TextInput` is imported under in `code`.
+ *
+ * `TextInput` is always scanned, so a source that renders it without a
+ * resolvable import is still caught; `TextInput as RNTextInput` adds
+ * `RNTextInput`. Longest first, so `RNTextInput` is preferred over a name it
+ * contains.
  */
-const JSX_TEXT_INPUT = /(?<![<\w])<TextInput\b/g;
+function textInputNames(code: string): string[] {
+  const names = new Set<string>(['TextInput']);
+  for (const match of code.matchAll(REACT_NATIVE_IMPORT)) {
+    const alias = TEXT_INPUT_ALIAS.exec(match[1] ?? '');
+    const name = alias?.[1];
+    if (name !== undefined) {
+      names.add(name);
+    }
+  }
+  return [...names].toSorted((a, b) => b.length - a.length);
+}
 
 /** The `multiline` prop, as a whole token. */
 const MULTILINE = /\bmultiline\b/;
@@ -94,7 +119,8 @@ const MULTILINE = /\bmultiline\b/;
 type RawInput = { line: number; block: string };
 
 /**
- * Finds every raw JSX `<TextInput` in `files` that may not stay raw.
+ * Finds every raw JSX opening of a `TextInput` local name in `files` that may
+ * not stay raw.
  *
  * A path is fine when it is the shared single-line box, or when it is an
  * allowlisted multiline composer and the occurrence carries `multiline`. A
@@ -135,11 +161,17 @@ function isAllowedRawInput(path: string, raw: RawInput): boolean {
   return Object.hasOwn(ALLOWLIST, path) && MULTILINE.test(raw.block);
 }
 
-/** Every raw `<TextInput` opening in one source, with the line it opens on. */
+/**
+ * Every raw JSX opening of a `TextInput` local name in one source, with the
+ * line it opens on. The lookbehind drops a type reference such as
+ * `useRef<TextInput>` or `RefObject<RNTextInput | null>`: the `<` or a word
+ * character precedes it, which JSX never does.
+ */
 function rawTextInputs(source: string): RawInput[] {
   const code = stripComments(source);
+  const jsxTextInput = new RegExp(`(?<![<\\w])<(?:${textInputNames(code).join('|')})\\b`, 'g');
   const found: RawInput[] = [];
-  for (const match of code.matchAll(JSX_TEXT_INPUT)) {
+  for (const match of code.matchAll(jsxTextInput)) {
     const start = match.index;
     // A `<` (with only whitespace between) before the tag is a type argument —
     // `RefObject<\n  TextInput | null>` — never JSX, which puts `>`, `(`, `,`,
@@ -266,6 +298,16 @@ const ROUTED_SINGLE_LINE = [
   '',
 ].join('\n');
 
+/** The same raw field, reached through an aliased `react-native` import. */
+const ALIASED_SINGLE_LINE = [
+  "import { TextInput as RNTextInput } from 'react-native';",
+  '',
+  'export function Whatever() {',
+  '  return <RNTextInput placeholder="x" />;',
+  '}',
+  '',
+].join('\n');
+
 describe('single-line input guard', () => {
   it('routes every raw single-line TextInput through the shared input box', () => {
     const files = readSourceTree();
@@ -309,6 +351,59 @@ describe('single-line input guard', () => {
     expect(unsharedSingleLineInputs({ [allowlisted]: RAW_SINGLE_LINE })).toEqual([
       `${allowlisted}:4`,
     ]);
+  });
+
+  it('reports a raw single-line field reached through an aliased import', () => {
+    expect(
+      unsharedSingleLineInputs({ 'src/components/Whatever.tsx': ALIASED_SINGLE_LINE })
+    ).toEqual(['src/components/Whatever.tsx:4']);
+  });
+
+  it('accepts an aliased multiline field in an allowlisted composer', () => {
+    const allowlisted = 'src/components/agents/chat-composer-input-row.tsx';
+    const aliasedMultiline = [
+      "import { TextInput as RNTextInput } from 'react-native';",
+      '',
+      'export function Composer() {',
+      '  return <RNTextInput multiline placeholder="x" />;',
+      '}',
+      '',
+    ].join('\n');
+    expect(unsharedSingleLineInputs({ [allowlisted]: aliasedMultiline })).toEqual([]);
+    expect(unsharedSingleLineInputs({ [allowlisted]: ALIASED_SINGLE_LINE })).toEqual([
+      `${allowlisted}:4`,
+    ]);
+  });
+
+  it('resolves an alias declared in a multi-line import', () => {
+    const multiLineImport = [
+      'import {',
+      '  Platform,',
+      '  TextInput as PromptInput,',
+      "} from 'react-native';",
+      '',
+      'export function Whatever() {',
+      '  return <PromptInput placeholder="x" />;',
+      '}',
+      '',
+    ].join('\n');
+    expect(unsharedSingleLineInputs({ 'src/components/Whatever.tsx': multiLineImport })).toEqual([
+      'src/components/Whatever.tsx:7',
+    ]);
+  });
+
+  it('leaves an aliased name in a type position alone', () => {
+    const typed = [
+      "import { useRef } from 'react';",
+      "import { TextInput as RNTextInput } from 'react-native';",
+      '',
+      'export function Whatever() {',
+      '  const ref = useRef<RNTextInput>(null);',
+      '  return ref;',
+      '}',
+      '',
+    ].join('\n');
+    expect(unsharedSingleLineInputs({ 'src/components/Whatever.tsx': typed })).toEqual([]);
   });
 
   it('leaves a type reference or a comparison alone', () => {

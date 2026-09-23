@@ -27,12 +27,19 @@ vi.mock('expo-secure-store', () => ({
 // relies on it.
 
 import { resetAuthTerminalReports } from '@/lib/auth/auth-response-class';
-import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+import { bumpAuthEpoch, currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { performRefresh } from '@/lib/auth/credentials';
 import { clearActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
 import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
+import * as SecureStore from 'expo-secure-store';
 /* eslint-enable import/first */
+
+async function flushMicrotasks(): Promise<void> {
+  await new Promise(resolve => {
+    setImmediate(resolve);
+  });
+}
 
 function recordEvents(): TelemetryEvent[] {
   const events: TelemetryEvent[] = [];
@@ -71,8 +78,16 @@ describe('refresh terminal classification', () => {
     const first = await performRefresh();
     const second = await performRefresh();
 
-    expect(first).toEqual({ ok: false, refused: true });
-    expect(second).toEqual({ ok: false, refused: true });
+    expect(first).toEqual({
+      ok: false,
+      refused: true,
+      sessionVersion: currentAuthEpoch(),
+    });
+    expect(second).toEqual({
+      ok: false,
+      refused: true,
+      sessionVersion: currentAuthEpoch(),
+    });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(store.get(AUTH_TOKEN_KEY)).toBeUndefined();
     expect(store.get(REFRESH_TOKEN_KEY)).toBeUndefined();
@@ -106,10 +121,78 @@ describe('refresh terminal classification', () => {
 
     const outcome = await performRefresh();
 
-    expect(outcome).toEqual({ ok: false, refused: true });
+    expect(outcome).toEqual({
+      ok: false,
+      refused: true,
+      sessionVersion: currentAuthEpoch(),
+    });
     // A non-401 terminal refusal is not proof the credential is dead, so the
     // pair stays until sign-out clears it.
     expect(store.get(AUTH_TOKEN_KEY)).toBe('live-token');
     expect(store.get(REFRESH_TOKEN_KEY)).toBe('live-refresh');
+  });
+
+  it('still refuses and reports when the keychain delete rejects on a 401', async () => {
+    store.set(AUTH_TOKEN_KEY, 'dead-token');
+    store.set(REFRESH_TOKEN_KEY, 'dead-refresh');
+    store.set(TOKEN_EXPIRES_AT_KEY, '123');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({ error: 'INVALID_REFRESH_TOKEN' }, { status: 401 })
+    );
+    // The keychain rejects the first delete. The terminal refusal must survive
+    // it: without the guard the rejection would reach doRefresh's catch, be
+    // downgraded to a retryable outcome, and leave the dead pair in place so
+    // every foreground retries the same 401.
+    vi.mocked(SecureStore.deleteItemAsync).mockRejectedValueOnce(new Error('keychain unavailable'));
+    const events = recordEvents();
+
+    const outcome = await performRefresh();
+
+    expect(outcome).toEqual({
+      ok: false,
+      refused: true,
+      sessionVersion: currentAuthEpoch(),
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]?.fingerprint).toEqual(['auth-terminal', '/api/auth/native/refresh', '401']);
+  });
+
+  it('scopes a refusal to the session that owned it when the epoch moves mid-clear', async () => {
+    store.set(AUTH_TOKEN_KEY, 'dead-token');
+    store.set(REFRESH_TOKEN_KEY, 'dead-refresh');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({ error: 'INVALID_REFRESH_TOKEN' }, { status: 401 })
+    );
+    const { promise: clearGate, resolve: releaseClear } = Promise.withResolvers<undefined>();
+    // Hold the first delete open so a newer session can land inside the clear.
+    vi.mocked(SecureStore.deleteItemAsync).mockImplementationOnce(async (key: string) => {
+      await clearGate;
+      store.delete(key);
+    });
+    const ownedEpoch = currentAuthEpoch();
+
+    const refresh = performRefresh();
+    // Wait until the refresh reached the clear (the hanging delete) before
+    // moving the epoch: that is the window where the refusal is still returned
+    // even though the session that owned it is gone.
+    let flushes = 0;
+    while (vi.mocked(SecureStore.deleteItemAsync).mock.calls.length === 0 && flushes < 50) {
+      flushes += 1;
+      // eslint-disable-next-line no-await-in-loop -- sequential flush until the delete is in flight
+      await flushMicrotasks();
+    }
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalled();
+    bumpAuthEpoch();
+    releaseClear(undefined);
+
+    const outcome = await refresh;
+
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok && outcome.refused) {
+      expect(outcome.sessionVersion).toBe(ownedEpoch);
+    }
+    // The handler's guard reads exactly this: the refusal is stale, so it must
+    // not sign out the session that replaced it.
+    expect(isCurrentAuthEpoch(ownedEpoch)).toBe(false);
   });
 });

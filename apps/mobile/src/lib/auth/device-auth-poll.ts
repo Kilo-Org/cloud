@@ -60,7 +60,7 @@ export function startDeviceAuthPoll(params: {
   };
 
   const runTick = async () => {
-    if (Date.now() - startedAt > POLL_OVERALL_TIMEOUT_MS) {
+    if (Date.now() - startedAt >= POLL_OVERALL_TIMEOUT_MS) {
       cleanup();
       setState(previous =>
         errorDeviceAuthState(code, i18n.t('authErrors.signInTimedOut'), previous.verificationUrl)
@@ -140,9 +140,14 @@ export function startDeviceAuthPoll(params: {
         case 'retry': {
           retryDelay = Math.min(retryDelay * 2, POLL_MAX_INTERVAL_MS);
           // A throttled poll waits as long as the server asked, never less
-          // than our own backoff, and never past the overall poll budget.
+          // than our own backoff, and never past the overall poll budget: the
+          // wait is capped by the time left, so a Retry-After longer than the
+          // remaining budget cannot schedule a tick after the budget. The
+          // boundary check above is inclusive so a wait capped to exactly the
+          // remaining time times out on that tick instead of polling again.
           const wait = Math.max(retryDelay, outcome.retryAfterMs ?? 0);
-          scheduleNext(Math.min(wait, POLL_OVERALL_TIMEOUT_MS));
+          const remaining = POLL_OVERALL_TIMEOUT_MS - (Date.now() - startedAt);
+          scheduleNext(Math.min(wait, Math.max(0, remaining)));
           return;
         }
         case 'error': {

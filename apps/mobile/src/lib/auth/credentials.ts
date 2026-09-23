@@ -39,7 +39,15 @@ type RefreshSuccess = {
   expiresIn: number;
   sessionVersion: number;
 };
-type RefreshRefused = { ok: false; refused: true; superseded?: false };
+type RefreshRefused = {
+  ok: false;
+  refused: true;
+  superseded?: false;
+  /** The session that owned the refusal. A handler must drop the refusal when
+   *  this is no longer the current epoch: the epoch can move while the clear
+   *  awaits, and signing out then would tear down the newer session. */
+  sessionVersion: number;
+};
 type RefreshTransient = {
   ok: false;
   refused: false;
@@ -82,9 +90,15 @@ async function clearStoredCredentialsAtEpoch(epoch: number): Promise<void> {
     if (superseded()) {
       return;
     }
-    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
-    await SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS);
+    // Best effort, like sign-out's credential batch: a keychain rejection must
+    // not escape into doRefresh's catch, which would downgrade this terminal
+    // 401 into a retryable outcome and restart the very loop it must stop. The
+    // refusal is reported and the in-memory owner dropped below regardless.
+    await Promise.allSettled([
+      SecureStore.deleteItemAsync(AUTH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS),
+      SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY, IOS_BEARER_SECURE_STORE_OPTIONS),
+      SecureStore.deleteItemAsync(TOKEN_EXPIRES_AT_KEY, IOS_BEARER_SECURE_STORE_OPTIONS),
+    ]);
   });
   if (!superseded()) {
     clearActiveToken();
@@ -192,7 +206,7 @@ async function doRefresh(): Promise<RefreshOutcome> {
     }
     if (!storedRefreshToken) {
       // No refresh token: cannot recover from this 401 — sign out.
-      return { ok: false, refused: true };
+      return { ok: false, refused: true, sessionVersion };
     }
 
     // Bound the refresh network I/O at the control-plane deadline so a hung
@@ -226,7 +240,7 @@ async function doRefresh(): Promise<RefreshOutcome> {
           await clearStoredCredentialsAtEpoch(sessionVersion);
         }
         reportAuthTerminalFailure(REFRESH_PATH, classified.status);
-        return { ok: false, refused: true };
+        return { ok: false, refused: true, sessionVersion };
       }
       if (classified.kind === 'retry') {
         return { ok: false, refused: false, retryAfterMs: classified.retryAfterMs };

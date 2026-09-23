@@ -584,7 +584,16 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         return;
       }
 
-      if (!outcome.ok && outcome.refused && !isSignedOutReference.current) {
+      // A refusal belongs to the session that owned the refresh. The epoch can
+      // move while the refresh awaited — or this call can join an in-flight
+      // refresh from an older session — so re-check before tearing down: a
+      // newer session must not be signed out by an older refusal.
+      if (
+        !outcome.ok &&
+        outcome.refused &&
+        isCurrentAuthEpoch(outcome.sessionVersion) &&
+        !isSignedOutReference.current
+      ) {
         await signOut(true);
       }
     };
@@ -634,8 +643,16 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // used to keep the dead token and wait for "the next real 401", which
           // is exactly the retry the refresh refused: every foreground asked
           // again. Stop the loop here and send the person to sign in. A
-          // transient failure leaves the session alone.
-          if (!outcome.ok && outcome.refused && !isSignedOutReference.current) {
+          // transient failure leaves the session alone. The refusal is scoped
+          // to the session that owned it: the epoch can move while the clear
+          // inside the refresh awaits, so a refusal from a superseded session
+          // must not sign out the newer one.
+          if (
+            !outcome.ok &&
+            outcome.refused &&
+            isCurrentAuthEpoch(outcome.sessionVersion) &&
+            !isSignedOutReference.current
+          ) {
             await signOut(true);
           }
         } catch {

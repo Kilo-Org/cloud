@@ -420,7 +420,7 @@ type AuthContextValue = {
   isSigningOut: boolean;
   restoreFailed: boolean;
   retryRestore: () => void;
-  signIn: (token: string) => Promise<void>;
+  signIn: (token: string, refreshToken?: string, expiresIn?: number) => Promise<void>;
   signOut: (ended?: boolean) => Promise<void>;
 };
 
@@ -1476,6 +1476,80 @@ describe('bootstrap and foreground race fencing', () => {
     expect(getCtx().token).toBeUndefined();
     const tokenOwner = await import('@/lib/auth/token-owner');
     expect(tokenOwner.getActiveToken()).toBeNull();
+
+    fetchSpy.mockRestore();
+    unmount();
+  });
+
+  it('regression: a refused refresh from a superseded epoch does not sign out the newer session', async () => {
+    const { getCtx, unmount } = await mountProvider();
+
+    // A session with a refresh token and an expiry inside the refresh margin,
+    // so a foreground event initiates a proactive refresh.
+    await act(async () => {
+      await getCtx().signIn('active-token', 'active-refresh', 3600);
+    });
+
+    const listeners = hoisted.appState.addEventListener.mock.calls;
+    const eventListener = listeners.at(-1)?.[1];
+
+    // Serve the foreground's expiry read and the refresh's refresh-token read.
+    // eslint-disable-next-line require-await -- mock returning a resolved promise
+    hoisted.secureStore.getItemAsync.mockImplementation(async (key: string) => {
+      if (key === 'token-expires-at') {
+        return String(Date.now() + 60_000);
+      }
+      if (key === 'refresh-token') {
+        return 'active-refresh';
+      }
+      return null;
+    });
+
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(Response.json({ error: 'INVALID_REFRESH_TOKEN' }, { status: 401 }));
+
+    // Hold the terminal clear open so the epoch can move inside it: this is the
+    // window where the refresh still returns refused for the session that
+    // owned it.
+    const { promise: clearGate, resolve: releaseClear } = Promise.withResolvers<undefined>();
+    hoisted.secureStore.deleteItemAsync.mockImplementationOnce(async () => {
+      await clearGate;
+    });
+
+    await act(async () => {
+      eventListener?.('active');
+      await Promise.resolve();
+    });
+
+    // Wait until the clear is in flight, then move the epoch: a newer session
+    // now owns the tree while the old refresh is still inside its clear.
+    const authEpoch = await import('@/lib/auth/auth-epoch');
+    let flushes = 0;
+    while (hoisted.secureStore.deleteItemAsync.mock.calls.length === 0 && flushes < 50) {
+      flushes += 1;
+      // eslint-disable-next-line no-await-in-loop -- sequential flush until the clear is in flight
+      await act(async () => {
+        await new Promise<void>(resolve => {
+          void setTimeout(resolve, 0);
+        });
+      });
+    }
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalled();
+
+    authEpoch.bumpAuthEpoch();
+    releaseClear(undefined);
+
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    // The stale refusal must not tear down the newer session.
+    expect(getCtx().sessionEnded).toBe(false);
+    expect(getCtx().token).toBe('active-token');
 
     fetchSpy.mockRestore();
     unmount();

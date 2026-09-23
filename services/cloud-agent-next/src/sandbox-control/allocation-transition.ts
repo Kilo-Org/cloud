@@ -9,6 +9,7 @@ import type { Command } from '../sandbox-state/commands.js';
 import type { AllocationInputEvent } from '../sandbox-state/events.js';
 import type { AllocationRecord, AllocationState } from '../sandbox-state/model/allocation.js';
 import { allocationStateKey } from '../sandbox-state/allocation/reduce.js';
+import { diagnosticCause } from './diagnostics.js';
 import type { ControlDiagnosticFields } from './diagnostics.js';
 
 export const ALLOCATION_AGGREGATE = 'allocation';
@@ -58,6 +59,22 @@ function stopReason(state: AllocationState): string | undefined {
   }
 }
 
+/**
+ * The failure the event carries. A failed create or launch settles into a record
+ * that has no stop intent, so the cause exists only on the event; without this
+ * projection the state history records the transition but not why it happened.
+ */
+function eventFailureReason(event: AllocationInputEvent): string | undefined {
+  switch (event.type) {
+    case 'CREATE_FAILED':
+    case 'CREATE_UNKNOWN':
+    case 'LAUNCH_FAILED':
+      return diagnosticCause(event.reason);
+    default:
+      return undefined;
+  }
+}
+
 export function buildAllocationTransition(
   from: AllocationRecord,
   to: AllocationRecord,
@@ -74,7 +91,7 @@ export function buildAllocationTransition(
     at,
     allocationId: createIntentId(to.state) ?? createIntentId(from.state),
     incarnation: allocatedIncarnation(to.state) ?? allocatedIncarnation(from.state),
-    reason: stopReason(to.state),
+    reason: stopReason(to.state) ?? eventFailureReason(event),
   };
 }
 

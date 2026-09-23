@@ -2,7 +2,11 @@ import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import DEFAULT_PROMPT_TEMPLATE_BITBUCKET from './default-prompt-template-bitbucket.json';
 import DEFAULT_PROMPT_TEMPLATE_GITHUB from './default-prompt-template.json';
 import DEFAULT_PROMPT_TEMPLATE_GITLAB from './default-prompt-template-gitlab.json';
-import { generateReviewPrompt, PromptTemplateSchema } from './generate-prompt';
+import {
+  generateReviewPrompt,
+  PromptTemplateSchema,
+  FREE_MODEL_OUTPUT_BUDGET,
+} from './generate-prompt';
 import type { ExistingReviewState } from './generate-prompt';
 import {
   REVIEW_INSTRUCTIONS_FILE,
@@ -662,5 +666,110 @@ describe('generateReviewPrompt (incremental review)', () => {
 
     expect(prompt).not.toContain('## Inline Comment Footer');
     expect(prompt).not.toContain('@kilocode-bot fix it');
+  });
+});
+
+describe('generateReviewPrompt (free model output budget)', () => {
+  const freeConfig = {
+    ...baseConfig,
+    model_slug: 'kilo-auto/free',
+  } satisfies CodeReviewAgentConfig;
+  const paidConfig = {
+    ...baseConfig,
+    model_slug: 'anthropic/claude-sonnet-4.6',
+  } satisfies CodeReviewAgentConfig;
+
+  it('adds the output budget block and -free version for kilo-auto/free', async () => {
+    const { prompt, version } = await generateReviewPrompt(freeConfig, 'owner/repo', 42);
+
+    expect(prompt).toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(`${DEFAULT_PROMPT_TEMPLATE_GITHUB.version}-free`);
+  });
+
+  it('adds the block for a concrete :free model slug', async () => {
+    const { prompt, version } = await generateReviewPrompt(
+      { ...baseConfig, model_slug: 'poolside/laguna-s-2.1:free' },
+      'owner/repo',
+      42
+    );
+
+    expect(prompt).toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(`${DEFAULT_PROMPT_TEMPLATE_GITHUB.version}-free`);
+  });
+
+  it('omits the block and keeps the template version for a paid model', async () => {
+    const { prompt, version } = await generateReviewPrompt(paidConfig, 'owner/repo', 42);
+
+    expect(prompt).not.toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(DEFAULT_PROMPT_TEMPLATE_GITHUB.version);
+  });
+
+  it('omits the block and keeps the template version for an empty slug', async () => {
+    const { prompt, version } = await generateReviewPrompt(
+      { ...baseConfig, model_slug: '' },
+      'owner/repo',
+      42
+    );
+
+    expect(prompt).not.toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(DEFAULT_PROMPT_TEMPLATE_GITHUB.version);
+  });
+
+  it('differs from the paid prompt only by the output budget block', async () => {
+    const free = await generateReviewPrompt(freeConfig, 'owner/repo', 42);
+    const paid = await generateReviewPrompt(paidConfig, 'owner/repo', 42);
+
+    expect(free.prompt.replace(FREE_MODEL_OUTPUT_BUDGET + '\n\n', '')).toBe(paid.prompt);
+  });
+
+  it('omits the block when sub-agent guidance is omitted (council)', async () => {
+    const { prompt, version } = await generateReviewPrompt(freeConfig, 'owner/repo', 42, {
+      omitSubAgentGuidance: true,
+    });
+
+    expect(prompt).not.toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(DEFAULT_PROMPT_TEMPLATE_GITHUB.version);
+  });
+
+  it('differs from the incremental paid prompt only by the output budget block', async () => {
+    const options = {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateWithSummary,
+      previousHeadSha: 'abc123prev',
+    };
+    const free = await generateReviewPrompt(freeConfig, 'owner/repo', 42, options);
+    const paid = await generateReviewPrompt(paidConfig, 'owner/repo', 42, options);
+
+    expect(free.prompt).toContain('INCREMENTAL REVIEW MODE');
+    expect(free.prompt.replace(FREE_MODEL_OUTPUT_BUDGET + '\n\n', '')).toBe(paid.prompt);
+  });
+
+  it('adds the block for GitLab free prompts', async () => {
+    const { prompt } = await generateReviewPrompt(freeConfig, 'group/project', 10, {
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+    });
+
+    expect(prompt).toContain(FREE_MODEL_OUTPUT_BUDGET);
+  });
+
+  it('omits the block and keeps the -local version for local output mode', async () => {
+    const { prompt, version } = await generateReviewPrompt(freeConfig, 'owner/repo', 42, {
+      outputMode: 'kilo',
+    });
+
+    expect(prompt).not.toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(`${DEFAULT_PROMPT_TEMPLATE_GITHUB.version}-local`);
+  });
+
+  it('adds the block in incremental mode', async () => {
+    const { prompt } = await generateReviewPrompt(freeConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateWithSummary,
+      previousHeadSha: 'abc123prev',
+    });
+
+    expect(prompt).toContain('INCREMENTAL REVIEW MODE');
+    expect(prompt).toContain(FREE_MODEL_OUTPUT_BUDGET);
   });
 });

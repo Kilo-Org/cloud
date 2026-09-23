@@ -11,8 +11,9 @@ import {
 
 // A user-chosen title is not distinguishable from the backend's placeholder by
 // its text alone, so the app records the titles its own rename flow wrote.
-// That registry lives at module scope (it mirrors the other session-scoped
-// stores), so each case starts from a clean slate.
+// That registry is durable (hydrated from the encrypted KV at startup), so each
+// case starts from a clean in-memory slate; `session-user-titles.test.ts` owns
+// the persistence contract.
 afterEach(() => {
   clearUserSessionTitles();
 });

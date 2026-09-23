@@ -1,3 +1,12 @@
+import {
+  clearUserSessionTitles as clearStoredUserSessionTitles,
+  getUserSessionTitle,
+  rememberUserSessionTitle as rememberStoredUserSessionTitle,
+  useUserSessionTitlesRevision,
+} from './session-user-titles';
+
+export { useUserSessionTitlesRevision };
+
 export type RenameState = {
   isModalOpen: boolean;
   optimisticTitle: string | null;
@@ -71,23 +80,29 @@ const PLACEHOLDER_SESSION_TITLE_PATTERN =
  * unnamed placeholder; it cannot prove who wrote it, and the rename API accepts
  * any nonblank title, so a user may choose one that matches the pattern. Stored
  * text alone cannot separate the two, so the app records the titles its own
- * rename flow wrote and never hides those as unnamed. Module scope mirrors the
- * other session-scoped stores; `clearSessionScopedState` drops it at an account
- * boundary.
+ * rename flow wrote and never hides those as unnamed. The record is durable
+ * (hydrated from the encrypted KV at startup), so a chosen title survives a
+ * cold relaunch; `clearSessionScopedState` drops it at an account boundary.
+ *
+ * Only a title that the placeholder pattern would hide needs recording: every
+ * other title is already returned as-is by `namedSessionTitle`, so the caller
+ * filters before writing and the record stays tiny.
  */
-const userRenamedTitles = new Map<string, string>();
-
-/** Record a title the user wrote through the rename flow for one session. */
 export function rememberUserSessionTitle(sessionId: string, title: string): void {
   const trimmed = title.trim();
-  if (trimmed.length > 0) {
-    userRenamedTitles.set(sessionId, trimmed);
+  if (trimmed.length === 0 || !PLACEHOLDER_SESSION_TITLE_PATTERN.test(trimmed)) {
+    return;
   }
+  rememberStoredUserSessionTitle(sessionId, trimmed);
 }
 
-/** Drop every recorded user title at a sign-out or account switch. */
+/**
+ * Drop every recorded user title at a sign-out or account switch. The store
+ * clears memory synchronously and deletes its KV scope best-effort, so the
+ * teardown never awaits a disk write.
+ */
 export function clearUserSessionTitles(): void {
-  userRenamedTitles.clear();
+  void clearStoredUserSessionTitles();
 }
 
 /**
@@ -109,7 +124,7 @@ export function namedSessionTitle(
   }
   if (
     PLACEHOLDER_SESSION_TITLE_PATTERN.test(trimmed) &&
-    !(sessionId !== undefined && userRenamedTitles.get(sessionId) === trimmed)
+    !(sessionId !== undefined && getUserSessionTitle(sessionId) === trimmed)
   ) {
     return undefined;
   }

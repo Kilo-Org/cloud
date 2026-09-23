@@ -139,9 +139,23 @@ function toJsonString(recents: RecentPr[]): string {
 
 export async function getRecentPrs(): Promise<RecentPr[]> {
   // A failed read is reported and reads as "no recents"; the list is a
-  // convenience and must not reject into the screen or the search collector.
+  // convenience and must not reject into the screen.
   const raw = await readStoredValueSafe(PR_REVIEW_RECENTS_KEY);
   return parseRecents(raw);
+}
+
+/**
+ * The recents for the OS search index. `undefined` means the read failed and
+ * was reported at warning level; the index must then claim no recents scope,
+ * because a read that did not happen is not evidence that an indexed entry is
+ * gone. {@link getRecentPrs} cannot serve this: reading a failure as "no
+ * recents" is the right screen outcome and the wrong index one, because the
+ * collector treats a read list as the whole scope and would delete every
+ * indexed recents entry.
+ */
+export async function getRecentPrsForIndex(): Promise<RecentPr[] | undefined> {
+  const read = await readStoredValueForUpdate(PR_REVIEW_RECENTS_KEY);
+  return read.status === 'unreadable' ? undefined : parseRecents(read.value);
 }
 
 /**

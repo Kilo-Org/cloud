@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   getRecentPrs,
+  getRecentPrsForIndex,
   markRecentPrFailed,
   type RecentPr,
   removeRecentPr,
@@ -52,24 +53,32 @@ function makeRecent(overrides: Partial<RecentPr> = {}): RecentPr {
 describe('recent-prs with an unreadable store', () => {
   it('leaves the stored recents intact when the read for an upsert fails', async () => {
     await upsertRecentPr(makeRecent({ owner: 'octocat', repo: 'hello', number: 1, title: 'One' }));
+    // The bytes a mutation that always writes would replace. An upsert that
+    // read the failed read as "no recents" would persist `[Two]` here, so this
+    // assertion pins the abort that `getRecentPrs()` alone reads past.
+    const storedBefore = store.get('pr-review-recents');
 
     vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain locked'));
     await expect(
       upsertRecentPr(makeRecent({ owner: 'octocat', repo: 'hello', number: 2, title: 'Two' }))
     ).resolves.toBeUndefined();
 
+    expect(store.get('pr-review-recents')).toBe(storedBefore);
     await expect(getRecentPrs()).resolves.toMatchObject([{ number: 1, title: 'One' }]);
   });
 
   it('leaves the stored recents intact when the read for a remove fails', async () => {
     await upsertRecentPr(makeRecent({ owner: 'octocat', repo: 'hello', number: 1, title: 'One' }));
     await upsertRecentPr(makeRecent({ owner: 'octocat', repo: 'hello', number: 2, title: 'Two' }));
+    // A remove that read the failed read as "no recents" would persist `[]`.
+    const storedBefore = store.get('pr-review-recents');
 
     vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain locked'));
     await expect(
       removeRecentPr({ owner: 'octocat', repo: 'hello', number: 1 })
     ).resolves.toBeUndefined();
 
+    expect(store.get('pr-review-recents')).toBe(storedBefore);
     await expect(getRecentPrs()).resolves.toMatchObject([
       { number: 2, title: 'Two' },
       { number: 1, title: 'One' },
@@ -78,12 +87,35 @@ describe('recent-prs with an unreadable store', () => {
 
   it('leaves the stored recents intact when the read for a failed-mark fails', async () => {
     await upsertRecentPr(makeRecent({ owner: 'octocat', repo: 'hello', number: 1, title: 'One' }));
+    // The exact bytes the successful upsert stored. `markRecentPrFailed` writes
+    // only when it finds a matching entry, so `getRecentPrs()` cannot witness
+    // this abort — it reads the same list whether or not the failed read wiped
+    // anything. The stored bytes can: a mark that treated the unreadable record
+    // as an empty one and wrote it back would replace these bytes with `[]`.
+    const storedBefore = store.get('pr-review-recents');
 
     vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain locked'));
     await expect(
       markRecentPrFailed({ owner: 'octocat', repo: 'hello', number: 1 })
     ).resolves.toBeUndefined();
 
-    await expect(getRecentPrs()).resolves.toMatchObject([{ number: 1, lastResult: 'ok' }]);
+    expect(store.get('pr-review-recents')).toBe(storedBefore);
+  });
+});
+
+// The OS search index reads the recents to decide whether a recents scope may
+// remove an indexed entry, so it must tell a failed read from an empty list:
+// `undefined` aborts the scope claim, `[]` authorises removal.
+describe('getRecentPrsForIndex with an unreadable store', () => {
+  it('resolves undefined when the read fails, so no recents scope is claimed', async () => {
+    vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain locked'));
+
+    await expect(getRecentPrsForIndex()).resolves.toBeUndefined();
+  });
+
+  it('resolves the stored list when the read succeeds', async () => {
+    await upsertRecentPr(makeRecent({ owner: 'octocat', repo: 'hello', number: 1, title: 'One' }));
+
+    await expect(getRecentPrsForIndex()).resolves.toMatchObject([{ number: 1, title: 'One' }]);
   });
 });

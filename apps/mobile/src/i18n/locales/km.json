@@ -839,11 +839,11 @@
       "sessionStatusTitle": "ស្ថានភាពវគ្គ",
       "sessionStatusSubtitle": "បានបញ្ចប់ / បានបរាជ័យ / រួចរាល់សម្រាប់ឱ្យអ្នកគ្រប់គ្រង",
       "kiloclawActivitySubtitle": "ម៉ាស៊ីនរួចរាល់/បរាជ័យ សកម្មភាពតាមកាលវិភាគ",
-      "kiloclawActivityUnavailable": "ចាប់ផ្ដើមម៉ាស៊ីន KiloClaw ដើម្បីទទួលបានសកម្មភាព KiloClaw។",
+      "kiloclawActivityUnavailable": "ចាប់ផ្តើមអ៊ីនស្តង់ KiloClaw ដើម្បីទទួលបានសកម្មភាព KiloClaw។",
       "balanceAlertsSubtitle": "ការព្រមានពេលសមតុល្យរបស់អង្គការទាប",
-      "balanceAlertsUnavailable": "ចូលរួមស្ថាប័នដើម្បីទទួលបានការជូនដំណឹងពេលសមតុល្យទាប។",
+      "balanceAlertsUnavailable": "ចូលរួមអង្គការមួយ ដើម្បីទទួលបានការព្រមានអំពីសមតុល្យ។",
       "securityFindingsSubtitle": "ការរកឃើញថ្មី និងការរំលឹក SLA",
-      "securityFindingsUnavailable": "បើកភ្នាក់ងារសុវត្ថិភាព Kilo នៅក្នុងវិសាលភាពដើម្បីទទួលបានបញ្ហាសុវត្ថិភាពដែលរកឃើញ។",
+      "securityFindingsUnavailable": "បើកភ្នាក់ងារសុវត្ថិភាព Kilo ក្នុងវិសាលភាពមួយ ដើម្បីទទួលបានការរកឃើញសុវត្ថិភាព។",
       "spendAlertsSubtitle": "ការឆ្លងកាត់កម្រិត និងការកើនឡើងប្រចាំម៉ោង",
       "spendAlertsToggle": "ប្រភេទនៃការជូនដំណឹងអំពីការចំណាយ"
     },
@@ -3119,6 +3119,14 @@
     "tooManySignInAttempts": "អ្នកបានព្យាយាមចូលគណនីច្រើនដងពេក។ សូមរង់ចាំ ហើយព្យាយាមម្តងទៀត។"
   },
   "models": {
+    "auto": {
+      "frontier": "ស្វ័យប្រវត្តិ កម្រិតខ្ពស់បំផុត",
+      "balanced": "ស្វ័យប្រវត្តិ មានតុល្យភាព",
+      "efficient": "ស្វ័យប្រវត្តិ ប្រសិទ្ធភាព",
+      "small": "ស្វ័យប្រវត្តិ តូច",
+      "free": "ស្វ័យប្រវត្តិ ឥតគិតថ្លៃ",
+      "organization": "អង្គការ ស្វ័យប្រវត្តិ"
+    },
     "dataCollected": "មានការប្រមូលទិន្នន័យ",
     "free": "ឥតគិតថ្លៃ",
     "couldNotUpdateFavorites": "មិនអាចធ្វើបច្ចុប្បន្នភាពចំណូលចិត្តបានទេ។",

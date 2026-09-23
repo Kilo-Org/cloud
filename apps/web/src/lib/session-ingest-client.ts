@@ -65,19 +65,34 @@ export type SessionMessage = SessionSnapshot['messages'][number];
 /**
  * Redact a request URL to an allow-listed route label for logging: the
  * pathname with its dynamic segment (session id or share token) replaced by a
- * placeholder, and never the query string. Falls back to a constant when the
- * URL will not parse, so logging can never throw into a request.
+ * placeholder, and never the query string.
+ *
+ * The route marker is matched anywhere in the pathname, not anchored to its
+ * start: every call site concatenates `SESSION_INGEST_WORKER_URL` as-is
+ * (`config.server.ts:479` returns the env value unchanged), so a configured
+ * trailing slash or path prefix yields `//api/session/<id>/...` or
+ * `/prefix/api/session/<id>/...`. Anchoring here would let the dynamic segment
+ * through unredacted. The label is rebuilt from the matched route, so the
+ * configured base — including any path prefix — never reaches the log. Anything
+ * that is not an allow-listed route shape falls back to a constant, so an
+ * unrecognised path can never emit a session id or share token.
  */
 function redactedRouteForLog(requestUrl: string): string {
   try {
     const pathname = new URL(requestUrl).pathname;
-    if (pathname.startsWith('/api/session/')) {
-      return pathname.replace(/^\/api\/session\/[^/]+/, '/api/session/:sessionId');
+    const sessionRoute = pathname.match(/\/api\/session\/[^/]+/);
+    if (sessionRoute) {
+      return `/api/session/:sessionId${pathname.slice(
+        (sessionRoute.index ?? 0) + sessionRoute[0].length
+      )}`;
     }
-    if (pathname.startsWith('/session/')) {
-      return pathname.replace(/^\/session\/[^/]+/, '/session/:shareToken');
+    const shareRoute = pathname.match(/\/session\/[^/]+/);
+    if (shareRoute) {
+      return `/session/:shareToken${pathname.slice(
+        (shareRoute.index ?? 0) + shareRoute[0].length
+      )}`;
     }
-    return pathname;
+    return 'unknown';
   } catch {
     return 'unknown';
   }

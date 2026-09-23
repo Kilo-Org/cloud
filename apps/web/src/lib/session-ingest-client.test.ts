@@ -1032,3 +1032,100 @@ describe('bounded upstream budget', () => {
     expect(line).not.toContain('?');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Redacted route label
+// ---------------------------------------------------------------------------
+
+// `SESSION_INGEST_WORKER_URL` is concatenated as-is at every call site
+// (`config.server.ts:479` returns the env value unchanged), so a configured
+// trailing slash or path prefix shifts the route marker. The redaction must not
+// fail open and emit the raw dynamic segment in those shapes.
+describe('redacted route label', () => {
+  const configServer = jest.requireMock('@/lib/config.server') as {
+    SESSION_INGEST_WORKER_URL: string;
+  };
+  const defaultWorkerUrl = 'https://ingest.test.example.com';
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockFetch.mockReset();
+    mockCaptureException.mockReset();
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    configServer.SESSION_INGEST_WORKER_URL = defaultWorkerUrl;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+    configServer.SESSION_INGEST_WORKER_URL = defaultWorkerUrl;
+  });
+
+  function logLineForTimedOutRequest(): Promise<string> {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockFetch.mockImplementation(() => new Promise<Response>(() => {}));
+
+    const outcome = fetchSessionMessagesPage('ses_secret_id', 'user_123', {
+      limit: 50,
+    }).catch((error: unknown) => error);
+
+    return jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS).then(async () => {
+      await outcome;
+      expect(log).toHaveBeenCalledTimes(1);
+      return String(log.mock.calls[0]?.[0]);
+    });
+  }
+
+  it('redacts the session id when the worker URL has a trailing slash', async () => {
+    configServer.SESSION_INGEST_WORKER_URL = `${defaultWorkerUrl}/`;
+
+    const line = await logLineForTimedOutRequest();
+
+    expect(JSON.parse(line).route).toBe('/api/session/:sessionId/messages');
+    expect(line).not.toContain('ses_secret_id');
+  });
+
+  it('redacts the session id when the worker URL has a path prefix', async () => {
+    configServer.SESSION_INGEST_WORKER_URL = `${defaultWorkerUrl}/prefix`;
+
+    const line = await logLineForTimedOutRequest();
+
+    // The label is the allow-listed route, never the configured base path.
+    expect(JSON.parse(line).route).toBe('/api/session/:sessionId/messages');
+    expect(line).not.toContain('ses_secret_id');
+    expect(line).not.toContain('/prefix');
+  });
+
+  it('redacts the share token when the worker URL has a path prefix', async () => {
+    configServer.SESSION_INGEST_WORKER_URL = `${defaultWorkerUrl}/prefix`;
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockFetch.mockImplementation(() => new Promise<Response>(() => {}));
+
+    const outcome = fetchSharedSessionSnapshot('secret.share.jwt.token').catch(
+      (error: unknown) => error
+    );
+    await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
+    await outcome;
+
+    const line = String(log.mock.calls[0]?.[0]);
+    expect(JSON.parse(line).route).toBe('/session/:shareToken');
+    expect(line).not.toContain('secret.share.jwt.token');
+    expect(line).not.toContain('/prefix');
+  });
+
+  it('falls back to a constant for an unmatched route instead of the raw path', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockFetch.mockImplementation(() => new Promise<Response>(() => {}));
+
+    const outcome = invalidateOrganizationSessionAccess(
+      'usr_removed',
+      '11111111-1111-4111-8111-111111111111'
+    ).catch((error: unknown) => error);
+    await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
+    await outcome;
+
+    const line = String(log.mock.calls[0]?.[0]);
+    expect(JSON.parse(line).route).toBe('unknown');
+    expect(line).not.toContain('session-access');
+  });
+});

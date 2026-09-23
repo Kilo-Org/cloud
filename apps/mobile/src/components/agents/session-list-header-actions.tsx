@@ -8,11 +8,11 @@ import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // The row's `gap-4` compiles to 14pt, not 16pt: NativeWind v5 fixes 1rem at
-// 14pt, so `gap-4` (1rem) is 14pt. The filter control's own left slop is 3pt
-// (`COMPACT_CONTROL_HIT_SLOP_DP` from `@/lib/a11y/touch-target`), so the
-// new-session control's right side is capped at 6: the facing regions stay
-// inside the gap (6 + 3 = 9 ≤ 14) instead of overlapping. 32 + 8 + 6 = 46pt
-// still clears `DESIGN.md:364`'s 44pt.
+// 14pt, so `gap-4` (1rem) is 14pt. The filter control's own left slop is 8pt
+// (`@/lib/a11y/tap-target`), so the new-session control's right side is capped
+// at 14 - 8 = 6 and the two facing slops meet at the row's gap without
+// overlapping (6 + 8 = 14). 32 + 8 + 6 = 46pt still clears `DESIGN.md:364`'s
+// 44pt.
 const NEW_SESSION_HIT_SLOP = {
   top: COMPACT_CONTROL_HIT_SLOP_DP,
   bottom: COMPACT_CONTROL_HIT_SLOP_DP,

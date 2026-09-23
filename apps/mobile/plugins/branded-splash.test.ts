@@ -175,16 +175,21 @@ describe('shared branded splash', () => {
         ],
       },
     });
-    // compileModsAsync introspects the project's own native resources, so the
-    // colors modResults carry whatever the worktree's generated `android/`
-    // project declares next to the splash color: the app's other plugins
-    // (adaptive-icon, notification, app background) and, when a local prebuild
-    // already generated `android/`, that file's extra entries (iconBackground,
-    // colorPrimary, …) as well — a fixed-length array therefore passes only on a
-    // clean checkout. Assert the splash color this plugin owns is present among
-    // them, by containment, the same way the styles assertion below pins its
-    // theme: not the whole array and not its exact length, so a prebuild's other
-    // colors surviving here cannot fail the case.
+    // arrayContaining, not an exact array: compileModsAsync introspects the
+    // project's own native resources, so `withAndroidColors` reads whatever the
+    // worktree's generated `android/` tree already declares next to the splash
+    // color. That carries the app's other plugins' colors (adaptive-icon,
+    // notification, app background: colorPrimary, app_background,
+    // notification_icon_color, iconBackground, …) and, when a local prebuild
+    // already generated `android/`, that file's extra
+    // `res/values/colors.xml` entries as well — the directory is gitignored, so
+    // CI sees only the splash color while a worktree with a prebuild sees the
+    // app's colors too. Asserting the exact length therefore passed only on a
+    // clean checkout. The plugin's contract is that its own color is present,
+    // not that it is the only one: assert the splash color by containment, the
+    // same way the styles assertion below pins its theme — not the whole array
+    // and not its exact length, so a prebuild's other colors surviving here
+    // cannot fail the case.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([

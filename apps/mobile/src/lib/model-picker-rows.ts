@@ -126,6 +126,10 @@ export function buildModelPickerRows({
 function searchableText(model: SessionModelOption): string {
   return [
     model.name,
+    // The row renders an auto model's catalog name (`Auto Efficiente` in
+    // Italian), so that translated name must be searchable too; matching only
+    // the gateway's English spelling answered "No matches" for the name the
+    // user could see.
     model.displayId,
     model.provider?.name,
     model.provider?.id,

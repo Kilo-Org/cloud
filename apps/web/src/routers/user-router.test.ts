@@ -14,7 +14,7 @@ import {
   user_notification_preferences,
   user_push_tokens,
 } from '@kilocode/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import type { User } from '@kilocode/db/schema';
@@ -25,6 +25,7 @@ import {
 } from '@/lib/email';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
+import { refreshGlanceableScope } from '@/lib/notifications-worker-client';
 
 jest.mock('@/lib/email', () => {
   const actual = jest.requireActual('@/lib/email');
@@ -48,11 +49,20 @@ jest.mock('@/lib/user', () => {
   };
 });
 
+// Registering a replacement iOS activity token retires the previous live row;
+// the router asks the notifications worker for a scope refresh so the retired
+// card is ended at registration. Never let that best-effort call reach the
+// network here.
+jest.mock('@/lib/notifications-worker-client', () => ({
+  refreshGlanceableScope: jest.fn(),
+}));
+
 const mockSendSignInCodeEmail = jest.mocked(sendSignInCodeEmail);
 const mockSendDeletionConfirmation = jest.mocked(sendAccountDeletionConfirmationEmail);
 const mockSendDeletionSupportNotification = jest.mocked(sendAccountDeletionSupportNotification);
 const mockPerformGdprRemoval = jest.mocked(performGdprRemoval);
 const mockAssertUserCanBeSoftDeleted = jest.mocked(assertUserCanBeSoftDeleted);
+const mockRefreshGlanceableScope = jest.mocked(refreshGlanceableScope);
 
 const AVAILABLE_CAPABILITY = { available: true, unavailableReasonCode: null };
 const UNAVAILABLE_BALANCE_ALERTS = {
@@ -1365,7 +1375,15 @@ describe('user router - register activity token', () => {
     });
   });
 
+  beforeEach(() => {
+    // The real worker client always resolves; a bare `jest.fn()` returns
+    // undefined, which the router's `.catch` would trip over.
+    mockRefreshGlanceableScope.mockReset();
+    mockRefreshGlanceableScope.mockResolvedValue(undefined);
+  });
+
   afterEach(async () => {
+    mockRefreshGlanceableScope.mockClear();
     await db
       .delete(user_activity_tokens)
       .where(inArray(user_activity_tokens.user_id, [tokenUser.id, otherUser.id]));
@@ -1406,6 +1424,272 @@ describe('user router - register activity token', () => {
     expect(rows[0]?.kind).toBe('ios_push_to_start');
     expect(rows[0]?.platform).toBe('ios');
     expect(rows[0]?.organization_id).toBe('org-1');
+  });
+
+  it('replaces the previous live ios_activity row for the same scope', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const tokenA = 'activity-token-replace-a';
+    const tokenB = 'activity-token-replace-b';
+
+    await caller.user.registerActivityToken({
+      token: tokenA,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+    await caller.user.registerActivityToken({
+      token: tokenB,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    // Exactly one live card target: B replaced A in the same transaction.
+    const liveAfterB = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(
+        and(
+          eq(user_activity_tokens.user_id, tokenUser.id),
+          eq(user_activity_tokens.kind, 'ios_activity'),
+          isNull(user_activity_tokens.superseded_at)
+        )
+      );
+    expect(liveAfterB.map(row => row.token)).toEqual([tokenB]);
+
+    const [rowA] = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.token, tokenA));
+    expect(rowA?.superseded_at).not.toBeNull();
+
+    // Re-adopting A un-supersedes it and retires B: the app's own card is live
+    // again, and the scope still has exactly one live row.
+    await caller.user.registerActivityToken({
+      token: tokenA,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    const liveAfterA = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(
+        and(
+          eq(user_activity_tokens.user_id, tokenUser.id),
+          eq(user_activity_tokens.kind, 'ios_activity'),
+          isNull(user_activity_tokens.superseded_at)
+        )
+      );
+    expect(liveAfterA.map(row => row.token)).toEqual([tokenA]);
+
+    const [rowAAgain] = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.token, tokenA));
+    expect(rowAAgain?.superseded_at).toBeNull();
+
+    const [rowB] = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.token, tokenB));
+    expect(rowB?.superseded_at).not.toBeNull();
+  });
+
+  it('converges when concurrent registrations race for one scope', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    // A live card already exists, so both concurrent registrations take the
+    // replace path: retire the live row, then insert. Both retire the same row
+    // and the second blocks on its row lock; once the first transaction
+    // commits, the second's insert collides with the first's live row on
+    // `UQ_user_activity_tokens_live_ios_activity` and the whole transaction
+    // rolls back. Registration must converge instead of rejecting.
+    await caller.user.registerActivityToken({
+      token: 'activity-token-race-seed',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    const racers = ['a', 'b', 'c', 'd', 'e'].map(suffix =>
+      caller.user.registerActivityToken({
+        token: `activity-token-race-${suffix}`,
+        kind: 'ios_activity',
+        platform: 'ios',
+        organizationId: null,
+      })
+    );
+    const results = await Promise.allSettled(racers);
+
+    expect(results.map(result => result.status)).toEqual([
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+      'fulfilled',
+    ]);
+
+    // Exactly one live card target survived the race.
+    const live = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(
+        and(
+          eq(user_activity_tokens.user_id, tokenUser.id),
+          eq(user_activity_tokens.kind, 'ios_activity'),
+          isNull(user_activity_tokens.superseded_at)
+        )
+      );
+    expect(live).toHaveLength(1);
+    expect(live[0]?.token.startsWith('activity-token-race-')).toBe(true);
+  });
+
+  it('asks the notifications worker to end the replaced card at registration', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerActivityToken({
+      token: 'activity-token-refresh-a',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+    // The first card has no predecessor to retire, so registration must not
+    // spend a device wake.
+    expect(mockRefreshGlanceableScope).not.toHaveBeenCalled();
+
+    await caller.user.registerActivityToken({
+      token: 'activity-token-refresh-b',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    // The replacement retired A's row; the refresh is what sends the retired
+    // token its `end` instead of waiting for the next session transition.
+    expect(mockRefreshGlanceableScope).toHaveBeenCalledTimes(1);
+    expect(mockRefreshGlanceableScope).toHaveBeenCalledWith({
+      userId: tokenUser.id,
+      organizationId: null,
+    });
+  });
+
+  it('asks for the scope refresh for each replaced card in its own scope', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerActivityToken({
+      token: 'activity-token-refresh-scope-org-1',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: 'org-refresh-1',
+    });
+    await caller.user.registerActivityToken({
+      token: 'activity-token-refresh-scope-org-2',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: 'org-refresh-1',
+    });
+
+    expect(mockRefreshGlanceableScope).toHaveBeenCalledTimes(1);
+    expect(mockRefreshGlanceableScope).toHaveBeenCalledWith({
+      userId: tokenUser.id,
+      organizationId: 'org-refresh-1',
+    });
+  });
+
+  it('does not refresh when the same token re-registers its own card', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'activity-token-refresh-same';
+
+    await caller.user.registerActivityToken({
+      token,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+    mockRefreshGlanceableScope.mockClear();
+
+    await caller.user.registerActivityToken({
+      token,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    // Re-adopting the same card retires nothing, so there is no card to end.
+    expect(mockRefreshGlanceableScope).not.toHaveBeenCalled();
+  });
+
+  it('still registers the replacement when the notifications worker call fails', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    mockRefreshGlanceableScope.mockRejectedValueOnce(new Error('notifications worker down'));
+
+    await caller.user.registerActivityToken({
+      token: 'activity-token-refresh-fail-a',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+    await expect(
+      caller.user.registerActivityToken({
+        token: 'activity-token-refresh-fail-b',
+        kind: 'ios_activity',
+        platform: 'ios',
+        organizationId: null,
+      })
+    ).resolves.toEqual({ success: true });
+
+    // The DB invariant stands on its own: exactly one live card target.
+    const live = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(
+        and(
+          eq(user_activity_tokens.user_id, tokenUser.id),
+          eq(user_activity_tokens.kind, 'ios_activity'),
+          isNull(user_activity_tokens.superseded_at)
+        )
+      );
+    expect(live.map(row => row.token)).toEqual(['activity-token-refresh-fail-b']);
+  });
+
+  it('keeps other scopes live when a scoped ios_activity token replaces its scope', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+
+    await caller.user.registerActivityToken({
+      token: 'activity-token-scope-org-a',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: 'org-scope-1',
+    });
+    await caller.user.registerActivityToken({
+      token: 'activity-token-scope-org-b',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: 'org-scope-1',
+    });
+    // The personal scope is a different scope, so its live row survives.
+    await caller.user.registerActivityToken({
+      token: 'activity-token-scope-personal',
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    const live = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(
+        and(
+          eq(user_activity_tokens.user_id, tokenUser.id),
+          eq(user_activity_tokens.kind, 'ios_activity'),
+          isNull(user_activity_tokens.superseded_at)
+        )
+      );
+    expect(live.map(row => row.token).sort()).toEqual(
+      ['activity-token-scope-org-b', 'activity-token-scope-personal'].sort()
+    );
   });
 
   it('unregisterActivityToken deletes only the authenticated user matching token', async () => {

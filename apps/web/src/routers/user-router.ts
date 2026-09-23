@@ -45,7 +45,7 @@ import {
   agent_configs,
   passkey_credentials,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull } from 'drizzle-orm';
+import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 'drizzle-orm';
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
@@ -64,6 +64,7 @@ import { getBalanceForUser } from '@/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
+import { refreshGlanceableScope } from '@/lib/notifications-worker-client';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
@@ -292,6 +293,13 @@ function formatKiloClawDeductionDescription(
 
 function capitalizeFirst(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Scope key for the per-(user, organization) activity-token registration lock.
+// The empty organization stands for the personal scope, matching the `coalesce`
+// in `UQ_user_activity_tokens_live_ios_activity`.
+function activityTokenScopeLockKey(userId: string, organizationId: string | null): string {
+  return `user-activity-token-scope:${userId}:${organizationId ?? ''}`;
 }
 
 function getDeductionKind(
@@ -1312,7 +1320,9 @@ export const userRouter = createTRPCRouter({
 
   // Activity tokens for glanceable surfaces (Live Activity / push-to-start /
   // Android ongoing). Upsert on `token` so a re-registration of the same
-  // device token replaces the row instead of failing the unique index.
+  // device token replaces the row instead of failing the unique index, and
+  // retire the scope's previous live `ios_activity` row in the same
+  // transaction so one scope never has two live cards.
 
   registerActivityToken: baseProcedure
     .input(
@@ -1324,25 +1334,88 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await db
-        .insert(user_activity_tokens)
-        .values({
-          user_id: ctx.user.id,
-          token: input.token,
-          kind: input.kind,
-          platform: input.platform,
-          organization_id: input.organizationId,
-        })
-        .onConflictDoUpdate({
-          target: [user_activity_tokens.token],
-          set: {
+      const retiredTokens = await db.transaction(async tx => {
+        // Registration is a replace. An `ios_activity` token is the app adopting
+        // its Lock Screen card, and only one card may be live per (user,
+        // organization) scope. Retire the scope's previous live row in the same
+        // transaction as the insert, so two live rows cannot exist and the
+        // partial unique index cannot reject the replacement.
+        let supersededTokens: string[] = [];
+        if (input.kind === 'ios_activity') {
+          // Registration is a replace, so two concurrent registrations for one
+          // scope would both retire the same previous row and then both insert;
+          // the second collides on the partial unique index
+          // `UQ_user_activity_tokens_live_ios_activity` and its transaction
+          // rolls back instead of converging. Serialize the replace per scope
+          // with a transaction-scoped advisory lock, so the later registration
+          // sees and supersedes the earlier one's just-inserted row.
+          const scopeKey = activityTokenScopeLockKey(ctx.user.id, input.organizationId);
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${scopeKey}, 0))`);
+
+          const orgPredicate =
+            input.organizationId === null
+              ? isNull(user_activity_tokens.organization_id)
+              : eq(user_activity_tokens.organization_id, input.organizationId);
+          const superseded = await tx
+            .update(user_activity_tokens)
+            .set({ superseded_at: sql`now()` })
+            .where(
+              and(
+                eq(user_activity_tokens.user_id, ctx.user.id),
+                orgPredicate,
+                eq(user_activity_tokens.kind, 'ios_activity'),
+                isNull(user_activity_tokens.superseded_at),
+                ne(user_activity_tokens.token, input.token)
+              )
+            )
+            // The retired tokens are what the notification below must end.
+            .returning({ token: user_activity_tokens.token });
+          supersededTokens = superseded.map(row => row.token);
+        }
+
+        await tx
+          .insert(user_activity_tokens)
+          .values({
             user_id: ctx.user.id,
+            token: input.token,
             kind: input.kind,
             platform: input.platform,
             organization_id: input.organizationId,
-            updated_at: sql`now()`,
-          },
+          })
+          .onConflictDoUpdate({
+            target: [user_activity_tokens.token],
+            set: {
+              user_id: ctx.user.id,
+              kind: input.kind,
+              platform: input.platform,
+              organization_id: input.organizationId,
+              // The app re-adopting its own card must not leave its row marked
+              // dead: a re-registration of the same token un-supersedes it.
+              superseded_at: null,
+              updated_at: sql`now()`,
+            },
+          });
+
+        return supersededTokens;
+      });
+
+      // Retiring the row is not enough on its own: the retired card stays
+      // stacked on the Lock Screen until a delivery pass sends it an `end`, and
+      // those are driven by agent-session transitions, which can be minutes
+      // away during a long-running task. Ask the notifications worker for a
+      // scope refresh now so the replaced card is ended at registration. The
+      // row is already retired and the DB holds the one-live-card invariant, so
+      // this is best-effort: a failure only leaves the end to the next
+      // scheduled refresh and must never fail the registration.
+      if (retiredTokens.length > 0) {
+        await refreshGlanceableScope({
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+        }).catch(error => {
+          console.error('[registerActivityToken] Failed to request glanceable refresh:', error);
         });
+      }
+
       return { success: true };
     }),
 

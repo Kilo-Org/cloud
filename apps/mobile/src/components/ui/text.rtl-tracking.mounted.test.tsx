@@ -48,6 +48,10 @@ afterEach(() => {
 // and the bottom tab labels.
 const TRACKED_CLASSES = ['tracking-[1.5px]', 'tracking-[0.2px]'] as const;
 
+// The Hebrew eyebrow copy from `he.json` (`home.agentSessions`). Hebrew is a
+// shipped RTL locale and not Arabic script, so the reset has to reach it too.
+const HEBREW = 'פעילים עכשיו';
+
 describe('Text tracked labels in RTL', () => {
   it.each(TRACKED_CLASSES)(
     'draws %s with no letter spacing while a tracked class stays on the element',
@@ -61,6 +65,24 @@ describe('Text tracked labels in RTL', () => {
       expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
     }
   );
+
+  it('resets a caller-tracked Hebrew label, not only Arabic', () => {
+    i18nManager.isRTL = true;
+    const root = mount(createElement(Text, { className: 'tracking-[0.2px]' }, HEBREW));
+
+    expect(hostText(root).props.className as string).toContain('tracking-[0.2px]');
+    expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
+  });
+
+  it('drops the eyebrow Latin display treatment from Hebrew copy', () => {
+    i18nManager.isRTL = true;
+    const root = mount(createElement(Text, { variant: 'eyebrow' }, HEBREW));
+
+    const className = hostText(root).props.className as string;
+    expect(className.split(' ')).not.toContain('uppercase');
+    expect(className).not.toContain('tracking');
+    expect(hostStyle(root)).toContainEqual(RTL_NO_LETTER_SPACING);
+  });
 
   it('leaves no non-zero letter spacing on a tracked label in any class order', () => {
     i18nManager.isRTL = true;
@@ -82,7 +104,7 @@ describe('Text tracked labels in RTL', () => {
   it('keeps the caller style after the RTL defaults', () => {
     i18nManager.isRTL = true;
     const callerStyle = { color: '#ff0000' };
-    // Arabic-script copy, the only copy the merged rule resets (text.rtl-labels:
+    // RTL-script copy, the copy the merged rule resets (text.rtl-labels:
     // Latin labels keep their tracking); the caller style still lands last.
     const root = mount(
       createElement(Text, { className: 'tracking-[1.5px]', style: callerStyle }, 'استكشف')

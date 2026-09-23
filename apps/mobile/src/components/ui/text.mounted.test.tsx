@@ -43,7 +43,8 @@ afterEach(() => {
 describe('Text eyebrow letterspacing', () => {
   // Finding home-ar-loading: an Arabic section label carried the Latin
   // uppercase letter-spacing and broke apart mid-word ('ال جلسا ت'). The
-  // display treatment is dropped only for Arabic copy in an RTL interface.
+  // display treatment is dropped for RTL-script copy (Arabic, Hebrew) in an
+  // RTL interface.
   it.each([false, true])('keeps the eyebrow display treatment for Latin copy (RTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
     const classes = hostClasses(mount(createElement(Text, { variant: 'eyebrow' }, 'Live now')));

@@ -4,7 +4,7 @@ import * as React from 'react';
 import { I18nManager, Text as RNText, type Role } from 'react-native';
 
 import {
-  hasArabicScript,
+  hasRtlScript,
   RTL_NO_LETTER_SPACING,
   RTL_WRITING_DIRECTION,
   withoutMonoFamily,
@@ -55,10 +55,11 @@ const ARIA_LEVEL = {
 
 /**
  * The eyebrow's Latin display treatment: full capitals, letterspaced. It is
- * dropped for Arabic-script copy in an RTL interface: `letter-spacing` pulls a
- * cursive script apart — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت' —
- * and that copy also drops the mono family (see `withoutMonoFamily`). Latin
- * copy, and Arabic copy in an LTR interface, keep the treatment.
+ * dropped for RTL-script copy in an RTL interface (`hasRtlScript`: the app
+ * ships Arabic-script languages and Hebrew): `letter-spacing` pulls a
+ * cursive script apart — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت'
+ * — and that copy also drops the mono family (see `withoutMonoFamily`).
+ * Latin copy, and RTL-script copy in an LTR interface, keep the treatment.
  *
  * Exported so the eyebrow-scale labels rendered outside the variant — the
  * `SectionHeader` action link — carry the identical treatment instead of a
@@ -81,22 +82,22 @@ function Text({
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot.Text : RNText;
   const isRTL = I18nManager.isRTL;
-  const isArabic = hasArabicScript(props.children);
+  const isRtlScript = hasRtlScript(props.children);
   const classes = cn(
     textVariants({ variant }),
-    variant === 'eyebrow' && !(isRTL && isArabic) && EYEBROW_LATIN_DISPLAY,
+    variant === 'eyebrow' && !(isRTL && isRtlScript) && EYEBROW_LATIN_DISPLAY,
     textClass,
     className
   );
   return (
     <Component
-      className={isRTL && isArabic ? withoutMonoFamily(classes) : classes}
+      className={isRTL && isRtlScript ? withoutMonoFamily(classes) : classes}
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
       style={
         isRTL
-          ? [RTL_WRITING_DIRECTION, isArabic ? RTL_NO_LETTER_SPACING : undefined, props.style]
+          ? [RTL_WRITING_DIRECTION, isRtlScript ? RTL_NO_LETTER_SPACING : undefined, props.style]
           : props.style
       }
     />

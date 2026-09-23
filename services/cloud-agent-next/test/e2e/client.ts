@@ -763,6 +763,12 @@ export type StreamConnection = {
   get receivedCount(): number;
   /** Whether the socket is still open. */
   get isOpen(): boolean;
+  /**
+   * Close code/reason of the first socket close observed on this connection, or
+   * `null` while no close frame has been seen. It lets a caller tell an observed
+   * transport drop from a wait that simply timed out on a live socket.
+   */
+  closeInfo: { code: number; reason: string } | null;
 };
 
 export type StreamOptions = {
@@ -868,6 +874,7 @@ export function openStream(
   let retryPending = false;
   let currentGeneration = 0;
   let currentWs: WebSocket | undefined;
+  let closeInfo: { code: number; reason: string } | null = null;
   const listeners: Array<{
     predicate: (event: StreamEvent) => boolean;
     resolve: (event: StreamEvent | null) => void;
@@ -940,12 +947,15 @@ export function openStream(
       handleMessage(raw);
     });
 
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
       if (generation !== currentGeneration) return;
       // `ws` emits `error` then `close` for a rejected handshake. While the
       // single retry is pending, this socket's close must not end the shared
       // connection or drop pending waits.
       if (retryPending) return;
+      // First cause wins: a later close (an explicit close after the server
+      // already closed, or a stale socket) must not overwrite the drop evidence.
+      if (closeInfo === null) closeInfo = { code, reason: reason.toString('utf8') };
       finalizeClose();
     });
 
@@ -1094,6 +1104,9 @@ export function openStream(
     },
     get isOpen() {
       return !closed;
+    },
+    get closeInfo() {
+      return closeInfo;
     },
   };
 }

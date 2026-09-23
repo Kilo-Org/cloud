@@ -63,7 +63,7 @@ const SDK_57_EXACT_EXCLUDE_ENTRIES = [
   'expo-modules-jsi@57.1.0',
   '@expo/cli@57.0.23',
   '@expo/metro-file-map@57.0.3',
-  'expo-glass-effect@57.0.2',
+  'expo-glass-effect@57.0.3',
 ] as const;
 
 // Exact pnpm syntax for one pinned package version: bare or @scoped name, then

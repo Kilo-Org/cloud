@@ -12,12 +12,20 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 // (`@/lib/a11y/tap-target`), so the new-session control's right side is capped
 // at 14 - 8 = 6 and the two facing slops meet at the row's gap without
 // overlapping (6 + 8 = 14). 32 + 8 + 6 = 46pt still clears `DESIGN.md:364`'s
-// 44pt.
+// 44pt. The filter's slop is spelled per side too, so that meeting can be
+// checked instead of only the smallest of its four sides.
 const NEW_SESSION_HIT_SLOP = {
   top: COMPACT_CONTROL_HIT_SLOP_DP,
   bottom: COMPACT_CONTROL_HIT_SLOP_DP,
   left: COMPACT_CONTROL_HIT_SLOP_DP,
   right: 6,
+};
+
+const FILTER_HIT_SLOP = {
+  top: COMPACT_CONTROL_HIT_SLOP_DP,
+  bottom: COMPACT_CONTROL_HIT_SLOP_DP,
+  left: COMPACT_CONTROL_HIT_SLOP_DP,
+  right: COMPACT_CONTROL_HIT_SLOP_DP,
 };
 
 type SessionListHeaderActionsProps = {
@@ -52,6 +60,7 @@ export function SessionListHeaderActions({
       ) : null}
       <SessionFilterButton
         activeCount={activeFilterCount}
+        hitSlop={FILTER_HIT_SLOP}
         onPress={onOpenFilters}
         testID="agents-open-filters"
       />

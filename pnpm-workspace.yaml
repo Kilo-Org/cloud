@@ -83,7 +83,7 @@ minimumReleaseAgeExclude:
   - expo-modules-jsi@57.1.0
   - '@expo/cli@57.0.23'
   - '@expo/metro-file-map@57.0.3'
-  - expo-glass-effect@57.0.2
+  - expo-glass-effect@57.0.3
   - expo-dev-client
   - expo-dev-launcher
   - expo-dev-menu

@@ -257,9 +257,12 @@ async function dispatchNeedsInputResponse(
         return true;
       }
       // An unparseable PR URL falls back to the session route: the user still
-      // lands on the raise instead of nowhere.
+      // lands on the raise instead of nowhere. Session-bound: the destination
+      // belongs to the session that raised it, so it must never open for
+      // another account (see `PendingDeepLinkOptions.sessionBound`).
       setPendingDeepLink(prPathForData(data) ?? notificationPathForData(data), 'notification', {
         organizationId: organizationIdForData(data),
+        sessionBound: true,
       });
       return true;
     }
@@ -270,6 +273,7 @@ async function dispatchNeedsInputResponse(
       }
       setPendingDeepLink(notificationPathForData(data), 'notification', {
         organizationId: organizationIdForData(data),
+        sessionBound: true,
       });
       return true;
     }
@@ -286,9 +290,12 @@ async function dispatchNeedsInputResponse(
   // Always stash: the gated consumer in `_layout.tsx` owns every navigation.
   // `router.navigate` queues rather than throws when the router is unmounted,
   // so a tap while at the consent/force-update/login gate would navigate past
-  // the gate and be dropped by the root redirect.
+  // the gate and be dropped by the root redirect. A session destination is
+  // session-bound: it belongs to the account the session belongs to, so it is
+  // never stored account-independently (see `PendingDeepLinkOptions.sessionBound`).
   setPendingDeepLink(notificationPathForData(data), 'notification', {
     organizationId: organizationIdForData(data),
+    sessionBound: isRaiseData(data),
   });
   return false;
 }

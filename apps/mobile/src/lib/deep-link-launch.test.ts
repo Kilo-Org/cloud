@@ -367,6 +367,7 @@ describe('deep-link-launch', () => {
     });
 
     it('round-trips the organization through the persisted record', async () => {
+      setCurrentDeepLinkUserId('user-a');
       setPendingDeepLink('/(app)/agent-chat/ses_1', 'notification', { organizationId: 'org-7' });
       await vi.waitFor(() => {
         expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
@@ -378,6 +379,7 @@ describe('deep-link-launch', () => {
 
       _resetDeepLinkLaunchForTests();
 
+      setCurrentDeepLinkUserId('user-a');
       await restorePersistedPendingDeepLink();
       expect(consumePendingDeepLink()).toEqual({
         href: '/(app)/agent-chat/ses_1',
@@ -385,11 +387,43 @@ describe('deep-link-launch', () => {
       });
     });
 
-    it('restores a record written before the organization rode with the slot as none', async () => {
+    it('does not stash a notification that carries an organization while signed out', () => {
+      setCurrentDeepLinkUserId(null);
+
+      setPendingDeepLink('/(app)/agent-chat/ses_1', 'notification', { organizationId: 'org-2' });
+
+      // An anonymous capture must never carry a session's organization into
+      // whichever account signs in next.
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+
+    it('drops a persisted notification that carries an organization but no account identity', async () => {
       store.set(
         PENDING_DEEP_LINK_KEY,
         JSON.stringify({
           href: '/(app)/agent-chat/ses_1',
+          source: 'notification',
+          storedAt: Date.now(),
+          userId: null,
+          sessionBound: false,
+          organizationId: 'org-2',
+        })
+      );
+      _resetDeepLinkLaunchForTests();
+
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+      });
+    });
+
+    it('restores a record written before the organization rode with the slot as none', async () => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: '/(app)/(tabs)/(3_profile)',
           source: 'notification',
           storedAt: Date.now(),
           userId: null,
@@ -400,9 +434,124 @@ describe('deep-link-launch', () => {
       await restorePersistedPendingDeepLink();
 
       expect(consumePendingDeepLink()).toEqual({
-        href: '/(app)/agent-chat/ses_1',
+        href: '/(app)/(tabs)/(3_profile)',
         organizationId: null,
       });
+    });
+  });
+
+  describe('notification session destinations', () => {
+    // A session notification belongs to the session's account even when it
+    // carries no organization (a Personal session): the route names the
+    // account's own session, so it must never open for another account.
+    const SESSION_HREF = '/(app)/agent-chat/ses_1?via=push';
+
+    it('stashes a signed-out destination that is not a session route', () => {
+      setCurrentDeepLinkUserId(null);
+
+      setPendingDeepLink('/(app)/(tabs)/(3_profile)', 'notification');
+
+      expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
+    });
+
+    it('does not stash a session destination with no organization while signed out', () => {
+      setCurrentDeepLinkUserId(null);
+
+      setPendingDeepLink(SESSION_HREF, 'notification');
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+    });
+
+    it('stashes a session destination for the signed-in account', () => {
+      setCurrentDeepLinkUserId('user-a');
+
+      setPendingDeepLink(SESSION_HREF, 'notification');
+
+      expect(getPendingDeepLinkSnapshot()).toBe(SESSION_HREF);
+    });
+
+    it('binds the record to the account and drops it for another account', async () => {
+      setCurrentDeepLinkUserId('user-a');
+      setPendingDeepLink(SESSION_HREF, 'notification');
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
+      });
+      const record = JSON.parse(store.get(PENDING_DEEP_LINK_KEY) ?? '') as {
+        userId: string | null;
+        sessionBound: boolean;
+      };
+      expect(record.userId).toBe('user-a');
+      expect(record.sessionBound).toBe(true);
+
+      _resetDeepLinkLaunchForTests();
+      setCurrentDeepLinkUserId('user-b');
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+    });
+
+    it('restores the session record for the account that captured it', async () => {
+      setCurrentDeepLinkUserId('user-a');
+      setPendingDeepLink(SESSION_HREF, 'notification');
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(true);
+      });
+
+      _resetDeepLinkLaunchForTests();
+      setCurrentDeepLinkUserId('user-a');
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLink()).toBe(SESSION_HREF);
+    });
+
+    it('does not restore a session record with no account identity', async () => {
+      store.set(
+        PENDING_DEEP_LINK_KEY,
+        JSON.stringify({
+          href: SESSION_HREF,
+          source: 'notification',
+          storedAt: Date.now(),
+          userId: null,
+        })
+      );
+      _resetDeepLinkLaunchForTests();
+
+      setCurrentDeepLinkUserId('user-b');
+      await restorePersistedPendingDeepLink();
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      await vi.waitFor(() => {
+        expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+      });
+    });
+
+    it('binds a session destination captured before the account settled', () => {
+      // A cold-launch tap is captured at module scope, before auth restores.
+      setPendingDeepLink(SESSION_HREF, 'notification');
+
+      setCurrentDeepLinkUserId('user-a');
+
+      expect(getPendingDeepLink()).toBe(SESSION_HREF);
+    });
+
+    it('drops a session destination captured before a signed-out settle', () => {
+      setPendingDeepLink(SESSION_HREF, 'notification');
+
+      setCurrentDeepLinkUserId(null);
+
+      expect(getPendingDeepLinkSnapshot()).toBeNull();
+      expect(store.has(PENDING_DEEP_LINK_KEY)).toBe(false);
+    });
+
+    it('keeps a signed-out universal link to the same session restorable', () => {
+      // The public universal link stays account-independent: a signed-out
+      // reader may still sign in and land on the page they opened.
+      setCurrentDeepLinkUserId(null);
+
+      setPendingDeepLink(SESSION_HREF, 'universal-link');
+
+      expect(getPendingDeepLinkSnapshot()).toBe(SESSION_HREF);
     });
   });
 

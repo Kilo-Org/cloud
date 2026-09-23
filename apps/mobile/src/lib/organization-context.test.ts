@@ -53,6 +53,7 @@ vi.mock('expo-secure-store', () => ({
 type OrganizationContextValue = {
   organizationId: string | null;
   isLoaded: boolean;
+  error: 'restore' | 'save' | null;
   setOrganizationId: (id: string | null) => void;
 };
 
@@ -175,6 +176,44 @@ describe('OrganizationProvider.setOrganizationId', () => {
       ORGANIZATION_PERSONAL_STORAGE_KEY,
       'personal'
     );
+
+    unmount();
+  });
+
+  it('honors a stored organization when the Personal marker read fails', async () => {
+    hoisted.getItemAsync.mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      if (key === ORGANIZATION_STORAGE_KEY) {
+        return 'org-1';
+      }
+      throw new Error('marker read failed');
+    });
+
+    const { getCtx, unmount } = await mountProvider();
+
+    // The stored organization explicitly wins; a marker-read failure must not
+    // discard it. The marker is not even read when an organization is stored.
+    expect(getCtx().organizationId).toBe('org-1');
+    expect(getCtx().isLoaded).toBe(true);
+    expect(getCtx().error).toBeNull();
+
+    unmount();
+  });
+
+  it('reports a restore error when the Personal marker read fails with nothing stored', async () => {
+    hoisted.getItemAsync.mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      if (key === ORGANIZATION_STORAGE_KEY) {
+        return null;
+      }
+      throw new Error('marker read failed');
+    });
+
+    const { getCtx, unmount } = await mountProvider();
+
+    // Nothing explicit is stored and the marker cannot be read, so the
+    // selection state is undetermined and the existing restore error stands.
+    expect(getCtx().error).toBe('restore');
 
     unmount();
   });

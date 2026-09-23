@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one module owns the pending slot, its durable mirror, and the precedence and account-binding rules that read both. */
 import * as Sentry from '@sentry/react-native';
 import * as z from 'zod';
 
@@ -8,7 +9,11 @@ import {
 } from '@kilocode/app-shared/universal-links';
 
 import { PENDING_DEEP_LINK_KEY } from './storage-keys';
-import { APP_SCHEME, isSystemSearchFamilyLink } from './system-search-families';
+import {
+  APP_SCHEME,
+  isSystemSearchFamilyLink,
+  SESSION_HREF_PREFIX,
+} from './system-search-families';
 
 type DeepLinkSource = 'universal-link' | 'notification' | 'system-search';
 
@@ -22,7 +27,10 @@ type PendingDeepLinkOptions = {
    * The destination belongs to the session that produced it and must not open
    * for another account. Set for an app-scheme launch URL that names a family
    * the phone's own search indexes: on Android that URL is how a tap on an
-   * indexed result is delivered.
+   * indexed result is delivered. Also set for a session notification's
+   * destination; a notification tap that names a session route is treated as
+   * session-bound even when the caller does not set this (see
+   * `isSessionBoundDestination`).
    */
   sessionBound?: boolean;
   /**
@@ -204,6 +212,34 @@ function deletePersistedPendingDeepLink(): void {
 }
 
 /**
+ * Whether a notification-sourced destination names a session route. A session
+ * notification belongs to the session's account even when it carries no
+ * organization (a Personal session): the route names a session the receiving
+ * account owns, so the destination must never open for another account. The
+ * cold-start body tap in `notifications.ts` shares this transport and cannot
+ * flag the binding itself, so the source and the route together decide it.
+ */
+const isNotificationSessionDestination = (source: DeepLinkSource, href: string): boolean =>
+  source === 'notification' && href.startsWith(SESSION_HREF_PREFIX);
+
+/**
+ * Whether a destination belongs to the session that produced it and so must
+ * never open for another account. A system-search result is one. A destination
+ * that carries an organization is another: the organization is the session's
+ * scope, so it belongs to the account the session belongs to. A notification
+ * that names a session route is one too, organization or not.
+ */
+const isSessionBoundDestination = (
+  source: DeepLinkSource,
+  href: string,
+  options?: PendingDeepLinkOptions
+): boolean =>
+  source === 'system-search' ||
+  options?.sessionBound === true ||
+  Boolean(options?.organizationId) ||
+  isNotificationSessionDestination(source, href);
+
+/**
  * Stash a deep-link href for the root layout to consume after gates clear.
  * Source is required so the type checker enforces precedence:
  * - `'universal-link'` always wins (overwrites anything).
@@ -222,7 +258,7 @@ export function setPendingDeepLink(
   source: DeepLinkSource,
   options?: PendingDeepLinkOptions
 ): void {
-  const sessionBound = source === 'system-search' || options?.sessionBound === true;
+  const sessionBound = isSessionBoundDestination(source, href, options);
   if (sessionBound) {
     // A destination captured before the account is known. The native
     // system-search slot is single-shot, so its capture is held until the
@@ -274,7 +310,7 @@ function applyPendingDeepLink(
   pendingSource = source;
   pendingDeepLinkUserId = currentDeepLinkUserId;
   pendingUniversalLinkFromLaunch = options?.fromLaunchAppScheme === true;
-  pendingDeepLinkSessionBound = source === 'system-search' || options?.sessionBound === true;
+  pendingDeepLinkSessionBound = isSessionBoundDestination(source, href, options);
   pendingDeepLinkOrganizationId = options?.organizationId ?? null;
   pendingDeepLinkEpoch += 1;
   persistPendingDeepLink(href, source);
@@ -407,17 +443,24 @@ export async function restorePersistedPendingDeepLink(): Promise<void> {
   // current account. A null record userId (captured while signed out) still
   // restores, except for a session-bound destination: that belongs to the
   // session that produced it, so a record without an account identity is never
-  // trusted.
+  // trusted. A record carrying an organization is one of those even when it
+  // predates the session binding, and so is a notification that names a session
+  // route (a Personal session's notification carries no organization but is
+  // still the receiving account's).
+  const sessionBound =
+    record.sessionBound ||
+    record.organizationId !== null ||
+    isNotificationSessionDestination(record.source, record.href);
   if (record.userId !== null && record.userId !== currentDeepLinkUserId) {
     deletePersistedPendingDeepLink();
     return;
   }
-  if (record.userId === null && (record.source === 'system-search' || record.sessionBound)) {
+  if (record.userId === null && (record.source === 'system-search' || sessionBound)) {
     deletePersistedPendingDeepLink();
     return;
   }
 
-  const { href, source, sessionBound, organizationId } = record;
+  const { href, source, organizationId } = record;
   setPendingDeepLink(href, source, { sessionBound, organizationId });
 }
 

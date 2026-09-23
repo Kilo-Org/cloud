@@ -9,6 +9,8 @@ import {
   _setSecureStoreForTests,
   consumePendingDeepLink,
   getPendingDeepLinkSnapshot,
+  restorePersistedPendingDeepLink,
+  setCurrentDeepLinkUserId,
   setPendingDeepLink,
 } from './deep-link-launch';
 import {
@@ -17,6 +19,7 @@ import {
   registerNeedsInputCategories,
 } from './notification-actions';
 import { notificationIdentifierForSession } from './needs-input-notification';
+import { PENDING_DEEP_LINK_KEY } from './storage-keys';
 
 const mocks = vi.hoisted(() => ({
   setNotificationCategoryAsync: vi.fn(),
@@ -105,12 +108,26 @@ function raiseResponse(input: ResponseInput = {}): Notifications.NotificationRes
   return response as Notifications.NotificationResponse;
 }
 
+// Backs the pending slot's durable mirror so a suite can read back the record
+// a tap wrote without loading the native SecureStore.
+const pendingStore = new Map<string, string>();
+
 beforeEach(() => {
   _resetDeepLinkLaunchForTests();
+  pendingStore.clear();
   _setSecureStoreForTests({
-    setItemAsync: vi.fn().mockResolvedValue(undefined),
-    deleteItemAsync: vi.fn().mockResolvedValue(undefined),
-    getItemAsync: vi.fn().mockResolvedValue(null),
+    setItemAsync: vi.fn(async (key: string, value: string) => {
+      pendingStore.set(key, value);
+      await Promise.resolve();
+    }),
+    deleteItemAsync: vi.fn(async (key: string) => {
+      pendingStore.delete(key);
+      await Promise.resolve();
+    }),
+    getItemAsync: vi.fn(async (key: string) => {
+      await Promise.resolve();
+      return pendingStore.get(key) ?? null;
+    }),
   });
   mocks.setNotificationCategoryAsync.mockReset().mockResolvedValue(undefined);
   mocks.scheduleNotificationAsync.mockReset().mockResolvedValue(undefined);
@@ -641,6 +658,23 @@ describe('handleNeedsInputNotificationResponse — open PR and open session', ()
 
     expect(getPendingDeepLinkSnapshot()).toBe('/(app)/(tabs)/(3_profile)');
   });
+
+  it('does not stash a signed-out Open PR for another account', async () => {
+    setCurrentDeepLinkUserId(null);
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: NEEDS_INPUT_ACTION_IDS.openPr,
+        data: raiseData({ prUrl: 'https://github.com/org/repo/pull/7' }),
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    // A PR-review destination is not a session route, so it is bound by the
+    // action path itself: an anonymous tap must not open it for a later
+    // account.
+    expect(getPendingDeepLinkSnapshot()).toBeNull();
+  });
 });
 
 describe('handleNeedsInputNotificationResponse — session organization', () => {
@@ -717,6 +751,68 @@ describe('handleNeedsInputNotificationResponse — session organization', () => 
       href: '/(app)/(tabs)/(3_profile)/security-agent/personal/findings/f1?via=push',
       organizationId: null,
     });
+  });
+
+  it('does not stash a session destination captured while signed out', async () => {
+    setCurrentDeepLinkUserId(null);
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        data: raiseData({ organizationId: 'org-9' }),
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    // The destination belongs to the session's account, so an anonymous tap
+    // must not leave a record that a later account could restore with org-9.
+    expect(getPendingDeepLinkSnapshot()).toBeNull();
+  });
+
+  it('does not stash a signed-out session destination that carries no organization', async () => {
+    setCurrentDeepLinkUserId(null);
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        data: raiseData(),
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    // A Personal session still belongs to the account that received the push:
+    // without the account binding the destination would open for whoever signs
+    // in next.
+    expect(getPendingDeepLinkSnapshot()).toBeNull();
+  });
+
+  it('binds a signed-in session destination to the account that received it', async () => {
+    setCurrentDeepLinkUserId('user-a');
+
+    await handleNeedsInputNotificationResponse(
+      raiseResponse({
+        actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+        data: raiseData({ organizationId: 'org-9' }),
+      }),
+      { runInteraction: mocks.runNeedsInputInteraction }
+    );
+
+    await vi.waitFor(() => {
+      expect(pendingStore.has(PENDING_DEEP_LINK_KEY)).toBe(true);
+    });
+    const record = JSON.parse(pendingStore.get(PENDING_DEEP_LINK_KEY) ?? '') as {
+      userId: string | null;
+      sessionBound: boolean;
+    };
+    expect(record.userId).toBe('user-a');
+    expect(record.sessionBound).toBe(true);
+
+    // A later launch as another account neither navigates nor switches.
+    _resetDeepLinkLaunchForTests();
+    setCurrentDeepLinkUserId('user-b');
+    await restorePersistedPendingDeepLink();
+
+    expect(getPendingDeepLinkSnapshot()).toBeNull();
   });
 });
 

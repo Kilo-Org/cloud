@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.ViewTreeObserver
+import android.view.WindowInsets
 import android.view.WindowManager
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -107,9 +108,10 @@ private class SurfaceGeometryObserver(
   private var stopped = false
 
   // Scratch objects and holders, reused on every pass so the steady state
-  // allocates nothing: the root inverse and the ancestor clip matrix, the rects
-  // the measurement and the signal write through, the rect the signal reads the
-  // framework's clip bounds into, the window/root location and the origin.
+  // allocates nothing: the root inverse, the ancestor clip matrix (also the
+  // signal's ancestor transform accumulator), the rects the measurement and the
+  // signal write through, the rect the signal reads the framework's clip bounds
+  // into, the window/root location and the origin.
   private val toLocalMatrix = Matrix()
   private val ancestorMatrix = Matrix()
   private val windowBounds = RectF()
@@ -121,6 +123,11 @@ private class SurfaceGeometryObserver(
   private val clipRead = Rect()
   private val windowLocation = IntArray(2)
   private val origin = FloatArray(2)
+  // The ancestor transform chain, compared value by value through two reused
+  // arrays so the signal observes a scale, rotation or skew change that the
+  // root's screen location alone would miss.
+  private val matrixValues = FloatArray(9)
+  private val lastMatrixValues = FloatArray(9)
 
   // The six measured values, compared as values instead of as whole Maps.
   private val current = GeometryValues(tag)
@@ -140,6 +147,10 @@ private class SurfaceGeometryObserver(
   private var lastScreenY = 0
   private var lastScroll = 0
   private var lastAlpha = 1f
+  private var lastWindowInsets: WindowInsets? = null
+  private var lastDisplayFrameTop = 0
+  private var lastDisplayFrameBottom = 0
+  private var lastSoftInputMode = 0
 
   // The ancestor clip walk, `CLIP_STRIDE` ints per ancestor, kept in two reused
   // buffers and compared value by value, so the signal never allocates and never
@@ -216,18 +227,22 @@ private class SurfaceGeometryObserver(
    * The allocation-free signal the pre-draw pass gates on. It covers every input
    * `measure` reads between layout events: the root's height, attachment, shown
    * state and window visibility, its screen location written into the
-   * preallocated array, the ancestor scroll offsets, and the ancestor walk's
-   * alpha product and clip bounds. A change here is the only thing that starts a
-   * measurement between layout events.
+   * preallocated array, the ancestor scroll offsets, the ancestor walk's alpha
+   * product, clip bounds and transform chain, and the window insets, visible
+   * display frame and soft-input mode the safe-area and keyboard branches read.
+   * A change here is the only thing that starts a measurement between layout
+   * events.
    */
   private fun signalChanged(root: View): Boolean {
     root.getLocationOnScreen(windowLocation)
+    ancestorMatrix.reset()
     var scroll = 0
     var alpha = 1f
     var clipCount = 0
     var ancestor: View? = root
     while (ancestor != null) {
       alpha *= ancestor.alpha
+      ancestorMatrix.postConcat(ancestor.matrix)
       val base = clipCount * CLIP_STRIDE
       if (base + CLIP_STRIDE > clipWalk.size) {
         clipWalk = clipWalk.copyOf(maxOf(CLIP_STRIDE, clipWalk.size * 2))
@@ -250,6 +265,22 @@ private class SurfaceGeometryObserver(
       if (parent != null) scroll += parent.scrollX + parent.scrollY
       ancestor = parent
     }
+    ancestorMatrix.getValues(matrixValues)
+    val transformChanged = !matrixValues.contentEquals(lastMatrixValues)
+    System.arraycopy(matrixValues, 0, lastMatrixValues, 0, matrixValues.size)
+
+    // The safe-area and keyboard branches read the window insets, the visible
+    // display frame and the window's soft-input mode. Insets and the frame can
+    // move without a layout pass, so compare the platform insets value (the
+    // source `ViewCompat.getRootWindowInsets` wraps) and the frame the
+    // measurement would read. `getRootWindowInsets` is API 23+; minSdk is 24.
+    val windowInsets = root.rootWindowInsets
+    val insetsChanged = windowInsets != lastWindowInsets
+    val windowRoot = root.rootView
+    windowRoot.getWindowVisibleDisplayFrame(displayFrame)
+    val softInputMode =
+      (windowRoot.layoutParams as? WindowManager.LayoutParams)?.softInputMode ?: 0
+
     val attachedNow = attached && root.isAttachedToWindow
     val shown = root.isShown
     val windowVisibility = root.windowVisibility
@@ -263,6 +294,11 @@ private class SurfaceGeometryObserver(
       windowLocation[1] != lastScreenY ||
       scroll != lastScroll ||
       alpha != lastAlpha ||
+      transformChanged ||
+      insetsChanged ||
+      displayFrame.top != lastDisplayFrameTop ||
+      displayFrame.bottom != lastDisplayFrameBottom ||
+      softInputMode != lastSoftInputMode ||
       !sameClipWalk(clipCount)
     hasSignal = true
     lastHeight = height
@@ -273,6 +309,10 @@ private class SurfaceGeometryObserver(
     lastScreenY = windowLocation[1]
     lastScroll = scroll
     lastAlpha = alpha
+    lastWindowInsets = windowInsets
+    lastDisplayFrameTop = displayFrame.top
+    lastDisplayFrameBottom = displayFrame.bottom
+    lastSoftInputMode = softInputMode
     rememberClipWalk(clipCount)
     return changed
   }

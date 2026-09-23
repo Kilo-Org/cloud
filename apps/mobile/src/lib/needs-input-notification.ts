@@ -64,7 +64,8 @@ export type NeedsInputNotificationPlan = {
    * their post must update the notification quietly: Android replays the
    * attention channel's sound on every `notify` of an existing notification, so
    * a kind flip would otherwise alert the user again for a raise they were
-   * already told about.
+   * already told about. A session the same plan dismisses is never listed here —
+   * its dismissal runs first, so its post is a new notification that must alert.
    */
   updates: string[];
 };
@@ -274,9 +275,16 @@ export function planNeedsInputNotifications({
     }
   }
   // A post whose session is already in `previous` replaces the notification on
-  // screen, so it must update it quietly (see `updates`).
+  // screen, so it must update it quietly (see `updates`). A session this plan
+  // dismisses is not one of those: the dismissal runs before the first post, so
+  // the notification the post creates is new and must alert like any first post.
+  const dismissed = new Set(dismiss);
   const updates = publish
-    .filter(row => alreadyNotified.has(row.sessionId))
+    .filter(
+      row =>
+        alreadyNotified.has(row.sessionId) &&
+        !dismissed.has(notificationIdentifierForSession(row.sessionId))
+    )
     .map(row => row.sessionId);
 
   return { publish, dismiss, updates };

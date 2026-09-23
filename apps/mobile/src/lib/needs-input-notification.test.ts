@@ -205,6 +205,30 @@ describe('planNeedsInputNotifications', () => {
     expect(plan.dismiss).toEqual([]);
   });
 
+  it('alerts again when a raise it dismisses is re-posted under a new organization', () => {
+    // A raise that moved organization and changed kind lands in both `dismiss`
+    // and `publish`. The dismissal removes the standing notification first, so
+    // the post that follows is a brand-new alert for a raise the user was never
+    // shown — never a quiet in-place replacement of the notification on screen.
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow({ organizationId: null })],
+      next: [
+        makeCached({
+          id: 'ses_1',
+          title: 'Fix the bug',
+          status: 'permission',
+          organizationId: 'org-a',
+        }),
+      ],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+    expect(plan.dismiss).toEqual(['needs-input:ses_1']);
+    expect(plan.publish).toEqual([notifiedRow({ kind: 'permission', organizationId: 'org-a' })]);
+    expect(plan.updates).toEqual([]);
+  });
+
   it('withholds the re-publish while that session chat is open', () => {
     const plan = planNeedsInputNotifications({
       previous: [notifiedRow()],
@@ -454,6 +478,35 @@ describe('applyNeedsInputNotifications', () => {
           categoryIdentifier: 'kilo-needs-input:permission',
           sound: false,
         }),
+      })
+    );
+  });
+
+  it('does not silence a re-post the same plan dismissed', async () => {
+    // The dismissal runs before the post, so the notification the post creates
+    // is new: it must carry the sound a fresh raise carries.
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow({ organizationId: null })],
+      next: [
+        makeCached({
+          id: 'ses_1',
+          title: 'Fix the bug',
+          status: 'permission',
+          organizationId: 'org-a',
+        }),
+      ],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+
+    await applyNeedsInputNotifications(plan);
+
+    expect(mocks.dismissNotificationAsync).toHaveBeenCalledWith('needs-input:ses_1');
+    expect(mocks.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: 'needs-input:ses_1',
+        content: expect.not.objectContaining({ sound: false }),
       })
     );
   });

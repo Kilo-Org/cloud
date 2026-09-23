@@ -158,8 +158,8 @@ describe('the surface-geometry pre-draw observer', () => {
 
   it('covers every ancestor input measure reads in the changed signal', () => {
     // The gate may only skip a pass when nothing measure() reads changed, so the
-    // signal covers the ancestor walk too: the alpha product and the ancestors'
-    // clip bounds, both read on every measure() pass.
+    // signal covers the ancestor walk too: the alpha product, the ancestors'
+    // clip bounds and their transform chain, all read on every measure() pass.
     expect(SIGNAL, 'the ancestor alpha product is signalled').toMatch(/\balpha\b/);
     expect(SIGNAL, 'the alpha product is compared with the last pass').toContain('lastAlpha');
     expect(SIGNAL, 'the ancestors clip bounds are signalled').toMatch(/getClipBounds\(/);
@@ -167,8 +167,32 @@ describe('the surface-geometry pre-draw observer', () => {
     expect(SIGNAL, 'the walk starts at the root, as measure does').toMatch(
       /ancestor: View\? = root\b/
     );
+    expect(SIGNAL, 'the ancestor transform chain is signalled').toMatch(
+      /ancestorMatrix\.postConcat\(ancestor\.matrix\)/
+    );
+    expect(SIGNAL, 'the transform chain is compared with the last pass').toContain(
+      'lastMatrixValues'
+    );
     expect(SIGNAL, 'no matrix or rect is allocated for the walk').not.toMatch(
       /Matrix\(|RectF\(|Rect\(|IntArray\(|FloatArray\(|floatArrayOf\(/
+    );
+  });
+
+  it('covers the insets, display frame and soft-input mode measure reads', () => {
+    // measure() reads the window insets, the visible display frame and the
+    // window's soft-input mode for its safe-area and keyboard branches, and
+    // insets can change without a layout pass: the gate must observe all three.
+    expect(SIGNAL, 'the window insets are signalled').toContain('rootWindowInsets');
+    expect(SIGNAL, 'the insets are compared with the last pass').toContain('lastWindowInsets');
+    expect(SIGNAL, 'the visible display frame is signalled').toContain(
+      'getWindowVisibleDisplayFrame'
+    );
+    expect(SIGNAL, 'the display frame is compared with the last pass').toContain(
+      'lastDisplayFrame'
+    );
+    expect(SIGNAL, 'the soft-input mode is signalled').toContain('softInputMode');
+    expect(SIGNAL, 'the soft-input mode is compared with the last pass').toContain(
+      'lastSoftInputMode'
     );
   });
 

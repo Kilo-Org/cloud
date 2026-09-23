@@ -9,9 +9,17 @@ import { type RepoOption } from '@/lib/picker-bridge';
 import { modelPickerSlot, repoPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import '@/i18n';
 
+// Live so a test can flip the interface direction before it mounts; the input
+// alignment helper reads `I18nManager.isRTL` when it composes the style.
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+// The one token the picker's search input passes inline; the assertions read
+// the same value the mock hands the component.
+const theme = vi.hoisted(() => ({ foreground: '#111111' }));
+
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({
   FlatList: 'FlatList',
+  I18nManager: i18nManager,
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
@@ -42,7 +50,9 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/agents/model-selector', () => ({
   ModelPickerOptionRow: 'ModelPickerOptionRow',
 }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: theme.foreground }),
+}));
 vi.mock('@/lib/hooks/use-model-preferences', () => ({
   useModelPreferences: () => ({ favorites: [], addFavorite: vi.fn(), removeFavorite: vi.fn() }),
 }));
@@ -59,6 +69,7 @@ const repo: RepoOption = { platform: 'github', fullName: 'org/repo', isPrivate: 
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  i18nManager.isRTL = false;
   modelPickerSlot.set(UNFENCED_ROUTE_KEY, {
     options: [model],
     currentValue: '',
@@ -175,6 +186,34 @@ describe('repository picker search placeholder', () => {
       changeSearch('org/repo');
     });
     expect(hosts(renderer, 'Text').some(node => node.props.children === copy)).toBe(false);
+  });
+});
+
+describe('repository picker query alignment', () => {
+  function searchInput(renderer: Awaited<ReturnType<typeof mount>>) {
+    const input = hosts(renderer, 'TextInput')[0];
+    if (!input) {
+      throw new Error('Picker search input did not mount');
+    }
+    return input;
+  }
+
+  it('aligns the typed query to the field start edge in RTL', async () => {
+    // `textAlign: 'auto'` resolves against the first strong character, so a
+    // Latin query stays at the left edge while the clear and search controls
+    // sit at the right, leaving a dead gap between them.
+    i18nManager.isRTL = true;
+    const renderer = await mount(RepoPickerScreen);
+    expect(searchInput(renderer).props.style).toEqual([
+      { textAlign: 'right' },
+      { color: theme.foreground },
+    ]);
+  });
+
+  it('leaves the input style to the caller in LTR so English is unchanged', async () => {
+    i18nManager.isRTL = false;
+    const renderer = await mount(RepoPickerScreen);
+    expect(searchInput(renderer).props.style).toEqual({ color: theme.foreground });
   });
 });
 

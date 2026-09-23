@@ -110,8 +110,9 @@ export type OpenAiChatGptRoutingResult =
     };
 
 function isOpenAiChatGptModel(requestedModel: string): boolean {
-  const model = requestedModel.trim();
-  // Retired Kilo aliases are not upstream model IDs either.
+  const model = requestedModel.trim().toLowerCase();
+  // Disabling a Kilo-only alias must not turn it into a delegated OpenAI model;
+  // retired Kilo aliases are not upstream model IDs either.
   return (
     OPENAI_MODEL_PREFIX.test(model) &&
     !isGptOssModel(model) &&

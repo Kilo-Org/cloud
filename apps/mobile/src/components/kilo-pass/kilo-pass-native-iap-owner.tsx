@@ -32,7 +32,10 @@ import {
   type StoreKiloPassProduct,
 } from '@/lib/kilo-pass/store-products';
 import { getAppStoreKiloPassOwnershipPreflight } from '@/lib/kilo-pass/subscription-card-state';
-import { useStoreKiloPassProducts } from '@/lib/kilo-pass/use-store-kilo-pass-products';
+import {
+  backendStoreKiloPassProductsQueryOptions,
+  useStoreKiloPassProducts,
+} from '@/lib/kilo-pass/use-store-kilo-pass-products';
 import {
   createAppStoreKiloPassPurchaseActions,
   getKiloPassPurchaseErrorMessage,
@@ -162,9 +165,12 @@ export function useKiloPassNativeIap(): KiloPassNativeIapContextValue {
 }
 
 /**
- * The single `useIAP` call site. Mounted only when the purchase presentation is
- * `native_iap` on iOS or Android, so there is never more than one IAP owner on
- * the Kilo Pass route.
+ * The single `useIAP` call site. Mounted once at the Kilo Pass route entry on
+ * iOS and Android — before the presentation query resolves — so the native
+ * store connection and the store-product query overlap that request instead of
+ * queuing behind it. It wraps every presentation variant (loading, error,
+ * non-native, and native-IAP) so it never unmounts and remounts as the query
+ * settles; only the purchasable content is gated on `native_iap`.
  */
 export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   const trpc = useTRPC();
@@ -257,10 +263,12 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     getAvailablePurchases: refreshAvailablePurchases,
   } = actionsRef;
 
-  // The backend's product identifiers. The enabled-id set below unions them
-  // with the store-resolved ones, so a tier the store cannot query still has
-  // its charged-but-uncompleted transactions completed instead of released.
-  const serverProductsQuery = useQuery(trpc.kiloPass.getMobileStoreProducts.queryOptions());
+  // The backend's product identifiers, unioned by the enabled-id sets below with
+  // the store-resolved ones, so a tier the store cannot query still has its
+  // charged-but-uncompleted transactions completed instead of released. Shares
+  // the store-product cache lifetime, so a re-entered route reads the catalog
+  // instead of paying the request again.
+  const serverProductsQuery = useQuery(backendStoreKiloPassProductsQueryOptions(trpc));
   const productsQuery = useStoreKiloPassProducts({
     connected,
     fetchStoreProducts: fetchAppStoreSubscriptions,
@@ -334,7 +342,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         enabledGoogleProductIds,
         loadEnabledAppleProductIds: async () => {
           const result = await queryClient.fetchQuery(
-            trpc.kiloPass.getMobileStoreProducts.queryOptions()
+            backendStoreKiloPassProductsQueryOptions(trpc)
           );
           return getEnabledProductIds(
             result.products.map(product => product.appleProductId),
@@ -343,7 +351,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         },
         loadEnabledGoogleProductIds: async () => {
           const result = await queryClient.fetchQuery(
-            trpc.kiloPass.getMobileStoreProducts.queryOptions()
+            backendStoreKiloPassProductsQueryOptions(trpc)
           );
           return getEnabledProductIds(
             result.products.map(product => product.googleProductId),
@@ -451,9 +459,22 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     isRestoringPurchases,
   ]);
 
+  // Drop the store-product caches only when the signed-in account actually
+  // changes. Running this on the owner's first mount deleted the 5-minute entry
+  // `useStoreKiloPassProducts` deliberately keeps, so every re-entry re-ran the
+  // native `fetchProducts` plus `getMobileStoreProducts` and repainted the tier
+  // skeletons for products the app already had. The backend catalog carries the
+  // account's `appAccountToken` and now lives for the same window, so it is
+  // dropped with the entry it feeds instead of leaking the previous account's.
+  const previousAuthEpochRef = useRef(authEpoch);
   useEffect(() => {
+    if (previousAuthEpochRef.current === authEpoch) {
+      return;
+    }
+    previousAuthEpochRef.current = authEpoch;
+    queryClient.removeQueries(trpc.kiloPass.getMobileStoreProducts.pathFilter());
     queryClient.removeQueries({ queryKey: ['kilo-pass', 'app-store-products'] });
-  }, [authEpoch, queryClient]);
+  }, [authEpoch, queryClient, trpc]);
 
   useEffect(() => {
     if (!isIapPlatform) {

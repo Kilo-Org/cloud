@@ -18,6 +18,8 @@ import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { CloudAgentSessionState } from '../persistence/types.js';
 import type { HonoContext } from '../hono-context.js';
+import type { AllocationRecord } from '../sandbox-state/model/allocation.js';
+import { legacyPhysicalState } from '../sandbox-state/project/physical-label.js';
 import type { SandboxId, SessionId } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
 
@@ -33,6 +35,31 @@ export type AllocationInspection = {
    */
   physicalState: string | null;
 };
+
+export function projectAllocationInspection(
+  logicalSandboxId: string,
+  record: AllocationRecord
+): AllocationInspection {
+  const state = record.state;
+  if (state.kind === 'stopped') {
+    if (state.summary === null) {
+      return { logicalSandboxId, physicalProviderRef: null, physicalState: null };
+    }
+    return {
+      logicalSandboxId,
+      physicalProviderRef: state.summary.providerRef,
+      physicalState: 'stopped',
+    };
+  }
+
+  const physicalProviderRef = state.target?.providerRef ?? null;
+  const ownsAllocation = state.createIntent !== null || physicalProviderRef !== null;
+  return {
+    logicalSandboxId,
+    physicalProviderRef,
+    physicalState: ownsAllocation ? legacyPhysicalState(record) : null,
+  };
+}
 
 export async function handleAllocationInspect(c: Context<HonoContext>): Promise<Response> {
   const userId = c.get('userId');
@@ -73,15 +100,6 @@ export async function handleAllocationInspect(c: Context<HonoContext>): Promise<
       { createdOnPlatform: metadata.identity.createdOnPlatform }
     ));
 
-  const physical = await getSandboxControlStub(env, logicalSandboxId).getPhysicalRecord();
-  // Allocation ownership, not provider-reference presence, decides whether the
-  // control plane has anything to report: `claimCreate` records `creating`
-  // before a provider reference exists.
-  const hasAllocation = physical.createIntent !== null || physical.providerRef !== null;
-  const body: AllocationInspection = {
-    logicalSandboxId,
-    physicalProviderRef: physical.providerRef,
-    physicalState: hasAllocation ? physical.state : null,
-  };
-  return Response.json(body);
+  const record = await getSandboxControlStub(env, logicalSandboxId).getAllocationRecord();
+  return Response.json(projectAllocationInspection(logicalSandboxId, record));
 }

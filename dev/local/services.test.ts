@@ -208,13 +208,33 @@ test('registers user data export with worktree-aware ports and dependencies', ()
   assert.equal(service.port, 8818 + portOffset);
   assert.deepEqual(service.dependsOn, ['postgres', 'nextjs']);
   assert.deepEqual(resolveTargets(['data-export']), [
+    'postgres',
     'stripe',
     'redis',
-    'postgres',
+    'cloudflare-session-ingest',
     'redis-http',
     'nextjs',
     'user-data-export',
   ]);
+});
+
+test('starts the session-ingest worker whenever the web app starts', () => {
+  // The web app mints web tickets through Session Ingest
+  // (`activeSessions.createWebTicket` / `getToken`), so starting the web stack
+  // must pull the worker in transitively — otherwise the mutation fetches a
+  // dead SESSION_INGEST_WORKER_URL and every web-ticket run gets a 412
+  // PRECONDITION_FAILED. Same precedent as mobile -> latency-ingest.
+  const appTargets = resolveTargets(['app']);
+
+  assert.ok(
+    appTargets.includes('cloudflare-session-ingest'),
+    `expected cloudflare-session-ingest in app start targets, got: ${appTargets.join(', ')}`
+  );
+
+  const worker = getService('cloudflare-session-ingest');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/session-ingest');
+  assert.equal(worker.port, 8800 + portOffset);
 });
 
 test('points both user data export Hyperdrive bindings at the offset database', () => {

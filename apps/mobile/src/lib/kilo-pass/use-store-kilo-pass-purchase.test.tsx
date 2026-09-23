@@ -40,6 +40,7 @@ const mockedAuth = vi.hoisted(() => ({ authEpoch: 0 }));
 const mockedCurrentUserId = vi.hoisted(() => ({ userId: 'user-1' }));
 
 const mockedReactQuery = vi.hoisted(() => ({
+  backendProductsStaleTime: undefined as number | undefined,
   completeAppStorePurchase: vi.fn(),
   completeAppStorePurchaseIsPending: false,
   fetchQuery: vi.fn(),
@@ -94,13 +95,14 @@ vi.mock('@tanstack/react-query', () => ({
       mutateAsync: mockedReactQuery.completeAppStorePurchase,
     };
   },
-  useQuery: (options: { queryKey: unknown[] }) => {
+  useQuery: (options: { queryKey: unknown[]; staleTime?: number }) => {
     mockedReactQuery.useQuery();
     mockedReactQuery.lastQueryKey = options.queryKey;
     const isMobileStoreProducts = options.queryKey[0] === 'mobile-products';
     const isStoreProducts = options.queryKey[0] === 'kilo-pass';
     let data: unknown = undefined;
     if (isMobileStoreProducts) {
+      mockedReactQuery.backendProductsStaleTime = options.staleTime;
       data = mockedReactQuery.mobileStoreProductsData;
     } else if (isStoreProducts) {
       data = mockedReactQuery.storeProductsData;
@@ -152,7 +154,10 @@ vi.mock('@/lib/trpc', () => ({
         completeAppStorePurchase: { mutationOptions: () => ({}) },
         completePlayPurchase: { mutationOptions: () => ({}) },
         getCreditHistory: { pathFilter: () => ({ queryKey: ['credit-history'] }) },
-        getMobileStoreProducts: { queryOptions: () => ({ queryKey: ['mobile-products'] }) },
+        getMobileStoreProducts: {
+          pathFilter: () => ({ queryKey: ['mobile-products'] }),
+          queryOptions: () => ({ queryKey: ['mobile-products'] }),
+        },
         getPurchasePresentation: { pathFilter: () => ({ queryKey: ['purchase-presentation'] }) },
         getState: { pathFilter: () => ({ queryKey: ['state'] }) },
       },
@@ -382,6 +387,7 @@ beforeEach(() => {
   mockedIap.handlers = null;
   mockedIap.requestPurchase.mockResolvedValue(null);
   mockedIap.restorePurchases.mockResolvedValue(undefined);
+  mockedReactQuery.backendProductsStaleTime = undefined;
   mockedReactQuery.completeAppStorePurchase.mockResolvedValue({ alreadyProcessed: false });
   mockedReactQuery.completeAppStorePurchaseIsPending = false;
   mockedReactQuery.fetchQuery.mockResolvedValue({
@@ -1323,14 +1329,34 @@ describe('KiloPassNativeIapOwner', () => {
     expect(mockedReactQuery.lastQueryKey).toEqual(['kilo-pass', 'app-store-products', 'user-42']);
   });
 
-  it('clears the product cache when the auth epoch changes', () => {
-    mockedAuth.authEpoch = 7;
+  it('keeps the product cache on the first mount so a re-entered screen hits it', () => {
     const owner = renderKiloPassNativeIapOwner();
 
     owner.render();
 
+    expect(mockedReactQuery.removeQueries).not.toHaveBeenCalled();
+  });
+
+  it('holds the backend product catalog for the store cache window so a re-entry does not refetch it', () => {
+    const owner = renderKiloPassNativeIapOwner();
+
+    owner.render();
+
+    expect(mockedReactQuery.backendProductsStaleTime).toBe(5 * 60 * 1000);
+  });
+
+  it('clears the product cache when the auth epoch changes', () => {
+    const owner = renderKiloPassNativeIapOwner();
+    owner.render();
+
+    mockedAuth.authEpoch = 7;
+    owner.render();
+
     expect(mockedReactQuery.removeQueries).toHaveBeenCalledWith({
       queryKey: ['kilo-pass', 'app-store-products'],
+    });
+    expect(mockedReactQuery.removeQueries).toHaveBeenCalledWith({
+      queryKey: ['mobile-products'],
     });
   });
 
@@ -1432,6 +1458,28 @@ describe('KiloPassNativeIapOwner', () => {
       purchase: unresolvedTierPurchase,
       isConsumable: false,
     });
+  });
+
+  // The owner mounts for every presentation variant, including web_management
+  // and unavailable, where KiloPassNativeIapContent (the inline error surface)
+  // is not rendered. Recovery is the only error path that can run there, and it
+  // must stay silent rather than pop a bare toast behind a screen with no
+  // purchase UI.
+  it('keeps a recovery failure silent while no inline error surface is mounted', async () => {
+    mockedIap.availablePurchases = [createPurchase()];
+    mockedReactQuery.mobileStoreProductsData = {
+      products: [{ appleProductId: product.appleProductId }],
+    };
+    mockedReactQuery.completeAppStorePurchase.mockRejectedValue({
+      message: 'Server rejected the completion',
+    });
+    const owner = renderKiloPassNativeIapOwner();
+
+    owner.render();
+    await flushPromises();
+
+    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledTimes(1);
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it('restores an owned purchase for a tier the store could not resolve', async () => {
